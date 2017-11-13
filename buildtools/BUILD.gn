@@ -66,6 +66,13 @@ source_set("gtest_main") {
   ]
 }
 
+source_set("gtest_prod") {
+  all_dependent_configs = [ ":googletest_prod_config" ]
+  public = [
+    "googletest/googletest/include/gtest/gtest_prod.h",
+  ]
+}
+
 source_set("gmock") {
   testonly = true
   include_dirs = [ "googletest/googlemock" ]

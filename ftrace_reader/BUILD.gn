@@ -58,6 +58,7 @@ source_set("ftrace_reader") {
   all_dependent_configs = [ ":ftrace_reader_config" ]
   deps += [
     "//base",
+    "//buildtools:gtest_prod",
     "//protozero",
   ]
   public_deps = [
