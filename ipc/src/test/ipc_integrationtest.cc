@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include "ipc/src/client_impl.h"
-
 #include "base/test/test_task_runner.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

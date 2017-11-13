@@ -16,7 +16,6 @@
 
 #include "ipc/src/protoc_plugin/ipc_generator.h"
 
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -39,7 +38,6 @@ using google::protobuf::io::Printer;
 using google::protobuf::io::ZeroCopyOutputStream;
 
 using google::protobuf::Split;
-using google::protobuf::StripPrefixString;
 using google::protobuf::StripString;
 using google::protobuf::StripSuffixString;
 using google::protobuf::UpperString;
@@ -64,7 +62,7 @@ class $c$ : public ::perfetto::ipc::Service {
   // Methods from the .proto file
 )";
 
-static const char kHeaderProxylass[] = R"(
+static const char kHeaderProxyClass[] = R"(
 class $c$Proxy : public ::perfetto::ipc::ServiceProxy {
  public:
    explicit $c$Proxy(::perfetto::ipc::ServiceProxy::EventListener*);
@@ -161,7 +159,7 @@ void GenerateServiceHeader(const FileDescriptor& file,
   printer->Print("};\n\n");
 
   // Generate the client-side declarations.
-  printer->Print(kHeaderProxylass, "c", svc.name());
+  printer->Print(kHeaderProxyClass, "c", svc.name());
   types_seen.clear();
   ForEachMethod(svc, [&types_seen, printer](const MethodDescriptor& method,
                                             const std::string& input_type,
