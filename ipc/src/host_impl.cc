@@ -61,7 +61,7 @@ bool HostImpl::ExposeService(std::unique_ptr<Service> service) {
     return false;
   }
   ServiceID sid = ++last_service_id_;
-  ExposedService exposed_service{sid, service_name, std::move(service)};
+  ExposedService exposed_service(sid, service_name, std::move(service));
   services_.emplace(sid, std::move(exposed_service));
   return true;
 }
