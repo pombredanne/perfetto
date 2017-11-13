@@ -34,7 +34,7 @@ using DeferredGreeterReply = ::perfetto::ipc::Deferred<GreeterReplyMsg>;
 
 class Greeter : public ::perfetto::ipc::Service {
  public:
-  virtual ~Greeter();
+  ~Greeter() override;
 
   virtual void SayHello(const GreeterRequestMsg&, DeferredGreeterReply) = 0;
   virtual void WaveGoodbye(const GreeterRequestMsg&, DeferredGreeterReply) = 0;
