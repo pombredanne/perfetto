@@ -56,7 +56,7 @@ executable("ipc_unittests") {
     "src/buffered_frame_deserializer_unittest.cc",
     "src/client_impl_unittest.cc",
     "src/deferred_unittest.cc",
-    "src/test/integration_test.cc",
+    "src/test/ipc_integrationtest.cc",
     "src/unix_socket_unittest.cc",
   ]
 }

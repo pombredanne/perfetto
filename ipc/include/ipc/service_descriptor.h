@@ -50,7 +50,7 @@ class ServiceDescriptor {
     // Function pointer to decoded the reply argument of the method.
     DecoderFunc reply_proto_decoder;
 
-    // Function pointer that dispatch the generic request to the corresponding
+    // Function pointer that dispatches the generic request to the corresponding
     // method implementation.
     using InvokerFunc = void (*)(Service*,
                                  const ProtoMessage& /* request_args */,
