@@ -61,8 +61,7 @@ FtraceCpuReader::FtraceCpuReader(const FtraceToProtoTranslationTable* table,
                                  base::ScopedFile fd)
     : table_(table), cpu_(cpu), fd_(std::move(fd)) {}
 
-bool FtraceCpuReader::Read(const Config& config,
-                           pbzero::FtraceEventBundle* bundle) {
+bool FtraceCpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
   if (!fd_)
     return false;
 
