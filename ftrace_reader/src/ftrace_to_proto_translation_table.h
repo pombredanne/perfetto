@@ -59,15 +59,9 @@ class FtraceToProtoTranslationTable {
       std::string path_to_event_dir);
   ~FtraceToProtoTranslationTable();
 
-  // TODO(hjd): Move to private once gtest-prod works.
-  template <typename T>
-  static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
-    if (*ptr + sizeof(T) > end)
-      return false;
-    memcpy(out, *ptr, sizeof(T));
-    *ptr += sizeof(T);
-    return true;
-  }
+  // A map from the ftrace event id to the matching event.
+  const std::map<size_t, Event>& events() const { return events_; }
+  const std::vector<Field>& common_fields() const { return common_fields_; }
 
  private:
   FtraceToProtoTranslationTable(std::map<size_t, Event> events,
