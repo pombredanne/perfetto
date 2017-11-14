@@ -52,7 +52,7 @@ class $c$ : public ::perfetto::ipc::Service {
   static ::perfetto::ipc::ServiceDescriptor* NewDescriptor();
 
  public:
-  ~$c$() override;
+  virtual ~$c$();
 
   static const ::perfetto::ipc::ServiceDescriptor& GetDescriptorStatic();
 
@@ -75,7 +75,7 @@ class $c$Proxy : public ::perfetto::ipc::ServiceProxy {
 )";
 
 static const char kCppClassDefinitions[] = R"(
-const ::perfetto::ipc::ServiceDescriptor& Greeter::GetDescriptorStatic() {
+const ::perfetto::ipc::ServiceDescriptor& $c$::GetDescriptorStatic() {
   static auto* instance = NewDescriptor();
   return *instance;
 }
@@ -83,7 +83,7 @@ const ::perfetto::ipc::ServiceDescriptor& Greeter::GetDescriptorStatic() {
 // Host-side definitions.
 $c$::~$c$() = default;
 
-const ::perfetto::ipc::ServiceDescriptor& Greeter::GetDescriptor() {
+const ::perfetto::ipc::ServiceDescriptor& $c$::GetDescriptor() {
   return GetDescriptorStatic();
 }
 
@@ -192,7 +192,7 @@ void GenerateServiceCpp(const FileDescriptor& file,
   printer->Print("::perfetto::ipc::ServiceDescriptor* $c$::NewDescriptor() {\n",
                  "c", svc.name());
   printer->Print("  auto* desc = new ::perfetto::ipc::ServiceDescriptor();\n");
-  printer->Print("  desc->service_name = \"Greeter\";\n");
+  printer->Print("  desc->service_name = \"$c$\";\n", "c", svc.name());
 
   ForEachMethod(svc, [&svc, printer](const MethodDescriptor& method,
                                      const std::string& input_type,

@@ -39,7 +39,7 @@ constexpr char kSockName[] = "/tmp/perfetto_ipc_test.sock";
 
 class MockEventListener : public ServiceProxy::EventListener {
  public:
-  MOCK_METHOD1(OnConnect, void(bool));
+  MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
 };
 
@@ -77,8 +77,7 @@ TEST_F(IPCIntegrationTest, SayHelloWaveGoodbye) {
   ASSERT_TRUE(host->ExposeService(std::unique_ptr<Service>(svc)));
 
   auto on_connect = task_runner_.CreateCheckpoint("on_connect");
-  EXPECT_CALL(svc_proxy_events_, OnConnect(true))
-      .WillOnce(Invoke([on_connect](bool) { on_connect(); }));
+  EXPECT_CALL(svc_proxy_events_, OnConnect()).WillOnce(Invoke(on_connect));
   std::unique_ptr<Client> cli =
       Client::CreateInstance(kSockName, &task_runner_);
   std::unique_ptr<GreeterProxy> svc_proxy(new GreeterProxy(&svc_proxy_events_));
