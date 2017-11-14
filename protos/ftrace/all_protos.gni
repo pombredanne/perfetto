@@ -1,0 +1,8 @@
+# TODO(hjd): Auto-generate.
+
+all_protos = [
+  "ftrace_event_bundle.proto",
+  "print.proto",
+  "sched_switch.proto",
+  "ftrace_event.proto",
+]
