@@ -52,7 +52,7 @@ class $c$ : public ::perfetto::ipc::Service {
   static ::perfetto::ipc::ServiceDescriptor* NewDescriptor();
 
  public:
-  virtual ~$c$();
+  ~$c$() override;
 
   static const ::perfetto::ipc::ServiceDescriptor& GetDescriptorStatic();
 
