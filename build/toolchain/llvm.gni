@@ -15,13 +15,13 @@
 import("//build/sanitizers/vars.gni")
 
 declare_args() {
-  is_hermetic_clang = (is_linux || is_android) && is_clang && using_sanitizer
+  is_hermetic_clang = is_clang && is_linux_host && using_sanitizer
 }
 
 assert(!is_hermetic_clang || is_clang, "is_hermetic_clang requires is_clang")
 
 declare_args() {
-  if (is_linux || is_android) {
+  if (is_linux_host) {
     if (is_hermetic_clang) {
       _hermetic_llvm_dir = rebase_path("//buildtools/clang", root_build_dir)
       linux_llvm_dir = "$_hermetic_llvm_dir/lib/clang/6.0.0/"
