@@ -19,7 +19,6 @@ action_foreach("generate_full_protos") {
   visibility = [ ":*" ]
   script = "//build/generate_full_protos.py"
   sources = all_protos
-  print(sources)
 
   output_directory = "$target_gen_dir" + "_full_protos"
   outputs = [
@@ -48,6 +47,7 @@ proto_library("ftrace_full") {
 }
 
 protozero_library("ftrace") {
+  generate_cc = false
   sources = all_protos
   proto_in_dir = "."
 }
