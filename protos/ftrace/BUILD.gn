@@ -21,5 +21,4 @@ protozero_library("ftrace") {
     "print.proto",
     "sched_switch.proto",
   ]
-  proto_in_dir = "."
 }

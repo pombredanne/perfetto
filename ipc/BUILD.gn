@@ -66,7 +66,6 @@ proto_library("wire_protocol") {
     "src/wire_protocol.proto",
   ]
   include_dirs = [ "include" ]
-  proto_in_dir = "src/"
 }
 
 proto_library("test_messages") {
@@ -76,5 +75,4 @@ proto_library("test_messages") {
     "src/test/greeter_service.proto",
   ]
   include_dirs = [ "include" ]
-  proto_in_dir = "src/test"
 }
