@@ -244,7 +244,7 @@ TEST_F(ClientImplTest, BindAndInvokeMethod) {
         on_invalid_invoke();
       });
   RequestProto empty_req;
-  proxy->BeginInvoke("InvaidMethod", empty_req, std::move(deferred_reply2));
+  proxy->BeginInvoke("InvalidMethod", empty_req, std::move(deferred_reply2));
   task_runner_->RunUntilCheckpoint("on_invalid_invoke");
 }
 

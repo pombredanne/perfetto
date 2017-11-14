@@ -45,7 +45,7 @@ class ServiceProxy {
     virtual ~EventListener() = default;
 
     // Called once after Client::BindService() if the ServiceProxy has been
-    // succesffully bound to the host. It is possible to start sending IPC
+    // successfully bound to the host. It is possible to start sending IPC
     // requests soon after this.
     virtual void OnConnect() {}
 
