@@ -55,10 +55,12 @@ executable("ftrace_reader_demo") {
 }
 
 source_set("ftrace_reader") {
-  all_dependent_configs = [ ":ftrace_reader_config" ]
+  all_dependent_configs = [
+    ":ftrace_reader_config",
+    "//buildtools:googletest_prod_config",
+  ]
   deps += [
     "//base",
-    "//buildtools:gtest_prod",
     "//protozero",
   ]
   public_deps = [
