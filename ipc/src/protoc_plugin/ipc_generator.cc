@@ -16,6 +16,7 @@
 
 #include "ipc/src/protoc_plugin/ipc_generator.h"
 
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
