@@ -34,9 +34,7 @@ constexpr int kFileDescriptorWatchTimeoutMs = 10;
 
 TestTaskRunner::TestTaskRunner() = default;
 
-TestTaskRunner::~TestTaskRunner() {
-  PERFETTO_DCHECK(task_queue_.empty());
-}
+TestTaskRunner::~TestTaskRunner() = default;
 
 void TestTaskRunner::Run() {
   for (;;)
