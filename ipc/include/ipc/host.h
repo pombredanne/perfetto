@@ -31,6 +31,10 @@ namespace ipc {
 
 class Service;
 
+// The host-side of the IPC layer. This class acts as a registry and request
+// dispatcher. It listen on the UnixSocket |socket_name| for incoming requests
+// (coming Client instances) and dispatches their requests to the various
+// Services exposed.
 class Host {
  public:
   // Creates an instance and starts listening on the given |socket_name|.
@@ -40,8 +44,9 @@ class Host {
   virtual ~Host() = default;
 
   // Registers a new service and makes it available to remote IPC peers.
-  // The service will be destroyed when destroying the Host instance in case of
-  // success, or immediately after the call in case of failure.
+  // All the exposed Service instances will be destroyed when destroying the
+  // Host instance if ExposeService suceeds and returns true, or immediately
+  // after the call in case of failure.
   // Returns true if the register has been succesfully registered, false in case
   // of errors (e.g., another service with the same name is already registered).
   virtual bool ExposeService(std::unique_ptr<Service>) = 0;
