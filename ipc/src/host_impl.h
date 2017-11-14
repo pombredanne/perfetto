@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "base/task_runner.h"
+#include "base/thread_checker.h"
 #include "ipc/deferred.h"
 #include "ipc/host.h"
 #include "ipc/src/buffered_frame_deserializer.h"
@@ -80,7 +81,6 @@ class HostImpl : public Host, public UnixSocket::EventListener {
 
   static void SendFrame(ClientConnection*, const Frame&);
 
-  const char* const socket_name_;
   base::TaskRunner* const task_runner_;
   base::WeakPtrFactory<HostImpl> weak_ptr_factory_;
   std::map<ServiceID, ExposedService> services_;
@@ -89,6 +89,7 @@ class HostImpl : public Host, public UnixSocket::EventListener {
   std::map<UnixSocket*, ClientConnection*> clients_by_socket_;
   ServiceID last_service_id_ = 0;
   ClientID last_client_id_ = 0;
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 }  // namespace ipc

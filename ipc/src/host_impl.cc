@@ -28,9 +28,7 @@
 
 #include "wire_protocol.pb.h"
 
-// TODO(primiano): Add ThreadChecker everywhere.
-// TODO(primiano): put a limit on #connections per peer uid (NOT pid).
-// TODO(primiano): put a limit on unreplied requests per client.
+// TODO(primiano): put limits on #connections/uid and req. queue (b/69093705).
 
 namespace perfetto {
 namespace ipc {
@@ -45,16 +43,16 @@ std::unique_ptr<Host> Host::CreateInstance(const char* socket_name,
 }
 
 HostImpl::HostImpl(const char* socket_name, base::TaskRunner* task_runner)
-    : socket_name_(socket_name),
-      task_runner_(task_runner),
-      weak_ptr_factory_(this) {
+    : task_runner_(task_runner), weak_ptr_factory_(this) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   sock_ = UnixSocket::Listen(socket_name, this, task_runner_);
 }
 
 HostImpl::~HostImpl() = default;
 
 bool HostImpl::ExposeService(std::unique_ptr<Service> service) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   const std::string& service_name = service->GetDescriptor().service_name;
   if (GetServiceByName(service_name)) {
     PERFETTO_DLOG("Duplicate ExposeService(): %s", service_name.c_str());
@@ -68,16 +66,17 @@ bool HostImpl::ExposeService(std::unique_ptr<Service> service) {
 
 void HostImpl::OnNewIncomingConnection(UnixSocket*,
                                        std::unique_ptr<UnixSocket> new_conn) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   std::unique_ptr<ClientConnection> client(new ClientConnection());
   ClientID client_id = ++last_client_id_;
   clients_by_socket_[new_conn.get()] = client.get();
   client->id = client_id;
   client->sock = std::move(new_conn);
   clients_[client_id] = std::move(client);
-  PERFETTO_DLOG("[host_impl.cc] New client %" PRIu64, client_id);
 }
 
 void HostImpl::OnDataAvailable(UnixSocket* sock) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it = clients_by_socket_.find(sock);
   if (it == clients_by_socket_.end())
     return;
@@ -142,6 +141,7 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
   Frame reply_frame;
   RequestID request_id = req_frame.request_id();
   reply_frame.set_request_id(request_id);
+  reply_frame.mutable_msg_invoke_method_reply()->set_success(false);
   auto svc_it = services_.find(req.service_id());
   if (svc_it == services_.end())
     return SendFrame(client, reply_frame);  // |success| == false by default.
@@ -203,10 +203,11 @@ void HostImpl::SendFrame(ClientConnection* client, const Frame& frame) {
   // socket buffer is full? Maybe we just want to drop this on the floor? Or
   // maybe throttle the send and PostTask the reply later?
   bool res = client->sock->Send(buf.data(), buf.size());
-  PERFETTO_CHECK(res);
+  PERFETTO_CHECK(!client->sock->is_connected() || res);
 }
 
 void HostImpl::OnDisconnect(UnixSocket* sock) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it = clients_by_socket_.find(sock);
   if (it == clients_by_socket_.end())
     return;
