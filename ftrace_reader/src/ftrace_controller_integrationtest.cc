@@ -56,11 +56,11 @@ TEST(FtraceController, TraceMarker) {
 
 TEST(FtraceController, EnableDisableEvent) {
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create();
-  ftrace->EnableEvent("sched/sched_switch");
+  ftrace->EnableEvent("sched", "sched_switch");
   sleep(1);
   EXPECT_THAT(GetTraceOutput(), HasSubstr("sched_switch"));
 
-  ftrace->DisableEvent("sched/sched_switch");
+  ftrace->DisableEvent("sched", "sched_switch");
   ftrace->ClearTrace();
   sleep(1);
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("sched_switch")));

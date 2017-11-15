@@ -102,13 +102,15 @@ int main(int argc, const char** argv) {
   ftrace->ClearTrace();
   ftrace->WriteTraceMarker("Hello, world!");
 
+  perfetto::FtraceConfig config;
   for (int i = 1; i < argc; i++) {
-    printf("Enabling: %s\n", argv[i]);
-    ftrace->EnableEvent(argv[i]);
+    config.AddEvent(argv[i]);
   }
+  std::unique_ptr<perfetto::FtraceSink> sink =
+      ftrace->CreateSink(std::move(config), nullptr);
 
   // Sleep for one second so we get some events
-  sleep(1);
+  sleep(10);
 
   ScatteredBuffer buffer(4096);
   protozero::ScatteredStreamWriter stream_writer(&buffer);
@@ -116,11 +118,6 @@ int main(int argc, const char** argv) {
   message.Reset(&stream_writer);
   perfetto::FtraceCpuReader* reader = ftrace->GetCpuReader(0);
   reader->Read(perfetto::FtraceCpuReader::Config(), &message);
-
-  for (int i = 1; i < argc; i++) {
-    printf("Disable: %s\n", argv[i]);
-    ftrace->DisableEvent(argv[i]);
-  }
 
   return 0;
 }

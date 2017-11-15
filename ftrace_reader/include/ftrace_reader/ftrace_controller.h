@@ -21,18 +21,57 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "base/weak_ptr.h"
+#include "ftrace_event_bundle.pbzero.h"
 #include "ftrace_reader/ftrace_cpu_reader.h"
 
 namespace perfetto {
+
+class FtraceController;
+
+class FtraceConfig {
+ public:
+  FtraceConfig();
+  ~FtraceConfig();
+
+  void AddEvent(const std::string&);
+
+  // TODO(hjd): Make private.
+  const std::set<std::string>& events() { return events_; }
+
+ private:
+  std::set<std::string> events_;
+};
+
+class FtraceSink {
+ public:
+  class Delegate {
+   public:
+    virtual pbzero::FtraceEventBundle* GetBundleForCpu(int) = 0;
+    virtual ~Delegate();
+  };
+
+  // TODO(hjd): Make private.
+  const std::set<std::string>& enabled_events() { return config_.events(); }
+  FtraceSink(base::WeakPtr<FtraceController>, FtraceConfig);
+  ~FtraceSink();
+
+ private:
+  base::WeakPtr<FtraceController> controller_weak_;
+  FtraceConfig config_;
+};
 
 // Utility class for controling ftrace.
 class FtraceController {
  public:
   static std::unique_ptr<FtraceController> Create();
   ~FtraceController();
+
+  std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
 
   // Clears the trace buffers for all CPUs. Blocks until this is done.
   void ClearTrace();
@@ -51,12 +90,6 @@ class FtraceController {
   // point.
   bool IsTracingEnabled();
 
-  // Enable the event |name|.
-  bool EnableEvent(const std::string& name);
-
-  // Disable the event |name|.
-  bool DisableEvent(const std::string& name);
-
   // Returns a cached FtraceCpuReader for |cpu|.
   // FtraceCpuReaders are constructed lazily.
   FtraceCpuReader* GetCpuReader(size_t cpu);
@@ -65,13 +98,31 @@ class FtraceController {
   // This will match the number of tracing/per_cpu/cpuXX directories.
   size_t NumberOfCpus() const;
 
+  // TODO(hjd): Make private.
+  // Enable the event |name|.
+  bool EnableEvent(const std::string& group, const std::string& name);
+
+  // TODO(hjd): Make private.
+  // Disable the event |name|.
+  bool DisableEvent(const std::string& group, const std::string& name);
+
  private:
+  friend FtraceSink;
+
   FtraceController(std::unique_ptr<FtraceToProtoTranslationTable>);
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
+  void Register(FtraceSink*);
+  void Unregister(FtraceSink*);
+  void RegisterForEvent(const std::string& event_name);
+  void UnregisterForEvent(const std::string& event_name);
+
+  base::WeakPtrFactory<FtraceController> weak_factory_;
+  std::vector<size_t> enabled_count_;
   std::unique_ptr<FtraceToProtoTranslationTable> table_;
   std::map<size_t, FtraceCpuReader> readers_;
+  std::set<FtraceSink*> sinks_;
 };
 
 }  // namespace perfetto
