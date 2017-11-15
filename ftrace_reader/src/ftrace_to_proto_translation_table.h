@@ -92,9 +92,9 @@ class FtraceToProtoTranslationTable {
   FtraceToProtoTranslationTable& operator=(
       const FtraceToProtoTranslationTable&) = delete;
 
+  const std::vector<Event> events_;
   size_t largest_id_;
-  std::vector<Event> events_;
-  std::map<std::string, Event*> name_to_event_;
+  std::map<std::string, const Event*> name_to_event_;
   std::vector<Field> common_fields_;
 };
 

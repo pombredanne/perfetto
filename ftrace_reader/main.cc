@@ -43,6 +43,12 @@ std::string ToHex(const void* data, size_t length) {
 
 }  // namespace
 
+class FakeTaskRunner : public perfetto::base::TaskRunner {
+  virtual void PostTask(std::function<void()>) {}
+  virtual void AddFileDescriptorWatch(int fd, std::function<void()>) {}
+  virtual void RemoveFileDescriptorWatch(int fd) {}
+};
+
 class ScatteredBuffer : public protozero::ScatteredStreamWriter::Delegate {
  public:
   explicit ScatteredBuffer(size_t chunk_size);
@@ -97,7 +103,8 @@ std::string ScatteredBuffer::GetBytesAsString(size_t start, size_t length) {
 }
 
 int main(int argc, const char** argv) {
-  auto ftrace = perfetto::FtraceController::Create();
+  FakeTaskRunner runner;
+  auto ftrace = perfetto::FtraceController::Create(&runner);
 
   ftrace->ClearTrace();
   ftrace->WriteTraceMarker("Hello, world!");

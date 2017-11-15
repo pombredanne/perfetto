@@ -25,9 +25,12 @@
 #include <string>
 #include <vector>
 
+#include "base/task_runner.h"
 #include "base/weak_ptr.h"
-#include "ftrace_event_bundle.pbzero.h"
 #include "ftrace_reader/ftrace_cpu_reader.h"
+#include "protozero/protozero_message_handle.h"
+
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 
@@ -40,18 +43,25 @@ class FtraceConfig {
 
   void AddEvent(const std::string&);
 
-  // TODO(hjd): Make private.
-  const std::set<std::string>& events() { return events_; }
+  const std::set<std::string>& events() const { return events_; }
 
  private:
   std::set<std::string> events_;
 };
 
+// To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
+// to create a |FtraceSink|. While the FtraceSink lives FtraceController will
+// call |GetBundleForCpu|, write data into the bundle then call
+// |OnBundleComplete| allowing the client to perform finalization.
 class FtraceSink {
  public:
   class Delegate {
    public:
-    virtual pbzero::FtraceEventBundle* GetBundleForCpu(int) = 0;
+    virtual protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>
+        GetBundleForCpu(size_t) = 0;
+    virtual void OnBundleComplete(
+        int,
+        protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>) = 0;
     virtual ~Delegate();
   };
 
@@ -65,10 +75,10 @@ class FtraceSink {
   FtraceConfig config_;
 };
 
-// Utility class for controling ftrace.
+// Utility class for controlling ftrace.
 class FtraceController {
  public:
-  static std::unique_ptr<FtraceController> Create();
+  static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
   ~FtraceController();
 
   std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
@@ -98,18 +108,12 @@ class FtraceController {
   // This will match the number of tracing/per_cpu/cpuXX directories.
   size_t NumberOfCpus() const;
 
-  // TODO(hjd): Make private.
-  // Enable the event |name|.
-  bool EnableEvent(const std::string& group, const std::string& name);
-
-  // TODO(hjd): Make private.
-  // Disable the event |name|.
-  bool DisableEvent(const std::string& group, const std::string& name);
-
  private:
   friend FtraceSink;
+  FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
-  FtraceController(std::unique_ptr<FtraceToProtoTranslationTable>);
+  FtraceController(base::TaskRunner* runner,
+                   std::unique_ptr<FtraceToProtoTranslationTable>);
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
@@ -118,11 +122,18 @@ class FtraceController {
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
 
+  // Enable the event under with the given |group| and |name|.
+  bool EnableEvent(const std::string& group, const std::string& name);
+  // Disable the event under with the given |group| and |name|.
+  bool DisableEvent(const std::string& group, const std::string& name);
+
+  base::TaskRunner* task_runner_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;
   std::unique_ptr<FtraceToProtoTranslationTable> table_;
   std::map<size_t, FtraceCpuReader> readers_;
   std::set<FtraceSink*> sinks_;
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 }  // namespace perfetto

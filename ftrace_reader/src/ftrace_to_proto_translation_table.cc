@@ -45,6 +45,22 @@ std::string ReadFileIntoString(std::string path) {
   return str;
 }
 
+using Event = FtraceToProtoTranslationTable::Event;
+const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
+  size_t largest_id = 0;
+  for (const Event& event : events) {
+    if (event.ftrace_event_id > largest_id)
+      largest_id = event.ftrace_event_id;
+  }
+  std::vector<FtraceToProtoTranslationTable::Event> events_by_id;
+  events_by_id.resize(largest_id + 1);
+  for (const Event& event : events) {
+    events_by_id[event.ftrace_event_id] = event;
+  }
+  events_by_id.shrink_to_fit();
+  return events_by_id;
+}
+
 }  // namespace
 
 // static
@@ -109,15 +125,10 @@ FtraceToProtoTranslationTable::Create(std::string path_to_root) {
 FtraceToProtoTranslationTable::FtraceToProtoTranslationTable(
     const std::vector<Event>& events,
     std::vector<Field> common_fields)
-    : events_(), common_fields_(std::move(common_fields)) {
-  largest_id_ = 0;
+    : events_(BuildEventsVector(events)),
+      largest_id_(events_.size() - 1),
+      common_fields_(std::move(common_fields)) {
   for (const Event& event : events) {
-    if (event.ftrace_event_id > largest_id_)
-      largest_id_ = event.ftrace_event_id;
-  }
-  events_.resize(largest_id_ + 1, {});
-  for (Event event : events) {
-    events_[event.ftrace_event_id] = event;
     name_to_event_[event.name] = &events_.at(event.ftrace_event_id);
   }
 }
