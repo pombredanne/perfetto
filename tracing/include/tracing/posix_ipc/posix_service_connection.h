@@ -26,7 +26,6 @@ namespace perfetto {
 
 class Producer;
 class ServiceProxyForProducer;
-class TaskRunner;
 
 // Allows to connect to an existing service through a UNIX domain socket.
 // Exposed to:
@@ -41,9 +40,9 @@ class PosixServiceConnection {
   // or nullptr if the service is unreachable.
   using ConnectAsProducerCallback =
       std::function<void(std::unique_ptr<Service::ProducerEndpoint>)>;
-  static void ConnectAsProducer(const std::string& service_socket_name,
+  static void ConnectAsProducer(const char* service_socket_name,
                                 Producer*,
-                                TaskRunner*,
+                                base::TaskRunner*,
                                 ConnectAsProducerCallback);
 
   // Not implemented yet.

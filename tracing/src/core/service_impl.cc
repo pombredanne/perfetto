@@ -96,10 +96,6 @@ ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
   service_->DisconnectProducer(id_);
 }
 
-ProducerID ServiceImpl::ProducerEndpointImpl::GetID() const {
-  return id_;
-}
-
 void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
     const DataSourceDescriptor&,
     RegisterDataSourceCallback callback) {

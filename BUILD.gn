@@ -36,6 +36,7 @@ group("tests") {
     "//protozero:protozero_unittests",
     "//tools/sanitizers_unittests",
     "//tracing:tracing_benchmarks",
+    "//tracing:tracing_test",
     "//tracing:tracing_unittests",
   ]
 }

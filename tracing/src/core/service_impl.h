@@ -67,7 +67,6 @@ class ServiceImpl : public Service {
     SharedMemory* shared_memory() const { return shared_memory_.get(); }
 
     // Service::ProducerEndpoint implementation.
-    ProducerID GetID() const override;
     void RegisterDataSource(const DataSourceDescriptor&,
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;

@@ -19,14 +19,21 @@
 
 #include <stdint.h>
 
+#include <functional>
 #include <vector>
 
+#include "ipc/service_proxy.h"
 #include "tracing/core/basic_types.h"
 #include "tracing/core/service.h"
+#include "tracing/src/posix_ipc/tracing_service_producer_port.ipc.h"
 
 namespace perfetto {
-class Producer;
+
+namespace base {
 class TaskRunner;
+}  // namespace base
+
+class Producer;
 class PosixSharedMemory;
 
 // Implements the Service::ProducerEndpoint exposed to Producer. Proxies the
@@ -34,10 +41,8 @@ class PosixSharedMemory;
 class PosixServiceProxyForProducer : public Service::ProducerEndpoint,
                                      public ipc::ServiceProxy::EventListener {
  public:
-  PosixServiceProxyForProducer(Producer*, TaskRunner*);
+  PosixServiceProxyForProducer(Producer*, base::TaskRunner*);
   ~PosixServiceProxyForProducer() override;
-
-  void Connect(const char* service_socket_name);
 
   // Service::ProducerEndpoint implementation.
   void RegisterDataSource(const DataSourceDescriptor&,
@@ -49,13 +54,23 @@ class PosixServiceProxyForProducer : public Service::ProducerEndpoint,
   void OnConnect() override;
   void OnDisconnect() override;
 
+  void set_on_connect(std::function<void(bool /*connected*/)> callback) {
+    on_connect_ = callback;
+  }
+
+  TracingServiceProducerPortProxy* ipc_endpoint() { return &ipc_endpoint_; }
+
  private:
+  void OnServiceRequest(const GetAsyncCommandResponse&);
+
   // TODO think to destruction order.
   Producer* const producer_;
-  TaskRunner* const task_runner_;
+  base::TaskRunner* const task_runner_;
+  TracingServiceProducerPortProxy ipc_endpoint_;
   RegisterDataSourceCallback pending_register_data_source_callback_;
   std::unique_ptr<PosixSharedMemory> shared_memory_;
-  TracingServiceProducerPortProxy* remote_service_ = nullptr;
+  std::function<void(bool /* connected */)> on_connect_;
+  bool connected_ = false;
 };
 
 }  // namespace perfetto

@@ -19,4 +19,6 @@ option optimize_for = LITE_RUNTIME;
 
 package perfetto.proto;
 
-message DataSourceConfig {}
+message DataSourceConfig {
+  string trace_category_filters = 1;  // TODO: temporary for tests.
+}

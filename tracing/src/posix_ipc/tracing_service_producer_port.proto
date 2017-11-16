@@ -82,8 +82,12 @@ message DrainSharedBufferResponse {}
 message GetAsyncCommandRequest {}
 
 message GetAsyncCommandResponse {
-  message StartDataSource { proto.DataSourceConfig config = 1; }
-  message StopDataSource {}
+  message StartDataSource {
+    uint64 new_instance_id = 1;
+    proto.DataSourceConfig config = 2;
+  }
+
+  message StopDataSource { uint64 instance_id = 1; }
 
   oneof cmd {
     StartDataSource start_data_source = 1;

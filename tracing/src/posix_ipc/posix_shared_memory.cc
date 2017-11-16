@@ -37,7 +37,8 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::Create(size_t size) {
   char path[64];
   sprintf(path, "/tmp/perfetto-shm-%d", getpid());
 
-  base::ScopedFile fd(open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR));
+  base::ScopedFile fd(
+      open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR));
   if (!fd)
     return nullptr;
   int res = unlink(path);
@@ -48,7 +49,8 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::Create(size_t size) {
 }
 
 // static
-std::unique_ptr<PosixSharedMemory> PosixSharedMemory::AttachToFd(base::ScopedFile fd) {
+std::unique_ptr<PosixSharedMemory> PosixSharedMemory::AttachToFd(
+    base::ScopedFile fd) {
   struct stat stat_buf = {};
   if (fstat(fd.get(), &stat_buf))
     return nullptr;
@@ -57,7 +59,8 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::AttachToFd(base::ScopedFil
 }
 
 // static
-std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd, size_t size) {
+std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd,
+                                                            size_t size) {
   PERFETTO_DCHECK(fd);
   PERFETTO_DCHECK(size > 0);
   void* start = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
@@ -67,7 +70,9 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd,
       new PosixSharedMemory(start, size, std::move(fd)));
 }
 
-PosixSharedMemory::PosixSharedMemory(void* start, size_t size, base::ScopedFile fd)
+PosixSharedMemory::PosixSharedMemory(void* start,
+                                     size_t size,
+                                     base::ScopedFile fd)
     : start_(start), size_(size), fd_(std::move(fd)) {}
 
 PosixSharedMemory::~PosixSharedMemory() {

@@ -58,9 +58,6 @@ class Service {
    public:
     virtual ~ProducerEndpoint() = default;
 
-    // The same ID that is passed the producer via Producer::OnConnect().
-    virtual ProducerID GetID() const = 0;
-
     // Called by the Producer to (un)register data sources. The Services returns
     // asynchronousy the ID for the data source.
     // TODO(primiano): thinking twice there is no reason why the service choses

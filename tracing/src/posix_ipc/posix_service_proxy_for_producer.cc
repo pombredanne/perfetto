@@ -17,78 +17,124 @@
 #include "tracing/src/posix_ipc/posix_service_proxy_for_producer.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include "base/task_runner.h"
-#include "ipc/client.h"
 #include "tracing/core/data_source_config.h"
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/producer.h"
 #include "tracing/src/posix_ipc/posix_shared_memory.h"
-#include "tracing/src/posix_ipc/tracing_service_producer_port.ipc.h"
 
 // TODO think to what happens when PosixServiceProxyForProducer gets destroyed
 // w.r.t. the Producer pointer. Also think to lifetime of the Producer* during
 // the callbacks.
 
 namespace perfetto {
-namespace {
-
-struct PerProcessIPCContext {
-  static PerProcessIPCContext& GetInstance();
-  TracingServiceProducerPortProxy* NewProducer(const char* service_socket_name);
-  void OnProducerDestroyed();
-
-  // Owns the IPC client socket.
-  std::unique_ptr<ipc::Client> ipc_client;
-
-  // The interface that allows to make IPC calls on the remote Service.
-  std::unique_ptr<TracingServiceProducerPortProxy> service_proxy;
-
-  int num_producers = 0;
-};
-
-// static
-PerProcessIPCContext& PerProcessIPCContext::GetInstance() {
-  PerProcessIPCContext* instance = new PerProcessIPCContext();
-  return *instance;
-}
-
-TracingServiceProducerPortProxy* PerProcessIPCContext::NewProducer(
-    const char* service_socket_name) {
-  if (num_producers++ > 0)
-    return;
-  PERFETTO_DCHECK(!ipc_client);
-  PERFETTO_DCHECK(!service_proxy);
-  ipc_client = ipc::Client::CreateInstance(service_socket_name);
-  service_proxy.reset(new TracingServiceProducerPortProxy());
-  ipc_client.BindService(service_proxy.GetWeakPtr());
-  return service_proxy.get();
-}
-
-void PerProcessIPCContext::OnProducerDestroyed() {
-  PERFETTO_DCHECK(PerProcessIPCContext > 0);
-  if (--num_producers > 0)
-    return;
-  service_proxy.reset();
-  ipc_client.reset();
-}
-
-}  // namespace.
 
 PosixServiceProxyForProducer::PosixServiceProxyForProducer(
     Producer* producer,
-    TaskRunner* task_runner)
-    : producer_(producer), task_runner_(task_runner), ipc_(this) {}
+    base::TaskRunner* task_runner)
+    : producer_(producer),
+      task_runner_(task_runner),
+      ipc_endpoint_(this /* event_listener */) {}
 
-PosixServiceProxyForProducer::~PosixServiceProxyForProducer() {
-  if (remote_service_)
-    OnProducerDestroyed();
+PosixServiceProxyForProducer::~PosixServiceProxyForProducer() = default;
+
+void PosixServiceProxyForProducer::OnConnect() {
+  connected_ = true;
+  if (on_connect_)
+    on_connect_(true);
+  on_connect_ = nullptr;
+
+  // Create the back channel to receive commands from the Service.
+  ipc::Deferred<GetAsyncCommandResponse> async;
+
+  // The IPC layer guarantees that the outstanding callback will be dropped on
+  // the floor if ipc_endpoint_ is destructed between the request and the reply.
+  // Binding |this| is hence safe w.r.t. callbacks queued after destruction.
+  async.Bind([this](ipc::AsyncResult<GetAsyncCommandResponse> resp) {
+    if (!resp)
+      return;  // The IPC channel was terminated and this was auto-rejected.
+    OnServiceRequest(*resp);
+  });
+  ipc_endpoint_.GetAsyncCommand(GetAsyncCommandRequest(), std::move(async));
 }
 
-void PosixServiceProxyForProducer::Connect(const char* service_socket_name) {
-  remote_service_ =
-      PerProcessIPCContext::GetInstance().NewProducer(service_socket_name);
-  PERFETTO_DCHECK(remote_service_);
+void PosixServiceProxyForProducer::OnDisconnect() {
+  PERFETTO_DLOG("Tracing service connection failure");
+  connected_ = false;
+  if (on_connect_)
+    on_connect_(false);
+  on_connect_ = nullptr;
+}
+
+void PosixServiceProxyForProducer::OnServiceRequest(
+    const GetAsyncCommandResponse& cmd) {
+  if (cmd.cmd_case() == GetAsyncCommandResponse::kStartDataSource) {
+    const auto& req = cmd.start_data_source();
+    const DataSourceInstanceID dsid = req.new_instance_id();
+    const proto::DataSourceConfig& proto_cfg = req.config();
+    DataSourceConfig cfg;
+    cfg.trace_category_filters = proto_cfg.trace_category_filters();
+    producer_->CreateDataSourceInstance(dsid, cfg);
+    return;
+  }
+
+  if (cmd.cmd_case() == GetAsyncCommandResponse::kStopDataSource) {
+    const DataSourceInstanceID dsid = cmd.stop_data_source().instance_id();
+    producer_->TearDownDataSourceInstance(dsid);
+    return;
+  }
+
+  PERFETTO_DLOG("Unknown async request %d received from tracing service",
+                cmd.cmd_case());
+}
+
+void PosixServiceProxyForProducer::RegisterDataSource(
+    const DataSourceDescriptor& descriptor,
+    RegisterDataSourceCallback callback) {
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot RegisterDataSource(), disconnected from the tracing service");
+    return task_runner_->PostTask(std::bind(callback, 0));
+  }
+  RegisterDataSourceRequest req;
+  auto* proto_descriptor = req.mutable_data_source_descriptor();
+  proto_descriptor->set_name(descriptor.name);
+  ipc::Deferred<RegisterDataSourceResponse> async_response;
+  async_response.Bind(
+      [callback](ipc::AsyncResult<RegisterDataSourceResponse> response) {
+        if (!response)
+          return callback(0);
+        callback(response->data_source_id());
+      });
+  ipc_endpoint_.RegisterDataSource(req, std::move(async_response));
+}
+
+void PosixServiceProxyForProducer::UnregisterDataSource(DataSourceID id) {
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot UnregisterDataSource(), disconnected from the tracing service");
+    return;
+  }
+  UnregisterDataSourceRequest req;
+  req.set_data_source_id(id);
+  ipc_endpoint_.UnregisterDataSource(
+      req, ipc::Deferred<UnregisterDataSourceResponse>());
+}
+
+void PosixServiceProxyForProducer::DrainSharedBuffer(
+    const std::vector<uint32_t>& changed_pages) {
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot UnregisterDataSource(), disconnected from the tracing service");
+    return;
+  }
+  DrainSharedBufferRequest req;
+  for (uint32_t changed_page : changed_pages)
+    req.add_changed_pages(changed_page);
+  ipc_endpoint_.DrainSharedBuffer(req,
+                                  ipc::Deferred<DrainSharedBufferResponse>());
 }
 
 }  // namespace perfetto

@@ -101,7 +101,9 @@ void PosixServiceProducerPort::OnDataSourceRegistered(
 }
 
 void PosixServiceProducerPort::OnClientDisconnected() {
-  producers_.erase(ipc::Service::client_info().client_id());
+  ipc::ClientID client_id = ipc::Service::client_info().client_id();
+  PERFETTO_DLOG("Client %" PRIu64 " disconnected", client_id);
+  producers_.erase(client_id);
 }
 
 // TODO: test what happens if we receive the following tasks, in order:

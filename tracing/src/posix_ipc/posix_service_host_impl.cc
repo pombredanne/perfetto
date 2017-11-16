@@ -21,6 +21,7 @@
 #include "ipc/host.h"
 #include "tracing/core/service.h"
 #include "tracing/src/posix_ipc/posix_service_producer_port.h"
+#include "tracing/src/posix_ipc/posix_shared_memory.h"
 
 namespace perfetto {
 
@@ -41,7 +42,8 @@ bool PosixServiceHostImpl::Start(const char* producer_socket_name) {
   PERFETTO_DCHECK(!svc_);  // Check if already started.
 
   // Create and initialize the platform-independent tracing business logic.
-  std::unique_ptr<SharedMemory::Factory> shm_factory;
+  std::unique_ptr<SharedMemory::Factory> shm_factory(
+      new PosixSharedMemory::Factory());
   // new PosixSharedMemory::Factory());
   svc_ = Service::CreateInstance(std::move(shm_factory), task_runner_);
 
