@@ -18,11 +18,21 @@ source_set("base") {
     "logging.h",
     "scoped_file.h",
     "task_runner.h",
+    "task_runner_posix.cc",
+    "task_runner_posix.h",
     "thread_checker.cc",
     "thread_checker.h",
     "utils.h",
     "weak_ptr.h",
   ]
+
+  if (target_os == "android") {
+    sources += [
+      "task_runner_android.cc",
+      "task_runner_android.h",
+    ]
+    libs = [ "android" ]
+  }
 }
 
 source_set("test_support") {
@@ -45,6 +55,7 @@ executable("base_unittests") {
   ]
   sources = [
     "scoped_file_unittest.cc",
+    "task_runner_posix_unittest.cc",
     "thread_checker_unittest.cc",
     "utils_unittest.cc",
     "weak_ptr_unittest.cc",
