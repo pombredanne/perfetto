@@ -87,6 +87,7 @@ void TaskRunnerAndroid::UpdatePollTasksLocked() {
       poll_tasks_.insert(std::make_pair(it.first, std::move(it.second)));
     }
   }
+  pending_poll_tasks_.clear();
 }
 
 void TaskRunnerAndroid::RunImmediateTask() {

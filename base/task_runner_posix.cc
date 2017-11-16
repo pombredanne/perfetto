@@ -120,6 +120,8 @@ void TaskRunnerPosix::UpdatePollTasksLocked() {
     poll_fds_.push_back({it.first, POLLIN, 0});
     poll_tasks_.push_back(std::move(it.second));
   }
+
+  pending_poll_tasks_.clear();
 }
 
 void TaskRunnerPosix::RunImmediateTask() {
