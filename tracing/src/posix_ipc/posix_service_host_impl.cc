@@ -26,8 +26,6 @@ namespace perfetto {
 
 // Implements the publicly exposed factory method declared in
 // include/tracing/posix_ipc/posix_service_host.h.
-
-// static
 std::unique_ptr<PosixServiceHost> PosixServiceHost::CreateInstance(
     base::TaskRunner* task_runner) {
   return std::unique_ptr<PosixServiceHost>(

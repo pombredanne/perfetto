@@ -36,18 +36,18 @@ class TaskRunner;
 class PosixServiceConnection {
  public:
   // Connects to the producer port of the Service listening on the given
-  // |service_socket_name|. Returns a ProducerEndpoint interface that allows to
-  // interact with the service if the connection is succesful, or nullptr if
-  // the service is unreachable.
-
-  // TODO should this be async?
-  static std::unique_ptr<Service::ProducerEndpoint> ConnectAsProducer(
-      const std::string& service_socket_name,
-      Producer*,
-      TaskRunner*);
+  // |service_socket_name|. Returns asynchronously a ProducerEndpoint interface
+  // that allows to interact with the service if the connection is succesful,
+  // or nullptr if the service is unreachable.
+  using ConnectAsProducerCallback =
+      std::function<void(std::unique_ptr<Service::ProducerEndpoint>)>;
+  static void ConnectAsProducer(const std::string& service_socket_name,
+                                Producer*,
+                                TaskRunner*,
+                                ConnectAsProducerCallback);
 
   // Not implemented yet.
-  // static std::unique_ptr<ServiceProxy> ConnectAsConsumer(Producer*);
+  // static void ConnectAsConsumer(...);
 
  private:
   PosixServiceConnection() = delete;

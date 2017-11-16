@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-#include "tracing/unix_rpc/unix_service_connection.h"
+#include "tracing/posix_ipc/posix_service_connection.h"
 
 #include "tracing/core/service.h"
-#include "tracing/src/unix_rpc/unix_service_proxy_for_producer.h"
+#include "tracing/src/posix_ipc/posix_service_proxy_for_producer.h"
+#include "tracing/src/posix_ipc/tracing_service_producer_port.ipc.h"
 
 namespace perfetto {
 
 // static
-std::unique_ptr<Service::ProducerEndpoint>
-UnixServiceConnection::ConnectAsProducer(const char* service_socket_name,
+PosixServiceConnection::ConnectAsProducer(const char* service_socket_name,
                                          Producer* producer,
-                                         TaskRunner* task_runner) {
-  std::unique_ptr<UnixServiceProxyForProducer> service_proxy(
-      new UnixServiceProxyForProducer(producer, task_runner));
+                                         TaskRunner* task_runner,
+                                         ConnectAsProducerCallback callback) {
+  std::unique_ptr<PosixServiceProxyForProducer> service_proxy(
+      new PosixServiceProxyForProducer(producer, task_runner));
   if (!service_proxy->Connect(service_socket_name))
     return nullptr;
   return std::move(service_proxy);

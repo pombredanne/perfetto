@@ -17,42 +17,45 @@
 #ifndef TRACING_SRC_POSIX_IPC_POSIX_SERVICE_PROXY_FOR_PRODUCER_H_
 #define TRACING_SRC_POSIX_IPC_POSIX_SERVICE_PROXY_FOR_PRODUCER_H_
 
+#include <stdint.h>
+
+#include <vector>
+
 #include "tracing/core/basic_types.h"
 #include "tracing/core/service.h"
-#include "tracing/src/unix_rpc/unix_socket.h"
 
 namespace perfetto {
-
 class Producer;
 class TaskRunner;
-class UnixSharedMemory;
+class PosixSharedMemory;
 
-// Implements the Service::ProducerEndpoint interface doing RPC over a UNIX
-// socket.
-class UnixServiceProxyForProducer : public Service::ProducerEndpoint {
+// Implements the Service::ProducerEndpoint exposed to Producer. Proxies the
+// requests to a remote Service onto an IPC channel.
+class PosixServiceProxyForProducer : public Service::ProducerEndpoint,
+                                     public ipc::ServiceProxy::EventListener {
  public:
-  UnixServiceProxyForProducer(Producer*, TaskRunner*);
-  ~UnixServiceProxyForProducer() override;
+  PosixServiceProxyForProducer(Producer*, TaskRunner*);
+  ~PosixServiceProxyForProducer() override;
 
-  bool Connect(const char* service_socket_name);
+  void Connect(const char* service_socket_name);
 
-  // ServiceProxyForProducer implementation.
-  ProducerID GetID() const override;
+  // Service::ProducerEndpoint implementation.
   void RegisterDataSource(const DataSourceDescriptor&,
                           RegisterDataSourceCallback) override;
   void UnregisterDataSource(DataSourceID) override;
-  void NotifyPageAcquired(uint32_t page_index) override;
-  void NotifyPageReleased(uint32_t page_index) override;
+  void DrainSharedBuffer(const std::vector<uint32_t>& changed_pages) override;
+
+  // ipc::ServiceProxy::EventListener implementation.
+  void OnConnect() override;
+  void OnDisconnect() override;
 
  private:
-  void OnDataAvailable();
-
-  ProducerID id_ = 0;
+  // TODO think to destruction order.
   Producer* const producer_;
   TaskRunner* const task_runner_;
   RegisterDataSourceCallback pending_register_data_source_callback_;
-  UnixSocket conn_;
-  std::unique_ptr<UnixSharedMemory> shared_memory_;
+  std::unique_ptr<PosixSharedMemory> shared_memory_;
+  TracingServiceProducerPortProxy* remote_service_ = nullptr;
 };
 
 }  // namespace perfetto

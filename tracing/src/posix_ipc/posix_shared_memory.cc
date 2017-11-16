@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "tracing/src/unix_rpc/unix_shared_memory.h"
+#include "tracing/src/posix_ipc/posix_shared_memory.h"
 
 #include <fcntl.h>
 #include <stdint.h>
@@ -25,62 +25,60 @@
 #include <memory>
 #include <utility>
 
-#include "tracing/src/core/base.h"
+#include "base/logging.h"
 
 namespace perfetto {
 
 // static
-std::unique_ptr<UnixSharedMemory> UnixSharedMemory::Create(size_t size) {
+std::unique_ptr<PosixSharedMemory> PosixSharedMemory::Create(size_t size) {
   // TODO: use memfd_create on Linux/Android if the kernel supports is (needs
   // syscall.h, there is no glibc wrtapper). If not, on Android fallback on
   // ashmem and on Linux fallback on /dev/shm/perfetto-whatever.
   char path[64];
   sprintf(path, "/tmp/perfetto-shm-%d", getpid());
 
-  // TODO use ScopedFd (have to introduce it in base.h). Right now this leaks
-  // a fd if mmap fails.
-  int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-  if (fd < 0)
+  base::ScopedFile fd(open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR));
+  if (!fd)
     return nullptr;
-  unlink(path);
-  if (ftruncate(fd, static_cast<off_t>(size)) < 0)
+  int res = unlink(path);
+  PERFETTO_DCHECK(res == 0);
+  if (ftruncate(fd.get(), static_cast<off_t>(size)) < 0)
     return nullptr;
-  return MapFD(fd, size);
+  return MapFD(std::move(fd), size);
 }
 
 // static
-std::unique_ptr<UnixSharedMemory> UnixSharedMemory::AttachToFd(int fd) {
+std::unique_ptr<PosixSharedMemory> PosixSharedMemory::AttachToFd(base::ScopedFile fd) {
   struct stat stat_buf = {};
-  if (fstat(fd, &stat_buf))
+  if (fstat(fd.get(), &stat_buf))
     return nullptr;
-  DCHECK(stat_buf.st_size > 0);
-  return MapFD(fd, static_cast<size_t>(stat_buf.st_size));
+  PERFETTO_DCHECK(stat_buf.st_size > 0);
+  return MapFD(std::move(fd), static_cast<size_t>(stat_buf.st_size));
 }
 
 // static
-std::unique_ptr<UnixSharedMemory> UnixSharedMemory::MapFD(int fd, size_t size) {
-  DCHECK(fd >= 0);
-  DCHECK(size > 0);
-  void* start = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd, size_t size) {
+  PERFETTO_DCHECK(fd);
+  PERFETTO_DCHECK(size > 0);
+  void* start = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   if (start == MAP_FAILED)
     return nullptr;
-  return std::unique_ptr<UnixSharedMemory>(
-      new UnixSharedMemory(start, size, fd));
+  return std::unique_ptr<PosixSharedMemory>(
+      new PosixSharedMemory(start, size, std::move(fd)));
 }
 
-UnixSharedMemory::UnixSharedMemory(void* start, size_t size, int fd)
-    : start_(start), size_(size), fd_(fd) {}
+PosixSharedMemory::PosixSharedMemory(void* start, size_t size, base::ScopedFile fd)
+    : start_(start), size_(size), fd_(std::move(fd)) {}
 
-UnixSharedMemory::~UnixSharedMemory() {
+PosixSharedMemory::~PosixSharedMemory() {
   munmap(start(), size());
-  close(fd_);
 }
 
-UnixSharedMemory::Factory::~Factory() {}
+PosixSharedMemory::Factory::~Factory() {}
 
-std::unique_ptr<SharedMemory> UnixSharedMemory::Factory::CreateSharedMemory(
+std::unique_ptr<SharedMemory> PosixSharedMemory::Factory::CreateSharedMemory(
     size_t size) {
-  return UnixSharedMemory::Create(size);
+  return PosixSharedMemory::Create(size);
 }
 
 }  // namespace perfetto

@@ -44,6 +44,11 @@ source_set("tracing_posix") {
     "src/posix_ipc/posix_service_host_impl.h",
     "src/posix_ipc/posix_service_producer_port.cc",
     "src/posix_ipc/posix_service_producer_port.h",
+    "src/posix_ipc/posix_shared_memory.cc",
+    "src/posix_ipc/posix_shared_memory.h",
+    "src/posix_ipc/posix_service_connection.cc",
+    "src/posix_ipc/posix_service_proxy_for_producer.cc",
+    "src/posix_ipc/posix_service_proxy_for_producer.h",
   ]
   deps = [
     ":ipc_protos",

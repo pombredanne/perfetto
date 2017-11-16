@@ -45,6 +45,8 @@ class PosixServiceHostImpl : public PosixServiceHost {
 
   std::unique_ptr<Service> svc_;
 
+  // The IPC host that listens on the Producer socket. It owns the
+  // PosixServiceProducerPort instance which deals with all producers' IPC(s).
   std::unique_ptr<ipc::Host> producer_ipc_host_;
 };
 

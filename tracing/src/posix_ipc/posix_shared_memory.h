@@ -21,11 +21,13 @@
 
 #include <memory>
 
+#include "base/scoped_file.h"
 #include "tracing/core/shared_memory.h"
 
 namespace perfetto {
 
-class UnixSharedMemory : public SharedMemory {
+// Implements the SharedMemory and its factory for the posix-based transport.
+class PosixSharedMemory : public SharedMemory {
  public:
   class Factory : public SharedMemory::Factory {
    public:
@@ -34,29 +36,29 @@ class UnixSharedMemory : public SharedMemory {
   };
 
   // Create a brand new SHM region (the service uses this).
-  static std::unique_ptr<UnixSharedMemory> Create(size_t size);
+  static std::unique_ptr<PosixSharedMemory> Create(size_t size);
 
   // Mmaps a file descriptor to an existing SHM region (the producer uses this).
-  static std::unique_ptr<UnixSharedMemory> AttachToFd(int fd);
+  static std::unique_ptr<PosixSharedMemory> AttachToFd(base::ScopedFile);
 
-  ~UnixSharedMemory() override;
+  ~PosixSharedMemory() override;
 
-  int fd() const { return fd_; }
+  int fd() const { return fd_.get(); }
 
   // SharedMemory implementation.
   void* start() const override { return start_; }
   size_t size() const override { return size_; }
 
  private:
-  static std::unique_ptr<UnixSharedMemory> MapFD(int fd, size_t size);
+  static std::unique_ptr<PosixSharedMemory> MapFD(base::ScopedFile, size_t);
 
-  UnixSharedMemory(void* start, size_t size, int fd);
-  UnixSharedMemory(const UnixSharedMemory&) = delete;
-  UnixSharedMemory& operator=(const UnixSharedMemory&) = delete;
+  PosixSharedMemory(void* start, size_t size, base::ScopedFile);
+  PosixSharedMemory(const PosixSharedMemory&) = delete;
+  PosixSharedMemory& operator=(const PosixSharedMemory&) = delete;
 
   void* const start_;
   const size_t size_;
-  int fd_;
+  base::ScopedFile fd_;
 };
 
 }  // namespace perfetto
