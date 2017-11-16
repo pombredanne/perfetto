@@ -70,12 +70,10 @@ class Service {
                                     RegisterDataSourceCallback) = 0;
     virtual void UnregisterDataSource(DataSourceID) = 0;
 
-    // Called by the Producer to signal acquisition and release of shared memory
-    // pages from the shared memory buffer shared between Service and Producer.
-    // A page is acquired before the Producer starts writing into that and
-    // released once full.
-    virtual void NotifyPageAcquired(uint32_t page) = 0;
-    virtual void NotifyPageReleased(uint32_t page) = 0;
+    // Called by the Producer to signal release of pages from the shared memory
+    // buffer shared between Service and Producer.
+    virtual void DrainSharedBuffer(
+        const std::vector<uint32_t>& changed_pages) = 0;
   };  // class ProducerEndpoint.
 
   // Implemented in src/core/service_impl.cc .

@@ -72,8 +72,7 @@ class ServiceImpl : public Service {
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;
 
-    void NotifyPageAcquired(uint32_t page) override;
-    void NotifyPageReleased(uint32_t page) override;
+    void DrainSharedBuffer(const std::vector<uint32_t>& changed_pages) override;
 
    private:
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;

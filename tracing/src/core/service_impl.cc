@@ -104,36 +104,23 @@ void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
     const DataSourceDescriptor&,
     RegisterDataSourceCallback callback) {
   const DataSourceID dsid = ++last_data_source_id_;
-  PERFETTO_DLOG("[ServiceImpl] RegisterDataSource from producer %" PRIu64, id_);
+  PERFETTO_DLOG("RegisterDataSource from producer %" PRIu64, id_);
   task_runner_->PostTask(std::bind(std::move(callback), dsid));
   // TODO implement the bookkeeping logic.
 }
 
 void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
     DataSourceID dsid) {
-  PERFETTO_DLOG("[ServiceImpl] UnregisterDataSource(%" PRIu64
-                ") from producer %" PRIu64,
+  PERFETTO_DLOG("UnregisterDataSource(%" PRIu64 ") from producer %" PRIu64,
                 dsid, id_);
   PERFETTO_CHECK(dsid);
   // TODO implement the bookkeeping logic.
   return;
 }
 
-void ServiceImpl::ProducerEndpointImpl::NotifyPageAcquired(uint32_t page) {
-  PERFETTO_DLOG("[ServiceImpl] NotifyPageAcquired(%" PRIu32
-                ") from producer %" PRIu64,
-                page, id_);
-  // TODO implement the bookkeeping logic.
-  return;
-}
-
-void ServiceImpl::ProducerEndpointImpl::NotifyPageReleased(uint32_t page) {
-  PERFETTO_DLOG("[ServiceImpl] NotifyPageReleased(%" PRIu32
-                ") from producer %" PRIu64,
-                page, id_);
-  PERFETTO_DCHECK(shared_memory_);
-  PERFETTO_DLOG("[ServiceImpl] Reading Shared memory: \"%s\"",
-                reinterpret_cast<const char*>(shared_memory_->start()));
+void ServiceImpl::ProducerEndpointImpl::DrainSharedBuffer(
+    const std::vector<uint32_t>& changed_pages) {
+  PERFETTO_DLOG("DrainSharedBuffer() from producer %" PRIu64, id_);
   // TODO implement the bookkeeping logic.
   return;
 }

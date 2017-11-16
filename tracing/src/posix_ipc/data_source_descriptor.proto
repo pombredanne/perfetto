@@ -17,7 +17,7 @@
 syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
 
-package perfetto;
+package perfetto.proto;
 
 // This message is sent from Producer(s) to the tracing Service when registering
 // to advertise their capabilities. It describes the structure of tracing

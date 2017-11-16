@@ -28,8 +28,12 @@ source_set("ipc") {
   sources = [
     "include/ipc/async_result.h",
     "include/ipc/basic_types.h",
+    "include/ipc/client_info.h",
     "include/ipc/deferred.h",
     "include/ipc/host.h",
+    "include/ipc/service.h",
+    "include/ipc/service_descriptor.h",
+    "include/ipc/service_proxy.h",
     "src/buffered_frame_deserializer.cc",
     "src/client_impl.cc",
     "src/deferred.cc",
@@ -37,6 +41,7 @@ source_set("ipc") {
     "src/host_impl.h",
     "src/service_proxy.cc",
     "src/unix_socket.cc",
+    "src/unix_socket.h",
   ]
 }
 
@@ -67,7 +72,6 @@ proto_library("wire_protocol") {
     "src/wire_protocol.proto",
   ]
   include_dirs = [ "include" ]
-  proto_in_dir = "src/"
 }
 
 ipc_library("test_messages") {
@@ -77,5 +81,4 @@ ipc_library("test_messages") {
     "src/test/greeter_service.proto",
   ]
   include_dirs = [ "include" ]
-  proto_in_dir = "src/test"
 }

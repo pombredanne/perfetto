@@ -17,6 +17,6 @@
 syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
 
-package perfetto;
+package perfetto.proto;
 
 message DataSourceConfig {}

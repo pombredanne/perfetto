@@ -16,6 +16,7 @@
 
 #include "ipc/src/protoc_plugin/ipc_generator.h"
 
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -52,7 +53,7 @@ class $c$ : public ::perfetto::ipc::Service {
   static ::perfetto::ipc::ServiceDescriptor* NewDescriptor();
 
  public:
-  virtual ~$c$();
+  ~$c$() override;
 
   static const ::perfetto::ipc::ServiceDescriptor& GetDescriptorStatic();
 

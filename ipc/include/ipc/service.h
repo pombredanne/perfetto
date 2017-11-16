@@ -17,6 +17,8 @@
 #ifndef IPC_INCLUDE_IPC_SERVICE_H_
 #define IPC_INCLUDE_IPC_SERVICE_H_
 
+#include "ipc/client_info.h"
+
 namespace perfetto {
 namespace ipc {
 
@@ -26,7 +28,20 @@ class ServiceDescriptor;
 class Service {
  public:
   virtual ~Service() = default;
+
+  // Overridden by the auto-generated class.
   virtual const ServiceDescriptor& GetDescriptor() = 0;
+
+  // Invoked when a remote client disconnects. Use client_info() for details.
+  virtual void OnClientDisconnected() {}
+
+  // Returns the ClientInfo for the current IPC request, nullptr if called
+  // outside the scope of an IPC method.
+  ClientInfo client_info() const { return client_info_; }
+
+ private:
+  friend class HostImpl;
+  ClientInfo client_info_;
 };
 
 }  // namespace ipc

@@ -17,8 +17,8 @@
 syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
 
-import "data_source_config.proto";
-import "data_source_descriptor.proto";
+import "tracing/src/posix_ipc/data_source_config.proto";
+import "tracing/src/posix_ipc/data_source_descriptor.proto";
 
 package perfetto;
 
@@ -36,8 +36,8 @@ service TracingServiceProducerPort {
   // memory buffer have been changed. This is used to kick the tracing service
   // and let it move filled pages from the staging shared memory buffer into the
   // actual (non-shared) trace buffer.
-  rpc NotifySharedBufferUpdated(NotifySharedBufferUpdatedRequest)
-      returns (NotifySharedBufferUpdatedResponse) {}
+  rpc DrainSharedBuffer(DrainSharedBufferRequest)
+      returns (DrainSharedBufferResponse) {}
 
   // This is a backchannel to get asynchronous commands / notifications back
   // from the Service.
@@ -48,7 +48,7 @@ service TracingServiceProducerPort {
 // Arguments for rpc RegisterDataSource().
 
 message RegisterDataSourceRequest {
-  DataSourceDescriptor data_source_descriptor = 1;
+  proto.DataSourceDescriptor data_source_descriptor = 1;
 }
 
 message RegisterDataSourceResponse {
@@ -69,21 +69,20 @@ message UnregisterDataSourceRequest {
 
 message UnregisterDataSourceResponse {}
 
-// Arguments for rpc NotifySharedBufferUpdated().
+// Arguments for rpc DrainSharedBuffer().
 
-message NotifySharedBufferUpdatedRequest {
-  message ChangedPage { uint32 page_index = 1; }
-  repeated ChangedPage changed_pages = 1;
+message DrainSharedBufferRequest {
+  repeated uint32 changed_pages = 1;
 }
 
-message NotifySharedBufferUpdatedResponse {}
+message DrainSharedBufferResponse {}
 
 // Arguments for rpc GetAsyncCommand().
 
 message GetAsyncCommandRequest {}
 
 message GetAsyncCommandResponse {
-  message StartDataSource { DataSourceConfig config = 1; }
+  message StartDataSource { proto.DataSourceConfig config = 1; }
   message StopDataSource {}
 
   oneof cmd {

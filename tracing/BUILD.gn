@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("//ipc//ipc_library.gni")
+
 config("tracing_config") {
   include_dirs = [ "include" ]
 }
 
+# Core tracing library, platform independent, no transport layer.
 source_set("tracing") {
   all_dependent_configs = [ ":tracing_config" ]
-  deps += [
-    "src/ipc",
-    "//base",
-  ]
+  deps += [ "//base" ]
   sources = [
     "include/tracing/core/basic_types.h",
     "include/tracing/core/data_source_config.h",
@@ -34,10 +34,28 @@ source_set("tracing") {
   ]
 }
 
+# Posix specialization of the tracing library for Linux/Android/Mac. Provides
+# an IPC transport over a UNIX domain socket.
+source_set("tracing_posix") {
+  sources = [
+    "include/tracing/posix_ipc/posix_service_connection.h",
+    "include/tracing/posix_ipc/posix_service_host.h",
+    "src/posix_ipc/posix_service_host_impl.cc",
+    "src/posix_ipc/posix_service_host_impl.h",
+    "src/posix_ipc/posix_service_producer_port.cc",
+    "src/posix_ipc/posix_service_producer_port.h",
+  ]
+  deps = [
+    ":ipc_protos",
+    ":tracing",
+  ]
+}
+
 executable("tracing_unittests") {
   testonly = true
   deps += [
     ":tracing",
+    ":tracing_posix",
     "//base",
     "//base:test_support",
     "//buildtools:gmock",
@@ -56,5 +74,14 @@ executable("tracing_benchmarks") {
   deps += [ "//buildtools:benchmark" ]
   sources = [
     "src/test/hello_world_benchmark.cc",
+  ]
+}
+
+# Proto and IPC sercice definitions.
+ipc_library("ipc_protos") {
+  sources = [
+    "src/posix_ipc/data_source_config.proto",
+    "src/posix_ipc/data_source_descriptor.proto",
+    "src/posix_ipc/tracing_service_producer_port.proto",
   ]
 }

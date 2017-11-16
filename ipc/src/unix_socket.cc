@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/ucred.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -108,6 +109,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
     // Only in the case of OnNewIncomingConnection().
     fd_ = std::move(adopt_fd);
     state_ = State::kConnected;
+    ReadPeerCredentials();
   } else {
     fd_.reset(socket(AF_UNIX, SOCK_STREAM, 0));
   }
@@ -218,6 +220,22 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
   }
 }
 
+void UnixSocket::ReadPeerCredentials() {
+#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+  struct ucred user_cred;
+  socklen_t len = sizeof(user_cred);
+  int res = getsockopt(*fd_, SOL_SOCKET, SO_PEERCRED, &user_cred, &len);
+  PERFETTO_CHECK(res == 0);
+  peer_uid_ = user_cred.uid;
+#else
+  struct xucred user_cred;
+  socklen_t len = sizeof(user_cred);
+  int res = getsockopt(*fd_, 0, LOCAL_PEERCRED, &user_cred, &len);
+  PERFETTO_CHECK(res == 0 && user_cred.cr_version == XUCRED_VERSION);
+  peer_uid_ = user_cred.cr_uid;
+#endif
+}
+
 void UnixSocket::OnEvent() {
   if (state_ == State::kDisconnected)
     return;  // Some spurious event, typically queued just before Shutdown().
@@ -233,6 +251,7 @@ void UnixSocket::OnEvent() {
     if (res == 0 && sock_err == EINPROGRESS)
       return;  // Not connected yet, just a spurious FD watch wakeup.
     if (res == 0 && sock_err == 0) {
+      ReadPeerCredentials();
       state_ = State::kConnected;
       return event_listener_->OnConnect(this, true /* connected */);
     }
