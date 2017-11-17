@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "ftrace_reader/ftrace_cpu_reader.h"
+#include "cpu_reader.h"
 
 #include <utility>
 
 #include "base/logging.h"
-#include "ftrace_to_proto_translation_table.h"
+#include "proto_translation_table.h"
 
 #include "protos/ftrace/ftrace_event.pbzero.h"
 
@@ -57,12 +57,16 @@ struct TimeStamp {
 
 }  // namespace
 
-FtraceCpuReader::FtraceCpuReader(const FtraceToProtoTranslationTable* table,
-                                 size_t cpu,
-                                 base::ScopedFile fd)
+CpuReader::CpuReader(const ProtoTranslationTable* table,
+                     size_t cpu,
+                     base::ScopedFile fd)
     : table_(table), cpu_(cpu), fd_(std::move(fd)) {}
 
-bool FtraceCpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
+int CpuReader::GetFileDescriptor() {
+  return fd_.get();
+}
+
+bool CpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
   if (!fd_)
     return false;
 
@@ -76,10 +80,9 @@ bool FtraceCpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
   return ParsePage(cpu_, buffer, bytes, bundle);
 }
 
-FtraceCpuReader::~FtraceCpuReader() = default;
-FtraceCpuReader::FtraceCpuReader(FtraceCpuReader&&) = default;
+CpuReader::~CpuReader() = default;
 
-uint8_t* FtraceCpuReader::GetBuffer() {
+uint8_t* CpuReader::GetBuffer() {
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.
   if (!buffer_)
     buffer_ = std::unique_ptr<uint8_t[]>(new uint8_t[kPageSize]);
@@ -94,10 +97,10 @@ uint8_t* FtraceCpuReader::GetBuffer() {
 // Some information about the layout of the page header is available in user
 // space at: /sys/kernel/debug/tracing/events/header_event
 // This method is deliberately static so it can be tested independently.
-bool FtraceCpuReader::ParsePage(size_t cpu,
-                                const uint8_t* ptr,
-                                size_t size,
-                                pbzero::FtraceEventBundle* bundle) {
+bool CpuReader::ParsePage(size_t cpu,
+                          const uint8_t* ptr,
+                          size_t size,
+                          pbzero::FtraceEventBundle* bundle) {
   const uint8_t* const start = ptr;
   const uint8_t* const end = ptr + size;
   bundle->set_cpu(cpu);

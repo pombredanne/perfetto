@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_FTRACE_CPU_READER_H_
-#define FTRACE_READER_FTRACE_CPU_READER_H_
+#ifndef FTRACE_READER_CPU_READER_H_
+#define FTRACE_READER_CPU_READER_H_
 
 #include <stdint.h>
 #include <memory>
@@ -27,29 +27,30 @@
 
 namespace perfetto {
 
-class FtraceToProtoTranslationTable;
+class ProtoTranslationTable;
 
-class FtraceCpuReader {
+class CpuReader {
  public:
   class Config {};
 
-  FtraceCpuReader(const FtraceToProtoTranslationTable*,
-                  size_t cpu,
-                  base::ScopedFile fd);
-  ~FtraceCpuReader();
-  FtraceCpuReader(FtraceCpuReader&&);
+  CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
+  ~CpuReader();
 
   bool Read(const Config&, pbzero::FtraceEventBundle*);
+  bool Read() {
+    PERFETTO_DLOG("Read CPU");
+    return true;
+  }
 
   int GetFileDescriptor();
 
  private:
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvanceNumber);
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvancePlainStruct);
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvanceComplexStruct);
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvanceUnderruns);
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvanceAtEnd);
-  FRIEND_TEST(FtraceCpuReaderTest, ReadAndAdvanceOverruns);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvanceNumber);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvancePlainStruct);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvanceComplexStruct);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvanceUnderruns);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvanceAtEnd);
+  FRIEND_TEST(CpuReaderTest, ReadAndAdvanceOverruns);
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
@@ -65,15 +66,15 @@ class FtraceCpuReader {
                         size_t ptr_size,
                         pbzero::FtraceEventBundle*);
   uint8_t* GetBuffer();
-  FtraceCpuReader(const FtraceCpuReader&) = delete;
-  FtraceCpuReader& operator=(const FtraceCpuReader&) = delete;
+  CpuReader(const CpuReader&) = delete;
+  CpuReader& operator=(const CpuReader&) = delete;
 
-  const FtraceToProtoTranslationTable* table_;
+  const ProtoTranslationTable* table_;
   const size_t cpu_;
   base::ScopedFile fd_;
   std::unique_ptr<uint8_t[]> buffer_;
 };
 
-} // namespace perfetto
+}  // namespace perfetto
 
-#endif  // FTRACE_READER_FTRACE_CPU_READER_H_
+#endif  // FTRACE_READER_CPU_READER_H_

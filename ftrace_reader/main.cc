@@ -25,7 +25,6 @@
 #include <vector>
 
 #include "ftrace_reader/ftrace_controller.h"
-#include "ftrace_reader/ftrace_cpu_reader.h"
 #include "protozero/scattered_stream_writer.h"
 
 namespace {
@@ -123,8 +122,8 @@ int main(int argc, const char** argv) {
   protozero::ScatteredStreamWriter stream_writer(&buffer);
   pbzero::FtraceEventBundle message;
   message.Reset(&stream_writer);
-  perfetto::FtraceCpuReader* reader = ftrace->GetCpuReader(0);
-  reader->Read(perfetto::FtraceCpuReader::Config(), &message);
+  //  perfetto::CpuReader* reader = ftrace->GetCpuReader(0);
+  //  reader->Read(perfetto::CpuReader::Config(), &message);
 
   return 0;
 }

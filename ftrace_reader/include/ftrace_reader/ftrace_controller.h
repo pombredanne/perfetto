@@ -25,9 +25,10 @@
 #include <string>
 #include <vector>
 
+#include "base/scoped_file.h"
 #include "base/task_runner.h"
 #include "base/weak_ptr.h"
-#include "ftrace_reader/ftrace_cpu_reader.h"
+#include "gtest/gtest_prod.h"
 #include "protozero/protozero_message_handle.h"
 
 #include "protos/ftrace/ftrace_event_bundle.pbzero.h"
@@ -35,10 +36,14 @@
 namespace perfetto {
 
 class FtraceController;
+class ProtoTranslationTable;
+class CpuReader;
+class FtraceApi;
 
 class FtraceConfig {
  public:
   FtraceConfig();
+  FtraceConfig(std::set<std::string> events);
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
@@ -60,9 +65,9 @@ class FtraceSink {
     virtual protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>
         GetBundleForCpu(size_t) = 0;
     virtual void OnBundleComplete(
-        int,
+        size_t,
         protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>) = 0;
-    virtual ~Delegate();
+    virtual ~Delegate() = default;
   };
 
   // TODO(hjd): Make private.
@@ -79,7 +84,7 @@ class FtraceSink {
 class FtraceController {
  public:
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
-  ~FtraceController();
+  virtual ~FtraceController();
 
   std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
 
@@ -100,20 +105,25 @@ class FtraceController {
   // point.
   bool IsTracingEnabled();
 
-  // Returns a cached FtraceCpuReader for |cpu|.
-  // FtraceCpuReaders are constructed lazily.
-  FtraceCpuReader* GetCpuReader(size_t cpu);
+  void Start();
+  void Stop();
 
-  // Returns the number of CPUs.
-  // This will match the number of tracing/per_cpu/cpuXX directories.
-  size_t NumberOfCpus() const;
+ protected:
+  // Protected for testing.
+  FtraceController(std::unique_ptr<FtraceApi>,
+                   const std::string& root,
+                   base::TaskRunner*,
+                   std::unique_ptr<ProtoTranslationTable>);
+
+  virtual std::unique_ptr<CpuReader> CreateCpuReader(
+      const ProtoTranslationTable*,
+      size_t cpu,
+      const std::string& path);
 
  private:
   friend FtraceSink;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
-  FtraceController(base::TaskRunner* runner,
-                   std::unique_ptr<FtraceToProtoTranslationTable>);
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
@@ -122,16 +132,25 @@ class FtraceController {
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
 
+  void CpuReady(size_t cpu);
+
   // Enable the event under with the given |group| and |name|.
   bool EnableEvent(const std::string& group, const std::string& name);
   // Disable the event under with the given |group| and |name|.
   bool DisableEvent(const std::string& group, const std::string& name);
 
+  // Returns a cached CpuReader for |cpu|.
+  // CpuReaders are constructed lazily.
+  CpuReader* GetCpuReader(size_t cpu);
+
+  std::unique_ptr<FtraceApi> impl_;
+  bool running_;
+  const std::string root_;
   base::TaskRunner* task_runner_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;
-  std::unique_ptr<FtraceToProtoTranslationTable> table_;
-  std::map<size_t, FtraceCpuReader> readers_;
+  std::unique_ptr<ProtoTranslationTable> table_;
+  std::map<size_t, std::unique_ptr<CpuReader>> readers_;
   std::set<FtraceSink*> sinks_;
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };

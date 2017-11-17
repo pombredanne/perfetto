@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ftrace_to_proto_translation_table.h"
+#include "proto_translation_table.h"
 
 #include "gtest/gtest.h"
 
@@ -29,10 +29,10 @@ class AllTranslationTableTest : public TestWithParam<const char*> {
   void SetUp() override {
     std::string path =
         "ftrace_reader/test/data/" + std::string(GetParam()) + "/";
-    table_ = FtraceToProtoTranslationTable::Create(path);
+    table_ = ProtoTranslationTable::Create(path);
   }
 
-  std::unique_ptr<FtraceToProtoTranslationTable> table_;
+  std::unique_ptr<ProtoTranslationTable> table_;
 };
 
 const char* kDevices[] = {"android_seed_N2F62_3.10.49",
@@ -46,7 +46,7 @@ INSTANTIATE_TEST_CASE_P(ByDevice, AllTranslationTableTest, ValuesIn(kDevices));
 
 TEST(TranslationTable, Seed) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
-  auto table = FtraceToProtoTranslationTable::Create(path);
+  auto table = ProtoTranslationTable::Create(path);
   EXPECT_EQ(table->largest_id(), 744);
   auto sched_switch_event = table->GetEventByName("sched_switch");
   EXPECT_EQ(sched_switch_event->name, "sched_switch");
@@ -57,8 +57,8 @@ TEST(TranslationTable, Seed) {
 }
 
 TEST(TranslationTable, Getters) {
-  using Event = FtraceToProtoTranslationTable::Event;
-  using Field = FtraceToProtoTranslationTable::Field;
+  using Event = ProtoTranslationTable::Event;
+  using Field = ProtoTranslationTable::Field;
 
   std::vector<Field> common_fields;
   std::vector<Event> events;
@@ -84,7 +84,7 @@ TEST(TranslationTable, Getters) {
     events.push_back(event);
   }
 
-  FtraceToProtoTranslationTable table(events, std::move(common_fields));
+  ProtoTranslationTable table(events, std::move(common_fields));
   EXPECT_EQ(table.largest_id(), 100);
   EXPECT_EQ(table.EventNameToFtraceId("foo"), 1);
   EXPECT_EQ(table.EventNameToFtraceId("baz"), 100);
@@ -93,6 +93,37 @@ TEST(TranslationTable, Getters) {
   EXPECT_EQ(table.GetEventById(3), nullptr);
   EXPECT_EQ(table.GetEventById(200), nullptr);
   EXPECT_EQ(table.GetEventById(0), nullptr);
+}
+
+TEST(EventFilterTest, EventFilter) {
+  using Event = ProtoTranslationTable::Event;
+  using Field = ProtoTranslationTable::Field;
+
+  std::vector<Field> common_fields;
+  std::vector<Event> events;
+
+  {
+    Event event;
+    event.name = "foo";
+    event.ftrace_event_id = 1;
+    events.push_back(event);
+  }
+
+  {
+    Event event;
+    event.name = "bar";
+    event.ftrace_event_id = 10;
+    events.push_back(event);
+  }
+
+  ProtoTranslationTable table(events, std::move(common_fields));
+  EventFilter filter(table, std::set<std::string>({"foo"}));
+
+  EXPECT_TRUE(filter.IsEventEnabled(1));
+  EXPECT_FALSE(filter.IsEventEnabled(2));
+  EXPECT_FALSE(filter.IsEventEnabled(10));
+  EXPECT_FALSE(filter.IsEventEnabled(0));
+  EXPECT_FALSE(filter.IsEventEnabled(100));
 }
 
 }  // namespace

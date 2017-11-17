@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ftrace_to_proto_translation_table.h"
+#include "proto_translation_table.h"
 
 #include <fstream>
 #include <sstream>
@@ -45,14 +45,14 @@ std::string ReadFileIntoString(std::string path) {
   return str;
 }
 
-using Event = FtraceToProtoTranslationTable::Event;
+using Event = ProtoTranslationTable::Event;
 const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
   size_t largest_id = 0;
   for (const Event& event : events) {
     if (event.ftrace_event_id > largest_id)
       largest_id = event.ftrace_event_id;
   }
-  std::vector<FtraceToProtoTranslationTable::Event> events_by_id;
+  std::vector<ProtoTranslationTable::Event> events_by_id;
   events_by_id.resize(largest_id + 1);
   for (const Event& event : events) {
     events_by_id[event.ftrace_event_id] = event;
@@ -61,11 +61,24 @@ const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
   return events_by_id;
 }
 
+using Table = ProtoTranslationTable;
+const std::vector<bool> BuildEnabledVector(const Table& table,
+                                           const std::set<std::string>& names) {
+  std::vector<bool> enabled(table.largest_id() + 1);
+  for (const std::string& name : names) {
+    const Event* event = table.GetEventByName(name);
+    if (!event)
+      continue;
+    enabled[event->ftrace_event_id] = true;
+  }
+  return enabled;
+}
+
 }  // namespace
 
 // static
-std::unique_ptr<FtraceToProtoTranslationTable>
-FtraceToProtoTranslationTable::Create(std::string path_to_root) {
+std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
+    std::string path_to_root) {
   if (path_to_root.length() == 0 || path_to_root.back() != '/') {
     PERFETTO_DLOG("Path '%s' must end with /.", path_to_root.c_str());
     return nullptr;
@@ -117,14 +130,13 @@ FtraceToProtoTranslationTable::Create(std::string path_to_root) {
     return nullptr;
   }
 
-  auto table = std::unique_ptr<FtraceToProtoTranslationTable>(
-      new FtraceToProtoTranslationTable(events, std::move(common_fields)));
+  auto table = std::unique_ptr<ProtoTranslationTable>(
+      new ProtoTranslationTable(events, std::move(common_fields)));
   return table;
 }
 
-FtraceToProtoTranslationTable::FtraceToProtoTranslationTable(
-    const std::vector<Event>& events,
-    std::vector<Field> common_fields)
+ProtoTranslationTable::ProtoTranslationTable(const std::vector<Event>& events,
+                                             std::vector<Field> common_fields)
     : events_(BuildEventsVector(events)),
       largest_id_(events_.size() - 1),
       common_fields_(std::move(common_fields)) {
@@ -133,6 +145,11 @@ FtraceToProtoTranslationTable::FtraceToProtoTranslationTable(
   }
 }
 
-FtraceToProtoTranslationTable::~FtraceToProtoTranslationTable() = default;
+ProtoTranslationTable::~ProtoTranslationTable() = default;
+
+EventFilter::EventFilter(const ProtoTranslationTable& table,
+                         const std::set<std::string>& names)
+    : enabled_(BuildEnabledVector(table, names)) {}
+EventFilter::~EventFilter() = default;
 
 }  // namespace perfetto
