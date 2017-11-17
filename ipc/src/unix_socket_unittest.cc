@@ -252,6 +252,7 @@ TEST_F(UnixSocketTest, SharedMemory) {
     EXPECT_CALL(event_listener_, OnNewIncomingConnection(srv.get(), _))
         .WillOnce(Invoke(
             [this, tmp_fd, checkpoint, mem](UnixSocket*, UnixSocket* new_conn) {
+              ASSERT_EQ(geteuid(), new_conn->peer_uid());
               ASSERT_TRUE(new_conn->Send("txfd", 5, tmp_fd));
               // Wait for the client to change this again.
               EXPECT_CALL(event_listener_, OnDataAvailable(new_conn))
@@ -356,6 +357,7 @@ TEST_F(UnixSocketTest, SendIsAtomic) {
           Invoke([cli_connected](UnixSocket*, bool) { cli_connected(); }));
   task_runner_.RunUntilCheckpoint("cli_connected");
   ASSERT_TRUE(cli->is_connected());
+  ASSERT_EQ(geteuid(), cli->peer_uid());
 
   bool did_requeue = false;
   for (int i = 0; i < kNumFrames; i++)
