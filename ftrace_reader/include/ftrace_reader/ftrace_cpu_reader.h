@@ -40,6 +40,10 @@ class FtraceCpuReader {
   FtraceCpuReader(FtraceCpuReader&&);
 
   bool Read(const Config&, pbzero::FtraceEventBundle*);
+  bool Read() {
+    PERFETTO_DLOG("Read CPU");
+    return true;
+  }
 
   int GetFileDescriptor();
 

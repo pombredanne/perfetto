@@ -23,6 +23,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "base/scoped_file.h"
 
@@ -96,6 +97,25 @@ class FtraceToProtoTranslationTable {
   size_t largest_id_;
   std::map<std::string, const Event*> name_to_event_;
   std::vector<Field> common_fields_;
+};
+
+class EventFilter {
+ public:
+  EventFilter(const FtraceToProtoTranslationTable&,
+              const std::set<std::string>&);
+  ~EventFilter();
+
+  bool IsEventEnabled(size_t ftrace_event_id) const {
+    if (ftrace_event_id == 0 || ftrace_event_id > enabled_.size())
+      return false;
+    return enabled_[ftrace_event_id];
+  }
+
+ private:
+  EventFilter(const EventFilter&) = delete;
+  EventFilter& operator=(const EventFilter&) = delete;
+
+  const std::vector<bool> enabled_;
 };
 
 }  // namespace perfetto

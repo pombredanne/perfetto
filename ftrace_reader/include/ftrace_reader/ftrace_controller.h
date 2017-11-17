@@ -39,6 +39,7 @@ class FtraceController;
 class FtraceConfig {
  public:
   FtraceConfig();
+  FtraceConfig(std::set<std::string> events);
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
@@ -60,9 +61,9 @@ class FtraceSink {
     virtual protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>
         GetBundleForCpu(size_t) = 0;
     virtual void OnBundleComplete(
-        int,
+        size_t,
         protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>) = 0;
-    virtual ~Delegate();
+    virtual ~Delegate() = default;
   };
 
   // TODO(hjd): Make private.
@@ -79,7 +80,7 @@ class FtraceSink {
 class FtraceController {
  public:
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
-  ~FtraceController();
+  virtual ~FtraceController();
 
   std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
 
@@ -104,16 +105,35 @@ class FtraceController {
   // FtraceCpuReaders are constructed lazily.
   FtraceCpuReader* GetCpuReader(size_t cpu);
 
-  // Returns the number of CPUs.
-  // This will match the number of tracing/per_cpu/cpuXX directories.
-  size_t NumberOfCpus() const;
+  void Start();
+  void Stop();
+
+ protected:
+  class SystemImpl {
+   public:
+    SystemImpl() = default;
+    virtual ~SystemImpl() = default;
+
+    virtual bool WriteToFile(const std::string& path, const std::string& str);
+
+    // Returns the number of CPUs.
+    // This will match the number of tracing/per_cpu/cpuXX directories.
+    size_t virtual NumberOfCpus() const;
+  };
+
+  // Protected for testing.
+  FtraceController(std::unique_ptr<SystemImpl>, const std::string& root, base::TaskRunner*,
+                   std::unique_ptr<FtraceToProtoTranslationTable>);
+
+  virtual FtraceCpuReader CreateCpuReader(
+        const FtraceToProtoTranslationTable*,
+        size_t cpu, 
+        const std::string& path);
 
  private:
   friend FtraceSink;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
-  FtraceController(base::TaskRunner* runner,
-                   std::unique_ptr<FtraceToProtoTranslationTable>);
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
@@ -122,11 +142,16 @@ class FtraceController {
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
 
+  void CpuReady(size_t cpu);
+
   // Enable the event under with the given |group| and |name|.
   bool EnableEvent(const std::string& group, const std::string& name);
   // Disable the event under with the given |group| and |name|.
   bool DisableEvent(const std::string& group, const std::string& name);
 
+  std::unique_ptr<SystemImpl> impl_;
+  bool running_;
+  const std::string root_;
   base::TaskRunner* task_runner_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;

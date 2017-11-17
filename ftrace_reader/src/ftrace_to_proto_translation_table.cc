@@ -61,6 +61,18 @@ const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
   return events_by_id;
 }
 
+using Table = FtraceToProtoTranslationTable;
+const std::vector<bool> BuildEnabledVector(const Table& table, const std::set<std::string>& names) {
+  std::vector<bool> enabled(table.largest_id()+1);
+  for (const std::string& name : names) {
+    const Event* event = table.GetEventByName(name);
+    if (!event)
+      continue;
+    enabled[event->ftrace_event_id] = true;
+  }
+  return enabled;
+}
+
 }  // namespace
 
 // static
@@ -134,5 +146,9 @@ FtraceToProtoTranslationTable::FtraceToProtoTranslationTable(
 }
 
 FtraceToProtoTranslationTable::~FtraceToProtoTranslationTable() = default;
+
+EventFilter::EventFilter(const FtraceToProtoTranslationTable& table, const std::set<std::string>& names) : enabled_(BuildEnabledVector(table, names)) {
+}
+EventFilter::~EventFilter() = default;
 
 }  // namespace perfetto
