@@ -23,7 +23,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/ucred.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -34,6 +33,10 @@
 #include "base/logging.h"
 #include "base/task_runner.h"
 #include "base/utils.h"
+
+#if BUILDFLAG(OS_MACOSX)
+#include <sys/ucred.h>
+#endif
 
 namespace perfetto {
 namespace ipc {
