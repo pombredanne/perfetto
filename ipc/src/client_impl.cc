@@ -235,6 +235,8 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
   }
   service_proxy->EndInvoke(req.request_id, std::move(decoded_reply),
                            reply.has_more());
+  if (reply.has_more())
+    queued_requests_.emplace(req.request_id, std::move(req));
 }
 
 ClientImpl::QueuedRequest::QueuedRequest() = default;

@@ -41,6 +41,7 @@ class PosixServiceProducerPort : public TracingServiceProducerPort {
   using Service = ::perfetto::Service;  // From tracing/core/service.h .
   explicit PosixServiceProducerPort(Service* core_service);
   ~PosixServiceProducerPort() override;
+
   // TracingServiceProducerIPCPort implementation (from .proto IPC definition).
   void RegisterDataSource(const RegisterDataSourceRequest&,
                           DeferredRegisterDataSourceResponse) override;

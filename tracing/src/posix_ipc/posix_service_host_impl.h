@@ -34,15 +34,12 @@ class PosixServiceHostImpl : public PosixServiceHost {
   // PosixServiceHost implementation.
   bool Start(const char* producer_socket_name) override;
   Service* service_for_testing() const override;
-  void set_observer_for_testing(ObserverForTesting*) override;
 
  private:
   PosixServiceHostImpl(const PosixServiceHostImpl&) = delete;
   PosixServiceHostImpl& operator=(const PosixServiceHostImpl&) = delete;
 
   base::TaskRunner* const task_runner_;
-  ObserverForTesting* observer_ = nullptr;
-
   std::unique_ptr<Service> svc_;
 
   // The IPC host that listens on the Producer socket. It owns the

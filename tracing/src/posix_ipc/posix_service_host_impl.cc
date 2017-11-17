@@ -63,8 +63,4 @@ Service* PosixServiceHostImpl::service_for_testing() const {
   return svc_.get();
 }
 
-void PosixServiceHostImpl::set_observer_for_testing(ObserverForTesting* obs) {
-  observer_ = obs;
-}
-
 }  // namespace perfetto

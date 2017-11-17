@@ -60,15 +60,20 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   PERFETTO_DCHECK(it_and_inserted.second);
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer(),
                                    id, endpoint->shared_memory()));
+  if (observer_)
+    observer_->OnProducerConnected(id);
   return std::move(endpoint);
 }
 
 void ServiceImpl::DisconnectProducer(ProducerID id) {
   PERFETTO_DCHECK(producers_.count(id));
   producers_.erase(id);
+  if (observer_)
+    observer_->OnProducerDisconnected(id);
 }
 
-Service::ProducerEndpoint* ServiceImpl::GetProducer(ProducerID id) const {
+ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
+    ProducerID id) const {
   auto it = producers_.find(id);
   if (it == producers_.end())
     return nullptr;
@@ -92,7 +97,10 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       shared_memory_(std::move(shared_memory)) {}
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
-  task_runner_->PostTask(std::bind(&Producer::OnDisconnect, producer_));
+  // TODO: this is a violation of our callback contract. We promised to not send
+  // callbacks to the Producer* once we get destroyed.
+  // task_runner_->PostTask(std::bind(&Producer::OnDisconnect, producer_));
+  producer_->OnDisconnect();
   service_->DisconnectProducer(id_);
 }
 
@@ -100,25 +108,28 @@ void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
     const DataSourceDescriptor&,
     RegisterDataSourceCallback callback) {
   const DataSourceID dsid = ++last_data_source_id_;
-  PERFETTO_DLOG("RegisterDataSource from producer %" PRIu64, id_);
   task_runner_->PostTask(std::bind(std::move(callback), dsid));
   // TODO implement the bookkeeping logic.
+  if (service_->observer_)
+    service_->observer_->OnDataSourceRegistered(id_, dsid);
 }
 
 void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
     DataSourceID dsid) {
-  PERFETTO_DLOG("UnregisterDataSource(%" PRIu64 ") from producer %" PRIu64,
-                dsid, id_);
   PERFETTO_CHECK(dsid);
   // TODO implement the bookkeeping logic.
-  return;
+  if (service_->observer_)
+    service_->observer_->OnDataSourceUnregistered(id_, dsid);
 }
 
 void ServiceImpl::ProducerEndpointImpl::DrainSharedBuffer(
     const std::vector<uint32_t>& changed_pages) {
-  PERFETTO_DLOG("DrainSharedBuffer() from producer %" PRIu64, id_);
   // TODO implement the bookkeeping logic.
   return;
+}
+
+void ServiceImpl::set_observer_for_testing(ObserverForTesting* observer) {
+  observer_ = observer;
 }
 
 }  // namespace perfetto

@@ -87,6 +87,24 @@ class Service {
   // To disconnect just destroy the returned ProducerEndpoint object. It is safe
   // to destroy the Producer once the Producer::OnDisconnect() has been invoked.
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(Producer*) = 0;
+
+ public:  // Testing-only
+  class ObserverForTesting {
+   public:
+    virtual ~ObserverForTesting() {}
+    virtual void OnProducerConnected(ProducerID) {}
+    virtual void OnProducerDisconnected(ProducerID) {}
+    virtual void OnDataSourceRegistered(ProducerID, DataSourceID) {}
+    virtual void OnDataSourceUnregistered(ProducerID, DataSourceID) {}
+    virtual void OnDataSourceInstanceCreated(ProducerID,
+                                             DataSourceID,
+                                             DataSourceInstanceID) {}
+    virtual void OnDataSourceInstanceDestroyed(ProducerID,
+                                               DataSourceID,
+                                               DataSourceInstanceID) {}
+  };
+
+  virtual void set_observer_for_testing(ObserverForTesting*) = 0;
 };
 
 }  // namespace perfetto

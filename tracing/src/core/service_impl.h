@@ -37,22 +37,6 @@ class SharedMemory;
 // The tracing service business logic.
 class ServiceImpl : public Service {
  public:
-  explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
-                       base::TaskRunner*);
-  ~ServiceImpl() override;
-
-  // Called by the ProducerEndpointImpl dtor.
-  void DisconnectProducer(ProducerID);
-
-  // Service implementation.
-  std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
-      Producer*) override;
-
-  // Exposed mainly for testing.
-  size_t num_producers() const { return producers_.size(); }
-  Service::ProducerEndpoint* GetProducer(ProducerID) const;
-
- private:
   // The implementation behind the service endpoint exposed to each producer.
   class ProducerEndpointImpl : public Service::ProducerEndpoint {
    public:
@@ -85,6 +69,23 @@ class ServiceImpl : public Service {
     DataSourceID last_data_source_id_ = 0;
   };
 
+  explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
+                       base::TaskRunner*);
+  ~ServiceImpl() override;
+
+  // Called by the ProducerEndpointImpl dtor.
+  void DisconnectProducer(ProducerID);
+
+  // Service implementation.
+  std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
+      Producer*) override;
+  void set_observer_for_testing(ObserverForTesting*) override;
+
+  // Exposed mainly for testing.
+  size_t num_producers() const { return producers_.size(); }
+  ProducerEndpointImpl* GetProducer(ProducerID) const;
+
+ private:
   ServiceImpl(const ServiceImpl&) = delete;
   ServiceImpl& operator=(const ServiceImpl&) = delete;
 
@@ -92,6 +93,7 @@ class ServiceImpl : public Service {
   base::TaskRunner* const task_runner_;
   ProducerID last_producer_id_ = 0;
   std::map<ProducerID, ProducerEndpointImpl*> producers_;
+  ObserverForTesting* observer_ = nullptr;
 };
 
 }  // namespace perfetto

@@ -143,13 +143,35 @@ void PosixServiceProducerPort::GetAsyncCommand(
 
 PosixServiceProducerPort::ProducerProxy::ProducerProxy() = default;
 PosixServiceProducerPort::ProducerProxy::~ProducerProxy() = default;
-void PosixServiceProducerPort::ProducerProxy::OnConnect(ProducerID,
-                                                        SharedMemory*) {}
-void PosixServiceProducerPort::ProducerProxy::OnDisconnect() {}
+
+void PosixServiceProducerPort::ProducerProxy::OnConnect(ProducerID prid,
+                                                        SharedMemory*) {
+  // TODO
+}
+
+void PosixServiceProducerPort::ProducerProxy::OnDisconnect() {
+  // TODO
+  PERFETTO_DLOG("OnDisconnect");
+}
+
 void PosixServiceProducerPort::ProducerProxy::CreateDataSourceInstance(
-    DataSourceInstanceID,
-    const DataSourceConfig&) {}
+    DataSourceInstanceID dsid,
+    const DataSourceConfig& cfg) {
+  auto cmd = ipc::AsyncResult<GetAsyncCommandResponse>::Create();
+  cmd.set_has_more(true);
+  cmd->mutable_start_data_source()->set_new_instance_id(dsid);
+  cmd->mutable_start_data_source()
+      ->mutable_config()
+      ->set_trace_category_filters(cfg.trace_category_filters);
+  async_producer_commands.Resolve(std::move(cmd));
+}
+
 void PosixServiceProducerPort::ProducerProxy::TearDownDataSourceInstance(
-    DataSourceInstanceID) {}
+    DataSourceInstanceID dsid) {
+  auto cmd = ipc::AsyncResult<GetAsyncCommandResponse>::Create();
+  cmd.set_has_more(true);
+  cmd->mutable_stop_data_source()->set_instance_id(dsid);
+  async_producer_commands.Resolve(std::move(cmd));
+}
 
 }  // namespace perfetto

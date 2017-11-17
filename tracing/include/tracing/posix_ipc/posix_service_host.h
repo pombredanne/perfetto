@@ -42,20 +42,6 @@ class PosixServiceHost {
   // failure (e.g., something else is listening on |socket_name|).
   virtual bool Start(const char* producer_socket_name) = 0;
 
-  // Testing-only
- public:
-  class ObserverForTesting {
-   public:
-    virtual ~ObserverForTesting() {}
-    virtual void OnProducerConnected(ProducerID) = 0;
-    virtual void OnDataSourceRegistered(DataSourceID) = 0;
-    virtual void OnDataSourceUnregistered(DataSourceID) = 0;
-    virtual void OnDataSourceInstanceCreated(DataSourceInstanceID) = 0;
-    virtual void OnDataSourceInstanceDestroyed(DataSourceInstanceID) = 0;
-  };
-
-  virtual void set_observer_for_testing(ObserverForTesting*) = 0;
-
   // Accesses the underlying Service business logic. Exposed only for testing.
   virtual Service* service_for_testing() const = 0;
 };
