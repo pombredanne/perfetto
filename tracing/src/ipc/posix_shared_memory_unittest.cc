@@ -47,8 +47,13 @@ bool IsMapped(void* start, size_t size) {
   EXPECT_EQ(0u, size % kPageSize);
   const size_t num_pages = size / kPageSize;
   std::unique_ptr<PageState[]> page_states(new PageState[num_pages]);
-  memset(page_states.get(), 0xff, num_pages * sizeof(PageState));
-  EXPECT_EQ(0, mincore(start, size, page_states.get()));
+  memset(page_states.get(), 0, num_pages * sizeof(PageState));
+  int res = mincore(start, size, page_states.get());
+  // Linux returns ENOMEM when an unmapped memory range is passed.
+  // MacOS instead returns 0 but leaves the page_states empty.
+  if (res == -1 && errno == ENOMEM)
+    return false;
+  EXPECT_EQ(0, res);
   for (size_t i = 0; i < num_pages; i++) {
     if (!page_states[i])
       return false;
