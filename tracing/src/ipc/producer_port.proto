@@ -52,8 +52,16 @@ service ProducerPort {
 }
 
 // Arguments for rpc InitializeConnection().
-message InitializeConnectionRequest {}
-message InitializeConnectionResponse {}
+message InitializeConnectionRequest {
+  // Optional. Provides a hint to the tracing service about the suggested size
+  // of the shared memory buffer. The service is not required to respect this
+  // and might return a smaller buffer.
+  // TODO: uint32 shared_buffer_size_hint = 1;
+}
+
+message InitializeConnectionResponse {
+  // This message provides the shared memory buffer FD (not a proto field).
+}
 
 // Arguments for rpc RegisterDataSource().
 

@@ -47,11 +47,11 @@ ipc_library("ipc_protos") {
 # an IPC transport over a UNIX domain socket.
 source_set("ipc") {
   sources = [
-    "include/tracing/ipc/ipc_service_host.h",
+    "include/tracing/ipc/service_ipc_host.h",
     "src/ipc/posix_shared_memory.cc",
     "src/ipc/posix_shared_memory.h",
-    "src/ipc/service/ipc_service_host_impl.cc",
-    "src/ipc/service/ipc_service_host_impl.h",
+    "src/ipc/service/service_ipc_host_impl.cc",
+    "src/ipc/service/service_ipc_host_impl.h",
     "src/ipc/service/producer_ipc_service.cc",
     "src/ipc/service/producer_ipc_service.h",
   ]

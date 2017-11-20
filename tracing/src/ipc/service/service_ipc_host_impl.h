@@ -19,9 +19,10 @@
 
 #include <memory>
 
-#include "tracing/ipc/ipc_service_host.h"
+#include "tracing/ipc/service_ipc_host.h"
 
 namespace perfetto {
+
 namespace ipc {
 class Host;
 }
@@ -30,22 +31,22 @@ class Host;
 // very few things: it mostly initializes the IPC transport. The actual
 // implementation of the IPC <> Service business logic glue lives in
 // producer_ipc_service.cc and consumer_ipc_service.cc.
-class IPCServiceHostImpl : public IPCServiceHost {
+class ServiceIPCHostImpl : public ServiceIPCHost {
  public:
-  IPCServiceHostImpl(base::TaskRunner*);
-  ~IPCServiceHostImpl() override;
+  ServiceIPCHostImpl(base::TaskRunner*);
+  ~ServiceIPCHostImpl() override;
 
-  // IPCServiceHost implementation.
+  // ServiceIPCHost implementation.
   bool Start(const char* producer_socket_name) override;
   Service* service_for_testing() const override;
 
  private:
   base::TaskRunner* const task_runner_;
-  std::unique_ptr<Service> svc_;  // The Service business logic.
+  std::unique_ptr<Service> svc_;  // The service business logic.
 
   // The IPC host that listens on the Producer socket. It owns the
   // PosixServiceProducerPort instance which deals with all producers' IPC(s).
-  std::unique_ptr<ipc::Host> producer_ipc_host_;
+  std::unique_ptr<ipc::Host> producer_ipc_port_;
 };
 
 }  // namespace perfetto
