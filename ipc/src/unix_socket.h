@@ -159,8 +159,13 @@ class UnixSocket {
   int fd() const { return fd_.get(); }
   int last_error() const { return last_error_; }
 
-  // User ID of the peer, as returned by the kernel.
-  int peer_uid() const { return peer_uid_; }
+  // User ID of the peer, as returned by the kernel. If the client disconnects
+  // and the socket goes into the kDisconnected state, it retains the uid of
+  // the last peer.
+  int peer_uid() const {
+    PERFETTO_DCHECK(!is_listening() && peer_uid_ >= 0);
+    return peer_uid_;
+  }
 
  private:
   UnixSocket(EventListener*, base::TaskRunner*);
