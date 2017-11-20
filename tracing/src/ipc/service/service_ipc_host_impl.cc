@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "tracing/src/ipc/service/ipc_service_host_impl.h"
+#include "tracing/src/ipc/service/service_ipc_host_impl.h"
 
 #include "base/logging.h"
 #include "base/task_runner.h"
@@ -29,17 +29,17 @@ namespace perfetto {
 
 // Implements the publicly exposed factory method declared in
 // include/tracing/posix_ipc/posix_service_host.h.
-std::unique_ptr<IPCServiceHost> IPCServiceHost::CreateInstance(
+std::unique_ptr<ServiceIPCHost> ServiceIPCHost::CreateInstance(
     base::TaskRunner* task_runner) {
-  return std::unique_ptr<IPCServiceHost>(new IPCServiceHostImpl(task_runner));
+  return std::unique_ptr<ServiceIPCHost>(new ServiceIPCHostImpl(task_runner));
 }
 
-IPCServiceHostImpl::IPCServiceHostImpl(base::TaskRunner* task_runner)
+ServiceIPCHostImpl::ServiceIPCHostImpl(base::TaskRunner* task_runner)
     : task_runner_(task_runner) {}
 
-IPCServiceHostImpl::~IPCServiceHostImpl() {}
+ServiceIPCHostImpl::~ServiceIPCHostImpl() {}
 
-bool IPCServiceHostImpl::Start(const char* producer_socket_name) {
+bool ServiceIPCHostImpl::Start(const char* producer_socket_name) {
   PERFETTO_CHECK(!svc_);  // Check if already started.
 
   // Create and initialize the platform-independent tracing business logic.
@@ -48,25 +48,25 @@ bool IPCServiceHostImpl::Start(const char* producer_socket_name) {
   svc_ = Service::CreateInstance(std::move(shm_factory), task_runner_);
 
   // Initialize the IPC transport.
-  producer_ipc_host_ =
+  producer_ipc_port_ =
       ipc::Host::CreateInstance(producer_socket_name, task_runner_);
-  if (!producer_ipc_host_)
+  if (!producer_ipc_port_)
     return false;
 
-  // TODO: add a test that destroyes the IPCServiceHostImpl soon after Start()
+  // TODO: add a test that destroyes the ServiceIPCHostImpl soon after Start()
   // and checks that no spurious callbacks are issued.
-  bool producer_service_exposed = producer_ipc_host_->ExposeService(
+  bool producer_service_exposed = producer_ipc_port_->ExposeService(
       std::unique_ptr<ipc::Service>(new ProducerIPCService(svc_.get())));
   PERFETTO_CHECK(producer_service_exposed);
   return true;
 }
 
-Service* IPCServiceHostImpl::service_for_testing() const {
+Service* ServiceIPCHostImpl::service_for_testing() const {
   return svc_.get();
 }
 
 // Definitions for the base class ctor/dtor.
-IPCServiceHost::IPCServiceHost() = default;
-IPCServiceHost::~IPCServiceHost() = default;
+ServiceIPCHost::ServiceIPCHost() = default;
+ServiceIPCHost::~ServiceIPCHost() = default;
 
 }  // namespace perfetto

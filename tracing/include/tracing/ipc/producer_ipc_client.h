@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_IPC_IPC_CONNECTION_H_
-#define TRACING_INCLUDE_IPC_IPC_CONNECTION_H_
+#ifndef TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_
+#define TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_
 
 #include <memory>
 #include <string>
@@ -30,9 +30,8 @@ class Producer;
 // Exposed to:
 //   Producer(s) and Consumer(s) of the tracing library.
 // Implemented in:
-//   src/ipc/producer/ipc_producer_connection.cc
-//   src/ipc/consumer/ipc_consumer_connection.cc
-class IPCConnection {
+//   src/ipc/producer/producer_ipc_client_impl.cc
+class ProducerIPCClient {
  public:
   // Connects to the producer port of the Service listening on the given
   // |service_socket_name|. If the connection is successful, the OnConnect()
@@ -42,18 +41,13 @@ class IPCConnection {
   // callbacks invoked on the Producer interface: no more Producer callbacks are
   // invoked immediately after its destruction and any pending callback will be
   // dropped.
-  static std::unique_ptr<Service::ProducerEndpoint> ConnectAsProducer(
-      const char* service_socket_name,
-      Producer*,
-      base::TaskRunner*);
+  static std::unique_ptr<Service::ProducerEndpoint>
+  Connect(const char* service_socket_name, Producer*, base::TaskRunner*);
 
-  // Not implemented yet.
-  // static void ConnectAsConsumer(...);
-
- private:
-  IPCConnection() = delete;
+ protected:
+  ProducerIPCClient() = delete;
 };
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_IPC_IPC_CONNECTION_H_
+#endif  // TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_

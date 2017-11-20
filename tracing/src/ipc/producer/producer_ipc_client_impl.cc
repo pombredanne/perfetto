@@ -14,43 +14,59 @@
  * limitations under the License.
  */
 
-#include "tracing/src/ipc/producer/producer_ipc_proxy.h"
+#include "tracing/src/ipc/producer/producer_ipc_client_impl.h"
 
 #include <inttypes.h>
 #include <string.h>
 
 #include "base/task_runner.h"
+#include "ipc/client.h"
 #include "tracing/core/data_source_config.h"
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/producer.h"
 #include "tracing/src/ipc/posix_shared_memory.h"
 
-// TODO think to what happens when ProducerIPCProxy gets destroyed
+// TODO think to what happens when ProducerIPCClientImpl gets destroyed
 // w.r.t. the Producer pointer. Also think to lifetime of the Producer* during
 // the callbacks.
 
 namespace perfetto {
 
-ProducerIPCProxy::ProducerIPCProxy(Producer* producer,
-                                   base::TaskRunner* task_runner)
+// static. (Declared in include/tracing/ipc/producer_ipc_client.h).
+std::unique_ptr<Service::ProducerEndpoint> ProducerIPCClient::Connect(
+    const char* service_sock_name,
+    Producer* producer,
+    base::TaskRunner* task_runner) {
+  return std::unique_ptr<Service::ProducerEndpoint>(
+      new ProducerIPCClientImpl(service_sock_name, producer, task_runner));
+}
+
+ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
+                                             Producer* producer,
+
+                                             base::TaskRunner* task_runner)
     : producer_(producer),
       task_runner_(task_runner),
-      ipc_endpoint_(this /* event_listener */) {}
+      ipc_channel_(ipc::Client::CreateInstance(service_sock_name, task_runner)),
+      producer_port_(this /* event_listener */) {
+  ipc_channel_->BindService(producer_port_.GetWeakPtr());
+}
 
-ProducerIPCProxy::~ProducerIPCProxy() = default;
+ProducerIPCClientImpl::~ProducerIPCClientImpl() = default;
 
-void ProducerIPCProxy::OnConnect() {
+// Called by the IPC layer if the BindService() succeeds.
+void ProducerIPCClientImpl::OnConnect() {
   connected_ = true;
 
   // The IPC layer guarantees that any outstanding callback will be dropped on
-  // the floor if ipc_endpoint_ is destroyed between the request and the reply.
+  // the floor if producer_port_ is destroyed between the request and the reply.
   // Binding |this| is hence safe.
   ipc::Deferred<InitializeConnectionResponse> on_init;
   on_init.Bind([this](ipc::AsyncResult<InitializeConnectionResponse> resp) {
     OnConnectionInitialized(resp.success());
   });
-  ipc_endpoint_.InitializeConnection(InitializeConnectionRequest(),
-                                     std::move(on_init));
+  producer_port_.InitializeConnection(InitializeConnectionRequest(),
+                                      std::move(on_init));
 
   // Create the back channel to receive commands from the Service.
   ipc::Deferred<GetAsyncCommandResponse> on_cmd;
@@ -59,23 +75,27 @@ void ProducerIPCProxy::OnConnect() {
       return;  // The IPC channel was closed and |resp| was auto-rejected.
     OnServiceRequest(*resp);
   });
-  ipc_endpoint_.GetAsyncCommand(GetAsyncCommandRequest(), std::move(on_cmd));
+  producer_port_.GetAsyncCommand(GetAsyncCommandRequest(), std::move(on_cmd));
 }
 
-void ProducerIPCProxy::OnDisconnect() {
+void ProducerIPCClientImpl::OnDisconnect() {
   PERFETTO_DLOG("Tracing service connection failure");
   connected_ = false;
   producer_->OnDisconnect();
 }
 
-void ProducerIPCProxy::OnConnectionInitialized(bool connection_succeeded) {
+void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
+  // TODO: this message will also transfer the shared memory file descriptor.
+  // Wire it up in next cls.
+
   if (connection_succeeded)
     producer_->OnConnect();
   // If connection_succeeded == false, the OnDisconnect() call will follow next
   // and there we'll notify the |producer_|. TODO: add a test for this.
 }
 
-void ProducerIPCProxy::OnServiceRequest(const GetAsyncCommandResponse& cmd) {
+void ProducerIPCClientImpl::OnServiceRequest(
+    const GetAsyncCommandResponse& cmd) {
   if (cmd.cmd_case() == GetAsyncCommandResponse::kStartDataSource) {
     // Keep this in sync with chages in data_source_config.proto.
     const auto& req = cmd.start_data_source();
@@ -97,7 +117,7 @@ void ProducerIPCProxy::OnServiceRequest(const GetAsyncCommandResponse& cmd) {
                 cmd.cmd_case());
 }
 
-void ProducerIPCProxy::RegisterDataSource(
+void ProducerIPCClientImpl::RegisterDataSource(
     const DataSourceDescriptor& descriptor,
     RegisterDataSourceCallback callback) {
   if (!connected_) {
@@ -112,8 +132,8 @@ void ProducerIPCProxy::RegisterDataSource(
   ipc::Deferred<RegisterDataSourceResponse> async_response;
   // TODO: add a test that destroys the IPC channel soon after this call and
   // checks that the callback(0) is invoked.
-  // TODO: add a test that destroyes ProducerIPCProxy soon after this call and
-  // checks that the callback is dropped.
+  // TODO: add a test that destroyes ProducerIPCClientImpl soon after this call
+  // and checks that the callback is dropped.
   async_response.Bind(
       [callback](ipc::AsyncResult<RegisterDataSourceResponse> response) {
         if (!response) {
@@ -125,10 +145,10 @@ void ProducerIPCProxy::RegisterDataSource(
                         response->error().c_str());
         callback(response->data_source_id());
       });
-  ipc_endpoint_.RegisterDataSource(req, std::move(async_response));
+  producer_port_.RegisterDataSource(req, std::move(async_response));
 }
 
-void ProducerIPCProxy::UnregisterDataSource(DataSourceID id) {
+void ProducerIPCClientImpl::UnregisterDataSource(DataSourceID id) {
   if (!connected_) {
     PERFETTO_DLOG(
         "Cannot UnregisterDataSource(), not connected to tracing service");
@@ -136,11 +156,11 @@ void ProducerIPCProxy::UnregisterDataSource(DataSourceID id) {
   }
   UnregisterDataSourceRequest req;
   req.set_data_source_id(id);
-  ipc_endpoint_.UnregisterDataSource(
+  producer_port_.UnregisterDataSource(
       req, ipc::Deferred<UnregisterDataSourceResponse>());
 }
 
-void ProducerIPCProxy::NotifySharedMemoryUpdate(
+void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
   if (!connected_) {
     PERFETTO_DLOG(
@@ -150,7 +170,7 @@ void ProducerIPCProxy::NotifySharedMemoryUpdate(
   NotifySharedMemoryUpdateRequest req;
   for (uint32_t changed_page : changed_pages)
     req.add_changed_pages(changed_page);
-  ipc_endpoint_.NotifySharedMemoryUpdate(
+  producer_port_.NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
 }
 

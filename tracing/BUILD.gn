@@ -47,17 +47,16 @@ ipc_library("ipc_protos") {
 # an IPC transport over a UNIX domain socket.
 source_set("ipc") {
   sources = [
-    "include/tracing/ipc/ipc_connection.h",
-    "include/tracing/ipc/ipc_service_host.h",
+    "include/tracing/ipc/producer_ipc_client.h",
+    "include/tracing/ipc/service_ipc_host.h",
     "src/ipc/posix_shared_memory.cc",
     "src/ipc/posix_shared_memory.h",
-    "src/ipc/producer/producer_ipc_connection.cc",
-    "src/ipc/producer/producer_ipc_proxy.cc",
-    "src/ipc/producer/producer_ipc_proxy.h",
-    "src/ipc/service/ipc_service_host_impl.cc",
-    "src/ipc/service/ipc_service_host_impl.h",
+    "src/ipc/producer/producer_ipc_client_impl.cc",
+    "src/ipc/producer/producer_ipc_client_impl.h",
     "src/ipc/service/producer_ipc_service.cc",
     "src/ipc/service/producer_ipc_service.h",
+    "src/ipc/service/service_ipc_host_impl.cc",
+    "src/ipc/service/service_ipc_host_impl.h",
   ]
   deps = [
     ":ipc_protos",
