@@ -17,8 +17,11 @@
 #ifndef TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
 #define TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
 
+#include <stdint.h>
+
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "tracing/core/basic_types.h"
 #include "tracing/core/shared_memory.h"
