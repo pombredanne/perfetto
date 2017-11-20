@@ -28,8 +28,6 @@ class FtraceApi {
   FtraceApi(const std::string& root);
   virtual ~FtraceApi();
 
-  virtual base::ScopedFile OpenFile(const std::string& path);
-
   // Enable the event under with the given |group| and |name|.
   bool EnableEvent(const std::string& group, const std::string& name);
 
@@ -57,8 +55,7 @@ class FtraceApi {
   // point.
   bool IsTracingEnabled();
 
-  std::string GetTracePipeRawPath(size_t cpu);
-
+  virtual base::ScopedFile OpenPipeForCpu(size_t cpu);
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:

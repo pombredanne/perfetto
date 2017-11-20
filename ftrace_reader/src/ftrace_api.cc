@@ -65,28 +65,9 @@ bool FtraceApi::DisableEvent(const std::string& group,
   return WriteToFile(path, "0");
 }
 
-bool FtraceApi::WriteToFile(const std::string& path, const std::string& str) {
-  base::ScopedFile fd(open(path.c_str(), O_WRONLY));
-  if (!fd)
-    return false;
-  ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
-  ssize_t length = static_cast<ssize_t>(str.length());
-  // This should either fail or write fully.
-  PERFETTO_DCHECK(written == length || written == -1);
-  return written == length;
-}
-
-base::ScopedFile FtraceApi::OpenFile(const std::string& path) {
-  return base::ScopedFile(open(path.c_str(), O_RDONLY));
-}
-
 size_t FtraceApi::NumberOfCpus() const {
   static size_t num_cpus = sysconf(_SC_NPROCESSORS_CONF);
   return num_cpus;
-}
-
-std::string FtraceApi::GetTracePipeRawPath(size_t cpu) {
-  return root_ + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
 }
 
 void FtraceApi::ClearTrace() {
@@ -113,6 +94,23 @@ bool FtraceApi::DisableTracing() {
 bool FtraceApi::IsTracingEnabled() {
   std::string path = root_ + "tracing_on";
   return ReadOneCharFromFile(path) == '1';
+}
+
+bool FtraceApi::WriteToFile(const std::string& path, const std::string& str) {
+  base::ScopedFile fd(open(path.c_str(), O_WRONLY));
+  if (!fd)
+    return false;
+  ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
+  ssize_t length = static_cast<ssize_t>(str.length());
+  // This should either fail or write fully.
+  PERFETTO_DCHECK(written == length || written == -1);
+  return written == length;
+}
+
+base::ScopedFile FtraceApi::OpenPipeForCpu(size_t cpu) {
+  std::string path =
+      root_ + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
+  return base::ScopedFile(open(path.c_str(), O_RDONLY));
 }
 
 }  // namespace perfetto

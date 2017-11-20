@@ -27,6 +27,18 @@ namespace perfetto {
 
 namespace {
 
+const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
+                                           const std::set<std::string>& names) {
+  std::vector<bool> enabled(table.largest_id() + 1);
+  for (const std::string& name : names) {
+    const ProtoTranslationTable::Event* event = table.GetEventByName(name);
+    if (!event)
+      continue;
+    enabled[event->ftrace_event_id] = true;
+  }
+  return enabled;
+}
+
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
 // Some information about the values of these constants are exposed to user
@@ -57,6 +69,12 @@ struct TimeStamp {
 
 }  // namespace
 
+EventFilter::EventFilter(const ProtoTranslationTable& table,
+                         std::set<std::string> names)
+    : enabled_(BuildEnabledVector(table, names)),
+      enabled_names_(std::move(names)) {}
+EventFilter::~EventFilter() = default;
+
 CpuReader::CpuReader(const ProtoTranslationTable* table,
                      size_t cpu,
                      base::ScopedFile fd)
@@ -66,7 +84,7 @@ int CpuReader::GetFileDescriptor() {
   return fd_.get();
 }
 
-bool CpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
+bool CpuReader::Drain(std::vector<Writer>* writers) {
   if (!fd_)
     return false;
 
@@ -77,7 +95,10 @@ bool CpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
     return false;
   PERFETTO_CHECK(bytes <= kPageSize);
 
-  return ParsePage(cpu_, buffer, bytes, bundle);
+  for (const Writer& writer : *writers) {
+    ParsePage(cpu_, buffer, bytes, writer.filter, nullptr);
+  }
+  return true;
 }
 
 CpuReader::~CpuReader() = default;
@@ -100,6 +121,7 @@ uint8_t* CpuReader::GetBuffer() {
 bool CpuReader::ParsePage(size_t cpu,
                           const uint8_t* ptr,
                           size_t size,
+                          const EventFilter* filter,
                           pbzero::FtraceEventBundle* bundle) {
   const uint8_t* const start = ptr;
   const uint8_t* const end = ptr + size;

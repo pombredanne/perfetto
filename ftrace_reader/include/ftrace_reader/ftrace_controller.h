@@ -39,6 +39,7 @@ class FtraceController;
 class ProtoTranslationTable;
 class CpuReader;
 class FtraceApi;
+class EventFilter;
 
 class FtraceConfig {
  public:
@@ -70,14 +71,29 @@ class FtraceSink {
     virtual ~Delegate() = default;
   };
 
-  // TODO(hjd): Make private.
-  const std::set<std::string>& enabled_events() { return config_.events(); }
-  FtraceSink(base::WeakPtr<FtraceController>, FtraceConfig);
+  FtraceSink(base::WeakPtr<FtraceController>,
+             std::unique_ptr<EventFilter>,
+             Delegate*);
   ~FtraceSink();
 
  private:
+  friend FtraceController;
+
+  EventFilter* GetEventFilter() { return filter_.get(); }
+  protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> GetBundleForCpu(
+      size_t cpu) {
+    return delegate_->GetBundleForCpu(cpu);
+  }
+  void OnBundleComplete(
+      size_t cpu,
+      protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle) {
+    delegate_->OnBundleComplete(cpu, std::move(bundle));
+  }
+
+  const std::set<std::string>& enabled_events();
   base::WeakPtr<FtraceController> controller_weak_;
-  FtraceConfig config_;
+  std::unique_ptr<EventFilter> filter_;
+  FtraceSink::Delegate* delegate_;
 };
 
 // Utility class for controlling ftrace.
@@ -99,8 +115,7 @@ class FtraceController {
 
   virtual std::unique_ptr<CpuReader> CreateCpuReader(
       const ProtoTranslationTable*,
-      size_t cpu,
-      const std::string& path);
+      size_t cpu);
 
  private:
   friend FtraceSink;

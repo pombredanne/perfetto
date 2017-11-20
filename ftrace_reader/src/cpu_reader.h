@@ -22,26 +22,49 @@
 
 #include "base/scoped_file.h"
 #include "gtest/gtest_prod.h"
-
+#include "proto_translation_table.h"
 #include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 
 class ProtoTranslationTable;
 
+class EventFilter {
+ public:
+  EventFilter(const ProtoTranslationTable&, std::set<std::string>);
+  ~EventFilter();
+
+  bool IsEventEnabled(size_t ftrace_event_id) const {
+    if (ftrace_event_id == 0 || ftrace_event_id > enabled_.size())
+      return false;
+    return enabled_[ftrace_event_id];
+  }
+
+  const std::set<std::string>& enabled_names() { return enabled_names_; }
+
+ private:
+  EventFilter(const EventFilter&) = delete;
+  EventFilter& operator=(const EventFilter&) = delete;
+
+  const std::vector<bool> enabled_;
+  std::set<std::string> enabled_names_;
+};
+
 class CpuReader {
  public:
-  class Config {};
+  struct Writer {
+    const EventFilter* filter;
+    protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle;
+    Writer(
+        const EventFilter* the_filter,
+        protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> the_bundle)
+        : filter(the_filter), bundle(std::move(the_bundle)) {}
+  };
 
   CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
   ~CpuReader();
 
-  bool Read(const Config&, pbzero::FtraceEventBundle*);
-  bool Read() {
-    PERFETTO_DLOG("Read CPU");
-    return true;
-  }
-
+  bool Drain(std::vector<Writer>* writers);
   int GetFileDescriptor();
 
  private:
@@ -64,6 +87,7 @@ class CpuReader {
   static bool ParsePage(size_t cpu,
                         const uint8_t* ptr,
                         size_t ptr_size,
+                        const EventFilter*,
                         pbzero::FtraceEventBundle*);
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;

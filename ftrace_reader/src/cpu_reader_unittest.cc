@@ -22,6 +22,37 @@
 
 namespace perfetto {
 
+TEST(EventFilterTest, EventFilter) {
+  using Event = ProtoTranslationTable::Event;
+  using Field = ProtoTranslationTable::Field;
+
+  std::vector<Field> common_fields;
+  std::vector<Event> events;
+
+  {
+    Event event;
+    event.name = "foo";
+    event.ftrace_event_id = 1;
+    events.push_back(event);
+  }
+
+  {
+    Event event;
+    event.name = "bar";
+    event.ftrace_event_id = 10;
+    events.push_back(event);
+  }
+
+  ProtoTranslationTable table(events, std::move(common_fields));
+  EventFilter filter(table, std::set<std::string>({"foo"}));
+
+  EXPECT_TRUE(filter.IsEventEnabled(1));
+  EXPECT_FALSE(filter.IsEventEnabled(2));
+  EXPECT_FALSE(filter.IsEventEnabled(10));
+  EXPECT_FALSE(filter.IsEventEnabled(0));
+  EXPECT_FALSE(filter.IsEventEnabled(100));
+}
+
 TEST(CpuReaderTest, ReadAndAdvanceNumber) {
   uint64_t expected = 42;
   uint64_t actual = 0;
