@@ -50,10 +50,10 @@ source_set("ipc") {
     "include/tracing/ipc/service_ipc_host.h",
     "src/ipc/posix_shared_memory.cc",
     "src/ipc/posix_shared_memory.h",
-    "src/ipc/service/service_ipc_host_impl.cc",
-    "src/ipc/service/service_ipc_host_impl.h",
     "src/ipc/service/producer_ipc_service.cc",
     "src/ipc/service/producer_ipc_service.h",
+    "src/ipc/service/service_ipc_host_impl.cc",
+    "src/ipc/service/service_ipc_host_impl.h",
   ]
   deps = [
     ":ipc_protos",

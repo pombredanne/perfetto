@@ -120,11 +120,11 @@ void ProducerIPCService::OnDataSourceRegistered(ipc::ClientID ipc_client_id,
   PERFETTO_DLOG("Data source %s registered, Client:%" PRIu64 " ID: %" PRIu64,
                 data_source_name.c_str(), ipc_client_id, id);
 
-  DeferredRegisterDataSourceResponse ipc_repsonse = std::move(it->second);
+  DeferredRegisterDataSourceResponse ipc_response = std::move(it->second);
   producer->pending_data_sources.erase(it);
   auto response = ipc::AsyncResult<RegisterDataSourceResponse>::Create();
   response->set_data_source_id(id);
-  ipc_repsonse.Resolve(std::move(response));
+  ipc_response.Resolve(std::move(response));
 }
 
 // Called by the IPC layer.

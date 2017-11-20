@@ -17,6 +17,7 @@
 #ifndef IPC_INCLUDE_IPC_CLIENT_INFO_H_
 #define IPC_INCLUDE_IPC_CLIENT_INFO_H_
 
+#include "base/logging.h"
 #include "ipc/basic_types.h"
 
 namespace perfetto {
@@ -35,8 +36,11 @@ class ClientInfo {
 
   // For map<> and other sorted containers.
   bool operator<(const ClientInfo& other) const {
+    PERFETTO_DCHECK(client_id_ != other.client_id_ || *this == other);
     return client_id_ < other.client_id_;
   }
+
+  bool is_valid() const { return client_id_ != 0; }
 
   // A monotonic counter.
   ClientID client_id() const { return client_id_; }
