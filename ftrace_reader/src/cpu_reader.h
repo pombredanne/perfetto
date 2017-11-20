@@ -55,6 +55,7 @@ class CpuReader {
   struct Writer {
     const EventFilter* filter;
     protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle;
+
     Writer(
         const EventFilter* the_filter,
         protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> the_bundle)

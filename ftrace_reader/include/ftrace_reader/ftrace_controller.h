@@ -113,10 +113,6 @@ class FtraceController {
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
 
-  virtual std::unique_ptr<CpuReader> CreateCpuReader(
-      const ProtoTranslationTable*,
-      size_t cpu);
-
  private:
   friend FtraceSink;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);

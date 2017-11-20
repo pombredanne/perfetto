@@ -112,16 +112,11 @@ CpuReader* FtraceController::GetCpuReader(size_t cpu) {
   if (cpu >= ftrace_api_->NumberOfCpus())
     return nullptr;
   if (!readers_.count(cpu)) {
-    readers_.emplace(cpu, CreateCpuReader(table_.get(), cpu));
+    readers_.emplace(cpu,
+                     std::unique_ptr<CpuReader>(new CpuReader(
+                         table_.get(), cpu, ftrace_api_->OpenPipeForCpu(cpu))));
   }
   return readers_.at(cpu).get();
-}
-
-std::unique_ptr<CpuReader> FtraceController::CreateCpuReader(
-    const ProtoTranslationTable* table,
-    size_t cpu) {
-  return std::unique_ptr<CpuReader>(
-      new CpuReader(table, cpu, ftrace_api_->OpenPipeForCpu(cpu)));
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
