@@ -18,6 +18,7 @@
 
 #include <fcntl.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -31,20 +32,16 @@ namespace perfetto {
 
 // static
 std::unique_ptr<PosixSharedMemory> PosixSharedMemory::Create(size_t size) {
-  // TODO: use memfd_create on Linux/Android if the kernel supports is (needs
-  // syscall.h, there is no glibc wrtapper). If not, on Android fallback on
+  // TODO: use memfd_create on Linux/Android if the kernel supports it (needs
+  // syscall.h, there is no glibc wrapper). If not, on Android fallback on
   // ashmem and on Linux fallback on /dev/shm/perfetto-whatever.
-  char path[64];
-  sprintf(path, "/tmp/perfetto-shm-%d", getpid());
-
-  base::ScopedFile fd(
-      open(path, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR));
-  if (!fd)
-    return nullptr;
+  char path[] = "/tmp/perfetto-shm.XXXXXX";
+  base::ScopedFile fd(mkstemp(path));
+  PERFETTO_CHECK(fd);
   int res = unlink(path);
-  PERFETTO_DCHECK(res == 0);
-  if (ftruncate(fd.get(), static_cast<off_t>(size)) < 0)
-    return nullptr;
+  PERFETTO_CHECK(res == 0);
+  res = ftruncate(fd.get(), static_cast<off_t>(size));
+  PERFETTO_CHECK(res == 0);
   return MapFD(std::move(fd), size);
 }
 
@@ -52,9 +49,8 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::Create(size_t size) {
 std::unique_ptr<PosixSharedMemory> PosixSharedMemory::AttachToFd(
     base::ScopedFile fd) {
   struct stat stat_buf = {};
-  if (fstat(fd.get(), &stat_buf))
-    return nullptr;
-  PERFETTO_DCHECK(stat_buf.st_size > 0);
+  int res = fstat(fd.get(), &stat_buf);
+  PERFETTO_CHECK(res == 0 && stat_buf.st_size > 0);
   return MapFD(std::move(fd), static_cast<size_t>(stat_buf.st_size));
 }
 
@@ -64,8 +60,7 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd,
   PERFETTO_DCHECK(fd);
   PERFETTO_DCHECK(size > 0);
   void* start = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
-  if (start == MAP_FAILED)
-    return nullptr;
+  PERFETTO_CHECK(start != MAP_FAILED);
   return std::unique_ptr<PosixSharedMemory>(
       new PosixSharedMemory(start, size, std::move(fd)));
 }

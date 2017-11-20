@@ -72,7 +72,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   // Invoked soon after having established the connection with the service.
   void OnConnectionInitialized(bool connection_succeeded);
 
-  // Invoked when the remote Service sends an IPC to tell us to do someting
+  // Invoked when the remote Service sends an IPC to tell us to do something
   // (e.g. start/stop a data source).
   void OnServiceRequest(const GetAsyncCommandResponse&);
 

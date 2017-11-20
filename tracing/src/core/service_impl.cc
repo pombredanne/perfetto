@@ -96,9 +96,6 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       shared_memory_(std::move(shared_memory)) {}
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
-  // TODO: this is a violation of our callback contract. We promised to not send
-  // callbacks to the Producer* once we get destroyed.
-  // task_runner_->PostTask(std::bind(&Producer::OnDisconnect, producer_));
   producer_->OnDisconnect();
   service_->DisconnectProducer(id_);
 }

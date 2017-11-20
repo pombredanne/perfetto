@@ -17,6 +17,7 @@
 #ifndef IPC_INCLUDE_IPC_SERVICE_H_
 #define IPC_INCLUDE_IPC_SERVICE_H_
 
+#include "base/logging.h"
 #include "ipc/client_info.h"
 
 namespace perfetto {
@@ -39,7 +40,10 @@ class Service {
 
   // Returns the ClientInfo for the current IPC request. Returns an invalid
   // ClientInfo if called outside the scope of an IPC method.
-  ClientInfo client_info() const { return client_info_; }
+  ClientInfo client_info() const {
+    PERFETTO_DCHECK(client_info_.is_valid());
+    return client_info_;
+  }
 
  private:
   friend class HostImpl;
