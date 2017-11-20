@@ -25,17 +25,6 @@ package perfetto.proto;
 message DataSourceDescriptor {
   string name = 1;  // e.g., "linux.ftrace", "chromium.tracing"
 
-  enum Mode {
-    // The data source, once enabled, will spontaneously write data into the
-    // tracing buffer (e.g., kernel ftrace events).
-    CONTINUOUS = 0;
-
-    // The data source needs to be triggered to inject a new snapshot into the
-    // tracing buffer (e.g., process stats). TODO: not implemented yet.
-    POLLING = 1;
-  }
-  Mode mode = 2;
-
   // TODO: this should have a structure to enabled reflection of the proto
   // fields emitted (see go/perfetto-logging).
 }
