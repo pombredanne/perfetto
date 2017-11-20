@@ -42,9 +42,6 @@ class ServiceIPCHost {
   // failure (e.g., something else is listening on |socket_name|).
   virtual bool Start(const char* producer_socket_name) = 0;
 
-  // Accesses the underlying Service business logic. Exposed only for testing.
-  virtual Service* service_for_testing() const = 0;
-
  protected:
   ServiceIPCHost();
 

@@ -28,6 +28,7 @@
 #include "tracing/ipc/producer_ipc_client.h"
 #include "tracing/ipc/service_ipc_host.h"
 #include "tracing/src/core/service_impl.h"
+#include "tracing/src/ipc/service/service_ipc_host_impl.h"
 
 namespace perfetto {
 
@@ -91,7 +92,8 @@ void __attribute__((noreturn)) ProducerMain() {
 void __attribute__((noreturn)) ServiceMain() {
   unlink(kSocketName);
   base::TestTaskRunner task_runner;
-  auto host = ServiceIPCHost::CreateInstance(&task_runner);
+  std::unique_ptr<ServiceIPCHostImpl> host(static_cast<ServiceIPCHostImpl*>(
+      ServiceIPCHost::CreateInstance(&task_runner).release()));
 
   class Observer : public Service::ObserverForTesting {
    public:
@@ -101,7 +103,7 @@ void __attribute__((noreturn)) ServiceMain() {
     }
 
     void OnProducerDisconnected(ProducerID prid) override {
-      printf("Producer disonnected: ID=%" PRIu64 "\n", prid);
+      printf("Producer disconnected: ID=%" PRIu64 "\n", prid);
     }
 
     void OnDataSourceRegistered(ProducerID prid, DataSourceID dsid) override {

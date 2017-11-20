@@ -21,10 +21,10 @@ package perfetto.proto;
 
 // This message is sent from Producer(s) to the tracing Service when registering
 // to advertise their capabilities. It describes the structure of tracing
-// structs that will be produced by the data source and the supported filters.
+// protos that will be produced by the data source and the supported filters.
 message DataSourceDescriptor {
   string name = 1;  // e.g., "linux.ftrace", "chromium.tracing"
 
-  // TODO: this should have a structure to enabled reflection of the proto
+  // TODO: this should have a structure to enable reflection of the proto
   // fields emitted (see go/perfetto-logging).
 }

@@ -43,7 +43,6 @@ std::unique_ptr<Service::ProducerEndpoint> ProducerIPCClient::Connect(
 
 ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
                                              Producer* producer,
-
                                              base::TaskRunner* task_runner)
     : producer_(producer),
       task_runner_(task_runner),
@@ -140,9 +139,10 @@ void ProducerIPCClientImpl::RegisterDataSource(
           PERFETTO_DLOG("RegisterDataSource() failed: connection reset");
           return callback(0);
         }
-        if (response->data_source_id() == 0)
+        if (response->data_source_id() == 0) {
           PERFETTO_DLOG("RegisterDataSource() failed: %s",
                         response->error().c_str());
+        }
         callback(response->data_source_id());
       });
   producer_port_.RegisterDataSource(req, std::move(async_response));
