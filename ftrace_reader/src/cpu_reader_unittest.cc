@@ -16,6 +16,7 @@
 
 #include "cpu_reader.h"
 
+#include "ftrace_api.h"
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
@@ -107,7 +108,8 @@ TEST(CpuReaderTest, ReadAndAdvanceUnderruns) {
 
 TEST(CpuReaderTest, ParseEmpty) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
-  auto table = ProtoTranslationTable::Create(path);
+  FtraceApi ftrace_api(path);
+  auto table = ProtoTranslationTable::Create(path, &ftrace_api);
   CpuReader(table.get(), 42, base::ScopedFile());
 }
 

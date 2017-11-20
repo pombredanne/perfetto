@@ -47,7 +47,7 @@ executable("ftrace_reader_integrationtests") {
     "//buildtools:gtest_main",
   ]
   sources = [
-    "src/ftrace_controller_integrationtest.cc",
+    "src/ftrace_api_integrationtest.cc",
   ]
 }
 

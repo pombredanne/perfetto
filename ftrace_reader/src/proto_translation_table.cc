@@ -20,6 +20,7 @@
 #include <sstream>
 #include <string>
 
+#include "ftrace_api.h"
 #include "ftrace_reader/format_parser.h"
 #include "ftrace_reader/ftrace_to_proto.h"
 
@@ -78,7 +79,8 @@ const std::vector<bool> BuildEnabledVector(const Table& table,
 
 // static
 std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
-    std::string path_to_root) {
+    std::string path_to_root,
+    const FtraceApi* ftrace_api) {
   if (path_to_root.length() == 0 || path_to_root.back() != '/') {
     PERFETTO_DLOG("Path '%s' must end with /.", path_to_root.c_str());
     return nullptr;

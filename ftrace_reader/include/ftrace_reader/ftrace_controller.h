@@ -88,30 +88,12 @@ class FtraceController {
 
   std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
 
-  // Clears the trace buffers for all CPUs. Blocks until this is done.
-  void ClearTrace();
-
-  // Writes the string |str| as an event into the trace buffer.
-  bool WriteTraceMarker(const std::string& str);
-
-  // Enable tracing.
-  bool EnableTracing();
-
-  // Disables tracing, does not clear the buffer.
-  bool DisableTracing();
-
-  // Returns true iff tracing is enabled.
-  // Necessarily racy: another program could enable/disable tracing at any
-  // point.
-  bool IsTracingEnabled();
-
   void Start();
   void Stop();
 
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceApi>,
-                   const std::string& root,
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
 
@@ -134,18 +116,12 @@ class FtraceController {
 
   void CpuReady(size_t cpu);
 
-  // Enable the event under with the given |group| and |name|.
-  bool EnableEvent(const std::string& group, const std::string& name);
-  // Disable the event under with the given |group| and |name|.
-  bool DisableEvent(const std::string& group, const std::string& name);
-
   // Returns a cached CpuReader for |cpu|.
   // CpuReaders are constructed lazily.
   CpuReader* GetCpuReader(size_t cpu);
 
-  std::unique_ptr<FtraceApi> impl_;
-  bool running_;
-  const std::string root_;
+  std::unique_ptr<FtraceApi> ftrace_api_;
+  bool running_ = false;
   base::TaskRunner* task_runner_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;

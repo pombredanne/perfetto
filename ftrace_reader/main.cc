@@ -105,8 +105,8 @@ int main(int argc, const char** argv) {
   FakeTaskRunner runner;
   auto ftrace = perfetto::FtraceController::Create(&runner);
 
-  ftrace->ClearTrace();
-  ftrace->WriteTraceMarker("Hello, world!");
+  //  ftrace->ClearTrace();
+  //  ftrace->WriteTraceMarker("Hello, world!");
 
   perfetto::FtraceConfig config;
   for (int i = 1; i < argc; i++) {

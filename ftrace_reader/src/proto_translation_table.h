@@ -31,6 +31,8 @@
 
 namespace perfetto {
 
+class FtraceApi;
+
 class ProtoTranslationTable {
  public:
   enum FtraceFieldType {
@@ -58,7 +60,8 @@ class ProtoTranslationTable {
   };
 
   static std::unique_ptr<ProtoTranslationTable> Create(
-      std::string path_to_event_dir);
+      std::string path_to_event_dir,
+      const FtraceApi* ftrace_api);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,

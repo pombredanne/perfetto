@@ -100,7 +100,7 @@ std::unique_ptr<Table> FakeTable() {
 
 class MockFtraceApi : public FtraceApi {
  public:
-  MockFtraceApi() : FtraceApi("/tracingroot/") {
+  MockFtraceApi() : FtraceApi("/root/") {
     ON_CALL(*this, NumberOfCpus()).WillByDefault(Return(1));
     EXPECT_CALL(*this, NumberOfCpus()).Times(AnyNumber());
   }
@@ -111,11 +111,10 @@ class MockFtraceApi : public FtraceApi {
 
 class TestFtraceController : public FtraceController {
  public:
-  TestFtraceController(std::unique_ptr<MockFtraceApi> impl,
-                       const std::string& root,
+  TestFtraceController(std::unique_ptr<MockFtraceApi> ftrace_api,
                        base::TaskRunner* runner,
                        std::unique_ptr<Table> table)
-      : FtraceController(std::move(impl), root, runner, std::move(table)) {}
+      : FtraceController(std::move(ftrace_api), runner, std::move(table)) {}
 
   //  MOCK_METHOD3(CreateCpuReader, CpuReader(const ProtoTranslationTable*,
   //  size_t cpu, const std::string& path));
@@ -129,8 +128,8 @@ class TestFtraceController : public FtraceController {
 
 TEST(FtraceControllerTest, NoExistentEventsDontCrash) {
   MockTaskRunner task_runner;
-  auto impl = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
-  TestFtraceController controller(std::move(impl), "/root/", &task_runner,
+  auto ftrace_api = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
+  TestFtraceController controller(std::move(ftrace_api), &task_runner,
                                   FakeTable());
 
   MockDelegate delegate;
@@ -142,26 +141,28 @@ TEST(FtraceControllerTest, NoExistentEventsDontCrash) {
 
 TEST(FtraceControllerTest, OneSink) {
   MockTaskRunner task_runner;
-  auto impl = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
-  auto raw_impl = impl.get();
-  TestFtraceController controller(std::move(impl), "/root/", &task_runner,
+  auto ftrace_api = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
+  auto raw_ftrace_api = ftrace_api.get();
+  TestFtraceController controller(std::move(ftrace_api), &task_runner,
                                   FakeTable());
 
   MockDelegate delegate;
   FtraceConfig config({"foo"});
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "1"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "1"));
   std::unique_ptr<FtraceSink> sink = controller.CreateSink(config, &delegate);
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "0"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "0"));
   sink.reset();
 }
 
 TEST(FtraceControllerTest, MultipleSinks) {
   MockTaskRunner task_runner;
-  auto impl = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
-  auto raw_impl = impl.get();
-  TestFtraceController controller(std::move(impl), "/root/", &task_runner,
+  auto ftrace_api = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
+  auto raw_ftrace_api = ftrace_api.get();
+  TestFtraceController controller(std::move(ftrace_api), &task_runner,
                                   FakeTable());
 
   MockDelegate delegate;
@@ -169,33 +170,39 @@ TEST(FtraceControllerTest, MultipleSinks) {
   FtraceConfig configA({"foo"});
   FtraceConfig configB({"foo", "bar"});
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "1"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "1"));
   std::unique_ptr<FtraceSink> sinkA = controller.CreateSink(configA, &delegate);
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/bar/enable", "1"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/bar/enable", "1"));
   std::unique_ptr<FtraceSink> sinkB = controller.CreateSink(configB, &delegate);
 
   sinkA.reset();
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "0"));
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/bar/enable", "0"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "0"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/bar/enable", "0"));
   sinkB.reset();
 }
 
 TEST(FtraceControllerTest, ControllerMayDieFirst) {
   MockTaskRunner task_runner;
-  auto impl = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
-  auto raw_impl = impl.get();
+  auto ftrace_api = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
+  auto raw_ftrace_api = ftrace_api.get();
   std::unique_ptr<TestFtraceController> controller(new TestFtraceController(
-      std::move(impl), "/root/", &task_runner, FakeTable()));
+      std::move(ftrace_api), &task_runner, FakeTable()));
 
   MockDelegate delegate;
   FtraceConfig config({"foo"});
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "1"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "1"));
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
-  EXPECT_CALL(*raw_impl, WriteToFile("/root/events/group/foo/enable", "0"));
+  EXPECT_CALL(*raw_ftrace_api,
+              WriteToFile("/root/events/group/foo/enable", "0"));
   controller.reset();
 
   sink.reset();
@@ -203,9 +210,9 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
 
 TEST(FtraceControllerTest, StartStop) {
   MockTaskRunner task_runner;
-  auto impl = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
-  auto raw_impl = impl.get();
-  TestFtraceController controller(std::move(impl), "/root/", &task_runner,
+  auto ftrace_api = std::unique_ptr<MockFtraceApi>(new MockFtraceApi());
+  auto raw_ftrace_api = ftrace_api.get();
+  TestFtraceController controller(std::move(ftrace_api), &task_runner,
                                   FakeTable());
 
   // Stopping before we start does nothing.

@@ -28,13 +28,38 @@ class FtraceApi {
   FtraceApi(const std::string& root);
   virtual ~FtraceApi();
 
-  virtual bool WriteToFile(const std::string& path, const std::string& str);
-
   virtual base::ScopedFile OpenFile(const std::string& path);
+
+  // Enable the event under with the given |group| and |name|.
+  bool EnableEvent(const std::string& group, const std::string& name);
+
+  // Disable the event under with the given |group| and |name|.
+  bool DisableEvent(const std::string& group, const std::string& name);
 
   // Returns the number of CPUs.
   // This will match the number of tracing/per_cpu/cpuXX directories.
   size_t virtual NumberOfCpus() const;
+
+  // Clears the trace buffers for all CPUs. Blocks until this is done.
+  void ClearTrace();
+
+  // Writes the string |str| as an event into the trace buffer.
+  bool WriteTraceMarker(const std::string& str);
+
+  // Enable tracing.
+  bool EnableTracing();
+
+  // Disables tracing, does not clear the buffer.
+  bool DisableTracing();
+
+  // Returns true iff tracing is enabled.
+  // Necessarily racy: another program could enable/disable tracing at any
+  // point.
+  bool IsTracingEnabled();
+
+  std::string GetTracePipeRawPath(size_t cpu);
+
+  virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:
   const std::string root_;

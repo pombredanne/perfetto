@@ -37,50 +37,21 @@ namespace {
 // TODO(b/68242551): Do not hardcode these paths.
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
-// Reading this file produces human readable trace output.
-// Writing to this file clears all trace buffers for all CPUS.
-const char kTracePath[] = "/sys/kernel/debug/tracing/trace";
-
-// Writing to this file injects an event into the trace buffer.
-const char kTraceMarkerPath[] = "/sys/kernel/debug/tracing/trace_marker";
-
-// Reading this file returns 1/0 if tracing is enabled/disabled.
-// Writing 1/0 to this file enables/disables tracing.
-// Disabling tracing with this file prevents further writes but
-// does not clear the buffer.
-const char kTracingOnPath[] = "/sys/kernel/debug/tracing/tracing_on";
-
-char ReadOneCharFromFile(const std::string& path) {
-  base::ScopedFile fd(open(path.c_str(), O_RDONLY));
-  if (!fd)
-    return '\0';
-  char result = '\0';
-  ssize_t bytes = PERFETTO_EINTR(read(fd.get(), &result, 1));
-  PERFETTO_DCHECK(bytes == 1 || bytes == -1);
-  return result;
-}
-
-std::string TracePipeRawPath(const std::string& root, size_t cpu) {
-  return root + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
-}
-
 }  // namespace
 
 // static
 std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
-  auto impl = std::unique_ptr<FtraceApi>(new FtraceApi(kTracePath));
-  auto table = ProtoTranslationTable::Create(kTracingPath);
-  return std::unique_ptr<FtraceController>(new FtraceController(
-      std::move(impl), kTracingPath, runner, std::move(table)));
+  auto ftrace_api = std::unique_ptr<FtraceApi>(new FtraceApi(kTracingPath));
+  auto table = ProtoTranslationTable::Create(kTracingPath, ftrace_api.get());
+  return std::unique_ptr<FtraceController>(
+      new FtraceController(std::move(ftrace_api), runner, std::move(table)));
 }
 
-FtraceController::FtraceController(std::unique_ptr<FtraceApi> impl,
-                                   const std::string& root,
+FtraceController::FtraceController(std::unique_ptr<FtraceApi> ftrace_api,
                                    base::TaskRunner* task_runner,
                                    std::unique_ptr<ProtoTranslationTable> table)
-    : impl_(std::move(impl)),
-      root_(root),
+    : ftrace_api_(std::move(ftrace_api)),
       task_runner_(task_runner),
       weak_factory_(this),
       enabled_count_(table->largest_id() + 1),
@@ -89,7 +60,7 @@ FtraceController::~FtraceController() {
   for (size_t id = 1; id <= table_->largest_id(); id++) {
     if (enabled_count_[id]) {
       const ProtoTranslationTable::Event* event = table_->GetEventById(id);
-      DisableEvent(event->group, event->name);
+      ftrace_api_->DisableEvent(event->group, event->name);
     }
   }
 };
@@ -98,7 +69,7 @@ void FtraceController::Start() {
   if (running_)
     return;
   running_ = true;
-  for (size_t cpu = 0; cpu < impl_->NumberOfCpus(); cpu++) {
+  for (size_t cpu = 0; cpu < ftrace_api_->NumberOfCpus(); cpu++) {
     CpuReader* reader = GetCpuReader(cpu);
     int fd = reader->GetFileDescriptor();
     base::WeakPtr<FtraceController> ptr = weak_factory_.GetWeakPtr();
@@ -115,7 +86,7 @@ void FtraceController::Stop() {
   if (!running_)
     return;
   running_ = false;
-  for (size_t cpu = 0; cpu < impl_->NumberOfCpus(); cpu++) {
+  for (size_t cpu = 0; cpu < ftrace_api_->NumberOfCpus(); cpu++) {
     CpuReader* reader = GetCpuReader(cpu);
     int fd = reader->GetFileDescriptor();
     task_runner_->RemoveFileDescriptorWatch(fd);
@@ -127,46 +98,11 @@ void FtraceController::CpuReady(size_t cpu) {
   reader->Read();
 }
 
-void FtraceController::ClearTrace() {
-  base::ScopedFile fd(open(kTracePath, O_WRONLY | O_TRUNC));
-  PERFETTO_CHECK(fd);  // Could not clear.
-}
-
-bool FtraceController::WriteTraceMarker(const std::string& str) {
-  return impl_->WriteToFile(kTraceMarkerPath, str);
-}
-
-bool FtraceController::EnableTracing() {
-  return impl_->WriteToFile(kTracingOnPath, "1");
-}
-
-bool FtraceController::DisableTracing() {
-  return impl_->WriteToFile(kTracingOnPath, "0");
-}
-
-bool FtraceController::IsTracingEnabled() {
-  return ReadOneCharFromFile(kTracingOnPath) == '1';
-}
-
-bool FtraceController::EnableEvent(const std::string& group,
-                                   const std::string& name) {
-  // The events directory contains the 'format' and 'enable' files for each
-  // event. These are nested like so: group_name/event_name/{format, enable}
-  std::string path = root_ + "events/" + group + "/" + name + "/enable";
-  return impl_->WriteToFile(path, "1");
-}
-
-bool FtraceController::DisableEvent(const std::string& group,
-                                    const std::string& name) {
-  std::string path = root_ + "events/" + group + "/" + name + "/enable";
-  return impl_->WriteToFile(path, "0");
-}
-
 CpuReader* FtraceController::GetCpuReader(size_t cpu) {
-  if (cpu >= impl_->NumberOfCpus())
+  if (cpu >= ftrace_api_->NumberOfCpus())
     return nullptr;
   if (!readers_.count(cpu)) {
-    std::string path = TracePipeRawPath(root_, cpu);
+    std::string path = ftrace_api_->GetTracePipeRawPath(cpu);
     readers_.emplace(cpu, CreateCpuReader(table_.get(), cpu, path));
   }
   return readers_.at(cpu).get();
@@ -177,7 +113,7 @@ std::unique_ptr<CpuReader> FtraceController::CreateCpuReader(
     size_t cpu,
     const std::string& path) {
   return std::unique_ptr<CpuReader>(
-      new CpuReader(table, cpu, impl_->OpenFile(path)));
+      new CpuReader(table, cpu, ftrace_api_->OpenFile(path)));
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
@@ -208,7 +144,7 @@ void FtraceController::RegisterForEvent(const std::string& name) {
   }
   size_t& count = enabled_count_.at(event->ftrace_event_id);
   if (count == 0)
-    EnableEvent(event->group, event->name);
+    ftrace_api_->EnableEvent(event->group, event->name);
   count += 1;
 }
 
@@ -221,7 +157,7 @@ void FtraceController::UnregisterForEvent(const std::string& name) {
   PERFETTO_CHECK(count > 0);
   count -= 1;
   if (count == 0)
-    DisableEvent(event->group, event->name);
+    ftrace_api_->DisableEvent(event->group, event->name);
 }
 
 void FtraceController::Unregister(FtraceSink* sink) {

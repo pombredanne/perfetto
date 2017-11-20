@@ -24,9 +24,46 @@
 #include "base/utils.h"
 
 namespace perfetto {
+namespace {
+
+// Reading this file produces human readable trace output.
+// Writing to this file clears all trace buffers for all CPUS.
+// const char kTracePath[] = "/sys/kernel/debug/tracing/trace";
+
+// Writing to this file injects an event into the trace buffer.
+// const char kTraceMarkerPath[] = "/sys/kernel/debug/tracing/trace_marker";
+
+// Reading this file returns 1/0 if tracing is enabled/disabled.
+// Writing 1/0 to this file enables/disables tracing.
+// Disabling tracing with this file prevents further writes but
+// does not clear the buffer.
+// const char kTracingOnPath[] = "/sys/kernel/debug/tracing/tracing_on";
+
+char ReadOneCharFromFile(const std::string& path) {
+  base::ScopedFile fd(open(path.c_str(), O_RDONLY));
+  if (!fd)
+    return '\0';
+  char result = '\0';
+  ssize_t bytes = PERFETTO_EINTR(read(fd.get(), &result, 1));
+  PERFETTO_DCHECK(bytes == 1 || bytes == -1);
+  return result;
+}
+
+}  // namespace
 
 FtraceApi::FtraceApi(const std::string& root) : root_(root) {}
 FtraceApi::~FtraceApi() = default;
+
+bool FtraceApi::EnableEvent(const std::string& group, const std::string& name) {
+  std::string path = root_ + "events/" + group + "/" + name + "/enable";
+  return WriteToFile(path, "1");
+}
+
+bool FtraceApi::DisableEvent(const std::string& group,
+                             const std::string& name) {
+  std::string path = root_ + "events/" + group + "/" + name + "/enable";
+  return WriteToFile(path, "0");
+}
 
 bool FtraceApi::WriteToFile(const std::string& path, const std::string& str) {
   base::ScopedFile fd(open(path.c_str(), O_WRONLY));
@@ -46,6 +83,36 @@ base::ScopedFile FtraceApi::OpenFile(const std::string& path) {
 size_t FtraceApi::NumberOfCpus() const {
   static size_t num_cpus = sysconf(_SC_NPROCESSORS_CONF);
   return num_cpus;
+}
+
+std::string FtraceApi::GetTracePipeRawPath(size_t cpu) {
+  return root_ + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
+}
+
+void FtraceApi::ClearTrace() {
+  std::string path = root_ + "trace";
+  base::ScopedFile fd(open(path.c_str(), O_WRONLY | O_TRUNC));
+  PERFETTO_CHECK(fd);  // Could not clear.
+}
+
+bool FtraceApi::WriteTraceMarker(const std::string& str) {
+  std::string path = root_ + "trace_marker";
+  return WriteToFile(path, str);
+}
+
+bool FtraceApi::EnableTracing() {
+  std::string path = root_ + "tracing_on";
+  return WriteToFile(path, "1");
+}
+
+bool FtraceApi::DisableTracing() {
+  std::string path = root_ + "tracing_on";
+  return WriteToFile(path, "0");
+}
+
+bool FtraceApi::IsTracingEnabled() {
+  std::string path = root_ + "tracing_on";
+  return ReadOneCharFromFile(path) == '1';
 }
 
 }  // namespace perfetto
