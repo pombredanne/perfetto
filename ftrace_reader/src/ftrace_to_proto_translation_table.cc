@@ -112,8 +112,9 @@ FtraceToProtoTranslationTable::Create(std::string path_to_root) {
       event.fields.push_back(Field{ftrace_field.offset, ftrace_field.size});
     }
 
-    if (common_fields.size() == 0) {
-      for (FtraceEvent::Field ftrace_field : ftrace_event.common_fields) {
+    if (common_fields.empty()) {
+      for (const FtraceEvent::Field& ftrace_field :
+           ftrace_event.common_fields) {
         common_fields.push_back(Field{ftrace_field.offset, ftrace_field.size});
       }
     }
