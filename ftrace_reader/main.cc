@@ -105,9 +105,6 @@ int main(int argc, const char** argv) {
   FakeTaskRunner runner;
   auto ftrace = perfetto::FtraceController::Create(&runner);
 
-  //  ftrace->ClearTrace();
-  //  ftrace->WriteTraceMarker("Hello, world!");
-
   perfetto::FtraceConfig config;
   for (int i = 1; i < argc; i++) {
     config.AddEvent(argv[i]);
@@ -122,8 +119,6 @@ int main(int argc, const char** argv) {
   protozero::ScatteredStreamWriter stream_writer(&buffer);
   pbzero::FtraceEventBundle message;
   message.Reset(&stream_writer);
-  //  perfetto::CpuReader* reader = ftrace->GetCpuReader(0);
-  //  reader->Read(perfetto::CpuReader::Config(), &message);
 
   return 0;
 }

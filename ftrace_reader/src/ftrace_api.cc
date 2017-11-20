@@ -26,18 +26,15 @@
 namespace perfetto {
 namespace {
 
-// Reading this file produces human readable trace output.
+// Reading /trace produces human readable trace output.
 // Writing to this file clears all trace buffers for all CPUS.
-// const char kTracePath[] = "/sys/kernel/debug/tracing/trace";
 
-// Writing to this file injects an event into the trace buffer.
-// const char kTraceMarkerPath[] = "/sys/kernel/debug/tracing/trace_marker";
+// Writing to /trace_marker file injects an event into the trace buffer.
 
-// Reading this file returns 1/0 if tracing is enabled/disabled.
+// Reading /tracing_on returns 1/0 if tracing is enabled/disabled.
 // Writing 1/0 to this file enables/disables tracing.
 // Disabling tracing with this file prevents further writes but
 // does not clear the buffer.
-// const char kTracingOnPath[] = "/sys/kernel/debug/tracing/tracing_on";
 
 char ReadOneCharFromFile(const std::string& path) {
   base::ScopedFile fd(open(path.c_str(), O_RDONLY));
