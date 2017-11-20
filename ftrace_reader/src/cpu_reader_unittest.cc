@@ -20,8 +20,8 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
-#include "protos/ftrace_full/ftrace_event.pb.h"
-#include "protos/ftrace_full/ftrace_event_bundle.pb.h"
+#include "protos/ftrace/ftrace_event.pb.h"
+#include "protos/ftrace/ftrace_event_bundle.pb.h"
 #include "protozero/scattered_stream_writer.h"
 #include "scattered_stream_delegate_for_testing.h"
 
@@ -240,6 +240,7 @@ TEST(CpuReaderTest, ParseSimpleEvent) {
   const FtraceEvent& proto_event = proto_bundle.event().Get(0);
   EXPECT_EQ(proto_event.pid(), 72);
   EXPECT_TRUE(proto_event.has_print());
+  EXPECT_EQ(proto_event.print().buf(), "Hello, world!\n");
 }
 
 }  // namespace perfetto
