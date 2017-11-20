@@ -25,8 +25,8 @@
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/producer.h"
 #include "tracing/core/service.h"
-#include "tracing/ipc/ipc_connection.h"
-#include "tracing/ipc/ipc_service_host.h"
+#include "tracing/ipc/producer_ipc_client.h"
+#include "tracing/ipc/service_ipc_host.h"
 #include "tracing/src/core/service_impl.h"
 
 namespace perfetto {
@@ -68,7 +68,7 @@ void __attribute__((noreturn)) ProducerMain() {
   base::TestTaskRunner task_runner;
   TestProducer producer;
   std::unique_ptr<Service::ProducerEndpoint> endpoint =
-      IPCConnection::ConnectAsProducer(kSocketName, &producer, &task_runner);
+      ProducerIPCClient::Connect(kSocketName, &producer, &task_runner);
   producer.on_connect = task_runner.CreateCheckpoint("connect");
   task_runner.RunUntilCheckpoint("connect");
 
@@ -91,7 +91,7 @@ void __attribute__((noreturn)) ProducerMain() {
 void __attribute__((noreturn)) ServiceMain() {
   unlink(kSocketName);
   base::TestTaskRunner task_runner;
-  auto host = IPCServiceHost::CreateInstance(&task_runner);
+  auto host = ServiceIPCHost::CreateInstance(&task_runner);
 
   class Observer : public Service::ObserverForTesting {
    public:

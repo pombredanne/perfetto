@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_IPC_IPC_SERVICE_HOST_H_
-#define TRACING_INCLUDE_IPC_IPC_SERVICE_HOST_H_
+#ifndef TRACING_INCLUDE_IPC_SERVICE_IPC_HOST_H_
+#define TRACING_INCLUDE_IPC_SERVICE_IPC_HOST_H_
 
 #include <memory>
 
@@ -32,11 +32,11 @@ class Service;
 // Exposed to:
 //   The code in the tracing client that will host the service e.g., traced.
 // Implemented in:
-//   src/ipc/service/ipc_service_host_impl.cc
-class IPCServiceHost {
+//   src/ipc/service/service_ipc_host_impl.cc
+class ServiceIPCHost {
  public:
-  static std::unique_ptr<IPCServiceHost> CreateInstance(base::TaskRunner*);
-  virtual ~IPCServiceHost();
+  static std::unique_ptr<ServiceIPCHost> CreateInstance(base::TaskRunner*);
+  virtual ~ServiceIPCHost();
 
   // Start listening on the Producer & Consumer ports. Returns false in case of
   // failure (e.g., something else is listening on |socket_name|).
@@ -46,13 +46,13 @@ class IPCServiceHost {
   virtual Service* service_for_testing() const = 0;
 
  protected:
-  IPCServiceHost();
+  ServiceIPCHost();
 
  private:
-  IPCServiceHost(const IPCServiceHost&) = delete;
-  IPCServiceHost& operator=(const IPCServiceHost&) = delete;
+  ServiceIPCHost(const ServiceIPCHost&) = delete;
+  ServiceIPCHost& operator=(const ServiceIPCHost&) = delete;
 };
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_IPC_IPC_SERVICE_HOST_H_
+#endif  // TRACING_INCLUDE_IPC_SERVICE_IPC_HOST_H_

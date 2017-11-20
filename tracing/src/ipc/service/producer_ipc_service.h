@@ -25,7 +25,6 @@
 #include "ipc/basic_types.h"
 #include "tracing/core/producer.h"
 #include "tracing/core/service.h"
-// #include "tracing/ipc/ipc_service_host.h"
 
 #include "tracing/src/ipc/producer_port.ipc.h"  // From producer_port.proto.
 
