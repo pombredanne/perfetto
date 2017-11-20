@@ -34,7 +34,7 @@ class Producer;
 class ProducerIPCClient {
  public:
   // Connects to the producer port of the Service listening on the given
-  // |service_socket_name|. If the connection is successful, the OnConnect()
+  // |service_sock_name|. If the connection is successful, the OnConnect()
   // method will be invoked asynchronously on the passed Produer interface.
   // If the connection fails, OnDisconnect() will be invoked instead.
   // The returned ProducerEndpoint serves also to delimit the scope of the
@@ -42,7 +42,7 @@ class ProducerIPCClient {
   // invoked immediately after its destruction and any pending callback will be
   // dropped.
   static std::unique_ptr<Service::ProducerEndpoint>
-  Connect(const char* service_socket_name, Producer*, base::TaskRunner*);
+  Connect(const char* service_sock_name, Producer*, base::TaskRunner*);
 
  protected:
   ProducerIPCClient() = delete;

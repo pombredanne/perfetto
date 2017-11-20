@@ -24,9 +24,8 @@ package perfetto;
 
 // IPC interface definition for the producer port of the tracing service.
 service ProducerPort {
-  // Called once only after establishing the connection with the Service. Right
-  // now it is used only as a liveness check. In future this will hold
-  // per-producer configuration.
+  // Called once only after establishing the connection with the Service.
+  // The service replies sending the shared memory file descriptor in reply.
   rpc InitializeConnection(InitializeConnectionRequest)
       returns (InitializeConnectionResponse) {}
 
