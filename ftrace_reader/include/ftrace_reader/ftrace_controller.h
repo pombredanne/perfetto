@@ -35,16 +35,18 @@
 
 namespace perfetto {
 
+const size_t kMaxSinks = 32;
+
 class FtraceController;
 class ProtoTranslationTable;
 class CpuReader;
-class FtraceApi;
+class FtraceProcfs;
 class EventFilter;
 
 class FtraceConfig {
  public:
   FtraceConfig();
-  FtraceConfig(std::set<std::string> events);
+  explicit FtraceConfig(std::set<std::string> events);
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
@@ -79,7 +81,7 @@ class FtraceSink {
  private:
   friend FtraceController;
 
-  EventFilter* GetEventFilter() { return filter_.get(); }
+  EventFilter* get_event_filter() { return filter_.get(); }
   protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> GetBundleForCpu(
       size_t cpu) {
     return delegate_->GetBundleForCpu(cpu);
@@ -109,7 +111,7 @@ class FtraceController {
 
  protected:
   // Protected for testing.
-  FtraceController(std::unique_ptr<FtraceApi>,
+  FtraceController(std::unique_ptr<FtraceProcfs>,
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
 
@@ -125,15 +127,18 @@ class FtraceController {
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
 
-  void CpuReady(size_t cpu);
+  // Called when we know there is data for the raw pipe
+  // for the given |cpu|. Kicks off the reading/parsing
+  // of the pipe.
+  void OnRawFtraceDataAvailable(size_t cpu);
 
   // Returns a cached CpuReader for |cpu|.
-  // CpuReaders are constructed lazily.
+  // CpuReaders are constructed lazily and owned by the controller.
   CpuReader* GetCpuReader(size_t cpu);
 
-  std::unique_ptr<FtraceApi> ftrace_api_;
-  bool running_ = false;
-  base::TaskRunner* task_runner_;
+  std::unique_ptr<FtraceProcfs> ftrace_procfs_;
+  bool listening_for_raw_trace_data_ = false;
+  base::TaskRunner* task_runner_ = nullptr;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;
   std::unique_ptr<ProtoTranslationTable> table_;

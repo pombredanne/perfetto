@@ -31,7 +31,7 @@
 
 namespace perfetto {
 
-class FtraceApi;
+class FtraceProcfs;
 
 class ProtoTranslationTable {
  public:
@@ -61,7 +61,7 @@ class ProtoTranslationTable {
 
   static std::unique_ptr<ProtoTranslationTable> Create(
       std::string path_to_event_dir,
-      const FtraceApi* ftrace_api);
+      const FtraceProcfs* ftrace_procfs);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ftrace_api.h"
+#include "ftrace_procfs.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -38,73 +38,74 @@ namespace {
 
 char ReadOneCharFromFile(const std::string& path) {
   base::ScopedFile fd(open(path.c_str(), O_RDONLY));
-  if (!fd)
-    return '\0';
+  PERFETTO_CHECK(fd);
   char result = '\0';
   ssize_t bytes = PERFETTO_EINTR(read(fd.get(), &result, 1));
-  PERFETTO_DCHECK(bytes == 1 || bytes == -1);
+  PERFETTO_CHECK(bytes == 1 || bytes == -1);
   return result;
 }
 
 }  // namespace
 
-FtraceApi::FtraceApi(const std::string& root) : root_(root) {}
-FtraceApi::~FtraceApi() = default;
+FtraceProcfs::FtraceProcfs(const std::string& root) : root_(root) {}
+FtraceProcfs::~FtraceProcfs() = default;
 
-bool FtraceApi::EnableEvent(const std::string& group, const std::string& name) {
+bool FtraceProcfs::EnableEvent(const std::string& group,
+                               const std::string& name) {
   std::string path = root_ + "events/" + group + "/" + name + "/enable";
   return WriteToFile(path, "1");
 }
 
-bool FtraceApi::DisableEvent(const std::string& group,
-                             const std::string& name) {
+bool FtraceProcfs::DisableEvent(const std::string& group,
+                                const std::string& name) {
   std::string path = root_ + "events/" + group + "/" + name + "/enable";
   return WriteToFile(path, "0");
 }
 
-size_t FtraceApi::NumberOfCpus() const {
+size_t FtraceProcfs::NumberOfCpus() const {
   static size_t num_cpus = sysconf(_SC_NPROCESSORS_CONF);
   return num_cpus;
 }
 
-void FtraceApi::ClearTrace() {
+void FtraceProcfs::ClearTrace() {
   std::string path = root_ + "trace";
   base::ScopedFile fd(open(path.c_str(), O_WRONLY | O_TRUNC));
   PERFETTO_CHECK(fd);  // Could not clear.
 }
 
-bool FtraceApi::WriteTraceMarker(const std::string& str) {
+bool FtraceProcfs::WriteTraceMarker(const std::string& str) {
   std::string path = root_ + "trace_marker";
   return WriteToFile(path, str);
 }
 
-bool FtraceApi::EnableTracing() {
+bool FtraceProcfs::EnableTracing() {
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
 }
 
-bool FtraceApi::DisableTracing() {
+bool FtraceProcfs::DisableTracing() {
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
 }
 
-bool FtraceApi::IsTracingEnabled() {
+bool FtraceProcfs::IsTracingEnabled() {
   std::string path = root_ + "tracing_on";
   return ReadOneCharFromFile(path) == '1';
 }
 
-bool FtraceApi::WriteToFile(const std::string& path, const std::string& str) {
+bool FtraceProcfs::WriteToFile(const std::string& path,
+                               const std::string& str) {
   base::ScopedFile fd(open(path.c_str(), O_WRONLY));
   if (!fd)
     return false;
   ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
   ssize_t length = static_cast<ssize_t>(str.length());
   // This should either fail or write fully.
-  PERFETTO_DCHECK(written == length || written == -1);
+  PERFETTO_CHECK(written == length || written == -1);
   return written == length;
 }
 
-base::ScopedFile FtraceApi::OpenPipeForCpu(size_t cpu) {
+base::ScopedFile FtraceProcfs::OpenPipeForCpu(size_t cpu) {
   std::string path =
       root_ + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
   return base::ScopedFile(open(path.c_str(), O_RDONLY));

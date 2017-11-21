@@ -17,7 +17,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "ftrace_api.h"
+#include "ftrace_procfs.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -44,21 +44,21 @@ std::string GetTraceOutput() {
 
 }  // namespace
 
-TEST(FtraceApiIntegrationTest, ClearTrace) {
-  FtraceApi ftrace(kTracingPath);
+TEST(FtraceProcfsIntegrationTest, ClearTrace) {
+  FtraceProcfs ftrace(kTracingPath);
   ftrace.WriteTraceMarker("Hello, World!");
   ftrace.ClearTrace();
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("Hello, World!")));
 }
 
 TEST(FtraceControllerIntegrationTest, TraceMarker) {
-  FtraceApi ftrace(kTracingPath);
+  FtraceProcfs ftrace(kTracingPath);
   ftrace.WriteTraceMarker("Hello, World!");
   EXPECT_THAT(GetTraceOutput(), HasSubstr("Hello, World!"));
 }
 
 TEST(FtraceControllerIntegrationTest, EnableDisableEvent) {
-  FtraceApi ftrace(kTracingPath);
+  FtraceProcfs ftrace(kTracingPath);
   ftrace.EnableEvent("sched", "sched_switch");
   sleep(1);
   EXPECT_THAT(GetTraceOutput(), HasSubstr("sched_switch"));
@@ -70,7 +70,7 @@ TEST(FtraceControllerIntegrationTest, EnableDisableEvent) {
 }
 
 TEST(FtraceControllerIntegrationTest, EnableDisableTracing) {
-  FtraceApi ftrace(kTracingPath);
+  FtraceProcfs ftrace(kTracingPath);
   ftrace.ClearTrace();
   EXPECT_TRUE(ftrace.IsTracingEnabled());
   ftrace.WriteTraceMarker("Before");
