@@ -20,6 +20,7 @@
 #include <functional>
 #include <memory>
 
+#include "base/scoped_file.h"
 #include "base/weak_ptr.h"
 #include "ipc/basic_types.h"
 
@@ -53,6 +54,9 @@ class Client {
   // ServiceProxy instance is sufficient and will automatically unbind it. This
   // method is exposed only for the ServiceProxy destructor.
   virtual void UnbindService(ServiceID) = 0;
+
+  virtual size_t num_received_file_descriptors() const = 0;
+  virtual base::ScopedFile PopReceivedFileDescriptor() = 0;
 };
 
 }  // namespace ipc

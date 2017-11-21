@@ -17,6 +17,7 @@
 #ifndef IPC_SRC_CLIENT_IMPL_H_
 #define IPC_SRC_CLIENT_IMPL_H_
 
+#include "base/scoped_file.h"
 #include "base/task_runner.h"
 #include "ipc/client.h"
 #include "ipc/src/buffered_frame_deserializer.h"
@@ -46,6 +47,8 @@ class ClientImpl : public Client, public UnixSocket::EventListener {
   // Client implementation.
   void BindService(base::WeakPtr<ServiceProxy>) override;
   void UnbindService(ServiceID) override;
+  size_t num_received_file_descriptors() const override;
+  base::ScopedFile PopReceivedFileDescriptor() override;
 
   // UnixSocket::EventListener implementation.
   void OnConnect(UnixSocket*, bool connected) override;
@@ -81,6 +84,7 @@ class ClientImpl : public Client, public UnixSocket::EventListener {
   base::TaskRunner* const task_runner_;
   RequestID last_request_id_ = 0;
   BufferedFrameDeserializer frame_deserializer_;
+  std::list<base::ScopedFile> received_file_descriptors_;
   std::map<RequestID, QueuedRequest> queued_requests_;
   std::map<ServiceID, base::WeakPtr<ServiceProxy>> service_bindings_;
   base::WeakPtrFactory<Client> weak_ptr_factory_;
