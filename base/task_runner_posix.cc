@@ -28,30 +28,24 @@ TaskRunnerPosix::TaskRunnerPosix() {
   // Create a self-pipe which is used to wake up the main thread from inside
   // poll(2).
   int pipe_fds[2];
-  if (pipe(pipe_fds) == -1) {
-    PERFETTO_DPLOG("pipe()");
-    return;
-  }
-  control_read_.reset(pipe_fds[0]);
-  control_write_.reset(pipe_fds[1]);
+  PERFETTO_CHECK(pipe(pipe_fds) == 0);
 
   // Make the pipe non-blocking so that we never block the waking thread (either
   // the main thread or another one) when scheduling a wake-up.
-  int flags = fcntl(control_write_.get(), F_GETFL, 0);
-  PERFETTO_DCHECK(flags != -1);
-  if (fcntl(control_write_.get(), F_SETFL, flags | O_NONBLOCK) == -1) {
-    PERFETTO_DPLOG("fcntl()");
-    return;
+  for (auto fd : pipe_fds) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    PERFETTO_CHECK(flags != -1);
+    PERFETTO_CHECK(fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0);
+    PERFETTO_CHECK(fcntl(fd, F_SETFD, FD_CLOEXEC) == 0);
   }
+  control_read_.reset(pipe_fds[0]);
+  control_write_.reset(pipe_fds[1]);
 
 #if BUILDFLAG(OS_LINUX)
   // We are never expecting to have more than a few bytes in the wake-up pipe.
   // Reduce the buffer size on Linux. Note that this gets rounded up to the page
   // size.
-  if (fcntl(control_read_.get(), F_SETPIPE_SZ, 1) == -1) {
-    PERFETTO_DPLOG("fcntl()");
-    return;
-  }
+  PERFETTO_CHECK(fcntl(control_read_.get(), F_SETPIPE_SZ, 1) > 0);
 #endif
 
   AddFileDescriptorWatch(control_read_.get(), [] {
@@ -70,14 +64,6 @@ void TaskRunnerPosix::WakeUp() {
   const char dummy = 'P';
   if (write(control_write_.get(), &dummy, 1) <= 0 && errno != EAGAIN)
     PERFETTO_DPLOG("write()");
-}
-
-void TaskRunnerPosix::ClearWakeUp() {
-  // Drain the byte(s) written to the wake-up pipe. We can potentially read more
-  // than one byte if several wake-ups have been scheduled.
-  char buffer[16];
-  if (read(control_read_.get(), &buffer[0], sizeof(buffer)) <= 0)
-    PERFETTO_DPLOG("read()");
 }
 
 void TaskRunnerPosix::Run() {
@@ -115,10 +101,7 @@ TaskRunnerPosix::Event TaskRunnerPosix::WaitForEvent() {
   }
   int ret = PERFETTO_EINTR(poll(
       &poll_fds_[0], static_cast<nfds_t>(poll_fds_.size()), poll_timeout_ms));
-  if (ret == -1) {
-    PERFETTO_DPLOG("poll()");
-    PERFETTO_CHECK(ret != -1);
-  }
+  PERFETTO_CHECK(ret >= 0);
   bool did_timeout = (ret == 0);
   return did_timeout ? Event::kTaskRunnable : Event::kFileDescriptorReadable;
 }
@@ -146,6 +129,7 @@ void TaskRunnerPosix::RunImmediateAndDelayedTask() {
   // becomes an issue.
   std::function<void()> immediate_task;
   std::function<void()> delayed_task;
+  auto now = GetTime();
   {
     std::lock_guard<std::mutex> lock(lock_);
     if (!immediate_tasks_.empty()) {
@@ -154,7 +138,7 @@ void TaskRunnerPosix::RunImmediateAndDelayedTask() {
     }
     if (!delayed_tasks_.empty()) {
       auto it = delayed_tasks_.begin();
-      if (GetTime() >= it->first) {
+      if (now >= it->first) {
         delayed_task = std::move(it->second);
         delayed_tasks_.erase(it);
       }
@@ -176,7 +160,13 @@ void TaskRunnerPosix::PostFileDescriptorWatches() {
     // The wake-up event is handled inline to avoid an infinite recursion of
     // posted tasks.
     if (poll_fds_[i].fd == control_read_.get()) {
-      ClearWakeUp();
+      // Drain the byte(s) written to the wake-up pipe. We can potentially read
+      // more than one byte if several wake-ups have been scheduled.
+      char buffer[16];
+      if (read(control_read_.get(), &buffer[0], sizeof(buffer)) <= 0 &&
+          errno != EAGAIN) {
+        PERFETTO_DPLOG("read()");
+      }
       continue;
     }
 
@@ -226,10 +216,10 @@ void TaskRunnerPosix::PostTask(std::function<void()> task) {
 void TaskRunnerPosix::PostDelayedTask(std::function<void()> task,
                                       int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
+  auto runtime = GetTime() + std::chrono::milliseconds(delay_ms);
   {
     std::lock_guard<std::mutex> lock(lock_);
-    delayed_tasks_.insert(std::make_pair(
-        GetTime() + std::chrono::milliseconds(delay_ms), std::move(task)));
+    delayed_tasks_.insert(std::make_pair(runtime, std::move(task)));
   }
   WakeUp();
 }

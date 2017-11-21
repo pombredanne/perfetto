@@ -130,6 +130,8 @@ UnixSocket::UnixSocket(EventListener* event_listener,
   flags |= O_NONBLOCK;
   fcntl_res = fcntl(fd(), F_SETFL, flags);
   PERFETTO_CHECK(fcntl_res == 0);
+  fcntl_res = fcntl(fd(), F_SETFD, FD_CLOEXEC);
+  PERFETTO_CHECK(fcntl_res == 0);
 
   base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->AddFileDescriptorWatch(*fd_, [weak_ptr]() {
