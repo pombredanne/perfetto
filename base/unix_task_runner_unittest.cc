@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "base/task_runner_posix.h"
+#include "base/unix_task_runner.h"
 
 #include "base/scoped_file.h"
 #include "gtest/gtest.h"
@@ -49,8 +49,8 @@ struct Pipe {
   ScopedFile write_fd;
 };
 
-TEST(TaskRunnerPosix, PostImmediateTask) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostImmediateTask) {
+  UnixTaskRunner task_runner;
   int counter = 0;
   task_runner.PostTask([&counter] { counter = (counter << 4) | 1; });
   task_runner.PostTask([&counter] { counter = (counter << 4) | 2; });
@@ -61,8 +61,8 @@ TEST(TaskRunnerPosix, PostImmediateTask) {
   EXPECT_EQ(0x1234, counter);
 }
 
-TEST(TaskRunnerPosix, PostDelayedTask) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostDelayedTask) {
+  UnixTaskRunner task_runner;
   int counter = 0;
   task_runner.PostDelayedTask([&counter] { counter = (counter << 4) | 1; }, 5);
   task_runner.PostDelayedTask([&counter] { counter = (counter << 4) | 2; }, 10);
@@ -73,24 +73,24 @@ TEST(TaskRunnerPosix, PostDelayedTask) {
   EXPECT_EQ(0x1234, counter);
 }
 
-TEST(TaskRunnerPosix, PostImmediateTaskFromTask) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostImmediateTaskFromTask) {
+  UnixTaskRunner task_runner;
   task_runner.PostTask([&task_runner] {
     task_runner.PostTask([&task_runner] { task_runner.Quit(); });
   });
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, PostDelayedTaskFromTask) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostDelayedTaskFromTask) {
+  UnixTaskRunner task_runner;
   task_runner.PostTask([&task_runner] {
     task_runner.PostDelayedTask([&task_runner] { task_runner.Quit(); }, 10);
   });
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, PostImmediateTaskFromOtherThread) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostImmediateTaskFromOtherThread) {
+  UnixTaskRunner task_runner;
   ThreadChecker thread_checker;
   int counter = 0;
   std::thread thread([&task_runner, &counter, &thread_checker] {
@@ -108,8 +108,8 @@ TEST(TaskRunnerPosix, PostImmediateTaskFromOtherThread) {
   EXPECT_EQ(0x1234, counter);
 }
 
-TEST(TaskRunnerPosix, PostDelayedTaskFromOtherThread) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, PostDelayedTaskFromOtherThread) {
+  UnixTaskRunner task_runner;
   std::thread thread([&task_runner] {
     task_runner.PostDelayedTask([&task_runner] { task_runner.Quit(); }, 10);
   });
@@ -117,16 +117,16 @@ TEST(TaskRunnerPosix, PostDelayedTaskFromOtherThread) {
   thread.join();
 }
 
-TEST(TaskRunnerPosix, AddFileDescriptorWatch) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, AddFileDescriptorWatch) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
   task_runner.AddFileDescriptorWatch(pipe.read_fd.get(),
                                      [&task_runner] { task_runner.Quit(); });
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, RemoveFileDescriptorWatch) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, RemoveFileDescriptorWatch) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
 
   bool watch_ran = false;
@@ -139,8 +139,8 @@ TEST(TaskRunnerPosix, RemoveFileDescriptorWatch) {
   EXPECT_FALSE(watch_ran);
 }
 
-TEST(TaskRunnerPosix, RemoveFileDescriptorWatchFromTask) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, RemoveFileDescriptorWatchFromTask) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
 
   bool watch_ran = false;
@@ -155,8 +155,8 @@ TEST(TaskRunnerPosix, RemoveFileDescriptorWatchFromTask) {
   EXPECT_FALSE(watch_ran);
 }
 
-TEST(TaskRunnerPosix, AddFileDescriptorWatchFromAnotherWatch) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, AddFileDescriptorWatchFromAnotherWatch) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
   Pipe pipe2;
 
@@ -169,8 +169,8 @@ TEST(TaskRunnerPosix, AddFileDescriptorWatchFromAnotherWatch) {
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, RemoveFileDescriptorWatchFromAnotherWatch) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, RemoveFileDescriptorWatchFromAnotherWatch) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
   Pipe pipe2;
 
@@ -188,8 +188,8 @@ TEST(TaskRunnerPosix, RemoveFileDescriptorWatchFromAnotherWatch) {
   EXPECT_FALSE(watch_ran);
 }
 
-TEST(TaskRunnerPosix, ReplaceFileDescriptorWatchFromAnotherWatch) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, ReplaceFileDescriptorWatchFromAnotherWatch) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
   Pipe pipe2;
 
@@ -207,8 +207,8 @@ TEST(TaskRunnerPosix, ReplaceFileDescriptorWatchFromAnotherWatch) {
   EXPECT_FALSE(watch_ran);
 }
 
-TEST(TaskRunnerPosix, AddFileDescriptorWatchFromAnotherThread) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, AddFileDescriptorWatchFromAnotherThread) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
 
   std::thread thread([&task_runner, &pipe] {
@@ -219,8 +219,8 @@ TEST(TaskRunnerPosix, AddFileDescriptorWatchFromAnotherThread) {
   thread.join();
 }
 
-TEST(TaskRunnerPosix, FileDescriptorWatchWithMultipleEvents) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, FileDescriptorWatchWithMultipleEvents) {
+  UnixTaskRunner task_runner;
   Pipe pipe;
 
   int event_count = 0;
@@ -237,8 +237,8 @@ TEST(TaskRunnerPosix, FileDescriptorWatchWithMultipleEvents) {
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, FileDescriptorClosedEvent) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, FileDescriptorClosedEvent) {
+  UnixTaskRunner task_runner;
   int pipe_fds[2];
   PERFETTO_DCHECK(pipe(pipe_fds) == 0);
   ScopedFile read_fd(pipe_fds[0]);
@@ -250,18 +250,18 @@ TEST(TaskRunnerPosix, FileDescriptorClosedEvent) {
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, PostManyDelayedTasks) {
+TEST(UnixTaskRunner, PostManyDelayedTasks) {
   // Check that PostTask doesn't start failing if there are too many scheduled
   // wake-ups.
-  TaskRunnerPosix task_runner;
+  UnixTaskRunner task_runner;
   for (int i = 0; i < 0x1000; i++)
     task_runner.PostDelayedTask([] {}, 0);
   task_runner.PostDelayedTask([&task_runner] { task_runner.Quit(); }, 10);
   task_runner.Run();
 }
 
-TEST(TaskRunnerPosix, RunAgain) {
-  TaskRunnerPosix task_runner;
+TEST(UnixTaskRunner, RunAgain) {
+  UnixTaskRunner task_runner;
   int counter = 0;
   task_runner.PostTask([&task_runner, &counter] {
     counter++;

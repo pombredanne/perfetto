@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "base/task_runner_posix.h"
+#include "base/unix_task_runner.h"
 
 #include "base/build_config.h"
 
@@ -24,7 +24,7 @@
 namespace perfetto {
 namespace base {
 
-TaskRunnerPosix::TaskRunnerPosix() {
+UnixTaskRunner::UnixTaskRunner() {
   // Create a self-pipe which is used to wake up the main thread from inside
   // poll(2).
   int pipe_fds[2];
@@ -54,19 +54,19 @@ TaskRunnerPosix::TaskRunnerPosix() {
   });
 }
 
-TaskRunnerPosix::~TaskRunnerPosix() = default;
+UnixTaskRunner::~UnixTaskRunner() = default;
 
-TaskRunnerPosix::TimePoint TaskRunnerPosix::GetTime() const {
+UnixTaskRunner::TimePoint UnixTaskRunner::GetTime() const {
   return std::chrono::steady_clock::now();
 }
 
-void TaskRunnerPosix::WakeUp() {
+void UnixTaskRunner::WakeUp() {
   const char dummy = 'P';
   if (write(control_write_.get(), &dummy, 1) <= 0 && errno != EAGAIN)
     PERFETTO_DPLOG("write()");
 }
 
-void TaskRunnerPosix::Run() {
+void UnixTaskRunner::Run() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   quit_ = false;
   while (true) {
@@ -85,7 +85,7 @@ void TaskRunnerPosix::Run() {
   }
 }
 
-TaskRunnerPosix::Event TaskRunnerPosix::WaitForEvent() {
+UnixTaskRunner::Event UnixTaskRunner::WaitForEvent() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   int poll_timeout_ms;
   {
@@ -106,7 +106,7 @@ TaskRunnerPosix::Event TaskRunnerPosix::WaitForEvent() {
   return did_timeout ? Event::kTaskRunnable : Event::kFileDescriptorReadable;
 }
 
-void TaskRunnerPosix::Quit() {
+void UnixTaskRunner::Quit() {
   {
     std::lock_guard<std::mutex> lock(lock_);
     quit_ = true;
@@ -114,7 +114,7 @@ void TaskRunnerPosix::Quit() {
   WakeUp();
 }
 
-void TaskRunnerPosix::UpdateWatchTasksLocked() {
+void UnixTaskRunner::UpdateWatchTasksLocked() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!watch_tasks_changed_)
     return;
@@ -124,7 +124,7 @@ void TaskRunnerPosix::UpdateWatchTasksLocked() {
     poll_fds_.push_back({it.first, POLLIN | POLLHUP, 0});
 }
 
-void TaskRunnerPosix::RunImmediateAndDelayedTask() {
+void UnixTaskRunner::RunImmediateAndDelayedTask() {
   // TODO(skyostil): Add a separate work queue in case in case locking overhead
   // becomes an issue.
   std::function<void()> immediate_task;
@@ -150,7 +150,7 @@ void TaskRunnerPosix::RunImmediateAndDelayedTask() {
     delayed_task();
 }
 
-void TaskRunnerPosix::PostFileDescriptorWatches() {
+void UnixTaskRunner::PostFileDescriptorWatches() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (size_t i = 0; i < poll_fds_.size(); i++) {
     if (!(poll_fds_[i].revents & (POLLIN | POLLHUP)))
@@ -172,12 +172,12 @@ void TaskRunnerPosix::PostFileDescriptorWatches() {
 
     // Binding to |this| is safe since we are the only object executing the
     // task.
-    PostTask(std::bind(&TaskRunnerPosix::RunFileDescriptorWatch, this,
+    PostTask(std::bind(&UnixTaskRunner::RunFileDescriptorWatch, this,
                        poll_fds_[i].fd));
   }
 }
 
-void TaskRunnerPosix::RunFileDescriptorWatch(int fd) {
+void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
   std::function<void()> task;
   {
     std::lock_guard<std::mutex> lock(lock_);
@@ -189,7 +189,7 @@ void TaskRunnerPosix::RunFileDescriptorWatch(int fd) {
   task();
 }
 
-TaskRunnerPosix::TimeDurationMs TaskRunnerPosix::GetDelayToNextTaskLocked()
+UnixTaskRunner::TimeDurationMs UnixTaskRunner::GetDelayToNextTaskLocked()
     const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!immediate_tasks_.empty())
@@ -202,7 +202,7 @@ TaskRunnerPosix::TimeDurationMs TaskRunnerPosix::GetDelayToNextTaskLocked()
   return TimeDurationMs(-1);
 }
 
-void TaskRunnerPosix::PostTask(std::function<void()> task) {
+void UnixTaskRunner::PostTask(std::function<void()> task) {
   bool was_empty;
   {
     std::lock_guard<std::mutex> lock(lock_);
@@ -213,8 +213,7 @@ void TaskRunnerPosix::PostTask(std::function<void()> task) {
     WakeUp();
 }
 
-void TaskRunnerPosix::PostDelayedTask(std::function<void()> task,
-                                      int delay_ms) {
+void UnixTaskRunner::PostDelayedTask(std::function<void()> task, int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
   auto runtime = GetTime() + std::chrono::milliseconds(delay_ms);
   {
@@ -224,8 +223,8 @@ void TaskRunnerPosix::PostDelayedTask(std::function<void()> task,
   WakeUp();
 }
 
-void TaskRunnerPosix::AddFileDescriptorWatch(int fd,
-                                             std::function<void()> task) {
+void UnixTaskRunner::AddFileDescriptorWatch(int fd,
+                                            std::function<void()> task) {
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(!watch_tasks_.count(fd));
@@ -235,7 +234,7 @@ void TaskRunnerPosix::AddFileDescriptorWatch(int fd,
   WakeUp();
 }
 
-void TaskRunnerPosix::RemoveFileDescriptorWatch(int fd) {
+void UnixTaskRunner::RemoveFileDescriptorWatch(int fd) {
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(watch_tasks_.count(fd));

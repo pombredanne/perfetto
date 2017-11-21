@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PERFETTO_BASE_TASK_RUNNER_POSIX_H_
-#define PERFETTO_BASE_TASK_RUNNER_POSIX_H_
+#ifndef PERFETTO_BASE_UNIX_TASK_RUNNER_H_
+#define PERFETTO_BASE_UNIX_TASK_RUNNER_H_
 
 #include "base/scoped_file.h"
 #include "base/task_runner.h"
@@ -32,10 +32,10 @@ namespace perfetto {
 namespace base {
 
 // Runs a task runner on the current thread.
-class TaskRunnerPosix : public TaskRunner {
+class UnixTaskRunner : public TaskRunner {
  public:
-  TaskRunnerPosix();
-  ~TaskRunnerPosix() override;
+  UnixTaskRunner();
+  ~UnixTaskRunner() override;
 
   // Start executing tasks. Doesn't return until Quit() is called. Run() may be
   // called multiple times on the same task runner.
@@ -89,4 +89,4 @@ class TaskRunnerPosix : public TaskRunner {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // PERFETTO_BASE_TASK_RUNNER_POSIX_H_
+#endif  // PERFETTO_BASE_UNIX_TASK_RUNNER_H_
