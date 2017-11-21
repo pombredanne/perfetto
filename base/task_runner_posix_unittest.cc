@@ -260,6 +260,22 @@ TEST(TaskRunnerPosix, PostManyDelayedTasks) {
   task_runner.Run();
 }
 
+TEST(TaskRunnerPosix, RunAgain) {
+  TaskRunnerPosix task_runner;
+  int counter = 0;
+  task_runner.PostTask([&task_runner, &counter] {
+    counter++;
+    task_runner.Quit();
+  });
+  task_runner.Run();
+  task_runner.PostTask([&task_runner, &counter] {
+    counter++;
+    task_runner.Quit();
+  });
+  task_runner.Run();
+  EXPECT_EQ(2, counter);
+}
+
 }  // namespace
 }  // namespace base
 }  // namespace perfetto

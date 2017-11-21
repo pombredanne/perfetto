@@ -37,6 +37,8 @@ class TaskRunnerPosix : public TaskRunner {
   TaskRunnerPosix();
   ~TaskRunnerPosix() override;
 
+  // Start executing tasks. Doesn't return until Quit() is called. Run() may be
+  // called multiple times on the same task runner.
   void Run();
   void Quit();
 

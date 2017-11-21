@@ -82,6 +82,7 @@ void TaskRunnerPosix::ClearWakeUp() {
 
 void TaskRunnerPosix::Run() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  quit_ = false;
   while (true) {
     switch (WaitForEvent()) {
       case Event::kQuit:
