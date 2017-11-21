@@ -54,7 +54,6 @@ class TaskRunnerPosix : public TaskRunner {
   TimePoint GetTime() const;
 
   void WakeUp();
-  void ClearWakeUp();
 
   enum class Event { kQuit, kTaskRunnable, kFileDescriptorReadable };
   Event WaitForEvent();
