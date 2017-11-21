@@ -66,13 +66,14 @@ void ProducerIPCService::InitializeConnection(
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
       producer.get(), req.shared_buffer_size_hint_bytes());
-  PosixSharedMemory* shm = static_cast<PosixSharedMemory*>(
-      producer->service_endpoint->shared_memory());
+  const int shm_fd = static_cast<PosixSharedMemory*>(
+                         producer->service_endpoint->shared_memory())
+                         ->fd();
   producers_.emplace(ipc_client_id, std::move(producer));
   // Because of the std::move() |producer| is invalid after this point.
 
   auto async_res = ipc::AsyncResult<InitializeConnectionResponse>::Create();
-  async_res.set_fd(shm->fd());
+  async_res.set_fd(shm_fd);
   response.Resolve(std::move(async_res));
 }
 
