@@ -55,8 +55,11 @@ class Client {
   // method is exposed only for the ServiceProxy destructor.
   virtual void UnbindService(ServiceID) = 0;
 
-  virtual size_t num_received_file_descriptors() const = 0;
-  virtual base::ScopedFile PopReceivedFileDescriptor() = 0;
+  // Returns (with move semantics) the last file descriptor received on the IPC
+  // channel. No buffering is performed: if a service sends two file descriptors
+  // and the caller doesn't read them immediately, the first one will be
+  // automatically closed when the second is received.
+  virtual base::ScopedFile TakeReceivedFD() = 0;
 };
 
 }  // namespace ipc

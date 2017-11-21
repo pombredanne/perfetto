@@ -89,7 +89,7 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   if (!connection_succeeded)
     return;
 
-  base::ScopedFile shmem_fd = ipc_channel_->PopReceivedFileDescriptor();
+  base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
   PERFETTO_CHECK(shmem_fd);
   shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
   producer_->OnConnect();

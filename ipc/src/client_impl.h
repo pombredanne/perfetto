@@ -47,8 +47,7 @@ class ClientImpl : public Client, public UnixSocket::EventListener {
   // Client implementation.
   void BindService(base::WeakPtr<ServiceProxy>) override;
   void UnbindService(ServiceID) override;
-  size_t num_received_file_descriptors() const override;
-  base::ScopedFile PopReceivedFileDescriptor() override;
+  base::ScopedFile TakeReceivedFD() override;
 
   // UnixSocket::EventListener implementation.
   void OnConnect(UnixSocket*, bool connected) override;
@@ -84,7 +83,7 @@ class ClientImpl : public Client, public UnixSocket::EventListener {
   base::TaskRunner* const task_runner_;
   RequestID last_request_id_ = 0;
   BufferedFrameDeserializer frame_deserializer_;
-  std::list<base::ScopedFile> received_file_descriptors_;
+  base::ScopedFile received_fd_;
   std::map<RequestID, QueuedRequest> queued_requests_;
   std::map<ServiceID, base::WeakPtr<ServiceProxy>> service_bindings_;
   base::WeakPtrFactory<Client> weak_ptr_factory_;

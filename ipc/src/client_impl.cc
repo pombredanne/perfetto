@@ -144,7 +144,7 @@ void ClientImpl::OnDataAvailable(UnixSocket*) {
     base::ScopedFile fd;
     rsize = sock_->Receive(buf.data, buf.size, &fd);
     if (fd)
-      received_file_descriptors_.push_back(std::move(fd));
+      received_fd_ = std::move(fd);
     if (!frame_deserializer_.EndReceive(rsize)) {
       // The endpoint tried to send a frame that is way too large.
       return sock_->Shutdown();  // In turn will trigger an OnDisconnect().
@@ -248,17 +248,8 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
 
 ClientImpl::QueuedRequest::QueuedRequest() = default;
 
-size_t ClientImpl::num_received_file_descriptors() const {
-  return received_file_descriptors_.size();
-}
-
-base::ScopedFile ClientImpl::PopReceivedFileDescriptor() {
-  if (received_file_descriptors_.empty())
-    return base::ScopedFile();
-  base::ScopedFile res(std::move(received_file_descriptors_.front()));
-  received_file_descriptors_.pop_front();
-  PERFETTO_DCHECK(res);
-  return res;
+base::ScopedFile ClientImpl::TakeReceivedFD() {
+  return std::move(received_fd_);
 }
 
 }  // namespace ipc

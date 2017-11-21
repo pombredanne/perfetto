@@ -337,8 +337,7 @@ TEST_F(ClientImplTest, ReceiveFileDescriptor) {
   task_runner_->RunUntilCheckpoint("on_reply");
 
   fclose(tx_file);
-  ASSERT_EQ(1u, cli_->num_received_file_descriptors());
-  base::ScopedFile rx_fd = cli_->PopReceivedFileDescriptor();
+  base::ScopedFile rx_fd = cli_->TakeReceivedFD();
   ASSERT_TRUE(rx_fd);
   char buf[sizeof(kFileContent)] = {};
   ASSERT_EQ(0, lseek(*rx_fd, 0, SEEK_SET));
