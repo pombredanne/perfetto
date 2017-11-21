@@ -93,7 +93,7 @@ class Service {
   // To disconnect just destroy the returned ProducerEndpoint object. It is safe
   // to destroy the Producer once the Producer::OnDisconnect() has been invoked.
   // |shared_buffer_size_hint_bytes| is an optional hint on the size of the
-  // shared memory  buffer. The service can ignore the hint (e.g., if the hint
+  // shared memory buffer. The service can ignore the hint (e.g., if the hint
   // is unreasonably large).
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
       Producer*,

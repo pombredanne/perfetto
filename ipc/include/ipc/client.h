@@ -58,7 +58,8 @@ class Client {
   // Returns (with move semantics) the last file descriptor received on the IPC
   // channel. No buffering is performed: if a service sends two file descriptors
   // and the caller doesn't read them immediately, the first one will be
-  // automatically closed when the second is received.
+  // automatically closed when the second is received (and will hit a DCHECK in
+  // debug builds).
   virtual base::ScopedFile TakeReceivedFD() = 0;
 };
 
