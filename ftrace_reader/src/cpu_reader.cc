@@ -27,6 +27,9 @@ namespace perfetto {
 
 namespace {
 
+using BundleHandle =
+    protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>;
+
 const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
                                            const std::set<std::string>& names) {
   std::vector<bool> enabled(table.largest_id() + 1);
@@ -71,7 +74,7 @@ struct TimeStamp {
 
 EventFilter::EventFilter(const ProtoTranslationTable& table,
                          std::set<std::string> names)
-    : enabled_(BuildEnabledVector(table, names)),
+    : enabled_ids_(BuildEnabledVector(table, names)),
       enabled_names_(std::move(names)) {}
 EventFilter::~EventFilter() = default;
 
@@ -84,7 +87,8 @@ int CpuReader::GetFileDescriptor() {
   return fd_.get();
 }
 
-bool CpuReader::Drain(std::vector<Writer>* writers) {
+bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
+                      const std::array<BundleHandle, kMaxSinks>& bundles) {
   if (!fd_)
     return false;
 
@@ -95,8 +99,10 @@ bool CpuReader::Drain(std::vector<Writer>* writers) {
     return false;
   PERFETTO_CHECK(bytes <= kPageSize);
 
-  for (const Writer& writer : *writers) {
-    ParsePage(cpu_, buffer, bytes, writer.filter, nullptr);
+  for (size_t i = 0; i < kMaxSinks; i++) {
+    if (!filters[i])
+      break;
+    ParsePage(cpu_, buffer, bytes, filters[i], &*bundles[i]);
   }
   return true;
 }

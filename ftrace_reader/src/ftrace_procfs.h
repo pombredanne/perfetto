@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_FTRACE_API_H_
-#define FTRACE_READER_FTRACE_API_H_
+#ifndef FTRACE_READER_FTRACE_PROCFS_H_
+#define FTRACE_READER_FTRACE_PROCFS_H_
 
 #include <string>
 
@@ -23,10 +23,10 @@
 
 namespace perfetto {
 
-class FtraceApi {
+class FtraceProcfs {
  public:
-  FtraceApi(const std::string& root);
-  virtual ~FtraceApi();
+  FtraceProcfs(const std::string& root);
+  virtual ~FtraceProcfs();
 
   // Enable the event under with the given |group| and |name|.
   bool EnableEvent(const std::string& group, const std::string& name);
@@ -64,4 +64,4 @@ class FtraceApi {
 
 }  // namespace perfetto
 
-#endif  // FTRACE_READER_FTRACE_API_H_
+#endif  // FTRACE_READER_FTRACE_PROCFS_H_

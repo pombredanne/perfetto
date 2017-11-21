@@ -47,7 +47,7 @@ executable("ftrace_reader_integrationtests") {
     "//buildtools:gtest_main",
   ]
   sources = [
-    "src/ftrace_api_integrationtest.cc",
+    "src/ftrace_procfs_integrationtest.cc",
   ]
 }
 
@@ -77,9 +77,9 @@ source_set("ftrace_reader") {
     "src/cpu_reader.cc",
     "src/cpu_reader.h",
     "src/format_parser.cc",
-    "src/ftrace_api.cc",
-    "src/ftrace_api.h",
     "src/ftrace_controller.cc",
+    "src/ftrace_procfs.cc",
+    "src/ftrace_procfs.h",
     "src/ftrace_to_proto.cc",
     "src/proto_translation_table.cc",
     "src/proto_translation_table.h",

@@ -16,7 +16,7 @@
 
 #include "cpu_reader.h"
 
-#include "ftrace_api.h"
+#include "ftrace_procfs.h"
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
@@ -49,8 +49,6 @@ TEST(EventFilterTest, EventFilter) {
   EXPECT_TRUE(filter.IsEventEnabled(1));
   EXPECT_FALSE(filter.IsEventEnabled(2));
   EXPECT_FALSE(filter.IsEventEnabled(10));
-  EXPECT_FALSE(filter.IsEventEnabled(0));
-  EXPECT_FALSE(filter.IsEventEnabled(100));
 }
 
 TEST(CpuReaderTest, ReadAndAdvanceNumber) {
@@ -65,12 +63,12 @@ TEST(CpuReaderTest, ReadAndAdvanceNumber) {
   EXPECT_EQ(actual, expected);
 }
 
-struct PlainStruct {
-  uint64_t timestamp;
-  uint64_t length;
-};
-
 TEST(CpuReaderTest, ReadAndAdvancePlainStruct) {
+  struct PlainStruct {
+    uint64_t timestamp;
+    uint64_t length;
+  };
+
   uint64_t expected[2] = {42, 999};
   PlainStruct actual;
   uint8_t buffer[16] = {};
@@ -83,14 +81,14 @@ TEST(CpuReaderTest, ReadAndAdvancePlainStruct) {
   EXPECT_EQ(actual.length, 999);
 }
 
-struct ComplexStruct {
-  uint64_t timestamp;
-  uint32_t length;
-  uint32_t : 24;
-  uint32_t overwrite : 8;
-};
-
 TEST(CpuReaderTest, ReadAndAdvanceComplexStruct) {
+  struct ComplexStruct {
+    uint64_t timestamp;
+    uint32_t length;
+    uint32_t : 24;
+    uint32_t overwrite : 8;
+  };
+
   uint64_t expected[2] = {42, 0xcdffffffabababab};
   ComplexStruct actual = {};
   uint8_t buffer[16] = {};
@@ -139,8 +137,8 @@ TEST(CpuReaderTest, ReadAndAdvanceUnderruns) {
 
 TEST(CpuReaderTest, ParseEmpty) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
-  FtraceApi ftrace_api(path);
-  auto table = ProtoTranslationTable::Create(path, &ftrace_api);
+  FtraceProcfs ftrace_procfs(path);
+  auto table = ProtoTranslationTable::Create(path, &ftrace_procfs);
   CpuReader(table.get(), 42, base::ScopedFile());
 }
 

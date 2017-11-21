@@ -18,9 +18,12 @@
 #define FTRACE_READER_CPU_READER_H_
 
 #include <stdint.h>
+
+#include <array>
 #include <memory>
 
 #include "base/scoped_file.h"
+#include "ftrace_reader/ftrace_controller.h"
 #include "gtest/gtest_prod.h"
 #include "proto_translation_table.h"
 #include "protos/ftrace/ftrace_event_bundle.pbzero.h"
@@ -29,43 +32,41 @@ namespace perfetto {
 
 class ProtoTranslationTable;
 
+// Class for efficient 'is event with id x enabled?' tests.
+// Mirrors the data in a FtraceConfig but in a format better suited
+// to be consumed by CpuReader.
 class EventFilter {
  public:
   EventFilter(const ProtoTranslationTable&, std::set<std::string>);
   ~EventFilter();
 
   bool IsEventEnabled(size_t ftrace_event_id) const {
-    if (ftrace_event_id == 0 || ftrace_event_id > enabled_.size())
+    if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size()) {
+      PERFETTO_DCHECK(false);
       return false;
-    return enabled_[ftrace_event_id];
+    }
+    return enabled_ids_[ftrace_event_id];
   }
 
-  const std::set<std::string>& enabled_names() { return enabled_names_; }
+  const std::set<std::string>& enabled_names() const { return enabled_names_; }
 
  private:
   EventFilter(const EventFilter&) = delete;
   EventFilter& operator=(const EventFilter&) = delete;
 
-  const std::vector<bool> enabled_;
+  const std::vector<bool> enabled_ids_;
   std::set<std::string> enabled_names_;
 };
 
 class CpuReader {
  public:
-  struct Writer {
-    const EventFilter* filter;
-    protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle;
-
-    Writer(
-        const EventFilter* the_filter,
-        protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> the_bundle)
-        : filter(the_filter), bundle(std::move(the_bundle)) {}
-  };
-
   CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
   ~CpuReader();
 
-  bool Drain(std::vector<Writer>* writers);
+  bool Drain(const std::array<const EventFilter*, kMaxSinks>&,
+             const std::array<
+                 protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>,
+                 kMaxSinks>&);
   int GetFileDescriptor();
 
  private:
@@ -78,7 +79,7 @@ class CpuReader {
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
-    if (*ptr + sizeof(T) > end)
+    if (*ptr > end - sizeof(T))
       return false;
     memcpy(out, *ptr, sizeof(T));
     *ptr += sizeof(T);
