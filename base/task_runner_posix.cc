@@ -16,12 +16,17 @@
 
 #include "base/task_runner_posix.h"
 
+#include "base/build_config.h"
+
+#include <fcntl.h>
 #include <unistd.h>
 
 namespace perfetto {
 namespace base {
 
 TaskRunnerPosix::TaskRunnerPosix() {
+  // Create a self-pipe which is used to wake up the main thread from inside
+  // poll(2).
   int pipe_fds[2];
   if (pipe(pipe_fds) == -1) {
     PERFETTO_DPLOG("pipe()");
@@ -30,12 +35,28 @@ TaskRunnerPosix::TaskRunnerPosix() {
   control_read_.reset(pipe_fds[0]);
   control_write_.reset(pipe_fds[1]);
 
-  // Register a dummy fd watch which is used to wake up this thread from other
-  // threads.
-  AddFileDescriptorWatch(control_read_.get(), [this] {
-    char dummy;
-    if (read(control_read_.get(), &dummy, 1) <= 0)
-      PERFETTO_DPLOG("read()");
+  // Make the pipe non-blocking so that we never block the waking thread (either
+  // the main thread or another one) when scheduling a wake-up.
+  int flags = fcntl(control_write_.get(), F_GETFL, 0);
+  PERFETTO_DCHECK(flags != -1);
+  if (fcntl(control_write_.get(), F_SETFL, flags | O_NONBLOCK) == -1) {
+    PERFETTO_DPLOG("fcntl()");
+    return;
+  }
+
+#if BUILDFLAG(OS_LINUX)
+  // We are never expecting to have more than a few bytes in the wake-up pipe.
+  // Reduce the buffer size on Linux. Note that this gets rounded up to the page
+  // size.
+  if (fcntl(control_read_.get(), F_SETPIPE_SZ, 1) == -1) {
+    PERFETTO_DPLOG("fcntl()");
+    return;
+  }
+#endif
+
+  AddFileDescriptorWatch(control_read_.get(), [] {
+    // Not reached -- see PostFileDescriptorWatches().
+    PERFETTO_DCHECK(false);
   });
 }
 
@@ -46,13 +67,17 @@ TaskRunnerPosix::TimePoint TaskRunnerPosix::GetTime() const {
 }
 
 void TaskRunnerPosix::WakeUp() {
-  // If we're running on the main thread there's no need to schedule a wake-up
-  // since we're already inside Run().
-  if (thread_checker_.CalledOnValidThread())
-    return;
   const char dummy = 'P';
-  if (write(control_write_.get(), &dummy, 1) <= 0)
+  if (write(control_write_.get(), &dummy, 1) <= 0 && errno != EAGAIN)
     PERFETTO_DPLOG("write()");
+}
+
+void TaskRunnerPosix::ClearWakeUp() {
+  // Drain the byte(s) written to the wake-up pipe. We can potentially read more
+  // than one byte if several wake-ups have been scheduled.
+  char buffer[16];
+  if (read(control_read_.get(), &buffer[0], sizeof(buffer)) <= 0)
+    PERFETTO_DPLOG("read()");
 }
 
 void TaskRunnerPosix::Run() {
@@ -75,23 +100,23 @@ void TaskRunnerPosix::Run() {
 
 TaskRunnerPosix::Event TaskRunnerPosix::WaitForEvent() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  int poll_timeout;
+  int poll_timeout_ms;
   {
     std::lock_guard<std::mutex> lock(lock_);
-    if (done_)
+    if (quit_)
       return Event::kQuit;
-    poll_timeout = static_cast<int>(GetDelayToNextTaskLocked().count());
+    poll_timeout_ms = static_cast<int>(GetDelayToNextTaskLocked().count());
     // Don't start polling until we run out of runnable tasks (immediate or ones
     // with expired delays).
-    if (!poll_timeout)
+    if (!poll_timeout_ms)
       return Event::kTaskRunnable;
     UpdateWatchTasksLocked();
   }
-  int ret = PERFETTO_EINTR(
-      poll(&poll_fds_[0], static_cast<nfds_t>(poll_fds_.size()), poll_timeout));
+  int ret = PERFETTO_EINTR(poll(
+      &poll_fds_[0], static_cast<nfds_t>(poll_fds_.size()), poll_timeout_ms));
   if (ret == -1) {
     PERFETTO_DPLOG("poll()");
-    return Event::kQuit;
+    PERFETTO_CHECK(ret != -1);
   }
   bool did_timeout = (ret == 0);
   return did_timeout ? Event::kTaskRunnable : Event::kFileDescriptorReadable;
@@ -100,20 +125,19 @@ TaskRunnerPosix::Event TaskRunnerPosix::WaitForEvent() {
 void TaskRunnerPosix::Quit() {
   {
     std::lock_guard<std::mutex> lock(lock_);
-    done_ = true;
+    quit_ = true;
   }
   WakeUp();
 }
 
-bool TaskRunnerPosix::UpdateWatchTasksLocked() {
+void TaskRunnerPosix::UpdateWatchTasksLocked() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!watch_tasks_changed_)
-    return false;
+    return;
   watch_tasks_changed_ = false;
   poll_fds_.clear();
   for (const auto& it : watch_tasks_)
-    poll_fds_.push_back({it.first, POLLIN, 0});
-  return true;
+    poll_fds_.push_back({it.first, POLLIN | POLLHUP, 0});
 }
 
 void TaskRunnerPosix::RunImmediateAndDelayedTask() {
@@ -144,35 +168,47 @@ void TaskRunnerPosix::RunImmediateAndDelayedTask() {
 void TaskRunnerPosix::PostFileDescriptorWatches() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (size_t i = 0; i < poll_fds_.size(); i++) {
-    if (!(poll_fds_[i].revents & POLLIN))
+    if (!(poll_fds_[i].revents & (POLLIN | POLLHUP)))
       continue;
     poll_fds_[i].revents = 0;
-    int fd = poll_fds_[i].fd;
-    PostTask([this, fd] {
-      std::function<void()> task;
-      {
-        std::lock_guard<std::mutex> lock(lock_);
-        auto it = watch_tasks_.find(fd);
-        if (it == watch_tasks_.end())
-          return;
-        task = it->second;
-      }
-      task();
-    });
+
+    // The wake-up event is handled inline to avoid an infinite recursion of
+    // posted tasks.
+    if (poll_fds_[i].fd == control_read_.get()) {
+      ClearWakeUp();
+      continue;
+    }
+
+    // Binding to |this| is safe since we are the only object executing the
+    // task.
+    PostTask(std::bind(&TaskRunnerPosix::RunFileDescriptorWatch, this,
+                       poll_fds_[i].fd));
   }
 }
 
-TaskRunnerPosix::TimeDuration TaskRunnerPosix::GetDelayToNextTaskLocked()
+void TaskRunnerPosix::RunFileDescriptorWatch(int fd) {
+  std::function<void()> task;
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    auto it = watch_tasks_.find(fd);
+    if (it == watch_tasks_.end())
+      return;
+    task = it->second;
+  }
+  task();
+}
+
+TaskRunnerPosix::TimeDurationMs TaskRunnerPosix::GetDelayToNextTaskLocked()
     const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!immediate_tasks_.empty())
-    return TimeDuration(0);
+    return TimeDurationMs(0);
   if (!delayed_tasks_.empty()) {
-    return std::max(TimeDuration(0),
-                    std::chrono::duration_cast<TimeDuration>(
+    return std::max(TimeDurationMs(0),
+                    std::chrono::duration_cast<TimeDurationMs>(
                         delayed_tasks_.begin()->first - GetTime()));
   }
-  return TimeDuration(-1);
+  return TimeDurationMs(-1);
 }
 
 void TaskRunnerPosix::PostTask(std::function<void()> task) {
@@ -201,6 +237,7 @@ void TaskRunnerPosix::AddFileDescriptorWatch(int fd,
                                              std::function<void()> task) {
   {
     std::lock_guard<std::mutex> lock(lock_);
+    PERFETTO_DCHECK(!watch_tasks_.count(fd));
     watch_tasks_[fd] = std::move(task);
     watch_tasks_changed_ = true;
   }
@@ -210,6 +247,7 @@ void TaskRunnerPosix::AddFileDescriptorWatch(int fd,
 void TaskRunnerPosix::RemoveFileDescriptorWatch(int fd) {
   {
     std::lock_guard<std::mutex> lock(lock_);
+    PERFETTO_DCHECK(watch_tasks_.count(fd));
     watch_tasks_.erase(fd);
     watch_tasks_changed_ = true;
   }

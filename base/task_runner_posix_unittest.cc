@@ -35,6 +35,11 @@ struct Pipe {
     Write();
   }
 
+  void Read() {
+    char b;
+    PERFETTO_DCHECK(read(read_fd.get(), &b, 1) == 1);
+  }
+
   void Write() {
     const char b = '?';
     PERFETTO_DCHECK(write(write_fd.get(), &b, 1) == 1);
@@ -156,7 +161,8 @@ TEST(TaskRunnerPosix, AddFileDescriptorWatchFromAnotherWatch) {
   Pipe pipe2;
 
   task_runner.AddFileDescriptorWatch(
-      pipe.read_fd.get(), [&task_runner, &pipe2] {
+      pipe.read_fd.get(), [&task_runner, &pipe, &pipe2] {
+        pipe.Read();
         task_runner.AddFileDescriptorWatch(
             pipe2.read_fd.get(), [&task_runner] { task_runner.Quit(); });
       });
@@ -170,7 +176,8 @@ TEST(TaskRunnerPosix, RemoveFileDescriptorWatchFromAnotherWatch) {
 
   bool watch_ran = false;
   task_runner.AddFileDescriptorWatch(
-      pipe.read_fd.get(), [&task_runner, &pipe2] {
+      pipe.read_fd.get(), [&task_runner, &pipe, &pipe2] {
+        pipe.Read();
         task_runner.RemoveFileDescriptorWatch(pipe2.read_fd.get());
       });
   task_runner.AddFileDescriptorWatch(pipe2.read_fd.get(),
@@ -217,17 +224,39 @@ TEST(TaskRunnerPosix, FileDescriptorWatchWithMultipleEvents) {
   Pipe pipe;
 
   int event_count = 0;
-  task_runner.AddFileDescriptorWatch(
-      pipe.read_fd.get(), [&task_runner, &pipe, &event_count] {
-        if (++event_count == 3) {
-          task_runner.Quit();
-          return;
-        }
-        char b;
-        ASSERT_EQ(1, read(pipe.read_fd.get(), &b, 1));
-      });
+  task_runner.AddFileDescriptorWatch(pipe.read_fd.get(),
+                                     [&task_runner, &pipe, &event_count] {
+                                       if (++event_count == 3) {
+                                         task_runner.Quit();
+                                         return;
+                                       }
+                                       pipe.Read();
+                                     });
   task_runner.PostTask([&pipe] { pipe.Write(); });
   task_runner.PostTask([&pipe] { pipe.Write(); });
+  task_runner.Run();
+}
+
+TEST(TaskRunnerPosix, FileDescriptorClosedEvent) {
+  TaskRunnerPosix task_runner;
+  int pipe_fds[2];
+  PERFETTO_DCHECK(pipe(pipe_fds) == 0);
+  ScopedFile read_fd(pipe_fds[0]);
+  ScopedFile write_fd(pipe_fds[1]);
+
+  write_fd.reset();
+  task_runner.AddFileDescriptorWatch(read_fd.get(),
+                                     [&task_runner] { task_runner.Quit(); });
+  task_runner.Run();
+}
+
+TEST(TaskRunnerPosix, PostManyDelayedTasks) {
+  // Check that PostTask doesn't start failing if there are too many scheduled
+  // wake-ups.
+  TaskRunnerPosix task_runner;
+  for (int i = 0; i < 0x1000; i++)
+    task_runner.PostDelayedTask([] {}, 0);
+  task_runner.PostDelayedTask([&task_runner] { task_runner.Quit(); }, 10);
   task_runner.Run();
 }
 

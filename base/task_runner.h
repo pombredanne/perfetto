@@ -45,7 +45,9 @@ class TaskRunner {
   virtual void PostDelayedTask(std::function<void()>, int delay_ms) = 0;
 
   // Schedule a task to run when |fd| becomes readable. The same |fd| can only
-  // be monitored by one function.
+  // be monitored by one function. Note that this function only needs to be
+  // implemented on platforms where the built-in ipc framework is used.
+  // TODO(skyostil): Refactor this out of the shared interface.
   virtual void AddFileDescriptorWatch(int fd, std::function<void()>) = 0;
 
   // Remove a previously scheduled watch for |fd|. If this is run on the target

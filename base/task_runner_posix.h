@@ -48,19 +48,21 @@ class TaskRunnerPosix : public TaskRunner {
 
  private:
   using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
-  using TimeDuration = std::chrono::milliseconds;
+  using TimeDurationMs = std::chrono::milliseconds;
   TimePoint GetTime() const;
 
   void WakeUp();
+  void ClearWakeUp();
 
   enum class Event { kQuit, kTaskRunnable, kFileDescriptorReadable };
   Event WaitForEvent();
 
-  bool UpdateWatchTasksLocked();
+  void UpdateWatchTasksLocked();
 
-  TimeDuration GetDelayToNextTaskLocked() const;
+  TimeDurationMs GetDelayToNextTaskLocked() const;
   void RunImmediateAndDelayedTask();
   void PostFileDescriptorWatches();
+  void RunFileDescriptorWatch(int fd);
 
   ThreadChecker thread_checker_;
 
@@ -75,7 +77,7 @@ class TaskRunnerPosix : public TaskRunner {
 
   std::deque<std::function<void()>> immediate_tasks_;
   std::multimap<TimePoint, std::function<void()>> delayed_tasks_;
-  bool done_ = false;
+  bool quit_ = false;
 
   std::map<int, std::function<void()>> watch_tasks_;
   bool watch_tasks_changed_ = false;
