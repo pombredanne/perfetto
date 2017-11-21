@@ -189,8 +189,8 @@ TEST(CpuReaderTest, ParseEmpty) {
 
 TEST(CpuReaderTest, ParseSimpleEvent) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
-  FtraceApi ftrace_api(path);
-  auto table = ProtoTranslationTable::Create(path, &ftrace_api);
+  FtraceProcfs ftrace(path);
+  auto table = ProtoTranslationTable::Create(path, &ftrace);
 
   std::unique_ptr<uint8_t[]> in_page = MakeBuffer(kPageSize);
   std::unique_ptr<uint8_t[]> out_page = MakeBuffer(kPageSize);
