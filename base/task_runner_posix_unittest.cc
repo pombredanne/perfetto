@@ -28,7 +28,7 @@ namespace {
 struct Pipe {
   Pipe() {
     int pipe_fds[2];
-    pipe(pipe_fds);
+    PERFETTO_DCHECK(pipe(pipe_fds) == 0);
     read_fd.reset(pipe_fds[0]);
     write_fd.reset(pipe_fds[1]);
     // Make the pipe initially readable.
@@ -37,7 +37,7 @@ struct Pipe {
 
   void Write() {
     const char b = '?';
-    write(write_fd.get(), &b, 1);
+    PERFETTO_DCHECK(write(write_fd.get(), &b, 1) == 1);
   }
 
   ScopedFile read_fd;
