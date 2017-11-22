@@ -57,6 +57,8 @@ class ServiceImpl : public Service {
     void NotifySharedMemoryUpdate(
         const std::vector<uint32_t>& changed_pages) override;
 
+    std::unique_ptr<TraceWriter> GetTraceWriter() override;
+
     SharedMemory* shared_memory() const override;
 
    private:

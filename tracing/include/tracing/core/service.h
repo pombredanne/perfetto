@@ -85,7 +85,7 @@ class Service {
     // acquiring/releasing chunks from the shared memory buffer. The returned
     // writer is *not* thread safe. The intended design is that each data source
     // creates one TraceWriter for each thread (or more if necessary).
-    virtual TraceWriter GetTraceWriter() = 0;  // TODO make pure virtual and override.
+    virtual std::unique_ptr<TraceWriter> GetTraceWriter() = 0;
   };  // class ProducerEndpoint.
 
   // Implemented in src/core/service_impl.cc .

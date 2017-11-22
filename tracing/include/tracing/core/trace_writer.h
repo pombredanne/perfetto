@@ -41,24 +41,23 @@ class TraceWriter : public protozero::ScatteredStreamWriter::Delegate {
   // ScatteredStreamWriter::Delegate implementation.
   protozero::ContiguousMemoryRange GetNewBuffer() override;
 
-
  private:
-   TraceWriter(const TraceWriter&) = delete;
-   TraceWriter& operator=(const TraceWriter&) = delete;
+  TraceWriter(const TraceWriter&) = delete;
+  TraceWriter& operator=(const TraceWriter&) = delete;
 
-   void OnFinalize(size_t packet_size);
+  void OnFinalize(size_t packet_size);
 
-   ProducerSharedMemoryArbiter* const shmem_arbiter_;
-   const WriterID id_;
-   SharedMemoryABI::Chunk cur_chunk_;
-   uint16_t cur_chunk_id_ = 0;
-   protozero::ScatteredStreamWriter protobuf_stream_writer_;
-   TracePacket cur_packet_;
-   uintptr_t cur_packet_start_ = 0;
-   size_t cur_packet_prev_fragments_size_ = 0;
-   bool cur_packet_being_written_ = false;
-   protozero::ContiguousMemoryRange cur_packet_header_ = {};
-   std::function<void(size_t)> finalize_callback_;
+  ProducerSharedMemoryArbiter* const shmem_arbiter_;
+  const WriterID id_;
+  SharedMemoryABI::Chunk cur_chunk_;
+  uint16_t cur_chunk_id_ = 0;
+  protozero::ScatteredStreamWriter protobuf_stream_writer_;
+  TracePacket cur_packet_;
+  uintptr_t cur_packet_start_ = 0;
+  size_t cur_packet_prev_fragments_size_ = 0;
+  bool cur_packet_being_written_ = false;
+  protozero::ContiguousMemoryRange cur_packet_header_ = {};
+  std::function<void(size_t)> finalize_callback_;
 };
 
 }  // namespace perfetto

@@ -140,7 +140,8 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
 
   // TODO get rid of the uint8_t* cast below.
   return protozero::ContiguousMemoryRange{
-      reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()), reinterpret_cast<uint8_t*>(cur_chunk_.end())};
+      reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()),
+      reinterpret_cast<uint8_t*>(cur_chunk_.end())};
 }
 
 }  // namespace perfetto

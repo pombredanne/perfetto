@@ -252,8 +252,8 @@ class SharedMemoryABI {
 
     // This never changes throughout the life of the Chunk.
     struct Identifier {
-      // A sequence identifies a linear stream of TracePacket produced by the same
-      // data source.
+      // A sequence identifies a linear stream of TracePacket produced by the
+      // same data source.
       uint16_t writer_id;
 
       // chunk_id is a monotonic counter of the chunk within its own

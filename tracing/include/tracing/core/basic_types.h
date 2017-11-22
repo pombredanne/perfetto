@@ -28,7 +28,6 @@ using DataSourceID = uint64_t;
 using DataSourceInstanceID = uint64_t;
 using WriterID = uint16_t;
 
-
 }  // namespace perfetto
 
 #endif  // TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_

@@ -61,6 +61,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   void UnregisterDataSource(DataSourceID) override;
   void NotifySharedMemoryUpdate(
       const std::vector<uint32_t>& changed_pages) override;
+  std::unique_ptr<TraceWriter> GetTraceWriter() override;
   SharedMemory* shared_memory() const override;
 
   // ipc::ServiceProxy::EventListener implementation.
