@@ -103,8 +103,10 @@ void UnixTaskRunner::UpdateWatchTasksLocked() {
     return;
   watch_tasks_changed_ = false;
   poll_fds_.clear();
-  for (const auto& it : watch_tasks_)
+  for (auto& it : watch_tasks_) {
+    it.second.poll_fd_index = poll_fds_.size();
     poll_fds_.push_back({it.first, POLLIN | POLLHUP, 0});
+  }
 }
 
 void UnixTaskRunner::RunImmediateAndDelayedTask() {
@@ -157,6 +159,11 @@ void UnixTaskRunner::PostFileDescriptorWatches() {
     // task.
     PostTask(std::bind(&UnixTaskRunner::RunFileDescriptorWatch, this,
                        poll_fds_[i].fd));
+
+    // Make the fd negative while a posted task is pending. This makes poll(2)
+    // ignore the fd.
+    PERFETTO_DCHECK(poll_fds_[i].fd >= 0);
+    poll_fds_[i].fd = -poll_fds_[i].fd;
   }
 }
 
@@ -167,7 +174,14 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     auto it = watch_tasks_.find(fd);
     if (it == watch_tasks_.end())
       return;
-    task = it->second;
+    // Make poll(2) pay attention to the fd again. Since another thread may have
+    // updated this watch we need to refresh the set first.
+    UpdateWatchTasksLocked();
+    size_t fd_index = it->second.poll_fd_index;
+    PERFETTO_DCHECK(fd_index < poll_fds_.size());
+    PERFETTO_DCHECK(std::abs(poll_fds_[fd_index].fd) == fd);
+    poll_fds_[fd_index].fd = fd;
+    task = it->second.callback;
   }
   task();
 }
@@ -211,7 +225,7 @@ void UnixTaskRunner::AddFileDescriptorWatch(int fd,
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(!watch_tasks_.count(fd));
-    watch_tasks_[fd] = std::move(task);
+    watch_tasks_[fd] = {std::move(task), SIZE_MAX};
     watch_tasks_changed_ = true;
   }
   WakeUp();
