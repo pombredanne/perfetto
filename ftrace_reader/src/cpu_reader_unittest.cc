@@ -182,14 +182,14 @@ TEST(CpuReaderTest, ReadAndAdvanceUnderruns) {
 TEST(CpuReaderTest, ParseEmpty) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
   FtraceProcfs ftrace_procfs(path);
-  auto table = ProtoTranslationTable::Create(path, &ftrace_procfs);
+  auto table = ProtoTranslationTable::Create(&ftrace_procfs);
   CpuReader(table.get(), 42, base::ScopedFile());
 }
 
 TEST(CpuReaderTest, ParseSimpleEvent) {
   std::string path = "ftrace_reader/test/data/android_seed_N2F62_3.10.49/";
   FtraceProcfs ftrace(path);
-  auto table = ProtoTranslationTable::Create(path, &ftrace);
+  auto table = ProtoTranslationTable::Create(&ftrace);
 
   std::unique_ptr<uint8_t[]> in_page = MakeBuffer(kPageSize);
   std::unique_ptr<uint8_t[]> out_page = MakeBuffer(kPageSize);
@@ -223,7 +223,7 @@ TEST(CpuReaderTest, ParseSimpleEvent) {
   message.Reset(&stream_writer);
 
   CpuReader::ParsePage(42 /* cpu number */, in_page.get(), kPageSize, &filter,
-                       &message, &table);
+                       &message, table.get());
 
   size_t msg_size =
       delegate.chunks().size() * kPageSize - stream_writer.bytes_available();
