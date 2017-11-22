@@ -49,8 +49,7 @@ class BinaryWriter {
   void WriteEventHeader(uint32_t time_delta, uint32_t entry_type) {
     // Entry header is a packed time delta (d) and type (t):
     // dddddddd dddddddd dddddddd dddttttt
-    //    Write<uint32_t>((time_delta << 5) | (entry_type & 0x1f));
-    Write<uint32_t>(entry_type);
+    Write<uint32_t>((time_delta << 5) | (entry_type & 0x1f));
   }
 
   void WriteString(const char* s) {

@@ -129,6 +129,7 @@ class ProtoZeroMessage {
   }
 
   void AppendString(uint32_t field_id, const char* str);
+  void AppendString(uint32_t field_id, const char* str, size_t size);
   void AppendBytes(uint32_t field_id, const void* value, size_t size);
 
   // Begins a nested message, using the static storage provided by the parent

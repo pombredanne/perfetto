@@ -42,7 +42,6 @@ class EventFilter {
 
   bool IsEventEnabled(size_t ftrace_event_id) const {
     if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size()) {
-      PERFETTO_DCHECK(false);
       return false;
     }
     return enabled_ids_[ftrace_event_id];

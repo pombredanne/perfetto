@@ -107,7 +107,7 @@ bool FtraceProcfs::WriteToFile(const std::string& path,
 
 base::ScopedFile FtraceProcfs::OpenPipeForCpu(size_t cpu) {
   std::string path =
-      root_ + "per_cpu/" + std::to_string(cpu) + "/trace_pipe_raw";
+      root_ + "per_cpu/cpu" + std::to_string(cpu) + "/trace_pipe_raw";
   return base::ScopedFile(open(path.c_str(), O_RDONLY));
 }
 
