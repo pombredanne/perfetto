@@ -14,21 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
-#define TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
+syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
 
-#include <stdint.h>
+import "protos/ftrace/ftrace_event_bundle.proto";
 
-#include <limits>
+// TODO: put all these protos under some namespace.
 
-namespace perfetto {
-
-using ProducerID = uint64_t;
-using DataSourceID = uint64_t;
-using DataSourceInstanceID = uint64_t;
-using WriterID = uint16_t;
-
-
-}  // namespace perfetto
-
-#endif  // TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
+// The root object emitted by Perfetto. A perfetto trace is just a stream of
+// TracePacket(s).
+message TracePacket {
+  oneof data { FtraceEventBundle ftrace_events = 1; }
+}

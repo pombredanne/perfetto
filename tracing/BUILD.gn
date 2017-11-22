@@ -21,7 +21,10 @@ config("tracing_config") {
 # Core tracing library, platform independent, no transport layer.
 source_set("tracing") {
   all_dependent_configs = [ ":tracing_config" ]
-  deps += [ "//base" ]
+  deps += [
+    "//base",
+    "//protos",
+  ]
   sources = [
     "include/tracing/core/basic_types.h",
     "include/tracing/core/data_source_config.h",
@@ -30,9 +33,13 @@ source_set("tracing") {
     "include/tracing/core/service.h",
     "include/tracing/core/shared_memory.h",
     "include/tracing/core/shared_memory_abi.h",
+    "include/tracing/core/trace_writer.h",
+    "src/core/producer_shared_memory_arbiter.cc",
+    "src/core/producer_shared_memory_arbiter.h",
     "src/core/service_impl.cc",
     "src/core/service_impl.h",
     "src/core/shared_memory_abi.cc",
+    "src/core/trace_writer.cc",
   ]
 }
 

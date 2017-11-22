@@ -35,6 +35,7 @@ class TaskRunner;
 class DataSourceConfig;
 class DataSourceDescriptor;
 class Producer;
+class TraceWriter;
 
 // TODO: for the moment this assumes that all the calls hapen on the same
 // thread/sequence. Not sure this will be the case long term in Chrome.
@@ -77,6 +78,14 @@ class Service {
 
     // Returns the SharedMemory buffer for this Producer.
     virtual SharedMemory* shared_memory() const = 0;
+
+    // Returns a TraceWriter interface that allows to write protobufs directly
+    // into the shared memory buffer. The returned TraceWriter will deal under
+    // the hoods with splitting protobufs into chunks and with
+    // acquiring/releasing chunks from the shared memory buffer. The returned
+    // writer is *not* thread safe. The intended design is that each data source
+    // creates one TraceWriter for each thread (or more if necessary).
+    virtual TraceWriter GetTraceWriter() = 0;  // TODO make pure virtual and override.
   };  // class ProducerEndpoint.
 
   // Implemented in src/core/service_impl.cc .

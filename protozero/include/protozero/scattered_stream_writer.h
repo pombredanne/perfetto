@@ -24,6 +24,8 @@
 
 #include "protozero/contiguous_memory_range.h"
 
+// TODO s/uint8_t*/uintptr_t/. Pointer casting through uint8_t* is formally UB.
+
 namespace protozero {
 
 // This class deals with the following problem: append-only proto messages want
@@ -112,6 +114,7 @@ class ScatteredStreamWriter {
 
   Delegate* const delegate_;
   ContiguousMemoryRange cur_range_;
+
   uint8_t* write_ptr_;
 };
 

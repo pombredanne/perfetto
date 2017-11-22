@@ -70,6 +70,7 @@ class ProtoZeroMessage {
   // This is to deal with case of backfilling the size of a root (non-nested)
   // message which is split into multiple chunks. Upon finalization only the
   // partial size that lies in the last chunk has to be backfilled.
+  // TODO: this might be not needed anymore.
   void inc_size_already_written(size_t size) { size_already_written_ += size; }
 
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
@@ -149,6 +150,10 @@ class ProtoZeroMessage {
     BeginNestedMessageInternal(field_id, message);
     return message;
   }
+
+#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
+  bool is_finalized() const { return sealed_; }
+#endif
 
  private:
   ProtoZeroMessage(const ProtoZeroMessage&) = delete;
