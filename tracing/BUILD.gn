@@ -29,8 +29,10 @@ source_set("tracing") {
     "include/tracing/core/producer.h",
     "include/tracing/core/service.h",
     "include/tracing/core/shared_memory.h",
+    "include/tracing/core/shared_memory_abi.h",
     "src/core/service_impl.cc",
     "src/core/service_impl.h",
+    "src/core/shared_memory_abi.cc",
   ]
 }
 
