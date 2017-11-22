@@ -104,7 +104,8 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
   for (size_t i = 0; i < kMaxSinks; i++) {
     if (!filters[i])
       break;
-    bool result = ParsePage(cpu_, buffer, bytes, filters[i], &*bundles[i]);
+    bool result =
+        ParsePage(cpu_, buffer, bytes, filters[i], &*bundles[i], table_);
     PERFETTO_DCHECK(result);
   }
   return true;
@@ -131,7 +132,12 @@ bool CpuReader::ParsePage(size_t cpu,
                           const uint8_t* ptr,
                           size_t size,
                           const EventFilter* filter,
-                          pbzero::FtraceEventBundle* bundle) {
+                          pbzero::FtraceEventBundle* bundle,
+                          const ProtoTranslationTable* table) {
+  const size_t print_id = table->GetEventByName("print")->ftrace_event_id;
+  const size_t sched_switch_id =
+      table->GetEventByName("sched_switch")->ftrace_event_id;
+
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + size;
 
@@ -218,7 +224,7 @@ bool CpuReader::ParsePage(size_t cpu,
         event->set_pid(pid);
 
         // TODO(hjd): Replace this handrolled code with generic parsing code.
-        if (ftrace_event_id == 5) {
+        if (ftrace_event_id == print_id) {
           pbzero::PrintFtraceEvent* print_event = event->set_print();
           // Trace Marker Parser
           uint64_t ip;
@@ -228,14 +234,14 @@ bool CpuReader::ParsePage(size_t cpu,
 
           // TODO(hjd): Not sure if this is null-terminated.
           const uint8_t* buf_start = ptr;
-          const uint8_t* buf_end = next - 1;
+          const uint8_t* buf_end = next - 2;
           print_event->set_buf(reinterpret_cast<const char*>(buf_start),
                                buf_end - buf_start);
           print_event->Finalize();
         }
 
         // TODO(hjd): Replace this handrolled code with generic parsing code.
-        if (ftrace_event_id == 273) {
+        if (ftrace_event_id == sched_switch_id) {
           pbzero::SchedSwitchFtraceEvent* switch_event =
               event->set_sched_switch();
 

@@ -218,11 +218,12 @@ TEST(CpuReaderTest, ParseSimpleEvent) {
 
   perfetto::ScatteredStreamDelegateForTesting delegate(kPageSize);
   protozero::ScatteredStreamWriter stream_writer(&delegate);
+  delegate.set_writer(&stream_writer);
   pbzero::FtraceEventBundle message;
   message.Reset(&stream_writer);
 
   CpuReader::ParsePage(42 /* cpu number */, in_page.get(), kPageSize, &filter,
-                       &message);
+                       &message, &table);
 
   size_t msg_size =
       delegate.chunks().size() * kPageSize - stream_writer.bytes_available();
@@ -237,6 +238,7 @@ TEST(CpuReaderTest, ParseSimpleEvent) {
   const FtraceEvent& proto_event = proto_bundle.event().Get(0);
   EXPECT_EQ(proto_event.pid(), 72);
   EXPECT_TRUE(proto_event.has_print());
+  // TODO(hjd): Check if this is the correct format.
   EXPECT_EQ(proto_event.print().buf(), "Hello, world!\n");
 }
 

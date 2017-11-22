@@ -50,7 +50,6 @@ class EndToEndIntegrationTest : public ::testing::Test,
     message->set_after("--- Bundle wrapper after ---");
     PERFETTO_CHECK(message);
     size_t msg_size = message->Finalize();
-    printf("Finalize size=%zu\n", msg_size);
     std::unique_ptr<uint8_t[]> buffer = GetBuffer(msg_size);
     wrapper->ParseFromArray(buffer.get(), static_cast<int>(msg_size));
     message.reset();
@@ -68,8 +67,6 @@ class EndToEndIntegrationTest : public ::testing::Test,
     message->Reset(writer.get());
     message->set_before("--- Bundle wrapper before ---");
   }
-
-  // virtual void TearDown() {}
 
   virtual BundleHandle GetBundleForCpu(size_t cpu) {
     PERFETTO_CHECK(!currently_writing_);
@@ -94,7 +91,7 @@ class EndToEndIntegrationTest : public ::testing::Test,
     return writer_delegate->GetBuffer(size);
   }
 
-  size_t count = 0;
+  size_t count = 3;
   base::UnixTaskRunner runner_;
   bool currently_writing_ = false;
   size_t cpu_being_written_ = 9999;
@@ -110,28 +107,31 @@ TEST_F(EndToEndIntegrationTest, SchedSwitchAndPrint) {
   procfs.ClearTrace();
   procfs.WriteTraceMarker("Hello, World!");
 
+  // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
-
-  // We're going to enable our favourite event:
-  FtraceConfig config(std::set<std::string>({"sched_switch"}));
-
-  pbzero::FtraceEventBundle wrapper;
-
+  FtraceConfig config(std::set<std::string>({"print", "sched_switch"}));
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
+  // Let some events build up.
   sleep(1);
 
+  // Start watching pipe fds.
   ftrace->Start();
 
+  // Start processing the tasks (OnBundleComplete will quit the task runner).
   runner()->Run();
 
+  // Stop listening to fds.
   ftrace->Stop();
 
+  // Disable events.
   sink.reset();
 
+  // Read the output into a full proto so we can use reflection.
   TestBundleWrapper output;
   Finalize(&output);
 
+  // Check we can see the guards:
   EXPECT_THAT(output.before(), HasSubstr("before"));
   EXPECT_THAT(output.after(), HasSubstr("after"));
 

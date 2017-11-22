@@ -85,6 +85,13 @@ TEST(FtraceProcfsIntegrationTest, EnableDisableTracing) {
   EXPECT_THAT(GetTraceOutput(), HasSubstr("After"));
 }
 
+TEST(FtraceProcfsIntegrationTest, ReadFormatFile) {
+  FtraceProcfs ftrace(kTracingPath);
+  std::string format = ftrace.ReadEventFormat("ftrace", "print");
+  EXPECT_THAT(format, HasSubstr("name: print"));
+  EXPECT_THAT(format, HasSubstr("field:char buf"));
+}
+
 TEST(FtraceProcfsIntegrationTest, CanOpenTracePipeRaw) {
   FtraceProcfs ftrace(kTracingPath);
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
