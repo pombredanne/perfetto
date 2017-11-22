@@ -67,6 +67,12 @@ void ProtoZeroMessage::AppendString(uint32_t field_id, const char* str) {
   AppendBytes(field_id, str, strlen(str));
 }
 
+void ProtoZeroMessage::AppendString(uint32_t field_id,
+                                    const char* str,
+                                    size_t size) {
+  AppendBytes(field_id, str, size);
+}
+
 void ProtoZeroMessage::AppendBytes(uint32_t field_id,
                                    const void* src,
                                    size_t size) {

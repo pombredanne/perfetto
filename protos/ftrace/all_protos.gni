@@ -14,6 +14,7 @@
 
 # TODO(hjd): Auto-generate.
 ftrace_proto_names = [
+  "test_bundle_wrapper.proto",
   "ftrace_event_bundle.proto",
   "print.proto",
   "sched_switch.proto",

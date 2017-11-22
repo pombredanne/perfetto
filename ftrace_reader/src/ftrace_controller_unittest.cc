@@ -118,9 +118,6 @@ class TestFtraceController : public FtraceController {
                        std::unique_ptr<Table> table)
       : FtraceController(std::move(ftrace_procfs), runner, std::move(table)) {}
 
-  //  MOCK_METHOD3(CreateCpuReader, CpuReader(const ProtoTranslationTable*,
-  //  size_t cpu, const std::string& path));
-
  private:
   TestFtraceController(const TestFtraceController&) = delete;
   TestFtraceController& operator=(const TestFtraceController&) = delete;

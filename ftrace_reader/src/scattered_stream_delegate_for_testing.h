@@ -50,13 +50,20 @@ class ScatteredStreamDelegateForTesting
 
   void GetBytes(size_t start, size_t length, uint8_t* buf);
   std::string GetBytesAsString(size_t start, size_t length);
+  std::unique_ptr<uint8_t[]> GetBuffer(size_t size);
 
   const std::vector<std::unique_ptr<uint8_t[]>>& chunks() const {
     return chunks_;
   }
 
+  void set_writer(protozero::ScatteredStreamWriter* writer) {
+    writer_ = writer;
+  }
+
  private:
   const size_t chunk_size_;
+  protozero::ScatteredStreamWriter* writer_ = nullptr;
+  std::vector<size_t> chunks_used_size_;
   std::vector<std::unique_ptr<uint8_t[]>> chunks_;
 };
 
@@ -68,6 +75,11 @@ ScatteredStreamDelegateForTesting::~ScatteredStreamDelegateForTesting() {}
 
 protozero::ContiguousMemoryRange
 ScatteredStreamDelegateForTesting::GetNewBuffer() {
+  PERFETTO_CHECK(writer_);
+  if (chunks_.size()) {
+    size_t used = chunk_size_ - writer_->bytes_available();
+    chunks_used_size_.push_back(used);
+  }
   std::unique_ptr<uint8_t[]> chunk(new uint8_t[chunk_size_]);
   uint8_t* begin = chunk.get();
   memset(begin, 0xff, chunk_size_);
@@ -78,6 +90,26 @@ ScatteredStreamDelegateForTesting::GetNewBuffer() {
 std::string ScatteredStreamDelegateForTesting::GetChunkAsString(
     size_t chunk_index) {
   return ToHex(chunks_[chunk_index].get(), chunk_size_);
+}
+
+std::unique_ptr<uint8_t[]> ScatteredStreamDelegateForTesting::GetBuffer(
+    size_t size) {
+  std::unique_ptr<uint8_t[]> buffer =
+      std::unique_ptr<uint8_t[]>(new uint8_t[size]);
+  size_t remaining = size;
+  size_t i = 0;
+  for (const auto& chunk : chunks_) {
+    size_t chunk_size = remaining;
+    if (i < chunks_used_size_.size()) {
+      chunk_size = chunks_used_size_[i];
+    }
+    PERFETTO_CHECK(chunk_size <= chunk_size_);
+    memcpy(buffer.get() + size - remaining, chunk.get(), chunk_size);
+    remaining -= chunk_size;
+    i++;
+  }
+
+  return buffer;
 }
 
 void ScatteredStreamDelegateForTesting::GetBytes(size_t start,

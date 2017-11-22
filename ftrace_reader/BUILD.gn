@@ -46,8 +46,11 @@ executable("ftrace_reader_integrationtests") {
     "//buildtools:gmock",
     "//buildtools:gtest",
     "//buildtools:gtest_main",
+    "//buildtools:protobuf_full",
+    "//protos/ftrace:ftrace_full_protos",
   ]
   sources = [
+    "src/end_to_end_integrationtest.cc",
     "src/ftrace_procfs_integrationtest.cc",
   ]
 }
@@ -57,7 +60,10 @@ executable("ftrace_reader_demo") {
   sources = [
     "src/main.cc",
   ]
-  deps += [ ":ftrace_reader" ]
+  deps += [
+    ":ftrace_reader",
+    "//base",
+  ]
 }
 
 source_set("ftrace_reader") {
