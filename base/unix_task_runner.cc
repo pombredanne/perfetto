@@ -97,6 +97,11 @@ void UnixTaskRunner::Quit() {
   WakeUp();
 }
 
+bool UnixTaskRunner::IsIdleForTesting() {
+  std::lock_guard<std::mutex> lock(lock_);
+  return immediate_tasks_.empty();
+}
+
 void UnixTaskRunner::UpdateWatchTasksLocked() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!watch_tasks_changed_)
@@ -222,6 +227,7 @@ void UnixTaskRunner::PostDelayedTask(std::function<void()> task, int delay_ms) {
 
 void UnixTaskRunner::AddFileDescriptorWatch(int fd,
                                             std::function<void()> task) {
+  PERFETTO_DCHECK(fd >= 0);
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(!watch_tasks_.count(fd));
@@ -232,6 +238,7 @@ void UnixTaskRunner::AddFileDescriptorWatch(int fd,
 }
 
 void UnixTaskRunner::RemoveFileDescriptorWatch(int fd) {
+  PERFETTO_DCHECK(fd >= 0);
   {
     std::lock_guard<std::mutex> lock(lock_);
     PERFETTO_DCHECK(watch_tasks_.count(fd));
