@@ -91,7 +91,7 @@ class EndToEndIntegrationTest : public ::testing::Test,
     return writer_delegate->GetBuffer(size);
   }
 
-  size_t count = 3;
+  size_t count = 0;
   base::UnixTaskRunner runner_;
   bool currently_writing_ = false;
   size_t cpu_being_written_ = 9999;
@@ -110,6 +110,45 @@ TEST_F(EndToEndIntegrationTest, SchedSwitchAndPrint) {
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   FtraceConfig config(std::set<std::string>({"print", "sched_switch"}));
+  std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
+
+  // Let some events build up.
+  sleep(1);
+
+  // Start watching pipe fds.
+  ftrace->Start();
+
+  // Start processing the tasks (OnBundleComplete will quit the task runner).
+  runner()->Run();
+
+  // Stop listening to fds.
+  ftrace->Stop();
+
+  // Disable events.
+  sink.reset();
+
+  // Read the output into a full proto so we can use reflection.
+  TestBundleWrapper output;
+  Finalize(&output);
+
+  // Check we can see the guards:
+  EXPECT_THAT(output.before(), HasSubstr("before"));
+  EXPECT_THAT(output.after(), HasSubstr("after"));
+
+  std::string output_as_text;
+  google::protobuf::TextFormat::PrintToString(output, &output_as_text);
+  printf("%s\n", output_as_text.c_str());
+}
+
+TEST_F(EndToEndIntegrationTest, Atrace) {
+  FtraceProcfs procfs(kTracingPath);
+  procfs.ClearTrace();
+
+  // Create a sink listening for our favorite events:
+  std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
+  FtraceConfig config;
+  config.AddAtraceCategory("input");
+  config.AddAtraceApp("com.google.android.apps.maps");
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.

@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <array>
 #include <string>
@@ -36,6 +37,27 @@ namespace {
 
 // TODO(b/68242551): Do not hardcode these paths.
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+
+bool RunAtrace(const std::vector<std::string>& args) {
+  int status = 1;
+  char* const envp[1] = {nullptr};
+  pid_t pid = fork();
+  if (pid == -1)
+    return false;
+  if (pid > 0) {
+    waitpid(pid, &status, 0);
+  } else {
+    std::vector<char*> argv;
+    argv.push_back(
+        const_cast<char*>(std::string("/system/bin/atrace").c_str()));
+    for (const auto& arg : args)
+      argv.push_back(const_cast<char*>(arg.c_str()));
+    argv.push_back(nullptr);
+    execve("/system/bin/atrace", &argv[0], envp);
+    exit(1);
+  }
+  return status == 0;
+}
 
 }  // namespace
 
@@ -99,6 +121,7 @@ void FtraceController::Stop() {
     int fd = reader->GetFileDescriptor();
     task_runner_->RemoveFileDescriptorWatch(fd);
   }
+  ftrace_procfs_->DisableTracing();
 }
 
 void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
@@ -140,7 +163,8 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
   auto filter = std::unique_ptr<EventFilter>(
       new EventFilter(*table_.get(), config.events()));
   auto sink = std::unique_ptr<FtraceSink>(
-      new FtraceSink(std::move(controller_weak), std::move(filter), delegate));
+      new FtraceSink(std::move(controller_weak), std::move(config),
+                     std::move(filter), delegate));
   Register(sink.get());
   return sink;
 }
@@ -149,6 +173,9 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it_and_inserted = sinks_.insert(sink);
   PERFETTO_DCHECK(it_and_inserted.second);
+  if (sink->config().WantsAtrace()) {
+    StartAtrace(sink->config());
+  }
   for (const std::string& name : sink->enabled_events())
     RegisterForEvent(name);
 }
@@ -183,12 +210,47 @@ void FtraceController::Unregister(FtraceSink* sink) {
   PERFETTO_DCHECK(removed == 1);
   for (const std::string& name : sink->enabled_events())
     UnregisterForEvent(name);
+  if (sink->config().WantsAtrace()) {
+    StopAtrace();
+  }
+}
+
+void FtraceController::StartAtrace(const FtraceConfig& config) {
+#if defined(ANDROID)
+  PERFETTO_CHECK(atrace_running_ == false);
+  atrace_running_ = true;
+  PERFETTO_DLOG("Start atrace...");
+  std::vector<std::string> args;
+  args.push_back("--async_start");
+  for (const auto& category : config.atrace_categories())
+    args.push_back(category);
+  if (!config.atrace_apps().empty()) {
+    args.push_back("-a");
+    for (const auto& app : config.atrace_apps())
+      args.push_back(app);
+  }
+
+  PERFETTO_CHECK(RunAtrace(args));
+  PERFETTO_DLOG("...done");
+#endif  // defined(ANDROID)
+}
+
+void FtraceController::StopAtrace() {
+#if defined(ANDROID)
+  PERFETTO_CHECK(atrace_running_ == true);
+  atrace_running_ = false;
+  PERFETTO_DLOG("Stop atrace...");
+  PERFETTO_CHECK(RunAtrace(std::vector<std::string>({"--async_stop"})));
+  PERFETTO_DLOG("...done");
+#endif  // defined(ANDROID)
 }
 
 FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
+                       FtraceConfig config,
                        std::unique_ptr<EventFilter> filter,
                        Delegate* delegate)
     : controller_weak_(std::move(controller_weak)),
+      config_(std::move(config)),
       filter_(std::move(filter)),
       delegate_(delegate){};
 
@@ -203,11 +265,29 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 
 FtraceConfig::FtraceConfig() = default;
 FtraceConfig::FtraceConfig(std::set<std::string> events)
-    : events_(std::move(events)) {}
+    : ftrace_events_(std::move(events)) {}
 FtraceConfig::~FtraceConfig() = default;
 
 void FtraceConfig::AddEvent(const std::string& event) {
-  events_.insert(event);
+  ftrace_events_.insert(event);
+}
+
+void FtraceConfig::AddAtraceApp(const std::string& app) {
+  // You implicitly need the print ftrace event if you
+  // are using atrace.
+  AddEvent("print");
+  atrace_apps_.insert(app);
+}
+
+void FtraceConfig::AddAtraceCategory(const std::string& category) {
+  // You implicitly need the print ftrace event if you
+  // are using atrace.
+  AddEvent("print");
+  atrace_categories_.insert(category);
+}
+
+bool FtraceConfig::WantsAtrace() const {
+  return !atrace_categories_.empty() || !atrace_apps_.empty();
 }
 
 }  // namespace perfetto

@@ -50,11 +50,20 @@ class FtraceConfig {
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
+  void AddAtraceCategory(const std::string&);
+  void AddAtraceApp(const std::string&);
+  bool WantsAtrace() const;
 
-  const std::set<std::string>& events() const { return events_; }
+  const std::set<std::string>& events() const { return ftrace_events_; }
+  const std::set<std::string>& atrace_categories() const {
+    return atrace_categories_;
+  }
+  const std::set<std::string>& atrace_apps() const { return atrace_apps_; }
 
  private:
-  std::set<std::string> events_;
+  std::set<std::string> ftrace_events_;
+  std::set<std::string> atrace_categories_;
+  std::set<std::string> atrace_apps_;
 };
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
@@ -74,9 +83,11 @@ class FtraceSink {
   };
 
   FtraceSink(base::WeakPtr<FtraceController>,
+             FtraceConfig config,
              std::unique_ptr<EventFilter>,
              Delegate*);
   ~FtraceSink();
+  const FtraceConfig& config() const { return config_; }
 
  private:
   friend FtraceController;
@@ -91,9 +102,9 @@ class FtraceSink {
       protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle) {
     delegate_->OnBundleComplete(cpu, std::move(bundle));
   }
-
   const std::set<std::string>& enabled_events();
   base::WeakPtr<FtraceController> controller_weak_;
+  FtraceConfig config_;
   std::unique_ptr<EventFilter> filter_;
   FtraceSink::Delegate* delegate_;
 };
@@ -127,6 +138,9 @@ class FtraceController {
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
 
+  void StartAtrace(const FtraceConfig&);
+  void StopAtrace();
+
   // Called when we know there is data for the raw pipe
   // for the given |cpu|. Kicks off the reading/parsing
   // of the pipe.
@@ -138,6 +152,7 @@ class FtraceController {
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   bool listening_for_raw_trace_data_ = false;
+  bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   std::vector<size_t> enabled_count_;
