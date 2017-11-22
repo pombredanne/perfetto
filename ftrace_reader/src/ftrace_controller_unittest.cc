@@ -40,6 +40,7 @@ using Table = ProtoTranslationTable;
 class MockTaskRunner : public base::TaskRunner {
  public:
   MOCK_METHOD1(PostTask, void(std::function<void()>));
+  MOCK_METHOD2(PostDelayedTask, void(std::function<void()>, int delay_ms));
   MOCK_METHOD2(AddFileDescriptorWatch, void(int fd, std::function<void()>));
   MOCK_METHOD1(RemoveFileDescriptorWatch, void(int fd));
 };

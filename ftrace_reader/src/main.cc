@@ -24,18 +24,13 @@
 #include <utility>
 #include <vector>
 
+#include "base/unix_task_runner.h"
 #include "ftrace_reader/ftrace_controller.h"
 #include "protozero/scattered_stream_writer.h"
 #include "scattered_stream_delegate_for_testing.h"
 
-class FakeTaskRunner : public perfetto::base::TaskRunner {
-  virtual void PostTask(std::function<void()>) {}
-  virtual void AddFileDescriptorWatch(int fd, std::function<void()>) {}
-  virtual void RemoveFileDescriptorWatch(int fd) {}
-};
-
 int main(int argc, const char** argv) {
-  FakeTaskRunner runner;
+  perfetto::base::UnixTaskRunner runner;
   auto ftrace = perfetto::FtraceController::Create(&runner);
 
   perfetto::FtraceConfig config;

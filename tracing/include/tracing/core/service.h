@@ -17,8 +17,11 @@
 #ifndef TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
 #define TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
 
+#include <stdint.h>
+
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "tracing/core/basic_types.h"
 #include "tracing/core/shared_memory.h"
@@ -52,14 +55,11 @@ class Service {
   // Subclassed by:
   // 1. The service_impl.cc business logic when returning it in response to
   //    the ConnectProducer() method.
-  // 2. The transport layer (e.g., src/unix_rpc) when the producer and
-  //    the service don't talk locally but via some RPC mechanism.
+  // 2. The transport layer (e.g., src/ipc) when the producer and
+  //    the service don't talk locally but via some IPC mechanism.
   class ProducerEndpoint {
    public:
     virtual ~ProducerEndpoint() = default;
-
-    // The same ID that is passed the producer via Producer::OnConnect().
-    virtual ProducerID GetID() const = 0;
 
     // Called by the Producer to (un)register data sources. The Services returns
     // asynchronousy the ID for the data source.
@@ -70,12 +70,13 @@ class Service {
                                     RegisterDataSourceCallback) = 0;
     virtual void UnregisterDataSource(DataSourceID) = 0;
 
-    // Called by the Producer to signal acquisition and release of shared memory
-    // pages from the shared memory buffer shared between Service and Producer.
-    // A page is acquired before the Producer starts writing into that and
-    // released once full.
-    virtual void NotifyPageAcquired(uint32_t page) = 0;
-    virtual void NotifyPageReleased(uint32_t page) = 0;
+    // Called by the Producer to signal that some pages in the shared memory
+    // buffer (shared between Service and Producer) have changed.
+    virtual void NotifySharedMemoryUpdate(
+        const std::vector<uint32_t>& changed_pages) = 0;
+
+    // Returns the SharedMemory buffer for this Producer.
+    virtual SharedMemory* shared_memory() const = 0;
   };  // class ProducerEndpoint.
 
   // Implemented in src/core/service_impl.cc .
@@ -91,7 +92,30 @@ class Service {
   // the returned ProducerEndpoint is alive.
   // To disconnect just destroy the returned ProducerEndpoint object. It is safe
   // to destroy the Producer once the Producer::OnDisconnect() has been invoked.
-  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(Producer*) = 0;
+  // |shared_buffer_size_hint_bytes| is an optional hint on the size of the
+  // shared memory buffer. The service can ignore the hint (e.g., if the hint
+  // is unreasonably large).
+  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
+      Producer*,
+      size_t shared_buffer_size_hint_bytes = 0) = 0;
+
+ public:  // Testing-only
+  class ObserverForTesting {
+   public:
+    virtual ~ObserverForTesting() {}
+    virtual void OnProducerConnected(ProducerID) {}
+    virtual void OnProducerDisconnected(ProducerID) {}
+    virtual void OnDataSourceRegistered(ProducerID, DataSourceID) {}
+    virtual void OnDataSourceUnregistered(ProducerID, DataSourceID) {}
+    virtual void OnDataSourceInstanceCreated(ProducerID,
+                                             DataSourceID,
+                                             DataSourceInstanceID) {}
+    virtual void OnDataSourceInstanceDestroyed(ProducerID,
+                                               DataSourceID,
+                                               DataSourceInstanceID) {}
+  };
+
+  virtual void set_observer_for_testing(ObserverForTesting*) = 0;
 };
 
 }  // namespace perfetto

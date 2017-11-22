@@ -169,7 +169,9 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
                                                std::move(reply));
       });
 
+  service->client_info_ = ClientInfo(client->id, client->sock->peer_uid());
   method.invoker(service, *decoded_req_args, std::move(deferred_reply));
+  service->client_info_ = ClientInfo();
 }
 
 void HostImpl::ReplyToMethodInvocation(ClientID client_id,
@@ -192,17 +194,17 @@ void HostImpl::ReplyToMethodInvocation(ClientID client_id,
       reply_frame_data->set_success(true);
     }
   }
-  SendFrame(client, reply_frame);
+  SendFrame(client, reply_frame, reply.fd());
 }
 
 // static
-void HostImpl::SendFrame(ClientConnection* client, const Frame& frame) {
+void HostImpl::SendFrame(ClientConnection* client, const Frame& frame, int fd) {
   std::string buf = BufferedFrameDeserializer::Serialize(frame);
 
   // TODO(primiano): remember that this is doing non-blocking I/O. What if the
   // socket buffer is full? Maybe we just want to drop this on the floor? Or
   // maybe throttle the send and PostTask the reply later?
-  bool res = client->sock->Send(buf.data(), buf.size());
+  bool res = client->sock->Send(buf.data(), buf.size(), fd);
   PERFETTO_CHECK(!client->sock->is_connected() || res);
 }
 
@@ -212,9 +214,17 @@ void HostImpl::OnDisconnect(UnixSocket* sock) {
   if (it == clients_by_socket_.end())
     return;
   ClientID client_id = it->second->id;
+  ClientInfo client_info(client_id, sock->peer_uid());
   clients_by_socket_.erase(it);
   PERFETTO_DCHECK(clients_.count(client_id));
   clients_.erase(client_id);
+
+  for (const auto& service_it : services_) {
+    Service& service = *service_it.second.instance;
+    service.client_info_ = client_info;
+    service.OnClientDisconnected();
+    service.client_info_ = ClientInfo();
+  }
 }
 
 const HostImpl::ExposedService* HostImpl::GetServiceByName(
