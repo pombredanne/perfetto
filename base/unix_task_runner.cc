@@ -20,6 +20,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <cmath>
 
 namespace perfetto {
 namespace base {
