@@ -53,7 +53,7 @@ TraceWriter::TraceWriter(ProducerSharedMemoryArbiter* shmem_arbiter)
 
   // TODO we could handle this more gracefully and always return some garbage
   // TracePacket in NewTracePacket.
-  PERFETTO_CHECK(id_ == 0);
+  PERFETTO_CHECK(id_ != 0);
 }
 
 TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
@@ -61,7 +61,9 @@ TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
   // finalized the previous packet.
   PERFETTO_DCHECK(!cur_packet_being_written_);
 
-  // Reserve space for the size of the message.
+  // Reserve space for the size of the message. Note: this call might re-enter
+  // this class into GetNewBuffer() if there isn't enough space or if this is
+  // the very first call to NewTracePacket().
   cur_packet_header_ = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
   memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
   cur_packet_.Reset(&protobuf_stream_writer_);
@@ -95,12 +97,18 @@ void TraceWriter::OnFinalize(size_t packet_size) {
   cur_packet_being_written_ = false;
 
   // Keep this last, it has release-store semantics.
-  cur_chunk_.IncreasePacketCount();
+  cur_chunk_.IncrementPacketCount();
 }
 
-// Called by the ProtoZeroMessage when it runs out of space.
+// Called by the ProtoZeroMessage. We can get here in two cases:
+// 1. In the middle of writing a ProtoZeroMessage,
+// when cur_packet_being_written_ == true. In this case we want to update the
+// chunk header with a partial packet and start a new partial packet in the
+// new chunk.
+// 2. While trying to reserve the packet header at the beginning of
+// NewTracePacket(). In this case we just want a new chunk without creating any
+// fragments.
 protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
-  bool last_packet_is_partial = false;
   if (cur_packet_being_written_) {
     const uintptr_t wptr =
         reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr());
@@ -109,14 +117,12 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
     PERFETTO_DCHECK(partial_packet_size < cur_chunk_.size());
     const auto size = static_cast<PacketHeaderType>(partial_packet_size);
     memcpy(cur_packet_header_.begin, &size, sizeof(size));
-    last_packet_is_partial = true;
+    cur_chunk_.IncrementPacketCount(true /* last_packet_is_partial */);
   }
-  cur_chunk_.IncreasePacketCount(last_packet_is_partial);
 
   // Start a new chunk.
   SharedMemoryABI::ChunkHeader::Identifier identifier = {};
-  static_assert(sizeof(id_) <= sizeof(identifier.writer_id),
-                "WriterID too large");
+  static_assert(sizeof(id_) <= sizeof(identifier.writer_id), "WriterID size");
   identifier.writer_id = id_;
   identifier.chunk_id = cur_chunk_id_++;
 
@@ -134,11 +140,15 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
-  // TODO reserve size unsafe for the new size.
-  // //////////////////////////////////////
-  cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_chunk_.payload_begin());
+  if (cur_packet_being_written_) {
+    cur_packet_header_ =
+        protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
+    memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
+    cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_chunk_.payload_begin());
+  }
 
-  // TODO get rid of the uint8_t* cast below.
+  // TODO get rid of the uint8_t* cast below, needs fixing
+  // scattered_stream_writer.h.
   return protozero::ContiguousMemoryRange{
       reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()),
       reinterpret_cast<uint8_t*>(cur_chunk_.end())};

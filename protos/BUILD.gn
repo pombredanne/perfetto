@@ -13,12 +13,24 @@
 # limitations under the License.
 
 import("//protozero//protozero_library.gni")
+import("//build/proto_library.gni")
 
-protozero_library("protos") {
+proto_sources = [ "trace_packet.proto" ]
+
+protozero_library("zero") {
+  generate_cc = false
   deps = [
     "ftrace",
   ]
-  sources = [
-    "trace_packet.proto",
+  sources = proto_sources
+}
+
+# TODO: we don't really want the _full version but just the _lite. However
+# this requires to have 3 targets (zero, full and lite) for ftrace. Need to
+# solve that problem first.
+proto_library("full") {
+  deps = [
+    "ftrace:ftrace_full_protos",
   ]
+  sources = proto_sources
 }

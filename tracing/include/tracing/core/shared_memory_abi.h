@@ -129,16 +129,6 @@ namespace perfetto {
 // size. This buffer will be read and written by processes that have a different
 // bitness in the same OS.
 
-// In theory std::atomic does not guarantee that the underlying type consists
-// only of the actual atomic word. Theoretically it could have locks or other
-// state. In practice most implementations just implement them wihtout extra
-// state. The code below overlays the atomic into the SMB, hence relies on
-// this implementation detail. This should be fine pragmatically (Chrome's base
-// makes the same assumption), but let's have a check for this.
-static_assert(sizeof(std::atomic<uint32_t>) == sizeof(uint32_t) &&
-                  sizeof(std::atomic<uint16_t>) == sizeof(uint16_t),
-              "Incompatible STL atomic implementation");
-
 class SharedMemoryABI {
  public:
   // 14 is the max number that can be encoded in a 32 bit atomic word using
@@ -147,12 +137,12 @@ class SharedMemoryABI {
   static constexpr size_t kMaxChunksPerPage = 14;
 
   // Each TrackePacket in the Chunk is prefixed by 2 bytes stating its size.
-  // This limits the max chunk (and in turn a page) size. This doe NOT limit
+  // This limits the max chunk (and in turn, page) size. This does NOT limit
   // the size of a TracePacket, because large packets can still be split across
   // several chunks.
   using PacketHeaderType = uint16_t;
   static constexpr size_t kPacketHeaderSize = sizeof(PacketHeaderType);
-  static constexpr size_t kMaxPageSize = 1 << kPacketHeaderSize;
+  static constexpr size_t kMaxPageSize = 1ul << (8 * kPacketHeaderSize);
 
   // Chunk states and transitions:
   //       kFree  <------------------+
@@ -186,23 +176,41 @@ class SharedMemoryABI {
   };
 
   enum PageLayout : uint32_t {
-    kPageFree = 0,  // The page is fully free and has not been partitioned yet.
+    // The page is fully free and has not been partitioned yet.
+    kPageNotPartitioned = 0,
 
     // The page contains (8 == sizeof(PageHeader)):
     // align4(X) := the largest integer N s.t. (N % 4) == 0 && N <= X.
+
     kPageDiv1 = 1,   // Only one chunk of size: PAGE_SIZE - 8.
     kPageDiv2 = 2,   // Two chunks of size: align4((PAGE_SIZE - 8) / 2).
     kPageDiv4 = 3,   // Four chunks of size: align4((PAGE_SIZE - 8) / 4).
     kPageDiv7 = 4,   // Seven chunks of size: align4((PAGE_SIZE - 8) / 7).
     kPageDiv14 = 5,  // Fourteen chunks of size: align4((PAGE_SIZE - 8) / 14).
 
-    kPageReserved1 = 6,
-    kPageReserved2 = 7,
+    // The rational for 7 and 14 above is to maximize the page usage for the
+    // likely case of |page_size| == 4096:
+    // (((4096 - 8) / 14) % 4) == 0, while (((4096 - 8) / 16 % 4)) == 3. So
+    // Div16 would waste 3 * 16 = 48 bytes per page for chunk alignment gaps.
+
+    kPageDivReserved1 = 6,
+    kPageDivReserved2 = 7,
+    kNumPageLayouts = 8,
   };
 
-  static constexpr size_t kNumChunksPerLayout[] = {0, 1, 2, 4, 7, 14, 0, 0};
+  // Keep this consistent with the enum above.
+  static constexpr size_t kNumChunksForLayout[] = {0, 1, 2, 4, 7, 14, 0, 0};
 
-  // Once per page at the beginning of the page.
+  static constexpr uint32_t kChunkAlignment = 4;
+  static constexpr uint32_t kChunkShift = 2;
+  static constexpr uint32_t kChunkMask = 0x3;
+  static constexpr uint32_t kLayoutMask = 0x70000000;
+  static constexpr uint32_t kLayoutShift = 28;
+  static constexpr uint32_t kAllChunksMask = 0x0FFFFFFF;
+
+  // This relies on kChunkComplete == 3.
+  static constexpr uint32_t kAllChunksComplete = 0x0FFFFFFF;
+
   struct PageHeader {
     // |layout| bits:
     // [31] [30:29] [28:27] ... [1:0]
@@ -212,42 +220,30 @@ class SharedMemoryABI {
     //  |      |       +--------------------- ChunkState[13]
     //  |      +----------------------------- PageLayout (0 == page fully free)
     //  +------------------------------------ Reserved for future use
-    static constexpr uint32_t kChunkAlignment = 4;
-    static constexpr uint32_t kChunkMask = 0x3;
-    static constexpr uint32_t kChunkShift = 2;
-    static constexpr uint32_t kLayoutMask = 0x70000000;
-    static constexpr uint32_t kLayoutShift = 28;
-    static constexpr uint32_t kAllChunksMask = 0x0FFFFFFF;
-
-    static constexpr uint32_t BuildAllChunksState(ChunkState state) {
-      return state | state << 2 | state << 4 | state << 6 | state << 8 |
-             state << 10 | state << 12 | state << 14 | state << 16 |
-             state << 18 | state << 20 | state << 22 | state << 24 |
-             state << 26;
-    }
-
     std::atomic<uint32_t> layout;
     uint32_t reserved;
   };
 
   struct ChunkHeader {
     struct PacketsState {
+      enum Flags : uint8_t {
+        // If set, the first TracePacket in the chunk is partial and continues
+        // from |chunk_id| - 1 (within the same |writer_id|).
+        kFirstPacketContinuesFromPrevChunk = 1 << 0,
+
+        // If set, the last TracePacket in the chunk is partial and continues on
+        // |chunk_id| + 1 (within the same |writer_id|).
+        kLastPacketContinuesOnNextChunk = 1 << 1,
+      };
+
+      uint8_t flags;
+      uint8_t reserved;
+
       // Number of valid TracePacket protobuf messages contained in the chunk.
       // Each TracePacket is prefixed by its own size. This field is
       // monotonically updated by the Producer with release store semantic after
       // the packet has been written into the chunk.
       uint16_t count;
-
-      // If set, the first TracePacket in the chunk is partial and continues
-      // from |chunk_id| - 1 within the same |writer_id|.
-      static constexpr uint8_t kFirstPacketContinuesFromPrevChunk = 1 << 0;
-
-      // If set, the last TracePacket in the chunk is partial and continues on
-      // |chunk_id| + 1 within the same |writer_id|.
-      static constexpr uint8_t kLastPacketContinuesOnNextChunk = 1 << 1;
-
-      uint8_t flags;
-      uint8_t reserved;
     };
 
     // This never changes throughout the life of the Chunk.
@@ -269,6 +265,8 @@ class SharedMemoryABI {
     std::atomic<PacketsState> packets;
   };
 
+  // TODO would be nicer if the Chunk was move only, purely for doc purposes
+  // and to make the Acquire/Release methods look more meaningful.
   class Chunk {
    public:
     void Reset(uintptr_t begin, size_t size);
@@ -282,22 +280,30 @@ class SharedMemoryABI {
     // Size, including Chunk header.
     size_t size() { return end_addr() - begin_addr(); }
 
-    ChunkHeader* header() const {
-      return reinterpret_cast<ChunkHeader*>(begin_);
-    }
-
     void* payload_begin() const {
       return reinterpret_cast<void*>(begin_addr() + sizeof(ChunkHeader));
     }
 
     bool is_valid() const { return begin_ != nullptr && end_ > begin_; }
 
-    uint16_t GetPacketCount() const;
-    void IncreasePacketCount(bool last_packet_is_partial = false);
+    ChunkHeader* header() { return reinterpret_cast<ChunkHeader*>(begin_); }
+
+    // Returns the count of packets (|packets.count|) with acquire-load
+    // semantics.
+    uint16_t GetPacketCount();
+
+    // Increases |packets.count| with release-store semantics. The increment is
+    // NOT atomic (i.e. no CAS). Only the Producer is supposed to perform this
+    // increment and it is supposed to do this thread-safely (i.e. a Chunk
+    // cannot be shared by multiple threads without locking anyways).
+    // If |last_packet_is_partial| == true it also toggles the
+    // kLastPacketContinuesOnNextChunk flag. The flag update is performed
+    // atomically with the |packets.count| update.
+    void IncrementPacketCount(bool last_packet_is_partial = false);
 
    private:
     // This class is deliberately copiable and assignable.
-    // Don't add extra fields, that would make the copy quite expensive.
+    // Don't add extra fields, that would make the copy expensive.
     void* begin_ = nullptr;
     void* end_ = nullptr;
   };
@@ -305,10 +311,11 @@ class SharedMemoryABI {
   SharedMemoryABI(void* start, size_t size, size_t page_size);
 
   void* start() const { return reinterpret_cast<void*>(start_); }
+  void* end() const { return reinterpret_cast<void*>(start_ + size_); }
   size_t size() const { return size_; }
   size_t num_pages() const { return num_pages_; }
 
-  PageHeader* GetPageHeader(size_t page_idx) {
+  PageHeader* page_header(size_t page_idx) {
     PERFETTO_DCHECK(page_idx < num_pages_);
     return reinterpret_cast<PageHeader*>(start_ + page_size_ * page_idx);
   }
@@ -317,63 +324,94 @@ class SharedMemoryABI {
   // The state of the page can change at any point after this returns. The
   // caller should use this just as a hint to figure out whether it should
   // TryPartitionPage() or acquire an individual chunk.
-  bool IsPageFree(size_t page_idx) {
-    return GetPageHeader(page_idx)->layout.load(std::memory_order_relaxed) == 0;
+  bool is_page_free(size_t page_idx) {
+    return page_header(page_idx)->layout.load(std::memory_order_relaxed) == 0;
   }
 
-  static constexpr size_t GetNumChunksInPage(uint32_t page_layout) {
-    return kNumChunksPerLayout[(page_layout & PageHeader::kLayoutMask) >>
-                               PageHeader::kLayoutShift];
+  // Returns true if all chunks in the page are kChunkComplete. As above, this
+  // can change quickly. The service is supposed to
+  // TryMarkAllChunksAsBeingRead() if this succeeds.
+  bool is_page_complete(size_t page_idx) {
+    return (page_header(page_idx)->layout.load(std::memory_order_relaxed) &
+            kAllChunksMask) == kAllChunksComplete;
   }
 
-  size_t GetChunkSizeForPage(uint32_t page_layout) const {
-    return chunk_sizes_[(page_layout & PageHeader::kLayoutMask) >>
-                        PageHeader::kLayoutShift];
+  PageLayout page_layout(size_t page_idx) {
+    uint32_t x = page_header(page_idx)->layout.load(std::memory_order_relaxed);
+    return static_cast<PageLayout>((x & kLayoutMask) >> kLayoutShift);
   }
 
   // Returns a bitmap in which each bit is set if the corresponding Chunk exists
-  // in the page (according to the page layout) and is free. It returns 0 if
-  // the page was clear and not partitioned.
+  // in the page (according to the page layout) and is free. If the page is not
+  // partitioned it returns 0 (as if the page had no free chunks).
   size_t GetFreeChunks(size_t page_idx);
 
-  // Used by the Service to take full ownership of a page in one shot.
-  // It tries to atomically migrate all chunks into the kChunkBeingRead state.
-  // Can only be done if all chunks are either kChunkFree or kChunkComplete.
-  // If this fails, the service has to fall back acquiring and moving the
-  // chunks individually.
+  // Used by the Service to take full ownership of oll the chunks in the a page
+  // in one shot.  It tries to atomically migrate all chunks into the
+  // kChunkBeingRead state. Can only be done if all chunks are either kChunkFree
+  // or kChunkComplete. If this fails, the service has to fall back acquiring
+  // the chunks individually.
   bool TryMarkAllChunksAsBeingRead(size_t page_idx);
 
   // Tries to atomically partition a page with the given |layout|. Returns true
-  // if the page was free and has been partitioned. False if the page wasn't
-  // free anymore by the time we tried to partition it.
+  // if the page was free and has been partitioned; false if the page wasn't
+  // free anymore by the time we tried the atomic CAS.
   bool TryPartitionPage(size_t page_idx, PageLayout layout);
 
-  // Tries to atomically mark a single chunk within the page as kBeingWritten.
-  // Returns false if the page is not partitioned or the chunk is not free.
-  bool TryAcquireChunkForWriting(size_t page_idx,
-                                 size_t chunk_idx,
-                                 const ChunkHeader&,
-                                 Chunk*);
+  // Tries to atomically mark a single chunk within the page as either
+  // kBeingWritten or kBeingRead. Returns false if the page is not partitioned
+  // or the chunk is not in a state that allows the transition (respectively,
+  // kFree and kComplete). If succeeds, it returns true and updates the Chunk*
+  // output argument with the chunk boundaries.
+  bool TryAcquireChunkForWrite(size_t page_idx,
+                               size_t chunk_idx,
+                               const ChunkHeader* chunk_header,
+                               Chunk* chunk) {
+    return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingWritten,
+                           chunk_header, chunk);
+  }
 
-  // Puts a chunk back into the kWriteComplete state.
-  void MarkChunkAsComplete(Chunk chunk);
+  bool TryAcquireChunkForRead(size_t page_idx, size_t chunk_idx, Chunk* chunk) {
+    return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingRead, nullptr,
+                           chunk);
+  }
 
-  void* end() const { return reinterpret_cast<void*>(start_ + size_); }
+  // Puts a chunk into the kWriteComplete state.
+  void ReleaseChunkAsComplete(Chunk chunk) {
+    ReleaseChunk(chunk, kChunkComplete);
+  }
+
+  // Puts a chunk into the kChunkFree state.
+  void ReleaseChunkAsFree(Chunk chunk) { ReleaseChunk(chunk, kChunkFree); }
+
+  ChunkState GetChunkState(size_t page_idx, size_t chunk_idx);
 
  private:
-  using ChunkSizePerDivider = std::array<size_t, 8>;
-  static ChunkSizePerDivider InitChunkSizes(size_t page_size);
-
   SharedMemoryABI(const SharedMemoryABI&) = delete;
   SharedMemoryABI& operator=(const SharedMemoryABI&) = delete;
 
+  static constexpr size_t GetNumChunksForLayout(uint32_t page_layout) {
+    return kNumChunksForLayout[(page_layout & kLayoutMask) >> kLayoutShift];
+  }
+
+  size_t GetChunkSizeForPage(uint32_t page_layout) const {
+    return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
+  }
+
   std::pair<size_t, size_t> GetPageAndChunkIndex(Chunk chunk);
+
+  bool TryAcquireChunk(size_t page_idx,
+                       size_t chunk_idx,
+                       ChunkState,
+                       const ChunkHeader*,
+                       Chunk*);
+  void ReleaseChunk(Chunk chunk, ChunkState);
 
   const uintptr_t start_;
   const size_t size_;
   const size_t page_size_;
   const size_t num_pages_;
-  ChunkSizePerDivider const chunk_sizes_;
+  std::array<size_t, kNumPageLayouts> const chunk_sizes_;
 };
 
 }  // namespace perfetto

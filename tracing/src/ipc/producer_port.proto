@@ -52,10 +52,14 @@ service ProducerPort {
 
 // Arguments for rpc InitializeConnection().
 message InitializeConnectionRequest {
+  // Defines the granularity of the tracing pages. Must be an integer multiple
+  // of 4096. See tradeoff considerations in shared_memory_abi.h.
+  uint32 shared_buffer_page_size_bytes = 1;
+
   // Optional. Provides a hint to the tracing service about the suggested size
   // of the shared memory buffer. The service is not required to respect this
   // and might return a smaller buffer.
-  uint32 shared_buffer_size_hint_bytes = 1;
+  uint32 shared_buffer_size_hint_bytes = 2;
 }
 
 message InitializeConnectionResponse {

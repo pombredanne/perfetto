@@ -32,8 +32,10 @@ WriterID NextID(WriterID id) {
 
 using Chunk = SharedMemoryABI::Chunk;
 
-ProducerSharedMemoryArbiter::ProducerSharedMemoryArbiter(SharedMemoryABI* shmem)
-    : shmem_(shmem) {}
+ProducerSharedMemoryArbiter::ProducerSharedMemoryArbiter(void* start,
+                                                         size_t size,
+                                                         size_t page_size)
+    : shmem_(start, size, page_size) {}
 
 Chunk ProducerSharedMemoryArbiter::GetNewChunk(
     const SharedMemoryABI::ChunkHeader& header,
@@ -47,21 +49,21 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
 
   const size_t initial_page_idx = page_idx_;
   do {
-    if (shmem_->IsPageFree(page_idx_)) {
+    if (shmem_.is_page_free(page_idx_)) {
       // TODO: Use the |size_hint| here to decide the layout.
       auto layout = SharedMemoryABI::PageLayout::kPageDiv4;
-      shmem_->TryPartitionPage(page_idx_, layout);
+      shmem_.TryPartitionPage(page_idx_, layout);
     }
     // At this point either the page has been just partitioned or was already
     // partitioned. TODO: this code could be optimized using the return value of
     // TryPartitionPage() above.
-    uint32_t free_chunks = shmem_->GetFreeChunks(page_idx_);
+    uint32_t free_chunks = shmem_.GetFreeChunks(page_idx_);
     for (uint32_t chunk_idx = 0; free_chunks; chunk_idx++, free_chunks >>= 1) {
       if (free_chunks & 1) {
         // We found a free chunk.
         Chunk chunk;
-        if (shmem_->TryAcquireChunkForWriting(page_idx_, chunk_idx, header,
-                                              &chunk)) {
+        if (shmem_.TryAcquireChunkForWrite(page_idx_, chunk_idx, &header,
+                                           &chunk)) {
           PERFETTO_DCHECK(chunk.is_valid());
           return chunk;
         }
@@ -69,7 +71,7 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
     }
     // All chunk in the page are busy (either kBeingRead or kBeingWritten).
     // Try with the next page.
-    page_idx_ = (page_idx_ + 1) % shmem_->num_pages();
+    page_idx_ = (page_idx_ + 1) % shmem_.num_pages();
   } while (page_idx_ != initial_page_idx);
 
   // All chunks are taken (either kBeingWritten by us or kBeingRead by the
@@ -78,9 +80,10 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
   PERFETTO_CHECK(false);
 }
 
+// TODO: nobody calls this yet?
 void ProducerSharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   std::lock_guard<std::mutex> scoped_lock(lock_);
-  shmem_->MarkChunkAsComplete(chunk);
+  shmem_.ReleaseChunkAsComplete(chunk);
 }
 
 WriterID ProducerSharedMemoryArbiter::AcquireWriterID() {

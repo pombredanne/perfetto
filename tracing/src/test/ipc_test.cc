@@ -25,6 +25,7 @@
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/producer.h"
 #include "tracing/core/service.h"
+#include "tracing/core/trace_writer.h"
 #include "tracing/ipc/producer_ipc_client.h"
 #include "tracing/ipc/service_ipc_host.h"
 #include "tracing/src/core/service_impl.h"
@@ -87,13 +88,16 @@ void __attribute__((noreturn)) ProducerMain() {
     endpoint->RegisterDataSource(descriptor, on_register);
     task_runner.RunUntilCheckpoint("register" + std::to_string(i));
 
-    auto* ipc_client = static_cast<ProducerIPCClientImpl*>(endpoint.get());
-    void* shm = ipc_client->shared_memory()->start();
-    char buf[32];
-    memcpy(buf, shm, sizeof(buf));
-    buf[sizeof(buf) - 1] = '\0';
-    printf("Shared Memory contents: \"%s\"\n", buf);
+    auto trace_writer1 = endpoint->CreateTraceWriter();
+    auto trace_writer2 = endpoint->CreateTraceWriter();
+    for (int j = 0; j < 10; j++) {
+      auto event = trace_writer1->NewTracePacket();
+      event->set_test("foo");
+      event = trace_writer2->NewTracePacket();
+      event->set_test("bar");
+    }
   }
+  endpoint->NotifySharedMemoryUpdate(std::vector<uint32_t>());
   task_runner.Run();
 }
 
@@ -120,10 +124,6 @@ void __attribute__((noreturn)) ServiceMain() {
              prid, dsid);
       DataSourceConfig cfg;
       cfg.trace_category_filters = "foo,bar";
-      SharedMemory* shm = svc_->GetProducer(prid)->shared_memory();
-      char shm_contents[32];
-      sprintf(shm_contents, "shmem @ iteration %" PRIu64, dsid);
-      memcpy(shm->start(), shm_contents, sizeof(shm_contents));
       svc_->GetProducer(prid)->producer()->CreateDataSourceInstance(42, cfg);
     }
 

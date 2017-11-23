@@ -23,6 +23,7 @@
 
 #include "tracing/core/basic_types.h"
 #include "tracing/core/service.h"
+#include "tracing/core/shared_memory_abi.h"
 
 namespace perfetto {
 
@@ -44,7 +45,8 @@ class ServiceImpl : public Service {
                          ServiceImpl*,
                          base::TaskRunner*,
                          Producer*,
-                         std::unique_ptr<SharedMemory>);
+                         std::unique_ptr<SharedMemory>,
+                         size_t shared_buffer_page_size_bytes);
     ~ProducerEndpointImpl() override;
 
     Producer* producer() const { return producer_; }
@@ -57,7 +59,7 @@ class ServiceImpl : public Service {
     void NotifySharedMemoryUpdate(
         const std::vector<uint32_t>& changed_pages) override;
 
-    std::unique_ptr<TraceWriter> GetTraceWriter() override;
+    std::unique_ptr<TraceWriter> CreateTraceWriter() override;
 
     SharedMemory* shared_memory() const override;
 
@@ -70,6 +72,7 @@ class ServiceImpl : public Service {
     base::TaskRunner* const task_runner_;
     Producer* producer_;
     std::unique_ptr<SharedMemory> shared_memory_;
+    SharedMemoryABI shmem_abi_;
     DataSourceID last_data_source_id_ = 0;
   };
 
@@ -83,7 +86,9 @@ class ServiceImpl : public Service {
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
       Producer*,
+      size_t shared_buffer_page_size_bytes,
       size_t shared_buffer_size_hint_bytes = 0) override;
+
   void set_observer_for_testing(ObserverForTesting*) override;
 
   // Exposed mainly for testing.

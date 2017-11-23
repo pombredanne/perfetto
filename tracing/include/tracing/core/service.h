@@ -85,7 +85,7 @@ class Service {
     // acquiring/releasing chunks from the shared memory buffer. The returned
     // writer is *not* thread safe. The intended design is that each data source
     // creates one TraceWriter for each thread (or more if necessary).
-    virtual std::unique_ptr<TraceWriter> GetTraceWriter() = 0;
+    virtual std::unique_ptr<TraceWriter> CreateTraceWriter() = 0;
   };  // class ProducerEndpoint.
 
   // Implemented in src/core/service_impl.cc .
@@ -106,6 +106,7 @@ class Service {
   // is unreasonably large).
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
       Producer*,
+      size_t shared_buffer_page_size_bytes,
       size_t shared_buffer_size_hint_bytes = 0) = 0;
 
  public:  // Testing-only

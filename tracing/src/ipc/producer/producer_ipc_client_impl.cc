@@ -24,6 +24,8 @@
 #include "tracing/core/data_source_config.h"
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/producer.h"
+#include "tracing/core/trace_writer.h"
+#include "tracing/src/core/producer_shared_memory_arbiter.h"
 #include "tracing/src/ipc/posix_shared_memory.h"
 
 // TODO think to what happens when ProducerIPCClientImpl gets destroyed
@@ -31,6 +33,12 @@
 // the callbacks.
 
 namespace perfetto {
+
+namespace {
+// TODO: this should be configurable by the library client. Hardcoding for the
+// moment.
+constexpr uint32_t kTracingPageSize = 4096 * 2;
+}  // namespace
 
 // static. (Declared in include/tracing/ipc/producer_ipc_client.h).
 std::unique_ptr<Service::ProducerEndpoint> ProducerIPCClient::Connect(
@@ -64,8 +72,9 @@ void ProducerIPCClientImpl::OnConnect() {
   on_init.Bind([this](ipc::AsyncResult<InitializeConnectionResponse> resp) {
     OnConnectionInitialized(resp.success());
   });
-  producer_port_.InitializeConnection(InitializeConnectionRequest(),
-                                      std::move(on_init));
+  InitializeConnectionRequest init_req;
+  init_req.set_shared_buffer_page_size_bytes(kTracingPageSize);
+  producer_port_.InitializeConnection(init_req, std::move(on_init));
 
   // Create the back channel to receive commands from the Service.
   ipc::Deferred<GetAsyncCommandResponse> on_cmd;
@@ -92,6 +101,8 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
   PERFETTO_CHECK(shmem_fd);
   shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
+  shared_memory_arbiter_.reset(new ProducerSharedMemoryArbiter(
+      shared_memory_->start(), shared_memory_->size(), kTracingPageSize));
   producer_->OnConnect();
 }
 
@@ -174,6 +185,13 @@ void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
     req.add_changed_pages(changed_page);
   producer_port_.NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
+}
+
+std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter() {
+  // TODO: we should rather return a dummy NoopWriter in this case.
+  PERFETTO_CHECK(shared_memory_arbiter_);
+  return std::unique_ptr<TraceWriter>(
+      new TraceWriter(shared_memory_arbiter_.get()));
 }
 
 SharedMemory* ProducerIPCClientImpl::shared_memory() const {

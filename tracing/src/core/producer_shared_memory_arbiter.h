@@ -35,7 +35,11 @@ namespace perfetto {
 // current thread-local chunk.
 class ProducerSharedMemoryArbiter {
  public:
-  explicit ProducerSharedMemoryArbiter(SharedMemoryABI*);
+  // Args:
+  // |start|,|size|: boundaries of the shared memory buffer.
+  // |page_size|: a multiple of 4KB that defines the granularity of tracing
+  // pagaes. See tradeoff considerations in shared_memory_abi.h.
+  ProducerSharedMemoryArbiter(void* start, size_t size, size_t page_size);
 
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
                                      size_t size_hint = 0);
@@ -58,7 +62,7 @@ class ProducerSharedMemoryArbiter {
       delete;
 
   std::mutex lock_;
-  SharedMemoryABI* const shmem_;
+  SharedMemoryABI shmem_;
   size_t page_idx_ = 0;
   WriterID last_writer_id_ = 0;
   std::vector<bool> active_writer_ids_;

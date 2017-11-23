@@ -23,7 +23,11 @@ source_set("tracing") {
   all_dependent_configs = [ ":tracing_config" ]
   deps += [
     "//base",
-    "//protos",
+    "//protos:full",
+    "//protos:zero",
+  ]
+  public_deps = [
+    "//protozero",
   ]
   sources = [
     "include/tracing/core/basic_types.h",

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
-#define TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
+#ifndef TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
+#define TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
 
 #include <functional>
 
@@ -62,4 +62,4 @@ class TraceWriter : public protozero::ScatteredStreamWriter::Delegate {
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
+#endif  // TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
