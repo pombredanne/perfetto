@@ -48,6 +48,7 @@ class ProtoZeroMessageHandleBase {
   ProtoZeroMessageHandleBase(ProtoZeroMessageHandleBase&&) noexcept;
   ProtoZeroMessageHandleBase& operator=(ProtoZeroMessageHandleBase&&);
 
+  void Finalize();
   void set_on_finalize(std::function<void(size_t)> f) { on_finalize_ = f; }
 
  protected:
