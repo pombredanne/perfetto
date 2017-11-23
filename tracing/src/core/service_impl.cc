@@ -26,6 +26,8 @@
 #include "tracing/core/producer.h"
 #include "tracing/core/shared_memory.h"
 
+#include "protos/trace_packet.pb.h"
+
 namespace perfetto {
 
 // TODO add ThreadChecker everywhere.
@@ -56,6 +58,7 @@ ServiceImpl::~ServiceImpl() {
 
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     Producer* producer,
+    size_t shared_buffer_page_size_bytes,
     size_t shared_buffer_size_hint_bytes) {
   const ProducerID id = ++last_producer_id_;
 
@@ -68,7 +71,8 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   // to go away.
   auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
   std::unique_ptr<ProducerEndpointImpl> endpoint(new ProducerEndpointImpl(
-      id, this, task_runner_, producer, std::move(shared_memory)));
+      id, this, task_runner_, producer, std::move(shared_memory),
+      shared_buffer_page_size_bytes));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer()));
@@ -101,12 +105,16 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
     ServiceImpl* service,
     base::TaskRunner* task_runner,
     Producer* producer,
-    std::unique_ptr<SharedMemory> shared_memory)
+    std::unique_ptr<SharedMemory> shared_memory,
+    size_t shared_buffer_page_size_bytes)
     : id_(id),
       service_(service),
       task_runner_(task_runner),
       producer_(std::move(producer)),
-      shared_memory_(std::move(shared_memory)) {}
+      shared_memory_(std::move(shared_memory)),
+      shmem_abi_(shared_memory_->start(),
+                 shared_memory_->size(),
+                 shared_buffer_page_size_bytes) {}
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
   producer_->OnDisconnect();
@@ -133,8 +141,73 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 
 void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
-  // TODO implement the bookkeeping logic.
-  return;
+  // TODO the code below is temporary for testing only. It just spits out
+  // on stdout the content of the shared memory buffer.
+
+  // Scann all pages and see if there are any complete chunks we can read.
+  for (size_t page_idx = 0; page_idx < shmem_abi_.num_pages(); page_idx++) {
+    if (shmem_abi_.is_page_free(page_idx))
+      continue;
+
+    // Read the page layout.
+    bool complete = shmem_abi_.is_page_complete(page_idx);
+    auto layout = shmem_abi_.page_layout(page_idx);
+    size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
+    printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu chunks)\n",
+           page_idx, complete, layout, num_chunks);
+
+    // Iterate over the chunks in the page.
+    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+      auto state = shmem_abi_.GetChunkState(page_idx, chunk_idx);
+      auto chunk = shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx);
+      // |chunk| may not be valid if it was in a bad state.
+
+      auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
+      auto id = hdr->identifier.load(std::memory_order_relaxed);
+      auto packets = hdr->packets.load(std::memory_order_relaxed);
+      printf(
+          "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets: %u, "
+          "flags: %x, acquired_for_reading: %d\n",
+          chunk_idx, id.writer_id, id.chunk_id,
+          SharedMemoryABI::kChunkStateStr[state], packets.count, packets.flags,
+          chunk.is_valid());
+      if (!chunk.is_valid())
+        continue;
+
+      PERFETTO_DCHECK(chunk.is_valid());
+      size_t num_packets = chunk.GetPacketCount();
+      uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
+
+      // Iterate over all packets.
+      printf("    Dumping packets in chunk:\n");
+
+      for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
+        SharedMemoryABI::PacketHeaderType pack_size;
+        memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
+        ptr += sizeof(pack_size);
+        TracePacket proto;
+        bool parsed = false;
+        // TODO stiching, looks at the flags.
+        printf("      #%-3zu len:%u ", pack_idx, pack_size);
+        if (ptr > chunk.end_addr() - pack_size) {
+          printf("out of bounds!\n");
+          break;
+        }
+        parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+        ptr += pack_size;
+        printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
+      }
+      shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
+    }
+  }
+}
+
+std::unique_ptr<TraceWriter>
+ServiceImpl::ProducerEndpointImpl::CreateTraceWriter() {
+  // Not implemented. This would be only used in the case of using the core
+  // tracing library directly in-process with no IPC layer. It is a legit
+  // use case, but just not one we intend to support right now.
+  PERFETTO_CHECK(false);
 }
 
 void ServiceImpl::set_observer_for_testing(ObserverForTesting* observer) {

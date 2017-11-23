@@ -24,6 +24,7 @@ namespace perfetto {
 using ProducerID = uint64_t;
 using DataSourceID = uint64_t;
 using DataSourceInstanceID = uint64_t;
+using WriterID = uint16_t;
 
 }  // namespace perfetto
 

@@ -39,6 +39,7 @@ class Client;
 }  // namespace ipc
 
 class Producer;
+class ProducerSharedMemoryArbiter;
 class PosixSharedMemory;
 
 // Exposes a Service endpoint to Producer(s), proxying all requests through a
@@ -61,6 +62,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   void UnregisterDataSource(DataSourceID) override;
   void NotifySharedMemoryUpdate(
       const std::vector<uint32_t>& changed_pages) override;
+  std::unique_ptr<TraceWriter> CreateTraceWriter() override;
   SharedMemory* shared_memory() const override;
 
   // ipc::ServiceProxy::EventListener implementation.
@@ -89,6 +91,8 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   ProducerPortProxy producer_port_;
 
   std::unique_ptr<PosixSharedMemory> shared_memory_;
+  std::unique_ptr<ProducerSharedMemoryArbiter> shared_memory_arbiter_;
+
   bool connected_ = false;
 };
 

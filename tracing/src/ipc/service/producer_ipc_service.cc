@@ -65,7 +65,8 @@ void ProducerIPCService::InitializeConnection(
 
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
-      producer.get(), req.shared_buffer_size_hint_bytes());
+      producer.get(), req.shared_buffer_page_size_bytes(),
+      req.shared_buffer_size_hint_bytes());
   const int shm_fd = static_cast<PosixSharedMemory*>(
                          producer->service_endpoint->shared_memory())
                          ->fd();

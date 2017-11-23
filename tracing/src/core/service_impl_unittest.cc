@@ -54,10 +54,11 @@ TEST(ServiceImpl, RegisterAndUnregister) {
       Service::CreateInstance(std::move(shm_factory), &task_runner).release()));
   MockProducer mock_producer_1;
   MockProducer mock_producer_2;
+  const size_t kTracingPageSize = 4096;  // Unused in this test.
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_1 =
-      svc->ConnectProducer(&mock_producer_1);
+      svc->ConnectProducer(&mock_producer_1, kTracingPageSize);
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_2 =
-      svc->ConnectProducer(&mock_producer_2);
+      svc->ConnectProducer(&mock_producer_2, kTracingPageSize);
 
   ASSERT_TRUE(producer_endpoint_1);
   ASSERT_TRUE(producer_endpoint_2);
