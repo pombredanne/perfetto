@@ -130,6 +130,7 @@ bool SharedMemoryABI::TryAcquireChunk(size_t page_idx,
   uintptr_t page_start = start_ + page_idx * page_size_;
   const size_t chunk_size = GetChunkSizeForPage(layout);
   uintptr_t chunk_offset_in_page = sizeof(PageHeader) + chunk_idx * chunk_size;
+
   chunk->Reset(page_start + chunk_offset_in_page, chunk_size);
   PERFETTO_DCHECK(chunk->end() <= end());
   if (desired_chunk_state == kChunkBeingWritten) {
@@ -155,8 +156,7 @@ size_t SharedMemoryABI::GetFreeChunks(size_t page_idx) {
   const size_t num_chunks = GetNumChunksForLayout(layout);
   size_t res = 0;
   for (size_t i = 0; i < num_chunks; i++) {
-    res |= ((layout & kChunkMask) == kChunkFree) ? 1 : 0;
-    res <<= 1;
+    res |= ((layout & kChunkMask) == kChunkFree) ? (1 << i) : 0;
     layout >>= kChunkShift;
   }
   return res;
@@ -177,7 +177,7 @@ void SharedMemoryABI::ReleaseChunk(Chunk chunk,
     const size_t page_chunk_size = GetChunkSizeForPage(layout);
     PERFETTO_CHECK(chunk.size() == page_chunk_size);
     const uint32_t chunk_state =
-        ((layout >> (chunk_idx * kChunkShift)) & kAllChunksMask);
+        ((layout >> (chunk_idx * kChunkShift)) & kChunkMask);
 
     // Verify that the chunk is still in a state that allows the transitiont to
     // |desired_chunk_state|. The only allowed transitions are:
@@ -186,7 +186,6 @@ void SharedMemoryABI::ReleaseChunk(Chunk chunk,
     const ChunkState expected_chunk_state =
         desired_chunk_state == kChunkComplete ? kChunkBeingWritten
                                               : kChunkBeingRead;
-
     PERFETTO_CHECK(chunk_state == expected_chunk_state);
     uint32_t next_layout = layout;
     next_layout &= ~(kChunkMask << (chunk_idx * kChunkShift));
@@ -227,8 +226,9 @@ std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(Chunk chunk) {
   PERFETTO_CHECK(chunk.end_addr() <= start_ + size_);
 
   // TODO: this could be optimized if we cache |page_shift_|.
-  const size_t page_idx = chunk.begin_addr() / page_size_;
-  const size_t offset = chunk.begin_addr() % page_size_;
+  const uintptr_t rel_addr = chunk.begin_addr() - start_;
+  const size_t page_idx = rel_addr / page_size_;
+  const size_t offset = rel_addr % page_size_;
   PERFETTO_CHECK(offset >= sizeof(PageHeader));
   PERFETTO_CHECK(offset % kChunkAlignment == 0);
   PERFETTO_CHECK((offset - sizeof(PageHeader)) % chunk.size() == 0);

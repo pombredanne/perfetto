@@ -98,6 +98,8 @@ void TraceWriter::OnFinalize(size_t packet_size) {
 
   // Keep this last, it has release-store semantics.
   cur_chunk_.IncrementPacketCount();
+
+  // TODO call also  here ReturnCompletedChunk()?
 }
 
 // Called by the ProtoZeroMessage. We can get here in two cases:
@@ -133,6 +135,9 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
         kFirstPacketContinuesFromPrevChunk;
   }
 
+  if (cur_chunk_.is_valid())
+    shmem_arbiter_->ReturnCompletedChunk(cur_chunk_);
+
   // The memory order of the stores below doesn't really matter. This |header|
   // is just a temporary object and GetNewChunk() will copy it into the shared
   // buffer with the proper barriers.
@@ -140,11 +145,15 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
+
   if (cur_packet_being_written_) {
-    cur_packet_header_ =
-        protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
+    cur_packet_header_.begin =
+        reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin());
+    cur_packet_header_.end =
+        reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()) +
+        kPacketHeaderSize;
     memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
-    cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_chunk_.payload_begin());
+    cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_packet_header_.end);
   }
 
   // TODO get rid of the uint8_t* cast below, needs fixing

@@ -58,6 +58,8 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
     // partitioned. TODO: this code could be optimized using the return value of
     // TryPartitionPage() above.
     uint32_t free_chunks = shmem_.GetFreeChunks(page_idx_);
+    PERFETTO_DLOG("Free chunks for page %zu: %x", page_idx_, free_chunks);
+
     for (uint32_t chunk_idx = 0; free_chunks; chunk_idx++, free_chunks >>= 1) {
       if (free_chunks & 1) {
         // We found a free chunk.
@@ -65,6 +67,7 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
         if (shmem_.TryAcquireChunkForWrite(page_idx_, chunk_idx, &header,
                                            &chunk)) {
           PERFETTO_DCHECK(chunk.is_valid());
+          PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;
         }
       }
@@ -80,7 +83,6 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
   PERFETTO_CHECK(false);
 }
 
-// TODO: nobody calls this yet?
 void ProducerSharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   std::lock_guard<std::mutex> scoped_lock(lock_);
   shmem_.ReleaseChunkAsComplete(chunk);

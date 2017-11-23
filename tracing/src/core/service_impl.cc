@@ -154,7 +154,7 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
       SharedMemoryABI::Chunk chunk;
       bool res = shmem_abi_.TryAcquireChunkForRead(page_idx, chunk_idx, &chunk);
-      printf("    Chunk: %zu, State: %d, locked for read: %d\n", chunk_idx,
+      printf("\n    Chunk: %zu, State: %d, locked for read: %d\n", chunk_idx,
              shmem_abi_.GetChunkState(page_idx, chunk_idx), res);
       if (!res)
         continue;
@@ -169,10 +169,13 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
         ptr += sizeof(pack_size);
         TracePacket proto;
         bool parsed = false;
-        if (ptr <= chunk.end_addr() - pack_size) {
-          parsed =
-              proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+        // TODO stiching, looks at the flags.
+        if (ptr > chunk.end_addr() - pack_size) {
+          printf("    #%zu, size:%u, out of bounds!\n", pack_idx, pack_size);
+          break;
         }
+        parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+        ptr += pack_size;
         printf("    #%zu size:%u parsed:%d  content:%s\n", pack_idx, pack_size,
                parsed, proto.test().c_str());
       }
