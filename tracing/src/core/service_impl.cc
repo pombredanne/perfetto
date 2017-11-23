@@ -22,6 +22,7 @@
 
 #include "base/logging.h"
 #include "base/task_runner.h"
+#include "tracing/core/consumer.h"
 #include "tracing/core/data_source_config.h"
 #include "tracing/core/producer.h"
 #include "tracing/core/shared_memory.h"
@@ -88,12 +89,67 @@ void ServiceImpl::DisconnectProducer(ProducerID id) {
     observer_->OnProducerDisconnected(id);
 }
 
+std::unique_ptr<Service::ConsumerEndpoint> ServiceImpl::ConnectConsumer(
+    Consumer* consumer) {
+  std::unique_ptr<ConsumerEndpointImpl> endpoint(
+      new ConsumerEndpointImpl(this, task_runner_, consumer));
+  auto it_and_inserted = consumers_.emplace(endpoint.get());
+  PERFETTO_DCHECK(it_and_inserted.second);
+  task_runner_->PostTask(std::bind(&Consumer::OnConnect, endpoint->consumer()));
+  // TODO: notfy observer.
+  return std::move(endpoint);
+}
+
+void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
+  PERFETTO_DCHECK(consumers_.count(consumer));
+  consumers_.erase(consumer);
+  // TODO: notfy observer.
+}
+
 ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
     ProducerID id) const {
   auto it = producers_.find(id);
   if (it == producers_.end())
     return nullptr;
   return it->second;
+}
+
+void ServiceImpl::SetupLogging(const ConsumerEndpoint::LoggingConfig& cfg) {
+  // TODO: this really needs to be more graceful or will UAF. Refcount or
+  // something similar.
+  log_buffers_.clear();
+  for (const auto& buffer_cfg : cfg.buffers) {
+    log_buffers_.emplace_back(buffer_cfg.size_kb * 1024);
+  }
+
+  std::map<RegisterDataSource*, DataSourceConfig*> data_sources_to_enable;
+  for (const auto& cfg_data_source : cfg.data_sources) {
+    auto range = data_sources_.equal_range(cfg_data_source.name);
+    for (auto it = range.first; it != range.second; it++) {
+      const RegisterDataSource& data_source = it.second;
+      // TODO match against |producer_name_filter|.
+      data_sources_to_enable[&data_source] = cfg_data_source.config;
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ServiceImpl::ConsumerEndpointImpl implementation
+////////////////////////////////////////////////////////////////////////////////
+
+ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
+    ServiceImpl* service,
+    base::TaskRunner* task_runner,
+    Consumer* consumer)
+    : service_(service), task_runner_(task_runner), consumer_(consumer) {}
+
+ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
+  consumer_->OnDisconnect();
+  service_->DisconnectConsumer(this);
+}
+
+void ServiceImpl::ConsumerEndpointImpl::SetupLogging(const LoggingConfig& cfg) {
+  service_->SetupLogging(cfg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +166,7 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
     : id_(id),
       service_(service),
       task_runner_(task_runner),
-      producer_(std::move(producer)),
+      producer_(producer),
       shared_memory_(std::move(shared_memory)),
       shmem_abi_(shared_memory_->start(),
                  shared_memory_->size(),
@@ -217,5 +273,16 @@ void ServiceImpl::set_observer_for_testing(ObserverForTesting* observer) {
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   return shared_memory_.get();
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// ServiceImpl::LogBuffer implementation
+////////////////////////////////////////////////////////////////////////////////
+
+ServiceImpl::LogBuffer::LogBuffer(size_t s) : size(s) {
+  data.reset(new char[size]);
+}
+
+ServiceImpl::LogBuffer::LogBuffer(LogBuffer&&) noexcept = default;
+ServiceImpl::LogBuffer::~LogBuffer() = default;
 
 }  // namespace perfetto

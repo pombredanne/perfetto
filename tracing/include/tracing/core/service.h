@@ -20,10 +20,12 @@
 #include <stdint.h>
 
 #include <functional>
+#include <list>
 #include <memory>
 #include <vector>
 
 #include "tracing/core/basic_types.h"
+#include "tracing/core/data_source_config.h"
 #include "tracing/core/shared_memory.h"
 
 namespace perfetto {
@@ -32,7 +34,7 @@ namespace base {
 class TaskRunner;
 }  // namespace base
 
-class DataSourceConfig;
+class Consumer;
 class DataSourceDescriptor;
 class Producer;
 class TraceWriter;
@@ -88,6 +90,35 @@ class Service {
     virtual std::unique_ptr<TraceWriter> CreateTraceWriter() = 0;
   };  // class ProducerEndpoint.
 
+  // The API for the Consumer port of the Service.
+  // Subclassed by:
+  // 1. The service_impl.cc business logic when returning it in response to
+  //    the ConnectConsumer() method.
+  // 2. The transport layer (e.g., src/ipc) when the consumer and
+  //    the service don't talk locally but via some IPC mechanism.
+  class ConsumerEndpoint {
+   public:
+    struct LoggingConfig {
+      struct BufferConfig {
+        uint32_t size_kb = 0;
+      };
+      struct DataSource {
+        std::list<std::string> producer_name_filter;
+        DataSourceConfig config;
+        uint32_t destination_buffer = 0;
+      };
+
+      std::list<BufferConfig> buffers;
+      std::list<DataSource> data_sources;
+    };
+    virtual ~ConsumerEndpoint() = default;
+
+    // In order to stop logging just invoke SetupLogging with an empty config.
+    // Data will be received invoking the Consumer::OnData() method.
+    virtual void SetupLogging(const LoggingConfig&) = 0;
+
+  };  // class ConsumerEndpoint.
+
   // Implemented in src/core/service_impl.cc .
   static std::unique_ptr<Service> CreateInstance(
       std::unique_ptr<SharedMemory::Factory>,
@@ -112,6 +143,8 @@ class Service {
       Producer*,
       size_t shared_buffer_page_size_bytes = 4096,
       size_t shared_buffer_size_hint_bytes = 0) = 0;
+
+  virtual std::unique_ptr<ConsumerEndpoint> ConnectConsumer(Consumer*) = 0;
 
  public:  // Testing-only
   class ObserverForTesting {

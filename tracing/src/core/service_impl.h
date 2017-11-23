@@ -18,8 +18,10 @@
 #define TRACING_SRC_CORE_SERVICE_IMPL_H_
 
 #include <functional>
+#include <list>
 #include <map>
 #include <memory>
+#include <set>
 
 #include "tracing/core/basic_types.h"
 #include "tracing/core/service.h"
@@ -76,6 +78,26 @@ class ServiceImpl : public Service {
     DataSourceID last_data_source_id_ = 0;
   };
 
+  // The implementation behind the service endpoint exposed to each consumer.
+  class ConsumerEndpointImpl : public Service::ConsumerEndpoint {
+   public:
+    ConsumerEndpointImpl(ServiceImpl*, base::TaskRunner*, Consumer*);
+    ~ConsumerEndpointImpl() override;
+
+    Consumer* consumer() const { return consumer_; }
+
+    // Service::ConsumerEndpoint implementation.
+    void SetupLogging(const LoggingConfig&) override;
+
+   private:
+    ConsumerEndpointImpl(const ConsumerEndpointImpl&) = delete;
+    ConsumerEndpointImpl& operator=(const ConsumerEndpointImpl&) = delete;
+
+    ServiceImpl* const service_;
+    base::TaskRunner* const task_runner_;
+    Consumer* consumer_;
+  };
+
   explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
                        base::TaskRunner*);
   ~ServiceImpl() override;
@@ -83,11 +105,20 @@ class ServiceImpl : public Service {
   // Called by the ProducerEndpointImpl dtor.
   void DisconnectProducer(ProducerID);
 
+  // Called by the ConsumerEndpointImpl dtor.
+  void DisconnectConsumer(ConsumerEndpointImpl*);
+
+  // Called by the ConsumerEndpointImpl.
+  void SetupLogging(const ConsumerEndpoint::LoggingConfig& cfg);
+
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
       Producer*,
       size_t shared_buffer_page_size_bytes,
       size_t shared_buffer_size_hint_bytes = 0) override;
+
+  std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
+      Consumer*) override;
 
   void set_observer_for_testing(ObserverForTesting*) override;
 
@@ -96,14 +127,31 @@ class ServiceImpl : public Service {
   ProducerEndpointImpl* GetProducer(ProducerID) const;
 
  private:
+  struct LogBuffer {
+    explicit LogBuffer(size_t);
+    LogBuffer(LogBuffer&&) noexcept;
+    ~LogBuffer();
+
+    std::unique_ptr<char[]> data;
+    const size_t size = 0;
+  };
+
+  struct RegisteredDataSource {
+    DataSourceDescriptor descriptor;
+    ProducerID producer_id;
+  };
+
   ServiceImpl(const ServiceImpl&) = delete;
   ServiceImpl& operator=(const ServiceImpl&) = delete;
 
   std::unique_ptr<SharedMemory::Factory> shm_factory_;
   base::TaskRunner* const task_runner_;
+  ObserverForTesting* observer_ = nullptr;
   ProducerID last_producer_id_ = 0;
   std::map<ProducerID, ProducerEndpointImpl*> producers_;
-  ObserverForTesting* observer_ = nullptr;
+  std::set<ConsumerEndpointImpl*> consumers_;
+  std::list<LogBuffer> log_buffers_;
+  std::multimap<std::string, RegisteredDataSource> data_sources_;
 };
 
 }  // namespace perfetto

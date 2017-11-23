@@ -1,0 +1,73 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
+
+import "tracing/src/ipc/data_source_config.proto";
+import "tracing/src/ipc/data_source_descriptor.proto";
+
+package perfetto;
+
+// IPC interface definition for the consumer port of the tracing service.
+service ConsumerPort {
+  // To stop the capture just issue another SetupLogging() request with an
+  // empty SetupLoggingRequest argument.
+  rpc SetupLogging(SetupLoggingRequest) returns (stream SetupLoggingResponse) {}
+}
+
+// Arguments for rpc SetupLogging().
+message SetupLoggingRequest {
+  message BufferConfig {
+    uint32 size_kb = 1;
+    // TODO: enum Policy { RING_BUFFER, STOP_WHEN_FULL }
+  }
+  repeated BufferConfig buffers = 1;
+
+  message DataSource {
+    // Filters and data-source specific config. It contains also the unique name
+    // of the data source, the one passed in the  DataSourceDescriptor when they
+    // register on the service.
+    proto.DataSourceConfig config = 1;
+
+    // The index of the |buffer|.
+    uint32 destination_buffer = 2;
+
+    // Optional. If multilple producer (~processes) expose the same data source
+    // and |producer_name_filter| != "", the data source is enabled only for
+    // producers which name match any of the producer_name_filter below.
+    // This allow to enable a data source only on specific processes.
+    repeated string producer_name_filter = 3;
+  }
+  repeated DataSource data_sources = 2;
+}
+
+message SetupLoggingResponse {
+  // Each streaming reply returns one or more trace packets (see
+  // trace_packet.proto).
+  // Why "bytes" here? If we just return the full TracePacket object, that will
+  // force the Consumer to deserialize it. In many occasions, the Consumer will
+  // not consume the TracePacket(s) locally but will just forward
+  // them on the network or save them to a file. Deserializing them on-device
+  // would be a waste of time, memory and energy.
+
+  // TODO: in the past we agreed that a TracePacket can be very large (MBs).
+  // However here it will hit the limit of the IPC layer in order to keep
+  // the socket buffer bounded. We should probably upgrade this protocol to
+  // support chunks, so we could directly propagate the chunked TracePacket
+  // stored in the log buffer.
+  repeated bytes trace_packets = 1;
+}

@@ -52,6 +52,7 @@ source_set("tracing") {
 # IPC service definitions.
 ipc_library("ipc_protos") {
   sources = [
+    "src/ipc/consumer_port.proto",
     "src/ipc/data_source_config.proto",
     "src/ipc/data_source_descriptor.proto",
     "src/ipc/producer_port.proto",

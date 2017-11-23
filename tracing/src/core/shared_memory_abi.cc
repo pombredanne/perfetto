@@ -25,7 +25,7 @@ namespace {
 // Returns the largest 4-bytes aligned chunk size <= |page_size| / |divider|
 // for each divider in PageLayout.
 constexpr size_t GetChunkSize(size_t page_size, size_t divider) {
-  return (page_size / divider) & ~3UL;
+  return ((page_size - sizeof(SharedMemoryABI::PageHeader)) / divider) & ~3UL;
 }
 
 std::array<size_t, SharedMemoryABI::kNumPageLayouts> InitChunkSizes(

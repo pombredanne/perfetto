@@ -20,5 +20,10 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.proto;
 
 message DataSourceConfig {
-  string trace_category_filters = 1;  // TODO: temporary for tests.
+  // Data source unique name, e.g., "org.chromium.trace_events". This must match
+  // the name passed by the data source when it registers (see
+  // RegisterDataSource()).
+  string name = 1;
+
+  string trace_category_filters = 2;  // TODO: temporary for tests.
 }
