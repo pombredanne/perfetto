@@ -89,12 +89,15 @@ void __attribute__((noreturn)) ProducerMain() {
     task_runner.RunUntilCheckpoint("register" + std::to_string(i));
   }
   auto trace_writer1 = endpoint->CreateTraceWriter();
-  // auto trace_writer2 = endpoint->CreateTraceWriter();
+  auto trace_writer2 = endpoint->CreateTraceWriter();
   for (int j = 0; j < 120; j++) {
     auto event = trace_writer1->NewTracePacket();
-    event->set_test("Stream 1 ..................................");
-    // event = trace_writer2->NewTracePacket();
-    // event->set_test("bar");
+    char content[64];
+    sprintf(content, "Stream 1 - %3d .................", j);
+    event->set_test(content);
+    event = trace_writer2->NewTracePacket();
+    sprintf(content, "Stream 2 - %3d ++++++++++++++++++++++++++++++++++++", j);
+    event->set_test(content);
   }
 
   endpoint->NotifySharedMemoryUpdate(std::vector<uint32_t>());

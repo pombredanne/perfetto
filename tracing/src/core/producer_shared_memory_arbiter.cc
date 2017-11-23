@@ -64,8 +64,8 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
       if (free_chunks & 1) {
         // We found a free chunk.
         Chunk chunk;
-        if (shmem_.TryAcquireChunkForWrite(page_idx_, chunk_idx, &header,
-                                           &chunk)) {
+        if (shmem_.TryAcquireChunkForWriting(page_idx_, chunk_idx, &header,
+                                             &chunk)) {
           PERFETTO_DCHECK(chunk.is_valid());
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;

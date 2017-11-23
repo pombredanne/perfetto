@@ -174,6 +174,8 @@ class SharedMemoryABI {
     // Service can now move it to its non-shared ring buffer.
     kChunkComplete = 3,
   };
+  static constexpr const char* kChunkStateStr[] = {"Free", "BeingWritten",
+                                                   "BeingRead", "Complete"};
 
   enum PageLayout : uint32_t {
     // The page is fully free and has not been partitioned yet.
@@ -269,8 +271,6 @@ class SharedMemoryABI {
   // and to make the Acquire/Release methods look more meaningful.
   class Chunk {
    public:
-    void Reset(uintptr_t begin, size_t size);
-
     void* begin() const { return begin_; }
     uintptr_t begin_addr() const { return reinterpret_cast<uintptr_t>(begin_); }
 
@@ -302,6 +302,9 @@ class SharedMemoryABI {
     void IncrementPacketCount(bool last_packet_is_partial = false);
 
    private:
+    friend class SharedMemoryABI;
+    void Reset(uintptr_t begin, size_t size);
+
     // This class is deliberately copiable and assignable.
     // Don't add extra fields, that would make the copy expensive.
     void* begin_ = nullptr;
@@ -330,7 +333,7 @@ class SharedMemoryABI {
 
   // Returns true if all chunks in the page are kChunkComplete. As above, this
   // can change quickly. The service is supposed to
-  // TryMarkAllChunksAsBeingRead() if this succeeds.
+  // TryAcquireAllChunksForReading() if this succeeds.
   bool is_page_complete(size_t page_idx) {
     return (page_header(page_idx)->layout.load(std::memory_order_relaxed) &
             kAllChunksMask) == kAllChunksComplete;
@@ -346,16 +349,9 @@ class SharedMemoryABI {
   // partitioned it returns 0 (as if the page had no free chunks).
   size_t GetFreeChunks(size_t page_idx);
 
-  // Used by the Service to take full ownership of oll the chunks in the a page
-  // in one shot.  It tries to atomically migrate all chunks into the
-  // kChunkBeingRead state. Can only be done if all chunks are either kChunkFree
-  // or kChunkComplete. If this fails, the service has to fall back acquiring
-  // the chunks individually.
-  bool TryMarkAllChunksAsBeingRead(size_t page_idx);
-
   // Tries to atomically partition a page with the given |layout|. Returns true
   // if the page was free and has been partitioned; false if the page wasn't
-  // free anymore by the time we tried the atomic CAS.
+  // free anymore by the time we tried the atomic exchange.
   bool TryPartitionPage(size_t page_idx, PageLayout layout);
 
   // Tries to atomically mark a single chunk within the page as either
@@ -363,18 +359,27 @@ class SharedMemoryABI {
   // or the chunk is not in a state that allows the transition (respectively,
   // kFree and kComplete). If succeeds, it returns true and updates the Chunk*
   // output argument with the chunk boundaries.
-  bool TryAcquireChunkForWrite(size_t page_idx,
-                               size_t chunk_idx,
-                               const ChunkHeader* chunk_header,
-                               Chunk* chunk) {
+  bool TryAcquireChunkForWriting(size_t page_idx,
+                                 size_t chunk_idx,
+                                 const ChunkHeader* chunk_header,
+                                 Chunk* chunk) {
     return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingWritten,
                            chunk_header, chunk);
   }
 
-  bool TryAcquireChunkForRead(size_t page_idx, size_t chunk_idx, Chunk* chunk) {
+  bool TryAcquireChunkForReading(size_t page_idx,
+                                 size_t chunk_idx,
+                                 Chunk* chunk) {
     return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingRead, nullptr,
                            chunk);
   }
+
+  // Used by the Service to take full ownership of oll the chunks in the a page
+  // in one shot.  It tries to atomically migrate all chunks into the
+  // kChunkBeingRead state. Can only be done if all chunks are either kChunkFree
+  // or kChunkComplete. If this fails, the service has to fall back acquiring
+  // the chunks individually.
+  bool TryAcquireAllChunksForReading(size_t page_idx);
 
   // Puts a chunk into the kWriteComplete state.
   void ReleaseChunkAsComplete(Chunk chunk) {
@@ -384,7 +389,13 @@ class SharedMemoryABI {
   // Puts a chunk into the kChunkFree state.
   void ReleaseChunkAsFree(Chunk chunk) { ReleaseChunk(chunk, kChunkFree); }
 
+  // TODO ReleaseAllChunksAsFree() using madvise.
+
   ChunkState GetChunkState(size_t page_idx, size_t chunk_idx);
+
+  // For testing / debugging only. Returns a copy of the chunk header. The
+  // chunk header can change at any time after this call.
+  ChunkHeader* GetChunkHeader(size_t page_idx, size_t chunk_idx);
 
  private:
   SharedMemoryABI(const SharedMemoryABI&) = delete;
@@ -399,6 +410,7 @@ class SharedMemoryABI {
   }
 
   std::pair<size_t, size_t> GetPageAndChunkIndex(Chunk chunk);
+  bool GetChunk(size_t page_idx, size_t chunk_idx, Chunk*);
 
   bool TryAcquireChunk(size_t page_idx,
                        size_t chunk_idx,

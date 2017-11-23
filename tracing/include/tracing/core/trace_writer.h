@@ -54,7 +54,6 @@ class TraceWriter : public protozero::ScatteredStreamWriter::Delegate {
   protozero::ScatteredStreamWriter protobuf_stream_writer_;
   TracePacket cur_packet_;
   uintptr_t cur_packet_start_ = 0;
-  size_t cur_packet_prev_fragments_size_ = 0;
   bool cur_packet_being_written_ = false;
   protozero::ContiguousMemoryRange cur_packet_header_ = {};
   std::function<void(size_t)> finalize_callback_;

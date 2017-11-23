@@ -70,7 +70,6 @@ TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
   TracePacketHandle handle(&cur_packet_);
   handle.set_on_finalize(finalize_callback_);
   cur_packet_being_written_ = true;
-  cur_packet_prev_fragments_size_ = 0;
   cur_packet_start_ =
       reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr());
   return handle;
@@ -87,12 +86,10 @@ void TraceWriter::OnFinalize(size_t packet_size) {
   // into account any fragmentation due to to chunks. However, we want to write
   // only the size of the fragment that lays in the current chunk.
 
-  PERFETTO_DCHECK(cur_packet_prev_fragments_size_ == 0 ||
-                  cur_chunk_.GetPacketCount() == 1);
+  const PacketHeaderType size = static_cast<PacketHeaderType>(
+      reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr()) -
+      cur_packet_start_);
 
-  size_t size_in_cur_chunk = packet_size - cur_packet_prev_fragments_size_;
-  PERFETTO_DCHECK(size_in_cur_chunk <= 1 << (8 * kPacketHeaderSize));
-  const PacketHeaderType size = static_cast<PacketHeaderType>(packet_size);
   memcpy(cur_packet_header_.begin, &size, sizeof(size));
   cur_packet_being_written_ = false;
 
@@ -116,6 +113,7 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
         reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr());
     PERFETTO_DCHECK(wptr >= cur_packet_start_);
     size_t partial_packet_size = wptr - cur_packet_start_;
+    PERFETTO_DLOG("Partial size: %zu", partial_packet_size);
     PERFETTO_DCHECK(partial_packet_size < cur_chunk_.size());
     const auto size = static_cast<PacketHeaderType>(partial_packet_size);
     memcpy(cur_packet_header_.begin, &size, sizeof(size));
@@ -145,7 +143,7 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
-
+  void* begin = cur_chunk_.payload_begin();
   if (cur_packet_being_written_) {
     cur_packet_header_.begin =
         reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin());
@@ -153,13 +151,15 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
         reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()) +
         kPacketHeaderSize;
     memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
+
     cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_packet_header_.end);
+    begin = reinterpret_cast<void*>(cur_packet_start_);
   }
 
   // TODO get rid of the uint8_t* cast below, needs fixing
   // scattered_stream_writer.h.
   return protozero::ContiguousMemoryRange{
-      reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()),
+      reinterpret_cast<uint8_t*>(begin),
       reinterpret_cast<uint8_t*>(cur_chunk_.end())};
 }
 
