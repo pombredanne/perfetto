@@ -19,8 +19,8 @@
 #include "base/build_config.h"
 
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <cmath>
 
 namespace perfetto {
 namespace base {
@@ -180,7 +180,7 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     UpdateWatchTasksLocked();
     size_t fd_index = it->second.poll_fd_index;
     PERFETTO_DCHECK(fd_index < poll_fds_.size());
-    PERFETTO_DCHECK(std::abs(poll_fds_[fd_index].fd) == fd);
+    PERFETTO_DCHECK(::abs(poll_fds_[fd_index].fd) == fd);
     poll_fds_[fd_index].fd = fd;
     task = it->second.callback;
   }
