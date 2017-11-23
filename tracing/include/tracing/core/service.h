@@ -84,7 +84,7 @@ class Service {
     // the hoods with splitting protobufs into chunks and with
     // acquiring/releasing chunks from the shared memory buffer. The returned
     // writer is *not* thread safe. The intended design is that each data source
-    // creates one TraceWriter for each thread (or more if necessary).
+    // creates one TraceWriter for each thread (or more, if necessary).
     virtual std::unique_ptr<TraceWriter> CreateTraceWriter() = 0;
   };  // class ProducerEndpoint.
 
@@ -101,12 +101,16 @@ class Service {
   // the returned ProducerEndpoint is alive.
   // To disconnect just destroy the returned ProducerEndpoint object. It is safe
   // to destroy the Producer once the Producer::OnDisconnect() has been invoked.
+  // |shared_buffer_page_size_bytes| is an optional argument to define the
+  // size of tracing pages. It has to be an integer multiple of 4KB. See
+  // comments in shared_memory_abi.h for tradeoffs. The service will refuse
+  // to connect the Producer if this value is too big or malformed.
   // |shared_buffer_size_hint_bytes| is an optional hint on the size of the
   // shared memory buffer. The service can ignore the hint (e.g., if the hint
   // is unreasonably large).
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
       Producer*,
-      size_t shared_buffer_page_size_bytes,
+      size_t shared_buffer_page_size_bytes = 4096,
       size_t shared_buffer_size_hint_bytes = 0) = 0;
 
  public:  // Testing-only

@@ -14,51 +14,43 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
-#define TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
-
-#include <functional>
-
-#include "protozero/protozero_message_handle.h"
-#include "protozero/scattered_stream_writer.h"
-#include "tracing/core/basic_types.h"
-#include "tracing/core/shared_memory_abi.h"
+#ifndef TRACING_SRC_CORE_TRACE_WRITER_H
+#define TRACING_SRC_CORE_TRACE_WRITER_H
 
 #include "protos/trace_packet.pbzero.h"
+#include "protozero/protozero_message_handle.h"
 
 namespace perfetto {
 
-class ProducerSharedMemoryArbiter;
+// This is a single-thread write interface that allows to write protobufs
+// directly into the tracing shared buffer without making any copies.
+// It takes care of acquiring and releasing chunks from the
+// ProducerSharedMemoryArbiter and splitting protos over chunks.
+// The idea is that each data source creates one TraceWriter for each thread
+// it wants to write from. Each TraceWriter will get its own dedicated chunk
+// and will write into the shared buffer without any locking most of the time.
+// Locking will happen only when a chunk is exhausted and a new one is acquired
+// from the arbiter.
 
-class TraceWriter : public protozero::ScatteredStreamWriter::Delegate {
+// TODO: TraceWriter needs to keep the shared memory buffer alive (refcount?).
+// If the shared memory buffer goes away (e.g. the Service crashes) the
+// TraceWriter here will happily keep writing into unmapped memory.
+
+class TraceWriter {
  public:
   using TracePacket = pbzero::TracePacket;
   using TracePacketHandle = protozero::ProtoZeroMessageHandle<TracePacket>;
 
-  explicit TraceWriter(ProducerSharedMemoryArbiter*);
-  TracePacketHandle NewTracePacket();
+  TraceWriter();
+  virtual ~TraceWriter();
 
-  // ScatteredStreamWriter::Delegate implementation.
-  protozero::ContiguousMemoryRange GetNewBuffer() override;
+  virtual TracePacketHandle NewTracePacket() = 0;
 
  private:
   TraceWriter(const TraceWriter&) = delete;
   TraceWriter& operator=(const TraceWriter&) = delete;
-
-  void OnFinalize(size_t packet_size);
-
-  ProducerSharedMemoryArbiter* const shmem_arbiter_;
-  const WriterID id_;
-  SharedMemoryABI::Chunk cur_chunk_;
-  uint16_t cur_chunk_id_ = 0;
-  protozero::ScatteredStreamWriter protobuf_stream_writer_;
-  TracePacket cur_packet_;
-  uintptr_t cur_packet_start_ = 0;
-  bool cur_packet_being_written_ = false;
-  protozero::ContiguousMemoryRange cur_packet_header_ = {};
-  std::function<void(size_t)> finalize_callback_;
 };
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_TRACING_TRACE_ARBITER_H_
+#endif  // TRACING_SRC_CORE_TRACE_WRITER_H

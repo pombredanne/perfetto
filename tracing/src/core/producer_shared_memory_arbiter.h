@@ -27,6 +27,8 @@
 
 namespace perfetto {
 
+class TraceWriter;
+
 // This class handles the shared memory buffer on the producer side. It is used
 // to obtain thread-local chunks and to partition pages from several threads.
 // There is one arbiter instance per Producer.
@@ -45,21 +47,23 @@ class ProducerSharedMemoryArbiter {
                                      size_t size_hint = 0);
   void ReturnCompletedChunk(SharedMemoryABI::Chunk chunk);
 
-  // Allocates a new WriterID. There is a 1:1 mapping between TraceWriter
-  // instances and WriterID. The WriterID is written in each chunk header
-  // owned by a given TraceWriter and is used by the Service to reconstruct
-  // reorder TracePackets written by the same TraceWriter.
-  // Returns 0 if all WriterID slots are exhausted, in which case the Writer
-  // is supposed to just give up.
+  // Creates a new TraceWriter and assigns it a new WriterID. The WriterID is
+  // written in each chunk header owned by a given TraceWriter and is used by
+  // the Service to reconstruct reorder TracePackets written by the same
+  // TraceWriter. CHECK(s) if all WriterID slots are exhausted.
+  // TODO: instad of crashing this should return a NoopWriter.
+  std::unique_ptr<TraceWriter> CreateTraceWriter();
+
+ private:
+  friend class TraceWriter;
+  ProducerSharedMemoryArbiter(const ProducerSharedMemoryArbiter&) = delete;
+  ProducerSharedMemoryArbiter& operator=(const ProducerSharedMemoryArbiter&) =
+      delete;
+
   WriterID AcquireWriterID();
 
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
-
- private:
-  ProducerSharedMemoryArbiter(const ProducerSharedMemoryArbiter&) = delete;
-  ProducerSharedMemoryArbiter& operator=(const ProducerSharedMemoryArbiter&) =
-      delete;
 
   std::mutex lock_;
   SharedMemoryABI shmem_;

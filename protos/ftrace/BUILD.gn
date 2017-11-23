@@ -43,7 +43,6 @@ action_foreach("generate_full_protos") {
 proto_library("ftrace_full_protos") {
   deps = [
     ":generate_full_protos",
-    "//buildtools:protobuf_full",
   ]
   sources = []
 

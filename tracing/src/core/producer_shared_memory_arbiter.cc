@@ -17,6 +17,7 @@
 #include "tracing/src/core/producer_shared_memory_arbiter.h"
 
 #include "base/logging.h"
+#include "tracing/src/core/trace_writer_impl.h"
 
 #include <limits>
 
@@ -63,9 +64,9 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
     for (uint32_t chunk_idx = 0; free_chunks; chunk_idx++, free_chunks >>= 1) {
       if (free_chunks & 1) {
         // We found a free chunk.
-        Chunk chunk;
-        if (shmem_.TryAcquireChunkForWriting(page_idx_, chunk_idx, &header,
-                                             &chunk)) {
+        Chunk chunk =
+            shmem_.TryAcquireChunkForWriting(page_idx_, chunk_idx, &header);
+        if (chunk.is_valid()) {
           PERFETTO_DCHECK(chunk.is_valid());
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;
@@ -85,7 +86,12 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
 
 void ProducerSharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   std::lock_guard<std::mutex> scoped_lock(lock_);
-  shmem_.ReleaseChunkAsComplete(chunk);
+  shmem_.ReleaseChunkAsComplete(std::move(chunk));
+}
+
+std::unique_ptr<TraceWriter> ProducerSharedMemoryArbiter::CreateTraceWriter() {
+  return std::unique_ptr<TraceWriter>(
+      new TraceWriterImpl(this, AcquireWriterID()));
 }
 
 WriterID ProducerSharedMemoryArbiter::AcquireWriterID() {

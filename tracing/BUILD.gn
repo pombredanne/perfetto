@@ -23,6 +23,7 @@ source_set("tracing") {
   all_dependent_configs = [ ":tracing_config" ]
   deps += [
     "//base",
+    "//buildtools:protobuf_full",  # TODO: temporary. See //protos/BUILD.gn .
     "//protos:full",
     "//protos:zero",
   ]
@@ -43,7 +44,8 @@ source_set("tracing") {
     "src/core/service_impl.cc",
     "src/core/service_impl.h",
     "src/core/shared_memory_abi.cc",
-    "src/core/trace_writer.cc",
+    "src/core/trace_writer_impl.cc",
+    "src/core/trace_writer_impl.h",
   ]
 }
 

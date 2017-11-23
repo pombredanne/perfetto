@@ -19,8 +19,6 @@
 
 #include <stdint.h>
 
-#include <limits>
-
 namespace perfetto {
 
 using ProducerID = uint64_t;

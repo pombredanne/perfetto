@@ -158,12 +158,11 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
 
     // Iterate over the chunks in the page.
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-      SharedMemoryABI::Chunk chunk;
       auto state = shmem_abi_.GetChunkState(page_idx, chunk_idx);
-      bool locked =
-          shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx, &chunk);
-      auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
+      auto chunk = shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx);
+      // |chunk| may not be valid if it was in a bad state.
 
+      auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
       auto id = hdr->identifier.load(std::memory_order_relaxed);
       auto packets = hdr->packets.load(std::memory_order_relaxed);
       printf(
@@ -171,8 +170,8 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
           "flags: %x, acquired_for_reading: %d\n",
           chunk_idx, id.writer_id, id.chunk_id,
           SharedMemoryABI::kChunkStateStr[state], packets.count, packets.flags,
-          locked);
-      if (!locked)
+          chunk.is_valid());
+      if (!chunk.is_valid())
         continue;
 
       PERFETTO_DCHECK(chunk.is_valid());
@@ -198,10 +197,9 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
         ptr += pack_size;
         printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
       }
-      shmem_abi_.ReleaseChunkAsFree(chunk);
+      shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
     }
   }
-  return;
 }
 
 std::unique_ptr<TraceWriter>

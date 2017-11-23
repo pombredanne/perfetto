@@ -188,10 +188,7 @@ void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
 }
 
 std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter() {
-  // TODO: we should rather return a dummy NoopWriter in this case.
-  PERFETTO_CHECK(shared_memory_arbiter_);
-  return std::unique_ptr<TraceWriter>(
-      new TraceWriter(shared_memory_arbiter_.get()));
+  return shared_memory_arbiter_->CreateTraceWriter();
 }
 
 SharedMemory* ProducerIPCClientImpl::shared_memory() const {

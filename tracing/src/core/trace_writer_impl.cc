@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "tracing/core/trace_writer.h"
+#include "tracing/src/core/trace_writer_impl.h"
 
 #include <string.h>
 
@@ -45,10 +45,9 @@ using PacketHeaderType = SharedMemoryABI::PacketHeaderType;
 // guarantee that it can't go away if there if any TracePacket is alive.
 // Temporarily the shared memory buffer is long lived and this is not a problem.
 
-TraceWriter::TraceWriter(ProducerSharedMemoryArbiter* shmem_arbiter)
-    : shmem_arbiter_(shmem_arbiter),
-      id_(shmem_arbiter->AcquireWriterID()),
-      protobuf_stream_writer_(this) {
+TraceWriterImpl::TraceWriterImpl(ProducerSharedMemoryArbiter* shmem_arbiter,
+                                 WriterID id)
+    : shmem_arbiter_(shmem_arbiter), id_(id), protobuf_stream_writer_(this) {
   finalize_callback_ = [this](size_t packet_size) { OnFinalize(packet_size); };
 
   // TODO we could handle this more gracefully and always return some garbage
@@ -56,7 +55,9 @@ TraceWriter::TraceWriter(ProducerSharedMemoryArbiter* shmem_arbiter)
   PERFETTO_CHECK(id_ != 0);
 }
 
-TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
+TraceWriterImpl::~TraceWriterImpl() = default;
+
+TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // If we hit this, the caller is calling NewTracePacket() without having
   // finalized the previous packet.
   PERFETTO_DCHECK(!cur_packet_being_written_);
@@ -64,8 +65,8 @@ TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
   // Reserve space for the size of the message. Note: this call might re-enter
   // this class into GetNewBuffer() if there isn't enough space or if this is
   // the very first call to NewTracePacket().
-  cur_packet_header_ = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
-  memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
+  cur_packet_header_ = reinterpret_cast<uintptr_t>(
+      protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize).begin);
   cur_packet_.Reset(&protobuf_stream_writer_);
   TracePacketHandle handle(&cur_packet_);
   handle.set_on_finalize(finalize_callback_);
@@ -75,10 +76,9 @@ TraceWriter::TracePacketHandle TraceWriter::NewTracePacket() {
   return handle;
 }
 
-void TraceWriter::OnFinalize(size_t packet_size) {
+void TraceWriterImpl::OnFinalize(size_t packet_size) {
   PERFETTO_CHECK(cur_packet_being_written_);
-  PERFETTO_DCHECK(cur_packet_header_.is_valid());
-  PERFETTO_DCHECK(cur_packet_header_.size() == kPacketHeaderSize);
+  PERFETTO_DCHECK(cur_packet_header_);
 
   // This could be the OnFinalize() call for a packet o that was startd in
   // a previous chunk and is continuing in the current one. In this case
@@ -90,7 +90,7 @@ void TraceWriter::OnFinalize(size_t packet_size) {
       reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr()) -
       cur_packet_start_);
 
-  memcpy(cur_packet_header_.begin, &size, sizeof(size));
+  memcpy(reinterpret_cast<void*>(cur_packet_header_), &size, sizeof(size));
   cur_packet_being_written_ = false;
 
   // Keep this last, it has release-store semantics.
@@ -107,7 +107,7 @@ void TraceWriter::OnFinalize(size_t packet_size) {
 // 2. While trying to reserve the packet header at the beginning of
 // NewTracePacket(). In this case we just want a new chunk without creating any
 // fragments.
-protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
+protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   if (cur_packet_being_written_) {
     const uintptr_t wptr =
         reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr());
@@ -116,7 +116,7 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
     PERFETTO_DLOG("Partial size: %zu", partial_packet_size);
     PERFETTO_DCHECK(partial_packet_size < cur_chunk_.size());
     const auto size = static_cast<PacketHeaderType>(partial_packet_size);
-    memcpy(cur_packet_header_.begin, &size, sizeof(size));
+    memcpy(reinterpret_cast<void*>(cur_packet_header_), &size, sizeof(size));
     cur_chunk_.IncrementPacketCount(true /* last_packet_is_partial */);
   }
 
@@ -133,8 +133,14 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
         kFirstPacketContinuesFromPrevChunk;
   }
 
-  if (cur_chunk_.is_valid())
-    shmem_arbiter_->ReturnCompletedChunk(cur_chunk_);
+  if (cur_chunk_.is_valid()) {
+    // TODO: need to change ProtoZeroMessage to stop it backfilling the size
+    // header of nested message if they are in previous chunks and instead let
+    // it build a patch list. Right now ProtoZeroMessage will assume that we are
+    // holing onto all the chunks that are involved in a message, which is not
+    // true.
+    shmem_arbiter_->ReturnCompletedChunk(std::move(cur_chunk_));
+  }
 
   // The memory order of the stores below doesn't really matter. This |header|
   // is just a temporary object and GetNewChunk() will copy it into the shared
@@ -143,24 +149,22 @@ protozero::ContiguousMemoryRange TraceWriter::GetNewBuffer() {
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
-  void* begin = cur_chunk_.payload_begin();
+  auto payload_begin = reinterpret_cast<uintptr_t>(cur_chunk_.payload_begin());
   if (cur_packet_being_written_) {
-    cur_packet_header_.begin =
-        reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin());
-    cur_packet_header_.end =
-        reinterpret_cast<uint8_t*>(cur_chunk_.payload_begin()) +
-        kPacketHeaderSize;
-    memset(cur_packet_header_.begin, 0, kPacketHeaderSize);
-
-    cur_packet_start_ = reinterpret_cast<uintptr_t>(cur_packet_header_.end);
-    begin = reinterpret_cast<void*>(cur_packet_start_);
+    cur_packet_header_ = payload_begin;
+    cur_packet_start_ = payload_begin + kPacketHeaderSize;
+    payload_begin = cur_packet_start_;
   }
 
   // TODO get rid of the uint8_t* cast below, needs fixing
   // scattered_stream_writer.h.
   return protozero::ContiguousMemoryRange{
-      reinterpret_cast<uint8_t*>(begin),
+      reinterpret_cast<uint8_t*>(payload_begin),
       reinterpret_cast<uint8_t*>(cur_chunk_.end())};
 }
+
+// Base class ctor/dtor definition.
+TraceWriter::TraceWriter() = default;
+TraceWriter::~TraceWriter() = default;
 
 }  // namespace perfetto
