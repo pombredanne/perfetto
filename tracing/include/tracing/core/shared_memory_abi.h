@@ -227,16 +227,18 @@ class SharedMemoryABI {
   // | Tells how many chunks there are, how big they are |
   // | and their state (free, read, write, complete ).   |
   // +===================================================+
+  // +***************************************************+
   // | Chunk #0 header [8 bytes]                         |
   // | Tells how many packets there are and whether the  |
   // | whether the 1st and last ones are fragmented.     |
   // | Also has a seq number to reassemble fragments.    |
+  // +***************************************************+
   // +---------------------------------------------------+
   // | Packet #0 size [2 bytes]                          |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
   // | Packet #0 payload                                 |
   // | A TracePacket protobuf message                    |
-  // +===================================================+
+  // +---------------------------------------------------+
   //                         ...
   // +---------------------------------------------------+
   // | Packet #N size [2 bytes]                          |
@@ -245,9 +247,8 @@ class SharedMemoryABI {
   // | A TracePacket protobuf message                    |
   // +---------------------------------------------------+
   //                         ...
-  // +===================================================+
+  // +***************************************************+
   // | Chunk #M header [8 bytes]                         |
-  // +===================================================+
   //                         ...
 
   // There is one page header per page, at the beginning of the page.
