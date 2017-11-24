@@ -67,18 +67,6 @@ struct Pipe {
   ScopedFile write_fd;
 };
 
-TYPED_TEST(TaskRunnerTest, Foo) {
-  auto& task_runner = this->task_runner;
-  int counter = 0;
-  task_runner.PostTask([&counter] { counter = (counter << 4) | 1; });
-  task_runner.PostTask([&counter] { counter = (counter << 4) | 2; });
-  task_runner.PostTask([&counter] { counter = (counter << 4) | 3; });
-  task_runner.PostTask([&counter] { counter = (counter << 4) | 4; });
-  task_runner.PostTask([&task_runner] { task_runner.Quit(); });
-  task_runner.Run();
-  EXPECT_EQ(0x1234, counter);
-}
-
 TYPED_TEST(TaskRunnerTest, PostImmediateTask) {
   auto& task_runner = this->task_runner;
   int counter = 0;

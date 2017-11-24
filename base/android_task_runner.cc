@@ -80,9 +80,9 @@ AndroidTaskRunner::TimePoint AndroidTaskRunner::GetTime() const {
 }
 
 void AndroidTaskRunner::RunImmediateTask() {
-  uint64_t trigger_count;
-  if (read(immediate_event_.get(), &trigger_count, sizeof(trigger_count)) !=
-      sizeof(trigger_count)) {
+  uint64_t count;
+  if (read(immediate_event_.get(), &count, sizeof(count)) != sizeof(count) &&
+      errno != EAGAIN) {
     PERFETTO_DPLOG("read");
   }
 
@@ -106,9 +106,9 @@ void AndroidTaskRunner::RunImmediateTask() {
 }
 
 void AndroidTaskRunner::RunDelayedTask() {
-  uint64_t trigger_count;
-  if (read(delayed_timer_.get(), &trigger_count, sizeof(trigger_count)) !=
-      sizeof(trigger_count)) {
+  uint64_t count;
+  if (read(delayed_timer_.get(), &count, sizeof(count)) != sizeof(count) &&
+      errno != EAGAIN) {
     PERFETTO_DPLOG("read");
   }
 
@@ -132,8 +132,10 @@ void AndroidTaskRunner::RunDelayedTask() {
 
 void AndroidTaskRunner::ScheduleImmediateWakeUp() {
   uint64_t value = 1;
-  if (write(immediate_event_.get(), &value, sizeof(value)) == -1)
+  if (write(immediate_event_.get(), &value, sizeof(value)) == -1 &&
+      errno != EAGAIN) {
     PERFETTO_DPLOG("write");
+  }
 }
 
 void AndroidTaskRunner::ScheduleDelayedWakeUp(const TimePoint& time) {
