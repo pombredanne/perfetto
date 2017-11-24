@@ -17,10 +17,13 @@
 #ifndef TRACING_SRC_CORE_TRACE_WRITER_H
 #define TRACING_SRC_CORE_TRACE_WRITER_H
 
-#include "protos/trace_packet.pbzero.h"
 #include "protozero/protozero_message_handle.h"
 
 namespace perfetto {
+
+namespace protos {
+class TracePacket;
+}  // namespace protos
 
 // This is a single-thread write interface that allows to write protobufs
 // directly into the tracing shared buffer without making any copies.
@@ -38,8 +41,8 @@ namespace perfetto {
 
 class TraceWriter {
  public:
-  using TracePacket = pbzero::TracePacket;
-  using TracePacketHandle = protozero::ProtoZeroMessageHandle<TracePacket>;
+  using TracePacketHandle =
+      protozero::ProtoZeroMessageHandle<protos::TracePacket>;
 
   TraceWriter();
   virtual ~TraceWriter();

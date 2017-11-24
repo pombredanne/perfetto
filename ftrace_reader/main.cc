@@ -118,7 +118,7 @@ int main(int argc, const char** argv) {
 
   ScatteredBuffer buffer(4096);
   protozero::ScatteredStreamWriter stream_writer(&buffer);
-  pbzero::FtraceEventBundle message;
+  perfetto::protos::FtraceEventBundle message;
   message.Reset(&stream_writer);
 
   return 0;

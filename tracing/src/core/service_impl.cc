@@ -186,7 +186,7 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
         SharedMemoryABI::PacketHeaderType pack_size;
         memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
         ptr += sizeof(pack_size);
-        TracePacket proto;
+        protos::TracePacket proto;
         bool parsed = false;
         // TODO stiching, looks at the flags.
         printf("      #%-3zu len:%u ", pack_idx, pack_size);

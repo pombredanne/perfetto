@@ -53,7 +53,7 @@ Chunk ProducerSharedMemoryArbiter::GetNewChunk(
     if (shmem_.is_page_free(page_idx_)) {
       // TODO: Use the |size_hint| here to decide the layout.
       auto layout = SharedMemoryABI::PageLayout::kPageDiv4;
-      shmem_.TryPartitionPage(page_idx_, layout);
+      shmem_.TryPartitionPage(page_idx_, layout, 0 /* target_buffer */);
     }
     // At this point either the page has been just partitioned or was already
     // partitioned. TODO: this code could be optimized using the return value of

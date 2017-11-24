@@ -35,12 +35,10 @@ class ProducerSharedMemoryArbiter;
 class TraceWriterImpl : public TraceWriter,
                         public protozero::ScatteredStreamWriter::Delegate {
  public:
-  using TracePacket = pbzero::TracePacket;
-  using TracePacketHandle = protozero::ProtoZeroMessageHandle<TracePacket>;
+  using TracePacketHandle =
+      protozero::ProtoZeroMessageHandle<protos::TracePacket>;
 
-  TraceWriterImpl(ProducerSharedMemoryArbiter*,
-                  WriterID,
-                  uint32_t target_buffer);
+  TraceWriterImpl(ProducerSharedMemoryArbiter*, WriterID, size_t target_buffer);
   ~TraceWriterImpl() override;
 
   // TraceWriter implementation.
@@ -67,7 +65,7 @@ class TraceWriterImpl : public TraceWriter,
 
   // This is just propagated into the chunk heaer.
   // See comments in DataSourceConfig::target_buffer.
-  const uint32_t target_buffer_;
+  const size_t target_buffer_;
 
   // Monotonic sequence id of the chunk. Together with the WriterID  is allows
   // the Service to to reconstruct the linear sequence of packets.
@@ -83,7 +81,7 @@ class TraceWriterImpl : public TraceWriter,
 
   // The packet returned via NewTracePacket(). Its owned by us,
   // TracePacketHandle has just a pointer to it.
-  TracePacket cur_packet_;
+  protos::TracePacket cur_packet_;
 
   // The start address, within |cur_cunk_| bounds, of |cur_packet_|. Used to
   // figure out frament sizes when a TracePacket write is interrupted by

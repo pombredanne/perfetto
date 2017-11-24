@@ -103,7 +103,7 @@ void FtraceController::Stop() {
 void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   CpuReader* reader = GetCpuReader(cpu);
   using BundleHandle =
-      protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>;
+      protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>;
   std::array<const EventFilter*, kMaxSinks> filters{};
   std::array<BundleHandle, kMaxSinks> bundles{};
   size_t sink_count = sinks_.size();
