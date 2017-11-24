@@ -227,8 +227,7 @@ TEST(CpuReaderTest, ParseSimpleEvent) {
 
   size_t msg_size =
       delegate.chunks().size() * kPageSize - stream_writer.bytes_available();
-  std::unique_ptr<uint8_t[]> proto = MakeBuffer(msg_size);
-  delegate.GetBytes(0, msg_size, proto.get());
+  std::unique_ptr<uint8_t[]> proto = delegate.StitchChunks(msg_size);
 
   FtraceEventBundle proto_bundle;
   proto_bundle.ParseFromArray(proto.get(), static_cast<int>(msg_size));

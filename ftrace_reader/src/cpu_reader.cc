@@ -134,6 +134,7 @@ bool CpuReader::ParsePage(size_t cpu,
                           const EventFilter* filter,
                           pbzero::FtraceEventBundle* bundle,
                           const ProtoTranslationTable* table) {
+  // TODO(hjd): Remove when the generic parser comes in.
   const size_t print_id = table->GetEventByName("print")->ftrace_event_id;
   const size_t sched_switch_id =
       table->GetEventByName("sched_switch")->ftrace_event_id;
@@ -253,6 +254,7 @@ bool CpuReader::ParsePage(size_t cpu,
           uint32_t next_pid;
           uint32_t next_prio;
 
+          // TODO(hjd): Avoid this copy.
           if (!ReadAndAdvance<char[16]>(&ptr, end, &prev_comm))
             return false;
           if (!ReadAndAdvance<uint32_t>(&ptr, end, &prev_pid))

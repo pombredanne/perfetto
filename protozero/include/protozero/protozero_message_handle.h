@@ -47,7 +47,7 @@ class ProtoZeroMessageHandleBase {
   ProtoZeroMessageHandleBase& operator=(ProtoZeroMessageHandleBase&&);
 
  protected:
-  explicit ProtoZeroMessageHandleBase(ProtoZeroMessage*);
+  explicit ProtoZeroMessageHandleBase(ProtoZeroMessage* = nullptr);
   ProtoZeroMessage& operator*() const { return *message_; }
   ProtoZeroMessage* operator->() const { return message_; }
 

@@ -435,8 +435,10 @@ class GeneratorJob {
     // For strings also generate a variant for non-null terminated strings.
     if (field->type() == FieldDescriptor::TYPE_STRING) {
       stub_h_->Print(setter,
+                     "// Doesn't check for null terminator.\n"
+                     "// Expects |value| to be at least |size| long.\n"
                      "void $action$_$name$($cpp_type$ value, size_t size) {\n"
-                     "  $appender$($id$, value, size);\n"
+                     "  AppendBytes($id$, value, size);\n"
                      "}\n");
     }
   }

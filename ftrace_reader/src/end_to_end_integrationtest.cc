@@ -50,7 +50,7 @@ class EndToEndIntegrationTest : public ::testing::Test,
     message->set_after("--- Bundle wrapper after ---");
     PERFETTO_CHECK(message);
     size_t msg_size = message->Finalize();
-    std::unique_ptr<uint8_t[]> buffer = GetBuffer(msg_size);
+    std::unique_ptr<uint8_t[]> buffer = writer_delegate->StitchChunks(msg_size);
     wrapper->ParseFromArray(buffer.get(), static_cast<int>(msg_size));
     message.reset();
   }
@@ -86,11 +86,6 @@ class EndToEndIntegrationTest : public ::testing::Test,
   base::UnixTaskRunner* runner() { return &runner_; }
 
  private:
-  std::unique_ptr<uint8_t[]> GetBuffer(size_t size) {
-    // Read the chunks into a contiguous buffer:
-    return writer_delegate->GetBuffer(size);
-  }
-
   size_t count = 3;
   base::UnixTaskRunner runner_;
   bool currently_writing_ = false;
