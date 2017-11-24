@@ -47,7 +47,7 @@ using PacketHeaderType = SharedMemoryABI::PacketHeaderType;
 
 TraceWriterImpl::TraceWriterImpl(ProducerSharedMemoryArbiter* shmem_arbiter,
                                  WriterID id,
-                                 uint32_t target_buffer)
+                                 size_t target_buffer)
     : shmem_arbiter_(shmem_arbiter),
       id_(id),
       target_buffer_(target_buffer),
@@ -117,7 +117,6 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
         reinterpret_cast<uintptr_t>(protobuf_stream_writer_.write_ptr());
     PERFETTO_DCHECK(wptr >= cur_packet_start_);
     size_t partial_packet_size = wptr - cur_packet_start_;
-    PERFETTO_DLOG("Partial size: %zu", partial_packet_size);
     PERFETTO_DCHECK(partial_packet_size < cur_chunk_.size());
     const auto size = static_cast<PacketHeaderType>(partial_packet_size);
     memcpy(reinterpret_cast<void*>(cur_packet_header_), &size, sizeof(size));
@@ -127,14 +126,13 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   // Start a new chunk.
   SharedMemoryABI::ChunkHeader::Identifier identifier = {};
   identifier.writer_id = id_;
-  identifier.target_buffer = target_buffer_;
   identifier.chunk_id = cur_chunk_id_++;
 
   SharedMemoryABI::ChunkHeader::PacketsState packets_state = {};
   if (cur_packet_being_written_) {
     packets_state.count = 1;
-    packets_state.flags = SharedMemoryABI::ChunkHeader::PacketsState::
-        kFirstPacketContinuesFromPrevChunk;
+    packets_state.flags =
+        SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
   }
 
   if (cur_chunk_.is_valid()) {
@@ -152,7 +150,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   SharedMemoryABI::ChunkHeader header = {};
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
-  cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
+  cur_chunk_ = shmem_arbiter_->GetNewChunk(header, target_buffer_);
   auto payload_begin = reinterpret_cast<uintptr_t>(cur_chunk_.payload_begin());
   if (cur_packet_being_written_) {
     cur_packet_header_ = payload_begin;

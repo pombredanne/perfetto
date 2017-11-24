@@ -37,7 +37,7 @@ namespace perfetto {
 namespace {
 // TODO: this should be configurable by the library client. Hardcoding for the
 // moment.
-constexpr uint32_t kTracingPageSize = 4096 * 2;
+constexpr uint32_t kTracingPageSize = 4096;
 }  // namespace
 
 // static. (Declared in include/tracing/ipc/producer_ipc_client.h).
@@ -55,7 +55,8 @@ ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
     : producer_(producer),
       task_runner_(task_runner),
       ipc_channel_(ipc::Client::CreateInstance(service_sock_name, task_runner)),
-      producer_port_(this /* event_listener */) {
+      producer_port_(this /* event_listener */),
+      weak_ptr_factory_(this) {
   ipc_channel_->BindService(producer_port_.GetWeakPtr());
 }
 
@@ -101,8 +102,16 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
   PERFETTO_CHECK(shmem_fd);
   shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  auto on_page_complete_callback =
+      [weak_this](const std::vector<uint32_t>& changed_pages) {
+        if (!weak_this)
+          return;
+        weak_this->NotifySharedMemoryUpdate(changed_pages);
+      };
   shared_memory_arbiter_.reset(new ProducerSharedMemoryArbiter(
-      shared_memory_->start(), shared_memory_->size(), kTracingPageSize));
+      shared_memory_->start(), shared_memory_->size(), kTracingPageSize,
+      on_page_complete_callback, task_runner_));
   producer_->OnConnect();
 }
 
@@ -181,14 +190,16 @@ void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
     return;
   }
   NotifySharedMemoryUpdateRequest req;
+  req.mutable_changed_pages()->Reserve(static_cast<int>(changed_pages.size()));
   for (uint32_t changed_page : changed_pages)
     req.add_changed_pages(changed_page);
   producer_port_.NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
+  PERFETTO_DLOG("NotifySharedMemoryUpdate %zu", changed_pages.size());
 }
 
 std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter(
-    uint32_t target_buffer) {
+    size_t target_buffer) {
   return shared_memory_arbiter_->CreateTraceWriter(target_buffer);
 }
 

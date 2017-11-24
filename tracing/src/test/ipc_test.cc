@@ -99,8 +99,6 @@ void __attribute__((noreturn)) ProducerMain() {
     sprintf(content, "Stream 2 - %3d ++++++++++++++++++++++++++++++++++++", j);
     event->set_test(content);
   }
-
-  endpoint->NotifySharedMemoryUpdate(std::vector<uint32_t>());
   task_runner.Run();
 }
 

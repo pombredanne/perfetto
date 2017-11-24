@@ -21,6 +21,7 @@
 
 #include <vector>
 
+#include "base/weak_ptr.h"
 #include "ipc/service_proxy.h"
 #include "tracing/core/basic_types.h"
 #include "tracing/core/service.h"
@@ -62,8 +63,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   void UnregisterDataSource(DataSourceID) override;
   void NotifySharedMemoryUpdate(
       const std::vector<uint32_t>& changed_pages) override;
-  std::unique_ptr<TraceWriter> CreateTraceWriter(
-      uint32_t target_buffer) override;
+  std::unique_ptr<TraceWriter> CreateTraceWriter(size_t target_buffer) override;
   SharedMemory* shared_memory() const override;
 
   // ipc::ServiceProxy::EventListener implementation.
@@ -93,6 +93,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
 
   std::unique_ptr<PosixSharedMemory> shared_memory_;
   std::unique_ptr<ProducerSharedMemoryArbiter> shared_memory_arbiter_;
+  base::WeakPtrFactory<ProducerIPCClientImpl> weak_ptr_factory_;
 
   bool connected_ = false;
 };

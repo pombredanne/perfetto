@@ -63,7 +63,7 @@ class ServiceImpl : public Service {
         const std::vector<uint32_t>& changed_pages) override;
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(
-        uint32_t target_buffer) override;
+        size_t target_buffer) override;
 
     SharedMemory* shared_memory() const override;
 
@@ -138,15 +138,37 @@ class ServiceImpl : public Service {
   };
 
   class LogBuffer {
-  public:
+   public:
     LogBuffer();
     ~LogBuffer();
-    void Reset(size_t size = 0);  // |size| == 0 destroyes the buffer.
+
+    void Create(size_t size, size_t page_size);
+    void Reset();
+
+    size_t size() const { return size_in_4k_multiples_ * 4096ul; }
+    size_t page_size() const { return page_size_in_4k_multiples_ * 4096ul; }
+    size_t num_pages() const {
+      return size_in_4k_multiples_ / page_size_in_4k_multiples_;
+    }
     explicit operator bool() const { return !!data_; }
 
+    uint8_t* get_page(size_t page) {
+      PERFETTO_DCHECK(page < num_pages());
+      PERFETTO_DCHECK(*this);
+      return &data_[page * page_size()];
+    }
+
+    uint8_t* get_next_page() {
+      size_t cur = cur_page_;
+      cur_page_ = cur_page_ == num_pages() - 1 ? 0 : cur_page_ + 1;
+      return get_page(cur);
+    }
+
    private:
-    std::unique_ptr<char[]> data_;
-    size_t size_ = 0;
+    uint8_t* data_ = nullptr;
+    uint16_t size_in_4k_multiples_ = 0;
+    uint16_t page_size_in_4k_multiples_ = 0;
+    uint16_t cur_page_ = 0;  // Write pointer in the ring buffer.
   };
 
   struct TracingSession {

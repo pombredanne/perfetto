@@ -88,7 +88,7 @@ class Service {
     // writer is *not* thread safe. The intended design is that each data source
     // creates one TraceWriter for each thread (or more, if necessary).
     virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
-        uint32_t target_buffer = 0) = 0;
+        size_t target_buffer = 0) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.

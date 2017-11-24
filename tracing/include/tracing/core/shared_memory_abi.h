@@ -220,6 +220,8 @@ class SharedMemoryABI {
 
   // This assumes that kChunkComplete == 3.
   static constexpr uint32_t kAllChunksComplete = 0x0FFFFFFF;
+  static constexpr uint32_t kAllChunksFree = 0;
+  static constexpr size_t kInvalidPageIdx = -1;
 
   // Layout of a Page.
   // +===================================================+
@@ -262,7 +264,13 @@ class SharedMemoryABI {
     //  |      +----------------------------- PageLayout (0 == page fully free)
     //  +------------------------------------ Reserved for future use
     std::atomic<uint32_t> layout;
-    uint32_t reserved;
+
+    // Tells the Service on which logging buffer partition the chunks contained
+    // in the page should be moved into. This is reflecting the
+    // DataSourceConfig.target_buffer received at registration time.
+    // kMaxLogBufferID in basic_types.h relies on the size of this.
+    std::atomic<uint16_t> target_buffer;
+    uint16_t reserved;
   };
 
   // There is one Chunk header per chunk (hence PageLayout per page) at the
@@ -295,11 +303,7 @@ class SharedMemoryABI {
       // same data source.
       unsigned writer_id : 10;  // kMaxWriterID relies on the size of this.
 
-      // Hints the Service on which logging buffer partition the chunk should
-      // be moved into. This is  reflecting the DataSourceConfig.target_buffer
-      // received at registration time.
-      // kMaxLogBufferID in basic_types.h relies on the size of this.
-      unsigned target_buffer : 6;
+      unsigned reserved : 6;
 
       // chunk_id is a monotonic counter of the chunk within its own
       // sequence. The tuple (writer_id, chunk_id) allows to figure
@@ -374,11 +378,16 @@ class SharedMemoryABI {
   void* start() const { return reinterpret_cast<void*>(start_); }
   void* end() const { return reinterpret_cast<void*>(start_ + size_); }
   size_t size() const { return size_; }
+  size_t page_size() const { return page_size_; }
   size_t num_pages() const { return num_pages_; }
 
-  PageHeader* page_header(size_t page_idx) {
+  void* page_start(size_t page_idx) {
     PERFETTO_DCHECK(page_idx < num_pages_);
-    return reinterpret_cast<PageHeader*>(start_ + page_size_ * page_idx);
+    return reinterpret_cast<void*>(start_ + page_size_ * page_idx);
+  }
+
+  PageHeader* page_header(size_t page_idx) {
+    return reinterpret_cast<PageHeader*>(page_start(page_idx));
   }
 
   // Returns true if the page is fully clear and has not been partitioned yet.
@@ -403,6 +412,9 @@ class SharedMemoryABI {
     return static_cast<PageLayout>((x & kLayoutMask) >> kLayoutShift);
   }
 
+  // Returns the |target_buffer| tag in the page header.
+  size_t GetTargetBuffer(size_t page_idx);
+
   // Returns a bitmap in which each bit is set if the corresponding Chunk exists
   // in the page (according to the page layout) and is free. If the page is not
   // partitioned it returns 0 (as if the page had no free chunks).
@@ -411,7 +423,11 @@ class SharedMemoryABI {
   // Tries to atomically partition a page with the given |layout|. Returns true
   // if the page was free and has been partitioned with the given |layout|,
   // false if the page wasn't free anymore by the time we got there.
-  bool TryPartitionPage(size_t page_idx, PageLayout layout);
+  // If succeeds all the chunks are atomically set in the kChunkFree state and
+  // the target_buffer is stored with release-store semantics.
+  bool TryPartitionPage(size_t page_idx,
+                        PageLayout layout,
+                        size_t target_buffer);
 
   // Tries to atomically mark a single chunk within the page as kBeingWritten.
   // Returns a !is_valid() chunk if the page is not partitioned or the chunk is
@@ -442,13 +458,17 @@ class SharedMemoryABI {
                           size_t chunk_idx);
 
   // Puts a chunk into the kWriteComplete state.
-  void ReleaseChunkAsComplete(Chunk chunk) {
-    ReleaseChunk(std::move(chunk), kChunkComplete);
+  // If all chunks in the page are kChunkComplete returns the page index,
+  // otherwise returns kInvalidPageIdx.
+  size_t ReleaseChunkAsComplete(Chunk chunk) {
+    return ReleaseChunk(std::move(chunk), kChunkComplete);
   }
 
   // Puts a chunk into the kChunkFree state.
-  void ReleaseChunkAsFree(Chunk chunk) {
-    ReleaseChunk(std::move(chunk), kChunkFree);
+  // If all chunks in the page are kChunkFree returns the page index,
+  // otherwise returns kInvalidPageIdx.
+  size_t ReleaseChunkAsFree(Chunk chunk) {
+    return ReleaseChunk(std::move(chunk), kChunkFree);
   }
 
   ChunkState GetChunkState(size_t page_idx, size_t chunk_idx);
@@ -456,6 +476,8 @@ class SharedMemoryABI {
   // For testing / debugging only. Returns a copy of the chunk header. The
   // chunk header can change at any time after this call.
   ChunkHeader* GetChunkHeader(size_t page_idx, size_t chunk_idx);
+
+  std::pair<size_t, size_t> GetPageAndChunkIndex(const Chunk& chunk);
 
  private:
   SharedMemoryABI(const SharedMemoryABI&) = delete;
@@ -469,14 +491,13 @@ class SharedMemoryABI {
     return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
   }
 
-  std::pair<size_t, size_t> GetPageAndChunkIndex(const Chunk& chunk);
   Chunk GetChunk(size_t page_idx, size_t chunk_idx);
 
   Chunk TryAcquireChunk(size_t page_idx,
                         size_t chunk_idx,
                         ChunkState,
                         const ChunkHeader*);
-  void ReleaseChunk(Chunk chunk, ChunkState);
+  size_t ReleaseChunk(Chunk chunk, ChunkState);
 
   const uintptr_t start_;
   const size_t size_;

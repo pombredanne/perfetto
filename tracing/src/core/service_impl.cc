@@ -17,6 +17,7 @@
 #include "tracing/src/core/service_impl.h"
 
 #include <inttypes.h>
+#include <sys/mman.h>
 
 #include <algorithm>
 
@@ -135,7 +136,7 @@ void ServiceImpl::StartTracing(ConsumerEndpointImpl* initiator,
     for (size_t i = 0; i < kMaxTraceBuffers; i++) {
       if (trace_buffers_[i])
         continue;
-      trace_buffers_[i].Reset(buffer_cfg.size_kb * 1024);
+      trace_buffers_[i].Create(buffer_cfg.size_kb * 1024, 4096 /* page size */);
       tracing_session.trace_buffers.emplace_back(i);
       did_allocate_all_buffers = true;
       break;
@@ -270,12 +271,20 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     // TODO: we should start collecting individual chunks from non fully
     // complete pages after a while.
 
-    // Read the page layout.
-    auto layout = shmem_abi_.page_layout(page_idx);
-    size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
-    printf("  Draining page: %zu,layout: %zu chunks\n", page_idx, num_chunks);
+    size_t target_buffer = shmem_abi_.GetTargetBuffer(page_idx);
+    printf("  Moving page: %u, into buffer: %zu\n", page_idx, target_buffer);
 
-    // TODO move in central buffer.
+    if (target_buffer >= kMaxTraceBuffers &&
+        service_->trace_buffers_[target_buffer]) {
+      // TODO: we should have some stronger check to prevent that the Producer
+      // passes |target_buffer| which is valid, but that we never asked it to
+      // use. Essentially we want to prevent A malicious producer to inject data
+      // into a log buffer that has nothing to do with it.
+      // TODO right now the page_size in the SMB and the trace_buffers_ can
+      // mismatch Remove the ability to decide the page size on the Producer.
+      uint8_t* dst = service_->trace_buffers_[target_buffer].get_next_page();
+      memcpy(dst, shmem_abi_.page_start(page_idx), shmem_abi_.page_size());
+    }
 
     shmem_abi_.ReleaseAllChunksAsFree(page_idx);
   }
@@ -291,7 +300,8 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
   //   bool complete = shmem_abi_.is_page_complete(page_idx);
   //   auto layout = shmem_abi_.page_layout(page_idx);
   //   size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
-  //   printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu chunks)\n",
+  //   printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu
+  //   chunks)\n",
   //          page_idx, complete, layout, num_chunks);
   //
   //   // Iterate over the chunks in the page.
@@ -304,11 +314,10 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
   //     auto id = hdr->identifier.load(std::memory_order_relaxed);
   //     auto packets = hdr->packets.load(std::memory_order_relaxed);
   //     printf(
-  //         "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets: %u, "
-  //         "flags: %x, acquired_for_reading: %d\n",
-  //         chunk_idx, id.writer_id, id.chunk_id,
-  //         SharedMemoryABI::kChunkStateStr[state], packets.count, packets.flags,
-  //         chunk.is_valid());
+  //         "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets:
+  //         %u, " "flags: %x, acquired_for_reading: %d\n", chunk_idx,
+  //         id.writer_id, id.chunk_id, SharedMemoryABI::kChunkStateStr[state],
+  //         packets.count, packets.flags, chunk.is_valid());
   //     if (!chunk.is_valid())
   //       continue;
   //
@@ -331,9 +340,9 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
   //         printf("out of bounds!\n");
   //         break;
   //       }
-  //       parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
-  //       ptr += pack_size;
-  //       printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
+  //       parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr),
+  //       pack_size); ptr += pack_size; printf("\"%s\"\n", parsed ?
+  //       proto.test().c_str() : "[Parser fail]");
   //     }
   //     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
   //   }
@@ -341,7 +350,7 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
 }
 
 std::unique_ptr<TraceWriter>
-ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(uint32_t) {
+ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(size_t) {
   // Not implemented. This would be only used in the case of using the core
   // tracing library directly in-process with no IPC layer. It is a legit
   // use case, but just not one we intend to support right now.
@@ -361,13 +370,34 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
 ////////////////////////////////////////////////////////////////////////////////
 
 ServiceImpl::LogBuffer::LogBuffer() = default;
-ServiceImpl::LogBuffer::~LogBuffer() = default;
+ServiceImpl::LogBuffer::~LogBuffer() {
+  Reset();
+}
 
-void ServiceImpl::LogBuffer::Reset(size_t size) {
+void ServiceImpl::LogBuffer::Reset() {
+  if (data_) {
+    int res = munmap(data_, size());
+    PERFETTO_DCHECK(res == 0);
+    data_ = nullptr;
+  }
+  size_in_4k_multiples_ = 0;
+  page_size_in_4k_multiples_ = 0;
+}
+
+void ServiceImpl::LogBuffer::Create(size_t size, size_t page_size) {
   // Check that the caller is not destroying an existing buffer.
-  PERFETTO_CHECK(size == 0 || size_ == 0);
-  data_.reset(size > 0 ? new char[size] : nullptr);
-  size_ = size;
+  PERFETTO_CHECK(!data_);
+  PERFETTO_CHECK(size && (page_size % 4096) == 0 && (size % page_size) == 0);
+  const size_t kMaxSize = (1ul << (sizeof(size_in_4k_multiples_) * 8)) * 4096;
+  PERFETTO_CHECK(size < kMaxSize);
+  size_in_4k_multiples_ = static_cast<uint16_t>(size / 4096);
+  page_size_in_4k_multiples_ = static_cast<uint16_t>(page_size / 4096);
+  cur_page_ = 0;
+  PERFETTO_CHECK(this->size() == size);
+  void* mm = mmap(nullptr, size, PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  PERFETTO_CHECK(mm != MAP_FAILED);
+  data_ = reinterpret_cast<uint8_t*>(mm);
 }
 
 }  // namespace perfetto
