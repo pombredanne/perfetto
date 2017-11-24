@@ -481,13 +481,13 @@ class SharedMemoryABI {
 
   std::pair<size_t, size_t> GetPageAndChunkIndex(const Chunk& chunk);
 
- private:
-  SharedMemoryABI(const SharedMemoryABI&) = delete;
-  SharedMemoryABI& operator=(const SharedMemoryABI&) = delete;
-
   static constexpr size_t GetNumChunksForLayout(uint32_t page_layout) {
     return kNumChunksForLayout[(page_layout & kLayoutMask) >> kLayoutShift];
   }
+
+ private:
+  SharedMemoryABI(const SharedMemoryABI&) = delete;
+  SharedMemoryABI& operator=(const SharedMemoryABI&) = delete;
 
   size_t GetChunkSizeForPage(uint32_t page_layout) const {
     return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];

@@ -188,9 +188,60 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
     producer_it->second->producer()->TearDownDataSourceInstance(
         data_source_inst.second);
   }
+
+  for (size_t buf_idx : tracing_session.trace_buffers) {
+    PERFETTO_CHECK(buf_idx < kMaxTraceBuffers && trace_buffers_[buf_idx]);
+    TraceBuffer& trace_buffer = trace_buffers_[buf_idx];
+    SharedMemoryABI abi(trace_buffer.get_page(0), trace_buffer.size(),
+                        trace_buffer.page_size());
+    for (size_t page_idx =
+             (trace_buffer.cur_page() + 1) % trace_buffer.num_pages();
+         page_idx != trace_buffer.cur_page();
+         page_idx = (page_idx + 1) % trace_buffer.num_pages()) {
+      bool is_free = abi.is_page_free(page_idx);
+      printf("Dumping page: %zu (Free: %d)\n", page_idx, is_free);
+      if (is_free)
+        continue;
+      uint32_t layout = abi.page_layout(page_idx);
+      size_t num_chunks = abi.GetNumChunksForLayout(layout);
+      for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+        if (abi.GetChunkState(page_idx, chunk_idx) ==
+            SharedMemoryABI::kChunkFree) {
+          continue;
+        }
+        printf("  Chunk %zu\n", chunk_idx);
+        auto chunk = abi.GetChunkUnchecked(page_idx, layout, chunk_idx);
+        uint16_t num_packets;
+        uint8_t flags;
+        std::tie(num_packets, flags) = chunk.GetPacketCountAndFlags();
+        uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
+
+        for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
+          SharedMemoryABI::PacketHeaderType pack_size;
+          memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
+          ptr += sizeof(pack_size);
+          TracePacket proto;
+          bool parsed = false;
+          // TODO stiching, looks at the flags.
+          printf("      #%-3zu len:%u ", pack_idx, pack_size);
+          if (ptr > chunk.end_addr() - pack_size) {
+            printf("out of bounds!\n");
+            break;
+          }
+          parsed =
+              proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+          ptr += pack_size;
+          printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
+        }
+      }
+    }
+  }
+
+  tracing_sessions_.erase(it);
+
   // TODO this needs to be more graceful. This will destroy the |trace_buffers|,
   // which will cause some UAF. Refcount the log buffers or similar.
-  tracing_sessions_.erase(initiator);
+  // TODO: destroy the buffer in log_buffers_.
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -368,15 +419,15 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ServiceImpl::LogBuffer implementation
+// ServiceImpl::TraceBuffer implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::LogBuffer::LogBuffer() = default;
-ServiceImpl::LogBuffer::~LogBuffer() {
+ServiceImpl::TraceBuffer::TraceBuffer() = default;
+ServiceImpl::TraceBuffer::~TraceBuffer() {
   Reset();
 }
 
-void ServiceImpl::LogBuffer::Reset() {
+void ServiceImpl::TraceBuffer::Reset() {
   if (data_) {
     int res = munmap(data_, size());
     PERFETTO_DCHECK(res == 0);
@@ -386,7 +437,7 @@ void ServiceImpl::LogBuffer::Reset() {
   page_size_in_4k_multiples_ = 0;
 }
 
-void ServiceImpl::LogBuffer::Create(size_t size, size_t page_size) {
+void ServiceImpl::TraceBuffer::Create(size_t size, size_t page_size) {
   // Check that the caller is not destroying an existing buffer.
   PERFETTO_CHECK(!data_);
   PERFETTO_CHECK(size && (page_size % 4096) == 0 && (size % page_size) == 0);

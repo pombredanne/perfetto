@@ -137,16 +137,17 @@ class ServiceImpl : public Service {
     ProducerID producer_id;
   };
 
-  class LogBuffer {
+  class TraceBuffer {
    public:
-    LogBuffer();
-    ~LogBuffer();
+    TraceBuffer();
+    ~TraceBuffer();
 
     void Create(size_t size, size_t page_size);
     void Reset();
 
     size_t size() const { return size_in_4k_multiples_ * 4096ul; }
     size_t page_size() const { return page_size_in_4k_multiples_ * 4096ul; }
+    size_t cur_page() const { return cur_page_; }
     size_t num_pages() const {
       return size_in_4k_multiples_ / page_size_in_4k_multiples_;
     }
@@ -198,7 +199,7 @@ class ServiceImpl : public Service {
   // while draining the Producer's shared memory buffers, avoiding expensive
   // lookups. The index of the buffers in this array matches the |target_buffer|
   // field in the SharedMemoryABI::ChunkHeader.
-  LogBuffer trace_buffers_[kMaxTraceBuffers] = {};
+  TraceBuffer trace_buffers_[kMaxTraceBuffers] = {};
 };
 
 }  // namespace perfetto
