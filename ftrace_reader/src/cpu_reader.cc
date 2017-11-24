@@ -219,12 +219,6 @@ bool CpuReader::ParsePage(size_t cpu,
           if (!ReadAndAdvance<uint64_t>(&ptr, end, &ip))
             return false;
           print_event->set_ip(ip);
-
-          const uint8_t* buf_start = ptr;
-          PERFETTO_DLOG("  marker=%s", buf_start);
-          while (*ptr != '\0')
-            ptr++;
-          print_event->set_buf(reinterpret_cast<const char*>(buf_start));
           print_event->Finalize();
         }
 
