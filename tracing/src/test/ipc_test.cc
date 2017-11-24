@@ -62,6 +62,8 @@ class TestProducer : public Producer {
         "The tracing service requested us to start a new data source %" PRIu64
         ", config: %s",
         dsid, cfg.trace_category_filters.c_str());
+    if (on_create_ds)
+      on_create_ds(cfg);
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID instance_id) override {
@@ -71,6 +73,7 @@ class TestProducer : public Producer {
   }
 
   std::function<void()> on_connect;
+  std::function<void(const DataSourceConfig&)> on_create_ds;
 };
 
 class TestConsumer : public Consumer {
@@ -112,22 +115,20 @@ void __attribute__((noreturn)) ProducerMain() {
   endpoint->RegisterDataSource(descriptor, on_register);
   task_runner.RunUntilCheckpoint("register");
 
-  task_runner.RunUntilIdle();
-
-  printf("Press a key to start streaming data...\n");
-  getchar();
-
-  auto trace_writer1 = endpoint->CreateTraceWriter();
-  auto trace_writer2 = endpoint->CreateTraceWriter();
-  for (int j = 0; j < 240; j++) {
-    auto event = trace_writer1->NewTracePacket();
-    char content[64];
-    sprintf(content, "Stream 1 - %3d .................", j);
-    event->set_test(content);
-    event = trace_writer2->NewTracePacket();
-    sprintf(content, "Stream 2 - %3d ++++++++++++++++++++++++++++++++++++", j);
-    event->set_test(content);
-  }
+  producer.on_create_ds = [&endpoint](const DataSourceConfig& cfg) {
+    auto trace_writer1 = endpoint->CreateTraceWriter();
+    auto trace_writer2 = endpoint->CreateTraceWriter();
+    for (int j = 0; j < 240; j++) {
+      auto event = trace_writer1->NewTracePacket();
+      char content[64];
+      sprintf(content, "Stream 1 - %3d .................", j);
+      event->set_test(content);
+      event = trace_writer2->NewTracePacket();
+      sprintf(content, "Stream 2 - %3d ++++++++++++++++++++++++++++++++++++",
+              j);
+      event->set_test(content);
+    }
+  };
   task_runner.Run();
 }
 

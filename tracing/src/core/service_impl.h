@@ -43,6 +43,31 @@ struct TraceConfig;
 // The tracing service business logic.
 class ServiceImpl : public Service {
  public:
+  explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
+                       base::TaskRunner*);
+  ~ServiceImpl() override;
+
+  // Service implementation.
+  std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
+      Producer*,
+      size_t shared_buffer_page_size_bytes,
+      size_t shared_buffer_size_hint_bytes = 0) override;
+
+  std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
+      Consumer*) override;
+
+  void set_observer_for_testing(ObserverForTesting*) override;
+
+  // Exposed for testing.
+  size_t num_producers() const { return producers_.size(); }
+  Service::ProducerEndpoint* GetProducer(ProducerID) const;
+
+ private:
+  struct RegisteredDataSource {
+    DataSourceDescriptor descriptor;
+    ProducerID producer_id;
+  };
+
   // The implementation behind the service endpoint exposed to each producer.
   class ProducerEndpointImpl : public Service::ProducerEndpoint {
    public:
@@ -79,6 +104,9 @@ class ServiceImpl : public Service {
     Producer* producer_;
     std::unique_ptr<SharedMemory> shared_memory_;
     SharedMemoryABI shmem_abi_;
+    std::map<DataSourceInstanceID,
+             std::multimap<std::string, RegisteredDataSource>::iterator>
+        data_source_instances_;
     DataSourceID last_data_source_id_ = 0;
   };
 
@@ -103,41 +131,6 @@ class ServiceImpl : public Service {
     base::TaskRunner* const task_runner_;
     Consumer* consumer_;
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
-  };
-
-  explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
-                       base::TaskRunner*);
-  ~ServiceImpl() override;
-
-  // Called by the ProducerEndpointImpl dtor.
-  void DisconnectProducer(ProducerID);
-
-  // Called by the ConsumerEndpointImpl dtor.
-  void DisconnectConsumer(ConsumerEndpointImpl*);
-
-  // Called by the ConsumerEndpointImpl.
-  void StartTracing(ConsumerEndpointImpl*, const TraceConfig& cfg);
-  void StopTracing(ConsumerEndpointImpl*);
-
-  // Service implementation.
-  std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
-      Producer*,
-      size_t shared_buffer_page_size_bytes,
-      size_t shared_buffer_size_hint_bytes = 0) override;
-
-  std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
-      Consumer*) override;
-
-  void set_observer_for_testing(ObserverForTesting*) override;
-
-  // Exposed mainly for testing.
-  size_t num_producers() const { return producers_.size(); }
-  ProducerEndpointImpl* GetProducer(ProducerID) const;
-
- private:
-  struct RegisteredDataSource {
-    DataSourceDescriptor descriptor;
-    ProducerID producer_id;
   };
 
   class TraceBuffer {
@@ -186,6 +179,16 @@ class ServiceImpl : public Service {
 
   ServiceImpl(const ServiceImpl&) = delete;
   ServiceImpl& operator=(const ServiceImpl&) = delete;
+
+  // Called by the ProducerEndpointImpl dtor.
+  void DisconnectProducer(ProducerID);
+
+  // Called by the ConsumerEndpointImpl dtor.
+  void DisconnectConsumer(ConsumerEndpointImpl*);
+
+  // Called by the ConsumerEndpointImpl.
+  void StartTracing(ConsumerEndpointImpl*, const TraceConfig& cfg);
+  void StopTracing(ConsumerEndpointImpl*);
 
   std::unique_ptr<SharedMemory::Factory> shm_factory_;
   base::TaskRunner* const task_runner_;

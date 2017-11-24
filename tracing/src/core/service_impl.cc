@@ -111,8 +111,7 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   // TODO: notfy observer.
 }
 
-ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
-    ProducerID id) const {
+Service::ProducerEndpoint* ServiceImpl::GetProducer(ProducerID id) const {
   auto it = producers_.find(id);
   if (it == producers_.end())
     return nullptr;
@@ -165,7 +164,7 @@ void ServiceImpl::StartTracing(ConsumerEndpointImpl* initiator,
 
       const ProducerID producer_id = reg_data_source.producer_id;
       auto producer_iter = producers_.find(producer_id);
-      PERFETTO_CHECK(producer_iter == producers_.end());
+      PERFETTO_CHECK(producer_iter != producers_.end());
       ProducerEndpointImpl* producer = producer_iter->second;
       DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
       tracing_session.data_source_instances.emplace(producer_id, inst_id);
@@ -309,22 +308,34 @@ ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
 }
 
 void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
-    const DataSourceDescriptor&,
+    const DataSourceDescriptor& desc,
     RegisterDataSourceCallback callback) {
   const DataSourceID dsid = ++last_data_source_id_;
-  task_runner_->PostTask(std::bind(std::move(callback), dsid));
-  // TODO implement the bookkeeping logic.
+  auto it = service_->data_sources_.emplace(desc.name, RegisteredDataSource());
+  it->second.descriptor = desc;
+  it->second.producer_id = id_;
+  data_source_instances_[dsid] = it;
 
   // TODO: at this point if any tracing session is started we should check
-  // whether the data source should part of any of the started sessions.
+  // whether the data source should part of any of the ongoing sessions.
+
+  task_runner_->PostTask(std::bind(std::move(callback), dsid));
+
   if (service_->observer_)
     service_->observer_->OnDataSourceRegistered(id_, dsid);
 }
 
 void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
     DataSourceID dsid) {
-  PERFETTO_CHECK(dsid);
-  // TODO implement the bookkeeping logic.
+  auto it = data_source_instances_.find(dsid);
+  if (!dsid || it == data_source_instances_.end()) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+  // TODO: destruction order. What if service_ gets destroyed?
+  // TODO: erase them all in case of premature destruction.
+  service_->data_sources_.erase(it->second);
+  data_source_instances_.erase(dsid);
   if (service_->observer_)
     service_->observer_->OnDataSourceUnregistered(id_, dsid);
 }
@@ -374,65 +385,6 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
 
     shmem_abi_.ReleaseAllChunksAsFree(page_idx);
   }
-
-  // // TODO the code below is temporary for testing only. It just spits out
-  // // on stdout the content of the shared memory buffer.
-  // // Scan all pages and see if there are any complete chunks we can read.
-  // for (size_t page_idx = 0; page_idx < shmem_abi_.num_pages(); page_idx++) {
-  //   if (shmem_abi_.is_page_free(page_idx))
-  //     continue;
-  //
-  //   // Read the page layout.
-  //   bool complete = shmem_abi_.is_page_complete(page_idx);
-  //   auto layout = shmem_abi_.page_layout(page_idx);
-  //   size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
-  //   printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu
-  //   chunks)\n",
-  //          page_idx, complete, layout, num_chunks);
-  //
-  //   // Iterate over the chunks in the page.
-  //   for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-  //     auto state = shmem_abi_.GetChunkState(page_idx, chunk_idx);
-  //     auto chunk = shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx);
-  //     // |chunk| may not be valid if it was in a bad state.
-  //
-  //     auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
-  //     auto id = hdr->identifier.load(std::memory_order_relaxed);
-  //     auto packets = hdr->packets.load(std::memory_order_relaxed);
-  //     printf(
-  //         "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets:
-  //         %u, " "flags: %x, acquired_for_reading: %d\n", chunk_idx,
-  //         id.writer_id, id.chunk_id, SharedMemoryABI::kChunkStateStr[state],
-  //         packets.count, packets.flags, chunk.is_valid());
-  //     if (!chunk.is_valid())
-  //       continue;
-  //
-  //     PERFETTO_DCHECK(chunk.is_valid());
-  //     size_t num_packets = chunk.GetPacketCount();
-  //     uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
-  //
-  //     // Iterate over all packets.
-  //     printf("    Dumping packets in chunk:\n");
-  //
-  //     for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
-  //       SharedMemoryABI::PacketHeaderType pack_size;
-  //       memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
-  //       ptr += sizeof(pack_size);
-  //       TracePacket proto;
-  //       bool parsed = false;
-  //       // TODO stiching, looks at the flags.
-  //       printf("      #%-3zu len:%u ", pack_idx, pack_size);
-  //       if (ptr > chunk.end_addr() - pack_size) {
-  //         printf("out of bounds!\n");
-  //         break;
-  //       }
-  //       parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr),
-  //       pack_size); ptr += pack_size; printf("\"%s\"\n", parsed ?
-  //       proto.test().c_str() : "[Parser fail]");
-  //     }
-  //     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
-  //   }
-  // }
 }
 
 std::unique_ptr<TraceWriter>
