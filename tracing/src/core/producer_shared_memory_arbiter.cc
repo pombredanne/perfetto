@@ -24,7 +24,7 @@
 namespace perfetto {
 
 namespace {
-static constexpr WriterID kMaxWriterID = std::numeric_limits<WriterID>::max();
+static constexpr size_t kMaxWriterID = SharedMemoryABI::kMaxWriterID;
 
 WriterID NextID(WriterID id) {
   return id < kMaxWriterID ? id + 1 : 1;
@@ -89,9 +89,10 @@ void ProducerSharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   shmem_.ReleaseChunkAsComplete(std::move(chunk));
 }
 
-std::unique_ptr<TraceWriter> ProducerSharedMemoryArbiter::CreateTraceWriter() {
+std::unique_ptr<TraceWriter> ProducerSharedMemoryArbiter::CreateTraceWriter(
+    uint32_t target_buffer) {
   return std::unique_ptr<TraceWriter>(
-      new TraceWriterImpl(this, AcquireWriterID()));
+      new TraceWriterImpl(this, AcquireWriterID(), target_buffer));
 }
 
 WriterID ProducerSharedMemoryArbiter::AcquireWriterID() {

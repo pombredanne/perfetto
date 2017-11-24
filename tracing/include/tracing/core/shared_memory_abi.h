@@ -268,17 +268,17 @@ class SharedMemoryABI {
   // There is one Chunk header per chunk (hence PageLayout per page) at the
   // beginning of each chunk.
   struct ChunkHeader {
+    enum Flags : uint8_t {
+      // If set, the first TracePacket in the chunk is partial and continues
+      // from |chunk_id| - 1 (within the same |writer_id|).
+      kFirstPacketContinuesFromPrevChunk = 1 << 0,
+
+      // If set, the last TracePacket in the chunk is partial and continues on
+      // |chunk_id| + 1 (within the same |writer_id|).
+      kLastPacketContinuesOnNextChunk = 1 << 1,
+    };
+
     struct PacketsState {
-      enum Flags : uint8_t {
-        // If set, the first TracePacket in the chunk is partial and continues
-        // from |chunk_id| - 1 (within the same |writer_id|).
-        kFirstPacketContinuesFromPrevChunk = 1 << 0,
-
-        // If set, the last TracePacket in the chunk is partial and continues on
-        // |chunk_id| + 1 (within the same |writer_id|).
-        kLastPacketContinuesOnNextChunk = 1 << 1,
-      };
-
       uint8_t flags;
       uint8_t reserved;
 
@@ -293,7 +293,13 @@ class SharedMemoryABI {
     struct Identifier {
       // A sequence identifies a linear stream of TracePacket produced by the
       // same data source.
-      uint16_t writer_id;
+      unsigned writer_id : 10;  // kMaxWriterID relies on the size of this.
+
+      // Hints the Service on which logging buffer partition the chunk should
+      // be moved into. This is  reflecting the DataSourceConfig.target_buffer
+      // received at registration time.
+      // kMaxLogBufferID in basic_types.h relies on the size of this.
+      unsigned target_buffer : 6;
 
       // chunk_id is a monotonic counter of the chunk within its own
       // sequence. The tuple (writer_id, chunk_id) allows to figure
@@ -307,6 +313,7 @@ class SharedMemoryABI {
     std::atomic<Identifier> identifier;
     std::atomic<PacketsState> packets;
   };
+  static constexpr size_t kMaxWriterID = (1 << 10) - 1;
 
   class Chunk {
    public:
@@ -341,7 +348,7 @@ class SharedMemoryABI {
 
     // Returns the count of packets (|packets.count|) with acquire-load
     // semantics.
-    uint16_t GetPacketCount();
+    std::pair<uint16_t, uint8_t> GetPacketCountAndFlags();
 
     // Increases |packets.count| with release-store semantics. The increment is
     // atomic but NOT race-free (i.e. no CAS). Only the Producer is supposed to
@@ -427,6 +434,12 @@ class SharedMemoryABI {
   // or kChunkComplete. If this fails, the service has to fall back acquiring
   // the chunks individually.
   bool TryAcquireAllChunksForReading(size_t page_idx);
+  void ReleaseAllChunksAsFree(size_t page_idx);
+
+  // The caller must have successfully TryAcquireAllChunksForReading().
+  Chunk GetChunkUnchecked(size_t page_idx,
+                          uint32_t page_layout,
+                          size_t chunk_idx);
 
   // Puts a chunk into the kWriteComplete state.
   void ReleaseChunkAsComplete(Chunk chunk) {
@@ -437,8 +450,6 @@ class SharedMemoryABI {
   void ReleaseChunkAsFree(Chunk chunk) {
     ReleaseChunk(std::move(chunk), kChunkFree);
   }
-
-  // TODO ReleaseAllChunksAsFree() using madvise.
 
   ChunkState GetChunkState(size_t page_idx, size_t chunk_idx);
 

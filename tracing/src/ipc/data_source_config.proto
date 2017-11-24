@@ -20,5 +20,18 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.proto;
 
 message DataSourceConfig {
-  string trace_category_filters = 1;  // TODO: temporary for tests.
+  // Data source unique name, e.g., "org.chromium.trace_events". This must match
+  // the name passed by the data source when it registers (see
+  // RegisterDataSource()).
+  string name = 1;
+
+  // The index of the logging buffer where TracePacket(s) will be stored.
+  // This field doesn't make a major difference for the Producer(s). The final
+  // logging buffers, in fact, are completely owned by the Service. We just ask
+  // the Producer to copy this number into the chunk headers it emits, so that
+  // the Service can quickly identify the buffer where to move the chunks into
+  // without expensive lookups on its fastpath.
+  uint32 target_buffer = 2;
+
+  string trace_category_filters = 3;  // TODO: temporary for tests.
 }

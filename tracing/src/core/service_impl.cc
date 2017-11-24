@@ -175,7 +175,8 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
         continue;
 
       PERFETTO_DCHECK(chunk.is_valid());
-      size_t num_packets = chunk.GetPacketCount();
+      uint16_t num_packets;
+      std::tie(num_packets, std::ignore) = chunk.GetPacketCountAndFlags();
       uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
 
       // Iterate over all packets.

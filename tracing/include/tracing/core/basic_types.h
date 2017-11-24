@@ -26,6 +26,9 @@ using DataSourceID = uint64_t;
 using DataSourceInstanceID = uint64_t;
 using WriterID = uint16_t;
 
+// Keep this in sync with SharedMemoryABI::ChunkHeader::target_buffer.
+static constexpr unsigned kMaxTraceBuffers = 1 << 6;
+
 }  // namespace perfetto
 
 #endif  // TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
