@@ -21,7 +21,7 @@
 
 #include <memory>
 
-#include "protos/trace_packet.pb.h"
+class TracePacket;
 
 namespace perfetto {
 
@@ -33,6 +33,7 @@ class TracePacket {
  public:
   using DecodedTracePacket = ::TracePacket;
   TracePacket(const void* start, size_t size);
+  ~TracePacket();
   TracePacket(TracePacket&&) noexcept;
   TracePacket& operator=(TracePacket&&);
 

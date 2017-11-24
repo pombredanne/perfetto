@@ -23,6 +23,8 @@ namespace perfetto {
 TracePacket::TracePacket(const void* start, size_t size)
     : start_(start), size_(size) {}
 
+TracePacket::~TracePacket() = default;
+
 TracePacket::TracePacket(TracePacket&&) noexcept = default;
 TracePacket& TracePacket::operator=(TracePacket&&) = default;
 

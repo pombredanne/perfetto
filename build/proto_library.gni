@@ -22,6 +22,9 @@ template("proto_library") {
     proto_in_dir = invoker.proto_in_dir
   }
   proto_out_dir = "//"
+  if (defined(invoker.proto_out_dir)) {
+    proto_out_dir = invoker.proto_out_dir
+  }
 
   # If false will not generate the default .pb.{cc,h} files. Used for custom
   # codegen plugins.

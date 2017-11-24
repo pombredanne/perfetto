@@ -160,14 +160,22 @@ config("debug_symbols") {
 
 config("release") {
   cflags = [
-    "-O3",
     "-fdata-sections",
     "-ffunction-sections",
   ]
+  if (is_android) {
+    cflags += [ "-Oz" ]
+  } else {
+    cflags += [ "-O3" ]
+  }
   if (is_mac) {
     ldflags = [ "-dead_strip" ]
   } else {
-    ldflags = [ "-Wl,--gc-sections" ]
+    ldflags = [
+      "-Wl,--gc-sections",
+      "-Wl,--icf=all",
+      "-Wl,-O1",
+    ]
   }
   defines = [ "NDEBUG" ]
 }

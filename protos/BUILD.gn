@@ -28,9 +28,10 @@ protozero_library("zero") {
 # TODO: we don't really want the _full version but just the _lite. However
 # this requires to have 3 targets (zero, full and lite) for ftrace. Need to
 # solve that problem first.
-proto_library("full") {
+proto_library("lite") {
   deps = [
-    "ftrace:ftrace_full_protos",
+    "ftrace:ftrace_lite_protos",
   ]
+  proto_out_dir = "lite_protos"
   sources = proto_sources
 }
