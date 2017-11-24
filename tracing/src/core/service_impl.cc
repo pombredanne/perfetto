@@ -20,6 +20,7 @@
 #include <sys/mman.h>
 
 #include <algorithm>
+#include <bitset>
 
 #include "base/logging.h"
 #include "base/task_runner.h"
@@ -205,6 +206,9 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
         continue;
       uint32_t layout = abi.page_layout(page_idx);
       size_t num_chunks = abi.GetNumChunksForLayout(layout);
+      printf("Num chunks: %zu, header: %s\n", num_chunks,
+             abi.page_header_dbg(page_idx).c_str());
+
       for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
         if (abi.GetChunkState(page_idx, chunk_idx) ==
             SharedMemoryABI::kChunkFree) {
@@ -217,14 +221,15 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
         std::tie(num_packets, flags) = chunk.GetPacketCountAndFlags();
         uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
 
-        std::shared_ptr<std::vector<TracePacket>> packets;
+        std::shared_ptr<std::vector<TracePacket>> packets(
+            new std::vector<TracePacket>());
         packets->reserve(num_packets);
         for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
           SharedMemoryABI::PacketHeaderType pack_size;
           memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
           ptr += sizeof(pack_size);
           // TODO stiching, looks at the flags.
-          printf("      #%-3zu len:%u ", pack_idx, pack_size);
+          printf("      #%-3zu len:%u \n", pack_idx, pack_size);
           if (ptr > chunk.end_addr() - pack_size) {
             printf("out of bounds!\n");
             break;
@@ -309,6 +314,9 @@ void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
   const DataSourceID dsid = ++last_data_source_id_;
   task_runner_->PostTask(std::bind(std::move(callback), dsid));
   // TODO implement the bookkeeping logic.
+
+  // TODO: at this point if any tracing session is started we should check
+  // whether the data source should part of any of the started sessions.
   if (service_->observer_)
     service_->observer_->OnDataSourceRegistered(id_, dsid);
 }
@@ -324,9 +332,12 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
   for (uint32_t page_idx : changed_pages) {
+    printf(
+        "  Page header: %s\n",
+        std::bitset<32>(shmem_abi_.page_layout(page_idx)).to_string().c_str());
+
     if (page_idx >= shmem_abi_.num_pages())
       continue;  // The Producer is playing dirty.
-    PERFETTO_DLOG("NOTIFY %d ", shmem_abi_.is_page_complete(page_idx));
 
     if (!shmem_abi_.is_page_complete(page_idx))
       continue;
@@ -336,9 +347,12 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     // complete pages after a while.
 
     size_t target_buffer = shmem_abi_.GetTargetBuffer(page_idx);
-    printf("  Moving page: %u, into buffer: %zu\n", page_idx, target_buffer);
 
-    if (target_buffer >= kMaxTraceBuffers &&
+    printf("NotifySharedMemoryUpdate(). page: %u, buffer: %zu (%s)\n", page_idx,
+           target_buffer,
+           service_->trace_buffers_[target_buffer] ? "OK" : "N/A");
+
+    if (target_buffer < kMaxTraceBuffers &&
         service_->trace_buffers_[target_buffer]) {
       // TODO: we should have some stronger check to prevent that the Producer
       // passes |target_buffer| which is valid, but that we never asked it to
@@ -347,6 +361,14 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
       // TODO right now the page_size in the SMB and the trace_buffers_ can
       // mismatch Remove the ability to decide the page size on the Producer.
       uint8_t* dst = service_->trace_buffers_[target_buffer].get_next_page();
+      printf("  Moving page: %u, into buffer: %zu, %zx.\n", page_idx,
+             target_buffer,
+             dst - service_->trace_buffers_[target_buffer].get_page(0));
+      printf("  Page header: %s\n",
+             std::bitset<32>(shmem_abi_.page_layout(page_idx))
+                 .to_string()
+                 .c_str());
+
       memcpy(dst, shmem_abi_.page_start(page_idx), shmem_abi_.page_size());
     }
 

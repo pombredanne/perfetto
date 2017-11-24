@@ -86,13 +86,12 @@ class TestConsumer : public Consumer {
   }
 
   void OnTraceData(const std::vector<TracePacket>& trace_packets) override {
-    PERFETTO_DLOG("OnTraceData");
-    for (const TracePacket& packet : trace_packets) {
-      PERFETTO_DLOG("  packet %p %zu", packet.start(), packet.size());
-    }
+    if (on_trace_data)
+      on_trace_data(trace_packets);
   }
 
   std::function<void()> on_connect;
+  std::function<void(const std::vector<TracePacket>&)> on_trace_data;
 };
 
 void __attribute__((noreturn)) ProducerMain() {
@@ -103,21 +102,24 @@ void __attribute__((noreturn)) ProducerMain() {
   producer.on_connect = task_runner.CreateCheckpoint("connect");
   task_runner.RunUntilCheckpoint("connect");
 
-  for (int i = 0; i < 3; i++) {
-    DataSourceDescriptor descriptor;
-    descriptor.name = "perfetto.test.data_source";
-    auto reg_checkpoint =
-        task_runner.CreateCheckpoint("register" + std::to_string(i));
-    auto on_register = [reg_checkpoint](DataSourceID id) {
-      printf("Service acked RegisterDataSource() with ID %" PRIu64 "\n", id);
-      reg_checkpoint();
-    };
-    endpoint->RegisterDataSource(descriptor, on_register);
-    task_runner.RunUntilCheckpoint("register" + std::to_string(i));
-  }
+  DataSourceDescriptor descriptor;
+  descriptor.name = "perfetto.test.data_source";
+  auto reg_checkpoint = task_runner.CreateCheckpoint("register");
+  auto on_register = [reg_checkpoint](DataSourceID id) {
+    printf("Service acked RegisterDataSource() with ID %" PRIu64 "\n", id);
+    reg_checkpoint();
+  };
+  endpoint->RegisterDataSource(descriptor, on_register);
+  task_runner.RunUntilCheckpoint("register");
+
+  task_runner.RunUntilIdle();
+
+  printf("Press a key to start streaming data...\n");
+  getchar();
+
   auto trace_writer1 = endpoint->CreateTraceWriter();
   auto trace_writer2 = endpoint->CreateTraceWriter();
-  for (int j = 0; j < 120; j++) {
+  for (int j = 0; j < 240; j++) {
     auto event = trace_writer1->NewTracePacket();
     char content[64];
     sprintf(content, "Stream 1 - %3d .................", j);
@@ -148,11 +150,19 @@ void __attribute__((noreturn)) ConsumerMain() {
   endpoint->StartTracing(trace_config);
   task_runner.RunUntilIdle();
 
-  sleep(2);
+  printf("Press a key to stop tracing...\n");
+  getchar();
 
-  PERFETTO_DLOG("Requestin trace stop");
+  consumer.on_trace_data = [](const std::vector<TracePacket>& trace_packets) {
+    printf("OnTraceData()\n");
+    for (const TracePacket& const_packet : trace_packets) {
+      TracePacket& packet = const_cast<TracePacket&>(const_packet);
+      bool decoded = packet.Decode();
+      printf(" %d %s\n", decoded,
+             decoded ? packet->test().c_str() : "[Decode fail]");
+    }
+  };
   endpoint->StopTracing();
-
   task_runner.Run();
 }
 
@@ -178,9 +188,9 @@ void __attribute__((noreturn)) ServiceMain() {
       printf("Data source registered, Producer=%" PRIu64 " DataSource=%" PRIu64
              "\n",
              prid, dsid);
-      DataSourceConfig cfg;
-      cfg.trace_category_filters = "foo,bar";
-      svc_->GetProducer(prid)->producer()->CreateDataSourceInstance(42, cfg);
+      // DataSourceConfig cfg;
+      // cfg.trace_category_filters = "foo,bar";
+      // svc_->GetProducer(prid)->producer()->CreateDataSourceInstance(42, cfg);
     }
 
     void OnDataSourceUnregistered(ProducerID prid, DataSourceID dsid) override {

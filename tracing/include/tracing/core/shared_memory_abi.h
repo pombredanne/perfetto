@@ -22,6 +22,7 @@
 
 #include <array>
 #include <atomic>
+#include <bitset>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -256,7 +257,7 @@ class SharedMemoryABI {
   // There is one page header per page, at the beginning of the page.
   struct PageHeader {
     // |layout| bits:
-    // [31] [30:29] [28:27] ... [1:0]
+    // [31] [30:28] [27:26] ... [1:0]
     //  |      |       |     |    |
     //  |      |       |     |    +---------- ChunkState[0]
     //  |      |       |     +--------------- ChunkState[12..1]
@@ -409,9 +410,14 @@ class SharedMemoryABI {
   }
 
   // For testing / debugging only.
-  PageLayout page_layout(size_t page_idx) {
+  std::string page_header_dbg(size_t page_idx) {
     uint32_t x = page_header(page_idx)->layout.load(std::memory_order_relaxed);
-    return static_cast<PageLayout>((x & kLayoutMask) >> kLayoutShift);
+    return std::bitset<32>(x).to_string();
+  }
+
+  // For testing / debugging only.
+  uint32_t page_layout(size_t page_idx) {
+    return page_header(page_idx)->layout.load(std::memory_order_relaxed);
   }
 
   // Returns the |target_buffer| tag in the page header.
