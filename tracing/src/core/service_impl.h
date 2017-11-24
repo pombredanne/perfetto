@@ -128,7 +128,6 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl& operator=(const ConsumerEndpointImpl&) = delete;
 
     ServiceImpl* const service_;
-    base::TaskRunner* const task_runner_;
     Consumer* consumer_;
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
   };

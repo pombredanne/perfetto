@@ -37,7 +37,9 @@
 #include "tracing/src/ipc/producer/producer_ipc_client_impl.h"
 #include "tracing/src/ipc/service/service_ipc_host_impl.h"
 
-#include "protos/trace_packet.pb.h"
+// TODO split these, now I need both.
+#include "protos/trace_packet.pbzero.h"
+// #include "protos/trace_packet.pb.h"
 
 namespace perfetto {
 

@@ -255,14 +255,10 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
 // ServiceImpl::ConsumerEndpointImpl implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
-    ServiceImpl* service,
-    base::TaskRunner* task_runner,
-    Consumer* consumer)
-    : service_(service),
-      task_runner_(task_runner),
-      consumer_(consumer),
-      weak_ptr_factory_(this) {}
+ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(ServiceImpl* service,
+                                                        base::TaskRunner*,
+                                                        Consumer* consumer)
+    : service_(service), consumer_(consumer), weak_ptr_factory_(this) {}
 
 ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   consumer_->OnDisconnect();

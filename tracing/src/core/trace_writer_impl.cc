@@ -21,10 +21,11 @@
 #include <type_traits>
 #include <utility>
 
+#include "base/logging.h"
 #include "tracing/core/shared_memory_abi.h"
 #include "tracing/src/core/producer_shared_memory_arbiter.h"
 
-#include "base/logging.h"
+#include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 

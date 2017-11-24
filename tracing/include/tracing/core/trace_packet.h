@@ -24,6 +24,9 @@
 class TracePacket;
 
 namespace perfetto {
+namespace protos {
+class TracePacket;
+}  // namespace protos
 
 // A wrapper around a byte buffer that contains a protobuf-encoded TracePacket
 // (see trace_packet.proto). The TracePacket is decoded only if the Consumer
@@ -31,7 +34,7 @@ namespace perfetto {
 // the network or save it to a file without wasting time decoding it.
 class TracePacket {
  public:
-  using DecodedTracePacket = ::TracePacket;
+  using DecodedTracePacket = protos::TracePacket;
   TracePacket(const void* start, size_t size);
   ~TracePacket();
   TracePacket(TracePacket&&) noexcept;

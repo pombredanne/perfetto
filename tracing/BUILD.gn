@@ -23,12 +23,8 @@ source_set("tracing") {
   all_dependent_configs = [ ":tracing_config" ]
   deps += [
     "//base",
-    "//buildtools:protobuf_lite",
     "//protos:lite",
     "//protos:zero",
-  ]
-  public_deps = [
-    "//protozero",
   ]
   sources = [
     "include/tracing/core/basic_types.h",
@@ -117,7 +113,7 @@ executable("tracing_test") {
     "//base",
     "//base:test_support",
     "//ipc",
-    "//protos:lite",
+    "//protos:zero",
   ]
   sources = [
     "src/test/ipc_test.cc",

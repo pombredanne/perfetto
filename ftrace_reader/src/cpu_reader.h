@@ -65,7 +65,7 @@ class CpuReader {
 
   bool Drain(const std::array<const EventFilter*, kMaxSinks>&,
              const std::array<
-                 protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>,
+                 protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>,
                  kMaxSinks>&);
   int GetFileDescriptor();
 
@@ -90,7 +90,7 @@ class CpuReader {
                         const uint8_t* ptr,
                         size_t ptr_size,
                         const EventFilter*,
-                        pbzero::FtraceEventBundle*);
+                        protos::FtraceEventBundle*);
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
