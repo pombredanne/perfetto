@@ -21,6 +21,7 @@
 #include "ipc/host.h"
 #include "tracing/core/service.h"
 #include "tracing/src/ipc/posix_shared_memory.h"
+#include "tracing/src/ipc/service/consumer_ipc_service.h"
 #include "tracing/src/ipc/service/producer_ipc_service.h"
 
 namespace perfetto {
@@ -39,7 +40,8 @@ ServiceIPCHostImpl::ServiceIPCHostImpl(base::TaskRunner* task_runner)
 
 ServiceIPCHostImpl::~ServiceIPCHostImpl() {}
 
-bool ServiceIPCHostImpl::Start(const char* producer_socket_name) {
+bool ServiceIPCHostImpl::Start(const char* producer_socket_name,
+                               const char* consumer_socket_name) {
   PERFETTO_CHECK(!svc_);  // Check if already started.
 
   // Create and initialize the platform-independent tracing business logic.
@@ -53,11 +55,22 @@ bool ServiceIPCHostImpl::Start(const char* producer_socket_name) {
   if (!producer_ipc_port_)
     return false;
 
+  consumer_ipc_port_ =
+      ipc::Host::CreateInstance(consumer_socket_name, task_runner_);
+  if (!consumer_ipc_port_) {
+    producer_ipc_port_.reset();
+    return false;
+  }
+
   // TODO: add a test that destroyes the ServiceIPCHostImpl soon after Start()
   // and checks that no spurious callbacks are issued.
   bool producer_service_exposed = producer_ipc_port_->ExposeService(
       std::unique_ptr<ipc::Service>(new ProducerIPCService(svc_.get())));
   PERFETTO_CHECK(producer_service_exposed);
+
+  bool consumer_service_exposed = consumer_ipc_port_->ExposeService(
+      std::unique_ptr<ipc::Service>(new ConsumerIPCService(svc_.get())));
+  PERFETTO_CHECK(consumer_service_exposed);
   return true;
 }
 

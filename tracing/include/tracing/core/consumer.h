@@ -19,10 +19,13 @@
 
 #include "tracing/core/basic_types.h"
 
+#include <vector>
+
 namespace perfetto {
 
 class DataSourceConfig;
 class SharedMemory;
+class TracePacket;
 
 class Consumer {
  public:
@@ -38,6 +41,8 @@ class Consumer {
   // obtained through Service::ConnectConsumer()) or involuntarily (e.g., if the
   // Service process crashes).
   virtual void OnDisconnect() = 0;
+
+  virtual void OnTraceData(const std::vector<TracePacket>&) = 0;
 };
 
 }  // namespace perfetto

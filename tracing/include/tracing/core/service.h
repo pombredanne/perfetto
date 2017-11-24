@@ -37,6 +37,7 @@ class TaskRunner;
 class Consumer;
 class DataSourceDescriptor;
 class Producer;
+struct TraceConfig;
 class TraceWriter;
 
 // TODO: for the moment this assumes that all the calls hapen on the same
@@ -99,19 +100,6 @@ class Service {
   //    the service don't talk locally but via some IPC mechanism.
   class ConsumerEndpoint {
    public:
-    struct TraceConfig {
-      struct BufferConfig {
-        uint32_t size_kb = 0;
-      };
-      struct DataSource {
-        std::list<std::string> producer_name_filter;
-        DataSourceConfig config;
-        uint32_t destination_buffer = 0;
-      };
-
-      std::list<BufferConfig> buffers;
-      std::list<DataSource> data_sources;
-    };
     virtual ~ConsumerEndpoint() = default;
 
     virtual void StartTracing(const TraceConfig&) = 0;

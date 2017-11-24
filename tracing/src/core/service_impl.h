@@ -23,6 +23,7 @@
 #include <memory>
 #include <set>
 
+#include "base/weak_ptr.h"
 #include "tracing/core/basic_types.h"
 #include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/service.h"
@@ -37,6 +38,7 @@ class TaskRunner;
 class DataSourceConfig;
 class Producer;
 class SharedMemory;
+struct TraceConfig;
 
 // The tracing service business logic.
 class ServiceImpl : public Service {
@@ -87,6 +89,7 @@ class ServiceImpl : public Service {
     ~ConsumerEndpointImpl() override;
 
     Consumer* consumer() const { return consumer_; }
+    base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // Service::ConsumerEndpoint implementation.
     void StartTracing(const TraceConfig&) override;
@@ -99,6 +102,7 @@ class ServiceImpl : public Service {
     ServiceImpl* const service_;
     base::TaskRunner* const task_runner_;
     Consumer* consumer_;
+    base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
   };
 
   explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
@@ -112,8 +116,7 @@ class ServiceImpl : public Service {
   void DisconnectConsumer(ConsumerEndpointImpl*);
 
   // Called by the ConsumerEndpointImpl.
-  void StartTracing(ConsumerEndpointImpl*,
-                    const ConsumerEndpoint::TraceConfig& cfg);
+  void StartTracing(ConsumerEndpointImpl*, const TraceConfig& cfg);
   void StopTracing(ConsumerEndpointImpl*);
 
   // Service implementation.

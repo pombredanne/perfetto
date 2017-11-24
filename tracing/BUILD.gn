@@ -38,12 +38,15 @@ source_set("tracing") {
     "include/tracing/core/service.h",
     "include/tracing/core/shared_memory.h",
     "include/tracing/core/shared_memory_abi.h",
+    "include/tracing/core/trace_config.h",
+    "include/tracing/core/trace_packet.h",
     "include/tracing/core/trace_writer.h",
     "src/core/producer_shared_memory_arbiter.cc",
     "src/core/producer_shared_memory_arbiter.h",
     "src/core/service_impl.cc",
     "src/core/service_impl.h",
     "src/core/shared_memory_abi.cc",
+    "src/core/trace_packet.cc",
     "src/core/trace_writer_impl.cc",
     "src/core/trace_writer_impl.h",
   ]
@@ -63,12 +66,17 @@ ipc_library("ipc_protos") {
 # an IPC transport over a UNIX domain socket.
 source_set("ipc") {
   sources = [
+    "include/tracing/ipc/consumer_ipc_client.h",
     "include/tracing/ipc/producer_ipc_client.h",
     "include/tracing/ipc/service_ipc_host.h",
+    "src/ipc/consumer/consumer_ipc_client_impl.cc",
+    "src/ipc/consumer/consumer_ipc_client_impl.h",
     "src/ipc/posix_shared_memory.cc",
     "src/ipc/posix_shared_memory.h",
     "src/ipc/producer/producer_ipc_client_impl.cc",
     "src/ipc/producer/producer_ipc_client_impl.h",
+    "src/ipc/service/consumer_ipc_service.cc",
+    "src/ipc/service/consumer_ipc_service.h",
     "src/ipc/service/producer_ipc_service.cc",
     "src/ipc/service/producer_ipc_service.h",
     "src/ipc/service/service_ipc_host_impl.cc",

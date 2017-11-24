@@ -17,6 +17,8 @@
 #ifndef TRACING_INCLUDE_TRACING_CORE_DATA_SOURCE_CONFIG_H_
 #define TRACING_INCLUDE_TRACING_CORE_DATA_SOURCE_CONFIG_H_
 
+#include <stdint.h>
+
 #include <string>
 
 namespace perfetto {
@@ -32,6 +34,8 @@ namespace perfetto {
 class DataSourceConfig {
  public:
   std::string name;  // e.g., "org.chromium.trace_events"
+
+  uint32_t target_buffer = 0;
 
   // TODO(primiano): temporary, for testing only.
   std::string trace_category_filters;  // e.g., "ipc,media,toplvel"

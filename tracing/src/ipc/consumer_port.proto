@@ -24,7 +24,7 @@ package perfetto;
 // IPC interface definition for the consumer port of the tracing service.
 service ConsumerPort {
   rpc StartTracing(StartTracingRequest) returns (StartTracingResponse) {}
-  rpc StopTracing(StartTracingRequest) returns (stream StopTracingResponse) {}
+  rpc StopTracing(StopTracingRequest) returns (stream StopTracingResponse) {}
   // TODO rpc ListDataSources(), for the UI.
 }
 

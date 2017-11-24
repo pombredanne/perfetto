@@ -27,8 +27,8 @@
 #include "tracing/core/data_source_config.h"
 #include "tracing/core/producer.h"
 #include "tracing/core/shared_memory.h"
-
-#include "protos/trace_packet.pb.h"
+#include "tracing/core/trace_config.h"
+#include "tracing/core/trace_packet.h"
 
 namespace perfetto {
 
@@ -119,7 +119,7 @@ ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
 }
 
 void ServiceImpl::StartTracing(ConsumerEndpointImpl* initiator,
-                               const ConsumerEndpoint::TraceConfig& cfg) {
+                               const TraceConfig& cfg) {
   auto it_and_inserted = tracing_sessions_.emplace(initiator, TracingSession());
   if (!it_and_inserted.second) {
     PERFETTO_DLOG("The Consumer has already started a tracing session");
@@ -188,6 +188,7 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
     producer_it->second->producer()->TearDownDataSourceInstance(
         data_source_inst.second);
   }
+  auto weak_consumer = initiator->GetWeakPtr();
 
   for (size_t buf_idx : tracing_session.trace_buffers) {
     PERFETTO_CHECK(buf_idx < kMaxTraceBuffers && trace_buffers_[buf_idx]);
@@ -216,25 +217,27 @@ void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
         std::tie(num_packets, flags) = chunk.GetPacketCountAndFlags();
         uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
 
+        std::shared_ptr<std::vector<TracePacket>> packets;
+        packets->reserve(num_packets);
         for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
           SharedMemoryABI::PacketHeaderType pack_size;
           memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
           ptr += sizeof(pack_size);
-          TracePacket proto;
-          bool parsed = false;
           // TODO stiching, looks at the flags.
           printf("      #%-3zu len:%u ", pack_idx, pack_size);
           if (ptr > chunk.end_addr() - pack_size) {
             printf("out of bounds!\n");
             break;
           }
-          parsed =
-              proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+          packets->emplace_back(reinterpret_cast<void*>(ptr), pack_size);
           ptr += pack_size;
-          printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
-        }
-      }
-    }
+        }  // for(packet)
+        task_runner_->PostTask([weak_consumer, packets]() {
+          if (weak_consumer)
+            weak_consumer->consumer()->OnTraceData(*packets);
+        });
+      }  // for(chunk)
+    }    // for(page)
   }
 
   tracing_sessions_.erase(it);
@@ -252,7 +255,10 @@ ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
     ServiceImpl* service,
     base::TaskRunner* task_runner,
     Consumer* consumer)
-    : service_(service), task_runner_(task_runner), consumer_(consumer) {}
+    : service_(service),
+      task_runner_(task_runner),
+      consumer_(consumer),
+      weak_ptr_factory_(this) {}
 
 ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   consumer_->OnDisconnect();
@@ -265,6 +271,11 @@ void ServiceImpl::ConsumerEndpointImpl::StartTracing(const TraceConfig& cfg) {
 
 void ServiceImpl::ConsumerEndpointImpl::StopTracing() {
   service_->StopTracing(this);
+}
+
+base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>
+ServiceImpl::ConsumerEndpointImpl::GetWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

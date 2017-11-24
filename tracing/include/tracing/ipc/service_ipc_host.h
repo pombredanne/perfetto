@@ -39,8 +39,9 @@ class ServiceIPCHost {
   virtual ~ServiceIPCHost();
 
   // Start listening on the Producer & Consumer ports. Returns false in case of
-  // failure (e.g., something else is listening on |socket_name|).
-  virtual bool Start(const char* producer_socket_name) = 0;
+  // failure (e.g., something else is listening on |xxx_socket_name|).
+  virtual bool Start(const char* producer_socket_name,
+                     const char* consumer_socket_name) = 0;
 
  protected:
   ServiceIPCHost();
