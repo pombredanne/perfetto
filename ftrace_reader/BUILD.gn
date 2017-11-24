@@ -57,7 +57,10 @@ executable("ftrace_reader_demo") {
   sources = [
     "src/main.cc",
   ]
-  deps += [ ":ftrace_reader" ]
+  deps += [
+    ":ftrace_reader",
+    "//base",
+  ]
 }
 
 source_set("ftrace_reader") {
