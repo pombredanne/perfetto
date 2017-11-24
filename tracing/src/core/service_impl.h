@@ -24,6 +24,7 @@
 #include <set>
 
 #include "tracing/core/basic_types.h"
+#include "tracing/core/data_source_descriptor.h"
 #include "tracing/core/service.h"
 #include "tracing/core/shared_memory_abi.h"
 
@@ -61,7 +62,8 @@ class ServiceImpl : public Service {
     void NotifySharedMemoryUpdate(
         const std::vector<uint32_t>& changed_pages) override;
 
-    std::unique_ptr<TraceWriter> CreateTraceWriter() override;
+    std::unique_ptr<TraceWriter> CreateTraceWriter(
+        uint32_t target_buffer) override;
 
     SharedMemory* shared_memory() const override;
 
@@ -87,7 +89,8 @@ class ServiceImpl : public Service {
     Consumer* consumer() const { return consumer_; }
 
     // Service::ConsumerEndpoint implementation.
-    void SetupLogging(const LoggingConfig&) override;
+    void StartTracing(const TraceConfig&) override;
+    void StopTracing() override;
 
    private:
     ConsumerEndpointImpl(const ConsumerEndpointImpl&) = delete;
@@ -109,7 +112,8 @@ class ServiceImpl : public Service {
   void DisconnectConsumer(ConsumerEndpointImpl*);
 
   // Called by the ConsumerEndpointImpl.
-  void SetupLogging(const ConsumerEndpoint::LoggingConfig& cfg);
+  void StartTracing(const ConsumerEndpoint::TraceConfig& cfg);
+  void StopTracing();
 
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(

@@ -46,8 +46,12 @@ using PacketHeaderType = SharedMemoryABI::PacketHeaderType;
 // Temporarily the shared memory buffer is long lived and this is not a problem.
 
 TraceWriterImpl::TraceWriterImpl(ProducerSharedMemoryArbiter* shmem_arbiter,
-                                 WriterID id)
-    : shmem_arbiter_(shmem_arbiter), id_(id), protobuf_stream_writer_(this) {
+                                 WriterID id,
+                                 uint32_t target_buffer)
+    : shmem_arbiter_(shmem_arbiter),
+      id_(id),
+      target_buffer_(target_buffer),
+      protobuf_stream_writer_(this) {
   finalize_callback_ = [this](size_t packet_size) { OnFinalize(packet_size); };
 
   // TODO we could handle this more gracefully and always return some garbage
@@ -122,8 +126,8 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
 
   // Start a new chunk.
   SharedMemoryABI::ChunkHeader::Identifier identifier = {};
-  static_assert(sizeof(id_) <= sizeof(identifier.writer_id), "WriterID size");
   identifier.writer_id = id_;
+  identifier.target_buffer = target_buffer_;
   identifier.chunk_id = cur_chunk_id_++;
 
   SharedMemoryABI::ChunkHeader::PacketsState packets_state = {};

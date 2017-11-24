@@ -38,7 +38,9 @@ class TraceWriterImpl : public TraceWriter,
   using TracePacket = pbzero::TracePacket;
   using TracePacketHandle = protozero::ProtoZeroMessageHandle<TracePacket>;
 
-  TraceWriterImpl(ProducerSharedMemoryArbiter*, WriterID);
+  TraceWriterImpl(ProducerSharedMemoryArbiter*,
+                  WriterID,
+                  uint32_t target_buffer);
   ~TraceWriterImpl() override;
 
   // TraceWriter implementation.
@@ -62,6 +64,10 @@ class TraceWriterImpl : public TraceWriter,
 
   // ID of the current writer.
   const WriterID id_;
+
+  // This is just propagated into the chunk heaer.
+  // See comments in DataSourceConfig::target_buffer.
+  const uint32_t target_buffer_;
 
   // Monotonic sequence id of the chunk. Together with the WriterID  is allows
   // the Service to to reconstruct the linear sequence of packets.

@@ -87,7 +87,8 @@ class Service {
     // acquiring/releasing chunks from the shared memory buffer. The returned
     // writer is *not* thread safe. The intended design is that each data source
     // creates one TraceWriter for each thread (or more, if necessary).
-    virtual std::unique_ptr<TraceWriter> CreateTraceWriter() = 0;
+    virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
+        uint32_t target_buffer = 0) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.
@@ -98,7 +99,7 @@ class Service {
   //    the service don't talk locally but via some IPC mechanism.
   class ConsumerEndpoint {
    public:
-    struct LoggingConfig {
+    struct TraceConfig {
       struct BufferConfig {
         uint32_t size_kb = 0;
       };
@@ -113,9 +114,10 @@ class Service {
     };
     virtual ~ConsumerEndpoint() = default;
 
-    // In order to stop logging just invoke SetupLogging with an empty config.
-    // Data will be received invoking the Consumer::OnData() method.
-    virtual void SetupLogging(const LoggingConfig&) = 0;
+    virtual void StartTracing(const TraceConfig&) = 0;
+
+    // Tracing data will be delivered invoking the Consumer::OnData() method.
+    virtual void StopTracing() = 0;
 
   };  // class ConsumerEndpoint.
 

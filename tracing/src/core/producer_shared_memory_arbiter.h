@@ -52,7 +52,7 @@ class ProducerSharedMemoryArbiter {
   // the Service to reconstruct reorder TracePackets written by the same
   // TraceWriter. CHECK(s) if all WriterID slots are exhausted.
   // TODO: instad of crashing this should return a NoopWriter.
-  std::unique_ptr<TraceWriter> CreateTraceWriter();
+  std::unique_ptr<TraceWriter> CreateTraceWriter(uint32_t target_buffer = 0);
 
  private:
   friend class TraceWriter;

@@ -187,8 +187,9 @@ void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
 }
 
-std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter() {
-  return shared_memory_arbiter_->CreateTraceWriter();
+std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter(
+    uint32_t target_buffer) {
+  return shared_memory_arbiter_->CreateTraceWriter(target_buffer);
 }
 
 SharedMemory* ProducerIPCClientImpl::shared_memory() const {

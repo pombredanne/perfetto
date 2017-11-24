@@ -114,7 +114,7 @@ ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
   return it->second;
 }
 
-void ServiceImpl::SetupLogging(const ConsumerEndpoint::LoggingConfig& cfg) {
+void ServiceImpl::StartTracing(const ConsumerEndpoint::TraceConfig& cfg) {
   // TODO: this really needs to be more graceful or will UAF. Refcount or
   // something similar.
   log_buffers_.clear();
@@ -122,16 +122,31 @@ void ServiceImpl::SetupLogging(const ConsumerEndpoint::LoggingConfig& cfg) {
     log_buffers_.emplace_back(buffer_cfg.size_kb * 1024);
   }
 
-  std::map<RegisterDataSource*, DataSourceConfig*> data_sources_to_enable;
+  std::multimap<ProducerID, const DataSourceConfig*> data_sources_to_enable;
   for (const auto& cfg_data_source : cfg.data_sources) {
-    auto range = data_sources_.equal_range(cfg_data_source.name);
+    // Scan all the registered data sources with a matching name.
+    auto range = data_sources_.equal_range(cfg_data_source.config.name);
     for (auto it = range.first; it != range.second; it++) {
-      const RegisterDataSource& data_source = it.second;
+      const RegisteredDataSource& data_source = it->second;
       // TODO match against |producer_name_filter|.
-      data_sources_to_enable[&data_source] = cfg_data_source.config;
+      data_sources_to_enable.emplace(data_source.producer_id,
+                                     &cfg_data_source.config);
     }
   }
+
+  for (auto it : data_sources_to_enable) {
+    auto producer_it = producers_.find(it.first);
+    if (producer_it == producers_.end()) {
+      PERFETTO_DCHECK(false);
+      continue;
+    }
+    ProducerEndpointImpl* producer = producer_it->second;
+    const DataSourceConfig& dsconfig = *it.second;
+    producer->producer()->CreateDataSourceInstance(TODO here, dsconfig);
+  }
 }
+
+void ServiceImpl::StopTracing() {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // ServiceImpl::ConsumerEndpointImpl implementation
@@ -148,8 +163,12 @@ ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   service_->DisconnectConsumer(this);
 }
 
-void ServiceImpl::ConsumerEndpointImpl::SetupLogging(const LoggingConfig& cfg) {
-  service_->SetupLogging(cfg);
+void ServiceImpl::ConsumerEndpointImpl::StartTracing(const TraceConfig& cfg) {
+  service_->StartTracing(cfg);
+}
+
+void ServiceImpl::ConsumerEndpointImpl::StopTracing() {
+  service_->StopTracing();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +278,7 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
 }
 
 std::unique_ptr<TraceWriter>
-ServiceImpl::ProducerEndpointImpl::CreateTraceWriter() {
+ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(uint32_t) {
   // Not implemented. This would be only used in the case of using the core
   // tracing library directly in-process with no IPC layer. It is a legit
   // use case, but just not one we intend to support right now.
