@@ -112,8 +112,9 @@ class ServiceImpl : public Service {
   void DisconnectConsumer(ConsumerEndpointImpl*);
 
   // Called by the ConsumerEndpointImpl.
-  void StartTracing(const ConsumerEndpoint::TraceConfig& cfg);
-  void StopTracing();
+  void StartTracing(ConsumerEndpointImpl*,
+                    const ConsumerEndpoint::TraceConfig& cfg);
+  void StopTracing(ConsumerEndpointImpl*);
 
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
@@ -131,18 +132,30 @@ class ServiceImpl : public Service {
   ProducerEndpointImpl* GetProducer(ProducerID) const;
 
  private:
-  struct LogBuffer {
-    explicit LogBuffer(size_t);
-    LogBuffer(LogBuffer&&) noexcept;
-    ~LogBuffer();
-
-    std::unique_ptr<char[]> data;
-    const size_t size = 0;
-  };
-
   struct RegisteredDataSource {
     DataSourceDescriptor descriptor;
     ProducerID producer_id;
+  };
+
+  class LogBuffer {
+  public:
+    LogBuffer();
+    ~LogBuffer();
+    void Reset(size_t size = 0);  // |size| == 0 destroyes the buffer.
+    explicit operator bool() const { return !!data_; }
+
+   private:
+    std::unique_ptr<char[]> data_;
+    size_t size_ = 0;
+  };
+
+  struct TracingSession {
+    // List of data source instances that have been enabled on the various
+    // producers for this tracing session.
+    std::multimap<ProducerID, DataSourceInstanceID> data_source_instances;
+
+    // Point to objects owned by the parent's |trace_buffers_|.
+    std::vector<size_t> trace_buffers;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;
@@ -152,10 +165,18 @@ class ServiceImpl : public Service {
   base::TaskRunner* const task_runner_;
   ObserverForTesting* observer_ = nullptr;
   ProducerID last_producer_id_ = 0;
+  DataSourceInstanceID last_data_source_instance_id_ = 0;
   std::map<ProducerID, ProducerEndpointImpl*> producers_;
   std::set<ConsumerEndpointImpl*> consumers_;
-  std::list<LogBuffer> log_buffers_;
+  std::map<ConsumerEndpointImpl*, TracingSession> tracing_sessions_;
   std::multimap<std::string, RegisteredDataSource> data_sources_;
+
+  // This vector maintain a stable index of log buffers for the various
+  // |tracing_sessions_|. This is to keep a ID -> buffer table that we can query
+  // while draining the Producer's shared memory buffers, avoiding expensive
+  // lookups. The index of the buffers in this array matches the |target_buffer|
+  // field in the SharedMemoryABI::ChunkHeader.
+  LogBuffer trace_buffers_[kMaxTraceBuffers] = {};
 };
 
 }  // namespace perfetto

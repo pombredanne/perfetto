@@ -16,8 +16,11 @@
 
 #include "tracing/core/shared_memory_abi.h"
 
+#include <sys/mman.h>
+
 #include "base/logging.h"
 #include "base/utils.h"
+#include "tracing/core/basic_types.h"
 
 namespace perfetto {
 
@@ -69,6 +72,11 @@ SharedMemoryABI::SharedMemoryABI(void* start, size_t size, size_t page_size)
                     sizeof(std::atomic<uint16_t>) == sizeof(uint16_t),
                 "Incompatible STL atomic implementation");
 
+  // Sanity check the consistency of the kMax... constants.
+  ChunkHeader::Identifier chunk_id;
+  PERFETTO_CHECK((chunk_id.writer_id = -1) == kMaxWriterID);
+  PERFETTO_CHECK((chunk_id.target_buffer = -1) == kMaxTraceBuffers - 1);
+
   PERFETTO_CHECK(page_size >= 4096);
   PERFETTO_CHECK(page_size % 4096 == 0);
   PERFETTO_CHECK(page_size <= kMaxPageSize);
@@ -109,6 +117,21 @@ SharedMemoryABI::ChunkHeader* SharedMemoryABI::GetChunkHeader(
   return chunk.is_valid() ? chunk.header() : nullptr;
 }
 
+SharedMemoryABI::Chunk GetChunkUnchecked(size_t page_idx,
+                                         uint32_t page_layout,
+                                         size_t chunk_idx) {
+  const size_t num_chunks = GetNumChunksForLayout(layout);
+  PERFETTO_DCHECK(chunk_idx < num_chunks);
+  // Compute the chunk virtual address and write it into |chunk|.
+  uintptr_t page_start = start_ + page_idx * page_size_;
+  const size_t chunk_size = GetChunkSizeForPage(layout);
+  uintptr_t chunk_offset_in_page = sizeof(PageHeader) + chunk_idx * chunk_size;
+
+  Chunk chunk(page_start + chunk_offset_in_page, chunk_size);
+  PERFETTO_DCHECK(chunk.end() <= end());
+  return chunk;
+}
+
 SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
     size_t page_idx,
     size_t chunk_idx,
@@ -147,12 +170,7 @@ SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
   }
 
   // Compute the chunk virtual address and write it into |chunk|.
-  uintptr_t page_start = start_ + page_idx * page_size_;
-  const size_t chunk_size = GetChunkSizeForPage(layout);
-  uintptr_t chunk_offset_in_page = sizeof(PageHeader) + chunk_idx * chunk_size;
-
-  Chunk chunk(page_start + chunk_offset_in_page, chunk_size);
-  PERFETTO_DCHECK(chunk.end() <= end());
+  Chunk chunk = GetChunkUnchecked(page_idx, layout, chunk_idx);
   if (desired_chunk_state == kChunkBeingWritten) {
     PERFETTO_DCHECK(header);
     ChunkHeader* new_header = chunk.header();
@@ -221,6 +239,42 @@ void SharedMemoryABI::ReleaseChunk(Chunk chunk,
   PERFETTO_DCHECK(false);
 }
 
+bool SharedMemoryABI::TryAcquireAllChunksForReading(size_t page_idx) {
+  PageHeader* phdr = page_header(page_idx);
+  uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
+  const size_t num_chunks = GetNumChunksForLayout(layout);
+  if (num_chunks == 0)
+    return false;
+  uint32_t next_layout = layout & kLayoutMask;
+  for (size_t chunk_idx = 0; i < num_chunks; chunk_idx++) {
+    const uint32_t chunk_state =
+        ((layout >> (chunk_idx * kChunkShift)) & kChunkMask);
+    swtich(chunk_state) {
+      case kChunkBeingWritten:
+        return false;
+      case kChunkBeingRead:
+      case kChunkComplete:
+        next_layout |= kChunkBeingRead << (chunk_idx * kChunkShift);
+        break;
+      case kChunkFree:
+        next_layout |= kChunkFree << (chunk_idx * kChunkShift);
+        break;
+    }
+  }
+  return phdr->layout.compare_exchange_weak(layout, next_layout,
+                                            std::memory_order_acq_rel);
+}
+
+void ReleaseAllChunksAsFree(size_t page_idx) {
+  PageHeader* phdr = page_header(page_idx);
+  phdr->layout.store(0, std::memory_order_release);
+  uintptr_t page_start = start_ + page_idx * page_size_;
+  // TODO: On Linux/Android this should be MADV_REMOVE if we use memfd_create()
+  // and tmpfs supports hole punching (need to consult kernel sources).
+  int ret = madvise(page_start, page_size_, MADV_DONTNEED);
+  PERFETTO_DCHECK(ret == 0);
+}
+
 SharedMemoryABI::Chunk::Chunk() = default;
 
 SharedMemoryABI::Chunk::Chunk(uintptr_t begin, size_t size)
@@ -229,8 +283,9 @@ SharedMemoryABI::Chunk::Chunk(uintptr_t begin, size_t size)
   PERFETTO_CHECK(end_ >= begin_);
 }
 
-uint16_t SharedMemoryABI::Chunk::GetPacketCount() {
-  return header()->packets.load(std::memory_order_acquire).count;
+std::pair<uint16_t, uint8_t> SharedMemoryABI::Chunk::GetPacketCountAndFlags() {
+  auto state = header()->packets.load(std::memory_order_acquire);
+  return std::make_pair(state.count, state.flags);
 }
 
 void SharedMemoryABI::Chunk::IncrementPacketCount(bool last_packet_is_partial) {
@@ -240,7 +295,7 @@ void SharedMemoryABI::Chunk::IncrementPacketCount(bool last_packet_is_partial) {
   auto packets = chunk_header->packets.load(std::memory_order_relaxed);
   packets.count++;
   if (last_packet_is_partial)
-    packets.flags |= ChunkHeader::PacketsState::kLastPacketContinuesOnNextChunk;
+    packets.flags |= ChunkHeader::kLastPacketContinuesOnNextChunk;
 
   // This needs to be a release store because if the Service sees this, it also
   // has to be guaranteed to see all the previous stores for the protobuf packet

@@ -102,6 +102,9 @@ std::unique_ptr<Service::ConsumerEndpoint> ServiceImpl::ConnectConsumer(
 
 void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   PERFETTO_DCHECK(consumers_.count(consumer));
+  auto tracing_session_it = tracing_sessions_.find(consumer);
+  if (tracing_session_it != tracing_sessions_.end())
+    StopTracing(tracing_session_it->first);
   consumers_.erase(consumer);
   // TODO: notfy observer.
 }
@@ -114,39 +117,80 @@ ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
   return it->second;
 }
 
-void ServiceImpl::StartTracing(const ConsumerEndpoint::TraceConfig& cfg) {
-  // TODO: this really needs to be more graceful or will UAF. Refcount or
-  // something similar.
-  log_buffers_.clear();
+void ServiceImpl::StartTracing(ConsumerEndpointImpl* initiator,
+                               const ConsumerEndpoint::TraceConfig& cfg) {
+  auto it_and_inserted = tracing_sessions_.emplace(initiator, TracingSession());
+  if (!it_and_inserted.second) {
+    PERFETTO_DLOG("The Consumer has already started a tracing session");
+    return;
+  }
+  TracingSession& tracing_session = it_and_inserted.first->second;
+
+  // Initialize the log buffers.
+  tracing_session.trace_buffers.reserve(cfg.buffers.size());
+  bool did_allocate_all_buffers = false;
   for (const auto& buffer_cfg : cfg.buffers) {
-    log_buffers_.emplace_back(buffer_cfg.size_kb * 1024);
+    did_allocate_all_buffers = false;
+    // Find a free slot in the |trace_buffers_| table.
+    for (size_t i = 0; i < kMaxTraceBuffers; i++) {
+      if (trace_buffers_[i])
+        continue;
+      trace_buffers_[i].Reset(buffer_cfg.size_kb * 1024);
+      tracing_session.trace_buffers.emplace_back(i);
+      did_allocate_all_buffers = true;
+      break;
+    }
+  }
+  // This can happen if all the kMaxTraceBuffers slots are taken (i.e. we are
+  // not talking about OOM here, just creating > kMaxTraceBuffers entries). In
+  // this case, free all the previously allocated buffers and abort.
+  // TODO: add a test to cover this case, this is quite subtle.
+  if (!did_allocate_all_buffers) {
+    for (size_t buf_index : tracing_session.trace_buffers)
+      trace_buffers_[buf_index].Reset();
+    tracing_sessions_.erase(initiator);
+    PERFETTO_DLOG("Failed to allocate logging buffers");
+    return;
   }
 
-  std::multimap<ProducerID, const DataSourceConfig*> data_sources_to_enable;
+  // Enable the data sources on the producers.
   for (const auto& cfg_data_source : cfg.data_sources) {
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config.name);
     for (auto it = range.first; it != range.second; it++) {
-      const RegisteredDataSource& data_source = it->second;
+      const RegisteredDataSource& reg_data_source = it->second;
       // TODO match against |producer_name_filter|.
-      data_sources_to_enable.emplace(data_source.producer_id,
-                                     &cfg_data_source.config);
-    }
-  }
 
-  for (auto it : data_sources_to_enable) {
-    auto producer_it = producers_.find(it.first);
-    if (producer_it == producers_.end()) {
-      PERFETTO_DCHECK(false);
-      continue;
+      const ProducerID producer_id = reg_data_source.producer_id;
+      auto producer_iter = producers_.find(producer_id);
+      PERFETTO_CHECK(producer_iter == producers_.end());
+      ProducerEndpointImpl* producer = producer_iter->second;
+      DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
+      tracing_session.data_source_instances.emplace(producer_id, inst_id);
+      producer->producer()->CreateDataSourceInstance(inst_id,
+                                                     cfg_data_source.config);
     }
-    ProducerEndpointImpl* producer = producer_it->second;
-    const DataSourceConfig& dsconfig = *it.second;
-    producer->producer()->CreateDataSourceInstance(TODO here, dsconfig);
   }
 }
 
-void ServiceImpl::StopTracing() {}
+void ServiceImpl::StopTracing(ConsumerEndpointImpl* initiator) {
+  auto it = tracing_sessions_.find(initiator);
+  if (it == tracing_sessions_.end()) {
+    PERFETTO_DLOG("No active tracing session found for the Consumer");
+    return;
+  }
+  TracingSession& tracing_session = it->second;
+  for (const auto& data_source_inst : tracing_session.data_source_instances) {
+    auto producer_it = producers_.find(data_source_inst.first);
+    if (producer_it == producers_.end())
+      continue;  // This could legitimately happen if a Producer disconnects.
+    producer_it->second->producer()->TearDownDataSourceInstance(
+        data_source_inst.second);
+  }
+  // TODO this needs to be more graceful. This will destroy the |trace_buffers|,
+  // which will cause some UAF. Refcount the log buffers or similar.
+  tracing_sessions_.erase(initiator);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // ServiceImpl::ConsumerEndpointImpl implementation
@@ -164,11 +208,11 @@ ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
 }
 
 void ServiceImpl::ConsumerEndpointImpl::StartTracing(const TraceConfig& cfg) {
-  service_->StartTracing(cfg);
+  service_->StartTracing(this, cfg);
 }
 
 void ServiceImpl::ConsumerEndpointImpl::StopTracing() {
-  service_->StopTracing();
+  service_->StopTracing(this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -216,65 +260,84 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 
 void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
-  // TODO the code below is temporary for testing only. It just spits out
-  // on stdout the content of the shared memory buffer.
-
-  // Scann all pages and see if there are any complete chunks we can read.
-  for (size_t page_idx = 0; page_idx < shmem_abi_.num_pages(); page_idx++) {
-    if (shmem_abi_.is_page_free(page_idx))
+  for (uint32_t page_idx : changed_pages) {
+    if (page_idx >= shmem_abi_.num_pages())
+      continue;  // The Producer is playing dirty.
+    if (!shmem_abi_.is_page_complete(page_idx))
       continue;
+    if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))
+      continue;
+    // TODO: we should start collecting individual chunks from non fully
+    // complete pages after a while.
 
     // Read the page layout.
-    bool complete = shmem_abi_.is_page_complete(page_idx);
     auto layout = shmem_abi_.page_layout(page_idx);
     size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
-    printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu chunks)\n",
-           page_idx, complete, layout, num_chunks);
+    printf("  Draining page: %zu,layout: %zu chunks\n", page_idx, num_chunks);
 
-    // Iterate over the chunks in the page.
-    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
-      auto state = shmem_abi_.GetChunkState(page_idx, chunk_idx);
-      auto chunk = shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx);
-      // |chunk| may not be valid if it was in a bad state.
+    // TODO move in central buffer.
 
-      auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
-      auto id = hdr->identifier.load(std::memory_order_relaxed);
-      auto packets = hdr->packets.load(std::memory_order_relaxed);
-      printf(
-          "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets: %u, "
-          "flags: %x, acquired_for_reading: %d\n",
-          chunk_idx, id.writer_id, id.chunk_id,
-          SharedMemoryABI::kChunkStateStr[state], packets.count, packets.flags,
-          chunk.is_valid());
-      if (!chunk.is_valid())
-        continue;
-
-      PERFETTO_DCHECK(chunk.is_valid());
-      size_t num_packets = chunk.GetPacketCount();
-      uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
-
-      // Iterate over all packets.
-      printf("    Dumping packets in chunk:\n");
-
-      for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
-        SharedMemoryABI::PacketHeaderType pack_size;
-        memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
-        ptr += sizeof(pack_size);
-        TracePacket proto;
-        bool parsed = false;
-        // TODO stiching, looks at the flags.
-        printf("      #%-3zu len:%u ", pack_idx, pack_size);
-        if (ptr > chunk.end_addr() - pack_size) {
-          printf("out of bounds!\n");
-          break;
-        }
-        parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
-        ptr += pack_size;
-        printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
-      }
-      shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
-    }
+    shmem_abi_.ReleaseAllChunksAsFree(page_idx);
   }
+
+  // // TODO the code below is temporary for testing only. It just spits out
+  // // on stdout the content of the shared memory buffer.
+  // // Scan all pages and see if there are any complete chunks we can read.
+  // for (size_t page_idx = 0; page_idx < shmem_abi_.num_pages(); page_idx++) {
+  //   if (shmem_abi_.is_page_free(page_idx))
+  //     continue;
+  //
+  //   // Read the page layout.
+  //   bool complete = shmem_abi_.is_page_complete(page_idx);
+  //   auto layout = shmem_abi_.page_layout(page_idx);
+  //   size_t num_chunks = SharedMemoryABI::kNumChunksForLayout[layout];
+  //   printf("  Scanning page: %zu, complete: %d. Page layout: %d (%zu chunks)\n",
+  //          page_idx, complete, layout, num_chunks);
+  //
+  //   // Iterate over the chunks in the page.
+  //   for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+  //     auto state = shmem_abi_.GetChunkState(page_idx, chunk_idx);
+  //     auto chunk = shmem_abi_.TryAcquireChunkForReading(page_idx, chunk_idx);
+  //     // |chunk| may not be valid if it was in a bad state.
+  //
+  //     auto* hdr = shmem_abi_.GetChunkHeader(page_idx, chunk_idx);
+  //     auto id = hdr->identifier.load(std::memory_order_relaxed);
+  //     auto packets = hdr->packets.load(std::memory_order_relaxed);
+  //     printf(
+  //         "    Chunk: %zu, WriterID: %u, ChunkID: %u, state: %s, #packets: %u, "
+  //         "flags: %x, acquired_for_reading: %d\n",
+  //         chunk_idx, id.writer_id, id.chunk_id,
+  //         SharedMemoryABI::kChunkStateStr[state], packets.count, packets.flags,
+  //         chunk.is_valid());
+  //     if (!chunk.is_valid())
+  //       continue;
+  //
+  //     PERFETTO_DCHECK(chunk.is_valid());
+  //     size_t num_packets = chunk.GetPacketCount();
+  //     uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk.payload_begin());
+  //
+  //     // Iterate over all packets.
+  //     printf("    Dumping packets in chunk:\n");
+  //
+  //     for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
+  //       SharedMemoryABI::PacketHeaderType pack_size;
+  //       memcpy(&pack_size, reinterpret_cast<void*>(ptr), sizeof(pack_size));
+  //       ptr += sizeof(pack_size);
+  //       TracePacket proto;
+  //       bool parsed = false;
+  //       // TODO stiching, looks at the flags.
+  //       printf("      #%-3zu len:%u ", pack_idx, pack_size);
+  //       if (ptr > chunk.end_addr() - pack_size) {
+  //         printf("out of bounds!\n");
+  //         break;
+  //       }
+  //       parsed = proto.ParseFromArray(reinterpret_cast<void*>(ptr), pack_size);
+  //       ptr += pack_size;
+  //       printf("\"%s\"\n", parsed ? proto.test().c_str() : "[Parser fail]");
+  //     }
+  //     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
+  //   }
+  // }
 }
 
 std::unique_ptr<TraceWriter>
@@ -297,11 +360,14 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
 // ServiceImpl::LogBuffer implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::LogBuffer::LogBuffer(size_t s) : size(s) {
-  data.reset(new char[size]);
-}
-
-ServiceImpl::LogBuffer::LogBuffer(LogBuffer&&) noexcept = default;
+ServiceImpl::LogBuffer::LogBuffer() = default;
 ServiceImpl::LogBuffer::~LogBuffer() = default;
+
+void ServiceImpl::LogBuffer::Reset(size_t size) {
+  // Check that the caller is not destroying an existing buffer.
+  PERFETTO_CHECK(size == 0 || size_ == 0);
+  data_.reset(size > 0 ? new char[size] : nullptr);
+  size_ = size;
+}
 
 }  // namespace perfetto
