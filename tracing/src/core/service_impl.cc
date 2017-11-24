@@ -264,6 +264,8 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
   for (uint32_t page_idx : changed_pages) {
     if (page_idx >= shmem_abi_.num_pages())
       continue;  // The Producer is playing dirty.
+    PERFETTO_DLOG("NOTIFY %d ", shmem_abi_.is_page_complete(page_idx));
+
     if (!shmem_abi_.is_page_complete(page_idx))
       continue;
     if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))

@@ -402,8 +402,10 @@ class SharedMemoryABI {
   // is advisory only. The Service is supposed to use this only to decide
   // whether to TryAcquireAllChunksForReading() or not.
   bool is_page_complete(size_t page_idx) {
-    return (page_header(page_idx)->layout.load(std::memory_order_relaxed) &
-            kAllChunksMask) == kAllChunksComplete;
+    auto layout = page_header(page_idx)->layout.load(std::memory_order_relaxed);
+    const size_t num_chunks = GetNumChunksForLayout(layout);
+    return (layout & kAllChunksMask) ==
+           (kAllChunksComplete & ((1 << (num_chunks * kChunkShift)) - 1));
   }
 
   // For testing / debugging only.
