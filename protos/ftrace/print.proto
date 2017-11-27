@@ -4,5 +4,5 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 message PrintFtraceEvent {
   uint32 ip = 1;
-  uint32 buf = 2;
+  string buf = 2;
 }

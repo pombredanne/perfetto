@@ -31,9 +31,14 @@
 #include "gtest/gtest_prod.h"
 #include "protozero/protozero_message_handle.h"
 
-#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
+
+namespace protos {
+namespace pbzero {
+class FtraceEventBundle;
+}  // namespace pbzero
+}  // namespace protos
 
 const size_t kMaxSinks = 32;
 
@@ -63,7 +68,7 @@ class FtraceConfig {
 // |OnBundleComplete| allowing the client to perform finalization.
 class FtraceSink {
  public:
-  using FtraceEventBundle = protos::FtraceEventBundle;
+  using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
   class Delegate {
    public:
     virtual protozero::ProtoZeroMessageHandle<FtraceEventBundle>

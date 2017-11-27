@@ -26,6 +26,8 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
+
 using testing::_;
 using testing::Return;
 using testing::ByMove;
@@ -36,6 +38,7 @@ namespace perfetto {
 namespace {
 
 using Table = ProtoTranslationTable;
+using protozero::ProtoZeroMessageHandle;
 
 class MockTaskRunner : public base::TaskRunner {
  public:
@@ -49,15 +52,14 @@ class MockDelegate : public perfetto::FtraceSink::Delegate {
  public:
   MOCK_METHOD1(
       GetBundleForCpu,
-      protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>(size_t));
+      ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>(size_t));
   MOCK_METHOD2(
       OnBundleComplete_,
-      void(size_t,
-           protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>&));
+      void(size_t, ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>&));
 
   void OnBundleComplete(
       size_t cpu,
-      protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle> bundle) {
+      ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle> bundle) {
     OnBundleComplete_(cpu, bundle);
   }
 };

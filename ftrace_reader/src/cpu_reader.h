@@ -26,9 +26,14 @@
 #include "ftrace_reader/ftrace_controller.h"
 #include "gtest/gtest_prod.h"
 #include "proto_translation_table.h"
-#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
+
+namespace protos {
+namespace pbzero {
+class FtraceEventBundle;
+}  // namespace pbzero
+}  // namespace protos
 
 class ProtoTranslationTable;
 
@@ -63,10 +68,11 @@ class CpuReader {
   CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
   ~CpuReader();
 
-  bool Drain(const std::array<const EventFilter*, kMaxSinks>&,
-             const std::array<
-                 protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>,
-                 kMaxSinks>&);
+  bool Drain(
+      const std::array<const EventFilter*, kMaxSinks>&,
+      const std::array<
+          protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
+          kMaxSinks>&);
   int GetFileDescriptor();
 
  private:
@@ -76,6 +82,7 @@ class CpuReader {
   FRIEND_TEST(CpuReaderTest, ReadAndAdvanceUnderruns);
   FRIEND_TEST(CpuReaderTest, ReadAndAdvanceAtEnd);
   FRIEND_TEST(CpuReaderTest, ReadAndAdvanceOverruns);
+  FRIEND_TEST(CpuReaderTest, ParseSimpleEvent);
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
@@ -90,7 +97,7 @@ class CpuReader {
                         const uint8_t* ptr,
                         size_t ptr_size,
                         const EventFilter*,
-                        protos::FtraceEventBundle*);
+                        protos::pbzero::FtraceEventBundle*);
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
