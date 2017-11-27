@@ -27,6 +27,8 @@ template("protozero_library") {
     forward_variables_from(invoker,
                            [
                              "defines",
+                             "deps",
+                             "generate_cc",
                              "include_dirs",
                              "proto_in_dir",
                              "proto_out_dir",

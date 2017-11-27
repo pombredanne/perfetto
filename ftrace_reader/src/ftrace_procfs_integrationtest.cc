@@ -17,7 +17,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "ftrace_reader/ftrace_controller.h"
+#include "ftrace_procfs.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -27,6 +27,7 @@ using testing::Not;
 namespace perfetto {
 namespace {
 
+const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 const char kTracePath[] = "/sys/kernel/debug/tracing/trace";
 
 std::string GetTraceOutput() {
@@ -41,46 +42,47 @@ std::string GetTraceOutput() {
   return stream.str();
 }
 
-TEST(FtraceController, ClearTrace) {
-  std::unique_ptr<FtraceController> ftrace = FtraceController::Create();
-  ftrace->WriteTraceMarker("Hello, World!");
-  ftrace->ClearTrace();
+}  // namespace
+
+TEST(FtraceProcfsIntegrationTest, ClearTrace) {
+  FtraceProcfs ftrace(kTracingPath);
+  ftrace.WriteTraceMarker("Hello, World!");
+  ftrace.ClearTrace();
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("Hello, World!")));
 }
 
-TEST(FtraceController, TraceMarker) {
-  std::unique_ptr<FtraceController> ftrace = FtraceController::Create();
-  ftrace->WriteTraceMarker("Hello, World!");
+TEST(FtraceControllerIntegrationTest, TraceMarker) {
+  FtraceProcfs ftrace(kTracingPath);
+  ftrace.WriteTraceMarker("Hello, World!");
   EXPECT_THAT(GetTraceOutput(), HasSubstr("Hello, World!"));
 }
 
-TEST(FtraceController, EnableDisableEvent) {
-  std::unique_ptr<FtraceController> ftrace = FtraceController::Create();
-  ftrace->EnableEvent("sched/sched_switch");
+TEST(FtraceControllerIntegrationTest, EnableDisableEvent) {
+  FtraceProcfs ftrace(kTracingPath);
+  ftrace.EnableEvent("sched", "sched_switch");
   sleep(1);
   EXPECT_THAT(GetTraceOutput(), HasSubstr("sched_switch"));
 
-  ftrace->DisableEvent("sched/sched_switch");
-  ftrace->ClearTrace();
+  ftrace.DisableEvent("sched", "sched_switch");
+  ftrace.ClearTrace();
   sleep(1);
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("sched_switch")));
 }
 
-TEST(FtraceController, EnableDisableTracing) {
-  std::unique_ptr<FtraceController> ftrace = FtraceController::Create();
-  ftrace->ClearTrace();
-  EXPECT_TRUE(ftrace->IsTracingEnabled());
-  ftrace->WriteTraceMarker("Before");
-  ftrace->DisableTracing();
-  EXPECT_FALSE(ftrace->IsTracingEnabled());
-  ftrace->WriteTraceMarker("During");
-  ftrace->EnableTracing();
-  EXPECT_TRUE(ftrace->IsTracingEnabled());
-  ftrace->WriteTraceMarker("After");
+TEST(FtraceControllerIntegrationTest, EnableDisableTracing) {
+  FtraceProcfs ftrace(kTracingPath);
+  ftrace.ClearTrace();
+  EXPECT_TRUE(ftrace.IsTracingEnabled());
+  ftrace.WriteTraceMarker("Before");
+  ftrace.DisableTracing();
+  EXPECT_FALSE(ftrace.IsTracingEnabled());
+  ftrace.WriteTraceMarker("During");
+  ftrace.EnableTracing();
+  EXPECT_TRUE(ftrace.IsTracingEnabled());
+  ftrace.WriteTraceMarker("After");
   EXPECT_THAT(GetTraceOutput(), HasSubstr("Before"));
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("During")));
   EXPECT_THAT(GetTraceOutput(), HasSubstr("After"));
 }
 
-}  // namespace
 }  // namespace perfetto

@@ -25,7 +25,6 @@
 #include <vector>
 
 #include "ftrace_reader/ftrace_controller.h"
-#include "ftrace_reader/ftrace_cpu_reader.h"
 #include "protozero/scattered_stream_writer.h"
 
 namespace {
@@ -42,6 +41,13 @@ std::string ToHex(const void* data, size_t length) {
 }
 
 }  // namespace
+
+class FakeTaskRunner : public perfetto::base::TaskRunner {
+  void PostTask(std::function<void()>) override {}
+  void PostDelayedTask(std::function<void()>, int delay_ms) override {}
+  void AddFileDescriptorWatch(int fd, std::function<void()>) override {}
+  void RemoveFileDescriptorWatch(int fd) override {}
+};
 
 class ScatteredBuffer : public protozero::ScatteredStreamWriter::Delegate {
  public:
@@ -97,30 +103,23 @@ std::string ScatteredBuffer::GetBytesAsString(size_t start, size_t length) {
 }
 
 int main(int argc, const char** argv) {
-  auto ftrace = perfetto::FtraceController::Create();
+  FakeTaskRunner runner;
+  auto ftrace = perfetto::FtraceController::Create(&runner);
 
-  ftrace->ClearTrace();
-  ftrace->WriteTraceMarker("Hello, world!");
-
+  perfetto::FtraceConfig config;
   for (int i = 1; i < argc; i++) {
-    printf("Enabling: %s\n", argv[i]);
-    ftrace->EnableEvent(argv[i]);
+    config.AddEvent(argv[i]);
   }
+  std::unique_ptr<perfetto::FtraceSink> sink =
+      ftrace->CreateSink(std::move(config), nullptr);
 
   // Sleep for one second so we get some events
-  sleep(1);
+  sleep(10);
 
   ScatteredBuffer buffer(4096);
   protozero::ScatteredStreamWriter stream_writer(&buffer);
   pbzero::FtraceEventBundle message;
   message.Reset(&stream_writer);
-  perfetto::FtraceCpuReader* reader = ftrace->GetCpuReader(0);
-  reader->Read(perfetto::FtraceCpuReader::Config(), &message);
-
-  for (int i = 1; i < argc; i++) {
-    printf("Disable: %s\n", argv[i]);
-    ftrace->DisableEvent(argv[i]);
-  }
 
   return 0;
 }

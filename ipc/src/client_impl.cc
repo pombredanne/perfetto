@@ -107,7 +107,9 @@ bool ClientImpl::SendFrame(const Frame& frame) {
   // TODO(primiano): remember that this is doing non-blocking I/O. What if the
   // socket buffer is full? Maybe we just want to drop this on the floor? Or
   // maybe throttle the send and PostTask the reply later?
-  return sock_->Send(buf.data(), buf.size());
+  bool res = sock_->Send(buf.data(), buf.size());
+  PERFETTO_CHECK(!sock_->is_connected() || res);
+  return res;
 }
 
 void ClientImpl::OnConnect(UnixSocket*, bool connected) {
@@ -139,7 +141,12 @@ void ClientImpl::OnDataAvailable(UnixSocket*) {
   size_t rsize;
   do {
     auto buf = frame_deserializer_.BeginReceive();
-    rsize = sock_->Receive(buf.data, buf.size);
+    base::ScopedFile fd;
+    rsize = sock_->Receive(buf.data, buf.size, &fd);
+    if (fd) {
+      PERFETTO_DCHECK(!received_fd_);
+      received_fd_ = std::move(fd);
+    }
     if (!frame_deserializer_.EndReceive(rsize)) {
       // The endpoint tried to send a frame that is way too large.
       return sock_->Shutdown();  // In turn will trigger an OnDisconnect().
@@ -218,7 +225,7 @@ void ClientImpl::OnBindServiceReply(QueuedRequest req,
 
 void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
                                      const Frame::InvokeMethodReply& reply) {
-  base::WeakPtr<ServiceProxy>& service_proxy = req.service_proxy;
+  base::WeakPtr<ServiceProxy> service_proxy = req.service_proxy;
   if (!service_proxy)
     return;
   std::unique_ptr<ProtoMessage> decoded_reply;
@@ -231,11 +238,21 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
       }
     }
   }
-  service_proxy->EndInvoke(req.request_id, std::move(decoded_reply),
+  const RequestID request_id = req.request_id;
+  service_proxy->EndInvoke(request_id, std::move(decoded_reply),
                            reply.has_more());
+
+  // If this is a streaming method and future replies will be resolved, put back
+  // the |req| with the callback into the set of active requests.
+  if (reply.has_more())
+    queued_requests_.emplace(request_id, std::move(req));
 }
 
 ClientImpl::QueuedRequest::QueuedRequest() = default;
+
+base::ScopedFile ClientImpl::TakeReceivedFD() {
+  return std::move(received_fd_);
+}
 
 }  // namespace ipc
 }  // namespace perfetto
