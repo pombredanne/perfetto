@@ -15,6 +15,8 @@
 import("//protozero//protozero_library.gni")
 import("//build/proto_library.gni")
 
+proto_sources = [ "trace_packet.proto" ]
+
 # Protozero generated stubs, for writers.
 protozero_library("zero") {
   deps = [
