@@ -24,7 +24,7 @@
 #include <unwind.h>
 
 #if defined(NDEBUG)
-#error This translation unit should not be used in production builds
+#error This translation unit should not be used in release builds
 #endif
 
 namespace {

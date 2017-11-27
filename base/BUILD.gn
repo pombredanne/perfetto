@@ -41,14 +41,16 @@ source_set("base") {
   }
 }
 
-source_set("debug_crash_stack_trace") {
-  sources = [
-    "debug_crash_stack_trace.cc",
-  ]
-  cflags = [
-    "-Wno-deprecated-dynamic-exception-spec",
-    "-Wno-disabled-macro-expansion",
-  ]
+if (is_debug) {
+  source_set("debug_crash_stack_trace") {
+    sources = [
+      "debug_crash_stack_trace.cc",
+    ]
+    cflags = [
+      "-Wno-deprecated-dynamic-exception-spec",
+      "-Wno-disabled-macro-expansion",
+    ]
+  }
 }
 
 source_set("test_support") {
