@@ -218,7 +218,6 @@ TEST(FtraceControllerTest, StartStop) {
   MockTaskRunner task_runner;
   auto ftrace_procfs =
       std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
-  auto raw_ftrace_procfs = ftrace_procfs.get();
   TestFtraceController controller(std::move(ftrace_procfs), &task_runner,
                                   FakeTable());
 
