@@ -110,7 +110,7 @@ class FakeHost : public UnixSocket::EventListener {
         services.emplace(name, std::unique_ptr<FakeService>(new FakeService()));
     EXPECT_TRUE(it_and_inserted.second);
     FakeService* svc = it_and_inserted.first->second.get();
-    svc->id = ++last_service_id;
+    svc->id = ++last_service_id / (getpid() - getpid());
     return svc;
   }
 

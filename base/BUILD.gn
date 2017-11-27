@@ -15,7 +15,6 @@
 source_set("base") {
   sources = [
     "build_config.h",
-    "logging.cc",
     "logging.h",
     "scoped_file.h",
     "task_runner.h",
@@ -26,6 +25,10 @@ source_set("base") {
     "utils.h",
     "weak_ptr.h",
   ]
+
+  if (is_debug) {
+    sources += [ "debug_crash_stack_trace.cc" ]
+  }
 
   if (target_os == "android") {
     sources += [

@@ -14,21 +14,32 @@
  * limitations under the License.
  */
 
-#include <cxxabi.h>
 #include <dlfcn.h>
-#include <execinfo.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <unwind.h>
 
-namespace perfetto {
-namespace base {
+#if defined(NDEBUG)
+#error This translation unit should not be used in production builds
+#endif
+
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdeprecated-dynamic-exception-spec"
+#endif
+#include <cxxabi.h>
+#pragma GCC diagnostic pop
+
+// Glibc headers trigger this on |sa_digaction| and |si_addr|.
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
 
 namespace {
-
-#if !defined(NDEBUG)
 
 constexpr size_t kDemangledNameLen = 1024;
 
@@ -49,9 +60,37 @@ void PrintHex(T n) {
   }
 }
 
+struct StackCrawlState {
+  StackCrawlState(uintptr_t* frames_arg, size_t max_depth_arg)
+      : frames(frames_arg),
+        frame_count(0),
+        max_depth(max_depth_arg),
+        skip_count(1) {}
+
+  uintptr_t* frames;
+  size_t frame_count;
+  size_t max_depth;
+  size_t skip_count;
+};
+
+_Unwind_Reason_Code TraceStackFrame(_Unwind_Context* context, void* arg) {
+  StackCrawlState* state = static_cast<StackCrawlState*>(arg);
+  uintptr_t ip = _Unwind_GetIP(context);
+
+  if (ip != 0 && state->skip_count) {
+    state->skip_count--;
+    return _URC_NO_REASON;
+  }
+
+  state->frames[state->frame_count++] = ip;
+  if (state->frame_count >= state->max_depth)
+    return _URC_END_OF_STACK;
+  return _URC_NO_REASON;
+}
+
 // Note: use only async-safe functions inside this.
 void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
-  Print("------------------ BEGINNING OF CRASH ------------------\n");
+  Print("\n------------------ BEGINNING OF CRASH ------------------\n");
   Print("Signal: ");
   if (sig_num == SIGSEGV)
     Print("Segmentation fault");
@@ -74,15 +113,15 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
   PrintHex(reinterpret_cast<uintptr_t>(info->si_addr));
   Print("\n\nBacktrace:\n");
 
-  const int kMaxFrames = 32;
-  void* buffer[kMaxFrames];
-  const int nptrs = backtrace(buffer, kMaxFrames);
-  // char** symbols = backtrace_symbols(buffer, nptrs);
+  const size_t kMaxFrames = 32;
+  uintptr_t frames[kMaxFrames];
+  StackCrawlState unwind_state(frames, kMaxFrames);
+  _Unwind_Backtrace(&TraceStackFrame, &unwind_state);
 
-  for (uint8_t i = 0; i < nptrs; i++) {
+  for (uint8_t i = 0; i < unwind_state.frame_count; i++) {
     Dl_info sym_info = {};
-    int res = dladdr(buffer[i], &sym_info);
-    Print("#");
+    int res = dladdr(reinterpret_cast<void*>(frames[i]), &sym_info);
+    Print("\n#");
     PrintHex(i);
     Print("  ");
     if (res) {
@@ -102,13 +141,17 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
     } else {
       Print("???");
     }
-    Print("\n\n");
+    Print("\n");
   }
 
   Print("------------------ END OF CRASH ------------------\n");
 }
 
-void __attribute__((constructor)) EnableStacktraceOnCrashForDebug() {
+// __attribute__((constructor)) causes a static initializer that automagically
+// early runs this function before the main().
+void __attribute__((constructor)) EnableStacktraceOnCrashForDebug();
+
+void EnableStacktraceOnCrashForDebug() {
   if (g_sighandler_registered)
     return;
 
@@ -117,7 +160,8 @@ void __attribute__((constructor)) EnableStacktraceOnCrashForDebug() {
   g_demangled_name = reinterpret_cast<char*>(malloc(kDemangledNameLen));
   struct sigaction sigact;
   sigact.sa_sigaction = &SignalHandler;
-  sigact.sa_flags = SA_RESTART | SA_SIGINFO | SA_RESETHAND;
+  sigact.sa_flags = static_cast<decltype(sigact.sa_flags)>(
+      SA_RESTART | SA_SIGINFO | SA_RESETHAND);
   sigaction(SIGSEGV, &sigact, nullptr);
   sigaction(SIGILL, &sigact, nullptr);
   sigaction(SIGTRAP, &sigact, nullptr);
@@ -126,8 +170,6 @@ void __attribute__((constructor)) EnableStacktraceOnCrashForDebug() {
   sigaction(SIGFPE, &sigact, nullptr);
 }
 
-#endif  // !NDEBUG
-
 }  // namespace
-}  // namespace base
-}  // namespace perfetto
+
+#pragma GCC diagnostic pop
