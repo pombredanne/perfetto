@@ -14,18 +14,34 @@
  * limitations under the License.
  */
 
-#include "ftrace_reader/ftrace_cpu_reader.h"
+#include "cpu_reader.h"
 
 #include <utility>
 
 #include "base/logging.h"
-#include "ftrace_to_proto_translation_table.h"
+#include "proto_translation_table.h"
 
 #include "protos/ftrace/ftrace_event.pbzero.h"
+#include "protos/ftrace/print.pbzero.h"
 
 namespace perfetto {
 
 namespace {
+
+using BundleHandle =
+    protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>;
+
+const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
+                                           const std::set<std::string>& names) {
+  std::vector<bool> enabled(table.largest_id() + 1);
+  for (const std::string& name : names) {
+    const ProtoTranslationTable::Event* event = table.GetEventByName(name);
+    if (!event)
+      continue;
+    enabled[event->ftrace_event_id] = true;
+  }
+  return enabled;
+}
 
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
@@ -57,12 +73,23 @@ struct TimeStamp {
 
 }  // namespace
 
-FtraceCpuReader::FtraceCpuReader(const FtraceToProtoTranslationTable* table,
-                                 size_t cpu,
-                                 base::ScopedFile fd)
+EventFilter::EventFilter(const ProtoTranslationTable& table,
+                         std::set<std::string> names)
+    : enabled_ids_(BuildEnabledVector(table, names)),
+      enabled_names_(std::move(names)) {}
+EventFilter::~EventFilter() = default;
+
+CpuReader::CpuReader(const ProtoTranslationTable* table,
+                     size_t cpu,
+                     base::ScopedFile fd)
     : table_(table), cpu_(cpu), fd_(std::move(fd)) {}
 
-bool FtraceCpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
+int CpuReader::GetFileDescriptor() {
+  return fd_.get();
+}
+
+bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
+                      const std::array<BundleHandle, kMaxSinks>& bundles) {
   if (!fd_)
     return false;
 
@@ -73,13 +100,17 @@ bool FtraceCpuReader::Read(const Config&, pbzero::FtraceEventBundle* bundle) {
     return false;
   PERFETTO_CHECK(bytes <= kPageSize);
 
-  return ParsePage(cpu_, buffer, bytes, bundle);
+  for (size_t i = 0; i < kMaxSinks; i++) {
+    if (!filters[i])
+      break;
+    ParsePage(cpu_, buffer, bytes, filters[i], &*bundles[i]);
+  }
+  return true;
 }
 
-FtraceCpuReader::~FtraceCpuReader() = default;
-FtraceCpuReader::FtraceCpuReader(FtraceCpuReader&&) = default;
+CpuReader::~CpuReader() = default;
 
-uint8_t* FtraceCpuReader::GetBuffer() {
+uint8_t* CpuReader::GetBuffer() {
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.
   if (!buffer_)
     buffer_ = std::unique_ptr<uint8_t[]>(new uint8_t[kPageSize]);
@@ -94,23 +125,23 @@ uint8_t* FtraceCpuReader::GetBuffer() {
 // Some information about the layout of the page header is available in user
 // space at: /sys/kernel/debug/tracing/events/header_event
 // This method is deliberately static so it can be tested independently.
-bool FtraceCpuReader::ParsePage(size_t cpu,
-                                const uint8_t* ptr,
-                                size_t size,
-                                pbzero::FtraceEventBundle* bundle) {
-  const uint8_t* const start = ptr;
-  const uint8_t* const end = ptr + size;
+bool CpuReader::ParsePage(size_t cpu,
+                          const uint8_t* ptr,
+                          size_t size,
+                          const EventFilter* filter,
+                          pbzero::FtraceEventBundle* bundle) {
+  const uint8_t* const start_of_page = ptr;
+  const uint8_t* const end_of_page = ptr + size;
   bundle->set_cpu(cpu);
 
   // TODO(hjd): Read this format dynamically?
   PageHeader page_header;
-  if (!ReadAndAdvance(&ptr, end, &page_header))
-    return false;
-  if (ptr + page_header.size > end)
+  if (!ReadAndAdvance(&ptr, end_of_page, &page_header))
     return false;
 
-  // TODO(hjd): Remove.
-  (void)start;
+  const uint8_t* const end = ptr + page_header.size;
+  if (end > end_of_page)
+    return false;
 
   while (ptr < end) {
     EventHeader event_header;
@@ -155,9 +186,13 @@ bool FtraceCpuReader::ParsePage(size_t cpu,
         }
         const uint8_t* next = ptr + 4 * event_header.type_or_length;
 
-        uint16_t event_type;
-        if (!ReadAndAdvance<uint16_t>(&ptr, end, &event_type))
+        uint16_t ftrace_event_id;
+        if (!ReadAndAdvance<uint16_t>(&ptr, end, &ftrace_event_id))
           return false;
+        if (!filter->IsEventEnabled(ftrace_event_id)) {
+          ptr = next;
+          break;
+        }
 
         // Common headers:
         // TODO(hjd): Read this format dynamically?
@@ -171,26 +206,27 @@ bool FtraceCpuReader::ParsePage(size_t cpu,
         if (!ReadAndAdvance<uint32_t>(&ptr, end, &pid))
           return false;
 
-        PERFETTO_DLOG("Event type=%d pid=%d", event_type, pid);
+        PERFETTO_DLOG("Event type=%d pid=%d", ftrace_event_id, pid);
 
         pbzero::FtraceEvent* event = bundle->add_event();
         event->set_pid(pid);
 
-        if (event_type == 5) {
+        // TODO(hjd): Replace this handrolled code with generic parsing code.
+        if (ftrace_event_id == 5) {
+          pbzero::PrintFtraceEvent* print_event = event->set_print();
           // Trace Marker Parser
           uint64_t ip;
           if (!ReadAndAdvance<uint64_t>(&ptr, end, &ip))
             return false;
-
-          const uint8_t* word_start = ptr;
-          PERFETTO_DLOG("  marker=%s", word_start);
-          while (*ptr != '\0')
-            ptr++;
+          print_event->set_ip(ip);
+          print_event->Finalize();
         }
+
+        event->Finalize();
 
         // Jump to next event.
         ptr = next;
-        PERFETTO_DLOG("%zu", ptr - start);
+        PERFETTO_DLOG("%zu", ptr - start_of_page);
       }
     }
   }
