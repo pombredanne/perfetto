@@ -118,9 +118,6 @@ class TestFtraceController : public FtraceController {
                        std::unique_ptr<Table> table)
       : FtraceController(std::move(ftrace_procfs), runner, std::move(table)) {}
 
-  //  MOCK_METHOD3(CreateCpuReader, CpuReader(const ProtoTranslationTable*,
-  //  size_t cpu, const std::string& path));
-
  private:
   TestFtraceController(const TestFtraceController&) = delete;
   TestFtraceController& operator=(const TestFtraceController&) = delete;
@@ -218,12 +215,14 @@ TEST(FtraceControllerTest, StartStop) {
   MockTaskRunner task_runner;
   auto ftrace_procfs =
       std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
+  auto raw_ftrace_procfs = ftrace_procfs.get();
   TestFtraceController controller(std::move(ftrace_procfs), &task_runner,
                                   FakeTable());
 
   // Stopping before we start does nothing.
   controller.Stop();
 
+  EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(task_runner, AddFileDescriptorWatch(_, _));
   controller.Start();
   // Double start does nothing.
