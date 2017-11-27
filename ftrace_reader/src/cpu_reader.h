@@ -29,13 +29,13 @@
 
 namespace perfetto {
 
+class ProtoTranslationTable;
+
 namespace protos {
 namespace pbzero {
 class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
-
-class ProtoTranslationTable;
 
 // Class for efficient 'is event with id x enabled?' tests.
 // Mirrors the data in a FtraceConfig but in a format better suited
@@ -47,7 +47,6 @@ class EventFilter {
 
   bool IsEventEnabled(size_t ftrace_event_id) const {
     if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size()) {
-      PERFETTO_DCHECK(false);
       return false;
     }
     return enabled_ids_[ftrace_event_id];
@@ -97,7 +96,8 @@ class CpuReader {
                         const uint8_t* ptr,
                         size_t ptr_size,
                         const EventFilter*,
-                        protos::pbzero::FtraceEventBundle*);
+                        protos::pbzero::FtraceEventBundle*,
+                        const ProtoTranslationTable* table);
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;

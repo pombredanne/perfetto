@@ -31,7 +31,6 @@
 #include "gtest/gtest_prod.h"
 #include "protozero/protozero_message_handle.h"
 
-
 namespace perfetto {
 
 namespace protos {

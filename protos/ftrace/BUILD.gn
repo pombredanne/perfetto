@@ -41,6 +41,7 @@ action_foreach("generate_full_protos") {
 }
 
 proto_library("full") {
+  testonly = true
   deps = [
     ":generate_full_protos",
   ]

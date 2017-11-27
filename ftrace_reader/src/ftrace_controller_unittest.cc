@@ -33,12 +33,12 @@ using testing::Return;
 using testing::ByMove;
 using testing::AnyNumber;
 
+using Table = perfetto::ProtoTranslationTable;
+using FtraceEventBundle = perfetto::protos::pbzero::FtraceEventBundle;
+
 namespace perfetto {
 
 namespace {
-
-using Table = ProtoTranslationTable;
-using protozero::ProtoZeroMessageHandle;
 
 class MockTaskRunner : public base::TaskRunner {
  public:
@@ -52,14 +52,17 @@ class MockDelegate : public perfetto::FtraceSink::Delegate {
  public:
   MOCK_METHOD1(
       GetBundleForCpu,
-      ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>(size_t));
-  MOCK_METHOD2(
-      OnBundleComplete_,
-      void(size_t, ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>&));
+      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>(
+          size_t));
+  MOCK_METHOD2(OnBundleComplete_,
+               void(size_t,
+                    protozero::ProtoZeroMessageHandle<
+                        protos::pbzero::FtraceEventBundle>&));
 
   void OnBundleComplete(
       size_t cpu,
-      ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle> bundle) {
+      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>
+          bundle) {
     OnBundleComplete_(cpu, bundle);
   }
 };
@@ -119,9 +122,6 @@ class TestFtraceController : public FtraceController {
                        base::TaskRunner* runner,
                        std::unique_ptr<Table> table)
       : FtraceController(std::move(ftrace_procfs), runner, std::move(table)) {}
-
-  //  MOCK_METHOD3(CreateCpuReader, CpuReader(const ProtoTranslationTable*,
-  //  size_t cpu, const std::string& path));
 
  private:
   TestFtraceController(const TestFtraceController&) = delete;
@@ -220,12 +220,14 @@ TEST(FtraceControllerTest, StartStop) {
   MockTaskRunner task_runner;
   auto ftrace_procfs =
       std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
+  auto raw_ftrace_procfs = ftrace_procfs.get();
   TestFtraceController controller(std::move(ftrace_procfs), &task_runner,
                                   FakeTable());
 
   // Stopping before we start does nothing.
   controller.Stop();
 
+  EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(task_runner, AddFileDescriptorWatch(_, _));
   controller.Start();
   // Double start does nothing.
