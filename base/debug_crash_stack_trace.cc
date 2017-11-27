@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cxxabi.h>
 #include <dlfcn.h>
 #include <signal.h>
 #include <stdio.h>
@@ -24,19 +25,6 @@
 
 #if defined(NDEBUG)
 #error This translation unit should not be used in production builds
-#endif
-
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wdeprecated-dynamic-exception-spec"
-#endif
-#include <cxxabi.h>
-#pragma GCC diagnostic pop
-
-// Glibc headers trigger this on |sa_digaction| and |si_addr|.
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
 #endif
 
 namespace {
@@ -171,5 +159,3 @@ void EnableStacktraceOnCrashForDebug() {
 }
 
 }  // namespace
-
-#pragma GCC diagnostic pop
