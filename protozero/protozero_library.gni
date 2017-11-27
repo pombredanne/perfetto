@@ -24,14 +24,14 @@ template("protozero_library") {
     generator_plugin_label = "//protozero/src/protoc_plugin"
     generator_plugin_suffix = ".pbzero"
     public_configs = [ "//protozero:protozero_config" ]
-    deps = [
-      "//protozero",
-    ]
+    deps = []
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+    deps += [ "//protozero" ]
     forward_variables_from(invoker,
                            [
                              "defines",
-                             "deps",
-                             "generate_cc",
                              "generator_plugin_options",
                              "include_dirs",
                              "proto_in_dir",

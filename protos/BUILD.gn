@@ -19,9 +19,8 @@ proto_sources = [ "trace_packet.proto" ]
 
 # Protozero generated stubs, for writers.
 protozero_library("zero") {
-  generate_cc = false
   deps = [
-    "ftrace",
+    "ftrace:zero",
   ]
   sources = proto_sources
   proto_out_dir = "protos_zero"
@@ -32,5 +31,6 @@ proto_library("lite") {
   deps = [
     "ftrace:lite",
   ]
+  sources = proto_sources
   proto_out_dir = "protos_lite"
 }
