@@ -50,19 +50,15 @@ class MockTaskRunner : public base::TaskRunner {
 
 class MockDelegate : public perfetto::FtraceSink::Delegate {
  public:
-  MOCK_METHOD1(
-      GetBundleForCpu,
-      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>(
-          size_t));
+  MOCK_METHOD1(GetBundleForCpu,
+               protozero::ProtoZeroMessageHandle<FtraceEventBundle>(size_t));
   MOCK_METHOD2(OnBundleComplete_,
                void(size_t,
-                    protozero::ProtoZeroMessageHandle<
-                        protos::pbzero::FtraceEventBundle>&));
+                    protozero::ProtoZeroMessageHandle<FtraceEventBundle>&));
 
   void OnBundleComplete(
       size_t cpu,
-      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>
-          bundle) {
+      protozero::ProtoZeroMessageHandle<FtraceEventBundle> bundle) {
     OnBundleComplete_(cpu, bundle);
   }
 };
