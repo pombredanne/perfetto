@@ -34,6 +34,14 @@ constexpr size_t kDemangledNameLen = 4096;
 bool g_sighandler_registered = false;
 char* g_demangled_name = nullptr;
 
+struct SigHandler {
+  int sig_num;
+  struct sigaction old_handler;
+};
+
+SigHandler g_signals[] = {{SIGSEGV}, {SIGILL}, {SIGTRAP},
+                          {SIGABRT}, {SIGBUS}, {SIGFPE}};
+
 template <typename T>
 void Print(const T& str) {
   write(STDERR_FILENO, str, sizeof(str));
@@ -78,6 +86,10 @@ _Unwind_Reason_Code TraceStackFrame(_Unwind_Context* context, void* arg) {
 
 // Note: use only async-safe functions inside this.
 void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
+  // Restore the old handlers.
+  for (size_t i = 0; i < sizeof(g_signals) / sizeof(g_signals[0]); i++)
+    sigaction(g_signals[i].sig_num, &g_signals[i].old_handler, nullptr);
+
   Print("\n------------------ BEGINNING OF CRASH ------------------\n");
   Print("Signal: ");
   if (sig_num == SIGSEGV) {
@@ -153,12 +165,8 @@ void EnableStacktraceOnCrashForDebug() {
   sigact.sa_sigaction = &SignalHandler;
   sigact.sa_flags = static_cast<decltype(sigact.sa_flags)>(
       SA_RESTART | SA_SIGINFO | SA_RESETHAND);
-  sigaction(SIGSEGV, &sigact, nullptr);
-  sigaction(SIGILL, &sigact, nullptr);
-  sigaction(SIGTRAP, &sigact, nullptr);
-  sigaction(SIGABRT, &sigact, nullptr);
-  sigaction(SIGBUS, &sigact, nullptr);
-  sigaction(SIGFPE, &sigact, nullptr);
+  for (size_t i = 0; i < sizeof(g_signals) / sizeof(g_signals[0]); i++)
+    sigaction(g_signals[i].sig_num, &sigact, &g_signals[i].old_handler);
 }
 
 }  // namespace
