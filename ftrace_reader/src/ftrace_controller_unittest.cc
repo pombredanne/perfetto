@@ -49,15 +49,15 @@ class MockDelegate : public perfetto::FtraceSink::Delegate {
  public:
   MOCK_METHOD1(
       GetBundleForCpu,
-      protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>(size_t));
+      protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>(size_t));
   MOCK_METHOD2(
       OnBundleComplete_,
       void(size_t,
-           protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>&));
+           protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>&));
 
   void OnBundleComplete(
       size_t cpu,
-      protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle> bundle) {
+      protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle> bundle) {
     OnBundleComplete_(cpu, bundle);
   }
 };

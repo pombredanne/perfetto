@@ -28,7 +28,7 @@ namespace perfetto {
 namespace {
 
 using BundleHandle =
-    protozero::ProtoZeroMessageHandle<pbzero::FtraceEventBundle>;
+    protozero::ProtoZeroMessageHandle<protos::FtraceEventBundle>;
 
 const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
                                            const std::set<std::string>& names) {
@@ -128,7 +128,7 @@ bool CpuReader::ParsePage(size_t cpu,
                           const uint8_t* ptr,
                           size_t size,
                           const EventFilter* filter,
-                          pbzero::FtraceEventBundle* bundle) {
+                          protos::FtraceEventBundle* bundle) {
   const uint8_t* const start = ptr;
   const uint8_t* const end = ptr + size;
   bundle->set_cpu(cpu);
@@ -204,7 +204,7 @@ bool CpuReader::ParsePage(size_t cpu,
 
         PERFETTO_DLOG("Event type=%d pid=%d", event_type, pid);
 
-        pbzero::FtraceEvent* event = bundle->add_event();
+        protos::FtraceEvent* event = bundle->add_event();
         event->set_pid(pid);
 
         if (event_type == 5) {
