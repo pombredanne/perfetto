@@ -29,7 +29,7 @@
 
 namespace {
 
-constexpr size_t kDemangledNameLen = 1024;
+constexpr size_t kDemangledNameLen = 4096;
 
 bool g_sighandler_registered = false;
 char* g_demangled_name = nullptr;
@@ -80,20 +80,22 @@ _Unwind_Reason_Code TraceStackFrame(_Unwind_Context* context, void* arg) {
 void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
   Print("\n------------------ BEGINNING OF CRASH ------------------\n");
   Print("Signal: ");
-  if (sig_num == SIGSEGV)
+  if (sig_num == SIGSEGV) {
     Print("Segmentation fault");
-  else if (sig_num == SIGILL)
+  } else if (sig_num == SIGILL) {
     Print("Illegal instruction (possibly unaligned access)");
-  else if (sig_num == SIGTRAP)
+  } else if (sig_num == SIGTRAP) {
     Print("Trap");
-  else if (sig_num == SIGABRT)
+  } else if (sig_num == SIGABRT) {
     Print("Abort");
-  else if (sig_num == SIGBUS)
+  } else if (sig_num == SIGBUS) {
     Print("Bus Error (possibly unmapped memory access)");
-  else if (sig_num == SIGFPE)
+  } else if (sig_num == SIGFPE) {
     Print("Floating point exception");
-  else
-    Print("Unexpected signal");
+  } else {
+    Print("Unexpected signal ");
+    PrintHex(static_cast<uint32_t>(sig_num));
+  }
 
   Print("\n");
 
@@ -120,7 +122,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
                                             g_demangled_name, &len, &ignored);
       if (demangled) {
         sym_name = demangled;
-        // In the exceptional case of demangling someting > kDemangledNameLen,
+        // In the exceptional case of demangling something > kDemangledNameLen,
         // __cxa_demangle will realloc(). In that case the malloc()-ed pointer
         // might be moved.
         g_demangled_name = demangled;
@@ -142,6 +144,7 @@ void __attribute__((constructor)) EnableStacktraceOnCrashForDebug();
 void EnableStacktraceOnCrashForDebug() {
   if (g_sighandler_registered)
     return;
+  g_sighandler_registered = true;
 
   // Pre-allocate the string for __cxa_demangle() to reduce the risk of that
   // invoking realloc() within the signal handler.
