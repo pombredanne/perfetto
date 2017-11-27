@@ -28,7 +28,7 @@ declare_args() {
       linux_clang_bin = "$_hermetic_llvm_dir/bin/clang"
       linux_clangxx_bin = "$_hermetic_llvm_dir/bin/clang++"
       linux_clangrt_dir = "$_hermetic_llvm_dir/lib/clang/6.0.0/lib/linux"
-    } else {
+    } else if (is_clang) {
       # Guess the path for the system clang.
       find_llvm_out = exec_script("linux_find_llvm.py", [], "list lines")
       linux_llvm_dir = find_llvm_out[0]
