@@ -51,6 +51,9 @@ TEST(TranslationTable, Seed) {
   FtraceProcfs ftrace_procfs(path);
   auto table = ProtoTranslationTable::Create(&ftrace_procfs);
   EXPECT_EQ(table->largest_id(), 744);
+  EXPECT_EQ(table->common_fields().at(0).ftrace_offset, 0u);
+  EXPECT_EQ(table->common_fields().at(0).ftrace_size, 2u);
+
   auto sched_switch_event = table->GetEventByName("sched_switch");
   EXPECT_EQ(sched_switch_event->name, "sched_switch");
   EXPECT_EQ(sched_switch_event->group, "sched");
