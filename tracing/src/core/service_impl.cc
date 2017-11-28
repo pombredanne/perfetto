@@ -117,8 +117,6 @@ void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
     const DataSourceDescriptor&,
     RegisterDataSourceCallback callback) {
   const DataSourceID dsid = ++last_data_source_id_;
-                desc.name.c_str(), dsid);
-
   task_runner_->PostTask(std::bind(std::move(callback), dsid));
   // TODO implement the bookkeeping logic.
   if (service_->observer_)
