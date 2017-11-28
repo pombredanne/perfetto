@@ -34,7 +34,7 @@ source_set("base") {
 }
 
 if (is_android) {
-  source_set("android") {
+  source_set("android_task_runner") {
     deps += [ ":base" ]
     sources = [
       "android_task_runner.cc",
@@ -59,9 +59,11 @@ if (is_debug) {
 source_set("test_support") {
   testonly = true
   public_deps = [
-    ":android",
     ":base",
   ]
+  if (is_android) {
+    public_deps += [ ":android_task_runner" ]
+  }
   sources = [
     "test/test_task_runner.cc",
     "test/test_task_runner.h",

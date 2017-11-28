@@ -148,13 +148,13 @@ config("default") {
 }
 
 config("debug_symbols") {
-  if (is_android) {
-    cflags = [
-      "-gline-tables-only",
-      "-funwind-tables",
-    ]
-  } else {
-    cflags = [ "-g2" ]
+  cflags = [
+    "-g",
+    "-O0",
+  ]
+  if (is_android || is_linux) {
+    cflags += [ "-funwind-tables" ]
+    ldflags = [ "-rdynamic" ]
   }
 }
 
