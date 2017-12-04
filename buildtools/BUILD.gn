@@ -327,7 +327,9 @@ if (current_toolchain == host_toolchain) {
   }
 
   executable("protoc") {
-    deps += [ ":protoc_lib" ]
+    deps = [
+      ":protoc_lib",
+    ]
     sources = [
       "protobuf/src/google/protobuf/compiler/main.cc",
     ]

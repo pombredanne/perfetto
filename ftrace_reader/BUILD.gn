@@ -15,11 +15,12 @@
 import("//build_overrides/build.gni")
 
 config("ftrace_reader_config") {
-  include_dirs = [ "include" ]
+  include_dirs = [
+    "include",
+    "..",
+  ]
 
-  if (!build_with_chromium) {
-    deps += [ "//buildtools:googletest_prod_config" ]
-  } else {
+  if (build_with_chromium) {
     include_dirs += [ "//testing/gtest/include" ]
   }
 }
@@ -78,6 +79,10 @@ source_set("ftrace_reader") {
     "../perfetto_base",
     "../protozero",
   ]
+
+  if (!build_with_chromium) {
+    configs += [ "//buildtools:googletest_prod_config" ]
+  }
 
   public_deps = [
     "../protos/ftrace:zero",

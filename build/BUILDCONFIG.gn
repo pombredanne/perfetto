@@ -82,10 +82,11 @@ set_defaults("shared_library") {
 set_defaults("executable") {
   configs = default_configs
   configs += [ "//build:executable" ]
-  deps = [
-    "//build/libc++:deps",
-    "//build/sanitizers:deps",
-  ]
+
+  #deps = [
+  #  "//build/libc++:deps",
+  #  "//build/sanitizers:deps",
+  #]
 }
 
 set_default_toolchain("//build/toolchain:gcc_like")
