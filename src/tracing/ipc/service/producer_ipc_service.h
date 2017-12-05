@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_
-#define TRACING_SRC_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_
+#ifndef SRC_TRACING_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_
+#define SRC_TRACING_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_
 
 #include <map>
 #include <memory>
@@ -110,4 +110,4 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
 
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_
+#endif  // SRC_TRACING_IPC_SERVICE_PRODUCER_IPC_SERVICE_H_

@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("gn/perfetto.gni")
+
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
-    ":perfetto_benchmarks",
-    ":perfetto_tests",
+    ":tests",
     "src/ftrace_reader:ftrace_reader_demo",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
@@ -24,25 +25,19 @@ group("all") {
   ]
 }
 
-executable("perfetto_tests") {
+group("tests") {
   testonly = true
-  deps += [
+  deps = [
     "src/base:base_unittests",
+    "src/ftrace_reader:ftrace_reader_integrationtests",
     "src/ftrace_reader:ftrace_reader_unittests",
     "src/ipc:ipc_unittests",
     "src/protozero:protozero_unittests",
     "src/tracing:tracing_unittests",
     "tools/sanitizers_unittests",
-    "//buildtools:gtest_main",
   ]
 
-  # The ftrace integration test requires a Linux kernel.
-  if (is_linux || is_android) {
-    deps += [ "src/ftrace_reader:ftrace_reader_integrationtests" ]
+  if (!build_with_chromium) {
+    deps += [ "src/tracing:tracing_benchmarks" ]
   }
-}
-
-executable("perfetto_benchmarks") {
-  testonly = true
-  deps += [ "src/tracing:tracing_benchmarks" ]
 }

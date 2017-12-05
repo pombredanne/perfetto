@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_IPC_PRODUCER_IPC_PROXY_H_
-#define TRACING_SRC_IPC_PRODUCER_IPC_PROXY_H_
+#ifndef SRC_TRACING_IPC_PRODUCER_PRODUCER_IPC_CLIENT_IMPL_H_
+#define SRC_TRACING_IPC_PRODUCER_PRODUCER_IPC_CLIENT_IMPL_H_
 
 #include <stdint.h>
 
@@ -94,4 +94,4 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
 
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_IPC_PRODUCER_IPC_PROXY_H_
+#endif  // SRC_TRACING_IPC_PRODUCER_PRODUCER_IPC_CLIENT_IMPL_H_

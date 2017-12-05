@@ -297,7 +297,8 @@ TEST_F(HostImplTest, SendFileDescriptor) {
       .WillOnce(Invoke([on_fd_received](int fd) {
         char buf[sizeof(kFileContent)] = {};
         ASSERT_EQ(0, lseek(fd, 0, SEEK_SET));
-        ASSERT_EQ(sizeof(buf), PERFETTO_EINTR(read(fd, buf, sizeof(buf))));
+        ASSERT_EQ(static_cast<int32_t>(sizeof(buf)),
+                  PERFETTO_EINTR(read(fd, buf, sizeof(buf))));
         ASSERT_STREQ(kFileContent, buf);
         on_fd_received();
       }));

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_SRC_CLIENT_IMPL_H_
-#define IPC_SRC_CLIENT_IMPL_H_
+#ifndef SRC_IPC_CLIENT_IMPL_H_
+#define SRC_IPC_CLIENT_IMPL_H_
 
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
@@ -95,4 +95,4 @@ class ClientImpl : public Client, public UnixSocket::EventListener {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_SRC_CLIENT_IMPL_H_
+#endif  // SRC_IPC_CLIENT_IMPL_H_

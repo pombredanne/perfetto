@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_PROTO_GEN_FORMAT_PARSER_H_
-#define FTRACE_READER_PROTO_GEN_FORMAT_PARSER_H_
+#ifndef INCLUDE_PERFETTO_FTRACE_READER_FORMAT_PARSER_H_
+#define INCLUDE_PERFETTO_FTRACE_READER_FORMAT_PARSER_H_
 
 #include <string>
 
@@ -27,4 +27,4 @@ bool ParseFtraceEvent(const std::string& input, FtraceEvent* output = nullptr);
 
 }  // namespace perfetto
 
-#endif  // FTRACE_READER_PROTO_GEN_FORMAT_PARSER_H_
+#endif  // INCLUDE_PERFETTO_FTRACE_READER_FORMAT_PARSER_H_

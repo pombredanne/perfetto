@@ -142,8 +142,12 @@ script:
   - build/ninja -C out/dist -j8 all
   - |
     TEST_TARGETS="
-    perfetto_tests
-    perfetto_benchmarks
+    base_unittests
+    protozero_unittests
+    tracing_unittests
+    tracing_benchmarks
+    sanitizers_unittests
+    ftrace_reader_unittests
     "
 
     if [[ "$CFG" != android-* ]]; then

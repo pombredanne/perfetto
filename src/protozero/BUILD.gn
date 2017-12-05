@@ -12,18 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build/proto_library.gni")
+import("../../gn/perfetto.gni")
+import("../../gn/proto_library.gni")
 import("protozero_library.gni")
 
 source_set("protozero") {
-  configs += [ "//buildtools:googletest_prod_config" ]
-  deps += [ "../base" ]
+  public_deps = [
+    "../../include/perfetto/protozero",
+  ]
+  deps = [
+    "../../gn:default_deps",
+    "../../gn:gtest_prod_config",
+    "../base",
+  ]
   sources = [
-    "../../include/perfetto/protozero/contiguous_memory_range.h",
-    "../../include/perfetto/protozero/proto_field_descriptor.h",
-    "../../include/perfetto/protozero/protozero_message.h",
-    "../../include/perfetto/protozero/protozero_message_handle.h",
-    "../../include/perfetto/protozero/scattered_stream_writer.h",
     "proto_utils.cc",
     "protozero_message.cc",
     "protozero_message_handle.cc",
@@ -31,15 +33,15 @@ source_set("protozero") {
   ]
 }
 
-source_set("protozero_unittests") {
+executable("protozero_unittests") {
   testonly = true
-  deps += [
+  deps = [
     ":protozero",
     ":testing_messages_lite",
     ":testing_messages_zero",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
     "../base",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
   ]
   sources = [
     "proto_utils_unittest.cc",
@@ -61,14 +63,14 @@ testing_proto_sources = [
 ]
 
 protozero_library("testing_messages_zero") {
-  include_dirs = [ "include" ]
   sources = testing_proto_sources
+  proto_in_dir = perfetto_root_path
   proto_out_dir = "protos_zero"
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
 
 proto_library("testing_messages_lite") {
-  include_dirs = [ "include" ]
   sources = testing_proto_sources
+  proto_in_dir = perfetto_root_path
   proto_out_dir = "protos_lite"
 }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PERFETTO_BASE_THREAD_CHECKER_H_
-#define PERFETTO_BASE_THREAD_CHECKER_H_
+#ifndef INCLUDE_PERFETTO_BASE_THREAD_CHECKER_H_
+#define INCLUDE_PERFETTO_BASE_THREAD_CHECKER_H_
 
 #include <pthread.h>
 #include <atomic>
@@ -52,4 +52,4 @@ class ThreadChecker {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // PERFETTO_BASE_THREAD_CHECKER_H_
+#endif  // INCLUDE_PERFETTO_BASE_THREAD_CHECKER_H_

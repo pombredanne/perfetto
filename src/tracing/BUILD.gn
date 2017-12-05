@@ -12,23 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("../../gn/perfetto.gni")
+import("//build_overrides/build.gni")
 import("../ipc/ipc_library.gni")
-
-config("tracing_config") {
-  include_dirs = [ "include" ]
-}
 
 # Core tracing library, platform independent, no transport layer.
 source_set("tracing") {
-  all_dependent_configs = [ ":tracing_config" ]
-  deps += [ "../base" ]
+  public_deps = [
+    "../../include/perfetto/tracing/core",
+  ]
+  deps = [
+    "../../gn:default_deps",
+    "../base",
+  ]
   sources = [
-    "../../include/perfetto/tracing/core/basic_types.h",
-    "../../include/perfetto/tracing/core/data_source_config.h",
-    "../../include/perfetto/tracing/core/data_source_descriptor.h",
-    "../../include/perfetto/tracing/core/producer.h",
-    "../../include/perfetto/tracing/core/service.h",
-    "../../include/perfetto/tracing/core/shared_memory.h",
     "core/service_impl.cc",
     "core/service_impl.h",
   ]
@@ -36,6 +33,7 @@ source_set("tracing") {
 
 # IPC service definitions.
 ipc_library("ipc_protos") {
+  proto_in_dir = perfetto_root_path
   sources = [
     "ipc/data_source_config.proto",
     "ipc/data_source_descriptor.proto",
@@ -46,9 +44,11 @@ ipc_library("ipc_protos") {
 # Posix specialization of the tracing library for Linux/Android/Mac. Provides
 # an IPC transport over a UNIX domain socket.
 source_set("ipc") {
+  public_deps = [
+    "../../include/perfetto/tracing/core",
+    "../../include/perfetto/tracing/ipc",
+  ]
   sources = [
-    "../../include/perfetto/tracing/ipc/producer_ipc_client.h",
-    "../../include/perfetto/tracing/ipc/service_ipc_host.h",
     "ipc/posix_shared_memory.cc",
     "ipc/posix_shared_memory.h",
     "ipc/producer/producer_ipc_client_impl.cc",
@@ -61,20 +61,23 @@ source_set("ipc") {
   deps = [
     ":ipc_protos",
     ":tracing",
+    "../../gn:default_deps",
     "../base",
+    "../ipc",
   ]
 }
 
-source_set("tracing_unittests") {
+executable("tracing_unittests") {
   testonly = true
-  deps += [
+  deps = [
     ":ipc",
     ":tracing",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
     "../base",
     "../base:test_support",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
   ]
+
   sources = [
     "core/service_impl_unittest.cc",
     "ipc/posix_shared_memory_unittest.cc",
@@ -83,10 +86,31 @@ source_set("tracing_unittests") {
   ]
 }
 
-source_set("tracing_benchmarks") {
+executable("tracing_test") {
   testonly = true
-  deps += [ "//buildtools:benchmark" ]
-  sources = [
-    "test/hello_world_benchmark.cc",
+  deps = [
+    ":ipc",
+    ":ipc_protos",
+    ":tracing",
+    "../../gn:default_deps",
+    "../base",
+    "../base:test_support",
+    "../ipc",
   ]
+  sources = [
+    "test/ipc_test.cc",
+  ]
+}
+
+if (!build_with_chromium) {
+  executable("tracing_benchmarks") {
+    testonly = true
+    deps = [
+      "../../gn:default_deps",
+      "//buildtools:benchmark",
+    ]
+    sources = [
+      "test/hello_world_benchmark.cc",
+    ]
+  }
 }

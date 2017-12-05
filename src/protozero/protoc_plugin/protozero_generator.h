@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PROTOZERO_SRC_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_
-#define PROTOZERO_SRC_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_
+#ifndef SRC_PROTOZERO_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_
+#define SRC_PROTOZERO_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_
 
 #include <string>
 
@@ -37,4 +37,4 @@ class ProtoZeroGenerator : public ::google::protobuf::compiler::CodeGenerator {
 
 }  // namespace protozero
 
-#endif  // PROTOZERO_SRC_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_
+#endif  // SRC_PROTOZERO_PROTOC_PLUGIN_PROTOZERO_GENERATOR_H_

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
-#define TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
+#ifndef INCLUDE_PERFETTO_TRACING_CORE_SERVICE_H_
+#define INCLUDE_PERFETTO_TRACING_CORE_SERVICE_H_
 
 #include <stdint.h>
 
@@ -120,4 +120,4 @@ class Service {
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_TRACING_CORE_SERVICE_H_
+#endif  // INCLUDE_PERFETTO_TRACING_CORE_SERVICE_H_

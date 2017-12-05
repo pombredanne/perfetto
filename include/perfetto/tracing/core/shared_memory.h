@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_CORE_SHARED_MEMORY_H_
-#define TRACING_INCLUDE_TRACING_CORE_SHARED_MEMORY_H_
+#ifndef INCLUDE_PERFETTO_TRACING_CORE_SHARED_MEMORY_H_
+#define INCLUDE_PERFETTO_TRACING_CORE_SHARED_MEMORY_H_
 
 #include <stddef.h>
 
@@ -48,4 +48,4 @@ class SharedMemory {
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_TRACING_CORE_SHARED_MEMORY_H_
+#endif  // INCLUDE_PERFETTO_TRACING_CORE_SHARED_MEMORY_H_

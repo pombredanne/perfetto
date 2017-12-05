@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_IPC_IPC_SERVICE_HOST_IMPL_H_
-#define TRACING_SRC_IPC_IPC_SERVICE_HOST_IMPL_H_
+#ifndef SRC_TRACING_IPC_SERVICE_SERVICE_IPC_HOST_IMPL_H_
+#define SRC_TRACING_IPC_SERVICE_SERVICE_IPC_HOST_IMPL_H_
 
 #include <memory>
 
@@ -52,4 +52,4 @@ class ServiceIPCHostImpl : public ServiceIPCHost {
 
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_IPC_IPC_SERVICE_HOST_IMPL_H_
+#endif  // SRC_TRACING_IPC_SERVICE_SERVICE_IPC_HOST_IMPL_H_

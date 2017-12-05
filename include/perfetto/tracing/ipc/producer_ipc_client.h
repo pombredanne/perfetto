@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_
-#define TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_
+#ifndef INCLUDE_PERFETTO_TRACING_IPC_PRODUCER_IPC_CLIENT_H_
+#define INCLUDE_PERFETTO_TRACING_IPC_PRODUCER_IPC_CLIENT_H_
 
 #include <memory>
 #include <string>
@@ -50,4 +50,4 @@ class ProducerIPCClient {
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_IPC_PRODUCER_IPC_CLIENT_H_
+#endif  // INCLUDE_PERFETTO_TRACING_IPC_PRODUCER_IPC_CLIENT_H_

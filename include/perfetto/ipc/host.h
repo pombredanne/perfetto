@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_INCLUDE_IPC_HOST_H_
-#define IPC_INCLUDE_IPC_HOST_H_
+#ifndef INCLUDE_PERFETTO_IPC_HOST_H_
+#define INCLUDE_PERFETTO_IPC_HOST_H_
 
 #include <memory>
 
@@ -55,4 +55,4 @@ class Host {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_INCLUDE_IPC_HOST_H_
+#endif  // INCLUDE_PERFETTO_IPC_HOST_H_

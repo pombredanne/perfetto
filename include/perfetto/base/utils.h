@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PERFETTO_BASE_UTILS_H_
-#define PERFETTO_BASE_UTILS_H_
+#ifndef INCLUDE_PERFETTO_BASE_UTILS_H_
+#define INCLUDE_PERFETTO_BASE_UTILS_H_
 
 #include <errno.h>
 #include <stddef.h>
@@ -60,4 +60,4 @@ constexpr T AssumeLittleEndian(T value) {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // PERFETTO_BASE_UTILS_H_
+#endif  // INCLUDE_PERFETTO_BASE_UTILS_H_

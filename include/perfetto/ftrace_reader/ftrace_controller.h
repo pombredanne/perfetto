@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_FTRACE_CONTROLLER_H_
-#define FTRACE_READER_FTRACE_CONTROLLER_H_
+#ifndef INCLUDE_PERFETTO_FTRACE_READER_FTRACE_CONTROLLER_H_
+#define INCLUDE_PERFETTO_FTRACE_READER_FTRACE_CONTROLLER_H_
 
 #include <unistd.h>
 
@@ -154,4 +154,4 @@ class FtraceController {
 
 }  // namespace perfetto
 
-#endif  // FTRACE_READER_FTRACE_CONTROLLER_H_
+#endif  // INCLUDE_PERFETTO_FTRACE_READER_FTRACE_CONTROLLER_H_

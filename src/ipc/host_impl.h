@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_SRC_HOST_IMPL_H_
-#define IPC_SRC_HOST_IMPL_H_
+#ifndef SRC_IPC_HOST_IMPL_H_
+#define SRC_IPC_HOST_IMPL_H_
 
 #include <map>
 #include <set>
@@ -95,4 +95,4 @@ class HostImpl : public Host, public UnixSocket::EventListener {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_SRC_HOST_IMPL_H_
+#endif  // SRC_IPC_HOST_IMPL_H_

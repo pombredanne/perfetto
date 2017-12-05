@@ -12,25 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build/proto_library.gni")
+import("../../gn/perfetto.gni")
+import("../../gn/proto_library.gni")
 import("ipc_library.gni")
 
 source_set("ipc") {
-  deps += [
+  public_deps = [
+    "../../include/perfetto/ipc",
+  ]
+  deps = [
     ":wire_protocol",
+    "../../gn:default_deps",
     "../base",
   ]
   sources = [
-    "../../include/perfetto/ipc/async_result.h",
-    "../../include/perfetto/ipc/basic_types.h",
-    "../../include/perfetto/ipc/client.h",
-    "../../include/perfetto/ipc/client_info.h",
-    "../../include/perfetto/ipc/codegen_helpers.h",
-    "../../include/perfetto/ipc/deferred.h",
-    "../../include/perfetto/ipc/host.h",
-    "../../include/perfetto/ipc/service.h",
-    "../../include/perfetto/ipc/service_descriptor.h",
-    "../../include/perfetto/ipc/service_proxy.h",
     "buffered_frame_deserializer.cc",
     "client_impl.cc",
     "deferred.cc",
@@ -42,16 +37,16 @@ source_set("ipc") {
   ]
 }
 
-source_set("ipc_unittests") {
+executable("ipc_unittests") {
   testonly = true
-  deps += [
+  deps = [
     ":ipc",
     ":test_messages",
     ":wire_protocol",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
     "../base",
     "../base:test_support",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
   ]
   sources = [
     "buffered_frame_deserializer_unittest.cc",
@@ -67,8 +62,7 @@ proto_library("wire_protocol") {
   sources = [
     "wire_protocol.proto",
   ]
-
-  # include_dirs = [ "include" ]
+  proto_in_dir = perfetto_root_path
   proto_out_dir = "protos_lite"
 }
 
@@ -78,5 +72,5 @@ ipc_library("test_messages") {
     "test/deferred_unittest_messages.proto",
     "test/greeter_service.proto",
   ]
-  # include_dirs = [ "include" ]
+  proto_in_dir = perfetto_root_path
 }

@@ -149,7 +149,8 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
   Service* service = svc_it->second.instance.get();
   const ServiceDescriptor& svc = service->GetDescriptor();
   const auto& methods = svc.methods;
-  if (req.method_id() <= 0 || req.method_id() > methods.size())
+  if (req.method_id() <= 0 ||
+      static_cast<uint32_t>(req.method_id()) > methods.size())
     return SendFrame(client, reply_frame);
 
   const ServiceDescriptor::Method& method = methods[req.method_id() - 1];

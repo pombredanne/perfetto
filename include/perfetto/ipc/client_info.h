@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_INCLUDE_IPC_CLIENT_INFO_H_
-#define IPC_INCLUDE_IPC_CLIENT_INFO_H_
+#ifndef INCLUDE_PERFETTO_IPC_CLIENT_INFO_H_
+#define INCLUDE_PERFETTO_IPC_CLIENT_INFO_H_
 
 #include "perfetto/base/logging.h"
 #include "perfetto/ipc/basic_types.h"
@@ -56,4 +56,4 @@ class ClientInfo {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_INCLUDE_IPC_CLIENT_INFO_H_
+#endif  // INCLUDE_PERFETTO_IPC_CLIENT_INFO_H_

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_TEST_TEST_SHARED_MEMORY_H_
-#define TRACING_SRC_TEST_TEST_SHARED_MEMORY_H_
+#ifndef SRC_TRACING_TEST_TEST_SHARED_MEMORY_H_
+#define SRC_TRACING_TEST_TEST_SHARED_MEMORY_H_
 
 #include <stddef.h>
 
@@ -47,4 +47,4 @@ class TestSharedMemory : public SharedMemory {
 
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_TEST_TEST_SHARED_MEMORY_H_
+#endif  // SRC_TRACING_TEST_TEST_SHARED_MEMORY_H_

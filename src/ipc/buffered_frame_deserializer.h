@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_SRC_BUFFERED_FRAME_DESERIALIZER_H_
-#define IPC_SRC_BUFFERED_FRAME_DESERIALIZER_H_
+#ifndef SRC_IPC_BUFFERED_FRAME_DESERIALIZER_H_
+#define SRC_IPC_BUFFERED_FRAME_DESERIALIZER_H_
 
 #include <stddef.h>
 
@@ -126,4 +126,4 @@ class BufferedFrameDeserializer {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_SRC_BUFFERED_FRAME_DESERIALIZER_H_
+#endif  // SRC_IPC_BUFFERED_FRAME_DESERIALIZER_H_

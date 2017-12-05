@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PROTOZERO_INCLUDE_PROTOZERO_PROTO_UTILS_H_
-#define PROTOZERO_INCLUDE_PROTOZERO_PROTO_UTILS_H_
+#ifndef INCLUDE_PERFETTO_PROTOZERO_PROTO_UTILS_H_
+#define INCLUDE_PERFETTO_PROTOZERO_PROTO_UTILS_H_
 
 #include <inttypes.h>
 #include <stddef.h>
@@ -128,4 +128,4 @@ const uint8_t* ParseField(const uint8_t* start,
 }  // namespace proto_utils
 }  // namespace protozero
 
-#endif  // PROTOZERO_INCLUDE_PROTOZERO_PROTO_UTILS_H_
+#endif  // INCLUDE_PERFETTO_PROTOZERO_PROTO_UTILS_H_

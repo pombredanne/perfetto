@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PERFETTO_BASE_SCOPED_FILE_H_
-#define PERFETTO_BASE_SCOPED_FILE_H_
+#ifndef INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_
+#define INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_
 
 #include <dirent.h>
 #include <unistd.h>
@@ -64,4 +64,4 @@ using ScopedDir = ScopedResource<DIR*, closedir, nullptr>;
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // PERFETTO_BASE_SCOPED_FILE_H_
+#endif  // INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_

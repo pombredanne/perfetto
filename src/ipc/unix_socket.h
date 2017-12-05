@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_SRC_UNIX_SOCKET_H_
-#define IPC_SRC_UNIX_SOCKET_H_
+#ifndef SRC_IPC_UNIX_SOCKET_H_
+#define SRC_IPC_UNIX_SOCKET_H_
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -193,4 +193,4 @@ class UnixSocket {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_SRC_UNIX_SOCKET_H_
+#endif  // SRC_IPC_UNIX_SOCKET_H_

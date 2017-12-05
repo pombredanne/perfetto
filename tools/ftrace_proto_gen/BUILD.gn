@@ -16,7 +16,8 @@ executable("ftrace_proto_gen") {
   sources = [
     "main.cc",
   ]
-  deps += [
+  deps = [
+    "../../gn:default_deps",
     "../../src/base",
     "../../src/ftrace_reader",
   ]

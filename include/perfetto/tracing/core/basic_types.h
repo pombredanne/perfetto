@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
-#define TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
+#ifndef INCLUDE_PERFETTO_TRACING_CORE_BASIC_TYPES_H_
+#define INCLUDE_PERFETTO_TRACING_CORE_BASIC_TYPES_H_
 
 #include <stdint.h>
 
@@ -27,4 +27,4 @@ using DataSourceInstanceID = uint64_t;
 
 }  // namespace perfetto
 
-#endif  // TRACING_INCLUDE_TRACING_CORE_BASIC_TYPES_H_
+#endif  // INCLUDE_PERFETTO_TRACING_CORE_BASIC_TYPES_H_

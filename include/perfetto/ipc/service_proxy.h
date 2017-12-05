@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_INCLUDE_IPC_SERVICE_PROXY_H_
-#define IPC_INCLUDE_IPC_SERVICE_PROXY_H_
+#ifndef INCLUDE_PERFETTO_IPC_SERVICE_PROXY_H_
+#define INCLUDE_PERFETTO_IPC_SERVICE_PROXY_H_
 
 #include "perfetto/ipc/basic_types.h"
 
@@ -97,4 +97,4 @@ class ServiceProxy {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_INCLUDE_IPC_SERVICE_PROXY_H_
+#endif  // INCLUDE_PERFETTO_IPC_SERVICE_PROXY_H_

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_INCLUDE_IPC_SERVICE_DESCRIPTOR_H_
-#define IPC_INCLUDE_IPC_SERVICE_DESCRIPTOR_H_
+#ifndef INCLUDE_PERFETTO_IPC_SERVICE_DESCRIPTOR_H_
+#define INCLUDE_PERFETTO_IPC_SERVICE_DESCRIPTOR_H_
 
 #include <functional>
 #include <string>
@@ -69,4 +69,4 @@ class ServiceDescriptor {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_INCLUDE_IPC_SERVICE_DESCRIPTOR_H_
+#endif  // INCLUDE_PERFETTO_IPC_SERVICE_DESCRIPTOR_H_

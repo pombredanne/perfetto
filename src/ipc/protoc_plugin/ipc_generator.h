@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef IPC_SRC_PROTOC_PLUGIN_IPC_GENERATOR_H_
-#define IPC_SRC_PROTOC_PLUGIN_IPC_GENERATOR_H_
+#ifndef SRC_IPC_PROTOC_PLUGIN_IPC_GENERATOR_H_
+#define SRC_IPC_PROTOC_PLUGIN_IPC_GENERATOR_H_
 
 #include <string>
 
@@ -39,4 +39,4 @@ class IPCGenerator : public ::google::protobuf::compiler::CodeGenerator {
 }  // namespace ipc
 }  // namespace perfetto
 
-#endif  // IPC_SRC_PROTOC_PLUGIN_IPC_GENERATOR_H_
+#endif  // SRC_IPC_PROTOC_PLUGIN_IPC_GENERATOR_H_

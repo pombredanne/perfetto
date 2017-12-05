@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_TEST_TEST_TASK_RUNNER_H_
-#define TRACING_SRC_TEST_TEST_TASK_RUNNER_H_
+#ifndef SRC_BASE_TEST_TEST_TASK_RUNNER_H_
+#define SRC_BASE_TEST_TEST_TASK_RUNNER_H_
 
 #include <sys/select.h>
 
@@ -74,4 +74,4 @@ class TestTaskRunner : public TaskRunner {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_TEST_TEST_TASK_RUNNER_H_
+#endif  // SRC_BASE_TEST_TEST_TASK_RUNNER_H_

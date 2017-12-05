@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_PROTO_TRANSLATION_TABLE_H_
-#define FTRACE_PROTO_TRANSLATION_TABLE_H_
+#ifndef SRC_FTRACE_READER_PROTO_TRANSLATION_TABLE_H_
+#define SRC_FTRACE_READER_PROTO_TRANSLATION_TABLE_H_
 
 #include <stdint.h>
 
@@ -106,4 +106,4 @@ class ProtoTranslationTable {
 
 }  // namespace perfetto
 
-#endif  // FTRACE_PROTO_TRANSLATION_TABLE_H_
+#endif  // SRC_FTRACE_READER_PROTO_TRANSLATION_TABLE_H_

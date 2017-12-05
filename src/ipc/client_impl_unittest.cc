@@ -154,10 +154,12 @@ class FakeHost : public UnixSocket::EventListener {
         Frame reply;
         reply.set_request_id(req.request_id());
         for (const auto& svc : services) {
-          if (svc.second->id != req.msg_invoke_method().service_id())
+          if (static_cast<int32_t>(svc.second->id) !=
+              req.msg_invoke_method().service_id())
             continue;
           for (const auto& method : svc.second->methods) {
-            if (method.second->id != req.msg_invoke_method().method_id())
+            if (static_cast<int32_t>(method.second->id) !=
+                req.msg_invoke_method().method_id())
               continue;
             method.second->OnInvoke(req.msg_invoke_method(),
                                     reply.mutable_msg_invoke_method_reply());
@@ -341,7 +343,8 @@ TEST_F(ClientImplTest, ReceiveFileDescriptor) {
   ASSERT_TRUE(rx_fd);
   char buf[sizeof(kFileContent)] = {};
   ASSERT_EQ(0, lseek(*rx_fd, 0, SEEK_SET));
-  ASSERT_EQ(sizeof(buf), PERFETTO_EINTR(read(*rx_fd, buf, sizeof(buf))));
+  ASSERT_EQ(static_cast<long>(sizeof(buf)),
+            PERFETTO_EINTR(read(*rx_fd, buf, sizeof(buf))));
   ASSERT_STREQ(kFileContent, buf);
 }
 

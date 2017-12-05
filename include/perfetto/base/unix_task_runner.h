@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PERFETTO_BASE_UNIX_TASK_RUNNER_H_
-#define PERFETTO_BASE_UNIX_TASK_RUNNER_H_
+#ifndef INCLUDE_PERFETTO_BASE_UNIX_TASK_RUNNER_H_
+#define INCLUDE_PERFETTO_BASE_UNIX_TASK_RUNNER_H_
 
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
@@ -95,4 +95,4 @@ class UnixTaskRunner : public TaskRunner {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // PERFETTO_BASE_UNIX_TASK_RUNNER_H_
+#endif  // INCLUDE_PERFETTO_BASE_UNIX_TASK_RUNNER_H_

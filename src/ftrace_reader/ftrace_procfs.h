@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_FTRACE_PROCFS_H_
-#define FTRACE_READER_FTRACE_PROCFS_H_
+#ifndef SRC_FTRACE_READER_FTRACE_PROCFS_H_
+#define SRC_FTRACE_READER_FTRACE_PROCFS_H_
 
 #include <string>
 
@@ -71,4 +71,4 @@ class FtraceProcfs {
 
 }  // namespace perfetto
 
-#endif  // FTRACE_READER_FTRACE_PROCFS_H_
+#endif  // SRC_FTRACE_READER_FTRACE_PROCFS_H_

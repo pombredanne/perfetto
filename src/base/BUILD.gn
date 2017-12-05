@@ -12,32 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("//build_overrides/build.gni")
+
 source_set("base") {
+  deps = [
+    "../../gn:default_deps",
+  ]
+  public_deps = [
+    "../../include/perfetto/base",
+  ]
   sources = [
-    "../../include/perfetto/base/build_config.h",
-    "../../include/perfetto/base/logging.h",
-    "../../include/perfetto/base/scoped_file.h",
-    "../../include/perfetto/base/task_runner.h",
-    "../../include/perfetto/base/thread_checker.h",
-    "../../include/perfetto/base/unix_task_runner.h",
-    "../../include/perfetto/base/utils.h",
-    "../../include/perfetto/base/weak_ptr.h",
     "thread_checker.cc",
     "unix_task_runner.cc",
   ]
-
-  if (is_debug) {
-    deps = [
-      ":debug_crash_stack_trace",
-    ]
-  }
-
   if (is_android) {
-    sources += [
-      "../../include/perfetto/base/android_task_runner.h",
-      "android_task_runner.cc",
-    ]
+    sources += [ "android_task_runner.cc" ]
     libs = [ "android" ]
+  }
+  if (is_debug) {
+    deps += [ ":debug_crash_stack_trace" ]
   }
 }
 
@@ -55,20 +48,23 @@ if (is_debug) {
 
 source_set("test_support") {
   testonly = true
-  deps += [ ":base" ]
+  deps = [
+    ":base",
+    "../../gn:default_deps",
+  ]
   sources = [
     "test/test_task_runner.cc",
     "test/test_task_runner.h",
   ]
 }
 
-source_set("base_unittests") {
+executable("base_unittests") {
   testonly = true
-  deps += [
+  deps = [
     ":base",
     ":test_support",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
   ]
   sources = [
     "scoped_file_unittest.cc",

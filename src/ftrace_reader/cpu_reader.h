@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FTRACE_READER_CPU_READER_H_
-#define FTRACE_READER_CPU_READER_H_
+#ifndef SRC_FTRACE_READER_CPU_READER_H_
+#define SRC_FTRACE_READER_CPU_READER_H_
 
 #include <stdint.h>
 #include <string.h>
@@ -112,4 +112,4 @@ class CpuReader {
 
 }  // namespace perfetto
 
-#endif  // FTRACE_READER_CPU_READER_H_
+#endif  // SRC_FTRACE_READER_CPU_READER_H_

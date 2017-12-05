@@ -12,43 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("ftrace_reader") {
-  all_dependent_configs = [ "//buildtools:googletest_prod_config" ]
-  deps += [ "../base" ]
-  public_deps = [
-    "//protos/ftrace:zero",
-  ]
-  sources = [
-    "../../include/perfetto/ftrace_reader/format_parser.h",
-    "../../include/perfetto/ftrace_reader/ftrace_controller.h",
-    "../../include/perfetto/ftrace_reader/ftrace_to_proto.h",
-    "cpu_reader.cc",
-    "cpu_reader.h",
-    "format_parser.cc",
-    "ftrace_controller.cc",
-    "ftrace_procfs.cc",
-    "ftrace_procfs.h",
-    "ftrace_to_proto.cc",
-    "proto_translation_table.cc",
-    "proto_translation_table.h",
-  ]
-}
+import("//build_overrides/build.gni")
 
-source_set("test_support") {
-  sources = [
-    "test/scattered_stream_delegate_for_testing.cc",
-    "test/scattered_stream_delegate_for_testing.h",
-  ]
-}
-
-source_set("ftrace_reader_unittests") {
+executable("ftrace_reader_unittests") {
   testonly = true
-  deps += [
+  deps = [
     ":ftrace_reader",
-    ":test_support",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
-    "//protos/ftrace:full",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+    "../../gn:protobuf_full_deps",
+    "../../protos/ftrace:full",
   ]
   sources = [
     "cpu_reader_unittest.cc",
@@ -56,21 +29,20 @@ source_set("ftrace_reader_unittests") {
     "ftrace_controller_unittest.cc",
     "ftrace_to_proto_unittest.cc",
     "proto_translation_table_unittest.cc",
+    "scattered_stream_delegate_for_testing.h",
   ]
 }
 
 # These tests require access to a real ftrace implementation and must
 # run with sudo.
-source_set("ftrace_reader_integrationtests") {
+executable("ftrace_reader_integrationtests") {
   testonly = true
-  deps += [
+  deps = [
     ":ftrace_reader",
-    ":test_support",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+    "../../protos/ftrace:full",
     "../base",
-    "//buildtools:gmock",
-    "//buildtools:gtest",
-    "//buildtools:protobuf_full",
-    "//protos/ftrace:full",
   ]
   sources = [
     "end_to_end_integrationtest.cc",
@@ -83,9 +55,34 @@ executable("ftrace_reader_demo") {
   sources = [
     "main.cc",
   ]
-  deps += [
+  deps = [
     ":ftrace_reader",
-    ":test_support",
+    "../../gn:default_deps",
+    "../../gn:gtest_prod_config",
     "../base",
+  ]
+}
+
+source_set("ftrace_reader") {
+  public_deps = [
+    "../../include/perfetto/ftrace_reader",
+    "../../protos/ftrace:zero",
+  ]
+  deps = [
+    "../../gn:default_deps",
+    "../../gn:gtest_prod_config",
+    "../base",
+    "../protozero",
+  ]
+  sources = [
+    "cpu_reader.cc",
+    "cpu_reader.h",
+    "format_parser.cc",
+    "ftrace_controller.cc",
+    "ftrace_procfs.cc",
+    "ftrace_procfs.h",
+    "ftrace_to_proto.cc",
+    "proto_translation_table.cc",
+    "proto_translation_table.h",
   ]
 }

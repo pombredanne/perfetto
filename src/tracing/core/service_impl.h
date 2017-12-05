@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TRACING_SRC_CORE_SERVICE_IMPL_H_
-#define TRACING_SRC_CORE_SERVICE_IMPL_H_
+#ifndef SRC_TRACING_CORE_SERVICE_IMPL_H_
+#define SRC_TRACING_CORE_SERVICE_IMPL_H_
 
 #include <functional>
 #include <map>
@@ -101,4 +101,4 @@ class ServiceImpl : public Service {
 
 }  // namespace perfetto
 
-#endif  // TRACING_SRC_CORE_SERVICE_IMPL_H_
+#endif  // SRC_TRACING_CORE_SERVICE_IMPL_H_

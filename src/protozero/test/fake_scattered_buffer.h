@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef PROTOZERO_SRC_TEST_FAKE_SCATTERED_BUFFER_H_
-#define PROTOZERO_SRC_TEST_FAKE_SCATTERED_BUFFER_H_
+#ifndef SRC_PROTOZERO_TEST_FAKE_SCATTERED_BUFFER_H_
+#define SRC_PROTOZERO_TEST_FAKE_SCATTERED_BUFFER_H_
 
 #include <memory>
 #include <string>
@@ -51,4 +51,4 @@ class FakeScatteredBuffer : public ScatteredStreamWriter::Delegate {
 
 }  // namespace protozero
 
-#endif  // PROTOZERO_SRC_TEST_FAKE_SCATTERED_BUFFER_H_
+#endif  // SRC_PROTOZERO_TEST_FAKE_SCATTERED_BUFFER_H_
