@@ -19,6 +19,8 @@ import("perfetto.gni")
 group("gtest_prod_config") {
   if (!build_with_chromium) {
     public_configs = [ "//buildtools:googletest_prod_config" ]
+  } else {
+    public_configs = [ ":gtest_config" ]
   }
 }
 

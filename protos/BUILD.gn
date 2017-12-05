@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("../src/protozero//protozero_library.gni")
+import("../src/protozero/protozero_library.gni")
 import("../build/proto_library.gni")
 
 proto_sources = [ "trace_packet.proto" ]
