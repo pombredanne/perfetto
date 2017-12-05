@@ -17,7 +17,7 @@ executable("ftrace_proto_gen") {
     "main.cc",
   ]
   deps += [
-    "//base",
-    "//ftrace_reader",
+    "../../src/base",
+    "../../src/ftrace_reader",
   ]
 }

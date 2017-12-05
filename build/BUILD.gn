@@ -53,7 +53,10 @@ config("default") {
   ldflags = []
   libs = []
 
-  include_dirs = [ ".." ]
+  include_dirs = [
+    "..",
+    "../include",
+  ]
 
   cflags_cc += [ "-std=c++11" ]
 

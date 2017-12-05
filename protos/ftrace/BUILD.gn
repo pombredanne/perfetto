@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//protozero/protozero_library.gni")
 import("all_protos.gni")
+import("//src/protozero/protozero_library.gni")
 
 # Create a copy of all the protos listed in all_protos.gni with the
 # "option optimize_for = LITE_RUNTIME" bit removed so we can generate

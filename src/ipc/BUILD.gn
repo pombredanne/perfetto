@@ -1,0 +1,82 @@
+# Copyright (C) 2017 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("//build/proto_library.gni")
+import("ipc_library.gni")
+
+source_set("ipc") {
+  deps += [
+    ":wire_protocol",
+    "../base",
+  ]
+  sources = [
+    "../../include/perfetto/ipc/async_result.h",
+    "../../include/perfetto/ipc/basic_types.h",
+    "../../include/perfetto/ipc/client.h",
+    "../../include/perfetto/ipc/client_info.h",
+    "../../include/perfetto/ipc/codegen_helpers.h",
+    "../../include/perfetto/ipc/deferred.h",
+    "../../include/perfetto/ipc/host.h",
+    "../../include/perfetto/ipc/service.h",
+    "../../include/perfetto/ipc/service_descriptor.h",
+    "../../include/perfetto/ipc/service_proxy.h",
+    "buffered_frame_deserializer.cc",
+    "client_impl.cc",
+    "deferred.cc",
+    "host_impl.cc",
+    "host_impl.h",
+    "service_proxy.cc",
+    "unix_socket.cc",
+    "unix_socket.h",
+  ]
+}
+
+source_set("ipc_unittests") {
+  testonly = true
+  deps += [
+    ":ipc",
+    ":test_messages",
+    ":wire_protocol",
+    "../base",
+    "../base:test_support",
+    "//buildtools:gmock",
+    "//buildtools:gtest",
+  ]
+  sources = [
+    "buffered_frame_deserializer_unittest.cc",
+    "client_impl_unittest.cc",
+    "deferred_unittest.cc",
+    "host_impl_unittest.cc",
+    "test/ipc_integrationtest.cc",
+    "unix_socket_unittest.cc",
+  ]
+}
+
+proto_library("wire_protocol") {
+  sources = [
+    "wire_protocol.proto",
+  ]
+
+  # include_dirs = [ "include" ]
+  proto_out_dir = "protos_lite"
+}
+
+ipc_library("test_messages") {
+  sources = [
+    "test/client_unittest_messages.proto",
+    "test/deferred_unittest_messages.proto",
+    "test/greeter_service.proto",
+  ]
+  # include_dirs = [ "include" ]
+}

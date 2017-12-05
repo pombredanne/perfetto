@@ -15,24 +15,34 @@
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
-    ":tests",
-    "//ftrace_reader:ftrace_reader_demo",
-    "//ipc/src/protoc_plugin:ipc_plugin($host_toolchain)",
-    "//protozero/src/protoc_plugin($host_toolchain)",
-    "//tools/ftrace_proto_gen:ftrace_proto_gen",
+    ":perfetto_benchmarks",
+    ":perfetto_tests",
+    "src/ftrace_reader:ftrace_reader_demo",
+    "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
+    "src/protozero/protoc_plugin($host_toolchain)",
+    "tools/ftrace_proto_gen:ftrace_proto_gen",
   ]
 }
 
-group("tests") {
+executable("perfetto_tests") {
   testonly = true
-  deps = [
-    "//base:base_unittests",
-    "//ftrace_reader:ftrace_reader_integrationtests",
-    "//ftrace_reader:ftrace_reader_unittests",
-    "//ipc:ipc_unittests",
-    "//protozero:protozero_unittests",
-    "//tools/sanitizers_unittests",
-    "//tracing:tracing_benchmarks",
-    "//tracing:tracing_unittests",
+  deps += [
+    "src/base:base_unittests",
+    "src/ftrace_reader:ftrace_reader_unittests",
+    "src/ipc:ipc_unittests",
+    "src/protozero:protozero_unittests",
+    "src/tracing:tracing_unittests",
+    "tools/sanitizers_unittests",
+    "//buildtools:gtest_main",
   ]
+
+  # The ftrace integration test requires a Linux kernel.
+  if (is_linux || is_android) {
+    deps += [ "src/ftrace_reader:ftrace_reader_integrationtests" ]
+  }
+}
+
+executable("perfetto_benchmarks") {
+  testonly = true
+  deps += [ "src/tracing:tracing_benchmarks" ]
 }

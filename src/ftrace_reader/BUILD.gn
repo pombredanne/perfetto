@@ -1,0 +1,91 @@
+# Copyright (C) 2017 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+source_set("ftrace_reader") {
+  all_dependent_configs = [ "//buildtools:googletest_prod_config" ]
+  deps += [ "../base" ]
+  public_deps = [
+    "//protos/ftrace:zero",
+  ]
+  sources = [
+    "../../include/perfetto/ftrace_reader/format_parser.h",
+    "../../include/perfetto/ftrace_reader/ftrace_controller.h",
+    "../../include/perfetto/ftrace_reader/ftrace_to_proto.h",
+    "cpu_reader.cc",
+    "cpu_reader.h",
+    "format_parser.cc",
+    "ftrace_controller.cc",
+    "ftrace_procfs.cc",
+    "ftrace_procfs.h",
+    "ftrace_to_proto.cc",
+    "proto_translation_table.cc",
+    "proto_translation_table.h",
+  ]
+}
+
+source_set("test_support") {
+  sources = [
+    "test/scattered_stream_delegate_for_testing.cc",
+    "test/scattered_stream_delegate_for_testing.h",
+  ]
+}
+
+source_set("ftrace_reader_unittests") {
+  testonly = true
+  deps += [
+    ":ftrace_reader",
+    ":test_support",
+    "//buildtools:gmock",
+    "//buildtools:gtest",
+    "//protos/ftrace:full",
+  ]
+  sources = [
+    "cpu_reader_unittest.cc",
+    "format_parser_unittest.cc",
+    "ftrace_controller_unittest.cc",
+    "ftrace_to_proto_unittest.cc",
+    "proto_translation_table_unittest.cc",
+  ]
+}
+
+# These tests require access to a real ftrace implementation and must
+# run with sudo.
+source_set("ftrace_reader_integrationtests") {
+  testonly = true
+  deps += [
+    ":ftrace_reader",
+    ":test_support",
+    "../base",
+    "//buildtools:gmock",
+    "//buildtools:gtest",
+    "//buildtools:protobuf_full",
+    "//protos/ftrace:full",
+  ]
+  sources = [
+    "end_to_end_integrationtest.cc",
+    "ftrace_procfs_integrationtest.cc",
+  ]
+}
+
+executable("ftrace_reader_demo") {
+  testonly = true
+  sources = [
+    "main.cc",
+  ]
+  deps += [
+    ":ftrace_reader",
+    ":test_support",
+    "../base",
+  ]
+}
