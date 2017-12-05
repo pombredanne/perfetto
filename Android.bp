@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-cc_defaults {
-  name: "perfetto_defaults",
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // base
 ///////////////////////////////////////////////////////////////////////////////
@@ -33,7 +29,6 @@ filegroup {
 
 filegroup {
   name: "perfetto_base_test_support",
-  // deps += [ ":base" ]
   srcs: [
     "base/test/test_task_runner.cc",
   ]
@@ -41,7 +36,6 @@ filegroup {
 
 cc_test {
   name: "perfetto_base_unittests",
-  defaults: ["perfetto_defaults"],
   srcs: [
     ":perfetto_base",
     ":perfetto_base_test_support",
