@@ -417,7 +417,9 @@ if (use_custom_libcxx) {
       ":libc++config",
       "//build/sanitizers:sanitizer_options_link_helper",
     ]
-    deps += [ ":libunwind" ]
+    deps = [
+      ":libunwind",
+    ]
   }
 
   if (custom_libcxx_is_static) {
@@ -468,7 +470,9 @@ if (use_custom_libcxx) {
       "//build/sanitizers:sanitizer_options_link_helper",
     ]
     defines = [ "_LIBCPP_BUILDING_LIBRARY" ]
-    deps += [ ":libc++abi" ]
+    deps = [
+      ":libc++abi",
+    ]
   }
 }  # if (use_custom_libcxx)
 
