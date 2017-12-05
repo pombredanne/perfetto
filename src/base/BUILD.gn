@@ -58,7 +58,7 @@ source_set("test_support") {
   ]
 }
 
-executable("base_unittests") {
+executable("perfetto_base_unittests") {
   testonly = true
   deps = [
     ":base",

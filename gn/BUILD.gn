@@ -24,7 +24,7 @@ group("gtest_prod_config") {
 
 config("gtest_config") {
   if (build_with_chromium) {
-    include_dirs += [ "//testing/gtest/include" ]
+    include_dirs = [ "//testing/gtest/include" ]
   }
 }
 
