@@ -60,12 +60,12 @@ if (!is_debug) {
 
 set_defaults("source_set") {
   configs = default_configs
-  deps = []
+  #deps = []
 }
 
 set_defaults("static_library") {
   configs = default_configs
-  deps = []
+  #deps = []
 }
 
 # Realistically the only shared_library that we build right now is libc++.so
@@ -74,19 +74,15 @@ set_defaults("static_library") {
 set_defaults("shared_library") {
   configs = default_configs
   configs += [ "//build:shared_library" ]
-  deps = [
-    "//build/sanitizers:deps",
-  ]
+
+  #deps = [
+  #  "//build/sanitizers:deps",
+  #]
 }
 
 set_defaults("executable") {
   configs = default_configs
   configs += [ "//build:executable" ]
-
-  #deps = [
-  #  "//build/libc++:deps",
-  #  "//build/sanitizers:deps",
-  #]
 }
 
 set_default_toolchain("//build/toolchain:gcc_like")

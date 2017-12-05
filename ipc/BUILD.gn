@@ -63,6 +63,7 @@ executable("ipc_unittests") {
     ":ipc",
     ":test_messages",
     ":wire_protocol",
+    "../gn:default_deps",
     "../gn:gtest_deps",
     "../perfetto_base",
     "../perfetto_base:test_support",

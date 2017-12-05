@@ -80,6 +80,7 @@ executable("tracing_unittests") {
   deps = [
     ":ipc",
     ":tracing",
+    "../gn:default_deps",
     "../gn:gtest_deps",
     "../perfetto_base",
     "../perfetto_base:test_support",
@@ -99,6 +100,7 @@ executable("tracing_test") {
     ":ipc",
     ":ipc_protos",
     ":tracing",
+    "../gn:default_deps",
     "../ipc",
     "../perfetto_base",
     "../perfetto_base:test_support",
@@ -113,6 +115,7 @@ if (!build_with_chromium) {
     testonly = true
 
     deps = [
+      "../gn:default_deps",
       "//buildtools:benchmark",
     ]
 

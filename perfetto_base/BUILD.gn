@@ -77,6 +77,7 @@ executable("perfetto_base_unittests") {
   deps = [
     ":perfetto_base",
     ":test_support",
+    "../gn:default_deps",
     "../gn:gtest_deps",
   ]
 

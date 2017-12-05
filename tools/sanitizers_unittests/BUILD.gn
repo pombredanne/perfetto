@@ -16,6 +16,7 @@ executable("sanitizers_unittests") {
   testonly = true
 
   deps = [
+    "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
 

@@ -18,6 +18,7 @@ executable("ftrace_proto_gen") {
   ]
   deps = [
     "../../ftrace_reader",
+    "../../gn:default_deps",
     "../../perfetto_base",
   ]
 }

@@ -58,6 +58,7 @@ executable("protozero_unittests") {
     ":protozero",
     ":testing_messages_lite",
     ":testing_messages_zero",
+    "../gn:default_deps",
     "../gn:gtest_deps",
     "../perfetto_base",
   ]

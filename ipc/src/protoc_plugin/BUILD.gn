@@ -23,6 +23,7 @@ if (current_toolchain == host_toolchain) {
     ]
 
     deps = [
+      "../../../gn:default_deps",
       "../../../gn:protoc_lib_deps",
     ]
     public_configs = [ "../../../perfetto_base:base_config" ]

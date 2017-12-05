@@ -29,6 +29,7 @@ executable("ftrace_reader_unittests") {
   testonly = true
   deps = [
     ":ftrace_reader",
+    "../gn:default_deps",
     "../gn:gtest_deps",
     "../gn:protobuf_full_deps",
     "../protos/ftrace:full",
@@ -50,6 +51,7 @@ executable("ftrace_reader_integrationtests") {
   testonly = true
   deps = [
     ":ftrace_reader",
+    "../gn:default_deps",
     "../gn:gtest_deps",
     "../perfetto_base",
     "../protos/ftrace:full",
@@ -68,6 +70,7 @@ executable("ftrace_reader_demo") {
   ]
   deps = [
     ":ftrace_reader",
+    "../gn:default_deps",
     "../perfetto_base",
   ]
 }
@@ -81,7 +84,7 @@ source_set("ftrace_reader") {
   ]
 
   if (!build_with_chromium) {
-    configs += [ "//buildtools:googletest_prod_config" ]
+    all_dependent_configs += [ "//buildtools:googletest_prod_config" ]
   }
 
   public_deps = [

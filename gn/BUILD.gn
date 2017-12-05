@@ -34,9 +34,11 @@ group("gtest_deps") {
 
 group("protoc_lib_deps") {
   if (!build_with_chromium) {
-    public_deps = [
-      "//buildtools:protoc_lib",
-    ]
+    if (current_toolchain == host_toolchain) {
+      public_deps = [
+        "//buildtools:protoc_lib",
+      ]
+    }
   } else {
     public_deps = [
       "//third_party/protobuf:protoc_lib",
@@ -52,6 +54,15 @@ group("protobuf_full_deps") {
   } else {
     public_deps = [
       "//third_party/protobuf:protobuf_full",
+    ]
+  }
+}
+
+group("default_deps") {
+  if (!build_with_chromium) {
+    public_deps = [
+      "//build/libc++:deps",
+      "//build/sanitizers:deps",
     ]
   }
 }
