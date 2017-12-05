@@ -1,0 +1,631 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+cc_defaults {
+  name: "perfetto_defaults",
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// base
+///////////////////////////////////////////////////////////////////////////////
+
+filegroup {
+  name: "perfetto_base",
+  srcs: [
+    "base/android_task_runner.cc",
+    "base/thread_checker.cc",
+    "base/unix_task_runner.cc",
+  ]
+}
+
+filegroup {
+  name: "perfetto_base_test_support",
+  // deps += [ ":base" ]
+  srcs: [
+    "base/test/test_task_runner.cc",
+  ]
+}
+
+cc_test {
+  name: "perfetto_base_unittests",
+  defaults: ["perfetto_defaults"],
+  srcs: [
+    ":perfetto_base",
+    ":perfetto_base_test_support",
+    "base/scoped_file_unittest.cc",
+    "base/task_runner_unittest.cc",
+    "base/thread_checker_unittest.cc",
+    "base/utils_unittest.cc",
+    "base/weak_ptr_unittest.cc",
+  ],
+  shared_libs: [
+    "libandroid"
+  ],
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// protozero
+///////////////////////////////////////////////////////////////////////////////
+
+// TODO(skyostil): Don't hardcode external/perfetto.
+protoc_cmd = "mkdir -p $(genDir)/external/perfetto && "
+protoc_cmd += "$(location) --cpp_out=$(genDir)/external/perfetto "
+protoc_cmd += "--proto_path=external/perfetto $(in)"
+
+protozeroc_cmd = "mkdir -p $(genDir)/external/perfetto && "
+protozeroc_cmd += "$(location) --plugin=protoc-gen-plugin="
+protozeroc_cmd += "$(location protozero_protoc_plugin) "
+protozeroc_cmd += "--plugin_out=wrapper_namespace="
+protozeroc_cmd += "pbzero:$(genDir)/external/perfetto "
+protozeroc_cmd += "--proto_path=external/perfetto $(in)"
+
+cc_defaults {
+  name: "protozero_defaults",
+  local_include_dirs: [ "protozero/include" ],
+  cflags: [
+    "-Wno-error=return-type",
+    "-Wno-sign-compare",
+    "-Wno-sign-promo",
+    "-Wno-unused-parameter",
+  ]
+}
+
+filegroup {
+  name: "protozero",
+  srcs:  [
+    "protozero/src/proto_utils.cc",
+    "protozero/src/protozero_message.cc",
+    "protozero/src/protozero_message_handle.cc",
+    "protozero/src/scattered_stream_writer.cc",
+  ]
+}
+
+cc_binary_host {
+  name: "protozero_protoc_plugin",
+  defaults: [ "protozero_defaults" ],
+  srcs: [
+    "protozero/src/protoc_plugin/protozero_generator.cc",
+    "protozero/src/protoc_plugin/protozero_plugin.cc",
+  ],
+  shared_libs: [ "libprotoc" ],
+}
+
+filegroup {
+  name: "protozero_testing_messages",
+  srcs:  [
+    "protozero/src/test/example_proto/library.proto",
+    "protozero/src/test/example_proto/library_internals/galaxies.proto",
+    "protozero/src/test/example_proto/test_messages.proto",
+    "protozero/src/test/example_proto/upper_import.proto",
+  ]
+}
+
+// Each proto set gets a pair of genrules: one of the sources and one for the
+// headers. This is because a "srcs" entry which depends on a genrule that
+// generates a .h file causes an error since soong isn't expecting to compile a
+// header.
+// TODO(skyostil): End this insanity.
+cc_genrule {
+  name: "protozero_testing_messages_lite",
+  tools: [ "aprotoc" ],
+  srcs: [ ":protozero_testing_messages" ],
+  cmd: protoc_cmd,
+  out: [
+    "external/perfetto/protozero/src/test/example_proto/library.pb.cc",
+    "external/perfetto/protozero/src/test/example_proto/library_internals/galaxies.pb.cc",
+    "external/perfetto/protozero/src/test/example_proto/test_messages.pb.cc",
+    "external/perfetto/protozero/src/test/example_proto/upper_import.pb.cc",
+  ]
+}
+
+cc_genrule {
+  name: "protozero_testing_messages_lite_headers",
+  tools: [ "aprotoc" ],
+  srcs: [ ":protozero_testing_messages" ],
+  cmd: protoc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/protozero/src/test/example_proto/library.pb.h",
+    "external/perfetto/protozero/src/test/example_proto/library_internals/galaxies.pb.h",
+    "external/perfetto/protozero/src/test/example_proto/test_messages.pb.h",
+    "external/perfetto/protozero/src/test/example_proto/upper_import.pb.h",
+  ]
+}
+
+cc_genrule {
+  name: "protozero_testing_messages_zero",
+  tools: [ "aprotoc", "protozero_protoc_plugin" ],
+  srcs: [ ":protozero_testing_messages" ],
+  cmd: protozeroc_cmd,
+  out: [
+    "external/perfetto/protozero/src/test/example_proto/library.pbzero.cc",
+    "external/perfetto/protozero/src/test/example_proto/library_internals/galaxies.pbzero.cc",
+    "external/perfetto/protozero/src/test/example_proto/test_messages.pbzero.cc",
+    "external/perfetto/protozero/src/test/example_proto/upper_import.pbzero.cc",
+  ]
+}
+
+cc_genrule {
+  name: "protozero_testing_messages_zero_headers",
+  tools: [ "aprotoc", "protozero_protoc_plugin" ],
+  srcs: [ ":protozero_testing_messages" ],
+  cmd: protozeroc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/protozero/src/test/example_proto/library.pbzero.h",
+    "external/perfetto/protozero/src/test/example_proto/library_internals/galaxies.pbzero.h",
+    "external/perfetto/protozero/src/test/example_proto/test_messages.pbzero.h",
+    "external/perfetto/protozero/src/test/example_proto/upper_import.pbzero.h",
+  ]
+}
+
+cc_test {
+  name: "protozero_unittests",
+  defaults: [ "protozero_defaults" ],
+  generated_headers: [
+    "protozero_testing_messages_lite_headers",
+    "protozero_testing_messages_zero_headers",
+  ],
+  shared_libs: [
+    "libprotobuf-cpp-lite"
+  ],
+  srcs: [
+    ":protozero",
+    ":protozero_testing_messages_lite",
+    ":protozero_testing_messages_zero",
+    "protozero/src/proto_utils_unittest.cc",
+    "protozero/src/protozero_message_unittest.cc",
+    "protozero/src/scattered_stream_writer_unittest.cc",
+    "protozero/src/test/fake_scattered_buffer.cc",
+    "protozero/src/test/protozero_conformance_unittest.cc",
+  ]
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// protos
+///////////////////////////////////////////////////////////////////////////////
+
+filegroup {
+  name: "perfetto_messages",
+  srcs:  [
+    "protos/ftrace/ftrace_event.proto",
+    "protos/ftrace/ftrace_event_bundle.proto",
+    "protos/ftrace/print.proto",
+    "protos/ftrace/sched_switch.proto",
+    "protos/ftrace/test_bundle_wrapper.proto",
+    "protos/trace_packet.proto",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_messages_lite",
+  tools: [ "aprotoc" ],
+  srcs: [ ":perfetto_messages" ],
+  cmd: protoc_cmd,
+  out: [
+    "external/perfetto/protos/ftrace/ftrace_event.pb.cc",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pb.cc",
+    "external/perfetto/protos/ftrace/print.pb.cc",
+    "external/perfetto/protos/ftrace/sched_switch.pb.cc",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pb.cc",
+    "external/perfetto/protos/trace_packet.pb.cc",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_messages_lite_headers",
+  tools: [ "aprotoc" ],
+  srcs: [ ":perfetto_messages" ],
+  cmd: protoc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/protos/ftrace/ftrace_event.pb.h",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pb.h",
+    "external/perfetto/protos/ftrace/print.pb.h",
+    "external/perfetto/protos/ftrace/sched_switch.pb.h",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pb.h",
+    "external/perfetto/protos/trace_packet.pb.h",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_messages_zero",
+  tools: [ "aprotoc", "protozero_protoc_plugin" ],
+  srcs: [ ":perfetto_messages" ],
+  cmd: protozeroc_cmd,
+  out: [
+    "external/perfetto/protos/ftrace/ftrace_event.pbzero.cc",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pbzero.cc",
+    "external/perfetto/protos/ftrace/print.pbzero.cc",
+    "external/perfetto/protos/ftrace/sched_switch.pbzero.cc",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pbzero.cc",
+    "external/perfetto/protos/trace_packet.pbzero.cc",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_messages_zero_headers",
+  tools: [ "aprotoc", "protozero_protoc_plugin" ],
+  srcs: [ ":perfetto_messages" ],
+  cmd: protozeroc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/protos/ftrace/ftrace_event.pbzero.h",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pbzero.h",
+    "external/perfetto/protos/ftrace/print.pbzero.h",
+    "external/perfetto/protos/ftrace/sched_switch.pbzero.h",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pbzero.h",
+    "external/perfetto/protos/trace_packet.pbzero.h",
+  ]
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ftrace
+///////////////////////////////////////////////////////////////////////////////
+
+cc_defaults {
+  name: "perfetto_ftrace_defaults",
+  local_include_dirs: [ "ftrace_reader/include" ],
+  cflags: [
+    // TODO(skyostil): Fix the code instead.
+    "-Wno-missing-field-initializers",
+  ]
+}
+
+cc_test {
+  name: "perfetto_ftrace_reader_unittests",
+  defaults: [
+    "perfetto_ftrace_defaults",
+    "protozero_defaults"
+  ],
+  generated_headers: [
+    "perfetto_messages_lite_headers",
+    "perfetto_messages_zero_headers",
+  ],
+  shared_libs: [
+    "libprotobuf-cpp-lite"
+  ],
+  static_libs: [
+    "libgmock"
+  ],
+  srcs: [
+    ":perfetto_ftrace_reader",
+    ":perfetto_messages_lite",
+    ":perfetto_messages_zero",
+    ":protozero",
+    "ftrace_reader/src/cpu_reader_unittest.cc",
+    "ftrace_reader/src/format_parser_unittest.cc",
+    "ftrace_reader/src/ftrace_controller_unittest.cc",
+    "ftrace_reader/src/ftrace_to_proto_unittest.cc",
+    "ftrace_reader/src/proto_translation_table_unittest.cc",
+  ]
+}
+
+// TODO(skyostil): Add full protobufs (as opposed to lite) for this test.
+//cc_test {
+//  name: "perfetto_ftrace_reader_integrationtests",
+//  defaults: [
+//    "perfetto_ftrace_defaults",
+//    "protozero_defaults"
+//  ],
+//  generated_headers: [
+//    "perfetto_messages_lite_headers",
+//    "perfetto_messages_zero_headers",
+//  ],
+//  shared_libs: [
+//    "libprotobuf-cpp-lite"
+//  ],
+//  static_libs: [
+//    "libgmock"
+//  ],
+//  srcs: [
+//    ":perfetto_ftrace_reader",
+//    ":perfetto_messages_lite",
+//    ":perfetto_messages_zero",
+//    ":protozero",
+//    "ftrace_reader/src/end_to_end_integrationtest.cc",
+//    "ftrace_reader/src/ftrace_procfs_integrationtest.cc",
+//  ]
+//}
+
+cc_test {
+  name: "perfetto_ftrace_reader_demo",
+  defaults: [
+    "perfetto_ftrace_defaults",
+    "protozero_defaults",
+  ],
+  generated_headers: [
+    "perfetto_messages_lite_headers",
+    "perfetto_messages_zero_headers",
+  ],
+  shared_libs: [
+    "libprotobuf-cpp-lite"
+  ],
+  srcs: [
+    ":perfetto_base",
+    ":perfetto_base_test_support",
+    ":perfetto_ftrace_reader",
+    ":perfetto_messages_lite",
+    ":perfetto_messages_zero",
+    ":protozero",
+    "ftrace_reader/src/main.cc",
+  ]
+}
+
+filegroup {
+  name: "perfetto_ftrace_reader",
+  srcs: [
+    "ftrace_reader/src/cpu_reader.cc",
+    "ftrace_reader/src/format_parser.cc",
+    "ftrace_reader/src/ftrace_controller.cc",
+    "ftrace_reader/src/ftrace_procfs.cc",
+    "ftrace_reader/src/ftrace_to_proto.cc",
+    "ftrace_reader/src/proto_translation_table.cc",
+  ]
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ipc
+///////////////////////////////////////////////////////////////////////////////
+
+ipcc_cmd = "mkdir -p $(genDir)/external/perfetto && "
+ipcc_cmd += "$(location) "
+ipcc_cmd += "--plugin=protoc-gen-plugin=$(location perfetto_ipc_protoc_plugin) "
+ipcc_cmd += "--cpp_out=$(genDir)/external/perfetto "
+ipcc_cmd += "--proto_path=external/perfetto "
+ipcc_cmd += "--plugin_out=$(genDir)/external/perfetto $(in)"
+
+cc_defaults {
+  name: "perfetto_ipc_defaults",
+  local_include_dirs: [ "ipc/include" ],
+  cflags: [
+    // TODO(skyostil): Fix.
+    "-Wno-missing-field-initializers",
+    "-Wno-sign-compare",
+    "-Wno-unused-parameter",
+  ]
+}
+
+cc_binary_host {
+  name: "perfetto_ipc_protoc_plugin",
+  defaults: [ "perfetto_ipc_defaults" ],
+  srcs: [
+    "ipc/src/protoc_plugin/ipc_generator.cc",
+    "ipc/src/protoc_plugin/ipc_plugin.cc",
+  ],
+  cflags: [
+    "-Wno-unused-parameter",
+  ],
+  shared_libs: [ "libprotoc" ],
+}
+
+filegroup {
+  name: "perfetto_ipc",
+  srcs: [
+    "ipc/src/buffered_frame_deserializer.cc",
+    "ipc/src/client_impl.cc",
+    "ipc/src/deferred.cc",
+    "ipc/src/host_impl.cc",
+    "ipc/src/service_proxy.cc",
+    "ipc/src/unix_socket.cc",
+  ]
+}
+
+filegroup {
+  name: "perfetto_ipc_messages",
+  srcs:  [
+    "ipc/src/wire_protocol.proto",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_ipc_messages_lite",
+  tools: [ "aprotoc" ],
+  srcs: [ ":perfetto_ipc_messages" ],
+  cmd: protoc_cmd,
+  out: [
+    "external/perfetto/ipc/src/wire_protocol.pb.cc",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_ipc_messages_lite_headers",
+  tools: [ "aprotoc" ],
+  srcs: [ ":perfetto_ipc_messages" ],
+  cmd: protoc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/ipc/src/wire_protocol.pb.h",
+  ]
+}
+
+filegroup {
+  name: "perfetto_ipc_test_messages",
+  srcs:  [
+    "ipc/src/test/client_unittest_messages.proto",
+    "ipc/src/test/deferred_unittest_messages.proto",
+    "ipc/src/test/greeter_service.proto",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_ipc_test_messages_ipc",
+  tools: [ "aprotoc", "perfetto_ipc_protoc_plugin" ],
+  srcs: [ ":perfetto_ipc_test_messages" ],
+  cmd: ipcc_cmd,
+  out: [
+    "external/perfetto/ipc/src/test/client_unittest_messages.ipc.cc",
+    "external/perfetto/ipc/src/test/client_unittest_messages.pb.cc",
+    "external/perfetto/ipc/src/test/deferred_unittest_messages.ipc.cc",
+    "external/perfetto/ipc/src/test/deferred_unittest_messages.pb.cc",
+    "external/perfetto/ipc/src/test/greeter_service.ipc.cc",
+    "external/perfetto/ipc/src/test/greeter_service.pb.cc",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_ipc_test_messages_ipc_headers",
+  tools: [ "aprotoc", "perfetto_ipc_protoc_plugin" ],
+  srcs: [ ":perfetto_ipc_test_messages" ],
+  cmd: ipcc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/ipc/src/test/client_unittest_messages.ipc.h",
+    "external/perfetto/ipc/src/test/client_unittest_messages.pb.h",
+    "external/perfetto/ipc/src/test/deferred_unittest_messages.ipc.h",
+    "external/perfetto/ipc/src/test/deferred_unittest_messages.pb.h",
+    "external/perfetto/ipc/src/test/greeter_service.ipc.h",
+    "external/perfetto/ipc/src/test/greeter_service.pb.h",
+  ]
+}
+
+cc_test {
+  name: "perfetto_ipc_unittests",
+  defaults: [ "perfetto_ipc_defaults" ],
+  generated_headers: [
+    "perfetto_ipc_messages_lite_headers",
+    "perfetto_ipc_test_messages_ipc_headers",
+  ],
+  shared_libs: [
+    "libprotobuf-cpp-lite",
+    "libandroid"
+  ],
+  static_libs: [
+    "libgmock"
+  ],
+  srcs: [
+    ":perfetto_base",
+    ":perfetto_base_test_support",
+    ":perfetto_ipc",
+    ":perfetto_ipc_messages_lite",
+    ":perfetto_ipc_test_messages_ipc",
+    "ipc/src/buffered_frame_deserializer_unittest.cc",
+    "ipc/src/client_impl_unittest.cc",
+    "ipc/src/deferred_unittest.cc",
+    "ipc/src/host_impl_unittest.cc",
+    "ipc/src/test/ipc_integrationtest.cc",
+    "ipc/src/unix_socket_unittest.cc",
+  ]
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// tracing
+///////////////////////////////////////////////////////////////////////////////
+
+cc_defaults {
+  name: "perfetto_tracing_defaults",
+  local_include_dirs: [ "tracing/include" ],
+}
+
+filegroup {
+  name: "perfetto_tracing",
+  srcs: [
+    "tracing/src/core/service_impl.cc",
+  ]
+}
+
+filegroup {
+  name: "perfetto_tracing_messages",
+  srcs:  [
+    "tracing/src/ipc/data_source_config.proto",
+    "tracing/src/ipc/data_source_descriptor.proto",
+    "tracing/src/ipc/producer_port.proto",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_tracing_messages_lite",
+  tools: [ "aprotoc", "perfetto_ipc_protoc_plugin" ],
+  srcs: [ ":perfetto_tracing_messages" ],
+  cmd: ipcc_cmd,
+  out: [
+    "external/perfetto/tracing/src/ipc/data_source_config.ipc.cc",
+    "external/perfetto/tracing/src/ipc/data_source_config.pb.cc",
+    "external/perfetto/tracing/src/ipc/data_source_descriptor.ipc.cc",
+    "external/perfetto/tracing/src/ipc/data_source_descriptor.pb.cc",
+    "external/perfetto/tracing/src/ipc/producer_port.ipc.cc",
+    "external/perfetto/tracing/src/ipc/producer_port.pb.cc",
+  ]
+}
+
+cc_genrule {
+  name: "perfetto_tracing_messages_lite_headers",
+  tools: [ "aprotoc", "perfetto_ipc_protoc_plugin" ],
+  srcs: [ ":perfetto_tracing_messages" ],
+  cmd: ipcc_cmd,
+  export_include_dirs: [ "." ],
+  out: [
+    "external/perfetto/tracing/src/ipc/data_source_config.ipc.h",
+    "external/perfetto/tracing/src/ipc/data_source_config.pb.h",
+    "external/perfetto/tracing/src/ipc/data_source_descriptor.ipc.h",
+    "external/perfetto/tracing/src/ipc/data_source_descriptor.pb.h",
+    "external/perfetto/tracing/src/ipc/producer_port.ipc.h",
+    "external/perfetto/tracing/src/ipc/producer_port.pb.h",
+  ]
+}
+
+filegroup {
+  name: "perfetto_tracing_ipc",
+  srcs: [
+    "tracing/src/ipc/posix_shared_memory.cc",
+    "tracing/src/ipc/producer/producer_ipc_client_impl.cc",
+    "tracing/src/ipc/service/producer_ipc_service.cc",
+    "tracing/src/ipc/service/service_ipc_host_impl.cc",
+  ]
+}
+
+cc_test {
+  name: "perfetto_tracing_unittests",
+  defaults: [
+    "perfetto_ftrace_defaults",
+    "perfetto_ipc_defaults",
+    "perfetto_tracing_defaults",
+    "protozero_defaults",
+  ],
+  generated_headers: [
+    "perfetto_messages_lite_headers",
+    "perfetto_messages_zero_headers",
+    "perfetto_tracing_messages_lite_headers",
+  ],
+  shared_libs: [
+    "libandroid"
+    "libprotobuf-cpp-lite",
+  ],
+  static_libs: [
+    "libgmock"
+  ],
+  srcs: [
+    ":perfetto_base",
+    ":perfetto_base_test_support",
+    ":perfetto_messages_lite",
+    ":perfetto_messages_zero",
+    ":perfetto_tracing",
+    ":perfetto_tracing_ipc",
+    ":perfetto_tracing_messages_lite",
+    ":protozero",
+    "tracing/src/core/service_impl_unittest.cc",
+    "tracing/src/ipc/posix_shared_memory_unittest.cc",
+    "tracing/src/test/test_shared_memory.cc",
+  ]
+}
+
+cc_benchmark {
+  name: "perfetto_tracing_benchmarks",
+  defaults: [ "perfetto_tracing_defaults" ],
+  srcs: [
+    "tracing/src/test/hello_world_benchmark.cc",
+  ]
+}
