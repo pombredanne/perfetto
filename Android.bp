@@ -283,6 +283,7 @@ cc_test {
     ":perfetto_messages_zero",
     ":protozero",
     "src/ftrace_reader/main.cc",
+    "src/ftrace_reader/test/scattered_stream_delegate_for_testing.cc",
   ]
 }
 
@@ -508,6 +509,7 @@ cc_test {
     "src/ftrace_reader/ftrace_controller_unittest.cc",
     "src/ftrace_reader/ftrace_to_proto_unittest.cc",
     "src/ftrace_reader/proto_translation_table_unittest.cc",
+    "src/ftrace_reader/test/scattered_stream_delegate_for_testing.cc",
     "src/ipc/buffered_frame_deserializer_unittest.cc",
     "src/ipc/client_impl_unittest.cc",
     "src/ipc/deferred_unittest.cc",
