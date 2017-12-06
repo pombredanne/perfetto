@@ -39,23 +39,6 @@ filegroup {
   ]
 }
 
-cc_test {
-  name: "perfetto_base_unittests",
-  defaults: [ "perfetto_defaults" ],
-  srcs: [
-    ":perfetto_base",
-    ":perfetto_base_test_support",
-    "src/base/scoped_file_unittest.cc",
-    "src/base/task_runner_unittest.cc",
-    "src/base/thread_checker_unittest.cc",
-    "src/base/utils_unittest.cc",
-    "src/base/weak_ptr_unittest.cc",
-  ],
-  shared_libs: [
-    "libandroid"
-  ],
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // protozero
 ///////////////////////////////////////////////////////////////////////////////
@@ -172,28 +155,6 @@ cc_genrule {
   ]
 }
 
-cc_test {
-  name: "protozero_unittests",
-  defaults: [ "protozero_defaults" ],
-  generated_headers: [
-    "protozero_testing_messages_lite_headers",
-    "protozero_testing_messages_zero_headers",
-  ],
-  shared_libs: [
-    "libprotobuf-cpp-lite"
-  ],
-  srcs: [
-    ":protozero",
-    ":protozero_testing_messages_lite",
-    ":protozero_testing_messages_zero",
-    "src/protozero/proto_utils_unittest.cc",
-    "src/protozero/protozero_message_unittest.cc",
-    "src/protozero/scattered_stream_writer_unittest.cc",
-    "src/protozero/test/fake_scattered_buffer.cc",
-    "src/protozero/test/protozero_conformance_unittest.cc",
-  ]
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // protos
 ///////////////////////////////////////////////////////////////////////////////
@@ -282,35 +243,6 @@ cc_defaults {
   cflags: [
     // TODO(skyostil): Fix the code instead.
     "-Wno-missing-field-initializers",
-  ]
-}
-
-cc_test {
-  name: "perfetto_ftrace_reader_unittests",
-  defaults: [
-    "perfetto_ftrace_defaults",
-    "protozero_defaults"
-  ],
-  generated_headers: [
-    "perfetto_messages_lite_headers",
-    "perfetto_messages_zero_headers",
-  ],
-  shared_libs: [
-    "libprotobuf-cpp-lite"
-  ],
-  static_libs: [
-    "libgmock"
-  ],
-  srcs: [
-    ":perfetto_ftrace_reader",
-    ":perfetto_messages_lite",
-    ":perfetto_messages_zero",
-    ":protozero",
-    "src/ftrace_reader/cpu_reader_unittest.cc",
-    "src/ftrace_reader/format_parser_unittest.cc",
-    "src/ftrace_reader/ftrace_controller_unittest.cc",
-    "src/ftrace_reader/ftrace_to_proto_unittest.cc",
-    "src/ftrace_reader/proto_translation_table_unittest.cc",
   ]
 }
 
@@ -492,35 +424,6 @@ cc_genrule {
   ]
 }
 
-cc_test {
-  name: "perfetto_ipc_unittests",
-  defaults: [ "perfetto_ipc_defaults" ],
-  generated_headers: [
-    "perfetto_ipc_messages_lite_headers",
-    "perfetto_ipc_test_messages_ipc_headers",
-  ],
-  shared_libs: [
-    "libprotobuf-cpp-lite",
-    "libandroid"
-  ],
-  static_libs: [
-    "libgmock"
-  ],
-  srcs: [
-    ":perfetto_base",
-    ":perfetto_base_test_support",
-    ":perfetto_ipc",
-    ":perfetto_ipc_messages_lite",
-    ":perfetto_ipc_test_messages_ipc",
-    "src/ipc/buffered_frame_deserializer_unittest.cc",
-    "src/ipc/client_impl_unittest.cc",
-    "src/ipc/deferred_unittest.cc",
-    "src/ipc/host_impl_unittest.cc",
-    "src/ipc/test/ipc_integrationtest.cc",
-    "src/ipc/unix_socket_unittest.cc",
-  ]
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // tracing
 ///////////////////////////////////////////////////////////////////////////////
@@ -582,42 +485,78 @@ filegroup {
   ]
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// tests and benchmarks
+///////////////////////////////////////////////////////////////////////////////
+
 cc_test {
-  name: "perfetto_tracing_unittests",
+  name: "perfetto_tests",
   defaults: [
+    "perfetto_defaults",
     "perfetto_ftrace_defaults",
     "perfetto_ipc_defaults",
     "protozero_defaults",
   ],
-  generated_headers: [
-    "perfetto_messages_lite_headers",
-    "perfetto_messages_zero_headers",
-    "perfetto_tracing_messages_lite_headers",
-  ],
-  shared_libs: [
-    "libandroid",
-    "libprotobuf-cpp-lite",
-  ],
-  static_libs: [
-    "libgmock"
-  ],
   srcs: [
     ":perfetto_base",
     ":perfetto_base_test_support",
+    ":perfetto_ftrace_reader",
+    ":perfetto_ipc",
+    ":perfetto_ipc_messages_lite",
+    ":perfetto_ipc_test_messages_ipc",
     ":perfetto_messages_lite",
     ":perfetto_messages_zero",
     ":perfetto_tracing",
     ":perfetto_tracing_ipc",
     ":perfetto_tracing_messages_lite",
     ":protozero",
+    ":protozero_testing_messages_lite",
+    ":protozero_testing_messages_zero",
+    "src/base/scoped_file_unittest.cc",
+    "src/base/task_runner_unittest.cc",
+    "src/base/thread_checker_unittest.cc",
+    "src/base/utils_unittest.cc",
+    "src/base/weak_ptr_unittest.cc",
+    "src/ftrace_reader/cpu_reader_unittest.cc",
+    "src/ftrace_reader/format_parser_unittest.cc",
+    "src/ftrace_reader/ftrace_controller_unittest.cc",
+    "src/ftrace_reader/ftrace_to_proto_unittest.cc",
+    "src/ftrace_reader/proto_translation_table_unittest.cc",
+    "src/ipc/buffered_frame_deserializer_unittest.cc",
+    "src/ipc/client_impl_unittest.cc",
+    "src/ipc/deferred_unittest.cc",
+    "src/ipc/host_impl_unittest.cc",
+    "src/ipc/test/ipc_integrationtest.cc",
+    "src/ipc/unix_socket_unittest.cc",
+    "src/protozero/proto_utils_unittest.cc",
+    "src/protozero/protozero_message_unittest.cc",
+    "src/protozero/scattered_stream_writer_unittest.cc",
+    "src/protozero/test/fake_scattered_buffer.cc",
+    "src/protozero/test/protozero_conformance_unittest.cc",
     "src/tracing/core/service_impl_unittest.cc",
     "src/tracing/ipc/posix_shared_memory_unittest.cc",
     "src/tracing/test/test_shared_memory.cc",
-  ]
+  ],
+  generated_headers: [
+    "perfetto_ipc_messages_lite_headers",
+    "perfetto_ipc_test_messages_ipc_headers",
+    "perfetto_messages_lite_headers",
+    "perfetto_messages_zero_headers",
+    "perfetto_tracing_messages_lite_headers",
+    "protozero_testing_messages_lite_headers",
+    "protozero_testing_messages_zero_headers",
+  ],
+  shared_libs: [
+    "libandroid",
+    "libprotobuf-cpp-lite"
+  ],
+  static_libs: [
+    "libgmock"
+  ],
 }
 
 cc_benchmark {
-  name: "perfetto_tracing_benchmarks",
+  name: "perfetto_benchmarks",
   defaults: [ "perfetto_defaults" ],
   srcs: [
     "src/tracing/test/hello_world_benchmark.cc",
