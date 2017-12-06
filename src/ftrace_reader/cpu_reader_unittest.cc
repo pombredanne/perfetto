@@ -42,12 +42,12 @@ struct ExamplePage {
 };
 
 // Single class to manage the whole protozero -> scattered stream -> chunks ->
-// single buffer -> real proto dance. Has a method: |writer()| to get an
-// protozero ftrace bundle writer and a method |GetBundle()| to attempt to
+// single buffer -> real proto dance. Has a method: writer() to get an
+// protozero ftrace bundle writer and a method GetBundle() to attempt to
 // parse whatever has been written so far into a proto message.
 class BundleProvider {
  public:
-  BundleProvider(size_t chunk_size)
+  explicit BundleProvider(size_t chunk_size)
       : chunk_size_(chunk_size), delegate_(chunk_size_), stream_(&delegate_) {
     delegate_.set_writer(&stream_);
     writer_.Reset(&stream_);
@@ -61,7 +61,7 @@ class BundleProvider {
   // on success and nullptr on failure.
   std::unique_ptr<protos::FtraceEventBundle> GetBundle() {
     auto bundle = std::unique_ptr<protos::FtraceEventBundle>(
-        new protos::FtraceEventBundle);
+        new protos::FtraceEventBundle());
     size_t msg_size =
         delegate_.chunks().size() * chunk_size_ - stream_.bytes_available();
     std::unique_ptr<uint8_t[]> buffer = delegate_.StitchChunks(msg_size);
@@ -100,13 +100,13 @@ ProtoTranslationTable* GetTable(const std::string& name) {
 std::unique_ptr<uint8_t[]> PageFromXxd(const std::string& text) {
   auto buffer = std::unique_ptr<uint8_t[]>(new uint8_t[kPageSize]);
   const char* ptr = text.data();
-  for (size_t i = 0; i < kPageSize; i++)
-    buffer[i] = 0xfa;
+  memset(buffer.get(), 0xfa, kPageSize);
   uint8_t* out = buffer.get();
   while (*ptr != '\0') {
     if (*(ptr++) != ':')
       continue;
     for (int i = 0; i < 8; i++) {
+      PERFETTO_CHECK(text.size() >= (ptr - text.data()) + 5);
       PERFETTO_CHECK(*(ptr++) == ' ');
       int n = sscanf(ptr, "%02hhx%02hhx", out, out + 1);
       PERFETTO_CHECK(n == 2);
