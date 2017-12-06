@@ -71,16 +71,22 @@ class Error(Exception):
     pass
 
 
-def indent(n):
-    return '    ' * n
-
-
 class Module(object):
-    def __init__(self, type):
-        self.type = type
+    def __init__(self, name):
+        self.name = name
+        self.srcs = []
+        self.comment = None
 
     def to_string(self, output):
-        output.append('%s {' % self.type)
+        if self.comment:
+            output.append('// %s' % self.comment)
+        output.append('%s {' % self.name)
+        output.append('  name: "%s",' % self.name)
+        if self.srcs:
+            output.append('  srcs: [')
+            for src in sorted(self.srcs):
+                output.append('    "%s",' % src)
+            output.append('  ],')
         output.append('}')
 
 
@@ -96,13 +102,23 @@ class Blueprint(object):
             m.to_string(output)
 
 
+def label_to_path(label):
+    assert label.startswith('//')
+    return label[2:]
+
+
 def create_module_from_target(desc, target_name):
     target = desc[target_name]
+    print target
     if target['type'] == 'executable':
-        module_type = 'cc_binary_host' if 'host' in target['toolchain'] else 'cc_binary'
+        module_name = ('cc_binary_host' if 'host' in target['toolchain']
+                       else 'cc_binary')
     else:
         raise Error('Unknown target type: %s' % target['type'])
-    module = Module(module_type)
+    module = Module(module_name)
+    module.comment = 'GN target: %s' % target_name
+    if 'sources' in target:
+        module.srcs.extend(label_to_path(src) for src in target['sources'])
     return module
 
 
