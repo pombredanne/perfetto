@@ -53,3 +53,12 @@ if (!build_with_chromium) {
     ]
   }
 }
+
+executable("reflection_test") {
+  testonly = true
+  deps = [
+    "gn:default_deps",
+    "gn:protobuf_full_deps",
+  ]
+  sources = [ "reflection_test.cc" ]
+}
