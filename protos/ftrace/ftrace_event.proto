@@ -24,8 +24,9 @@ package perfetto.protos;
 
 message FtraceEvent {
   uint32 pid = 1;
+  uint64 timestamp = 2;
   oneof event {
-    PrintFtraceEvent print = 2;
-    SchedSwitchFtraceEvent sched_switch = 3;
+    PrintFtraceEvent print = 3;
+    SchedSwitchFtraceEvent sched_switch = 4;
   }
 }
