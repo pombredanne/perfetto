@@ -34,6 +34,7 @@ group("all") {
 executable("perfetto_tests") {
   testonly = true
   deps = [
+    "gn:default_deps",
     "src/base:base_unittests",
     "src/ftrace_reader:ftrace_reader_unittests",
     "src/ipc:perfetto_ipc_unittests",
@@ -47,6 +48,7 @@ if (!build_with_chromium) {
   executable("perfetto_benchmarks") {
     testonly = true
     deps = [
+      "gn:default_deps",
       "src/tracing:tracing_benchmarks",
     ]
   }
