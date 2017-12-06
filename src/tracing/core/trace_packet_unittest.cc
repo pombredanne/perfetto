@@ -42,6 +42,16 @@ TEST(TracePacketTest, Simple) {
   ASSERT_NE(nullptr, tp.operator->());
   ASSERT_EQ(proto.test(), tp->test());
   ASSERT_EQ(proto.test(), (*tp).test());
+
+  // Check move operators.
+  TracePacket moved_tp(std::move(tp));
+  ASSERT_NE(nullptr, moved_tp.operator->());
+  ASSERT_EQ(proto.test(), moved_tp->test());
+
+  TracePacket moved_tp_2;
+  moved_tp_2 = std::move(moved_tp);
+  ASSERT_NE(nullptr, moved_tp_2.operator->());
+  ASSERT_EQ(proto.test(), moved_tp_2->test());
 }
 
 TEST(TracePacketTest, Chunked) {

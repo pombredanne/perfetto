@@ -23,8 +23,6 @@
 
 namespace perfetto {
 
-class DataSourceConfig;
-class SharedMemory;
 class TracePacket;
 
 class Consumer {

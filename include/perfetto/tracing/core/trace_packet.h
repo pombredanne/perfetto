@@ -26,6 +26,7 @@
 class TracePacket;
 
 namespace perfetto {
+
 namespace protos {
 class TracePacket;  // From protos/trace_packet.pb.h.
 }  // namespace protos
@@ -68,8 +69,7 @@ class TracePacket {
   TracePacket(const TracePacket&) = delete;
   TracePacket& operator=(const TracePacket&) = delete;
 
-  // TODO(primiano): This should also have some refptr to keep log buffer
-  // refcounted.
+  // TODO(primiano): who owns the memory of the chunks? Figure out later.
 
   ChunkSequence chunks_;  // Not owned.
   std::unique_ptr<DecodedTracePacket> decoded_packet_;

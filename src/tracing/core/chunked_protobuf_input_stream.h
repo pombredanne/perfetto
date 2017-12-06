@@ -33,6 +33,8 @@ class ChunkedProtobufInputStream
   explicit ChunkedProtobufInputStream(const ChunkSequence*);
   ~ChunkedProtobufInputStream() override;
 
+  // ZeroCopyInputStream implementation. See zero_copy_stream.h for the API
+  // contract of the methods below.
   bool Next(const void** data, int* size) override;
   void BackUp(int count) override;
   bool Skip(int count) override;
