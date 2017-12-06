@@ -184,8 +184,8 @@ bool CpuReader::ParsePage(size_t cpu,
         uint32_t time_delta_ext;
         if (!ReadAndAdvance<uint32_t>(&ptr, end, &time_delta_ext))
           return false;
-        // See https://goo.gl/CFBu5x
-        timestamp += ((uint64_t)time_delta_ext) << 27;
+        (void)time_delta_ext;
+        // TODO(hjd): Handle.
         break;
       }
       case kTypeTimeStamp: {
@@ -243,14 +243,9 @@ bool CpuReader::ParsePage(size_t cpu,
 
           // TODO(hjd): Not sure if this is null-terminated.
           const uint8_t* buf_start = ptr;
-          const uint8_t* buf_end = next;
-          for (const uint8_t* c = buf_start; c < buf_end; c++) {
-            if (*c != '\0')
-              continue;
-            print_event->set_buf(reinterpret_cast<const char*>(buf_start),
-                                 c - buf_start);
-            break;
-          }
+          const uint8_t* buf_end = next - 2;
+          print_event->set_buf(reinterpret_cast<const char*>(buf_start),
+                               buf_end - buf_start);
           print_event->Finalize();
         }
 
