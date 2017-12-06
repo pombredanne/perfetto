@@ -35,7 +35,7 @@ const size_t kPageSize = 4096;
 const uint64_t kNanoInSecond = 1000 * 1000 * 1000;
 const uint64_t kNanoInMicro = 1000;
 
-::testing::AssertionResult WithinOneMicrosceond(uint64_t actual_ns,
+::testing::AssertionResult WithinOneMicrosecond(uint64_t actual_ns,
                                                 uint64_t expected_s,
                                                 uint64_t expected_us) {
   // Round to closest us.
@@ -317,7 +317,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
   ASSERT_EQ(bundle->event().size(), 1);
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712);
-  EXPECT_TRUE(WithinOneMicrosceond(event.timestamp(), 608934, 535199));
+  EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 608934, 535199));
   EXPECT_EQ(event.print().buf(), "Hello, world!\n");
 }
 
@@ -372,21 +372,21 @@ TEST(CpuReaderTest, ParseThreePrint) {
   {
     const protos::FtraceEvent& event = bundle->event().Get(0);
     EXPECT_EQ(event.pid(), 30693);
-    EXPECT_TRUE(WithinOneMicrosceond(event.timestamp(), 615436, 216806));
+    EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 615436, 216806));
     EXPECT_EQ(event.print().buf(), "Hello, world!\n");
   }
 
   {
     const protos::FtraceEvent& event = bundle->event().Get(1);
     EXPECT_EQ(event.pid(), 30693);
-    EXPECT_TRUE(WithinOneMicrosceond(event.timestamp(), 615486, 377232));
+    EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 615486, 377232));
     EXPECT_EQ(event.print().buf(), "Good afternoon, world!\n");
   }
 
   {
     const protos::FtraceEvent& event = bundle->event().Get(2);
     EXPECT_EQ(event.pid(), 30693);
-    EXPECT_TRUE(WithinOneMicrosceond(event.timestamp(), 615495, 632679));
+    EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 615495, 632679));
     EXPECT_EQ(event.print().buf(), "Goodbye, world!\n");
   }
 }
