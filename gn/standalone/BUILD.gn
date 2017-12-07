@@ -44,6 +44,10 @@ config("no_rtti") {
   cflags = [ "-fno-rtti" ]
 }
 
+config("visibility_hidden") {
+  cflags = [ "-fvisibility=hidden" ]
+}
+
 config("default") {
   asmflags = []
   cflags = []
@@ -56,7 +60,6 @@ config("default") {
   cflags_cc += [ "-std=c++11" ]
 
   cflags += [
-    "-fvisibility=hidden",
     "-fstrict-aliasing",
     "-fstack-protector",
     "-fPIC",
