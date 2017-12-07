@@ -41,6 +41,8 @@ class ChunkedProtobufInputStream
   google::protobuf::int64 ByteCount() const override;
 
  private:
+  bool Validate() const;
+
   const ChunkSequence* const chunks_;
   ChunkSequence::const_iterator cur_chunk_;
   size_t pos_in_cur_chunk_ = 0;

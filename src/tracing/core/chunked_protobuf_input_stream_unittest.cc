@@ -22,6 +22,12 @@
 namespace perfetto {
 namespace {
 
+// The tests below work on chunks, that are a (start pointer, size) tuple but
+// never dereference the memory in the pointer. Hence, we just use an array of
+// integers that is used both to derive N distinct pointers and to keep track
+// of N distinct sizes. In other words, the tests below will see Chunks of the
+// form {start: &kBuf[0], end: &kBuf[0] + kBuf[0]}, and so on. As long as we
+// don't dereference those pointers, this int array should be enough.
 const int kBufs[]{100, 200, 1024, 0, 10, 0, 1, 1, 7};
 
 TEST(ChunkedProtobufInputStreamTest, SingleChunk) {

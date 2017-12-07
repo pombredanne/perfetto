@@ -21,6 +21,7 @@
 
 #include <memory>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/chunk.h"
 
 class TracePacket;
@@ -56,8 +57,9 @@ class TracePacket {
   // Decodes the packet for inline use.
   bool Decode();
 
+  // Must explicitly call Decode() first.
   const DecodedTracePacket* operator->() {
-    Decode();
+    PERFETTO_DCHECK(decoded_packet_);
     return decoded_packet_.get();
   }
   const DecodedTracePacket& operator*() { return *(operator->()); }
