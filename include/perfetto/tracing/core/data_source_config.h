@@ -17,24 +17,46 @@
 #ifndef INCLUDE_PERFETTO_TRACING_CORE_DATA_SOURCE_CONFIG_H_
 #define INCLUDE_PERFETTO_TRACING_CORE_DATA_SOURCE_CONFIG_H_
 
+#include <stdint.h>
+
 #include <string>
 
+#include "perfetto/tracing/core/proto_pimpl_macros.h"
+
 namespace perfetto {
+
+namespace protos {
+class DataSourceConfig;  // From data_source_config.proto .
+}  // namespace protos
 
 // This class contains the configuration that the Service sends back to the
 // Producer when it tells it to enable a given data source. This is the way
 // that, for instance, the Service will tell the producer "turn tracing on,
 // enable categories 'foo' and 'bar' and emit only the fields X and Y".
 
-// This has to be kept in sync with src/ipc/data_source_config.proto .
-// TODO(primiano): find a way to auto-generate this and the glue code that
-// converts DataSourceConfig <> proto::DataSourceConfig.
+// This has to be kept in sync with src/ipc/data_source_config.proto via a pimpl
+// pattern (http://en.cppreference.com/w/cpp/language/pimpl).
 class DataSourceConfig {
  public:
-  std::string data_source_name;  // e.g., "org.chromium.trace_events"
+  DataSourceConfig();
+  explicit DataSourceConfig(protos::DataSourceConfig*);
+  DataSourceConfig(DataSourceConfig&&) noexcept;
+  ~DataSourceConfig();
+
+  void set_name(const std::string&);
+  const std::string& name() const;
+
+  uint32_t target_buffer() const;
+  void set_target_buffer(uint32_t);
 
   // TODO(primiano): temporary, for testing only.
-  std::string trace_category_filters;  // e.g., "ipc,media,toplvel"
+  void set_trace_category_filters(const std::string&);
+  const std::string& trace_category_filters() const;
+
+  void CopyFrom(const protos::DataSourceConfig&);
+  const protos::DataSourceConfig& proto() const { return *impl_; }
+
+  PERFETTO_DECLARE_PROTO_PIMPL(DataSourceConfig, protos::DataSourceConfig)
 };
 
 }  // namespace perfetto

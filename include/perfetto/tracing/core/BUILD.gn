@@ -23,7 +23,10 @@ source_set("core") {
     "data_source_config.h",
     "data_source_descriptor.h",
     "producer.h",
+    "proto_pimpl_macros.h",
     "service.h",
     "shared_memory.h",
+    "trace_config.h",
+    "trace_packet.h",
   ]
 }

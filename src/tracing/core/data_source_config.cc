@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
-option optimize_for = LITE_RUNTIME;
+#include "perfetto/tracing/core/data_source_config.h"
 
-package perfetto.proto;
+#include "protos/tracing_service/data_source_config.pb.h"
 
-message DataSourceConfig {
-  string trace_category_filters = 1;  // TODO: temporary for tests.
-}
+namespace perfetto {
+
+PERFETTO_DEFINE_CTOR_AND_COPY_OPERATORS(DataSourceConfig,
+                                        DataSourceConfig,
+                                        protos::DataSourceConfig)
+PERFETTO_DEFINE_STRING_ACCESSORS(DataSourceConfig, name)
+PERFETTO_DEFINE_POD_ACCESSORS(DataSourceConfig, uint32_t, target_buffer)
+PERFETTO_DEFINE_STRING_ACCESSORS(DataSourceConfig, trace_category_filters)
+
+}  // namespace perfetto

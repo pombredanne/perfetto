@@ -14,17 +14,17 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
-option optimize_for = LITE_RUNTIME;
+#include "perfetto/tracing/core/data_source_descriptor.h"
 
-package perfetto.proto;
+#include "perfetto/tracing/core/proto_pimpl_macros.h"
 
-// This message is sent from Producer(s) to the tracing Service when registering
-// to advertise their capabilities. It describes the structure of tracing
-// protos that will be produced by the data source and the supported filters.
-message DataSourceDescriptor {
-  string name = 1;  // e.g., "linux.ftrace", "chromium.tracing"
+#include "protos/tracing_service/data_source_descriptor.pb.h"
 
-  // TODO: this should have a structure to enable reflection of the proto
-  // fields emitted (see go/perfetto-logging).
-}
+namespace perfetto {
+
+PERFETTO_DEFINE_CTOR_AND_COPY_OPERATORS(DataSourceDescriptor,
+                                        DataSourceDescriptor,
+                                        protos::DataSourceDescriptor)
+PERFETTO_DEFINE_STRING_ACCESSORS(DataSourceDescriptor, name)
+
+}  // namespace perfetto
