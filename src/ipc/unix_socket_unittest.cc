@@ -412,7 +412,7 @@ TEST_F(UnixSocketTest, BlockingSend) {
 
   auto all_frames_done = task_runner_.CreateCheckpoint("all_frames_done");
   size_t total_bytes_received = 0;
-  constexpr size_t kTotalBytes = 1024 * 1024 * 20;
+  constexpr size_t kTotalBytes = 1024 * 1024 * 5;
   EXPECT_CALL(event_listener_, OnNewIncomingConnection(srv.get(), _))
       .WillOnce(Invoke([this, &total_bytes_received, all_frames_done](
                            UnixSocket*, UnixSocket* srv_conn) {
@@ -426,6 +426,9 @@ TEST_F(UnixSocketTest, BlockingSend) {
                     all_frames_done();
                 }));
       }));
+
+  // Override default timeout as this test can take time on the emulator.
+  const int kTimeoutMs = 30000;
 
   // Perform the blocking send form another thread.
   std::thread tx_thread([] {
@@ -441,16 +444,16 @@ TEST_F(UnixSocketTest, BlockingSend) {
 
     auto all_sent = tx_task_runner.CreateCheckpoint("all_sent");
     tx_task_runner.PostTask([&cli, all_sent] {
-      char buf[1024] = {};
+      char buf[4096 * 4] = {};
       for (size_t i = 0; i < kTotalBytes / sizeof(buf); i++)
         cli->Send(buf, sizeof(buf), -1 /*fd*/,
                   UnixSocket::BlockingMode::kBlocking);
       all_sent();
     });
-    tx_task_runner.RunUntilCheckpoint("all_sent");
+    tx_task_runner.RunUntilCheckpoint("all_sent", kTimeoutMs);
   });
 
-  task_runner_.RunUntilCheckpoint("all_frames_done");
+  task_runner_.RunUntilCheckpoint("all_frames_done", kTimeoutMs);
   tx_thread.join();
 }
 
