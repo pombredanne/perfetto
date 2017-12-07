@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "src/ftrace_reader/event_info.h"
 
 namespace perfetto {
 
@@ -39,32 +40,9 @@ class FtraceEventBundle;
 
 class ProtoTranslationTable {
  public:
-  enum FtraceFieldType {
-    kFtraceNumber = 0,
-  };
-
-  enum ProtoFieldType {
-    kProtoNumber = 0,
-  };
-
-  struct Field {
-    size_t ftrace_offset;
-    size_t ftrace_size;
-    FtraceFieldType ftrace_type;
-    size_t proto_field_id;
-    ProtoFieldType proto_field_type;
-  };
-
-  struct Event {
-    std::string name;
-    std::string group;
-    std::vector<Field> fields;
-    size_t ftrace_event_id;
-    size_t proto_field_id;
-  };
-
   static std::unique_ptr<ProtoTranslationTable> Create(
-      const FtraceProcfs* ftrace_procfs);
+      const FtraceProcfs* ftrace_procfs,
+      std::vector<Event> events);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,
@@ -93,6 +71,8 @@ class ProtoTranslationTable {
       return 0;
     return name_to_event_.at(name)->ftrace_event_id;
   }
+
+  const std::vector<Event>& events() { return events_; }
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
