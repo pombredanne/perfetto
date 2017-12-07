@@ -79,7 +79,7 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 #define PERFETTO_DCHECK(x)                             \
   do {                                                 \
     if (!__builtin_expect(!!(x), true)) {              \
-      PERFETTO_DPLOG("(D)CHECK(" #x ")");              \
+      PERFETTO_DPLOG("PERFETTO_CHECK(" #x ")");        \
       *(reinterpret_cast<volatile int*>(0x10)) = 0x42; \
       __builtin_unreachable();                         \
     }                                                  \
