@@ -81,14 +81,14 @@ bool ChunkedProtobufInputStream::Skip(int count) {
   return true;
 }
 
-int64_t ChunkedProtobufInputStream::ByteCount() const {
-  int64_t count = 0;
+google::protobuf::int64 ChunkedProtobufInputStream::ByteCount() const {
+  google::protobuf::int64 count = 0;
   for (auto it = chunks_->begin(); it != chunks_->end(); it++) {
     if (it == cur_chunk_) {
-      count += static_cast<int64_t>(pos_in_cur_chunk_);
+      count += static_cast<google::protobuf::int64>(pos_in_cur_chunk_);
       break;
     }
-    count += static_cast<int64_t>(it->size);
+    count += static_cast<google::protobuf::int64>(it->size);
   }
   return count;
 }

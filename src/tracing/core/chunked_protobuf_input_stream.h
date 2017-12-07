@@ -21,7 +21,7 @@
 
 #include <stdint.h>
 
-#include <google/protobuf/io/zero_copy_stream.h>
+#include "google/protobuf/io/zero_copy_stream.h"
 
 namespace perfetto {
 
@@ -38,7 +38,7 @@ class ChunkedProtobufInputStream
   bool Next(const void** data, int* size) override;
   void BackUp(int count) override;
   bool Skip(int count) override;
-  int64_t ByteCount() const override;
+  google::protobuf::int64 ByteCount() const override;
 
  private:
   const ChunkSequence* const chunks_;

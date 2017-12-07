@@ -66,7 +66,7 @@ TEST(ChunkedProtobufInputStreamTest, SimpleSequence) {
   for (size_t i = 0; i < base::ArraySize(kBufs); i++)
     seq.emplace_back(&kBufs[i], kBufs[i]);
   ChunkedProtobufInputStream istr(&seq);
-  int64_t num_bytes = 0;
+  int num_bytes = 0;
   const void* ptr = nullptr;
   int size = 0;
   for (size_t i = 0; i < base::ArraySize(kBufs); i++) {
