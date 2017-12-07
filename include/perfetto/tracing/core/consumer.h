@@ -17,7 +17,7 @@
 #ifndef INCLUDE_PERFETTO_TRACING_CORE_CONSUMER_H_
 #define INCLUDE_PERFETTO_TRACING_CORE_CONSUMER_H_
 
-#include "tracing/core/basic_types.h"
+#include "perfetto/tracing/core/basic_types.h"
 
 #include <vector>
 
