@@ -209,7 +209,8 @@ void HostImpl::SendFrame(ClientConnection* client, const Frame& frame, int fd) {
   // socket buffer is full? We might want to either drop the request or throttle
   // the send and PostTask the reply later? Right now we are making Send()
   // blocking as a workaround. Propagate bakpressure to the caller instead.
-  bool res = client->sock->Send(buf.data(), buf.size(), fd, true /*blocking*/);
+  bool res = client->sock->Send(buf.data(), buf.size(), fd,
+                                UnixSocket::BlockingMode::kBlocking);
   PERFETTO_CHECK(res || !client->sock->is_connected());
 }
 

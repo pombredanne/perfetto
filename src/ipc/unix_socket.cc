@@ -280,7 +280,10 @@ bool UnixSocket::Send(const std::string& msg) {
   return Send(msg.c_str(), msg.size() + 1);
 }
 
-bool UnixSocket::Send(const void* msg, size_t len, int send_fd, bool blocking) {
+bool UnixSocket::Send(const void* msg,
+                      size_t len,
+                      int send_fd,
+                      BlockingMode blocking_mode) {
   if (state_ != State::kConnected) {
     errno = last_error_ = ENOTCONN;
     return false;
@@ -307,10 +310,10 @@ bool UnixSocket::Send(const void* msg, size_t len, int send_fd, bool blocking) {
     msg_hdr.msg_controllen = cmsg->cmsg_len;
   }
 
-  if (blocking)
+  if (blocking_mode == BlockingMode::kBlocking)
     SetBlockingIO(true);
   const ssize_t sz = PERFETTO_EINTR(sendmsg(*fd_, &msg_hdr, kNoSigPipe));
-  if (blocking)
+  if (blocking_mode == BlockingMode::kBlocking)
     SetBlockingIO(false);
 
   if (sz >= 0) {
