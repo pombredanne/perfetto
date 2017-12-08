@@ -32,8 +32,10 @@ source_set("base") {
 
 if (is_android) {
   source_set("android_task_runner") {
-    sources += [ "android_task_runner.cc" ]
-    sources += [ "android_task_runner.h" ]
+    sources = [
+      "android_task_runner.cc",
+      "android_task_runner.h",
+    ]
     libs = [ "android" ]
   }
 }
