@@ -103,6 +103,10 @@ config("protobuf_gen_config") {
     "-Wno-undef",
     "-Wno-zero-as-null-pointer-constant",
   ]
+
+  if (!is_clang) {
+    cflags += [ "-Wno-sign-compare" ]
+  }
 }
 
 # Configuration used to build libprotobuf_* and the protoc compiler.
