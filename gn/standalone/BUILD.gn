@@ -43,10 +43,6 @@ config("no_rtti") {
   cflags = [ "-fno-rtti" ]
 }
 
-config("visibility_hidden") {
-  cflags = [ "-fvisibility=hidden" ]
-}
-
 config("default") {
   asmflags = []
   cflags = []
@@ -210,5 +206,13 @@ config("executable") {
       "-Wl,-rpath=\$ORIGIN/.",
       "-Wl,-rpath-link=.",
     ]
+  }
+
+  # Retains most symbols for stack traces. See comments in
+  # linker_version_script.map .
+  if (is_linux || is_android) {
+    version_script = "linker_version_script.map"
+    ldflags += [ "-Wl,--version-script=" +
+                 rebase_path(version_script, root_build_dir) ]
   }
 }

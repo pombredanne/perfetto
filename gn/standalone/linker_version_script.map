@@ -1,0 +1,20 @@
+# This linker script is used only for standalone (non-production) builds.
+# Together with -rdynamic it exports most symbols, so that stacktrace produced
+# by debug_crash_stack_trace.cc contain meaningful frame names. We cannot just
+# export all symbols because doing so leaks libprotobuf symbols. Leaking
+# protobuf symbols causes a crash, because other system libraries we depend
+# on (e.g., libhwui.so) dynmically link against /system/lib/libprotobuf.so,
+# which is different from our own copy when building standalone. Ditto for
+# c++ symbols.
+{
+global:
+  extern "C++" {
+    perfetto::*;
+    *testing*;
+  };
+
+  _start;
+
+local:
+  *;
+};

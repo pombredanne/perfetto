@@ -29,12 +29,12 @@ source_set("base") {
     sources += [ "android_task_runner.cc" ]
     libs = [ "android" ]
   }
-  if (is_debug) {
+  if (is_debug && !build_with_chromium) {
     deps += [ ":debug_crash_stack_trace" ]
   }
 }
 
-if (is_debug) {
+if (is_debug && !build_with_chromium) {
   source_set("debug_crash_stack_trace") {
     sources = [
       "debug_crash_stack_trace.cc",
