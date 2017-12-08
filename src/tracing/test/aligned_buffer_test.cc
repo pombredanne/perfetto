@@ -14,17 +14,22 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
-option optimize_for = LITE_RUNTIME;
+#include "src/tracing/test/aligned_buffer_test.h"
 
-package perfetto.proto;
+#include "perfetto/base/logging.h"
 
-// This message is sent from Producer(s) to the tracing Service when registering
-// to advertise their capabilities. It describes the structure of tracing
-// protos that will be produced by the data source and the supported filters.
-message DataSourceDescriptor {
-  string name = 1;  // e.g., "linux.ftrace", "chromium.tracing"
+namespace perfetto {
 
-  // TODO: this should have a structure to enable reflection of the proto
-  // fields emitted (see go/perfetto-logging).
+// static
+constexpr size_t AlignedBufferTest::kNumPages;
+
+void AlignedBufferTest::SetUp() {
+  page_size_ = GetParam();
+  buf_.reset(new TestSharedMemory(page_size_ * kNumPages));
 }
+
+void AlignedBufferTest::TearDown() {
+  buf_.reset();
+}
+
+}  // namespace perfetto
