@@ -57,15 +57,14 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
         ftrace_procfs->ReadEventFormat(event.group, event.name);
     FtraceEvent ftrace_event;
     if (contents == "" || !ParseFtraceEvent(contents, &ftrace_event)) {
-      PERFETTO_DLOG("Could not read '%s'", event.name.c_str());
+      PERFETTO_DLOG("Could not read '%s'", event.name);
       continue;
     }
     event.ftrace_event_id = ftrace_event.id;
-    event.fields.reserve(ftrace_event.fields.size());
     for (Field& field : event.fields) {
       for (FtraceEvent::Field ftrace_field : ftrace_event.fields) {
-        if (field.ftrace_name !=
-            GetNameFromTypeAndName(ftrace_field.type_and_name))
+        if (GetNameFromTypeAndName(ftrace_field.type_and_name) !=
+            field.ftrace_name)
           continue;
         field.ftrace_offset = ftrace_field.offset;
         field.ftrace_size = ftrace_field.size;
@@ -88,7 +87,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
                events.end());
 
   auto table = std::unique_ptr<ProtoTranslationTable>(
-      new ProtoTranslationTable(events, std::move(common_fields)));
+      new ProtoTranslationTable(std::move(events), std::move(common_fields)));
   return table;
 }
 

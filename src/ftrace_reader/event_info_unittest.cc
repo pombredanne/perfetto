@@ -27,19 +27,25 @@ TEST(GetStaticEventInfo, SanityCheck) {
     // For each event the following fields should be filled
     // statically:
     // Non-empty name.
-    ASSERT_FALSE(event.name.empty());
+    ASSERT_TRUE(event.name);
     // Non-empty group.
-    ASSERT_FALSE(event.group.empty());
+    ASSERT_TRUE(event.group);
     // Non-zero proto field id.
     ASSERT_TRUE(event.proto_field_id);
+    // Zero the ftrace id.
+    ASSERT_FALSE(event.ftrace_event_id);
 
     for (const Field& field : event.fields) {
       // Non-empty name.
-      ASSERT_FALSE(field.ftrace_name.empty());
+      ASSERT_TRUE(field.ftrace_name);
       // Non-zero proto field id.
       ASSERT_TRUE(field.proto_field_id);
       // Should have set the proto field type.
       ASSERT_TRUE(field.proto_field_type);
+      // Other fields should be zeroed.
+      ASSERT_FALSE(field.ftrace_offset);
+      ASSERT_FALSE(field.ftrace_size);
+      ASSERT_FALSE(field.ftrace_type);
     }
   }
 }

@@ -16,9 +16,10 @@
 
 #include "src/ftrace_reader/event_info.h"
 
+namespace perfetto {
 namespace {
 
-Field FieldFromNameIdType(std::string name, size_t id, ProtoFieldType type) {
+Field FieldFromNameIdType(const char* name, size_t id, ProtoFieldType type) {
   Field field{};
   field.ftrace_name = name;
   field.proto_field_id = id;
@@ -29,6 +30,7 @@ Field FieldFromNameIdType(std::string name, size_t id, ProtoFieldType type) {
 }  // namespace
 
 // TODO(hjd): Auto-generate this file.
+// TODO(b/70373826): Reduce runetime overhead with constexpr magic etc.
 std::vector<Event> GetStaticEventInfo() {
   std::vector<Event> events;
 
@@ -58,3 +60,5 @@ std::vector<Event> GetStaticEventInfo() {
 
   return events;
 }
+
+}  // namespace perfetto

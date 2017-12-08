@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+namespace perfetto {
+
 enum ProtoFieldType {
   kProtoNumber = 1,
   kProtoString,
@@ -33,22 +35,47 @@ enum FtraceFieldType {
 };
 
 struct Field {
-  size_t ftrace_offset;
-  size_t ftrace_size;
+  Field() = default;
+  Field(uint16_t offset, uint16_t size)
+      : ftrace_offset(offset), ftrace_size(size) {}
+
+  uint16_t ftrace_offset;
+  uint16_t ftrace_size;
   FtraceFieldType ftrace_type;
-  size_t proto_field_id;
+  const char* ftrace_name;
+
+  uint32_t proto_field_id;
   ProtoFieldType proto_field_type;
-  std::string ftrace_name;
 };
 
 struct Event {
-  std::string name;
-  std::string group;
+  Event() = default;
+  Event(const char* event_name, const char* event_group)
+      : name(event_name), group(event_group) {}
+
+  const char* name;
+  const char* group;
   std::vector<Field> fields;
-  size_t ftrace_event_id;
-  size_t proto_field_id;
+  uint32_t ftrace_event_id;
+
+  // Field id of the subevent proto (e.g. PrintFtraceEvent) in the FtraceEvent
+  // parent proto.
+  uint32_t proto_field_id;
 };
 
+// The compile time information needed to read the raw ftrace buffer.
+// Specifically for each event we have a proto we fill:
+//  The event name (e.g. sched_switch)
+//  The event group  (e.g. sched)
+//  The the proto field ID of this event in the FtraceEvent proto.
+//  For each field in the proto:
+//    The field name (e.g. prev_comm)
+//    The proto field id for this field
+//    The proto field type for this field (e.g. kProtoString or kProtoUint32)
+// The other fields: ftrace_event_id, ftrace_size, ftrace_offset, ftrace_type
+// are zeroed.
 std::vector<Event> GetStaticEventInfo();
+
+}  // namespace perfetto
 
 #endif  // SRC_FTRACE_READER_EVENT_PROTO_INFO_H_

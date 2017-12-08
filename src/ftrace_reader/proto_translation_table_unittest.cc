@@ -50,8 +50,8 @@ TEST_P(AllTranslationTableTest, Create) {
   for (const Event& event : table_->events()) {
     if (!event.ftrace_event_id)
       continue;
-    EXPECT_FALSE(event.name.empty());
-    EXPECT_FALSE(event.group.empty());
+    EXPECT_TRUE(event.name);
+    EXPECT_TRUE(event.group);
     EXPECT_TRUE(event.proto_field_id);
     for (const Field& field : event.fields) {
       EXPECT_TRUE(field.proto_field_id);
