@@ -104,7 +104,10 @@ config("protobuf_gen_config") {
   ]
 
   if (!is_clang) {
-    cflags += [ "-Wno-sign-compare" ]
+    cflags += [
+      "-Wno-sign-compare",
+      " -Wno-maybe-uninitialized",
+    ]
   }
 }
 
