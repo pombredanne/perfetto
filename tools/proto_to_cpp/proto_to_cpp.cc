@@ -363,11 +363,16 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
            proto_type);
   p->Indent();
   for (int i = 0; i < msg->field_count(); i++) {
+    p->Print("\n");
     const FieldDescriptor* field = msg->field(i);
     if (!field->is_repeated()) {
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("$n$_.FromProto(proto.$n$());\n", "n", field->name());
       } else {
+        p->Print(
+            "static_assert(sizeof($n$_) == sizeof(proto.$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
         p->Print("$n$_ = static_cast<decltype($n$_)>(proto.$n$());\n", "n",
                  field->name());
       }
@@ -378,6 +383,10 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("  $n$_.back().FromProto(field);\n", "n", field->name());
       } else {
+        p->Print(
+            "static_assert(sizeof($n$_.back()) == sizeof(proto.$n$(0)), \"size "
+            "mismatch\");\n",
+            "n", field->name());
         p->Print(
             "  $n$_.back() = static_cast<decltype($n$_)::value_type>(field);\n",
             "n", field->name());
@@ -395,11 +404,16 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
   p->Indent();
   p->Print("proto->Clear();\n");
   for (int i = 0; i < msg->field_count(); i++) {
+    p->Print("\n");
     const FieldDescriptor* field = msg->field(i);
     if (!field->is_repeated()) {
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("$n$_.ToProto(proto->mutable_$n$());\n", "n", field->name());
       } else {
+        p->Print(
+            "static_assert(sizeof($n$_) == sizeof(proto->$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
         p->Print("proto->set_$n$(static_cast<decltype(proto->$n$())>($n$_));\n",
                  "n", field->name());
       }
@@ -409,6 +423,10 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("  it.ToProto(entry);\n");
       } else {
+        p->Print(
+            "static_assert(sizeof(it) == sizeof(proto->$n$(0)), \"size "
+            "mismatch\");\n",
+            "n", field->name());
         p->Print("  *entry = static_cast<decltype(proto->$n$(0))>(it);\n", "n",
                  field->name());
       }
