@@ -28,7 +28,7 @@ class Consumer;
 
 // Allows to connect to a remote Service through a UNIX domain socket.
 // Exposed to:
-//   Consumer(s) and Consumer(s) of the tracing library.
+//   Consumer(s) of the tracing library.
 // Implemented in:
 //   src/ipc/producer/producer_ipc_client_impl.cc
 class ConsumerIPCClient {

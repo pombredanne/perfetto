@@ -39,8 +39,16 @@ DataSourceConfig& DataSourceConfig::operator=(DataSourceConfig&&) = default;
 
 void DataSourceConfig::FromProto(
     const perfetto::protos::DataSourceConfig& proto) {
+  static_assert(sizeof(name_) == sizeof(proto.name()), "size mismatch");
   name_ = static_cast<decltype(name_)>(proto.name());
+
+  static_assert(sizeof(target_buffer_) == sizeof(proto.target_buffer()),
+                "size mismatch");
   target_buffer_ = static_cast<decltype(target_buffer_)>(proto.target_buffer());
+
+  static_assert(
+      sizeof(trace_category_filters_) == sizeof(proto.trace_category_filters()),
+      "size mismatch");
   trace_category_filters_ = static_cast<decltype(trace_category_filters_)>(
       proto.trace_category_filters());
   unknown_fields_ = proto.unknown_fields();
@@ -49,9 +57,18 @@ void DataSourceConfig::FromProto(
 void DataSourceConfig::ToProto(
     perfetto::protos::DataSourceConfig* proto) const {
   proto->Clear();
+
+  static_assert(sizeof(name_) == sizeof(proto->name()), "size mismatch");
   proto->set_name(static_cast<decltype(proto->name())>(name_));
+
+  static_assert(sizeof(target_buffer_) == sizeof(proto->target_buffer()),
+                "size mismatch");
   proto->set_target_buffer(
       static_cast<decltype(proto->target_buffer())>(target_buffer_));
+
+  static_assert(sizeof(trace_category_filters_) ==
+                    sizeof(proto->trace_category_filters()),
+                "size mismatch");
   proto->set_trace_category_filters(
       static_cast<decltype(proto->trace_category_filters())>(
           trace_category_filters_));
