@@ -13,7 +13,7 @@
 # limitations under the License.
 
 if (current_toolchain == host_toolchain) {
-  executable("proto_to_cpp") {
+  executable("proto_to_cpp_host") {
     testonly = true
     deps = [
       "../../gn:default_deps",
@@ -23,4 +23,19 @@ if (current_toolchain == host_toolchain) {
       "proto_to_cpp.cc",
     ]
   }
+}
+
+copy("proto_to_cpp") {
+  testonly = true
+  host_out_dir_ =
+      get_label_info(":proto_to_cpp_host($host_toolchain)", "root_out_dir")
+  deps = [
+    ":proto_to_cpp_host($host_toolchain)",
+  ]
+  sources = [
+    "${host_out_dir_}/proto_to_cpp_host",
+  ]
+  outputs = [
+    "${root_out_dir}/proto_to_cpp",
+  ]
 }
