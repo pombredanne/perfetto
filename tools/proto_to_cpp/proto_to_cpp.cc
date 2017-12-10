@@ -293,7 +293,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
   p->Print("\n");
 
   std::string proto_type = GetFwdDeclType(msg, true);
-  p->Print("// Conversion methods from/to the corresponding protobuf types.");
+  p->Print("// Conversion methods from/to the corresponding protobuf types.\n");
   p->Print("$n$& operator=(const $p$&);\n", "n", msg->name(), "p", proto_type);
   p->Print("void ToProto($p$*) const;\n", "p", proto_type);
 
@@ -336,6 +336,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
                field->lowercase_name());
     }
   }
+  p->Print("\n");
   p->Print("// Allows to preserve unknown protobuf fields for compatibility\n");
   p->Print("// with future versions of .proto files.\n");
   p->Print("std::string unknown_fields_;\n");
