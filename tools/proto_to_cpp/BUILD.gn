@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("core") {
-  public_deps = [
-    "../../base",
-  ]
-  sources = [
-    "basic_types.h",
-    "chunk.h",
-    "consumer.h",
-    "data_source_config.h",
-    "data_source_descriptor.h",
-    "producer.h",
-    "service.h",
-    "shared_memory.h",
-    "trace_config.h",
-    "trace_packet.h",
-  ]
+if (current_toolchain == host_toolchain) {
+  executable("proto_to_cpp") {
+    testonly = true
+    deps = [
+      "../../gn:default_deps",
+      "../../gn:protobuf_full_deps",
+    ]
+    sources = [
+      "proto_to_cpp.cc",
+    ]
+  }
 }

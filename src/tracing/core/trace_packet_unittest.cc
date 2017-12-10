@@ -66,11 +66,11 @@ TEST(TracePacketTest, Chunked) {
   auto chunk = tp.begin();
   ASSERT_NE(tp.end(), chunk);
   ASSERT_EQ(ser_buf.data(), chunk->start);
-  ASSERT_EQ(3, chunk->size);
+  ASSERT_EQ(3u, chunk->size);
 
   ASSERT_NE(tp.end(), ++chunk);
   ASSERT_EQ(ser_buf.data() + 3, chunk->start);
-  ASSERT_EQ(5, chunk->size);
+  ASSERT_EQ(5u, chunk->size);
 
   ASSERT_NE(tp.end(), ++chunk);
   ASSERT_EQ(ser_buf.data() + 3 + 5, chunk->start);
@@ -89,9 +89,7 @@ TEST(TracePacketTest, Corrupted) {
   std::string ser_buf = proto.SerializeAsString();
   TracePacket tp;
   tp.AddChunk({ser_buf.data(), ser_buf.size() - 2});  // corrupted.
-
   ASSERT_FALSE(tp.Decode());
-  ASSERT_EQ(nullptr, tp.operator->());
 }
 
 }  // namespace

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
+syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "protos/tracing_service/data_source_config.proto";
@@ -49,7 +49,7 @@ service ConsumerPort {
 
 // Arguments for rpc EnableTracing().
 message EnableTracingRequest {
-  protos.TraceConfig trace_config = 1;
+  optional protos.TraceConfig trace_config = 1;
 }
 
 message EnableTracingResponse {}
@@ -57,7 +57,7 @@ message EnableTracingResponse {}
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {
   // When set, all active data source are disabled.
-  bool disable_all = 1;
+  optional bool disable_all = 1;
 
   // TODO: not supported yet.
   // repeated string data_source_name;

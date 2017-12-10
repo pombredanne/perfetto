@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
+syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "protos/tracing_service/data_source_config.proto";
@@ -23,7 +23,7 @@ package perfetto.protos;
 
 message TraceConfig {
   message BufferConfig {
-    uint32 size_kb = 1;
+    optional uint32 size_kb = 1;
     // TODO: uint32 page_size = 2;
 
     enum OptimizeFor {
@@ -46,14 +46,14 @@ message TraceConfig {
       // TODO: Not implemented yet.
       // CONTINUOUS_STREAMING = 1;
     }
-    OptimizeFor optimize_for = 3;
+    optional OptimizeFor optimize_for = 3;
 
     enum FillPolicy {
       RING_BUFFER = 0;
       // TODO: not implemented yet.
       // STOP_WHEN_FULL = 1;
     }
-    FillPolicy fill_policy = 4;
+    optional FillPolicy fill_policy = 4;
   }
   repeated BufferConfig buffers = 1;
 
@@ -61,15 +61,17 @@ message TraceConfig {
     // Filters and data-source specific config. It contains also the unique name
     // of the data source, the one passed in the  DataSourceDescriptor when they
     // register on the service.
-    protos.DataSourceConfig config = 1;
+    optional protos.DataSourceConfig config = 1;
 
     // Optional. If multilple producer (~processes) expose the same data source
     // and |producer_name_filter| != "", the data source is enabled only for
     // producers which name match any of the producer_name_filter below.
-    // This allow to enable a data source only on specific processes.
+    // This allow to enable a data source only for specific processes.
+    // The "repeated" field has OR sematics: specifying a filter ["foo", "bar"]
+    // will enable data source on both "foo" and "bar" (if existent).
     repeated string producer_name_filter = 2;
   }
   repeated DataSource data_sources = 2;
 
-  uint32 duration_ms = 3;
+  optional uint32 duration_ms = 3;
 }

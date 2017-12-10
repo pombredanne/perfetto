@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
+syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "protos/tracing_service/data_source_config.proto";
@@ -54,12 +54,12 @@ service ProducerPort {
 message InitializeConnectionRequest {
   // Defines the granularity of the tracing pages. Must be an integer multiple
   // of 4096. See tradeoff considerations in shared_memory_abi.h.
-  uint32 shared_buffer_page_size_bytes = 1;
+  optional uint32 shared_buffer_page_size_bytes = 1;
 
   // Optional. Provides a hint to the tracing service about the suggested size
   // of the shared memory buffer. The service is not required to respect this
   // and might return a smaller buffer.
-  uint32 shared_buffer_size_hint_bytes = 2;
+  optional uint32 shared_buffer_size_hint_bytes = 2;
 }
 
 message InitializeConnectionResponse {
@@ -69,15 +69,15 @@ message InitializeConnectionResponse {
 // Arguments for rpc RegisterDataSource().
 
 message RegisterDataSourceRequest {
-  protos.DataSourceDescriptor data_source_descriptor = 1;
+  optional protos.DataSourceDescriptor data_source_descriptor = 1;
 }
 
 message RegisterDataSourceResponse {
   // The ID assigned by the service to this data source. 0 in case of errors.
-  uint64 data_source_id = 1;
+  optional uint64 data_source_id = 1;
 
   // Only set in case of errors, when |data_source_id| == 0.
-  string error = 2;
+  optional string error = 2;
 };
 
 // Arguments for rpc UnregisterDataSource().
@@ -85,7 +85,7 @@ message RegisterDataSourceResponse {
 message UnregisterDataSourceRequest {
   // The ID of the data source to unregister, as previously returned in
   // |RegisterDataSourceResponse.data_source_id|.
-  uint64 data_source_id = 1;
+  optional uint64 data_source_id = 1;
 }
 
 message UnregisterDataSourceResponse {}
@@ -104,11 +104,11 @@ message GetAsyncCommandRequest {}
 
 message GetAsyncCommandResponse {
   message StartDataSource {
-    uint64 new_instance_id = 1;
-    protos.DataSourceConfig config = 2;
+    optional uint64 new_instance_id = 1;
+    optional protos.DataSourceConfig config = 2;
   }
 
-  message StopDataSource { uint64 instance_id = 1; }
+  message StopDataSource { optional uint64 instance_id = 1; }
 
   oneof cmd {
     StartDataSource start_data_source = 1;
