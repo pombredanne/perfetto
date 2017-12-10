@@ -38,21 +38,19 @@ TraceConfig::~TraceConfig() = default;
 TraceConfig::TraceConfig(TraceConfig&&) noexcept = default;
 TraceConfig& TraceConfig::operator=(TraceConfig&&) = default;
 
-TraceConfig& TraceConfig::operator=(
-    const perfetto::protos::TraceConfig& proto) {
+void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
   buffers_.clear();
   for (const auto& field : proto.buffers()) {
     buffers_.emplace_back();
-    buffers_.back() = field;
+    buffers_.back().FromProto(field);
   }
   data_sources_.clear();
   for (const auto& field : proto.data_sources()) {
     data_sources_.emplace_back();
-    data_sources_.back() = field;
+    data_sources_.back().FromProto(field);
   }
   duration_ms_ = static_cast<decltype(duration_ms_)>(proto.duration_ms());
   unknown_fields_ = proto.unknown_fields();
-  return *this;
 }
 
 void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
@@ -77,13 +75,12 @@ TraceConfig::BufferConfig::BufferConfig(TraceConfig::BufferConfig&&) noexcept =
 TraceConfig::BufferConfig& TraceConfig::BufferConfig::operator=(
     TraceConfig::BufferConfig&&) = default;
 
-TraceConfig::BufferConfig& TraceConfig::BufferConfig::operator=(
+void TraceConfig::BufferConfig::FromProto(
     const perfetto::protos::TraceConfig_BufferConfig& proto) {
   size_kb_ = static_cast<decltype(size_kb_)>(proto.size_kb());
   optimize_for_ = static_cast<decltype(optimize_for_)>(proto.optimize_for());
   fill_policy_ = static_cast<decltype(fill_policy_)>(proto.fill_policy());
   unknown_fields_ = proto.unknown_fields();
-  return *this;
 }
 
 void TraceConfig::BufferConfig::ToProto(
@@ -104,16 +101,16 @@ TraceConfig::DataSource::DataSource(TraceConfig::DataSource&&) noexcept =
 TraceConfig::DataSource& TraceConfig::DataSource::operator=(
     TraceConfig::DataSource&&) = default;
 
-TraceConfig::DataSource& TraceConfig::DataSource::operator=(
+void TraceConfig::DataSource::FromProto(
     const perfetto::protos::TraceConfig_DataSource& proto) {
-  config_ = proto.config();
+  config_.FromProto(proto.config());
   producer_name_filter_.clear();
   for (const auto& field : proto.producer_name_filter()) {
     producer_name_filter_.emplace_back();
-    producer_name_filter_.back() = field;
+    producer_name_filter_.back() =
+        static_cast<decltype(producer_name_filter_)::value_type>(field);
   }
   unknown_fields_ = proto.unknown_fields();
-  return *this;
 }
 
 void TraceConfig::DataSource::ToProto(
@@ -122,7 +119,7 @@ void TraceConfig::DataSource::ToProto(
   config_.ToProto(proto->mutable_config());
   for (const auto& it : producer_name_filter_) {
     auto* entry = proto->add_producer_name_filter();
-    *entry = static_cast<decltype(producer_name_filter_)::value_type>(it);
+    *entry = static_cast<decltype(proto->producer_name_filter(0))>(it);
   }
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }

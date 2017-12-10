@@ -18,7 +18,6 @@ source_set("ipc") {
     "../core",
   ]
   sources = [
-    "consumer_ipc_client.h",
     "producer_ipc_client.h",
     "service_ipc_host.h",
   ]

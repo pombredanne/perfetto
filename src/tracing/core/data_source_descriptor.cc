@@ -39,11 +39,10 @@ DataSourceDescriptor::DataSourceDescriptor(DataSourceDescriptor&&) noexcept =
 DataSourceDescriptor& DataSourceDescriptor::operator=(DataSourceDescriptor&&) =
     default;
 
-DataSourceDescriptor& DataSourceDescriptor::operator=(
+void DataSourceDescriptor::FromProto(
     const perfetto::protos::DataSourceDescriptor& proto) {
   name_ = static_cast<decltype(name_)>(proto.name());
   unknown_fields_ = proto.unknown_fields();
-  return *this;
 }
 
 void DataSourceDescriptor::ToProto(

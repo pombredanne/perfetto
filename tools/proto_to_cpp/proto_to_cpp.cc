@@ -101,13 +101,7 @@ std::string GetFwdDeclType(const Descriptor* msg, bool with_namespace = false) {
 }
 
 void GenFwdDecl(const Descriptor* msg, Printer* p) {
-  std::vector<std::string> namespaces = Split(msg->file()->package(), ".");
-  for (size_t i = 0; i < namespaces.size(); i++)
-    p->Print("namespace $n$ { ", "n", namespaces[i]);
   p->Print("class $n$;", "n", GetFwdDeclType(msg));
-  for (size_t i = 0; i < namespaces.size(); i++)
-    p->Print(" }");
-  p->Print("\n");
 
   // Recurse into subtypes
   for (int i = 0; i < msg->field_count(); i++) {
@@ -243,8 +237,14 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   }
 
   // Generate forward declarations in the header for proto types.
+  header_printer.Print("// Forward declarations for protobuf types.\n");
+  std::vector<std::string> namespaces = Split(proto_file->package(), ".");
+  for (size_t i = 0; i < namespaces.size(); i++)
+    header_printer.Print("namespace $n$ {\n", "n", namespaces[i]);
   for (int i = 0; i < proto_file->message_type_count(); i++)
     GenFwdDecl(proto_file->message_type(i), &header_printer);
+  for (size_t i = 0; i < namespaces.size(); i++)
+    header_printer.Print("}\n");
 
   header_printer.Print("\nnamespace perfetto {\n");
   cpp_printer.Print("\nnamespace perfetto {\n");
@@ -294,7 +294,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
 
   std::string proto_type = GetFwdDeclType(msg, true);
   p->Print("// Conversion methods from/to the corresponding protobuf types.\n");
-  p->Print("$n$& operator=(const $p$&);\n", "n", msg->name(), "p", proto_type);
+  p->Print("void FromProto(const $p$&);\n", "n", msg->name(), "p", proto_type);
   p->Print("void ToProto($p$*) const;\n", "p", proto_type);
 
   // Generate accessors.
@@ -311,7 +311,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
         p->Print("void set_$n$($t$ value) { $n$_ = value; }\n", "t",
                  GetCppType(field, true), "n", field->lowercase_name());
       }
-    } else {
+    } else {  // is_repeated()
       p->Print(
           "int $n$_size() const { return static_cast<int>($n$_.size()); }\n",
           "t", GetCppType(field, false), "n", field->lowercase_name());
@@ -331,7 +331,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
     if (!field->is_repeated()) {
       p->Print("$t$ $n$_ = {};\n", "t", GetCppType(field, false), "n",
                field->lowercase_name());
-    } else {
+    } else {  // is_repeated()
       p->Print("std::vector<$t$> $n$_;\n", "t", GetCppType(field, false), "n",
                field->lowercase_name());
     }
@@ -359,28 +359,33 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
   std::string proto_type = GetFwdDeclType(msg, true);
 
   // Genrate the FromProto() method definition.
-  p->Print("$f$& $f$::operator=(const $p$& proto) {\n", "f", full_name, "p",
+  p->Print("void $f$::FromProto(const $p$& proto) {\n", "f", full_name, "p",
            proto_type);
   p->Indent();
   for (int i = 0; i < msg->field_count(); i++) {
     const FieldDescriptor* field = msg->field(i);
     if (!field->is_repeated()) {
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
-        p->Print("$n$_ = proto.$n$();\n", "n", field->name());
+        p->Print("$n$_.FromProto(proto.$n$());\n", "n", field->name());
       } else {
         p->Print("$n$_ = static_cast<decltype($n$_)>(proto.$n$());\n", "n",
                  field->name());
       }
-    } else {
+    } else {  // is_repeated()
       p->Print("$n$_.clear();\n", "n", field->name());
       p->Print("for (const auto& field : proto.$n$()) {\n", "n", field->name());
       p->Print("  $n$_.emplace_back();\n", "n", field->name());
-      p->Print("  $n$_.back() = field;\n", "n", field->name());
+      if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
+        p->Print("  $n$_.back().FromProto(field);\n", "n", field->name());
+      } else {
+        p->Print(
+            "  $n$_.back() = static_cast<decltype($n$_)::value_type>(field);\n",
+            "n", field->name());
+      }
       p->Print("}\n");
     }
   }
   p->Print("unknown_fields_ = proto.unknown_fields();\n");
-  p->Print("return *this;\n");
   p->Outdent();
   p->Print("}\n\n");
 
@@ -398,14 +403,14 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
         p->Print("proto->set_$n$(static_cast<decltype(proto->$n$())>($n$_));\n",
                  "n", field->name());
       }
-    } else {
+    } else {  // is_repeated()
       p->Print("for (const auto& it : $n$_) {\n", "n", field->name());
       p->Print("  auto* entry = proto->add_$n$();\n", "n", field->name());
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("  it.ToProto(entry);\n");
       } else {
-        p->Print("  *entry = static_cast<decltype($n$_)::value_type>(it);\n",
-                 "n", field->name());
+        p->Print("  *entry = static_cast<decltype(proto->$n$(0))>(it);\n", "n",
+                 field->name());
       }
       p->Print("}\n");
     }

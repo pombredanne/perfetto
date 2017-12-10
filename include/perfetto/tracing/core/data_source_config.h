@@ -35,6 +35,7 @@
 #include <vector>
 #include "perfetto/base/build_config.h"
 
+// Forward declarations for protobuf types.
 namespace perfetto {
 namespace protos {
 class DataSourceConfig;
@@ -53,7 +54,7 @@ class DataSourceConfig {
   DataSourceConfig& operator=(const DataSourceConfig&) = delete;
 
   // Conversion methods from/to the corresponding protobuf types.
-  DataSourceConfig& operator=(const perfetto::protos::DataSourceConfig&);
+  void FromProto(const perfetto::protos::DataSourceConfig&);
   void ToProto(perfetto::protos::DataSourceConfig*) const;
 
   const std::string& name() const { return name_; }
