@@ -37,14 +37,13 @@ DataSourceConfig::~DataSourceConfig() = default;
 DataSourceConfig::DataSourceConfig(DataSourceConfig&&) noexcept = default;
 DataSourceConfig& DataSourceConfig::operator=(DataSourceConfig&&) = default;
 
-DataSourceConfig& DataSourceConfig::operator=(
+void DataSourceConfig::FromProto(
     const perfetto::protos::DataSourceConfig& proto) {
   name_ = static_cast<decltype(name_)>(proto.name());
   target_buffer_ = static_cast<decltype(target_buffer_)>(proto.target_buffer());
   trace_category_filters_ = static_cast<decltype(trace_category_filters_)>(
       proto.trace_category_filters());
   unknown_fields_ = proto.unknown_fields();
-  return *this;
 }
 
 void DataSourceConfig::ToProto(

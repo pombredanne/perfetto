@@ -37,25 +37,14 @@
 
 #include "include/perfetto/tracing/core/data_source_config.h"
 
+// Forward declarations for protobuf types.
 namespace perfetto {
 namespace protos {
 class TraceConfig;
-}
-}  // namespace perfetto
-namespace perfetto {
-namespace protos {
 class TraceConfig_BufferConfig;
-}
-}  // namespace perfetto
-namespace perfetto {
-namespace protos {
 class TraceConfig_DataSource;
-}
-}  // namespace perfetto
-namespace perfetto {
-namespace protos {
 class DataSourceConfig;
-}
+}  // namespace protos
 }  // namespace perfetto
 
 namespace perfetto {
@@ -78,7 +67,7 @@ class TraceConfig {
     BufferConfig& operator=(const BufferConfig&) = delete;
 
     // Conversion methods from/to the corresponding protobuf types.
-    BufferConfig& operator=(const perfetto::protos::TraceConfig_BufferConfig&);
+    void FromProto(const perfetto::protos::TraceConfig_BufferConfig&);
     void ToProto(perfetto::protos::TraceConfig_BufferConfig*) const;
 
     uint32_t size_kb() const { return size_kb_; }
@@ -110,7 +99,7 @@ class TraceConfig {
     DataSource& operator=(const DataSource&) = delete;
 
     // Conversion methods from/to the corresponding protobuf types.
-    DataSource& operator=(const perfetto::protos::TraceConfig_DataSource&);
+    void FromProto(const perfetto::protos::TraceConfig_DataSource&);
     void ToProto(perfetto::protos::TraceConfig_DataSource*) const;
 
     const DataSourceConfig& config() const { return config_; }
@@ -144,7 +133,7 @@ class TraceConfig {
   TraceConfig& operator=(const TraceConfig&) = delete;
 
   // Conversion methods from/to the corresponding protobuf types.
-  TraceConfig& operator=(const perfetto::protos::TraceConfig&);
+  void FromProto(const perfetto::protos::TraceConfig&);
   void ToProto(perfetto::protos::TraceConfig*) const;
 
   int buffers_size() const { return static_cast<int>(buffers_.size()); }
