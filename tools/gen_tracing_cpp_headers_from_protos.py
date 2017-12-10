@@ -37,7 +37,7 @@ def main():
     print('This script mast be executed from the perfetto root directory')
     return 1
   if len(sys.argv) < 2:
-    print('Usage: %s out/xxx/gcc_like_host' % sys.argv[0])
+    print('Usage: %s out/xxx' % sys.argv[0])
     return 1
   out_dir = sys.argv[1]
   clang_format = ['clang-format', '-i', '--sort-includes']
