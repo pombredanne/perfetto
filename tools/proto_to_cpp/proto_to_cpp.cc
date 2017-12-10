@@ -215,10 +215,9 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   OstreamOutputStream cpp_proto_ostr(&cpp_ostr);
   Printer cpp_printer(&cpp_proto_ostr, '$');
 
-  std::string include_guard = proto_file->name();
+  std::string include_guard = dst_header + "_";
   UpperString(&include_guard);
   StripString(&include_guard, ".-/\\", '_');
-  include_guard.append("_GENCPP_H_");
   header_printer.Print(kHeader, "f", __FILE__, "p", src_proto);
   header_printer.Print("#ifndef $g$\n#define $g$\n\n", "g", include_guard);
   header_printer.Print("#include <stdint.h>\n");
@@ -294,6 +293,7 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
   p->Print("\n");
 
   std::string proto_type = GetFwdDeclType(msg, true);
+  p->Print("// Conversion methods from/to the corresponding protobuf types.");
   p->Print("$n$& operator=(const $p$&);\n", "n", msg->name(), "p", proto_type);
   p->Print("void ToProto($p$*) const;\n", "p", proto_type);
 
@@ -336,6 +336,8 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
                field->lowercase_name());
     }
   }
+  p->Print("// Allows to preserve unknown protobuf fields for compatibility\n");
+  p->Print("// with future versions of .proto files.\n");
   p->Print("std::string unknown_fields_;\n");
   p->Outdent();
   p->Print("};\n\n");
