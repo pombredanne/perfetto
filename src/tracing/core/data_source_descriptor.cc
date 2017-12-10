@@ -26,43 +26,31 @@
  * ./tools/generate_cpp_headers.py
  */
 
-#ifndef PROTOS_TRACING_SERVICE_DATA_SOURCE_DESCRIPTOR_PROTO_GENCPP_H_
-#define PROTOS_TRACING_SERVICE_DATA_SOURCE_DESCRIPTOR_PROTO_GENCPP_H_
+#include "include/perfetto/tracing/core/data_source_descriptor.h"
 
-#include <stdint.h>
-#include <string>
-#include <type_traits>
-#include <vector>
-#include "perfetto/base/build_config.h"
+#include "protos/tracing_service/data_source_descriptor.pb.h"
 
 namespace perfetto {
-namespace protos {
-class DataSourceDescriptor;
+
+DataSourceDescriptor::DataSourceDescriptor() = default;
+DataSourceDescriptor::~DataSourceDescriptor() = default;
+DataSourceDescriptor::DataSourceDescriptor(DataSourceDescriptor&&) noexcept =
+    default;
+DataSourceDescriptor& DataSourceDescriptor::operator=(DataSourceDescriptor&&) =
+    default;
+
+DataSourceDescriptor& DataSourceDescriptor::operator=(
+    const perfetto::protos::DataSourceDescriptor& proto) {
+  name_ = static_cast<decltype(name_)>(proto.name());
+  unknown_fields_ = proto.unknown_fields();
+  return *this;
 }
-}  // namespace perfetto
 
-namespace perfetto {
-
-class DataSourceDescriptor {
- public:
-  DataSourceDescriptor();
-  ~DataSourceDescriptor();
-  DataSourceDescriptor(DataSourceDescriptor&&) noexcept;
-  DataSourceDescriptor& operator=(DataSourceDescriptor&&);
-  DataSourceDescriptor(const DataSourceDescriptor&) = delete;
-  DataSourceDescriptor& operator=(const DataSourceDescriptor&) = delete;
-
-  DataSourceDescriptor& operator=(
-      const perfetto::protos::DataSourceDescriptor&);
-  void ToProto(perfetto::protos::DataSourceDescriptor*) const;
-
-  const std::string& name() const { return name_; }
-  void set_name(const std::string& value) { name_ = value; }
-
- private:
-  std::string name_ = {};
-  std::string unknown_fields_;
-};
+void DataSourceDescriptor::ToProto(
+    perfetto::protos::DataSourceDescriptor* proto) const {
+  proto->Clear();
+  proto->set_name(static_cast<decltype(proto->name())>(name_));
+  *(proto->mutable_unknown_fields()) = unknown_fields_;
+}
 
 }  // namespace perfetto
-#endif  // PROTOS_TRACING_SERVICE_DATA_SOURCE_DESCRIPTOR_PROTO_GENCPP_H_
