@@ -101,13 +101,7 @@ std::string GetFwdDeclType(const Descriptor* msg, bool with_namespace = false) {
 }
 
 void GenFwdDecl(const Descriptor* msg, Printer* p) {
-  std::vector<std::string> namespaces = Split(msg->file()->package(), ".");
-  for (size_t i = 0; i < namespaces.size(); i++)
-    p->Print("namespace $n$ { ", "n", namespaces[i]);
   p->Print("class $n$;", "n", GetFwdDeclType(msg));
-  for (size_t i = 0; i < namespaces.size(); i++)
-    p->Print(" }");
-  p->Print("\n");
 
   // Recurse into subtypes
   for (int i = 0; i < msg->field_count(); i++) {
@@ -243,8 +237,14 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   }
 
   // Generate forward declarations in the header for proto types.
+  header_printer.Print("// Forward declarations for protobuf types.\n");
+  std::vector<std::string> namespaces = Split(proto_file->package(), ".");
+  for (size_t i = 0; i < namespaces.size(); i++)
+    header_printer.Print("namespace $n$ {\n", "n", namespaces[i]);
   for (int i = 0; i < proto_file->message_type_count(); i++)
     GenFwdDecl(proto_file->message_type(i), &header_printer);
+  for (size_t i = 0; i < namespaces.size(); i++)
+    header_printer.Print("}\n");
 
   header_printer.Print("\nnamespace perfetto {\n");
   cpp_printer.Print("\nnamespace perfetto {\n");
