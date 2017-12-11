@@ -72,8 +72,8 @@ TEST(TranslationTable, Seed) {
   EXPECT_EQ(table->common_fields().at(0).ftrace_size, 2u);
 
   auto sched_switch_event = table->GetEventByName("sched_switch");
-  EXPECT_EQ(sched_switch_event->name, "sched_switch");
-  EXPECT_EQ(sched_switch_event->group, "sched");
+  EXPECT_EQ(std::string(sched_switch_event->name), "sched_switch");
+  EXPECT_EQ(std::string(sched_switch_event->group), "sched");
   EXPECT_EQ(sched_switch_event->ftrace_event_id, 68ul);
   EXPECT_EQ(sched_switch_event->fields.at(0).ftrace_offset, 8u);
   EXPECT_EQ(sched_switch_event->fields.at(0).ftrace_size, 16u);
