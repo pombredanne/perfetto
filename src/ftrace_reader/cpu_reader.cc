@@ -268,7 +268,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
       nested->AppendVarInt<uint64_t>(field.proto_field_id, number);
     } else if (field.ftrace_type == kFtraceChar16 &&
                field.proto_field_type == kProtoString) {
-      // TODO(hjd): Add AppendMaybeTerminated to protozero.
+      // TODO(hjd): Add AppendMaxLength string to protozero.
       char str[16];
       if (!ReadAndAdvance<char[16]>(&p, end, &str))
         return false;

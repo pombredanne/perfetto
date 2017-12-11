@@ -167,6 +167,19 @@ class BinaryWriter {
     }
   }
 
+  void WriteFixedString(size_t n, const char* s) {
+    size_t length = strlen(s);
+    PERFETTO_CHECK(length < n);
+    char c;
+    while ((c = *s++)) {
+      Write<char>(c);
+    }
+    Write<char>('\0');
+    for (size_t i = 0; i < n - length - 1; i++) {
+      Write<char>('Z');
+    }
+  }
+
   std::unique_ptr<uint8_t[]> GetWritten() {
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[written()]);
     memcpy(buffer.get(), page_.get(), written());
@@ -577,13 +590,34 @@ TEST(CpuReaderTest, ParseAllFields) {
     event->proto_field_id = 42;
     event->ftrace_event_id = ftrace_event_id;
     {
+      // uint32 -> uint32
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
-      field->ftrace_offset = 0;
+      field->ftrace_offset = 8;
       field->ftrace_size = 4;
       field->ftrace_type = kFtraceUint32;
       field->proto_field_id = 1;
       field->proto_field_type = kProtoUint32;
+    }
+    {
+      // char[16] -> string
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->ftrace_offset = 12;
+      field->ftrace_size = 16;
+      field->ftrace_type = kFtraceChar16;
+      field->proto_field_id = 500;
+      field->proto_field_type = kProtoString;
+    }
+    {
+      // char -> string
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->ftrace_offset = 28;
+      field->ftrace_size = 0;
+      field->ftrace_type = kFtraceCString;
+      field->proto_field_id = 501;
+      field->proto_field_type = kProtoString;
     }
   }
   ProtoTranslationTable table(events, std::move(common_fields));
@@ -596,6 +630,8 @@ TEST(CpuReaderTest, ParseAllFields) {
   writer.Write<int8_t>(1);                 // Preempt count.
   writer.Write<int32_t>(1001);             // Pid
   writer.Write<int32_t>(1002);
+  writer.WriteFixedString(16, "Hello");
+  writer.WriteFixedString(300, "Goodbye");
 
   auto input = writer.GetWritten();
   auto length = writer.written();
@@ -607,6 +643,10 @@ TEST(CpuReaderTest, ParseAllFields) {
   auto event = provider.ParseProto();
   ASSERT_TRUE(event);
   EXPECT_EQ(event->pid(), 1001ul);
+  EXPECT_EQ(event->event_case(), FakeFtraceEvent::kAllFields);
+  EXPECT_EQ(event->all_fields().field_uint32(), 1002ul);
+  EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
+  EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
 }
 
 }  // namespace perfetto
