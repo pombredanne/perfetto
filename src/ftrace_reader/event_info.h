@@ -51,6 +51,13 @@ enum FtraceFieldType {
   kFtraceCString,
 };
 
+enum ConsumingStrategy {
+  kUint32ToUint32 = 1,
+  kUint64ToUint64,
+  kChar16ToString,
+  kCStringToString,
+};
+
 inline const char* ToString(ProtoFieldType v) {
   switch (v) {
     case kProtoDouble:
@@ -111,6 +118,8 @@ struct Field {
 
   uint32_t proto_field_id;
   ProtoFieldType proto_field_type;
+
+  ConsumingStrategy strategy;
 };
 
 struct Event {
@@ -126,6 +135,11 @@ struct Event {
   // Field id of the subevent proto (e.g. PrintFtraceEvent) in the FtraceEvent
   // parent proto.
   uint32_t proto_field_id;
+
+  // 'Size' of the event. Some caveats: some events (e.g. print) end with a null
+  // terminated string of unknown size. This size doesn't include the length of
+  // that string.
+  uint16_t size;
 };
 
 // The compile time information needed to read the raw ftrace buffer.
@@ -140,6 +154,10 @@ struct Event {
 // The other fields: ftrace_event_id, ftrace_size, ftrace_offset, ftrace_type
 // are zeroed.
 std::vector<Event> GetStaticEventInfo();
+
+bool SetConsumingStrategy(FtraceFieldType ftrace,
+                          ProtoFieldType proto,
+                          ConsumingStrategy* out);
 
 }  // namespace perfetto
 

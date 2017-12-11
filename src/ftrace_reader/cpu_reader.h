@@ -86,6 +86,17 @@ class CpuReader {
     return true;
   }
 
+  template <typename T>
+  static void ReadVarInt(const uint8_t* start,
+                         size_t offset,
+                         protozero::ProtoZeroMessage* out,
+                         size_t field_id) {
+    T t;
+    memcpy(reinterpret_cast<void*>(&t),
+           reinterpret_cast<const void*>(start + offset), sizeof(T));
+    out->AppendVarInt<T>(field_id, t);
+  }
+
   static bool ParsePage(size_t cpu,
                         const uint8_t* ptr,
                         const EventFilter*,
