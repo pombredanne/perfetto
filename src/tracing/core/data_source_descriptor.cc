@@ -41,6 +41,7 @@ DataSourceDescriptor& DataSourceDescriptor::operator=(DataSourceDescriptor&&) =
 
 void DataSourceDescriptor::FromProto(
     const perfetto::protos::DataSourceDescriptor& proto) {
+  static_assert(sizeof(name_) == sizeof(proto.name()), "size mismatch");
   name_ = static_cast<decltype(name_)>(proto.name());
   unknown_fields_ = proto.unknown_fields();
 }
@@ -48,6 +49,8 @@ void DataSourceDescriptor::FromProto(
 void DataSourceDescriptor::ToProto(
     perfetto::protos::DataSourceDescriptor* proto) const {
   proto->Clear();
+
+  static_assert(sizeof(name_) == sizeof(proto->name()), "size mismatch");
   proto->set_name(static_cast<decltype(proto->name())>(name_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }

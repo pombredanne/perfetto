@@ -44,25 +44,34 @@ void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
     buffers_.emplace_back();
     buffers_.back().FromProto(field);
   }
+
   data_sources_.clear();
   for (const auto& field : proto.data_sources()) {
     data_sources_.emplace_back();
     data_sources_.back().FromProto(field);
   }
+
+  static_assert(sizeof(duration_ms_) == sizeof(proto.duration_ms()),
+                "size mismatch");
   duration_ms_ = static_cast<decltype(duration_ms_)>(proto.duration_ms());
   unknown_fields_ = proto.unknown_fields();
 }
 
 void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
   proto->Clear();
+
   for (const auto& it : buffers_) {
     auto* entry = proto->add_buffers();
     it.ToProto(entry);
   }
+
   for (const auto& it : data_sources_) {
     auto* entry = proto->add_data_sources();
     it.ToProto(entry);
   }
+
+  static_assert(sizeof(duration_ms_) == sizeof(proto->duration_ms()),
+                "size mismatch");
   proto->set_duration_ms(
       static_cast<decltype(proto->duration_ms())>(duration_ms_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
@@ -77,8 +86,15 @@ TraceConfig::BufferConfig& TraceConfig::BufferConfig::operator=(
 
 void TraceConfig::BufferConfig::FromProto(
     const perfetto::protos::TraceConfig_BufferConfig& proto) {
+  static_assert(sizeof(size_kb_) == sizeof(proto.size_kb()), "size mismatch");
   size_kb_ = static_cast<decltype(size_kb_)>(proto.size_kb());
+
+  static_assert(sizeof(optimize_for_) == sizeof(proto.optimize_for()),
+                "size mismatch");
   optimize_for_ = static_cast<decltype(optimize_for_)>(proto.optimize_for());
+
+  static_assert(sizeof(fill_policy_) == sizeof(proto.fill_policy()),
+                "size mismatch");
   fill_policy_ = static_cast<decltype(fill_policy_)>(proto.fill_policy());
   unknown_fields_ = proto.unknown_fields();
 }
@@ -86,9 +102,17 @@ void TraceConfig::BufferConfig::FromProto(
 void TraceConfig::BufferConfig::ToProto(
     perfetto::protos::TraceConfig_BufferConfig* proto) const {
   proto->Clear();
+
+  static_assert(sizeof(size_kb_) == sizeof(proto->size_kb()), "size mismatch");
   proto->set_size_kb(static_cast<decltype(proto->size_kb())>(size_kb_));
+
+  static_assert(sizeof(optimize_for_) == sizeof(proto->optimize_for()),
+                "size mismatch");
   proto->set_optimize_for(
       static_cast<decltype(proto->optimize_for())>(optimize_for_));
+
+  static_assert(sizeof(fill_policy_) == sizeof(proto->fill_policy()),
+                "size mismatch");
   proto->set_fill_policy(
       static_cast<decltype(proto->fill_policy())>(fill_policy_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
@@ -104,9 +128,13 @@ TraceConfig::DataSource& TraceConfig::DataSource::operator=(
 void TraceConfig::DataSource::FromProto(
     const perfetto::protos::TraceConfig_DataSource& proto) {
   config_.FromProto(proto.config());
+
   producer_name_filter_.clear();
   for (const auto& field : proto.producer_name_filter()) {
     producer_name_filter_.emplace_back();
+    static_assert(sizeof(producer_name_filter_.back()) ==
+                      sizeof(proto.producer_name_filter(0)),
+                  "size mismatch");
     producer_name_filter_.back() =
         static_cast<decltype(producer_name_filter_)::value_type>(field);
   }
@@ -116,9 +144,13 @@ void TraceConfig::DataSource::FromProto(
 void TraceConfig::DataSource::ToProto(
     perfetto::protos::TraceConfig_DataSource* proto) const {
   proto->Clear();
+
   config_.ToProto(proto->mutable_config());
+
   for (const auto& it : producer_name_filter_) {
     auto* entry = proto->add_producer_name_filter();
+    static_assert(sizeof(it) == sizeof(proto->producer_name_filter(0)),
+                  "size mismatch");
     *entry = static_cast<decltype(proto->producer_name_filter(0))>(it);
   }
   *(proto->mutable_unknown_fields()) = unknown_fields_;
