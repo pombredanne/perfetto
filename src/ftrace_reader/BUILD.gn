@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("../../gn/perfetto.gni")
+import("../../gn/proto_library.gni")
+import("../protozero/protozero_library.gni")
+
 source_set("test_support") {
   testonly = true
   deps = [
@@ -28,6 +32,8 @@ source_set("ftrace_reader_unittests") {
   testonly = true
   deps = [
     ":ftrace_reader",
+    ":ftrace_reader_test_messages_lite",
+    ":ftrace_reader_test_messages_zero",
     ":test_support",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
@@ -35,11 +41,27 @@ source_set("ftrace_reader_unittests") {
   ]
   sources = [
     "cpu_reader_unittest.cc",
+    "event_info_unittest.cc",
     "format_parser_unittest.cc",
     "ftrace_controller_unittest.cc",
     "ftrace_to_proto_unittest.cc",
     "proto_translation_table_unittest.cc",
   ]
+}
+
+ftrace_reader_test_proto_sources = [ "test/test_messages.proto" ]
+
+protozero_library("ftrace_reader_test_messages_zero") {
+  sources = ftrace_reader_test_proto_sources
+  proto_in_dir = perfetto_root_path
+  proto_out_dir = "protos_zero"
+  generator_plugin_options = "wrapper_namespace=pbzero"
+}
+
+proto_library("ftrace_reader_test_messages_lite") {
+  sources = ftrace_reader_test_proto_sources
+  proto_in_dir = perfetto_root_path
+  proto_out_dir = "protos_lite"
 }
 
 # These tests require access to a real ftrace implementation and must
@@ -60,20 +82,6 @@ executable("ftrace_reader_integrationtests") {
   ]
 }
 
-executable("ftrace_reader_demo") {
-  testonly = true
-  sources = [
-    "main.cc",
-  ]
-  deps = [
-    ":ftrace_reader",
-    ":test_support",
-    "../../gn:default_deps",
-    "../../gn:gtest_prod_config",
-    "../base",
-  ]
-}
-
 source_set("ftrace_reader") {
   public_deps = [
     "../../include/perfetto/ftrace_reader",
@@ -88,6 +96,8 @@ source_set("ftrace_reader") {
   sources = [
     "cpu_reader.cc",
     "cpu_reader.h",
+    "event_info.cc",
+    "event_info.h",
     "format_parser.cc",
     "ftrace_controller.cc",
     "ftrace_procfs.cc",
