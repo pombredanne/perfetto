@@ -26,6 +26,7 @@
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
+#include "perfetto/protozero/protozero_message.h"
 #include "proto_translation_table.h"
 
 namespace perfetto {
@@ -90,6 +91,12 @@ class CpuReader {
                         const EventFilter*,
                         protos::pbzero::FtraceEventBundle*,
                         const ProtoTranslationTable* table);
+
+  static bool ParseEvent(uint16_t ftrace_event_id,
+                         const uint8_t* start,
+                         const uint8_t* end,
+                         protozero::ProtoZeroMessage* message,
+                         const ProtoTranslationTable* table);
 
  private:
   uint8_t* GetBuffer();
