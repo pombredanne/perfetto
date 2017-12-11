@@ -35,8 +35,7 @@ using namespace google::protobuf::io;
 
 namespace {
 
-static const char kHeader[] = R"(
-/*
+static const char kHeader[] = R"(/*
  * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -268,6 +267,13 @@ void ProtoToCpp::GenHeader(const Descriptor* msg, Printer* p) {
   // Do a first pass to generate nested types.
   for (int i = 0; i < msg->field_count(); i++) {
     const FieldDescriptor* field = msg->field(i);
+    if (field->has_default_value()) {
+      PERFETTO_ELOG(
+          "Error on field %s: Explicitly declared default values are not "
+          "supported",
+          field->name().c_str());
+      PERFETTO_CHECK(false);
+    }
 
     if (field->type() == FieldDescriptor::TYPE_ENUM) {
       const EnumDescriptor* enum_desc = field->enum_type();

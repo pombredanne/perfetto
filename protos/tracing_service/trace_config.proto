@@ -34,7 +34,7 @@ message TraceConfig {
     // TODO: uint32 page_size = 2;
 
     enum OptimizeFor {
-      // The log buffer is drained spordadically (typically only once after
+      // The log buffer is drained sporadically (typically only once after
       // DisableTracing()). This mode minimizes the Service overhead when moving
       // the pages from the Producer(s) shared staging buffers into the central
       // log buffer, at the cost of doing some extra memory moves to reorder and
@@ -70,10 +70,12 @@ message TraceConfig {
     // register on the service.
     optional protos.DataSourceConfig config = 1;
 
-    // Optional. If multilple producer (~processes) expose the same data source
+    // Optional. If multiple producers (~processes) expose the same data source
     // and |producer_name_filter| != "", the data source is enabled only for
-    // producers which name match any of the producer_name_filter below.
-    // This allow to enable a data source only for specific processes.
+    // producers whose names match any of the producer_name_filter below.
+    // The |producer_name_filter| has to be an exact match. (TODO(primiano):
+    // support wildcards or regex).
+    // This allows to enable a data source only for specific processes.
     // The "repeated" field has OR sematics: specifying a filter ["foo", "bar"]
     // will enable data source on both "foo" and "bar" (if existent).
     repeated string producer_name_filter = 2;
