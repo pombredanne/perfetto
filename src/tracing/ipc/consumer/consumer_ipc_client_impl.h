@@ -71,7 +71,7 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
  private:
   void OnReadBuffersResponse(ipc::AsyncResult<ReadBuffersResponse>);
 
-  // TODO think to destruction order, do we rely on any specific dtor sequence?
+  // TODO(primiano): think to dtor order, do we rely on any specific sequence?
   Consumer* const consumer_;
 
   // The object that owns the client socket and takes care of IPC traffic.

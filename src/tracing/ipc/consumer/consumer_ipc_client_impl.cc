@@ -25,9 +25,9 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
-// TODO think to what happens when ConsumerIPCClientImpl gets destroyed
-// w.r.t. the Consumer pointer. Also think to lifetime of the Consumer* during
-// the callbacks.
+// TODO Add a test to check to what happens when ConsumerIPCClientImpl gets
+// destroyed w.r.t. the Consumer pointer. Also think to lifetime of the
+// Consumer* during the callbacks.
 
 namespace perfetto {
 
@@ -108,7 +108,7 @@ void ConsumerIPCClientImpl::ReadBuffers() {
   // The IPC layer guarantees that callbacks are destroyed after this object
   // is destroyed (by virtue of destroying the |consumer_port_|). In turn the
   // contract of this class expects the caller to not destroy the Consumer class
-  // before having destroyed this class. Hence binding consumer here is safe.
+  // before having destroyed this class. Hence binding |this| here is safe.
   async_response.Bind([this](ipc::AsyncResult<ReadBuffersResponse> response) {
     OnReadBuffersResponse(std::move(response));
   });
@@ -121,6 +121,8 @@ void ConsumerIPCClientImpl::OnReadBuffersResponse(
     PERFETTO_DLOG("ReadBuffers() failed");
     return;
   }
+  // TODO(primiano): We have to guarantee that the log buffer stays alive at
+  // least as long as these requests are on flights.
   std::vector<TracePacket> trace_packets;
   trace_packets.reserve(response->trace_packets().size());
   for (const std::string& bytes : response->trace_packets()) {
@@ -139,11 +141,6 @@ void ConsumerIPCClientImpl::FreeBuffers() {
 
   FreeBuffersRequest req;
   ipc::Deferred<FreeBuffersResponse> async_response;
-
-  // The IPC layer guarantees that callbacks are destroyed after this object
-  // is destroyed (by virtue of destroying the |consumer_port_|). In turn the
-  // contract of this class expects the caller to not destroy the Consumer class
-  // before having destroyed this class. Hence binding consumer here is safe.
   async_response.Bind([](ipc::AsyncResult<FreeBuffersResponse> response) {
     if (!response)
       PERFETTO_DLOG("FreeBuffers() failed");

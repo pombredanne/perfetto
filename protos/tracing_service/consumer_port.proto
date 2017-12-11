@@ -25,6 +25,10 @@ package perfetto;
 // IPC interface definition for the consumer port of the tracing service.
 service ConsumerPort {
   // Creates the ring buffers that will be used for the tracing session.
+  // TODO(primiano): not implemented yet. EnableTracing will implicitly create
+  // the required buffer. This is to allow Enabling/Disabling tracing with
+  // different configs without losing the contents of the buffers for the
+  // previous tracing session.
   // rpc CreateBuffers(CreateBuffersRequest) returns (CreateBuffersResponse) {}
 
   // Enables tracing for one or more data sources. At least one buffer must have
@@ -34,9 +38,16 @@ service ConsumerPort {
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
 
-  // Streams back the contents of one or more buffers.
-  // TODO: add the ability to pass a FD and just let the service write into
-  // that.
+  // Streams back the contents of one or more buffers. At the moment this can
+  // be called once only after calling DisableTracing(). In future it will be
+  // possible to call this while the trace is enabled to stream continuously the
+  // contents of the buffer(s). One call is enough to drain all the buffers. The
+  // response consists in a sequence of ReadBufferResponse messages (hence the
+  // "stream" in the return type), each carrying one or more TracePacket(s).
+  // An EOF flag is attached to the last ReadBufferResponse through the
+  // |has_more| == false field.
+  // TODO: add the ability to pass a file descriptor and just let the service
+  // write into that.
   rpc ReadBuffers(ReadBuffersRequest) returns (stream ReadBuffersResponse) {}
 
   // Destroys the buffers previously created. Note: all buffers are destroyed
@@ -56,10 +67,7 @@ message EnableTracingResponse {}
 
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {
-  // When set, all active data source are disabled.
-  optional bool disable_all = 1;
-
-  // TODO: not supported yet.
+  // TODO: not supported yet, selectively disable only some data sources.
   // repeated string data_source_name;
 }
 
