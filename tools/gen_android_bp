@@ -1,0 +1,403 @@
+#!/usr/bin/env python
+# Copyright (C) 2017 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This tool translates a collection of BUILD.gn files into an mostly equivalent
+# Android.bp file for the Soong build system. The input to the tool is a JSON
+# description of the GN build definition generated with the following command:
+#
+#   gn desc out --format=json --all-toolchains "//*" > desc.json
+#
+# The tool is then given a list of GN labels for which to generate Android.bp
+# build rules. The dependencies for the GN labels are squashed to the generated
+# Android.bp target, except for actions which get their own genrule. Some
+# libraries are also mapped to their Android equivalents -- see |builtin_deps|.
+
+import argparse
+import json
+import os
+import re
+import sys
+
+module_prefix = "perfetto_"
+
+# Location of the project in the Android tree.
+tree_path = "external/perfetto"
+
+#    "//base:base_unittests": {
+#        "all_dependent_configs": [
+#            "//buildtools:googletest_config"
+#        ],
+#        "allow_circular_includes_from": [],
+#        "asmflags": [
+#        ],
+#        "cflags": [
+#        ],
+#        "cflags_cc": [
+#        ],
+#        "check_includes": true,
+#        "configs": [
+#          // Not defined anywhere? Map some known ones like googletest_config.
+#        ],
+#        "defines": [
+#          // Whitelist these.
+#        ],
+#        "deps": [
+#          // Walk these recursively.
+#        ],
+#        "include_dirs": [
+#          // Allow repo-relative paths.
+#        ],
+#        "ldflags": [
+#          // Shouldn't need any of these.
+#        ],
+#        "lib_dirs": [
+#          // Ditto.
+#        ],
+#        "libs": [
+#          // Whitelist?
+#        ],
+#        "outputs": [
+#          // Map to cc_binary / cc_binary_host
+#        ],
+#        "public": "*",
+#        "sources": [
+#          // Drop headers.
+#        ],
+#        "testonly": true,  // Ignore.
+#        // Use to determine if this is host or target.
+#        "toolchain": "//build/toolchain:gcc_like",
+#        "type": "executable",  // cc_binary / cc_binary_host
+#        "visibility": [
+#          // Ignore.
+#        ]
+#    },
+#
+
+class Error(Exception):
+    pass
+
+
+class Module(object):
+    def __init__(self, type, name):
+        self.type = type
+        self.name = name
+        self.srcs = []
+        self.comment = None
+        self.shared_libs = []
+        self.static_libs = []
+        self.tools = []
+        self.cmd = None
+        self.out = None
+        self.export_include_dirs = []
+
+    def to_string(self, output):
+        if self.comment:
+            output.append('// %s' % self.comment)
+        output.append('%s {' % self.type)
+        self._output_field(output, 'name')
+        self._output_field(output, 'srcs')
+        self._output_field(output, 'shared_libs')
+        self._output_field(output, 'static_libs')
+        self._output_field(output, 'tools')
+        self._output_field(output, 'cmd', sort=False)
+        self._output_field(output, 'out')
+        self._output_field(output, 'export_include_dirs')
+        output.append('}')
+        output.append('')
+
+    def _output_field(self, output, name, sort=True):
+        value = getattr(self, name)
+        if not value:
+            return
+        if isinstance(value, list):
+            output.append('  %s: [' % name)
+            for item in sorted(value) if sort else value:
+                output.append('    "%s",' % item)
+            output.append('  ],')
+        else:
+            output.append('  %s: "%s",' % (name, value))
+
+
+class Blueprint(object):
+    def __init__(self):
+        self.modules = []
+
+    def to_string(self, output):
+        for m in self.modules:
+            m.to_string(output)
+
+
+def label_to_path(label):
+    assert label.startswith('//')
+    return label[2:]
+
+
+def label_to_module_name(label):
+    target = label.split(':')[1]
+    module = re.sub(r'[^a-zA-Z0-9_]', '_', target)
+    if not module.startswith(module_prefix):
+      return module_prefix + module
+    return module
+
+
+def label_without_toolchain(label):
+    return label.split('(')[0]
+
+
+def is_supported_source_file(name):
+    return os.path.splitext(name)[1] in ['.c', '.cc', '.proto']
+
+
+def is_generated_by_action(desc, label):
+    for target in desc.itervalues():
+        if target['type'] == 'action' and label in target['outputs']:
+            return True
+    return False
+
+def enable_gmock(module):
+    module.static_libs.append('libgmock')
+
+
+def enable_gtest(module):
+    assert module.type == 'cc_test'
+
+
+def enable_protobuf_full(module):
+    module.shared_libs.append('libprotobuf-cpp-full')
+
+
+def enable_protobuf_lite(module):
+    module.shared_libs.append('libprotobuf-cpp-lite')
+
+
+def enable_protoc(module):
+    assert module.type == 'cc_genrule'
+    module.tools.append('aprotoc')
+
+
+def enable_protoc_lib(module):
+    module.shared_libs.append('libprotoc')
+
+
+builtin_deps = {
+    '//buildtools:gmock': enable_gmock,
+    '//buildtools:gtest': enable_gtest,
+    '//buildtools:gtest_main': enable_gtest,
+    # TODO(skyostil): Remove after full protobuffers aren't used anymore.
+    '//buildtools:protobuf_full': enable_protobuf_full,
+    '//buildtools:protobuf_lite': enable_protobuf_lite,
+    '//buildtools:protoc': enable_protoc,
+    '//buildtools:protoc_lib': enable_protoc_lib,
+}
+
+
+def apply_module_dependency(blueprint, desc, module, dep_name):
+    if label_without_toolchain(dep_name) in builtin_deps:
+        builtin_deps[label_without_toolchain(dep_name)](module)
+        return
+    target = desc[dep_name]
+    # HACK
+    if module.type == 'cc_genrule':
+        return
+    #if module.type == 'cc_genrule':
+    #    print dep_name
+    # HACK
+    #if 'host' in target['toolchain']:
+    #    return
+
+    # genrules should only depend on tools.
+    #if module.type == 'cc_genrule' and target['type'] == 'executable':
+    #    create_modules_from_target(blueprint, desc, dep_name)
+    #    module.tools.append(label_to_module_name(dep_name))
+    if target['type'] == 'action':
+        create_modules_from_target(blueprint, desc, dep_name)
+        # See make_genrules_for_action.
+        module.srcs.append(':' + label_to_module_name(dep_name))
+        module.srcs.append(':' + label_to_module_name(dep_name) + '_headers')
+    elif target['type'] in ['group', 'source_set'] and 'sources' in target:
+        # Ignore source files that are generated by actions since they will be
+        # implicitly added by the genrule dependencies.
+        module.srcs.extend(label_to_path(src) for src in target['sources'] if is_supported_source_file(src) and not is_generated_by_action(desc, src))
+
+
+def make_genrules_for_action(blueprint, desc, target_name):
+    target = desc[target_name]
+
+    # We only support genrules that call protoc (with or without a plugin) to
+    # turn .proto files into header and source files.
+    args = target['args']
+    if not args[0].endswith('/protoc'):
+        raise Error('Unsupported action in target %s: %s' % (target_name, target['args']))
+
+    # We create two genrules for each action: one for the protobuf headers and
+    # another for the sources. This is because the module that depends on the
+    # generated files needs to declare two different types of dependencies --
+    # -source files in 'srcs' and headers in 'generated_headers' -- and it's not
+    # valid to produce .h files from a source dependency and vice versa.
+    source_module = Module('cc_genrule', label_to_module_name(target_name))
+    source_module.srcs.extend(label_to_path(src) for src in target['sources'])
+
+    header_module = Module('cc_genrule', label_to_module_name(target_name) + '_headers')
+    header_module.srcs = source_module.srcs[:]
+    header_module.export_include_dirs = ['.']
+
+    #for dep_name in target['deps']:
+    #    print 
+    #    if desc[dep_name]['type'] == 'executable':
+    #        create_modules_from_target(blueprint, desc, dep_name)
+    #    module.tools.append(label_to_module_name(dep_name))
+    wrapper_ns = 'pb'
+
+    # TODO(skyostil): Is there a way to avoid hardcoding the tree path here?
+    # TODO(skyostil): Find a way to avoid creating the directory.
+    cmd = [
+            "mkdir -p $(genDir)/%s &&" % tree_path,
+            "$(location aprotoc)",
+            '--cpp_out=$(genDir)/%s' % tree_path,
+            '--proto_path=%s' % tree_path
+    ]
+    i = 1
+    while i < len(args):
+        if not args[i][0] == '-':
+            break
+        if args[i] in ['--proto_path', '--cpp_out']:
+            i += 1
+        elif args[i].startswith('--plugin='):
+            # Look for a dependency that generates this plugin.
+            plugin = os.path.split(args[i])[-1]
+            for dep in target['deps']:
+                if desc[dep]['type'] != 'executable':
+                    continue
+                executable = os.path.split(desc[dep]['outputs'][0])[-1]
+                if executable == plugin:
+                    # TODO(skyostil): Also ensure that a module for |dep| is
+                    # generated.
+                    cmd += ['--plugin=protoc-gen-plugin=$(location %s)' % label_to_module_name(dep)]
+                    source_module.tools.append(label_to_module_name(dep))
+                    break
+            else:
+                raise Error('Unrecognized protoc plugin in target %s: %s' % (target_name, args[i]))
+        elif args[i].startswith('--plugin_out='):
+            plugin_args = args[i][len('--plugin_out='):].split(':')[0]
+            m = re.match(r'wrapper_namespace=(.*)', plugin_args)
+            if m:
+                wrapper_ns = m.group(1)
+            cmd += ['--plugin_out=%s:$(genDir)/%s' % (plugin_args, tree_path)]
+        else:
+            raise Error('Unsupported protoc argument in target %s: %s' % (target_name, args[i]))
+        i += 1
+    cmd += ['$(in)']
+
+    source_module.cmd = ' '.join(cmd)
+    source_module.out = ['%s/%s' % (tree_path, src.replace('.proto', '.%s.cc' % wrapper_ns)) for src in source_module.srcs]
+
+    header_module.cmd = source_module.cmd
+    header_module.tools = source_module.tools[:]
+    header_module.out = ['%s/%s' % (tree_path, src.replace('.proto', '.%s.h' % wrapper_ns)) for src in header_module.srcs]
+
+    return source_module, header_module
+
+
+def create_modules_from_target(blueprint, desc, target_name):
+    target = desc[target_name]
+    if target['type'] == 'executable':
+        if 'host' in target['toolchain']:
+            module_type = 'cc_binary_host'
+        elif target.get('testonly', False):
+            module_type = 'cc_test'
+        else:
+            module_type = 'cc_binary'
+    #elif target['type'] in ['group', 'source_set']:
+    #    module_type = 'filegroup'
+        modules = [Module(module_type, label_to_module_name(target_name))]
+    elif target['type'] == 'action':
+        #print target['args']
+        #module_type = 'cc_genrule'
+        modules = make_genrules_for_action(blueprint, desc, target_name)
+    else:
+        raise Error('Unknown target type: %s' % target['type'])
+        #return None
+
+    for module in modules:
+        module.comment = 'GN target: %s' % target_name
+
+        for dep in resolve_dependencies(desc, target_name):
+            apply_module_dependency(blueprint, desc, module, dep)
+
+        #if 'sources' in target:
+        #    module.srcs.extend(label_to_path(src) for src in target['sources'] if is_supported_source_file(src))
+        #if 'deps' in target:
+        #    module.srcs.extend(':' + label_to_module_name(dep) for dep in target['deps'])
+        blueprint.modules.append(module)
+
+
+def resolve_dependencies(desc, target_name):
+    if label_without_toolchain(target_name) in builtin_deps:
+        return set()
+    target = desc[target_name]
+    resolved_deps = set()
+    for dep in target.get('deps', []):
+        resolved_deps.add(dep)
+        # Ignore the transitive dependencies of actions because they are
+        # explicitly converted to genrules.
+        if desc[dep]['type'] == 'action':
+            continue
+        resolved_deps.update(resolve_dependencies(desc, dep))
+    return resolved_deps
+
+
+def create_blueprint_for_targets(desc, targets):
+    blueprint = Blueprint()
+    for target in targets:
+        create_modules_from_target(blueprint, desc, target)
+    return blueprint
+
+
+def main():
+    parser = argparse.ArgumentParser(
+          description='Generate Android.bp from a GN description.')
+    parser.add_argument('desc',
+          help='GN description (e.g., gn desc out --format=json --all-toolchains "//*"')
+    args = parser.parse_args()
+
+    with open(args.desc) as f:
+        desc = json.load(f)
+
+    targets = ["//:perfetto_tests"]
+    blueprint = create_blueprint_for_targets(desc, targets)
+
+    output = [
+        '// Copyright (C) 2017 The Android Open Source Project',
+        '//',
+        '// Licensed under the Apache License, Version 2.0 (the "License");',
+        '// you may not use this file except in compliance with the License.',
+        '// You may obtain a copy of the License at',
+        '//',
+        '//      http://www.apache.org/licenses/LICENSE-2.0',
+        '//',
+        '// Unless required by applicable law or agreed to in writing, software',
+        '// distributed under the License is distributed on an "AS IS" BASIS,',
+        '// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.',
+        '// See the License for the specific language governing permissions and',
+        '// limitations under the License.',
+        '//',
+        '// This file is automatically generated. Do not edit.',
+        '']
+    blueprint.to_string(output)
+    print '\n'.join(output)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
