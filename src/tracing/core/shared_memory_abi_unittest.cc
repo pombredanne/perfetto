@@ -21,26 +21,37 @@
 namespace perfetto {
 namespace {
 
+using testing::ValuesIn;
 using Chunk = SharedMemoryABI::Chunk;
 using ChunkHeader = SharedMemoryABI::ChunkHeader;
 
-std::unique_ptr<uint8_t[]> GetBuffer(size_t size) {
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
-  memset(buf.get(), 0, size);
-  return buf;
-}
+class SharedMemoryABITest : public ::testing::TestWithParam<size_t> {
+ public:
+  void SetUp() override {
+    page_size_ = GetParam();
+    buf_size_ = page_size_ * kNumPages;
+    buf_.reset(new uint8_t[buf_size_]);
+    memset(buf_.get(), 0, buf_size_);
+  }
 
-TEST(SharedMemoryABITest, SingleThreaded) {
-  const size_t kPageSize = 4096;
+  void TearDown() override { buf_.reset(); }
+
   const size_t kNumPages = 10;
-  const size_t kBufSize = kPageSize * kNumPages;
-  std::unique_ptr<uint8_t[]> buf = GetBuffer(kBufSize);
-  SharedMemoryABI abi(buf.get(), kBufSize, kPageSize);
+  std::unique_ptr<uint8_t[]> buf_;
+  size_t buf_size_;
+  size_t page_size_;
+};
 
-  ASSERT_EQ(buf.get(), abi.start());
-  ASSERT_EQ(buf.get() + kBufSize, abi.end());
-  ASSERT_EQ(kBufSize, abi.size());
-  ASSERT_EQ(kPageSize, abi.page_size());
+size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
+INSTANTIATE_TEST_CASE_P(PageSize, SharedMemoryABITest, ValuesIn(kPageSizes));
+
+TEST_P(SharedMemoryABITest, NominalCases) {
+  SharedMemoryABI abi(buf_.get(), buf_size_, page_size_);
+
+  ASSERT_EQ(buf_.get(), abi.start());
+  ASSERT_EQ(buf_.get() + buf_size_, abi.end());
+  ASSERT_EQ(buf_size_, abi.size());
+  ASSERT_EQ(page_size_, abi.page_size());
   ASSERT_EQ(kNumPages, abi.num_pages());
 
   for (size_t i = 0; i < kNumPages; i++) {
@@ -80,13 +91,19 @@ TEST(SharedMemoryABITest, SingleThreaded) {
   uint8_t* last_chunk_end = nullptr;
 
   for (size_t page_idx = 0; page_idx <= 4; page_idx++) {
+    uint8_t* const page_start = buf_.get() + page_idx * page_size_;
+    uint8_t* const page_end = page_start + page_size_;
     const size_t num_chunks =
         SharedMemoryABI::GetNumChunksForLayout(abi.page_layout_dbg(page_idx));
     const size_t target_buffer = 10 + page_idx;
+    Chunk chunks[14];
 
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+      Chunk& chunk = chunks[chunk_idx];
       ChunkHeader header{};
 
+      ASSERT_EQ(SharedMemoryABI::kChunkFree,
+                abi.GetChunkState(page_idx, chunk_idx));
       uint16_t chunk_id = ++last_chunk_id;
       last_writer_id = (last_writer_id + 1) & SharedMemoryABI::kMaxWriterID;
       unsigned writer_id = last_writer_id;
@@ -97,39 +114,186 @@ TEST(SharedMemoryABITest, SingleThreaded) {
       header.packets.store({packets_count, flags, 0 /* reserved */});
 
       // Acquiring a chunk with a different target_buffer should fail.
-      Chunk chunk = abi.TryAcquireChunkForWriting(page_idx, chunk_idx,
-                                                  target_buffer + 1, &header);
+      chunk = abi.TryAcquireChunkForWriting(page_idx, chunk_idx,
+                                            target_buffer + 1, &header);
       ASSERT_FALSE(chunk.is_valid());
+      ASSERT_EQ(SharedMemoryABI::kChunkFree,
+                abi.GetChunkState(page_idx, chunk_idx));
 
       // But acquiring with the right |target_buffer| should succeed.
       chunk = abi.TryAcquireChunkForWriting(page_idx, chunk_idx, target_buffer,
                                             &header);
       ASSERT_TRUE(chunk.is_valid());
+      ASSERT_EQ(SharedMemoryABI::kChunkBeingWritten,
+                abi.GetChunkState(page_idx, chunk_idx));
+
+      // Sanity check chunk bounds.
       size_t expected_chunk_size =
-          (kPageSize - sizeof(SharedMemoryABI::PageHeader)) / num_chunks;
+          (page_size_ - sizeof(SharedMemoryABI::PageHeader)) / num_chunks;
       expected_chunk_size = expected_chunk_size - (expected_chunk_size % 4);
       ASSERT_EQ(expected_chunk_size, chunk.size());
+      ASSERT_GT(chunk.begin(), page_start);
       ASSERT_GT(chunk.begin(), last_chunk_begin);
       ASSERT_GE(chunk.begin(), last_chunk_end);
+      ASSERT_LE(chunk.end(), page_end);
       ASSERT_GT(chunk.end(), chunk.begin());
       ASSERT_EQ(chunk.end(), chunk.begin() + chunk.size());
       last_chunk_begin = chunk.begin();
       last_chunk_end = chunk.end();
 
-      // TODO cover chunk begin, end size.
-      EXPECT_EQ(chunk_id, chunk.header()->identifier.load().chunk_id);
-      EXPECT_EQ(writer_id, chunk.header()->identifier.load().writer_id);
-      EXPECT_EQ(packets_count, chunk.header()->packets.load().count);
-      EXPECT_EQ(flags, chunk.header()->packets.load().flags);
-      EXPECT_EQ(std::make_pair(packets_count, flags),
+      ASSERT_EQ(chunk_id, chunk.header()->identifier.load().chunk_id);
+      ASSERT_EQ(writer_id, chunk.header()->identifier.load().writer_id);
+      ASSERT_EQ(packets_count, chunk.header()->packets.load().count);
+      ASSERT_EQ(flags, chunk.header()->packets.load().flags);
+      ASSERT_EQ(std::make_pair(packets_count, flags),
                 chunk.GetPacketCountAndFlags());
 
+      chunk.IncrementPacketCount(false);
+      ASSERT_EQ(packets_count + 1, chunk.header()->packets.load().count);
+
+      chunk.IncrementPacketCount(true);
+      ASSERT_EQ(packets_count + 2, chunk.header()->packets.load().count);
+      ASSERT_TRUE(
+          chunk.header()->packets.load().flags &
+          SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);
+
       // Reacquiring the same chunk should fail.
-      chunk = abi.TryAcquireChunkForWriting(page_idx, chunk_idx, target_buffer,
-                                            &header);
+      ASSERT_FALSE(abi.TryAcquireChunkForWriting(page_idx, chunk_idx,
+                                                 target_buffer, &header)
+                       .is_valid());
+    }
+
+    // Now release chunks and check the Release() logic.
+    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+      Chunk& chunk = chunks[chunk_idx];
+
+      // ReleaseChunkAsComplete returns |page_idx| only if all chunks in the
+      // page are complete.
+      size_t res = abi.ReleaseChunkAsComplete(std::move(chunk));
+      if (chunk_idx == num_chunks - 1) {
+        ASSERT_EQ(page_idx, res);
+        ASSERT_TRUE(abi.is_page_complete(page_idx));
+      } else {
+        ASSERT_EQ(SharedMemoryABI::kInvalidPageIdx, res);
+        ASSERT_FALSE(abi.is_page_complete(page_idx));
+      }
+      ASSERT_EQ(SharedMemoryABI::kChunkComplete,
+                abi.GetChunkState(page_idx, chunk_idx));
+    }
+
+    // Now acquire all chunks for reading.
+    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+      Chunk& chunk = chunks[chunk_idx];
+      // Acquiring with the wrong |target_buffer| should fail.
+      chunk =
+          abi.TryAcquireChunkForReading(page_idx, chunk_idx, target_buffer + 1);
       ASSERT_FALSE(chunk.is_valid());
+
+      // Acquiring with the right |target_buffer| should succeed.
+      chunk = abi.TryAcquireChunkForReading(page_idx, chunk_idx, target_buffer);
+      ASSERT_TRUE(chunk.is_valid());
+      ASSERT_EQ(SharedMemoryABI::kChunkBeingRead,
+                abi.GetChunkState(page_idx, chunk_idx));
+    }
+
+    // Finally release all chunks as free.
+    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+      Chunk& chunk = chunks[chunk_idx];
+
+      // ReleaseChunkAsFree returns |page_idx| only if all chunks in the
+      // page are free. If this was the last chunk in the page, the full page
+      // should be marked as free.
+      size_t res = abi.ReleaseChunkAsFree(std::move(chunk));
+      if (chunk_idx == num_chunks - 1) {
+        ASSERT_EQ(page_idx, res);
+        ASSERT_TRUE(abi.is_page_free(page_idx));
+      } else {
+        ASSERT_EQ(SharedMemoryABI::kInvalidPageIdx, res);
+        ASSERT_FALSE(abi.is_page_free(page_idx));
+        ASSERT_EQ(SharedMemoryABI::kChunkFree,
+                  abi.GetChunkState(page_idx, chunk_idx));
+      }
     }
   }
+}
+
+TEST_P(SharedMemoryABITest, BatchAcquireAndRelease) {
+  SharedMemoryABI abi(buf_.get(), buf_size_, page_size_);
+  ChunkHeader header{};
+
+  // TryAcquire on a non-partitioned page should fail.
+  ASSERT_FALSE(abi.TryAcquireChunkForWriting(0, 0, 0, &header).is_valid());
+  ASSERT_FALSE(abi.TryAcquireChunkForReading(0, 0, 0).is_valid());
+
+  // Now partition the page in one whole chunk.
+  ASSERT_TRUE(abi.TryPartitionPage(0, SharedMemoryABI::kPageDiv1, 10));
+
+  Chunk chunk = abi.TryAcquireChunkForWriting(0, 0, 10, &header);
+  ASSERT_TRUE(chunk.is_valid());
+
+  // TryAcquireAllChunksForReading() should fail, as the chunk is being written.
+  ASSERT_FALSE(abi.TryAcquireAllChunksForReading(0));
+
+  ASSERT_EQ(0u, abi.ReleaseChunkAsComplete(std::move(chunk)));
+
+  // TryAcquireAllChunksForReading() should succeed given that the page has only
+  // one chunk and is now complete.
+  ASSERT_TRUE(abi.TryAcquireAllChunksForReading(0));
+
+  // Release the one chunk and check that the page is freed up.
+  abi.ReleaseAllChunksAsFree(0);
+  ASSERT_TRUE(abi.is_page_free(0));
+
+  // Now repartition the page into four chunks and try some trickier cases.
+  ASSERT_TRUE(abi.TryPartitionPage(0, SharedMemoryABI::kPageDiv4, 10));
+
+  // Acquire only the first and last chunks.
+  Chunk chunk0 = abi.TryAcquireChunkForWriting(0, 0, 10, &header);
+  ASSERT_TRUE(chunk0.is_valid());
+  Chunk chunk3 = abi.TryAcquireChunkForWriting(0, 3, 10, &header);
+  ASSERT_TRUE(chunk3.is_valid());
+
+  // TryAcquireAllChunksForReading() should fail, some chunks are being written.
+  ASSERT_FALSE(abi.TryAcquireAllChunksForReading(0));
+
+  // Mark only one chunks as complete and try again, it should still fail.
+  // Note: calls to ReleaseChunkAsComplete() will return kInvalidPageIdx
+  // because not all chunks are complete (the two middles ones remain free).
+  ASSERT_EQ(SharedMemoryABI::kInvalidPageIdx,
+            abi.ReleaseChunkAsComplete(std::move(chunk0)));
+
+  ASSERT_EQ(SharedMemoryABI::kChunkComplete, abi.GetChunkState(0, 0));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 1));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 2));
+  ASSERT_EQ(SharedMemoryABI::kChunkBeingWritten, abi.GetChunkState(0, 3));
+  ASSERT_FALSE(abi.TryAcquireAllChunksForReading(0));
+
+  // Now release also the last chunk as complete and try again the
+  // TryAcquireAllChunksForReading(). This time it should succeed.
+  ASSERT_EQ(SharedMemoryABI::kInvalidPageIdx,
+            abi.ReleaseChunkAsComplete(std::move(chunk3)));
+
+  ASSERT_EQ(SharedMemoryABI::kChunkComplete, abi.GetChunkState(0, 0));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 1));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 2));
+  ASSERT_EQ(SharedMemoryABI::kChunkComplete, abi.GetChunkState(0, 3));
+  ASSERT_TRUE(abi.TryAcquireAllChunksForReading(0));
+
+  // At this point the two outer chunks should transition into the
+  // kChunkBeingRead state, while the middle ones should stay free.
+  ASSERT_EQ(SharedMemoryABI::kChunkBeingRead, abi.GetChunkState(0, 0));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 1));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 2));
+  ASSERT_EQ(SharedMemoryABI::kChunkBeingRead, abi.GetChunkState(0, 3));
+
+  // Release only one chunk as free.
+  abi.ReleaseChunkAsFree(abi.GetChunkUnchecked(0, abi.page_layout_dbg(0), 0));
+  ASSERT_EQ(SharedMemoryABI::kChunkFree, abi.GetChunkState(0, 0));
+  ASSERT_EQ(SharedMemoryABI::kChunkBeingRead, abi.GetChunkState(0, 3));
+
+  // Release the last chunk as free, the full page should be freed.
+  abi.ReleaseChunkAsFree(abi.GetChunkUnchecked(0, abi.page_layout_dbg(0), 3));
+  ASSERT_TRUE(abi.is_page_free(0));
 }
 
 }  // namespace
