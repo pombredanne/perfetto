@@ -51,6 +51,9 @@ enum FtraceFieldType {
   kFtraceCString,
 };
 
+// Joint enum of FtraceFieldType (left) and ProtoFieldType (right).
+// where there exists a way to convert from the FtraceFieldType
+// into the ProtoFieldType.
 enum TranslationStrategy {
   kUint32ToUint32 = 1,
   kUint64ToUint64,
