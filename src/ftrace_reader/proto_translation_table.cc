@@ -44,15 +44,63 @@ const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
   return events_by_id;
 }
 
+bool MergeFieldInfo(Field* field, const FtraceEvent::Field& ftrace_field) {
+  PERFETTO_DCHECK(field->ftrace_name);
+  PERFETTO_DCHECK(field->proto_field_id);
+  PERFETTO_DCHECK(field->proto_field_type);
+  PERFETTO_DCHECK(!field->ftrace_offset);
+  PERFETTO_DCHECK(!field->ftrace_size);
+  // TODO(hjd): Re-instate this after we decide this at runtime.
+  // PERFETTO_DCHECK(!field.ftrace_type);
+
+  // TODO(hjd): Set field.ftrace_type here.
+  field->ftrace_offset = ftrace_field.offset;
+  field->ftrace_size = ftrace_field.size;
+
+  bool can_consume = SetTranslationStrategy(
+      field->ftrace_type, field->proto_field_type, &field->strategy);
+
+  return can_consume;
+}
+
+uint16_t MergeFields(std::vector<Field>* fields,
+                     const std::vector<FtraceEvent::Field>& ftrace_fields) {
+  uint16_t max_offset = 0;
+
+  auto field = fields->begin();
+  while (field != fields->end()) {
+    bool success = false;
+    for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
+      if (GetNameFromTypeAndName(ftrace_field.type_and_name) !=
+          field->ftrace_name)
+        continue;
+
+      success = MergeFieldInfo(&*field, ftrace_field);
+
+      uint16_t max_for_field = field->ftrace_offset + field->ftrace_size;
+      max_offset = std::max<uint16_t>(max_offset, max_for_field);
+
+      break;
+    }
+    if (success) {
+      ++field;
+    } else {
+      fields->erase(field);
+    }
+  }
+  return max_offset;
+}
+
 }  // namespace
 
 // static
 std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     const FtraceProcfs* ftrace_procfs,
-    std::vector<Event> events) {
-  std::vector<Field> common_fields;
-
+    std::vector<Event> events,
+    std::vector<Field> common_fields) {
+  bool common_fields_processed = false;
   uint16_t common_fields_end = 0;
+
   for (Event& event : events) {
     PERFETTO_DCHECK(event.name);
     PERFETTO_DCHECK(event.group);
@@ -65,52 +113,17 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     if (contents == "" || !ParseFtraceEvent(contents, &ftrace_event)) {
       continue;
     }
-    uint16_t fields_end = 0;
+
     event.ftrace_event_id = ftrace_event.id;
-    auto field = event.fields.begin();
-    while (field != event.fields.end()) {
-      bool success = false;
-      for (FtraceEvent::Field ftrace_field : ftrace_event.fields) {
-        if (GetNameFromTypeAndName(ftrace_field.type_and_name) !=
-            field->ftrace_name)
-          continue;
 
-        PERFETTO_DCHECK(field->ftrace_name);
-        PERFETTO_DCHECK(field->proto_field_id);
-        PERFETTO_DCHECK(field->proto_field_type);
-        PERFETTO_DCHECK(!field->ftrace_offset);
-        PERFETTO_DCHECK(!field->ftrace_size);
-        // TODO(hjd): Re-instate this after we decide this at runtime.
-        // PERFETTO_DCHECK(!field.ftrace_type);
-
-        // TODO(hjd): Set field.ftrace_type here.
-        field->ftrace_offset = ftrace_field.offset;
-        field->ftrace_size = ftrace_field.size;
-        fields_end = std::max<uint16_t>(
-            fields_end, field->ftrace_offset + field->ftrace_size);
-
-        bool can_consume = SetTranslationStrategy(
-            field->ftrace_type, field->proto_field_type, &field->strategy);
-        success = can_consume;
-        break;
-      }
-      if (success) {
-        ++field;
-      } else {
-        event.fields.erase(field);
-      }
+    if (!common_fields_processed) {
+      common_fields_end =
+          MergeFields(&common_fields, ftrace_event.common_fields);
+      common_fields_processed = true;
     }
-    // Only hit this first time though this loop.
-    if (common_fields.empty()) {
-      for (const FtraceEvent::Field& ftrace_field :
-           ftrace_event.common_fields) {
-        uint16_t offset = ftrace_field.offset;
-        uint16_t size = ftrace_field.size;
-        common_fields.push_back(Field{offset, size});
-        common_fields_end =
-            std::max<uint16_t>(common_fields_end, offset + size);
-      }
-    }
+
+    uint16_t fields_end = MergeFields(&event.fields, ftrace_event.fields);
+
     event.size = std::max<uint16_t>(fields_end, common_fields_end);
   }
 

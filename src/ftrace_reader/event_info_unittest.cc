@@ -54,6 +54,24 @@ TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
   }
 }
 
+TEST(EventInfoTest, GetStaticCommonFieldsInfoSanityCheck) {
+  std::vector<Field> fields = GetStaticCommonFieldsInfo();
+  for (const Field& field : fields) {
+    // Non-empty name.
+    ASSERT_TRUE(field.ftrace_name);
+    // Non-zero proto field id.
+    ASSERT_TRUE(field.proto_field_id);
+    // Should have set the proto field type.
+    ASSERT_TRUE(field.proto_field_type);
+    // Other fields should be zeroed.
+    ASSERT_FALSE(field.ftrace_offset);
+    ASSERT_FALSE(field.ftrace_size);
+    ASSERT_FALSE(field.strategy);
+    // TODO(hjd): Re-instate this after we decide this at runtime.
+    // ASSERT_FALSE(field.ftrace_type);
+  }
+}
+
 TEST(EventInfoTest, SetTranslationStrategySanityCheck) {
   TranslationStrategy strategy = kUint32ToUint32;
   ASSERT_FALSE(SetTranslationStrategy(kFtraceCString, kProtoUint64, &strategy));

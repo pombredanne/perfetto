@@ -42,7 +42,8 @@ class ProtoTranslationTable {
  public:
   static std::unique_ptr<ProtoTranslationTable> Create(
       const FtraceProcfs* ftrace_procfs,
-      std::vector<Event> events);
+      std::vector<Event> events,
+      std::vector<Field> common_fields);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,
