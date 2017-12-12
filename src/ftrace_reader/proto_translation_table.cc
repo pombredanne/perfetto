@@ -52,7 +52,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     std::vector<Event> events) {
   std::vector<Field> common_fields;
 
-  uint16_t common_max_offset = 0;
+  uint16_t common_fields_end = 0;
   for (Event& event : events) {
     PERFETTO_DCHECK(event.name);
     PERFETTO_DCHECK(event.group);
@@ -65,7 +65,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     if (contents == "" || !ParseFtraceEvent(contents, &ftrace_event)) {
       continue;
     }
-    uint16_t max_offset = 0;
+    uint16_t fields_end = 0;
     event.ftrace_event_id = ftrace_event.id;
     auto field = event.fields.begin();
     while (field != event.fields.end()) {
@@ -86,10 +86,10 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
         // TODO(hjd): Set field.ftrace_type here.
         field->ftrace_offset = ftrace_field.offset;
         field->ftrace_size = ftrace_field.size;
-        max_offset = std::max<uint16_t>(
-            max_offset, field->ftrace_offset + field->ftrace_size);
+        fields_end = std::max<uint16_t>(
+            fields_end, field->ftrace_offset + field->ftrace_size);
 
-        bool can_consume = SetConsumingStrategy(
+        bool can_consume = SetTranslationStrategy(
             field->ftrace_type, field->proto_field_type, &field->strategy);
         success = can_consume;
         break;
@@ -100,17 +100,18 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
         event.fields.erase(field);
       }
     }
+    // Only hit this first time though this loop.
     if (common_fields.empty()) {
       for (const FtraceEvent::Field& ftrace_field :
            ftrace_event.common_fields) {
         uint16_t offset = ftrace_field.offset;
         uint16_t size = ftrace_field.size;
         common_fields.push_back(Field{offset, size});
-        common_max_offset =
-            std::max<uint16_t>(common_max_offset, offset + size);
+        common_fields_end =
+            std::max<uint16_t>(common_fields_end, offset + size);
       }
     }
-    event.size = std::max<uint16_t>(max_offset, common_max_offset);
+    event.size = std::max<uint16_t>(fields_end, common_fields_end);
   }
 
   events.erase(std::remove_if(events.begin(), events.end(),

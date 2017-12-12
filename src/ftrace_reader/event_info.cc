@@ -73,9 +73,9 @@ std::vector<Event> GetStaticEventInfo() {
   return events;
 }
 
-bool SetConsumingStrategy(FtraceFieldType ftrace,
-                          ProtoFieldType proto,
-                          ConsumingStrategy* out) {
+bool SetTranslationStrategy(FtraceFieldType ftrace,
+                            ProtoFieldType proto,
+                            TranslationStrategy* out) {
   if (ftrace == kFtraceUint32 && proto == kProtoUint32) {
     *out = kUint32ToUint32;
   } else if (ftrace == kFtraceUint64 && proto == kProtoUint64) {

@@ -80,7 +80,7 @@ class ProtoProvider {
   }
   ~ProtoProvider() = default;
 
-  protos::pbzero::FtraceEventBundle* writer() { return &writer_; }
+  ZeroT* writer() { return &writer_; }
 
   // Stitch together the scattered chunks into a single buffer then attempt
   // to parse the buffer as a FtraceEventBundle. Returns the FtraceEventBundle
@@ -102,7 +102,7 @@ class ProtoProvider {
   size_t chunk_size_;
   perfetto::ScatteredStreamDelegateForTesting delegate_;
   protozero::ScatteredStreamWriter stream_;
-  protos::pbzero::FtraceEventBundle writer_;
+  ZeroT writer_;
 };
 
 using BundleProvider =
@@ -176,11 +176,11 @@ class BinaryWriter {
     }
     Write<char>('\0');
     for (size_t i = 0; i < n - length - 1; i++) {
-      Write<char>('Z');
+      Write<char>('\xff');
     }
   }
 
-  std::unique_ptr<uint8_t[]> GetWritten() {
+  std::unique_ptr<uint8_t[]> GetCopy() {
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[written()]);
     memcpy(buffer.get(), page_.get(), written());
     return buffer;
@@ -221,13 +221,13 @@ TEST(PageFromXxdTest, ManyLines) {
   EXPECT_EQ(page.get()[0x29], 0xde);
 }
 
-TEST(BinaryWriter, ) {
+TEST(CpuReaderTest, BinaryWriter) {
   BinaryWriter writer;
   writer.Write<uint64_t>(1);
   writer.Write<uint32_t>(2);
   writer.Write<uint16_t>(3);
   writer.Write<uint8_t>(4);
-  auto buffer = writer.GetWritten();
+  auto buffer = writer.GetCopy();
   EXPECT_EQ(buffer.get()[0], 1);
   EXPECT_EQ(buffer.get()[1], 0);
   EXPECT_EQ(buffer.get()[2], 0);
@@ -598,8 +598,8 @@ TEST(CpuReaderTest, ParseAllFields) {
       field->ftrace_type = kFtraceUint32;
       field->proto_field_id = 1;
       field->proto_field_type = kProtoUint32;
-      SetConsumingStrategy(field->ftrace_type, field->proto_field_type,
-                           &field->strategy);
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
     }
     {
       // char[16] -> string
@@ -610,8 +610,8 @@ TEST(CpuReaderTest, ParseAllFields) {
       field->ftrace_type = kFtraceChar16;
       field->proto_field_id = 500;
       field->proto_field_type = kProtoString;
-      SetConsumingStrategy(field->ftrace_type, field->proto_field_type,
-                           &field->strategy);
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
     }
     {
       // char -> string
@@ -622,8 +622,8 @@ TEST(CpuReaderTest, ParseAllFields) {
       field->ftrace_type = kFtraceCString;
       field->proto_field_id = 501;
       field->proto_field_type = kProtoString;
-      SetConsumingStrategy(field->ftrace_type, field->proto_field_type,
-                           &field->strategy);
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
     }
   }
   ProtoTranslationTable table(events, std::move(common_fields));
@@ -639,12 +639,12 @@ TEST(CpuReaderTest, ParseAllFields) {
   writer.WriteFixedString(16, "Hello");
   writer.WriteFixedString(300, "Goodbye");
 
-  auto input = writer.GetWritten();
+  auto input = writer.GetCopy();
   auto length = writer.written();
 
   ASSERT_TRUE(CpuReader::ParseEvent(ftrace_event_id, input.get(),
-                                    input.get() + length, provider.writer(),
-                                    &table));
+                                    input.get() + length, &table,
+                                    provider.writer()));
 
   auto event = provider.ParseProto();
   ASSERT_TRUE(event);

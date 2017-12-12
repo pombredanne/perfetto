@@ -31,6 +31,19 @@ namespace perfetto {
 
 namespace {
 
+static bool ReadIntoString(const uint8_t* start,
+                           const uint8_t* end,
+                           size_t field_id,
+                           protozero::ProtoZeroMessage* out) {
+  for (const uint8_t* c = start; c < end; c++) {
+    if (*c != '\0')
+      continue;
+    out->AppendBytes(field_id, reinterpret_cast<const char*>(start), c - start);
+    return true;
+  }
+  return false;
+}
+
 using BundleHandle =
     protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
 
@@ -208,7 +221,7 @@ bool CpuReader::ParsePage(size_t cpu,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, event, table))
+          if (!ParseEvent(ftrace_event_id, start, next, table, event))
             return false;
         }
 
@@ -223,8 +236,8 @@ bool CpuReader::ParsePage(size_t cpu,
 bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* start,
                            const uint8_t* end,
-                           protozero::ProtoZeroMessage* message,
-                           const ProtoTranslationTable* table) {
+                           const ProtoTranslationTable* table,
+                           protozero::ProtoZeroMessage* message) {
   PERFETTO_DCHECK(start < end);
   const uint8_t* ptr = start;
   const size_t length = end - start;
@@ -260,41 +273,30 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   // TODO(hjd): Replace ReadAndAdvance with single max(offset + size) check.
   for (const Field& field : info.fields) {
-    const uint8_t* p = start + field.ftrace_offset;
+    const uint8_t* field_start = start + field.ftrace_offset;
     switch (field.strategy) {
       case kUint32ToUint32:
-        ReadVarInt<uint32_t>(start, field.ftrace_offset, nested,
-                             field.proto_field_id);
+        ReadIntoVarInt<uint32_t>(start, field.ftrace_offset,
+                                 field.proto_field_id, nested);
         break;
       case kUint64ToUint64:
-        ReadVarInt<uint64_t>(start, field.ftrace_offset, nested,
-                             field.proto_field_id);
+        ReadIntoVarInt<uint64_t>(start, field.ftrace_offset,
+                                 field.proto_field_id, nested);
         break;
-      case kChar16ToString: {
-        // TODO(hjd): Add AppendMaxLength string to protozero.
-        char str[16];
-        if (!ReadAndAdvance<char[16]>(&p, end, &str))
+      case kChar16ToString:
+        if (!ReadIntoString(field_start, field_start + 16, field.proto_field_id,
+                            nested))
           return false;
-        str[15] = '\0';
-        nested->AppendString(field.proto_field_id, str);
         break;
-      }
-      case kCStringToString: {
+      case kCStringToString:
+        // TODO(hjd): Add AppendMaxLength string to protozero.
         // TODO(hjd): Kernel-dive to check this how size:0 char fields work.
-        const uint8_t* str_start = p;
-        const uint8_t* str_end = end;
-        for (const uint8_t* c = str_start; c < str_end; c++) {
-          if (*c != '\0')
-            continue;
-          nested->AppendBytes(field.proto_field_id,
-                              reinterpret_cast<const char*>(str_start),
-                              c - str_start);
-          break;
-        }
-      }
+        if (!ReadIntoString(field_start, end, field.proto_field_id, nested))
+          return false;
+        break;
     }
   }
-  nested->Finalize();
+  // This finalizes |nested| automatically.
   message->Finalize();
   return true;
 }

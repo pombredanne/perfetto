@@ -51,7 +51,7 @@ enum FtraceFieldType {
   kFtraceCString,
 };
 
-enum ConsumingStrategy {
+enum TranslationStrategy {
   kUint32ToUint32 = 1,
   kUint64ToUint64,
   kChar16ToString,
@@ -119,7 +119,7 @@ struct Field {
   uint32_t proto_field_id;
   ProtoFieldType proto_field_type;
 
-  ConsumingStrategy strategy;
+  TranslationStrategy strategy;
 };
 
 struct Event {
@@ -155,9 +155,9 @@ struct Event {
 // are zeroed.
 std::vector<Event> GetStaticEventInfo();
 
-bool SetConsumingStrategy(FtraceFieldType ftrace,
-                          ProtoFieldType proto,
-                          ConsumingStrategy* out);
+bool SetTranslationStrategy(FtraceFieldType ftrace,
+                            ProtoFieldType proto,
+                            TranslationStrategy* out);
 
 }  // namespace perfetto
 

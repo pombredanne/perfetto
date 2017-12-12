@@ -54,11 +54,11 @@ TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
   }
 }
 
-TEST(EventInfoTest, SetConsumingStrategySanityCheck) {
-  ConsumingStrategy strategy = kUint32ToUint32;
-  ASSERT_FALSE(SetConsumingStrategy(kFtraceCString, kProtoUint64, &strategy));
+TEST(EventInfoTest, SetTranslationStrategySanityCheck) {
+  TranslationStrategy strategy = kUint32ToUint32;
+  ASSERT_FALSE(SetTranslationStrategy(kFtraceCString, kProtoUint64, &strategy));
   ASSERT_EQ(strategy, kUint32ToUint32);
-  ASSERT_TRUE(SetConsumingStrategy(kFtraceCString, kProtoString, &strategy));
+  ASSERT_TRUE(SetTranslationStrategy(kFtraceCString, kProtoString, &strategy));
   ASSERT_EQ(strategy, kCStringToString);
 }
 
