@@ -84,6 +84,9 @@ inline const char* ToString(ProtoFieldType v) {
     case kProtoBytes:
       return "bytes";
   }
+  // For gcc:
+  PERFETTO_CHECK(false);
+  return "";
 }
 
 inline const char* ToString(FtraceFieldType v) {
@@ -97,6 +100,9 @@ inline const char* ToString(FtraceFieldType v) {
     case kFtraceCString:
       return "null terminated string";
   }
+  // For gcc:
+  PERFETTO_CHECK(false);
+  return "";
 }
 
 struct Field {
