@@ -19,6 +19,7 @@ def CheckChange(input, output):
     results += input.canned_checks.CheckLongLines(input, output, 80)
     results += input.canned_checks.CheckPatchFormatted(input, output)
     results += input.canned_checks.CheckGNFormatted(input, output)
+    results += CheckAndroidBlueprint(input, output)
     return results
 
 def CheckChangeOnUpload(input_api, output_api):
@@ -27,3 +28,11 @@ def CheckChangeOnUpload(input_api, output_api):
 def CheckChangeOnCommit(input_api, output_api):
     return CheckChange(input_api, output_api)
 
+def CheckAndroidBlueprint(input_api, output_api):
+    build_file_filter = lambda x: input_api.FilterSourceFile(
+          x,
+          white_list=('.*BUILD[.]gn$', '.*[.]gni$'))
+    if not input_api.AffectedSourceFiles(build_file_filter):
+        return []
+    #return [output_api.PresubmitResult('foo')]
+    return []

@@ -29,7 +29,16 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
+
+# Default targets to translate to the blueprint file.
+default_targets = ['//:perfetto_tests']
+
+# Arguments for the GN output directory.
+gn_args = 'target_os="android" target_cpu="arm" is_debug=false'
 
 # All module names are prefixed with this string to avoid collisions.
 module_prefix = 'perfetto_'
@@ -448,11 +457,23 @@ def create_blueprint_for_targets(desc, targets):
     return blueprint
 
 
+def create_build_description():
+    """Creates the JSON build description by running GN."""
+
+    out = tempfile.mkdtemp()
+    try:
+        subprocess.check_call(['gn', 'gen', out, '--args=%s' % gn_args])
+        desc = subprocess.check_output(['gn', 'desc', out, '--format=json', '--all-toolchains', '//*'])
+        return json.loads(desc)
+    finally:
+        shutil.rmtree(out)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Generate Android.bp from a GN description.')
     parser.add_argument(
-        'desc',
+        '--desc',
         help=
         'GN description (e.g., gn desc out --format=json --all-toolchains "//*"'
     )
@@ -462,10 +483,13 @@ def main():
         help='Targets to include in the blueprint (e.g., "//:perfetto_tests")')
     args = parser.parse_args()
 
-    with open(args.desc) as f:
-        desc = json.load(f)
+    if args.desc:
+        with open(args.desc) as f:
+            desc = json.load(f)
+    else:
+        desc = create_build_description()
 
-    blueprint = create_blueprint_for_targets(desc, args.targets)
+    blueprint = create_blueprint_for_targets(desc, args.targets or default_targets)
     output = [
         """// Copyright (C) 2017 The Android Open Source Project
 //
