@@ -294,7 +294,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
       PERFETTO_CHECK(false);
     }
   }
-  nested->Finalize();
+  // This finalizes |nested| automatically.
   message->Finalize();
   return true;
 }
