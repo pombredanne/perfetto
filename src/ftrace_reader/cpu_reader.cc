@@ -208,7 +208,7 @@ bool CpuReader::ParsePage(size_t cpu,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, event, table))
+          if (!ParseEvent(ftrace_event_id, start, next, table, event))
             return false;
         }
 
@@ -223,8 +223,8 @@ bool CpuReader::ParsePage(size_t cpu,
 bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* start,
                            const uint8_t* end,
-                           protozero::ProtoZeroMessage* message,
-                           const ProtoTranslationTable* table) {
+                           const ProtoTranslationTable* table,
+                           protozero::ProtoZeroMessage* message) {
   const uint8_t* ptr = start;
 
   // Common headers:
