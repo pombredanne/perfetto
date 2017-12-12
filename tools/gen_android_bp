@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This tool translates a collection of BUILD.gn files into an mostly equivalent
+# This tool translates a collection of BUILD.gn files into a mostly equivalent
 # Android.bp file for the Android Soong build system. The input to the tool is a
 # JSON description of the GN build definition generated with the following
 # command:
@@ -69,8 +69,7 @@ def enable_protoc_lib(module):
 
 
 def enable_libunwind(module):
-    if module.type != 'cc_genrule':
-        module.shared_libs.append('libunwind')
+    module.shared_libs.append('libunwind')
 
 
 # Android equivalents for third-party libraries that the upstream project
@@ -80,7 +79,6 @@ builtin_deps = {
     '//buildtools:gtest': enable_gtest,
     '//buildtools:gtest_main': enable_gtest,
     '//buildtools:libunwind': enable_libunwind,
-    # TODO(skyostil): Remove after full protobuffers aren't used anymore.
     '//buildtools:protobuf_full': enable_protobuf_full,
     '//buildtools:protobuf_lite': enable_protobuf_lite,
     '//buildtools:protoc_lib': enable_protoc_lib,
@@ -95,11 +93,20 @@ class Error(Exception):
     pass
 
 
+class ThrowingArgumentParser(argparse.ArgumentParser):
+    def __init__(self, context):
+        super(ThrowingArgumentParser, self).__init__()
+        self.context = context
+
+    def error(self, message):
+        raise Error('%s: %s' % (self.context, message))
+
+
 class Module(object):
     """A single module (e.g., cc_binary, cc_test) in a blueprint."""
 
-    def __init__(self, type, name):
-        self.type = type
+    def __init__(self, mod_type, name):
+        self.type = mod_type
         self.name = name
         self.srcs = []
         self.comment = None
@@ -305,45 +312,44 @@ def make_genrules_for_action(blueprint, desc, target_name):
         '--proto_path=%s' % tree_path
     ]
     namespaces = ['pb']
-    i = 1
-    while i < len(args):
-        if not args[i][0] == '-':
-            break
-        if args[i] in ['--proto_path', '--cpp_out']:
-            i += 1
-        elif args[i].startswith('--plugin='):
-            # Look for a dependency that generates this plugin.
-            plugin = os.path.split(args[i])[-1]
-            # TODO(skyostil): Can we detect this some other way?
-            if plugin == 'ipc_plugin':
-                namespaces.append('ipc')
-            elif plugin == 'protoc_plugin':
-                namespaces = ['pbzero']
-            for dep in target['deps']:
-                if desc[dep]['type'] != 'executable':
-                    continue
-                executable = os.path.split(desc[dep]['outputs'][0])[-1]
-                if executable == plugin:
-                    cmd += [
-                        '--plugin=protoc-gen-plugin=$(location %s)' %
-                        label_to_module_name(dep)
-                    ]
-                    source_module.tools.append(label_to_module_name(dep))
-                    # Also make sure the module for the tool is generated.
-                    create_modules_from_target(blueprint, desc, dep)
-                    break
-            else:
-                raise Error('Unrecognized protoc plugin in target %s: %s' %
-                            (target_name, args[i]))
-        elif args[i].startswith('--plugin_out='):
-            plugin_args = args[i][len('--plugin_out='):].split(':')[0]
-            cmd += ['--plugin_out=%s:$(genDir)/%s' % (plugin_args, tree_path)]
-        else:
-            raise Error('Unsupported protoc argument in target %s: %s' %
-                        (target_name, args[i]))
-        i += 1
-    cmd += ['$(in)']
 
+    parser = ThrowingArgumentParser('Action in target %s (%s)' %
+                                    (target_name, ' '.join(target['args'])))
+    parser.add_argument('--proto_path')
+    parser.add_argument('--cpp_out')
+    parser.add_argument('--plugin')
+    parser.add_argument('--plugin_out')
+    parser.add_argument('protos', nargs=argparse.REMAINDER)
+
+    args = parser.parse_args(args[1:])
+    if args.plugin:
+        _, plugin = os.path.split(args.plugin)
+        # TODO(skyostil): Can we detect this some other way?
+        if plugin == 'ipc_plugin':
+            namespaces.append('ipc')
+        elif plugin == 'protoc_plugin':
+            namespaces = ['pbzero']
+        for dep in target['deps']:
+            if desc[dep]['type'] != 'executable':
+                continue
+            _, executable = os.path.split(desc[dep]['outputs'][0])
+            if executable == plugin:
+                cmd += [
+                    '--plugin=protoc-gen-plugin=$(location %s)' %
+                    label_to_module_name(dep)
+                ]
+                source_module.tools.append(label_to_module_name(dep))
+                # Also make sure the module for the tool is generated.
+                create_modules_from_target(blueprint, desc, dep)
+                break
+        else:
+            raise Error('Unrecognized protoc plugin in target %s: %s' %
+                        (target_name, args[i]))
+    if args.plugin_out:
+        plugin_args = args.plugin_out.split(':')[0]
+        cmd += ['--plugin_out=%s:$(genDir)/%s' % (plugin_args, tree_path)]
+
+    cmd += ['$(in)']
     source_module.cmd = ' '.join(cmd)
     header_module.cmd = source_module.cmd
     header_module.tools = source_module.tools[:]
@@ -375,7 +381,7 @@ def create_modules_from_target(blueprint, desc, target_name):
     if target['type'] == 'executable':
         if 'host' in target['toolchain']:
             module_type = 'cc_binary_host'
-        elif target.get('testonly', False):
+        elif target.get('testonly'):
             module_type = 'cc_test'
         else:
             module_type = 'cc_binary'
@@ -461,26 +467,23 @@ def main():
 
     blueprint = create_blueprint_for_targets(desc, args.targets)
     output = [
-        '// Copyright (C) 2017 The Android Open Source Project',
-        '//',
-        '// Licensed under the Apache License, Version 2.0 (the "License");',
-        '// you may not use this file except in compliance with the License.',
-        '// You may obtain a copy of the License at',
-        '//',
-        '//      http://www.apache.org/licenses/LICENSE-2.0',
-        '//',
-        '// Unless required by applicable law or agreed to in writing, '
-            'software',
-        '// distributed under the License is distributed on an "AS IS" BASIS,',
-        '// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or '
-            'implied.',
-        '// See the License for the specific language governing permissions '
-            'and',
-        '// limitations under the License.',
-        '//',
-        '// This file is automatically generated. Do not edit.',
-        ''
-    ]  # yapf: disable
+        """// Copyright (C) 2017 The Android Open Source Project
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// This file is automatically generated by %s. Do not edit.
+""" % (__file__)
+    ]
     blueprint.to_string(output)
     print '\n'.join(output)
 
