@@ -17,6 +17,7 @@
 #include "proto_translation_table.h"
 
 #include <algorithm>
+#include <regex>
 
 #include "event_info.h"
 #include "ftrace_procfs.h"
@@ -53,17 +54,18 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field, Field* field) {
   PERFETTO_DCHECK(field->proto_field_type);
   PERFETTO_DCHECK(!field->ftrace_offset);
   PERFETTO_DCHECK(!field->ftrace_size);
-  // TODO(hjd): Re-instate this after we decide this at runtime.
-  // PERFETTO_DCHECK(!field.ftrace_type);
+  PERFETTO_DCHECK(!field.ftrace_type);
 
-  // TODO(hjd): Set field.ftrace_type here.
+  bool success = InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
+                                 ftrace_field.is_signed, &field->ftrace_type);
   field->ftrace_offset = ftrace_field.offset;
   field->ftrace_size = ftrace_field.size;
 
-  bool can_consume = SetTranslationStrategy(
-      field->ftrace_type, field->proto_field_type, &field->strategy);
+  success = success &&
+            SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                                   &field->strategy);
 
-  return can_consume;
+  return success;
 }
 
 // For each field in |fields| find the matching field from |ftrace_fields| (by
@@ -101,7 +103,48 @@ uint16_t MergeFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
   return fields_end;
 }
 
+bool StartsWith(const std::string& str, const std::string& prefix) {
+  return str.compare(0, prefix.length(), prefix) == 0;
+}
+
 }  // namespace
+
+// This is similar but different from InferProtoType (see ftrace_to_proto.cc).
+// TODO(hjd): Fold FtraceEvent(::Field) into Event.
+bool InferFtraceType(const std::string& type_and_name,
+                     size_t size,
+                     bool is_signed,
+                     FtraceFieldType* out) {
+  // Fixed length strings: "char foo[16]"
+  if (std::regex_match(type_and_name, std::regex(R"(char \w+\[\d+\])"))) {
+    *out = kFtraceFixedCString;
+    return true;
+  }
+
+  // Variable length strings: "char foo" + size: 0 (as in 'print').
+  if (StartsWith(type_and_name, "char ") && size == 0) {
+    *out = kFtraceCString;
+    return true;
+  }
+
+  // Ints of various sizes:
+  if (size == 4 && is_signed) {
+    *out = kFtraceInt32;
+    return true;
+  } else if (size == 4 && !is_signed) {
+    *out = kFtraceUint32;
+    return true;
+  } else if (size == 8 && is_signed) {
+    *out = kFtraceInt64;
+    return true;
+  } else if (size == 8 && !is_signed) {
+    *out = kFtraceUint64;
+    return true;
+  }
+
+  PERFETTO_DLOG("Could not infer ftrace type for '%s'", type_and_name.c_str());
+  return false;
+}
 
 // static
 std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(

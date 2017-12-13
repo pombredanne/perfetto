@@ -289,6 +289,13 @@ bool CpuReader::ParseField(const Field& field,
     case kUint64ToUint64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
+    case kInt32ToInt32:
+    case kInt32ToInt64:
+      ReadIntoVarInt<int32_t>(field_start, field_id, message);
+      return true;
+    case kInt64ToInt64:
+      ReadIntoVarInt<int64_t>(field_start, field_id, message);
+      return true;
     case kFixedCStringToString:
       // TODO(hjd): Add AppendMaxLength string to protozero.
       return ReadIntoString(field_start, field_start + field.ftrace_size,
