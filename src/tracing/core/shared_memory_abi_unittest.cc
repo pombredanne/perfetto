@@ -17,6 +17,7 @@
 #include "perfetto/tracing/core/shared_memory_abi.h"
 
 #include "gtest/gtest.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 namespace {
@@ -30,14 +31,16 @@ class SharedMemoryABITest : public ::testing::TestWithParam<size_t> {
   void SetUp() override {
     page_size_ = GetParam();
     buf_size_ = page_size_ * kNumPages;
-    buf_.reset(new uint8_t[buf_size_]);
+    void* mem = nullptr;
+    PERFETTO_CHECK(posix_memalign(&mem, page_size_, buf_size_) == 0);
+    buf_.reset(reinterpret_cast<uint8_t*>(mem));
     memset(buf_.get(), 0, buf_size_);
   }
 
   void TearDown() override { buf_.reset(); }
 
   const size_t kNumPages = 10;
-  std::unique_ptr<uint8_t[]> buf_;
+  std::unique_ptr<uint8_t, base::FreeDeleter> buf_;
   size_t buf_size_;
   size_t page_size_;
 };
