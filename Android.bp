@@ -32,6 +32,21 @@ cc_genrule {
   ],
 }
 
+// GN target: //src/ftrace_reader:ftrace_reader_test_messages_lite_gen
+cc_genrule {
+  name: "perfetto_src_ftrace_reader_ftrace_reader_test_messages_lite_gen",
+  srcs: [
+    "src/ftrace_reader/test/test_messages.proto",
+  ],
+  tools: [
+    "aprotoc",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/ftrace_reader/test/test_messages.pb.cc",
+  ],
+}
+
 // GN target: //src/ipc:test_messages_gen
 cc_genrule {
   name: "perfetto_src_ipc_test_messages_gen_headers",
@@ -91,6 +106,22 @@ cc_genrule {
   ],
   export_include_dirs: [
     ".",
+  ],
+}
+
+// GN target: //src/ftrace_reader:ftrace_reader_test_messages_zero_gen
+cc_genrule {
+  name: "perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen",
+  srcs: [
+    "src/ftrace_reader/test/test_messages.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/ftrace_reader/test/test_messages.pbzero.cc",
   ],
 }
 
@@ -195,6 +226,25 @@ cc_binary_host {
   ],
 }
 
+// GN target: //src/ftrace_reader:ftrace_reader_test_messages_zero_gen
+cc_genrule {
+  name: "perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen_headers",
+  srcs: [
+    "src/ftrace_reader/test/test_messages.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/ftrace_reader/test/test_messages.pbzero.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
 // GN target: //protos:lite_gen
 cc_genrule {
   name: "perfetto_protos_lite_gen",
@@ -279,6 +329,8 @@ cc_test {
     ":perfetto_protos_lite_gen",
     ":perfetto_protos_tracing_service_lite_gen",
     ":perfetto_protos_tracing_service_tracing_service_gen",
+    ":perfetto_src_ftrace_reader_ftrace_reader_test_messages_lite_gen",
+    ":perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen",
     ":perfetto_src_ipc_test_messages_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
     ":perfetto_src_protozero_testing_messages_lite_gen",
@@ -359,6 +411,8 @@ cc_test {
     "perfetto_protos_lite_gen_headers",
     "perfetto_protos_tracing_service_lite_gen_headers",
     "perfetto_protos_tracing_service_tracing_service_gen_headers",
+    "perfetto_src_ftrace_reader_ftrace_reader_test_messages_lite_gen_headers",
+    "perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen_headers",
     "perfetto_src_ipc_test_messages_gen_headers",
     "perfetto_src_ipc_wire_protocol_gen_headers",
     "perfetto_src_protozero_testing_messages_lite_gen_headers",
@@ -388,6 +442,24 @@ cc_genrule {
     "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pbzero.h",
     "external/perfetto/src/protozero/test/example_proto/test_messages.pbzero.h",
     "external/perfetto/src/protozero/test/example_proto/upper_import.pbzero.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
+// GN target: //src/ftrace_reader:ftrace_reader_test_messages_lite_gen
+cc_genrule {
+  name: "perfetto_src_ftrace_reader_ftrace_reader_test_messages_lite_gen_headers",
+  srcs: [
+    "src/ftrace_reader/test/test_messages.proto",
+  ],
+  tools: [
+    "aprotoc",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/ftrace_reader/test/test_messages.pb.h",
   ],
   export_include_dirs: [
     ".",
