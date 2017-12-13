@@ -54,3 +54,12 @@ if (!build_with_chromium) {
     ]
   }
 }
+
+executable("proto_compat_test") {
+  testonly = true
+  deps = [
+    "gn:default_deps",
+    "protos/tracing_service:lite",
+  ]
+  sources = [ "proto_compat_test.cc" ]
+}
