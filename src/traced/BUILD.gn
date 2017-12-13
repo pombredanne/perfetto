@@ -13,7 +13,6 @@
 # limitations under the License.
 
 executable("traced") {
-  testonly = true
   sources = [
     "traced.cc",
   ]
