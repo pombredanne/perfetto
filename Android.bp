@@ -32,62 +32,106 @@ cc_genrule {
   ],
 }
 
-// GN target: //src/ipc:wire_protocol_gen
+// GN target: //src/ipc:test_messages_gen
 cc_genrule {
-  name: "perfetto_src_ipc_wire_protocol_gen",
+  name: "perfetto_src_ipc_test_messages_gen_headers",
   srcs: [
-    "src/ipc/wire_protocol.proto",
+    "src/ipc/test/client_unittest_messages.proto",
+    "src/ipc/test/deferred_unittest_messages.proto",
+    "src/ipc/test/greeter_service.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/ipc/test/client_unittest_messages.ipc.h",
+    "external/perfetto/src/ipc/test/client_unittest_messages.pb.h",
+    "external/perfetto/src/ipc/test/deferred_unittest_messages.ipc.h",
+    "external/perfetto/src/ipc/test/deferred_unittest_messages.pb.h",
+    "external/perfetto/src/ipc/test/greeter_service.ipc.h",
+    "external/perfetto/src/ipc/test/greeter_service.pb.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
+cc_defaults {
+  name: "perfetto_defaults",
+  cflags: [
+    "-Wno-error=return-type",
+    "-Wno-sign-compare",
+    "-Wno-sign-promo",
+    "-Wno-unused-parameter",
+  ],
+  local_include_dirs: [
+    "include",
+  ],
+}
+
+// GN target: //protos/tracing_service:tracing_service_gen
+cc_genrule {
+  name: "perfetto_protos_tracing_service_tracing_service_gen_headers",
+  srcs: [
+    "protos/tracing_service/consumer_port.proto",
+    "protos/tracing_service/producer_port.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/protos/tracing_service/consumer_port.ipc.h",
+    "external/perfetto/protos/tracing_service/consumer_port.pb.h",
+    "external/perfetto/protos/tracing_service/producer_port.ipc.h",
+    "external/perfetto/protos/tracing_service/producer_port.pb.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
+// GN target: //protos/tracing_service:tracing_service_gen
+cc_genrule {
+  name: "perfetto_protos_tracing_service_tracing_service_gen",
+  srcs: [
+    "protos/tracing_service/consumer_port.proto",
+    "protos/tracing_service/producer_port.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/protos/tracing_service/consumer_port.ipc.cc",
+    "external/perfetto/protos/tracing_service/consumer_port.pb.cc",
+    "external/perfetto/protos/tracing_service/producer_port.ipc.cc",
+    "external/perfetto/protos/tracing_service/producer_port.pb.cc",
+  ],
+}
+
+// GN target: //src/protozero:testing_messages_lite_gen
+cc_genrule {
+  name: "perfetto_src_protozero_testing_messages_lite_gen_headers",
+  srcs: [
+    "src/protozero/test/example_proto/library.proto",
+    "src/protozero/test/example_proto/library_internals/galaxies.proto",
+    "src/protozero/test/example_proto/test_messages.proto",
+    "src/protozero/test/example_proto/upper_import.proto",
   ],
   tools: [
     "aprotoc",
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
-    "external/perfetto/src/ipc/wire_protocol.pb.cc",
-  ],
-}
-
-// GN target: //src/protozero:testing_messages_zero_gen
-cc_genrule {
-  name: "perfetto_src_protozero_testing_messages_zero_gen",
-  srcs: [
-    "src/protozero/test/example_proto/library.proto",
-    "src/protozero/test/example_proto/library_internals/galaxies.proto",
-    "src/protozero/test/example_proto/test_messages.proto",
-    "src/protozero/test/example_proto/upper_import.proto",
-  ],
-  tools: [
-    "aprotoc",
-    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
-  ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
-  out: [
-    "external/perfetto/src/protozero/test/example_proto/library.pbzero.cc",
-    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pbzero.cc",
-    "external/perfetto/src/protozero/test/example_proto/test_messages.pbzero.cc",
-    "external/perfetto/src/protozero/test/example_proto/upper_import.pbzero.cc",
-  ],
-}
-
-// GN target: //src/protozero:testing_messages_zero_gen
-cc_genrule {
-  name: "perfetto_src_protozero_testing_messages_zero_gen_headers",
-  srcs: [
-    "src/protozero/test/example_proto/library.proto",
-    "src/protozero/test/example_proto/library_internals/galaxies.proto",
-    "src/protozero/test/example_proto/test_messages.proto",
-    "src/protozero/test/example_proto/upper_import.proto",
-  ],
-  tools: [
-    "aprotoc",
-    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
-  ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
-  out: [
-    "external/perfetto/src/protozero/test/example_proto/library.pbzero.h",
-    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pbzero.h",
-    "external/perfetto/src/protozero/test/example_proto/test_messages.pbzero.h",
-    "external/perfetto/src/protozero/test/example_proto/upper_import.pbzero.h",
+    "external/perfetto/src/protozero/test/example_proto/library.pb.h",
+    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pb.h",
+    "external/perfetto/src/protozero/test/example_proto/test_messages.pb.h",
+    "external/perfetto/src/protozero/test/example_proto/upper_import.pb.h",
   ],
   export_include_dirs: [
     ".",
@@ -114,19 +158,6 @@ cc_genrule {
     "external/perfetto/src/ipc/test/deferred_unittest_messages.pb.cc",
     "external/perfetto/src/ipc/test/greeter_service.ipc.cc",
     "external/perfetto/src/ipc/test/greeter_service.pb.cc",
-  ],
-}
-
-cc_defaults {
-  name: "perfetto_defaults",
-  cflags: [
-    "-Wno-error=return-type",
-    "-Wno-sign-compare",
-    "-Wno-sign-promo",
-    "-Wno-unused-parameter",
-  ],
-  local_include_dirs: [
-    "include",
   ],
 }
 
@@ -179,32 +210,9 @@ cc_genrule {
   ],
 }
 
-// GN target: //src/tracing:ipc_protos_gen
+// GN target: //protos/ftrace:zero_gen
 cc_genrule {
-  name: "perfetto_src_tracing_ipc_protos_gen",
-  srcs: [
-    "src/tracing/ipc/data_source_config.proto",
-    "src/tracing/ipc/data_source_descriptor.proto",
-    "src/tracing/ipc/producer_port.proto",
-  ],
-  tools: [
-    "aprotoc",
-    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
-  ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
-  out: [
-    "external/perfetto/src/tracing/ipc/data_source_config.ipc.cc",
-    "external/perfetto/src/tracing/ipc/data_source_config.pb.cc",
-    "external/perfetto/src/tracing/ipc/data_source_descriptor.ipc.cc",
-    "external/perfetto/src/tracing/ipc/data_source_descriptor.pb.cc",
-    "external/perfetto/src/tracing/ipc/producer_port.ipc.cc",
-    "external/perfetto/src/tracing/ipc/producer_port.pb.cc",
-  ],
-}
-
-// GN target: //protos/ftrace:lite_gen
-cc_genrule {
-  name: "perfetto_protos_ftrace_lite_gen",
+  name: "perfetto_protos_ftrace_zero_gen",
   srcs: [
     "protos/ftrace/ftrace_event.proto",
     "protos/ftrace/ftrace_event_bundle.proto",
@@ -214,14 +222,30 @@ cc_genrule {
   ],
   tools: [
     "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/protos/ftrace/ftrace_event.pbzero.cc",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pbzero.cc",
+    "external/perfetto/protos/ftrace/print.pbzero.cc",
+    "external/perfetto/protos/ftrace/sched_switch.pbzero.cc",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pbzero.cc",
+  ],
+}
+
+// GN target: //src/ipc:wire_protocol_gen
+cc_genrule {
+  name: "perfetto_src_ipc_wire_protocol_gen",
+  srcs: [
+    "src/ipc/wire_protocol.proto",
+  ],
+  tools: [
+    "aprotoc",
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
-    "external/perfetto/protos/ftrace/ftrace_event.pb.cc",
-    "external/perfetto/protos/ftrace/ftrace_event_bundle.pb.cc",
-    "external/perfetto/protos/ftrace/print.pb.cc",
-    "external/perfetto/protos/ftrace/sched_switch.pb.cc",
-    "external/perfetto/protos/ftrace/test_bundle_wrapper.pb.cc",
+    "external/perfetto/src/ipc/wire_protocol.pb.cc",
   ],
 }
 
@@ -253,11 +277,12 @@ cc_test {
     ":perfetto_protos_ftrace_lite_gen",
     ":perfetto_protos_ftrace_zero_gen",
     ":perfetto_protos_lite_gen",
+    ":perfetto_protos_tracing_service_lite_gen",
+    ":perfetto_protos_tracing_service_tracing_service_gen",
     ":perfetto_src_ipc_test_messages_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
     ":perfetto_src_protozero_testing_messages_lite_gen",
     ":perfetto_src_protozero_testing_messages_zero_gen",
-    ":perfetto_src_tracing_ipc_protos_gen",
     "src/base/android_task_runner.cc",
     "src/base/scoped_file_unittest.cc",
     "src/base/task_runner_unittest.cc",
@@ -269,6 +294,8 @@ cc_test {
     "src/base/weak_ptr_unittest.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/cpu_reader_unittest.cc",
+    "src/ftrace_reader/event_info.cc",
+    "src/ftrace_reader/event_info_unittest.cc",
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/format_parser_unittest.cc",
     "src/ftrace_reader/ftrace_controller.cc",
@@ -302,10 +329,14 @@ cc_test {
     "src/protozero/test/protozero_conformance_unittest.cc",
     "src/tracing/core/chunked_protobuf_input_stream.cc",
     "src/tracing/core/chunked_protobuf_input_stream_unittest.cc",
+    "src/tracing/core/data_source_config.cc",
+    "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/service_impl_unittest.cc",
+    "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_packet_unittest.cc",
+    "src/tracing/ipc/consumer/consumer_ipc_client_impl.cc",
     "src/tracing/ipc/posix_shared_memory.cc",
     "src/tracing/ipc/posix_shared_memory_unittest.cc",
     "src/tracing/ipc/producer/producer_ipc_client_impl.cc",
@@ -326,20 +357,68 @@ cc_test {
     "perfetto_protos_ftrace_lite_gen_headers",
     "perfetto_protos_ftrace_zero_gen_headers",
     "perfetto_protos_lite_gen_headers",
+    "perfetto_protos_tracing_service_lite_gen_headers",
+    "perfetto_protos_tracing_service_tracing_service_gen_headers",
     "perfetto_src_ipc_test_messages_gen_headers",
     "perfetto_src_ipc_wire_protocol_gen_headers",
     "perfetto_src_protozero_testing_messages_lite_gen_headers",
     "perfetto_src_protozero_testing_messages_zero_gen_headers",
-    "perfetto_src_tracing_ipc_protos_gen_headers",
   ],
   defaults: [
     "perfetto_defaults",
   ],
 }
 
-// GN target: //protos/ftrace:zero_gen
+// GN target: //src/protozero:testing_messages_zero_gen
 cc_genrule {
-  name: "perfetto_protos_ftrace_zero_gen",
+  name: "perfetto_src_protozero_testing_messages_zero_gen_headers",
+  srcs: [
+    "src/protozero/test/example_proto/library.proto",
+    "src/protozero/test/example_proto/library_internals/galaxies.proto",
+    "src/protozero/test/example_proto/test_messages.proto",
+    "src/protozero/test/example_proto/upper_import.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
+  out: [
+    "external/perfetto/src/protozero/test/example_proto/library.pbzero.h",
+    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pbzero.h",
+    "external/perfetto/src/protozero/test/example_proto/test_messages.pbzero.h",
+    "external/perfetto/src/protozero/test/example_proto/upper_import.pbzero.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
+// GN target: //protos/tracing_service:lite_gen
+cc_genrule {
+  name: "perfetto_protos_tracing_service_lite_gen_headers",
+  srcs: [
+    "protos/tracing_service/data_source_config.proto",
+    "protos/tracing_service/data_source_descriptor.proto",
+    "protos/tracing_service/trace_config.proto",
+  ],
+  tools: [
+    "aprotoc",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
+  out: [
+    "external/perfetto/protos/tracing_service/data_source_config.pb.h",
+    "external/perfetto/protos/tracing_service/data_source_descriptor.pb.h",
+    "external/perfetto/protos/tracing_service/trace_config.pb.h",
+  ],
+  export_include_dirs: [
+    ".",
+  ],
+}
+
+// GN target: //protos/ftrace:lite_gen
+cc_genrule {
+  name: "perfetto_protos_ftrace_lite_gen",
   srcs: [
     "protos/ftrace/ftrace_event.proto",
     "protos/ftrace/ftrace_event_bundle.proto",
@@ -349,57 +428,14 @@ cc_genrule {
   ],
   tools: [
     "aprotoc",
-    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
   ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
-    "external/perfetto/protos/ftrace/ftrace_event.pbzero.cc",
-    "external/perfetto/protos/ftrace/ftrace_event_bundle.pbzero.cc",
-    "external/perfetto/protos/ftrace/print.pbzero.cc",
-    "external/perfetto/protos/ftrace/sched_switch.pbzero.cc",
-    "external/perfetto/protos/ftrace/test_bundle_wrapper.pbzero.cc",
-  ],
-}
-
-// GN target: //src/protozero/protoc_plugin:protoc_plugin(//gn/standalone/toolchain:gcc_like_host)
-cc_binary_host {
-  name: "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
-  srcs: [
-    "src/protozero/protoc_plugin/protozero_generator.cc",
-    "src/protozero/protoc_plugin/protozero_plugin.cc",
-  ],
-  shared_libs: [
-    "libprotoc",
-    "libunwind",
-  ],
-  defaults: [
-    "perfetto_defaults",
-  ],
-}
-
-// GN target: //src/ipc:test_messages_gen
-cc_genrule {
-  name: "perfetto_src_ipc_test_messages_gen_headers",
-  srcs: [
-    "src/ipc/test/client_unittest_messages.proto",
-    "src/ipc/test/deferred_unittest_messages.proto",
-    "src/ipc/test/greeter_service.proto",
-  ],
-  tools: [
-    "aprotoc",
-    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
-  ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
-  out: [
-    "external/perfetto/src/ipc/test/client_unittest_messages.ipc.h",
-    "external/perfetto/src/ipc/test/client_unittest_messages.pb.h",
-    "external/perfetto/src/ipc/test/deferred_unittest_messages.ipc.h",
-    "external/perfetto/src/ipc/test/deferred_unittest_messages.pb.h",
-    "external/perfetto/src/ipc/test/greeter_service.ipc.h",
-    "external/perfetto/src/ipc/test/greeter_service.pb.h",
-  ],
-  export_include_dirs: [
-    ".",
+    "external/perfetto/protos/ftrace/ftrace_event.pb.cc",
+    "external/perfetto/protos/ftrace/ftrace_event_bundle.pb.cc",
+    "external/perfetto/protos/ftrace/print.pb.cc",
+    "external/perfetto/protos/ftrace/sched_switch.pb.cc",
+    "external/perfetto/protos/ftrace/test_bundle_wrapper.pb.cc",
   ],
 }
 
@@ -429,27 +465,22 @@ cc_genrule {
   ],
 }
 
-// GN target: //src/protozero:testing_messages_lite_gen
+// GN target: //protos/tracing_service:lite_gen
 cc_genrule {
-  name: "perfetto_src_protozero_testing_messages_lite_gen_headers",
+  name: "perfetto_protos_tracing_service_lite_gen",
   srcs: [
-    "src/protozero/test/example_proto/library.proto",
-    "src/protozero/test/example_proto/library_internals/galaxies.proto",
-    "src/protozero/test/example_proto/test_messages.proto",
-    "src/protozero/test/example_proto/upper_import.proto",
+    "protos/tracing_service/data_source_config.proto",
+    "protos/tracing_service/data_source_descriptor.proto",
+    "protos/tracing_service/trace_config.proto",
   ],
   tools: [
     "aprotoc",
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
-    "external/perfetto/src/protozero/test/example_proto/library.pb.h",
-    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pb.h",
-    "external/perfetto/src/protozero/test/example_proto/test_messages.pb.h",
-    "external/perfetto/src/protozero/test/example_proto/upper_import.pb.h",
-  ],
-  export_include_dirs: [
-    ".",
+    "external/perfetto/protos/tracing_service/data_source_config.pb.cc",
+    "external/perfetto/protos/tracing_service/data_source_descriptor.pb.cc",
+    "external/perfetto/protos/tracing_service/trace_config.pb.cc",
   ],
 }
 
@@ -480,28 +511,40 @@ cc_genrule {
   ],
 }
 
-// GN target: //src/tracing:ipc_protos_gen
-cc_genrule {
-  name: "perfetto_src_tracing_ipc_protos_gen_headers",
+// GN target: //src/protozero/protoc_plugin:protoc_plugin(//gn/standalone/toolchain:gcc_like_host)
+cc_binary_host {
+  name: "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
   srcs: [
-    "src/tracing/ipc/data_source_config.proto",
-    "src/tracing/ipc/data_source_descriptor.proto",
-    "src/tracing/ipc/producer_port.proto",
+    "src/protozero/protoc_plugin/protozero_generator.cc",
+    "src/protozero/protoc_plugin/protozero_plugin.cc",
+  ],
+  shared_libs: [
+    "libprotoc",
+    "libunwind",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+}
+
+// GN target: //src/protozero:testing_messages_zero_gen
+cc_genrule {
+  name: "perfetto_src_protozero_testing_messages_zero_gen",
+  srcs: [
+    "src/protozero/test/example_proto/library.proto",
+    "src/protozero/test/example_proto/library_internals/galaxies.proto",
+    "src/protozero/test/example_proto/test_messages.proto",
+    "src/protozero/test/example_proto/upper_import.proto",
   ],
   tools: [
     "aprotoc",
-    "perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
   ],
-  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_ipc_protoc_plugin_ipc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=:$(genDir)/external/perfetto $(in)",
+  cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
   out: [
-    "external/perfetto/src/tracing/ipc/data_source_config.ipc.h",
-    "external/perfetto/src/tracing/ipc/data_source_config.pb.h",
-    "external/perfetto/src/tracing/ipc/data_source_descriptor.ipc.h",
-    "external/perfetto/src/tracing/ipc/data_source_descriptor.pb.h",
-    "external/perfetto/src/tracing/ipc/producer_port.ipc.h",
-    "external/perfetto/src/tracing/ipc/producer_port.pb.h",
-  ],
-  export_include_dirs: [
-    ".",
+    "external/perfetto/src/protozero/test/example_proto/library.pbzero.cc",
+    "external/perfetto/src/protozero/test/example_proto/library_internals/galaxies.pbzero.cc",
+    "external/perfetto/src/protozero/test/example_proto/test_messages.pbzero.cc",
+    "external/perfetto/src/protozero/test/example_proto/upper_import.pbzero.cc",
   ],
 }
