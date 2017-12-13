@@ -146,13 +146,9 @@ class SharedMemoryABI {
   // See PageLayout below.
   static constexpr size_t kMaxChunksPerPage = 14;
 
-  // Each TrackePacket in the Chunk is prefixed by 2 bytes stating its size.
-  // This limits the max chunk (and in turn, page) size. This does NOT limit
-  // the size of a TracePacket, because large packets can still be split across
-  // several chunks.
-  using PacketHeaderType = uint16_t;
-  static constexpr size_t kPacketHeaderSize = sizeof(PacketHeaderType);
-  static constexpr size_t kMaxPageSize = 1ul << (8 * kPacketHeaderSize);
+  // Each TrackePacket in the Chunk is prefixed by a 4 bytes reundant VarInt
+  // (see Protobuf varint) stating its size.
+  static constexpr size_t kPacketHeaderSize = 4;
 
   // Chunk states and transitions:
   //       kFree  <------------------+
@@ -230,14 +226,14 @@ class SharedMemoryABI {
   // | Also has a seq number to reassemble fragments.    |
   // +***************************************************+
   // +---------------------------------------------------+
-  // | Packet #0 size [2 bytes]                          |
+  // | Packet #0 size [varint, up to 4 bytes]            |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
   // | Packet #0 payload                                 |
   // | A TracePacket protobuf message                    |
   // +---------------------------------------------------+
   //                         ...
   // +---------------------------------------------------+
-  // | Packet #N size [2 bytes]                          |
+  // | Packet #N size [varint, up to 4 bytes]            |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
   // | Packet #N payload                                 |
   // | A TracePacket protobuf message                    |

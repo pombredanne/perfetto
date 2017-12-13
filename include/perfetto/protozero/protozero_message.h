@@ -59,12 +59,20 @@ class ProtoZeroMessage {
 
   // Optional. If is_valid() == true, the corresponding memory region (its
   // length == proto_utils::kMessageLengthFieldSize) is backfilled with the size
-  // of this message. This is the mechanism used by messages to backfill their
-  // corresponding size field in the parent message.
-  ContiguousMemoryRange size_field() const { return size_field_; }
-  void set_size_field(const ContiguousMemoryRange& reserved_range) {
-    size_field_ = reserved_range;
+  // of this message (minus |size_already_written| below). This is the mechanism
+  // used by messages to backfill their corresponding size field in the parent
+  // message.
+  uint8_t* size_field() const { return size_field_; }
+  void set_size_field(uint8_t* size_field) {
+    size_field_ = size_field;
   }
+
+  // This is to deal with case of backfilling the size of a root (non-nested)
+  // message which is split into multiple chunks. Upon finalization only the
+  // partial size that lies in the last chunk has to be backfilled.
+  void inc_size_already_written(uint32_t sz) { size_already_written_ += sz; }
+
+  ProtoZeroMessage* nested_message() { return nested_message_; }
 
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   void set_handle(ProtoZeroMessageHandleBase* handle) { handle_ = handle; }
@@ -172,11 +180,15 @@ class ProtoZeroMessage {
   // Keeps track of the size of the current message.
   size_t size_;
 
-  ContiguousMemoryRange size_field_;
+  uint8_t* size_field_;
+
+  // See comment for inc_size_already_written().
+  uint32_t size_already_written_;
 
   // Used to detect attemps to create messages with a nesting level >
   // kMaxNestingDepth. |nesting_depth_| == 0 for root (non-nested) messages.
   uint8_t nesting_depth_;
+
 
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   // When true, no more changes to the message are allowed. This is to DCHECK
@@ -193,6 +205,8 @@ class ProtoZeroMessage {
   // nested messages are finalized and sealed when any other field is set in the
   // parent message (or the parent message itself is finalized) and cannot be
   // accessed anymore afterwards.
+  // TODO(primiano): optimization: I think that nested_message_, when non-null.
+  // will always be @ (this) + offsetof(nested_messages_arena_).
   ProtoZeroMessage* nested_message_;
 
   // The root message owns the storage for all its nested messages, up to a max
