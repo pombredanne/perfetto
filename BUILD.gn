@@ -14,8 +14,6 @@
 
 import("gn/perfetto.gni")
 
-# Hello world.
-
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
