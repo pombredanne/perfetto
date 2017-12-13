@@ -115,6 +115,7 @@ format:
 	field:char field_a[16];	offset:8;	size:16;	signed:0;
 	field:int field_b;	offset:24;	size:4;	signed:1;
 	field:int field_d;	offset:28;	size:4;	signed:1;
+	field:u32 field_e;	offset:32;	size:4;	signed:0;
 
 print fmt: "some format")"));
   ;
@@ -160,6 +161,17 @@ print fmt: "some format")"));
       field->ftrace_type = kFtraceCString;
       field->ftrace_name = "field_c";
     }
+
+    {
+      // We should get this field.
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->proto_field_id = 504;
+      // TODO(hjd): Remove.
+      field->proto_field_type = kProtoUint64;
+      field->ftrace_type = kFtraceUint32;
+      field->ftrace_name = "field_e";
+    }
   }
 
   {
@@ -181,11 +193,18 @@ print fmt: "some format")"));
   auto event = table->GetEventById(42);
   EXPECT_EQ(event->ftrace_event_id, 42ul);
   EXPECT_EQ(event->proto_field_id, 21ul);
-  // We only collect size for events we parse so this doesn't count field d.
-  EXPECT_EQ(event->size, 28u);
+  EXPECT_EQ(event->size, 36u);
   EXPECT_EQ(std::string(event->name), "foo");
   EXPECT_EQ(std::string(event->group), "group");
-  EXPECT_EQ(event->fields.size(), 1ul);
+
+  ASSERT_EQ(event->fields.size(), 2ul);
+  auto field_a = event->fields.at(0);
+  EXPECT_EQ(field_a.proto_field_id, 501ul);
+  EXPECT_EQ(field_a.strategy, kFixedCStringToString);
+
+  auto field_e = event->fields.at(1);
+  EXPECT_EQ(field_e.proto_field_id, 504ul);
+  EXPECT_EQ(field_e.strategy, kUint32ToUint64);
 }
 
 TEST(TranslationTable, Getters) {

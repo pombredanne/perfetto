@@ -56,6 +56,7 @@ enum FtraceFieldType {
 // into the ProtoFieldType.
 enum TranslationStrategy {
   kUint32ToUint32 = 1,
+  kUint32ToUint64,
   kUint64ToUint64,
   kFixedCStringToString,
   kCStringToString,

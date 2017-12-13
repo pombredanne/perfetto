@@ -26,11 +26,10 @@ TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
   for (const Event& event : events) {
     // For each event the following fields should be filled
     // statically:
-    // Non-empty name.
+
+    // Non-empty name, group, and proto field id.
     ASSERT_TRUE(event.name);
-    // Non-empty group.
     ASSERT_TRUE(event.group);
-    // Non-zero proto field id.
     ASSERT_TRUE(event.proto_field_id);
 
     // Ftrace id and size should be zeroed.
@@ -38,12 +37,11 @@ TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
     ASSERT_FALSE(event.size);
 
     for (const Field& field : event.fields) {
-      // Non-empty name.
+      // Non-empty name, proto field id, and proto field type.
       ASSERT_TRUE(field.ftrace_name);
-      // Non-zero proto field id.
       ASSERT_TRUE(field.proto_field_id);
-      // Should have set the proto field type.
       ASSERT_TRUE(field.proto_field_type);
+
       // Other fields should be zeroed.
       ASSERT_FALSE(field.ftrace_offset);
       ASSERT_FALSE(field.ftrace_size);
@@ -57,12 +55,11 @@ TEST(EventInfoTest, GetStaticEventInfoSanityCheck) {
 TEST(EventInfoTest, GetStaticCommonFieldsInfoSanityCheck) {
   std::vector<Field> fields = GetStaticCommonFieldsInfo();
   for (const Field& field : fields) {
-    // Non-empty name.
+    // Non-empty name, group, and proto field id.
     ASSERT_TRUE(field.ftrace_name);
-    // Non-zero proto field id.
     ASSERT_TRUE(field.proto_field_id);
-    // Should have set the proto field type.
     ASSERT_TRUE(field.proto_field_type);
+
     // Other fields should be zeroed.
     ASSERT_FALSE(field.ftrace_offset);
     ASSERT_FALSE(field.ftrace_size);

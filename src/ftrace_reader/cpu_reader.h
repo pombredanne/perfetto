@@ -93,8 +93,7 @@ class CpuReader {
                              size_t field_id,
                              protozero::ProtoZeroMessage* out) {
     T t;
-    memcpy(reinterpret_cast<void*>(&t), reinterpret_cast<const void*>(start),
-           sizeof(T));
+    memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
     out->AppendVarInt<T>(field_id, t);
   }
 

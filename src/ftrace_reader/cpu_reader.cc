@@ -233,6 +233,8 @@ bool CpuReader::ParsePage(size_t cpu,
   return true;
 }
 
+// |start| is the start of the current event.
+// |end| is the end of the buffer.
 bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* start,
                            const uint8_t* end,
@@ -246,8 +248,10 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   // TODO(hjd): Test truncated events.
   // If the end of the buffer is before the end of the event give up.
-  if (length < info.size)
+  if (info.size > length) {
+    PERFETTO_DCHECK(false);
     return false;
+  }
 
   for (const Field& field : table->common_fields())
     ParseField(field, start, end, message);
@@ -279,6 +283,7 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint32ToUint32:
+    case kUint32ToUint64:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kUint64ToUint64:
