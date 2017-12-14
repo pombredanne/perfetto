@@ -146,8 +146,8 @@ class SharedMemoryABI {
   // See PageLayout below.
   static constexpr size_t kMaxChunksPerPage = 14;
 
-  // Each TrackePacket in the Chunk is prefixed by a 4 bytes reundant VarInt
-  // (see Protobuf varint) stating its size.
+  // Each TrackePacket in the Chunk is prefixed by a 4 bytes redundant VarInt
+  // (see proto_utils.h) stating its size.
   static constexpr size_t kPacketHeaderSize = 4;
 
   // Chunk states and transitions:

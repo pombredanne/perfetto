@@ -23,7 +23,6 @@ source_set("tracing") {
   deps = [
     "../../gn:default_deps",
     "../../protos:lite",
-    "../../protos:zero",
     "../base",
   ]
   sources = [
@@ -34,12 +33,8 @@ source_set("tracing") {
     "core/service_impl.cc",
     "core/service_impl.h",
     "core/shared_memory_abi.cc",
-    "core/shared_memory_arbiter.cc",
-    "core/shared_memory_arbiter.h",
     "core/trace_config.cc",
     "core/trace_packet.cc",
-    "core/trace_writer_impl.cc",
-    "core/trace_writer_impl.h",
   ]
 }
 
