@@ -56,50 +56,51 @@ Chunk SharedMemoryArbiter::GetNewChunk(
     // SharedMemoryABI. But let's not be too adventurous for the moment.
     {
       std::lock_guard<std::mutex> scoped_lock(lock_);
-
       const size_t initial_page_idx = page_idx_;
-      do {
+      for (size_t i = 0; i < shmem_.num_pages(); i++) {
+        page_idx_ = (initial_page_idx + i) % shmem_.num_pages();
         bool is_new_page = false;
         auto layout = kDefaultLayout;  // TODO(primiano): make dynamic.
-        size_t tbuf = target_buffer;
         if (shmem_.is_page_free(page_idx_)) {
           // TODO(primiano): Use the |size_hint| here to decide the layout.
           is_new_page =
               shmem_.TryPartitionPage(page_idx_, layout, target_buffer);
         }
         uint32_t free_chunks;
+        size_t tbuf;
         if (is_new_page) {
           free_chunks = (1 << SharedMemoryABI::kNumChunksForLayout[layout]) - 1;
+          tbuf = target_buffer;
         } else {
           free_chunks = shmem_.GetFreeChunks(page_idx_);
-          tbuf = shmem_.GetTargetBuffer(page_idx_);
+          tbuf = shmem_.page_header(page_idx_)->target_buffer.load(
+              std::memory_order_relaxed);
         }
         PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
                       page_idx_, free_chunks, tbuf);
 
-        if (tbuf == target_buffer) {
-          for (uint32_t chunk_idx = 0; free_chunks;
-               chunk_idx++, free_chunks >>= 1) {
-            if (free_chunks & 1) {
-              // We found a free chunk.
-              Chunk chunk = shmem_.TryAcquireChunkForWriting(
-                  page_idx_, chunk_idx, tbuf, &header);
-              if (chunk.is_valid()) {
-                PERFETTO_DCHECK(chunk.is_valid());
-                PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
-                return chunk;
-              }
-            }
-          }
+        if (tbuf != target_buffer)
+          continue;
+
+        for (uint32_t chunk_idx = 0; free_chunks;
+             chunk_idx++, free_chunks >>= 1) {
+          if (!(free_chunks & 1))
+            continue;
+          // We found a free chunk.
+          Chunk chunk = shmem_.TryAcquireChunkForWriting(page_idx_, chunk_idx,
+                                                         tbuf, &header);
+          if (!chunk.is_valid())
+            continue;
+          PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
+          return chunk;
         }
         // TODO: we should have some policy to guarantee fairness of the SMB
         // page allocator w.r.t |target_buffer|? Or is the SMB best-effort. All
         // chunk in the page are busy (either kBeingRead or kBeingWritten), or
         // all the pages are assigned to a different target buffer. Try with the
         // next page.
-        page_idx_ = (page_idx_ + 1) % shmem_.num_pages();
-      } while (page_idx_ != initial_page_idx);
-    }
+      }
+    }  // std::lock_guard<std::mutex>
     // All chunks are taken (either kBeingWritten by us or kBeingRead by the
     // Service). TODO: at this point we should return a bankrupcy chunk, not
     // crash the process.
@@ -113,7 +114,6 @@ void SharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     size_t page_index = shmem_.ReleaseChunkAsComplete(std::move(chunk));
-
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
       pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
       if (!scheduled_notification_) {

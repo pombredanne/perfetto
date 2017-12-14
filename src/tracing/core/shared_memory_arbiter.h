@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACING_CORE_PRODUCER_SHARED_MEMORY_ARBITER_H_
-#define SRC_TRACING_CORE_PRODUCER_SHARED_MEMORY_ARBITER_H_
+#ifndef SRC_TRACING_CORE_SHARED_MEMORY_ARBITER_H_
+#define SRC_TRACING_CORE_SHARED_MEMORY_ARBITER_H_
 
 #include <stdint.h>
 
@@ -96,4 +96,4 @@ class SharedMemoryArbiter {
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACING_CORE_PRODUCER_SHARED_MEMORY_ARBITER_H_
+#endif  // SRC_TRACING_CORE_SHARED_MEMORY_ARBITER_H_

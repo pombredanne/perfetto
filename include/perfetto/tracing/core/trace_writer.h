@@ -51,7 +51,9 @@ class TraceWriter {
 
   // Returns a handle to the root proto message for the trace. The message will
   // be finalized either by calling directly handle.Finalize() or by letting the
-  // handle go out of scope.
+  // handle go out of scope. The returned handle can be std::move()'d but cannot
+  // be used after either: (i) the TraceWriter instance is destroyed, (ii) a
+  // subsequence NewTracePacket() call is made on the same TraceWriter instance.
   virtual TracePacketHandle NewTracePacket() = 0;
 
  private:

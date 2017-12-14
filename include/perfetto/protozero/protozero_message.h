@@ -23,6 +23,7 @@
 
 #include <type_traits>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/protozero/contiguous_memory_range.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/protozero/protozero_message_handle.h"
@@ -63,9 +64,7 @@ class ProtoZeroMessage {
   // used by messages to backfill their corresponding size field in the parent
   // message.
   uint8_t* size_field() const { return size_field_; }
-  void set_size_field(uint8_t* size_field) {
-    size_field_ = size_field;
-  }
+  void set_size_field(uint8_t* size_field) { size_field_ = size_field; }
 
   // This is to deal with case of backfilling the size of a root (non-nested)
   // message which is split into multiple chunks. Upon finalization only the
@@ -73,6 +72,8 @@ class ProtoZeroMessage {
   void inc_size_already_written(uint32_t sz) { size_already_written_ += sz; }
 
   ProtoZeroMessage* nested_message() { return nested_message_; }
+
+  bool is_finalized() const { return finalized_; }
 
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   void set_handle(ProtoZeroMessageHandleBase* handle) { handle_ = handle; }
@@ -102,7 +103,7 @@ class ProtoZeroMessage {
   // Proto types: bool, enum (small).
   // Faster version of AppendVarInt for tiny numbers.
   void AppendTinyVarInt(uint32_t field_id, int32_t value) {
-    assert(0 <= value && value < 0x80);
+    PERFETTO_DCHECK(0 <= value && value < 0x80);
     if (nested_message_)
       EndNestedMessage();
 
@@ -162,10 +163,8 @@ class ProtoZeroMessage {
   void EndNestedMessage();
 
   void WriteToStream(const uint8_t* src_begin, const uint8_t* src_end) {
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
-    assert(!sealed_);
-#endif
-    assert(src_begin < src_end);
+    PERFETTO_DCHECK(!finalized_);
+    PERFETTO_DCHECK(src_begin < src_end);
     const size_t size = static_cast<size_t>(src_end - src_begin);
     stream_writer_->WriteBytes(src_begin, size);
     size_ += size;
@@ -189,12 +188,11 @@ class ProtoZeroMessage {
   // kMaxNestingDepth. |nesting_depth_| == 0 for root (non-nested) messages.
   uint8_t nesting_depth_;
 
-
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   // When true, no more changes to the message are allowed. This is to DCHECK
   // attempts of writing to a message which has been Finalize()-d.
-  bool sealed_;
+  uint8_t finalized_;
 
+#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   ProtoZeroMessageHandleBase* handle_;
 #endif
 

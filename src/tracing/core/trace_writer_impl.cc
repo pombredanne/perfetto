@@ -32,6 +32,7 @@
 
 using protozero::proto_utils::kMessageLengthFieldSize;
 using protozero::proto_utils::WriteRedundantVarInt;
+using ChunkHeader = perfetto::SharedMemoryABI::ChunkHeader;
 
 namespace perfetto {
 
@@ -39,9 +40,6 @@ namespace {
 constexpr size_t kPacketHeaderSize = SharedMemoryABI::kPacketHeaderSize;
 }  // namespace
 
-// TODO: we should figure out a way to ensure that the caller doesn't keep
-// a TracePacket alive after the TraceWriter (or the full shared memory buffer)
-// have been destroyed.
 TraceWriterImpl::TraceWriterImpl(SharedMemoryArbiter* shmem_arbiter,
                                  WriterID id,
                                  BufferID target_buffer)
@@ -61,10 +59,12 @@ TraceWriterImpl::~TraceWriterImpl() = default;
 TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // If we hit this, the caller is calling NewTracePacket() without having
   // finalized the previous packet.
-  PERFETTO_DCHECK(!fragmenting_packet_);
+  PERFETTO_DCHECK(cur_packet_->is_finalized());
+
   fragmenting_packet_ = false;
 
-  // TODO: hack to get a new page every time.
+  // TODO: hack to get a new page every time and reduce fragmentation (that
+  // requires stitching support in the service).
   protobuf_stream_writer_.Reset(GetNewBuffer());
 
   // Reserve space for the size of the message. Note: this call might re-enter
@@ -72,15 +72,15 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // this is the very first call to NewTracePacket().
   static_assert(
       kPacketHeaderSize == kMessageLengthFieldSize,
-      "The packet header must match the ProtoZero message header size");
+      "The packet header must match the ProtoZeroMessage header size");
   cur_packet_->Reset(&protobuf_stream_writer_);
   uint8_t* header = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
   memset(header, 0, kPacketHeaderSize);
   cur_packet_->set_size_field(header);
-  cur_chunk_.IncrementPacketCount();
+  cur_chunk_.increment_packet_count();
   TracePacketHandle handle(cur_packet_.get());
-  fragmenting_packet_ = true;
   cur_packet_start_ = protobuf_stream_writer_.write_ptr();
+  fragmenting_packet_ = true;
   return handle;
 }
 
@@ -89,9 +89,9 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
 // when |fragmenting_packet_| == true. In this case we want to update the
 // chunk header with a partial packet and start a new partial packet in the
 // new chunk.
-// 2. While trying to reserve the packet header at the beginning of
-// NewTracePacket(). In this case |fragmenting_packet_| == false and we
-// just want a new chunk without creating any fragments.
+// 2. While calling ReserveBytes() for the packet header in NewTracePacket().
+// In this case |fragmenting_packet_| == false and we just want a new chunk
+// without creating any fragments.
 protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   if (fragmenting_packet_) {
     uint8_t* const wptr = protobuf_stream_writer_.write_ptr();
@@ -99,11 +99,15 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     uint32_t partial_size = static_cast<uint32_t>(wptr - cur_packet_start_);
     PERFETTO_DCHECK(partial_size < cur_chunk_.size());
 
-    WriteRedundantVarInt(partial_size, cur_packet_->size_field());
+    // Backfill the packet header with the fragment size.
     cur_packet_->inc_size_already_written(partial_size);
-    cur_chunk_.IncrementPacketCount(true /* kLastPacketContinuesOnNextChunk */);
+    cur_chunk_.set_flag(ChunkHeader::kLastPacketContinuesOnNextChunk);
+    WriteRedundantVarInt(partial_size, cur_packet_->size_field());
 
-    // TODO(primiano): this logic requires proper testing.
+    // Descend in the stack of non-finalized nested submessages (if any) and
+    // detour their |size_field| into the |patch_list_|. At this point we have
+    // to release the chunk and they cannot write anymore into that.
+    // TODO(primiano): add tests to cover this logic.
     for (auto* nested_msg = cur_packet_->nested_message(); nested_msg;
          nested_msg = nested_msg->nested_message()) {
       uint8_t* const cur_hdr = nested_msg->size_field();
@@ -121,21 +125,20 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     shmem_arbiter_->ReturnCompletedChunk(std::move(cur_chunk_));
 
   // Start a new chunk.
-  SharedMemoryABI::ChunkHeader::Identifier identifier = {};
+  ChunkHeader::Identifier identifier = {};
   identifier.writer_id = id_;
   identifier.chunk_id = cur_chunk_id_++;
 
-  SharedMemoryABI::ChunkHeader::PacketsState packets_state = {};
+  ChunkHeader::PacketsState packets_state = {};
   if (fragmenting_packet_) {
     packets_state.count = 1;
-    packets_state.flags =
-        SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
+    packets_state.flags = ChunkHeader::kFirstPacketContinuesFromPrevChunk;
   }
 
   // The memory order of the stores below doesn't really matter. This |header|
-  // is just a temporary object and GetNewChunk() will copy it into the shared
-  // buffer with the proper barriers.
-  SharedMemoryABI::ChunkHeader header = {};
+  // is just a local temporary object. The GetNewChunk() call below will copy it
+  // into the shared buffer with the proper barriers.
+  ChunkHeader header = {};
   header.identifier.store(identifier, std::memory_order_relaxed);
   header.packets.store(packets_state, std::memory_order_relaxed);
 
@@ -143,6 +146,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   uint8_t* payload_begin = cur_chunk_.payload_begin();
   if (fragmenting_packet_) {
     cur_packet_->set_size_field(payload_begin);
+    memset(payload_begin, 0, kPacketHeaderSize);
     payload_begin += kPacketHeaderSize;
     cur_packet_start_ = payload_begin;
   }

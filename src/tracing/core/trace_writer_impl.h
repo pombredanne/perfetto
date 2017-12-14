@@ -25,7 +25,6 @@
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
-
 namespace perfetto {
 
 class SharedMemoryArbiter;
@@ -39,10 +38,14 @@ class TraceWriterImpl : public TraceWriter,
   TraceWriterImpl(SharedMemoryArbiter*, WriterID, BufferID);
   ~TraceWriterImpl() override;
 
-  // TraceWriter implementation.
+  // TraceWriter implementation. See documentation in trace_writer.h .
   TracePacketHandle NewTracePacket() override;
 
  private:
+  // Used to handle the backfilling of the headers (the |size_field|) of nested
+  // messages when a proto is fragmented over several chunks. This patchlist is
+  // sent out of band to the tracing service, after having returned the initial
+  // chunks of the fragment.
   struct Patch {
     Patch(uint16_t chunk_id, uint16_t offset);
     Patch(const Patch&) = delete;
@@ -71,14 +74,14 @@ class TraceWriterImpl : public TraceWriter,
   // See comments in data_source_config.proto for |target_buffer\.
   const BufferID target_buffer_;
 
-  // Monotonic sequence id of the chunk. Together with the WriterID this allows
-  // the Service to to reconstruct the linear sequence of packets.
+  // Monotonic (% wrapping) sequence id of the chunk. Together with the WriterID
+  // this allows the Service to to reconstruct the linear sequence of packets.
   uint16_t cur_chunk_id_ = 0;
 
   // The chunk we are holding onto (if any).
   SharedMemoryABI::Chunk cur_chunk_;
 
-  // SSW passed to protozero message to write directly into |cur_chunk_|. It
+  // Passed to protozero message to write directly into |cur_chunk_|. It
   // keeps track of the write pointer. It calls us back (GetNewBuffer()) when
   // |cur_chunk_| is filled.
   protozero::ScatteredStreamWriter protobuf_stream_writer_;
@@ -87,14 +90,13 @@ class TraceWriterImpl : public TraceWriter,
   // TracePacketHandle has just a pointer to it.
   std::unique_ptr<protos::pbzero::TracePacket> cur_packet_;
 
-  // The start address, within |cur_cunk_| bounds, of |cur_packet_|. Used to
-  // figure out fragments sizes when a TracePacket write is interrupted by
-  // GetNewBuffer().
+  // The start address, within |cur_cunk_|, of |cur_packet_|. Used to figure out
+  // fragments sizes when a TracePacket write is interrupted by GetNewBuffer().
   uint8_t* cur_packet_start_ = 0;
 
-  // true if we received a call to NewTracePacket() and the caller has not
-  // finalized/destroyed the returned handle (i.e. the caller is still writing
-  // on the TracePacket).
+  // true if we received a call to GetNewBuffer() after NewTracePacket(),
+  // false if GetNewBuffer() happened during NewTracePacket() prologue, while
+  // starting the TracePacket header.
   bool fragmenting_packet_ = false;
 
   // When a packet is fragmented across different chunks, the |size_field| of

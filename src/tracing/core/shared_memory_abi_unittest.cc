@@ -151,11 +151,14 @@ TEST_P(SharedMemoryABITest, NominalCases) {
       ASSERT_EQ(std::make_pair(packets_count, flags),
                 chunk.GetPacketCountAndFlags());
 
-      chunk.IncrementPacketCount(false);
+      chunk.increment_packet_count();
       ASSERT_EQ(packets_count + 1, chunk.header()->packets.load().count);
 
-      chunk.IncrementPacketCount(true);
+      chunk.increment_packet_count();
       ASSERT_EQ(packets_count + 2, chunk.header()->packets.load().count);
+
+      chunk.set_flag(
+          SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);
       ASSERT_TRUE(
           chunk.header()->packets.load().flags &
           SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);

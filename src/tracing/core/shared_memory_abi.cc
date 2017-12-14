@@ -329,21 +329,6 @@ std::pair<uint16_t, uint8_t> SharedMemoryABI::Chunk::GetPacketCountAndFlags() {
   return std::make_pair(state.count, state.flags);
 }
 
-void SharedMemoryABI::Chunk::IncrementPacketCount(bool last_packet_is_partial) {
-  // A chunk state is supposed to be modified only by the Producer and only by
-  // one thread. There is no need of CAS here (if the caller behaves properly).
-  ChunkHeader* chunk_header = header();
-  auto packets = chunk_header->packets.load(std::memory_order_relaxed);
-  packets.count++;
-  if (last_packet_is_partial)
-    packets.flags |= ChunkHeader::kLastPacketContinuesOnNextChunk;
-
-  // This needs to be a release store because if the Service sees this, it also
-  // has to be guaranteed to see all the previous stores for the protobuf packet
-  // bytes.
-  chunk_header->packets.store(packets, std::memory_order_release);
-}
-
 std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(
     const Chunk& chunk) {
   PERFETTO_DCHECK(chunk.is_valid());
