@@ -54,7 +54,9 @@ TraceWriterImpl::TraceWriterImpl(SharedMemoryArbiter* shmem_arbiter,
   cur_packet_.reset(new protos::pbzero::TracePacket());
 }
 
-TraceWriterImpl::~TraceWriterImpl() = default;
+TraceWriterImpl::~TraceWriterImpl() {
+  shmem_arbiter_->ReleaseWriterID(id_);
+}
 
 TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   // If we hit this, the caller is calling NewTracePacket() without having
@@ -153,6 +155,10 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
 
   return protozero::ContiguousMemoryRange{payload_begin, cur_chunk_.end()};
 }
+
+WriterID TraceWriterImpl::writer_id() const {
+  return id_;
+};
 
 TraceWriterImpl::Patch::Patch(uint16_t cid, uint16_t offset)
     : chunk_id(cid), offset_in_chunk(offset) {}

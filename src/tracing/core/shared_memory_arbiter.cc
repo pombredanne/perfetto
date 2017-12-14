@@ -26,7 +26,6 @@ namespace perfetto {
 
 namespace {
 constexpr size_t kMaxWriterID = SharedMemoryABI::kMaxWriterID;
-constexpr auto kDefaultLayout = SharedMemoryABI::PageLayout::kPageDiv1;
 
 WriterID NextID(WriterID id) {
   return id < kMaxWriterID ? id + 1 : 1;
@@ -34,6 +33,10 @@ WriterID NextID(WriterID id) {
 }  // namespace
 
 using Chunk = SharedMemoryABI::Chunk;
+
+// static
+SharedMemoryABI::PageLayout SharedMemoryArbiter::default_page_layout =
+    SharedMemoryABI::PageLayout::kPageDiv1;
 
 SharedMemoryArbiter::SharedMemoryArbiter(void* start,
                                          size_t size,
@@ -60,7 +63,10 @@ Chunk SharedMemoryArbiter::GetNewChunk(
       for (size_t i = 0; i < shmem_.num_pages(); i++) {
         page_idx_ = (initial_page_idx + i) % shmem_.num_pages();
         bool is_new_page = false;
-        auto layout = kDefaultLayout;  // TODO(primiano): make dynamic.
+
+        // TODO(primiano): make the page layout dynamic.
+        auto layout = SharedMemoryArbiter::default_page_layout;
+
         if (shmem_.is_page_free(page_idx_)) {
           // TODO(primiano): Use the |size_hint| here to decide the layout.
           is_new_page =
@@ -143,8 +149,9 @@ void SharedMemoryArbiter::InvokeOnPageCompleteCallback() {
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiter::CreateTraceWriter(
     BufferID target_buffer) {
+  const WriterID id = AcquireWriterID();
   return std::unique_ptr<TraceWriter>(
-      new TraceWriterImpl(this, AcquireWriterID(), target_buffer));
+      id ? new TraceWriterImpl(this, id, target_buffer) : nullptr);
 }
 
 WriterID SharedMemoryArbiter::AcquireWriterID() {
@@ -167,7 +174,6 @@ WriterID SharedMemoryArbiter::AcquireWriterID() {
       return id;
     }
   }
-  PERFETTO_DCHECK(false);
   return 0;
 }
 

@@ -40,6 +40,7 @@ class TraceWriterImpl : public TraceWriter,
 
   // TraceWriter implementation. See documentation in trace_writer.h .
   TracePacketHandle NewTracePacket() override;
+  WriterID writer_id() const override;
 
  private:
   // Used to handle the backfilling of the headers (the |size_field|) of nested

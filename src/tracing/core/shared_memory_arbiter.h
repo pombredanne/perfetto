@@ -42,6 +42,8 @@ class TaskRunner;
 // current thread-local chunk.
 class SharedMemoryArbiter {
  public:
+  // Exposed to allow tests to change it.
+
   using OnPageCompleteCallback =
       std::function<void(const std::vector<uint32_t>&)>;
 
@@ -67,12 +69,21 @@ class SharedMemoryArbiter {
   // Creates a new TraceWriter and assigns it a new WriterID. The WriterID is
   // written in each chunk header owned by a given TraceWriter and is used by
   // the Service to reconstruct reorder TracePackets written by the same
-  // TraceWriter. CHECK(s) if all WriterID slots are exhausted.
-  // TODO: instad of crashing this should return a NoopWriter.
+  // TraceWriter. Returns nullptr if all WriterID slots are exhausted.
+  // TODO: instad of nullptr this should return a NoopWriter.
   std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID target_buffer = 0);
 
+  SharedMemoryABI* shmem_abi_for_testing() { return &shmem_; }
+
+  static void set_default_layout_for_testing(SharedMemoryABI::PageLayout l) {
+    default_page_layout = l;
+  }
+
  private:
-  friend class TraceWriter;
+  friend class TraceWriterImpl;
+
+  static SharedMemoryABI::PageLayout default_page_layout;
+
   SharedMemoryArbiter(const SharedMemoryArbiter&) = delete;
   SharedMemoryArbiter& operator=(const SharedMemoryArbiter&) = delete;
 

@@ -55,6 +55,7 @@ class TraceWriter {
   // be used after either: (i) the TraceWriter instance is destroyed, (ii) a
   // subsequence NewTracePacket() call is made on the same TraceWriter instance.
   virtual TracePacketHandle NewTracePacket() = 0;
+  virtual WriterID writer_id() const = 0;
 
  private:
   TraceWriter(const TraceWriter&) = delete;
