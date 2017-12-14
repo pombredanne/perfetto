@@ -146,13 +146,9 @@ class SharedMemoryABI {
   // See PageLayout below.
   static constexpr size_t kMaxChunksPerPage = 14;
 
-  // Each TrackePacket in the Chunk is prefixed by 2 bytes stating its size.
-  // This limits the max chunk (and in turn, page) size. This does NOT limit
-  // the size of a TracePacket, because large packets can still be split across
-  // several chunks.
-  using PacketHeaderType = uint16_t;
-  static constexpr size_t kPacketHeaderSize = sizeof(PacketHeaderType);
-  static constexpr size_t kMaxPageSize = 1ul << (8 * kPacketHeaderSize);
+  // Each TrackePacket in the Chunk is prefixed by a 4 bytes redundant VarInt
+  // (see proto_utils.h) stating its size.
+  static constexpr size_t kPacketHeaderSize = 4;
 
   // Chunk states and transitions:
   //       kFree  <------------------+
@@ -230,14 +226,14 @@ class SharedMemoryABI {
   // | Also has a seq number to reassemble fragments.    |
   // +***************************************************+
   // +---------------------------------------------------+
-  // | Packet #0 size [2 bytes]                          |
+  // | Packet #0 size [varint, up to 4 bytes]            |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
   // | Packet #0 payload                                 |
   // | A TracePacket protobuf message                    |
   // +---------------------------------------------------+
   //                         ...
   // +---------------------------------------------------+
-  // | Packet #N size [2 bytes]                          |
+  // | Packet #N size [varint, up to 4 bytes]            |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
   // | Packet #N payload                                 |
   // | A TracePacket protobuf message                    |
@@ -351,14 +347,24 @@ class SharedMemoryABI {
     // semantics.
     std::pair<uint16_t, uint8_t> GetPacketCountAndFlags();
 
-    // Increases |packets.count| with release-store semantics. The increment is
-    // atomic but NOT race-free (i.e. no CAS). Only the Producer is supposed to
-    // perform this increment and it is supposed to do this thread-safely. A
-    // Chunk cannot be shared by multiple threads without locking.
-    // If |last_packet_is_partial| == true it also toggles the
-    // kLastPacketContinuesOnNextChunk flag. The flag update is performed
-    // atomically with the |packets.count| update.
-    void IncrementPacketCount(bool last_packet_is_partial = false);
+    // Increases |packets.count| with release semantics (however note that the
+    // packet count is incremented before starting writing a packet).
+    // The increment is atomic but NOT race-free (i.e. no CAS). Only the
+    // Producer is supposed to perform this increment thread-safely. A Chunk
+    // cannot be shared by multiple threads without locking.
+    void increment_packet_count() {
+      ChunkHeader* chunk_header = header();
+      auto packets = chunk_header->packets.load(std::memory_order_relaxed);
+      packets.count++;
+      chunk_header->packets.store(packets, std::memory_order_release);
+    }
+
+    void set_flag(ChunkHeader::Flags flag) {
+      ChunkHeader* chunk_header = header();
+      auto packets = chunk_header->packets.load(std::memory_order_relaxed);
+      packets.flags |= static_cast<uint8_t>(flag);
+      chunk_header->packets.store(packets, std::memory_order_release);
+    }
 
    private:
     friend class SharedMemoryABI;

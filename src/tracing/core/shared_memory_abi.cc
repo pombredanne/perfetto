@@ -83,7 +83,6 @@ SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
 
   PERFETTO_CHECK(page_size >= 4096);
   PERFETTO_CHECK(page_size % 4096 == 0);
-  PERFETTO_CHECK(page_size <= kMaxPageSize);
   PERFETTO_CHECK(reinterpret_cast<uintptr_t>(start) % page_size == 0);
   PERFETTO_CHECK(size % page_size == 0);
 }
@@ -328,21 +327,6 @@ SharedMemoryABI::Chunk::Chunk(uint8_t* begin, size_t size)
 std::pair<uint16_t, uint8_t> SharedMemoryABI::Chunk::GetPacketCountAndFlags() {
   auto state = header()->packets.load(std::memory_order_acquire);
   return std::make_pair(state.count, state.flags);
-}
-
-void SharedMemoryABI::Chunk::IncrementPacketCount(bool last_packet_is_partial) {
-  // A chunk state is supposed to be modified only by the Producer and only by
-  // one thread. There is no need of CAS here (if the caller behaves properly).
-  ChunkHeader* chunk_header = header();
-  auto packets = chunk_header->packets.load(std::memory_order_relaxed);
-  packets.count++;
-  if (last_packet_is_partial)
-    packets.flags |= ChunkHeader::kLastPacketContinuesOnNextChunk;
-
-  // This needs to be a release store because if the Service sees this, it also
-  // has to be guaranteed to see all the previous stores for the protobuf packet
-  // bytes.
-  chunk_header->packets.store(packets, std::memory_order_release);
 }
 
 std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(
