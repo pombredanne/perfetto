@@ -79,6 +79,7 @@ source_set("tracing_unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos:lite",
+    "../../protos:zero",
     "../base",
     "../base:test_support",
   ]
@@ -89,6 +90,7 @@ source_set("tracing_unittests") {
     "core/shared_memory_abi_unittest.cc",
     "core/shared_memory_arbiter_unittest.cc",
     "core/trace_packet_unittest.cc",
+    "core/trace_writer_impl_unittest.cc",
     "ipc/posix_shared_memory_unittest.cc",
     "test/aligned_buffer_test.cc",
     "test/aligned_buffer_test.h",

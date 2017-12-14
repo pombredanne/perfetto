@@ -52,9 +52,11 @@ TraceWriterImpl::TraceWriterImpl(SharedMemoryArbiter* shmem_arbiter,
   PERFETTO_CHECK(id_ != 0);
 
   cur_packet_.reset(new protos::pbzero::TracePacket());
+  cur_packet_->Finalize();  // To avoid the DCHECK in NewTracePacket().
 }
 
 TraceWriterImpl::~TraceWriterImpl() {
+  // TODO(primiano): this should also return the current chunk. Add tests.
   shmem_arbiter_->ReleaseWriterID(id_);
 }
 

@@ -16,8 +16,6 @@
 
 #include "src/tracing/core/shared_memory_arbiter.h"
 
-#include <stdlib.h>
-
 #include "gtest/gtest.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -188,6 +186,8 @@ TEST_P(SharedMemoryArbiterTest, WriterIDsAllocation) {
     }
   }
 }
+
+// TODO(primiano): add multi-threaded tests.
 
 }  // namespace
 }  // namespace perfetto
