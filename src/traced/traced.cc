@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <string.h>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/traced/probes/probes.h"
 #include "perfetto/traced/service/service.h"
