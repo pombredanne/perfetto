@@ -219,7 +219,6 @@ cc_binary_host {
   ],
   shared_libs: [
     "libprotoc",
-    "libunwind",
   ],
   defaults: [
     "perfetto_defaults",
@@ -385,6 +384,8 @@ cc_test {
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/service_impl_unittest.cc",
+    "src/tracing/core/shared_memory_abi.cc",
+    "src/tracing/core/shared_memory_abi_unittest.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_packet_unittest.cc",
@@ -592,7 +593,6 @@ cc_binary_host {
   ],
   shared_libs: [
     "libprotoc",
-    "libunwind",
   ],
   defaults: [
     "perfetto_defaults",
