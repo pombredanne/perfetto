@@ -32,7 +32,6 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 # Default targets to translate to the blueprint file.
 default_targets = ['//:perfetto_tests', '//src/traced:traced']
@@ -467,8 +466,13 @@ def repo_root():
 def create_build_description():
     """Creates the JSON build description by running GN."""
 
-    out = tempfile.mkdtemp()
+    out = os.path.join(repo_root(), 'out', 'tmp.gen_android_bp')
     try:
+        try:
+            os.makedirs(out)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
         subprocess.check_output(
             ['gn', 'gen', out, '--args=%s' % gn_args], cwd=repo_root())
         desc = subprocess.check_output(
