@@ -98,7 +98,7 @@ class SharedMemoryArbiter {
   SharedMemoryABI shmem_;
   size_t page_idx_ = 0;
   WriterID last_writer_id_ = 0;
-  std::vector<bool> active_writer_ids_;
+  std::vector<bool> active_writer_ids_;  // TODO(primiano): use IdAllocator.
   std::vector<uint32_t> pages_to_notify_;
   bool scheduled_notification_ = false;
   OnPageCompleteCallback on_page_complete_callback_;
