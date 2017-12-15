@@ -54,16 +54,15 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field, Field* field) {
   PERFETTO_DCHECK(field->proto_field_type);
   PERFETTO_DCHECK(!field->ftrace_offset);
   PERFETTO_DCHECK(!field->ftrace_size);
-  PERFETTO_DCHECK(!field.ftrace_type);
+  PERFETTO_DCHECK(!field->ftrace_type);
 
   bool success = InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
                                  ftrace_field.is_signed, &field->ftrace_type);
   field->ftrace_offset = ftrace_field.offset;
   field->ftrace_size = ftrace_field.size;
 
-  success = success &&
-            SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
-                                   &field->strategy);
+  success &= SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                                    &field->strategy);
 
   return success;
 }
@@ -115,7 +114,11 @@ bool InferFtraceType(const std::string& type_and_name,
                      size_t size,
                      bool is_signed,
                      FtraceFieldType* out) {
-  // Fixed length strings: "char foo[16]"
+  // Fixed length strings: e.g. "char foo[16]" we don't care about the number
+  // since we get the size as it's own field. Somewhat awkwardly these fields
+  // are both fixed size and null terminated meaning that we can't just drop
+  // them directly into the protobuf (since if the string is shorter than 15
+  // charatcors we).
   if (std::regex_match(type_and_name, std::regex(R"(char \w+\[\d+\])"))) {
     *out = kFtraceFixedCString;
     return true;

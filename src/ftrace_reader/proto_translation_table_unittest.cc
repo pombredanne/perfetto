@@ -134,7 +134,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 501;
-      field->ftrace_type = kFtraceFixedCString;
+      field->proto_field_type = kProtoString;
       field->ftrace_name = "field_a";
     }
 
@@ -161,7 +161,7 @@ print fmt: "some format")"));
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->proto_field_id = 504;
-      field->ftrace_type = kFtraceUint32;
+      field->proto_field_type = kProtoUint64;
       field->ftrace_name = "field_e";
     }
   }
