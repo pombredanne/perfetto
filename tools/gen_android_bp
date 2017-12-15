@@ -128,6 +128,7 @@ class Module(object):
         self.defaults = []
         self.cflags = []
         self.local_include_dirs = []
+        self.depfile = False
 
     def to_string(self, output):
         if self.comment:
@@ -145,6 +146,7 @@ class Module(object):
         self._output_field(output, 'defaults')
         self._output_field(output, 'cflags')
         self._output_field(output, 'local_include_dirs')
+        self._output_field(output, 'depfile')
         output.append('}')
         output.append('')
 
@@ -157,6 +159,8 @@ class Module(object):
             for item in sorted(value) if sort else value:
                 output.append('    "%s",' % item)
             output.append('  ],')
+        elif isinstance(value, bool):
+            output.append('  %s: %s,' % (name, 'true' if value else 'false'))
         else:
             output.append('  %s: "%s",' % (name, value))
 
@@ -238,7 +242,7 @@ def apply_module_dependency(blueprint, desc, module, dep_name):
     """
     # Don't try to inject library/source dependencies into genrules because they
     # are not compiled in the traditional sense.
-    if module.type == 'cc_genrule':
+    if module.type == 'genrule':
         return
 
     # If the dependency refers to a library which we can replace with an Android
@@ -278,7 +282,7 @@ def make_genrules_for_action(blueprint, desc, target_name):
     GN actions are used to dynamically generate files during the build. The
     Soong equivalent is a genrule. This function turns a specific kind of
     genrule which turns .proto files into source and header files into a pair
-    equivalent cc_genrules.
+    equivalent genrules.
 
     Args:
         blueprint: Blueprint instance which is being generated.
@@ -302,14 +306,16 @@ def make_genrules_for_action(blueprint, desc, target_name):
     # generated files needs to declare two different types of dependencies --
     # source files in 'srcs' and headers in 'generated_headers' -- and it's not
     # valid to generate .h files from a source dependency and vice versa.
-    source_module = Module('cc_genrule', label_to_module_name(target_name))
+    source_module = Module('genrule', label_to_module_name(target_name))
     source_module.srcs.extend(label_to_path(src) for src in target['sources'])
     source_module.tools = ['aprotoc']
+    source_module.depfile = True
 
-    header_module = Module('cc_genrule',
+    header_module = Module('genrule',
                            label_to_module_name(target_name) + '_headers')
     header_module.srcs = source_module.srcs[:]
     header_module.tools = source_module.tools[:]
+    header_module.depfile = source_module.depfile
     header_module.export_include_dirs = ['.']
 
     # TODO(skyostil): Is there a way to avoid hardcoding the tree path here?
@@ -357,7 +363,7 @@ def make_genrules_for_action(blueprint, desc, target_name):
         plugin_args = args.plugin_out.split(':')[0]
         cmd += ['--plugin_out=%s:$(genDir)/%s' % (plugin_args, tree_path)]
 
-    cmd += ['$(in)']
+    cmd += ['--dependency_out=$(depfile)', '$(in)']
     source_module.cmd = ' '.join(cmd)
     header_module.cmd = source_module.cmd
     header_module.tools = source_module.tools[:]
@@ -401,7 +407,7 @@ def create_modules_from_target(blueprint, desc, target_name):
 
     for module in modules:
         module.comment = 'GN target: %s' % target_name
-        if module.type != 'cc_genrule':
+        if module.type != 'genrule':
             module.defaults = [defaults_module]
 
         apply_module_dependency(blueprint, desc, module, target_name)
