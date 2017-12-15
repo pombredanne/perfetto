@@ -304,6 +304,9 @@ bool CpuReader::ParseField(const Field& field,
       // TODO(hjd): Kernel-dive to check this how size:0 char fields work.
       return ReadIntoString(field_start, end, field.proto_field_id, message);
   }
+  // Not reached, for gcc.
+  PERFETTO_CHECK(false);
+  return false;
 }
 
 }  // namespace perfetto
