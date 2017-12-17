@@ -40,6 +40,7 @@ class Client;
 
 class Producer;
 class PosixSharedMemory;
+class SharedMemoryArbiter;
 
 // Exposes a Service endpoint to Producer(s), proxying all requests through a
 // IPC channel to the remote Service. This class is the glue layer between the
@@ -61,6 +62,8 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   void UnregisterDataSource(DataSourceID) override;
   void NotifySharedMemoryUpdate(
       const std::vector<uint32_t>& changed_pages) override;
+  std::unique_ptr<TraceWriter> CreateTraceWriter(
+      BufferID target_buffer) override;
   SharedMemory* shared_memory() const override;
 
   // ipc::ServiceProxy::EventListener implementation.
@@ -77,6 +80,9 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   // (e.g. start/stop a data source).
   void OnServiceRequest(const GetAsyncCommandResponse&);
 
+  // Callback passed to SharedMemoryArbiter.
+  void OnPageComplete(const std::vector<uint32_t>&);
+
   // TODO think to destruction order, do we rely on any specific dtor sequence?
   Producer* const producer_;
   base::TaskRunner* const task_runner_;
@@ -89,6 +95,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   ProducerPortProxy producer_port_;
 
   std::unique_ptr<PosixSharedMemory> shared_memory_;
+  std::unique_ptr<SharedMemoryArbiter> shared_memory_arbiter_;
   bool connected_ = false;
 };
 

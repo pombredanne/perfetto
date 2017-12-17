@@ -26,16 +26,21 @@
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
 
+#include "protos/test_event.pbzero.h"
+#include "protos/trace_packet.pbzero.h"
+
 namespace perfetto {
 namespace {
 
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::_;
 
 constexpr char kProducerSockName[] = TEST_SOCK_NAME("tracing_test-producer");
@@ -129,21 +134,68 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   consumer_endpoint->EnableTracing(trace_config);
 
   // At this point, the Producer should be asked to turn its data source on.
+  DataSourceInstanceID ds_iid = 0;
   auto on_create_ds_instance =
       task_runner_->CreateCheckpoint("on_create_ds_instance");
   EXPECT_CALL(producer, CreateDataSourceInstance(_, _))
-      .WillOnce(Invoke([on_create_ds_instance](DataSourceInstanceID id,
-                                               const DataSourceConfig& cfg) {
-        ASSERT_NE(0u, id);
-        ASSERT_EQ("perfetto.test", cfg.name());
-        ASSERT_EQ(0u, cfg.target_buffer());
-        ASSERT_EQ("foo,bar", cfg.trace_category_filters());
-        on_create_ds_instance();
-      }));
+      .WillOnce(
+          Invoke([on_create_ds_instance, &ds_iid](DataSourceInstanceID id,
+                                                  const DataSourceConfig& cfg) {
+            ASSERT_NE(0u, id);
+            ds_iid = id;
+            ASSERT_EQ("perfetto.test", cfg.name());
+            ASSERT_EQ(0u, cfg.target_buffer());
+            ASSERT_EQ("foo,bar", cfg.trace_category_filters());
+            on_create_ds_instance();
+          }));
   task_runner_->RunUntilCheckpoint("on_create_ds_instance");
+
+  // Now let the data source fill some pages within the same task.
+  // Doing so should accumulate a bunch of chunks that will be notified by the
+  // a future task in one batch.
+  std::unique_ptr<TraceWriter> writer =
+      producer_endpoint->CreateTraceWriter(1 /* target_buffer */);
+  ASSERT_TRUE(writer);
+
+  const size_t kNumPackets = 10;
+  for (size_t i = 0; i < kNumPackets; i++) {
+    char buf[8];
+    sprintf(buf, "evt_%zu", i);
+    writer->NewTracePacket()->set_test_event()->set_str(buf, strlen(buf));
+  }
+
+  // Allow the service to see the NotifySharedMemoryUpdate() before disabling
+  // tracing.
+  task_runner_->RunUntilIdle();
+
+  // Disable tracing.
+  consumer_endpoint->DisableTracing();
+  auto on_teardown_ds_instance =
+      task_runner_->CreateCheckpoint("on_teardown_ds_instance");
+  EXPECT_CALL(producer, TearDownDataSourceInstance(ds_iid))
+      .WillOnce(InvokeWithoutArgs(on_teardown_ds_instance));
+  task_runner_->RunUntilCheckpoint("on_teardown_ds_instance");
+
+  // Read the log buffer.
+  consumer_endpoint->ReadBuffers();
+  size_t num_pack_rx = 0;
+  auto all_packets_rx = task_runner_->CreateCheckpoint("all_packets_rx");
+  EXPECT_CALL(consumer, OnTraceData(_, _))
+      .Times(kNumPackets)
+      .WillRepeatedly(
+          Invoke([&num_pack_rx, all_packets_rx](
+                     const std::vector<TracePacket>& packets, bool has_more) {
+            // TODO(primiano): check contents, requires both pblite and pzero.
+            num_pack_rx += packets.size();
+            if (!has_more)
+              all_packets_rx();
+          }));
+  task_runner_->RunUntilCheckpoint("all_packets_rx");
 
   _exit(0);  // TODO removeme before landing.
 }
 
+// TODO(primiano): add a test to cover that unknown fields are preserved
+// end-to-end.
 }  // namespace
 }  // namespace perfetto

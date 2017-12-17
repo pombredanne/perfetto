@@ -26,6 +26,7 @@
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/service.h"
 #include "src/tracing/core/id_allocator.h"
 
@@ -60,10 +61,9 @@ class ServiceImpl : public Service {
     void RegisterDataSource(const DataSourceDescriptor&,
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;
-
     void NotifySharedMemoryUpdate(
         const std::vector<uint32_t>& changed_pages) override;
-
+    std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
    private:
@@ -75,6 +75,7 @@ class ServiceImpl : public Service {
     base::TaskRunner* const task_runner_;
     Producer* producer_;
     std::unique_ptr<SharedMemory> shared_memory_;
+    SharedMemoryABI shmem_abi_;
     DataSourceID last_data_source_id_ = 0;
   };
 
@@ -108,6 +109,13 @@ class ServiceImpl : public Service {
 
   // Called by ProducerEndpointImpl.
   void DisconnectProducer(ProducerID);
+  void RegisterDataSource(ProducerID,
+                          DataSourceID,
+                          const DataSourceDescriptor&);
+  void CopyProducerPageIntoLogBuffer(ProducerID,
+                                     BufferID,
+                                     const uint8_t*,
+                                     size_t);
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
@@ -132,12 +140,12 @@ class ServiceImpl : public Service {
 
  private:
   struct RegisteredDataSource {
-    DataSourceDescriptor descriptor;
     ProducerID producer_id;
+    DataSourceID data_source_id;
+    DataSourceDescriptor descriptor;
   };
 
   struct TraceBuffer {
-   public:
     TraceBuffer(size_t page_size, size_t size);
     ~TraceBuffer();
     TraceBuffer(TraceBuffer&&) noexcept;
@@ -156,11 +164,11 @@ class ServiceImpl : public Service {
       return get_page(cur);
     }
 
-   private:
-    std::unique_ptr<void, base::FreeDeleter> data;
     size_t page_size;
     size_t size;
     size_t cur_page = 0;  // Write pointer in the ring buffer.
+    std::unique_ptr<void, base::FreeDeleter> data;
+    std::unique_ptr<SharedMemoryABI> abi;  // TODO(primiano): temporary.
   };
 
   // Holds the state of a tracing session. A tracing session is uniquely bound
@@ -186,7 +194,7 @@ class ServiceImpl : public Service {
   std::set<ConsumerEndpointImpl*> consumers_;
   ObserverForTesting* observer_ = nullptr;
   std::multimap<std::string /* name */, RegisteredDataSource> data_sources_;
-  std::multimap<ConsumerEndpointImpl*, TracingSession> tracing_sessions_;
+  std::map<ConsumerEndpointImpl*, TracingSession> tracing_sessions_;
 
   // Buffer IDs are global across all consumers (because a Producer can produce
   // data for more than one trace session, hence more than one consumer).

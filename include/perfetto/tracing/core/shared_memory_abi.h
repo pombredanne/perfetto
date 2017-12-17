@@ -413,6 +413,11 @@ class SharedMemoryABI {
            (kAllChunksComplete & ((1 << (num_chunks * kChunkShift)) - 1));
   }
 
+  uint16_t get_target_buffer(size_t page_idx) {
+    // TODO: should this be acquire? This is a tricky one. Think.
+    return page_header(page_idx)->target_buffer.load(std::memory_order_relaxed);
+  }
+
   // For testing / debugging only.
   std::string page_header_dbg(size_t page_idx) {
     uint32_t x = page_header(page_idx)->layout.load(std::memory_order_relaxed);

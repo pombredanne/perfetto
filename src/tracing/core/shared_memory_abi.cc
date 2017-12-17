@@ -203,12 +203,6 @@ bool SharedMemoryABI::TryPartitionPage(size_t page_idx,
                      std::memory_order_release);
   return true;
 }
-//
-// size_t SharedMemoryABI::GetTargetBuffer(size_t page_idx) {
-//   // TODO: should this be acquire? This is a tricky one. Think.
-//   return
-//   page_header(page_idx)->target_buffer.load(std::memory_order_relaxed);
-// }
 
 size_t SharedMemoryABI::GetFreeChunks(size_t page_idx) {
   uint32_t layout =

@@ -36,6 +36,7 @@ class Consumer;
 class DataSourceDescriptor;
 class Producer;
 class TraceConfig;
+class TraceWriter;
 
 // TODO: for the moment this assumes that all the calls hapen on the same
 // thread/sequence. Not sure this will be the case long term in Chrome.
@@ -76,8 +77,21 @@ class Service {
     virtual void NotifySharedMemoryUpdate(
         const std::vector<uint32_t>& changed_pages) = 0;
 
-    // Returns the SharedMemory buffer for this Producer.
+    // TODO(primiano): remove this, we shouldn't be exposing the raw
+    // SHM object but only the TraceWriter (below).
     virtual SharedMemory* shared_memory() const = 0;
+
+    // Creates a trace writer, which allows to create events and handles the
+    // handshake with the underying shared memory buffer. This method is
+    // thread-safe but the returned object is not. A TraceWriter can be used
+    // only by a thread (or the caller has to handle linearization via a mutex
+    // or equivalent).
+    // |target_buffer| is the target buffer ID were the data prodced by the
+    // writer should be stored by the tracing service. This value is passed
+    // upon creation of the data source (CreateDataSourceInstance()) in the
+    // DataSourceConfig.target_buffer().
+    virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
+        BufferID target_buffer) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.
