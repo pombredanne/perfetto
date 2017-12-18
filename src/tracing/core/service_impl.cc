@@ -409,7 +409,6 @@ void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     // TODO: we should start collecting individual chunks from non fully
     // complete pages after a while.
 
-    // TODO(primiano): before-landing: check get_target_buffer!!!!!!!!!!!!!!!!!!!!!!!!
     service_->CopyProducerPageIntoLogBuffer(
         id_, shmem_abi_.get_target_buffer(page_idx),
         shmem_abi_.page_start(page_idx), shmem_abi_.page_size());

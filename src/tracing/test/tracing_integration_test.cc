@@ -211,7 +211,10 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   task_runner_->RunUntilCheckpoint("on_consumer_disconnect");
 }
 
-// TODO(primiano): add a test to cover that unknown fields are preserved
-// end-to-end.
+// TODO(primiano): add tests to cover:
+// - unknown fields preserved end-to-end.
+// - >1 data source.
+// - >1 data consumer sharing the same data source, with different TraceBuffers.
+
 }  // namespace
 }  // namespace perfetto
