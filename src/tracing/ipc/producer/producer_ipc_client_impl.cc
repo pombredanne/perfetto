@@ -112,7 +112,6 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
 // notify the service about that.
 void ProducerIPCClientImpl::OnPageComplete(
     const std::vector<uint32_t>& changed_pages) {
-  PERFETTO_DLOG("OnPageComplete %zu", changed_pages.size()); ///////////////////////
   if (!connected_) {
     PERFETTO_DLOG("Cannot OnPageComplete(), not connected to tracing service");
     return;

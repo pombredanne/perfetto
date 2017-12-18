@@ -47,8 +47,8 @@ std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
   auto ftrace_procfs =
       std::unique_ptr<FtraceProcfs>(new FtraceProcfs(kTracingPath));
-  auto table =
-      ProtoTranslationTable::Create(ftrace_procfs.get(), GetStaticEventInfo());
+  auto table = ProtoTranslationTable::Create(
+      ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());
   return std::unique_ptr<FtraceController>(
       new FtraceController(std::move(ftrace_procfs), runner, std::move(table)));
 }
@@ -58,9 +58,9 @@ FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
                                    std::unique_ptr<ProtoTranslationTable> table)
     : ftrace_procfs_(std::move(ftrace_procfs)),
       task_runner_(task_runner),
-      weak_factory_(this),
       enabled_count_(table->largest_id() + 1),
-      table_(std::move(table)) {}
+      table_(std::move(table)),
+      weak_factory_(this) {}
 
 FtraceController::~FtraceController() {
   for (size_t id = 1; id <= table_->largest_id(); id++) {

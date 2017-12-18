@@ -25,11 +25,7 @@ constexpr size_t AlignedBufferTest::kNumPages;
 
 void AlignedBufferTest::SetUp() {
   page_size_ = GetParam();
-  buf_size_ = page_size_ * kNumPages;
-  void* mem = nullptr;
-  PERFETTO_CHECK(posix_memalign(&mem, page_size_, buf_size_) == 0);
-  buf_.reset(reinterpret_cast<uint8_t*>(mem));
-  memset(buf_.get(), 0, buf_size_);
+  buf_.reset(new TestSharedMemory(page_size_ * kNumPages));
 }
 
 void AlignedBufferTest::TearDown() {

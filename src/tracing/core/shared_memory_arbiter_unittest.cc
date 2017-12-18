@@ -154,37 +154,18 @@ TEST_P(SharedMemoryArbiterTest, GetAndReturnChunks) {
   task_runner_->RunUntilCheckpoint("on_callback");
 }
 
+// Check that we can actually create up to kMaxWriterID TraceWriter(s).
 TEST_P(SharedMemoryArbiterTest, WriterIDsAllocation) {
-  for (int repetition = 0; repetition < 3; repetition++) {
-    std::map<WriterID, std::unique_ptr<TraceWriter>> writers;
-    for (size_t i = 0; i < kMaxWriterID; i++) {
-      std::unique_ptr<TraceWriter> writer = arbiter_->CreateTraceWriter(0);
-      ASSERT_TRUE(writer);
-      WriterID writer_id = writer->writer_id();
-      ASSERT_NE(0u, writer_id);
-      ASSERT_EQ(0u, writers.count(writer_id));
-      writers[writer_id] = std::move(writer);
-    }
-    // A further call should fail as we exhausted writer IDs.
-    ASSERT_EQ(nullptr, arbiter_->CreateTraceWriter(0).get());
-
-    // Removing one ID should be enough to make room for another one.
-    writers.erase(42);
+  std::map<WriterID, std::unique_ptr<TraceWriter>> writers;
+  for (size_t i = 0; i < kMaxWriterID; i++) {
     std::unique_ptr<TraceWriter> writer = arbiter_->CreateTraceWriter(0);
     ASSERT_TRUE(writer);
-    ASSERT_EQ(42u, writer->writer_id());
-
-    // Remove the very first IDs and saturate again.
-    writers.erase(1);
-    writers.erase(2);
-    for (WriterID wid = 1; wid <= 2; wid++) {
-      writer = arbiter_->CreateTraceWriter(0);
-      ASSERT_TRUE(writer);
-      WriterID writer_id = writer->writer_id();
-      ASSERT_EQ(wid, writer_id);
-      writers[writer_id] = std::move(writer);
-    }
+    WriterID writer_id = writer->writer_id();
+    ASSERT_TRUE(writers.emplace(writer_id, std::move(writer)).second);
   }
+
+  // A further call should fail as we exhausted writer IDs.
+  ASSERT_EQ(nullptr, arbiter_->CreateTraceWriter(0).get());
 }
 
 // TODO(primiano): add multi-threaded tests.

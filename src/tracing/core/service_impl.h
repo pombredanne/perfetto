@@ -26,8 +26,8 @@
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
-#include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/service.h"
+#include "perfetto/tracing/core/shared_memory_abi.h"
 #include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {

@@ -23,6 +23,7 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/utils.h"
+#include "src/tracing/test/test_shared_memory.h"
 
 namespace perfetto {
 
@@ -33,14 +34,16 @@ class AlignedBufferTest : public ::testing::TestWithParam<size_t> {
   void SetUp() override;
   void TearDown() override;
 
-  size_t buf_size() const { return buf_size_; }
+  uint8_t* buf() const { return reinterpret_cast<uint8_t*>(buf_->start()); }
+  size_t buf_size() const { return buf_->size(); }
   size_t page_size() const { return page_size_; }
-  uint8_t* buf() const { return buf_.get(); }
 
  private:
-  size_t buf_size_ = 0;
   size_t page_size_ = 0;
-  std::unique_ptr<uint8_t, base::FreeDeleter> buf_;
+
+  // This doesn't need any sharing. TestSharedMemory just happens to have the
+  // right harness to create a zeroed page-aligned buffer.
+  std::unique_ptr<TestSharedMemory> buf_;
 };
 
 }  // namespace perfetto

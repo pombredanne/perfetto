@@ -83,7 +83,7 @@ SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
 
   PERFETTO_CHECK(page_size >= 4096);
   PERFETTO_CHECK(page_size % 4096 == 0);
-  PERFETTO_CHECK(reinterpret_cast<uintptr_t>(start) % page_size == 0);
+  PERFETTO_CHECK(reinterpret_cast<uintptr_t>(start) % 4096 == 0);
   PERFETTO_CHECK(size % page_size == 0);
 }
 

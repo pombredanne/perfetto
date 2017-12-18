@@ -25,6 +25,7 @@
 
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
 
@@ -52,8 +53,8 @@ class SharedMemoryArbiter {
   // |page_size|: a multiple of 4KB that defines the granularity of tracing
   // pagaes. See tradeoff considerations in shared_memory_abi.h.
   // |OnPageCompleteCallback|: a callback that will be posted on the passed
-  // |TaskRunner| when a page is complete (and hence the Producer should send
-  // a NotifySharedMemoryUpdate()).
+  // |TaskRunner| when one or more pages are complete (and hence the Producer
+  // should send a NotifySharedMemoryUpdate() to the Service).
   SharedMemoryArbiter(void* start,
                       size_t size,
                       size_t page_size,
@@ -70,10 +71,10 @@ class SharedMemoryArbiter {
   // written in each chunk header owned by a given TraceWriter and is used by
   // the Service to reconstruct reorder TracePackets written by the same
   // TraceWriter. Returns nullptr if all WriterID slots are exhausted.
-  // TODO: instad of nullptr this should return a NoopWriter.
+  // TODO(primiano): instad of nullptr this should return a NoopWriter.
   std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID target_buffer = 0);
 
-  SharedMemoryABI* shmem_abi_for_testing() { return &shmem_; }
+  SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 
   static void set_default_layout_for_testing(SharedMemoryABI::PageLayout l) {
     default_page_layout = l;
@@ -87,22 +88,22 @@ class SharedMemoryArbiter {
   SharedMemoryArbiter(const SharedMemoryArbiter&) = delete;
   SharedMemoryArbiter& operator=(const SharedMemoryArbiter&) = delete;
 
-  WriterID AcquireWriterID();
-
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
 
   void InvokeOnPageCompleteCallback();
 
+  base::TaskRunner* const task_runner_;
+  OnPageCompleteCallback on_page_complete_callback_;
+
+  // --- Begin lock-protected members ---
   std::mutex lock_;
-  SharedMemoryABI shmem_;
+  SharedMemoryABI shmem_abi_;
   size_t page_idx_ = 0;
-  WriterID last_writer_id_ = 0;
-  std::vector<bool> active_writer_ids_;  // TODO(primiano): use IdAllocator.
+  IdAllocator active_writer_ids_;
   std::vector<uint32_t> pages_to_notify_;
   bool scheduled_notification_ = false;
-  OnPageCompleteCallback on_page_complete_callback_;
-  base::TaskRunner* const task_runner_;
+  // --- End lock-protected members ---
 };
 
 }  // namespace perfetto

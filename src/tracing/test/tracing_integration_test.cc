@@ -192,7 +192,23 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
           }));
   task_runner_->RunUntilCheckpoint("all_packets_rx");
 
-  _exit(0);  // TODO removeme before landing.
+  // TODO(primiano): cover FreeBuffers.
+
+  // Destroy the service and check that both Producer and Consumer see an
+  // OnDisconnect() call.
+  svc.reset();
+
+  auto on_producer_disconnect =
+      task_runner_->CreateCheckpoint("on_producer_disconnect");
+  EXPECT_CALL(producer, OnDisconnect())
+      .WillOnce(Invoke(on_producer_disconnect));
+  task_runner_->RunUntilCheckpoint("on_producer_disconnect");
+
+  auto on_consumer_disconnect =
+      task_runner_->CreateCheckpoint("on_consumer_disconnect");
+  EXPECT_CALL(consumer, OnDisconnect())
+      .WillOnce(Invoke(on_consumer_disconnect));
+  task_runner_->RunUntilCheckpoint("on_consumer_disconnect");
 }
 
 // TODO(primiano): add a test to cover that unknown fields are preserved

@@ -87,11 +87,12 @@ class ConsumerIPCService : public ConsumerPort /* from consumer_port.proto */ {
   RemoteConsumer* GetConsumerForCurrentRequest();
 
   Service* const core_service_;
-  base::WeakPtrFactory<ConsumerIPCService> weak_ptr_factory_;
 
   // Maps IPC clients to ConsumerEndpoint instances registered on the
   // |core_service_| business logic.
   std::map<ipc::ClientID, std::unique_ptr<RemoteConsumer>> consumers_;
+
+  base::WeakPtrFactory<ConsumerIPCService> weak_ptr_factory_;
 };
 
 }  // namespace perfetto
