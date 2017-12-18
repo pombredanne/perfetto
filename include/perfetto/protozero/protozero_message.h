@@ -56,7 +56,7 @@ class ProtoZeroMessage {
   // all nested messages) and seals the message. Returns the size of the message
   // (and all nested sub-messages), without taking into account any chunking.
   // Finalize is idempotent and can be called several times w/o side effects.
-  size_t Finalize();
+  uint32_t Finalize();
 
   // Optional. If is_valid() == true, the corresponding memory region (its
   // length == proto_utils::kMessageLengthFieldSize) is backfilled with the size
@@ -165,7 +165,7 @@ class ProtoZeroMessage {
   void WriteToStream(const uint8_t* src_begin, const uint8_t* src_end) {
     PERFETTO_DCHECK(!finalized_);
     PERFETTO_DCHECK(src_begin < src_end);
-    const size_t size = static_cast<size_t>(src_end - src_begin);
+    const uint32_t size = static_cast<uint32_t>(src_end - src_begin);
     stream_writer_->WriteBytes(src_begin, size);
     size_ += size;
   }
@@ -176,21 +176,21 @@ class ProtoZeroMessage {
   // The stream writer interface used for the serialization.
   ScatteredStreamWriter* stream_writer_;
 
-  // Keeps track of the size of the current message.
-  size_t size_;
-
   uint8_t* size_field_;
+
+  // Keeps track of the size of the current message.
+  uint32_t size_;
 
   // See comment for inc_size_already_written().
   uint32_t size_already_written_;
 
+  // When true, no more changes to the message are allowed. This is to DCHECK
+  // attempts of writing to a message which has been Finalize()-d.
+  bool finalized_;
+
   // Used to detect attemps to create messages with a nesting level >
   // kMaxNestingDepth. |nesting_depth_| == 0 for root (non-nested) messages.
   uint8_t nesting_depth_;
-
-  // When true, no more changes to the message are allowed. This is to DCHECK
-  // attempts of writing to a message which has been Finalize()-d.
-  uint8_t finalized_;
 
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   ProtoZeroMessageHandleBase* handle_;

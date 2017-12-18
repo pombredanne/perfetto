@@ -86,7 +86,7 @@ void ProtoZeroMessage::AppendBytes(uint32_t field_id,
   WriteToStream(src_u8, src_u8 + size);
 }
 
-size_t ProtoZeroMessage::Finalize() {
+uint32_t ProtoZeroMessage::Finalize() {
   if (nested_message_)
     EndNestedMessage();
 
@@ -95,8 +95,9 @@ size_t ProtoZeroMessage::Finalize() {
   if (size_field_) {
     PERFETTO_DCHECK(!finalized_);
     PERFETTO_DCHECK(size_ < proto_utils::kMaxMessageLength);
-    proto_utils::WriteRedundantVarInt(
-        static_cast<uint32_t>(size_ - size_already_written_), size_field_);
+    PERFETTO_DCHECK(size_ >= size_already_written_);
+    proto_utils::WriteRedundantVarInt(size_ - size_already_written_,
+                                      size_field_);
     size_field_ = nullptr;
   }
 
