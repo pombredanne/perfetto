@@ -65,7 +65,7 @@ SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
 
   // In theory std::atomic does not guarantee that the underlying type consists
   // only of the actual atomic word. Theoretically it could have locks or other
-  // state. In practice most implementations just implement them wihtout extra
+  // state. In practice most implementations just implement them without extra
   // state. The code below overlays the atomic into the SMB, hence relies on
   // this implementation detail. This should be fine pragmatically (Chrome's
   // base makes the same assumption), but let's have a check for this.
@@ -233,7 +233,7 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
     const uint32_t chunk_state =
         ((layout >> (chunk_idx * kChunkShift)) & kChunkMask);
 
-    // Verify that the chunk is still in a state that allows the transitiont to
+    // Verify that the chunk is still in a state that allows the transition to
     // |desired_chunk_state|. The only allowed transitions are:
     // 1. kChunkBeingWritten -> kChunkComplete (Producer).
     // 2. kChunkBeingRead -> kChunkFree (Service).

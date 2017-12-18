@@ -34,7 +34,7 @@ class TraceWriterImplTest : public AlignedBufferTest {
     SharedMemoryArbiter::set_default_layout_for_testing(
         SharedMemoryABI::PageLayout::kPageDiv4);
     AlignedBufferTest::SetUp();
-    auto callback = [this](const std::vector<uint32_t>& arg) {};
+    auto callback = [](const std::vector<uint32_t>& arg) {};
     task_runner_.reset(new base::TestTaskRunner());
     arbiter_.reset(new SharedMemoryArbiter(buf(), buf_size(), page_size(),
                                            callback, task_runner_.get()));
