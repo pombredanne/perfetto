@@ -81,12 +81,13 @@ class Service {
     // SHM object but only the TraceWriter (below).
     virtual SharedMemory* shared_memory() const = 0;
 
-    // Creates a trace writer, which allows to create events and handles the
-    // handshake with the underying shared memory buffer. This method is
-    // thread-safe but the returned object is not. A TraceWriter can be used
-    // only by a thread (or the caller has to handle linearization via a mutex
-    // or equivalent).
-    // |target_buffer| is the target buffer ID were the data prodced by the
+    // Creates a trace writer, which allows to create events, handling the
+    // underying shared memory buffer and signalling to the Service. This method
+    // is thread-safe but the returned object is not. A TraceWriter should be
+    // used only from a single thread, or the caller has to handle linearization
+    // via a mutex or equivalent.
+    // Args:
+    // |target_buffer| is the target buffer ID where the data produced by the
     // writer should be stored by the tracing service. This value is passed
     // upon creation of the data source (CreateDataSourceInstance()) in the
     // DataSourceConfig.target_buffer().
@@ -140,24 +141,6 @@ class Service {
   // To disconnect just destroy the returned ConsumerEndpoint object. It is safe
   // to destroy the Consumer once the Consumer::OnDisconnect() has been invoked.
   virtual std::unique_ptr<ConsumerEndpoint> ConnectConsumer(Consumer*) = 0;
-
- public:  // Testing-only
-  class ObserverForTesting {
-   public:
-    virtual ~ObserverForTesting() {}
-    virtual void OnProducerConnected(ProducerID) {}
-    virtual void OnProducerDisconnected(ProducerID) {}
-    virtual void OnDataSourceRegistered(ProducerID, DataSourceID) {}
-    virtual void OnDataSourceUnregistered(ProducerID, DataSourceID) {}
-    virtual void OnDataSourceInstanceCreated(ProducerID,
-                                             DataSourceID,
-                                             DataSourceInstanceID) {}
-    virtual void OnDataSourceInstanceDestroyed(ProducerID,
-                                               DataSourceID,
-                                               DataSourceInstanceID) {}
-  };
-
-  virtual void set_observer_for_testing(ObserverForTesting*) = 0;
 };
 
 }  // namespace perfetto

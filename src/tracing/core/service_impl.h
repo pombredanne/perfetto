@@ -132,8 +132,6 @@ class ServiceImpl : public Service {
   std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
       Consumer*) override;
 
-  void set_observer_for_testing(ObserverForTesting*) override;
-
   // Exposed mainly for testing.
   size_t num_producers() const { return producers_.size(); }
   ProducerEndpointImpl* GetProducer(ProducerID) const;
@@ -146,16 +144,17 @@ class ServiceImpl : public Service {
   };
 
   struct TraceBuffer {
-    TraceBuffer(size_t page_size, size_t size);
+    static constexpr size_t kBufferPageSize = 4096;
+    explicit TraceBuffer(size_t size);
     ~TraceBuffer();
     TraceBuffer(TraceBuffer&&) noexcept;
     TraceBuffer& operator=(TraceBuffer&&);
 
-    size_t num_pages() const { return size / page_size; }
+    size_t num_pages() const { return size / kBufferPageSize; }
 
     uint8_t* get_page(size_t page) {
       PERFETTO_DCHECK(page < num_pages());
-      return reinterpret_cast<uint8_t*>(data.get()) + page * page_size;
+      return reinterpret_cast<uint8_t*>(data.get()) + page * kBufferPageSize;
     }
 
     uint8_t* get_next_page() {
@@ -164,11 +163,15 @@ class ServiceImpl : public Service {
       return get_page(cur);
     }
 
-    size_t page_size;
     size_t size;
     size_t cur_page = 0;  // Write pointer in the ring buffer.
     std::unique_ptr<void, base::FreeDeleter> data;
-    std::unique_ptr<SharedMemoryABI> abi;  // TODO(primiano): temporary.
+
+    // TODO(primiano): The TraceBuffer is not shared and there is no reason to
+    // use the SharedMemoryABI. This is just a a temporary workaround to reuse
+    // the convenience of SharedMemoryABI for bookkeeping of the buffer when
+    // implementing ReadBuffers().
+    std::unique_ptr<SharedMemoryABI> abi;
   };
 
   // Holds the state of a tracing session. A tracing session is uniquely bound
@@ -186,19 +189,23 @@ class ServiceImpl : public Service {
   ServiceImpl(const ServiceImpl&) = delete;
   ServiceImpl& operator=(const ServiceImpl&) = delete;
 
-  std::unique_ptr<SharedMemory::Factory> shm_factory_;
   base::TaskRunner* const task_runner_;
+  std::unique_ptr<SharedMemory::Factory> shm_factory_;
   ProducerID last_producer_id_ = 0;
   DataSourceInstanceID last_data_source_instance_id_ = 0;
-  std::map<ProducerID, ProducerEndpointImpl*> producers_;
-  std::set<ConsumerEndpointImpl*> consumers_;
-  ObserverForTesting* observer_ = nullptr;
-  std::multimap<std::string /* name */, RegisteredDataSource> data_sources_;
-  std::map<ConsumerEndpointImpl*, TracingSession> tracing_sessions_;
 
   // Buffer IDs are global across all consumers (because a Producer can produce
   // data for more than one trace session, hence more than one consumer).
   IdAllocator buffer_ids_;
+
+  std::multimap<std::string /*name*/, RegisteredDataSource> data_sources_;
+
+  // TODO(primiano): There doesn't seem to be any good read why |producers_| is
+  // a map indexed by ID and not just a set<ProducerEndpointImpl*>.
+  std::map<ProducerID, ProducerEndpointImpl*> producers_;
+
+  std::set<ConsumerEndpointImpl*> consumers_;
+  std::map<ConsumerEndpointImpl*, TracingSession> tracing_sessions_;
 };
 
 }  // namespace perfetto

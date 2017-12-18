@@ -64,12 +64,14 @@ void ConsumerIPCService::EnableTracing(const EnableTracingRequest& req,
   resp.Resolve(ipc::AsyncResult<EnableTracingResponse>::Create());
 }
 
+// Called by the IPC layer.
 void ConsumerIPCService::DisableTracing(const DisableTracingRequest& req,
                                         DeferredDisableTracingResponse resp) {
   GetConsumerForCurrentRequest()->service_endpoint->DisableTracing();
   resp.Resolve(ipc::AsyncResult<DisableTracingResponse>::Create());
 }
 
+// Called by the IPC layer.
 void ConsumerIPCService::ReadBuffers(const ReadBuffersRequest& req,
                                      DeferredReadBuffersResponse resp) {
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
@@ -77,6 +79,7 @@ void ConsumerIPCService::ReadBuffers(const ReadBuffersRequest& req,
   remote_consumer->service_endpoint->ReadBuffers();
 }
 
+// Called by the IPC layer.
 void ConsumerIPCService::FreeBuffers(const FreeBuffersRequest& req,
                                      DeferredFreeBuffersResponse resp) {
   GetConsumerForCurrentRequest()->service_endpoint->FreeBuffers();
