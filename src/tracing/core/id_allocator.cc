@@ -20,12 +20,15 @@
 
 namespace perfetto {
 
-IdAllocator::IdAllocator(IdType max) : max_(max) {}
+IdAllocator::IdAllocator(IdType end) : max_id_(end - 1) {
+  PERFETTO_DCHECK(end > 1);
+}
+
 IdAllocator::~IdAllocator() = default;
 
 IdAllocator::IdType IdAllocator::Allocate() {
-  for (IdType i = 0; i < max_; i++) {
-    last_id_ = last_id_ < max_ - 1 ? last_id_ + 1 : 1;
+  for (IdType ignored = 1; ignored <= max_id_; ignored++) {
+    last_id_ = last_id_ < max_id_ ? last_id_ + 1 : 1;
     const auto id = last_id_;
 
     // 0 is never a valid ID. So if we are looking for |id| == N and there are
@@ -46,7 +49,7 @@ IdAllocator::IdType IdAllocator::Allocate() {
 }
 
 void IdAllocator::Free(IdType id) {
-  if (id >= ids_.size() || !ids_[id]) {
+  if (id == 0 || id >= ids_.size() || !ids_[id]) {
     PERFETTO_DCHECK(false);
     return;
   }

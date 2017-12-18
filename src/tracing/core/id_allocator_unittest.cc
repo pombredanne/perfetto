@@ -39,16 +39,19 @@ TEST(IdAllocatorTest, IdAllocation) {
     ASSERT_EQ(0u, id_allocator.Allocate());
 
     // Removing one ID should be enough to make room for another one.
-    id_allocator.Free(42);
-    auto id = id_allocator.Allocate();
-    ASSERT_EQ(42u, id);
+    for (int i = 0; i < 3; i++) {
+      id_allocator.Free(42);
+      auto id = id_allocator.Allocate();
+      ASSERT_EQ(42u, id);
+    }
 
-    // Remove the very first IDs and saturate again.
+    // Remove the IDs at the boundaries and saturate again.
     id_allocator.Free(1);
-    id_allocator.Free(2);
-    ASSERT_NE(0u, id_allocator.Allocate());
-    ASSERT_NE(0u, id_allocator.Allocate());
+    id_allocator.Free(kMaxId - 1);
+    ASSERT_EQ(kMaxId - 1, id_allocator.Allocate());
+    ASSERT_EQ(1u, id_allocator.Allocate());
 
+    // Should be saturated again.
     ASSERT_EQ(0u, id_allocator.Allocate());
 
     // Release IDs in reverse order.
