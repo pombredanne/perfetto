@@ -24,14 +24,6 @@
 
 namespace perfetto {
 
-namespace {
-constexpr size_t kMaxWriterID = SharedMemoryABI::kMaxWriterID;
-
-WriterID NextID(WriterID id) {
-  return id < kMaxWriterID ? id + 1 : 1;
-}
-}  // namespace
-
 using Chunk = SharedMemoryABI::Chunk;
 
 // static
@@ -44,6 +36,7 @@ SharedMemoryArbiter::SharedMemoryArbiter(void* start,
                                          OnPageCompleteCallback callback,
                                          base::TaskRunner* task_runner)
     : shmem_(reinterpret_cast<uint8_t*>(start), size, page_size),
+      active_writer_ids_(SharedMemoryABI::kMaxWriterID + 1),
       on_page_complete_callback_(callback),
       task_runner_(task_runner) {}
 
@@ -149,41 +142,18 @@ void SharedMemoryArbiter::InvokeOnPageCompleteCallback() {
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiter::CreateTraceWriter(
     BufferID target_buffer) {
-  const WriterID id = AcquireWriterID();
+  WriterID id;
+  {
+    std::lock_guard<std::mutex> scoped_lock(lock_);
+    id = static_cast<WriterID>(active_writer_ids_.Allocate());
+  }
   return std::unique_ptr<TraceWriter>(
       id ? new TraceWriterImpl(this, id, target_buffer) : nullptr);
 }
 
-WriterID SharedMemoryArbiter::AcquireWriterID() {
-  std::lock_guard<std::mutex> scoped_lock(lock_);
-  for (size_t i = 0; i < kMaxWriterID; i++) {
-    last_writer_id_ = NextID(last_writer_id_);
-    const WriterID id = last_writer_id_;
-
-    // 0 is never a valid ID. So if we are looking for |id| == N and there are
-    // N or less elements in the vector, they must necessarily be all < N.
-    // e.g. if |id| == 4 and size() == 4, the vector will contain IDs 0,1,2,3.
-    if (id >= active_writer_ids_.size()) {
-      active_writer_ids_.resize(id + 1);
-      active_writer_ids_[id] = true;
-      return id;
-    }
-
-    if (!active_writer_ids_[id]) {
-      active_writer_ids_[id] = true;
-      return id;
-    }
-  }
-  return 0;
-}
-
 void SharedMemoryArbiter::ReleaseWriterID(WriterID id) {
   std::lock_guard<std::mutex> scoped_lock(lock_);
-  if (id >= active_writer_ids_.size() || !active_writer_ids_[id]) {
-    PERFETTO_DCHECK(false);
-    return;
-  }
-  active_writer_ids_[id] = false;
+  active_writer_ids_.Free(id);
 }
 
 }  // namespace perfetto

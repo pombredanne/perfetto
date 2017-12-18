@@ -25,6 +25,7 @@
 
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
 
@@ -87,8 +88,6 @@ class SharedMemoryArbiter {
   SharedMemoryArbiter(const SharedMemoryArbiter&) = delete;
   SharedMemoryArbiter& operator=(const SharedMemoryArbiter&) = delete;
 
-  WriterID AcquireWriterID();
-
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
 
@@ -98,7 +97,7 @@ class SharedMemoryArbiter {
   SharedMemoryABI shmem_;
   size_t page_idx_ = 0;
   WriterID last_writer_id_ = 0;
-  std::vector<bool> active_writer_ids_;
+  IdAllocator active_writer_ids_;
   std::vector<uint32_t> pages_to_notify_;
   bool scheduled_notification_ = false;
   OnPageCompleteCallback on_page_complete_callback_;
