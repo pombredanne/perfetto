@@ -29,11 +29,11 @@ class IdAllocator {
  public:
   using IdType = uint32_t;
 
-  // |max| is exclusive.
-  explicit IdAllocator(IdType max);
+  // |end| is exclusive.
+  explicit IdAllocator(IdType end);
   ~IdAllocator();
 
-  // Returns an ID in the range [1, max - 1] or 0 if no more ids are available.
+  // Returns an ID in the range [1, end - 1] or 0 if no more ids are available.
   IdType Allocate();
   void Free(IdType);
 
@@ -41,7 +41,7 @@ class IdAllocator {
   IdAllocator(const IdAllocator&) = delete;
   IdAllocator& operator=(const IdAllocator&) = delete;
 
-  const IdType max_;
+  const IdType max_id_;
   IdType last_id_ = 0;
   std::vector<bool> ids_;
 };
