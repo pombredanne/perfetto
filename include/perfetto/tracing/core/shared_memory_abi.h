@@ -111,7 +111,7 @@ namespace perfetto {
 // A chunk is a portion of a Page which is written and handled by a Producer.
 // A chunk contains a linear sequence of TracePacket(s) (the root proto).
 // A chunk cannot be written concurrently by two data sources. Protobufs must be
-// encoded as contiguous byte streams and cannot be inteleaved. Therefore, on
+// encoded as contiguous byte streams and cannot be interleaved. Therefore, on
 // the Producer side, a chunk is almost always owned exclusively by one thread
 // (% extremely peculiar slow-path cases).
 // Chunks are essentially single-writer single-thread lock-free arenas. Locking
@@ -146,7 +146,7 @@ class SharedMemoryABI {
   // See PageLayout below.
   static constexpr size_t kMaxChunksPerPage = 14;
 
-  // Each TrackePacket in the Chunk is prefixed by a 4 bytes redundant VarInt
+  // Each TracePacket in the Chunk is prefixed by a 4 bytes redundant VarInt
   // (see proto_utils.h) stating its size.
   static constexpr size_t kPacketHeaderSize = 4;
 
@@ -217,7 +217,7 @@ class SharedMemoryABI {
   // +===================================================+
   // | Page header [8 bytes]                             |
   // | Tells how many chunks there are, how big they are |
-  // | and their state (free, read, write, complete ).   |
+  // | and their state (free, read, write, complete).    |
   // +===================================================+
   // +***************************************************+
   // | Chunk #0 header [8 bytes]                         |
@@ -303,7 +303,7 @@ class SharedMemoryABI {
       // chunk_id is a monotonic counter of the chunk within its own
       // sequence. The tuple (writer_id, chunk_id) allows to figure
       // out if two chunks for a data source are contiguous (and hence a trace
-      // packet spanning across them can be glues) or we had some holes due to
+      // packet spanning across them can be glued) or we had some holes due to
       // the ring buffer wrapping.
       uint16_t chunk_id;
 
@@ -352,6 +352,8 @@ class SharedMemoryABI {
     // The increment is atomic but NOT race-free (i.e. no CAS). Only the
     // Producer is supposed to perform this increment thread-safely. A Chunk
     // cannot be shared by multiple threads without locking.
+    // The packet count is cleared by TryAcquireChunk(), when passing the new
+    // header for the chunk.
     void increment_packet_count() {
       ChunkHeader* chunk_header = header();
       auto packets = chunk_header->packets.load(std::memory_order_relaxed);
@@ -359,6 +361,8 @@ class SharedMemoryABI {
       chunk_header->packets.store(packets, std::memory_order_release);
     }
 
+    // Flags are cleared by TryAcquireChunk(), by passing the new header for
+    // the chunk.
     void set_flag(ChunkHeader::Flags flag) {
       ChunkHeader* chunk_header = header();
       auto packets = chunk_header->packets.load(std::memory_order_relaxed);
@@ -458,7 +462,7 @@ class SharedMemoryABI {
                            kChunkBeingRead, nullptr);
   }
 
-  // Used by the Service to take full ownership of oll the chunks in the a page
+  // Used by the Service to take full ownership of all the chunks in the a page
   // in one shot.  It tries to atomically migrate all chunks into the
   // kChunkBeingRead state. Can only be done if all chunks are either kChunkFree
   // or kChunkComplete. If this fails, the service has to fall back acquiring
