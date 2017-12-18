@@ -35,10 +35,10 @@ SharedMemoryArbiter::SharedMemoryArbiter(void* start,
                                          size_t page_size,
                                          OnPageCompleteCallback callback,
                                          base::TaskRunner* task_runner)
-    : shmem_(reinterpret_cast<uint8_t*>(start), size, page_size),
-      active_writer_ids_(SharedMemoryABI::kMaxWriterID + 1),
-      on_page_complete_callback_(callback),
-      task_runner_(task_runner) {}
+    : task_runner_(task_runner),
+      on_page_complete_callback_(std::move(callback)),
+      shmem_abi_(reinterpret_cast<uint8_t*>(start), size, page_size),
+      active_writer_ids_(SharedMemoryABI::kMaxWriterID + 1) {}
 
 Chunk SharedMemoryArbiter::GetNewChunk(
     const SharedMemoryABI::ChunkHeader& header,
@@ -53,17 +53,17 @@ Chunk SharedMemoryArbiter::GetNewChunk(
     {
       std::lock_guard<std::mutex> scoped_lock(lock_);
       const size_t initial_page_idx = page_idx_;
-      for (size_t i = 0; i < shmem_.num_pages(); i++) {
-        page_idx_ = (initial_page_idx + i) % shmem_.num_pages();
+      for (size_t i = 0; i < shmem_abi_.num_pages(); i++) {
+        page_idx_ = (initial_page_idx + i) % shmem_abi_.num_pages();
         bool is_new_page = false;
 
         // TODO(primiano): make the page layout dynamic.
         auto layout = SharedMemoryArbiter::default_page_layout;
 
-        if (shmem_.is_page_free(page_idx_)) {
+        if (shmem_abi_.is_page_free(page_idx_)) {
           // TODO(primiano): Use the |size_hint| here to decide the layout.
           is_new_page =
-              shmem_.TryPartitionPage(page_idx_, layout, target_buffer);
+              shmem_abi_.TryPartitionPage(page_idx_, layout, target_buffer);
         }
         uint32_t free_chunks;
         size_t tbuf;
@@ -71,8 +71,8 @@ Chunk SharedMemoryArbiter::GetNewChunk(
           free_chunks = (1 << SharedMemoryABI::kNumChunksForLayout[layout]) - 1;
           tbuf = target_buffer;
         } else {
-          free_chunks = shmem_.GetFreeChunks(page_idx_);
-          tbuf = shmem_.page_header(page_idx_)->target_buffer.load(
+          free_chunks = shmem_abi_.GetFreeChunks(page_idx_);
+          tbuf = shmem_abi_.page_header(page_idx_)->target_buffer.load(
               std::memory_order_relaxed);
         }
         PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
@@ -86,8 +86,8 @@ Chunk SharedMemoryArbiter::GetNewChunk(
           if (!(free_chunks & 1))
             continue;
           // We found a free chunk.
-          Chunk chunk = shmem_.TryAcquireChunkForWriting(page_idx_, chunk_idx,
-                                                         tbuf, &header);
+          Chunk chunk = shmem_abi_.TryAcquireChunkForWriting(
+              page_idx_, chunk_idx, tbuf, &header);
           if (!chunk.is_valid())
             continue;
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
@@ -112,7 +112,7 @@ void SharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
   bool should_post_callback = false;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
-    size_t page_index = shmem_.ReleaseChunkAsComplete(std::move(chunk));
+    size_t page_index = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
       pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
       if (!scheduled_notification_) {

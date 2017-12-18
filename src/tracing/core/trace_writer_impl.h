@@ -71,8 +71,8 @@ class TraceWriterImpl : public TraceWriter,
   // ID of the current writer.
   const WriterID id_;
 
-  // This is just copied back into the chunk heaer.
-  // See comments in data_source_config.proto for |target_buffer\.
+  // This is just copied back into the chunk header.
+  // See comments in data_source_config.proto for |target_buffer|.
   const BufferID target_buffer_;
 
   // Monotonic (% wrapping) sequence id of the chunk. Together with the WriterID
