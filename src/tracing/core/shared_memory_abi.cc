@@ -2,18 +2,17 @@
  * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS
+ * IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
  */
-
 #include "perfetto/tracing/core/shared_memory_abi.h"
 
 #include <sys/mman.h>
@@ -63,15 +62,27 @@ SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
   static_assert(alignof(ChunkHeader) == kChunkAlignment,
                 "ChunkHeader alignment");
 
-  // In theory std::atomic does not guarantee that the underlying type consists
-  // only of the actual atomic word. Theoretically it could have locks or other
-  // state. In practice most implementations just implement them without extra
-  // state. The code below overlays the atomic into the SMB, hence relies on
-  // this implementation detail. This should be fine pragmatically (Chrome's
-  // base makes the same assumption), but let's have a check for this.
+  // In theory std::atomic does not guarantee that the underlying type
+  // consists only of the actual atomic word. Theoretically it could have
+  // locks or other state. In practice most implementations just implement
+  // them without extra state. The code below overlays the atomic into the
+  // SMB, hence relies on this implementation detail. This should be fine
+  // pragmatically (Chrome's base makes the same assumption), but let's have a
+  // check for this.
   static_assert(sizeof(std::atomic<uint32_t>) == sizeof(uint32_t) &&
                     sizeof(std::atomic<uint16_t>) == sizeof(uint16_t),
                 "Incompatible STL <atomic> implementation");
+
+  // Chec that the kAllChunks(Complete,Free) are consistent with the
+  // ChunkState enum values.
+
+  // These must be zero because rely on zero-initialized memory being
+  // interpreted as "free".
+  static_assert(kChunkFree == 0 && kAllChunksFree == 0,
+                "kChunkFree/kAllChunksFree and must be 0");
+
+  static_assert((kAllChunksComplete & kChunkMask) == kChunkComplete,
+                "kAllChunksComplete out of sync with kChunkComplete");
 
   // Sanity check the consistency of the kMax... constants.
   ChunkHeader::Identifier chunk_id = {};
@@ -87,29 +98,16 @@ SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
   PERFETTO_CHECK(size % page_size == 0);
 }
 
-SharedMemoryABI::Chunk SharedMemoryABI::GetChunk(size_t page_idx,
-                                                 size_t chunk_idx) {
-  PageHeader* phdr = page_header(page_idx);
-  uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
-
-  // The page layout has changed (or the page is free).
-  if (chunk_idx >= GetNumChunksForLayout(layout))
-    return Chunk();
-
-  return GetChunkUnchecked(page_idx, layout, chunk_idx);
-}
-
 SharedMemoryABI::Chunk SharedMemoryABI::GetChunkUnchecked(size_t page_idx,
                                                           uint32_t page_layout,
                                                           size_t chunk_idx) {
   const size_t num_chunks = GetNumChunksForLayout(page_layout);
   PERFETTO_DCHECK(chunk_idx < num_chunks);
   // Compute the chunk virtual address and write it into |chunk|.
-  uint8_t* page_start = start_ + page_idx * page_size_;
   const size_t chunk_size = GetChunkSizeForLayout(page_layout);
   size_t chunk_offset_in_page = sizeof(PageHeader) + chunk_idx * chunk_size;
 
-  Chunk chunk(page_start + chunk_offset_in_page, chunk_size);
+  Chunk chunk(page_start(page_idx) + chunk_offset_in_page, chunk_size);
   PERFETTO_DCHECK(chunk.end() <= end());
   return chunk;
 }
@@ -134,8 +132,8 @@ SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
     }
     std::this_thread::yield();
   } while (--attempts);
-  // If |attempts| == 0, |num_chunks| below will become 0 and this function will
-  // return failing.
+  // If |attempts| == 0, |num_chunks| below will become 0 and this function
+  // will return failing.
   const size_t num_chunks = GetNumChunksForLayout(layout);
 
   // The page layout has changed (or the page is free).
@@ -176,7 +174,8 @@ SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
   if (desired_chunk_state == kChunkBeingWritten) {
     PERFETTO_DCHECK(header);
     ChunkHeader* new_header = chunk.header();
-    new_header->packets.store(header->packets, std::memory_order_relaxed);
+    new_header->packets_state.store(header->packets_state,
+                                    std::memory_order_relaxed);
     new_header->identifier.store(header->identifier, std::memory_order_release);
   }
   return chunk;
@@ -203,12 +202,6 @@ bool SharedMemoryABI::TryPartitionPage(size_t page_idx,
                      std::memory_order_release);
   return true;
 }
-//
-// size_t SharedMemoryABI::GetTargetBuffer(size_t page_idx) {
-//   // TODO: should this be acquire? This is a tricky one. Think.
-//   return
-//   page_header(page_idx)->target_buffer.load(std::memory_order_relaxed);
-// }
 
 size_t SharedMemoryABI::GetFreeChunks(size_t page_idx) {
   uint32_t layout =
@@ -309,8 +302,9 @@ void SharedMemoryABI::ReleaseAllChunksAsFree(size_t page_idx) {
   PageHeader* phdr = page_header(page_idx);
   phdr->layout.store(0, std::memory_order_release);
   uint8_t* page_start = start_ + page_idx * page_size_;
-  // TODO: On Linux/Android this should be MADV_REMOVE if we use memfd_create()
-  // and tmpfs supports hole punching (need to consult kernel sources).
+  // TODO: On Linux/Android this should be MADV_REMOVE if we use
+  // memfd_create() and tmpfs supports hole punching (need to consult kernel
+  // sources).
   int ret = madvise(reinterpret_cast<uint8_t*>(page_start), page_size_,
                     MADV_DONTNEED);
   PERFETTO_DCHECK(ret == 0);
@@ -324,18 +318,14 @@ SharedMemoryABI::Chunk::Chunk(uint8_t* begin, size_t size)
   PERFETTO_CHECK(end_ >= begin_);
 }
 
-std::pair<uint16_t, uint8_t> SharedMemoryABI::Chunk::GetPacketCountAndFlags() {
-  auto state = header()->packets.load(std::memory_order_acquire);
-  return std::make_pair(state.count, state.flags);
-}
-
 std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(
     const Chunk& chunk) {
   PERFETTO_DCHECK(chunk.is_valid());
   PERFETTO_DCHECK(chunk.begin() >= start_);
   PERFETTO_DCHECK(chunk.end() <= start_ + size_);
 
-  // TODO: this could be optimized if we cache |page_shift_|.
+  // TODO(primiano): The divisions below could be avoided if we cached
+  // |page_shift_|.
   const uintptr_t rel_addr = chunk.begin() - start_;
   const size_t page_idx = rel_addr / page_size_;
   const size_t offset = rel_addr % page_size_;
@@ -344,6 +334,7 @@ std::pair<size_t, size_t> SharedMemoryABI::GetPageAndChunkIndex(
   PERFETTO_DCHECK((offset - sizeof(PageHeader)) % chunk.size() == 0);
   const size_t chunk_idx = (offset - sizeof(PageHeader)) / chunk.size();
   PERFETTO_DCHECK(chunk_idx < kMaxChunksPerPage);
+  PERFETTO_DCHECK(chunk_idx < GetNumChunksForLayout(page_layout_dbg(page_idx)));
   return std::make_pair(page_idx, chunk_idx);
 }
 

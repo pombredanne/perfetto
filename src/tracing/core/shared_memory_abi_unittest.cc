@@ -114,7 +114,7 @@ TEST_P(SharedMemoryABITest, NominalCases) {
 
       uint16_t packets_count = static_cast<uint16_t>(chunk_idx * 10);
       uint8_t flags = static_cast<uint8_t>(0xffu - chunk_idx);
-      header.packets.store({packets_count, flags, 0 /* reserved */});
+      header.packets_state.store({packets_count, flags, 0 /* reserved */});
 
       // Acquiring a chunk with a different target_buffer should fail.
       chunk = abi.TryAcquireChunkForWriting(page_idx, chunk_idx,
@@ -146,21 +146,21 @@ TEST_P(SharedMemoryABITest, NominalCases) {
 
       ASSERT_EQ(chunk_id, chunk.header()->identifier.load().chunk_id);
       ASSERT_EQ(writer_id, chunk.header()->identifier.load().writer_id);
-      ASSERT_EQ(packets_count, chunk.header()->packets.load().count);
-      ASSERT_EQ(flags, chunk.header()->packets.load().flags);
+      ASSERT_EQ(packets_count, chunk.header()->packets_state.load().count);
+      ASSERT_EQ(flags, chunk.header()->packets_state.load().flags);
       ASSERT_EQ(std::make_pair(packets_count, flags),
                 chunk.GetPacketCountAndFlags());
 
-      chunk.increment_packet_count();
-      ASSERT_EQ(packets_count + 1, chunk.header()->packets.load().count);
+      chunk.IncrementPacketCount();
+      ASSERT_EQ(packets_count + 1, chunk.header()->packets_state.load().count);
 
-      chunk.increment_packet_count();
-      ASSERT_EQ(packets_count + 2, chunk.header()->packets.load().count);
+      chunk.IncrementPacketCount();
+      ASSERT_EQ(packets_count + 2, chunk.header()->packets_state.load().count);
 
-      chunk.set_flag(
+      chunk.SetFlag(
           SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);
       ASSERT_TRUE(
-          chunk.header()->packets.load().flags &
+          chunk.header()->packets_state.load().flags &
           SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);
 
       // Reacquiring the same chunk should fail.

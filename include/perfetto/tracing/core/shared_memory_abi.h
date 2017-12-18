@@ -65,7 +65,7 @@ namespace perfetto {
 //                     |  Page  |  Page  |  Page  |
 //                     +--------+--------+--------+
 //                     | Chunk  |        | Chunk  |
-//                     +--------+  Chunk +--------+ <--+
+//                     +--------+  Chunk +--------+ <----+
 //                     | Chunk  |        | Chunk  |      |
 //                     +--------+--------+--------+      +---------------------+
 //                                                       |       Service       |
@@ -91,19 +91,20 @@ namespace perfetto {
 // central logging buffers, the Service most of the times looks at and moves
 // whole pages. Similarly, the Producer sends an IPC to invite the Service to
 // drain the shared memory buffer only when a whole page is filled.
-// The page size is essentially a triangular tradeoff between:
+// Having fixed the total SMB size (hence the total memory overhead), the page
+// size is a triangular tradeoff between:
 // 1) IPC traffic: smaller pages -> more IPCs.
-// 2) Proucer lock freedom: larger pages -> larger chunks -> data sources can
+// 2) Producer lock freedom: larger pages -> larger chunks -> data sources can
 //    write more data without needing to swap chunks and synchronize.
 // 3) Risk of write-starving the SMB: larger pages -> higher chance that the
 //    Service won't manage to drain them and the SMB remains full.
 // The page size, on the other side, has no implications on wasted memory due to
 // fragmentations (see Chunk below).
-// The size of the page is chosen by the Producer at connection time and stays
+// The size of the page is chosen by the Service at connection time and stays
 // fixed throughout all the lifetime of the Producer. Different producers (i.e.
-// ~ different client processes) can chose a different sizes.
+// ~ different client processes) can use different page sizes.
 // The page size must be an integer multiple of 4k (this is to allow VM page
-// stealing optimizations) and obviously has to be an integer divider of the
+// stealing optimizations) and obviously has to be an integer divisor of the
 // total SMB size.
 
 // Chunk
@@ -128,9 +129,9 @@ namespace perfetto {
 // -----------
 // Is the atom of tracing. Putting aside pages and chunks a trace is merely a
 // sequence of TracePacket(s). TracePacket is the root protobuf message.
-// A TracePacket can spawn across several chunks (hence even across several
+// A TracePacket can span across several chunks (hence even across several
 // pages). A TracePacket can therefore be >> chunk size, >> page size and even
-// >> SMB size. The Chunks header carries metadata to deal with the TracePacket
+// >> SMB size. The Chunk header carries metadata to deal with the TracePacket
 // splitting case.
 
 // Use only explicitly-sized types below. DO NOT use size_t or any architecture
@@ -151,29 +152,29 @@ class SharedMemoryABI {
   static constexpr size_t kPacketHeaderSize = 4;
 
   // Chunk states and transitions:
-  //       kFree  <------------------+
+  //    kChunkFree  <----------------+
   //         |  (Producer)           |
   //         V                       |
-  //   kBeingWritten                 |
+  //  kChunkBeingWritten             |
   //         |  (Producer)           |
   //         V                       |
-  //  kWriteComplete                 |
+  //  kChunkComplete                 |
   //         |  (Service)            |
   //         V                       |
-  //    kBeingRead                   |
+  //  kChunkBeingRead                |
   //        |   (Service)            |
   //        +------------------------+
   enum ChunkState : uint32_t {
     // The Chunk is free. The Service shall never touch it, the Producer can
-    // acquire it and transition it into kBeingWritten.
+    // acquire it and transition it into kChunkBeingWritten.
     kChunkFree = 0,
 
     // The Chunk is being used by the Producer and is not complete yet.
-    // The Service shall never touch kBeingWritten pages.
+    // The Service shall never touch kChunkBeingWritten pages.
     kChunkBeingWritten = 1,
 
     // The Service is moving the page into its non-shared ring buffer. The
-    // Producer shall never touch kBeingRead pages.
+    // Producer shall never touch kChunkBeingRead pages.
     kChunkBeingRead = 2,
 
     // The Producer is done writing the page and won't touch it again. The
@@ -193,6 +194,10 @@ class SharedMemoryABI {
     // other flags in the page header (e.g., target_buffer).
     kPageBeingPartitioned = 1,
 
+    // TODO(primiano): Aligning a chunk @ 16 bytes could allow to use faster
+    // intrinsics based on quad-word moves. Do the path and check what is the
+    // fragmentation loss.
+
     // align4(X) := the largest integer N s.t. (N % 4) == 0 && N <= X.
     // 8 == sizeof(PageHeader).
     kPageDiv1 = 2,   // Only one chunk of size: PAGE_SIZE - 8.
@@ -201,7 +206,7 @@ class SharedMemoryABI {
     kPageDiv7 = 5,   // Seven chunks of size: align4((PAGE_SIZE - 8) / 7).
     kPageDiv14 = 6,  // Fourteen chunks of size: align4((PAGE_SIZE - 8) / 14).
 
-    // The rational for 7 and 14 above is to maximize the page usage for the
+    // The rationale for 7 and 14 above is to maximize the page usage for the
     // likely case of |page_size| == 4096:
     // (((4096 - 8) / 14) % 4) == 0, while (((4096 - 8) / 16 % 4)) == 3. So
     // Div16 would waste 3 * 16 = 48 bytes per page for chunk alignment gaps.
@@ -223,7 +228,7 @@ class SharedMemoryABI {
   // | Chunk #0 header [8 bytes]                         |
   // | Tells how many packets there are and whether the  |
   // | whether the 1st and last ones are fragmented.     |
-  // | Also has a seq number to reassemble fragments.    |
+  // | Also has a chunk id to reassemble fragments.    |
   // +***************************************************+
   // +---------------------------------------------------+
   // | Packet #0 size [varint, up to 4 bytes]            |
@@ -232,6 +237,9 @@ class SharedMemoryABI {
   // | A TracePacket protobuf message                    |
   // +---------------------------------------------------+
   //                         ...
+  // + . . . . . . . . . . . . . . . . . . . . . . . . . +
+  // |      Optional padding to maintain aligment        |
+  // + . . . . . . . . . . . . . . . . . . . . . . . . . +
   // +---------------------------------------------------+
   // | Packet #N size [varint, up to 4 bytes]            |
   // + - - - - - - - - - - - - - - - - - - - - - - - - - +
@@ -242,9 +250,11 @@ class SharedMemoryABI {
   // +***************************************************+
   // | Chunk #M header [8 bytes]                         |
   //                         ...
+
+  // Alignment applies to start offset only. The Chunk size is *not* aligned.
+  static constexpr uint32_t kChunkAlignment = 4;
   static constexpr uint32_t kChunkShift = 2;
   static constexpr uint32_t kChunkMask = 0x3;
-  static constexpr uint32_t kChunkAlignment = 4;
   static constexpr uint32_t kLayoutMask = 0x70000000;
   static constexpr uint32_t kLayoutShift = 28;
   static constexpr uint32_t kAllChunksMask = 0x0FFFFFFF;
@@ -316,7 +326,7 @@ class SharedMemoryABI {
 
     // Updated with release-store semantics
     std::atomic<Identifier> identifier;
-    std::atomic<PacketsState> packets;
+    std::atomic<PacketsState> packets_state;
   };
   static constexpr size_t kMaxWriterID = (1 << 10) - 1;
 
@@ -343,31 +353,33 @@ class SharedMemoryABI {
 
     ChunkHeader* header() { return reinterpret_cast<ChunkHeader*>(begin_); }
 
-    // Returns the count of packets (|packets.count|) with acquire-load
-    // semantics.
-    std::pair<uint16_t, uint8_t> GetPacketCountAndFlags();
+    // Returns the count of packets and the flags with acquire-load semantics.
+    std::pair<uint16_t, uint8_t> GetPacketCountAndFlags() {
+      auto pstate = header()->packets_state.load(std::memory_order_acquire);
+      return std::make_pair(pstate.count, pstate.flags);
+    }
 
-    // Increases |packets.count| with release semantics (however note that the
+    // Increases |packets_state.count| with release semantics (however the
     // packet count is incremented before starting writing a packet).
     // The increment is atomic but NOT race-free (i.e. no CAS). Only the
     // Producer is supposed to perform this increment thread-safely. A Chunk
     // cannot be shared by multiple threads without locking.
     // The packet count is cleared by TryAcquireChunk(), when passing the new
     // header for the chunk.
-    void increment_packet_count() {
+    void IncrementPacketCount() {
       ChunkHeader* chunk_header = header();
-      auto packets = chunk_header->packets.load(std::memory_order_relaxed);
-      packets.count++;
-      chunk_header->packets.store(packets, std::memory_order_release);
+      auto pstate = chunk_header->packets_state.load(std::memory_order_relaxed);
+      pstate.count++;
+      chunk_header->packets_state.store(pstate, std::memory_order_release);
     }
 
     // Flags are cleared by TryAcquireChunk(), by passing the new header for
     // the chunk.
-    void set_flag(ChunkHeader::Flags flag) {
+    void SetFlag(ChunkHeader::Flags flag) {
       ChunkHeader* chunk_header = header();
-      auto packets = chunk_header->packets.load(std::memory_order_relaxed);
-      packets.flags |= static_cast<uint8_t>(flag);
-      chunk_header->packets.store(packets, std::memory_order_release);
+      auto pstate = chunk_header->packets_state.load(std::memory_order_relaxed);
+      pstate.flags |= static_cast<uint8_t>(flag);
+      chunk_header->packets_state.store(pstate, std::memory_order_release);
     }
 
    private:
@@ -375,8 +387,8 @@ class SharedMemoryABI {
     Chunk(uint8_t* begin, size_t size);
 
     // Don't add extra fields, keep the move operator fast.
-    uint8_t* begin_ = 0;
-    uint8_t* end_ = 0;
+    uint8_t* begin_ = nullptr;
+    uint8_t* end_ = nullptr;
   };
 
   // Construct an instace from an existing shared memory buffer.
@@ -442,9 +454,10 @@ class SharedMemoryABI {
                         PageLayout layout,
                         size_t target_buffer);
 
-  // Tries to atomically mark a single chunk within the page as kBeingWritten.
-  // Returns a !is_valid() chunk if the page is not partitioned or the chunk is
-  // not in the kChunkFree state. If succeeds sets the chunk header to |header|.
+  // Tries to atomically mark a single chunk within the page as
+  // kChunkBeingWritten. Returns an invalid chunk if the page is not partitioned
+  // or the chunk is not in the kChunkFree state. If succeeds sets the chunk
+  // header to |header|.
   Chunk TryAcquireChunkForWriting(size_t page_idx,
                                   size_t chunk_idx,
                                   size_t expected_target_buffer,
@@ -475,7 +488,7 @@ class SharedMemoryABI {
                           uint32_t page_layout,
                           size_t chunk_idx);
 
-  // Puts a chunk into the kWriteComplete state.
+  // Puts a chunk into the kChunkComplete state.
   // If all chunks in the page are kChunkComplete returns the page index,
   // otherwise returns kInvalidPageIdx.
   size_t ReleaseChunkAsComplete(Chunk chunk) {
@@ -509,8 +522,6 @@ class SharedMemoryABI {
   size_t GetChunkSizeForLayout(uint32_t page_layout) const {
     return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
   }
-
-  Chunk GetChunk(size_t page_idx, size_t chunk_idx);
 
   Chunk TryAcquireChunk(size_t page_idx,
                         size_t chunk_idx,
