@@ -30,7 +30,7 @@ TEST(IdAllocatorTest, IdAllocation) {
     std::set<IdType> ids;
     for (IdType i = 0; i < kMaxId - 1; i++) {
       auto id = id_allocator.Allocate();
-      ASSERT_NE(0u, id);
+      EXPECT_NE(0u, id);
       ASSERT_EQ(0u, ids.count(id));
       ids.insert(id);
     }
