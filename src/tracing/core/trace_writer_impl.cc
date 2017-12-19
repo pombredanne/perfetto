@@ -47,8 +47,8 @@ TraceWriterImpl::TraceWriterImpl(SharedMemoryArbiter* shmem_arbiter,
       id_(id),
       target_buffer_(target_buffer),
       protobuf_stream_writer_(this) {
-  // TODO we could handle this more gracefully and always return some garbage
-  // TracePacket in NewTracePacket.
+  // TODO(primiano): we could handle the case of running out of TraceWriterID(s)
+  // more gracefully and always return a no-op TracePacket in NewTracePacket().
   PERFETTO_CHECK(id_ != 0);
 
   cur_packet_.reset(new protos::pbzero::TracePacket());
@@ -83,7 +83,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   cur_packet_->set_size_field(header);
   cur_chunk_.IncrementPacketCount();
   TracePacketHandle handle(cur_packet_.get());
-  cur_packet_start_ = protobuf_stream_writer_.write_ptr();
+  cur_fragment_start_ = protobuf_stream_writer_.write_ptr();
   fragmenting_packet_ = true;
   return handle;
 }
@@ -99,8 +99,8 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
 protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   if (fragmenting_packet_) {
     uint8_t* const wptr = protobuf_stream_writer_.write_ptr();
-    PERFETTO_DCHECK(wptr >= cur_packet_start_);
-    uint32_t partial_size = static_cast<uint32_t>(wptr - cur_packet_start_);
+    PERFETTO_DCHECK(wptr >= cur_fragment_start_);
+    uint32_t partial_size = static_cast<uint32_t>(wptr - cur_fragment_start_);
     PERFETTO_DCHECK(partial_size < cur_chunk_.size());
 
     // Backfill the packet header with the fragment size.
@@ -152,7 +152,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     cur_packet_->set_size_field(payload_begin);
     memset(payload_begin, 0, kPacketHeaderSize);
     payload_begin += kPacketHeaderSize;
-    cur_packet_start_ = payload_begin;
+    cur_fragment_start_ = payload_begin;
   }
 
   return protozero::ContiguousMemoryRange{payload_begin, cur_chunk_.end()};
