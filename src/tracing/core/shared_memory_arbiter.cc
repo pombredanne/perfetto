@@ -53,6 +53,8 @@ Chunk SharedMemoryArbiter::GetNewChunk(
     {
       std::lock_guard<std::mutex> scoped_lock(lock_);
       const size_t initial_page_idx = page_idx_;
+      // TODO(primiano): instead of scanning, we could maintain a bitmap of
+      // free chunks for each |target_buffer| and one for fully free pages.
       for (size_t i = 0; i < shmem_abi_.num_pages(); i++) {
         page_idx_ = (initial_page_idx + i) % shmem_abi_.num_pages();
         bool is_new_page = false;
@@ -72,6 +74,13 @@ Chunk SharedMemoryArbiter::GetNewChunk(
           tbuf = target_buffer;
         } else {
           free_chunks = shmem_abi_.GetFreeChunks(page_idx_);
+
+          // |tbuf| here is advisory only and could change at any point, before
+          // or after this read. The only use of |tbuf| here is to to skip pages
+          // that are more likely to belong to other target_buffers, avoiding
+          // the more epxensive atomic operations in those cases. The
+          // authoritative check on |tbuf| happens atomically in the
+          // TryAcquireChunkForWriting() call below.
           tbuf = shmem_abi_.page_header(page_idx_)->target_buffer.load(
               std::memory_order_relaxed);
         }
@@ -95,7 +104,7 @@ Chunk SharedMemoryArbiter::GetNewChunk(
         }
         // TODO: we should have some policy to guarantee fairness of the SMB
         // page allocator w.r.t |target_buffer|? Or is the SMB best-effort. All
-        // chunk in the page are busy (either kBeingRead or kBeingWritten), or
+        // chunks in the page are busy (either kBeingRead or kBeingWritten), or
         // all the pages are assigned to a different target buffer. Try with the
         // next page.
       }
@@ -114,11 +123,8 @@ void SharedMemoryArbiter::ReturnCompletedChunk(Chunk chunk) {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     size_t page_index = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
+      should_post_callback = pages_to_notify_.empty();
       pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
-      if (!scheduled_notification_) {
-        should_post_callback = true;
-        scheduled_notification_ = true;
-      }
     }
   }
   if (should_post_callback) {
@@ -135,7 +141,6 @@ void SharedMemoryArbiter::InvokeOnPageCompleteCallback() {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     pages_to_notify = std::move(pages_to_notify_);
     pages_to_notify_.clear();
-    scheduled_notification_ = false;
   }
   on_page_complete_callback_(pages_to_notify);
 }

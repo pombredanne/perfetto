@@ -77,7 +77,7 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
           abi->TryAcquireChunkForReading(page_idx, chunk_idx, tgt_buf_id);
       if (!chunk.is_valid())
         continue;
-      packets_count += chunk.header()->packets.load().count;
+      packets_count += chunk.header()->packets_state.load().count;
     }
   }
   EXPECT_EQ(32u, packets_count);

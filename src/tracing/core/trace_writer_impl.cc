@@ -81,7 +81,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
   uint8_t* header = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
   memset(header, 0, kPacketHeaderSize);
   cur_packet_->set_size_field(header);
-  cur_chunk_.increment_packet_count();
+  cur_chunk_.IncrementPacketCount();
   TracePacketHandle handle(cur_packet_.get());
   cur_packet_start_ = protobuf_stream_writer_.write_ptr();
   fragmenting_packet_ = true;
@@ -105,7 +105,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
 
     // Backfill the packet header with the fragment size.
     cur_packet_->inc_size_already_written(partial_size);
-    cur_chunk_.set_flag(ChunkHeader::kLastPacketContinuesOnNextChunk);
+    cur_chunk_.SetFlag(ChunkHeader::kLastPacketContinuesOnNextChunk);
     WriteRedundantVarInt(partial_size, cur_packet_->size_field());
 
     // Descend in the stack of non-finalized nested submessages (if any) and
@@ -144,7 +144,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   // into the shared buffer with the proper barriers.
   ChunkHeader header = {};
   header.identifier.store(identifier, std::memory_order_relaxed);
-  header.packets.store(packets_state, std::memory_order_relaxed);
+  header.packets_state.store(packets_state, std::memory_order_relaxed);
 
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header, target_buffer_);
   uint8_t* payload_begin = cur_chunk_.payload_begin();

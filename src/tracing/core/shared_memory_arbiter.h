@@ -43,15 +43,13 @@ class TaskRunner;
 // current thread-local chunk.
 class SharedMemoryArbiter {
  public:
-  // Exposed to allow tests to change it.
-
   using OnPageCompleteCallback =
-      std::function<void(const std::vector<uint32_t>&)>;
+      std::function<void(const std::vector<uint32_t>& /*page_indexes*/)>;
 
   // Args:
   // |start|,|size|: boundaries of the shared memory buffer.
   // |page_size|: a multiple of 4KB that defines the granularity of tracing
-  // pagaes. See tradeoff considerations in shared_memory_abi.h.
+  // pages. See tradeoff considerations in shared_memory_abi.h.
   // |OnPageCompleteCallback|: a callback that will be posted on the passed
   // |TaskRunner| when one or more pages are complete (and hence the Producer
   // should send a NotifySharedMemoryUpdate() to the Service).
@@ -61,18 +59,22 @@ class SharedMemoryArbiter {
                       OnPageCompleteCallback,
                       base::TaskRunner*);
 
+  // Creates a new TraceWriter and assigns it a new WriterID. The WriterID is
+  // written in each chunk header owned by a given TraceWriter and is used by
+  // the Service to reconstruct TracePackets written by the same TraceWriter.
+  // Returns nullptr if all WriterID slots are exhausted.
+  // TODO(primiano): instead of nullptr this should return a NoopWriter.
+  std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID target_buffer = 0);
+
+  // Returns a new Chunk to write tracing data. The call always returns a valid
+  // Chunk. TODO(primiano): right now this blocks if there are no free chunks
+  // in the SMB. In the long term the caller should be allowed to pick a policy
+  // and handle the retry itself asynchronously.
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
                                      BufferID target_buffer,
                                      size_t size_hint = 0);
 
   void ReturnCompletedChunk(SharedMemoryABI::Chunk chunk);
-
-  // Creates a new TraceWriter and assigns it a new WriterID. The WriterID is
-  // written in each chunk header owned by a given TraceWriter and is used by
-  // the Service to reconstruct reorder TracePackets written by the same
-  // TraceWriter. Returns nullptr if all WriterID slots are exhausted.
-  // TODO(primiano): instad of nullptr this should return a NoopWriter.
-  std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID target_buffer = 0);
 
   SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 
@@ -102,7 +104,6 @@ class SharedMemoryArbiter {
   size_t page_idx_ = 0;
   IdAllocator active_writer_ids_;
   std::vector<uint32_t> pages_to_notify_;
-  bool scheduled_notification_ = false;
   // --- End lock-protected members ---
 };
 
