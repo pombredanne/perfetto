@@ -16,7 +16,7 @@ import("../../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
 # Core tracing library, platform independent, no transport layer.
-source_set("tracing") {
+static_library("tracing") {
   public_deps = [
     "../../include/perfetto/tracing/core",
   ]
@@ -47,7 +47,7 @@ source_set("tracing") {
 
 # Posix specialization of the tracing library for Linux/Android/Mac. Provides
 # an IPC transport over a UNIX domain socket.
-source_set("ipc") {
+static_library("ipc") {
   public_deps = [
     "../../include/perfetto/tracing/core",
     "../../include/perfetto/tracing/ipc",
