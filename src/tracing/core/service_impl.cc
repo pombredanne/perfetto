@@ -17,6 +17,7 @@
 #include "src/tracing/core/service_impl.h"
 
 #include <inttypes.h>
+#include <string.h>
 
 #include <algorithm>
 
