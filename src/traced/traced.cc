@@ -27,6 +27,6 @@ int main(int argc, char** argv) {
   if (argc > 1 && !strcmp(argv[1], "service"))
     return perfetto::ServiceMain(argc, argv);
 
-  printf("Usage: %s  probes | service\n", argv[0]);
+  printf("Usage: %s probes | service\n", argv[0]);
   return 1;
 }
