@@ -59,7 +59,12 @@ TEST(PageAllocatorTest, GuardRegions) {
   EXPECT_DEATH({ raw[kSize] = 'x'; }, ".*");
 }
 
-#if !BUILDFLAG(OS_MACOSX)
+// Disable this on:
+// MacOS: because it doesn't seem to have an equivalent rlimit to bound mmap().
+// Sanitizers: they seem to try to shadow mmaped memory and fail due to OOMs.
+#if !BUILDFLAG(OS_MACOSX) && !defined(ADDRESS_SANITIZER) &&   \
+    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) && \
+    !defined(MEMORY_SANITIZER)
 // Glibc headers hit this on RLIMIT_ macros.
 #pragma GCC diagnostic push
 #if defined(__clang__)
