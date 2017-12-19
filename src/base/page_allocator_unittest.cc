@@ -60,6 +60,11 @@ TEST(PageAllocatorTest, GuardRegions) {
 }
 
 #if !BUILDFLAG(OS_MACOSX)
+// Glibc headers hit this on RLIMIT_ macros.
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
 TEST(PageAllocatorTest, Unchecked) {
   struct rlimit limit {
     1024 * 1024 * 32, 1024 * 1024 * 32
@@ -76,6 +81,7 @@ TEST(PageAllocatorTest, Unchecked) {
       },
       ::testing::ExitedWithCode(0), "");
 }
+#pragma GCC diagnostic pop
 #endif
 
 }  // namespace
