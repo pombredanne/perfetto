@@ -59,6 +59,8 @@ tree_path = 'external/perfetto'
 def enable_gmock(module):
     module.static_libs.append('libgmock')
 
+def enable_gtest_prod(module):
+    module.static_libs.append('libgtest_prod')
 
 def enable_gtest(module):
     assert module.type == 'cc_test'
@@ -86,6 +88,7 @@ def enable_libunwind(module):
 builtin_deps = {
     '//buildtools:gmock': enable_gmock,
     '//buildtools:gtest': enable_gtest,
+    '//buildtools:gtest_prod': enable_gtest_prod,
     '//buildtools:gtest_main': enable_gtest,
     '//buildtools:libunwind': enable_libunwind,
     '//buildtools:protobuf_full': enable_protobuf_full,
@@ -247,6 +250,8 @@ def apply_module_dependency(blueprint, desc, module, dep_name):
     if label_without_toolchain(dep_name) in builtin_deps:
         builtin_deps[label_without_toolchain(dep_name)](module)
         return
+
+    builtin_deps['//buildtools:gtest_prod'](module)
 
     # Similarly some shared libraries are directly mapped to Android
     # equivalents.
