@@ -43,9 +43,8 @@ class PageAllocator {
   // Allocates |size| bytes using mmap(MAP_ANONYMOUS). The returned pointer is
   // guaranteed to be page-aligned and the memory is guaranteed to be zeroed.
   // |size| must be a multiple of 4KB (a page size).
-  // The default version will crash if the mmap() fails (regardless of the state
-  // of -fno-exceptions). The nothrow overload instead will return a nullptr in
-  // case of failure.
+  // The default version will crash if the mmap() fails. The unchecked overload,
+  // instead, will return a nullptr in case of failure.
   static UniquePtr Allocate(size_t size);
   static UniquePtr Allocate(size_t size, const Unchecked&);
 };

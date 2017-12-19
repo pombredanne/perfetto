@@ -35,13 +35,12 @@ PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
   void* ptr = mmap(nullptr, outer_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
   if (ptr == MAP_FAILED && unchecked)
-    return PageAllocator::UniquePtr(nullptr, PageAllocator::Deleter(0));
+    return nullptr;
   PERFETTO_CHECK(ptr && ptr != MAP_FAILED);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
   int res = mprotect(ptr, kGuardSize, PROT_NONE);
   res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
   PERFETTO_CHECK(res == 0);
-
   return PageAllocator::UniquePtr(usable_region, PageAllocator::Deleter(size));
 }
 
@@ -57,11 +56,10 @@ void PageAllocator::Deleter::operator()(void* ptr) const {
   if (!ptr)
     return;
   PERFETTO_CHECK(size_);
-  size_t size = size_;
   char* start = reinterpret_cast<char*>(ptr) - kGuardSize;
-  size += kGuardSize * 2;
-  int res = munmap(start, size);
-  PERFETTO_DCHECK(res == 0);
+  const size_t outer_size = size_ + kGuardSize * 2;
+  int res = munmap(start, outer_size);
+  PERFETTO_CHECK(res == 0);
 }
 
 // static
