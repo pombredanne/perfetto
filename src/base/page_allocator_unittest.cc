@@ -66,16 +66,17 @@ TEST(PageAllocatorTest, GuardRegions) {
 #pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
 #endif
 TEST(PageAllocatorTest, Unchecked) {
+  const size_t kMemLimit = 256 * 1024 * 1024l;
   struct rlimit limit {
-    1024 * 1024 * 32, 1024 * 1024 * 32
+    kMemLimit, kMemLimit
   };
   // ASSERT_EXIT here is to spawn the test in a sub-process and avoid
   // propagating the setrlimit() to other test units in case of failure.
   ASSERT_EXIT(
       {
         ASSERT_EQ(0, setrlimit(RLIMIT_AS, &limit));
-        PageAllocator::UniquePtr ptr = PageAllocator::Allocate(
-            128 * 1024 * 1024, PageAllocator::Unchecked());
+        PageAllocator::UniquePtr ptr =
+            PageAllocator::Allocate(kMemLimit * 2, PageAllocator::Unchecked());
         ASSERT_FALSE(ptr);
         exit(0);
       },
