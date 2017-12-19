@@ -47,7 +47,7 @@ class TraceWriterImplTest : public AlignedBufferTest {
 
   std::unique_ptr<base::TestTaskRunner> task_runner_;
   std::unique_ptr<SharedMemoryArbiter> arbiter_;
-  std::function<void(const std::vector<uint32_t>&)> on_page_complete_;
+  std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
 };
 
 size_t const kPageSizes[] = {4096, 65536};
@@ -77,7 +77,7 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
           abi->TryAcquireChunkForReading(page_idx, chunk_idx, tgt_buf_id);
       if (!chunk.is_valid())
         continue;
-      packets_count += chunk.header()->packets.load().count;
+      packets_count += chunk.header()->packets_state.load().count;
     }
   }
   EXPECT_EQ(32u, packets_count);

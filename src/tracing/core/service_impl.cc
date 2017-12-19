@@ -145,7 +145,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     for (const auto& kv : ts.trace_buffers)
       buffer_ids_.Free(kv.first);
     ts.trace_buffers.clear();
-    return;
+    return;  // TODO(primiano): return failure condition?
   }
 
   // Enable the data sources on the producers.
@@ -196,7 +196,7 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
     return;  // TODO(primiano): signal failure?
   }
   // TODO(primiano): Most of this code is temporary and we should find a better
-  // solution to bookeep the log buffer (e.g., an allocator-like freelist)
+  // solution to bookkeep the log buffer (e.g., an allocator-like freelist)
   // rather than leveraging the SharedMemoryABI (which is intended only for the
   // Producer <> Service SMB and not for the TraceBuffer itself).
   auto weak_consumer = consumer->GetWeakPtr();
@@ -220,6 +220,8 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
         std::tie(num_packets, flags) = chunk.GetPacketCountAndFlags();
         const uint8_t* ptr = chunk.payload_begin();
 
+        // shared_ptr is really a workardound for the fact that is not possible
+        // to std::move() move-only types in labmdas until C++17.
         std::shared_ptr<std::vector<TracePacket>> packets(
             new std::vector<TracePacket>());
         packets->reserve(num_packets);
@@ -227,7 +229,7 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
         for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
           uint64_t pack_size = 0;
           ptr = ParseVarInt(ptr, chunk.end(), &pack_size);
-          // TODO stiching, look at the flags.
+          // TODO stitching, look at the flags.
           bool skip = (pack_idx == 0 &&
                        flags & SharedMemoryABI::ChunkHeader::
                                    kFirstPacketContinuesFromPrevChunk) ||
@@ -256,7 +258,8 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
   }      // for(buffer_id)
   task_runner_->PostTask([weak_consumer]() {
     if (weak_consumer)
-      weak_consumer->consumer()->OnTraceData(std::vector<TracePacket>(), false);
+      weak_consumer->consumer()->OnTraceData(std::vector<TracePacket>(),
+                                             false /*has_more*/);
   });
 }
 
@@ -289,7 +292,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
       if (id == target_buffer) {
         // TODO(primiano): we should have some stronger check to prevent that
         // the Producer passes |target_buffer| which is valid, but that we never
-        // asked it to use. Essentially we want to prevent A malicious producer
+        // asked it to use. Essentially we want to prevent a malicious producer
         // to inject data into a log buffer that has nothing to do with it.
         tbuf = &tbuf_it.second;
         break;

@@ -84,7 +84,7 @@ class Service {
     // Creates a trace writer, which allows to create events, handling the
     // underying shared memory buffer and signalling to the Service. This method
     // is thread-safe but the returned object is not. A TraceWriter should be
-    // used only from a single thread, or the caller has to handle linearization
+    // used only from a single thread, or the caller has to handle sequencing
     // via a mutex or equivalent.
     // Args:
     // |target_buffer| is the target buffer ID where the data produced by the

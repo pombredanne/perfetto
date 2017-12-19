@@ -144,6 +144,7 @@ class ServiceImpl : public Service {
   };
 
   struct TraceBuffer {
+    // TODO(primiano): make this configurable.
     static constexpr size_t kBufferPageSize = 4096;
     explicit TraceBuffer(size_t size);
     ~TraceBuffer();
@@ -200,8 +201,8 @@ class ServiceImpl : public Service {
 
   std::multimap<std::string /*name*/, RegisteredDataSource> data_sources_;
 
-  // TODO(primiano): There doesn't seem to be any good read why |producers_| is
-  // a map indexed by ID and not just a set<ProducerEndpointImpl*>.
+  // TODO(primiano): There doesn't seem to be any good reason why |producers_|
+  // is a map indexed by ID and not just a set<ProducerEndpointImpl*>.
   std::map<ProducerID, ProducerEndpointImpl*> producers_;
 
   std::set<ConsumerEndpointImpl*> consumers_;

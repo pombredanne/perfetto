@@ -110,7 +110,7 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
 
   auto result = ipc::AsyncResult<ReadBuffersResponse>::Create();
   result.set_has_more(has_more);
-  // TODO(primiano): Expose the chunks to the Producer rather than stiching
+  // TODO(primiano): Expose the chunks to the Consumer rather than stitching
   // them and wasting cpu time to hide this detail.
   for (const TracePacket& trace_packet : trace_packets) {
     std::string* dst = result->add_trace_packets();

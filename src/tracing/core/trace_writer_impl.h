@@ -76,7 +76,7 @@ class TraceWriterImpl : public TraceWriter,
   const BufferID target_buffer_;
 
   // Monotonic (% wrapping) sequence id of the chunk. Together with the WriterID
-  // this allows the Service to to reconstruct the linear sequence of packets.
+  // this allows the Service to reconstruct the linear sequence of packets.
   uint16_t cur_chunk_id_ = 0;
 
   // The chunk we are holding onto (if any).
@@ -91,9 +91,9 @@ class TraceWriterImpl : public TraceWriter,
   // TracePacketHandle has just a pointer to it.
   std::unique_ptr<protos::pbzero::TracePacket> cur_packet_;
 
-  // The start address, within |cur_cunk_|, of |cur_packet_|. Used to figure out
+  // The start address of |cur_packet_| within |cur_chunk_|. Used to figure out
   // fragments sizes when a TracePacket write is interrupted by GetNewBuffer().
-  uint8_t* cur_packet_start_ = 0;
+  uint8_t* cur_fragment_start_ = nullptr;
 
   // true if we received a call to GetNewBuffer() after NewTracePacket(),
   // false if GetNewBuffer() happened during NewTracePacket() prologue, while
