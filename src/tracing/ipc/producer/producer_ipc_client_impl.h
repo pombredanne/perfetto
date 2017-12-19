@@ -21,6 +21,7 @@
 
 #include <vector>
 
+#include "perfetto/base/thread_checker.h"
 #include "perfetto/ipc/service_proxy.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/service.h"
@@ -81,7 +82,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   void OnServiceRequest(const GetAsyncCommandResponse&);
 
   // Callback passed to SharedMemoryArbiter.
-  void OnPageComplete(const std::vector<uint32_t>&);
+  void OnPagesComplete(const std::vector<uint32_t>&);
 
   // TODO think to destruction order, do we rely on any specific dtor sequence?
   Producer* const producer_;
@@ -97,6 +98,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   std::unique_ptr<PosixSharedMemory> shared_memory_;
   std::unique_ptr<SharedMemoryArbiter> shared_memory_arbiter_;
   bool connected_ = false;
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 }  // namespace perfetto

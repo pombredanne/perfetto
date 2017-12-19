@@ -52,13 +52,17 @@ bool ServiceIPCHostImpl::Start(const char* producer_socket_name,
   // Initialize the IPC transport.
   producer_ipc_port_ =
       ipc::Host::CreateInstance(producer_socket_name, task_runner_);
-  if (!producer_ipc_port_)
-    return static_cast<void>(Shutdown()), false;
+  if (!producer_ipc_port_) {
+    Shutdown();
+    return false;
+  }
 
   consumer_ipc_port_ =
       ipc::Host::CreateInstance(consumer_socket_name, task_runner_);
-  if (!producer_ipc_port_)
-    return static_cast<void>(Shutdown()), false;
+  if (!producer_ipc_port_) {
+    Shutdown();
+    return false;
+  }
 
   // TODO: add a test that destroyes the ServiceIPCHostImpl soon after Start()
   // and checks that no spurious callbacks are issued.

@@ -51,12 +51,14 @@ ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
       ipc_channel_(ipc::Client::CreateInstance(service_sock_name, task_runner)),
       producer_port_(this /* event_listener */) {
   ipc_channel_->BindService(producer_port_.GetWeakPtr());
+  PERFETTO_DCHECK_THREAD(thread_checker_);
 }
 
 ProducerIPCClientImpl::~ProducerIPCClientImpl() = default;
 
 // Called by the IPC layer if the BindService() succeeds.
 void ProducerIPCClientImpl::OnConnect() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   connected_ = true;
 
   // The IPC layer guarantees that any outstanding callback will be dropped on
@@ -80,12 +82,14 @@ void ProducerIPCClientImpl::OnConnect() {
 }
 
 void ProducerIPCClientImpl::OnDisconnect() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Tracing service connection failure");
   connected_ = false;
   producer_->OnDisconnect();
 }
 
 void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   // If connection_succeeded == false, the OnDisconnect() call will follow next
   // and there we'll notify the |producer_|. TODO: add a test for this.
   if (!connection_succeeded)
@@ -97,23 +101,24 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   // TODO(primiano): handle mmap failure in case of OOM.
   shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
 
-  auto on_page_complete = [this](const std::vector<uint32_t>& changed_pages) {
-    OnPageComplete(changed_pages);
+  auto on_pages_complete = [this](const std::vector<uint32_t>& changed_pages) {
+    OnPagesComplete(changed_pages);
   };
   shared_memory_arbiter_.reset(
       new SharedMemoryArbiter(shared_memory_->start(), shared_memory_->size(),
                               4096 /* TODO where does this come from? */,
-                              on_page_complete, task_runner_));
+                              on_pages_complete, task_runner_));
 
   producer_->OnConnect();
 }
 
 // Called by SharedMemoryArbiter when some chunks are complete and we need to
 // notify the service about that.
-void ProducerIPCClientImpl::OnPageComplete(
+void ProducerIPCClientImpl::OnPagesComplete(
     const std::vector<uint32_t>& changed_pages) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
-    PERFETTO_DLOG("Cannot OnPageComplete(), not connected to tracing service");
+    PERFETTO_DLOG("Cannot OnPagesComplete(), not connected to tracing service");
     return;
   }
   NotifySharedMemoryUpdateRequest req;
@@ -126,6 +131,7 @@ void ProducerIPCClientImpl::OnPageComplete(
 
 void ProducerIPCClientImpl::OnServiceRequest(
     const GetAsyncCommandResponse& cmd) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   if (cmd.cmd_case() == GetAsyncCommandResponse::kStartDataSource) {
     // Keep this in sync with chages in data_source_config.proto.
     const auto& req = cmd.start_data_source();
@@ -149,6 +155,7 @@ void ProducerIPCClientImpl::OnServiceRequest(
 void ProducerIPCClientImpl::RegisterDataSource(
     const DataSourceDescriptor& descriptor,
     RegisterDataSourceCallback callback) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
         "Cannot RegisterDataSource(), not connected to tracing service");
@@ -177,6 +184,7 @@ void ProducerIPCClientImpl::RegisterDataSource(
 }
 
 void ProducerIPCClientImpl::UnregisterDataSource(DataSourceID id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
         "Cannot UnregisterDataSource(), not connected to tracing service");
@@ -190,6 +198,7 @@ void ProducerIPCClientImpl::UnregisterDataSource(DataSourceID id) {
 
 void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
         "Cannot NotifySharedMemoryUpdate(), not connected to tracing service");
