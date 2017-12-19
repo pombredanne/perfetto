@@ -447,6 +447,7 @@ ServiceImpl::TraceBuffer::TraceBuffer(size_t sz) : size(sz) {
     return;
   }
   PERFETTO_CHECK(ptr);
+  memset(ptr, 0, size);
   data.reset(ptr);
   abi.reset(new SharedMemoryABI(get_page(0), size, kBufferPageSize));
 }

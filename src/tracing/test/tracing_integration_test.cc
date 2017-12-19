@@ -196,18 +196,19 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
 
   // Destroy the service and check that both Producer and Consumer see an
   // OnDisconnect() call.
-  svc.reset();
 
   auto on_producer_disconnect =
       task_runner_->CreateCheckpoint("on_producer_disconnect");
   EXPECT_CALL(producer, OnDisconnect())
       .WillOnce(Invoke(on_producer_disconnect));
-  task_runner_->RunUntilCheckpoint("on_producer_disconnect");
 
   auto on_consumer_disconnect =
       task_runner_->CreateCheckpoint("on_consumer_disconnect");
   EXPECT_CALL(consumer, OnDisconnect())
       .WillOnce(Invoke(on_consumer_disconnect));
+
+  svc.reset();
+  task_runner_->RunUntilCheckpoint("on_producer_disconnect");
   task_runner_->RunUntilCheckpoint("on_consumer_disconnect");
 }
 
