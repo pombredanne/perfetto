@@ -18,6 +18,7 @@ include $(CLEAR_VARS)
 
 # Don't include this package in any target
 LOCAL_MODULE_TAGS := tests
+
 # When built, explicitly put it in the data partition.
 LOCAL_MODULE_PATH := $(TARGET_OUT_DATA_APPS)
 

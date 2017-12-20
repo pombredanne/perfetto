@@ -15,16 +15,22 @@
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
+
 LOCAL_MODULE:= CtsPerfettoTestCases
 LOCAL_MODULE_PATH := $(TARGET_OUT_DATA)/nativetest
+LOCAL_MULTILIB := both
+LOCAL_MODULE_STEM_32 := $(LOCAL_MODULE)32
+LOCAL_MODULE_STEM_64 := $(LOCAL_MODULE)64
+LOCAL_CPP_EXTENSION := .cc
 
 LOCAL_SRC_FILES := \
-    src/PerfettoTest.cpp
+    perfetto_cts.cc
 
 LOCAL_CFLAGS := -Wall -Werror
 
 LOCAL_STATIC_LIBRARIES := \
-    libgtest
+    libgtest \
+    perfetto_src_tracing_ipc
 
 # Tag this module as a cts test artifact
 LOCAL_COMPATIBILITY_SUITE := cts vts general-tests
