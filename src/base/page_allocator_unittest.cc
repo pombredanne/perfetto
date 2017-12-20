@@ -80,8 +80,7 @@ TEST(PageAllocatorTest, Unchecked) {
   ASSERT_EXIT(
       {
         ASSERT_EQ(0, setrlimit(RLIMIT_AS, &limit));
-        PageAllocator::UniquePtr ptr =
-            PageAllocator::Allocate(kMemLimit * 2, PageAllocator::Unchecked());
+        auto ptr = PageAllocator::AllocateMayFail(kMemLimit * 2);
         ASSERT_FALSE(ptr);
         exit(0);
       },

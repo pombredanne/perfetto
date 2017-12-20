@@ -444,7 +444,7 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 ////////////////////////////////////////////////////////////////////////////////
 
 ServiceImpl::TraceBuffer::TraceBuffer(size_t sz) : size(sz) {
-  data = base::PageAllocator::Allocate(size, base::PageAllocator::unchecked);
+  data = base::PageAllocator::AllocateMayFail(size);
   if (!data) {
     PERFETTO_ELOG("Trace buffer allocation failed (size: %zu, page_size: %zu)",
                   size, kBufferPageSize);

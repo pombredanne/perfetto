@@ -46,9 +46,6 @@ PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
 
 }  // namespace
 
-// static
-PageAllocator::Unchecked PageAllocator::unchecked;
-
 PageAllocator::Deleter::Deleter() : Deleter(0) {}
 PageAllocator::Deleter::Deleter(size_t size) : size_(size) {}
 
@@ -68,8 +65,7 @@ PageAllocator::UniquePtr PageAllocator::Allocate(size_t size) {
 }
 
 // static
-PageAllocator::UniquePtr PageAllocator::Allocate(size_t size,
-                                                 const Unchecked&) {
+PageAllocator::UniquePtr PageAllocator::AllocateMayFail(size_t size) {
   return AllocateInternal(size, true /*unchecked*/);
 }
 

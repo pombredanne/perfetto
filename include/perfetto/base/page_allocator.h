@@ -34,19 +34,17 @@ class PageAllocator {
     size_t size_;
   };
 
-  // Used only as a marker for Allocate() below.
-  struct Unchecked {};
-  static Unchecked unchecked;
-
   using UniquePtr = std::unique_ptr<void, Deleter>;
 
   // Allocates |size| bytes using mmap(MAP_ANONYMOUS). The returned pointer is
   // guaranteed to be page-aligned and the memory is guaranteed to be zeroed.
-  // |size| must be a multiple of 4KB (a page size).
-  // The default version will crash if the mmap() fails. The unchecked overload,
-  // instead, will return a nullptr in case of failure.
+  // |size| must be a multiple of 4KB (a page size). Crashes if the underlying
+  // mmap() fails.
   static UniquePtr Allocate(size_t size);
-  static UniquePtr Allocate(size_t size, const Unchecked&);
+
+  // Like the above, but returns a nullptr if the mmap() fails (e.g., if out
+  // of virtual address space).
+  static UniquePtr AllocateMayFail(size_t size);
 };
 
 }  // namespace base
