@@ -14,11 +14,19 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
-option optimize_for = LITE_RUNTIME;
+#ifndef SRC_BASE_TEST_VM_TEST_UTILS_H_
+#define SRC_BASE_TEST_VM_TEST_UTILS_H_
 
-package perfetto.proto;
+#include <stddef.h>
 
-message DataSourceConfig {
-  string trace_category_filters = 1;  // TODO: temporary for tests.
-}
+namespace perfetto {
+namespace base {
+namespace vm_test_utils {
+
+bool IsMapped(void* start, size_t size);
+
+}  // namespace vm_test_utils
+}  // namespace base
+}  // namespace perfetto
+
+#endif  // SRC_BASE_TEST_VM_TEST_UTILS_H_

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "src/ftrace_reader/event_info.h"
 
 namespace perfetto {
 
@@ -37,42 +38,20 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
+bool InferFtraceType(const std::string& type_and_name,
+                     size_t size,
+                     bool is_signed,
+                     FtraceFieldType* out);
+
 class ProtoTranslationTable {
  public:
-  enum FtraceFieldType {
-    kFtraceNumber = 0,
-  };
-
-  enum ProtoFieldType {
-    kProtoNumber = 0,
-  };
-
-  struct Field {
-    Field() = default;
-    Field(size_t offset, size_t size)
-        : ftrace_offset(offset), ftrace_size(size) {}
-
-    size_t ftrace_offset = 0;
-    size_t ftrace_size = 0;
-    FtraceFieldType ftrace_type = kFtraceNumber;
-    size_t proto_field_id = 0;
-    ProtoFieldType proto_field_type = kProtoNumber;
-  };
-
-  struct Event {
-    Event() = default;
-    Event(const std::string& event_name, const std::string& event_group)
-        : name(event_name), group(event_group) {}
-
-    std::string name;
-    std::string group;
-    std::vector<Field> fields;
-    size_t ftrace_event_id = 0;
-    size_t proto_field_id = 0;
-  };
-
+  // This method mutates the |events| and |common_fields| vectors to
+  // fill some of the fields and to delete unused events/fields
+  // before std:move'ing them into the ProtoTranslationTable.
   static std::unique_ptr<ProtoTranslationTable> Create(
-      const FtraceProcfs* ftrace_procfs);
+      const FtraceProcfs* ftrace_procfs,
+      std::vector<Event> events,
+      std::vector<Field> common_fields);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,
@@ -101,6 +80,8 @@ class ProtoTranslationTable {
       return 0;
     return name_to_event_.at(name)->ftrace_event_id;
   }
+
+  const std::vector<Event>& events() { return events_; }
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;

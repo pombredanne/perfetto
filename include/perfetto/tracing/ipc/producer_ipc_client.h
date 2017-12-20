@@ -28,7 +28,7 @@ class Producer;
 
 // Allows to connect to a remote Service through a UNIX domain socket.
 // Exposed to:
-//   Producer(s) and Consumer(s) of the tracing library.
+//   Producer(s) of the tracing library.
 // Implemented in:
 //   src/ipc/producer/producer_ipc_client_impl.cc
 class ProducerIPCClient {

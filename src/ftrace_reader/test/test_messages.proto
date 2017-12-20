@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
+syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-package perfetto.proto;
+message FakeFtraceEvent {
+  optional uint32 common_field = 1;
+  oneof event { FakeAllFieldsFtraceEvent all_fields = 42; }
+}
 
-// This message is sent from Producer(s) to the tracing Service when registering
-// to advertise their capabilities. It describes the structure of tracing
-// protos that will be produced by the data source and the supported filters.
-message DataSourceDescriptor {
-  string name = 1;  // e.g., "linux.ftrace", "chromium.tracing"
-
-  // TODO: this should have a structure to enable reflection of the proto
-  // fields emitted (see go/perfetto-logging).
+message FakeAllFieldsFtraceEvent {
+  optional uint32 field_uint32 = 1;
+  optional string field_char_16 = 500;
+  optional string field_char = 501;
 }

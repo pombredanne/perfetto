@@ -31,6 +31,19 @@ namespace perfetto {
 
 namespace {
 
+static bool ReadIntoString(const uint8_t* start,
+                           const uint8_t* end,
+                           size_t field_id,
+                           protozero::ProtoZeroMessage* out) {
+  for (const uint8_t* c = start; c < end; c++) {
+    if (*c != '\0')
+      continue;
+    out->AppendBytes(field_id, reinterpret_cast<const char*>(start), c - start);
+    return true;
+  }
+  return false;
+}
+
 using BundleHandle =
     protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
 
@@ -38,7 +51,7 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
                                            const std::set<std::string>& names) {
   std::vector<bool> enabled(table.largest_id() + 1);
   for (const std::string& name : names) {
-    const ProtoTranslationTable::Event* event = table.GetEventByName(name);
+    const Event* event = table.GetEventByName(name);
     if (!event)
       continue;
     enabled[event->ftrace_event_id] = true;
@@ -133,11 +146,6 @@ bool CpuReader::ParsePage(size_t cpu,
                           const EventFilter* filter,
                           protos::pbzero::FtraceEventBundle* bundle,
                           const ProtoTranslationTable* table) {
-  // TODO(hjd): Remove when the generic parser comes in.
-  const size_t print_id = table->GetEventByName("print")->ftrace_event_id;
-  const size_t sched_switch_id =
-      table->GetEventByName("sched_switch")->ftrace_event_id;
-
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + kPageSize;
 
@@ -204,99 +212,18 @@ bool CpuReader::ParsePage(size_t cpu,
           // TODO(hjd): Look at the next few bytes for real size.
           PERFETTO_CHECK(false);
         }
+        const uint8_t* start = ptr;
         const uint8_t* next = ptr + 4 * event_header.type_or_length;
 
         uint16_t ftrace_event_id;
         if (!ReadAndAdvance<uint16_t>(&ptr, end, &ftrace_event_id))
           return false;
-        if (!filter->IsEventEnabled(ftrace_event_id)) {
-          ptr = next;
-          break;
+        if (filter->IsEventEnabled(ftrace_event_id)) {
+          protos::pbzero::FtraceEvent* event = bundle->add_event();
+          event->set_timestamp(timestamp);
+          if (!ParseEvent(ftrace_event_id, start, next, table, event))
+            return false;
         }
-
-        // Common headers:
-        // TODO(hjd): Read this format dynamically?
-        uint8_t flags;
-        uint8_t preempt_count;
-        uint32_t pid;
-        if (!ReadAndAdvance<uint8_t>(&ptr, end, &flags))
-          return false;
-        if (!ReadAndAdvance<uint8_t>(&ptr, end, &preempt_count))
-          return false;
-        if (!ReadAndAdvance<uint32_t>(&ptr, end, &pid))
-          return false;
-
-        // PERFETTO_DLOG("Event type=%d pid=%d", ftrace_event_id, pid);
-
-        protos::pbzero::FtraceEvent* event = bundle->add_event();
-        event->set_pid(pid);
-        event->set_timestamp(timestamp);
-
-        // TODO(hjd): Replace this handrolled code with generic parsing code.
-        if (ftrace_event_id == print_id) {
-          protos::pbzero::PrintFtraceEvent* print_event = event->set_print();
-          // Trace Marker Parser
-          uint64_t ip;
-          if (!ReadAndAdvance<uint64_t>(&ptr, end, &ip))
-            return false;
-          print_event->set_ip(ip);
-
-          // TODO(hjd): Not sure if this is null-terminated.
-          const uint8_t* buf_start = ptr;
-          const uint8_t* buf_end = next;
-          for (const uint8_t* c = buf_start; c < buf_end; c++) {
-            if (*c != '\0')
-              continue;
-            print_event->set_buf(reinterpret_cast<const char*>(buf_start),
-                                 c - buf_start);
-            break;
-          }
-          print_event->Finalize();
-        }
-
-        // TODO(hjd): Replace this handrolled code with generic parsing code.
-        if (ftrace_event_id == sched_switch_id) {
-          protos::pbzero::SchedSwitchFtraceEvent* switch_event =
-              event->set_sched_switch();
-
-          char prev_comm[16];
-          uint32_t prev_pid;
-          uint32_t prev_prio;
-          uint64_t prev_state;
-          char next_comm[16];
-          uint32_t next_pid;
-          uint32_t next_prio;
-
-          // TODO(hjd): Avoid this copy.
-          if (!ReadAndAdvance<char[16]>(&ptr, end, &prev_comm))
-            return false;
-          if (!ReadAndAdvance<uint32_t>(&ptr, end, &prev_pid))
-            return false;
-          if (!ReadAndAdvance<uint32_t>(&ptr, end, &prev_prio))
-            return false;
-          if (!ReadAndAdvance<uint64_t>(&ptr, end, &prev_state))
-            return false;
-          if (!ReadAndAdvance<char[16]>(&ptr, end, &next_comm))
-            return false;
-          if (!ReadAndAdvance<uint32_t>(&ptr, end, &next_pid))
-            return false;
-          if (!ReadAndAdvance<uint32_t>(&ptr, end, &next_prio))
-            return false;
-          // TODO(hjd): Not sure if this is null-terminated.
-          prev_comm[15] = '\0';
-          switch_event->set_prev_comm(prev_comm);
-          switch_event->set_prev_pid(prev_pid);
-          switch_event->set_prev_prio(prev_prio);
-          switch_event->set_prev_state(prev_state);
-          // TODO(hjd): Not sure if this is null-terminated.
-          next_comm[15] = '\0';
-          switch_event->set_next_comm(next_comm);
-          switch_event->set_next_pid(next_pid);
-          switch_event->set_next_prio(next_prio);
-          switch_event->Finalize();
-        }
-
-        event->Finalize();
 
         // Jump to next event.
         ptr = next;
@@ -304,6 +231,82 @@ bool CpuReader::ParsePage(size_t cpu,
     }
   }
   return true;
+}
+
+// |start| is the start of the current event.
+// |end| is the end of the buffer.
+bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
+                           const uint8_t* start,
+                           const uint8_t* end,
+                           const ProtoTranslationTable* table,
+                           protozero::ProtoZeroMessage* message) {
+  PERFETTO_DCHECK(start < end);
+  const size_t length = end - start;
+
+  // TODO(hjd): Rework to work even if the event is unknown.
+  const Event& info = *table->GetEventById(ftrace_event_id);
+
+  // TODO(hjd): Test truncated events.
+  // If the end of the buffer is before the end of the event give up.
+  if (info.size > length) {
+    PERFETTO_DCHECK(false);
+    return false;
+  }
+
+  for (const Field& field : table->common_fields())
+    ParseField(field, start, end, message);
+
+  protozero::ProtoZeroMessage* nested =
+      message->BeginNestedMessage<protozero::ProtoZeroMessage>(
+          info.proto_field_id);
+
+  for (const Field& field : info.fields)
+    ParseField(field, start, end, nested);
+
+  // This finalizes |nested| automatically.
+  message->Finalize();
+  return true;
+}
+
+// Caller must guarantee that the field fits in the range,
+// explicitly: start + field.ftrace_offset + field.ftrace_size <= end
+// The only exception is fields with strategy = kCStringToString
+// where the total size isn't known up front. In this case ParseField
+// will check the string terminates in the bounds and won't read past |end|.
+bool CpuReader::ParseField(const Field& field,
+                           const uint8_t* start,
+                           const uint8_t* end,
+                           protozero::ProtoZeroMessage* message) {
+  PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
+  const uint8_t* field_start = start + field.ftrace_offset;
+  uint32_t field_id = field.proto_field_id;
+
+  switch (field.strategy) {
+    case kUint32ToUint32:
+    case kUint32ToUint64:
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+      return true;
+    case kUint64ToUint64:
+      ReadIntoVarInt<uint64_t>(field_start, field_id, message);
+      return true;
+    case kInt32ToInt32:
+    case kInt32ToInt64:
+      ReadIntoVarInt<int32_t>(field_start, field_id, message);
+      return true;
+    case kInt64ToInt64:
+      ReadIntoVarInt<int64_t>(field_start, field_id, message);
+      return true;
+    case kFixedCStringToString:
+      // TODO(hjd): Add AppendMaxLength string to protozero.
+      return ReadIntoString(field_start, field_start + field.ftrace_size,
+                            field_id, message);
+    case kCStringToString:
+      // TODO(hjd): Kernel-dive to check this how size:0 char fields work.
+      return ReadIntoString(field_start, end, field.proto_field_id, message);
+  }
+  // Not reached, for gcc.
+  PERFETTO_CHECK(false);
+  return false;
 }
 
 }  // namespace perfetto
