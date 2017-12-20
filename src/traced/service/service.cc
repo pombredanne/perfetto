@@ -24,10 +24,8 @@ int ServiceMain(int argc, char** argv) {
   base::UnixTaskRunner task_runner;
   std::unique_ptr<ServiceIPCHost> svc;
   svc = ServiceIPCHost::CreateInstance(&task_runner);
-  if (PERFETTO_PRODUCER_SOCK_NAME[0] != '@')
-    unlink(PERFETTO_PRODUCER_SOCK_NAME);
-  if (PERFETTO_PRODUCER_SOCK_NAME[0] != '@')
-    unlink(PERFETTO_CONSUMER_SOCK_NAME);
+  unlink(PERFETTO_PRODUCER_SOCK_NAME);
+  unlink(PERFETTO_CONSUMER_SOCK_NAME);
   svc->Start(PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
   PERFETTO_ILOG("Started traced, listening on %s %s",
                 PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
