@@ -24,9 +24,9 @@ can then be decoded by the GTest consumer. This app is simply installed before
 the GTest suite is run.
 
 # Notes
-The AndroidTest.xml file which is associated with these tests can be found 
+The AndroidTest.xml file which is associated with these tests can be found
 n $ANDROID/cts/tests/perfetto. This is to allow for other users of CTS to
-be aware that Perfetto has CTS tests. 
+be aware that Perfetto has CTS tests.
 
 The code is located inside the Perfetto repository as we anticipate fast
 development on Perfetto and moreover, we wish to retain the ability to
