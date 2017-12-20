@@ -18,6 +18,7 @@ include $(CLEAR_VARS)
 
 # Don't include this package in any target
 LOCAL_MODULE_TAGS := tests
+
 # When built, explicitly put it in the data partition.
 LOCAL_MODULE_PATH := $(TARGET_OUT_DATA_APPS)
 
@@ -32,6 +33,11 @@ LOCAL_COMPATIBILITY_SUITE := cts vts general-tests
 
 LOCAL_PACKAGE_NAME := CtsPerfettoProducerApp
 
+LOCAL_JNI_SHARED_LIBRARIES := \
+	libperfettoctsproducer_jni
+
 LOCAL_SDK_VERSION := current
 
 include $(BUILD_PACKAGE)
+
+include $(call all-makefiles-under,$(LOCAL_PATH))
