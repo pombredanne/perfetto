@@ -57,6 +57,10 @@ constexpr T AssumeLittleEndian(T value) {
   return value;
 }
 
+#if !defined(NDEBUG)
+void PrintStackTrace();
+#endif
+
 }  // namespace base
 }  // namespace perfetto
 
