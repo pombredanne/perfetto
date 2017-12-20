@@ -43,6 +43,9 @@ if (is_debug) {
       "-Wno-deprecated-dynamic-exception-spec",
       "-Wno-disabled-macro-expansion",
     ]
+    deps = [
+      "../../gn:default_deps",
+    ]
   }
 }
 
