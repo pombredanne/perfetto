@@ -20,6 +20,7 @@ group("all") {
     ":perfetto_tests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
+    "src/traced",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
   ]
@@ -40,8 +41,10 @@ executable("perfetto_tests") {
     "src/ipc:perfetto_ipc_unittests",
     "src/protozero:protozero_unittests",
     "src/tracing:tracing_unittests",
-    "tools/sanitizers_unittests",
   ]
+  if (!build_with_chromium) {
+    deps += [ "tools/sanitizers_unittests" ]
+  }
 }
 
 if (!build_with_chromium) {
