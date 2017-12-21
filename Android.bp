@@ -801,6 +801,7 @@ cc_binary {
 // GN target: //:traced
 cc_binary {
   name: "traced",
+  init_rc: ["traced.rc"],
   srcs: [
     ":perfetto_protos_ftrace_lite_gen",
     ":perfetto_protos_ftrace_zero_gen",

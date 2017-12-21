@@ -1,0 +1,7 @@
+service traced /system/bin/traced service
+    disabled
+    socket traced_consumer stream 0666 traced traced
+    socket traced_producer stream 0666 traced traced
+    user traced
+    group traced
+    writepid /dev/cpuset/system-background/tasks
