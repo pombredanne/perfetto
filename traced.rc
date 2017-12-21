@@ -1,0 +1,16 @@
+service traced /system/bin/traced service
+    seclabel u:r:traced:s0
+    disabled
+    socket traced_consumer stream 0666 traced traced
+    socket traced_producer stream 0666 traced traced
+    user traced
+    group traced
+    writepid /dev/cpuset/system-background/tasks
+
+service traced_probes /system/bin/traced probes
+    seclabel u:r:traced_probes:s0
+    disabled
+    # TODO: this should be perhaps just another uid?
+    user shell
+    group shell
+    writepid /dev/cpuset/system-background/tasks
