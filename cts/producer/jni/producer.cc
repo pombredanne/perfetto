@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <android/log.h>
 #include <jni.h>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -43,7 +43,7 @@ class ProducerImpl : public Producer {
   ~ProducerImpl() override{};
 
   void OnConnect() override {
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "connected");
+    PERFETTO_ILOG("connected");
     DataSourceDescriptor descriptor;
     descriptor.set_name("android.perfetto.cts.Producer");
     endpoint_->RegisterDataSource(descriptor,
@@ -51,21 +51,21 @@ class ProducerImpl : public Producer {
   }
 
   void OnDisconnect() override {
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Disconnect");
+    PERFETTO_ILOG("Disconnect");
     Shutdown();
   }
 
   void CreateDataSourceInstance(
       DataSourceInstanceID,
       const DataSourceConfig& source_config) override {
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Create");
+    PERFETTO_ILOG("Create");
     const std::string& categories = source_config.trace_category_filters();
     if (categories != "foo,bar") {
       Shutdown();
       return;
     }
 
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Writing");
+    PERFETTO_ILOG("Writing");
     auto trace_writer = endpoint_->CreateTraceWriter(1);
     for (int i = 0; i < 10; i++) {
       auto handle = trace_writer->NewTracePacket();
@@ -78,12 +78,12 @@ class ProducerImpl : public Producer {
     // TODO(primiano): remove this hack once flushing the final packet is fixed.
     trace_writer->NewTracePacket();
 
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Finalized");
+    PERFETTO_ILOG("Finalized");
     endpoint_->UnregisterDataSource(id_);
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {
-    __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Teardown");
+    PERFETTO_ILOG("Teardown");
     Shutdown();
   }
 
@@ -112,6 +112,6 @@ extern "C" JNIEXPORT void JNICALL
 Java_android_perfetto_producer_PerfettoProducerActivity_setupProducer(
     JNIEnv*,
     jclass /*clazz*/) {
-  __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "JNI");
+  PERFETTO_ILOG("JNI");
   perfetto::ListenAndRespond();
 }
