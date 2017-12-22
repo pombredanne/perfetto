@@ -29,8 +29,8 @@ namespace perfetto {
 #define PERFETTO_PRODUCER_SOCK_NAME "@perfetto-producer"
 #define PERFETTO_CONSUMER_SOCK_NAME "@perfetto-consumer"
 #else
-#define PERFETTO_PRODUCER_SOCK_NAME "/tmp/perfetto-producer"
-#define PERFETTO_CONSUMER_SOCK_NAME "/tmp/perfetto-consumer"
+#define PERFETTO_PRODUCER_SOCK_NAME "/data/local/tmp/perfetto-producer"
+#define PERFETTO_CONSUMER_SOCK_NAME "/data/local/tmp/perfetto-consumer"
 #endif
 
 int ServiceMain(int argc, char** argv);
