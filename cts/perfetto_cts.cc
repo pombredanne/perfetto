@@ -56,8 +56,8 @@ class MockConsumer : public Consumer {
 TEST(PerfettoTest, TestMockProducer) {
   MockConsumer mock_consumer;
   base::UnixTaskRunner task_runner;
-  auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME, &mock_consumer,
-                                           &task_runner);
+  auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
+                                           &mock_consumer, &task_runner);
 
   EXPECT_CALL(mock_consumer, OnConnect())
       .WillOnce(Invoke([&client, &task_runner]() {
@@ -80,21 +80,21 @@ TEST(PerfettoTest, TestMockProducer) {
       }));
 
   auto function = [&task_runner](auto* packets, bool has_more) {
-      if (has_more) {
-        for (auto& packet : *packets) {
-          packet.Decode();
-          ASSERT_TRUE(packet->has_test());
-          ASSERT_EQ(packet->test(), "test");
-        }
-        ASSERT_FALSE(packets->empty()); 
-      } else {
-        ASSERT_TRUE(packets->empty());
-        task_runner.Quit();
+    if (has_more) {
+      for (auto& packet : *packets) {
+        packet.Decode();
+        ASSERT_TRUE(packet->has_test());
+        ASSERT_EQ(packet->test(), "test");
       }
-    };
+      ASSERT_FALSE(packets->empty());
+    } else {
+      ASSERT_TRUE(packets->empty());
+      task_runner.Quit();
+    }
+  };
   EXPECT_CALL(mock_consumer, DoOnTraceData(_, _))
-    .Times(AtLeast(2))
-    .WillRepeatedly(Invoke(function));
+      .Times(AtLeast(2))
+      .WillRepeatedly(Invoke(function));
 
   task_runner.Run();
 }

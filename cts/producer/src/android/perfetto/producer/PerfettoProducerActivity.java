@@ -32,6 +32,7 @@ public class PerfettoProducerActivity extends Activity {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+        finish();
     }
 
     private static native void setupProducer();
