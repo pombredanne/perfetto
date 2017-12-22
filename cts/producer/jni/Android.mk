@@ -25,14 +25,15 @@ LOCAL_SRC_FILES := \
 	producer.cc
 
 LOCAL_C_INCLUDES := \
-	$(JNI_H_INCLUDE) \
-	system/core/include
+    $(JNI_H_INCLUDE) \
+    system/core/include
 
 LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_STATIC_LIBRARIES := \
-		perfetto_src_tracing_ipc \
+    perfetto_src_tracing_ipc \
     libprotobuf-cpp-lite
+
 LOCAL_SHARED_LIBRARIES := \
     liblog
 
