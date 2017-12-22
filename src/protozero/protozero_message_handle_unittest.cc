@@ -14,18 +14,18 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include <string.h>
+#include "perfetto/protozero/protozero_message_handle.h"
 
-#include "perfetto/traced/traced.h"
+namespace protozero {
 
-int main(int argc, char** argv) {
-  if (argc > 1 && !strcmp(argv[1], "probes"))
-    return perfetto::ProbesMain(argc, argv);
+namespace {
 
-  if (argc > 1 && !strcmp(argv[1], "service"))
-    return perfetto::ServiceMain(argc, argv);
-
-  printf("Usage: %s probes | service\n", argv[0]);
-  return 1;
+TEST(ProtoZeroMessageHandleTest, MoveHandleSharedMessageDoesntFinalize) {
+  ProtoZeroMessage message;
+  ProtoZeroMessageHandle handle_1(&message);
+  handle_1 = ProtoZeroMessageHandle(&message);
+  ASSERT_FALSE(handle_1->is_finalized());
 }
+
+}  // namespace
+}  // namespace protozero
