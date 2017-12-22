@@ -32,7 +32,6 @@
 #include "protos/trace_packet.pbzero.h"
 
 using ::testing::AtLeast;
-using ::testing::InSequence;
 using ::testing::Invoke;
 using ::testing::_;
 

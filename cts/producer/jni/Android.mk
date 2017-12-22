@@ -39,7 +39,6 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES := \
     liblog
 
-# LOCAL_SDK_VERSION := current
 LOCAL_CXX_STL := libc++_static
 
 include $(BUILD_SHARED_LIBRARY)
