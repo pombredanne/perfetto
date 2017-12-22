@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,26 +18,16 @@ package android.perfetto.producer;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.util.Log;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import java.lang.Override;
 import java.util.List;
 
 public class PerfettoProducerActivity extends Activity {
     @Override
-    public void onCreate(Bundle icicle) {
-        super.onCreate(icicle);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
         System.loadLibrary("perfettoctsproducer_jni");
         try {
-            List<String> lines =
-                    Files.readAllLines(Paths.get("/data/local/tmp", "org.limun.limun-build-id.txt"),
-                            Charset.defaultCharset());
-            for (String line : lines) {
-                System.out.println(line);
-            }
             setupProducer();
         } catch (Exception ex) {
             ex.printStackTrace();
