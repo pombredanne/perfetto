@@ -14,13 +14,20 @@
 
 import("gn/perfetto.gni")
 
+declare_args() {
+  # Only for local development. When true the binaries (perfetto, traced, ...)
+  # are monolithic and don't use a common shared library. This is mainly to
+  # avoid LD_LIBRARY_PATH dances when testing locally.
+  monolithic_binaries = false
+}
+assert(!monolithic_binaries || !build_with_android)
+
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
-    ":perfetto_tests",
+    ":perfetto_unittests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
-    "src/tracing:consumer_cmd",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
   ]
@@ -28,14 +35,17 @@ group("all") {
     deps += [
       ":perfetto",
       ":perfetto_benchmarks",
+      ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
+
+      # TODO(lalitm): remove this when we use lite runtime.
       "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
 }
 
-executable("perfetto_tests") {
+executable("perfetto_unittests") {
   testonly = true
   deps = [
     "gn:default_deps",
@@ -50,6 +60,19 @@ executable("perfetto_tests") {
   }
 }
 
+# These tests require access to a real ftrace implementation and must
+# run with sudo.
+executable("perfetto_integrationtests") {
+  testonly = true
+  deps = [
+    "gn:default_deps",
+    "test:end_to_end_integrationtests",
+
+    # TODO(lalitm): add this back when we use lite runtime.
+    # "src/ftrace_reader:ftrace_reader_integrationtests",
+  ]
+}
+
 if (!build_with_chromium) {
   executable("perfetto_benchmarks") {
     testonly = true
@@ -59,7 +82,13 @@ if (!build_with_chromium) {
     ]
   }
 
-  shared_library("libtraced_shared") {
+  if (monolithic_binaries) {
+    libtraced_shared_target_type = "source_set"
+  } else {
+    libtraced_shared_target_type = "shared_library"
+  }
+
+  target(libtraced_shared_target_type, "libtraced_shared") {
     deps = [
       "gn:default_deps",
       "src/traced/perfetto_cmd",

@@ -11,34 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-LOCAL_PATH := $(call my-dir)
 
-include $(CLEAR_VARS)
+source_set("end_to_end_integrationtests") {
+  testonly = true
+  deps = [
+    ":fake_producer",
+    "../gn:default_deps",
+    "../gn:gtest_deps",
+    "../src/tracing:ipc",
+  ]
+  sources = [
+    "end_to_end_integrationtest.cc",
+    "end_to_end_integrationtest.h",
+  ]
+}
 
-LOCAL_MODULE    := libperfettoctsproducer_jni
-
-LOCAL_MULTILIB := both
-
-LOCAL_MODULE_TAGS := optional
-
-LOCAL_CPP_EXTENSION := .cc
-LOCAL_SRC_FILES := \
-	producer.cc
-
-LOCAL_C_INCLUDES := \
-    $(JNI_H_INCLUDE) \
-    system/core/include
-
-LOCAL_CFLAGS += -Wall -Werror
-
-LOCAL_STATIC_LIBRARIES := \
-    perfetto_src_tracing_ipc \
-    libprotobuf-cpp-lite
-
-LOCAL_SHARED_LIBRARIES := \
-    liblog
-
-LOCAL_CXX_STL := libc++_static
-
-include $(BUILD_SHARED_LIBRARY)
+source_set("fake_producer") {
+  testonly = true
+  deps = [
+    "../gn:default_deps",
+    "../gn:gtest_deps",
+    "../src/tracing:ipc",
+  ]
+  sources = [
+    "fake_producer.cc",
+    "fake_producer.h",
+  ]
+}

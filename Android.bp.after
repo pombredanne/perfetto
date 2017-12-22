@@ -1,0 +1,48 @@
+cc_test {
+  name: "CtsPerfettoTestCases",
+  srcs: [
+    "test/end_to_end_integrationtest.cc",
+    "test/end_to_end_integrationtest_cts.cc",
+  ],
+  static_libs: [
+    "libgmock",
+    "libgtest",
+    "libgtest_main",
+    "perfetto_src_tracing_ipc",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  test_suites: [
+    "cts",
+    "vts",
+    "general-tests",
+  ],
+  compile_multilib: "both",
+  multilib: {
+    lib32: {
+        suffix: "32",
+    },
+    lib64: {
+        suffix: "64",
+    },
+  },
+}
+
+cc_library_shared {
+  name: "libperfettoctsproducer_jni",
+  srcs: [
+    "test/fake_producer.cc",
+    "test/cts/producer/jni/fake_producer_jni.cc",
+  ],
+  static_libs: [
+    "perfetto_src_tracing_ipc"
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  compile_multilib: "both",
+  stl: "libc++_static",
+}

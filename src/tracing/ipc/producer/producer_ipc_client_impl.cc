@@ -106,7 +106,7 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   };
   shared_memory_arbiter_.reset(
       new SharedMemoryArbiter(shared_memory_->start(), shared_memory_->size(),
-                              4096 /* TODO where does this come from? */,
+                              8192 /* TODO where does this come from? */,
                               on_pages_complete, task_runner_));
 
   producer_->OnConnect();

@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.os.Bundle;
 
 public class ProducerActivity extends Activity {
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -38,7 +37,8 @@ public class ProducerActivity extends Activity {
                     ex.printStackTrace();
                 }
             }
-        }).start();
+        })
+                .start();
     }
 
     private static native void setupProducer();

@@ -117,6 +117,66 @@ cc_defaults {
   ],
 }
 
+// GN target: //:perfetto_integrationtests
+cc_test {
+  name: "perfetto_integrationtests",
+  srcs: [
+    ":perfetto_protos_ftrace_lite_gen",
+    ":perfetto_protos_ftrace_zero_gen",
+    ":perfetto_protos_lite_gen",
+    ":perfetto_protos_tracing_service_lite_gen",
+    ":perfetto_protos_tracing_service_tracing_service_gen",
+    ":perfetto_protos_zero_gen",
+    ":perfetto_src_ipc_wire_protocol_gen",
+    "src/base/page_allocator.cc",
+    "src/base/thread_checker.cc",
+    "src/base/unix_task_runner.cc",
+    "src/ipc/buffered_frame_deserializer.cc",
+    "src/ipc/client_impl.cc",
+    "src/ipc/deferred.cc",
+    "src/ipc/host_impl.cc",
+    "src/ipc/service_proxy.cc",
+    "src/ipc/unix_socket.cc",
+    "src/protozero/proto_utils.cc",
+    "src/protozero/protozero_message.cc",
+    "src/protozero/protozero_message_handle.cc",
+    "src/protozero/scattered_stream_writer.cc",
+    "src/tracing/core/chunked_protobuf_input_stream.cc",
+    "src/tracing/core/data_source_config.cc",
+    "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/id_allocator.cc",
+    "src/tracing/core/service_impl.cc",
+    "src/tracing/core/shared_memory_abi.cc",
+    "src/tracing/core/shared_memory_arbiter.cc",
+    "src/tracing/core/trace_config.cc",
+    "src/tracing/core/trace_packet.cc",
+    "src/tracing/core/trace_writer_impl.cc",
+    "test/end_to_end_integrationtest.cc",
+    "test/fake_producer.cc",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  static_libs: [
+    "libgmock",
+    "libgtest_prod",
+    "perfetto_src_tracing_ipc",
+  ],
+  generated_headers: [
+    "perfetto_protos_ftrace_lite_gen_headers",
+    "perfetto_protos_ftrace_zero_gen_headers",
+    "perfetto_protos_lite_gen_headers",
+    "perfetto_protos_tracing_service_lite_gen_headers",
+    "perfetto_protos_tracing_service_tracing_service_gen_headers",
+    "perfetto_protos_zero_gen_headers",
+    "perfetto_src_ipc_wire_protocol_gen_headers",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+}
+
 // GN target: //protos/ftrace:lite_gen
 genrule {
   name: "perfetto_protos_ftrace_lite_gen",
@@ -723,9 +783,9 @@ cc_library_static {
   ],
 }
 
-// GN target: //:perfetto_tests
+// GN target: //:perfetto_unittests
 cc_test {
-  name: "perfetto_tests",
+  name: "perfetto_unittests",
   srcs: [
     ":perfetto_protos_ftrace_lite_gen",
     ":perfetto_protos_ftrace_zero_gen",
@@ -839,64 +899,6 @@ cc_test {
   ],
 }
 
-// GN target: //src/tracing:consumer_cmd
-cc_binary {
-  name: "src_tracing_consumer_cmd",
-  srcs: [
-    ":perfetto_protos_ftrace_lite_gen",
-    ":perfetto_protos_ftrace_zero_gen",
-    ":perfetto_protos_lite_gen",
-    ":perfetto_protos_tracing_service_lite_gen",
-    ":perfetto_protos_tracing_service_tracing_service_gen",
-    ":perfetto_protos_zero_gen",
-    ":perfetto_src_ipc_wire_protocol_gen",
-    "src/base/page_allocator.cc",
-    "src/base/thread_checker.cc",
-    "src/base/unix_task_runner.cc",
-    "src/ipc/buffered_frame_deserializer.cc",
-    "src/ipc/client_impl.cc",
-    "src/ipc/deferred.cc",
-    "src/ipc/host_impl.cc",
-    "src/ipc/service_proxy.cc",
-    "src/ipc/unix_socket.cc",
-    "src/protozero/proto_utils.cc",
-    "src/protozero/protozero_message.cc",
-    "src/protozero/protozero_message_handle.cc",
-    "src/protozero/scattered_stream_writer.cc",
-    "src/tracing/core/chunked_protobuf_input_stream.cc",
-    "src/tracing/core/data_source_config.cc",
-    "src/tracing/core/data_source_descriptor.cc",
-    "src/tracing/core/id_allocator.cc",
-    "src/tracing/core/service_impl.cc",
-    "src/tracing/core/shared_memory_abi.cc",
-    "src/tracing/core/shared_memory_arbiter.cc",
-    "src/tracing/core/trace_config.cc",
-    "src/tracing/core/trace_packet.cc",
-    "src/tracing/core/trace_writer_impl.cc",
-    "src/tracing/test/consumer_cmd.cc",
-  ],
-  shared_libs: [
-    "liblog",
-    "libprotobuf-cpp-lite",
-  ],
-  static_libs: [
-    "libgtest_prod",
-    "perfetto_src_tracing_ipc",
-  ],
-  generated_headers: [
-    "perfetto_protos_ftrace_lite_gen_headers",
-    "perfetto_protos_ftrace_zero_gen_headers",
-    "perfetto_protos_lite_gen_headers",
-    "perfetto_protos_tracing_service_lite_gen_headers",
-    "perfetto_protos_tracing_service_tracing_service_gen_headers",
-    "perfetto_protos_zero_gen_headers",
-    "perfetto_src_ipc_wire_protocol_gen_headers",
-  ],
-  defaults: [
-    "perfetto_defaults",
-  ],
-}
-
 // GN target: //:traced
 cc_binary {
   name: "traced",
@@ -932,4 +934,53 @@ cc_binary {
   defaults: [
     "perfetto_defaults",
   ],
+}
+
+cc_test {
+  name: "CtsPerfettoTestCases",
+  srcs: [
+    "test/end_to_end_integrationtest.cc",
+    "test/end_to_end_integrationtest_cts.cc",
+  ],
+  static_libs: [
+    "libgmock",
+    "libgtest",
+    "libgtest_main",
+    "perfetto_src_tracing_ipc",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  test_suites: [
+    "cts",
+    "vts",
+    "general-tests",
+  ],
+  compile_multilib: "both",
+  multilib: {
+    lib32: {
+        suffix: "32",
+    },
+    lib64: {
+        suffix: "64",
+    },
+  },
+}
+
+cc_library_shared {
+  name: "libperfettoctsproducer_jni",
+  srcs: [
+    "test/fake_producer.cc",
+    "test/cts/producer/jni/fake_producer_jni.cc",
+  ],
+  static_libs: [
+    "perfetto_src_tracing_ipc"
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  compile_multilib: "both",
+  stl: "libc++_static",
 }

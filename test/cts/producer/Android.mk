@@ -16,31 +16,26 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE:= CtsPerfettoTestCases
-LOCAL_MODULE_PATH := $(TARGET_OUT_DATA)/nativetest
-LOCAL_MULTILIB := both
-LOCAL_MODULE_STEM_32 := $(LOCAL_MODULE)32
-LOCAL_MODULE_STEM_64 := $(LOCAL_MODULE)64
-LOCAL_CPP_EXTENSION := .cc
-
-LOCAL_SRC_FILES := \
-    perfetto_cts.cc
-
-LOCAL_CFLAGS := -Wall -Werror
-
-LOCAL_SHARED_LIBRARIES := \
-    liblog \
-    libprotobuf-cpp-lite
-
-LOCAL_STATIC_LIBRARIES := \
-    libgmock \
-    libgtest \
-    libgtest_main \
-    perfetto_src_tracing_ipc
-
-# Tag this module as a cts test artifact
+# tag this module as a cts test artifact
 LOCAL_COMPATIBILITY_SUITE := cts vts general-tests
 
-include $(BUILD_CTS_EXECUTABLE)
+# Don't include this package in any target
+LOCAL_MODULE_TAGS := tests
+
+# When built, explicitly put it in the data partition.
+LOCAL_MODULE_PATH := $(TARGET_OUT_DATA_APPS)
+
+LOCAL_DEX_PREOPT := false
+LOCAL_MULTILIB := both
+LOCAL_PROGUARD_ENABLED := disabled
+
+LOCAL_SRC_FILES := $(call all-java-files-under, src)
+
+LOCAL_PACKAGE_NAME := CtsPerfettoProducerApp
+
+LOCAL_JNI_SHARED_LIBRARIES := \
+    libperfettoctsproducer_jni
+
+include $(BUILD_PACKAGE)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))

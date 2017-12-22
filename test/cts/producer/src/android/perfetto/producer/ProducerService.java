@@ -21,9 +21,8 @@ import android.os.IBinder;
 import android.content.Intent;
 
 public class ProducerService extends Service {
-
-   @Override
-   public void onCreate() {
+    @Override
+    public void onCreate() {
         System.loadLibrary("perfettoctsproducer_jni");
         new Thread(new Runnable() {
             @Override
@@ -34,8 +33,9 @@ public class ProducerService extends Service {
                     ex.printStackTrace();
                 }
             }
-        }).start();
-   }
+        })
+                .start();
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -48,9 +48,7 @@ public class ProducerService extends Service {
     }
 
     @Override
-    public void onDestroy() {
-
-    }
+    public void onDestroy() {}
 
     private static native void setupProducer();
 }
