@@ -52,7 +52,60 @@ class MockConsumer : public Consumer {
   }
 };
 
-TEST(PerfettoTest, TestMockProducer) {
+class PerfettoTest : public ::testing::Test {
+ protected:
+  void TestMockProducer(const std::string& producer_name) {
+    MockConsumer mock_consumer;
+    base::UnixTaskRunner task_runner;
+    auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
+                                            &mock_consumer, &task_runner);
+
+    EXPECT_CALL(mock_consumer, OnConnect())
+        .WillOnce(Invoke([&client, &task_runner, &producer_name]() {
+          TraceConfig trace_config;
+          trace_config.add_buffers()->set_size_kb(4096 * 10);
+          trace_config.set_duration_ms(10000);
+
+          auto* ds_config = trace_config.add_data_sources()->mutable_config();
+          ds_config->set_name(producer_name);
+          ds_config->set_target_buffer(0);
+          ds_config->set_trace_category_filters("foo,bar");
+
+          client->EnableTracing(trace_config);
+
+          task_runner.PostDelayedTask(std::bind([&client]() {
+                                        client->DisableTracing();
+                                        client->ReadBuffers();
+                                      }),
+                                      trace_config.duration_ms());
+        }));
+
+    uint64_t total = 0;
+    auto function = [&task_runner, &total](auto* packets, bool has_more) {
+      if (has_more) {
+        for (auto& packet : *packets) {
+          packet.Decode();
+          ASSERT_TRUE(packet->has_test());
+          ASSERT_EQ(packet->test(), "test");
+        }
+        total += packets->size();
+        ASSERT_FALSE(packets->empty());
+      } else {
+        ASSERT_EQ(total, 10u);
+        ASSERT_TRUE(packets->empty());
+        task_runner.Quit();
+      }
+    };
+    EXPECT_CALL(mock_consumer, DoOnTraceData(_, _))
+        .Times(AtLeast(2))
+        .WillRepeatedly(Invoke(function));
+
+    task_runner.Run();
+  }
+};
+
+/*
+TEST_F(PerfettoTest, TestFtraceProducer) {
   MockConsumer mock_consumer;
   base::UnixTaskRunner task_runner;
   auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
@@ -65,9 +118,9 @@ TEST(PerfettoTest, TestMockProducer) {
         trace_config.set_duration_ms(10000);
 
         auto* ds_config = trace_config.add_data_sources()->mutable_config();
-        ds_config->set_name("android.perfetto.cts.Producer");
-        ds_config->set_target_buffer(0);
-        ds_config->set_trace_category_filters("foo,bar");
+        ds_config->set_name("com.google.perfetto.ftrace");
+        ds_config->set_target_buffer(1);
+        ds_config->set_trace_category_filters("sched_switch,bar");
 
         client->EnableTracing(trace_config);
 
@@ -83,13 +136,15 @@ TEST(PerfettoTest, TestMockProducer) {
     if (has_more) {
       for (auto& packet : *packets) {
         packet.Decode();
-        ASSERT_TRUE(packet->has_test());
-        ASSERT_EQ(packet->test(), "test");
-        total++;
+        ASSERT_TRUE(packet->has_ftrace_events());
+        for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
+          ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
+        }
       }
+      total += packets->size();
       ASSERT_FALSE(packets->empty());
     } else {
-      ASSERT_EQ(total, 10u);
+      ASSERT_GE(total, 100u);
       ASSERT_TRUE(packets->empty());
       task_runner.Quit();
     }
@@ -100,5 +155,20 @@ TEST(PerfettoTest, TestMockProducer) {
 
   task_runner.Run();
 }
+
+TEST_F(PerfettoTest, TestProducerActivity) {
+  TestMockProducer("android.perfetto.cts.ProducerActivity");
+}
+*/
+
+TEST_F(PerfettoTest, TestProducerService) {
+  TestMockProducer("android.perfetto.cts.ProducerService");
+}
+
+/*
+TEST_F(PerfettoTest, TestProducerIsolatedService) {
+  TestMockProducer("android.perfetto.cts.ProducerIsolatedService");
+}
+*/
 
 }  // namespace perfetto

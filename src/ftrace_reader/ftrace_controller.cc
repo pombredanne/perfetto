@@ -96,6 +96,18 @@ void FtraceController::StartIfNeeded() {
   }
 }
 
+void FtraceController::ClearTrace() {
+  ftrace_procfs_->ClearTrace();
+}
+
+void FtraceController::DisableAllEvents() {
+  ftrace_procfs_->DisableAllEvents();
+}
+
+void FtraceController::WriteTraceMarker(const std::string& s) {
+  ftrace_procfs_->WriteTraceMarker(s);
+}
+
 void FtraceController::StopIfNeeded() {
   if (sinks_.size() != 0)
     return;
@@ -122,6 +134,7 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
     filters[i] = sink->get_event_filter();
     bundles[i++] = sink->GetBundleForCpu(cpu);
   }
+  PERFETTO_ELOG("Drain being called");
   reader->Drain(filters, bundles);
   i = 0;
   for (FtraceSink* sink : sinks_)
@@ -168,7 +181,7 @@ void FtraceController::RegisterForEvent(const std::string& name) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   const Event* event = table_->GetEventByName(name);
   if (!event) {
-    PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
+    PERFETTO_ELOG("Can't enable %s, event not known", name.c_str());
     return;
   }
   size_t& count = enabled_count_.at(event->ftrace_event_id);

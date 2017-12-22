@@ -35,17 +35,19 @@ namespace {
 
 class ProducerImpl : public Producer {
  public:
-  ProducerImpl(base::UnixTaskRunner* task_runner)
-      : endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
+  ProducerImpl(const std::string name,
+               base::UnixTaskRunner* task_runner)
+      : name_(name),
+        endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
                                              this,
                                              task_runner)),
         task_runner_(task_runner) {}
-  ~ProducerImpl() override{};
+  ~ProducerImpl() override = default;
 
   void OnConnect() override {
     PERFETTO_ILOG("connected");
     DataSourceDescriptor descriptor;
-    descriptor.set_name("android.perfetto.cts.Producer");
+    descriptor.set_name(name_);
     endpoint_->RegisterDataSource(descriptor,
                                   [this](DataSourceID id) { id_ = id; });
   }
@@ -93,14 +95,15 @@ class ProducerImpl : public Producer {
     task_runner_->Quit();
   }
 
+  std::string name_;
   DataSourceID id_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   base::UnixTaskRunner* task_runner_;
 };
 
-void ListenAndRespond() {
+void ListenAndRespond(const std::string& name) {
   base::UnixTaskRunner task_runner;
-  ProducerImpl producer(&task_runner);
+  ProducerImpl producer(name, &task_runner);
   task_runner.Run();
 }
 
@@ -109,9 +112,26 @@ void ListenAndRespond() {
 }  // namespace perfetto
 
 extern "C" JNIEXPORT void JNICALL
-Java_android_perfetto_producer_PerfettoProducerActivity_setupProducer(
+Java_android_perfetto_producer_ProducerActivity_setupProducer(
     JNIEnv*,
     jclass /*clazz*/) {
   PERFETTO_ILOG("JNI");
-  perfetto::ListenAndRespond();
+  perfetto::ListenAndRespond("android.perfetto.cts.ProducerActivity");
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_android_perfetto_producer_ProducerIsolatedService_setupProducer(
+    JNIEnv*,
+    jclass /*clazz*/) {
+  PERFETTO_ILOG("JNI");
+  perfetto::ListenAndRespond("android.perfetto.cts.ProducerIsolatedService");
+}
+
+
+extern "C" JNIEXPORT void JNICALL
+Java_android_perfetto_producer_ProducerService_setupProducer(
+    JNIEnv*,
+    jclass /*clazz*/) {
+  PERFETTO_ILOG("JNI");
+  perfetto::ListenAndRespond("android.perfetto.cts.ProducerService");
 }

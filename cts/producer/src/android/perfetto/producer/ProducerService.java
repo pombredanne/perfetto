@@ -16,23 +16,40 @@
 
 package android.perfetto.producer;
 
-import android.app.Activity;
-import android.os.Bundle;
+import android.app.Service;
+import android.os.IBinder;
+import android.content.Intent;
 
-import java.lang.Override;
-import java.util.List;
+public class ProducerService extends Service {
 
-public class PerfettoProducerActivity extends Activity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+   @Override
+   public void onCreate() {
         System.loadLibrary("perfettoctsproducer_jni");
-        try {
-            setupProducer();
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        finish();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    setupProducer();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }).start();
+   }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        return START_STICKY;
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public void onDestroy() {
+
     }
 
     private static native void setupProducer();
