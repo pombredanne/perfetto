@@ -73,7 +73,8 @@ class ProducerImpl : public Producer {
       handle->Finalize();
     }
 
-    // Temporarily create a new packet to flush the final packet to the consumer.
+    // Temporarily create a new packet to flush the final packet to the
+    // consumer.
     // TODO(primiano): remove this hack once flushing the final packet is fixed.
     trace_writer->NewTracePacket();
 
