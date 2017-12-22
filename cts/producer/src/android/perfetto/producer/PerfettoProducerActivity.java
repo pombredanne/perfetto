@@ -18,14 +18,22 @@ package android.perfetto.producer;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.util.Log;
 
 import java.lang.Override;
+import java.util.List;
 
 public class PerfettoProducerActivity extends Activity {
-
     @Override
-    public void onCreate(Bundle icicle) {
-        super.onCreate(icicle);
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        System.loadLibrary("perfettoctsproducer_jni");
+        try {
+            setupProducer();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        finish();
     }
+
+    private static native void setupProducer();
 }
