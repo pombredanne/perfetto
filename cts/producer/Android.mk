@@ -34,7 +34,7 @@ LOCAL_COMPATIBILITY_SUITE := cts vts general-tests
 LOCAL_PACKAGE_NAME := CtsPerfettoProducerApp
 
 LOCAL_JNI_SHARED_LIBRARIES := \
-	libperfettoctsproducer_jni
+    libperfettoctsproducer_jni
 
 LOCAL_CXX_STL := libc++_static
 
