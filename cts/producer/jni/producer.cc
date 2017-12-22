@@ -52,8 +52,7 @@ class ProducerImpl : public Producer {
 
   void OnDisconnect() override {
     __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Disconnect");
-    endpoint_.reset();
-    task_runner_->Quit();
+    Shutdown();
   }
 
   void CreateDataSourceInstance(
@@ -74,17 +73,19 @@ class ProducerImpl : public Producer {
       handle->Finalize();
     }
     __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Finalized");
-    Shutdown();
+    endpoint_->UnregisterDataSource(id_);
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {
     __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Teardown");
-    endpoint_.reset();
-    task_runner_->Quit();
+    Shutdown();
   }
 
  private:
-  void Shutdown() { endpoint_->UnregisterDataSource(id_); }
+  void Shutdown() {
+    endpoint_.reset();
+    task_runner_->Quit();
+  }
 
   DataSourceID id_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
