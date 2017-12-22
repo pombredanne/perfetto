@@ -14,9 +14,15 @@
  * limitations under the License.
  */
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/unix_task_runner.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
+
+#if BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)
+#include "src/sandbox/bpf_sandbox.h"
+#endif
 
 namespace perfetto {
 
@@ -43,6 +49,11 @@ int ServiceMain(int argc, char** argv) {
 
   PERFETTO_ILOG("Started traced, listening on %s %s",
                 PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
+
+#if BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)
+  InitServiceSandboxOrDie();
+#endif
+
   task_runner.Run();
   return 0;
 }

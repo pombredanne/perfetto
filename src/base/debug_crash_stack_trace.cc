@@ -23,6 +23,8 @@
 #include <unistd.h>
 #include <unwind.h>
 
+#include "perfetto/base/utils.h"
+
 #if defined(NDEBUG)
 #error This translation unit should not be used in release builds
 #endif
@@ -40,7 +42,8 @@ struct SigHandler {
 };
 
 SigHandler g_signals[] = {{SIGSEGV, {}}, {SIGILL, {}}, {SIGTRAP, {}},
-                          {SIGABRT, {}}, {SIGBUS, {}}, {SIGFPE, {}}};
+                          {SIGABRT, {}}, {SIGBUS, {}}, {SIGFPE, {}},
+                          {SIGSYS, {}}};
 
 template <typename T>
 void Print(const T& str) {
@@ -48,12 +51,20 @@ void Print(const T& str) {
 }
 
 template <typename T>
-void PrintHex(T n) {
-  for (unsigned i = 0; i < sizeof(n) * 8; i += 4) {
-    char nibble = static_cast<char>(n >> (sizeof(n) * 8 - i - 4)) & 0x0F;
-    char c = (nibble < 10) ? '0' + nibble : 'A' + nibble - 10;
-    write(STDERR_FILENO, &c, 1);
+void PrintDec(T n, T base = 10) {
+  char buf[128 + 2] = {};
+  char* c = nullptr;
+  for (c = &buf[sizeof(buf) - 2]; n && c >= buf; c--, n /= base) {
+    char digit = static_cast<char>(n % base) & 0x0F;
+    *c = (digit < 10) ? '0' + digit : 'A' + digit - 10;
   }
+  c++;
+  write(STDERR_FILENO, c, strlen(c));
+}
+
+template <typename T>
+void PrintHex(T n) {
+  PrintDec(n, static_cast<T>(16));
 }
 
 struct StackCrawlState {
@@ -92,23 +103,14 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
 
   Print("\n------------------ BEGINNING OF CRASH ------------------\n");
   Print("Signal: ");
-  if (sig_num == SIGSEGV) {
-    Print("Segmentation fault");
-  } else if (sig_num == SIGILL) {
-    Print("Illegal instruction (possibly unaligned access)");
-  } else if (sig_num == SIGTRAP) {
-    Print("Trap");
-  } else if (sig_num == SIGABRT) {
-    Print("Abort");
-  } else if (sig_num == SIGBUS) {
-    Print("Bus Error (possibly unmapped memory access)");
-  } else if (sig_num == SIGFPE) {
-    Print("Floating point exception");
-  } else {
-    Print("Unexpected signal ");
-    PrintHex(static_cast<uint32_t>(sig_num));
+  const char* sig_name = strsignal(sig_num);
+  write(STDERR_FILENO, sig_name, strlen(sig_name));
+  if (sig_num == SIGSYS) {
+    Print("\nSyscall: ");
+    PrintDec(info->si_syscall);
+    Print("  arch: ");
+    PrintHex(info->si_arch);
   }
-
   Print("\n");
 
   Print("Fault addr: ");
@@ -124,7 +126,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
     Dl_info sym_info = {};
     int res = dladdr(reinterpret_cast<void*>(frames[i]), &sym_info);
     Print("\n#");
-    PrintHex(i);
+    PrintDec(i);
     Print("  ");
     const char* sym_name = res ? sym_info.dli_sname : nullptr;
     if (sym_name) {

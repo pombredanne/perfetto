@@ -12,20 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("service") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-    "../../tracing",
-    "../../tracing:ipc",
-  ]
-  sources = [
-    "service.cc",
-  ]
-  if (is_linux || is_android) {
-    deps += [ "../../sandbox" ]
+if (is_linux || is_android) {
+  source_set("sandbox") {
+    deps = [
+      "../../gn:default_deps",
+      "../base",
+    ]
+    sources = [
+      "bpf_sandbox.cc",
+      "bpf_sandbox.h",
+    ]
+  }
+
+  source_set("sandbox_unittests") {
+    testonly = true
+    deps = [
+      ":sandbox",
+      "../../gn:default_deps",
+      "../../gn:gtest_deps",
+      "../base",
+    ]
+    sources = [
+      "bpf_sandbox_unittest.cc",
+    ]
   }
 }
