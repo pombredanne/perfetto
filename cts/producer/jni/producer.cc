@@ -72,6 +72,11 @@ class ProducerImpl : public Producer {
       handle->set_test("test");
       handle->Finalize();
     }
+
+    // Temporarily create a new packet to flush the final packet to the consumer.
+    // TODO(primiano): remove this hack once flushing the final packet is fixed.
+    trace_writer->NewTracePacket();
+
     __android_log_print(ANDROID_LOG_ERROR, "Perfetto", "Finalized");
     endpoint_->UnregisterDataSource(id_);
   }

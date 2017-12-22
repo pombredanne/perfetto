@@ -79,15 +79,18 @@ TEST(PerfettoTest, TestMockProducer) {
                                     trace_config.duration_ms());
       }));
 
-  auto function = [&task_runner](auto* packets, bool has_more) {
+  uint64_t total = 0;
+  auto function = [&task_runner, &total](auto* packets, bool has_more) {
     if (has_more) {
       for (auto& packet : *packets) {
         packet.Decode();
         ASSERT_TRUE(packet->has_test());
         ASSERT_EQ(packet->test(), "test");
+        total++;
       }
       ASSERT_FALSE(packets->empty());
     } else {
+      ASSERT_EQ(total, 10u);
       ASSERT_TRUE(packets->empty());
       task_runner.Quit();
     }
