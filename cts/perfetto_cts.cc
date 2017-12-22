@@ -31,6 +31,7 @@
 #include "protos/trace_packet.pb.h"
 #include "protos/trace_packet.pbzero.h"
 
+using ::testing::AtLeast;
 using ::testing::InSequence;
 using ::testing::Invoke;
 using ::testing::_;
@@ -92,6 +93,7 @@ TEST(PerfettoTest, TestMockProducer) {
       }
     };
   EXPECT_CALL(mock_consumer, DoOnTraceData(_, _))
+    .Times(AtLeast(2))
     .WillRepeatedly(Invoke(function));
 
   task_runner.Run();

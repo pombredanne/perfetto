@@ -18,6 +18,8 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE    := libperfettoctsproducer_jni
 
+LOCAL_MULTILIB := both
+
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CPP_EXTENSION := .cc

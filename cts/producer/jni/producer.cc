@@ -47,7 +47,7 @@ class ProducerImpl : public Producer {
     DataSourceDescriptor descriptor;
     descriptor.set_name("android.perfetto.cts.Producer");
     endpoint_->RegisterDataSource(descriptor,
-                                  [](DataSourceID) {});
+                                  [this](DataSourceID id) { id_ = id; });
   }
 
   void OnDisconnect() override {
@@ -81,10 +81,12 @@ class ProducerImpl : public Producer {
 
  private:
   void Shutdown() {
+    endpoint_->UnregisterDataSource(id_);
     endpoint_.reset();
     task_runner_->Quit();
   }
 
+  DataSourceID id_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   base::UnixTaskRunner* task_runner_;
 };
