@@ -92,9 +92,9 @@ TEST_F(BpfSandboxTest, SyscallArgumentFilter) {
   ASSERT_SANDBOX_TRAP(
       { mmap(0, 4096, PROT_READ | PROT_EXEC, MAP_ANONYMOUS, 0, 0); });
 
-  // Should trap because of PROT_SEM.
+  // Should trap because of extra PROT_ flag.
   ASSERT_SANDBOX_TRAP({
-    mmap(0, 4096, PROT_READ | PROT_WRITE | PROT_SEM, MAP_ANONYMOUS, 0, 0);
+    mmap(0, 4096, PROT_READ | PROT_WRITE | 0x80, MAP_ANONYMOUS, 0, 0);
   });
 
   // Should trap because of nonzero FD arg.
