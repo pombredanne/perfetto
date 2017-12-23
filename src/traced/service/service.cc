@@ -20,22 +20,30 @@
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
-#if BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)
+#if (BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)) &&                \
+    (defined(__i386__) || defined(__x86_64__) || defined(__arm__) || \
+     defined(__aarch64__))
+#define ENABLE_BPF_SANDBOX() 1
+#else
+#define ENABLE_BPF_SANDBOX() 0
+#endif
+
+#if ENABLE_BPF_SANDBOX()
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #if BUILDFLAG(OS_ANDROID)
 #include <linux/memfd.h>
-#endif
+#endif  // OS_ANDROID
 #include "src/sandbox/bpf_sandbox.h"
-#endif
+#endif  // ENABLE_BPF_SANDBOX
 
 namespace perfetto {
 
 namespace {
 
 void InitServiceSandboxIfSupported() {
-#if BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)
+#if ENABLE_BPF_SANDBOX()
   constexpr auto kNot = BpfSandbox::kNot;
   BpfSandbox bpf(SECCOMP_RET_TRAP);
   bpf.Allow(SYS_ppoll);          // For task runners.
@@ -136,7 +144,7 @@ void InitServiceSandboxIfSupported() {
   // TODO: copy_file_range and/or sendfile
 
   bpf.EnterSandbox();
-#endif
+#endif  // ENABLE_BPF_SANDBOX
 }
 
 }  // namespace
