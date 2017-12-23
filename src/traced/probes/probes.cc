@@ -15,6 +15,7 @@
  */
 
 #include <fcntl.h>
+#include <getopt.h>
 #include <inttypes.h>
 
 #include "perfetto/base/logging.h"
@@ -29,6 +30,7 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
+#include "src/traced/probes/probes_sandbox.h"
 
 #include "protos/trace_packet.pbzero.h"
 
@@ -95,17 +97,17 @@ void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID dsid,
   base::ScopedFile pipe(
       open("/d/tracing/per_cpu/cpu0/trace_pipe_raw", O_RDONLY));
 
-  PERFETTO_ILOG("tracing_on: %d, wr: %ld", *tracing_on,
+  PERFETTO_ILOG("tracing_on: %d, wr: %zd", *tracing_on,
                 write(*tracing_on, "1", 1));
   tracing_on.reset();
 
-  PERFETTO_ILOG("oom/enable: %d, wr: %ld", *enable, write(*enable, "1", 1));
+  PERFETTO_ILOG("oom/enable: %d, wr: %zd", *enable, write(*enable, "1", 1));
   enable.reset();
 
   char buf[4096] = {};
   fcntl(*pipe, F_SETFL, O_NONBLOCK);
   sleep(1);
-  PERFETTO_ILOG("trace_pipe_raw: %d, rd: %ld", *pipe,
+  PERFETTO_ILOG("trace_pipe_raw: %d, rd: %zd", *pipe,
                 read(*pipe, buf, sizeof(buf)));
   pipe.reset();
 }
@@ -119,6 +121,30 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID dsid) {
 }  // namespace
 
 int ProbesMain(int argc, char** argv) {
+  int no_sandbox = 0;
+  static struct option options[] = {{"no-sandbox", no_argument, &no_sandbox, 1},
+                                    {0, 0, 0, 0}};
+
+  for (int narg = 2, ret = 0;
+       (ret = getopt_long(argc - 1, &argv[1], "", options, nullptr)) != -1;
+       narg++) {
+    if (ret == '?') {
+      PERFETTO_ELOG("Error on cmdline option: %s", argv[narg]);
+      return 1;
+    }
+  }
+
+  // TODO(primiano): this code is duplicated with the service.
+  if (!no_sandbox) {
+#if PERFETTO_PROBES_SANDBOX_SUPPORTED()
+    InitProbesSandboxOrDie();
+#else
+    PERFETTO_LOG("Skipping BPF sandbox because not supported on this arch");
+#endif
+  } else {
+    PERFETTO_LOG("Skipping BPF sandbox because of --no-sandbox");
+  }
+
   perfetto::base::UnixTaskRunner task_runner;
   perfetto::ProbesProducer producer(&task_runner);
   task_runner.Run();

@@ -25,20 +25,20 @@
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
 
-#define ASSERT_SANDBOX_TRAP(x) \
-  ASSERT_EXIT(                 \
-      {                        \
-        bpf->EnterSandbox();   \
-        x                      \
-      },                       \
+#define ASSERT_SANDBOX_TRAP(x)    \
+  ASSERT_EXIT(                    \
+      {                           \
+        bpf->EnterSandboxOrDie(); \
+        x                         \
+      },                          \
       ::testing::KilledBySignal(SIGSYS), "")
 
-#define ASSERT_SANDBOX_ALLOW(x) \
-  ASSERT_EXIT(                  \
-      {                         \
-        bpf->EnterSandbox();    \
-        x _exit(0);             \
-      },                        \
+#define ASSERT_SANDBOX_ALLOW(x)   \
+  ASSERT_EXIT(                    \
+      {                           \
+        bpf->EnterSandboxOrDie(); \
+        x _exit(0);               \
+      },                          \
       ::testing::ExitedWithCode(0), "");
 
 namespace perfetto {
@@ -49,7 +49,7 @@ constexpr auto kNot = BpfSandbox::kNot;
 class BpfSandboxTest : public ::testing::Test {
  public:
   void SetUp() override {
-    bpf.reset(new BpfSandbox(SECCOMP_RET_TRAP));
+    bpf.reset(new BpfSandbox());
     bpf->Allow(SYS_exit_group);
   }
   void TearDown() override { bpf.reset(); }
@@ -64,14 +64,20 @@ TEST_F(BpfSandboxTest, SimplePolicy) {
 
 TEST_F(BpfSandboxTest, SyscallArgumentFilter) {
   bpf->Allow(SYS_write);
-  bpf->Allow(SYS_mmap, {
-                           {0, BPF_JEQ, 0},  // |addr| must be nullptr
-                           {0, BPF_JGT, 0},  // |length| must be  > 0
-                           {kNot, BPF_JSET,
-                            static_cast<uint32_t>(~(PROT_READ | PROT_WRITE))},
-                           {},               // No filters on |flags|
-                           {0, BPF_JEQ, 0},  // |fd| must be == 0
-                       });
+#if defined(SYS_mmap)
+#define MMAP_SYSCALL SYS_mmap
+#else
+#define MMAP_SYSCALL SYS_mmap2
+#endif
+  bpf->Allow(
+      MMAP_SYSCALL,
+      {
+          {0, BPF_JEQ, 0},  // |addr| must be nullptr
+          {0, BPF_JGT, 0},  // |length| must be  > 0
+          {kNot, BPF_JSET, static_cast<uint32_t>(~(PROT_READ | PROT_WRITE))},
+          {},               // No filters on |flags|
+          {0, BPF_JEQ, 0},  // |fd| must be == 0
+      });
   base::ScopedFile devnull(open("/dev/null", O_RDONLY));
   bpf->Allow(SYS_read, {{0, BPF_JEQ, static_cast<uint32_t>(*devnull)}});
 

@@ -36,7 +36,7 @@ class BpfSandbox {
     uint32_t value;  // Immediate value.
   };
 
-  BpfSandbox(uint32_t fail_action);
+  BpfSandbox();
 
   // Unconditionally whitelist the given syscall (SYS_xxx).
   void Allow(unsigned int nr);
@@ -48,7 +48,7 @@ class BpfSandbox {
   void Allow(unsigned int nr, std::initializer_list<ArgMatcher> args);
 
   // Crashes with a CHECK() in case of any error.
-  void EnterSandbox();
+  void EnterSandboxOrDie();
 
  private:
   void append(struct sock_filter value) {
@@ -57,7 +57,6 @@ class BpfSandbox {
   }
 
   static constexpr size_t kProgSize = 256;
-  const uint32_t fail_action_;
   bool finalized_ = false;
 
   struct sock_filter prog_[kProgSize];

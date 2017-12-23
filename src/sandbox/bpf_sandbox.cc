@@ -37,13 +37,18 @@ namespace {
 //     uint64_t args[6];              // Syscall arguments (up to 6).
 //  };
 
-#pragma GCC diagnostic ignored "-Wextended-offsetof"
-#define SECCOMP_LOAD_FIELD(x)        \
-  BPF_STMT(BPF_LD + BPF_W + BPF_ABS, \
-           static_cast<uint32_t>(offsetof(struct seccomp_data, x)))
-#define SECCOMP_LOAD_SYSCALL_NR() SECCOMP_LOAD_FIELD(nr)
-#define SECCOMP_LOAD_SYSCALL_ARCH() SECCOMP_LOAD_FIELD(arch)
-#define SECCOMP_LOAD_SYSCALL_ARG(n) SECCOMP_LOAD_FIELD(args[n])
+#define SECCOMP_LOAD(x) \
+  BPF_STMT(BPF_LD + BPF_W + BPF_ABS, static_cast<uint32_t>(x))
+
+#define SECCOMP_LOAD_SYSCALL_NR() \
+  SECCOMP_LOAD(offsetof(struct seccomp_data, nr))
+
+#define SECCOMP_LOAD_SYSCALL_ARCH() \
+  SECCOMP_LOAD(offsetof(struct seccomp_data, arch))
+
+#define SECCOMP_LOAD_SYSCALL_ARG(n)                  \
+  SECCOMP_LOAD(offsetof(struct seccomp_data, args) + \
+               n * sizeof(reinterpret_cast<struct seccomp_data*>(0)->args[0]))
 
 #if defined(__i386__)
 #define SECCOMP_ARCH AUDIT_ARCH_I386
@@ -59,13 +64,14 @@ namespace {
 #define SECCOMP_ARCH AUDIT_ARCH_AARCH64
 #endif
 
+constexpr auto kFailAction = SECCOMP_RET_TRAP;
 }  // namespace
 
-BpfSandbox::BpfSandbox(uint32_t fail_action) : fail_action_(fail_action) {
+BpfSandbox::BpfSandbox() {
   // Only accept syscalls for the current architecture.
   append(SECCOMP_LOAD_SYSCALL_ARCH());
   append(BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SECCOMP_ARCH, 1, 0));
-  append(BPF_STMT(BPF_RET + BPF_K, fail_action_));
+  append(BPF_STMT(BPF_RET + BPF_K, kFailAction));
   append(SECCOMP_LOAD_SYSCALL_NR());
 
 // Allow syscalls required by debug_crash_stack_trace.cc for unwinding.
@@ -131,11 +137,14 @@ void BpfSandbox::Allow(unsigned int nr,
   append(SECCOMP_LOAD_SYSCALL_NR());
 }
 
-void BpfSandbox::EnterSandbox() {
+void BpfSandbox::EnterSandboxOrDie() {
   if (finalized_)
     return;
   finalized_ = true;
-  append(BPF_STMT(BPF_RET + BPF_K, fail_action_));
+
+  // TODO(primiano): check that no threads exists at this point.
+
+  append(BPF_STMT(BPF_RET + BPF_K, kFailAction));
 
   struct sock_fprog filterprog = {};
   static_assert(
@@ -144,10 +153,13 @@ void BpfSandbox::EnterSandbox() {
   filterprog.len = static_cast<decltype(filterprog.len)>(prog_size_);
   filterprog.filter = prog_;
 
+  // Do not remove this logging line. On Android this warms up the initializers
+  // of liblog that would otherwise require extra open()-like syscalls.
+  PERFETTO_LOG("Entering BPF sandbox");
+
   // Enter sandbox.
   PERFETTO_CHECK(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == 0);
   PERFETTO_CHECK(prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &filterprog) == 0);
-  // PERFETTO_DLOG("Entered BPF sandbox");
 }
 
 }  // namespace perfetto

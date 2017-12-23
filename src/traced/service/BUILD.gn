@@ -24,8 +24,10 @@ source_set("service") {
   ]
   sources = [
     "service.cc",
+    "service_sandbox.h",
   ]
   if (is_linux || is_android) {
     deps += [ "../../sandbox" ]
+    sources += [ "service_sandbox.cc" ]
   }
 }
