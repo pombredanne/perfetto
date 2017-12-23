@@ -55,9 +55,15 @@ void InitServiceSandboxIfSupported() {
   bpf.Allow(SYS_mmap, {
                           {0, BPF_JEQ, 0},  // |addr| must be nullptr.
                           {kNot, BPF_JGT,
-                           2 * 1024 * 1024 * 1024ul},  // no ridiculous lengths.
+                           2 * 1024 * 1024 * 1024ul},    // no ridiculous len.
                           {kNot, BPF_JSET, kProtNotRW},  // No PROT_EXEC.
                       });
+  bpf.Allow(SYS_mmap2, {
+                           {0, BPF_JEQ, 0},  // |addr| must be nullptr.
+                           {kNot, BPF_JGT,
+                            2 * 1024 * 1024 * 1024ul},    // no ridiculous len.
+                           {kNot, BPF_JSET, kProtNotRW},  // No PROT_EXEC.
+                       });
   bpf.Allow(SYS_madvise);    // Allocator and BufferedFrameDeserializer.
   bpf.Allow(SYS_read);       // General I/O.
   bpf.Allow(SYS_write);      // General I/O.
