@@ -95,17 +95,17 @@ void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID dsid,
   base::ScopedFile pipe(
       open("/d/tracing/per_cpu/cpu0/trace_pipe_raw", O_RDONLY));
 
-  PERFETTO_ILOG("tracing_on: %d, wr: %ld", *tracing_on,
+  PERFETTO_ILOG("tracing_on: %d, wr: %zd", *tracing_on,
                 write(*tracing_on, "1", 1));
   tracing_on.reset();
 
-  PERFETTO_ILOG("oom/enable: %d, wr: %ld", *enable, write(*enable, "1", 1));
+  PERFETTO_ILOG("oom/enable: %d, wr: %zd", *enable, write(*enable, "1", 1));
   enable.reset();
 
   char buf[4096] = {};
   fcntl(*pipe, F_SETFL, O_NONBLOCK);
   sleep(1);
-  PERFETTO_ILOG("trace_pipe_raw: %d, rd: %ld", *pipe,
+  PERFETTO_ILOG("trace_pipe_raw: %d, rd: %zd", *pipe,
                 read(*pipe, buf, sizeof(buf)));
   pipe.reset();
 }
