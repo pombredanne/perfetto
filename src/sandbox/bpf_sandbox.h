@@ -38,14 +38,14 @@ class BpfSandbox {
 
   BpfSandbox(uint32_t fail_action);
 
-  void EnableBaselinePolicy();
-
   // Unconditionally whitelist the given syscall (SYS_xxx).
-  void AllowSyscall(unsigned int nr);
+  void Allow(unsigned int nr);
 
   // Filters each argument against a matcher. Each matcher is of the form:
-  // {BPF_JEQ, N}, {BPF_JGT, N}, {BPF_JSET, N}
-  void AllowSyscall(unsigned int nr, std::initializer_list<ArgMatcher> args);
+  // {BPF_JEQ, N}, {BPF_JGT, N}, {BPF_JSET, N}.
+  // If multiple filters are applied to the same syscall number, those have
+  // OR semantic.
+  void Allow(unsigned int nr, std::initializer_list<ArgMatcher> args);
 
   // Crashes with a CHECK() in case of any error.
   void EnterSandbox();

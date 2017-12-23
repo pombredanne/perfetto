@@ -67,22 +67,16 @@ BpfSandbox::BpfSandbox(uint32_t fail_action) : fail_action_(fail_action) {
   append(BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SECCOMP_ARCH, 1, 0));
   append(BPF_STMT(BPF_RET + BPF_K, fail_action_));
   append(SECCOMP_LOAD_SYSCALL_NR());
-}
-
-void BpfSandbox::EnableBaselinePolicy() {
-  AllowSyscall(SYS_read);
-  AllowSyscall(SYS_write);
-  AllowSyscall(SYS_exit_group);
 
 // Allow syscalls required by debug_crash_stack_trace.cc for unwinding.
 #if !defined(NDEBUG)
-  AllowSyscall(SYS_futex);
-  AllowSyscall(SYS_rt_sigaction);
-  AllowSyscall(SYS_sigaltstack);
+  Allow(SYS_futex);
+  Allow(SYS_rt_sigaction);
+  Allow(SYS_sigaltstack);
 #endif
 }
 
-void BpfSandbox::AllowSyscall(unsigned int nr) {
+void BpfSandbox::Allow(unsigned int nr) {
   append(BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, nr, 0, 1));
   append(BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW));
 }
@@ -109,8 +103,8 @@ void BpfSandbox::AllowSyscall(unsigned int nr) {
 // #8 Either the initial syscall check or an arg predicate failed. Reload the
 // syscall number in the W register and continue with the next rule.
 //   SECCOMP_LOAD_SYSCALL_NR()
-void BpfSandbox::AllowSyscall(unsigned int nr,
-                              std::initializer_list<ArgMatcher> args) {
+void BpfSandbox::Allow(unsigned int nr,
+                       std::initializer_list<ArgMatcher> args) {
   static_assert(BPF_JA == 0, "The empty matcher {} assumes JumpAlways == 0");
   PERFETTO_CHECK(!finalized_);
   struct seccomp_data x;

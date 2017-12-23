@@ -29,6 +29,41 @@
 #error This translation unit should not be used in release builds
 #endif
 
+#if defined(__i386__)
+#define SYSCALL_REG(_ctx, _reg) ((_ctx)->uc_mcontext.gregs[(_reg)])
+#define SYSCALL_PARM1(_ctx) SYSCALL_REG(_ctx, REG_EBX)
+#define SYSCALL_PARM2(_ctx) SYSCALL_REG(_ctx, REG_ECX)
+#define SYSCALL_PARM3(_ctx) SYSCALL_REG(_ctx, REG_EDX)
+#define SYSCALL_PARM4(_ctx) SYSCALL_REG(_ctx, REG_ESI)
+#define SYSCALL_PARM5(_ctx) SYSCALL_REG(_ctx, REG_EDI)
+#define SYSCALL_PARM6(_ctx) SYSCALL_REG(_ctx, REG_EBP)
+#elif defined(__x86_64__)
+#define SYSCALL_REG(_ctx, _reg) ((_ctx)->uc_mcontext.gregs[(_reg)])
+#define SYSCALL_PARM1(_ctx) SYSCALL_REG(_ctx, REG_RDI)
+#define SYSCALL_PARM2(_ctx) SYSCALL_REG(_ctx, REG_RSI)
+#define SYSCALL_PARM3(_ctx) SYSCALL_REG(_ctx, REG_RDX)
+#define SYSCALL_PARM4(_ctx) SYSCALL_REG(_ctx, REG_R10)
+#define SYSCALL_PARM5(_ctx) SYSCALL_REG(_ctx, REG_R8)
+#define SYSCALL_PARM6(_ctx) SYSCALL_REG(_ctx, REG_R9)
+#elif defined(__arm__)
+#define SYSCALL_REG(_ctx, _reg) ((_ctx)->uc_mcontext.arm_##_reg)
+#define SYSCALL_RESULT(_ctx) SYSCALL_REG(_ctx, r0)
+#define SYSCALL_PARM1(_ctx) SYSCALL_REG(_ctx, r0)
+#define SYSCALL_PARM2(_ctx) SYSCALL_REG(_ctx, r1)
+#define SYSCALL_PARM3(_ctx) SYSCALL_REG(_ctx, r2)
+#define SYSCALL_PARM4(_ctx) SYSCALL_REG(_ctx, r3)
+#define SYSCALL_PARM5(_ctx) SYSCALL_REG(_ctx, r4)
+#define SYSCALL_PARM6(_ctx) SYSCALL_REG(_ctx, r5)
+#elif defined(__aarch64__)
+#define SYSCALL_RESULT(_ctx) SYSCALL_REG(_ctx, 0)
+#define SYSCALL_PARM1(_ctx) SYSCALL_REG(_ctx, 0)
+#define SYSCALL_PARM2(_ctx) SYSCALL_REG(_ctx, 1)
+#define SYSCALL_PARM3(_ctx) SYSCALL_REG(_ctx, 2)
+#define SYSCALL_PARM4(_ctx) SYSCALL_REG(_ctx, 3)
+#define SYSCALL_PARM5(_ctx) SYSCALL_REG(_ctx, 4)
+#define SYSCALL_PARM6(_ctx) SYSCALL_REG(_ctx, 5)
+#endif
+
 namespace {
 
 constexpr size_t kDemangledNameLen = 4096;
@@ -97,6 +132,8 @@ _Unwind_Reason_Code TraceStackFrame(_Unwind_Context* context, void* arg) {
 
 // Note: use only async-safe functions inside this.
 void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
+  ucontext_t* ctx = static_cast<ucontext_t*>(ucontext);
+
   // Restore the old handlers.
   for (size_t i = 0; i < sizeof(g_signals) / sizeof(g_signals[0]); i++)
     sigaction(g_signals[i].sig_num, &g_signals[i].old_handler, nullptr);
@@ -110,6 +147,19 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
     PrintDec(info->si_syscall);
     Print("  arch: ");
     PrintHex(info->si_arch);
+    Print("\nArgs: (");
+    PrintHex(SYSCALL_PARM1(ctx));
+    Print(", ");
+    PrintHex(SYSCALL_PARM2(ctx));
+    Print(", ");
+    PrintHex(SYSCALL_PARM3(ctx));
+    Print(", ");
+    PrintHex(SYSCALL_PARM4(ctx));
+    Print(", ");
+    PrintHex(SYSCALL_PARM5(ctx));
+    Print(", ");
+    PrintHex(SYSCALL_PARM6(ctx));
+    Print(")");
   }
   Print("\n");
 
