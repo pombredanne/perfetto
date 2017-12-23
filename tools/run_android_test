@@ -144,7 +144,7 @@ def Main():
   cmd += env + './%s' % args.test_name
   if args.cmd_args:
     cmd += ' ' + ' '.join(args.cmd_args)
-  cmd += ';echo -e "\\nTEST_RET_CODE=$?"'
+  cmd += ' 1>&2;echo -e "\\nTEST_RET_CODE=$?"'
   print cmd
   test_output = subprocess.check_output([ADB_PATH, 'shell', cmd])
   print test_output

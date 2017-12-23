@@ -47,7 +47,7 @@ SigHandler g_signals[] = {{SIGSEGV, {}}, {SIGILL, {}}, {SIGTRAP, {}},
 
 template <typename T>
 void Print(const T& str) {
-  write(STDERR_FILENO, str, sizeof(str));
+  write(STDERR_FILENO, str, sizeof(str) - 1);
 }
 
 template <typename T>

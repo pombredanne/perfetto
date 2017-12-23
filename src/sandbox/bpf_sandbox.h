@@ -18,23 +18,29 @@
 #define SRC_SANDBOX_BPF_SANDBOX_H_
 
 #include <linux/filter.h>
+#include <linux/seccomp.h>
 #include <stdint.h>
 
 #include <initializer_list>
-#include <vector>
+
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 
-class BPFSandbox {
+class BpfSandbox {
  public:
+  static constexpr uint16_t kNot = 1;
   struct ArgMatcher {
-    static constexpr uint16_t kNot = 1;
     uint16_t flags;  // Either 0 or kNot, which inverts |predicate|.
     uint16_t pred;   // BPF_JEQ, BPF_JGT, BPF_JGE, BPF_JSET.
     uint32_t value;  // Immediate value.
   };
 
-  BPFSandbox(uint32_t fail_action);
+  BpfSandbox(uint32_t fail_action);
+
+  void EnableBaselinePolicy();
+
+  // Unconditionally whitelist the given syscall (SYS_xxx).
   void AllowSyscall(unsigned int nr);
 
   // Filters each argument against a matcher. Each matcher is of the form:
@@ -45,12 +51,18 @@ class BPFSandbox {
   void EnterSandbox();
 
  private:
+  void append(struct sock_filter value) {
+    PERFETTO_DCHECK(prog_size_ < kProgSize);
+    prog_[prog_size_++] = value;
+  }
+
+  static constexpr size_t kProgSize = 256;
   const uint32_t fail_action_;
   bool finalized_ = false;
-  std::vector<struct sock_filter> prog_;
-};
 
-void InitServiceSandboxOrDie();
+  struct sock_filter prog_[kProgSize];
+  size_t prog_size_ = 0;
+};
 
 }  // namespace perfetto
 
