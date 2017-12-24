@@ -79,26 +79,14 @@ void InitServiceSandboxOrDie() {
   bpf.Allow(SYS_lseek);
 #if defined(SYS_stat)
   bpf.Allow(SYS_stat);
+  bpf.Allow(SYS_fstat);
+  bpf.Allow(SYS_lstat);
+  bpf.Allow(SYS_ftruncate);
 #endif
 #if defined(SYS_stat64)
   bpf.Allow(SYS_stat64);
-#endif
-#if defined(SYS_fstat)
-  bpf.Allow(SYS_fstat);
-#endif
-#if defined(SYS_fstat64)
   bpf.Allow(SYS_fstat64);
-#endif
-#if defined(SYS_lstat)
-  bpf.Allow(SYS_lstat);
-#endif
-#if defined(SYS_lstat64)
   bpf.Allow(SYS_lstat64);
-#endif
-#if defined(SYS_ftruncate)
-  bpf.Allow(SYS_ftruncate);
-#endif
-#if defined(SYS_ftruncate64)
   bpf.Allow(SYS_ftruncate64);
 #endif
   bpf.Allow(SYS_close);
@@ -122,11 +110,13 @@ void InitServiceSandboxOrDie() {
   bpf.Allow(SYS_geteuid);
   bpf.Allow(SYS_getgid);
   bpf.Allow(SYS_gettid);
+
 #if defined(SYS_getuid32)
   bpf.Allow(SYS_getuid32);
   bpf.Allow(SYS_geteuid32);
   bpf.Allow(SYS_getgid32);
 #endif
+
   bpf.Allow(SYS_futex);  // Android libc.so an libunwind use this.
   bpf.Allow(SYS_exit);
   bpf.Allow(SYS_exit_group);
@@ -139,16 +129,19 @@ void InitServiceSandboxOrDie() {
   bpf.Allow(SYS_fcntl, {{}, {0, BPF_JEQ, F_ADD_SEALS}});
 
 // These are only available on 32-bit archs where sizeof(int) == 4.
-#if defined(SYS_fcntl64) && SYS_fcntl64
+#if defined(SYS_fcntl64)
   bpf.Allow(SYS_fcntl64, {{}, {0, BPF_JEQ, F_GETFL}});
   bpf.Allow(SYS_fcntl64, {{}, {0, BPF_JEQ, F_SETFL}});
   bpf.Allow(SYS_fcntl64, {{}, {0, BPF_JEQ, F_SETFD}, {0, BPF_JEQ, FD_CLOEXEC}});
+#if BUILDFLAG(HAVE_MEMFD)
   bpf.Allow(SYS_fcntl64, {{}, {0, BPF_JEQ, F_ADD_SEALS}});
-#endif
+#endif  // HAVE_MEMFD
+#endif  // SYS_fcntl64
 
   bpf.Allow(SYS_kill, {{0, BPF_JEQ, 0}});  // Only self-signals.
-#if BUILDFLAG(OS_ANDROID)
-  bpf.Allow(__NR_memfd_create);  // Used to create shmem.
+
+#if BUILDFLAG(HAVE_MEMFD)
+  bpf.Allow(__NR_memfd_create);  // For SharedMemoryPosix.
 #endif
 
   bpf.EnterSandboxOrDie();

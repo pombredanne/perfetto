@@ -41,4 +41,16 @@
 #error OS not supported (see build_config.h)
 #endif
 
+#if BUILDFLAG(OS_ANDROID)
+#define BUILDFLAG_DEFINE_HAVE_MEMFD() 1
+#else
+#define BUILDFLAG_DEFINE_HAVE_MEMFD() 0
+#endif
+
+#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#define BUILDFLAG_DEFINE_HAVE_BPF_SANDBOX() 1
+#else
+#define BUILDFLAG_DEFINE_HAVE_BPF_SANDBOX() 0
+#endif
+
 #endif  // INCLUDE_PERFETTO_BASE_BUILD_CONFIG_H_
