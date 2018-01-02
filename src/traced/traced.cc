@@ -25,7 +25,7 @@
 int main(int argc, char** argv) {
   int no_sandbox = 0;
   static struct option options[] = {{"no-sandbox", no_argument, &no_sandbox, 1},
-                                    {0, 0, 0, 0}};
+                                    {nullptr, 0, 0, 0}};
 
   for (int narg = 2, ret = 0;
        (ret = getopt_long(argc - 1, &argv[1], "", options, nullptr)) != -1;
