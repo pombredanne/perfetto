@@ -37,11 +37,16 @@ int main(int argc, char** argv) {
   }
 
 #if BUILDFLAG(HAVE_BPF_SANDBOX)
+#if !BUILDFLAG(SANITIZERS)
+  no_sandbox = 1;
+  PERFETTO_LOG("Skipping BPF sandbox because of sanitizers");
+#else
   if (no_sandbox)
     PERFETTO_LOG("Skipping BPF sandbox because of --no-sandbox");
+#endif  // BUILDFLAG(SANITIZERS)
 #else
   PERFETTO_LOG("Skipping BPF sandbox because not supported on this arch");
-#endif
+#endif  // BUILDFLAG(HAVE_BPF_SANDBOX)
 
   if (argc > 1 && !strcmp(argv[1], "probes"))
     return perfetto::ProbesMain(no_sandbox);
