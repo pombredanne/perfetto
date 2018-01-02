@@ -58,7 +58,8 @@ class BpfSandbox {
 
   // Adds an array of syscalls to the whitelist. Can be called multiple times
   // and has additive semantic (i.e. Allow(0..9) == Allow(0..4) + Allow(5..9)).
-  // If a syscall number shows up more than once, the filters on the given
+  // If multiple filters are applied to the same syscall number, those have
+  // OR semantic (See ArgFiltersHaveORSemantic in bpf_sandbox_unittest.cc).
   void Allow(const SyscallFilter filters[], size_t filters_size);
 
   // Syntactic sugar that allows to use the syntax: Allow({{SYS_x, {}}, ... }).
@@ -67,16 +68,12 @@ class BpfSandbox {
     Allow(filters, N);
   }
 
-  // Filters each argument against a matcher. Each matcher is of the form:
-  // {BPF_JEQ, N}, {BPF_JGT, N}, {BPF_JSET, N}.
-  // If multiple filters are applied to the same syscall number, those have
-  // OR semantic (See ArgFiltersHaveORSemantic in bpf_sandbox_unittest.cc).
-  void AllowOne(const SyscallFilter&);
-
   // Crashes with a CHECK() in case of any error.
   void EnterSandboxOrDie();
 
  private:
+  void AllowOne(const SyscallFilter&);
+
   void Append(struct sock_filter value) {
     PERFETTO_DCHECK(prog_size_ < kProgSize);
     prog_[prog_size_++] = value;

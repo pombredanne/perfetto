@@ -48,9 +48,9 @@ namespace {
 #if BUILDFLAG(HAVE_BPF_SANDBOX)
 void InitProbesSandboxOrDie() {
   static const BpfSandbox::SyscallFilter kProbesPolicy[] = {
-      {SYS_open, {}},    //
-      {SYS_openat, {}},  //
-      {SYS_connect, {}},
+      {SYS_open, {}},     //
+      {SYS_openat, {}},   //
+      {SYS_connect, {}},  //
   };
 
   BpfSandbox sandbox;

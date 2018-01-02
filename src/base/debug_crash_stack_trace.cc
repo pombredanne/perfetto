@@ -30,7 +30,7 @@
 #error This translation unit should not be used in release builds
 #endif
 
-#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
 #if defined(__i386__)
 #define SYSCALL_REG(_ctx, _reg) ((_ctx)->uc_mcontext.gregs[(_reg)])
 #define SYSCALL_PARM1(_ctx) SYSCALL_REG(_ctx, REG_EBX)
@@ -64,7 +64,7 @@
 #define SYSCALL_PARM5(_ctx) SYSCALL_REG(_ctx, 4)
 #define SYSCALL_PARM6(_ctx) SYSCALL_REG(_ctx, 5)
 #endif
-#endif  // BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#endif  // BUILDFLAG(HAVE_BPF_SANDBOX)
 
 namespace {
 
@@ -142,7 +142,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
   Print("Signal: ");
   const char* sig_name = strsignal(sig_num);
   write(STDERR_FILENO, sig_name, strlen(sig_name));
-#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
   if (sig_num == SIGSYS) {
     ucontext_t* ctx = static_cast<ucontext_t*>(ucontext);
     Print("\nSyscall: ");
@@ -163,7 +163,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
     PrintHex(SYSCALL_PARM6(ctx));
     Print(")");
   }
-#endif  // BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#endif  // BUILDFLAG(HAVE_BPF_SANDBOX)
   Print("\n");
 
   Print("Fault addr: ");
