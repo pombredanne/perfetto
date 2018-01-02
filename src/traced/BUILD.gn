@@ -26,3 +26,15 @@ source_set("traced") {
     "service",
   ]
 }
+
+if (is_linux || is_android) {
+  source_set("sandbox_baseline_policy") {
+    sources = [
+      "sandbox_baseline_policy.cc",
+      "sandbox_baseline_policy.h",
+    ]
+    deps = [
+      "../../gn:default_deps",
+    ]
+  }
+}

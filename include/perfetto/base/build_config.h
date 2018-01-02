@@ -47,7 +47,9 @@
 #define BUILDFLAG_DEFINE_HAVE_MEMFD() 0
 #endif
 
-#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#if (BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)) &&                \
+    (defined(__i386__) || defined(__x86_64__) || defined(__arm__) || \
+     defined(__aarch64__))
 #define BUILDFLAG_DEFINE_HAVE_BPF_SANDBOX() 1
 #else
 #define BUILDFLAG_DEFINE_HAVE_BPF_SANDBOX() 0

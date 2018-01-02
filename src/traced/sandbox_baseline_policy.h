@@ -14,23 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACED_SERVICE_SERVICE_SANDBOX_H_
-#define SRC_TRACED_SERVICE_SERVICE_SANDBOX_H_
-
-#include "perfetto/base/build_config.h"
-
-#if (BUILDFLAG(OS_ANDROID) || BUILDFLAG(OS_LINUX)) &&                \
-    (defined(__i386__) || defined(__x86_64__) || defined(__arm__) || \
-     defined(__aarch64__))
-#define PERFETTO_PROBES_SANDBOX_SUPPORTED() 1
-#else
-#define PERFETTO_PROBES_SANDBOX_SUPPORTED() 0
-#endif
+#ifndef SRC_TRACED_SANDBOX_BASELINE_POLICY_H_
+#define SRC_TRACED_SANDBOX_BASELINE_POLICY_H_
 
 namespace perfetto {
 
-void InitProbesSandboxOrDie();
+class BpfSandbox;
+void EnableBaselineSandboxPolicy(BpfSandbox*);
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_SERVICE_SERVICE_SANDBOX_H_
+#endif  // SRC_TRACED_SANDBOX_BASELINE_POLICY_H_

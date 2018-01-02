@@ -14,18 +14,41 @@
  * limitations under the License.
  */
 
+#include <getopt.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "perfetto/base/build_config.h"
+#include "perfetto/base/logging.h"
 #include "perfetto/traced/traced.h"
 
 int main(int argc, char** argv) {
+  int no_sandbox = 0;
+  static struct option options[] = {{"no-sandbox", no_argument, &no_sandbox, 1},
+                                    {0, 0, 0, 0}};
+
+  for (int narg = 2, ret = 0;
+       (ret = getopt_long(argc - 1, &argv[1], "", options, nullptr)) != -1;
+       narg++) {
+    if (ret == '?') {
+      PERFETTO_ELOG("Error on cmdline option: %s", argv[narg]);
+      return 1;
+    }
+  }
+
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+  if (no_sandbox)
+    PERFETTO_LOG("Skipping BPF sandbox because of --no-sandbox");
+#else
+  PERFETTO_LOG("Skipping BPF sandbox because not supported on this arch");
+#endif
+
   if (argc > 1 && !strcmp(argv[1], "probes"))
-    return perfetto::ProbesMain(argc, argv);
+    return perfetto::ProbesMain(no_sandbox);
 
   if (argc > 1 && !strcmp(argv[1], "service"))
-    return perfetto::ServiceMain(argc, argv);
+    return perfetto::ServiceMain(no_sandbox);
 
-  printf("Usage: %s probes | service\n", argv[0]);
+  printf("Usage: %s probes | service [--no-sandbox]\n", argv[0]);
   return 1;
 }

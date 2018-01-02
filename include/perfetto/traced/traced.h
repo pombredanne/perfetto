@@ -33,8 +33,8 @@ namespace perfetto {
 #define PERFETTO_CONSUMER_SOCK_NAME "/tmp/perfetto-consumer"
 #endif
 
-int ServiceMain(int argc, char** argv);
-int ProbesMain(int argc, char** argv);
+int ServiceMain(bool no_sandbox);
+int ProbesMain(bool no_sandbox);
 
 }  // namespace perfetto
 

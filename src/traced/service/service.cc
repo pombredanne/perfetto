@@ -21,24 +21,46 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
-#include "src/traced/service/service_sandbox.h"
+
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+#include <fcntl.h>
+#include <sys/syscall.h>
+
+#include "src/sandbox/bpf_sandbox.h"
+#include "src/traced/sandbox_baseline_policy.h"
+#endif  // HAVE_BPF_SANDBOX
 
 namespace perfetto {
 
-int ServiceMain(int argc, char** argv) {
-  int no_sandbox = 0;
-  static struct option options[] = {{"no-sandbox", no_argument, &no_sandbox, 1},
-                                    {0, 0, 0, 0}};
+namespace {
 
-  for (int narg = 2, ret = 0;
-       (ret = getopt_long(argc - 1, &argv[1], "", options, nullptr)) != -1;
-       narg++) {
-    if (ret == '?') {
-      PERFETTO_ELOG("Error on cmdline option: %s", argv[narg]);
-      return 1;
-    }
-  }
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+void InitServiceSandboxOrDie() {
+  static const BpfSandbox::SyscallFilter kServicePolicy[] = {
+    {SYS_accept, {}},
+    {SYS_accept4, {}},
 
+#if BUILDFLAG(HAVE_MEMFD)
+    {__NR_memfd_create, {}},
+#if defined(SYS_fcntl)
+    {SYS_fcntl, {{}, {0, BPF_JEQ, F_ADD_SEALS}}},
+#endif
+#if defined(SYS_fcntl64)
+    {SYS_fcntl64, {{}, {0, BPF_JEQ, F_ADD_SEALS}}},
+#endif  // SYS_fcntl64
+#endif  // HAVE_MEMFD
+  };
+
+  BpfSandbox sandbox;
+  EnableBaselineSandboxPolicy(&sandbox);
+  sandbox.Allow(kServicePolicy);
+  sandbox.EnterSandboxOrDie();
+}
+#endif  // HAVE_BPF_SANDBOX
+
+}  // namespace
+
+int ServiceMain(bool no_sandbox) {
   base::UnixTaskRunner task_runner;
   std::unique_ptr<ServiceIPCHost> svc;
   svc = ServiceIPCHost::CreateInstance(&task_runner);
@@ -62,15 +84,10 @@ int ServiceMain(int argc, char** argv) {
   PERFETTO_ILOG("Started traced, listening on %s %s",
                 PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
 
-  if (!no_sandbox) {
-#if PERFETTO_SERVICE_SANDBOX_SUPPORTED()
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+  if (!no_sandbox)
     InitServiceSandboxOrDie();
-#else
-    PERFETTO_LOG("Skipping BPF sandbox because not supported on this arch");
 #endif
-  } else {
-    PERFETTO_LOG("Skipping BPF sandbox because of --no-sandbox");
-  }
 
   task_runner.Run();
   return 0;

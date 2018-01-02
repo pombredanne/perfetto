@@ -18,6 +18,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/unix_task_runner.h"
@@ -30,13 +31,34 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
-#include "src/traced/probes/probes_sandbox.h"
+
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+#include <sys/syscall.h>
+
+#include "src/sandbox/bpf_sandbox.h"
+#include "src/traced/sandbox_baseline_policy.h"
+#endif  // HAVE_BPF_SANDBOX
 
 #include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 
 namespace {
+
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+void InitProbesSandboxOrDie() {
+  static const BpfSandbox::SyscallFilter kProbesPolicy[] = {
+      {SYS_open, {}},    //
+      {SYS_openat, {}},  //
+      {SYS_connect, {}},
+  };
+
+  BpfSandbox sandbox;
+  EnableBaselineSandboxPolicy(&sandbox);
+  sandbox.Allow(kProbesPolicy);
+  sandbox.EnterSandboxOrDie();
+}
+#endif  // HAVE_BPF_SANDBOX
 
 class ProbesProducer : Producer {
  public:
@@ -120,32 +142,14 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID dsid) {
 
 }  // namespace
 
-int ProbesMain(int argc, char** argv) {
-  int no_sandbox = 0;
-  static struct option options[] = {{"no-sandbox", no_argument, &no_sandbox, 1},
-                                    {0, 0, 0, 0}};
-
-  for (int narg = 2, ret = 0;
-       (ret = getopt_long(argc - 1, &argv[1], "", options, nullptr)) != -1;
-       narg++) {
-    if (ret == '?') {
-      PERFETTO_ELOG("Error on cmdline option: %s", argv[narg]);
-      return 1;
-    }
-  }
-
-  // TODO(primiano): this code is duplicated with the service.
-  if (!no_sandbox) {
-#if PERFETTO_PROBES_SANDBOX_SUPPORTED()
-    InitProbesSandboxOrDie();
-#else
-    PERFETTO_LOG("Skipping BPF sandbox because not supported on this arch");
-#endif
-  } else {
-    PERFETTO_LOG("Skipping BPF sandbox because of --no-sandbox");
-  }
-
+int ProbesMain(bool no_sandbox) {
   perfetto::base::UnixTaskRunner task_runner;
+
+#if BUILDFLAG(HAVE_BPF_SANDBOX)
+  if (!no_sandbox)
+    InitProbesSandboxOrDie();
+#endif
+
   perfetto::ProbesProducer producer(&task_runner);
   task_runner.Run();
   return 0;

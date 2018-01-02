@@ -23,10 +23,11 @@ source_set("probes") {
   ]
   sources = [
     "probes.cc",
-    "probes_sandbox.h",
   ]
   if (is_linux || is_android) {
-    deps += [ "../../sandbox" ]
-    sources += [ "probes_sandbox.cc" ]
+    deps += [
+      "..:sandbox_baseline_policy",
+      "../../sandbox",
+    ]
   }
 }

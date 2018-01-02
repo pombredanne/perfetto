@@ -50,36 +50,40 @@ class BpfSandboxTest : public ::testing::Test {
  public:
   void SetUp() override {
     bpf.reset(new BpfSandbox());
-    bpf->Allow(SYS_exit_group);
+    static const BpfSandbox::SyscallFilter test_policy[] = {
+        {SYS_exit_group, {}},
+    };
+    bpf->Allow(test_policy);
   }
   void TearDown() override { bpf.reset(); }
   std::unique_ptr<BpfSandbox> bpf;
 };
 
 TEST_F(BpfSandboxTest, SimplePolicy) {
-  bpf->Allow(SYS_write);
+  bpf->Allow({{SYS_write, {}}});
   ASSERT_SANDBOX_ALLOW({ write(STDOUT_FILENO, "\n", 1); });
   ASSERT_SANDBOX_TRAP({ base::ignore_result(fork()); });
 }
 
 TEST_F(BpfSandboxTest, SyscallArgumentFilter) {
-  bpf->Allow(SYS_write);
 #if defined(SYS_mmap)
 #define MMAP_SYSCALL SYS_mmap
 #else
 #define MMAP_SYSCALL SYS_mmap2
 #endif
-  bpf->Allow(
-      MMAP_SYSCALL,
-      {
-          {0, BPF_JEQ, 0},  // |addr| must be nullptr
-          {0, BPF_JGT, 0},  // |length| must be  > 0
-          {kNot, BPF_JSET, static_cast<uint32_t>(~(PROT_READ | PROT_WRITE))},
-          {},               // No filters on |flags|
-          {0, BPF_JEQ, 0},  // |fd| must be == 0
-      });
+
   base::ScopedFile devnull(open("/dev/null", O_RDONLY));
-  bpf->Allow(SYS_read, {{0, BPF_JEQ, static_cast<uint32_t>(*devnull)}});
+  bpf->Allow(
+      {{SYS_read, {{0, BPF_JEQ, static_cast<uint32_t>(*devnull)}}},
+       {SYS_write, {}},
+       {MMAP_SYSCALL,
+        {
+            {0, BPF_JEQ, 0},  // |addr| must be nullptr
+            {0, BPF_JGT, 0},  // |length| must be  > 0
+            {kNot, BPF_JSET, static_cast<uint32_t>(~(PROT_READ | PROT_WRITE))},
+            {},               // No filters on |flags|
+            {0, BPF_JEQ, 0},  // |fd| must be == 0
+        }}});
 
   ASSERT_SANDBOX_ALLOW(
       { mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, 0, 0); });
@@ -125,12 +129,15 @@ TEST_F(BpfSandboxTest, SyscallArgumentFilter) {
 // Tests that when applying several filters to the same syscall number, those
 // filter have OR semantic.
 TEST_F(BpfSandboxTest, ArgFiltersHaveORSemantic) {
-  bpf->Allow(SYS_write, {
-                            {0, BPF_JEQ, static_cast<uint32_t>(STDOUT_FILENO)},
-                        });
-  bpf->Allow(SYS_write, {
-                            {0, BPF_JEQ, static_cast<uint32_t>(STDERR_FILENO)},
-                        });
+  BpfSandbox::SyscallFilter policy1[]{
+      {SYS_write, {{0, BPF_JEQ, static_cast<uint32_t>(STDOUT_FILENO)}}},
+  };
+  bpf->Allow(policy1);
+
+  BpfSandbox::SyscallFilter policy2[]{
+      {SYS_write, {{0, BPF_JEQ, static_cast<uint32_t>(STDERR_FILENO)}}},
+  };
+  bpf->Allow(policy2);
 
   ASSERT_SANDBOX_ALLOW({
     write(STDOUT_FILENO, "\n", 1);
