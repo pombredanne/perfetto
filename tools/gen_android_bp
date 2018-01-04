@@ -34,7 +34,11 @@ import subprocess
 import sys
 
 # Default targets to translate to the blueprint file.
-default_targets = ['//:perfetto_tests']
+default_targets = [
+    '//:perfetto_tests',
+    '//:traced',
+    '//src/tracing:consumer_cmd',
+]
 
 # Arguments for the GN output directory.
 gn_args = 'target_os="android" target_cpu="arm" is_debug=false'
@@ -58,6 +62,10 @@ tree_path = 'external/perfetto'
 
 def enable_gmock(module):
     module.static_libs.append('libgmock')
+
+
+def enable_gtest_prod(module):
+    module.static_libs.append('libgtest_prod')
 
 
 def enable_gtest(module):
@@ -86,6 +94,7 @@ def enable_libunwind(module):
 builtin_deps = {
     '//buildtools:gmock': enable_gmock,
     '//buildtools:gtest': enable_gtest,
+    '//gn:gtest_prod_config': enable_gtest_prod,
     '//buildtools:gtest_main': enable_gtest,
     '//buildtools:libunwind': enable_libunwind,
     '//buildtools:protobuf_full': enable_protobuf_full,
@@ -190,9 +199,9 @@ def label_to_path(label):
 
 def label_to_module_name(label):
     """Turn a GN label (e.g., //:perfetto_tests) into a module name."""
-    label = re.sub(r'^//:?', '', label)
-    module = re.sub(r'[^a-zA-Z0-9_]', '_', label)
-    if not module.startswith(module_prefix):
+    module = re.sub(r'^//:?', '', label)
+    module = re.sub(r'[^a-zA-Z0-9_]', '_', module)
+    if not module.startswith(module_prefix) and label not in default_targets:
         return module_prefix + module
     return module
 

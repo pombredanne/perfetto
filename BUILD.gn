@@ -54,4 +54,11 @@ if (!build_with_chromium) {
       "src/tracing:tracing_benchmarks",
     ]
   }
+
+  executable("traced") {
+    deps = [
+      "gn:default_deps",
+      "src/traced",
+    ]
+  }
 }
