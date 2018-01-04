@@ -33,6 +33,7 @@ message TraceConfig {
     optional uint32 size_kb = 1;
     // TODO: uint32 page_size = 2;
 
+    // Keep include/perfetto/tracing/core/trace_config.h in sync.
     enum OptimizeFor {
       DEFAULT = 0;
       // The log buffer is drained sporadically (typically only once after
@@ -56,6 +57,7 @@ message TraceConfig {
     }
     optional OptimizeFor optimize_for = 3;
 
+    // Keep include/perfetto/tracing/core/trace_config.h in sync.
     enum FillPolicy {
       UNSPECIFIED = 0;
       RING_BUFFER = 1;
