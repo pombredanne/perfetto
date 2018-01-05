@@ -148,7 +148,6 @@ void FtraceProducer::Run() {
                                          &task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
-  ftrace_->WriteTraceMarker("Hello, world!");
   task_runner.Run();
 }
 
