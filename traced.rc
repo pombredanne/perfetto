@@ -14,7 +14,11 @@
 
 service traced /system/bin/traced
     disabled
+
+    # TODO(primiano): the consumer socket should be 0660 in order to further
+    # constrain access to this priviledged port using filesystem ACLs.
     socket traced_consumer stream 0666 traced traced
+
     socket traced_producer stream 0666 traced traced
     user traced
     group traced
