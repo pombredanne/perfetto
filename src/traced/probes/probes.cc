@@ -118,7 +118,7 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID dsid) {
 
 }  // namespace
 
-int ProbesMain(int argc, char** argv) {
+int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   perfetto::base::UnixTaskRunner task_runner;
   perfetto::ProbesProducer producer(&task_runner);
   task_runner.Run();

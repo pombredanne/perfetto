@@ -56,10 +56,31 @@ if (!build_with_chromium) {
     ]
   }
 
-  executable("traced") {
+  shared_library("libtraced_shared") {
     deps = [
       "gn:default_deps",
-      "src/traced",
+      "src/traced/probes",
+      "src/traced/service",
+    ]
+  }
+
+  executable("traced") {
+    deps = [
+      ":libtraced_shared",
+      "gn:default_deps",
+    ]
+    sources = [
+      "src/traced/service/main.cc",
+    ]
+  }
+
+  executable("traced_probes") {
+    deps = [
+      ":libtraced_shared",
+      "gn:default_deps",
+    ]
+    sources = [
+      "src/traced/probes/main.cc",
     ]
   }
 }

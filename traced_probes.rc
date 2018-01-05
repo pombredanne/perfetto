@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# The executable() target is defined in the root ../../BUILD.gn file. This is
-# to make it so that the Android blueprint generator generates a target named
-# just "traced" rather than "perfetto_src_traced_traced"
-source_set("traced") {
-  sources = [
-    "traced.cc",
-  ]
-  deps = [
-    "../../gn:default_deps",
-    "../base",
-    "probes",
-    "service",
-  ]
-}
+service traced_probes /system/bin/traced_probes
+    disabled
+    # TODO(primiano): We should probably introduce a specialized group
+    # for tracefs access, change FS ACLs from group:shell -> group:tracefs and
+    # switch to group:tracefs here.
+    user shell
+    group shell
+    writepid /dev/cpuset/system-background/tasks
