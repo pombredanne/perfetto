@@ -32,6 +32,13 @@ group("all") {
   }
 }
 
+group("lib") {
+  public_configs = [ "gn:public_config" ]
+  deps = [
+    "src/tracing",
+  ]
+}
+
 executable("perfetto_tests") {
   testonly = true
   deps = [
