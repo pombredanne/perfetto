@@ -114,20 +114,25 @@ void FtraceProducer::CreateDataSourceInstance(
 
   const std::string& categories = source_config.trace_category_filters();
   FtraceConfig config;
-  size_t last = 0;
-  for (size_t i = 0; i <= categories.size(); i++) {
-    if (i == categories.size() || categories[i] == ',') {
-      std::string category = categories.substr(last, i - last).c_str();
-      last = i + 1;
-      if (!category.size())
-        continue;
-      config.AddEvent(category);
+  for (size_t current = 0; current < categories.size();) {
+    size_t next = categories.find(',', current);
+    if (current == next) {
+      // Case with empty category (i.e. a string like category,,other)
+      current++;
+      continue;
+    } else if (next == std::string::npos) {
+      // No more commas so rest of string is one category.
+      next = categories.size();
     }
+    config.AddEvent(categories.substr(current, next).c_str());
+    current = next + 1;
   }
 
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+  // auto trace_writer = endpoint_->CreateTraceWriter(
+  //    static_cast<BufferID>(source_config.target_buffer()));
+  // TODO(primano): At the moment the buffer ID is always 1.
+  auto trace_writer = endpoint_->CreateTraceWriter(1);
   auto delegate =
       std::unique_ptr<SinkDelegate>(new SinkDelegate(std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(config, delegate.get());
