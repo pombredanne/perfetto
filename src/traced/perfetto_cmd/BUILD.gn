@@ -1,4 +1,4 @@
-# Copyright (C) 2017 The Android Open Source Project
+# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-service traced /system/bin/traced
-    disabled
-
-    # TODO(primiano): the consumer socket should be 0660 in order to further
-    # constrain access to this priviledged port using filesystem ACLs.
-    socket traced_consumer stream 0666 traced traced
-
-    socket traced_producer stream 0666 traced traced
-    user traced
-    group traced
-    writepid /dev/cpuset/system-background/tasks
+source_set("perfetto_cmd") {
+  public_deps = [
+    "../../../include/perfetto/traced",
+  ]
+  deps = [
+    "../../../gn:default_deps",
+    "../../../protos:lite",
+    "../../base",
+    "../../tracing:ipc",
+  ]
+  sources = [
+    "perfetto_cmd.cc",
+  ]
+}

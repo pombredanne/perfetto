@@ -12,11 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-service traced_probes /system/bin/traced_probes
+service traced /system/bin/traced
+    class late_start
     disabled
-    # TODO(primiano): We should probably introduce a specialized group
-    # for tracefs access, change FS ACLs from group:shell -> group:tracefs and
-    # switch to group:tracefs here.
+
+    # TODO(primiano): the consumer socket should be 0660 in order to further
+    # constrain access to this priviledged port using filesystem ACLs.
+    socket traced_consumer stream 0666 traced traced
+
+    socket traced_producer stream 0666 traced traced
+    user traced
+    group traced
+    writepid /dev/cpuset/system-background/tasks
+
+service traced_probes /system/bin/traced_probes
+    class late_start
+    disabled
+    # TODO(primiano): introduce a specialized group for tracefs access, change
+    # FS ACLs from group:shell -> group:tracefs and switch to that group here.
     user shell
     group shell
     writepid /dev/cpuset/system-background/tasks
+
+on property:perfetto.service.enable=true
+    mkdir /data/misc/perfetto-traces 0770 traced traced
+    start traced
+    start traced_probes
