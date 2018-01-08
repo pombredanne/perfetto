@@ -35,6 +35,5 @@ service traced_probes /system/bin/traced_probes
     writepid /dev/cpuset/system-background/tasks
 
 on property:perfetto.service.enable=true
-    mkdir /data/misc/perfetto-traces 0770 traced traced
     start traced
     start traced_probes
