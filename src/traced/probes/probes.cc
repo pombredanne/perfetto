@@ -35,6 +35,14 @@ namespace perfetto {
 
 namespace {
 
+bool IsAlnum(const std::string& str) {
+  for (size_t i = 0; i < str.size(); i++) {
+    if (!isalnum(str[i]) && str[i] != '_')
+      return false;
+  }
+  return true;
+}
+
 using BundleHandle =
     protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
 
@@ -112,20 +120,14 @@ void FtraceProducer::CreateDataSourceInstance(
   PERFETTO_ILOG("Source start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                 source_config.target_buffer());
 
-  const std::string& categories = source_config.trace_category_filters();
+  // TODO(hjd): Would be nice if ftrace_reader could use generate the config.
+  const DataSourceConfig::FtraceConfig proto_config =
+      source_config.com_google_perfetto_ftrace();
+
   FtraceConfig config;
-  for (size_t current = 0; current < categories.size();) {
-    size_t next = categories.find(',', current);
-    if (current == next) {
-      // Case with empty category (i.e. a string like category,,other)
-      current++;
-      continue;
-    } else if (next == std::string::npos) {
-      // No more commas so rest of string is one category.
-      next = categories.size();
-    }
-    config.AddEvent(categories.substr(current, next).c_str());
-    current = next + 1;
+  for (const std::string& event_name : proto_config.event_names()) {
+    if (IsAlnum(event_name))
+      config.AddEvent(event_name.c_str());
   }
 
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
@@ -162,7 +164,7 @@ void FtraceProducer::Run() {
 
 namespace perfetto {
 
-int ProbesMain(int argc, char** argv) {
+int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   PERFETTO_LOG("Probes");
   perfetto::FtraceProducer producer;
   producer.Run();
