@@ -83,6 +83,22 @@ cc_library_shared {
   ],
 }
 
+// GN target: //:perfetto
+cc_binary {
+  name: "perfetto",
+  srcs: [
+    "src/traced/perfetto_cmd/main.cc",
+  ],
+  shared_libs: [
+    "libandroid",
+    "liblog",
+    "libtraced_shared",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+}
+
 cc_defaults {
   name: "perfetto_defaults",
   cflags: [
