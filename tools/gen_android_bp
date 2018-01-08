@@ -44,10 +44,7 @@ default_targets = [
 
 # Defines a custom init_rc argument to be applied to the corresponding output
 # blueprint target.
-target_initrc = {
-    '//:traced': 'traced.rc',
-    '//:traced_probes': 'traced_probes.rc',
-}
+target_initrc = {}  # TODO(primiano): populate in upcoming CLs.
 
 # Arguments for the GN output directory.
 gn_args = 'target_os="android" target_cpu="arm" is_debug=false'

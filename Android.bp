@@ -878,9 +878,6 @@ cc_binary {
     "liblog",
     "libtraced_shared",
   ],
-  init_rc: [
-    "traced.rc",
-  ],
   defaults: [
     "perfetto_defaults",
   ],
@@ -896,9 +893,6 @@ cc_binary {
     "libandroid",
     "liblog",
     "libtraced_shared",
-  ],
-  init_rc: [
-    "traced_probes.rc",
   ],
   defaults: [
     "perfetto_defaults",

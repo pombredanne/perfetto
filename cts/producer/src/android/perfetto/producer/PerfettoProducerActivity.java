@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include "perfetto/traced/traced.h"
+package android.perfetto.producer;
 
-int main(int argc, char** argv) {
-  return perfetto::PerfettoCmdMain(argc, argv);
+import android.app.Activity;
+import android.os.Bundle;
+import android.util.Log;
+
+import java.lang.Override;
+
+public class PerfettoProducerActivity extends Activity {
+
+    @Override
+    public void onCreate(Bundle icicle) {
+        super.onCreate(icicle);
+    }
 }

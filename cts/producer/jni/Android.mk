@@ -11,18 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+LOCAL_PATH := $(call my-dir)
 
-source_set("perfetto_cmd") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../../protos:lite",
-    "../../base",
-    "../../tracing:ipc",
-  ]
-  sources = [
-    "perfetto_cmd.cc",
-  ]
-}
+include $(CLEAR_VARS)
+
+LOCAL_MODULE    := libperfettoctsproducer_jni
+
+LOCAL_MULTILIB := both
+
+LOCAL_MODULE_TAGS := optional
+
+LOCAL_CPP_EXTENSION := .cc
+LOCAL_SRC_FILES := \
+	producer.cc
+
+LOCAL_C_INCLUDES := \
+	$(JNI_H_INCLUDE) \
+	system/core/include
+
+LOCAL_CFLAGS += -Wall -Werror
+
+# TODO(lalitm): enable this once we have the below as NDK compatible.
+# LOCAL_STATIC_LIBRARIES := perfetto_src_tracing_ipc
+LOCAL_SHARED_LIBRARIES := \
+    liblog
+
+LOCAL_SDK_VERSION := current
+
+include $(BUILD_SHARED_LIBRARY)

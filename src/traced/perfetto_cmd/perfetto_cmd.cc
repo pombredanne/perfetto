@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ int PerfettoCmd::PrintUsage(const char* argv0) {
 }
 
 int PerfettoCmd::Main(int argc, char** argv) {
-  static struct option long_options[] = {
+  static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
       {"help", required_argument, 0, 'h'},
       {"config", required_argument, 0, 'c'},
@@ -177,15 +177,18 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
                               chunk.size);
     }
   }
-  if (!has_more) {
-    long bytes_written = trace_out_stream_.tellp();
-    trace_out_stream_.close();
-    std::string tmp_path = trace_out_path_ + ".tmp";
-    PERFETTO_CHECK(rename(tmp_path.c_str(), trace_out_path_.c_str()) == 0);
-    did_receive_full_trace_ = true;
-    PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
-                  trace_out_path_.c_str());
-  }
+  if (has_more)
+    return;
+
+  // Reached end of trace.
+  long bytes_written = trace_out_stream_.tellp();
+  trace_out_stream_.close();
+  std::string tmp_path = trace_out_path_ + ".tmp";
+  PERFETTO_CHECK(rename(tmp_path.c_str(), trace_out_path_.c_str()) == 0);
+  did_receive_full_trace_ = true;
+  PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
+                trace_out_path_.c_str());
+  consumer_endpoint_->FreeBuffers();
   task_runner_.Quit();
 }
 

@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include <stdio.h>
-#include "perfetto/traced/traced.h"
+#define LOG_NDEBUG 0
+#define LOG_TAG "PerfettoTest"
 
-int main(int argc, char** argv) {
-  return perfetto::PerfettoCmdMain(argc, argv);
+#include <gtest/gtest.h>
+
+TEST(PerfettoTest, TestRealProducer) {
 }
