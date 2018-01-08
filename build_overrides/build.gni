@@ -19,6 +19,6 @@
 build_with_chromium = false
 
 declare_args() {
-    # The Android blueprint file generator overrides this to true.
-    build_with_android = false
+  # The Android blueprint file generator overrides this to true.
+  build_with_android = false
 }
