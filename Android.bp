@@ -64,6 +64,7 @@ cc_library_shared {
     "libandroid",
     "liblog",
     "libprotobuf-cpp-lite",
+    "libutils",
   ],
   static_libs: [
     "libgtest_prod",
@@ -77,6 +78,26 @@ cc_library_shared {
     "perfetto_protos_tracing_service_tracing_service_gen_headers",
     "perfetto_protos_zero_gen_headers",
     "perfetto_src_ipc_wire_protocol_gen_headers",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
+}
+
+// GN target: //:perfetto
+cc_binary {
+  name: "perfetto",
+  srcs: [
+    "src/traced/perfetto_cmd/main.cc",
+  ],
+  shared_libs: [
+    "libandroid",
+    "liblog",
+    "libtraced_shared",
+    "libutils",
   ],
   defaults: [
     "perfetto_defaults",
@@ -877,6 +898,7 @@ cc_binary {
     "libandroid",
     "liblog",
     "libtraced_shared",
+    "libutils",
   ],
   defaults: [
     "perfetto_defaults",
@@ -893,6 +915,7 @@ cc_binary {
     "libandroid",
     "liblog",
     "libtraced_shared",
+    "libutils",
   ],
   defaults: [
     "perfetto_defaults",
