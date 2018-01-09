@@ -32,7 +32,7 @@ source_set("base") {
 }
 
 # The "android_task_runner" should be depended on only by targets that
-# explicitly need it, as it pull in a dependency on libandroid.so, that in turn
+# explicitly need it, as it pulls in a dependency on libandroid.so that in turn
 # pulls dozen of other .so(s).
 if (is_android) {
   source_set("android_task_runner") {
