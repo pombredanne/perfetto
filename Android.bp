@@ -901,6 +901,9 @@ cc_binary {
     "libtraced_shared",
     "libutils",
   ],
+  init_rc: [
+    "perfetto.rc",
+  ],
   defaults: [
     "perfetto_defaults",
   ],
