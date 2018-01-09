@@ -16,14 +16,17 @@
 
 #include "perfetto/protozero/protozero_message_handle.h"
 
+#include "gtest/gtest.h"
+#include "perfetto/protozero/protozero_message.h"
+
 namespace protozero {
 
 namespace {
 
 TEST(ProtoZeroMessageHandleTest, MoveHandleSharedMessageDoesntFinalize) {
   ProtoZeroMessage message;
-  ProtoZeroMessageHandle handle_1(&message);
-  handle_1 = ProtoZeroMessageHandle(&message);
+  ProtoZeroMessageHandle<ProtoZeroMessage> handle_1(&message);
+  handle_1 = ProtoZeroMessageHandle<ProtoZeroMessage>(&message);
   ASSERT_FALSE(handle_1->is_finalized());
 }
 
