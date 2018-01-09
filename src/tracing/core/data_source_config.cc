@@ -54,7 +54,7 @@ void DataSourceConfig::FromProto(
   trace_category_filters_ = static_cast<decltype(trace_category_filters_)>(
       proto.trace_category_filters());
 
-  com_google_perfetto_ftrace_.FromProto(proto.com_google_perfetto_ftrace());
+  ftrace_config_.FromProto(proto.ftrace_config());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -77,8 +77,7 @@ void DataSourceConfig::ToProto(
       static_cast<decltype(proto->trace_category_filters())>(
           trace_category_filters_));
 
-  com_google_perfetto_ftrace_.ToProto(
-      proto->mutable_com_google_perfetto_ftrace());
+  ftrace_config_.ToProto(proto->mutable_ftrace_config());
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

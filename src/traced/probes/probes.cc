@@ -94,14 +94,14 @@ class FtraceProducer : public Producer {
  private:
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
-  DataSourceID data_source_id_;
+  DataSourceID data_source_id_ = 0;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
 };
 
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
-  PERFETTO_DLOG("Connected to the service\n");
+  PERFETTO_LOG("Connected to the service\n");
 
   DataSourceDescriptor descriptor;
   descriptor.set_name("com.google.perfetto.ftrace");
@@ -110,24 +110,27 @@ void FtraceProducer::OnConnect() {
 }
 
 void FtraceProducer::OnDisconnect() {
-  PERFETTO_DLOG("Disconnected from tracing service");
+  PERFETTO_LOG("Disconnected from tracing service");
   exit(1);
 }
 
 void FtraceProducer::CreateDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
-  PERFETTO_ILOG("Source start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
-                source_config.target_buffer());
+  PERFETTO_LOG("Source start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
+               source_config.target_buffer());
 
   // TODO(hjd): Would be nice if ftrace_reader could use generate the config.
   const DataSourceConfig::FtraceConfig proto_config =
-      source_config.com_google_perfetto_ftrace();
+      source_config.ftrace_config();
 
   FtraceConfig config;
   for (const std::string& event_name : proto_config.event_names()) {
-    if (IsAlnum(event_name))
+    if (IsAlnum(event_name)) {
       config.AddEvent(event_name.c_str());
+    } else {
+      PERFETTO_LOG("Bad event name '%s'", event_name.c_str());
+    }
   }
 
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
@@ -144,7 +147,7 @@ void FtraceProducer::CreateDataSourceInstance(
 }
 
 void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
-  PERFETTO_ILOG("Source stop (id=%" PRIu64 ")", id);
+  PERFETTO_LOG("Source stop (id=%" PRIu64 ")", id);
   delegates_.erase(id);
 }
 
@@ -165,7 +168,7 @@ void FtraceProducer::Run() {
 namespace perfetto {
 
 int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
-  PERFETTO_LOG("Probes");
+  PERFETTO_LOG("Starting %s service", argv[0]);
   perfetto::FtraceProducer producer;
   producer.Run();
   return 0;

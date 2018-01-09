@@ -42,5 +42,5 @@ message DataSourceConfig {
 
   optional string trace_category_filters = 3;  // TODO: temporary for tests.
 
-  optional FtraceConfig com_google_perfetto_ftrace = 4;
+  optional FtraceConfig ftrace_config = 4;
 }

@@ -100,18 +100,14 @@ class DataSourceConfig {
     trace_category_filters_ = value;
   }
 
-  const FtraceConfig& com_google_perfetto_ftrace() const {
-    return com_google_perfetto_ftrace_;
-  }
-  FtraceConfig* mutable_com_google_perfetto_ftrace() {
-    return &com_google_perfetto_ftrace_;
-  }
+  const FtraceConfig& ftrace_config() const { return ftrace_config_; }
+  FtraceConfig* mutable_ftrace_config() { return &ftrace_config_; }
 
  private:
   std::string name_ = {};
   uint32_t target_buffer_ = {};
   std::string trace_category_filters_ = {};
-  FtraceConfig com_google_perfetto_ftrace_ = {};
+  FtraceConfig ftrace_config_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.
