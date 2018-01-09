@@ -42,6 +42,7 @@ class TraceConfig;
 class TraceConfig_BufferConfig;
 class TraceConfig_DataSource;
 class DataSourceConfig;
+class DataSourceConfig_FtraceConfig;
 }  // namespace protos
 }  // namespace perfetto
 
