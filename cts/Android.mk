@@ -28,12 +28,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := -Wall -Werror
 
-LOCAL_SHARED_LIBRARIES := \
-    liblog \
-    libprotobuf-cpp-lite
-
 LOCAL_STATIC_LIBRARIES := \
-    libgmock \
     libgtest \
     libgtest_main \
     perfetto_src_tracing_ipc

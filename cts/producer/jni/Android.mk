@@ -27,18 +27,16 @@ LOCAL_SRC_FILES := \
 	producer.cc
 
 LOCAL_C_INCLUDES := \
-    $(JNI_H_INCLUDE) \
-    system/core/include
+	$(JNI_H_INCLUDE) \
+	system/core/include
 
 LOCAL_CFLAGS += -Wall -Werror
 
-LOCAL_STATIC_LIBRARIES := \
-    perfetto_src_tracing_ipc \
-    libprotobuf-cpp-lite
-
+# TODO(lalitm): enable this once we have the below as NDK compatible.
+# LOCAL_STATIC_LIBRARIES := perfetto_src_tracing_ipc
 LOCAL_SHARED_LIBRARIES := \
     liblog
 
-LOCAL_CXX_STL := libc++_static
+LOCAL_SDK_VERSION := current
 
 include $(BUILD_SHARED_LIBRARY)
