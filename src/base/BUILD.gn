@@ -26,12 +26,28 @@ source_set("base") {
     "thread_checker.cc",
     "unix_task_runner.cc",
   ]
-  if (is_android) {
-    sources += [ "android_task_runner.cc" ]
-    libs = [ "android" ]
-  }
   if (is_debug) {
     deps += [ ":debug_crash_stack_trace" ]
+  }
+}
+
+# The "android_task_runner" should be depended on only by targets that
+# explicitly need it, as it pull in a dependency on libandroid.so, that in turn
+# pulls dozen of other .so(s).
+if (is_android) {
+  source_set("android_task_runner") {
+    deps = [
+      ":base",
+      "../../gn:default_deps",
+    ]
+    sources = [
+      "android_task_runner.cc",
+    ]
+    all_dependent_configs = [ ":android_config" ]
+  }
+
+  config("android_config") {
+    libs = [ "android" ]
   }
 }
 
@@ -68,6 +84,7 @@ source_set("test_support") {
 source_set("base_unittests") {
   testonly = true
   deps = [
+    ":android_task_runner",
     ":base",
     ":test_support",
     "../../gn:default_deps",
