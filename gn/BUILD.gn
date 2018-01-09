@@ -99,3 +99,7 @@ config("default_config") {
     "../include",
   ]
 }
+
+config("public_config") {
+  include_dirs = [ "../include" ]
+}

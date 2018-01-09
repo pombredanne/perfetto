@@ -28,7 +28,6 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/shared_memory.h"
-#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
 namespace perfetto {
@@ -129,7 +128,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return;
   }
   TracingSession& ts =
-      tracing_sessions_.emplace(consumer, TracingSession{}).first->second;
+      tracing_sessions_.emplace(consumer, TracingSession{cfg}).first->second;
 
   // Initialize the log buffers.
   bool did_allocate_all_buffers = true;
@@ -295,6 +294,34 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
   PERFETTO_DCHECK(!desc.name().empty());
   data_sources_.emplace(desc.name(),
                         RegisteredDataSource{producer_id, ds_id, desc});
+
+  // If there's existing tracing sessions, we need to check if the new
+  // data source is enabled by any of them.
+  if (tracing_sessions_.empty())
+    return;
+
+  auto producer_iter = producers_.find(producer_id);
+  if (producer_iter == producers_.end()) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+
+  ProducerEndpointImpl* producer = producer_iter->second;
+
+  for (auto& iter : tracing_sessions_) {
+    TracingSession& tracing_session = iter.second;
+    for (const TraceConfig::DataSource& cfg_data_source :
+         tracing_session.config.data_sources()) {
+      if (cfg_data_source.config().name() != desc.name())
+        continue;
+      // TODO(primiano): match against |producer_name_filter|.
+
+      DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
+      tracing_session.data_source_instances.emplace(producer_id, inst_id);
+      producer->producer()->CreateDataSourceInstance(inst_id,
+                                                     cfg_data_source.config());
+    }
+  }
 }
 
 void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,

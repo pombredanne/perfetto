@@ -28,6 +28,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/service.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "perfetto/tracing/core/trace_config.h"
 #include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
@@ -179,6 +180,8 @@ class ServiceImpl : public Service {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
+    TracingSession(const TraceConfig& config) : config(config) {}
+
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
     std::multimap<ProducerID, DataSourceInstanceID> data_source_instances;
@@ -186,6 +189,8 @@ class ServiceImpl : public Service {
     // The key of this map matches the |target_buffer| in the
     // SharedMemoryABI::ChunkHeader.
     std::map<BufferID, TraceBuffer> trace_buffers;
+
+    TraceConfig config;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;
