@@ -15,22 +15,16 @@
 service traced /system/bin/traced
     class late_start
     disabled
-
-    # TODO(primiano): the consumer socket should be 0660 in order to further
-    # constrain access to this priviledged port using filesystem ACLs.
-    socket traced_consumer stream 0666 traced traced
-
-    socket traced_producer stream 0666 traced traced
-    user traced
-    group traced
+    socket traced_consumer stream 0666 root root
+    socket traced_producer stream 0666 root root
+    user nobody
+    group nobody
     writepid /dev/cpuset/system-background/tasks
 
 service traced_probes /system/bin/traced_probes
     class late_start
     disabled
-    # TODO(primiano): introduce a specialized group for tracefs access, change
-    # FS ACLs from group:shell -> group:tracefs and switch to that group here.
-    user shell
+    user nobody
     group shell
     writepid /dev/cpuset/system-background/tasks
 
