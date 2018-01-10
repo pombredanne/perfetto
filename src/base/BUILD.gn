@@ -84,12 +84,14 @@ source_set("test_support") {
 source_set("base_unittests") {
   testonly = true
   deps = [
-    ":android_task_runner",
     ":base",
     ":test_support",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
+  if (is_android) {
+    deps += [ ":android_task_runner" ]
+  }
   sources = [
     "page_allocator_unittest.cc",
     "scoped_file_unittest.cc",
