@@ -96,6 +96,10 @@ group("default_deps") {
 }
 
 config("default_config") {
+  if (build_with_chromium) {
+    defines = [ "PERFETTO_CHROMIUM_BUILD" ]
+  }
+
   include_dirs = [
     "..",
     "../include",

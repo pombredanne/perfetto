@@ -20,7 +20,6 @@ group("all") {
     ":perfetto_tests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
-    "src/tracing:consumer_cmd",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
   ]
@@ -31,6 +30,7 @@ group("all") {
       ":traced",
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
+      "src/tracing:consumer_cmd",
     ]
   }
 }

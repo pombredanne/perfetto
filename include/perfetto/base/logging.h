@@ -72,7 +72,7 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 
 // Let android log to both stderr and logcat. When part of the Android tree
 // stderr points to /dev/null so logcat is the only way to get some logging.
-#if BUILDFLAG(OS_ANDROID)
+#if BUILDFLAG(OS_ANDROID) && !defined(PERFETTO_CHROMIUM_BUILD)
 #define PERFETTO_XLOG(level, fmt, ...)                                         \
   do {                                                                         \
     __android_log_print(                                                       \
