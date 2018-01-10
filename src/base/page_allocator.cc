@@ -38,9 +38,9 @@ PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
     return nullptr;
   PERFETTO_CHECK(ptr && ptr != MAP_FAILED);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
-  int res = mprotect(ptr, kGuardSize, PROT_NONE);
-  res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
-  PERFETTO_CHECK(res == 0);
+  // int res = mprotect(ptr, kGuardSize, PROT_NONE);
+  // res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
+  // PERFETTO_CHECK(res == 0);
   return PageAllocator::UniquePtr(usable_region, PageAllocator::Deleter(size));
 }
 
