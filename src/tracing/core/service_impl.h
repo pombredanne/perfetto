@@ -180,7 +180,7 @@ class ServiceImpl : public Service {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    TracingSession(const TraceConfig& config) : config(config) {}
+    TracingSession(const TraceConfig& new_config) : config(new_config) {}
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
