@@ -125,8 +125,8 @@ cache:
 before_install:
   - set -e
   - echo "$CFG" && echo "$GN_ARGS"
-  - ASAN_SYMBOLIZER_PATH="$(which llvm-symbolizer || echo /usr/bin/llvm-symbolizer-*)"
-  - LSAN_OPTIONS=verbosity=1:log_threads=1
+  - export ASAN_SYMBOLIZER_PATH="$(which llvm-symbolizer || echo /usr/bin/llvm-symbolizer-*)"
+  - export LSAN_OPTIONS=verbosity=1:log_threads=1
 
 install:
   - |
