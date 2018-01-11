@@ -147,7 +147,7 @@ class ServiceImpl : public Service {
 
   struct TraceBuffer {
     // TODO(primiano): make this configurable.
-    static constexpr size_t kBufferPageSize = 8192;
+    static constexpr size_t kBufferPageSize = 4096;
     explicit TraceBuffer(size_t size);
     ~TraceBuffer();
     TraceBuffer(TraceBuffer&&) noexcept;

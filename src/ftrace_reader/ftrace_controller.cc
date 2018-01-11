@@ -196,7 +196,7 @@ void FtraceController::RegisterForEvent(const std::string& name) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   const Event* event = table_->GetEventByName(name);
   if (!event) {
-    PERFETTO_ELOG("Can't enable %s, event not known", name.c_str());
+    PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
     return;
   }
   size_t& count = enabled_count_.at(event->ftrace_event_id);

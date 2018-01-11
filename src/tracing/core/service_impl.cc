@@ -37,7 +37,7 @@ namespace perfetto {
 using protozero::proto_utils::ParseVarInt;
 
 namespace {
-constexpr size_t kPageSize = 8192;
+constexpr size_t kPageSize = 4096;
 constexpr size_t kDefaultShmSize = kPageSize * 16;  // 64 KB.
 constexpr size_t kMaxShmSize = kPageSize * 1024;    // 4 MB.
 }  // namespace
@@ -163,7 +163,6 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     for (const auto& kv : ts.trace_buffers)
       buffer_ids_.Free(kv.first);
     ts.trace_buffers.clear();
-    PERFETTO_DLOG("Could not allocate buffers. Bailing out.");
     return;  // TODO(primiano): return failure condition?
   }
 
@@ -256,8 +255,8 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
                        flags & SharedMemoryABI::ChunkHeader::
                                    kLastPacketContinuesOnNextChunk);
 
-          // PERFETTO_DLOG("  #%-3zu len:%" PRIu64 " skip: %d\n", pack_idx,
-          //              pack_size, skip);
+          PERFETTO_DLOG("  #%-3zu len:%" PRIu64 " skip: %d\n", pack_idx,
+                        pack_size, skip);
           if (ptr > chunk.end() - pack_size) {
             PERFETTO_DLOG("out of bounds!\n");
             break;
@@ -283,18 +282,9 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
   });
 }
 
-void ServiceImpl::FreeBuffers(ConsumerEndpointImpl* consumer) {
-  auto it = tracing_sessions_.find(consumer);
-  if (it == tracing_sessions_.end()) {
-    PERFETTO_DLOG(
-        "Consumer invoked FreeBuffers() but no tracing session is active");
-    return;  // TODO(primiano): signal failure?
-  }
-  // Free all memory and id slots associated with this tracing session.
-  TracingSession& tracing_session = it->second;
-  for (const auto& kv : tracing_session.trace_buffers)
-    buffer_ids_.Free(kv.first);
-  tracing_session.trace_buffers.clear();
+void ServiceImpl::FreeBuffers(ConsumerEndpointImpl*) {
+  // TODO(primiano): implement here.
+  PERFETTO_DLOG("FreeBuffers() not implemented yet");
 }
 
 void ServiceImpl::RegisterDataSource(ProducerID producer_id,

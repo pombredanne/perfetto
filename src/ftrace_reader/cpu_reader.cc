@@ -155,7 +155,6 @@ size_t CpuReader::ParsePage(size_t cpu,
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + kPageSize;
 
-  PERFETTO_ELOG("Setting CPU %zu", cpu);
   bundle->set_cpu(cpu);
 
   // TODO(hjd): Read this format dynamically?
