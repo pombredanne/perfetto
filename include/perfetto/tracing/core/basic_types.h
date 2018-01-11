@@ -28,9 +28,8 @@ using DataSourceInstanceID = uint64_t;
 using WriterID = uint16_t;
 using BufferID = uint16_t;
 
-// TODO(primiano): Change this back to 1ul << 16 after running twice works.
 // Keep this in sync with SharedMemoryABI::PageHeader::target_buffer.
-static constexpr size_t kMaxTraceBuffers = 1ul << 1;
+static constexpr size_t kMaxTraceBuffers = 1ul << 16;
 
 }  // namespace perfetto
 
