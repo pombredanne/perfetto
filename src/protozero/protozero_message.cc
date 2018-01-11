@@ -59,10 +59,10 @@ void ProtoZeroMessage::Reset(ScatteredStreamWriter* stream_writer) {
   nested_message_ = nullptr;
   nesting_depth_ = 0;
   finalized_ = false;
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
+#if PERFETTO_DCHECK_IS_ON()
   handle_ = nullptr;
-#endif
   generation_++;
+#endif
 }
 
 void ProtoZeroMessage::AppendString(uint32_t field_id, const char* str) {
@@ -104,7 +104,7 @@ uint32_t ProtoZeroMessage::Finalize() {
   }
 
   finalized_ = true;
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
+#if PERFETTO_DCHECK_IS_ON()
   if (handle_)
     handle_->reset_message();
 #endif

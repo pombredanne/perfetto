@@ -25,7 +25,6 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/contiguous_memory_range.h"
-#include "perfetto/protozero/debug.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 
@@ -78,7 +77,7 @@ class ProtoZeroMessage {
 
   bool is_finalized() const { return finalized_; }
 
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
+#if PERFETTO_DCHECK_IS_ON()
   void set_handle(ProtoZeroMessageHandleBase* handle) { handle_ = handle; }
 #endif
 
@@ -195,11 +194,13 @@ class ProtoZeroMessage {
   // kMaxNestingDepth. |nesting_depth_| == 0 for root (non-nested) messages.
   uint8_t nesting_depth_;
 
+#if PERFETTO_DCHECK_IS_ON()
   // Current generation of message. Incremented on Reset.
   // Used to detect stale handles.
   uint32_t generation_;
+#endif
 
-#if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
+#if PERFETTO_DCHECK_IS_ON()
   ProtoZeroMessageHandleBase* handle_;
 #endif
 

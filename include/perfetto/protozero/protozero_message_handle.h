@@ -19,7 +19,6 @@
 
 #include <functional>
 
-#include "perfetto/protozero/debug.h"
 #include "perfetto/protozero/protozero_message.h"
 
 namespace protozero {
@@ -48,13 +47,11 @@ class ProtoZeroMessageHandleBase {
  protected:
   explicit ProtoZeroMessageHandleBase(ProtoZeroMessage* = nullptr);
   ProtoZeroMessage& operator*() const {
-    if (message_)
-      PERFETTO_DCHECK(generation_ == message_->generation_);
+    PERFETTO_DCHECK(!message_ || generation_ == message_->generation_);
     return *message_;
   }
   ProtoZeroMessage* operator->() const {
-    if (message_)
-      PERFETTO_DCHECK(generation_ == message_->generation_);
+    PERFETTO_DCHECK(!message_ || generation_ == message_->generation_);
     return message_;
   }
 
@@ -68,7 +65,9 @@ class ProtoZeroMessageHandleBase {
   void Move(ProtoZeroMessageHandleBase&&);
 
   ProtoZeroMessage* message_;
+#if PERFETTO_DCHECK_IS_ON()
   uint32_t generation_;
+#endif
 };
 
 template <typename T>
