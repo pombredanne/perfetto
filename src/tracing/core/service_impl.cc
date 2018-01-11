@@ -165,19 +165,15 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
     for (auto it = range.first; it != range.second; it++) {
       const RegisteredDataSource& reg_data_source = it->second;
-      // TODO(primiano): match against |producer_name_filter|.
 
-      const ProducerID producer_id = reg_data_source.producer_id;
-      auto producer_iter = producers_.find(producer_id);
+      auto producer_iter = producers_.find(reg_data_source.producer_id);
       if (producer_iter == producers_.end()) {
         PERFETTO_DCHECK(false);  // Something in the unregistration is broken.
         continue;
       }
-      ProducerEndpointImpl* producer = producer_iter->second;
-      DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
-      ts.data_source_instances.emplace(producer_id, inst_id);
-      producer->producer()->CreateDataSourceInstance(inst_id,
-                                                     cfg_data_source.config());
+
+      CreateDataSourceInstanceForProducer(cfg_data_source,
+                                          producer_iter->second, &ts);
     }
   }
 }  // namespace perfetto
@@ -312,16 +308,24 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
     TracingSession& tracing_session = iter.second;
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
-      if (cfg_data_source.config().name() != desc.name())
-        continue;
-      // TODO(primiano): match against |producer_name_filter|.
-
-      DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
-      tracing_session.data_source_instances.emplace(producer_id, inst_id);
-      producer->producer()->CreateDataSourceInstance(inst_id,
-                                                     cfg_data_source.config());
+      if (cfg_data_source.config().name() == desc.name())
+        CreateDataSourceInstanceForProducer(cfg_data_source, producer,
+                                            &tracing_session);
     }
   }
+}
+
+void ServiceImpl::CreateDataSourceInstanceForProducer(
+    const TraceConfig::DataSource& cfg_data_source,
+    ProducerEndpointImpl* producer,
+    TracingSession* tracing_session) {
+  // TODO(primiano): match against |producer_name_filter| and add tests
+  // for registration ordering (data sources vs consumers).
+
+  DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
+  tracing_session->data_source_instances.emplace(producer->id(), inst_id);
+  producer->producer()->CreateDataSourceInstance(inst_id,
+                                                 cfg_data_source.config());
 }
 
 void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,

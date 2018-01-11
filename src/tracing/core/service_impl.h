@@ -57,6 +57,7 @@ class ServiceImpl : public Service {
     ~ProducerEndpointImpl() override;
 
     Producer* producer() const { return producer_; }
+    ProducerID id() const { return id_; }
 
     // Service::ProducerEndpoint implementation.
     void RegisterDataSource(const DataSourceDescriptor&,
@@ -192,6 +193,11 @@ class ServiceImpl : public Service {
 
     TraceConfig config;
   };
+
+  void CreateDataSourceInstanceForProducer(
+      const TraceConfig::DataSource& cfg_data_source,
+      ProducerEndpointImpl* producer,
+      TracingSession* tracing_session);
 
   ServiceImpl(const ServiceImpl&) = delete;
   ServiceImpl& operator=(const ServiceImpl&) = delete;
