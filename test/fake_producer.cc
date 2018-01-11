@@ -27,11 +27,12 @@
 
 namespace perfetto {
 
-FakeProducer::FakeProducer(const std::string& name, base::UnixTaskRunner* task_runner)
+FakeProducer::FakeProducer(const std::string& name,
+                           base::UnixTaskRunner* task_runner)
     : name_(name),
       endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
-                                            this,
-                                            task_runner)),
+                                           this,
+                                           task_runner)),
       task_runner_(task_runner) {}
 FakeProducer::~FakeProducer() = default;
 
@@ -59,8 +60,8 @@ void FakeProducer::CreateDataSourceInstance(
   }
 
   PERFETTO_ILOG("Writing");
-  auto trace_writer =
-      endpoint_->CreateTraceWriter(source_config.target_buffer());
+  auto trace_writer = endpoint_->CreateTraceWriter(
+      static_cast<BufferID>(source_config.target_buffer()));
   for (int i = 0; i < 10; i++) {
     auto handle = trace_writer->NewTracePacket();
     handle->set_test("test");
@@ -86,4 +87,4 @@ void FakeProducer::Shutdown() {
   task_runner_->Quit();
 }
 
-}  // namespace
+}  // namespace perfetto

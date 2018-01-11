@@ -16,8 +16,8 @@
 
 #include <jni.h>
 
-#include "test/fake_producer.h"
 #include "perfetto/base/unix_task_runner.h"
+#include "test/fake_producer.h"
 
 namespace perfetto {
 namespace {
@@ -26,8 +26,8 @@ void ListenAndRespond(const std::string& name) {
   FakeProducer producer(name, &task_runner);
   task_runner.Run();
 }
-} // namespace
-} // namespace perfetto
+}  // namespace
+}  // namespace perfetto
 
 extern "C" JNIEXPORT void JNICALL
 Java_android_perfetto_producer_ProducerActivity_setupProducer(

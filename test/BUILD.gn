@@ -18,6 +18,8 @@ source_set("end_to_end_integrationtests") {
     ":fake_producer",
     "../gn:default_deps",
     "../gn:gtest_deps",
+    "../protos:lite",
+    "../protos:zero",
     "../src/tracing:ipc",
   ]
   sources = [
@@ -31,7 +33,8 @@ source_set("fake_producer") {
   deps = [
     "../gn:default_deps",
     "../gn:gtest_deps",
-    "../src/tracing:ipc",
+    "../protos:lite",
+    "../protos:zero",
   ]
   sources = [
     "fake_producer.cc",

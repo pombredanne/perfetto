@@ -66,7 +66,8 @@ TEST(PerfettoTest, TestFtraceProducer) {
       }));
 
   uint64_t total = 0;
-  auto function = [&task_runner, &total](auto* packets, bool has_more) {
+  auto function = [&task_runner, &total](std::vector<TracePacket>* packets,
+                                         bool has_more) {
     if (has_more) {
       for (auto& packet : *packets) {
         packet.Decode();

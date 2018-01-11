@@ -54,4 +54,4 @@ class MockConsumer : public Consumer {
 
 }  // namespace perfetto
 
-#endif // TEST_END_TO_END_INTEGRATIONTEST_
+#endif  // TEST_END_TO_END_INTEGRATIONTEST_

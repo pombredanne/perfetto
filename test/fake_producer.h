@@ -28,9 +28,8 @@ class FakeProducer : public Producer {
 
   void OnConnect() override;
   void OnDisconnect() override;
-  void CreateDataSourceInstance(
-      DataSourceInstanceID,
-      const DataSourceConfig& source_config) override;
+  void CreateDataSourceInstance(DataSourceInstanceID,
+                                const DataSourceConfig& source_config) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
  private:
@@ -42,4 +41,4 @@ class FakeProducer : public Producer {
   base::UnixTaskRunner* task_runner_;
 };
 
-}  // namespace
+}  // namespace perfetto
