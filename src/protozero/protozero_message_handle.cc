@@ -24,17 +24,20 @@ namespace protozero {
 
 ProtoZeroMessageHandleBase::ProtoZeroMessageHandleBase(
     ProtoZeroMessage* message)
-    : message_(message), generation_(message->generation_) {
+    : message_(message) {
+  if (message_) {
+    generation_ = message->generation_;
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
-  if (message_)
     message_->set_handle(this);
 #endif
+  }
 }
 
 ProtoZeroMessageHandleBase::~ProtoZeroMessageHandleBase() {
-  PERFETTO_DCHECK(generation_ == message_->generation_);
-  if (message_)
+  if (message_) {
+    PERFETTO_DCHECK(generation_ == message_->generation_);
     message_->Finalize();
+  }
 }
 
 ProtoZeroMessageHandleBase::ProtoZeroMessageHandleBase(
@@ -49,7 +52,6 @@ ProtoZeroMessageHandleBase& ProtoZeroMessageHandleBase::operator=(
   // the one we point to, don't finalize.
   if (message_ && message_ != other.message_)
     message_->Finalize();
-  PERFETTO_DCHECK(!other->is_finalized());
   Move(std::move(other));
   return *this;
 }
