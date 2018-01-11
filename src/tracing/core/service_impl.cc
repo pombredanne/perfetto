@@ -113,7 +113,10 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   PERFETTO_DLOG("Consumer %p disconnected", reinterpret_cast<void*>(consumer));
   PERFETTO_DCHECK(consumers_.count(consumer));
 
-  TracingSession& tracing_session = tracing_sessions_.at(consumer);
+  TODO(primiano)
+      : Check that there are no other uses
+            after this.TracingSession& tracing_session =
+      tracing_sessions_.at(consumer);
   for (const auto& kv : tracing_session.trace_buffers)
     buffer_ids_.Free(kv.first);
   tracing_session.trace_buffers.clear();
