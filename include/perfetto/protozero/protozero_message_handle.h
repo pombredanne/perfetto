@@ -47,11 +47,15 @@ class ProtoZeroMessageHandleBase {
  protected:
   explicit ProtoZeroMessageHandleBase(ProtoZeroMessage* = nullptr);
   ProtoZeroMessage& operator*() const {
+#if PERFETTO_DCHECK_IS_ON()
     PERFETTO_DCHECK(!message_ || generation_ == message_->generation_);
+#endif
     return *message_;
   }
   ProtoZeroMessage* operator->() const {
+#if PERFETTO_DCHECK_IS_ON()
     PERFETTO_DCHECK(!message_ || generation_ == message_->generation_);
+#endif
     return message_;
   }
 
