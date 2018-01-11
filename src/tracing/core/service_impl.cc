@@ -112,7 +112,12 @@ std::unique_ptr<Service::ConsumerEndpoint> ServiceImpl::ConnectConsumer(
 void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   PERFETTO_DLOG("Consumer %p disconnected", reinterpret_cast<void*>(consumer));
   PERFETTO_DCHECK(consumers_.count(consumer));
-  // TODO: In next CL, tear down the trace sessions for the consumer.
+
+  TracingSession& tracing_session = tracing_sessions_.at(consumer);
+  for (const auto& kv : tracing_session.trace_buffers)
+    buffer_ids_.Free(kv.first);
+  tracing_session.trace_buffers.clear();
+  tracing_sessions_.erase(consumer);
   consumers_.erase(consumer);
 }
 
