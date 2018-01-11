@@ -30,24 +30,17 @@ void ListenAndRespond(const std::string& name) {
 }  // namespace perfetto
 
 extern "C" JNIEXPORT void JNICALL
-Java_android_perfetto_producer_ProducerActivity_setupProducer(
-    JNIEnv*,
-    jclass /*clazz*/) {
-  PERFETTO_ILOG("JNI");
+Java_android_perfetto_producer_ProducerActivity_setupProducer(JNIEnv*, jclass) {
   perfetto::ListenAndRespond("android.perfetto.cts.ProducerActivity");
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_android_perfetto_producer_ProducerIsolatedService_setupProducer(
-    JNIEnv*,
-    jclass /*clazz*/) {
-  PERFETTO_ILOG("JNI");
+Java_android_perfetto_producer_ProducerIsolatedService_setupProducer(JNIEnv*,
+                                                                     jclass) {
   perfetto::ListenAndRespond("android.perfetto.cts.ProducerIsolatedService");
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_android_perfetto_producer_ProducerService_setupProducer(JNIEnv*,
-                                                             jclass /*clazz*/) {
-  PERFETTO_ILOG("JNI");
+Java_android_perfetto_producer_ProducerService_setupProducer(JNIEnv*, jclass) {
   perfetto::ListenAndRespond("android.perfetto.cts.ProducerService");
 }

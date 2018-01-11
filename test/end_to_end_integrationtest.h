@@ -20,20 +20,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "perfetto/base/unix_task_runner.h"
-#include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/consumer.h"
-#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
-#include "perfetto/tracing/ipc/consumer_ipc_client.h"
-
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pb.h"
-#include "protos/trace_packet.pbzero.h"
-
-using ::testing::AtLeast;
-using ::testing::Invoke;
-using ::testing::_;
 
 namespace perfetto {
 

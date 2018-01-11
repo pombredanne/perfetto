@@ -546,9 +546,9 @@ def main():
         'GN description (e.g., gn desc out --format=json --all-toolchains "//*"'
     )
     parser.add_argument(
-        '--after',
+        '--extras',
         help='Extra targets to include at the end of the Blueprint file',
-        default=os.path.join(repo_root(), 'Android.bp.after'),
+        default=os.path.join(repo_root(), 'Android.bp.extras'),
     )
     parser.add_argument(
         '--output',
@@ -588,7 +588,7 @@ def main():
 """ % (__file__)
     ]
     blueprint.to_string(output)
-    with open(args.after, 'r') as r:
+    with open(args.extras, 'r') as r:
         for line in r:
             output.append(line.rstrip("\n\r"))
     with open(args.output, 'w') as f:

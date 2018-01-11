@@ -60,19 +60,6 @@ executable("perfetto_unittests") {
   }
 }
 
-# These tests require access to a real ftrace implementation and must
-# run with sudo.
-executable("perfetto_integrationtests") {
-  testonly = true
-  deps = [
-    "gn:default_deps",
-    "test:end_to_end_integrationtests",
-
-    # TODO(lalitm): add this back when we use lite runtime.
-    # "src/ftrace_reader:ftrace_reader_integrationtests",
-  ]
-}
-
 if (!build_with_chromium) {
   executable("perfetto_benchmarks") {
     testonly = true
@@ -136,6 +123,19 @@ if (!build_with_chromium) {
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
+    ]
+  }
+
+  # These tests require access to a real ftrace implementation and must
+  # run with sudo.
+  executable("perfetto_integrationtests") {
+    testonly = true
+    deps = [
+      "gn:default_deps",
+      "test:end_to_end_integrationtests",
+
+      # TODO(lalitm): add this back when we use lite runtime.
+      # "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
 } else {
