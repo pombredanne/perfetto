@@ -27,10 +27,9 @@ ProtoZeroMessageHandleBase::ProtoZeroMessageHandleBase(
     : message_(message) {
   generation_ = message_ ? message->generation_ : 0;
 #if PERFETTO_DCHECK_IS_ON()
-  if (message_) {
+  if (message_)
     message_->set_handle(this);
 #endif
-  }
 }
 
 ProtoZeroMessageHandleBase::~ProtoZeroMessageHandleBase() {
