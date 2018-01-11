@@ -83,7 +83,7 @@ def enable_gtest_prod(module):
 
 
 def enable_gtest(module):
-    assert module.testonly
+    assert module.type == 'cc_test'
 
 
 def enable_protobuf_full(module):
@@ -154,7 +154,6 @@ class Module(object):
         self.defaults = []
         self.cflags = []
         self.local_include_dirs = []
-        self.testonly = False
 
     def to_string(self, output):
         if self.comment:
@@ -443,7 +442,6 @@ def create_modules_from_target(blueprint, desc, target_name):
         module.comment = 'GN target: %s' % target_name
         if target_name in target_initrc:
           module.init_rc = [target_initrc[target_name]]
-        module.testonly = target.get('testonly') is True
 
         # Don't try to inject library/source dependencies into genrules because
         # they are not compiled in the traditional sense.
