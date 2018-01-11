@@ -24,7 +24,7 @@ namespace protozero {
 
 ProtoZeroMessageHandleBase::ProtoZeroMessageHandleBase(
     ProtoZeroMessage* message)
-    : message_(message) {
+    : message_(message), generation_(message->generation_) {
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   if (message_)
     message_->set_handle(this);
@@ -32,6 +32,7 @@ ProtoZeroMessageHandleBase::ProtoZeroMessageHandleBase(
 }
 
 ProtoZeroMessageHandleBase::~ProtoZeroMessageHandleBase() {
+  PERFETTO_DCHECK(generation_ == message_->generation_);
   if (message_)
     message_->Finalize();
 }
@@ -60,6 +61,7 @@ void ProtoZeroMessageHandleBase::Move(ProtoZeroMessageHandleBase&& other) {
   // will manifest as a segfault when dereferencing |message_| below) to avoid a
   // useless null-check.
   message_ = other.message_;
+  generation_ = message_->generation_;
   other.message_ = nullptr;
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   message_->set_handle(this);

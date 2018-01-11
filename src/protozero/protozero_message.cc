@@ -19,6 +19,7 @@
 #include <type_traits>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/protozero/protozero_message_handle.h"
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
 // The memcpy() for float and double below needs to be adjusted if we want to
@@ -61,6 +62,7 @@ void ProtoZeroMessage::Reset(ScatteredStreamWriter* stream_writer) {
 #if PROTOZERO_ENABLE_HANDLE_DEBUGGING()
   handle_ = nullptr;
 #endif
+  generation_++;
 }
 
 void ProtoZeroMessage::AppendString(uint32_t field_id, const char* str) {

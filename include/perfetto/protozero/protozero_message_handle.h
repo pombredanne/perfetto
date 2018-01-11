@@ -19,11 +19,8 @@
 
 #include <functional>
 
-#if defined(NDEBUG) && !defined(DCHECK_ALWAYS_ON)
-#define PROTOZERO_ENABLE_HANDLE_DEBUGGING() 0
-#else
-#define PROTOZERO_ENABLE_HANDLE_DEBUGGING() 1
-#endif
+#include "perfetto/protozero/debug.h"
+#include "perfetto/protozero/protozero_message.h"
 
 namespace protozero {
 
@@ -50,8 +47,14 @@ class ProtoZeroMessageHandleBase {
 
  protected:
   explicit ProtoZeroMessageHandleBase(ProtoZeroMessage* = nullptr);
-  ProtoZeroMessage& operator*() const { return *message_; }
-  ProtoZeroMessage* operator->() const { return message_; }
+  ProtoZeroMessage& operator*() const {
+    PERFETTO_DCHECK(generation_ == message_->generation_);
+    return *message_;
+  }
+  ProtoZeroMessage* operator->() const {
+    PERFETTO_DCHECK(generation_ == message_->generation_);
+    return message_;
+  }
 
  private:
   friend class ProtoZeroMessage;
@@ -63,6 +66,7 @@ class ProtoZeroMessageHandleBase {
   void Move(ProtoZeroMessageHandleBase&&);
 
   ProtoZeroMessage* message_;
+  uint32_t generation_;
 };
 
 template <typename T>

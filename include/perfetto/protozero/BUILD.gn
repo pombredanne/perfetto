@@ -18,6 +18,7 @@ source_set("protozero") {
   ]
   sources = [
     "contiguous_memory_range.h",
+    "debug.h",
     "proto_field_descriptor.h",
     "protozero_message.h",
     "protozero_message_handle.h",
