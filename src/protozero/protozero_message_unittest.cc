@@ -83,6 +83,15 @@ class ProtoZeroMessageTest : public ::testing::Test {
     return msg;
   }
 
+  // This is a helper for the InvalidMessageHandle test.
+  // This creates a handle, resets the message, and then
+  // lets it run out of scope. This should CHECK-fail in debug
+  // mode.
+  void CreateAndDestructInvalidHandle(FakeRootMessage* msg) {
+    ProtoZeroMessageHandle<FakeRootMessage> handle(msg);
+    msg->Reset(stream_writer_.get());
+  }
+
   size_t GetNumSerializedBytes() {
     if (buffer_->chunks().empty())
       return 0;
@@ -249,6 +258,11 @@ TEST_F(ProtoZeroMessageTest, StressTest) {
   std::string full_buf = GetNextSerializedBytes(GetNumSerializedBytes());
   size_t buf_hash = SimpleHash(full_buf);
   EXPECT_EQ(0xfd19cc0a, buf_hash);
+}
+
+TEST_F(ProtoZeroMessageTest, InvalidMessageHandle) {
+  FakeRootMessage* msg = NewMessage();
+  EXPECT_DEBUG_DEATH(CreateAndDestructInvalidHandle(msg), "");
 }
 
 TEST_F(ProtoZeroMessageTest, MessageHandle) {
