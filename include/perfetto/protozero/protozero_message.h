@@ -198,9 +198,7 @@ class ProtoZeroMessage {
   // Current generation of message. Incremented on Reset.
   // Used to detect stale handles.
   uint32_t generation_;
-#endif
 
-#if PERFETTO_DCHECK_IS_ON()
   ProtoZeroMessageHandleBase* handle_;
 #endif
 
