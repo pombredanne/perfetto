@@ -97,7 +97,14 @@ group("default_deps") {
 
 config("default_config") {
   if (build_with_chromium) {
-    defines = [ "PERFETTO_CHROMIUM_BUILD" ]
+    defines = [ "BUILDFLAG_DEFINE_PERFETTO_CHROMIUM_BUILD()=1" ]
+
+    if (is_android) {
+      # Included for __android_log_print
+      libs = [ "log" ]
+    }
+  } else {
+    defines = [ "BUILDFLAG_DEFINE_PERFETTO_CHROMIUM_BUILD()=0" ]
   }
 
   include_dirs = [
