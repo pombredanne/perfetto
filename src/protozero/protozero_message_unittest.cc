@@ -68,6 +68,8 @@ class ProtoZeroMessageTest : public ::testing::Test {
     buffer_.reset();
   }
 
+  void ResetMessage(FakeRootMessage* msg) { msg->Reset(stream_writer_.get()); }
+
   FakeRootMessage* NewMessage() {
     std::unique_ptr<uint8_t[]> mem(
         new uint8_t[sizeof(kStartWatermark) + sizeof(FakeRootMessage) +
@@ -81,15 +83,6 @@ class ProtoZeroMessageTest : public ::testing::Test {
     FakeRootMessage* msg = reinterpret_cast<FakeRootMessage*>(msg_start);
     msg->Reset(stream_writer_.get());
     return msg;
-  }
-
-  // This is a helper for the InvalidMessageHandle test.
-  // This creates a handle, resets the message, and then
-  // lets it run out of scope. This should CHECK-fail in debug
-  // mode.
-  void CreateAndDestructInvalidHandle(FakeRootMessage* msg) {
-    ProtoZeroMessageHandle<FakeRootMessage> handle(msg);
-    msg->Reset(stream_writer_.get());
   }
 
   size_t GetNumSerializedBytes() {
@@ -260,9 +253,14 @@ TEST_F(ProtoZeroMessageTest, StressTest) {
   EXPECT_EQ(0xfd19cc0a, buf_hash);
 }
 
-TEST_F(ProtoZeroMessageTest, InvalidMessageHandle) {
+TEST_F(ProtoZeroMessageTest, DestructInvalidMessageHandle) {
   FakeRootMessage* msg = NewMessage();
-  EXPECT_DEBUG_DEATH(CreateAndDestructInvalidHandle(msg), "");
+  EXPECT_DEBUG_DEATH(
+      {
+        ProtoZeroMessageHandle<FakeRootMessage> handle(msg);
+        ResetMessage(msg);
+      },
+      "");
 }
 
 TEST_F(ProtoZeroMessageTest, MessageHandle) {
