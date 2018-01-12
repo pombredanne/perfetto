@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,23 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/logging.h"
-#include "perfetto/traced/traced.h"
+#include "perfetto/protozero/protozero_message_handle.h"
 
-#include "ftrace_producer.h"
+#include "gtest/gtest.h"
+#include "perfetto/protozero/protozero_message.h"
 
-namespace perfetto {
+namespace protozero {
 
-int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
-  PERFETTO_LOG("Starting %s service", argv[0]);
-  FtraceProducer producer;
-  producer.Run();
-  return 0;
+namespace {
+
+TEST(ProtoZeroMessageHandleTest, MoveHandleSharedMessageDoesntFinalize) {
+  ProtoZeroMessage message;
+  message.Reset(nullptr);
+
+  ProtoZeroMessageHandle<ProtoZeroMessage> handle_1(&message);
+  handle_1 = ProtoZeroMessageHandle<ProtoZeroMessage>(&message);
+  ASSERT_FALSE(handle_1->is_finalized());
 }
 
-}  // namespace perfetto
+}  // namespace
+}  // namespace protozero
