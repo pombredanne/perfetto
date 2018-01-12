@@ -35,7 +35,6 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
-#include "protos/trace.pbzero.h"
 #include "protos/tracing_service/trace_config.pb.h"
 
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
