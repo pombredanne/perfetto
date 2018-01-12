@@ -49,6 +49,11 @@ class ScopedResource {
     }
     t_ = r;
   }
+  T release() {
+    T t = t_;
+    t_ = InvalidValue;
+    return t;
+  }
   ~ScopedResource() { reset(InvalidValue); }
 
  private:

@@ -75,7 +75,6 @@ class PerfettoCmd : public Consumer {
 
  private:
   std::pair<base::ScopedFile, std::string> CreateTemporaryFile();
-  void SaveTraceFileAs(const std::string& name);
 
   PlatformTaskRunner task_runner_;
   std::unique_ptr<perfetto::Service::ConsumerEndpoint> consumer_endpoint_;
@@ -265,18 +264,11 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   long bytes_written = lseek(trace_out_fd_.get(), 0, SEEK_CUR);
   if (!dropbox_tag_.empty()) {
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
-    // DropBox needs a path to the uploaded file, so make a temporarily visible
-    // file.
-    // TODO(skyostil): Modify DropBox to take an fd directly.
-    std::pair<base::ScopedFile, std::string> tmp_file(CreateTemporaryFile());
-    std::string tmp_path = tmp_file.second;
-    SaveTraceFileAs(tmp_path);
-
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
-    android::binder::Status status = dropbox->addFile(
-        android::String16(dropbox_tag_.c_str()), tmp_path, 0 /* flags */);
-    unlink(tmp_path.c_str());
+    android::binder::Status status =
+        dropbox->addFile(android::String16(dropbox_tag_.c_str()),
+                         trace_out_fd_.release(), 0 /* flags */);
     if (!status.isOk()) {
       PERFETTO_ELOG("DropBox upload failed: %s", status.toString8().c_str());
       return;
@@ -285,7 +277,18 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
                   dropbox_tag_.c_str());
 #endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
   } else {
-    SaveTraceFileAs(trace_out_path_);
+#if !BUILDFLAG(OS_MACOSX)
+    if (access(trace_out_path_.c_str(), F_OK) != -1)
+      unlink(trace_out_path_.c_str());
+    std::stringstream fd_path;
+    fd_path << "/proc/self/fd/" << trace_out_fd_.get();
+    PERFETTO_CHECK(linkat(AT_FDCWD, fd_path.str().c_str(), AT_FDCWD,
+                          trace_out_path_.c_str(), AT_SYMLINK_FOLLOW) == 0);
+#else
+    PERFETTO_CHECK(
+        rename(tmp_trace_out_path_.c_str(), trace_out_path_.c_str()) == 0);
+#endif  // BUILDFLAG(OS_MACOSX)
+    trace_out_fd_.reset();
     PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
                   trace_out_path_.c_str());
   }
@@ -297,21 +300,6 @@ std::pair<base::ScopedFile, std::string> PerfettoCmd::CreateTemporaryFile() {
   base::ScopedFile tmp_file(mkstemp(&tmp_path[0]));
   return std::pair<base::ScopedFile, std::string>(std::move(tmp_file),
                                                   std::move(tmp_path));
-}
-
-void PerfettoCmd::SaveTraceFileAs(const std::string& name) {
-  PERFETTO_DCHECK(trace_out_fd_);
-#if !BUILDFLAG(OS_MACOSX)
-  if (access(name.c_str(), F_OK) != -1)
-    unlink(name.c_str());
-  std::stringstream fd_path;
-  fd_path << "/proc/self/fd/" << trace_out_fd_.get();
-  PERFETTO_CHECK(linkat(AT_FDCWD, fd_path.str().c_str(), AT_FDCWD, name.c_str(),
-                        AT_SYMLINK_FOLLOW) == 0);
-#else
-  PERFETTO_CHECK(rename(tmp_trace_out_path_.c_str(), name) == 0);
-#endif  // BUILDFLAG(OS_MACOSX)
-  trace_out_fd_.reset();
 }
 
 int __attribute__((visibility("default")))
