@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "perfetto/tracing/core/basic_types.h"
 
