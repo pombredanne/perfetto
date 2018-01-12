@@ -15,9 +15,9 @@
  */
 
 #include <getopt.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
-#include <sys/stat.h>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -124,6 +124,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
         test_config.set_duration_ms(3000);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("com.google.perfetto.ftrace");
+        ds_config->mutable_ftrace_config()->add_event_names("sched_switch");
         // TODO(primiano): At the moment this must always be 1.
         // Once the target_buffer situation is fixed this can be any number.
         ds_config->set_target_buffer(1);
@@ -147,8 +148,13 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == 'd') {
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
       dropbox_tag_ = optarg ? optarg : kDefaultDropBoxTag;
       continue;
+#else
+      PERFETTO_ELOG("DropBox is only supported with Android tree builds");
+      return 1;
+#endif
     }
 
     if (option == 'b') {
@@ -170,7 +176,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     return PrintUsage(argv[0]);
   }
 
-  if (access(kTempTraceDir, F_OK) == -1 && mkdir(kTempTraceDir, 0660) == -1) {
+  if (access(kTempTraceDir, F_OK) == -1 && mkdir(kTempTraceDir, 0770) == -1) {
     PERFETTO_ELOG("Could not create temporary trace directory: %s",
                   kTempTraceDir);
     return 1;
@@ -178,9 +184,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   {
     tmp_trace_out_path_ = std::string(kTempTraceDir) + "/perfetto-traceXXXXXX";
+    // TODO(skyostil): Use open(O_TMPFILE) + linkat so we don't leave partial
+    // trace files lying around in case of unexpected termination.
     base::ScopedFile tmp_file(mkstemp(&tmp_trace_out_path_[0]));
     if (!tmp_file) {
-      PERFETTO_ELOG("Could not create a temporary trace file");
+      PERFETTO_ELOG("Could not create a temporary trace file in %s",
+                    kTempTraceDir);
       return 1;
     }
   }
@@ -253,6 +262,7 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   long bytes_written = trace_out_stream_.tellp();
   trace_out_stream_.close();
   if (!dropbox_tag_.empty()) {
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
     android::binder::Status status =
@@ -265,6 +275,7 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
     }
     PERFETTO_ILOG("Uploaded %ld bytes into DropBox with tag %s", bytes_written,
                   dropbox_tag_.c_str());
+#endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
   } else {
     PERFETTO_CHECK(
         rename(tmp_trace_out_path_.c_str(), trace_out_path_.c_str()) == 0);
