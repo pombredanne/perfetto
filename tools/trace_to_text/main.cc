@@ -39,38 +39,42 @@
 #include "protos/trace.pb.h"
 #include "protos/trace_packet.pb.h"
 
-using namespace google::protobuf;
-using namespace google::protobuf::compiler;
+namespace perfetto {
+namespace {
+
+using google::protobuf::Descriptor;
+using google::protobuf::DynamicMessageFactory;
+using google::protobuf::FileDescriptor;
+using google::protobuf::Message;
+using google::protobuf::TextFormat;
+using google::protobuf::compiler::DiskSourceTree;
+using google::protobuf::compiler::Importer;
+using google::protobuf::compiler::MultiFileErrorCollector;
+using google::protobuf::io::OstreamOutputStream;
+using protos::FtraceEvent;
+using protos::FtraceEventBundle;
+using protos::PrintFtraceEvent;
+using protos::SchedSwitchFtraceEvent;
+using protos::Trace;
+using protos::TracePacket;
 
 class MFE : public MultiFileErrorCollector {
-  virtual void AddError(const string& filename,
+  virtual void AddError(const std::string& filename,
                         int line,
                         int column,
-                        const string& message) {
+                        const std::string& message) {
     printf("Error %s %d:%d: %s", filename.c_str(), line, column,
            message.c_str());
   }
 
-  virtual void AddWarning(const string& filename,
+  virtual void AddWarning(const std::string& filename,
                           int line,
                           int column,
-                          const string& message) {
+                          const std::string& message) {
     printf("Error %s %d:%d: %s", filename.c_str(), line, column,
            message.c_str());
   }
 };
-
-namespace perfetto {
-namespace {
-
-using protos::Trace;
-using protos::TracePacket;
-using protos::FtraceEventBundle;
-using protos::FtraceEvent;
-using protos::SchedSwitchFtraceEvent;
-using protos::PrintFtraceEvent;
-using google::protobuf::TextFormat;
-using google::protobuf::io::OstreamOutputStream;
 
 const char* GetFlag(int32_t state) {
   state &= 511;
@@ -134,28 +138,28 @@ std::string FormatPrint(uint64_t timestamp,
   return std::string(line);
 }
 
-int ProtoToText(std::istream* input, std::ostream* output, bool systrace) {
-  if (!systrace) {
-    DiskSourceTree dst;
-    dst.MapPath("protos", "protos");
-    MFE mfe;
-    Importer importer(&dst, &mfe);
-    const FileDescriptor* parsed_file = importer.Import("protos/trace.proto");
+int TraceToText(std::istream* input, std::ostream* output) {
+  DiskSourceTree dst;
+  dst.MapPath("protos", "protos");
+  MFE mfe;
+  Importer importer(&dst, &mfe);
+  const FileDescriptor* parsed_file = importer.Import("protos/trace.proto");
 
-    DynamicMessageFactory dmf;
-    const Descriptor* trace_descriptor = parsed_file->message_type(0);
-    const Message* msg_root = dmf.GetPrototype(trace_descriptor);
-    Message* msg = msg_root->New();
+  DynamicMessageFactory dmf;
+  const Descriptor* trace_descriptor = parsed_file->message_type(0);
+  const Message* msg_root = dmf.GetPrototype(trace_descriptor);
+  Message* msg = msg_root->New();
 
-    if (!msg->ParseFromIstream(input)) {
-      PERFETTO_DLOG("Could not parse input.");
-      return 1;
-    }
-    OstreamOutputStream zero_copy_output(output);
-    TextFormat::Print(*msg, &zero_copy_output);
-    return 0;
+  if (!msg->ParseFromIstream(input)) {
+    PERFETTO_DLOG("Could not parse input.");
+    return 1;
   }
+  OstreamOutputStream zero_copy_output(output);
+  TextFormat::Print(*msg, &zero_copy_output);
+  return 0;
+}
 
+int TraceToSystrace(std::istream* input, std::ostream* output) {
   const std::string header = R"({
   "traceEvents": [],
 )";
@@ -239,35 +243,9 @@ int main(int argc, char** argv) {
 
   bool systrace = format == "systrace";
 
-  //  DiskSourceTree dst;
-  //  dst.MapPath("protos", "protos");
-  //
-  //  MFE mfe;
-  //  Importer importer(&dst, &mfe);
-  //
-  ////  importer.AddUnusedImportTrackFile(file_name);
-  //  const FileDescriptor* parsed_file =
-  //  importer.Import("protos/trace_packet.proto");
-  //
-  //  printf("descriptor %p %s\n", reinterpret_cast<const void*>(parsed_file),
-  //  parsed_file->message_type(0)->name().c_str());
-  //
-  //  DynamicMessageFactory dmf;
-  //  const Message* msg_root = dmf.GetPrototype(parsed_file->message_type(0));
-  //
-  //  Message* msg = msg_root->New();
-  //  char bin[] = {0x12, 0x04, 0x66, 0x6f, 0x6f, 0x6f};
-  //  printf("parsed: %d\n", msg->ParseFromArray(bin, sizeof(bin)));
-  //
-  //  Message* msg2 = msg_root->New();
-  //  char bin2[] = {0x12, 0x04, 0x66, 0x6f, 0x6f, 0x6e};
-  //  printf("parsed: %d\n", msg2->ParseFromArray(bin2, sizeof(bin2)));
-  //
-  //  util::MessageDifferencer mdiff;
-  //  std::string report;
-  //  mdiff.ReportDifferencesToString(&report);
-  //  printf("equal? %d\n", mdiff.Compare(*msg, *msg2));
-  //  printf("diff: %s\n", report.c_str());
-
-  return perfetto::ProtoToText(&std::cin, &std::cout, systrace);
+  if (systrace) {
+    return perfetto::TraceToSystrace(&std::cin, &std::cout);
+  } else {
+    return perfetto::TraceToText(&std::cin, &std::cout);
+  }
 }
