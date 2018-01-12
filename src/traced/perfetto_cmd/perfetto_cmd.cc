@@ -15,6 +15,7 @@
  */
 
 #include <getopt.h>
+#include <unistd.h>
 
 #include <fstream>
 #include <iostream>
@@ -75,8 +76,9 @@ class PerfettoCmd : public Consumer {
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
   fprintf(stderr, R"(Usage: %s
-  --config  -c : /path/to/trace/config/file or - for stdin
-  --out     -o : /path/to/out/trace/file
+  --background  -b : exits immediately and continues the trace in background
+  --config      -c : /path/to/trace/config/file or - for stdin
+  --out         -o : /path/to/out/trace/file
   --help
 )", argv0);
   return 1;
@@ -88,12 +90,14 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"help", required_argument, 0, 'h'},
       {"config", required_argument, 0, 'c'},
       {"out", required_argument, 0, 'o'},
-      {0, 0, 0, 0}};
+      {"background", no_argument, 0, 'b'},
+      {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
   std::string trace_config_raw;
+  bool background = false;
   for (;;) {
-    int option = getopt_long(argc, argv, "c:o:", long_options, &option_index);
+    int option = getopt_long(argc, argv, "c:o:b", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -109,7 +113,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
         test_config.set_duration_ms(3000);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("perfetto.test");
-        ds_config->set_target_buffer(0);
+        // TODO(primiano): At the moment this must always be 1.
+        // Once the target_buffer situation is fixed this can be any number.
+        ds_config->set_target_buffer(1);
         ds_config->set_trace_category_filters("foo,bar");
         test_config.SerializeToString(&trace_config_raw);
       } else {
@@ -136,6 +142,10 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
+    if (option == 'b') {
+      background = true;
+      continue;
+    }
     return PrintUsage(argv[0]);
   }
 
@@ -152,6 +162,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
   trace_config_->FromProto(trace_config_proto);
   trace_config_raw.clear();
 
+  if (background) {
+    PERFETTO_CHECK(daemon(0 /*nochdir*/, 0 /*noclose*/) == 0);
+    PERFETTO_DLOG("Continuing in background");
+  }
+
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
 
@@ -160,9 +175,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
   while (true) {
     looper->pollAll(-1 /* timeoutMillis */);
   }
-#else  // defined(PERFETTO_BUILD_WITH_ANDROID)
+#else   // defined(PERFETTO_BUILD_WITH_ANDROID)
   task_runner_.Run();
-#endif // defined(PERFETTO_BUILD_WITH_ANDROID)
+#endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
   return did_receive_full_trace_ ? 0 : 1;
 }  // namespace perfetto
 
