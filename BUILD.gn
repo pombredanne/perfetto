@@ -25,7 +25,7 @@ assert(!monolithic_binaries || !build_with_android)
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
-    ":perfetto_tests",
+    ":perfetto_unittests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
@@ -35,14 +35,17 @@ group("all") {
     deps += [
       ":perfetto",
       ":perfetto_benchmarks",
+      ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
+
+      # TODO(lalitm): remove this when we use lite runtime.
       "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
 }
 
-executable("perfetto_tests") {
+executable("perfetto_unittests") {
   testonly = true
   deps = [
     "gn:default_deps",
@@ -124,6 +127,19 @@ if (!build_with_chromium) {
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
+    ]
+  }
+
+  # These tests require access to a real ftrace implementation and must
+  # run with sudo.
+  executable("perfetto_integrationtests") {
+    testonly = true
+    deps = [
+      "gn:default_deps",
+      "test:end_to_end_integrationtests",
+
+      # TODO(lalitm): add this back when we use lite runtime.
+      # "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
 } else {
