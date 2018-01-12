@@ -19,7 +19,6 @@
 
 #include <stddef.h>
 
-#include <functional>
 #include <memory>
 
 namespace perfetto {
@@ -29,8 +28,8 @@ namespace perfetto {
 // transport layer. This can be as simple as a malloc()-ed buffer, if both
 // Producer and Service are hosted in the same process, or some posix shared
 // memory for the out-of-process case (see src/unix_rpc).
-// All three classes are subclassed by the transport layer, which
-// will attach platform specific fields to them (e.g., a unix file descriptor).
+// Both this class and the Factory are subclassed by the transport layer, which
+// will attach platform specific fields to it (e.g., a unix file descriptor).
 class SharedMemory {
  public:
   class Factory {
