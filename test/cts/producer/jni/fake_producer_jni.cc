@@ -16,13 +16,14 @@
 
 #include <jni.h>
 
-#include "perfetto/base/unix_task_runner.h"
 #include "test/fake_producer.h"
+
+#include "src/base/test/test_task_runner.h"
 
 namespace perfetto {
 namespace {
 void ListenAndRespond(const std::string& name) {
-  base::UnixTaskRunner task_runner;
+  base::TestTaskRunner task_runner;
   FakeProducer producer(name, &task_runner);
   task_runner.Run();
 }

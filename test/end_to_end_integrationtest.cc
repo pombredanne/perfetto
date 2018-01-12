@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "fake_consumer.h"
+#include "test/fake_consumer.h"
 
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
@@ -27,15 +26,10 @@
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
-#include "protos/test_event.pbzero.h"
 #include "protos/trace_packet.pb.h"
 #include "protos/trace_packet.pbzero.h"
 
 #include "src/traced/probes/ftrace_producer.h"
-
-using ::testing::AtLeast;
-using ::testing::Invoke;
-using ::testing::_;
 
 namespace perfetto {
 
@@ -60,8 +54,8 @@ TEST(PerfettoTest, TestFtraceProducer) {
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto function = [&task_runner, &total, &finish](
-                      std::vector<TracePacket> packets, bool has_more) {
+  auto function = [&total, &finish](std::vector<TracePacket> packets,
+                                    bool has_more) {
     if (has_more) {
       for (auto& packet : packets) {
         packet.Decode();
@@ -81,6 +75,10 @@ TEST(PerfettoTest, TestFtraceProducer) {
     }
   };
 
+// If we're building with the Android platform (i.e. CTS), we expect that
+// the service and ftrace producer both exist and are already running.
+// TODO(lalitm): maybe add an additional build flag for CTS.
+#if !defined(PERFETTO_BUILD_WITH_ANDROID)
   // Create the service.
   std::unique_ptr<ServiceIPCHost> svc;
   svc = ServiceIPCHost::CreateInstance(&task_runner);
@@ -90,7 +88,8 @@ TEST(PerfettoTest, TestFtraceProducer) {
 
   // Create the ftrace producer.
   FtraceProducer producer;
-  producer.Run();
+  producer.Connect(&task_runner);
+#endif
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);

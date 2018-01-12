@@ -14,15 +14,25 @@
  * limitations under the License.
  */
 
-#include "fake_consumer.h"
+#include <gtest/gtest.h>
+
+#include "perfetto/tracing/core/trace_packet.h"
+
+#include "protos/test_event.pbzero.h"
+#include "protos/trace_packet.pb.h"
+#include "protos/trace_packet.pbzero.h"
+
+#include "test/fake_consumer.h"
 
 namespace perfetto {
 
 class PerfettoCtsTest : public ::testing::Test {
  protected:
   void TestMockProducer(const std::string& producer_name, uint64_t buffer) {
-    base::UnixTaskRunner task_runner;
+    base::TestTaskRunner task_runner;
+    auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
+    // Setup the trace config.
     TraceConfig trace_config;
     trace_config.add_buffers()->set_size_kb(4096 * 10);
     trace_config.set_duration_ms(1000);
@@ -32,32 +42,33 @@ class PerfettoCtsTest : public ::testing::Test {
     ds_config->set_target_buffer(buffer);
     ds_config->set_trace_category_filters("foo,bar");
 
+    // Setip the function.
     uint64_t total = 0;
-    auto function = [&task_runner, &total](auto* packets, bool has_more) {
+    auto function = [&total, &finish](std::vector<TracePacket> packets,
+                                      bool has_more) {
       if (has_more) {
-        for (auto& packet : *packets) {
+        for (auto& packet : packets) {
           packet.Decode();
           ASSERT_TRUE(packet->has_test());
           ASSERT_EQ(packet->test(), "test");
         }
-        total += packets->size();
+        total += packets.size();
 
         // TODO(lalitm): renable this when stiching inside the service is
         // present.
         // ASSERT_FALSE(packets->empty());
       } else {
         ASSERT_EQ(total, 10u);
-        ASSERT_TRUE(packets->empty());
-        task_runner.Quit();
+        ASSERT_TRUE(packets.empty());
+        finish();
       }
     };
-    EXPECT_CALL(mock_consumer, DoOnTraceData(_, _))
-        .Times(AtLeast(2))
-        .WillRepeatedly(Invoke(function));
 
-    // Timeout if the test fails.
-    task_runner.PostDelayedTask([&task_runner]() { task_runner.Quit(); }, 2000);
-    task_runner.Run();
+    // Finally, make the consumer connect to the service.
+    FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+    consumer.Connect();
+
+    task_runner.RunUntilCheckpoint("no.more.packets");
   }
 };
 

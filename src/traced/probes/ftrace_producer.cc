@@ -1,9 +1,24 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "ftrace_producer.h"
 
 #include <stdio.h>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -77,14 +92,12 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
-void FtraceProducer::Run() {
-  base::UnixTaskRunner task_runner;
-  ftrace_ = FtraceController::Create(&task_runner);
+void FtraceProducer::Connect(base::TaskRunner* task_runner) {
+  ftrace_ = FtraceController::Create(task_runner);
   endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
-                                         &task_runner);
+                                         task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
-  task_runner.Run();
 }
 
 FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
@@ -93,13 +106,12 @@ FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
 FtraceProducer::SinkDelegate::~SinkDelegate() = default;
 
 FtraceProducer::BundleHandle FtraceProducer::SinkDelegate::GetBundleForCpu(
-    size_t cpu) {
+    size_t) {
   trace_packet_ = writer_->NewTracePacket();
   return BundleHandle(trace_packet_->set_ftrace_events());
 }
 
-void FtraceProducer::SinkDelegate::OnBundleComplete(size_t cpu,
-                                                    BundleHandle bundle) {
+void FtraceProducer::SinkDelegate::OnBundleComplete(size_t, BundleHandle) {
   trace_packet_->Finalize();
 }
 
