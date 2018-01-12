@@ -28,16 +28,14 @@
 namespace perfetto {
 
 FakeProducer::FakeProducer(const std::string& name,
-                           base::UnixTaskRunner* task_runner)
+                           base::TestTaskRunner* task_runner)
     : name_(name),
       endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
                                            this,
-                                           task_runner)),
-      task_runner_(task_runner) {}
+                                           task_runner)) {}
 FakeProducer::~FakeProducer() = default;
 
 void FakeProducer::OnConnect() {
-  PERFETTO_ILOG("connected");
   DataSourceDescriptor descriptor;
   descriptor.set_name(name_);
   endpoint_->RegisterDataSource(descriptor,
@@ -45,21 +43,18 @@ void FakeProducer::OnConnect() {
 }
 
 void FakeProducer::OnDisconnect() {
-  PERFETTO_ILOG("Disconnect");
   Shutdown();
 }
 
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  PERFETTO_ILOG("Create");
   const std::string& categories = source_config.trace_category_filters();
   if (categories != "foo,bar") {
     Shutdown();
     return;
   }
 
-  PERFETTO_ILOG("Writing");
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   for (int i = 0; i < 10; i++) {
@@ -73,18 +68,15 @@ void FakeProducer::CreateDataSourceInstance(
   // TODO(primiano): remove this hack once flushing the final packet is fixed.
   trace_writer->NewTracePacket();
 
-  PERFETTO_ILOG("Finalized");
   endpoint_->UnregisterDataSource(id_);
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
-  PERFETTO_ILOG("Teardown");
   Shutdown();
 }
 
 void FakeProducer::Shutdown() {
   endpoint_.reset();
-  task_runner_->Quit();
 }
 
 }  // namespace perfetto

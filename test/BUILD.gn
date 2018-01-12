@@ -15,25 +15,43 @@
 source_set("end_to_end_integrationtests") {
   testonly = true
   deps = [
-    ":fake_producer",
+    ":fake_consumer",
     "../gn:default_deps",
     "../gn:gtest_deps",
-    "../protos:lite",
-    "../protos:zero",
+    "../src/traced/probes:ftrace_producer",
     "../src/tracing:ipc",
   ]
   sources = [
     "end_to_end_integrationtest.cc",
-    "end_to_end_integrationtest.h",
+  ]
+}
+
+source_set("fake_consumer") {
+  testonly = true
+  public_deps = [
+    "../include/perfetto/tracing/core",
+    "../protos:lite",
+  ]
+  deps = [
+    "../gn:default_deps",
+    "../gn:gtest_deps",
+    "../protos:zero",
+    "../src/base:test_support",
+  ]
+  sources = [
+    "fake_consumer.cc",
+    "fake_consumer.h",
   ]
 }
 
 source_set("fake_producer") {
   testonly = true
+  public_deps = [
+    "../include/perfetto/tracing/core",
+  ]
   deps = [
     "../gn:default_deps",
     "../gn:gtest_deps",
-    "../protos:lite",
     "../protos:zero",
   ]
   sources = [

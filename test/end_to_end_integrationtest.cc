@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "end_to_end_integrationtest.h"
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "fake_consumer.h"
 
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
@@ -25,10 +25,13 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
+#include "perfetto/tracing/ipc/service_ipc_host.h"
 
 #include "protos/test_event.pbzero.h"
 #include "protos/trace_packet.pb.h"
 #include "protos/trace_packet.pbzero.h"
+
+#include "src/traced/probes/ftrace_producer.h"
 
 using ::testing::AtLeast;
 using ::testing::Invoke;
@@ -37,62 +40,63 @@ using ::testing::_;
 namespace perfetto {
 
 TEST(PerfettoTest, TestFtraceProducer) {
-  MockConsumer mock_consumer;
-  base::UnixTaskRunner task_runner;
-  auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
-                                           &mock_consumer, &task_runner);
+  base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
-  EXPECT_CALL(mock_consumer, OnConnect())
-      .WillOnce(Invoke([&client, &task_runner]() {
-        TraceConfig trace_config;
-        trace_config.add_buffers()->set_size_kb(4096 * 10);
-        trace_config.set_duration_ms(1000);
+  // Setip the TraceConfig for the consumer.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(1000);
 
-        auto* ds_config = trace_config.add_data_sources()->mutable_config();
-        ds_config->set_name("com.google.perfetto.ftrace");
-        ds_config->set_target_buffer(1);
+  // Create the buffer for ftrace.
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("com.google.perfetto.ftrace");
+  ds_config->set_target_buffer(1);
 
-        auto* ftrace_config = ds_config->mutable_ftrace_config();
-        *ftrace_config->add_event_names() = "sched_switch";
-        *ftrace_config->add_event_names() = "bar";
+  // Setup the config for ftrace.
+  auto* ftrace_config = ds_config->mutable_ftrace_config();
+  *ftrace_config->add_event_names() = "sched_switch";
+  *ftrace_config->add_event_names() = "bar";
 
-        client->EnableTracing(trace_config);
-
-        task_runner.PostDelayedTask(std::bind([&client]() {
-                                      client->DisableTracing();
-                                      client->ReadBuffers();
-                                    }),
-                                    trace_config.duration_ms());
-      }));
-
+  // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto function = [&task_runner, &total](std::vector<TracePacket>* packets,
-                                         bool has_more) {
+  auto function = [&task_runner, &total, &finish](
+                      std::vector<TracePacket> packets, bool has_more) {
     if (has_more) {
-      for (auto& packet : *packets) {
+      for (auto& packet : packets) {
         packet.Decode();
         ASSERT_TRUE(packet->has_ftrace_events());
         for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
           ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
         }
       }
-      total += packets->size();
+      total += packets.size();
 
       // TODO(lalitm): renable this when stiching inside the service is present.
       // ASSERT_FALSE(packets->empty());
     } else {
       ASSERT_GE(total, 100u);
-      ASSERT_TRUE(packets->empty());
-      task_runner.Quit();
+      ASSERT_TRUE(packets.empty());
+      finish();
     }
   };
-  EXPECT_CALL(mock_consumer, DoOnTraceData(_, _))
-      .Times(AtLeast(2))
-      .WillRepeatedly(Invoke(function));
 
-  // Timeout if the test fails.
-  task_runner.PostDelayedTask([&task_runner]() { task_runner.Quit(); }, 2000);
-  task_runner.Run();
+  // Create the service.
+  std::unique_ptr<ServiceIPCHost> svc;
+  svc = ServiceIPCHost::CreateInstance(&task_runner);
+  unlink(PERFETTO_PRODUCER_SOCK_NAME);
+  unlink(PERFETTO_CONSUMER_SOCK_NAME);
+  svc->Start(PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
+
+  // Create the ftrace producer.
+  FtraceProducer producer;
+  producer.Run();
+
+  // Finally, make the consumer connect to the service.
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  consumer.Connect();
+
+  task_runner.RunUntilCheckpoint("no.more.packets");
 }
 
 }  // namespace perfetto

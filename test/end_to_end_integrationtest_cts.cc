@@ -14,37 +14,23 @@
  * limitations under the License.
  */
 
-#include "end_to_end_integrationtest.h"
+#include "fake_consumer.h"
 
 namespace perfetto {
 
 class PerfettoCtsTest : public ::testing::Test {
  protected:
   void TestMockProducer(const std::string& producer_name, uint64_t buffer) {
-    MockConsumer mock_consumer;
     base::UnixTaskRunner task_runner;
-    auto client = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
-                                             &mock_consumer, &task_runner);
 
-    EXPECT_CALL(mock_consumer, OnConnect())
-        .WillOnce(Invoke([&client, &task_runner, &producer_name, &buffer]() {
-          TraceConfig trace_config;
-          trace_config.add_buffers()->set_size_kb(4096 * 10);
-          trace_config.set_duration_ms(1000);
+    TraceConfig trace_config;
+    trace_config.add_buffers()->set_size_kb(4096 * 10);
+    trace_config.set_duration_ms(1000);
 
-          auto* ds_config = trace_config.add_data_sources()->mutable_config();
-          ds_config->set_name(producer_name);
-          ds_config->set_target_buffer(buffer);
-          ds_config->set_trace_category_filters("foo,bar");
-
-          client->EnableTracing(trace_config);
-
-          task_runner.PostDelayedTask(std::bind([&client]() {
-                                        client->DisableTracing();
-                                        client->ReadBuffers();
-                                      }),
-                                      trace_config.duration_ms());
-        }));
+    auto* ds_config = trace_config.add_data_sources()->mutable_config();
+    ds_config->set_name(producer_name);
+    ds_config->set_target_buffer(buffer);
+    ds_config->set_trace_category_filters("foo,bar");
 
     uint64_t total = 0;
     auto function = [&task_runner, &total](auto* packets, bool has_more) {

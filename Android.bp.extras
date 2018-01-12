@@ -3,6 +3,7 @@
 cc_test {
   name: "CtsPerfettoTestCases",
   srcs: [
+    "test/fake_consumer.cc",
     "test/end_to_end_integrationtest.cc",
     "test/end_to_end_integrationtest_cts.cc",
   ],
