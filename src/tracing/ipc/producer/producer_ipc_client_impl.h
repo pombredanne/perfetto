@@ -42,7 +42,7 @@ class Client;
 
 class Producer;
 class PosixSharedMemory;
-class SharedMemoryArbiterImpl;
+class SharedMemoryArbiter;
 
 // Exposes a Service endpoint to Producer(s), proxying all requests through a
 // IPC channel to the remote Service. This class is the glue layer between the
@@ -97,7 +97,7 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
   ProducerPortProxy producer_port_;
 
   std::unique_ptr<PosixSharedMemory> shared_memory_;
-  std::unique_ptr<SharedMemory::Arbiter> shared_memory_arbiter_;
+  std::unique_ptr<SharedMemoryArbiter> shared_memory_arbiter_;
   bool connected_ = false;
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };

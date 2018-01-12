@@ -21,17 +21,8 @@
 
 #include <functional>
 #include <memory>
-#include <vector>
-
-#include "perfetto/tracing/core/basic_types.h"
 
 namespace perfetto {
-
-namespace base {
-class TaskRunner;
-}
-
-class TraceWriter;
 
 // An abstract interface that models the shared memory region shared between
 // Service and Producer. The concrete implementation of this is up to the
@@ -48,23 +39,6 @@ class SharedMemory {
     virtual std::unique_ptr<SharedMemory> CreateSharedMemory(size_t) = 0;
   };
 
-  // Used by the Producer-side of the transport layer to vend TraceWriters
-  // from the SharedMemory it receives from the Service-side.
-  class Arbiter {
-   public:
-    using OnPagesCompleteCallback =
-        std::function<void(const std::vector<uint32_t>& /*page_indexes*/)>;
-
-    virtual ~Arbiter() = default;
-    virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
-        BufferID target_buffer) = 0;
-
-    // Implemented in src/core/shared_memory_arbiter.cc .
-    static std::unique_ptr<Arbiter> CreateInstance(SharedMemory*,
-                                                   size_t page_size,
-                                                   OnPagesCompleteCallback,
-                                                   base::TaskRunner*);
-  };
   // The transport layer is expected to tear down the resource associated to
   // this object region when destroyed.
   virtual ~SharedMemory() = default;

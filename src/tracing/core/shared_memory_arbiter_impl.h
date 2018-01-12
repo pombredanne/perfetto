@@ -24,8 +24,8 @@
 #include <vector>
 
 #include "perfetto/tracing/core/basic_types.h"
-#include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "perfetto/tracing/core/shared_memory_arbiter.h"
 #include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
@@ -42,7 +42,7 @@ class TaskRunner;
 // This class is thread-safe and uses locks to do so. Data sources are supposed
 // to interact with this sporadically, only when they run out of space on their
 // current thread-local chunk.
-class SharedMemoryArbiterImpl : public SharedMemory::Arbiter {
+class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
  public:
   // Args:
   // |start|,|size|: boundaries of the shared memory buffer.

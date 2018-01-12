@@ -18,6 +18,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/tracing/core/shared_memory.h"
 #include "src/tracing/core/trace_writer_impl.h"
 
 #include <limits>
@@ -31,7 +32,7 @@ SharedMemoryABI::PageLayout SharedMemoryArbiterImpl::default_page_layout =
     SharedMemoryABI::PageLayout::kPageDiv1;
 
 // static
-std::unique_ptr<SharedMemory::Arbiter> SharedMemory::Arbiter::CreateInstance(
+std::unique_ptr<SharedMemoryArbiter> SharedMemoryArbiter::CreateInstance(
     SharedMemory* shared_memory,
     size_t page_size,
     OnPagesCompleteCallback callback,

@@ -24,6 +24,7 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/shared_memory_arbiter.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/tracing/ipc/posix_shared_memory.h"
 
@@ -103,7 +104,7 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   auto on_pages_complete = [this](const std::vector<uint32_t>& changed_pages) {
     OnPagesComplete(changed_pages);
   };
-  shared_memory_arbiter_ = SharedMemory::Arbiter::CreateInstance(
+  shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
       shared_memory_.get(), 4096 /* TODO where does this come from? */,
       on_pages_complete, task_runner_);
 
