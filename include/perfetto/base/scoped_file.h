@@ -18,7 +18,10 @@
 #define INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_
 
 #include <dirent.h>
+#include <fcntl.h>
 #include <unistd.h>
+
+#include <string>
 
 #include "perfetto/base/logging.h"
 
@@ -48,6 +51,11 @@ class ScopedResource {
       PERFETTO_CHECK(res == 0);
     }
     t_ = r;
+  }
+
+  static ScopedResource OpenFile(const std::string& path, int flags) {
+    ScopedResource fd(open(path.c_str(), flags | O_CLOEXEC));
+    return fd;
   }
   ~ScopedResource() { reset(InvalidValue); }
 
