@@ -42,6 +42,29 @@
 namespace perfetto {
 namespace {
 
+const char kTraceHeader[] = R"({
+  "traceEvents": [],
+)";
+
+const char kTraceFooter[] = R"(\n",
+  "controllerTraceDataKey": "systraceController"
+})";
+
+const char kFtraceHeader[] =
+    ""
+    "  \"systemTraceEvents\": \""
+    "# tracer: nop\\n"
+    "#\\n"
+    "# entries-in-buffer/entries-written: 30624/30624   #P:4\\n"
+    "#\\n"
+    "#                                      _-----=> irqs-off\\n"
+    "#                                     / _----=> need-resched\\n"
+    "#                                    | / _---=> hardirq/softirq\\n"
+    "#                                    || / _--=> preempt-depth\\n"
+    "#                                    ||| /     delay\\n"
+    "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
+    "#              | |        |      |   ||||       |         |\\n";
+
 using google::protobuf::Descriptor;
 using google::protobuf::DynamicMessageFactory;
 using google::protobuf::FileDescriptor;
@@ -151,7 +174,7 @@ int TraceToText(std::istream* input, std::ostream* output) {
   Message* msg = msg_root->New();
 
   if (!msg->ParseFromIstream(input)) {
-    PERFETTO_DLOG("Could not parse input.");
+    PERFETTO_ELOG("Could not parse input.");
     return 1;
   }
   OstreamOutputStream zero_copy_output(output);
@@ -160,38 +183,18 @@ int TraceToText(std::istream* input, std::ostream* output) {
 }
 
 int TraceToSystrace(std::istream* input, std::ostream* output) {
-  const std::string header = R"({
-  "traceEvents": [],
-)";
-
-  const std::string ftrace_start =
-      ""
-      "  \"systemTraceEvents\": \""
-      "# tracer: nop\\n"
-      "#\\n"
-      "# entries-in-buffer/entries-written: 30624/30624   #P:4\\n"
-      "#\\n"
-      "#                                      _-----=> irqs-off\\n"
-      "#                                     / _----=> need-resched\\n"
-      "#                                    | / _---=> hardirq/softirq\\n"
-      "#                                    || / _--=> preempt-depth\\n"
-      "#                                    ||| /     delay\\n"
-      "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
-      "#              | |        |      |   ||||       |         |\\n";
-
-  const std::string footer = R"(\n",
-  "controllerTraceDataKey": "systraceController"
-})";
-
-  printf("%s", header.c_str());
-  printf("%s", ftrace_start.c_str());
+  printf("%s", kTraceHeader);
+  printf("%s", kFtraceHeader);
   std::multimap<uint64_t, std::string> sorted;
 
   std::string raw;
   std::istreambuf_iterator<char> begin(*input), end;
   raw.assign(begin, end);
   Trace trace;
-  trace.ParseFromString(raw);
+  if (!trace.ParseFromString(raw)) {
+    PERFETTO_ELOG("Could not parse input.");
+    return 1;
+  }
 
   for (const TracePacket& packet : trace.packet()) {
     if (!packet.has_ftrace_events())
@@ -215,7 +218,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   for (auto it = sorted.begin(); it != sorted.end(); it++)
     printf("%s", it->second.c_str());
 
-  printf("%s", footer.c_str());
+  printf("%s", kTraceFooter);
 
   return 0;
 }
