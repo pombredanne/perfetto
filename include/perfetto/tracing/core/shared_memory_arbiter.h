@@ -42,6 +42,12 @@ class SharedMemoryArbiter {
       std::function<void(const std::vector<uint32_t>& /*page_indexes*/)>;
 
   virtual ~SharedMemoryArbiter() = default;
+
+  // Creates a new TraceWriter and assigns it a new WriterID. The WriterID is
+  // written in each chunk header owned by a given TraceWriter and is used by
+  // the Service to reconstruct TracePackets written by the same TraceWriter.
+  // Returns nullptr if all WriterID slots are exhausted.
+  // TODO(primiano): instead of nullptr this should return a NoopWriter.
   virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
       BufferID target_buffer) = 0;
 
