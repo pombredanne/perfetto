@@ -224,6 +224,8 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
 // - unknown fields preserved end-to-end.
 // - >1 data source.
 // - >1 data consumer sharing the same data source, with different TraceBuffers.
+// - >1 consumer with > 1 buffer each.
+// - Consumer disconnecting in the middle of a ReadBuffers() call.
 
 }  // namespace
 }  // namespace perfetto
