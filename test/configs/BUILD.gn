@@ -1,4 +1,4 @@
-# Copyright (C) 2017 The Android Open Source Project
+# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build_overrides/build.gni")
-
-declare_args() {
-  # The Android blueprint file generator overrides this to true.
-  build_with_android = false
-}
+import("../../gn/perfetto.gni")
 
 if (!build_with_chromium) {
-  perfetto_root_path = "//"
-} else {
-  perfetto_root_path = "//third_party/perfetto/"
+  action_foreach("configs") {
+    testonly = true
+    script = "$root_out_dir/protoc_helper"
+
+    deps = [
+      "../../tools:protoc_helper",
+    ]
+
+    sources = [
+      "atrace.cfg",
+      "ftrace.cfg",
+    ]
+
+    outputs = [
+      "$root_out_dir/{{source_file_part}}.protobuf",
+    ]
+
+    args = [
+      "encode",
+      "--root=" + rebase_path(perfetto_root_path, ""),
+      "--input={{source}}",
+      "--output={{source_file_part}}.protobuf",
+    ]
+  }
 }
