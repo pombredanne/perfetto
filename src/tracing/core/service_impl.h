@@ -184,22 +184,18 @@ class ServiceImpl : public Service {
     TracingSession(TracingSessionID session_id, const TraceConfig& new_config)
         : id(session_id), config(new_config) {}
 
+    size_t num_buffers() const { return buffers_index.size(); }
+
     TracingSessionID id;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
     std::multimap<ProducerID, DataSourceInstanceID> data_source_instances;
 
-    // List of buffers, as declared in the trace config by the Consumer.
-    // Note: |buffers_index| below relies on |trace_buffer|'s pointers to be
-    // stable.
-    std::unique_ptr<TraceBuffer[]> trace_buffers;
-    size_t num_trace_buffers = 0;
-
-    // Maps a global BufferID (shared namespace amongst all consumers) into
-    // the corresponding |trace_buffers| entry.
-    // TODO make this global before sending CL.
-    std::map<BufferID, TraceBuffer*> buffers_index;
+    // Maps a per-trace-session buffer index into the corresponding global
+    // BufferID (shared namespace amongst all consumers). This vector has as
+    // many entries as |config.buffers_size()|.
+    std::vector<BufferID> buffers_index;
 
     // The original trace config provided by the Consumer when calling
     // EnableTracing().
@@ -236,6 +232,7 @@ class ServiceImpl : public Service {
 
   std::set<ConsumerEndpointImpl*> consumers_;
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
+  std::map<BufferID, TraceBuffer> buffers_;
 
   base::WeakPtrFactory<ServiceImpl> weak_ptr_factory_;  // Keep last.
 };

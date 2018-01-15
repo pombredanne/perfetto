@@ -30,6 +30,11 @@
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
+// General note: this class must assume that Producers are malicious and will
+// try to crash / exploit this class. We can trust pointers because they come
+// from the IPC layer, but we should never assume that that the producer calls
+// come in the right order or their arguments are sane / within bounds.
+
 namespace perfetto {
 
 // TODO add ThreadChecker everywhere.
@@ -150,8 +155,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // relative index (TraceConfig.DataSourceConfig.target_buffer) into the
   // corresponding BufferID, which is a global ID namespace for the service and
   // all producers.
-  ts.trace_buffers.reset(new TraceBuffer[cfg.buffers_size()]);
-  ts.num_trace_buffers = static_cast<size_t>(cfg.buffers_size());
+  ts.buffers_index.reserve(cfg.buffers_size());
   for (int i = 0; i < cfg.buffers_size(); i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
     BufferID global_id = static_cast<BufferID>(buffer_ids_.Allocate());
@@ -159,10 +163,13 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       did_allocate_all_buffers = false;  // We ran out of indexes.
       break;
     }
-    ts.buffers_index.emplace(global_id, &ts.trace_buffers[i]);
+    ts.buffers_index.push_back(global_id);
+    auto it_and_inserted = buffers_.emplace(global_id, TraceBuffer());
+    PERFETTO_DCHECK(it_and_inserted.second);  // buffers_.count(global_id) == 0.
+    TraceBuffer& trace_buffer = it_and_inserted.first->second;
     // TODO(primiano): make TraceBuffer::kBufferPageSize dynamic.
     const size_t buf_size = buffer_cfg.size_kb() * 1024u;
-    if (!ts.trace_buffers[i].Create(global_id, buf_size)) {
+    if (!trace_buffer.Create(global_id, buf_size)) {
       did_allocate_all_buffers = false;
       break;
     }
@@ -174,10 +181,10 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // In any case, free all the previously allocated buffers and abort.
   // TODO: add a test to cover this case, this is quite subtle.
   if (!did_allocate_all_buffers) {
-    for (const auto& kv : ts.buffers_index)
-      buffer_ids_.Free(kv.first);
-    ts.trace_buffers.reset();
-    ts.num_trace_buffers = 0;
+    for (BufferID global_id : ts.buffers_index) {
+      buffer_ids_.Free(global_id);
+      buffers_.erase(global_id);
+    }
     tracing_sessions_.erase(tsid);
     return;  // TODO(primiano): return failure condition?
   }
@@ -252,9 +259,14 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   // rather than leveraging the SharedMemoryABI (which is intended only for the
   // Producer <> Service SMB and not for the TraceBuffer itself).
   auto weak_consumer = consumer->GetWeakPtr();
-  for (size_t buf_idx = 0; buf_idx < tracing_session->num_trace_buffers;
+  for (size_t buf_idx = 0; buf_idx < tracing_session->num_buffers();
        buf_idx++) {
-    TraceBuffer& tbuf = tracing_session->trace_buffers[buf_idx];
+    auto tbuf_iter = buffers_.find(tracing_session->buffers_index[buf_idx]);
+    if (tbuf_iter == buffers_.end()) {
+      PERFETTO_DCHECK(false);
+      continue;
+    }
+    TraceBuffer& tbuf = tbuf_iter->second;
     SharedMemoryABI& abi = *tbuf.abi;
     for (size_t i = 0; i < tbuf.num_pages(); i++) {
       const size_t page_idx = (i + tbuf.cur_page) % tbuf.num_pages();
@@ -326,11 +338,11 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
     return;  // TODO(primiano): signal failure?
   }
   DisableTracing(tsid);
-  for (const auto& kv : tracing_session->buffers_index)
-    buffer_ids_.Free(kv.first);
-  tracing_session->buffers_index.clear();
-  tracing_session->trace_buffers.reset();
-  tracing_session->num_trace_buffers = 0;
+  for (BufferID buffer_id : tracing_session->buffers_index) {
+    buffer_ids_.Free(buffer_id);
+    PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);
+    buffers_.erase(buffer_id);
+  }
   tracing_sessions_.erase(tsid);
 }
 
@@ -383,14 +395,14 @@ void ServiceImpl::CreateDataSourceInstanceForProducer(
 
   DataSourceConfig ds_config = cfg_data_source.config();  // Deliberate copy.
   auto relative_buffer_id = ds_config.target_buffer();
-  if (relative_buffer_id >= tracing_session->num_trace_buffers) {
+  if (relative_buffer_id >= tracing_session->num_buffers()) {
     PERFETTO_LOG(
         "The TraceConfig for DataSource %s specified a traget_buffer out of "
         "bound (%d). Skipping it.",
         ds_config.name().c_str(), relative_buffer_id);
     return;
   }
-  BufferID global_id = tracing_session->trace_buffers[relative_buffer_id].id;
+  BufferID global_id = tracing_session->buffers_index[relative_buffer_id];
   PERFETTO_DCHECK(global_id);
   ds_config.set_target_buffer(global_id);
 
@@ -402,43 +414,34 @@ void ServiceImpl::CreateDataSourceInstanceForProducer(
 }
 
 void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
-                                                BufferID target_buffer,
+                                                BufferID target_buffer_id,
                                                 const uint8_t* src,
                                                 size_t size) {
   // TODO right now the page_size in the SMB and the trace_buffers_ can
   // mismatch. Remove the ability to decide the page size on the Producer.
 
-  // TODO(primiano): We should have a direct index to find the TargetBuffer and
-  // perform ACL checks without iterating through all the producers.
-  TraceBuffer* tbuf = nullptr;
-  for (auto& sessions_it : tracing_sessions_) {
-    for (auto& tbuf_it : sessions_it.second.buffers_index) {
-      const BufferID id = tbuf_it.first;
-      if (id == target_buffer) {
-        // TODO(primiano): we should have some stronger check to prevent that
-        // the Producer passes |target_buffer| which is valid, but that we never
-        // asked it to use. Essentially we want to prevent a malicious producer
-        // to inject data into a log buffer that has nothing to do with it.
-        tbuf = tbuf_it.second;
-        break;
-      }
-    }
-  }
-
-  if (!tbuf) {
+  auto buf_iter = buffers_.find(target_buffer_id);
+  if (buf_iter == buffers_.end()) {
     PERFETTO_DLOG("Could not find target buffer %u for producer %" PRIu64,
-                  target_buffer, producer_id);
+                  target_buffer_id, producer_id);
     return;
   }
+  TraceBuffer& buf = buf_iter->second;
+
+  // TODO(primiano): we should have a set<BufferID> |allowed_target_buffers| in
+  // ProducerEndpointImpl to perform ACL checks and prevent that the Producer
+  // passes a |target_buffer| which is valid, but that we never asked it to use.
+  // Essentially we want to prevent a malicious producer to inject data into a
+  // log buffer that has nothing to do with it.
 
   PERFETTO_DCHECK(size == kBufferPageSize);
-  uint8_t* dst = tbuf->get_next_page();
+  uint8_t* dst = buf.get_next_page();
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
   // a file descriptor (just use SharedMemory without sharing it).
-  PERFETTO_DLOG("Copying page %p from producer %" PRIu64
-                " into buffer %" PRIu16,
-                reinterpret_cast<const void*>(src), producer_id, target_buffer);
+  PERFETTO_DLOG(
+      "Copying page %p from producer %" PRIu64 " into buffer %" PRIu16,
+      reinterpret_cast<const void*>(src), producer_id, target_buffer_id);
   memcpy(dst, src, size);
 }
 
