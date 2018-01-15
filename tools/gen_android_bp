@@ -39,6 +39,7 @@ default_targets = [
     '//:libtraced_shared',
     '//:perfetto_tests',
     '//:perfetto',
+    '//:perfetto_protos_lite',
     '//:traced',
     '//:traced_probes',
 ]
@@ -503,6 +504,7 @@ def create_blueprint_for_targets(desc, targets):
         '-Wno-sign-compare',
         '-Wno-sign-promo',
         '-Wno-unused-parameter',
+        '-fvisibility=hidden',
     ]
 
     blueprint.add_module(defaults)

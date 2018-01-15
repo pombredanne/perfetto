@@ -34,7 +34,6 @@ cc_library_shared {
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
-    "src/ftrace_reader/ftrace_to_proto.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/ipc/buffered_frame_deserializer.cc",
     "src/ipc/client_impl.cc",
@@ -116,6 +115,7 @@ cc_defaults {
     "-Wno-sign-compare",
     "-Wno-sign-promo",
     "-Wno-unused-parameter",
+    "-fvisibility=hidden",
   ],
   local_include_dirs: [
     "include",
@@ -222,11 +222,42 @@ genrule {
   ],
 }
 
+// GN target: //:perfetto_protos_lite
+cc_library_static {
+  name: "perfetto_protos_lite",
+  srcs: [
+    ":perfetto_protos_ftrace_lite_gen",
+    ":perfetto_protos_lite_gen",
+    ":perfetto_protos_tracing_service_lite_gen",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  export_include_dirs: [
+    "include",
+  ],
+  generated_headers: [
+    "perfetto_protos_ftrace_lite_gen_headers",
+    "perfetto_protos_lite_gen_headers",
+    "perfetto_protos_tracing_service_lite_gen_headers",
+  ],
+  export_generated_headers: [
+    "perfetto_protos_ftrace_lite_gen_headers",
+    "perfetto_protos_lite_gen_headers",
+    "perfetto_protos_tracing_service_lite_gen_headers",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+}
+
 // GN target: //protos:lite_gen
 genrule {
   name: "perfetto_protos_lite_gen",
   srcs: [
     "protos/test_event.proto",
+    "protos/trace.proto",
     "protos/trace_packet.proto",
   ],
   tools: [
@@ -235,6 +266,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
     "external/perfetto/protos/test_event.pb.cc",
+    "external/perfetto/protos/trace.pb.cc",
     "external/perfetto/protos/trace_packet.pb.cc",
   ],
 }
@@ -244,6 +276,7 @@ genrule {
   name: "perfetto_protos_lite_gen_headers",
   srcs: [
     "protos/test_event.proto",
+    "protos/trace.proto",
     "protos/trace_packet.proto",
   ],
   tools: [
@@ -252,6 +285,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto $(in)",
   out: [
     "external/perfetto/protos/test_event.pb.h",
+    "external/perfetto/protos/trace.pb.h",
     "external/perfetto/protos/trace_packet.pb.h",
   ],
   export_include_dirs: [
@@ -348,6 +382,7 @@ genrule {
   name: "perfetto_protos_zero_gen",
   srcs: [
     "protos/test_event.proto",
+    "protos/trace.proto",
     "protos/trace_packet.proto",
   ],
   tools: [
@@ -357,6 +392,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
   out: [
     "external/perfetto/protos/test_event.pbzero.cc",
+    "external/perfetto/protos/trace.pbzero.cc",
     "external/perfetto/protos/trace_packet.pbzero.cc",
   ],
 }
@@ -366,6 +402,7 @@ genrule {
   name: "perfetto_protos_zero_gen_headers",
   srcs: [
     "protos/test_event.proto",
+    "protos/trace.proto",
     "protos/trace_packet.proto",
   ],
   tools: [
@@ -375,6 +412,7 @@ genrule {
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto $(in)",
   out: [
     "external/perfetto/protos/test_event.pbzero.h",
+    "external/perfetto/protos/trace.pbzero.h",
     "external/perfetto/protos/trace_packet.pbzero.h",
   ],
   export_include_dirs: [
@@ -765,8 +803,6 @@ cc_test {
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_controller_unittest.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
-    "src/ftrace_reader/ftrace_to_proto.cc",
-    "src/ftrace_reader/ftrace_to_proto_unittest.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/ftrace_reader/proto_translation_table_unittest.cc",
     "src/ftrace_reader/test/scattered_stream_delegate_for_testing.cc",
@@ -813,6 +849,8 @@ cc_test {
     "src/tracing/test/aligned_buffer_test.cc",
     "src/tracing/test/test_shared_memory.cc",
     "src/tracing/test/tracing_integration_test.cc",
+    "tools/ftrace_proto_gen/ftrace_proto_gen.cc",
+    "tools/ftrace_proto_gen/ftrace_proto_gen_unittest.cc",
     "tools/sanitizers_unittests/sanitizers_unittest.cc",
   ],
   shared_libs: [

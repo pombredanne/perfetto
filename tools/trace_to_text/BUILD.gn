@@ -12,28 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage: ./generate_full_protos.py path/to/input.proto path/to/output.proto
-# Copies the input to the output removing 'option optimize_for = LITE_RUNTIME'
-# if present.
+if (current_toolchain == host_toolchain) {
+  executable("trace_to_text_host") {
+    testonly = true
+    deps = [
+      "../../gn:default_deps",
+      "../../gn:protobuf_full_deps",
+      "../../protos:lite",
+    ]
+    sources = [
+      "main.cc",
+    ]
+  }
+}
 
-import argparse
-import sys
-
-def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument('input')
-  parser.add_argument('output')
-  args = parser.parse_args()
-
-  with open(args.input, 'r') as fin:
-    s = fin.read()
-
-  s = s.replace('option optimize_for = LITE_RUNTIME;\n', '')
-
-  with open(args.output, 'w') as fout:
-    fout.write(s)
-
-  return 0
-
-if __name__ == '__main__':
-  sys.exit(main())
+copy("trace_to_text") {
+  testonly = true
+  host_out_dir_ =
+      get_label_info(":trace_to_text_host($host_toolchain)", "root_out_dir")
+  deps = [
+    ":trace_to_text_host($host_toolchain)",
+  ]
+  sources = [
+    "${host_out_dir_}/trace_to_text_host",
+  ]
+  outputs = [
+    "${root_out_dir}/trace_to_text",
+  ]
+}
