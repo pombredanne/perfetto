@@ -218,7 +218,7 @@ class ServiceImpl : public Service {
 
   // Buffer IDs are global across all consumers (because a Producer can produce
   // data for more than one trace session, hence more than one consumer).
-  IdAllocator buffer_ids_;
+  IdAllocator<BufferID> buffer_ids_;
 
   std::multimap<std::string /*name*/, RegisteredDataSource> data_sources_;
 

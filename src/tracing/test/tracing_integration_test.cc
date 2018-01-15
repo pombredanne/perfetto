@@ -226,6 +226,9 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
 // - >1 data consumer sharing the same data source, with different TraceBuffers.
 // - >1 consumer with > 1 buffer each.
 // - Consumer disconnecting in the middle of a ReadBuffers() call.
+// - Multiple calls to DisableTracing.
+// - Out of order Enable/Disable/FreeBuffers calls.
+// - DisableTracing does actually freeze the buffers.
 
 }  // namespace
 }  // namespace perfetto

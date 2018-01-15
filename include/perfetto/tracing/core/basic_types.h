@@ -29,7 +29,7 @@ using WriterID = uint16_t;
 using BufferID = uint16_t;
 
 // Keep this in sync with SharedMemoryABI::PageHeader::target_buffer.
-static constexpr size_t kMaxTraceBuffers = 1ul << 16;
+static constexpr BufferID kMaxTraceBufferID = (1ul << 16) - 1;
 
 // TODO(primiano): temporary. The buffer page size should be configurable by
 // consumers.

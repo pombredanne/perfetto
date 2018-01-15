@@ -60,7 +60,7 @@ ServiceImpl::ServiceImpl(std::unique_ptr<SharedMemory::Factory> shm_factory,
                          base::TaskRunner* task_runner)
     : task_runner_(task_runner),
       shm_factory_(std::move(shm_factory)),
-      buffer_ids_(kMaxTraceBuffers),
+      buffer_ids_(kMaxTraceBufferID),
       weak_ptr_factory_(this) {
   PERFETTO_DCHECK(task_runner_);
 }
@@ -177,7 +177,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   // This can happen if either:
-  // - All the kMaxTraceBuffers slots are taken.
+  // - All the kMaxTraceBufferID slots are taken.
   // - OOM, or, more relistically, we exhausted virtual memory.
   // In any case, free all the previously allocated buffers and abort.
   // TODO: add a test to cover this case, this is quite subtle.
@@ -191,17 +191,6 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   consumer->tracing_session_id_ = tsid;
-
-  // Trigger delayed task if the trace is time limited.
-  if (cfg.duration_ms()) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(
-        [weak_this, tsid] {
-          if (weak_this)
-            weak_this->DisableTracing(tsid);
-        },
-        cfg.duration_ms());
-  }
 
   // Enable the data sources on the producers.
   for (const TraceConfig::DataSource& cfg_data_source : cfg.data_sources()) {
@@ -217,7 +206,18 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       CreateDataSourceInstanceForProducer(cfg_data_source, producer, &ts);
     }
   }
-}  // namespace perfetto
+
+  // Trigger delayed task if the trace is time limited.
+  if (cfg.duration_ms()) {
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_this, tsid] {
+          if (weak_this)
+            weak_this->DisableTracing(tsid);
+        },
+        cfg.duration_ms());
+  }
+}
 
 // DisableTracing just stops the data sources but doesn't free up any buffer.
 // This is to allow the consumer to freeze the buffers (by stopping the trace)
@@ -227,8 +227,8 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
   PERFETTO_DLOG("Disabling tracing session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
-    // This can genuinely happen if the consumer calls DisableTracing twice or
-    // if tracing is explicitly disabled and then delayed timer tasks expires.
+    // Can happen if the consumer calls this before EnableTracing() or after
+    // FreeBuffers().
     PERFETTO_DLOG("Couldn't find tracing session %" PRIu64, tsid);
     return;
   }

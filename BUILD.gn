@@ -30,6 +30,7 @@ group("all") {
     "src/protozero/protoc_plugin($host_toolchain)",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
+    "tools/trace_to_text",
   ]
   if (!build_with_chromium) {
     deps += [
@@ -82,7 +83,11 @@ if (!build_with_chromium) {
     if (build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
       deps += [ "src/base:android_task_runner" ]
-      libs = [ "utils" ]
+      libs = [
+        "binder",
+        "services",
+        "utils",
+      ]
     }
   }
 
