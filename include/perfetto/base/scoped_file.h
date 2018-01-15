@@ -52,11 +52,6 @@ class ScopedResource {
     }
     t_ = r;
   }
-
-  static ScopedResource OpenFile(const std::string& path, int flags) {
-    ScopedResource fd(open(path.c_str(), flags | O_CLOEXEC));
-    return fd;
-  }
   ~ScopedResource() { reset(InvalidValue); }
 
  private:
@@ -67,6 +62,12 @@ class ScopedResource {
 };
 
 using ScopedFile = ScopedResource<int, close, -1>;
+// Always open a ScopedFile with O-CLOEXEC so we can safely fork and exec.
+inline static ScopedFile OpenFile(const std::string& path, int flags) {
+  ScopedFile fd(open(path.c_str(), flags | O_CLOEXEC));
+  return fd;
+}
+
 using ScopedDir = ScopedResource<DIR*, closedir, nullptr>;
 
 }  // namespace base
