@@ -144,7 +144,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
   TracingSession& ts =
-      tracing_sessions_.emplace(tsid, TracingSession(tsid, cfg)).first->second;
+      tracing_sessions_.emplace(tsid, TracingSession(cfg)).first->second;
 
   PERFETTO_DLOG("Starting tracing session %" PRIu64, tsid);
 
@@ -169,7 +169,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     TraceBuffer& trace_buffer = it_and_inserted.first->second;
     // TODO(primiano): make TraceBuffer::kBufferPageSize dynamic.
     const size_t buf_size = buffer_cfg.size_kb() * 1024u;
-    if (!trace_buffer.Create(global_id, buf_size)) {
+    if (!trace_buffer.Create(buf_size)) {
       did_allocate_all_buffers = false;
       break;
     }
@@ -579,14 +579,13 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 
 ServiceImpl::TraceBuffer::TraceBuffer() = default;
 
-bool ServiceImpl::TraceBuffer::Create(BufferID buffer_id, size_t sz) {
+bool ServiceImpl::TraceBuffer::Create(size_t sz) {
   data = base::PageAllocator::AllocateMayFail(sz);
   if (!data) {
     PERFETTO_ELOG("Trace buffer allocation failed (size: %zu, page_size: %zu)",
                   sz, kBufferPageSize);
     return false;
   }
-  id = buffer_id;
   size = sz;
   abi.reset(new SharedMemoryABI(get_page(0), size, kBufferPageSize));
   return true;
@@ -597,5 +596,12 @@ ServiceImpl::TraceBuffer::TraceBuffer(ServiceImpl::TraceBuffer&&) noexcept =
     default;
 ServiceImpl::TraceBuffer& ServiceImpl::TraceBuffer::operator=(
     ServiceImpl::TraceBuffer&&) = default;
+
+////////////////////////////////////////////////////////////////////////////////
+// ServiceImpl::TracingSession implementation
+////////////////////////////////////////////////////////////////////////////////
+
+ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
+    : config(new_config) {}
 
 }  // namespace perfetto

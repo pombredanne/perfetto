@@ -152,7 +152,7 @@ class ServiceImpl : public Service {
     TraceBuffer(TraceBuffer&&) noexcept;
     TraceBuffer& operator=(TraceBuffer&&);
 
-    bool Create(BufferID, size_t size);
+    bool Create(size_t size);
     size_t num_pages() const { return size / kBufferPageSize; }
 
     uint8_t* get_page(size_t page) {
@@ -166,7 +166,6 @@ class ServiceImpl : public Service {
       return get_page(cur);
     }
 
-    BufferID id = 0;
     size_t size = 0;
     size_t cur_page = 0;  // Write pointer in the ring buffer.
     base::PageAllocator::UniquePtr data;
@@ -181,12 +180,13 @@ class ServiceImpl : public Service {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    TracingSession(TracingSessionID session_id, const TraceConfig& new_config)
-        : id(session_id), config(new_config) {}
+    explicit TracingSession(const TraceConfig&);
 
     size_t num_buffers() const { return buffers_index.size(); }
 
-    TracingSessionID id;
+    // The original trace config provided by the Consumer when calling
+    // EnableTracing().
+    const TraceConfig config;
 
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
@@ -196,10 +196,6 @@ class ServiceImpl : public Service {
     // BufferID (shared namespace amongst all consumers). This vector has as
     // many entries as |config.buffers_size()|.
     std::vector<BufferID> buffers_index;
-
-    // The original trace config provided by the Consumer when calling
-    // EnableTracing().
-    TraceConfig config;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;
