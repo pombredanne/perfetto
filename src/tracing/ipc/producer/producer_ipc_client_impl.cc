@@ -104,10 +104,9 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   auto on_pages_complete = [this](const std::vector<uint32_t>& changed_pages) {
     OnPagesComplete(changed_pages);
   };
-  shared_memory_arbiter_.reset(
-      new SharedMemoryArbiter(shared_memory_->start(), shared_memory_->size(),
-                              4096 /* TODO where does this come from? */,
-                              on_pages_complete, task_runner_));
+  shared_memory_arbiter_.reset(new SharedMemoryArbiter(
+      shared_memory_->start(), shared_memory_->size(), kBufferPageSize,
+      on_pages_complete, task_runner_));
 
   producer_->OnConnect();
 }

@@ -124,7 +124,7 @@ class ServiceImpl : public Service {
   void DisconnectConsumer(ConsumerEndpointImpl*);
   void EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
   void DisableTracing(TracingSessionID);
-  void ReadBuffers(ConsumerEndpointImpl*, TracingSessionID);
+  void ReadBuffers(TracingSessionID, ConsumerEndpointImpl*);
   void FreeBuffers(TracingSessionID);
 
   // Service implementation.
@@ -147,8 +147,6 @@ class ServiceImpl : public Service {
   };
 
   struct TraceBuffer {
-    // TODO(primiano): make this configurable.
-    static constexpr size_t kBufferPageSize = 4096;
     TraceBuffer();
     ~TraceBuffer();
     TraceBuffer(TraceBuffer&&) noexcept;
@@ -200,6 +198,7 @@ class ServiceImpl : public Service {
 
     // Maps a global BufferID (shared namespace amongst all consumers) into
     // the corresponding |trace_buffers| entry.
+    // TODO make this global before sending CL.
     std::map<BufferID, TraceBuffer*> buffers_index;
 
     // The original trace config provided by the Consumer when calling

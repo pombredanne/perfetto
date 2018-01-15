@@ -37,9 +37,9 @@ namespace perfetto {
 using protozero::proto_utils::ParseVarInt;
 
 namespace {
-constexpr size_t kPageSize = 4096;
-constexpr size_t kDefaultShmSize = kPageSize * 16;  // 64 KB.
-constexpr size_t kMaxShmSize = kPageSize * 1024;    // 4 MB.
+constexpr size_t kSystemPageSize = 4096;
+constexpr size_t kDefaultShmSize = kSystemPageSize * 16;  // 64 KB.
+constexpr size_t kMaxShmSize = kSystemPageSize * 1024;    // 4 MB.
 constexpr int kMaxBuffersPerConsumer = 32;
 }  // namespace
 
@@ -70,7 +70,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   const ProducerID id = ++last_producer_id_;
   PERFETTO_DLOG("Producer %" PRIu64 " connected", id);
   size_t shm_size = std::min(shared_buffer_size_hint_bytes, kMaxShmSize);
-  if (shm_size % kPageSize || shm_size < kPageSize)
+  if (shm_size % kSystemPageSize || shm_size < kSystemPageSize)
     shm_size = kDefaultShmSize;
 
   // TODO(primiano): right now Create() will suicide in case of OOM if the mmap
@@ -141,18 +141,22 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   TracingSession& ts =
       tracing_sessions_.emplace(tsid, TracingSession(tsid, cfg)).first->second;
 
+  PERFETTO_DLOG("Starting tracing session %" PRIu64, tsid);
+
   // Initialize the log buffers.
   bool did_allocate_all_buffers = true;
 
-  // Translates a relative index (TraceConfig.DataSourceConfig.target_buffer)
-  // into the corresponding BufferID (a global ID namespace for all consumers).
+  // Allocate the trace buffers. Also create a map to translate a consumer
+  // relative index (TraceConfig.DataSourceConfig.target_buffer) into the
+  // corresponding BufferID, which is a global ID namespace for the service and
+  // all producers.
   ts.trace_buffers.reset(new TraceBuffer[cfg.buffers_size()]);
   ts.num_trace_buffers = static_cast<size_t>(cfg.buffers_size());
   for (int i = 0; i < cfg.buffers_size(); i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
     BufferID global_id = static_cast<BufferID>(buffer_ids_.Allocate());
     if (!global_id) {
-      did_allocate_all_buffers = false;
+      did_allocate_all_buffers = false;  // We ran out of indexes.
       break;
     }
     ts.buffers_index.emplace(global_id, &ts.trace_buffers[i]);
@@ -166,7 +170,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   // This can happen if either:
   // - All the kMaxTraceBuffers slots are taken.
-  // - OOM, or, more relistically we exhausted virtual memory.
+  // - OOM, or, more relistically, we exhausted virtual memory.
   // In any case, free all the previously allocated buffers and abort.
   // TODO: add a test to cover this case, this is quite subtle.
   if (!did_allocate_all_buffers) {
@@ -180,7 +184,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   consumer->tracing_session_id_ = tsid;
 
-  // Trigger delayed task if the trace is time-limited.
+  // Trigger delayed task if the trace is time limited.
   if (cfg.duration_ms()) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
@@ -197,41 +201,45 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
     for (auto it = range.first; it != range.second; it++) {
       const RegisteredDataSource& reg_data_source = it->second;
-
-      auto producer_iter = producers_.find(reg_data_source.producer_id);
-      if (producer_iter == producers_.end()) {
+      ProducerEndpointImpl* producer = GetProducer(reg_data_source.producer_id);
+      if (!producer) {
         PERFETTO_DCHECK(false);  // Something in the unregistration is broken.
         continue;
       }
-
-      CreateDataSourceInstanceForProducer(cfg_data_source,
-                                          producer_iter->second, &ts);
+      CreateDataSourceInstanceForProducer(cfg_data_source, producer, &ts);
     }
   }
 }  // namespace perfetto
 
+// DisableTracing just stops the data sources but doesn't free up any buffer.
+// This is to allow the consumer to freeze the buffers (by stopping the trace)
+// and then drain the buffers. The actual teardown of the TracingSession happens
+// in FreeBuffers().
 void ServiceImpl::DisableTracing(TracingSessionID tsid) {
   PERFETTO_DLOG("Disabling tracing session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
+    // This can genuinely happen if the consumer calls DisableTracing twice or
+    // if tracing is explicitly disabled and then delayed timer tasks expires.
     PERFETTO_DLOG("Couldn't find tracing session %" PRIu64, tsid);
     return;
   }
   for (const auto& data_source_inst : tracing_session->data_source_instances) {
-    auto producer_it = producers_.find(data_source_inst.first);
-    if (producer_it == producers_.end())
+    const ProducerID producer_id = data_source_inst.first;
+    const DataSourceInstanceID ds_inst_id = data_source_inst.second;
+    ProducerEndpointImpl* producer = GetProducer(producer_id);
+    if (!producer)
       continue;  // This could legitimately happen if a Producer disconnects.
-    producer_it->second->producer_->TearDownDataSourceInstance(
-        data_source_inst.second);
+    producer->producer_->TearDownDataSourceInstance(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
 
   // Deliberately NOT removing the session from |tracing_session_|, it's still
-  // needed to call ReadBuffers(). FreeBuffers will erase() the session.
+  // needed to call ReadBuffers(). FreeBuffers() will erase() the session.
 }
 
-void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer,
-                              TracingSessionID tsid) {
+void ServiceImpl::ReadBuffers(TracingSessionID tsid,
+                              ConsumerEndpointImpl* consumer) {
   PERFETTO_DLOG("Reading buffers for session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
@@ -244,7 +252,7 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer,
   // rather than leveraging the SharedMemoryABI (which is intended only for the
   // Producer <> Service SMB and not for the TraceBuffer itself).
   auto weak_consumer = consumer->GetWeakPtr();
-  for (size_t buf_idx = 0; buf_idx > tracing_session->num_trace_buffers;
+  for (size_t buf_idx = 0; buf_idx < tracing_session->num_trace_buffers;
        buf_idx++) {
     TraceBuffer& tbuf = tracing_session->trace_buffers[buf_idx];
     SharedMemoryABI& abi = *tbuf.abi;
@@ -320,7 +328,9 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
   DisableTracing(tsid);
   for (const auto& kv : tracing_session->buffers_index)
     buffer_ids_.Free(kv.first);
+  tracing_session->buffers_index.clear();
   tracing_session->trace_buffers.reset();
+  tracing_session->num_trace_buffers = 0;
   tracing_sessions_.erase(tsid);
 }
 
@@ -340,13 +350,11 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
   if (tracing_sessions_.empty())
     return;
 
-  auto producer_iter = producers_.find(producer_id);
-  if (producer_iter == producers_.end()) {
+  ProducerEndpointImpl* producer = GetProducer(producer_id);
+  if (!producer) {
     PERFETTO_DCHECK(false);
     return;
   }
-
-  ProducerEndpointImpl* producer = producer_iter->second;
 
   for (auto& iter : tracing_sessions_) {
     TracingSession& tracing_session = iter.second;
@@ -366,23 +374,30 @@ void ServiceImpl::CreateDataSourceInstanceForProducer(
   // TODO(primiano): match against |producer_name_filter| and add tests
   // for registration ordering (data sources vs consumers).
 
-  // Translate the locally scoped (i.e. per TraceConfig) buffer index provided
-  // by the consumer into a global BufferID for the Producer.
+  // Create a copy of the DataSourceConfig specified in the trace config. This
+  // will be passed to the producer after translating the |target_buffer| id.
+  // The |target_buffer| parameter passed by the consumer in the trace config is
+  // relative to the buffers declared in the same trace config. This has to be
+  // translated to the global BufferID before passing it to the producers, which
+  // don't know anything about tracing sessions and consumers.
+
   DataSourceConfig ds_config = cfg_data_source.config();  // Deliberate copy.
-  auto local_buffer_id = ds_config.target_buffer();
-  if (local_buffer_id >= tracing_session->num_trace_buffers) {
-    PERFETTO_ELOG(
+  auto relative_buffer_id = ds_config.target_buffer();
+  if (relative_buffer_id >= tracing_session->num_trace_buffers) {
+    PERFETTO_LOG(
         "The TraceConfig for DataSource %s specified a traget_buffer out of "
         "bound (%d). Skipping it.",
-        ds_config.name().c_str(), local_buffer_id);
+        ds_config.name().c_str(), relative_buffer_id);
     return;
   }
-  BufferID global_id = tracing_session->trace_buffers[local_buffer_id].id;
+  BufferID global_id = tracing_session->trace_buffers[relative_buffer_id].id;
   PERFETTO_DCHECK(global_id);
   ds_config.set_target_buffer(global_id);
 
   DataSourceInstanceID inst_id = ++last_data_source_instance_id_;
   tracing_session->data_source_instances.emplace(producer->id_, inst_id);
+  PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
+                ds_config.name().c_str(), global_id);
   producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
 }
 
@@ -416,13 +431,14 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
     return;
   }
 
-  PERFETTO_DCHECK(size == TraceBuffer::kBufferPageSize);
+  PERFETTO_DCHECK(size == kBufferPageSize);
   uint8_t* dst = tbuf->get_next_page();
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
   // a file descriptor (just use SharedMemory without sharing it).
-  PERFETTO_DLOG("Copying page %p from producer %" PRIu64,
-                reinterpret_cast<const void*>(src), producer_id);
+  PERFETTO_DLOG("Copying page %p from producer %" PRIu64
+                " into buffer %" PRIu16,
+                reinterpret_cast<const void*>(src), producer_id, target_buffer);
   memcpy(dst, src, size);
 }
 
@@ -459,7 +475,7 @@ void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
 
 void ServiceImpl::ConsumerEndpointImpl::ReadBuffers() {
   if (tracing_session_id_)
-    service_->ReadBuffers(this, tracing_session_id_);
+    service_->ReadBuffers(tracing_session_id_, this);
 }
 
 void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
@@ -489,7 +505,7 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       shared_memory_(std::move(shared_memory)),
       shmem_abi_(reinterpret_cast<uint8_t*>(shared_memory_->start()),
                  shared_memory_->size(),
-                 kPageSize) {
+                 kSystemPageSize) {
   // TODO(primiano): make the page-size for the SHM dynamic and find a way to
   // communicate that to the Producer (add a field to the
   // InitializeConnectionResponse IPC).
