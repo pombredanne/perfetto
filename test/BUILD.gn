@@ -51,8 +51,8 @@ source_set("fake_producer") {
   ]
   deps = [
     "../gn:default_deps",
-    "../gn:gtest_deps",
     "../protos:zero",
+    "../src/base:test_support",
   ]
   sources = [
     "fake_producer.cc",
