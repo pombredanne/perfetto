@@ -86,16 +86,16 @@ class MFE : public MultiFileErrorCollector {
                         int line,
                         int column,
                         const std::string& message) {
-    printf("Error %s %d:%d: %s", filename.c_str(), line, column,
-           message.c_str());
+    PERFETTO_ELOG("Error %s %d:%d: %s", filename.c_str(), line, column,
+                  message.c_str());
   }
 
   virtual void AddWarning(const std::string& filename,
                           int line,
                           int column,
                           const std::string& message) {
-    printf("Error %s %d:%d: %s", filename.c_str(), line, column,
-           message.c_str());
+    PERFETTO_ELOG("Error %s %d:%d: %s", filename.c_str(), line, column,
+                  message.c_str());
   }
 };
 
@@ -121,11 +121,11 @@ const char* GetFlag(int32_t state) {
 }
 
 uint64_t TimestampToSeconds(uint64_t timestamp) {
-  return timestamp / 1000000000;
+  return timestamp / 1000000000ul;
 }
 
 uint64_t TimestampToMicroseconds(uint64_t timestamp) {
-  return (timestamp / 1000) % 1000000;
+  return (timestamp / 1000) % 1000000ul;
 }
 
 std::string FormatSchedSwitch(uint64_t timestamp,
@@ -153,6 +153,8 @@ std::string FormatPrint(uint64_t timestamp,
   uint64_t seconds = TimestampToSeconds(timestamp);
   uint64_t useconds = TimestampToMicroseconds(timestamp);
   std::string msg = print.buf();
+  // Remove any newlines in the message. It's not entirely clear what the right
+  // behaviour is here. Maybe we should escape them instead?
   msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
   sprintf(line,
           "<idle>-0     (-----) [%03" PRIu64 "] d..3 %" PRIu64 ".%.6" PRIu64
@@ -183,8 +185,6 @@ int TraceToText(std::istream* input, std::ostream* output) {
 }
 
 int TraceToSystrace(std::istream* input, std::ostream* output) {
-  printf("%s", kTraceHeader);
-  printf("%s", kFtraceHeader);
   std::multimap<uint64_t, std::string> sorted;
 
   std::string raw;
@@ -215,10 +215,13 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
     }
   }
 
-  for (auto it = sorted.begin(); it != sorted.end(); it++)
-    printf("%s", it->second.c_str());
+  *output << kTraceHeader;
+  *output << kFtraceHeader;
 
-  printf("%s", kTraceFooter);
+  for (auto it = sorted.begin(); it != sorted.end(); it++)
+    *output << it->second;
+
+  *output << kTraceFooter;
 
   return 0;
 }
@@ -229,7 +232,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
 namespace {
 
 int Usage(int argc, char** argv) {
-  printf("Usage: %s [systrace|text]\n", argv[0]);
+  printf("Usage: %s [systrace|text] < trace.proto > trace.txt\n", argv[0]);
   return 1;
 }
 

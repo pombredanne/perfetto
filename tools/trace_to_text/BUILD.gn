@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO: Make this a host toolchain exe.
+# TODO: Make this a host toolchain exe (seems to be some weird bug with the
+# proto headers).
 executable("trace_to_text") {
   testonly = true
   deps = [
