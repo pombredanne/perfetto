@@ -4,24 +4,27 @@ In order to run Perfetto and get a meaningful trace you need to build
 (see [build instructions](build_instructions.md)) and run the following:
 
 `traced`: The unprivileged trace daemon that owns the log buffers and maintains
-a registry of Producer and Consumers connected.
+a registry of Producers and Consumers connected.
 
 `traced_probes`: The privileged daemon that has access to the Kernel tracefs
 (typically mounted under `/sys/kernel/debug/tracing`), can drive
-[Ftrace](https://source.android.com/devices/tech/debug/ftrace) and write its
+[Ftrace](https://source.android.com/devices/tech/debug/ftrace) and writes its
 output into `traced`.
 
 `perfetto`: A command line utility client that drive the trace and save back
 the results (either to a file or to [Android's Dropbox][dropbox])
 
-Temporarily (TODO remove this after fixing SELinux policies):
-`$ adb root && adb shell setenforce 0`
 
-Instructions:
-`$ adb shell su root start traced`
-`$ adb shell su root start traced_probes`
+## Instructions:
+```
+# TODO(primiano): this is temporary until we fix SELinux policies.
+adb shell su root setenforce 0
 
-If this works you should see something like:
+adb shell su root start traced
+adb shell su root start traced_probes
+```
+
+If this works you will see something like:
 
 ```
 $ adb logcat -s perfetto
@@ -32,10 +35,15 @@ perfetto: ftrace_producer.cc:32 Connected to the service
 
 At which point you can grab a trace by doing:
 
-`$ adb shell perfetto --config :test --out /data/local/tmp/trace`
-or
-`$ adb shell perfetto --config :test --dropbox perfetto`
-to save it to [Android's Dropbox][dropbox]
+```
+$ adb shell perfetto --config :test --out /data/local/tmp/trace
+```
+
+or to save it to [Android's Dropbox][dropbox]:
+
+```
+$ adb shell perfetto --config :test --dropbox perfetto
+```
 
 `--config :test` uses a hard-coded test trace config. It is possible to pass
 an arbitrary trace config by doing the following:

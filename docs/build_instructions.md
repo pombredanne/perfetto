@@ -10,14 +10,19 @@ All dependent libraries are self-hosted and pulled by the
 `tools/install-build-deps` script.  
 The only requirements on the host are
 python and git:  
-`$ sudo apt-get update && sudo apt-get install git python`
+
+```
+$ sudo apt-get update && sudo apt-get install git python
+```
 
 
 # Standalone checkout
 
 Get the code
 ------------
-`$ git clone https://android.googlesource.com/platform/external/perfetto.git`
+```
+$ git clone https://android.googlesource.com/platform/external/perfetto.git
+```
 
 Build
 -----
@@ -27,13 +32,17 @@ the `tools/` prefix below and just use gn/ninja from depot_tools.
 `$ tools/install-build-deps` to install third-party build deps (NDK etc)
 
 `$ tools/gn args out/android` to generate build files and enter in the editor:
+
 ```
 target_os = "android"          # Leave empty for local testing
 target_cpu = "arm" or "arm64"  # Only when building for Android
 ```
+
 (See the [Build Configurations](#build-configurations) section below for more)
 
-`$ tools/ninja -C out/android all`
+```
+$ tools/ninja -C out/android all
+```
 
 This will generate artifacts under `out/android`.
 
