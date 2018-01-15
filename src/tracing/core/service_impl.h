@@ -230,7 +230,7 @@ class ServiceImpl : public Service {
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
   std::map<BufferID, TraceBuffer> buffers_;
 
-  base::WeakPtrFactory<ServiceImpl> weak_ptr_factory_;  // Keep last.
+  base::WeakPtrFactory<ServiceImpl> weak_ptr_factory_;  // Keep at the end.
 };
 
 }  // namespace perfetto

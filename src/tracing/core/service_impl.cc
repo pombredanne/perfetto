@@ -45,7 +45,7 @@ namespace {
 constexpr size_t kSystemPageSize = 4096;
 constexpr size_t kDefaultShmSize = kSystemPageSize * 16;  // 64 KB.
 constexpr size_t kMaxShmSize = kSystemPageSize * 1024;    // 4 MB.
-constexpr int kMaxBuffersPerConsumer = 32;
+constexpr int kMaxBuffersPerConsumer = 128;
 }  // namespace
 
 // static
@@ -119,7 +119,8 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   PERFETTO_DLOG("Consumer %p disconnected", reinterpret_cast<void*>(consumer));
   PERFETTO_DCHECK(consumers_.count(consumer));
 
-  // TODO(primiano) : Check that there are no other uses after this.
+  // TODO(primiano) : Check that this is safe (what happens if there are
+  // ReadBuffers() calls posted in the meantime? They need to become noop).
   if (consumer->tracing_session_id_)
     FreeBuffers(consumer->tracing_session_id_);  // Will also DisableTracing().
   consumers_.erase(consumer);
@@ -472,18 +473,27 @@ void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg) {
 }
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
-  if (tracing_session_id_)
+  if (tracing_session_id_) {
     service_->DisableTracing(tracing_session_id_);
+  } else {
+    PERFETTO_LOG("Consumer called DisableTracing() but tracing was not active");
+  }
 }
 
 void ServiceImpl::ConsumerEndpointImpl::ReadBuffers() {
-  if (tracing_session_id_)
+  if (tracing_session_id_) {
     service_->ReadBuffers(tracing_session_id_, this);
+  } else {
+    PERFETTO_LOG("Consumer called ReadBuffers() but tracing was not active");
+  }
 }
 
 void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
-  if (tracing_session_id_)
+  if (tracing_session_id_) {
     service_->FreeBuffers(tracing_session_id_);
+  } else {
+    PERFETTO_LOG("Consumer called FreeBuffers() but tracing was not active");
+  }
 }
 
 base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>
