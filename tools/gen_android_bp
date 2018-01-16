@@ -40,6 +40,7 @@ default_targets = [
     '//:perfetto_integrationtests',
     '//:perfetto_unittests',
     '//:perfetto',
+    '//:perfetto_protos_lite',
     '//:traced',
     '//:traced_probes',
 ]
