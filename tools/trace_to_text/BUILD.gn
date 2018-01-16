@@ -12,38 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build_overrides/build.gni")
-
-# TODO(primiano): Remove the |build_with_chromium| condition. The Chrome
-# proto_library.gni must be fixed as well though (rebase proto_sources on
-# root_build_dir rather than root_out_dir in proto_library.gni).
-if (!build_with_chromium) {
-  if (current_toolchain == host_toolchain) {
-    executable("trace_to_text_host") {
-      testonly = true
-      deps = [
-        "../../gn:default_deps",
-        "../../protos:lite",
-        "//buildtools:protobuf_full",
-      ]
-      sources = [
-        "main.cc",
-      ]
-    }
-  }
-
-  copy("trace_to_text") {
+if (current_toolchain == host_toolchain) {
+  executable("trace_to_text_host") {
     testonly = true
-    host_out_dir_ =
-        get_label_info(":trace_to_text_host($host_toolchain)", "root_out_dir")
     deps = [
-      ":trace_to_text_host($host_toolchain)",
+      "../../gn:default_deps",
+      "../../gn:protobuf_full_deps",
+      "../../protos:lite",
     ]
     sources = [
-      "${host_out_dir_}/trace_to_text_host",
-    ]
-    outputs = [
-      "${root_out_dir}/trace_to_text",
+      "main.cc",
     ]
   }
+}
+
+copy("trace_to_text") {
+  testonly = true
+  host_out_dir_ =
+      get_label_info(":trace_to_text_host($host_toolchain)", "root_out_dir")
+  deps = [
+    ":trace_to_text_host($host_toolchain)",
+  ]
+  sources = [
+    "${host_out_dir_}/trace_to_text_host",
+  ]
+  outputs = [
+    "${root_out_dir}/trace_to_text",
+  ]
 }

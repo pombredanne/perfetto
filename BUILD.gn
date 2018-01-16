@@ -30,6 +30,7 @@ group("all") {
     "src/protozero/protoc_plugin($host_toolchain)",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
+    "tools/trace_to_text",
   ]
   if (!build_with_chromium) {
     deps += [
@@ -38,7 +39,6 @@ group("all") {
       ":traced",
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
-      "tools/trace_to_text",
     ]
   }
 }
