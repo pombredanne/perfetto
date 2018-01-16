@@ -12,50 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("//build_overrides/build.gni")
+
 source_set("end_to_end_integrationtests") {
   testonly = true
   deps = [
-    ":fake_consumer",
     "../gn:default_deps",
     "../gn:gtest_deps",
+    "../protos:lite",
+    "../src/base:base",
+    "../src/base:test_support",
     "../src/traced/probes:ftrace_producer",
     "../src/tracing:ipc",
   ]
   sources = [
     "end_to_end_integrationtest.cc",
-  ]
-}
-
-source_set("fake_consumer") {
-  testonly = true
-  public_deps = [
-    "../include/perfetto/tracing/core",
-    "../protos:lite",
-  ]
-  deps = [
-    "../gn:default_deps",
-    "../gn:gtest_deps",
-    "../protos:zero",
-    "../src/base:test_support",
-  ]
-  sources = [
     "fake_consumer.cc",
     "fake_consumer.h",
-  ]
-}
-
-source_set("fake_producer") {
-  testonly = true
-  public_deps = [
-    "../include/perfetto/tracing/core",
-  ]
-  deps = [
-    "../gn:default_deps",
-    "../protos:zero",
-    "../src/base:test_support",
-  ]
-  sources = [
     "fake_producer.cc",
     "fake_producer.h",
   ]
+  if (is_android && !build_with_chromium) {
+    deps += [ "../src/base:android_task_runner" ]
+  }
 }

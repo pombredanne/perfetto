@@ -31,9 +31,9 @@ namespace perfetto {
 FakeConsumer::FakeConsumer(
     const TraceConfig& trace_config,
     std::function<void(std::vector<TracePacket>, bool)> packet_callback,
-    base::TestTaskRunner* task_runner)
+    base::TaskRunner* task_runner)
     : trace_config_(trace_config),
-      packet_callback_(packet_callback),
+      packet_callback_(std::move(packet_callback)),
       task_runner_(task_runner) {}
 FakeConsumer::~FakeConsumer() = default;
 
@@ -45,7 +45,7 @@ void FakeConsumer::Connect() {
 void FakeConsumer::OnConnect() {
   endpoint_->EnableTracing(trace_config_);
   task_runner_->PostDelayedTask(std::bind([this]() {
-                                  endpoint_->DisableTracing();
+                                  // endpoint_->DisableTracing();
                                   endpoint_->ReadBuffers();
                                 }),
                                 trace_config_.duration_ms());

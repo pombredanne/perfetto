@@ -142,6 +142,9 @@ if (!build_with_chromium) {
       # TODO(lalitm): add this back when we use lite runtime.
       # "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+    }
   }
 } else {
   group("lib") {

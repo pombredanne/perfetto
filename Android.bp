@@ -134,6 +134,7 @@ cc_test {
     ":perfetto_protos_tracing_service_tracing_service_gen",
     ":perfetto_protos_zero_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
+    "src/base/android_task_runner.cc",
     "src/base/page_allocator.cc",
     "src/base/test/test_task_runner.cc",
     "src/base/test/vm_test_utils.cc",
@@ -169,8 +170,10 @@ cc_test {
     "src/tracing/core/trace_writer_impl.cc",
     "test/end_to_end_integrationtest.cc",
     "test/fake_consumer.cc",
+    "test/fake_producer.cc",
   ],
   shared_libs: [
+    "libandroid",
     "liblog",
     "libprotobuf-cpp-lite",
   ],
@@ -190,6 +193,9 @@ cc_test {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
