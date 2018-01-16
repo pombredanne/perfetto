@@ -42,10 +42,10 @@ class FakeConsumer : public Consumer {
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
  private:
-  TraceConfig trace_config_;
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
-  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
-  base::TaskRunner* task_runner_;
+  std::unique_ptr<Service::ConsumerEndpoint> endpoint_ = nullptr;
+  const TraceConfig trace_config_;
+  const base::TaskRunner* task_runner_;
 };
 
 }  // namespace perfetto

@@ -37,8 +37,8 @@ class FakeProducer : public Producer {
   void Shutdown();
 
   std::string name_;
-  DataSourceID id_;
-  std::unique_ptr<Service::ProducerEndpoint> endpoint_;
+  DataSourceID id_ = 0;
+  std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
 };
 
 }  // namespace perfetto
