@@ -22,19 +22,15 @@ LOCAL_COMPATIBILITY_SUITE := cts vts general-tests
 # Don't include this package in any target
 LOCAL_MODULE_TAGS := tests
 
-# When built, explicitly put it in the data partition.
-LOCAL_MODULE_PATH := $(TARGET_OUT_DATA_APPS)
-
-LOCAL_DEX_PREOPT := false
 LOCAL_MULTILIB := both
-LOCAL_PROGUARD_ENABLED := disabled
 
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
 LOCAL_PACKAGE_NAME := CtsPerfettoProducerApp
 
 LOCAL_JNI_SHARED_LIBRARIES := \
-    libperfettoctsproducer_jni
+    libperfettoctsproducer_jni \
+    libnativehelper_compat_libc++
 
 include $(BUILD_PACKAGE)
 

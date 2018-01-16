@@ -10,7 +10,6 @@ cc_test {
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
-    "src/ftrace_reader/ftrace_to_proto.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/traced/probes/ftrace_producer.cc",
     "test/fake_consumer.cc",
@@ -42,6 +41,9 @@ cc_test {
         suffix: "64",
     },
   },
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
 }
 
 cc_library_shared {
@@ -53,13 +55,17 @@ cc_library_shared {
     "test/cts/producer/jni/fake_producer_jni.cc",
   ],
   static_libs: [
-    "perfetto_src_tracing_ipc"
+    "perfetto_src_tracing_ipc",
+    "libprotobuf-cpp-lite",
   ],
   shared_libs: [
     "libandroid",
     "liblog",
-    "libprotobuf-cpp-lite",
+    "libnativehelper_compat_libc++",
   ],
   compile_multilib: "both",
   stl: "libc++_static",
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
 }
