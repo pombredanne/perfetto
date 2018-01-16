@@ -28,18 +28,18 @@ namespace perfetto {
 
 class PerfettoCtsTest : public ::testing::Test {
  protected:
-  void TestMockProducer(const std::string& producer_name, uint64_t buffer) {
+  void TestMockProducer(const std::string& producer_name) {
     base::TestTaskRunner task_runner;
     auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
     // Setup the trace config.
     TraceConfig trace_config;
     trace_config.add_buffers()->set_size_kb(4096 * 10);
-    trace_config.set_duration_ms(1000);
+    trace_config.set_duration_ms(200);
 
     auto* ds_config = trace_config.add_data_sources()->mutable_config();
     ds_config->set_name(producer_name);
-    ds_config->set_target_buffer(buffer);
+    ds_config->set_target_buffer(0);
     ds_config->set_trace_category_filters("foo,bar");
 
     // Setip the function.
@@ -73,15 +73,15 @@ class PerfettoCtsTest : public ::testing::Test {
 };
 
 TEST_F(PerfettoCtsTest, TestProducerActivity) {
-  TestMockProducer("android.perfetto.cts.ProducerActivity", 2);
+  TestMockProducer("android.perfetto.cts.ProducerActivity");
 }
 
 TEST_F(PerfettoCtsTest, TestProducerService) {
-  TestMockProducer("android.perfetto.cts.ProducerService", 3);
+  TestMockProducer("android.perfetto.cts.ProducerService");
 }
 
 TEST_F(PerfettoCtsTest, TestProducerIsolatedService) {
-  TestMockProducer("android.perfetto.cts.ProducerIsolatedService", 4);
+  TestMockProducer("android.perfetto.cts.ProducerIsolatedService");
 }
 
 }  // namespace perfetto
