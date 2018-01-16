@@ -45,7 +45,7 @@ class FakeConsumer : public Consumer {
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
   std::unique_ptr<Service::ConsumerEndpoint> endpoint_ = nullptr;
   const TraceConfig trace_config_;
-  const base::TaskRunner* task_runner_;
+  base::TaskRunner* const task_runner_;
 };
 
 }  // namespace perfetto

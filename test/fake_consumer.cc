@@ -32,8 +32,8 @@ FakeConsumer::FakeConsumer(
     const TraceConfig& trace_config,
     std::function<void(std::vector<TracePacket>, bool)> packet_callback,
     base::TaskRunner* task_runner)
-    : trace_config_(trace_config),
-      packet_callback_(std::move(packet_callback)),
+    : packet_callback_(std::move(packet_callback)),
+      trace_config_(trace_config),
       task_runner_(task_runner) {}
 FakeConsumer::~FakeConsumer() = default;
 

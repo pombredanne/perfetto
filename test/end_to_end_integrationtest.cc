@@ -178,7 +178,7 @@ TEST_F(PerfettoTest, TestFtraceProducer) {
   *ftrace_config->add_event_names() = "bar";
 
   // Create the function to handle packets as they come in.
-  uint64_t total = 0;
+  long total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
     if (has_more) {
