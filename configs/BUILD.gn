@@ -23,6 +23,7 @@ action_foreach("configs") {
   ]
 
   sources = [
+    "atrace.cfg",
     "ftrace.cfg",
   ]
 
