@@ -3,11 +3,11 @@
 	dh $@
 
 override_dh_auto_configure:
-	tools/install-build-deps
-	tools/gn gen out/release
+	tools/install-build-deps --no-android
+	tools/gn gen out/release --args="is_debug=false"
 
 override_dh_auto_build:
 	tools/ninja -C out/release
 
 override_dh_auto_clean:
-	tools/ninja -C out/release -t clean
+	tools/gn clean out/release
