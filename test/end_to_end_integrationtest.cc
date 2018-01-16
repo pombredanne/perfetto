@@ -99,6 +99,8 @@ class PerfettoTest : public ::testing::Test {
       service_thread_.join();
     });
 #else
+    // Handle unused variables.
+    // TODO(lalitm): find a less hacky way to do this.
     (void)service_runner_;
     return ChildThreadHandle([]() {});
 #endif
@@ -139,6 +141,8 @@ class PerfettoTest : public ::testing::Test {
       producer_thread_.join();
     });
 #else
+    // Handle unused variables.
+    // TODO(lalitm): find a less hacky way to do this.
     (void)producer_runner_;
     return ChildThreadHandle([]() {});
 #endif
