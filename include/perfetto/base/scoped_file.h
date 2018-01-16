@@ -19,6 +19,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include <string>
@@ -52,6 +53,11 @@ class ScopedResource {
     }
     t_ = r;
   }
+  T release() {
+    T t = t_;
+    t_ = InvalidValue;
+    return t;
+  }
   ~ScopedResource() { reset(InvalidValue); }
 
  private:
@@ -68,6 +74,7 @@ inline static ScopedFile OpenFile(const std::string& path, int flags) {
   return fd;
 }
 
+using ScopedFstream = ScopedResource<FILE*, fclose, nullptr>;
 using ScopedDir = ScopedResource<DIR*, closedir, nullptr>;
 
 }  // namespace base
