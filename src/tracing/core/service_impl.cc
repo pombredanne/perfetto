@@ -159,7 +159,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   ts.buffers_index.reserve(cfg.buffers_size());
   for (int i = 0; i < cfg.buffers_size(); i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
-    BufferID global_id = static_cast<BufferID>(buffer_ids_.Allocate());
+    BufferID global_id = buffer_ids_.Allocate();
     if (!global_id) {
       did_allocate_all_buffers = false;  // We ran out of indexes.
       break;

@@ -162,7 +162,7 @@ std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
   WriterID id;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
-    id = static_cast<WriterID>(active_writer_ids_.Allocate());
+    id = active_writer_ids_.Allocate();
   }
   return std::unique_ptr<TraceWriter>(
       id ? new TraceWriterImpl(this, id, target_buffer) : nullptr);
