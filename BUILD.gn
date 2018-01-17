@@ -40,7 +40,7 @@ group("all") {
       ":traced",
       ":traced_probes",
 
-      # TODO(lalitm): remove this when we use lite runtime.
+      # TODO(lalitm): remove this when we can run ftrace on travis.
       "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
@@ -69,6 +69,20 @@ if (!build_with_chromium) {
       "gn:default_deps",
       "src/tracing:tracing_benchmarks",
     ]
+  }
+
+  executable("perfetto_integrationtests") {
+    testonly = true
+    deps = [
+      "gn:default_deps",
+      "test:end_to_end_integrationtests",
+
+      # TODO(lalitm): add this back when we can run ftrace on travis.
+      # "src/ftrace_reader:ftrace_reader_integrationtests",
+    ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+    }
   }
 
   # Used by Android's statsd in /frameworks/base/cmds.
@@ -138,22 +152,6 @@ if (!build_with_chromium) {
     sources = [
       "src/traced/perfetto_cmd/main.cc",
     ]
-  }
-
-  # These tests require access to a real ftrace implementation and must
-  # run with sudo.
-  executable("perfetto_integrationtests") {
-    testonly = true
-    deps = [
-      "gn:default_deps",
-      "test:end_to_end_integrationtests",
-
-      # TODO(lalitm): add this back when we use lite runtime.
-      # "src/ftrace_reader:ftrace_reader_integrationtests",
-    ]
-    if (build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-    }
   }
 } else {
   group("lib") {

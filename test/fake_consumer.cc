@@ -45,7 +45,7 @@ void FakeConsumer::Connect() {
 void FakeConsumer::OnConnect() {
   endpoint_->EnableTracing(trace_config_);
   task_runner_->PostDelayedTask(std::bind([this]() {
-                                  // endpoint_->DisableTracing();
+                                  endpoint_->DisableTracing();
                                   endpoint_->ReadBuffers();
                                 }),
                                 trace_config_.duration_ms());

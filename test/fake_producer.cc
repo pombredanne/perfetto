@@ -49,8 +49,9 @@ void FakeProducer::OnDisconnect() {
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  const std::string& categories = source_config.trace_category_filters();
-  if (categories != "foo,bar") {
+  // If we don't receive the expected categories, simply shut down so that
+  // tests fail.
+  if (source_config.trace_category_filters() != "foo,bar") {
     Shutdown();
     return;
   }
