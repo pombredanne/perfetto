@@ -17,6 +17,7 @@
 #include "proto_translation_table.h"
 
 #include <regex.h>
+
 #include <algorithm>
 
 #include "event_info.h"
@@ -106,20 +107,19 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
 }
 
 std::string RegexError(int errcode, const regex_t* preg) {
-  size_t size = regerror(errcode, preg, nullptr, 0);
-  std::vector<char> alloced_buf(size);
-  regerror(errcode, preg, alloced_buf.data(), size);
-  return {alloced_buf.data(), alloced_buf.size()};
+  constexpr size_t kBufsize = 64;
+  char buf[kBufsize];
+  regerror(errcode, preg, buf, kBufsize);
+  return {buf, kBufsize};
 }
 
 bool Match(const char* string, const char* pattern) {
   regex_t re;
   int ret = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB);
-  // TODO(fmayer): Add << to PERFETTO_CHECK to simplify this?
   if (ret != 0) {
     PERFETTO_FATAL("regcomp: %s", RegexError(ret, &re).c_str());
   }
-  ret = regexec(&re, string, (size_t)0, NULL, 0);
+  ret = regexec(&re, string, 0, nullptr, 0);
   regfree(&re);
   return ret != REG_NOMATCH;
 }
