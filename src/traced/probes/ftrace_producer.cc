@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "traced/probes/ftrace_producer.h"
+#include "src/traced/probes/ftrace_producer.h"
 
 #include <stdio.h>
 #include <string>
