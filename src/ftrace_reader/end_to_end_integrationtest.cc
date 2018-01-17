@@ -161,7 +161,6 @@ TEST_F(EndToEndIntegrationTest, Atrace) {
   EXPECT_THAT(output.after(), HasSubstr("after"));
 
   std::string output_as_text;
-  google::protobuf::TextFormat::PrintToString(output, &output_as_text);
   printf("%s\n", output_as_text.c_str());
 }
 #endif  // defined(ANDROID)
