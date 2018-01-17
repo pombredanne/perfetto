@@ -47,7 +47,7 @@ class FtraceProducer : public Producer {
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    SinkDelegate(std::unique_ptr<TraceWriter> writer);
+    explicit SinkDelegate(std::unique_ptr<TraceWriter> writer);
     ~SinkDelegate() override;
 
     // FtraceDelegateImpl
