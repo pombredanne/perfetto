@@ -52,6 +52,7 @@ executable("perfetto_tests") {
     "src/ipc:perfetto_ipc_unittests",
     "src/protozero:protozero_unittests",
     "src/tracing:tracing_unittests",
+    "tools/ftrace_proto_gen:ftrace_proto_gen_unittests",
   ]
   if (!build_with_chromium) {
     deps += [ "tools/sanitizers_unittests" ]
@@ -67,6 +68,16 @@ if (!build_with_chromium) {
     ]
   }
 
+  if (build_with_android) {
+    # Used by Android's statsd in /frameworks/base/cmds.
+    static_library("perfetto_protos_lite") {
+      deps = [
+        "gn:default_deps",
+        "protos:lite",
+      ]
+    }
+  }
+
   if (monolithic_binaries) {
     libtraced_shared_target_type = "source_set"
   } else {
@@ -76,19 +87,9 @@ if (!build_with_chromium) {
   target(libtraced_shared_target_type, "libtraced_shared") {
     deps = [
       "gn:default_deps",
-      "src/traced/perfetto_cmd",
       "src/traced/probes",
       "src/traced/service",
     ]
-    if (build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-      deps += [ "src/base:android_task_runner" ]
-      libs = [
-        "binder",
-        "services",
-        "utils",
-      ]
-    }
   }
 
   # The unprivileged trace daemon that listens for Producer and Consumer
@@ -120,12 +121,21 @@ if (!build_with_chromium) {
   # tracing, acting as a Consumer.
   executable("perfetto") {
     deps = [
-      ":libtraced_shared",
       "gn:default_deps",
+      "src/traced/perfetto_cmd",
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
     ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+      deps += [ "src/base:android_task_runner" ]
+      libs = [
+        "binder",
+        "services",
+        "utils",
+      ]
+    }
   }
 } else {
   group("lib") {
