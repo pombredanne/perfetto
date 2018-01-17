@@ -63,7 +63,7 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
   // methods to the remote Producer on the other side of the IPC channel.
   class RemoteProducer : public Producer {
    public:
-    RemoteProducer();
+    RemoteProducer(uid_t uid);
     ~RemoteProducer() override;
 
     // These methods are called by the |core_service_| business logic. There is
@@ -73,6 +73,7 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&) override;
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
+    uid_t uid() override;
 
     // RegisterDataSource requests that haven't been replied yet.
     std::map<std::string, DeferredRegisterDataSourceResponse>
@@ -87,6 +88,9 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
     // to send asynchronous commands to the remote Producer (e.g. start/stop a
     // data source).
     DeferredGetAsyncCommandResponse async_producer_commands;
+
+   private:
+    uid_t uid_;
   };
 
   ProducerIPCService(const ProducerIPCService&) = delete;

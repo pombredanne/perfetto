@@ -51,7 +51,8 @@ ProducerIPCService::GetProducerForCurrentRequest() {
 void ProducerIPCService::InitializeConnection(
     const InitializeConnectionRequest& req,
     DeferredInitializeConnectionResponse response) {
-  const ipc::ClientID ipc_client_id = ipc::Service::client_info().client_id();
+  const auto& client_info = ipc::Service::client_info();
+  const ipc::ClientID ipc_client_id = client_info.client_id();
   PERFETTO_CHECK(ipc_client_id);
 
   if (producers_.count(ipc_client_id) > 0) {
@@ -61,7 +62,8 @@ void ProducerIPCService::InitializeConnection(
   }
 
   // Create a new entry.
-  std::unique_ptr<RemoteProducer> producer(new RemoteProducer());
+  std::unique_ptr<RemoteProducer> producer(
+      new RemoteProducer(client_info.uid()));
 
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
@@ -205,7 +207,7 @@ void ProducerIPCService::GetAsyncCommand(
 // RemoteProducer methods
 ////////////////////////////////////////////////////////////////////////////////
 
-ProducerIPCService::RemoteProducer::RemoteProducer() = default;
+ProducerIPCService::RemoteProducer::RemoteProducer(uid_t uid) : uid_(uid) {}
 ProducerIPCService::RemoteProducer::~RemoteProducer() = default;
 
 // Invoked by the |core_service_| business logic after the ConnectProducer()
@@ -247,6 +249,10 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
   cmd.set_has_more(true);
   cmd->mutable_stop_data_source()->set_instance_id(dsid);
   async_producer_commands.Resolve(std::move(cmd));
+}
+
+uid_t ProducerIPCService::RemoteProducer::uid() {
+  return uid_;
 }
 
 }  // namespace perfetto

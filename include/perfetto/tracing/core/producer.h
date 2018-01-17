@@ -17,6 +17,8 @@
 #ifndef INCLUDE_PERFETTO_TRACING_CORE_PRODUCER_H_
 #define INCLUDE_PERFETTO_TRACING_CORE_PRODUCER_H_
 
+#include <unistd.h>
+
 #include "perfetto/tracing/core/basic_types.h"
 
 namespace perfetto {
@@ -75,6 +77,10 @@ class Producer {
 
   // Called by the Service to shut down an existing data source instance.
   virtual void TearDownDataSourceInstance(DataSourceInstanceID) = 0;
+
+  // Returns the UID of the producer process or -1 if one isn't available (e.g.,
+  // the producer is in-process).
+  virtual uid_t uid() = 0;
 };
 
 }  // namespace perfetto

@@ -53,7 +53,11 @@
 // from this process.
 namespace perfetto {
 namespace {
+#if BUILDFLAG(OS_ANDROID)
 const char kTempTraceDir[] = "/data/misc/perfetto-traces";
+#else
+const char kTempTraceDir[] = "/tmp";
+#endif
 const char kDefaultDropBoxTag[] = "perfetto";
 }  // namespace
 

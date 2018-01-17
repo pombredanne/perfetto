@@ -169,6 +169,7 @@ class ServiceImpl : public Service {
 
     size_t size;
     size_t cur_page = 0;  // Write pointer in the ring buffer.
+    uid_t uid = -1;
     base::PageAllocator::UniquePtr data;
 
     // TODO(primiano): The TraceBuffer is not shared and there is no reason to

@@ -264,6 +264,7 @@ void ServiceImpl::ReadBuffers(ConsumerEndpointImpl* consumer) {
           if (!skip) {
             packets->emplace_back();
             packets->back().AddChunk(Chunk(ptr, pack_size));
+            packets->back().set_uid(tbuf.uid);
           }
           ptr += pack_size;
         }  // for(packet)
@@ -366,6 +367,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   }
 
   PERFETTO_DCHECK(size == TraceBuffer::kBufferPageSize);
+  tbuf->uid = GetProducer(producer_id)->producer()->uid();
   uint8_t* dst = tbuf->get_next_page();
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself

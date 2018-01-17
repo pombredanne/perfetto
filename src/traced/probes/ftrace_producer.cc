@@ -77,6 +77,10 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
+uid_t FtraceProducer::uid() {
+  return -1;
+}
+
 void FtraceProducer::Run() {
   base::UnixTaskRunner task_runner;
   ftrace_ = FtraceController::Create(&task_runner);
