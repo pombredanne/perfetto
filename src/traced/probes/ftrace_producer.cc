@@ -1,4 +1,4 @@
-#include "ftrace_producer.h"
+#include "perfetto/traced/probes/ftrace_producer.h"
 
 #include <stdio.h>
 
