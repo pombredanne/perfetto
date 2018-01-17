@@ -117,7 +117,7 @@ bool Match(const char* string, const char* pattern) {
   int ret = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB);
   // TODO(fmayer): Add << to PERFETTO_CHECK to simplify this?
   if (ret != 0) {
-    PERFETTO_FATAL(RegexError(ret, &re).c_str());
+    PERFETTO_FATAL("regcomp: %s", RegexError(ret, &re).c_str());
   }
   ret = regexec(&re, string, (size_t)0, NULL, 0);
   regfree(&re);
