@@ -228,7 +228,8 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   header_printer.Print("#include <vector>\n");
   header_printer.Print("#include <string>\n");
   header_printer.Print("#include <type_traits>\n");
-  header_printer.Print("#include \"perfetto/base/build_config.h\"\n\n");
+  header_printer.Print("\n");
+  header_printer.Print("#include \"perfetto/base/build_config.h\"\n");
 
   cpp_printer.Print(kHeader, "f", __FILE__, "p", src_proto);
   cpp_printer.Print("#include \"$f$\"\n", "f", dst_header);
