@@ -95,13 +95,15 @@ class PerfettoCmd : public Consumer {
 };
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
-  fprintf(stderr, R"(Usage: %s
+  PERFETTO_ELOG(R"(
+Usage: %s
   --background  -b     : Exits immediately and continues tracing in background
   --config      -c     : /path/to/trace/config/file or - for stdin
   --out         -o     : /path/to/out/trace/file
   --dropbox     -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --help        -h
-)", argv0, kDefaultDropBoxTag);
+)",
+                argv0, kDefaultDropBoxTag);
   return 1;
 }
 
@@ -203,7 +205,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     return 1;
   }
 #else
-  fd.reset(CreateTemporaryFile(&tmp_trace_out_path_));
+  fd = CreateTemporaryFile(&tmp_trace_out_path_);
 #endif  // !BUILDFLAG(OS_MACOSX)
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
@@ -317,7 +319,7 @@ void PerfettoCmd::SaveTraceFileAs(const std::string& name) {
   PERFETTO_CHECK(linkat(AT_FDCWD, fd_path, AT_FDCWD, name.c_str(),
                         AT_SYMLINK_FOLLOW) == 0);
 #else
-  PERFETTO_CHECK(rename(tmp_trace_out_path_.c_str(), name) == 0);
+  PERFETTO_CHECK(rename(tmp_trace_out_path_.c_str(), name.c_str()) == 0);
 #endif  // BUILDFLAG(OS_MACOSX)
   trace_out_stream_.reset();
 }
