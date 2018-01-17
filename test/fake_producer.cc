@@ -27,13 +27,13 @@
 
 namespace perfetto {
 
-FakeProducer::FakeProducer(const std::string& name,
-                           base::TestTaskRunner* task_runner)
-    : name_(name),
-      endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
-                                           this,
-                                           task_runner)) {}
+FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
+
+void FakeProducer::Connect(base::TaskRunner* task_runner) {
+  endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
+                                         task_runner);
+}
 
 void FakeProducer::OnConnect() {
   DataSourceDescriptor descriptor;
@@ -68,7 +68,9 @@ void FakeProducer::CreateDataSourceInstance(
   // TODO(primiano): remove this hack once flushing the final packet is fixed.
   trace_writer->NewTracePacket();
 
-  endpoint_->UnregisterDataSource(id_);
+  // TODO(primiano): reenable this once UnregisterDataSource is specified in
+  // ServiceImpl.
+  // endpoint_->UnregisterDataSource(id_);
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {

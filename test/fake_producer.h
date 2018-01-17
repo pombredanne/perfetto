@@ -24,9 +24,12 @@ namespace perfetto {
 
 class FakeProducer : public Producer {
  public:
-  FakeProducer(const std::string& name, base::TestTaskRunner* task_runner);
+  FakeProducer(const std::string& name);
   ~FakeProducer() override;
 
+  void Connect(base::TaskRunner* task_runner);
+
+  // Producer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
   void CreateDataSourceInstance(DataSourceInstanceID,
