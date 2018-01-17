@@ -25,6 +25,9 @@
 namespace perfetto {
 class FtraceProducer : public Producer {
  public:
+  FtraceProducer();
+  FtraceProducer(const std::string& producer_socket);
+
   ~FtraceProducer() override;
 
   // Producer Impl:
@@ -62,6 +65,7 @@ class FtraceProducer : public Producer {
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   DataSourceID data_source_id_ = 0;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
+  const std::string producer_socket_;
 };
 }  // namespace perfetto
 

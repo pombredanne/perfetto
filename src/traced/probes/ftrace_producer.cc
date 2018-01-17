@@ -26,6 +26,11 @@ bool IsAlnum(const std::string& str) {
 
 }  // namespace.
 
+FtraceProducer::FtraceProducer(const std::string& producer_socket)
+    : producer_socket_(producer_socket) {}
+FtraceProducer::FtraceProducer()
+    : FtraceProducer(PERFETTO_PRODUCER_SOCK_NAME) {}
+
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
@@ -80,8 +85,8 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
 void FtraceProducer::Run() {
   base::UnixTaskRunner task_runner;
   ftrace_ = FtraceController::Create(&task_runner);
-  endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
-                                         &task_runner);
+  endpoint_ =
+      ProducerIPCClient::Connect(producer_socket_.c_str(), this, &task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
   task_runner.Run();
