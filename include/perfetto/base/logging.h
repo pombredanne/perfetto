@@ -89,7 +89,7 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
   do {                             \
     __builtin_trap();              \
     __builtin_unreachable();       \
-  } while (0);
+  } while (0)
 
 #define PERFETTO_LOG(fmt, ...) PERFETTO_XLOG(kLogInfo, fmt, ##__VA_ARGS__)
 #define PERFETTO_ILOG(fmt, ...) PERFETTO_XLOG(kLogImportant, fmt, ##__VA_ARGS__)
