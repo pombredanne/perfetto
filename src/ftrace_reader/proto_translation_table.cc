@@ -16,13 +16,13 @@
 
 #include "proto_translation_table.h"
 
+#include <regex.h>
+
 #include <algorithm>
-#include <regex>
 
 #include "event_info.h"
 #include "ftrace_procfs.h"
 #include "perfetto/ftrace_reader/format_parser.h"
-#include "perfetto/ftrace_reader/ftrace_to_proto.h"
 
 #include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
@@ -106,9 +106,26 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
   return str.compare(0, prefix.length(), prefix) == 0;
 }
 
+std::string RegexError(int errcode, const regex_t* preg) {
+  char buf[64];
+  regerror(errcode, preg, buf, sizeof(buf));
+  return {buf, sizeof(buf)};
+}
+
+bool Match(const char* string, const char* pattern) {
+  regex_t re;
+  int ret = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB);
+  if (ret != 0) {
+    PERFETTO_FATAL("regcomp: %s", RegexError(ret, &re).c_str());
+  }
+  ret = regexec(&re, string, 0, nullptr, 0);
+  regfree(&re);
+  return ret != REG_NOMATCH;
+}
+
 }  // namespace
 
-// This is similar but different from InferProtoType (see ftrace_to_proto.cc).
+// This is similar but different from InferProtoType (see format_parser.cc).
 // TODO(hjd): Fold FtraceEvent(::Field) into Event.
 bool InferFtraceType(const std::string& type_and_name,
                      size_t size,
@@ -119,7 +136,7 @@ bool InferFtraceType(const std::string& type_and_name,
   // are both fixed size and null terminated meaning that we can't just drop
   // them directly into the protobuf (since if the string is shorter than 15
   // charatcors we).
-  if (std::regex_match(type_and_name, std::regex(R"(char \w+\[\d+\])"))) {
+  if (Match(type_and_name.c_str(), R"(char [a-zA-Z_]+\[[0-9]+\])")) {
     *out = kFtraceFixedCString;
     return true;
   }
