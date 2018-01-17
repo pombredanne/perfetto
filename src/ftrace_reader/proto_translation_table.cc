@@ -16,8 +16,8 @@
 
 #include "proto_translation_table.h"
 
+#include <regex.h>
 #include <algorithm>
-#include <regex>
 
 #include "event_info.h"
 #include "ftrace_procfs.h"
@@ -105,6 +105,25 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
   return str.compare(0, prefix.length(), prefix) == 0;
 }
 
+std::string RegexError(int errcode, const regex_t* preg) {
+  size_t size = regerror(errcode, preg, nullptr, 0);
+  std::vector<char> alloced_buf(size);
+  regerror(errcode, preg, alloced_buf.data(), size);
+  return {alloced_buf.data(), alloced_buf.size()};
+}
+
+bool Match(const char* string, const char* pattern) {
+  regex_t re;
+  int ret = regcomp(&re, pattern, REG_EXTENDED | REG_NOSUB);
+  // TODO(fmayer): Add << to PERFETTO_CHECK to simplify this?
+  if (ret != 0) {
+    PERFETTO_FATAL(RegexError(ret, &re).c_str());
+  }
+  ret = regexec(&re, string, (size_t)0, NULL, 0);
+  regfree(&re);
+  return ret != REG_NOMATCH;
+}
+
 }  // namespace
 
 // This is similar but different from InferProtoType (see format_parser.cc).
@@ -118,7 +137,7 @@ bool InferFtraceType(const std::string& type_and_name,
   // are both fixed size and null terminated meaning that we can't just drop
   // them directly into the protobuf (since if the string is shorter than 15
   // charatcors we).
-  if (std::regex_match(type_and_name, std::regex(R"(char \w+\[\d+\])"))) {
+  if (Match(type_and_name.c_str(), R"(char [a-zA-Z_]+\[[0-9]+\])")) {
     *out = kFtraceFixedCString;
     return true;
   }

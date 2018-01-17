@@ -88,6 +88,12 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 #define PERFETTO_LOG(fmt, ...) PERFETTO_XLOG(kLogInfo, fmt, ##__VA_ARGS__)
 #define PERFETTO_ILOG(fmt, ...) PERFETTO_XLOG(kLogImportant, fmt, ##__VA_ARGS__)
 #define PERFETTO_ELOG(fmt, ...) PERFETTO_XLOG(kLogError, fmt, ##__VA_ARGS__)
+#define PERFETTO_FATAL(x)                            \
+  do {                                               \
+    PERFETTO_ELOG("%s", x);                          \
+    *(reinterpret_cast<volatile int*>(0x10)) = 0x42; \
+    __builtin_unreachable();                         \
+  } while (0)
 
 #if PERFETTO_DCHECK_IS_ON()
 
