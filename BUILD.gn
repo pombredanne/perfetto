@@ -129,7 +129,10 @@ if (!build_with_chromium) {
   }
 } else {
   group("lib") {
-    public_configs = [ "gn:public_config" ]
+    public_configs = [
+      "gn:public_config",
+      "protos:public_config",
+    ]
     deps = [
       "src/tracing",
     ]

@@ -29,7 +29,7 @@ ipc_library("tracing_service") {
 
 proto_library("lite") {
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos_lite"
+  proto_out_dir = "${perfetto_root_path}/protos_lite/${perfetto_root_path}"
   sources = [
     "data_source_config.proto",
     "data_source_descriptor.proto",

@@ -49,7 +49,7 @@ proto_library("full") {
   sources = []
   use_protobuf_full = true
   proto_in_dir = "$full_protos_base_dir/" + perfetto_root_path
-  proto_out_dir = "protos_full"
+  proto_out_dir = "${perfetto_root_path}/protos_full/${perfetto_root_path}"
   foreach(proto, ftrace_proto_names) {
     sources += [ "$full_protos_target_dir/$proto" ]
   }
@@ -58,12 +58,12 @@ proto_library("full") {
 proto_library("lite") {
   sources = ftrace_proto_names
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos_lite"
+  proto_out_dir = "${perfetto_root_path}/protos_lite/${perfetto_root_path}"
 }
 
 protozero_library("zero") {
   sources = ftrace_proto_names
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos_zero"
+  proto_out_dir = "${perfetto_root_path}/protos_zero/${perfetto_root_path}"
   generator_plugin_options = "wrapper_namespace=pbzero"
 }

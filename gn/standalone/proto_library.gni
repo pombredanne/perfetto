@@ -24,9 +24,6 @@ template("proto_library") {
   assert(defined(invoker.proto_out_dir),
          "proto_out_dir must be explicitly defined")
   proto_out_dir = invoker.proto_out_dir
-  assert(proto_out_dir == "protos_zero" || proto_out_dir == "protos_lite" ||
-             proto_out_dir == "protos_full",
-         "proto_out must be either 'proto_zero', 'proto_lite' or 'proto_full'")
 
   # If false will not generate the default .pb.{cc,h} files. Used for custom
   # codegen plugins.
