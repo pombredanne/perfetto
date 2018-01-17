@@ -107,10 +107,9 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
 }
 
 std::string RegexError(int errcode, const regex_t* preg) {
-  constexpr size_t kBufsize = 64;
-  char buf[kBufsize];
-  regerror(errcode, preg, buf, kBufsize);
-  return {buf, kBufsize};
+  char buf[64];
+  regerror(errcode, preg, buf, sizeof(buf));
+  return {buf, sizeof(buf)};
 }
 
 bool Match(const char* string, const char* pattern) {
