@@ -68,7 +68,6 @@ uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
 // 3. If input is 0 output is a good default number.
 size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb,
                                    size_t cpu_count) {
-  PERFETTO_ELOG("requested_buffer_size_kb %u", requested_buffer_size_kb);
   if (requested_buffer_size_kb == 0)
     requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
   if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
