@@ -45,6 +45,11 @@ class FtraceProcfs {
   // Read the available_events file.
   std::string ReadAvailableEvents() const;
 
+  // Set ftrace buffer size in pages.
+  // This size is *per cpu* so for the total size you have to multiple
+  // by the number of CPUs.
+  bool SetCpuBufferSizeInPages(size_t pages);
+
   // Returns the number of CPUs.
   // This will match the number of tracing/per_cpu/cpuXX directories.
   size_t virtual NumberOfCpus() const;
@@ -73,6 +78,7 @@ class FtraceProcfs {
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:
+  bool WriteNumberToFile(const std::string& path, size_t value);
   const std::string root_;
 };
 
