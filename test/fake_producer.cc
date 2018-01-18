@@ -42,19 +42,14 @@ void FakeProducer::OnConnect() {
                                 [this](DataSourceID id) { id_ = id; });
 }
 
-void FakeProducer::OnDisconnect() {
-  Shutdown();
-}
+void FakeProducer::OnDisconnect() {}
 
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
   // If we don't receive the expected categories, simply shut down so that
   // tests fail.
-  if (source_config.trace_category_filters() != "foo,bar") {
-    Shutdown();
-    return;
-  }
+  PERFETTO_CHECK(source_config.trace_category_filters() == "foo,bar");
 
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
@@ -74,12 +69,6 @@ void FakeProducer::CreateDataSourceInstance(
   // endpoint_->UnregisterDataSource(id_);
 }
 
-void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
-  Shutdown();
-}
-
-void FakeProducer::Shutdown() {
-  endpoint_.reset();
-}
+void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}
 
 }  // namespace perfetto
