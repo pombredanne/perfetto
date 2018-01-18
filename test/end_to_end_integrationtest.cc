@@ -19,6 +19,7 @@
 #include <functional>
 #include <thread>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -52,10 +53,12 @@ class PerfettoTest : public ::testing::Test {
   ~PerfettoTest() override = default;
 
  protected:
-  // We need to use templates because we want to create and destroy
-  // objects on the task runner thread. Templates give us an easy
-  // way to do that.
-  template <typename WorkerHandle>
+  class ThreadDelegate {
+   public:
+    virtual ~ThreadDelegate() = default;
+    virtual void Initialize(base::TaskRunner* task_runner) = 0;
+  };
+
   class TaskRunnerThread {
    public:
     TaskRunnerThread() = default;
@@ -70,33 +73,44 @@ class PerfettoTest : public ::testing::Test {
         thread_.join();
     }
 
-    void Start() {
+    void Start(std::unique_ptr<ThreadDelegate> delegate) {
       // Begin holding the lock for the condition variable.
       std::condition_variable ready;
       std::unique_lock<std::mutex> outer_lock(mutex_);
 
-      // Create and start the background thread.
-      thread_ = std::thread(std::bind(&TaskRunnerThread::Run, this, &ready));
+      // Create a shared_ptr to deal with bind nonsese and start the thread.
+      thread_ = std::thread(std::bind(
+          &TaskRunnerThread::Run, this,
+          std::shared_ptr<ThreadDelegate>(delegate.release()), &ready));
 
       // Wait for runner to be ready.
       ready.wait(outer_lock, [this]() { return runner_ != nullptr; });
     }
 
    private:
-    void Run(std::condition_variable* ready) {
+    void Run(std::shared_ptr<ThreadDelegate>& delegate,
+             std::condition_variable* ready) {
       // Create the task runner and execute the specicalised code.
       base::PlatformTaskRunner task_runner;
-      WorkerHandle handle(&task_runner);
+      delegate->Initialize(&task_runner);
 
-      // Notify the main thread that the runner is ready.
+      // Pass the runner back to the main thread.
       {
         std::unique_lock<std::mutex> lock(mutex_);
         runner_ = &task_runner;
       }
+
+      // Notify the main thread that the runner is ready.
       ready->notify_one();
 
       // Spin the loop.
       task_runner.Run();
+
+      // Ensure we clear out the delegate before runner goes out
+      // of scope.
+      delegate.reset();
+
+      // Cleanup the runner.
       {
         std::unique_lock<std::mutex> lock(mutex_);
         runner_ = nullptr;
@@ -110,41 +124,48 @@ class PerfettoTest : public ::testing::Test {
     base::PlatformTaskRunner* runner_ = nullptr;
   };
 
-  class ServiceHandle {
+  class ServiceDelegate : public ThreadDelegate {
    public:
-    explicit ServiceHandle(base::TaskRunner* task_runner) {
+    ServiceDelegate() = default;
+    ~ServiceDelegate() = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
       unlink(PERFETTO_PRODUCER_SOCK_NAME);
       unlink(PERFETTO_CONSUMER_SOCK_NAME);
       svc_->Start(PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
     }
-    ~ServiceHandle() = default;
 
    private:
-    std::unique_ptr<ServiceIPCHost> svc_ = nullptr;
+    std::unique_ptr<ServiceIPCHost> svc_;
   };
 
-  class FtraceProducerHandle {
+  class FtraceProducerDelegate : public ThreadDelegate {
    public:
-    explicit FtraceProducerHandle(base::TaskRunner* task_runner) {
-      producer_.Connect(task_runner);
+    FtraceProducerDelegate() = default;
+    ~FtraceProducerDelegate() = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
+      producer_.reset(new FtraceProducer);
+      producer_->Connect(task_runner);
     }
-    ~FtraceProducerHandle() = default;
 
    private:
-    FtraceProducer producer_;
+    std::unique_ptr<FtraceProducer> producer_;
   };
 
-  class FakeProducerHandle {
+  class FakeProducerDelegate : public ThreadDelegate {
    public:
-    explicit FakeProducerHandle(base::TaskRunner* task_runner)
-        : producer_("android.perfetto.FakeProducer") {
-      producer_.Connect(task_runner);
+    FakeProducerDelegate() = default;
+    ~FakeProducerDelegate() = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
+      producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
+      producer_->Connect(task_runner);
     }
-    ~FakeProducerHandle() = default;
 
    private:
-    FakeProducer producer_;
+    std::unique_ptr<FakeProducer> producer_;
   };
 };
 
@@ -196,11 +217,12 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
 // the service and ftrace producer both exist and are already running.
 // TODO(lalitm): maybe add an additional build flag for CTS.
 #if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  TaskRunnerThread<ServiceHandle> service_thread;
-  service_thread.Start();
+  TaskRunnerThread service_thread;
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
 
-  TaskRunnerThread<FtraceProducerHandle> producer_thread;
-  producer_thread.Start();
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(
+      std::unique_ptr<FtraceProducerDelegate>(new FtraceProducerDelegate));
 #endif
 
   // Finally, make the consumer connect to the service.
@@ -252,11 +274,12 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 // the service and ftrace producer both exist and are already running.
 // TODO(lalitm): maybe add an additional build flag for CTS.
 #if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
-  TaskRunnerThread<ServiceHandle> service_thread;
-  service_thread.Start();
+  TaskRunnerThread service_thread;
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
 
-  TaskRunnerThread<FakeProducerHandle> producer_thread;
-  producer_thread.Start();
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(
+      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate));
 #endif
 
   // Finally, make the consumer connect to the service.
