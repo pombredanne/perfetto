@@ -22,6 +22,13 @@
 namespace perfetto {
 namespace base {
 
+// size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
+// size_t const kPageSizes[] = {4096, 65536}; in
+// shared_memory_arbiter_impl_unittest and trace_writer_impl_unittest
+
+const size_t kPageSize = 4096;
+size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
+
 class PageAllocator {
  public:
   class Deleter {

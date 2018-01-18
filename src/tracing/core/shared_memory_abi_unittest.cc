@@ -28,8 +28,9 @@ using ChunkHeader = SharedMemoryABI::ChunkHeader;
 
 using SharedMemoryABITest = AlignedBufferTest;
 
-size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
-INSTANTIATE_TEST_CASE_P(PageSize, SharedMemoryABITest, ValuesIn(kPageSizes));
+INSTANTIATE_TEST_CASE_P(PageSize,
+                        SharedMemoryABITest,
+                        ValuesIn(base::kPageSizes));
 
 TEST_P(SharedMemoryABITest, NominalCases) {
   SharedMemoryABI abi(buf(), buf_size(), page_size());

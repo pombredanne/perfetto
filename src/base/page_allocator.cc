@@ -25,7 +25,6 @@ namespace base {
 
 namespace {
 
-static constexpr size_t kPageSize = 4096;
 static constexpr size_t kGuardSize = kPageSize;
 
 // static
