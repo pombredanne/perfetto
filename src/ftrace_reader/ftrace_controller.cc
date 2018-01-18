@@ -29,6 +29,7 @@
 #include "cpu_reader.h"
 #include "event_info.h"
 #include "ftrace_procfs.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
@@ -44,31 +45,26 @@ const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 // TODO(hjd): Expose this as a configurable variable.
 const int kDrainPeriodMs = 100;
 
-#if defined(ANDROID)
-bool RunAtrace(const std::vector<std::string>& args) {
+bool RunAtrace(std::vector<std::string> args) {
   int status = 1;
-  char* const envp[1] = {nullptr};
 
   std::vector<char*> argv;
-  // argv[0], args, and then a null.
-  argv.reserve(2 + args.size());
-  argv.push_back(const_cast<char*>(std::string("/system/bin/atrace").c_str()));
+  // args, and then a null.
+  argv.reserve(1 + args.size());
   for (const auto& arg : args)
     argv.push_back(const_cast<char*>(arg.c_str()));
   argv.push_back(nullptr);
 
   pid_t pid = fork();
-  if (pid == -1)
-    return false;
-  if (pid > 0) {
-    waitpid(pid, &status, 0);
-  } else {
-    execve("/system/bin/atrace", &argv[0], envp);
-    exit(1);
+  PERFETTO_CHECK(pid >= 0);
+  if (pid == 0) {
+    execv("/system/bin/atrace", &argv[0]);
+    // Reached only if execv fails.
+    _exit(1);
   }
+  waitpid(pid, &status, 0);
   return status == 0;
 }
-#endif  // defined(ANDROID)
 
 }  // namespace
 
@@ -260,11 +256,11 @@ void FtraceController::Unregister(FtraceSink* sink) {
 }
 
 void FtraceController::StartAtrace(const FtraceConfig& config) {
-#if defined(ANDROID)
   PERFETTO_CHECK(atrace_running_ == false);
   atrace_running_ = true;
   PERFETTO_DLOG("Start atrace...");
   std::vector<std::string> args;
+  args.push_back("atrace");  // argv0 for exec()
   args.push_back("--async_start");
   for (const auto& category : config.atrace_categories())
     args.push_back(category);
@@ -274,19 +270,17 @@ void FtraceController::StartAtrace(const FtraceConfig& config) {
       args.push_back(app);
   }
 
-  PERFETTO_CHECK(RunAtrace(args));
+  PERFETTO_CHECK(RunAtrace(std::move(args)));
   PERFETTO_DLOG("...done");
-#endif  // defined(ANDROID)
 }
 
 void FtraceController::StopAtrace() {
-#if defined(ANDROID)
   PERFETTO_CHECK(atrace_running_ == true);
   atrace_running_ = false;
   PERFETTO_DLOG("Stop atrace...");
-  PERFETTO_CHECK(RunAtrace(std::vector<std::string>({"--async_stop"})));
+  PERFETTO_CHECK(
+      RunAtrace(std::vector<std::string>({"atrace", "--async_stop"})));
   PERFETTO_DLOG("...done");
-#endif  // defined(ANDROID)
 }
 
 FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,

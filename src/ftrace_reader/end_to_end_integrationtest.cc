@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
@@ -131,16 +132,16 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   printf("%s\n", output_as_text.c_str());
 }
 
-#if defined(ANDROID)
-TEST_F(EndToEndIntegrationTest, Atrace) {
+#if BUILDFLAG(OS_ANDROID)
+TEST_F(EndToEndIntegrationTest, DISABLED_Atrace) {
   FtraceProcfs procfs(kTracingPath);
   procfs.ClearTrace();
 
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   FtraceConfig config;
-  config.AddAtraceCategory("input");
-  config.AddAtraceApp("com.google.android.apps.maps");
+  FtraceConfig config(std::set<std::string>({"sched_switch"}));
+  config.AddAtraceCategory("sched");
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.
@@ -163,6 +164,6 @@ TEST_F(EndToEndIntegrationTest, Atrace) {
   std::string output_as_text;
   printf("%s\n", output_as_text.c_str());
 }
-#endif  // defined(ANDROID)
+#endif  // BUILDFLAG(OS_ANDROID)
 
 }  // namespace perfetto
