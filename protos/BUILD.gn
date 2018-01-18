@@ -18,17 +18,10 @@ import("../gn/proto_library.gni")
 
 config("public_config") {
   include_dirs = [
-    # This lets embedders include Perfetto protobufs with full paths
-    # like "third_party/perfetto/protos/test_event.pbzero.h"
-    "${root_gen_dir}/${perfetto_root_path}/protos_zero",
-    "${root_gen_dir}/${perfetto_root_path}/protos_lite",
-
     # The below are needed due to generated protobuf headers including other
     # headers with a path relative to the perfetto root.
     # Unfortunately this means embedder code can include protos without
-    # the "third_party/perfetto" prefix, and would be nice to somehow avoid.
-    "${root_gen_dir}/${perfetto_root_path}/protos_zero/${perfetto_root_path}",
-    "${root_gen_dir}/${perfetto_root_path}/protos_lite/${perfetto_root_path}",
+    "${root_gen_dir}/${perfetto_root_path}",
   ]
 }
 
@@ -45,7 +38,7 @@ protozero_library("zero") {
   ]
   sources = proto_sources
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "${perfetto_root_path}/protos_zero/${perfetto_root_path}"
+  proto_out_dir = perfetto_root_path
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
 
@@ -57,5 +50,6 @@ proto_library("lite") {
   ]
   sources = proto_sources
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "${perfetto_root_path}/protos_lite/${perfetto_root_path}"
+  proto_out_dir = perfetto_root_path
+  generate_python = false
 }
