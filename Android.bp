@@ -150,6 +150,8 @@ cc_binary {
 cc_defaults {
   name: "perfetto_defaults",
   cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
     "-Wno-error=return-type",
     "-Wno-sign-compare",
     "-Wno-sign-promo",
@@ -288,10 +290,6 @@ cc_library_static {
   ],
   defaults: [
     "perfetto_defaults",
-  ],
-  cflags: [
-    "-DGOOGLE_PROTOBUF_NO_RTTI",
-    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
 }
 
@@ -544,10 +542,6 @@ cc_binary_host {
   defaults: [
     "perfetto_defaults",
   ],
-  cflags: [
-    "-DGOOGLE_PROTOBUF_NO_RTTI",
-    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
-  ],
 }
 
 // GN target: //src/ipc:test_messages_gen
@@ -644,10 +638,6 @@ cc_binary_host {
   ],
   defaults: [
     "perfetto_defaults",
-  ],
-  cflags: [
-    "-DGOOGLE_PROTOBUF_NO_RTTI",
-    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
 }
 
@@ -814,10 +804,6 @@ cc_library_static {
   ],
   defaults: [
     "perfetto_defaults",
-  ],
-  cflags: [
-    "-DGOOGLE_PROTOBUF_NO_RTTI",
-    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
 }
 
