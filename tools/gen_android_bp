@@ -75,6 +75,9 @@ tree_path = 'external/perfetto'
 # Compiler flags which are passed through to the blueprint.
 cflag_whitelist = r'^-DPERFETTO.*$'
 
+# Compiler defines which are passed through to the blueprint.
+define_whitelist = r'^GOOGLE_PROTO.*$'
+
 
 def enable_gmock(module):
     module.static_libs.append('libgmock')
@@ -451,6 +454,9 @@ def create_modules_from_target(blueprint, desc, target_name):
             for flag in target.get('cflags', []):
                 if re.match(cflag_whitelist, flag):
                   module.cflags.append(flag)
+            for define in target.get('defines', []):
+                if re.match(define_whitelist, define):
+                    module.cflags.append('-D%s' % define)
             module.defaults = [defaults_module]
             apply_module_dependency(blueprint, desc, module, target_name)
             for dep in resolve_dependencies(desc, target_name):

@@ -289,6 +289,10 @@ cc_library_static {
   defaults: [
     "perfetto_defaults",
   ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+  ],
 }
 
 // GN target: //protos:lite_gen
@@ -540,6 +544,10 @@ cc_binary_host {
   defaults: [
     "perfetto_defaults",
   ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+  ],
 }
 
 // GN target: //src/ipc:test_messages_gen
@@ -636,6 +644,10 @@ cc_binary_host {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
 }
 
@@ -802,6 +814,10 @@ cc_library_static {
   ],
   defaults: [
     "perfetto_defaults",
+  ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
 }
 
