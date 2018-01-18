@@ -29,17 +29,18 @@ protozero_library("zero") {
   ]
   sources = proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos_zero"
+  proto_out_dir = "protos"
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
 
 # Protobuf Lite stubs, for readers.
 proto_library("lite") {
+  generate_python = false
   deps = [
     "../ipc",
     "ftrace:lite",
   ]
   sources = proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos_lite"
+  proto_out_dir = "protos"
 }

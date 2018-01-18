@@ -17,14 +17,15 @@ import("../../../../src/protozero/protozero_library.gni")
 import("all_protos.gni")
 
 proto_library("lite") {
+  generate_python = false
   sources = ftrace_proto_names
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos_lite"
+  proto_out_dir = "protos"
 }
 
 protozero_library("zero") {
   sources = ftrace_proto_names
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos_zero"
+  proto_out_dir = "protos"
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
