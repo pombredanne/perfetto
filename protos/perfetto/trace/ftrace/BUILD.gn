@@ -1,4 +1,4 @@
-# Copyright (C) 2018 The Android Open Source Project
+# Copyright (C) 2017 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("perfetto_cmd") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../../protos/perfetto/trace:lite",
-    "../../base",
-    "../../protozero",
-    "../../tracing:ipc",
-  ]
-  sources = [
-    "perfetto_cmd.cc",
-  ]
+import("../../../../gn/perfetto.gni")
+import("../../../../src/protozero/protozero_library.gni")
+import("all_protos.gni")
+
+proto_library("lite") {
+  sources = ftrace_proto_names
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "protos_lite"
+}
+
+protozero_library("zero") {
+  sources = ftrace_proto_names
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "protos_zero"
+  generator_plugin_options = "wrapper_namespace=pbzero"
 }

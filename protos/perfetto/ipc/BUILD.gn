@@ -12,27 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("../../gn/perfetto.gni")
-import("../../gn/ipc_library.gni")
+import("../../../gn/perfetto.gni")
+import("../../../gn/ipc_library.gni")
 
 # IPC service definitions.
-ipc_library("tracing_service") {
+ipc_library("ipc") {
   deps = [
-    ":lite",
+    "../config",
   ]
-  proto_in_dir = perfetto_root_path
+  proto_in_dir = "$perfetto_root_path/protos"
   sources = [
     "consumer_port.proto",
     "producer_port.proto",
-  ]
-}
-
-proto_library("lite") {
-  proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos_lite"
-  sources = [
-    "data_source_config.proto",
-    "data_source_descriptor.proto",
-    "trace_config.proto",
   ]
 }
