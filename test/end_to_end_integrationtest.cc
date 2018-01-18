@@ -78,17 +78,16 @@ class PerfettoTest : public ::testing::Test {
       std::condition_variable ready;
       std::unique_lock<std::mutex> outer_lock(mutex_);
 
-      // Create a shared_ptr to deal with bind nonsese and start the thread.
-      thread_ = std::thread(std::bind(
-          &TaskRunnerThread::Run, this,
-          std::shared_ptr<ThreadDelegate>(delegate.release()), &ready));
+      // Start the thread.
+      thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate),
+                            &ready);
 
       // Wait for runner to be ready.
       ready.wait(outer_lock, [this]() { return runner_ != nullptr; });
     }
 
    private:
-    void Run(std::shared_ptr<ThreadDelegate>& delegate,
+    void Run(std::unique_ptr<ThreadDelegate> delegate,
              std::condition_variable* ready) {
       // Create the task runner and execute the specicalised code.
       base::PlatformTaskRunner task_runner;
@@ -127,7 +126,7 @@ class PerfettoTest : public ::testing::Test {
   class ServiceDelegate : public ThreadDelegate {
    public:
     ServiceDelegate() = default;
-    ~ServiceDelegate() = default;
+    ~ServiceDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
@@ -143,7 +142,7 @@ class PerfettoTest : public ::testing::Test {
   class FtraceProducerDelegate : public ThreadDelegate {
    public:
     FtraceProducerDelegate() = default;
-    ~FtraceProducerDelegate() = default;
+    ~FtraceProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FtraceProducer);
@@ -157,7 +156,7 @@ class PerfettoTest : public ::testing::Test {
   class FakeProducerDelegate : public ThreadDelegate {
    public:
     FakeProducerDelegate() = default;
-    ~FakeProducerDelegate() = default;
+    ~FakeProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
