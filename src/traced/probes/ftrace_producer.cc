@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "ftrace_producer.h"
+#include "src/traced/probes/ftrace_producer.h"
 
 #include <stdio.h>
+#include <string>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/traced/traced.h"

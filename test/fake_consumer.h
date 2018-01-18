@@ -43,7 +43,7 @@ class FakeConsumer : public Consumer {
 
  private:
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
-  std::unique_ptr<Service::ConsumerEndpoint> endpoint_ = nullptr;
+  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
   const TraceConfig trace_config_;
   base::TaskRunner* const task_runner_;
 };

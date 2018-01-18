@@ -25,23 +25,21 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
+#include "src/base/test/test_task_runner.h"
+#include "src/traced/probes/ftrace_producer.h"
+#include "test/fake_consumer.h"
+#include "test/fake_producer.h"
 
 #include "protos/trace_packet.pb.h"
 #include "protos/trace_packet.pbzero.h"
 
-#include "src/base/test/test_task_runner.h"
-#include "src/traced/probes/ftrace_producer.h"
-
-#include "test/fake_consumer.h"
-#include "test/fake_producer.h"
-
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #include "perfetto/base/android_task_runner.h"
 #endif
 
 namespace perfetto {
 
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
 using PlatformTaskRunner = base::UnixTaskRunner;
@@ -53,49 +51,57 @@ class PerfettoTest : public ::testing::Test {
   ~PerfettoTest() override = default;
 
  protected:
-  // We need to use templates because we want to create and detroy
+  // We need to use templates because we want to create and destroy
   // objects on the task runner thread. Templates give us an easy
   // way to do that.
   template <typename WorkerHandle>
   class TaskRunnerThread {
    public:
-    TaskRunnerThread() {}
+    TaskRunnerThread() = default;
     ~TaskRunnerThread() {
-      std::unique_lock<std::mutex> lock(mutex_);
-      if (runner_)
-        runner_->Quit();
-      lock.unlock();
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (runner_)
+          runner_->Quit();
+      }
 
       if (thread_.joinable())
         thread_.join();
     }
 
-    void Run() {
+    void Start() {
       // Begin holding the lock for the condition variable.
       std::condition_variable ready;
       std::unique_lock<std::mutex> outer_lock(mutex_);
 
       // Create and start the background thread.
-      thread_ = std::thread([this, &ready]() {
-        // Create the task runner and execute the specicalised code.
-        base::PlatformTaskRunner task_runner;
-        WorkerHandle handle(&task_runner);
-
-        // Notify the main thread that the runner is ready.
-        std::unique_lock<std::mutex> lock(mutex_);
-        runner_ = &task_runner;
-        lock.unlock();
-        ready.notify_one();
-
-        // Spin the loop.
-        task_runner.Run();
-      });
+      thread_ = std::thread(std::bind(&TaskRunnerThread::Run, this, &ready));
 
       // Wait for runner to be ready.
       ready.wait(outer_lock, [this]() { return runner_ != nullptr; });
     }
 
    private:
+    void Run(std::condition_variable* ready) {
+      // Create the task runner and execute the specicalised code.
+      base::PlatformTaskRunner task_runner;
+      WorkerHandle handle(&task_runner);
+
+      // Notify the main thread that the runner is ready.
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        runner_ = &task_runner;
+      }
+      ready->notify_one();
+
+      // Spin the loop.
+      task_runner.Run();
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        runner_ = nullptr;
+      }
+    }
+
     std::thread thread_;
 
     // All variables below this point are protected by |mutex_|.
@@ -188,12 +194,12 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
 // If we're building with the Android platform (i.e. CTS), we expect that
 // the service and ftrace producer both exist and are already running.
 // TODO(lalitm): maybe add an additional build flag for CTS.
-#if !defined(PERFETTO_BUILD_WITH_ANDROID)
+#if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
   TaskRunnerThread<ServiceHandle> service_thread;
-  service_thread.Run();
+  service_thread.Start();
 
   TaskRunnerThread<FtraceProducerHandle> producer_thread;
-  producer_thread.Run();
+  producer_thread.Start();
 #endif
 
   // Finally, make the consumer connect to the service.
@@ -244,12 +250,12 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 // If we're building with the Android platform (i.e. CTS), we expect that
 // the service and ftrace producer both exist and are already running.
 // TODO(lalitm): maybe add an additional build flag for CTS.
-#if !defined(PERFETTO_BUILD_WITH_ANDROID)
+#if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
   TaskRunnerThread<ServiceHandle> service_thread;
-  service_thread.Run();
+  service_thread.Start();
 
   TaskRunnerThread<FakeProducerHandle> producer_thread;
-  producer_thread.Run();
+  producer_thread.Start();
 #endif
 
   // Finally, make the consumer connect to the service.

@@ -39,9 +39,6 @@ group("all") {
       ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
-
-      # TODO(lalitm): remove this when we can run ftrace on travis.
-      "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
   }
 }
@@ -75,22 +72,22 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "gn:default_deps",
+      "src/ftrace_reader:ftrace_reader_integrationtests",
       "test:end_to_end_integrationtests",
-
-      # TODO(lalitm): add this back when we can run ftrace on travis.
-      # "src/ftrace_reader:ftrace_reader_integrationtests",
     ]
     if (build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
   }
 
-  # Used by Android's statsd in /frameworks/base/cmds.
-  static_library("perfetto_protos_lite") {
-    deps = [
-      "gn:default_deps",
-      "protos:lite",
-    ]
+  if (build_with_android) {
+    # Used by Android's statsd in /frameworks/base/cmds.
+    static_library("perfetto_protos_lite") {
+      deps = [
+        "gn:default_deps",
+        "protos:lite",
+      ]
+    }
   }
 
   if (monolithic_binaries) {
@@ -102,19 +99,9 @@ if (!build_with_chromium) {
   target(libtraced_shared_target_type, "libtraced_shared") {
     deps = [
       "gn:default_deps",
-      "src/traced/perfetto_cmd",
       "src/traced/probes",
       "src/traced/service",
     ]
-    if (build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-      deps += [ "src/base:android_task_runner" ]
-      libs = [
-        "binder",
-        "services",
-        "utils",
-      ]
-    }
   }
 
   # The unprivileged trace daemon that listens for Producer and Consumer
@@ -146,12 +133,21 @@ if (!build_with_chromium) {
   # tracing, acting as a Consumer.
   executable("perfetto") {
     deps = [
-      ":libtraced_shared",
       "gn:default_deps",
+      "src/traced/perfetto_cmd",
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
     ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+      deps += [ "src/base:android_task_runner" ]
+      libs = [
+        "binder",
+        "services",
+        "utils",
+      ]
+    }
   }
 } else {
   group("lib") {
