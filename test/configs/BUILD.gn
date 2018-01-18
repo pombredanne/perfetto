@@ -12,29 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("../gn/perfetto.gni")
+import("../../gn/perfetto.gni")
 
-action_foreach("configs") {
-  testonly = true
-  script = "$root_out_dir/protoc_helper"
+if (!build_with_chromium) {
+  action_foreach("configs") {
+    testonly = true
+    script = "$root_out_dir/protoc_helper"
 
-  deps = [
-    "../tools:protoc_helper",
-  ]
+    deps = [
+      "../../tools:protoc_helper",
+    ]
 
-  sources = [
-    "atrace.cfg",
-    "ftrace.cfg",
-  ]
+    sources = [
+      "atrace.cfg",
+      "ftrace.cfg",
+    ]
 
-  outputs = [
-    "$root_out_dir/{{source_file_part}}.protobuf",
-  ]
+    outputs = [
+      "$root_out_dir/{{source_file_part}}.protobuf",
+    ]
 
-  args = [
-    "encode",
-    "--root=" + rebase_path(perfetto_root_path, ""),
-    "--input={{source}}",
-    "--output={{source_file_part}}.protobuf",
-  ]
+    args = [
+      "encode",
+      "--root=" + rebase_path(perfetto_root_path, ""),
+      "--input={{source}}",
+      "--output={{source_file_part}}.protobuf",
+    ]
+  }
 }

@@ -26,7 +26,6 @@ group("all") {
   testonly = true  # allow to build also test targets
   deps = [
     ":perfetto_tests",
-    "configs",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
     "tools:protoc_helper",
@@ -41,6 +40,7 @@ group("all") {
       ":traced",
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
+      "test/configs",
     ]
   }
 }
@@ -89,19 +89,9 @@ if (!build_with_chromium) {
   target(libtraced_shared_target_type, "libtraced_shared") {
     deps = [
       "gn:default_deps",
-      "src/traced/perfetto_cmd",
       "src/traced/probes",
       "src/traced/service",
     ]
-    if (build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-      deps += [ "src/base:android_task_runner" ]
-      libs = [
-        "binder",
-        "services",
-        "utils",
-      ]
-    }
   }
 
   # The unprivileged trace daemon that listens for Producer and Consumer
@@ -133,12 +123,21 @@ if (!build_with_chromium) {
   # tracing, acting as a Consumer.
   executable("perfetto") {
     deps = [
-      ":libtraced_shared",
       "gn:default_deps",
+      "src/traced/perfetto_cmd",
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
     ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+      deps += [ "src/base:android_task_runner" ]
+      libs = [
+        "binder",
+        "services",
+        "utils",
+      ]
+    }
   }
 } else {
   group("lib") {
