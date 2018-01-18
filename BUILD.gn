@@ -39,6 +39,8 @@ group("all") {
       ":traced",
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
+      "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }

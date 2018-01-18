@@ -19,11 +19,12 @@ import("//build_overrides/build.gni")
 source_set("tracing") {
   public_deps = [
     "../../include/perfetto/tracing/core",
+    "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace:zero",
   ]
   deps = [
     "../../gn:default_deps",
-    "../../protos/perfetto/trace:lite",
-    "../../protos/perfetto/trace:zero",
+    "../../protos/perfetto/config",
     "../base",
   ]
   sources = [
