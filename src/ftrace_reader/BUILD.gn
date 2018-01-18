@@ -53,7 +53,7 @@ ftrace_reader_test_proto_sources = [ "test/test_messages.proto" ]
 protozero_library("ftrace_reader_test_messages_zero") {
   sources = ftrace_reader_test_proto_sources
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
 
@@ -61,7 +61,7 @@ proto_library("ftrace_reader_test_messages_lite") {
   generate_python = false
   sources = ftrace_reader_test_proto_sources
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
 }
 
 # These tests require access to a real ftrace implementation and must

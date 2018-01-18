@@ -18,7 +18,7 @@ import("../../../gn/proto_library.gni")
 proto_library("config") {
   generate_python = false
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
   sources = [
     "data_source_config.proto",
     "data_source_descriptor.proto",

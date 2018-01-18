@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import("../../gn/perfetto.gni")
-
 import("../../gn/ipc_library.gni")
 import("../../gn/proto_library.gni")
 
@@ -66,7 +65,7 @@ proto_library("wire_protocol") {
     "wire_protocol.proto",
   ]
   proto_in_dir = perfetto_root_path
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
 }
 
 ipc_library("test_messages") {

@@ -29,7 +29,7 @@ protozero_library("zero") {
   ]
   sources = proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
   generator_plugin_options = "wrapper_namespace=pbzero"
 }
 
@@ -42,5 +42,5 @@ proto_library("lite") {
   ]
   sources = proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "protos"
+  proto_out_dir = perfetto_root_path
 }
