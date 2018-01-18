@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-#include "fake_consumer.h"
+#include "test/fake_consumer.h"
 
 #include <gtest/gtest.h>
+#include <utility>
+#include <vector>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/traced/traced.h"

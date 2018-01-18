@@ -18,7 +18,7 @@
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
 
-#include "ftrace_producer.h"
+#include "src/traced/probes/ftrace_producer.h"
 
 namespace perfetto {
 

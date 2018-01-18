@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#ifndef TEST_FAKE_PRODUCER_H_
+#define TEST_FAKE_PRODUCER_H_
+
+#include <memory>
+#include <string>
+
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
@@ -24,7 +30,7 @@ namespace perfetto {
 
 class FakeProducer : public Producer {
  public:
-  FakeProducer(const std::string& name);
+  explicit FakeProducer(const std::string& name);
   ~FakeProducer() override;
 
   void Connect(base::TaskRunner* task_runner);
@@ -45,3 +51,5 @@ class FakeProducer : public Producer {
 };
 
 }  // namespace perfetto
+
+#endif  // TEST_FAKE_PRODUCER_H_

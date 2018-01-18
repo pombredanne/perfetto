@@ -25,13 +25,14 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
+
+#include "protos/trace_packet.pb.h"
+#include "protos/trace_packet.pbzero.h"
+
 #include "src/base/test/test_task_runner.h"
 #include "src/traced/probes/ftrace_producer.h"
 #include "test/fake_consumer.h"
 #include "test/fake_producer.h"
-
-#include "protos/trace_packet.pb.h"
-#include "protos/trace_packet.pbzero.h"
 
 #if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #include "perfetto/base/android_task_runner.h"
@@ -111,7 +112,7 @@ class PerfettoTest : public ::testing::Test {
 
   class ServiceHandle {
    public:
-    ServiceHandle(base::TaskRunner* task_runner) {
+    explicit ServiceHandle(base::TaskRunner* task_runner) {
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
       unlink(PERFETTO_PRODUCER_SOCK_NAME);
       unlink(PERFETTO_CONSUMER_SOCK_NAME);
@@ -125,7 +126,7 @@ class PerfettoTest : public ::testing::Test {
 
   class FtraceProducerHandle {
    public:
-    FtraceProducerHandle(base::TaskRunner* task_runner) {
+    explicit FtraceProducerHandle(base::TaskRunner* task_runner) {
       producer_.Connect(task_runner);
     }
     ~FtraceProducerHandle() = default;
@@ -136,7 +137,7 @@ class PerfettoTest : public ::testing::Test {
 
   class FakeProducerHandle {
    public:
-    FakeProducerHandle(base::TaskRunner* task_runner)
+    explicit FakeProducerHandle(base::TaskRunner* task_runner)
         : producer_("android.perfetto.FakeProducer") {
       producer_.Connect(task_runner);
     }
@@ -169,7 +170,7 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
   *ftrace_config->add_event_names() = "bar";
 
   // Create the function to handle packets as they come in.
-  long total = 0;
+  uint64_t total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
     if (has_more) {
@@ -185,7 +186,7 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
       // TODO(lalitm): renable this when stiching inside the service is present.
       // ASSERT_FALSE(packets->empty());
     } else {
-      ASSERT_GE(total, sysconf(_SC_NPROCESSORS_CONF));
+      ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
       ASSERT_TRUE(packets.empty());
       finish();
     }
@@ -227,7 +228,7 @@ TEST_F(PerfettoTest, TestFakeProducer) {
   ds_config->set_trace_category_filters("foo,bar");
 
   // Create the function to handle packets as they come in.
-  long total = 0;
+  uint64_t total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
     if (has_more) {

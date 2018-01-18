@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fake_producer.h"
+#include "test/fake_producer.h"
 
 #include "perfetto/base/logging.h"
 #include "perfetto/traced/traced.h"

@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef TEST_FAKE_CONSUMER_
-#define TEST_FAKE_CONSUMER_
+#ifndef TEST_FAKE_CONSUMER_H_
+#define TEST_FAKE_CONSUMER_H_
+
+#include <memory>
+#include <vector>
 
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -50,4 +53,4 @@ class FakeConsumer : public Consumer {
 
 }  // namespace perfetto
 
-#endif  // TEST_FAKE_CONSUMER_
+#endif  // TEST_FAKE_CONSUMER_H_
