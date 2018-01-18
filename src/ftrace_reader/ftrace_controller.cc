@@ -40,8 +40,9 @@ namespace {
 // TODO(b/68242551): Do not hardcode these paths.
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
-// TODO(hjd): Expose this as a configurable variable.
+// TODO(hjd): Expose these as configurable variables.
 const int kDrainPeriodMs = 100;
+const int kPerCpuBufferSizePages = 4;
 
 }  // namespace
 
@@ -107,6 +108,7 @@ void FtraceController::StartIfNeeded() {
   PERFETTO_CHECK(sinks_.size() != 0);
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
+  ftrace_procfs_->SetCpuBufferSizeInPages(kPerCpuBufferSizePages);
   ftrace_procfs_->EnableTracing();
   generation_++;
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
