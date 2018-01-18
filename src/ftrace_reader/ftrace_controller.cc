@@ -38,7 +38,7 @@ namespace perfetto {
 namespace {
 
 // TODO(b/68242551): Do not hardcode these paths.
-const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+const char kTracingPath[] = "/sys/kernel/debug/tracing/instances/meta/";
 
 // TODO(hjd): Expose this as a configurable variable.
 const int kDrainPeriodMs = 100;
