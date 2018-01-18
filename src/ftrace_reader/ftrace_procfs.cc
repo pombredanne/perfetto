@@ -30,6 +30,7 @@
 namespace perfetto {
 namespace {
 
+// TODO(b/72148971): Unify with other constants.
 static constexpr size_t kPageSize = 4096;
 
 // Reading /trace produces human readable trace output.
