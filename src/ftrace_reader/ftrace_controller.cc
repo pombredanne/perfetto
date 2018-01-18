@@ -57,7 +57,7 @@ uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
       kMaxDrainPeriodMs < drain_period_ms) {
     PERFETTO_LOG("drain_period_ms was %u should be between %u and %u",
                  drain_period_ms, kMinDrainPeriodMs, kMaxDrainPeriodMs);
-    return kMaxDrainPeriodMs;
+    return kDefaultDrainPeriodMs;
   }
   return drain_period_ms;
 }
@@ -73,7 +73,7 @@ size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb,
   if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
     requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
 
-  size_t pages = requested_buffer_size_kb / (kPageSize / 1024);
+  size_t pages = (requested_buffer_size_kb / cpu_count) / (kPageSize / 1024);
   if (pages == 0)
     return 1;
 

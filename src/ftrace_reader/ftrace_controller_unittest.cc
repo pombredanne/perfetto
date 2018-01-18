@@ -339,6 +339,59 @@ TEST(FtraceControllerTest, BufferSize) {
     config.set_total_buffer_size_kb(42);
     auto sink = controller.CreateSink(config, &delegate);
   }
+
+  {
+    // You picked a good size -> your size / # CPUs rounded to nearest page.
+    EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/buffer_size_kb", "20"));
+    FtraceConfig config({"foo"});
+    ON_CALL(*raw_ftrace_procfs, NumberOfCpus()).WillByDefault(Return(2));
+    config.set_total_buffer_size_kb(42);
+    auto sink = controller.CreateSink(config, &delegate);
+  }
+}
+
+TEST(FtraceControllerTest, PeriodicDrainConfig) {
+  MockTaskRunner task_runner;
+  auto ftrace_procfs =
+      std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
+  auto raw_ftrace_procfs = ftrace_procfs.get();
+  TestFtraceController controller(std::move(ftrace_procfs), &task_runner,
+                                  FakeTable());
+
+  // For this test we don't care about calls to WriteToFile.
+  EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(_, _)).Times(AnyNumber());
+  MockDelegate delegate;
+
+  {
+    // No period -> good default.
+    EXPECT_CALL(task_runner, PostDelayedTask(_, 100));
+    FtraceConfig config({"foo"});
+    auto sink = controller.CreateSink(config, &delegate);
+  }
+
+  {
+    // Pick a tiny value -> good default.
+    EXPECT_CALL(task_runner, PostDelayedTask(_, 100));
+    FtraceConfig config({"foo"});
+    config.set_drain_period_ms(0);
+    auto sink = controller.CreateSink(config, &delegate);
+  }
+
+  {
+    // Pick a huge value -> good default.
+    EXPECT_CALL(task_runner, PostDelayedTask(_, 100));
+    FtraceConfig config({"foo"});
+    config.set_drain_period_ms(1000 * 60 * 60);
+    auto sink = controller.CreateSink(config, &delegate);
+  }
+
+  {
+    // Pick a resonable value -> get that value.
+    EXPECT_CALL(task_runner, PostDelayedTask(_, 200));
+    FtraceConfig config({"foo"});
+    config.set_drain_period_ms(200);
+    auto sink = controller.CreateSink(config, &delegate);
+  }
 }
 
 }  // namespace perfetto
