@@ -20,7 +20,6 @@ config("public_config") {
   include_dirs = [
     # The below are needed due to generated protobuf headers including other
     # headers with a path relative to the perfetto root.
-    # Unfortunately this means embedder code can include protos without
     "${root_gen_dir}/${perfetto_root_path}",
   ]
 }
