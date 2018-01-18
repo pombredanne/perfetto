@@ -28,7 +28,6 @@ group("all") {
     ":perfetto_tests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
-    "tools:protoc_helper",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
     "tools/trace_to_text",
@@ -41,6 +40,7 @@ group("all") {
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
       "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }
@@ -68,16 +68,6 @@ if (!build_with_chromium) {
       "gn:default_deps",
       "src/tracing:tracing_benchmarks",
     ]
-  }
-
-  if (build_with_android) {
-    # Used by Android's statsd in /frameworks/base/cmds.
-    static_library("perfetto_protos_lite") {
-      deps = [
-        "gn:default_deps",
-        "protos:lite",
-      ]
-    }
   }
 
   if (monolithic_binaries) {
