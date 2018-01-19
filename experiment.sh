@@ -3,8 +3,13 @@
 set -e
 
 OUT_DIR=out/linux_clang_debug/
+CATAPULT_PATH=$HOME/proj/catapult/
 
-DURATION_MS="${DURATION_MS:-10000}"
+RUN_METRIC_PATH=$CATAPULT_PATH/tracing/bin/run_metric
+
+
+
+DURATION_MS="${DURATION_MS:-12000}"
 BUFFER_SIZE_KB="${BUFFER_SIZE_KB:-}"
 DRAIN_PERIOD_MS="${DRAIN_PERIOD_MS:-}"
 
@@ -36,7 +41,7 @@ if [[ -z "$DRAIN_PERIOD_MS" ]]; then
 fi
 
 if [[ -z "$1" ]]; then
-  echo "Usage: $0 output_trace_name.html"
+  echo "Usage: $0 output_dir"
   exit 1
 fi
 
@@ -47,8 +52,7 @@ adb shell setenforce 0
 tmpdir=$(mktemp -d)
 trap 'rm -rf -- "$tmpdir"' INT TERM HUP EXIT
 
-metadatadir=$output.metadata
-mkdir $metadatadir
+mkdir $output
 
 make_config $BUFFER_SIZE_KB $DRAIN_PERIOD_MS $DURATION_MS> $tmpdir/experiment.cfg.protobuf
 adb push $tmpdir/experiment.cfg.protobuf /data/local/
@@ -64,15 +68,18 @@ adb shell traced &
 adb shell traced_probes &
 
 adb shell perfetto -c /data/local/experiment.cfg.protobuf -o /data/local/out.protobuf &
-./buildtools/android_sdk/platform-tools/systrace/systrace.py -t 10 -o $output sched
+./buildtools/android_sdk/platform-tools/systrace/systrace.py -t 10 -o $output/trace.html sched
 
 set +x
 
 for i in {0..7}; do
-  adb pull /sys/kernel/debug/tracing/instances/meta/per_cpu/cpu$i/stats $metadatadir/stats$i
+  adb pull /sys/kernel/debug/tracing/instances/meta/per_cpu/cpu$i/stats $output/stats$i
 done
 
-find $metadatadir/ -type f | xargs grep '^overrun:' | cut -d' ' -f2 | paste -sd+ - | bc > $metadatadir/overrun
-echo 'dropped:' $(cat $metadatadir/overrun)
+find $output/ -type f | grep stats | xargs grep '^overrun:' | cut -d' ' -f2 | paste -sd+ - | bc > $output/overrun
 
+$RUN_METRIC_PATH $output/trace.html androidSystraceMetric --also-output-json --filename=$output/results
+cat $output/results.json | jq 'map(select(.name | contains("traced"))) | map({ name: .name, value: .sampleValues[0]})' > $output/traced_results.json
+
+echo 'dropped:' $(cat $output/overrun)
 
