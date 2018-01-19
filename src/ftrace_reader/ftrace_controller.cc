@@ -37,12 +37,14 @@
 namespace perfetto {
 namespace {
 
-// TODO(b/68242551): Do not hardcode these paths.
 #if BUILDFLAG(OS_ANDROID)
-const char kTracingPath[] = "/sys/kernel/tracing/";
-const char kTracingPathFallback[] = "/sys/kernel/debug/tracing/";
+const char* kTracingPaths[] = {
+    "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
+};
 #else
-const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+const char* kTracingPaths[] = {
+    "/sys/kernel/debug/tracing/", nullptr,
+};
 #endif
 
 // TODO(hjd): Expose this as a configurable variable.
@@ -51,20 +53,19 @@ const int kDrainPeriodMs = 100;
 }  // namespace
 
 // static
+// TODO(taylori): Add a test for tracing paths in integration tests.
 std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
-  auto ftrace_procfs =
-      std::unique_ptr<FtraceProcfs>(new FtraceProcfs(kTracingPath));
-#if BUILDFLAG(OS_ANDROID)
-  if (!ftrace_procfs->checkRootPath()) {
-    PERFETTO_LOG("%s was a bad path. Changing to %s.", kTracingPath,
-                 kTracingPathFallback);
-    ftrace_procfs->updateRootPath(kTracingPathFallback);
+  int index = 0;
+  auto ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
+  while (!ftrace_procfs && kTracingPaths[index]) {
+    ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
   }
-#endif
-  if (!ftrace_procfs->checkRootPath()) {
-    PERFETTO_LOG("Path was bad. Giving up.");
+
+  if (!ftrace_procfs) {
+    return nullptr;
   }
+
   auto table = ProtoTranslationTable::Create(
       ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());
   return std::unique_ptr<FtraceController>(
@@ -123,10 +124,11 @@ void FtraceController::StartIfNeeded() {
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
   ftrace_procfs_->EnableTracing();
+  generation_++;
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
     base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
-                                            weak_this, ++generation_, cpu),
+                                            weak_this, generation_, cpu),
                                   kDrainPeriodMs);
   }
 }

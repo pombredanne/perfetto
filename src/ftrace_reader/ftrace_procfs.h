@@ -61,9 +61,7 @@ class FtraceProcfs {
   // Disables tracing, does not clear the buffer.
   bool DisableTracing();
 
-  bool checkRootPath();
-
-  void updateRootPath(const std::string& newRoot);
+  static std::unique_ptr<FtraceProcfs> Create(const std::string& root);
 
   // Returns true iff tracing is enabled.
   // Necessarily racy: another program could enable/disable tracing at any
@@ -77,7 +75,8 @@ class FtraceProcfs {
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:
-  std::string root_;
+  const std::string root_;
+  static bool CheckRootPath(const std::string& root);
 };
 
 }  // namespace perfetto

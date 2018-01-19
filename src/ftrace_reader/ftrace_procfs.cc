@@ -130,13 +130,16 @@ bool FtraceProcfs::IsTracingEnabled() {
   return ReadOneCharFromFile(path) == '1';
 }
 
-bool FtraceProcfs::checkRootPath() {
-  base::ScopedFile fd = base::OpenFile(root_ + "trace", O_RDONLY);
-  return (bool)fd;
+bool FtraceProcfs::CheckRootPath(const std::string& root) {
+  base::ScopedFile fd = base::OpenFile(root + "trace", O_RDONLY);
+  return static_cast<bool>(fd);
 }
 
-void FtraceProcfs::updateRootPath(const std::string& newRoot) {
-  root_ = newRoot;
+std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
+  if (!CheckRootPath(root)) {
+    return nullptr;
+  }
+  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root));
 }
 
 bool FtraceProcfs::WriteToFile(const std::string& path,
