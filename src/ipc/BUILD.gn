@@ -38,6 +38,21 @@ source_set("ipc") {
   ]
 }
 
+executable("buffered_frame_deserializer_fuzzer") {
+  sources = [
+    "buffered_frame_deserializer_fuzzer.cc",
+  ]
+  deps = [
+    ":ipc",
+    "//gn:default_deps",
+  ]
+  cflags = [ "-fsanitize=fuzzer" ]
+  ldflags = [
+    "-fsanitize=fuzzer",
+    "-fsanitize-coverage=trace-pc-guard",
+  ]
+}
+
 source_set("perfetto_ipc_unittests") {
   testonly = true
   deps = [
