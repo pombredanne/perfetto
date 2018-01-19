@@ -145,6 +145,7 @@ class FtraceController {
 
   void StartIfNeeded();
   void StopIfNeeded();
+  base::ScopedFile checkPath(const char tracingPath[]);
 
   // Returns a cached CpuReader for |cpu|.
   // CpuReaders are constructed lazily and owned by the controller.

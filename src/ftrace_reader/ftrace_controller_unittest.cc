@@ -135,6 +135,11 @@ class TestFtraceController : public FtraceController {
 
 }  // namespace
 
+TEST(FtraceControllerTest, tracingPaths) {
+  NiceMock<MockTaskRunner> task_runner;
+  auto controller = FtraceController::Create(&task_runner);
+}
+
 TEST(FtraceControllerTest, NoExistentEventsDontCrash) {
   NiceMock<MockTaskRunner> task_runner;
   auto ftrace_procfs =
