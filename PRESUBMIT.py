@@ -19,7 +19,7 @@ def CheckChange(input, output):
     # There apparently is no way to wrap strings in blueprints, so ignore long
     # lines in them.
     long_line_sources = lambda x: input.FilterSourceFile(
-            x, white_list=".*", black_list=['Android[.]bp'])
+            x, white_list=".*", black_list=['Android[.]bp', ''])
 
     results = []
     results += input.canned_checks.CheckDoNotSubmit(input, output)
@@ -29,6 +29,7 @@ def CheckChange(input, output):
     results += input.canned_checks.CheckPatchFormatted(input, output)
     results += input.canned_checks.CheckGNFormatted(input, output)
     results += CheckAndroidBlueprint(input, output)
+    results += CheckMergedTraceConfigProto(input, output)
     return results
 
 
@@ -58,5 +59,22 @@ def CheckAndroidBlueprint(input_api, output_api):
             output_api.PresubmitError(
                 'Android.bp is out of date. Please run tools/gen_android_bp '
                 'to update it.')
+        ]
+    return []
+
+
+def CheckMergedTraceConfigProto(input_api, output_api):
+    # If no GN files were modified, bail out.
+    tool = 'tools/gen_merged_trace_config'
+    build_file_filter = lambda x: input_api.FilterSourceFile(
+          x,
+          white_list=('protos/perfetto/config/.*[.]proto$', tool))
+    if not input_api.AffectedSourceFiles(build_file_filter):
+        return []
+    if subprocess.call([tool, '--check-only']):
+        return [
+            output_api.PresubmitError(
+                'trace_config_merged.proto is out of date. Please run ' +
+                tool + ' to update it.')
         ]
     return []
