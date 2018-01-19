@@ -27,7 +27,8 @@ PROTOS = (
 
 MERGED_OUT_PROTO = 'protos/perfetto/config/trace_config_merged.proto'
 
-STRIP_PATTERN = r'// ----- BEGIN DATA SOURCE SPECIFIC FIELDS -----(.|\n)*----- END DATA SOURCE SPECIFIC FIELDS -----'
+STRIP_PATTERN = (r'// ----- BEGIN DATA SOURCE SPECIFIC FIELDS -----(.|\n)' +
+                 r'*----- END DATA SOURCE SPECIFIC FIELDS -----')
 STRIP_REPLACEMENT = 'extensions 100 to max;  // Data-source specific fields.'
 
 AUTOGEN_BANNER = '''

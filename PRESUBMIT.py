@@ -19,7 +19,7 @@ def CheckChange(input, output):
     # There apparently is no way to wrap strings in blueprints, so ignore long
     # lines in them.
     long_line_sources = lambda x: input.FilterSourceFile(
-            x, white_list=".*", black_list=['Android[.]bp', ''])
+            x, white_list=".*", black_list=['Android[.]bp'])
 
     results = []
     results += input.canned_checks.CheckDoNotSubmit(input, output)
@@ -64,7 +64,6 @@ def CheckAndroidBlueprint(input_api, output_api):
 
 
 def CheckMergedTraceConfigProto(input_api, output_api):
-    # If no GN files were modified, bail out.
     tool = 'tools/gen_merged_trace_config'
     build_file_filter = lambda x: input_api.FilterSourceFile(
           x,
