@@ -462,7 +462,6 @@ def create_modules_from_target(blueprint, desc, target_name):
         # Don't try to inject library/source dependencies into genrules because
         # they are not compiled in the traditional sense.
         if module.type != 'genrule':
-            module.cflags |= _get_cflags(target)
             module.defaults = [defaults_module]
             apply_module_dependency(blueprint, desc, module, target_name)
             for dep in resolve_dependencies(desc, target_name):
