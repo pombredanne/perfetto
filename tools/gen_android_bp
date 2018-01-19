@@ -511,7 +511,6 @@ def create_blueprint_for_targets(desc, targets):
     # Default settings used by all modules.
     defaults = Module('cc_defaults', defaults_module)
     defaults.local_include_dirs = ['include']
-    # TODO(fmayer): Figure out how to propagate defines.
     defaults.cflags = [
         '-Wno-error=return-type',
         '-Wno-sign-compare',
