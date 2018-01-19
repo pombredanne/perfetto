@@ -39,7 +39,6 @@ default_targets = [
     '//:libtraced_shared',
     '//:perfetto_tests',
     '//:perfetto',
-    '//:perfetto_config_protos_lite',
     '//:traced',
     '//:traced_probes',
 ]

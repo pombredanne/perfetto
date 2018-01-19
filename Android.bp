@@ -147,30 +147,6 @@ cc_binary {
   ],
 }
 
-// GN target: //:perfetto_config_protos_lite
-cc_library_static {
-  name: "perfetto_config_protos_lite",
-  srcs: [
-    ":perfetto_protos_perfetto_config_config_gen",
-  ],
-  shared_libs: [
-    "liblog",
-    "libprotobuf-cpp-lite",
-  ],
-  export_include_dirs: [
-    "include",
-  ],
-  generated_headers: [
-    "perfetto_protos_perfetto_config_config_gen_headers",
-  ],
-  export_generated_headers: [
-    "perfetto_protos_perfetto_config_config_gen_headers",
-  ],
-  defaults: [
-    "perfetto_defaults",
-  ],
-}
-
 cc_defaults {
   name: "perfetto_defaults",
   cflags: [
