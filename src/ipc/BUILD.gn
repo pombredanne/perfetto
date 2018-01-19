@@ -75,4 +75,5 @@ ipc_library("test_messages") {
     "test/greeter_service.proto",
   ]
   proto_in_dir = perfetto_root_path
+  proto_out_dir = perfetto_root_path
 }

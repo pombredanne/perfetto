@@ -21,6 +21,7 @@ ipc_library("ipc") {
     "../config",
   ]
   proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
   sources = [
     "consumer_port.proto",
     "producer_port.proto",
