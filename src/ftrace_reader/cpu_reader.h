@@ -72,7 +72,7 @@ class EventFilter {
 //
 // 1) Calling Drain() on a fixed schedule, i.e., by polling.
 //
-// 2) Calling WaitForPage() to block until a full page of data is
+// 2) Calling WaitForData() to wait until a full page of data is
 //    available, followed by a call to Drain().
 //
 // Internally the first option is implemented by directly reading the raw trace
@@ -174,6 +174,8 @@ class CpuReader {
   float pages_per_second_ = 0.f;
 
   // Begin lock protected members.
+  // TODO(skyostil): Think about whether we really need locking here since
+  // WaitForData never runs concurrently with Drain.
   std::mutex lock_;
   base::TaskRunner* task_runner_;
 

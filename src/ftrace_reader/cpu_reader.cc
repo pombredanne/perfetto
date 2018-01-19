@@ -133,8 +133,8 @@ void CpuReader::WaitForData(std::function<void(void)> callback) {
       spliced_data_to_staging_ = true;
     }
     int flags = fcntl(trace_fd_.get(), F_GETFL, 0);
-    // This call will block until there is roughly a page full of data in the
-    // staging pipe. For this to work the trace fd must be in blocking mode.
+    // The splice call will block until there is roughly a page full of data in
+    // the staging pipe. For this to work the trace fd must be in blocking mode.
     fcntl(trace_fd_.get(), F_SETFL, flags & ~O_NONBLOCK);
     if (PERFETTO_EINTR(splice(trace_fd_.get(), nullptr, staging_write_fd_.get(),
                               nullptr, kPageSize, SPLICE_F_MOVE)) == -1) {
