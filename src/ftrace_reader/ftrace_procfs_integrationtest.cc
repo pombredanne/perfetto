@@ -49,7 +49,7 @@ std::string ReadFile(const std::string& name) {
 
 std::string GetTraceOutput() {
   std::string output = ReadFile("trace");
-  if (output == "") {
+  if (output.empty()) {
     ADD_FAILURE() << "Could not read trace output";
   }
   return output;

@@ -40,14 +40,14 @@ namespace {
 static constexpr size_t kPageSize = 4096;
 
 // TODO(b/68242551): Do not hardcode these paths.
-const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+const char kTracingPath[] = "/sys/kernel/debug/tracing/instances/meta/";
 
 const int kDefaultDrainPeriodMs = 100;
 const int kMinDrainPeriodMs = 1;
 const int kMaxDrainPeriodMs = 1000 * 60;
 
 const int kDefaultTotalBufferSizeKb = 1024 * 8;     // 8mb
-const int kMaxTotalBufferSizeKb = 1024 * 1024 * 1;  // 1mb
+const int kMaxTotalBufferSizeKb = 1024 * 1024 * 1;  // 1gb
 
 uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
   if (drain_period_ms == 0) {

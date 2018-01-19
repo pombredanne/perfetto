@@ -65,7 +65,7 @@ void FtraceProducer::CreateDataSourceInstance(
   PERFETTO_LOG("Source start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                source_config.target_buffer());
 
-  // TODO(hjd): Would be nice if ftrace_reader could the generated config.
+  // TODO(hjd): Would be nice if ftrace_reader could use the generated config.
   const DataSourceConfig::FtraceConfig proto_config =
       source_config.ftrace_config();
 

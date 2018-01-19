@@ -46,7 +46,7 @@ class FtraceProcfs {
   std::string ReadAvailableEvents() const;
 
   // Set ftrace buffer size in pages.
-  // This size is *per cpu* so for the total size you have to multiple
+  // This size is *per cpu* so for the total size you have to multiply
   // by the number of CPUs.
   bool SetCpuBufferSizeInPages(size_t pages);
 
