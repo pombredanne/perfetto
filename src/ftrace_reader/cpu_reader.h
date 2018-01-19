@@ -22,9 +22,12 @@
 
 #include <array>
 #include <memory>
+#include <mutex>
+#include <thread>
 
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/protozero_message.h"
 #include "proto_translation_table.h"
@@ -64,17 +67,43 @@ class EventFilter {
   std::set<std::string> enabled_names_;
 };
 
+// Processes raw ftrace data for a logical CPU core. Data can be read in one of
+// two ways:
+//
+// 1) Calling Drain() on a fixed schedule, i.e., by polling.
+//
+// 2) Calling WaitForPage() to block until a full page of data is
+//    available, followed by a call to Drain().
+//
+// Internally the first option is implemented by directly reading the raw trace
+// pipe directly, while the second option uses splice(2) to move data from
+// the trace ring buffer to an intermediate pipe. This lets us block inside the
+// splice syscall until a full page of data is available -- as opposed to
+// poll(2) which would return as soon as any data is available to read.
+//
 class CpuReader {
  public:
-  CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
+  CpuReader(base::TaskRunner*,
+            const ProtoTranslationTable*,
+            size_t cpu,
+            base::ScopedFile fd);
   ~CpuReader();
 
+  // Blocks until a ~page of ftrace data is available for draining. |callback|
+  // will be invoked on the task runner passed to the constructor.
+  void WaitForData(std::function<void(void)> callback);
+
+  // Read up to a page of data an ftrace buffer without blocking. Returns true
+  // if a page was read successfully and it was more than half populated with
+  // ftrace events.
   bool Drain(
       const std::array<const EventFilter*, kMaxSinks>&,
       const std::array<
           protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
           kMaxSinks>&);
-  int GetFileDescriptor();
+
+  // Estimates how much data this CPU is producing based on the drain rate.
+  float pages_per_second() const { return pages_per_second_; }
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
@@ -134,8 +163,25 @@ class CpuReader {
 
   const ProtoTranslationTable* table_;
   const size_t cpu_;
-  base::ScopedFile fd_;
+  base::ScopedFile trace_fd_;
+  base::ScopedFile staging_read_fd_;
+  base::ScopedFile staging_write_fd_;
   std::unique_ptr<uint8_t[]> buffer_;
+
+  base::UnixTaskRunner monitor_task_runner_;
+  std::thread monitor_thread_;
+  int64_t last_read_time_ns_;
+  float pages_per_second_ = 0.f;
+
+  // Begin lock protected members.
+  std::mutex lock_;
+  base::TaskRunner* task_runner_;
+
+  // Whether we have used splice(2) to move data from the trace fd into the
+  // staging pipe.
+  bool spliced_data_to_staging_ = false;
+
+  // End lock protected members.
 };
 
 }  // namespace perfetto

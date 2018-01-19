@@ -95,23 +95,74 @@ EventFilter::EventFilter(const ProtoTranslationTable& table,
       enabled_names_(std::move(names)) {}
 EventFilter::~EventFilter() = default;
 
-CpuReader::CpuReader(const ProtoTranslationTable* table,
+CpuReader::CpuReader(base::TaskRunner* task_runner,
+                     const ProtoTranslationTable* table,
                      size_t cpu,
                      base::ScopedFile fd)
-    : table_(table), cpu_(cpu), fd_(std::move(fd)) {}
+    : table_(table),
+      cpu_(cpu),
+      trace_fd_(std::move(fd)),
+      task_runner_(task_runner) {
+  int pipe_fds[2];
+  PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
+  staging_read_fd_.reset(pipe_fds[0]);
+  staging_write_fd_.reset(pipe_fds[1]);
 
-int CpuReader::GetFileDescriptor() {
-  return fd_.get();
+  // Start a thread with a message loop to monitor for new ftrace data.
+  // TODO(skyostil): Add a light weight task runner that doesn't support
+  // monitoring fds.
+  // TODO(skyostil): Start and stop this thread on demand.
+  std::thread t(std::bind(&base::UnixTaskRunner::Run, &monitor_task_runner_));
+  std::swap(monitor_thread_, t);
+}
+
+CpuReader::~CpuReader() {
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    task_runner_ = nullptr;
+  }
+  monitor_task_runner_.Quit();
+  monitor_thread_.join();
+}
+
+void CpuReader::WaitForData(std::function<void(void)> callback) {
+  monitor_task_runner_.PostTask([this, callback] {
+    {
+      std::lock_guard<std::mutex> lock(lock_);
+      PERFETTO_DCHECK(!spliced_data_to_staging_);
+      spliced_data_to_staging_ = true;
+    }
+    int flags = fcntl(trace_fd_.get(), F_GETFL, 0);
+    // This call will block until there is roughly a page full of data in the
+    // staging pipe. For this to work the trace fd must be in blocking mode.
+    fcntl(trace_fd_.get(), F_SETFL, flags & ~O_NONBLOCK);
+    if (PERFETTO_EINTR(splice(trace_fd_.get(), nullptr, staging_write_fd_.get(),
+                              nullptr, kPageSize, SPLICE_F_MOVE)) == -1) {
+      PERFETTO_DPLOG("splice");
+    }
+    fcntl(trace_fd_.get(), F_SETFL, flags);
+    {
+      std::lock_guard<std::mutex> lock(lock_);
+      if (task_runner_)
+        task_runner_->PostTask(callback);
+    }
+  });
 }
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
-  if (!fd_)
+  if (!trace_fd_)
     return false;
 
+  int fd;
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    fd = spliced_data_to_staging_ ? staging_read_fd_.get() : trace_fd_.get();
+    spliced_data_to_staging_ = false;
+  }
+
   uint8_t* buffer = GetBuffer();
-  // TOOD(hjd): One read() per page may be too many.
-  long bytes = PERFETTO_EINTR(read(fd_.get(), buffer, kPageSize));
+  long bytes = PERFETTO_EINTR(read(fd, buffer, kPageSize));
   if (bytes == -1 && errno == EAGAIN)
     return false;
   if (bytes != kPageSize)
@@ -126,11 +177,21 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     PERFETTO_DCHECK(evt_size);
   }
 
+  // Update data rate estimate.
+  timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  int64_t now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+  if (last_read_time_ns_ && last_read_time_ns_ < now_ns) {
+    float elapsed_seconds =
+        static_cast<float>(now_ns - last_read_time_ns_) / 1e9f;
+    float instant_rate = evt_size / (kPageSize * elapsed_seconds);
+    pages_per_second_ += (instant_rate - pages_per_second_) * .2f;
+  }
+  last_read_time_ns_ = now_ns;
+
   // TODO(hjd): Introduce enum to distinguish real failures.
   return evt_size > (kPageSize / 2);
 }
-
-CpuReader::~CpuReader() = default;
 
 uint8_t* CpuReader::GetBuffer() {
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.

@@ -53,7 +53,7 @@
 // from this process.
 namespace perfetto {
 namespace {
-const char kTempTraceDir[] = "/data/misc/perfetto-traces";
+const char kTempTraceDir[] = "/tmp";
 const char kDefaultDropBoxTag[] = "perfetto";
 }  // namespace
 

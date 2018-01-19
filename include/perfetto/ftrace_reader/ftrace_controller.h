@@ -134,10 +134,6 @@ class FtraceController {
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
-  static void PeriodicDrainCPU(base::WeakPtr<FtraceController>,
-                               size_t generation,
-                               int cpu);
-
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
   void RegisterForEvent(const std::string& event_name);
@@ -145,6 +141,15 @@ class FtraceController {
 
   void StartIfNeeded();
   void StopIfNeeded();
+
+  // Select a strategy for draining the next data buffer for |cpu|. |has_more|
+  // indicates if we think the CPU already has pending data to read.
+  void ChooseDrainingStrategy(size_t cpu, bool has_more);
+
+  // Read up to one page of data from the trace buffer for |cpu|. |generation|
+  // is the generation this operation was scheduled for. Returns true if more
+  // data is expected to be available for this cpu.
+  bool DrainCpu(size_t cpu, size_t generation);
 
   // Returns a cached CpuReader for |cpu|.
   // CpuReaders are constructed lazily and owned by the controller.

@@ -43,6 +43,11 @@ const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 // TODO(hjd): Expose this as a configurable variable.
 const int kDrainPeriodMs = 100;
 
+// Below this rate we'll wait for the kernel to tell us that a CPU has data to
+// read. If the rate is higher we switch to draining the buffer for this CPU on
+// a periodic schedule.
+const int kFastDataRateThreshold = 8;  // Pages per second.
+
 }  // namespace
 
 // static
@@ -78,29 +83,6 @@ FtraceController::~FtraceController() {
   }
 }
 
-// static
-void FtraceController::PeriodicDrainCPU(
-    base::WeakPtr<FtraceController> weak_this,
-    size_t generation,
-    int cpu) {
-  // The controller might be gone.
-  if (!weak_this)
-    return;
-  // We might have stopped caring about events.
-  if (!weak_this->listening_for_raw_trace_data_)
-    return;
-  // We might have stopped tracing then quickly re-enabled it, in this case
-  // we don't want to end up with two periodic tasks for each CPU:
-  if (weak_this->generation_ != generation)
-    return;
-
-  bool has_more = weak_this->OnRawFtraceDataAvailable(cpu);
-  weak_this->task_runner_->PostDelayedTask(
-      std::bind(&FtraceController::PeriodicDrainCPU, weak_this, generation,
-                cpu),
-      has_more ? 0 : kDrainPeriodMs);
-}
-
 void FtraceController::StartIfNeeded() {
   if (sinks_.size() > 1)
     return;
@@ -109,12 +91,46 @@ void FtraceController::StartIfNeeded() {
   listening_for_raw_trace_data_ = true;
   ftrace_procfs_->EnableTracing();
   generation_++;
-  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
-    base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
-                                            weak_this, generation_, cpu),
-                                  kDrainPeriodMs);
+  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++)
+    ChooseDrainingStrategy(cpu, /* has_more */ false);
+}
+
+void FtraceController::ChooseDrainingStrategy(size_t cpu, bool has_more) {
+  CpuReader* reader = GetCpuReader(cpu);
+  PERFETTO_DLOG("cpu %zu rate: %.2f pages/s", cpu,
+                static_cast<double>(reader->pages_per_second()));
+  size_t generation = generation_;
+  // If the data rate is low, we don't want to wake up periodically but rather
+  // wait for the kernel to tell us when there is more data available.
+  if (reader->pages_per_second() < kFastDataRateThreshold) {
+    reader->WaitForData([this, cpu, generation] {
+      bool more = DrainCpu(cpu, generation);
+      ChooseDrainingStrategy(cpu, more);
+    });
+    return;
   }
+  // For a high data rate we drain the buffer at a fixed frequency to avoid
+  // waking up for each and every filled page.
+  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+  weak_this->task_runner_->PostDelayedTask(
+      [weak_this, cpu, generation] {
+        if (!weak_this)
+          return;
+        bool more = weak_this->DrainCpu(cpu, generation);
+        weak_this->ChooseDrainingStrategy(cpu, more);
+      },
+      has_more ? 0 : kDrainPeriodMs);
+}
+
+bool FtraceController::DrainCpu(size_t cpu, size_t generation) {
+  // We might have stopped caring about events.
+  if (!listening_for_raw_trace_data_)
+    return false;
+  // We might have stopped tracing then quickly re-enabled it, in this case
+  // we don't want to end up with two periodic tasks for each CPU:
+  if (generation_ != generation)
+    return false;
+  return OnRawFtraceDataAvailable(cpu);
 }
 
 void FtraceController::ClearTrace() {
@@ -161,9 +177,9 @@ bool FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
 CpuReader* FtraceController::GetCpuReader(size_t cpu) {
   PERFETTO_CHECK(cpu < ftrace_procfs_->NumberOfCpus());
   if (!readers_.count(cpu)) {
-    readers_.emplace(
-        cpu, std::unique_ptr<CpuReader>(new CpuReader(
-                 table_.get(), cpu, ftrace_procfs_->OpenPipeForCpu(cpu))));
+    readers_.emplace(cpu, std::unique_ptr<CpuReader>(new CpuReader(
+                              task_runner_, table_.get(), cpu,
+                              ftrace_procfs_->OpenPipeForCpu(cpu))));
   }
   return readers_.at(cpu).get();
 }

@@ -54,6 +54,9 @@ UnixTaskRunner::UnixTaskRunner() {
     // Not reached -- see PostFileDescriptorWatches().
     PERFETTO_DCHECK(false);
   });
+
+  // We aren't bound to a thread until Run() is called.
+  PERFETTO_DETACH_FROM_THREAD(thread_checker_);
 }
 
 UnixTaskRunner::~UnixTaskRunner() = default;

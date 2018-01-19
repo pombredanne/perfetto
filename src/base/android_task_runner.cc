@@ -35,6 +35,9 @@ AndroidTaskRunner::AndroidTaskRunner()
                          std::bind(&AndroidTaskRunner::RunImmediateTask, this));
   AddFileDescriptorWatch(delayed_timer_.get(),
                          std::bind(&AndroidTaskRunner::RunDelayedTask, this));
+
+  // We aren't bound to a thread until Run() is called.
+  PERFETTO_DETACH_FROM_THREAD(thread_checker_);
 }
 
 AndroidTaskRunner::~AndroidTaskRunner() {
@@ -57,6 +60,7 @@ AndroidTaskRunner::~AndroidTaskRunner() {
 }
 
 void AndroidTaskRunner::Run() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   quit_ = false;
   while (true) {
     {
