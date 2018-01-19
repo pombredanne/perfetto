@@ -17,6 +17,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "include/perfetto/base/utils.h"
 #include "src/ipc/buffered_frame_deserializer.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
@@ -25,6 +26,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   perfetto::ipc::BufferedFrameDeserializer bfd;
   auto rbuf = bfd.BeginReceive();
   memcpy(rbuf.data, data, size);
-  (void)bfd.EndReceive(size);
+  ::perfetto::base::ignore_result(bfd.EndReceive(size));
   return 0;
 }
