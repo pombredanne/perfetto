@@ -117,6 +117,6 @@ config("public_config") {
 
     # The below are needed due to generated protobuf headers including other
     # headers with a path relative to the perfetto root.
-    "${root_gen_dir}/${perfetto_root_path}/protos",
+    "${root_gen_dir}/${perfetto_root_path}",
   ]
 }
