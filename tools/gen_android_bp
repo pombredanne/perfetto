@@ -350,7 +350,8 @@ def make_genrules_for_action(blueprint, desc, target_name):
     cmd = [
         'mkdir -p $(genDir)/%s &&' % tree_path, '$(location aprotoc)',
         '--cpp_out=$(genDir)/%s' % tree_path,
-        '--proto_path=%s' % tree_path
+        '--proto_path=%s' % tree_path,
+        '--proto_path=%s/protos' % tree_path
     ]
     namespaces = ['pb']
 
