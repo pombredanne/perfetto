@@ -40,7 +40,7 @@ namespace {
 static constexpr size_t kPageSize = 4096;
 
 // TODO(b/68242551): Do not hardcode these paths.
-const char kTracingPath[] = "/sys/kernel/debug/tracing/instances/meta/";
+const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
 const int kDefaultDrainPeriodMs = 100;
 const int kMinDrainPeriodMs = 1;
