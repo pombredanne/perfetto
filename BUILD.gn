@@ -39,6 +39,8 @@ group("all") {
       ":traced",
       ":traced_probes",
       "src/ftrace_reader:ftrace_reader_integrationtests",
+      "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }
@@ -139,7 +141,10 @@ if (!build_with_chromium) {
   }
 } else {
   group("lib") {
-    public_configs = [ "gn:public_config" ]
+    public_configs = [
+      "gn:public_config",
+      "protos:public_config",
+    ]
     deps = [
       "src/tracing",
     ]
