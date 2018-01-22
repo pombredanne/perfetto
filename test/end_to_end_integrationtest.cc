@@ -48,9 +48,9 @@ using PlatformTaskRunner = base::AndroidTaskRunner;
 using PlatformTaskRunner = base::UnixTaskRunner;
 #endif
 
-// If we're building on Android but not as a CTS test, create the
-// define the producer and consumer socket in a world writable
-// directory so permissions are not a problem.
+// If we're building on Android but not as a CTS test, create the the producer
+// and consumer socket in a world writable directory so permissions are not a
+// problem.
 #if BUILDFLAG(OS_ANDROID) && !BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
 #define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
