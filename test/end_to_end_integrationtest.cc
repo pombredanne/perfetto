@@ -79,16 +79,14 @@ class PerfettoTest : public ::testing::Test {
       std::unique_lock<std::mutex> outer_lock(mutex_);
 
       // Start the thread.
-      thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate),
-                            &ready);
+      thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate));
 
       // Wait for runner to be ready.
       ready_.wait(outer_lock, [this]() { return runner_ != nullptr; });
     }
 
    private:
-    void Run(std::unique_ptr<ThreadDelegate> delegate,
-             std::condition_variable* ready) {
+    void Run(std::unique_ptr<ThreadDelegate> delegate) {
       // Create the task runner and execute the specicalised code.
       base::PlatformTaskRunner task_runner;
       delegate->Initialize(&task_runner);
@@ -100,7 +98,7 @@ class PerfettoTest : public ::testing::Test {
       }
 
       // Notify the main thread that the runner is ready.
-      ready_->notify_one();
+      ready_.notify_one();
 
       // Spin the loop.
       task_runner.Run();
