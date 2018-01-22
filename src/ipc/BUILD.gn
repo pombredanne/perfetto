@@ -38,7 +38,7 @@ source_set("ipc") {
   ]
 }
 
-if (enable_fuzz_tests) {
+if (build_fuzz_tests) {
   executable("buffered_frame_deserializer_fuzzer") {
     sources = [
       "buffered_frame_deserializer_fuzzer.cc",

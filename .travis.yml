@@ -58,7 +58,7 @@ matrix:
       dist: trusty
       sudo: true
       compiler: clang
-      env: CFG=linux_trusty-clang-x86_64-asan GN_ARGS="is_debug=false is_asan=true enable_fuzz_tests=true"
+      env: CFG=linux_trusty-clang-x86_64-asan GN_ARGS="is_debug=false is_asan=true build_fuzz_tests=true"
     - os: linux
       dist: trusty
       sudo: false
