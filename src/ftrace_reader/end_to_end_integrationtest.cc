@@ -107,7 +107,8 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   DataSourceConfig::FtraceConfig config;
-  *config.add_event_names() = {"print", "sched_switch"};
+  *config.add_event_names() = "print";
+  *config.add_event_names() = "sched_switch";
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.

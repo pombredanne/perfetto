@@ -26,6 +26,8 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+
 using testing::_;
 using testing::AnyNumber;
 using testing::ByMove;
@@ -182,7 +184,8 @@ TEST(FtraceControllerTest, MultipleSinks) {
   DataSourceConfig::FtraceConfig configA;
   *configA.add_event_names() = "foo";
   DataSourceConfig::FtraceConfig configB;
-  *configB.add_event_names() = {"foo", "bar"};
+  *configB.add_event_names() = "foo";
+  *configB.add_event_names() = "bar";
 
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(kFooEnablePath, "1"));

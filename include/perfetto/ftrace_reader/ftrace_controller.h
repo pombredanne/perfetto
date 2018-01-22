@@ -48,20 +48,6 @@ class CpuReader;
 class FtraceProcfs;
 class EventFilter;
 
-// class FtraceConfig {
-//  public:
-//   FtraceConfig();
-//   explicit FtraceConfig(std::set<std::string> events);
-//   ~FtraceConfig();
-//
-//   void AddEvent(const std::string&);
-//
-//   const std::set<std::string>& events() const { return events_; }
-//
-//  private:
-//   std::set<std::string> events_;
-// };
-
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
 // to create a |FtraceSink|. While the FtraceSink lives FtraceController will
 // call |GetBundleForCpu|, write data into the bundle then call
