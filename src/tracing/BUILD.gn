@@ -76,6 +76,27 @@ static_library("ipc") {
   ]
 }
 
+source_set("ipc_consumer") {
+  public_deps = [
+    "../../include/perfetto/tracing/core:core_consumer",
+    "../../include/perfetto/tracing/ipc:ipc_consumer",
+  ]
+  sources = [
+    "ipc/consumer/consumer_ipc_client_impl.cc",
+    "ipc/consumer/consumer_ipc_client_impl.h",
+    "ipc/posix_shared_memory.cc",
+    "ipc/posix_shared_memory.h",
+    "ipc/service/consumer_ipc_service.cc",
+    "ipc/service/consumer_ipc_service.h",
+  ]
+  deps = [
+    ":tracing",
+    "../../gn:default_deps",
+    "../../protos/perfetto/ipc",
+    "../base",
+  ]
+}
+
 source_set("tracing_unittests") {
   testonly = true
   deps = [

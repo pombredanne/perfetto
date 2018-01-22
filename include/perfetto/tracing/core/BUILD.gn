@@ -32,3 +32,23 @@ source_set("core") {
     "trace_writer.h",
   ]
 }
+
+source_set("core_consumer") {
+  public_deps = [
+    "../../base",
+  ]
+  sources = [
+    "basic_types.h",
+    "chunk.h",
+    "consumer.h",
+    "data_source_config.h",
+    "data_source_descriptor.h",
+    "service.h",
+    "shared_memory.h",
+    "shared_memory_abi.h",
+    "shared_memory_arbiter.h",
+    "trace_config.h",
+    "trace_packet.h",
+    "trace_writer.h",
+  ]
+}
