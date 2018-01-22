@@ -50,6 +50,7 @@ std::string GetTraceOutput() {
 
 }  // namespace
 
+// TODO(lalitm): reenable these thests (see b/72306171).
 TEST(FtraceProcfsIntegrationTest, DISABLED_ClearTrace) {
   FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);

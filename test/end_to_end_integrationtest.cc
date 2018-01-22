@@ -42,6 +42,7 @@
 
 namespace perfetto {
 
+using namespace std::chrono_literals;
 #if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
@@ -57,6 +58,8 @@ class PerfettoTest : public ::testing::Test {
   class ThreadDelegate {
    public:
     virtual ~ThreadDelegate() = default;
+
+    // Invoke on the target thread before the message loop is started.
     virtual void Initialize(base::TaskRunner* task_runner) = 0;
   };
 
@@ -74,15 +77,18 @@ class PerfettoTest : public ::testing::Test {
         thread_.join();
     }
 
+    // Blocks until the thread has been created and Initialize() has been
+    // called.
     void Start(std::unique_ptr<ThreadDelegate> delegate) {
       // Begin holding the lock for the condition variable.
-      std::unique_lock<std::mutex> outer_lock(mutex_);
+      std::unique_lock<std::mutex> lock(mutex_);
 
       // Start the thread.
+      DCHECK(!runner);
       thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate));
 
       // Wait for runner to be ready.
-      ready_.wait(outer_lock, [this]() { return runner_ != nullptr; });
+      ready_.wait_for(lock, 10s, [this]() { return runner_ != nullptr; });
     }
 
    private:
@@ -122,6 +128,9 @@ class PerfettoTest : public ::testing::Test {
     base::PlatformTaskRunner* runner_ = nullptr;
   };
 
+  // This is used only in standalone integrations tests. In CTS mode (i.e. when
+  // PERFETTO_ANDROID_BUILD) this code is not used and instead the system
+  // daemons are used
   class ServiceDelegate : public ThreadDelegate {
    public:
     ServiceDelegate() = default;
@@ -138,6 +147,9 @@ class PerfettoTest : public ::testing::Test {
     std::unique_ptr<ServiceIPCHost> svc_;
   };
 
+  // This is used only in standalone integrations tests. In CTS mode (i.e. when
+  // PERFETTO_ANDROID_BUILD) this code is not used and instead the system
+  // daemons are used.
   class FtraceProducerDelegate : public ThreadDelegate {
    public:
     FtraceProducerDelegate() = default;
