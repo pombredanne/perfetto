@@ -17,6 +17,7 @@
 #ifndef SRC_FTRACE_READER_FTRACE_PROCFS_H_
 #define SRC_FTRACE_READER_FTRACE_PROCFS_H_
 
+#include <memory>
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
