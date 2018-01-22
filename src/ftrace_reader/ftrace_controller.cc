@@ -245,13 +245,4 @@ const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
 }
 
-// FtraceConfig::FtraceConfig() = default;
-// FtraceConfig::FtraceConfig(std::set<std::string> events)
-//     : events_(std::move(events)) {}
-// FtraceConfig::~FtraceConfig() = default;
-//
-// void FtraceConfig::AddEvent(const std::string& event) {
-//   events_.insert(event);
-// }
-
 }  // namespace perfetto

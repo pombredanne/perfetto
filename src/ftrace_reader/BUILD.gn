@@ -73,8 +73,6 @@ executable("ftrace_reader_integrationtests") {
     ":test_support",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
-
-    #    "../../protos/perfetto/config",
     "../../protos/perfetto/trace/ftrace:lite",
     "../base",
   ]
@@ -88,9 +86,8 @@ source_set("ftrace_reader") {
   public_deps = [
     "../../gn:gtest_prod_config",
     "../../include/perfetto/ftrace_reader",
+    "../../include/perfetto/tracing/core",
     "../../protos/perfetto/trace/ftrace:zero",
-
-    #  "../../protos/perfetto/config",
   ]
   deps = [
     "../../gn:default_deps",
