@@ -27,8 +27,8 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
+#include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 namespace {
@@ -46,7 +46,7 @@ bool IsAlnum(const std::string& str) {
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
-  PERFETTO_LOG("Connected to the service");
+  PERFETTO_LOG("Connected to the service\n");
 
   DataSourceDescriptor descriptor;
   descriptor.set_name("com.google.perfetto.ftrace");

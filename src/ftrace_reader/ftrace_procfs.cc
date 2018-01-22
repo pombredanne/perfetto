@@ -21,6 +21,7 @@
 #include <sys/types.h>
 
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 
