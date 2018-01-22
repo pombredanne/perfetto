@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+
 #include "include/perfetto/tracing/core/data_source_config.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
