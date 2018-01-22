@@ -45,6 +45,7 @@ if (use_libfuzzer) {
     ]
     deps = [
       ":ipc",
+      ":wire_protocol",
       "//gn:default_deps",
     ]
     cflags = [ "-fsanitize=fuzzer" ]

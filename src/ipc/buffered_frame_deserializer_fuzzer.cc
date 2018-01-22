@@ -17,8 +17,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "include/perfetto/base/utils.h"
+#include "perfetto/base/utils.h"
 #include "src/ipc/buffered_frame_deserializer.h"
+#include "src/ipc/wire_protocol.pb.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
@@ -27,5 +28,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   auto rbuf = bfd.BeginReceive();
   memcpy(rbuf.data, data, size);
   ::perfetto::base::ignore_result(bfd.EndReceive(size));
+  // TODO(fmayer): Determine if this has value.
+  // This slows down fuzzing from 190k / s to 140k / sec.
+  while (bfd.PopNextFrame() != nullptr) {
+  }
   return 0;
 }
