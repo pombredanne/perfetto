@@ -170,19 +170,16 @@ class CpuReader {
 
   base::UnixTaskRunner monitor_task_runner_;
   std::thread monitor_thread_;
-  int64_t last_read_time_ns_;
+  int64_t last_read_time_ns_ = 0;
   float pages_per_second_ = 0.f;
-
-  // Begin lock protected members.
-  // TODO(skyostil): Think about whether we really need locking here since
-  // WaitForData never runs concurrently with Drain.
-  std::mutex lock_;
-  base::TaskRunner* task_runner_;
 
   // Whether we have used splice(2) to move data from the trace fd into the
   // staging pipe.
-  bool spliced_data_to_staging_ = false;
+  bool data_in_staging_pipe_ = false;
 
+  // Begin lock protected members.
+  std::mutex lock_;
+  base::TaskRunner* task_runner_;
   // End lock protected members.
 };
 

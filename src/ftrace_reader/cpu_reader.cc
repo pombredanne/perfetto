@@ -21,11 +21,11 @@
 #include "perfetto/base/logging.h"
 #include "proto_translation_table.h"
 
-#include "protos/ftrace/ftrace_event.pbzero.h"
-#include "protos/ftrace/print.pbzero.h"
-#include "protos/ftrace/sched_switch.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
+#include "perfetto/trace/ftrace/print.pbzero.h"
+#include "perfetto/trace/ftrace/sched_switch.pbzero.h"
 
-#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 
@@ -102,18 +102,15 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
     : table_(table),
       cpu_(cpu),
       trace_fd_(std::move(fd)),
+      // TODO(skyostil): Add a light weight task runner that doesn't support
+      // monitoring fds.
+      monitor_thread_(
+          std::bind(&base::UnixTaskRunner::Run, &monitor_task_runner_)),
       task_runner_(task_runner) {
   int pipe_fds[2];
   PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
-
-  // Start a thread with a message loop to monitor for new ftrace data.
-  // TODO(skyostil): Add a light weight task runner that doesn't support
-  // monitoring fds.
-  // TODO(skyostil): Start and stop this thread on demand.
-  std::thread t(std::bind(&base::UnixTaskRunner::Run, &monitor_task_runner_));
-  std::swap(monitor_thread_, t);
 }
 
 CpuReader::~CpuReader() {
@@ -127,11 +124,7 @@ CpuReader::~CpuReader() {
 
 void CpuReader::WaitForData(std::function<void(void)> callback) {
   monitor_task_runner_.PostTask([this, callback] {
-    {
-      std::lock_guard<std::mutex> lock(lock_);
-      PERFETTO_DCHECK(!spliced_data_to_staging_);
-      spliced_data_to_staging_ = true;
-    }
+    data_in_staging_pipe_ = true;
     int flags = fcntl(trace_fd_.get(), F_GETFL, 0);
     // The splice call will block until there is roughly a page full of data in
     // the staging pipe. For this to work the trace fd must be in blocking mode.
@@ -154,13 +147,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
   if (!trace_fd_)
     return false;
 
-  int fd;
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    fd = spliced_data_to_staging_ ? staging_read_fd_.get() : trace_fd_.get();
-    spliced_data_to_staging_ = false;
-  }
-
+  int fd = data_in_staging_pipe_ ? staging_read_fd_.get() : trace_fd_.get();
   uint8_t* buffer = GetBuffer();
   long bytes = PERFETTO_EINTR(read(fd, buffer, kPageSize));
   if (bytes == -1 && errno == EAGAIN)
@@ -168,6 +155,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
   if (bytes != kPageSize)
     return false;
   PERFETTO_CHECK(static_cast<size_t>(bytes) <= kPageSize);
+  data_in_staging_pipe_ = false;
 
   size_t evt_size = 0;
   for (size_t i = 0; i < kMaxSinks; i++) {
@@ -185,7 +173,9 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     float elapsed_seconds =
         static_cast<float>(now_ns - last_read_time_ns_) / 1e9f;
     float instant_rate = evt_size / (kPageSize * elapsed_seconds);
-    pages_per_second_ += (instant_rate - pages_per_second_) * .2f;
+    PERFETTO_DLOG("elapsed: %f, sz: %zu, rate: %f", (double)elapsed_seconds,
+                  evt_size, (double)instant_rate);
+    pages_per_second_ += (instant_rate - pages_per_second_) * .3f;
   }
   last_read_time_ns_ = now_ns;
 
@@ -318,19 +308,20 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
     return false;
   }
 
+  bool success = true;
   for (const Field& field : table->common_fields())
-    ParseField(field, start, end, message);
+    success &= ParseField(field, start, end, message);
 
   protozero::ProtoZeroMessage* nested =
       message->BeginNestedMessage<protozero::ProtoZeroMessage>(
           info.proto_field_id);
 
   for (const Field& field : info.fields)
-    ParseField(field, start, end, nested);
+    success &= ParseField(field, start, end, nested);
 
   // This finalizes |nested| automatically.
   message->Finalize();
-  return true;
+  return success;
 }
 
 // Caller must guarantee that the field fits in the range,
