@@ -78,7 +78,7 @@ static_library("ipc") {
 
 source_set("ipc_consumer") {
   public_deps = [
-    "../../include/perfetto/tracing/core:core_consumer",
+    "../../include/perfetto/tracing/core",
     "../../include/perfetto/tracing/ipc:ipc_consumer",
   ]
   sources = [

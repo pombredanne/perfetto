@@ -27,7 +27,7 @@ source_set("ipc") {
 source_set("ipc_consumer") {
   public_deps = [
     "../../base",
-    "../core:core_consumer",
+    "../core",
   ]
   sources = [
     "consumer_ipc_client.h",
