@@ -166,13 +166,15 @@ void ProducerIPCService::UnregisterDataSource(
 
 void ProducerIPCService::NotifySharedMemoryUpdate(
     const NotifySharedMemoryUpdateRequest& req,
-    DeferredNotifySharedMemoryUpdateResponse response) {
+    DeferredNotifySharedMemoryUpdateResponse) {
+  // NotifySharedMemoryUpdate messages don't expect any response. This is to
+  // avoid useless wakeups.
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
         "Producer invoked NotifySharedMemoryUpdate() before "
         "InitializeConnection()");
-    return response.Reject();
+    return;
   }
   // TODO: check that the page indexes are consistent with the size of the
   // shared memory region (once the SHM logic is there). Also add a test for it.
@@ -181,8 +183,6 @@ void ProducerIPCService::NotifySharedMemoryUpdate(
   for (const uint32_t& changed_page : req.changed_pages())
     changed_pages.push_back(changed_page);
   producer->service_endpoint->NotifySharedMemoryUpdate(changed_pages);
-  response.Resolve(
-      ipc::AsyncResult<NotifySharedMemoryUpdateResponse>::Create());
 }
 
 void ProducerIPCService::GetAsyncCommand(

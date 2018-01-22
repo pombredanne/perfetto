@@ -39,6 +39,7 @@ message Frame {
     optional int32 service_id = 1;  // As returned by BindServiceReply.id.
     optional int32 method_id = 2;  // As returned by BindServiceReply.method.id.
     optional bytes args_proto = 3;  // Proto-encoded request argument.
+    optional bool dont_reply = 4;   // The Client doesn't care about the reply.
   }
 
   // Host -> Client.
