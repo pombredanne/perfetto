@@ -27,7 +27,3 @@ message FakeAllFieldsFtraceEvent {
   optional string field_char_16 = 500;
   optional string field_char = 501;
 }
-
-message FakeFtraceConfig {
-  repeated string event_names = 1;
-}

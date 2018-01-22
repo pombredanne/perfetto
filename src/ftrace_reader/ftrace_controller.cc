@@ -33,7 +33,7 @@
 #include "proto_translation_table.h"
 
 //#include "include/perfetto/tracing/core/data_source_config.h"
-#include "perfetto/config/data_source_config.pb.h"
+//#include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {

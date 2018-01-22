@@ -26,7 +26,7 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
-#include "perfetto/config/data_source_config.pb.h"
+//#include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 using testing::_;
