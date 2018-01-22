@@ -70,6 +70,16 @@ if (!build_with_chromium) {
     ]
   }
 
+  if (build_with_android) {
+    # Used by Android's statsd in /frameworks/base/cmds.
+    static_library("perfetto_protos_lite") {
+      deps = [
+        "gn:default_deps",
+        "protos:lite",
+      ]
+    }
+  }
+
   if (monolithic_binaries) {
     libtraced_shared_target_type = "source_set"
   } else {
@@ -131,7 +141,10 @@ if (!build_with_chromium) {
   }
 } else {
   group("lib") {
-    public_configs = [ "gn:public_config" ]
+    public_configs = [
+      "gn:public_config",
+      "protos:public_config",
+    ]
     deps = [
       "src/tracing",
     ]

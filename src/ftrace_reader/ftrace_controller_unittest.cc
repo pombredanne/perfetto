@@ -26,7 +26,7 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -134,11 +134,6 @@ class TestFtraceController : public FtraceController {
 };
 
 }  // namespace
-
-TEST(FtraceControllerTest, tracingPaths) {
-  NiceMock<MockTaskRunner> task_runner;
-  auto controller = FtraceController::Create(&task_runner);
-}
 
 TEST(FtraceControllerTest, NoExistentEventsDontCrash) {
   NiceMock<MockTaskRunner> task_runner;

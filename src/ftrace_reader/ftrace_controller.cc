@@ -32,7 +32,7 @@
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
 
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 namespace {
@@ -43,7 +43,7 @@ const char* kTracingPaths[] = {
 };
 #else
 const char* kTracingPaths[] = {
-    "/sys/kernel/debug/tracing/", nullptr,
+    "/sys/kernel/debug/tracing/df", nullptr,
 };
 #endif
 
@@ -56,8 +56,8 @@ const int kDrainPeriodMs = 100;
 // TODO(taylori): Add a test for tracing paths in integration tests.
 std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
-  int index = 0;
-  auto ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
+  size_t index = 0;
+  std::unique_ptr<FtraceProcfs> ftrace_procfs = nullptr;
   while (!ftrace_procfs && kTracingPaths[index]) {
     ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
   }

@@ -25,6 +25,8 @@ namespace perfetto {
 
 class FtraceProcfs {
  public:
+  static std::unique_ptr<FtraceProcfs> Create(const std::string& root);
+
   FtraceProcfs(const std::string& root);
   virtual ~FtraceProcfs();
 
@@ -61,8 +63,6 @@ class FtraceProcfs {
   // Disables tracing, does not clear the buffer.
   bool DisableTracing();
 
-  static std::unique_ptr<FtraceProcfs> Create(const std::string& root);
-
   // Returns true iff tracing is enabled.
   // Necessarily racy: another program could enable/disable tracing at any
   // point.
@@ -75,8 +75,10 @@ class FtraceProcfs {
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:
-  const std::string root_;
+  // Checks the trace file is present at the given root path.
   static bool CheckRootPath(const std::string& root);
+
+  const std::string root_;
 };
 
 }  // namespace perfetto
