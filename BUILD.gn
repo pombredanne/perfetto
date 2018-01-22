@@ -38,6 +38,7 @@ group("all") {
       ":perfetto_benchmarks",
       ":traced",
       ":traced_probes",
+      "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "src/ftrace_reader:ftrace_reader_integrationtests",
       "test/configs",
       "tools:protoc_helper",
@@ -68,16 +69,6 @@ if (!build_with_chromium) {
       "gn:default_deps",
       "src/tracing:tracing_benchmarks",
     ]
-  }
-
-  if (build_with_android) {
-    # Used by Android's statsd in /frameworks/base/cmds.
-    static_library("perfetto_protos_lite") {
-      deps = [
-        "gn:default_deps",
-        "protos:lite",
-      ]
-    }
   }
 
   if (monolithic_binaries) {
@@ -141,10 +132,7 @@ if (!build_with_chromium) {
   }
 } else {
   group("lib") {
-    public_configs = [
-      "gn:public_config",
-      "protos:public_config",
-    ]
+    public_configs = [ "gn:public_config" ]
     deps = [
       "src/tracing",
     ]
