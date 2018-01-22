@@ -111,6 +111,12 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
   PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
+
+  monitor_task_runner_.PostTask([cpu] {
+    char name[16];
+    snprintf(name, sizeof(name), "splice%zu", cpu);
+    pthread_setname_np(pthread_self(), name);
+  });
 }
 
 CpuReader::~CpuReader() {
@@ -129,11 +135,26 @@ void CpuReader::WaitForData(std::function<void(void)> callback) {
     // The splice call will block until there is roughly a page full of data in
     // the staging pipe. For this to work the trace fd must be in blocking mode.
     fcntl(trace_fd_.get(), F_SETFL, flags & ~O_NONBLOCK);
+
+    timespec now;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
+    int64_t start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    int64_t rt_start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+
     if (PERFETTO_EINTR(splice(trace_fd_.get(), nullptr, staging_write_fd_.get(),
                               nullptr, kPageSize, SPLICE_F_MOVE)) == -1) {
       PERFETTO_DPLOG("splice");
     }
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
+    int64_t now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    int64_t rt_now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+    PERFETTO_DLOG("splice %zu took %fms thread time, %fms real time", cpu_,
+                  (now_ns - start_ns) / 1e6, (rt_now_ns - rt_start_ns) / 1e6);
+
     fcntl(trace_fd_.get(), F_SETFL, flags);
+
     {
       std::lock_guard<std::mutex> lock(lock_);
       if (task_runner_)
