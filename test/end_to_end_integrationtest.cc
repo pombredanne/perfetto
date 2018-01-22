@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <thread>
@@ -42,7 +43,6 @@
 
 namespace perfetto {
 
-using namespace std::chrono_literals;
 #if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
@@ -84,11 +84,12 @@ class PerfettoTest : public ::testing::Test {
       std::unique_lock<std::mutex> lock(mutex_);
 
       // Start the thread.
-      DCHECK(!runner);
+      PERFETTO_DCHECK(!runner_);
       thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate));
 
       // Wait for runner to be ready.
-      ready_.wait_for(lock, 10s, [this]() { return runner_ != nullptr; });
+      ready_.wait_for(lock, std::chrono::seconds(10),
+                      [this]() { return runner_ != nullptr; });
     }
 
    private:
