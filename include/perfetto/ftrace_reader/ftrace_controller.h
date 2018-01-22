@@ -26,11 +26,11 @@
 #include <vector>
 
 #include "gtest/gtest_prod.h"
-#include "include/perfetto/tracing/core/data_source_config.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/protozero/protozero_message_handle.h"
+#include "perfetto/tracing/core/data_source_config.h"
 
 namespace perfetto {
 

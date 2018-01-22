@@ -31,9 +31,6 @@
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pbzero.h"
 
-//#include "perfetto/tracing/core/data_source_config.h"
-#include "perfetto/config/data_source_config.pb.h"
-
 using testing::HasSubstr;
 using testing::Not;
 
