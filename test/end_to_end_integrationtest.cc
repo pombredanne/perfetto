@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
+#include <condition_variable>
 #include <functional>
 #include <thread>
 
@@ -75,7 +76,6 @@ class PerfettoTest : public ::testing::Test {
 
     void Start(std::unique_ptr<ThreadDelegate> delegate) {
       // Begin holding the lock for the condition variable.
-      std::condition_variable ready;
       std::unique_lock<std::mutex> outer_lock(mutex_);
 
       // Start the thread.
@@ -83,7 +83,7 @@ class PerfettoTest : public ::testing::Test {
                             &ready);
 
       // Wait for runner to be ready.
-      ready.wait(outer_lock, [this]() { return runner_ != nullptr; });
+      ready_.wait(outer_lock, [this]() { return runner_ != nullptr; });
     }
 
    private:
@@ -100,7 +100,7 @@ class PerfettoTest : public ::testing::Test {
       }
 
       // Notify the main thread that the runner is ready.
-      ready->notify_one();
+      ready_->notify_one();
 
       // Spin the loop.
       task_runner.Run();
@@ -117,6 +117,7 @@ class PerfettoTest : public ::testing::Test {
     }
 
     std::thread thread_;
+    std::condition_variable ready_;
 
     // All variables below this point are protected by |mutex_|.
     std::mutex mutex_;
