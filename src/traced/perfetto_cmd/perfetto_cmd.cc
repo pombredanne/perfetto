@@ -135,7 +135,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
         // TODO(primiano): temporary for testing only.
         perfetto::protos::TraceConfig test_config;
         test_config.add_buffers()->set_size_kb(4096 * 10);
-        test_config.set_duration_ms(3000);
+        test_config.set_duration_ms(10000);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("com.google.perfetto.ftrace");
         ds_config->mutable_ftrace_config()->add_event_names("sched_switch");

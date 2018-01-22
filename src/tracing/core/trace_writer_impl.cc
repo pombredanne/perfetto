@@ -115,6 +115,11 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     for (auto* nested_msg = cur_packet_->nested_message(); nested_msg;
          nested_msg = nested_msg->nested_message()) {
       uint8_t* const cur_hdr = nested_msg->size_field();
+      if (!(cur_hdr >= cur_chunk_.payload_begin() &&
+            cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end())) {
+        PERFETTO_DLOG("ERR %p %p %p", static_cast<void*>(cur_hdr), static_cast<void*>(cur_chunk_.payload_begin()),
+                      static_cast<void*>(cur_chunk_.end()));
+      }
       PERFETTO_DCHECK(cur_hdr >= cur_chunk_.payload_begin() &&
                       cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end());
       auto cur_hdr_offset = static_cast<uint16_t>(cur_hdr - cur_chunk_.begin());

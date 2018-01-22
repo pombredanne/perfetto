@@ -22,14 +22,20 @@
 
 #include <array>
 #include <memory>
+#include <thread>
 
 #include "gtest/gtest_prod.h"
+#include "perfetto/base/page_allocator.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/protozero_message.h"
 #include "proto_translation_table.h"
 
 namespace perfetto {
+
+namespace base {
+class TaskRunner;
+}  // namespace base
 
 class ProtoTranslationTable;
 
@@ -66,10 +72,14 @@ class EventFilter {
 
 class CpuReader {
  public:
-  CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
+  CpuReader(base::TaskRunner*,
+            FtraceController*,
+            const ProtoTranslationTable*,
+            size_t cpu,
+            base::ScopedFile trace_pipe_raw);
   ~CpuReader();
 
-  bool Drain(
+  void Drain(
       const std::array<const EventFilter*, kMaxSinks>&,
       const std::array<
           protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
@@ -129,13 +139,21 @@ class CpuReader {
 
  private:
   uint8_t* GetBuffer();
+  static void PipeWorker(base::TaskRunner*,
+                         FtraceController*,
+                         size_t cpu,
+                         int trace_pipe_raw,
+                         int staging_write_fd);
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
 
   const ProtoTranslationTable* table_;
   const size_t cpu_;
-  base::ScopedFile fd_;
-  std::unique_ptr<uint8_t[]> buffer_;
+  base::ScopedFile trace_pipe_raw_;
+  base::ScopedFile staging_read_fd_;
+  base::ScopedFile staging_write_fd_;
+  base::PageAllocator::UniquePtr buffer_;
+  std::thread pipe_worker_;
 };
 
 }  // namespace perfetto

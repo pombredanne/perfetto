@@ -41,11 +41,11 @@ class FtraceEventBundle;
 
 const size_t kMaxSinks = 32;
 
-class FtraceController;
-class ProtoTranslationTable;
 class CpuReader;
-class FtraceProcfs;
 class EventFilter;
+class FtraceController;
+class FtraceProcfs;
+class ProtoTranslationTable;
 
 class FtraceConfig {
  public:
@@ -115,28 +115,22 @@ class FtraceController {
   void WriteTraceMarker(const std::string& s);
   void ClearTrace();
 
+  // Called to read  data from the staging pipe for the given |cpu|. Kicks off
+  // the reading/parsing of the pipe.
+  // virtual for testing.
+  virtual void OnRawFtraceDataAvailable(size_t cpu);
+
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
-
-  // Called to read  data from the raw pipe
-  // for the given |cpu|. Kicks off the reading/parsing
-  // of the pipe. Returns true if there is probably more to read.
-  // Protected and virtual for testing.
-  virtual bool OnRawFtraceDataAvailable(size_t cpu);
-
  private:
   friend FtraceSink;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
-
-  static void PeriodicDrainCPU(base::WeakPtr<FtraceController>,
-                               size_t generation,
-                               int cpu);
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
@@ -146,17 +140,13 @@ class FtraceController {
   void StartIfNeeded();
   void StopIfNeeded();
 
-  // Returns a cached CpuReader for |cpu|.
-  // CpuReaders are constructed lazily and owned by the controller.
-  CpuReader* GetCpuReader(size_t cpu);
-
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   size_t generation_ = 0;
   bool listening_for_raw_trace_data_ = false;
   base::TaskRunner* task_runner_ = nullptr;
   std::vector<size_t> enabled_count_;
   std::unique_ptr<ProtoTranslationTable> table_;
-  std::map<size_t, std::unique_ptr<CpuReader>> readers_;
+  std::vector<std::unique_ptr<CpuReader>> readers_;
   std::set<FtraceSink*> sinks_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   PERFETTO_THREAD_CHECKER(thread_checker_)

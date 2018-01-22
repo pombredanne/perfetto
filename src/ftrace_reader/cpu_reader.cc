@@ -16,9 +16,12 @@
 
 #include "cpu_reader.h"
 
+#include <signal.h>
+
 #include <utility>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/task_runner.h"
 #include "proto_translation_table.h"
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
@@ -59,6 +62,12 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   return enabled;
 }
 
+void SetBlocking(int fd, bool is_blocking) {
+  int flags = fcntl(fd, F_GETFL, 0);
+  flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
+  PERFETTO_CHECK(fcntl(fd, F_SETFL, flags) == 0);
+}
+
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
 // Some information about the values of these constants are exposed to user
@@ -95,48 +104,148 @@ EventFilter::EventFilter(const ProtoTranslationTable& table,
       enabled_names_(std::move(names)) {}
 EventFilter::~EventFilter() = default;
 
-CpuReader::CpuReader(const ProtoTranslationTable* table,
+CpuReader::CpuReader(base::TaskRunner* task_runner,
+                     FtraceController* ftrace_controller,
+                     const ProtoTranslationTable* table,
                      size_t cpu,
-                     base::ScopedFile fd)
-    : table_(table), cpu_(cpu), fd_(std::move(fd)) {}
+                     base::ScopedFile trace_pipe_raw)
+    : table_(table), cpu_(cpu), trace_pipe_raw_(std::move(trace_pipe_raw)) {
+  int pipe_fds[2] = {};
+  PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
+  staging_read_fd_.reset(pipe_fds[0]);
+  staging_write_fd_.reset(pipe_fds[1]);
+  PERFETTO_CHECK(staging_read_fd_ && staging_write_fd_);
+  pipe_worker_ =
+      std::thread(&CpuReader::PipeWorker, task_runner, ftrace_controller, cpu,
+                  *trace_pipe_raw_, *staging_write_fd_);
+}
+
+CpuReader::~CpuReader() {
+  // Closing the pipes should cause splice() to return EPIPE.
+  // TODO this code needs to be carefully checked.
+  trace_pipe_raw_.reset();
+  staging_read_fd_.reset();
+  pipe_worker_.join();
+}
 
 int CpuReader::GetFileDescriptor() {
-  return fd_.get();
+  return trace_pipe_raw_.get();
 }
 
-bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
-                      const std::array<BundleHandle, kMaxSinks>& bundles) {
-  if (!fd_)
-    return false;
+// static
+void CpuReader::PipeWorker(base::TaskRunner* task_runner,
+                           FtraceController* ftrace_controller,
+                           size_t cpu,
+                           int trace_pipe_raw,
+                           int staging_write_fd) {
+  char thread_name[16];
+  snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu);
+  pthread_setname_np(pthread_self(), thread_name);
 
-  uint8_t* buffer = GetBuffer();
-  // TOOD(hjd): One read() per page may be too many.
-  long bytes = PERFETTO_EINTR(read(fd_.get(), buffer, kPageSize));
-  if (bytes == -1 && errno == EAGAIN)
-    return false;
-  if (bytes != kPageSize)
-    return false;
-  PERFETTO_CHECK(static_cast<size_t>(bytes) <= kPageSize);
+  sigset_t set;
+  sigemptyset(&set);
+  sigaddset(&set, SIGPIPE);
+  sigprocmask(SIG_BLOCK, &set, nullptr);
 
-  size_t evt_size = 0;
-  for (size_t i = 0; i < kMaxSinks; i++) {
-    if (!filters[i])
+  SetBlocking(trace_pipe_raw, true);
+  SetBlocking(staging_write_fd, true);
+
+  for (;;) {
+    // Move as many pages as we can from the trace_pipe_raw to the staging pipe
+    // until either the former is empty or the latter is full.
+    size_t pages_moved = 0;
+    int splice_res = 0;
+    for (;;) {
+      splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
+                          kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+      if (splice_res > 0) {
+        pages_moved++;
+        PERFETTO_DCHECK(splice_res == kPageSize);
+      } else {
+        break;
+      }
+    }
+    if (splice_res < 0 && errno == EPIPE)
       break;
-    evt_size = ParsePage(cpu_, buffer, filters[i], &*bundles[i], table_);
-    PERFETTO_DCHECK(evt_size);
-  }
+    PERFETTO_DCHECK(splice_res < 0 && errno == EAGAIN);
 
-  // TODO(hjd): Introduce enum to distinguish real failures.
-  return evt_size > (kPageSize / 2);
+    PERFETTO_DLOG("Splice[cpu:%zu], moved: %zu pages", cpu, pages_moved);
+
+    if (pages_moved > 0)
+      task_runner->PostTask([ftrace_controller, cpu] {
+        ftrace_controller->OnRawFtraceDataAvailable(cpu);
+      });
+
+    // Blocking splice. This will block until either there is a full page on
+    // |trace_pipe_raw| or |staging_write_fd| has space.
+    timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    const int64_t start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+
+    splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
+                        kPageSize, SPLICE_F_MOVE);
+    if (splice_res < 0 && errno == EPIPE)
+      break;
+
+    // TODO increase pages_moved and send IPC.
+
+    PERFETTO_DCHECK(splice_res == kPageSize);
+
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    const int64_t now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+
+    int64_t splice_duration_us = (now_ns - start_ns) / 1000;
+    PERFETTO_DLOG("Splice[cpu:%zu] blocking duration: %" PRIi64 " us",
+                  cpu, splice_duration_us);
+
+    // If we are waking up too close throttle the splice()s. We don't want to
+    // jam the execution too aggressively. At this point we rely solely on the
+    // kernel ftrace buffer to keep up.
+    static constexpr int64_t kMinWakeupUs = 100 * 1000L;
+    if (splice_duration_us < kMinWakeupUs) {
+      PERFETTO_DLOG("Throttling, splice too quick: %" PRIi64 " us",
+                    splice_duration_us);
+      usleep(kMinWakeupUs);
+    }
+
+    // TODO: this is not great. This loop, as is, implies that the max draining
+    // bandwidth we have is $pipe_buffer per kMinWakeupNs. We can survive bursts
+    // but not sustained trace loads. We should look tweak this logic by
+    // checking if we max-out |pages_moved| every time and become more
+    // aggressive in that case.
+  }
 }
 
-CpuReader::~CpuReader() = default;
+void CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
+                      const std::array<BundleHandle, kMaxSinks>& bundles) {
+  if (!staging_read_fd_)
+    return;
+  uint8_t* buffer = GetBuffer();
+
+  // TODO loop outer, if looping here something breaks in trace_writer_impl.
+  CONTINUE FROM HERE
+  for (;;) {
+    long bytes =
+        PERFETTO_EINTR(read(staging_read_fd_.get(), buffer, kPageSize));
+    if (bytes == -1 && errno == EAGAIN)
+      return;
+    // TODO: think about other error conditions.
+    PERFETTO_CHECK(static_cast<size_t>(bytes) == kPageSize);
+    size_t evt_size = 0;
+    for (size_t i = 0; i < kMaxSinks; i++) {
+      if (!filters[i])
+        break;
+      evt_size = ParsePage(cpu_, buffer, filters[i], &*bundles[i], table_);
+      PERFETTO_DCHECK(evt_size);
+    }
+  }
+}
 
 uint8_t* CpuReader::GetBuffer() {
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.
   if (!buffer_)
-    buffer_ = std::unique_ptr<uint8_t[]>(new uint8_t[kPageSize]);
-  return buffer_.get();
+    buffer_ = base::PageAllocator::Allocate(kPageSize);
+  return static_cast<uint8_t*>(buffer_.get());
 }
 
 // The structure of a raw trace buffer page is as follows:
