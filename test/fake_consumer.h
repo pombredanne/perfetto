@@ -37,7 +37,7 @@ class FakeConsumer : public Consumer {
       base::TaskRunner* task_runner);
   ~FakeConsumer() override;
 
-  void Connect();
+  void Connect(const char* socket_name);
 
   // Consumer implementation.
   void OnConnect() override;

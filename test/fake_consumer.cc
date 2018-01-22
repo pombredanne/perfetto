@@ -38,9 +38,8 @@ FakeConsumer::FakeConsumer(
       task_runner_(task_runner) {}
 FakeConsumer::~FakeConsumer() = default;
 
-void FakeConsumer::Connect() {
-  endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME, this,
-                                         task_runner_);
+void FakeConsumer::Connect(const char* socket_name) {
+  endpoint_ = ConsumerIPCClient::Connect(socket_name, this, task_runner_);
 }
 
 void FakeConsumer::OnConnect() {

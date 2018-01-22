@@ -33,7 +33,7 @@ class FakeProducer : public Producer {
   explicit FakeProducer(const std::string& name);
   ~FakeProducer() override;
 
-  void Connect(base::TaskRunner* task_runner);
+  void Connect(const char* socket_name, base::TaskRunner* task_runner);
 
   // Producer implementation.
   void OnConnect() override;

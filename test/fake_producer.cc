@@ -29,9 +29,9 @@ namespace perfetto {
 FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
 
-void FakeProducer::Connect(base::TaskRunner* task_runner) {
-  endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
-                                         task_runner);
+void FakeProducer::Connect(const char* socket_name,
+                           base::TaskRunner* task_runner) {
+  endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
 }
 
 void FakeProducer::OnConnect() {

@@ -48,6 +48,17 @@ using PlatformTaskRunner = base::AndroidTaskRunner;
 using PlatformTaskRunner = base::UnixTaskRunner;
 #endif
 
+// If we're building on Android but not as a CTS test, create the
+// define the producer and consumer socket in a world writable
+// directory so permissions are not a problem.
+#if BUILDFLAG(OS_ANDROID) && !BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
+#define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
+#else
+#define TEST_PRODUCER_SOCK_NAME PERFETTO_PRODUCER_SOCK_NAME
+#define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
+#endif
+
 class PerfettoTest : public ::testing::Test {
  public:
   PerfettoTest() {}
@@ -138,9 +149,9 @@ class PerfettoTest : public ::testing::Test {
 
     void Initialize(base::TaskRunner* task_runner) override {
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
-      unlink(PERFETTO_PRODUCER_SOCK_NAME);
-      unlink(PERFETTO_CONSUMER_SOCK_NAME);
-      svc_->Start(PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
+      unlink(TEST_PRODUCER_SOCK_NAME);
+      unlink(TEST_CONSUMER_SOCK_NAME);
+      svc_->Start(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME);
     }
 
    private:
@@ -157,7 +168,7 @@ class PerfettoTest : public ::testing::Test {
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FtraceProducer);
-      producer_->Connect(task_runner);
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
 
    private:
@@ -171,7 +182,7 @@ class PerfettoTest : public ::testing::Test {
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
-      producer_->Connect(task_runner);
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
 
    private:
@@ -237,7 +248,7 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
-  consumer.Connect();
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }
@@ -291,7 +302,7 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
-  consumer.Connect();
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }

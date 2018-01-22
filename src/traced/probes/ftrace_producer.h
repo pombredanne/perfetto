@@ -40,7 +40,7 @@ class FtraceProducer : public Producer {
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
   // Our Impl
-  void Connect(base::TaskRunner* task_runner);
+  void Connect(const char* socket_name, base::TaskRunner* task_runner);
 
  private:
   using BundleHandle =

@@ -93,10 +93,10 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
-void FtraceProducer::Connect(base::TaskRunner* task_runner) {
+void FtraceProducer::Connect(const char* socket_name,
+                             base::TaskRunner* task_runner) {
   ftrace_ = FtraceController::Create(task_runner);
-  endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
-                                         task_runner);
+  endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
 }
