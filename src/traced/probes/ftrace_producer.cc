@@ -27,6 +27,7 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
+#include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
@@ -69,10 +70,10 @@ void FtraceProducer::CreateDataSourceInstance(
   const DataSourceConfig::FtraceConfig proto_config =
       source_config.ftrace_config();
 
-  FtraceConfig config;
+  DataSourceConfig::FtraceConfig config;
   for (const std::string& event_name : proto_config.event_names()) {
     if (IsAlnum(event_name)) {
-      config.AddEvent(event_name.c_str());
+      *config.add_event_names() = event_name.c_str();
     } else {
       PERFETTO_LOG("Bad event name '%s'", event_name.c_str());
     }

@@ -18,6 +18,8 @@
 #include <memory>
 #include <utility>
 
+#include "perfetto/tracing/core/data_source_config.h"
+
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"

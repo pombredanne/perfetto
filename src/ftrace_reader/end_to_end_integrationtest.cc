@@ -31,6 +31,9 @@
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pbzero.h"
 
+//#include "perfetto/tracing/core/data_source_config.h"
+#include "perfetto/config/data_source_config.pb.h"
+
 using testing::HasSubstr;
 using testing::Not;
 
@@ -106,7 +109,8 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
 
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
-  FtraceConfig config(std::set<std::string>({"print", "sched_switch"}));
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = {"print", "sched_switch"};
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.

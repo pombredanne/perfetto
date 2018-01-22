@@ -26,6 +26,7 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
+#include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 using testing::_;
@@ -143,8 +144,8 @@ TEST(FtraceControllerTest, NoExistentEventsDontCrash) {
                                   FakeTable());
 
   MockDelegate delegate;
-  FtraceConfig config;
-  config.AddEvent("not_an_event");
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "not_an_event";
 
   std::unique_ptr<FtraceSink> sink = controller.CreateSink(config, &delegate);
 }
@@ -158,7 +159,8 @@ TEST(FtraceControllerTest, OneSink) {
                                   FakeTable());
 
   MockDelegate delegate;
-  FtraceConfig config({"foo"});
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "foo";
 
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(task_runner, PostDelayedTask(_, _));
@@ -180,8 +182,10 @@ TEST(FtraceControllerTest, MultipleSinks) {
 
   MockDelegate delegate;
 
-  FtraceConfig configA({"foo"});
-  FtraceConfig configB({"foo", "bar"});
+  DataSourceConfig::FtraceConfig configA;
+  *configA.add_event_names() = "foo";
+  DataSourceConfig::FtraceConfig configB;
+  *configB.add_event_names() = {"foo", "bar"};
 
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(kFooEnablePath, "1"));
@@ -208,7 +212,8 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
       std::move(ftrace_procfs), &task_runner, FakeTable()));
 
   MockDelegate delegate;
-  FtraceConfig config({"foo"});
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "foo";
 
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(kFooEnablePath, "1"));
@@ -234,7 +239,8 @@ TEST(FtraceControllerTest, TaskScheduling) {
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(_, _)).Times(AnyNumber());
 
   MockDelegate delegate;
-  FtraceConfig config({"foo"});
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "foo";
 
   EXPECT_CALL(task_runner, PostDelayedTask(_, 100));
   std::unique_ptr<FtraceSink> sink = controller.CreateSink(config, &delegate);
@@ -270,7 +276,8 @@ TEST(FtraceControllerTest, BackToBackEnableDisable) {
   EXPECT_CALL(*raw_ftrace_procfs, WriteToFile(_, _)).Times(AnyNumber());
 
   MockDelegate delegate;
-  FtraceConfig config({"foo"});
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "foo";
 
   EXPECT_CALL(task_runner, PostDelayedTask(_, 100));
   std::unique_ptr<FtraceSink> sink_a = controller.CreateSink(config, &delegate);
