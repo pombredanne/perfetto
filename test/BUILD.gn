@@ -19,7 +19,7 @@ source_set("end_to_end_integrationtests") {
   deps = [
     "../gn:default_deps",
     "../gn:gtest_deps",
-    "../protos:lite",
+    "../protos/perfetto/trace:lite",
     "../src/base:base",
     "../src/base:test_support",
     "../src/traced/probes:ftrace_producer",

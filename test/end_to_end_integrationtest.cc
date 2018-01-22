@@ -22,15 +22,14 @@
 #include <thread>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
-
-#include "protos/trace_packet.pb.h"
-#include "protos/trace_packet.pbzero.h"
 
 #include "src/base/test/test_task_runner.h"
 #include "src/traced/probes/ftrace_producer.h"
@@ -256,9 +255,6 @@ TEST_F(PerfettoTest, TestFakeProducer) {
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
-
-  // Setup the config for ftrace.
-  ds_config->set_trace_category_filters("foo,bar");
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;

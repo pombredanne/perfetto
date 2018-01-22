@@ -21,12 +21,11 @@
 #include <vector>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 

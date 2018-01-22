@@ -39,6 +39,9 @@ group("all") {
       ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
+      "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
+      "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }
@@ -77,16 +80,6 @@ if (!build_with_chromium) {
     ]
     if (build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-    }
-  }
-
-  if (build_with_android) {
-    # Used by Android's statsd in /frameworks/base/cmds.
-    static_library("perfetto_protos_lite") {
-      deps = [
-        "gn:default_deps",
-        "protos:lite",
-      ]
     }
   }
 

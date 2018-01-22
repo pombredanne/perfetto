@@ -17,13 +17,12 @@
 #include "test/fake_producer.h"
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 
@@ -47,10 +46,6 @@ void FakeProducer::OnDisconnect() {}
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  // If we don't receive the expected categories, simply shut down so that
-  // tests fail.
-  PERFETTO_CHECK(source_config.trace_category_filters() == "foo,bar");
-
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   for (int i = 0; i < 10; i++) {
