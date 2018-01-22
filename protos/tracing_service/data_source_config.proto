@@ -40,8 +40,7 @@ message DataSourceConfig {
   // without expensive lookups on its fastpath.
   optional uint32 target_buffer = 2;
 
-  // Keeep the lower IDs (up to 99) for fields that are *not* specific to
-  // data-sources and needs to be processed by the traced daemon.
+  optional string trace_category_filters = 3;  // TODO: temporary for tests.
 
-  optional FtraceConfig ftrace_config = 100;
+  optional FtraceConfig ftrace_config = 4;
 }

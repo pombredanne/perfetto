@@ -32,7 +32,7 @@
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
 
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 namespace {
@@ -43,7 +43,7 @@ const char* kTracingPaths[] = {
 };
 #else
 const char* kTracingPaths[] = {
-    "/sys/kernel/debug/tracing/df", nullptr,
+    "/sys/kernel/debug/tracing/", nullptr,
 };
 #endif
 
