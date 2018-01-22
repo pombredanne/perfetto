@@ -432,6 +432,7 @@ TEST_F(HostImplTest, MoveReplyObjectAndReplyAsynchronously) {
 // TEST(HostImplTest, ManyClients) {}
 // TEST(HostImplTest, OverlappingRequstsOutOfOrder) {}
 // TEST(HostImplTest, StreamingRequest) {}
+// TEST(HostImplTest, ManyDontReplyRequestsDontLeakMemory) {}
 
 }  // namespace
 }  // namespace ipc
