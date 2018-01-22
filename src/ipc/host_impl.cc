@@ -179,13 +179,23 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
   Deferred<ProtoMessage> deferred_reply;
   base::WeakPtr<HostImpl> host_weak_ptr = weak_ptr_factory_.GetWeakPtr();
   ClientID client_id = client->id;
-  deferred_reply.Bind(
-      [host_weak_ptr, client_id, request_id](AsyncResult<ProtoMessage> reply) {
-        if (!host_weak_ptr)
-          return;  // The reply came too late, the HostImpl has gone.
-        host_weak_ptr->ReplyToMethodInvocation(client_id, request_id,
-                                               std::move(reply));
-      });
+
+  if (req.dont_reply()) {
+    deferred_reply.Bind([](AsyncResult<ProtoMessage> reply) {
+      if (reply.success()) {
+        PERFETTO_DLOG(
+            "Dropping reply because dont_reply=true in the client request");
+      }
+    });
+  } else {
+    deferred_reply.Bind([host_weak_ptr, client_id,
+                         request_id](AsyncResult<ProtoMessage> reply) {
+      if (!host_weak_ptr)
+        return;  // The reply came too late, the HostImpl has gone.
+      host_weak_ptr->ReplyToMethodInvocation(client_id, request_id,
+                                             std::move(reply));
+    });
+  }
 
   service->client_info_ = ClientInfo(client->id, client->sock->peer_uid());
   method.invoker(service, *decoded_req_args, std::move(deferred_reply));
