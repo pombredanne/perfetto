@@ -60,6 +60,7 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_CreateWithBadPath) {
 }
 
 TEST(FtraceProcfsIntegrationTest, DISABLED_ClearTrace) {
+  FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   ftrace.WriteTraceMarker("Hello, World!");
   ftrace.ClearTrace();
