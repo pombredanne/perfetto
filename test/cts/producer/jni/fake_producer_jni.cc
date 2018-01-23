@@ -16,15 +16,18 @@
 
 #include <jni.h>
 
-#include "test/fake_producer.h"
+#include "perfetto/traced/traced.h"
 
 #include "src/base/test/test_task_runner.h"
+
+#include "test/fake_producer.h"
 
 namespace perfetto {
 namespace {
 void ListenAndRespond(const std::string& name) {
   base::TestTaskRunner task_runner;
-  FakeProducer producer(name, &task_runner);
+  FakeProducer producer(name);
+  producer.Connect(PERFETTO_PRODUCER_SOCK_NAME, &task_runner);
   task_runner.Run();
 }
 }  // namespace

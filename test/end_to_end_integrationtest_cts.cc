@@ -16,11 +16,11 @@
 
 #include <gtest/gtest.h>
 
+#include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
+#include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
-
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pb.h"
-#include "protos/trace_packet.pbzero.h"
 
 #include "test/fake_consumer.h"
 
@@ -40,7 +40,6 @@ class PerfettoCtsTest : public ::testing::Test {
     auto* ds_config = trace_config.add_data_sources()->mutable_config();
     ds_config->set_name(producer_name);
     ds_config->set_target_buffer(0);
-    ds_config->set_trace_category_filters("foo,bar");
 
     // Setip the function.
     uint64_t total = 0;
@@ -66,7 +65,7 @@ class PerfettoCtsTest : public ::testing::Test {
 
     // Finally, make the consumer connect to the service.
     FakeConsumer consumer(trace_config, std::move(function), &task_runner);
-    consumer.Connect();
+    consumer.Connect(PERFETTO_CONSUMER_SOCK_NAME);
 
     task_runner.RunUntilCheckpoint("no.more.packets");
   }
