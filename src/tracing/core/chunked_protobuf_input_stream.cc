@@ -29,8 +29,9 @@ ChunkedProtobufInputStream::ChunkedProtobufInputStream(
 ChunkedProtobufInputStream::~ChunkedProtobufInputStream() = default;
 
 bool ChunkedProtobufInputStream::Next(const void** data, int* size) {
-  if (cur_chunk_ == chunks_->end())
+  if (cur_chunk_ == chunks_->end()) {
     return false;
+  }
 
   PERFETTO_DCHECK(Validate());
   *data = reinterpret_cast<const void*>(
@@ -71,8 +72,9 @@ bool ChunkedProtobufInputStream::Skip(int count) {
   size_t n = static_cast<size_t>(count);
   while (n) {
     PERFETTO_DCHECK(Validate());
-    if (cur_chunk_ == chunks_->end())
+    if (cur_chunk_ == chunks_->end()) {
       return false;
+    }
 
     const size_t increment = std::min(n, cur_chunk_->size - pos_in_cur_chunk_);
     pos_in_cur_chunk_ += increment;

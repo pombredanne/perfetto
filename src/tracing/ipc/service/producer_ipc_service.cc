@@ -42,8 +42,9 @@ ProducerIPCService::GetProducerForCurrentRequest() {
   const ipc::ClientID ipc_client_id = ipc::Service::client_info().client_id();
   PERFETTO_CHECK(ipc_client_id);
   auto it = producers_.find(ipc_client_id);
-  if (it == producers_.end())
+  if (it == producers_.end()) {
     return nullptr;
+  }
   return it->second.get();
 }
 
@@ -103,24 +104,27 @@ void ProducerIPCService::RegisterDataSource(
   producer->pending_data_sources[data_source_name] = std::move(response);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
 
-  // TODO: add test to cover the case of IPC going away before the
+  // TODO(fmayer): add test to cover the case of IPC going away before the
   // RegisterDataSource callback is received.
   const ipc::ClientID ipc_client_id = ipc::Service::client_info().client_id();
   GetProducerForCurrentRequest()->service_endpoint->RegisterDataSource(
       dsd, [weak_this, ipc_client_id, data_source_name](DataSourceID id) {
-        if (!weak_this)
+        if (!weak_this) {
           return;
+        }
         weak_this->OnDataSourceRegistered(ipc_client_id, data_source_name, id);
       });
 }
 
 // Called by the Service business logic.
-void ProducerIPCService::OnDataSourceRegistered(ipc::ClientID ipc_client_id,
-                                                std::string data_source_name,
-                                                DataSourceID id) {
+void ProducerIPCService::OnDataSourceRegistered(
+    ipc::ClientID ipc_client_id,
+    const std::string& data_source_name,
+    DataSourceID id) {
   auto producer_it = producers_.find(ipc_client_id);
-  if (producer_it == producers_.end())
+  if (producer_it == producers_.end()) {
     return;  // The producer died in the meantime.
+  }
   RemoteProducer* producer = producer_it->second.get();
 
   auto it = producer->pending_data_sources.find(data_source_name);
@@ -143,7 +147,7 @@ void ProducerIPCService::OnClientDisconnected() {
   producers_.erase(client_id);
 }
 
-// TODO: test what happens if we receive the following tasks, in order:
+// TODO(fmayer): test what happens if we receive the following tasks, in order:
 // RegisterDataSource, UnregisterDataSource, OnDataSourceRegistered.
 // which essentially means that the client posted back to back a
 // ReqisterDataSource and UnregisterDataSource speculating on the next id.
@@ -174,12 +178,14 @@ void ProducerIPCService::NotifySharedMemoryUpdate(
         "InitializeConnection()");
     return response.Reject();
   }
-  // TODO: check that the page indexes are consistent with the size of the
-  // shared memory region (once the SHM logic is there). Also add a test for it.
+  // TODO(fmayer): check that the page indexes are consistent with the size of
+  // the shared memory region (once the SHM logic is there). Also add a test for
+  // it.
   std::vector<uint32_t> changed_pages;
   changed_pages.reserve(req.changed_pages_size());
-  for (const uint32_t& changed_page : req.changed_pages())
+  for (const uint32_t& changed_page : req.changed_pages()) {
     changed_pages.push_back(changed_page);
+  }
   producer->service_endpoint->NotifySharedMemoryUpdate(changed_pages);
   response.Resolve(
       ipc::AsyncResult<NotifySharedMemoryUpdateResponse>::Create());

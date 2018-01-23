@@ -90,8 +90,9 @@ class ProtoProvider {
     size_t msg_size =
         delegate_.chunks().size() * chunk_size_ - stream_.bytes_available();
     std::unique_ptr<uint8_t[]> buffer = delegate_.StitchChunks(msg_size);
-    if (!bundle->ParseFromArray(buffer.get(), static_cast<int>(msg_size)))
+    if (!bundle->ParseFromArray(buffer.get(), static_cast<int>(msg_size))) {
       return nullptr;
+    }
     return bundle;
   }
 
@@ -112,9 +113,10 @@ using BundleProvider =
 // directory |name|. Caches the table for subsequent lookups.
 std::map<std::string, std::unique_ptr<ProtoTranslationTable>>* g_tables;
 ProtoTranslationTable* GetTable(const std::string& name) {
-  if (!g_tables)
+  if (!g_tables) {
     g_tables =
         new std::map<std::string, std::unique_ptr<ProtoTranslationTable>>();
+  }
   if (!g_tables->count(name)) {
     std::string path = "src/ftrace_reader/test/data/" + name + "/";
     FtraceProcfs ftrace(path);
@@ -132,8 +134,9 @@ std::unique_ptr<uint8_t[]> PageFromXxd(const std::string& text) {
   memset(buffer.get(), 0xfa, kPageSize);
   uint8_t* out = buffer.get();
   while (*ptr != '\0') {
-    if (*(ptr++) != ':')
+    if (*(ptr++) != ':') {
       continue;
+    }
     for (int i = 0; i < 8; i++) {
       PERFETTO_CHECK(text.size() >=
                      static_cast<size_t>((ptr - text.data()) + 5));
@@ -143,8 +146,9 @@ std::unique_ptr<uint8_t[]> PageFromXxd(const std::string& text) {
       out += n;
       ptr += 4;
     }
-    while (*ptr != '\n')
+    while (*ptr != '\n') {
       ptr++;
+    }
   }
   return buffer;
 }

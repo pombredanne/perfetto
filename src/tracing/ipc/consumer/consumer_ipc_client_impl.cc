@@ -25,8 +25,8 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
-// TODO Add a test to check to what happens when ConsumerIPCClientImpl gets
-// destroyed w.r.t. the Consumer pointer. Also think to lifetime of the
+// TODO(fmayer): Add a test to check to what happens when ConsumerIPCClientImpl
+// gets destroyed w.r.t. the Consumer pointer. Also think to lifetime of the
 // Consumer* during the callbacks.
 
 namespace perfetto {
@@ -76,8 +76,9 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config) {
   trace_config.ToProto(req.mutable_trace_config());
   ipc::Deferred<EnableTracingResponse> async_response;
   async_response.Bind([](ipc::AsyncResult<EnableTracingResponse> response) {
-    if (!response)
-      PERFETTO_DLOG("EnableTracing() failed");
+    if (!response) {
+      { PERFETTO_DLOG("EnableTracing() failed"); }
+    }
   });
   consumer_port_.EnableTracing(req, std::move(async_response));
 }
@@ -90,8 +91,9 @@ void ConsumerIPCClientImpl::DisableTracing() {
 
   ipc::Deferred<DisableTracingResponse> async_response;
   async_response.Bind([](ipc::AsyncResult<DisableTracingResponse> response) {
-    if (!response)
-      PERFETTO_DLOG("DisableTracing() failed");
+    if (!response) {
+      { PERFETTO_DLOG("DisableTracing() failed"); }
+    }
   });
   consumer_port_.DisableTracing(DisableTracingRequest(),
                                 std::move(async_response));
@@ -142,8 +144,9 @@ void ConsumerIPCClientImpl::FreeBuffers() {
   FreeBuffersRequest req;
   ipc::Deferred<FreeBuffersResponse> async_response;
   async_response.Bind([](ipc::AsyncResult<FreeBuffersResponse> response) {
-    if (!response)
-      PERFETTO_DLOG("FreeBuffers() failed");
+    if (!response) {
+      { PERFETTO_DLOG("FreeBuffers() failed"); }
+    }
   });
   consumer_port_.FreeBuffers(req, std::move(async_response));
 }

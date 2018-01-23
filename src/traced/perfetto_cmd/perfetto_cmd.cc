@@ -124,8 +124,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
     int option =
         getopt_long(argc, argv, "c:o:bd::", long_options, &option_index);
 
-    if (option == -1)
+    if (option == -1) {
       break;  // EOF.
+    }
 
     if (option == 'c') {
       if (strcmp(optarg, "-") == 0) {
@@ -198,7 +199,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
 #if !BUILDFLAG(OS_MACOSX)
   // Open a temporary file under which doesn't have a visible name. It will
   // later get relinked as the final output file.
-  fd.reset(open(kTempTraceDir, O_TMPFILE | O_WRONLY, 0600));
+  fd.reset(open(kTempTraceDir, O_TMPFILE | O_WRONLY | O_CLOEXEC, 0600));
   if (!fd) {
     PERFETTO_ELOG("Could not create a temporary trace file in %s",
                   kTempTraceDir);
@@ -267,8 +268,9 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
              trace_out_stream_.get());
     }
   }
-  if (has_more)
+  if (has_more) {
     return;
+  }
 
   // Reached end of trace.
   consumer_endpoint_->FreeBuffers();

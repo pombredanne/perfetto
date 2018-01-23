@@ -61,8 +61,9 @@ TEST_P(AllTranslationTableTest, Create) {
   EXPECT_TRUE(table_->GetEventByName("print"));
   EXPECT_TRUE(table_->GetEventByName("sched_switch"));
   for (const Event& event : table_->events()) {
-    if (!event.ftrace_event_id)
+    if (!event.ftrace_event_id) {
       continue;
+    }
     EXPECT_TRUE(event.name);
     EXPECT_TRUE(event.group);
     EXPECT_TRUE(event.proto_field_id);

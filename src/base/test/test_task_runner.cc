@@ -32,8 +32,9 @@ TestTaskRunner::~TestTaskRunner() = default;
 
 void TestTaskRunner::Run() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  for (;;)
+  for (;;) {
     task_runner_.Run();
+}
 }
 
 void TestTaskRunner::RunUntilIdle() {
@@ -59,13 +60,15 @@ void TestTaskRunner::RunUntilCheckpoint(const std::string& checkpoint,
             checkpoint.c_str());
     abort();
   }
-  if (checkpoints_[checkpoint])
+  if (checkpoints_[checkpoint]) {
     return;
+  }
 
   task_runner_.PostDelayedTask(
       [this, checkpoint] {
-        if (checkpoints_[checkpoint])
+        if (checkpoints_[checkpoint]) {
           return;
+        }
         fprintf(stderr, "[TestTaskRunner] Failed to reach checkpoint \"%s\"\n",
                 checkpoint.c_str());
         abort();

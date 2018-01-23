@@ -41,12 +41,14 @@ bool IsMapped(void* start, size_t size) {
   int res = mincore(start, size, page_states.get());
   // Linux returns ENOMEM when an unmapped memory range is passed.
   // MacOS instead returns 0 but leaves the page_states empty.
-  if (res == -1 && errno == ENOMEM)
+  if (res == -1 && errno == ENOMEM) {
     return false;
+  }
   EXPECT_EQ(0, res);
   for (size_t i = 0; i < num_pages; i++) {
-    if (!page_states[i])
+    if (!page_states[i]) {
       return false;
+    }
   }
   return true;
 }

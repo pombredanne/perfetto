@@ -62,7 +62,7 @@ class FakeService : public Service {
     return reply;
   }
 
-  FakeService(const char* service_name) {
+  explicit FakeService(const char* service_name) {
     descriptor_.service_name = service_name;
     descriptor_.methods.push_back(
         {"FakeMethod1", &RequestDecoder, nullptr, &Invoker});
@@ -124,20 +124,24 @@ class FakeClient : public UnixSocket::EventListener {
     base::ScopedFile fd;
     size_t rsize = sock->Receive(buf.data, buf.size, &fd);
     ASSERT_TRUE(frame_deserializer_.EndReceive(rsize));
-    if (fd)
+    if (fd) {
       OnFileDescriptorReceived(*fd);
+    }
     while (std::unique_ptr<Frame> frame = frame_deserializer_.PopNextFrame()) {
       ASSERT_EQ(1u, requests_.count(frame->request_id()));
       EXPECT_EQ(0, requests_[frame->request_id()]++);
       if (frame->msg_case() == Frame::kMsgBindServiceReply) {
-        if (frame->msg_bind_service_reply().success())
+        if (frame->msg_bind_service_reply().success()) {
           last_bound_service_id_ = frame->msg_bind_service_reply().service_id();
+        }
         return OnServiceBound(frame->msg_bind_service_reply());
       }
-      if (frame->msg_case() == Frame::kMsgInvokeMethodReply)
+      if (frame->msg_case() == Frame::kMsgInvokeMethodReply) {
         return OnInvokeMethodReply(frame->msg_invoke_method_reply());
-      if (frame->msg_case() == Frame::kMsgRequestError)
+      }
+      if (frame->msg_case() == Frame::kMsgRequestError) {
         return OnRequestError();
+      }
       FAIL() << "Unexpected frame received from host " << frame->msg_case();
     }
   }

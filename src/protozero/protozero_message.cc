@@ -72,8 +72,9 @@ void ProtoZeroMessage::AppendString(uint32_t field_id, const char* str) {
 void ProtoZeroMessage::AppendBytes(uint32_t field_id,
                                    const void* src,
                                    size_t size) {
-  if (nested_message_)
+  if (nested_message_) {
     EndNestedMessage();
+  }
 
   PERFETTO_DCHECK(size < proto_utils::kMaxMessageLength);
   // Write the proto preamble (field id, type and length of the field).
@@ -89,8 +90,9 @@ void ProtoZeroMessage::AppendBytes(uint32_t field_id,
 }
 
 uint32_t ProtoZeroMessage::Finalize() {
-  if (nested_message_)
+  if (nested_message_) {
     EndNestedMessage();
+  }
 
   // Write the length of the nested message a posteriori, using a leading-zero
   // redundant varint encoding.
@@ -114,8 +116,9 @@ uint32_t ProtoZeroMessage::Finalize() {
 
 void ProtoZeroMessage::BeginNestedMessageInternal(uint32_t field_id,
                                                   ProtoZeroMessage* message) {
-  if (nested_message_)
+  if (nested_message_) {
     EndNestedMessage();
+  }
 
   // Write the proto preamble for the nested message.
   uint8_t data[proto_utils::kMaxTagEncodedSize];

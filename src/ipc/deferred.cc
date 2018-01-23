@@ -27,8 +27,9 @@ DeferredBase::DeferredBase(
     : callback_(std::move(callback)) {}
 
 DeferredBase::~DeferredBase() {
-  if (callback_)
+  if (callback_) {
     Reject();
+}
 }
 
 // Can't just use "= default" here because the default move operator for
@@ -39,8 +40,9 @@ DeferredBase::DeferredBase(DeferredBase&& other) noexcept {
 }
 
 DeferredBase& DeferredBase::operator=(DeferredBase&& other) {
-  if (callback_)
+  if (callback_) {
     Reject();
+  }
   Move(other);
   return *this;
 }
@@ -66,8 +68,9 @@ void DeferredBase::Resolve(AsyncResult<ProtoMessage> async_result) {
   }
   bool has_more = async_result.has_more();
   callback_(std::move(async_result));
-  if (!has_more)
+  if (!has_more) {
     callback_ = nullptr;
+}
 }
 
 // Resolves with a nullptr |msg_|, signalling failure to |callback_|.

@@ -35,8 +35,9 @@ namespace {
 
 bool IsAlnum(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && str[i] != '_')
+    if (!isalnum(str[i]) && str[i] != '_') {
       return false;
+    }
   }
   return true;
 }
@@ -66,7 +67,7 @@ void FtraceProducer::CreateDataSourceInstance(
                source_config.target_buffer());
 
   // TODO(hjd): Would be nice if ftrace_reader could use generate the config.
-  const DataSourceConfig::FtraceConfig proto_config =
+  const DataSourceConfig::FtraceConfig& proto_config =
       source_config.ftrace_config();
 
   FtraceConfig config;
