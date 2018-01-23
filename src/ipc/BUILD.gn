@@ -48,11 +48,7 @@ if (use_libfuzzer) {
       ":wire_protocol",
       "//gn:default_deps",
     ]
-    cflags = [ "-fsanitize=fuzzer" ]
-    ldflags = [
-      "-fsanitize=fuzzer",
-      "-fsanitize-coverage=trace-pc-guard",
-    ]
+    configs += [ "//build_configs:fuzzer_test" ]
   }
 }
 

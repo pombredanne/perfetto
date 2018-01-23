@@ -1,0 +1,7 @@
+config("fuzzer_test") {
+  cflags = [ "-fsanitize=fuzzer" ]
+  ldflags = [
+    "-fsanitize=fuzzer",
+    "-fsanitize-coverage=trace-pc-guard",
+  ]
+}
