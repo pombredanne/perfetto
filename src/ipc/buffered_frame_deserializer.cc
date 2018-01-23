@@ -31,10 +31,10 @@ namespace perfetto {
 namespace ipc {
 
 namespace {
-constexpr size_t kPageSize = 4096;
+static constexpr size_t kPageSize = 4096;
 
 // The header is just the number of bytes of the Frame protobuf message.
-constexpr size_t kHeaderSize = sizeof(uint32_t);
+static constexpr size_t kHeaderSize = sizeof(uint32_t);
 }  // namespace
 
 BufferedFrameDeserializer::BufferedFrameDeserializer(size_t max_capacity)
