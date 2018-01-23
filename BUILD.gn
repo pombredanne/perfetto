@@ -39,9 +39,9 @@ group("all") {
       ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
-
-      # TODO(lalitm): remove this when we use lite runtime.
-      "src/ftrace_reader:ftrace_reader_integrationtests",
+      "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
+      "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }
@@ -71,12 +71,16 @@ if (!build_with_chromium) {
     ]
   }
 
-  # Used by Android's statsd in /frameworks/base/cmds.
-  static_library("perfetto_protos_lite") {
+  executable("perfetto_integrationtests") {
+    testonly = true
     deps = [
       "gn:default_deps",
-      "protos:lite",
+      "src/ftrace_reader:ftrace_reader_integrationtests",
+      "test:end_to_end_integrationtests",
     ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+    }
   }
 
   if (monolithic_binaries) {
@@ -88,19 +92,9 @@ if (!build_with_chromium) {
   target(libtraced_shared_target_type, "libtraced_shared") {
     deps = [
       "gn:default_deps",
-      "src/traced/perfetto_cmd",
       "src/traced/probes",
       "src/traced/service",
     ]
-    if (build_with_android) {
-      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
-      deps += [ "src/base:android_task_runner" ]
-      libs = [
-        "binder",
-        "services",
-        "utils",
-      ]
-    }
   }
 
   # The unprivileged trace daemon that listens for Producer and Consumer
@@ -132,27 +126,20 @@ if (!build_with_chromium) {
   # tracing, acting as a Consumer.
   executable("perfetto") {
     deps = [
-      ":libtraced_shared",
       "gn:default_deps",
+      "src/traced/perfetto_cmd",
     ]
     sources = [
       "src/traced/perfetto_cmd/main.cc",
     ]
-  }
-
-  # These tests require access to a real ftrace implementation and must
-  # run with sudo.
-  executable("perfetto_integrationtests") {
-    testonly = true
-    deps = [
-      "gn:default_deps",
-      "test:end_to_end_integrationtests",
-
-      # TODO(lalitm): add this back when we use lite runtime.
-      # "src/ftrace_reader:ftrace_reader_integrationtests",
-    ]
     if (build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+      deps += [ "src/base:android_task_runner" ]
+      libs = [
+        "binder",
+        "services",
+        "utils",
+      ]
     }
   }
 } else {

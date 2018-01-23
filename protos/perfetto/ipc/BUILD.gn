@@ -12,28 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Usage: ./generate_full_protos.py path/to/input.proto path/to/output.proto
-# Copies the input to the output removing 'option optimize_for = LITE_RUNTIME'
-# if present.
+import("../../../gn/perfetto.gni")
+import("../../../gn/ipc_library.gni")
 
-import argparse
-import sys
-
-def main():
-  parser = argparse.ArgumentParser()
-  parser.add_argument('input')
-  parser.add_argument('output')
-  args = parser.parse_args()
-
-  with open(args.input, 'r') as fin:
-    s = fin.read()
-
-  s = s.replace('option optimize_for = LITE_RUNTIME;\n', '')
-
-  with open(args.output, 'w') as fout:
-    fout.write(s)
-
-  return 0
-
-if __name__ == '__main__':
-  sys.exit(main())
+# IPC service definitions.
+ipc_library("ipc") {
+  deps = [
+    "../config",
+  ]
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
+  sources = [
+    "consumer_port.proto",
+    "producer_port.proto",
+  ]
+}

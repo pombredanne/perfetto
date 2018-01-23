@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef TEST_FAKE_CONSUMER_
-#define TEST_FAKE_CONSUMER_
+#ifndef TEST_FAKE_CONSUMER_H_
+#define TEST_FAKE_CONSUMER_H_
+
+#include <memory>
+#include <vector>
 
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -34,7 +37,7 @@ class FakeConsumer : public Consumer {
       base::TaskRunner* task_runner);
   ~FakeConsumer() override;
 
-  void Connect();
+  void Connect(const char* socket_name);
 
   // Consumer implementation.
   void OnConnect() override;
@@ -43,11 +46,11 @@ class FakeConsumer : public Consumer {
 
  private:
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
-  std::unique_ptr<Service::ConsumerEndpoint> endpoint_ = nullptr;
+  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
   const TraceConfig trace_config_;
   base::TaskRunner* const task_runner_;
 };
 
 }  // namespace perfetto
 
-#endif  // TEST_FAKE_CONSUMER_
+#endif  // TEST_FAKE_CONSUMER_H_

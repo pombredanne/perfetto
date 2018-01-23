@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <map>
+#include <memory>
+#include <utility>
+
 #include "perfetto/base/task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/producer.h"
@@ -36,7 +40,7 @@ class FtraceProducer : public Producer {
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
   // Our Impl
-  void Connect(base::TaskRunner* task_runner);
+  void Connect(const char* socket_name, base::TaskRunner* task_runner);
 
  private:
   using BundleHandle =
@@ -44,7 +48,7 @@ class FtraceProducer : public Producer {
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    SinkDelegate(std::unique_ptr<TraceWriter> writer);
+    explicit SinkDelegate(std::unique_ptr<TraceWriter> writer);
     ~SinkDelegate() override;
 
     // FtraceDelegateImpl
@@ -66,4 +70,4 @@ class FtraceProducer : public Producer {
 };
 }  // namespace perfetto
 
-#endif
+#endif  // SRC_TRACED_PROBES_FTRACE_PRODUCER_H_

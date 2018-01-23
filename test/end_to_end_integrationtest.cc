@@ -16,10 +16,14 @@
 
 #include <gtest/gtest.h>
 #include <unistd.h>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
 #include <thread>
 
-#include "test/fake_consumer.h"
-
+#include "perfetto/base/logging.h"
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -27,138 +31,168 @@
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
-#include "protos/trace_packet.pb.h"
-#include "protos/trace_packet.pbzero.h"
-
 #include "src/base/test/test_task_runner.h"
 #include "src/traced/probes/ftrace_producer.h"
+#include "test/fake_consumer.h"
+#include "test/fake_producer.h"
 
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #include "perfetto/base/android_task_runner.h"
 #endif
 
 namespace perfetto {
 
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#if BUILDFLAG(PERFETTO_ANDROID_BUILD)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
 using PlatformTaskRunner = base::UnixTaskRunner;
 #endif
 
+// If we're building on Android but not as a CTS test, create the the producer
+// and consumer socket in a world writable directory so permissions are not a
+// problem.
+#if BUILDFLAG(OS_ANDROID) && !BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
+#define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
+#else
+#define TEST_PRODUCER_SOCK_NAME PERFETTO_PRODUCER_SOCK_NAME
+#define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
+#endif
+
 class PerfettoTest : public ::testing::Test {
  public:
-  PerfettoTest() : service_runner_(nullptr), producer_runner_(nullptr) {}
+  PerfettoTest() {}
   ~PerfettoTest() override = default;
 
  protected:
-  class ChildThreadHandle {
+  class ThreadDelegate {
    public:
-    ChildThreadHandle(std::function<void()> destructor)
-        : destructor_(std::move(destructor)) {}
-    ~ChildThreadHandle() { destructor_(); }
+    virtual ~ThreadDelegate() = default;
 
-   private:
-    std::function<void()> destructor_;
+    // Invoke on the target thread before the message loop is started.
+    virtual void Initialize(base::TaskRunner* task_runner) = 0;
   };
 
-  ChildThreadHandle SetupService() {
-// If we're building with the Android platform (i.e. CTS), we expect that
-// the service and ftrace producer both exist and are already running.
-// TODO(lalitm): maybe add an additional build flag for CTS.
-#if !defined(PERFETTO_BUILD_WITH_ANDROID)
-    // Begin holding the lock for the condition variable.
-    std::unique_lock<std::mutex> outer_lock(worker_mutex_);
-
-    service_thread_ = std::thread([this]() {
-      std::unique_ptr<base::PlatformTaskRunner> task_runner(
-          new base::PlatformTaskRunner());
-
-      // Create the service.
-      std::unique_ptr<ServiceIPCHost> svc;
-      svc = ServiceIPCHost::CreateInstance(task_runner.get());
-      unlink(PERFETTO_PRODUCER_SOCK_NAME);
-      unlink(PERFETTO_CONSUMER_SOCK_NAME);
-      svc->Start(PERFETTO_PRODUCER_SOCK_NAME, PERFETTO_CONSUMER_SOCK_NAME);
-
-      // Notify the main thread that the service is ready.
+  class TaskRunnerThread {
+   public:
+    TaskRunnerThread() = default;
+    ~TaskRunnerThread() {
       {
-        std::unique_lock<std::mutex> lock(worker_mutex_);
-        service_runner_ = task_runner.get();
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (runner_)
+          runner_->Quit();
       }
-      worker_ready_.notify_one();
 
-      task_runner->Run();
-    });
+      if (thread_.joinable())
+        thread_.join();
+    }
 
-    // Wait for service runner to be ready.
-    worker_ready_.wait(outer_lock,
-                       [this]() { return service_runner_ != nullptr; });
+    // Blocks until the thread has been created and Initialize() has been
+    // called.
+    void Start(std::unique_ptr<ThreadDelegate> delegate) {
+      // Begin holding the lock for the condition variable.
+      std::unique_lock<std::mutex> lock(mutex_);
 
-    return ChildThreadHandle([this]() {
-      service_runner_->Quit();
-      service_thread_.join();
-    });
-#else
-    // Handle unused variables.
-    // TODO(lalitm): find a less hacky way to do this.
-    (void)service_runner_;
-    return ChildThreadHandle([]() {});
-#endif
-  }
+      // Start the thread.
+      PERFETTO_DCHECK(!runner_);
+      thread_ = std::thread(&TaskRunnerThread::Run, this, std::move(delegate));
 
-  ChildThreadHandle SetupProducer() {
-// If we're building with the Android platform (i.e. CTS), we expect that
-// the service and ftrace producer both exist and are already running.
-// TODO(lalitm): maybe add an additional build flag for CTS.
-#if !defined(PERFETTO_BUILD_WITH_ANDROID)
-    // Begin holding the lock for the condition variable.
-    std::unique_lock<std::mutex> outer_lock(worker_mutex_);
+      // Wait for runner to be ready.
+      ready_.wait_for(lock, std::chrono::seconds(10),
+                      [this]() { return runner_ != nullptr; });
+    }
 
-    producer_thread_ = std::thread([this]() {
-      std::unique_ptr<base::PlatformTaskRunner> task_runner(
-          new base::PlatformTaskRunner());
+   private:
+    void Run(std::unique_ptr<ThreadDelegate> delegate) {
+      // Create the task runner and execute the specicalised code.
+      base::PlatformTaskRunner task_runner;
+      delegate->Initialize(&task_runner);
 
-      // Create the ftrace producer.
-      FtraceProducer producer;
-      producer.Connect(task_runner.get());
-
-      // Notify the main thread that the producer is ready.
+      // Pass the runner back to the main thread.
       {
-        std::unique_lock<std::mutex> lock(worker_mutex_);
-        producer_runner_ = task_runner.get();
+        std::unique_lock<std::mutex> lock(mutex_);
+        runner_ = &task_runner;
       }
-      worker_ready_.notify_one();
 
-      task_runner->Run();
-    });
+      // Notify the main thread that the runner is ready.
+      ready_.notify_one();
 
-    // Wait for producer runner to be ready.
-    worker_ready_.wait(outer_lock,
-                       [this]() { return producer_runner_ != nullptr; });
+      // Spin the loop.
+      task_runner.Run();
 
-    return ChildThreadHandle([this]() {
-      producer_runner_->Quit();
-      producer_thread_.join();
-    });
-#else
-    // Handle unused variables.
-    // TODO(lalitm): find a less hacky way to do this.
-    (void)producer_runner_;
-    return ChildThreadHandle([]() {});
-#endif
-  }
+      // Ensure we clear out the delegate before runner goes out
+      // of scope.
+      delegate.reset();
 
- private:
-  std::mutex worker_mutex_;
-  std::condition_variable worker_ready_;
-  base::PlatformTaskRunner* service_runner_ = nullptr;
-  base::PlatformTaskRunner* producer_runner_ = nullptr;
+      // Cleanup the runner.
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        runner_ = nullptr;
+      }
+    }
 
-  std::thread service_thread_;
-  std::thread producer_thread_;
+    std::thread thread_;
+    std::condition_variable ready_;
+
+    // All variables below this point are protected by |mutex_|.
+    std::mutex mutex_;
+    base::PlatformTaskRunner* runner_ = nullptr;
+  };
+
+  // This is used only in standalone integrations tests. In CTS mode (i.e. when
+  // PERFETTO_ANDROID_BUILD) this code is not used and instead the system
+  // daemons are used
+  class ServiceDelegate : public ThreadDelegate {
+   public:
+    ServiceDelegate() = default;
+    ~ServiceDelegate() override = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
+      svc_ = ServiceIPCHost::CreateInstance(task_runner);
+      unlink(TEST_PRODUCER_SOCK_NAME);
+      unlink(TEST_CONSUMER_SOCK_NAME);
+      svc_->Start(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME);
+    }
+
+   private:
+    std::unique_ptr<ServiceIPCHost> svc_;
+  };
+
+  // This is used only in standalone integrations tests. In CTS mode (i.e. when
+  // PERFETTO_ANDROID_BUILD) this code is not used and instead the system
+  // daemons are used.
+  class FtraceProducerDelegate : public ThreadDelegate {
+   public:
+    FtraceProducerDelegate() = default;
+    ~FtraceProducerDelegate() override = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
+      producer_.reset(new FtraceProducer);
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
+    }
+
+   private:
+    std::unique_ptr<FtraceProducer> producer_;
+  };
+
+  class FakeProducerDelegate : public ThreadDelegate {
+   public:
+    FakeProducerDelegate() = default;
+    ~FakeProducerDelegate() override = default;
+
+    void Initialize(base::TaskRunner* task_runner) override {
+      producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
+    }
+
+   private:
+    std::unique_ptr<FakeProducer> producer_;
+  };
 };
 
-TEST_F(PerfettoTest, TestFtraceProducer) {
+// TODO(lalitm): reenable this when we have a solution for running ftrace
+// on travis.
+TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
@@ -178,7 +212,7 @@ TEST_F(PerfettoTest, TestFtraceProducer) {
   *ftrace_config->add_event_names() = "bar";
 
   // Create the function to handle packets as they come in.
-  long total = 0;
+  uint64_t total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
     if (has_more) {
@@ -194,19 +228,81 @@ TEST_F(PerfettoTest, TestFtraceProducer) {
       // TODO(lalitm): renable this when stiching inside the service is present.
       // ASSERT_FALSE(packets->empty());
     } else {
-      ASSERT_GE(total, sysconf(_SC_NPROCESSORS_CONF));
+      ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
       ASSERT_TRUE(packets.empty());
       finish();
     }
   };
 
-  // Setup the service then the producer.
-  auto service_handle = SetupService();
-  auto producer_handle = SetupProducer();
+// If we're building with the Android platform (i.e. CTS), we expect that
+// the service and ftrace producer both exist and are already running.
+// TODO(lalitm): maybe add an additional build flag for CTS.
+#if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
+  TaskRunnerThread service_thread;
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
+
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(
+      std::unique_ptr<FtraceProducerDelegate>(new FtraceProducerDelegate));
+#endif
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
-  consumer.Connect();
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+
+  task_runner.RunUntilCheckpoint("no.more.packets");
+}
+
+TEST_F(PerfettoTest, TestFakeProducer) {
+  base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
+
+  // Setip the TraceConfig for the consumer.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(200);
+
+  // Create the buffer for ftrace.
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->set_target_buffer(0);
+
+  // Create the function to handle packets as they come in.
+  uint64_t total = 0;
+  auto function = [&total, &finish](std::vector<TracePacket> packets,
+                                    bool has_more) {
+    if (has_more) {
+      for (auto& packet : packets) {
+        packet.Decode();
+        ASSERT_TRUE(packet->has_test());
+        ASSERT_EQ(packet->test(), "test");
+      }
+      total += packets.size();
+
+      // TODO(lalitm): renable this when stiching inside the service is present.
+      // ASSERT_FALSE(packets->empty());
+    } else {
+      ASSERT_EQ(total, 10u);
+      ASSERT_TRUE(packets.empty());
+      finish();
+    }
+  };
+
+// If we're building with the Android platform (i.e. CTS), we expect that
+// the service and ftrace producer both exist and are already running.
+// TODO(lalitm): maybe add an additional build flag for CTS.
+#if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
+  TaskRunnerThread service_thread;
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
+
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(
+      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate));
+#endif
+
+  // Finally, make the consumer connect to the service.
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }

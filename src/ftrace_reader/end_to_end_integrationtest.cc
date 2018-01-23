@@ -26,10 +26,10 @@
 #include "perfetto/protozero/scattered_stream_writer.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
-#include "protos/ftrace/ftrace_event_bundle.pb.h"
-#include "protos/ftrace/ftrace_event_bundle.pbzero.h"
-#include "protos/ftrace/test_bundle_wrapper.pb.h"
-#include "protos/ftrace/test_bundle_wrapper.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
+#include "perfetto/trace/ftrace/test_bundle_wrapper.pbzero.h"
 
 using testing::HasSubstr;
 using testing::Not;
@@ -99,7 +99,7 @@ class EndToEndIntegrationTest : public ::testing::Test,
 
 }  // namespace
 
-TEST_F(EndToEndIntegrationTest, SchedSwitchAndPrint) {
+TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   FtraceProcfs procfs(kTracingPath);
   procfs.ClearTrace();
   procfs.WriteTraceMarker("Hello, World!");
@@ -127,7 +127,7 @@ TEST_F(EndToEndIntegrationTest, SchedSwitchAndPrint) {
   EXPECT_THAT(output.after(), HasSubstr("after"));
 
   std::string output_as_text;
-  google::protobuf::TextFormat::PrintToString(output, &output_as_text);
+  // TODO(hjd): Use reflection print code.
   printf("%s\n", output_as_text.c_str());
 }
 

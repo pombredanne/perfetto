@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#ifndef TEST_FAKE_PRODUCER_H_
+#define TEST_FAKE_PRODUCER_H_
+
+#include <memory>
+#include <string>
+
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
@@ -24,9 +30,12 @@ namespace perfetto {
 
 class FakeProducer : public Producer {
  public:
-  FakeProducer(const std::string& name, base::TestTaskRunner* task_runner);
+  explicit FakeProducer(const std::string& name);
   ~FakeProducer() override;
 
+  void Connect(const char* socket_name, base::TaskRunner* task_runner);
+
+  // Producer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
   void CreateDataSourceInstance(DataSourceInstanceID,
@@ -38,7 +47,9 @@ class FakeProducer : public Producer {
 
   std::string name_;
   DataSourceID id_ = 0;
-  std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
+  std::unique_ptr<Service::ProducerEndpoint> endpoint_;
 };
 
 }  // namespace perfetto
+
+#endif  // TEST_FAKE_PRODUCER_H_

@@ -14,17 +14,18 @@
  * limitations under the License.
  */
 
-#include "fake_consumer.h"
+#include "test/fake_consumer.h"
 
 #include <gtest/gtest.h>
+#include <utility>
+#include <vector>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pbzero.h"
 
 namespace perfetto {
 
@@ -37,15 +38,14 @@ FakeConsumer::FakeConsumer(
       task_runner_(task_runner) {}
 FakeConsumer::~FakeConsumer() = default;
 
-void FakeConsumer::Connect() {
-  endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME, this,
-                                         task_runner_);
+void FakeConsumer::Connect(const char* socket_name) {
+  endpoint_ = ConsumerIPCClient::Connect(socket_name, this, task_runner_);
 }
 
 void FakeConsumer::OnConnect() {
   endpoint_->EnableTracing(trace_config_);
   task_runner_->PostDelayedTask(std::bind([this]() {
-                                  // endpoint_->DisableTracing();
+                                  endpoint_->DisableTracing();
                                   endpoint_->ReadBuffers();
                                 }),
                                 trace_config_.duration_ms());

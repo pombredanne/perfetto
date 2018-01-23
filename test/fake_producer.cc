@@ -14,26 +14,25 @@
  * limitations under the License.
  */
 
-#include "fake_producer.h"
+#include "test/fake_producer.h"
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
-#include "protos/test_event.pbzero.h"
-#include "protos/trace_packet.pbzero.h"
-
 namespace perfetto {
 
-FakeProducer::FakeProducer(const std::string& name,
-                           base::TestTaskRunner* task_runner)
-    : name_(name),
-      endpoint_(ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME,
-                                           this,
-                                           task_runner)) {}
+FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
+
+void FakeProducer::Connect(const char* socket_name,
+                           base::TaskRunner* task_runner) {
+  endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
+}
 
 void FakeProducer::OnConnect() {
   DataSourceDescriptor descriptor;
@@ -42,19 +41,11 @@ void FakeProducer::OnConnect() {
                                 [this](DataSourceID id) { id_ = id; });
 }
 
-void FakeProducer::OnDisconnect() {
-  Shutdown();
-}
+void FakeProducer::OnDisconnect() {}
 
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  const std::string& categories = source_config.trace_category_filters();
-  if (categories != "foo,bar") {
-    Shutdown();
-    return;
-  }
-
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   for (int i = 0; i < 10; i++) {
@@ -68,15 +59,11 @@ void FakeProducer::CreateDataSourceInstance(
   // TODO(primiano): remove this hack once flushing the final packet is fixed.
   trace_writer->NewTracePacket();
 
-  endpoint_->UnregisterDataSource(id_);
+  // TODO(primiano): reenable this once UnregisterDataSource is specified in
+  // ServiceImpl.
+  // endpoint_->UnregisterDataSource(id_);
 }
 
-void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
-  Shutdown();
-}
-
-void FakeProducer::Shutdown() {
-  endpoint_.reset();
-}
+void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}
 
 }  // namespace perfetto
