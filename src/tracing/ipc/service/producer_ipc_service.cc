@@ -167,8 +167,9 @@ void ProducerIPCService::UnregisterDataSource(
 void ProducerIPCService::NotifySharedMemoryUpdate(
     const NotifySharedMemoryUpdateRequest& req,
     DeferredNotifySharedMemoryUpdateResponse) {
-  // NotifySharedMemoryUpdate messages don't expect any response. This is to
-  // avoid useless wakeups.
+  // The response object is deliberately not resolved. NotifySharedMemoryUpdate
+  // messages don't expect any response (i.e. the client sends them with the
+  // |dont_reply| flag). This is to avoid useless wakeups on the client side.
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
