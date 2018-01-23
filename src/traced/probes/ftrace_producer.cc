@@ -1,6 +1,23 @@
-#include "ftrace_producer.h"
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "src/traced/probes/ftrace_producer.h"
 
 #include <stdio.h>
+#include <string>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/unix_task_runner.h"
@@ -18,8 +35,9 @@ namespace {
 
 bool IsAlnum(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && str[i] != '_')
+    if (!isalnum(str[i]) && str[i] != '_') {
       return false;
+    }
   }
   return true;
 }
@@ -49,7 +67,7 @@ void FtraceProducer::CreateDataSourceInstance(
                source_config.target_buffer());
 
   // TODO(hjd): Would be nice if ftrace_reader could use generate the config.
-  const DataSourceConfig::FtraceConfig proto_config =
+  const DataSourceConfig::FtraceConfig& proto_config =
       source_config.ftrace_config();
 
   FtraceConfig config;

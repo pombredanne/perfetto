@@ -70,8 +70,9 @@ bool MakeSockAddr(const std::string& socket_name,
     return false;
   }
   memcpy(addr->sun_path, socket_name.data(), name_len);
-  if (addr->sun_path[0] == '@')
+  if (addr->sun_path[0] == '@') {
     addr->sun_path[0] = '\0';
+  }
   addr->sun_family = AF_UNIX;
   *addr_size = static_cast<socklen_t>(
       __builtin_offsetof(sockaddr_un, sun_path) + name_len + 1);
@@ -87,8 +88,9 @@ base::ScopedFile CreateSocket() {
 // static
 base::ScopedFile UnixSocket::CreateAndBind(const std::string& socket_name) {
   base::ScopedFile fd = CreateSocket();
-  if (!fd)
+  if (!fd) {
     return fd;
+  }
 
   sockaddr_un addr;
   socklen_t addr_size;
@@ -202,8 +204,9 @@ UnixSocket::UnixSocket(EventListener* event_listener,
 
   base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->AddFileDescriptorWatch(*fd_, [weak_ptr]() {
-    if (weak_ptr)
+    if (weak_ptr) {
       weak_ptr->OnEvent();
+    }
   });
 }
 
@@ -217,8 +220,9 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
   PERFETTO_DCHECK(state_ == State::kDisconnected);
 
   // This is the only thing that can gracefully fail in the ctor.
-  if (!fd_)
+  if (!fd_) {
     return NotifyConnectionState(false);
+  }
 
   sockaddr_un addr;
   socklen_t addr_size;
@@ -246,8 +250,9 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
   if (res == 0) {
     base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostTask([weak_ptr]() {
-      if (weak_ptr)
+      if (weak_ptr) {
         weak_ptr->OnEvent();
+      }
     });
   }
 }
@@ -269,19 +274,22 @@ void UnixSocket::ReadPeerCredentials() {
 }
 
 void UnixSocket::OnEvent() {
-  if (state_ == State::kDisconnected)
+  if (state_ == State::kDisconnected) {
     return;  // Some spurious event, typically queued just before Shutdown().
+  }
 
-  if (state_ == State::kConnected)
+  if (state_ == State::kConnected) {
     return event_listener_->OnDataAvailable(this);
+  }
 
   if (state_ == State::kConnecting) {
     PERFETTO_DCHECK(fd_);
     int sock_err = EINVAL;
     socklen_t err_len = sizeof(sock_err);
     int res = getsockopt(*fd_, SOL_SOCKET, SO_ERROR, &sock_err, &err_len);
-    if (res == 0 && sock_err == EINPROGRESS)
+    if (res == 0 && sock_err == EINPROGRESS) {
       return;  // Not connected yet, just a spurious FD watch wakeup.
+    }
     if (res == 0 && sock_err == 0) {
       ReadPeerCredentials();
       state_ = State::kConnected;
@@ -298,10 +306,11 @@ void UnixSocket::OnEvent() {
     for (;;) {
       sockaddr_un cli_addr = {};
       socklen_t size = sizeof(cli_addr);
-      base::ScopedFile new_fd(PERFETTO_EINTR(
-          accept(*fd_, reinterpret_cast<sockaddr*>(&cli_addr), &size)));
-      if (!new_fd)
+      base::ScopedFile new_fd(PERFETTO_EINTR(accept4(
+          *fd_, reinterpret_cast<sockaddr*>(&cli_addr), &size, SOCK_CLOEXEC)));
+      if (!new_fd) {
         return;
+      }
       std::unique_ptr<UnixSocket> new_sock(new UnixSocket(
           event_listener_, task_runner_, std::move(new_fd), State::kConnected));
       event_listener_->OnNewIncomingConnection(this, std::move(new_sock));
@@ -343,11 +352,13 @@ bool UnixSocket::Send(const void* msg,
     msg_hdr.msg_controllen = cmsg->cmsg_len;
   }
 
-  if (blocking_mode == BlockingMode::kBlocking)
+  if (blocking_mode == BlockingMode::kBlocking) {
     SetBlockingIO(true);
+  }
   const ssize_t sz = PERFETTO_EINTR(sendmsg(*fd_, &msg_hdr, kNoSigPipe));
-  if (blocking_mode == BlockingMode::kBlocking)
+  if (blocking_mode == BlockingMode::kBlocking) {
     SetBlockingIO(false);
+  }
 
   if (sz >= 0) {
     // There should be no way a non-blocking socket returns < |len|.
@@ -377,13 +388,15 @@ void UnixSocket::Shutdown() {
   base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   if (state_ == State::kConnected) {
     task_runner_->PostTask([weak_ptr]() {
-      if (weak_ptr)
+      if (weak_ptr) {
         weak_ptr->event_listener_->OnDisconnect(weak_ptr.get());
+      }
     });
   } else if (state_ == State::kConnecting) {
     task_runner_->PostTask([weak_ptr]() {
-      if (weak_ptr)
+      if (weak_ptr) {
         weak_ptr->event_listener_->OnConnect(weak_ptr.get(), false);
+      }
     });
   }
   if (fd_) {
@@ -440,8 +453,9 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   }
 
   if (msg_hdr.msg_flags & MSG_TRUNC || msg_hdr.msg_flags & MSG_CTRUNC) {
-    for (size_t i = 0; fds && i < fds_len; ++i)
+    for (size_t i = 0; fds && i < fds_len; ++i) {
       close(fds[i]);
+    }
     last_error_ = EMSGSIZE;
     Shutdown();
     return 0;
@@ -470,8 +484,9 @@ std::string UnixSocket::ReceiveString(size_t max_length) {
 void UnixSocket::NotifyConnectionState(bool success) {
   base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_ptr, success]() {
-    if (weak_ptr)
+    if (weak_ptr) {
       weak_ptr->event_listener_->OnConnect(weak_ptr.get(), success);
+    }
   });
 }
 

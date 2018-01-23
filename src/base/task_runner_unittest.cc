@@ -272,8 +272,9 @@ TYPED_TEST(TaskRunnerTest, PostManyDelayedTasks) {
   // Check that PostTask doesn't start failing if there are too many scheduled
   // wake-ups.
   auto& task_runner = this->task_runner;
-  for (int i = 0; i < 0x1000; i++)
+  for (int i = 0; i < 0x1000; i++) {
     task_runner.PostDelayedTask([] {}, 0);
+  }
   task_runner.PostDelayedTask([&task_runner] { task_runner.Quit(); }, 10);
   task_runner.Run();
 }

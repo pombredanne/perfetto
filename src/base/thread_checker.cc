@@ -43,8 +43,9 @@ bool ThreadChecker::CalledOnValidThread() const {
 
   // Will re-attach if previously detached using DetachFromThread().
   pthread_t prev_value = kDetached;
-  if (thread_id_.compare_exchange_strong(prev_value, self))
+  if (thread_id_.compare_exchange_strong(prev_value, self)) {
     return true;
+  }
   return prev_value == self;
 }
 

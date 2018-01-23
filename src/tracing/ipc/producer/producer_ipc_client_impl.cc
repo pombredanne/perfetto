@@ -28,7 +28,7 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/tracing/ipc/posix_shared_memory.h"
 
-// TODO think to what happens when ProducerIPCClientImpl gets destroyed
+// TODO(fmayer): think to what happens when ProducerIPCClientImpl gets destroyed
 // w.r.t. the Producer pointer. Also think to lifetime of the Producer* during
 // the callbacks.
 
@@ -74,8 +74,9 @@ void ProducerIPCClientImpl::OnConnect() {
   // Create the back channel to receive commands from the Service.
   ipc::Deferred<GetAsyncCommandResponse> on_cmd;
   on_cmd.Bind([this](ipc::AsyncResult<GetAsyncCommandResponse> resp) {
-    if (!resp)
+    if (!resp) {
       return;  // The IPC channel was closed and |resp| was auto-rejected.
+    }
     OnServiceRequest(*resp);
   });
   producer_port_.GetAsyncCommand(GetAsyncCommandRequest(), std::move(on_cmd));
@@ -92,8 +93,9 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   // If connection_succeeded == false, the OnDisconnect() call will follow next
   // and there we'll notify the |producer_|. TODO: add a test for this.
-  if (!connection_succeeded)
+  if (!connection_succeeded) {
     return;
+  }
 
   base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
   PERFETTO_CHECK(shmem_fd);
@@ -120,8 +122,9 @@ void ProducerIPCClientImpl::OnPagesComplete(
     return;
   }
   NotifySharedMemoryUpdateRequest req;
-  for (uint32_t page_idx : changed_pages)
+  for (uint32_t page_idx : changed_pages) {
     req.add_changed_pages(page_idx);
+  }
 
   producer_port_.NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
@@ -162,10 +165,10 @@ void ProducerIPCClientImpl::RegisterDataSource(
   RegisterDataSourceRequest req;
   descriptor.ToProto(req.mutable_data_source_descriptor());
   ipc::Deferred<RegisterDataSourceResponse> async_response;
-  // TODO: add a test that destroys the IPC channel soon after this call and
-  // checks that the callback(0) is invoked.
-  // TODO: add a test that destroyes ProducerIPCClientImpl soon after this call
-  // and checks that the callback is dropped.
+  // TODO(fmayer): add a test that destroys the IPC channel soon after this call
+  // and checks that the callback(0) is invoked.
+  // TODO(fmayer): add a test that destroyes ProducerIPCClientImpl soon after
+  // this call and checks that the callback is dropped.
   async_response.Bind(
       [callback](ipc::AsyncResult<RegisterDataSourceResponse> response) {
         if (!response) {
@@ -203,8 +206,9 @@ void ProducerIPCClientImpl::NotifySharedMemoryUpdate(
     return;
   }
   NotifySharedMemoryUpdateRequest req;
-  for (uint32_t changed_page : changed_pages)
+  for (uint32_t changed_page : changed_pages) {
     req.add_changed_pages(changed_page);
+  }
   producer_port_.NotifySharedMemoryUpdate(
       req, ipc::Deferred<NotifySharedMemoryUpdateResponse>());
 }

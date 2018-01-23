@@ -104,8 +104,9 @@ void ConsumerIPCService::RemoteConsumer::OnDisconnect() {}
 void ConsumerIPCService::RemoteConsumer::OnTraceData(
     std::vector<TracePacket> trace_packets,
     bool has_more) {
-  if (!read_buffers_response.IsBound())
-    return;
+  if (!read_buffers_response.IsBound()) {
+    { return; }
+  }
 
   auto result = ipc::AsyncResult<ReadBuffersResponse>::Create();
   result.set_has_more(has_more);
@@ -114,8 +115,9 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
   for (const TracePacket& trace_packet : trace_packets) {
     std::string* dst = result->add_trace_packets();
     dst->reserve(trace_packet.size());
-    for (const Chunk& chunk : trace_packet)
-      dst->append(reinterpret_cast<const char*>(chunk.start), chunk.size);
+    for (const Chunk& chunk : trace_packet) {
+      { dst->append(reinterpret_cast<const char*>(chunk.start), chunk.size); }
+    }
   }
   read_buffers_response.Resolve(std::move(result));
 }

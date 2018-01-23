@@ -84,15 +84,18 @@ void FtraceController::PeriodicDrainCPU(
     size_t generation,
     int cpu) {
   // The controller might be gone.
-  if (!weak_this)
+  if (!weak_this) {
     return;
+  }
   // We might have stopped caring about events.
-  if (!weak_this->listening_for_raw_trace_data_)
+  if (!weak_this->listening_for_raw_trace_data_) {
     return;
+  }
   // We might have stopped tracing then quickly re-enabled it, in this case
   // we don't want to end up with two periodic tasks for each CPU:
-  if (weak_this->generation_ != generation)
+  if (weak_this->generation_ != generation) {
     return;
+  }
 
   bool has_more = weak_this->OnRawFtraceDataAvailable(cpu);
   weak_this->task_runner_->PostDelayedTask(
@@ -102,8 +105,9 @@ void FtraceController::PeriodicDrainCPU(
 }
 
 void FtraceController::StartIfNeeded() {
-  if (sinks_.size() > 1)
+  if (sinks_.size() > 1) {
     return;
+  }
   PERFETTO_CHECK(sinks_.size() != 0);
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
@@ -130,8 +134,9 @@ void FtraceController::WriteTraceMarker(const std::string& s) {
 }
 
 void FtraceController::StopIfNeeded() {
-  if (sinks_.size() != 0)
+  if (sinks_.size() != 0) {
     return;
+  }
   PERFETTO_CHECK(listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = false;
   readers_.clear();
@@ -152,8 +157,9 @@ bool FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   }
   bool res = reader->Drain(filters, bundles);
   i = 0;
-  for (FtraceSink* sink : sinks_)
+  for (FtraceSink* sink : sinks_) {
     sink->OnBundleComplete(cpu, std::move(bundles[i++]));
+  }
   PERFETTO_DCHECK(sinks_.size() == sink_count);
   return res;
 }
@@ -169,14 +175,15 @@ CpuReader* FtraceController::GetCpuReader(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    FtraceConfig config,
+    const FtraceConfig& config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (sinks_.size() >= kMaxSinks)
+  if (sinks_.size() >= kMaxSinks) {
     return nullptr;
+  }
   auto controller_weak = weak_factory_.GetWeakPtr();
-  auto filter = std::unique_ptr<EventFilter>(
-      new EventFilter(*table_.get(), config.events()));
+  auto filter =
+      std::unique_ptr<EventFilter>(new EventFilter(*table_, config.events()));
   auto sink = std::unique_ptr<FtraceSink>(
       new FtraceSink(std::move(controller_weak), std::move(filter), delegate));
   Register(sink.get());
@@ -189,8 +196,9 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK(it_and_inserted.second);
 
   StartIfNeeded();
-  for (const std::string& name : sink->enabled_events())
+  for (const std::string& name : sink->enabled_events()) {
     RegisterForEvent(name);
+}
 }
 
 void FtraceController::RegisterForEvent(const std::string& name) {
@@ -201,20 +209,23 @@ void FtraceController::RegisterForEvent(const std::string& name) {
     return;
   }
   size_t& count = enabled_count_.at(event->ftrace_event_id);
-  if (count == 0)
+  if (count == 0) {
     ftrace_procfs_->EnableEvent(event->group, event->name);
+  }
   count += 1;
 }
 
 void FtraceController::UnregisterForEvent(const std::string& name) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   const Event* event = table_->GetEventByName(name);
-  if (!event)
+  if (!event) {
     return;
+  }
   size_t& count = enabled_count_.at(event->ftrace_event_id);
   PERFETTO_CHECK(count > 0);
-  if (--count == 0)
+  if (--count == 0) {
     ftrace_procfs_->DisableEvent(event->group, event->name);
+}
 }
 
 void FtraceController::Unregister(FtraceSink* sink) {
@@ -222,8 +233,9 @@ void FtraceController::Unregister(FtraceSink* sink) {
   size_t removed = sinks_.erase(sink);
   PERFETTO_DCHECK(removed == 1);
 
-  for (const std::string& name : sink->enabled_events())
+  for (const std::string& name : sink->enabled_events()) {
     UnregisterForEvent(name);
+  }
   StopIfNeeded();
 }
 
@@ -235,8 +247,9 @@ FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
       delegate_(delegate){};
 
 FtraceSink::~FtraceSink() {
-  if (controller_weak_)
+  if (controller_weak_) {
     controller_weak_->Unregister(this);
+  }
 };
 
 const std::set<std::string>& FtraceSink::enabled_events() {

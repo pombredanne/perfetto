@@ -49,7 +49,7 @@ char ReadOneCharFromFile(const std::string& path) {
   return result;
 }
 
-std::string ReadFileIntoString(std::string path) {
+std::string ReadFileIntoString(const std::string& path) {
   std::ifstream fin(path, std::ios::in);
   if (!fin) {
     PERFETTO_DLOG("Could not read '%s'", path.c_str());
@@ -133,8 +133,9 @@ bool FtraceProcfs::IsTracingEnabled() {
 bool FtraceProcfs::WriteToFile(const std::string& path,
                                const std::string& str) {
   base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
-  if (!fd)
+  if (!fd) {
     return false;
+  }
   ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
   ssize_t length = static_cast<ssize_t>(str.length());
   // This should either fail or write fully.

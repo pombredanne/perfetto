@@ -37,8 +37,9 @@ TEST(ScatteredStreamWriterTest, ScatteredWrites) {
   const uint8_t kThreeByteBuf[] = {0x50, 0x51, 0x52};
   const uint8_t kFourByteBuf[] = {0x60, 0x61, 0x62, 0x63};
   uint8_t kTwentyByteBuf[20];
-  for (uint8_t i = 0; i < sizeof(kTwentyByteBuf); ++i)
+  for (uint8_t i = 0; i < sizeof(kTwentyByteBuf); ++i) {
     kTwentyByteBuf[i] = 0xA0 + i;
+  }
 
   // Writing up to the chunk size should cause only the initial extension.
   for (uint8_t i = 0; i < kChunkSize; ++i) {
@@ -77,8 +78,9 @@ TEST(ScatteredStreamWriterTest, ScatteredWrites) {
 
   // Check that reserving more bytes than what left creates a brand new chunk
   // even if the previous one is not exhausted
-  for (uint8_t i = 0; i < 5; ++i)
+  for (uint8_t i = 0; i < 5; ++i) {
     ssw.WriteByte(0xFF);
+  }
   memcpy(ssw.ReserveBytes(4), kFourByteBuf, sizeof(kFourByteBuf));
   memcpy(ssw.ReserveBytesUnsafe(3), kThreeByteBuf, sizeof(kThreeByteBuf));
   memcpy(ssw.ReserveBytes(3), kThreeByteBuf, sizeof(kThreeByteBuf));

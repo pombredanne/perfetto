@@ -91,8 +91,9 @@ bool BufferedFrameDeserializer::EndReceive(size_t recv_size) {
 
   size_t consumed_size = 0;
   for (;;) {
-    if (size_ < consumed_size + kHeaderSize)
+    if (size_ < consumed_size + kHeaderSize) {
       break;  // Case A, not enough data to read even the header.
+    }
 
     // Read the header into |payload_size|.
     uint32_t payload_size = 0;
@@ -158,21 +159,24 @@ bool BufferedFrameDeserializer::EndReceive(size_t recv_size) {
 }
 
 std::unique_ptr<Frame> BufferedFrameDeserializer::PopNextFrame() {
-  if (decoded_frames_.empty())
+  if (decoded_frames_.empty()) {
     return nullptr;
+  }
   std::unique_ptr<Frame> frame = std::move(decoded_frames_.front());
   decoded_frames_.pop_front();
   return frame;
 }
 
 void BufferedFrameDeserializer::DecodeFrame(const char* data, size_t size) {
-  if (size == 0)
+  if (size == 0) {
     return;
+  }
   std::unique_ptr<Frame> frame(new Frame);
   const int sz = static_cast<int>(size);
   ::google::protobuf::io::ArrayInputStream stream(data, sz);
-  if (frame->ParseFromBoundedZeroCopyStream(&stream, sz))
+  if (frame->ParseFromBoundedZeroCopyStream(&stream, sz)) {
     decoded_frames_.push_back(std::move(frame));
+}
 }
 
 // static

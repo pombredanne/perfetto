@@ -41,8 +41,9 @@ TEST(PageAllocatorTest, Basic) {
     ASSERT_TRUE(ptr);
     ASSERT_EQ(0u, reinterpret_cast<uintptr_t>(ptr.get()) % 4096);
     ptr_raw = ptr.get();
-    for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
+    for (size_t i = 0; i < kSize / sizeof(uint64_t); i++) {
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(ptr.get()) + i));
+    }
 
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
   }

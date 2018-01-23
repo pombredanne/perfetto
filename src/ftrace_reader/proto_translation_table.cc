@@ -32,8 +32,9 @@ namespace {
 const std::vector<Event> BuildEventsVector(const std::vector<Event>& events) {
   size_t largest_id = 0;
   for (const Event& event : events) {
-    if (event.ftrace_event_id > largest_id)
+    if (event.ftrace_event_id > largest_id) {
       largest_id = event.ftrace_event_id;
+    }
   }
   std::vector<Event> events_by_id;
   events_by_id.resize(largest_id + 1);
@@ -82,8 +83,9 @@ uint16_t MergeFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
     bool success = false;
     for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
       if (GetNameFromTypeAndName(ftrace_field.type_and_name) !=
-          field->ftrace_name)
+          field->ftrace_name) {
         continue;
+      }
 
       success = MergeFieldInfo(ftrace_field, &*field);
 
@@ -190,7 +192,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
                events.end());
 
   auto table = std::unique_ptr<ProtoTranslationTable>(
-      new ProtoTranslationTable(std::move(events), std::move(common_fields)));
+      new ProtoTranslationTable(events, std::move(common_fields)));
   return table;
 }
 

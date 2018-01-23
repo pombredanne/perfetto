@@ -57,8 +57,9 @@ class MockEventListener : public UnixSocket::EventListener {
   }
 
   std::unique_ptr<UnixSocket> GetIncomingConnection() {
-    if (incoming_connections_.empty())
+    if (incoming_connections_.empty()) {
       return nullptr;
+    }
     std::unique_ptr<UnixSocket> sock = std::move(incoming_connections_.front());
     incoming_connections_.pop_front();
     return sock;
@@ -324,8 +325,9 @@ bool AtomicWrites_SendAttempt(UnixSocket* s,
                               int num_frame) {
   char buf[kAtomicWrites_FrameSize];
   memset(buf, static_cast<char>(num_frame), sizeof(buf));
-  if (s->Send(buf, sizeof(buf)))
+  if (s->Send(buf, sizeof(buf))) {
     return true;
+  }
   task_runner->PostTask(
       std::bind(&AtomicWrites_SendAttempt, s, task_runner, num_frame));
   return false;
@@ -356,16 +358,19 @@ TEST_F(UnixSocketTest, SendIsAtomic) {
                 Invoke([&received_iterations, all_frames_done](UnixSocket* s) {
                   char buf[kAtomicWrites_FrameSize];
                   size_t res = s->Receive(buf, sizeof(buf));
-                  if (res == 0)
+                  if (res == 0) {
                     return;  // Spurious select(), could happen.
+                  }
                   ASSERT_EQ(kAtomicWrites_FrameSize, res);
                   // Check that we didn't get two truncated frames.
-                  for (size_t i = 0; i < sizeof(buf); i++)
+                  for (size_t i = 0; i < sizeof(buf); i++) {
                     ASSERT_EQ(buf[0], buf[i]);
+                  }
                   ASSERT_EQ(0u, received_iterations.count(buf[0]));
                   received_iterations.insert(buf[0]);
-                  if (received_iterations.size() == kNumFrames)
+                  if (received_iterations.size() == kNumFrames) {
                     all_frames_done();
+                  }
                 }));
       }));
 
@@ -377,8 +382,9 @@ TEST_F(UnixSocketTest, SendIsAtomic) {
   ASSERT_EQ(geteuid(), static_cast<uint32_t>(cli->peer_uid()));
 
   bool did_requeue = false;
-  for (int i = 0; i < kNumFrames; i++)
+  for (int i = 0; i < kNumFrames; i++) {
     did_requeue |= !AtomicWrites_SendAttempt(cli.get(), &task_runner_, i);
+  }
 
   // We expect that at least one of the kNumFrames didn't fit in the socket
   // buffer and was re-posted, otherwise this entire test would be pointless.
@@ -444,8 +450,9 @@ TEST_F(UnixSocketTest, BlockingSend) {
                   char buf[1024];
                   size_t res = s->Receive(buf, sizeof(buf));
                   total_bytes_received += res;
-                  if (total_bytes_received == kTotalBytes)
+                  if (total_bytes_received == kTotalBytes) {
                     all_frames_done();
+                  }
                 }));
       }));
 
@@ -466,9 +473,10 @@ TEST_F(UnixSocketTest, BlockingSend) {
     auto all_sent = tx_task_runner.CreateCheckpoint("all_sent");
     char buf[1024 * 32] = {};
     tx_task_runner.PostTask([&cli, &buf, all_sent] {
-      for (size_t i = 0; i < kTotalBytes / sizeof(buf); i++)
+      for (size_t i = 0; i < kTotalBytes / sizeof(buf); i++) {
         cli->Send(buf, sizeof(buf), -1 /*fd*/,
                   UnixSocket::BlockingMode::kBlocking);
+      }
       all_sent();
     });
     tx_task_runner.RunUntilCheckpoint("all_sent", kTimeoutMs);
