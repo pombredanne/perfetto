@@ -126,6 +126,7 @@ def Main():
   AdbCall('wait-for-device')
   WaitForBootCompletion()
   AdbCall('root')
+  AdbCall('wait-for-device')
 
   target_dir = '/data/local/tmp/' + args.test_name
   AdbCall('shell', 'rm -rf "%s"; mkdir -p "%s"' % (2 * (target_dir,)))
