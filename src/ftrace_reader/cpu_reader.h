@@ -89,9 +89,9 @@ class CpuReader {
             base::ScopedFile fd);
   ~CpuReader();
 
-  // Blocks until a ~page of ftrace data is available for draining. |callback|
-  // will be invoked on the task runner passed to the constructor.
-  void WaitForData(std::function<void(void)> callback);
+  // Starts waiting for ftrace data be available. |callback| will be repeatedly
+  // invoked on the task runner passed to the constructor.
+  void WaitForData(std::function<void(void)> callback, int delay_ms = 0);
 
   // Read up to a page of data an ftrace buffer without blocking. Returns true
   // if a page was read successfully and it was more than half populated with
@@ -166,6 +166,7 @@ class CpuReader {
   base::ScopedFile trace_fd_;
   base::ScopedFile staging_read_fd_;
   base::ScopedFile staging_write_fd_;
+  size_t staging_capacity_;
   std::unique_ptr<uint8_t[]> buffer_;
 
   base::UnixTaskRunner monitor_task_runner_;
@@ -175,7 +176,7 @@ class CpuReader {
 
   // Whether we have used splice(2) to move data from the trace fd into the
   // staging pipe.
-  bool data_in_staging_pipe_ = false;
+  int pages_in_staging_pipe_ = 0;
 
   // Begin lock protected members.
   std::mutex lock_;

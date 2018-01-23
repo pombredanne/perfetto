@@ -31,6 +31,9 @@ namespace perfetto {
 
 namespace {
 
+// TODO(skyostil): Make this configurable.
+const int kMinSpliceInterval = 16;
+
 static bool ReadIntoString(const uint8_t* start,
                            const uint8_t* end,
                            size_t field_id,
@@ -111,6 +114,11 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
   PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
+  staging_capacity_ = fcntl(*staging_write_fd_, F_GETPIPE_SZ);
+
+  // Reads from the staging buffer are always non-blocking.
+  int flags = fcntl(*staging_read_fd_, 0);
+  fcntl(*staging_read_fd_, F_SETFL, flags | O_NONBLOCK);
 
   monitor_task_runner_.PostTask([cpu] {
     char name[16];
@@ -128,39 +136,57 @@ CpuReader::~CpuReader() {
   monitor_thread_.join();
 }
 
-void CpuReader::WaitForData(std::function<void(void)> callback) {
-  monitor_task_runner_.PostTask([this, callback] {
-    data_in_staging_pipe_ = true;
-    int flags = fcntl(trace_fd_.get(), F_GETFL, 0);
-    // The splice call will block until there is roughly a page full of data in
-    // the staging pipe. For this to work the trace fd must be in blocking mode.
-    fcntl(trace_fd_.get(), F_SETFL, flags & ~O_NONBLOCK);
+void CpuReader::WaitForData(std::function<void(void)> callback, int delay_ms) {
+  monitor_task_runner_.PostDelayedTask(
+      [this, callback] {
+        int trace_flags = fcntl(*trace_fd_, F_GETFL, 0);
+        int staging_flags = fcntl(*staging_write_fd_, F_GETFL, 0);
 
-    timespec now;
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
-    int64_t start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    int64_t rt_start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
+        // First do a blocking splice which sleeps until there is at least one
+        // page of data available (and enough space to write it).
+        fcntl(*trace_fd_, F_SETFL, trace_flags & ~O_NONBLOCK);
+        fcntl(*staging_write_fd_, F_SETFL, staging_flags & ~O_NONBLOCK);
+        if (PERFETTO_EINTR(splice(*trace_fd_, nullptr, *staging_write_fd_,
+                                  nullptr, kPageSize, SPLICE_F_MOVE)) == -1) {
+          PERFETTO_DPLOG("splice");
+        } else {
+          pages_in_staging_pipe_++;
+        }
 
-    if (PERFETTO_EINTR(splice(trace_fd_.get(), nullptr, staging_write_fd_.get(),
-                              nullptr, kPageSize, SPLICE_F_MOVE)) == -1) {
-      PERFETTO_DPLOG("splice");
-    }
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
-    int64_t now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    int64_t rt_now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
-    PERFETTO_DLOG("splice %zu took %fms thread time, %fms real time", cpu_,
-                  (now_ns - start_ns) / 1e6, (rt_now_ns - rt_start_ns) / 1e6);
+        // Schedule the next splice operation before starting the blocking read.
+        // If the read completes sooner than the minimum period, the task delay
+        // will ensure we won't start the next one too soon.
+        WaitForData(callback, kMinSpliceInterval);
 
-    fcntl(trace_fd_.get(), F_SETFL, flags);
+        // Configure both the trace and staging pipes as non-blocking.
+        fcntl(*trace_fd_, F_SETFL, trace_flags | O_NONBLOCK);
+        fcntl(*staging_write_fd_, F_SETFL, staging_flags | O_NONBLOCK);
 
-    {
-      std::lock_guard<std::mutex> lock(lock_);
-      if (task_runner_)
-        task_runner_->PostTask(callback);
-    }
-  });
+        // Next do as many non-blocking splices as we can. This moves any full
+        // pages from the trace pipe into the staging pipe as long as there is
+        // data in the former and space in the latter.
+        while (true) {
+          if (PERFETTO_EINTR(splice(*trace_fd_, nullptr, *staging_write_fd_,
+                                    nullptr, kPageSize,
+                                    SPLICE_F_MOVE | SPLICE_F_NONBLOCK)) == -1) {
+            if (errno != EAGAIN)
+              PERFETTO_DPLOG("splice");
+            break;
+          }
+          pages_in_staging_pipe_++;
+        }
+
+        // If there's enough data, notify the consumer to drain it. Note that we
+        // must make sure there's a drain scheduled when the pipe is nearing
+        // capacity so that the splice is eventually unblocked by the consumer.
+        if (pages_in_staging_pipe_ * kPageSize >= staging_capacity_ / 4) {
+          pages_in_staging_pipe_ = 0;
+          std::lock_guard<std::mutex> lock(lock_);
+          if (task_runner_)
+            task_runner_->PostTask(callback);
+        }
+      },
+      delay_ms);
 }
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
@@ -168,15 +194,14 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
   if (!trace_fd_)
     return false;
 
-  int fd = data_in_staging_pipe_ ? staging_read_fd_.get() : trace_fd_.get();
   uint8_t* buffer = GetBuffer();
-  long bytes = PERFETTO_EINTR(read(fd, buffer, kPageSize));
-  if (bytes == -1 && errno == EAGAIN)
+  long bytes = PERFETTO_EINTR(read(*staging_read_fd_, buffer, kPageSize));
+  if (bytes == -1 && errno == EAGAIN) {
     return false;
+  }
   if (bytes != kPageSize)
     return false;
   PERFETTO_CHECK(static_cast<size_t>(bytes) <= kPageSize);
-  data_in_staging_pipe_ = false;
 
   size_t evt_size = 0;
   for (size_t i = 0; i < kMaxSinks; i++) {

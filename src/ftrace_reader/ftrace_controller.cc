@@ -41,14 +41,6 @@ namespace {
 // const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 const char kTracingPath[] = "/sys/kernel/debug/tracing/instances/meta/";
 
-// TODO(hjd): Expose this as a configurable variable.
-const int kDrainPeriodMs = 100;
-
-// Below this rate we'll wait for the kernel to tell us that a CPU has data to
-// read. If the rate is higher we switch to draining the buffer for this CPU on
-// a periodic schedule.
-const int kFastDataRateThreshold = 128;  // Pages per second.
-
 }  // namespace
 
 // static
@@ -91,41 +83,11 @@ void FtraceController::StartIfNeeded() {
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
   ftrace_procfs_->EnableTracing();
-  generation_++;
-  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++)
-    ChooseDrainingStrategy(cpu, /* has_more */ false);
-}
-
-void FtraceController::ChooseDrainingStrategy(size_t cpu, bool has_more) {
-  CpuReader* reader = GetCpuReader(cpu);
-  PERFETTO_DLOG("cpu %zu rate: %.2f pages/s", cpu,
-                static_cast<double>(reader->pages_per_second()));
-  size_t generation = generation_;
-  // If the data rate is low, we don't want to wake up periodically but rather
-  // wait for the kernel to tell us when there is more data available.
-  if (reader->pages_per_second() < kFastDataRateThreshold) {
-    PERFETTO_DLOG("cpu %zu: \033[1;32mBLOCKING +++\033[0m", cpu);
+  size_t generation = ++generation_;
+  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
+    CpuReader* reader = GetCpuReader(cpu);
     reader->WaitForData([this, cpu, generation] { DrainCpu(cpu, generation); });
-    return;
   }
-  // For a high data rate we drain the buffer at a fixed frequency to avoid
-  // waking up for each and every filled page.
-  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
-  if (has_more)
-    PERFETTO_DLOG("cpu %zu: \033[1;34mREAD !!!!!!!!!!!!!!!!!!!!!!!!!!\033[0m",
-                  cpu);
-  else
-    PERFETTO_DLOG(
-        "cpu %zu: \033[1;33mSLEEPING FOR %dms ................\033[0m", cpu,
-        kDrainPeriodMs);
-
-  weak_this->task_runner_->PostDelayedTask(
-      [weak_this, cpu, generation] {
-        if (!weak_this)
-          return;
-        weak_this->DrainCpu(cpu, generation);
-      },
-      has_more ? 0 : kDrainPeriodMs);
 }
 
 void FtraceController::DrainCpu(size_t cpu, size_t generation) {
@@ -136,8 +98,15 @@ void FtraceController::DrainCpu(size_t cpu, size_t generation) {
   // we don't want to end up with two periodic tasks for each CPU:
   if (generation_ != generation)
     return;
-  bool has_more = OnRawFtraceDataAvailable(cpu);
-  ChooseDrainingStrategy(cpu, has_more);
+  // Flush all available data from the staging pipe.
+  if (!OnRawFtraceDataAvailable(cpu))
+    return;
+  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, cpu, generation] {
+    if (!weak_this)
+      return;
+    weak_this->DrainCpu(cpu, generation);
+  });
 }
 
 void FtraceController::ClearTrace() {

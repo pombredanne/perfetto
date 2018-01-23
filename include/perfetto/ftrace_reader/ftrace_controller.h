@@ -142,12 +142,8 @@ class FtraceController {
   void StartIfNeeded();
   void StopIfNeeded();
 
-  // Select a strategy for draining the next data buffer for |cpu|. |has_more|
-  // indicates if we think the CPU already has pending data to read.
-  void ChooseDrainingStrategy(size_t cpu, bool has_more);
-
-  // Read up to one page of data from the trace buffer for |cpu|. |generation|
-  // is the generation this operation was scheduled for.
+  // Read all available data from the trace buffer for |cpu|. |generation| is
+  // the generation this operation was scheduled for.
   void DrainCpu(size_t cpu, size_t generation);
 
   // Returns a cached CpuReader for |cpu|.
