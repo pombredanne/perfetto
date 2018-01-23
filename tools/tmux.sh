@@ -2,7 +2,7 @@
 
 set -e
 
-outdir=out/adbg
+outdir=out/arel
 
 ninja -C $outdir perfetto traced traced_probes
 

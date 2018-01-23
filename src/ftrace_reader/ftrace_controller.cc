@@ -38,7 +38,7 @@ namespace perfetto {
 namespace {
 
 // TODO(b/68242551): Do not hardcode these paths.
-const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+const char kTracingPath[] = "/sys/kernel/debug/tracing/instances/meta/";
 
 }  // namespace
 
@@ -120,25 +120,31 @@ void FtraceController::StopIfNeeded() {
 }
 
 void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
-  PERFETTO_LOG("OnRawFtraceDataAvailable BEGIN, tid=%d", gettid());
   PERFETTO_CHECK(cpu < readers_.size());
   CpuReader* reader = readers_[cpu].get();
   using BundleHandle =
       protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
-  std::array<const EventFilter*, kMaxSinks> filters{};
-  std::array<BundleHandle, kMaxSinks> bundles{};
-  size_t sink_count = sinks_.size();
-  size_t i = 0;
-  for (FtraceSink* sink : sinks_) {
-    filters[i] = sink->get_event_filter();
-    bundles[i++] = sink->GetBundleForCpu(cpu);
+  // TODO: this |n| is a workaround to prevent that we fill the SMB
+  // and end up in a state where we posted the notification to traced, but we
+  // are stuck stalling in TraceWriterImpl and hence never send the IPC, hence
+  // deadlock.
+  for (int n = 0; n < 10; n++) {
+    std::array<const EventFilter*, kMaxSinks> filters{};
+    std::array<BundleHandle, kMaxSinks> bundles{};
+    size_t sink_count = sinks_.size();
+    size_t i = 0;
+    for (FtraceSink* sink : sinks_) {
+      filters[i] = sink->get_event_filter();
+      bundles[i++] = sink->GetBundleForCpu(cpu);
+    }
+    bool has_data = reader->Drain(filters, bundles);
+    i = 0;
+    for (FtraceSink* sink : sinks_)
+      sink->OnBundleComplete(cpu, std::move(bundles[i++]));
+    PERFETTO_DCHECK(sinks_.size() == sink_count);
+    if (!has_data)
+      break;
   }
-  reader->Drain(filters, bundles);
-  i = 0;
-  for (FtraceSink* sink : sinks_)
-    sink->OnBundleComplete(cpu, std::move(bundles[i++]));
-  PERFETTO_DCHECK(sinks_.size() == sink_count);
-  PERFETTO_LOG("OnRawFtraceDataAvailable END, tid=%d", gettid());
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(

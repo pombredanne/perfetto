@@ -550,6 +550,7 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 
 void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
+  PERFETTO_DLOG("NotifySharedMemoryUpdate()");
   for (uint32_t page_idx : changed_pages) {
     if (page_idx >= shmem_abi_.num_pages())
       continue;  // Very likely a malicious producer playing dirty.

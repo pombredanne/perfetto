@@ -79,12 +79,11 @@ class CpuReader {
             base::ScopedFile trace_pipe_raw);
   ~CpuReader();
 
-  void Drain(
+  bool Drain(
       const std::array<const EventFilter*, kMaxSinks>&,
       const std::array<
           protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
           kMaxSinks>&);
-  int GetFileDescriptor();
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {

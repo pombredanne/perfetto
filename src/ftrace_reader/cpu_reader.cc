@@ -68,6 +68,12 @@ void SetBlocking(int fd, bool is_blocking) {
   PERFETTO_CHECK(fcntl(fd, F_SETFL, flags) == 0);
 }
 
+int64_t NowNs() {
+  timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec * 1000000000L + now.tv_nsec;
+}
+
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
 // Some information about the values of these constants are exposed to user
@@ -115,21 +121,28 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
   PERFETTO_CHECK(staging_read_fd_ && staging_write_fd_);
+
+  SetBlocking(*trace_pipe_raw_, true);
+  SetBlocking(*staging_write_fd_, true);
+  SetBlocking(*staging_read_fd_, false);
+
   pipe_worker_ =
       std::thread(&CpuReader::PipeWorker, task_runner, ftrace_controller, cpu,
                   *trace_pipe_raw_, *staging_write_fd_);
 }
 
 CpuReader::~CpuReader() {
-  // Closing the pipes should cause splice() to return EPIPE.
+  // Closing the pipes should cause splice() to return EPIPE or EBADF.
   // TODO this code needs to be carefully checked.
   trace_pipe_raw_.reset();
   staging_read_fd_.reset();
+  staging_write_fd_.reset();
+  // pthread_kill(pipe_worker_.native_handle(), SIGPIPE);  // TODO why do I need
+  // this?
+  PERFETTO_DLOG("Cpu reader dtor... cpu:%zu", cpu_);
   pipe_worker_.join();
-}
-
-int CpuReader::GetFileDescriptor() {
-  return trace_pipe_raw_.get();
+  // TODO: there seems to be a bug here, often cpu0 never joins.
+  PERFETTO_DLOG("  dtor joined cpu:%zu", cpu_);
 }
 
 // static
@@ -142,93 +155,107 @@ void CpuReader::PipeWorker(base::TaskRunner* task_runner,
   snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
 
+  // Mask SIGPIPE. This will be raised when destroying the other end of the pipe
+  // in the CpuReader dtor to force this thread to exit.
+  // TODO: not 100% sure this is needed, not sure if signal(SIGPIPE, SIGIGN)
+  // would be better.
   sigset_t set;
   sigemptyset(&set);
   sigaddset(&set, SIGPIPE);
   sigprocmask(SIG_BLOCK, &set, nullptr);
 
-  SetBlocking(trace_pipe_raw, true);
-  SetBlocking(staging_write_fd, true);
+  size_t pages_in_staging_pipe = 0;
+  useconds_t throttle = 0;
+
+  static constexpr useconds_t kThrottlePeriodHiRateUs = 50 * 1000L;
+  static constexpr useconds_t kThrottlePeriodLowRateUs = 250 * 1000L;
+  static constexpr useconds_t kWakeupThresholdNs = 100 * 1000L * 1000L;
+  static constexpr size_t kPagesBurstForHiRateTransition = 10;
 
   for (;;) {
+    if (throttle)
+      usleep(throttle);
+
+    // Do a blocking splice() first.
+    size_t pages_spliced_in_cur_iteration = 0;
+    int64_t t_start = NowNs();
+    int splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
+                            kPageSize, SPLICE_F_MOVE);
+    if (splice_res < 0 && (errno == EPIPE || errno == EBADF))  // dtor called
+      break;
+
+    const int64_t blocking_splice_duration_ns = NowNs() - t_start;
+    PERFETTO_DCHECK(splice_res == kPageSize);
+    pages_spliced_in_cur_iteration++;
+
     // Move as many pages as we can from the trace_pipe_raw to the staging pipe
     // until either the former is empty or the latter is full.
-    size_t pages_moved = 0;
-    int splice_res = 0;
     for (;;) {
       splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
                           kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
       if (splice_res > 0) {
-        pages_moved++;
+        pages_spliced_in_cur_iteration++;
         PERFETTO_DCHECK(splice_res == kPageSize);
       } else {
         break;
       }
     }
-    if (splice_res < 0 && errno == EPIPE)
+    if (splice_res < 0 && (errno == EPIPE || errno == EBADF))  // dtor called
       break;
     PERFETTO_DCHECK(splice_res < 0 && errno == EAGAIN);
 
-    PERFETTO_DLOG("Splice[cpu:%zu], moved: %zu pages", cpu, pages_moved);
+    if (pages_spliced_in_cur_iteration >= kPagesBurstForHiRateTransition) {
+      // We seem to be under a tracing burst. We can't just splice() straight
+      // away as doing so will interfere too much with the CPU run queues and
+      // introduce too much overhead. At the same time we can't be too relaxed
+      // because we are at serious risk of dropping content from the kernel
+      // ftrace buffer.  Throttle at kThrottlePeriodHiRateUs.
+      PERFETTO_DLOG("Entering burst mode");
+      throttle = kThrottlePeriodHiRateUs;
+    } else if (blocking_splice_duration_ns < kWakeupThresholdNs) {
+      // We have a manageable backlog in the staging pipe, but enough tracing
+      // activity that wakes us up too frequently. Introduce some throttling to
+      // relax the wakeups.
+      // TODO this is true only if splice is retuning because the output pipe is
+      // not full. We should figure out a way to distinguish the two cases.
+      throttle = kThrottlePeriodLowRateUs;
+    } else {
+      // We don't seem to be doing too bad. Just let the blocking splice() set
+      // our pace.
+      throttle = 0;
+    }
 
-    if (pages_moved > 0)
+    pages_in_staging_pipe += pages_spliced_in_cur_iteration;
+
+    PERFETTO_DLOG("Splice[%zu], pages: %zu / %zu, ms: %" PRIi64 " throttle: %u",
+                  cpu, pages_spliced_in_cur_iteration, pages_in_staging_pipe,
+                  blocking_splice_duration_ns / 1000000, throttle);
+
+    // TODO this 8 below is somewhat arbitrary. Careful with it though,
+    // this heavily relies on the default pipe buffer being > 10 * 4096.
+    if (pages_in_staging_pipe > 8) {
       task_runner->PostTask([ftrace_controller, cpu] {
         ftrace_controller->OnRawFtraceDataAvailable(cpu);
       });
-
-    // Blocking splice. This will block until either there is a full page on
-    // |trace_pipe_raw| or |staging_write_fd| has space.
-    timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    const int64_t start_ns = now.tv_sec * 1000000000L + now.tv_nsec;
-
-    splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
-                        kPageSize, SPLICE_F_MOVE);
-    if (splice_res < 0 && errno == EPIPE)
-      break;
-
-    // TODO increase pages_moved and send IPC.
-
-    PERFETTO_DCHECK(splice_res == kPageSize);
-
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    const int64_t now_ns = now.tv_sec * 1000000000L + now.tv_nsec;
-
-    int64_t splice_duration_us = (now_ns - start_ns) / 1000;
-    PERFETTO_DLOG("Splice[cpu:%zu] blocking duration: %" PRIi64 " us",
-                  cpu, splice_duration_us);
-
-    // If we are waking up too close throttle the splice()s. We don't want to
-    // jam the execution too aggressively. At this point we rely solely on the
-    // kernel ftrace buffer to keep up.
-    static constexpr int64_t kMinWakeupUs = 100 * 1000L;
-    if (splice_duration_us < kMinWakeupUs) {
-      PERFETTO_DLOG("Throttling, splice too quick: %" PRIi64 " us",
-                    splice_duration_us);
-      usleep(kMinWakeupUs);
+      pages_in_staging_pipe = 0;
     }
-
-    // TODO: this is not great. This loop, as is, implies that the max draining
-    // bandwidth we have is $pipe_buffer per kMinWakeupNs. We can survive bursts
-    // but not sustained trace loads. We should look tweak this logic by
-    // checking if we max-out |pages_moved| every time and become more
-    // aggressive in that case.
   }
+  PERFETTO_DLOG("Quitting splice thread for cpu %zu", cpu);
 }
 
-void CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
+bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
   if (!staging_read_fd_)
-    return;
+    return false;
   uint8_t* buffer = GetBuffer();
 
   // TODO loop outer, if looping here something breaks in trace_writer_impl.
-  CONTINUE FROM HERE
-  for (;;) {
+  // for (;;)
+  {
     long bytes =
         PERFETTO_EINTR(read(staging_read_fd_.get(), buffer, kPageSize));
     if (bytes == -1 && errno == EAGAIN)
-      return;
+      return false;
     // TODO: think about other error conditions.
     PERFETTO_CHECK(static_cast<size_t>(bytes) == kPageSize);
     size_t evt_size = 0;
@@ -238,6 +265,7 @@ void CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
       evt_size = ParsePage(cpu_, buffer, filters[i], &*bundles[i], table_);
       PERFETTO_DCHECK(evt_size);
     }
+    return true;
   }
 }
 

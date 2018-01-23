@@ -96,8 +96,8 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
           tbuf = shmem_abi_.page_header(page_idx_)->target_buffer.load(
               std::memory_order_relaxed);
         }
-        PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
-                      page_idx_, free_chunks, tbuf);
+        // PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
+        //               page_idx_, free_chunks, tbuf);
 
         if (tbuf != target_buffer)
           continue;
@@ -111,7 +111,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
               page_idx_, chunk_idx, tbuf, &header);
           if (!chunk.is_valid())
             continue;
-          PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
+          // PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;
         }
         // TODO: we should have some policy to guarantee fairness of the SMB
