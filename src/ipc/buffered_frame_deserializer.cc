@@ -31,7 +31,11 @@ namespace perfetto {
 namespace ipc {
 
 namespace {
+#ifdef PERFETTO_TESTONLY_SMALL_PAGES
+constexpr size_t kPageSize = 128;
+#else
 constexpr size_t kPageSize = 4096;
+#endif
 
 // The header is just the number of bytes of the Frame protobuf message.
 constexpr size_t kHeaderSize = sizeof(uint32_t);

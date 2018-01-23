@@ -53,6 +53,7 @@ if (use_libfuzzer) {
       "-fsanitize=fuzzer",
       "-fsanitize-coverage=trace-pc-guard",
     ]
+    defines = [ "PERFETTO_TESTONLY_SMALL_PAGES" ]
   }
 }
 

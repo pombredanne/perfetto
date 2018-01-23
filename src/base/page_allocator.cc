@@ -25,7 +25,11 @@ namespace base {
 
 namespace {
 
-static constexpr size_t kPageSize = 4096;
+#ifdef PERFETTO_TESTONLY_SMALL_PAGES
+constexpr size_t kPageSize = 128;
+#else
+constexpr size_t kPageSize = 4096;
+#endif
 static constexpr size_t kGuardSize = kPageSize;
 
 // static
@@ -38,9 +42,11 @@ PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
     return nullptr;
   PERFETTO_CHECK(ptr && ptr != MAP_FAILED);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
+#ifndef PERFETTO_TESTONLY_SMALL_PAGES
   int res = mprotect(ptr, kGuardSize, PROT_NONE);
   res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
   PERFETTO_CHECK(res == 0);
+#endif
   return PageAllocator::UniquePtr(usable_region, PageAllocator::Deleter(size));
 }
 

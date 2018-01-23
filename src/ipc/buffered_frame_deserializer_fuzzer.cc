@@ -24,7 +24,7 @@
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  perfetto::ipc::BufferedFrameDeserializer bfd;
+  perfetto::ipc::BufferedFrameDeserializer bfd(256);
   auto rbuf = bfd.BeginReceive();
   memcpy(rbuf.data, data, size);
   ::perfetto::base::ignore_result(bfd.EndReceive(size));
