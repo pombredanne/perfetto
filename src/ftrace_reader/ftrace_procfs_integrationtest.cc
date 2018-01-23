@@ -51,8 +51,15 @@ std::string GetTraceOutput() {
 }  // namespace
 
 // TODO(lalitm): reenable these thests (see b/72306171).
+TEST(FtraceProcfsIntegrationTest, DISABLED_CreateWithGoodPath) {
+  EXPECT_TRUE(FtraceProcfs::Create(kTracingPath));
+}
+
+TEST(FtraceProcfsIntegrationTest, DISABLED_CreateWithBadPath) {
+  EXPECT_FALSE(FtraceProcfs::Create(kTracingPath + std::string("bad_path")));
+}
+
 TEST(FtraceProcfsIntegrationTest, DISABLED_ClearTrace) {
-  FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   ftrace.WriteTraceMarker("Hello, World!");
   ftrace.ClearTrace();
