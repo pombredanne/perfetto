@@ -76,6 +76,7 @@ static_library("ipc") {
   ]
 }
 
+# IPC transport: only consumer side
 source_set("ipc_consumer") {
   public_deps = [
     "../../include/perfetto/tracing/core",
