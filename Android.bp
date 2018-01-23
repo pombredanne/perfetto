@@ -123,7 +123,6 @@ cc_binary {
     "src/tracing/core/trace_writer_impl.cc",
     "src/tracing/ipc/consumer/consumer_ipc_client_impl.cc",
     "src/tracing/ipc/posix_shared_memory.cc",
-    "src/tracing/ipc/service/consumer_ipc_service.cc",
   ],
   shared_libs: [
     "libandroid",
