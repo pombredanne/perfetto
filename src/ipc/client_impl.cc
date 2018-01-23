@@ -157,7 +157,7 @@ void ClientImpl::OnDataAvailable(UnixSocket*) {
     if (!frame_deserializer_.EndReceive(rsize)) {
       // The endpoint tried to send a frame that is way too large.
       return sock_->Shutdown();  // In turn will trigger an OnDisconnect().
-      // TODO(fmayer): check this.
+      // TODO: check this.
     }
   } while (rsize > 0);
 
@@ -240,7 +240,7 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
   }
   std::unique_ptr<ProtoMessage> decoded_reply;
   if (reply.success()) {
-    // TODO(fmayer): this could be optimized, stop doing method name string
+    // TODO: this could be optimized, stop doing method name string
     // lookups.
     for (const auto& method : service_proxy->GetDescriptor().methods) {
       if (req.method_name == method.name) {

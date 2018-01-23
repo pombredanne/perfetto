@@ -39,7 +39,7 @@ TEST(ScopedDir, CloseOutOfScope) {
 }
 
 TEST(ScopedFile, CloseOutOfScope) {
-  int raw_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+  int raw_fd = open("/dev/null", O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -63,8 +63,8 @@ TEST(ScopedFstream, CloseOutOfScope) {
 }
 
 TEST(ScopedFile, Reset) {
-  int raw_fd1 = open("/dev/null", O_RDONLY | O_CLOEXEC);
-  int raw_fd2 = open("/dev/zero", O_RDONLY | O_CLOEXEC);
+  int raw_fd1 = open("/dev/null", O_RDONLY);
+  int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -75,13 +75,13 @@ TEST(ScopedFile, Reset) {
     ASSERT_NE(0, close(raw_fd1));  // Should fail when closing twice.
     scoped_file.reset();
     ASSERT_NE(0, close(raw_fd2));
-    scoped_file.reset(open("/dev/null", O_RDONLY | O_CLOEXEC));
+    scoped_file.reset(open("/dev/null", O_RDONLY));
     ASSERT_GE(scoped_file.get(), 0);
   }
 }
 
 TEST(ScopedFile, Release) {
-  int raw_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+  int raw_fd = open("/dev/null", O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -92,8 +92,8 @@ TEST(ScopedFile, Release) {
 }
 
 TEST(ScopedFile, MoveCtor) {
-  int raw_fd1 = open("/dev/null", O_RDONLY | O_CLOEXEC);
-  int raw_fd2 = open("/dev/zero", O_RDONLY | O_CLOEXEC);
+  int raw_fd1 = open("/dev/null", O_RDONLY);
+  int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -112,8 +112,8 @@ TEST(ScopedFile, MoveCtor) {
 }
 
 TEST(ScopedFile, MoveAssignment) {
-  int raw_fd1 = open("/dev/null", O_RDONLY | O_CLOEXEC);
-  int raw_fd2 = open("/dev/zero", O_RDONLY | O_CLOEXEC);
+  int raw_fd1 = open("/dev/null", O_RDONLY);
+  int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -136,7 +136,7 @@ TEST(ScopedFile, MoveAssignment) {
 // failed close() suggests the memory ownership of the file is wrong and we
 // might have leaked a capability.
 TEST(ScopedFile, CloseFailureIsFatal) {
-  int raw_fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
+  int raw_fd = open("/dev/null", O_RDONLY);
   ASSERT_DEATH(
       {
         ScopedFile scoped_file(raw_fd);

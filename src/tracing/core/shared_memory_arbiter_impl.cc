@@ -118,7 +118,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;
         }
-        // TODO(fmayer): we should have some policy to guarantee fairness of the
+        // TODO: we should have some policy to guarantee fairness of the
         // SMB page allocator w.r.t |target_buffer|? Or is the SMB best-effort.
         // All chunks in the page are busy (either kBeingRead or kBeingWritten),
         // or all the pages are assigned to a different target buffer. Try with
@@ -144,7 +144,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
     }
   }
   if (should_post_callback) {
-    // TODO(fmayer): what happens if the arbiter gets destroyed?
+    // TODO: what happens if the arbiter gets destroyed?
     task_runner_->PostTask(std::bind(
         &SharedMemoryArbiterImpl::InvokeOnPagesCompleteCallback, this));
   }

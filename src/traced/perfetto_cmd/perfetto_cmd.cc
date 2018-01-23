@@ -199,7 +199,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
 #if !BUILDFLAG(OS_MACOSX)
   // Open a temporary file under which doesn't have a visible name. It will
   // later get relinked as the final output file.
-  fd.reset(open(kTempTraceDir, O_TMPFILE | O_WRONLY | O_CLOEXEC, 0600));
+  fd.reset(open(kTempTraceDir, O_TMPFILE | O_WRONLY, 0600));
   if (!fd) {
     PERFETTO_ELOG("Could not create a temporary trace file in %s",
                   kTempTraceDir);

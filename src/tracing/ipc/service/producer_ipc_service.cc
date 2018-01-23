@@ -104,7 +104,7 @@ void ProducerIPCService::RegisterDataSource(
   producer->pending_data_sources[data_source_name] = std::move(response);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
 
-  // TODO(fmayer): add test to cover the case of IPC going away before the
+  // TODO: add test to cover the case of IPC going away before the
   // RegisterDataSource callback is received.
   const ipc::ClientID ipc_client_id = ipc::Service::client_info().client_id();
   GetProducerForCurrentRequest()->service_endpoint->RegisterDataSource(
@@ -147,7 +147,7 @@ void ProducerIPCService::OnClientDisconnected() {
   producers_.erase(client_id);
 }
 
-// TODO(fmayer): test what happens if we receive the following tasks, in order:
+// TODO: test what happens if we receive the following tasks, in order:
 // RegisterDataSource, UnregisterDataSource, OnDataSourceRegistered.
 // which essentially means that the client posted back to back a
 // ReqisterDataSource and UnregisterDataSource speculating on the next id.
@@ -178,7 +178,7 @@ void ProducerIPCService::NotifySharedMemoryUpdate(
         "InitializeConnection()");
     return response.Reject();
   }
-  // TODO(fmayer): check that the page indexes are consistent with the size of
+  // TODO: check that the page indexes are consistent with the size of
   // the shared memory region (once the SHM logic is there). Also add a test for
   // it.
   std::vector<uint32_t> changed_pages;
