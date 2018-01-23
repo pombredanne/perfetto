@@ -127,7 +127,7 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
   SetBlocking(*staging_read_fd_, false);
 
   pipe_worker_ =
-      std::thread(&CpuReader::PipeWorker, task_runner, ftrace_controller, cpu,
+      std::thread(&CpuReader::PipeThread, task_runner, ftrace_controller, cpu,
                   *trace_pipe_raw_, *staging_write_fd_);
 }
 
@@ -146,7 +146,7 @@ CpuReader::~CpuReader() {
 }
 
 // static
-void CpuReader::PipeWorker(base::TaskRunner* task_runner,
+void CpuReader::PipeThread(base::TaskRunner* task_runner,
                            FtraceController* ftrace_controller,
                            size_t cpu,
                            int trace_pipe_raw,

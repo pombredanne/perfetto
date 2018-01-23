@@ -138,7 +138,7 @@ class CpuReader {
 
  private:
   uint8_t* GetBuffer();
-  static void PipeWorker(base::TaskRunner*,
+  static void PipeThread(base::TaskRunner*,
                          FtraceController*,
                          size_t cpu,
                          int trace_pipe_raw,
