@@ -50,30 +50,30 @@ std::string GetTraceOutput() {
 
 }  // namespace
 
-// TODO(lalitm): reenable these thests (see b/72306171).
-TEST(FtraceProcfsIntegrationTest, DISABLED_CreateWithGoodPath) {
+TEST(FtraceProcfsIntegrationTest, CreateWithGoodPath) {
   EXPECT_TRUE(FtraceProcfs::Create(kTracingPath));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_CreateWithBadPath) {
+TEST(FtraceProcfsIntegrationTest, CreateWithBadPath) {
   EXPECT_FALSE(FtraceProcfs::Create(kTracingPath + std::string("bad_path")));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_ClearTrace) {
+TEST(FtraceProcfsIntegrationTest, ClearTrace) {
+  FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   ftrace.WriteTraceMarker("Hello, World!");
   ftrace.ClearTrace();
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("Hello, World!")));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_TraceMarker) {
+TEST(FtraceProcfsIntegrationTest, TraceMarker) {
   FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   ftrace.WriteTraceMarker("Hello, World!");
   EXPECT_THAT(GetTraceOutput(), HasSubstr("Hello, World!"));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_EnableDisableEvent) {
+TEST(FtraceProcfsIntegrationTest, EnableDisableEvent) {
   FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   ftrace.EnableEvent("sched", "sched_switch");
@@ -86,7 +86,7 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_EnableDisableEvent) {
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("sched_switch")));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_EnableDisableTracing) {
+TEST(FtraceProcfsIntegrationTest, EnableDisableTracing) {
   FtraceProcfs ftrace(kTracingPath);
   ResetFtrace(&ftrace);
   EXPECT_TRUE(ftrace.IsTracingEnabled());
@@ -102,20 +102,20 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_EnableDisableTracing) {
   EXPECT_THAT(GetTraceOutput(), HasSubstr("After"));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_ReadFormatFile) {
+TEST(FtraceProcfsIntegrationTest, ReadFormatFile) {
   FtraceProcfs ftrace(kTracingPath);
   std::string format = ftrace.ReadEventFormat("ftrace", "print");
   EXPECT_THAT(format, HasSubstr("name: print"));
   EXPECT_THAT(format, HasSubstr("field:char buf"));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_ReadAvailableEvents) {
+TEST(FtraceProcfsIntegrationTest, ReadAvailableEvents) {
   FtraceProcfs ftrace(kTracingPath);
   std::string format = ftrace.ReadAvailableEvents();
   EXPECT_THAT(format, HasSubstr("sched:sched_switch"));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_CanOpenTracePipeRaw) {
+TEST(FtraceProcfsIntegrationTest, CanOpenTracePipeRaw) {
   FtraceProcfs ftrace(kTracingPath);
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
 }

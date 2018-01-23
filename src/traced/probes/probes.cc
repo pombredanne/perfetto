@@ -15,19 +15,16 @@
  */
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
 
-#include "src/traced/probes/ftrace_producer.h"
+#include "ftrace_producer.h"
 
 namespace perfetto {
 
 int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   PERFETTO_LOG("Starting %s service", argv[0]);
-  base::UnixTaskRunner task_runner;
   FtraceProducer producer;
-  producer.Connect(PERFETTO_PRODUCER_SOCK_NAME, &task_runner);
-  task_runner.Run();
+  producer.Run();
   return 0;
 }
 
