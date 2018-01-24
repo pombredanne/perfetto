@@ -310,7 +310,6 @@ bool CpuReader::ParseField(const Field& field,
       return ReadIntoString(field_start, end, field.proto_field_id, message);
     case kStringPtrToString:
       // TODO(hjd): Figure out how to read these.
-      message->AppendString(field.proto_field_id, "todo");
       return true;
   }
   // Not reached, for gcc.

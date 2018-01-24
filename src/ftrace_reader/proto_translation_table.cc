@@ -139,7 +139,7 @@ bool InferFtraceType(const std::string& type_and_name,
   // since we get the size as it's own field. Somewhat awkwardly these fields
   // are both fixed size and null terminated meaning that we can't just drop
   // them directly into the protobuf (since if the string is shorter than 15
-  // characters we want only the bit up to the null).
+  // characters we want only the bit up to the null terminator).
   if (Match(type_and_name.c_str(), R"(char [a-zA-Z_]+\[[0-9]+\])")) {
     *out = kFtraceFixedCString;
     return true;

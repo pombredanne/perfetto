@@ -39,13 +39,13 @@ import tempfile
 
 
 HEADER = """# Copyright (C) 2018 The Android Open Source Project
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -87,7 +87,7 @@ def main():
   parser.add_argument('--event', dest='event',
                       default=None,
                       help='output directory')
-  parser.add_argument('--update-metadata', dest='update_metadata',
+  parser.add_argument('--update-build-files', dest='update_build_files',
                       action='store_true',
                       help='should update metadata')
   args = parser.parse_args()
@@ -97,7 +97,7 @@ def main():
   output_dir = args.output_dir
   whitelist_path = args.whitelist_path
   single_event = args.event
-  update_metadata = args.update_metadata
+  update_build_files = args.update_build_files
 
   if whitelist_path is not None and not os.path.isfile(whitelist_path):
     parser.error('Whitelist file {} does not exist.'.format(whitelist_path))
@@ -118,7 +118,7 @@ def main():
     output_path = os.path.join(output_dir, proto_file_name)
     command(gen_path, input_path, output_path)
 
-  if update_metadata:
+  if update_build_files:
     names = sorted(os.listdir(output_dir))
     names = [name for name in names if name.endswith('.proto')]
     names = ''.join(['  "{}",\n'.format(name) for name in names])

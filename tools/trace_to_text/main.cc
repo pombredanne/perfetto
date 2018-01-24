@@ -195,21 +195,24 @@ std::string FormatCpuIdle(const CpuIdleFtraceEvent& event) {
 std::string FormatClockSetRate(const ClockSetRateFtraceEvent& event) {
   char line[2048];
   sprintf(line, "clock_set_rate: %s state=%llu cpu_id=%llu\\n",
-          event.name().c_str(), event.state(), event.cpu_id());
+          event.name().empty() ? "todo" : event.name().c_str(), event.state(),
+          event.cpu_id());
   return std::string(line);
 }
 
 std::string FormatClockEnable(const ClockEnableFtraceEvent& event) {
   char line[2048];
   sprintf(line, "clock_enable: %s state=%llu cpu_id=%llu\\n",
-          event.name().c_str(), event.state(), event.cpu_id());
+          event.name().empty() ? "todo" : event.name().c_str(), event.state(),
+          event.cpu_id());
   return std::string(line);
 }
 
 std::string FormatClockDisable(const ClockDisableFtraceEvent& event) {
   char line[2048];
   sprintf(line, "clock_disable: %s state=%llu cpu_id=%llu\\n",
-          event.name().c_str(), event.state(), event.cpu_id());
+          event.name().empty() ? "todo" : event.name().c_str(), event.state(),
+          event.cpu_id());
   return std::string(line);
 }
 
