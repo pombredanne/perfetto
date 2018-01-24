@@ -17,6 +17,7 @@
 #ifndef SRC_FTRACE_READER_FTRACE_PROCFS_H_
 #define SRC_FTRACE_READER_FTRACE_PROCFS_H_
 
+#include <memory>
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
@@ -25,6 +26,8 @@ namespace perfetto {
 
 class FtraceProcfs {
  public:
+  static std::unique_ptr<FtraceProcfs> Create(const std::string& root);
+
   FtraceProcfs(const std::string& root);
   virtual ~FtraceProcfs();
 
@@ -78,7 +81,11 @@ class FtraceProcfs {
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
  private:
+  // Checks the trace file is present at the given root path.
+  static bool CheckRootPath(const std::string& root);
+
   bool WriteNumberToFile(const std::string& path, size_t value);
+
   const std::string root_;
 };
 
