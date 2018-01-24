@@ -63,8 +63,8 @@ tmux select-pane -t 1
 
 tmux -2 attach-session -t demo
 
-# dst=$HOME/Downloads/trace.json
-# echo -e "\n\x1b[32mPulling trace into $dst\x1b[0m"
-# set -x
-# adb pull /data/local/tmp/trace.protobuf /tmp/trace.protobuf
-# $outdir/proto_to_text systrace < /tmp/trace.protobuf > $dst
+dst=$HOME/Downloads/trace.json
+echo -e "\n\x1b[32mPulling trace into $dst\x1b[0m"
+set -x
+adb pull /data/local/tmp/trace /tmp/trace.protobuf
+$outdir/trace_to_text systrace < /tmp/trace.protobuf > $dst

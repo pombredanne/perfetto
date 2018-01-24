@@ -66,8 +66,10 @@ void ServiceProxy::BeginInvoke(const std::string& method_name,
   } else {
     PERFETTO_DLOG("Cannot find method \"%s\" on the host", method_name.c_str());
   }
+
   // When passing |dont_reply| == true, the returned |request_id| should be 0.
   PERFETTO_DCHECK(!dont_reply || !request_id);
+
   if (!request_id)
     return;
   PERFETTO_DCHECK(pending_callbacks_.count(request_id) == 0);
@@ -79,13 +81,10 @@ void ServiceProxy::EndInvoke(RequestID request_id,
                              bool has_more) {
   auto callback_it = pending_callbacks_.find(request_id);
   if (callback_it == pending_callbacks_.end()) {
-    // We are getting replies to methods that the client did't bind to a
-    // callback. We could avoid context switches by marking the response proto
-    // as NoResponse, which would prevent the other end from sending us the
-    // reply at all.
-    PERFETTO_DLOG(
-        "Received an IPC reply for a request that was not bound to a "
-        "callback.");
+    // Either we are getting a reply for a method we never invoked, or we are
+    // getting a reply to a method marked dont_reply (that has been invoked
+    // without binding any callback in the Defererd response object).
+    PERFETTO_DCHECK(false);
     return;
   }
   DeferredBase& reply_callback = callback_it->second;

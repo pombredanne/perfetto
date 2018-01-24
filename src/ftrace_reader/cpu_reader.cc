@@ -116,6 +116,7 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
                      size_t cpu,
                      base::ScopedFile trace_pipe_raw)
     : table_(table), cpu_(cpu), trace_pipe_raw_(std::move(trace_pipe_raw)) {
+  has_task_on_main_thread_.store(false);
   int pipe_fds[2] = {};
   PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
   staging_read_fd_.reset(pipe_fds[0]);
@@ -123,25 +124,29 @@ CpuReader::CpuReader(base::TaskRunner* task_runner,
   PERFETTO_CHECK(staging_read_fd_ && staging_write_fd_);
 
   SetBlocking(*trace_pipe_raw_, true);
-  SetBlocking(*staging_write_fd_, true);
   SetBlocking(*staging_read_fd_, false);
 
-  pipe_worker_ =
-      std::thread(&CpuReader::PipeThread, task_runner, ftrace_controller, cpu,
-                  *trace_pipe_raw_, *staging_write_fd_);
+  // Note: O_NONBLOCK seems to be ignored by splice() on the target pipe. The
+  // blocking vs non-blocking behavior is controlled solely by the
+  // SPLICE_F_NONBLOCK flag passed to splice().
+  SetBlocking(*staging_write_fd_, false);
+
+  pipe_worker_ = std::thread(&CpuReader::PipeThread, task_runner,
+                             ftrace_controller, cpu, *trace_pipe_raw_,
+                             *staging_write_fd_, &has_task_on_main_thread_);
 }
 
 CpuReader::~CpuReader() {
-  // Closing the pipes should cause splice() to return EPIPE or EBADF.
+  // Closing the pipes should cause splice() to return EPIPE (if we reset this
+  // before the thread enters the splice()) or EINTR (if we reset it after the
+  // thread has entered the splice()).
   // TODO this code needs to be carefully checked.
-  trace_pipe_raw_.reset();
   staging_read_fd_.reset();
-  staging_write_fd_.reset();
-  // pthread_kill(pipe_worker_.native_handle(), SIGPIPE);  // TODO why do I need
-  // this?
+  trace_pipe_raw_.reset();
   PERFETTO_DLOG("Cpu reader dtor... cpu:%zu", cpu_);
+  // This shouldn't be needed but I feel a bit paranoid and it doesn't hurt.
+  pthread_kill(pipe_worker_.native_handle(), SIGPIPE);
   pipe_worker_.join();
-  // TODO: there seems to be a bug here, often cpu0 never joins.
   PERFETTO_DLOG("  dtor joined cpu:%zu", cpu_);
 }
 
@@ -150,94 +155,86 @@ void CpuReader::PipeThread(base::TaskRunner* task_runner,
                            FtraceController* ftrace_controller,
                            size_t cpu,
                            int trace_pipe_raw,
-                           int staging_write_fd) {
+                           int staging_write_fd,
+                           std::atomic<bool>* has_task_on_main_thread) {
   char thread_name[16];
   snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
 
-  // Mask SIGPIPE. This will be raised when destroying the other end of the pipe
-  // in the CpuReader dtor to force this thread to exit.
-  // TODO: not 100% sure this is needed, not sure if signal(SIGPIPE, SIGIGN)
-  // would be better.
-  sigset_t set;
-  sigemptyset(&set);
-  sigaddset(&set, SIGPIPE);
-  sigprocmask(SIG_BLOCK, &set, nullptr);
+  // We need an empty SIGPIPE handler to make it so that the blocking splice()
+  // is woken up when the ~CpuReader() dtor destroys the pipes.
+  // Just masking out the signal would cause an implicit syscall restart and
+  // hence make the join() in the dtor unreliable.
+  // TODO: doing a sigaction() per thread is pointless. the signal handler is
+  // per-process. Move this somewhere else and do it once.
+  struct sigaction act = {};
+  act.sa_sigaction = [](int, siginfo_t*, void*) {};
+  PERFETTO_CHECK(sigaction(SIGPIPE, &act, nullptr) == 0);
 
-  size_t pages_in_staging_pipe = 0;
-  useconds_t throttle = 0;
+  // TODO: make these constants configurable from the trace config.
 
-  static constexpr useconds_t kThrottlePeriodHiRateUs = 50 * 1000L;
-  static constexpr useconds_t kThrottlePeriodLowRateUs = 250 * 1000L;
-  static constexpr useconds_t kWakeupThresholdNs = 100 * 1000L * 1000L;
-  static constexpr size_t kPagesBurstForHiRateTransition = 10;
+  constexpr int64_t kMinWakeupIntervalNs = 100 * 1000L;
+  constexpr int64_t kStagingPipeTTLNs = 500 * 1000L * 1000L;
+
+  int64_t last_posttask_ns = NowNs();
+  int64_t blocking_splice_duration_ns = 0;
+  size_t pages_spliced_since_last_post_task = 0;
 
   for (;;) {
-    if (throttle)
-      usleep(throttle);
+    if (blocking_splice_duration_ns < kMinWakeupIntervalNs)
+      usleep((kMinWakeupIntervalNs - blocking_splice_duration_ns) / 1000);
 
     // Do a blocking splice() first.
     size_t pages_spliced_in_cur_iteration = 0;
     int64_t t_start = NowNs();
     int splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
                             kPageSize, SPLICE_F_MOVE);
-    if (splice_res < 0 && (errno == EPIPE || errno == EBADF))  // dtor called
-      break;
+    if (splice_res < 0) {
+      PERFETTO_DCHECK(errno == EPIPE || errno == EINTR || errno == EBADF);
+      break;  // CpuReader dtor called and is waiting to join() us.
+    }
+    const int64_t now_ns = NowNs();
+    blocking_splice_duration_ns = now_ns - t_start;
 
-    const int64_t blocking_splice_duration_ns = NowNs() - t_start;
     PERFETTO_DCHECK(splice_res == kPageSize);
     pages_spliced_in_cur_iteration++;
 
-    // Move as many pages as we can from the trace_pipe_raw to the staging pipe
-    // until either the former is empty or the latter is full.
+    // Move without blocking as many pages as we can from the trace_pipe_raw  to
+    // the staging pipe until either the former is empty or the latter is full.
     for (;;) {
       splice_res = splice(trace_pipe_raw, nullptr, staging_write_fd, nullptr,
                           kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-      if (splice_res > 0) {
-        pages_spliced_in_cur_iteration++;
-        PERFETTO_DCHECK(splice_res == kPageSize);
-      } else {
+      if (splice_res <= 0)
         break;
-      }
+      PERFETTO_DCHECK(splice_res == kPageSize);
+      pages_spliced_in_cur_iteration++;
     }
-    if (splice_res < 0 && (errno == EPIPE || errno == EBADF))  // dtor called
-      break;
+    if (splice_res < 0 && errno != EAGAIN) {
+      PERFETTO_DCHECK(errno == EPIPE || errno == EINTR || errno == EBADF);
+      break;  // CpuReader dtor called and is waiting to join() us.
+    }
     PERFETTO_DCHECK(splice_res < 0 && errno == EAGAIN);
 
-    if (pages_spliced_in_cur_iteration >= kPagesBurstForHiRateTransition) {
-      // We seem to be under a tracing burst. We can't just splice() straight
-      // away as doing so will interfere too much with the CPU run queues and
-      // introduce too much overhead. At the same time we can't be too relaxed
-      // because we are at serious risk of dropping content from the kernel
-      // ftrace buffer.  Throttle at kThrottlePeriodHiRateUs.
-      PERFETTO_DLOG("Entering burst mode");
-      throttle = kThrottlePeriodHiRateUs;
-    } else if (blocking_splice_duration_ns < kWakeupThresholdNs) {
-      // We have a manageable backlog in the staging pipe, but enough tracing
-      // activity that wakes us up too frequently. Introduce some throttling to
-      // relax the wakeups.
-      // TODO this is true only if splice is retuning because the output pipe is
-      // not full. We should figure out a way to distinguish the two cases.
-      throttle = kThrottlePeriodLowRateUs;
-    } else {
-      // We don't seem to be doing too bad. Just let the blocking splice() set
-      // our pace.
-      throttle = 0;
-    }
+    pages_spliced_since_last_post_task += pages_spliced_in_cur_iteration;
 
-    pages_in_staging_pipe += pages_spliced_in_cur_iteration;
-
-    PERFETTO_DLOG("Splice[%zu], pages: %zu / %zu, ms: %" PRIi64 " throttle: %u",
-                  cpu, pages_spliced_in_cur_iteration, pages_in_staging_pipe,
-                  blocking_splice_duration_ns / 1000000, throttle);
+    PERFETTO_DLOG("Splice[%zu], pages: %zu/%zu,  block: %" PRIi64 " ms", cpu,
+                  pages_spliced_in_cur_iteration,
+                  pages_spliced_since_last_post_task,
+                  blocking_splice_duration_ns / 1000000);
 
     // TODO this 8 below is somewhat arbitrary. Careful with it though,
     // this heavily relies on the default pipe buffer being > 10 * 4096.
-    if (pages_in_staging_pipe > 8) {
-      task_runner->PostTask([ftrace_controller, cpu] {
-        ftrace_controller->OnRawFtraceDataAvailable(cpu);
-      });
-      pages_in_staging_pipe = 0;
+    if (pages_spliced_since_last_post_task > 8 ||
+        now_ns - last_posttask_ns > kStagingPipeTTLNs) {
+      if (!has_task_on_main_thread->load()) {
+        // TODO: this should be a weakptr<ftrace_controller>.
+        has_task_on_main_thread->store(true);
+        task_runner->PostTask([ftrace_controller, cpu] {
+          ftrace_controller->OnRawFtraceDataAvailable(cpu);
+        });
+        last_posttask_ns = now_ns;
+        pages_spliced_since_last_post_task = 0;
+      }
     }
   }
   PERFETTO_DLOG("Quitting splice thread for cpu %zu", cpu);
@@ -249,7 +246,9 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     return false;
   uint8_t* buffer = GetBuffer();
 
-  // TODO loop outer, if looping here something breaks in trace_writer_impl.
+  // TODO moved the loop to the caller. Somehow looping here something breaks
+  // in trace_writer_impl while generating the patch list (we need to look into
+  // that though).
   // for (;;)
   {
     long bytes =

@@ -113,22 +113,26 @@ void FtraceController::StopIfNeeded() {
   PERFETTO_CHECK(listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = false;
 
+  // TODO: bug here, OnRawFtraceDataAvailable() tasks will be still posted
+  // and hit the CHECK because readers_ has been cleared.
+
   // This method will join() all the CpuReader threads.
   readers_.clear();
 
   ftrace_procfs_->DisableTracing();
 }
 
-void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
+void FtraceController::OnRawFtraceDataAvailable(size_t cpu, size_t counter) {
   PERFETTO_CHECK(cpu < readers_.size());
   CpuReader* reader = readers_[cpu].get();
   using BundleHandle =
       protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+
   // TODO: this |n| is a workaround to prevent that we fill the SMB
   // and end up in a state where we posted the notification to traced, but we
   // are stuck stalling in TraceWriterImpl and hence never send the IPC, hence
   // deadlock.
-  for (int n = 0; n < 10; n++) {
+  for (int n = 0; n < 16; n++) {
     std::array<const EventFilter*, kMaxSinks> filters{};
     std::array<BundleHandle, kMaxSinks> bundles{};
     size_t sink_count = sinks_.size();
@@ -142,9 +146,20 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
     for (FtraceSink* sink : sinks_)
       sink->OnBundleComplete(cpu, std::move(bundles[i++]));
     PERFETTO_DCHECK(sinks_.size() == sink_count);
+    PERFETTO_DLOG("OnRawFtraceDataAvailable(%zu), has_data=%d, c=%zu", cpu,
+                  has_data, counter);
     if (!has_data)
       break;
   }
+  reader->has_task_on_main_thread_.store(false);
+  //
+  // if (!has_data)
+  //   return;
+  // auto weak_this = weak_factory_.GetWeakPtr();
+  // task_runner_->PostTask([weak_this, cpu, counter] {
+  //   if (weak_this)
+  //     weak_this->OnRawFtraceDataAvailable(cpu, counter+1);
+  // });
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(

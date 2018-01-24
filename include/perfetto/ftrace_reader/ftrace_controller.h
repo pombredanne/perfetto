@@ -118,7 +118,7 @@ class FtraceController {
   // Called to read  data from the staging pipe for the given |cpu|. Kicks off
   // the reading/parsing of the pipe.
   // virtual for testing.
-  virtual void OnRawFtraceDataAvailable(size_t cpu);
+  virtual void OnRawFtraceDataAvailable(size_t cpu, size_t counter = 0);
 
  protected:
   // Protected for testing.

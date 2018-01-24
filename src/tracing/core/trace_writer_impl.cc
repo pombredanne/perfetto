@@ -98,6 +98,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
 // without creating any fragments.
 protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   if (fragmenting_packet_) {
+    PERFETTO_ELOG("FRAAAAAAGMENT");
     uint8_t* const wptr = protobuf_stream_writer_.write_ptr();
     PERFETTO_DCHECK(wptr >= cur_fragment_start_);
     uint32_t partial_size = static_cast<uint32_t>(wptr - cur_fragment_start_);

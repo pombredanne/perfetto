@@ -43,7 +43,7 @@ using protozero::proto_utils::ParseVarInt;
 
 namespace {
 constexpr size_t kSystemPageSize = 4096;
-constexpr size_t kDefaultShmSize = kSystemPageSize * 16;  // 64 KB.
+constexpr size_t kDefaultShmSize = kSystemPageSize * 256; //kSystemPageSize * 16;  // 64 KB.
 constexpr size_t kMaxShmSize = kSystemPageSize * 1024;    // 4 MB.
 constexpr int kMaxBuffersPerConsumer = 128;
 }  // namespace
@@ -518,7 +518,7 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       shared_memory_(std::move(shared_memory)),
       shmem_abi_(reinterpret_cast<uint8_t*>(shared_memory_->start()),
                  shared_memory_->size(),
-                 kSystemPageSize) {
+                 kBufferPageSize) {
   // TODO(primiano): make the page-size for the SHM dynamic and find a way to
   // communicate that to the Producer (add a field to the
   // InitializeConnectionResponse IPC).

@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include <array>
+#include <atomic>
 #include <memory>
 #include <thread>
 
@@ -136,13 +137,16 @@ class CpuReader {
                          const uint8_t* end,
                          protozero::ProtoZeroMessage* message);
 
+  std::atomic<bool> has_task_on_main_thread_;
+
  private:
   uint8_t* GetBuffer();
   static void PipeThread(base::TaskRunner*,
                          FtraceController*,
                          size_t cpu,
                          int trace_pipe_raw,
-                         int staging_write_fd);
+                         int staging_write_fd,
+                         std::atomic<bool>*);
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
 
