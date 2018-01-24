@@ -30,6 +30,7 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/protozero/protozero_message_handle.h"
+#include "perfetto/tracing/core/data_source_config.h"
 
 namespace perfetto {
 
@@ -46,20 +47,6 @@ class ProtoTranslationTable;
 class CpuReader;
 class FtraceProcfs;
 class EventFilter;
-
-class FtraceConfig {
- public:
-  FtraceConfig();
-  explicit FtraceConfig(std::set<std::string> events);
-  ~FtraceConfig();
-
-  void AddEvent(const std::string&);
-
-  const std::set<std::string>& events() const { return events_; }
-
- private:
-  std::set<std::string> events_;
-};
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
 // to create a |FtraceSink|. While the FtraceSink lives FtraceController will
@@ -109,7 +96,7 @@ class FtraceController {
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
   virtual ~FtraceController();
 
-  std::unique_ptr<FtraceSink> CreateSink(const FtraceConfig&,
+  std::unique_ptr<FtraceSink> CreateSink(DataSourceConfig::FtraceConfig,
                                          FtraceSink::Delegate*);
 
   void DisableAllEvents();

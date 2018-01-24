@@ -28,6 +28,7 @@
 #include "cpu_reader.h"
 #include "event_info.h"
 #include "ftrace_procfs.h"
+#include "include/perfetto/tracing/core/data_source_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
@@ -185,14 +186,16 @@ CpuReader* FtraceController::GetCpuReader(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    const FtraceConfig& config,
+    DataSourceConfig::FtraceConfig config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (sinks_.size() >= kMaxSinks)
     return nullptr;
   auto controller_weak = weak_factory_.GetWeakPtr();
-  auto filter =
-      std::unique_ptr<EventFilter>(new EventFilter(*table_, config.events()));
+  std::vector<std::string> event_names = config.event_names();
+  auto filter = std::unique_ptr<EventFilter>(new EventFilter(
+      *table_.get(),
+      std::set<std::string>(event_names.begin(), event_names.end())));
   auto sink = std::unique_ptr<FtraceSink>(
       new FtraceSink(std::move(controller_weak), std::move(filter), delegate));
   Register(sink.get());
@@ -257,15 +260,6 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
-}
-
-FtraceConfig::FtraceConfig() = default;
-FtraceConfig::FtraceConfig(std::set<std::string> events)
-    : events_(std::move(events)) {}
-FtraceConfig::~FtraceConfig() = default;
-
-void FtraceConfig::AddEvent(const std::string& event) {
-  events_.insert(event);
 }
 
 }  // namespace perfetto

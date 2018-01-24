@@ -68,10 +68,10 @@ void FtraceProducer::CreateDataSourceInstance(
   const DataSourceConfig::FtraceConfig& proto_config =
       source_config.ftrace_config();
 
-  FtraceConfig config;
+  DataSourceConfig::FtraceConfig config;
   for (const std::string& event_name : proto_config.event_names()) {
     if (IsAlnum(event_name)) {
-      config.AddEvent(event_name.c_str());
+      *config.add_event_names() = event_name.c_str();
     } else {
       PERFETTO_LOG("Bad event name '%s'", event_name.c_str());
     }

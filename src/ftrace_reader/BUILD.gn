@@ -75,6 +75,7 @@ source_set("ftrace_reader_integrationtests") {
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace/ftrace:lite",
     "../base",
+    "../tracing",
   ]
   sources = [
     "end_to_end_integrationtest.cc",
