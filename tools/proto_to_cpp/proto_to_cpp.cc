@@ -143,7 +143,7 @@ ProtoToCpp::ProtoToCpp(const std::string& header_dir,
       cpp_dir_(cpp_dir),
       include_path_(include_path),
       importer_(&dst_, &error_printer_) {
-  dst_.MapPath("protos", "protos");
+  dst_.MapPath("", "protos");
 }
 
 std::string ProtoToCpp::GetHeaderPath(const FileDescriptor* proto_file) {

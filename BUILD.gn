@@ -25,10 +25,9 @@ assert(!monolithic_binaries || !build_with_android)
 group("all") {
   testonly = true  # allow to build also test targets
   deps = [
-    ":perfetto_tests",
+    ":perfetto_unittests",
     "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
     "src/protozero/protoc_plugin($host_toolchain)",
-    "tools:protoc_helper",
     "tools/ftrace_proto_gen:ftrace_proto_gen",
     "tools/proto_to_cpp",
     "tools/trace_to_text",
@@ -37,15 +36,17 @@ group("all") {
     deps += [
       ":perfetto",
       ":perfetto_benchmarks",
+      ":perfetto_integrationtests",
       ":traced",
       ":traced_probes",
-      "src/ftrace_reader:ftrace_reader_integrationtests",
+      "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "test/configs",
+      "tools:protoc_helper",
     ]
   }
 }
 
-executable("perfetto_tests") {
+executable("perfetto_unittests") {
   testonly = true
   deps = [
     "gn:default_deps",
@@ -70,13 +71,15 @@ if (!build_with_chromium) {
     ]
   }
 
-  if (build_with_android) {
-    # Used by Android's statsd in /frameworks/base/cmds.
-    static_library("perfetto_protos_lite") {
-      deps = [
-        "gn:default_deps",
-        "protos:lite",
-      ]
+  executable("perfetto_integrationtests") {
+    testonly = true
+    deps = [
+      "gn:default_deps",
+      "src/ftrace_reader:ftrace_reader_integrationtests",
+      "test:end_to_end_integrationtests",
+    ]
+    if (build_with_android) {
+      cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
   }
 
