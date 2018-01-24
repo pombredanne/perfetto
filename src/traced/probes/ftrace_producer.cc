@@ -32,6 +32,9 @@
 namespace perfetto {
 namespace {
 
+uint64_t kInitialBackoffMs = 100;
+uint64_t kMaxBackoffMs = 30 * 1000;
+
 bool IsAlnum(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
     if (!isalnum(str[i]) && str[i] != '_')
@@ -42,9 +45,20 @@ bool IsAlnum(const std::string& str) {
 
 }  // namespace.
 
+// State transition diagram:
+//                    +----------------------------+
+//                    v                            +
+// NotStarted -> NotConnected -> Connecting -> Connected
+//                    ^              +
+//                    +--------------+
+//
+
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
+  PERFETTO_CHECK(state_ == kConnecting);
+  state_ = kConnected;
+  ResetBackoff();
   PERFETTO_LOG("Connected to the service");
 
   DataSourceDescriptor descriptor;
@@ -54,8 +68,12 @@ void FtraceProducer::OnConnect() {
 }
 
 void FtraceProducer::OnDisconnect() {
+  PERFETTO_CHECK(state_ == kConnected || state_ == kConnecting);
+  state_ = kNotConnected;
   PERFETTO_LOG("Disconnected from tracing service");
-  exit(1);
+  IncreaseBackoff();
+
+  task_runner_->PostDelayedTask([this] { this->Connect(); }, backoff_ms_);
 }
 
 void FtraceProducer::CreateDataSourceInstance(
@@ -93,12 +111,34 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
-void FtraceProducer::Connect(const char* socket_name,
-                             base::TaskRunner* task_runner) {
+void FtraceProducer::Initialize(const char* socket_name,
+                                base::TaskRunner* task_runner) {
+  PERFETTO_CHECK(state_ == kNotStarted);
+  state_ = kNotConnected;
+
+  ResetBackoff();
+  socket_name_ = socket_name;
+  task_runner_ = task_runner;
   ftrace_ = FtraceController::Create(task_runner);
-  endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
+  Connect();
+}
+
+void FtraceProducer::Connect() {
+  PERFETTO_CHECK(state_ == kNotConnected);
+  state_ = kConnecting;
+  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
+}
+
+void FtraceProducer::IncreaseBackoff() {
+  backoff_ms_ *= 2;
+  if (backoff_ms_ > kMaxBackoffMs)
+    backoff_ms_ = kMaxBackoffMs;
+}
+
+void FtraceProducer::ResetBackoff() {
+  backoff_ms_ = kInitialBackoffMs;
 }
 
 FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
