@@ -32,8 +32,6 @@ TaskRunnerThread::~TaskRunnerThread() {
     thread_.join();
 }
 
-// Blocks until the thread has been created and Initialize() has been
-// called.
 void TaskRunnerThread::Start(std::unique_ptr<ThreadDelegate> delegate) {
   // Begin holding the lock for the condition variable.
   std::unique_lock<std::mutex> lock(mutex_);

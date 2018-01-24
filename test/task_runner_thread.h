@@ -22,14 +22,18 @@
 
 namespace perfetto {
 
+// Used to perform initialization work on a background TaskRunnerThread.
 class ThreadDelegate {
  public:
   virtual ~ThreadDelegate() = default;
 
-  // Invoke on the target thread before the message loop is started.
+  // Invoked on the target thread before the message loop is started.
   virtual void Initialize(base::TaskRunner* task_runner) = 0;
 };
 
+// Background thread which spins a task runner until completed or the thread is
+// destroyed. If the thread is destroyed before the task runner completes, the
+// task runner is quit and the thread is joined.
 class TaskRunnerThread {
  public:
   TaskRunnerThread();
