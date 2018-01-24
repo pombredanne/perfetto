@@ -33,6 +33,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/tracing/core/data_source_config.h"
 
 // Forward declarations for protobuf types.
