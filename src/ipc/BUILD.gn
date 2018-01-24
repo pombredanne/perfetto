@@ -48,7 +48,7 @@ if (use_libfuzzer) {
       ":wire_protocol",
       "../../gn:default_deps",
     ]
-    configs += [ "../../gn:fuzzer_test" ]
+    configs += [ "../../gn:fuzzer_config" ]
   }
 }
 

@@ -121,7 +121,7 @@ config("public_config") {
   ]
 }
 
-config("fuzzer_test") {
+config("fuzzer_config") {
   cflags = [ "-fsanitize=fuzzer" ]
   ldflags = [
     "-fsanitize=fuzzer",
