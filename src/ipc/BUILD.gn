@@ -46,9 +46,9 @@ if (use_libfuzzer) {
     deps = [
       ":ipc",
       ":wire_protocol",
-      "//gn:default_deps",
+      "../../gn:default_deps",
     ]
-    configs += [ "//build_configs:fuzzer_test" ]
+    configs += [ "../../gn:fuzzer_test" ]
   }
 }
 
