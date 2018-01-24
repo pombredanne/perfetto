@@ -22,9 +22,6 @@
 namespace perfetto {
 namespace base {
 
-const size_t kPageSize = 4096;
-size_t const kPageSizes[] = {4096, 8192, 16384, 32768, 65536};
-
 class PageAllocator {
  public:
   class Deleter {

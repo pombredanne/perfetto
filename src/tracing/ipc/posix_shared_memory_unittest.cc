@@ -25,7 +25,6 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/page_allocator.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
 #include "src/base/test/test_task_runner.h"

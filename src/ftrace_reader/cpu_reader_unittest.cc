@@ -22,7 +22,7 @@
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
 
-#include "perfetto/base/page_allocator.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
@@ -411,7 +411,7 @@ ExamplePage g_single_print_malformed{
 TEST(CpuReaderTest, ParseSinglePrintMalformed) {
   const ExamplePage* test_case = &g_single_print_malformed;
 
-  BundleProvider bundle_provider(kPageSize);
+  BundleProvider bundle_provider(base::kPageSize);
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 

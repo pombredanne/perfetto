@@ -52,9 +52,10 @@ class SharedMemoryArbiterImplTest : public AlignedBufferTest {
   std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
 };
 
+size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_CASE_P(PageSize,
                         SharedMemoryArbiterImplTest,
-                        ::testing::ValuesIn(base::kPageSizes));
+                        ::testing::ValuesIn(kPageSizes));
 
 // Checks that chunks that target different buffer IDs are placed in different
 // pages.

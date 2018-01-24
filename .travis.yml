@@ -58,7 +58,7 @@ matrix:
       dist: trusty
       sudo: true
       compiler: clang
-      env: CFG=linux_trusty-clang-x86_64-asan GN_ARGS="is_debug=false is_asan=true"
+      env: CFG=linux_trusty-clang-x86_64-asan GN_ARGS="is_debug=false is_asan=true use_libfuzzer=true"
     - os: linux
       dist: trusty
       sudo: false
@@ -146,7 +146,8 @@ script:
   - tools/ninja -C out/dist -j8 all
   - |
     TEST_TARGETS="
-    perfetto_tests
+    perfetto_integrationtests
+    perfetto_unittests
     perfetto_benchmarks
     "
     if [[ "$CFG" != android-* ]]; then

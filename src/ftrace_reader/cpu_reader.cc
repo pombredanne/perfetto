@@ -19,7 +19,7 @@
 #include <utility>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/page_allocator.h"
+#include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"

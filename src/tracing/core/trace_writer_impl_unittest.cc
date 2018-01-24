@@ -50,9 +50,10 @@ class TraceWriterImplTest : public AlignedBufferTest {
   std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
 };
 
+size_t const kPageSizes[] = {4096, 65536};
 INSTANTIATE_TEST_CASE_P(PageSize,
                         TraceWriterImplTest,
-                        ::testing::ValuesIn(base::kPageSizes));
+                        ::testing::ValuesIn(kPageSizes));
 
 TEST_P(TraceWriterImplTest, SingleWriter) {
   const BufferID tgt_buf_id = 42;
