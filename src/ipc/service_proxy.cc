@@ -31,9 +31,8 @@ ServiceProxy::ServiceProxy(EventListener* event_listener)
     : event_listener_(event_listener), weak_ptr_factory_(this) {}
 
 ServiceProxy::~ServiceProxy() {
-  if (client_ && connected()) {
+  if (client_ && connected())
     client_->UnbindService(service_id_);
-  }
 };
 
 void ServiceProxy::InitializeBinding(
@@ -53,9 +52,8 @@ void ServiceProxy::BeginInvoke(const std::string& method_name,
     PERFETTO_DCHECK(false);
     return;
   }
-  if (!client_) {
+  if (!client_)
     return;  // The Client object has been destroyed in the meantime.
-  }
 
   auto remote_method_it = remote_method_ids_.find(method_name);
   RequestID request_id = 0;
@@ -67,9 +65,8 @@ void ServiceProxy::BeginInvoke(const std::string& method_name,
   } else {
     PERFETTO_DLOG("Cannot find method \"%s\" on the host", method_name.c_str());
   }
-  if (!request_id) {
+  if (!request_id)
     return;
-  }
   PERFETTO_DCHECK(pending_callbacks_.count(request_id) == 0);
   pending_callbacks_.emplace(request_id, std::move(reply));
 }
@@ -85,9 +82,8 @@ void ServiceProxy::EndInvoke(RequestID request_id,
   DeferredBase& reply_callback = callback_it->second;
   AsyncResult<ProtoMessage> reply(std::move(result), has_more);
   reply_callback.Resolve(std::move(reply));
-  if (!has_more) {
+  if (!has_more)
     pending_callbacks_.erase(callback_it);
-}
 }
 
 void ServiceProxy::OnConnect(bool success) {

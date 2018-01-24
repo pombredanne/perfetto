@@ -68,6 +68,14 @@ std::string ReadFileIntoString(const std::string& path) {
 
 }  // namespace
 
+// static
+std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
+  if (!CheckRootPath(root)) {
+    return nullptr;
+  }
+  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root));
+}
+
 FtraceProcfs::FtraceProcfs(const std::string& root) : root_(root) {}
 FtraceProcfs::~FtraceProcfs() = default;
 
@@ -133,9 +141,8 @@ bool FtraceProcfs::IsTracingEnabled() {
 bool FtraceProcfs::WriteToFile(const std::string& path,
                                const std::string& str) {
   base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
-  if (!fd) {
+  if (!fd)
     return false;
-  }
   ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
   ssize_t length = static_cast<ssize_t>(str.length());
   // This should either fail or write fully.
@@ -147,6 +154,12 @@ base::ScopedFile FtraceProcfs::OpenPipeForCpu(size_t cpu) {
   std::string path =
       root_ + "per_cpu/cpu" + std::to_string(cpu) + "/trace_pipe_raw";
   return base::OpenFile(path.c_str(), O_RDONLY | O_NONBLOCK);
+}
+
+// static
+bool FtraceProcfs::CheckRootPath(const std::string& root) {
+  base::ScopedFile fd = base::OpenFile(root + "trace", O_RDONLY);
+  return static_cast<bool>(fd);
 }
 
 }  // namespace perfetto

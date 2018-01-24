@@ -75,9 +75,8 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
       auto chunk =
           abi->TryAcquireChunkForReading(page_idx, chunk_idx, tgt_buf_id);
-      if (!chunk.is_valid()) {
+      if (!chunk.is_valid())
         continue;
-      }
       packets_count += chunk.header()->packets_state.load().count;
     }
   }

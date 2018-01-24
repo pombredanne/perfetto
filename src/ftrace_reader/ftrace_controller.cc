@@ -37,8 +37,15 @@
 namespace perfetto {
 namespace {
 
-// TODO(b/68242551): Do not hardcode these paths.
-const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+#if BUILDFLAG(OS_ANDROID)
+const char* kTracingPaths[] = {
+    "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
+};
+#else
+const char* kTracingPaths[] = {
+    "/sys/kernel/debug/tracing/", nullptr,
+};
+#endif
 
 // TODO(hjd): Expose this as a configurable variable.
 const int kDrainPeriodMs = 100;
@@ -46,10 +53,19 @@ const int kDrainPeriodMs = 100;
 }  // namespace
 
 // static
+// TODO(taylori): Add a test for tracing paths in integration tests.
 std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
-  auto ftrace_procfs =
-      std::unique_ptr<FtraceProcfs>(new FtraceProcfs(kTracingPath));
+  size_t index = 0;
+  std::unique_ptr<FtraceProcfs> ftrace_procfs = nullptr;
+  while (!ftrace_procfs && kTracingPaths[index]) {
+    ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
+  }
+
+  if (!ftrace_procfs) {
+    return nullptr;
+  }
+
   auto table = ProtoTranslationTable::Create(
       ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());
   return std::unique_ptr<FtraceController>(
@@ -84,18 +100,15 @@ void FtraceController::PeriodicDrainCPU(
     size_t generation,
     int cpu) {
   // The controller might be gone.
-  if (!weak_this) {
+  if (!weak_this)
     return;
-  }
   // We might have stopped caring about events.
-  if (!weak_this->listening_for_raw_trace_data_) {
+  if (!weak_this->listening_for_raw_trace_data_)
     return;
-  }
   // We might have stopped tracing then quickly re-enabled it, in this case
   // we don't want to end up with two periodic tasks for each CPU:
-  if (weak_this->generation_ != generation) {
+  if (weak_this->generation_ != generation)
     return;
-  }
 
   bool has_more = weak_this->OnRawFtraceDataAvailable(cpu);
   weak_this->task_runner_->PostDelayedTask(
@@ -105,9 +118,8 @@ void FtraceController::PeriodicDrainCPU(
 }
 
 void FtraceController::StartIfNeeded() {
-  if (sinks_.size() > 1) {
+  if (sinks_.size() > 1)
     return;
-  }
   PERFETTO_CHECK(sinks_.size() != 0);
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
@@ -134,9 +146,8 @@ void FtraceController::WriteTraceMarker(const std::string& s) {
 }
 
 void FtraceController::StopIfNeeded() {
-  if (sinks_.size() != 0) {
+  if (sinks_.size() != 0)
     return;
-  }
   PERFETTO_CHECK(listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = false;
   readers_.clear();
@@ -157,9 +168,8 @@ bool FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   }
   bool res = reader->Drain(filters, bundles);
   i = 0;
-  for (FtraceSink* sink : sinks_) {
+  for (FtraceSink* sink : sinks_)
     sink->OnBundleComplete(cpu, std::move(bundles[i++]));
-  }
   PERFETTO_DCHECK(sinks_.size() == sink_count);
   return res;
 }
@@ -178,9 +188,8 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
     const FtraceConfig& config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (sinks_.size() >= kMaxSinks) {
+  if (sinks_.size() >= kMaxSinks)
     return nullptr;
-  }
   auto controller_weak = weak_factory_.GetWeakPtr();
   auto filter =
       std::unique_ptr<EventFilter>(new EventFilter(*table_, config.events()));
@@ -196,9 +205,8 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK(it_and_inserted.second);
 
   StartIfNeeded();
-  for (const std::string& name : sink->enabled_events()) {
+  for (const std::string& name : sink->enabled_events())
     RegisterForEvent(name);
-}
 }
 
 void FtraceController::RegisterForEvent(const std::string& name) {
@@ -209,23 +217,20 @@ void FtraceController::RegisterForEvent(const std::string& name) {
     return;
   }
   size_t& count = enabled_count_.at(event->ftrace_event_id);
-  if (count == 0) {
+  if (count == 0)
     ftrace_procfs_->EnableEvent(event->group, event->name);
-  }
   count += 1;
 }
 
 void FtraceController::UnregisterForEvent(const std::string& name) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   const Event* event = table_->GetEventByName(name);
-  if (!event) {
+  if (!event)
     return;
-  }
   size_t& count = enabled_count_.at(event->ftrace_event_id);
   PERFETTO_CHECK(count > 0);
-  if (--count == 0) {
+  if (--count == 0)
     ftrace_procfs_->DisableEvent(event->group, event->name);
-}
 }
 
 void FtraceController::Unregister(FtraceSink* sink) {
@@ -233,9 +238,8 @@ void FtraceController::Unregister(FtraceSink* sink) {
   size_t removed = sinks_.erase(sink);
   PERFETTO_DCHECK(removed == 1);
 
-  for (const std::string& name : sink->enabled_events()) {
+  for (const std::string& name : sink->enabled_events())
     UnregisterForEvent(name);
-  }
   StopIfNeeded();
 }
 
@@ -247,9 +251,8 @@ FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
       delegate_(delegate){};
 
 FtraceSink::~FtraceSink() {
-  if (controller_weak_) {
+  if (controller_weak_)
     controller_weak_->Unregister(this);
-  }
 };
 
 const std::set<std::string>& FtraceSink::enabled_events() {

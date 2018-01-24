@@ -55,9 +55,8 @@ TEST(IdAllocatorTest, IdAllocation) {
     ASSERT_EQ(0u, id_allocator.Allocate());
 
     // Release IDs in reverse order.
-    for (IdType i = 0; i < kMaxId; i++) {
+    for (IdType i = 0; i < kMaxId; i++)
       id_allocator.Free(kMaxId - i);
-    }
   }
 }
 

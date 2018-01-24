@@ -67,7 +67,7 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
 
   fragmenting_packet_ = false;
 
-  // TODO: hack to get a new page every time and reduce fragmentation
+  // TODO(fmayer): hack to get a new page every time and reduce fragmentation
   // (that requires stitching support in the service).
   protobuf_stream_writer_.Reset(GetNewBuffer());
 
@@ -125,9 +125,8 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     }
   }
 
-  if (cur_chunk_.is_valid()) {
+  if (cur_chunk_.is_valid())
     shmem_arbiter_->ReturnCompletedChunk(std::move(cur_chunk_));
-  }
 
   // Start a new chunk.
   ChunkHeader::Identifier identifier = {};

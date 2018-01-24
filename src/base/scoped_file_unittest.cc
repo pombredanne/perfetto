@@ -51,7 +51,7 @@ TEST(ScopedFile, CloseOutOfScope) {
 }
 
 TEST(ScopedFstream, CloseOutOfScope) {
-  FILE* raw_stream = fopen("/dev/null", "re");
+  FILE* raw_stream = fopen("/dev/null", "r");
   ASSERT_NE(nullptr, raw_stream);
   {
     ScopedFstream scoped_stream(raw_stream);

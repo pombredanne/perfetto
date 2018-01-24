@@ -29,9 +29,8 @@ TracePacket::TracePacket(TracePacket&&) noexcept = default;
 TracePacket& TracePacket::operator=(TracePacket&&) = default;
 
 bool TracePacket::Decode() {
-  if (decoded_packet_) {
+  if (decoded_packet_)
     return true;
-  }
   decoded_packet_.reset(new DecodedTracePacket());
   ChunkedProtobufInputStream istr(&chunks_);
   if (!decoded_packet_->ParseFromZeroCopyStream(&istr)) {

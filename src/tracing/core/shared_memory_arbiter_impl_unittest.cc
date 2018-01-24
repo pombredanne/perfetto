@@ -34,9 +34,8 @@ class SharedMemoryArbiterImplTest : public AlignedBufferTest {
   void SetUp() override {
     AlignedBufferTest::SetUp();
     auto callback = [this](const std::vector<uint32_t>& arg) {
-      if (on_pages_complete_) {
+      if (on_pages_complete_)
         on_pages_complete_(arg);
-      }
     };
     task_runner_.reset(new base::TestTaskRunner());
     arbiter_.reset(new SharedMemoryArbiterImpl(buf(), buf_size(), page_size(),
@@ -75,9 +74,8 @@ TEST_P(SharedMemoryArbiterImplTest, ChunksAllocationByTargetBufferID) {
 
   // "first" == "page index", "second" == "chunk index".
   std::pair<size_t, size_t> idx[base::ArraySize(chunks)];
-  for (size_t i = 0; i < base::ArraySize(chunks); i++) {
+  for (size_t i = 0; i < base::ArraySize(chunks); i++)
     idx[i] = arbiter_->shmem_abi_for_testing()->GetPageAndChunkIndex(chunks[i]);
-  }
 
   // The first three chunks should lay in the same page, as they target the same
   // buffer id (1).

@@ -69,9 +69,8 @@ TEST(ChunkedProtobufInputStreamTest, SingleChunk) {
 
 TEST(ChunkedProtobufInputStreamTest, SimpleSequence) {
   ChunkSequence seq;
-  for (size_t i = 0; i < base::ArraySize(kBufs); i++) {
+  for (size_t i = 0; i < base::ArraySize(kBufs); i++)
     seq.emplace_back(&kBufs[i], kBufs[i]);
-  }
   ChunkedProtobufInputStream istr(&seq);
   int num_bytes = 0;
   const void* ptr = nullptr;
@@ -89,9 +88,8 @@ TEST(ChunkedProtobufInputStreamTest, SimpleSequence) {
 
 TEST(ChunkedProtobufInputStreamTest, SequenceWithSkipsAndBackups) {
   ChunkSequence seq;
-  for (size_t i = 0; i < base::ArraySize(kBufs); i++) {
+  for (size_t i = 0; i < base::ArraySize(kBufs); i++)
     seq.emplace_back(&kBufs[i], kBufs[i]);
-  }
   ChunkedProtobufInputStream istr(&seq);
   ASSERT_TRUE(istr.Skip(99));
   ASSERT_EQ(99, istr.ByteCount());

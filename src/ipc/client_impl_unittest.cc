@@ -125,15 +125,13 @@ class FakeHost : public UnixSocket::EventListener {
   }
 
   void OnDataAvailable(UnixSocket* sock) override {
-    if (sock != client_sock.get()) {
+    if (sock != client_sock.get())
       return;
-    }
     auto buf = frame_deserializer.BeginReceive();
     size_t rsize = client_sock->Receive(buf.data, buf.size);
     EXPECT_TRUE(frame_deserializer.EndReceive(rsize));
-    while (std::unique_ptr<Frame> frame = frame_deserializer.PopNextFrame()) {
+    while (std::unique_ptr<Frame> frame = frame_deserializer.PopNextFrame())
       OnFrameReceived(*frame);
-    }
   }
 
   void OnFrameReceived(const Frame& req) {
@@ -159,14 +157,12 @@ class FakeHost : public UnixSocket::EventListener {
         reply.set_request_id(req.request_id());
         for (const auto& svc : services) {
           if (static_cast<int32_t>(svc.second->id) !=
-              req.msg_invoke_method().service_id()) {
+              req.msg_invoke_method().service_id())
             continue;
-          }
           for (const auto& method : svc.second->methods) {
             if (static_cast<int32_t>(method.second->id) !=
-                req.msg_invoke_method().method_id()) {
+                req.msg_invoke_method().method_id())
               continue;
-            }
             method.second->OnInvoke(req.msg_invoke_method(),
                                     reply.mutable_msg_invoke_method_reply());
             has_more = reply.mutable_msg_invoke_method_reply()->has_more();
@@ -299,9 +295,8 @@ TEST_F(ClientImplTest, BindAndInvokeStreamingMethod) {
       [on_last_reply, &replies_seen](AsyncResult<ProtoMessage> reply) {
         EXPECT_TRUE(reply.success());
         replies_seen++;
-        if (!reply.has_more()) {
+        if (!reply.has_more())
           on_last_reply();
-        }
       });
   proxy->BeginInvoke("FakeMethod1", req, std::move(deferred_reply));
   task_runner_->RunUntilCheckpoint("on_last_reply");
@@ -359,9 +354,8 @@ TEST_F(ClientImplTest, BindSameServiceMultipleTimesShouldFail) {
   host_->AddFakeService("FakeSvc");
 
   std::unique_ptr<FakeProxy> proxy[3];
-  for (size_t i = 0; i < base::ArraySize(proxy); i++) {
+  for (size_t i = 0; i < base::ArraySize(proxy); i++)
     proxy[i].reset(new FakeProxy("FakeSvc", &proxy_events_));
-  }
 
   // Bind to the host.
   for (size_t i = 0; i < base::ArraySize(proxy); i++) {

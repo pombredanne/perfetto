@@ -40,9 +40,8 @@ class FakeChildMessage : public ProtoZeroMessage {};
 
 uint32_t SimpleHash(const std::string& str) {
   uint32_t hash = 5381;
-  for (char c : str) {
+  for (char c : str)
     hash = 33 * hash + static_cast<uint32_t>(c);
-  }
   return hash;
 }
 
@@ -87,9 +86,8 @@ class ProtoZeroMessageTest : public ::testing::Test {
   }
 
   size_t GetNumSerializedBytes() {
-    if (buffer_->chunks().empty()) {
+    if (buffer_->chunks().empty())
       return 0;
-    }
     return buffer_->chunks().size() * kChunkSize -
            stream_writer_->bytes_available();
   }
@@ -101,9 +99,8 @@ class ProtoZeroMessageTest : public ::testing::Test {
   }
 
   static void BuildNestedMessages(ProtoZeroMessage* msg, uint32_t depth = 0) {
-    for (uint32_t i = 1; i <= 128; ++i) {
+    for (uint32_t i = 1; i <= 128; ++i)
       msg->AppendBytes(i, kTestBytes, sizeof(kTestBytes));
-    }
 
     if (depth < ProtoZeroMessage::kMaxNestingDepth) {
       auto* nested_msg =
@@ -111,13 +108,11 @@ class ProtoZeroMessageTest : public ::testing::Test {
       BuildNestedMessages(nested_msg, depth + 1);
     }
 
-    for (uint32_t i = 129; i <= 256; ++i) {
+    for (uint32_t i = 129; i <= 256; ++i)
       msg->AppendVarInt(i, 42);
-    }
 
-    if ((depth & 2) == 0) {
+    if ((depth & 2) == 0)
       msg->Finalize();
-    }
   }
 
  private:

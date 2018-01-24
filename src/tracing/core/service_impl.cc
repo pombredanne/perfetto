@@ -37,7 +37,7 @@
 
 namespace perfetto {
 
-// TODO: add ThreadChecker everywhere.
+// TODO(fmayer): add ThreadChecker everywhere.
 
 using protozero::proto_utils::ParseVarInt;
 
@@ -66,7 +66,7 @@ ServiceImpl::ServiceImpl(std::unique_ptr<SharedMemory::Factory> shm_factory,
 }
 
 ServiceImpl::~ServiceImpl() {
-  // TODO: handle teardown of all Producer.
+  // TODO(fmayer): handle teardown of all Producer.
 }
 
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
@@ -75,9 +75,8 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   const ProducerID id = ++last_producer_id_;
   PERFETTO_DLOG("Producer %" PRIu64 " connected", id);
   size_t shm_size = std::min(shared_buffer_size_hint_bytes, kMaxShmSize);
-  if (shm_size % kSystemPageSize || shm_size < kSystemPageSize) {
+  if (shm_size % kSystemPageSize || shm_size < kSystemPageSize)
     shm_size = kDefaultShmSize;
-  }
 
   // TODO(primiano): right now Create() will suicide in case of OOM if the mmap
   // fails. We should instead gracefully fail the request and tell the client
@@ -100,9 +99,8 @@ void ServiceImpl::DisconnectProducer(ProducerID id) {
 ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
     ProducerID id) const {
   auto it = producers_.find(id);
-  if (it == producers_.end()) {
+  if (it == producers_.end())
     return nullptr;
-  }
   return it->second;
 }
 
@@ -123,9 +121,8 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
 
   // TODO(primiano) : Check that this is safe (what happens if there are
   // ReadBuffers() calls posted in the meantime? They need to become noop).
-  if (consumer->tracing_session_id_) {
+  if (consumer->tracing_session_id_)
     FreeBuffers(consumer->tracing_session_id_);  // Will also DisableTracing().
-  }
   consumers_.erase(consumer);
 }
 
@@ -183,7 +180,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // - All the kMaxTraceBufferID slots are taken.
   // - OOM, or, more relistically, we exhausted virtual memory.
   // In any case, free all the previously allocated buffers and abort.
-  // TODO: add a test to cover this case, this is quite subtle.
+  // TODO(fmayer): add a test to cover this case, this is quite subtle.
   if (!did_allocate_all_buffers) {
     for (BufferID global_id : ts.buffers_index) {
       buffer_ids_.Free(global_id);
@@ -215,9 +212,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
-          if (weak_this) {
+          if (weak_this)
             weak_this->DisableTracing(tsid);
-          }
         },
         cfg.duration_ms());
   }
@@ -240,9 +236,8 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
-    if (!producer) {
+    if (!producer)
       continue;  // This could legitimately happen if a Producer disconnects.
-    }
     producer->producer_->TearDownDataSourceInstance(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
@@ -276,9 +271,8 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     SharedMemoryABI& abi = *tbuf.abi;
     for (size_t i = 0; i < tbuf.num_pages(); i++) {
       const size_t page_idx = (i + tbuf.cur_page) % tbuf.num_pages();
-      if (abi.is_page_free(page_idx)) {
+      if (abi.is_page_free(page_idx))
         continue;
-      }
       uint32_t layout = abi.page_layout_dbg(page_idx);
       size_t num_chunks = abi.GetNumChunksForLayout(layout);
       for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
@@ -301,7 +295,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
         for (size_t pack_idx = 0; pack_idx < num_packets; pack_idx++) {
           uint64_t pack_size = 0;
           ptr = ParseVarInt(ptr, chunk.end(), &pack_size);
-          // TODO: stitching, look at the flags.
+          // TODO(fmayer): stitching, look at the flags.
           bool skip = (pack_idx == 0 &&
                        flags & SharedMemoryABI::ChunkHeader::
                                    kFirstPacketContinuesFromPrevChunk) ||
@@ -322,19 +316,17 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
           ptr += pack_size;
         }  // for(packet)
         task_runner_->PostTask([weak_consumer, packets]() {
-          if (weak_consumer) {
+          if (weak_consumer)
             weak_consumer->consumer_->OnTraceData(std::move(*packets),
                                                   true /*has_more*/);
-          }
         });
       }  // for(chunk)
     }    // for(page_idx)
   }      // for(buffer_id)
   task_runner_->PostTask([weak_consumer]() {
-    if (weak_consumer) {
+    if (weak_consumer)
       weak_consumer->consumer_->OnTraceData(std::vector<TracePacket>(),
                                             false /*has_more*/);
-    }
   });
 }
 
@@ -368,9 +360,8 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
 
   // If there are existing tracing sessions, we need to check if the new
   // data source is enabled by any of them.
-  if (tracing_sessions_.empty()) {
+  if (tracing_sessions_.empty())
     return;
-  }
 
   ProducerEndpointImpl* producer = GetProducer(producer_id);
   if (!producer) {
@@ -382,10 +373,9 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
     TracingSession& tracing_session = iter.second;
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
-      if (cfg_data_source.config().name() == desc.name()) {
+      if (cfg_data_source.config().name() == desc.name())
         CreateDataSourceInstanceForProducer(cfg_data_source, producer,
                                             &tracing_session);
-      }
     }
   }
 }
@@ -428,7 +418,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
                                                 BufferID target_buffer_id,
                                                 const uint8_t* src,
                                                 size_t size) {
-  // TODO: right now the page_size in the SMB and the trace_buffers_ can
+  // TODO(fmayer): right now the page_size in the SMB and the trace_buffers_ can
   // mismatch. Remove the ability to decide the page size on the Producer.
 
   auto buf_iter = buffers_.find(target_buffer_id);
@@ -459,9 +449,8 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
 ServiceImpl::TracingSession* ServiceImpl::GetTracingSession(
     TracingSessionID tsid) {
   auto it = tsid ? tracing_sessions_.find(tsid) : tracing_sessions_.end();
-  if (it == tracing_sessions_.end()) {
+  if (it == tracing_sessions_.end())
     return nullptr;
-  }
   return &it->second;
 }
 
@@ -562,18 +551,15 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 void ServiceImpl::ProducerEndpointImpl::NotifySharedMemoryUpdate(
     const std::vector<uint32_t>& changed_pages) {
   for (uint32_t page_idx : changed_pages) {
-    if (page_idx >= shmem_abi_.num_pages()) {
+    if (page_idx >= shmem_abi_.num_pages())
       continue;  // Very likely a malicious producer playing dirty.
-    }
 
-    if (!shmem_abi_.is_page_complete(page_idx)) {
+    if (!shmem_abi_.is_page_complete(page_idx))
       continue;
-    }
-    if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx)) {
+    if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))
       continue;
-    }
 
-    // TODO: we should start collecting individual chunks from non fully
+    // TODO(fmayer): we should start collecting individual chunks from non fully
     // complete pages after a while.
 
     service_->CopyProducerPageIntoLogBuffer(

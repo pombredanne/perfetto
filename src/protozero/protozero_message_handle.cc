@@ -51,9 +51,8 @@ ProtoZeroMessageHandleBase& ProtoZeroMessageHandleBase::operator=(
   // If the current handle was pointing to a message and is being reset to a new
   // one, finalize the old message. However, if the other message is the same as
   // the one we point to, don't finalize.
-  if (message_ && message_ != other.message_) {
+  if (message_ && message_ != other.message_)
     message_->Finalize();
-  }
   Move(std::move(other));
   return *this;
 }

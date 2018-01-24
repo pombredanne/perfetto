@@ -42,9 +42,8 @@ bool IsCommonFieldName(const std::string& name) {
 
 bool IsCIdentifier(const std::string& s) {
   for (const char c : s) {
-    if (!(std::isalnum(c) || c == '_')) {
+    if (!(std::isalnum(c) || c == '_'))
       return false;
-    }
   }
   return s.size() > 0 && !std::isdigit(s[0]);
 }
@@ -59,27 +58,23 @@ bool IsCIdentifier(const std::string& s) {
 // "" -> ""
 std::string GetNameFromTypeAndName(const std::string& type_and_name) {
   size_t right = type_and_name.size();
-  if (right == 0) {
+  if (right == 0)
     return "";
-  }
 
   if (type_and_name[type_and_name.size() - 1] == ']') {
     right = type_and_name.rfind('[');
-    if (right == std::string::npos) {
+    if (right == std::string::npos)
       return "";
-    }
   }
 
   size_t left = type_and_name.rfind(' ', right);
-  if (left == std::string::npos) {
+  if (left == std::string::npos)
     return "";
-  }
   left++;
 
   std::string result = type_and_name.substr(left, right - left);
-  if (!IsCIdentifier(result)) {
+  if (!IsCIdentifier(result))
     return "";
-  }
 
   return result;
 }
@@ -140,24 +135,21 @@ bool ParseFtraceEvent(const std::string& input, FtraceEvent* output) {
       break;
     }
 
-    if (output) {
+    if (output)
       fprintf(stderr, "Cannot parse line: \"%s\"\n", line);
-    }
     return false;
   }
 
   if (!has_id || !has_name || fields.size() == 0) {
-    if (output) {
+    if (output)
       fprintf(stderr, "Could not parse format file: %s.\n",
               !has_id ? "no ID found"
                       : !has_name ? "no name found" : "no fields found");
-    }
     return false;
   }
 
-  if (!output) {
+  if (!output)
     return true;
-  }
 
   output->id = id;
   output->name = name;

@@ -193,9 +193,8 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
                      std::vector<TracePacket>* packets, bool has_more) {
             // TODO(primiano): check contents, requires both pblite and pzero.
             num_pack_rx += packets->size();
-            if (!has_more) {
+            if (!has_more)
               all_packets_rx();
-            }
           }));
   task_runner_->RunUntilCheckpoint("all_packets_rx");
 

@@ -64,9 +64,8 @@ UnixTaskRunner::TimePoint UnixTaskRunner::GetTime() const {
 
 void UnixTaskRunner::WakeUp() {
   const char dummy = 'P';
-  if (write(control_write_.get(), &dummy, 1) <= 0 && errno != EAGAIN) {
+  if (write(control_write_.get(), &dummy, 1) <= 0 && errno != EAGAIN)
     PERFETTO_DPLOG("write()");
-}
 }
 
 void UnixTaskRunner::Run() {
@@ -76,9 +75,8 @@ void UnixTaskRunner::Run() {
     int poll_timeout_ms;
     {
       std::lock_guard<std::mutex> lock(lock_);
-      if (quit_) {
+      if (quit_)
         return;
-      }
       poll_timeout_ms = static_cast<int>(GetDelayToNextTaskLocked().count());
       UpdateWatchTasksLocked();
     }
@@ -108,9 +106,8 @@ bool UnixTaskRunner::IsIdleForTesting() {
 
 void UnixTaskRunner::UpdateWatchTasksLocked() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (!watch_tasks_changed_) {
+  if (!watch_tasks_changed_)
     return;
-  }
   watch_tasks_changed_ = false;
   poll_fds_.clear();
   for (auto& it : watch_tasks_) {
@@ -141,22 +138,19 @@ void UnixTaskRunner::RunImmediateAndDelayedTask() {
   }
 
   errno = 0;
-  if (immediate_task) {
+  if (immediate_task)
     immediate_task();
-  }
 
   errno = 0;
-  if (delayed_task) {
+  if (delayed_task)
     delayed_task();
-}
 }
 
 void UnixTaskRunner::PostFileDescriptorWatches() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (size_t i = 0; i < poll_fds_.size(); i++) {
-    if (!(poll_fds_[i].revents & (POLLIN | POLLHUP))) {
+    if (!(poll_fds_[i].revents & (POLLIN | POLLHUP)))
       continue;
-    }
     poll_fds_[i].revents = 0;
 
     // The wake-up event is handled inline to avoid an infinite recursion of
@@ -189,9 +183,8 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
   {
     std::lock_guard<std::mutex> lock(lock_);
     auto it = watch_tasks_.find(fd);
-    if (it == watch_tasks_.end()) {
+    if (it == watch_tasks_.end())
       return;
-    }
     // Make poll(2) pay attention to the fd again. Since another thread may have
     // updated this watch we need to refresh the set first.
     UpdateWatchTasksLocked();
@@ -208,9 +201,8 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
 UnixTaskRunner::TimeDurationMs UnixTaskRunner::GetDelayToNextTaskLocked()
     const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (!immediate_tasks_.empty()) {
+  if (!immediate_tasks_.empty())
     return TimeDurationMs(0);
-  }
   if (!delayed_tasks_.empty()) {
     return std::max(TimeDurationMs(0),
                     std::chrono::duration_cast<TimeDurationMs>(
@@ -226,9 +218,8 @@ void UnixTaskRunner::PostTask(std::function<void()> task) {
     was_empty = immediate_tasks_.empty();
     immediate_tasks_.push_back(std::move(task));
   }
-  if (was_empty) {
+  if (was_empty)
     WakeUp();
-}
 }
 
 void UnixTaskRunner::PostDelayedTask(std::function<void()> task, int delay_ms) {

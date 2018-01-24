@@ -84,9 +84,8 @@ bool FrameEq(std::vector<char> expected_frame_with_header, const Frame& frame) {
 
   size_t expected_size = expected_frame_with_header.size() - kHeaderSize;
   EXPECT_EQ(expected_size, reserialized_frame.size());
-  if (expected_size != reserialized_frame.size()) {
+  if (expected_size != reserialized_frame.size())
     return false;
-  }
 
   return memcmp(reserialized_frame.data(),
                 expected_frame_with_header.data() + kHeaderSize,
@@ -287,9 +286,8 @@ TEST(BufferedFrameDeserializerTest, CanRecoverAfterUnparsableFrames) {
     const size_t size = i * 10;
     std::vector<char> frame = GetSimpleFrame(size);
     const bool unparsable = (i % 3) == 1;
-    if (unparsable) {
+    if (unparsable)
       memset(frame.data() + kHeaderSize, 0xFF, size - kHeaderSize);
-    }
 
     BufferedFrameDeserializer::ReceiveBuffer rbuf = bfd.BeginReceive();
     CheckedMemcpy(rbuf, frame);

@@ -124,9 +124,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
     int option =
         getopt_long(argc, argv, "c:o:bd::", long_options, &option_index);
 
-    if (option == -1) {
+    if (option == -1)
       break;  // EOF.
-    }
 
     if (option == 'c') {
       if (strcmp(optarg, "-") == 0) {
@@ -268,9 +267,8 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
              trace_out_stream_.get());
     }
   }
-  if (has_more) {
+  if (has_more)
     return;
-  }
 
   // Reached end of trace.
   consumer_endpoint_->FreeBuffers();

@@ -31,14 +31,13 @@ namespace perfetto {
 
 namespace {
 
-static bool ReadIntoString(const uint8_t* start,
-                           const uint8_t* end,
-                           size_t field_id,
-                           protozero::ProtoZeroMessage* out) {
+bool ReadIntoString(const uint8_t* start,
+                    const uint8_t* end,
+                    size_t field_id,
+                    protozero::ProtoZeroMessage* out) {
   for (const uint8_t* c = start; c < end; c++) {
-    if (*c != '\0') {
+    if (*c != '\0')
       continue;
-    }
     out->AppendBytes(field_id, reinterpret_cast<const char*>(start), c - start);
     return true;
   }
@@ -53,9 +52,8 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   std::vector<bool> enabled(table.largest_id() + 1);
   for (const std::string& name : names) {
     const Event* event = table.GetEventByName(name);
-    if (!event) {
+    if (!event)
       continue;
-    }
     enabled[event->ftrace_event_id] = true;
   }
   return enabled;
@@ -108,26 +106,22 @@ int CpuReader::GetFileDescriptor() {
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
-  if (!fd_) {
+  if (!fd_)
     return false;
-  }
 
   uint8_t* buffer = GetBuffer();
   // TOOD(hjd): One read() per page may be too many.
   long bytes = PERFETTO_EINTR(read(fd_.get(), buffer, kPageSize));
-  if (bytes == -1 && errno == EAGAIN) {
+  if (bytes == -1 && errno == EAGAIN)
     return false;
-  }
-  if (bytes != kPageSize) {
+  if (bytes != kPageSize)
     return false;
-  }
   PERFETTO_CHECK(static_cast<size_t>(bytes) <= kPageSize);
 
   size_t evt_size = 0;
   for (size_t i = 0; i < kMaxSinks; i++) {
-    if (!filters[i]) {
+    if (!filters[i])
       break;
-    }
     evt_size = ParsePage(cpu_, buffer, filters[i], &*bundles[i], table_);
     PERFETTO_DCHECK(evt_size);
   }
@@ -140,9 +134,8 @@ CpuReader::~CpuReader() = default;
 
 uint8_t* CpuReader::GetBuffer() {
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.
-  if (!buffer_) {
+  if (!buffer_)
     buffer_ = std::unique_ptr<uint8_t[]>(new uint8_t[kPageSize]);
-  }
   return buffer_.get();
 }
 
@@ -166,25 +159,22 @@ size_t CpuReader::ParsePage(size_t cpu,
 
   // TODO(hjd): Read this format dynamically?
   PageHeader page_header;
-  if (!ReadAndAdvance(&ptr, end_of_page, &page_header)) {
+  if (!ReadAndAdvance(&ptr, end_of_page, &page_header))
     return 0;
-  }
 
   // TODO(hjd): There is something wrong with the page header struct.
   page_header.size = page_header.size & 0xfffful;
 
   const uint8_t* const end = ptr + page_header.size;
-  if (end > end_of_page) {
+  if (end > end_of_page)
     return 0;
-  }
 
   uint64_t timestamp = page_header.timestamp;
 
   while (ptr < end) {
     EventHeader event_header;
-    if (!ReadAndAdvance(&ptr, end, &event_header)) {
+    if (!ReadAndAdvance(&ptr, end, &event_header))
       return 0;
-    }
 
     timestamp += event_header.time_delta;
 
@@ -196,18 +186,16 @@ size_t CpuReader::ParsePage(size_t cpu,
           PERFETTO_CHECK(false);  // TODO(hjd): Handle
         }
         uint32_t length;
-        if (!ReadAndAdvance<uint32_t>(&ptr, end, &length)) {
+        if (!ReadAndAdvance<uint32_t>(&ptr, end, &length))
           return 0;
-        }
         ptr += length;
         break;
       }
       case kTypeTimeExtend: {
         // Extend the time delta.
         uint32_t time_delta_ext;
-        if (!ReadAndAdvance<uint32_t>(&ptr, end, &time_delta_ext)) {
+        if (!ReadAndAdvance<uint32_t>(&ptr, end, &time_delta_ext))
           return 0;
-        }
         // See https://goo.gl/CFBu5x
         timestamp += (static_cast<uint64_t>(time_delta_ext)) << 27;
         break;
@@ -215,9 +203,8 @@ size_t CpuReader::ParsePage(size_t cpu,
       case kTypeTimeStamp: {
         // Sync time stamp with external clock.
         TimeStamp time_stamp;
-        if (!ReadAndAdvance<TimeStamp>(&ptr, end, &time_stamp)) {
+        if (!ReadAndAdvance<TimeStamp>(&ptr, end, &time_stamp))
           return 0;
-        }
         // TODO(hjd): Handle.
         break;
       }
@@ -233,15 +220,13 @@ size_t CpuReader::ParsePage(size_t cpu,
         const uint8_t* next = ptr + 4 * event_header.type_or_length;
 
         uint16_t ftrace_event_id;
-        if (!ReadAndAdvance<uint16_t>(&ptr, end, &ftrace_event_id)) {
+        if (!ReadAndAdvance<uint16_t>(&ptr, end, &ftrace_event_id))
           return 0;
-        }
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, table, event)) {
+          if (!ParseEvent(ftrace_event_id, start, next, table, event))
             return 0;
-          }
         }
 
         // Jump to next event.
@@ -273,17 +258,15 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   }
 
   bool success = true;
-  for (const Field& field : table->common_fields()) {
+  for (const Field& field : table->common_fields())
     success &= ParseField(field, start, end, message);
-  }
 
   protozero::ProtoZeroMessage* nested =
       message->BeginNestedMessage<protozero::ProtoZeroMessage>(
           info.proto_field_id);
 
-  for (const Field& field : info.fields) {
+  for (const Field& field : info.fields)
     success &= ParseField(field, start, end, nested);
-  }
 
   // This finalizes |nested| automatically.
   message->Finalize();

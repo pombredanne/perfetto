@@ -100,25 +100,22 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
         PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
                       page_idx_, free_chunks, tbuf);
 
-        if (tbuf != target_buffer) {
+        if (tbuf != target_buffer)
           continue;
-        }
 
         for (uint32_t chunk_idx = 0; free_chunks;
              chunk_idx++, free_chunks >>= 1) {
-          if (!(free_chunks & 1)) {
+          if (!(free_chunks & 1))
             continue;
-          }
           // We found a free chunk.
           Chunk chunk = shmem_abi_.TryAcquireChunkForWriting(
               page_idx_, chunk_idx, tbuf, &header);
-          if (!chunk.is_valid()) {
+          if (!chunk.is_valid())
             continue;
-          }
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           return chunk;
         }
-        // TODO: we should have some policy to guarantee fairness of the
+        // TODO(fmayer): we should have some policy to guarantee fairness of the
         // SMB page allocator w.r.t |target_buffer|? Or is the SMB best-effort.
         // All chunks in the page are busy (either kBeingRead or kBeingWritten),
         // or all the pages are assigned to a different target buffer. Try with
@@ -144,7 +141,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
     }
   }
   if (should_post_callback) {
-    // TODO: what happens if the arbiter gets destroyed?
+    // TODO(fmayer): what happens if the arbiter gets destroyed?
     task_runner_->PostTask(std::bind(
         &SharedMemoryArbiterImpl::InvokeOnPagesCompleteCallback, this));
   }

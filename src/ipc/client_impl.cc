@@ -46,16 +46,16 @@ ClientImpl::ClientImpl(const char* socket_name, base::TaskRunner* task_runner)
 }
 
 ClientImpl::~ClientImpl() {
+  // Ensure we are not destroyed in the middle of invoking a reply.
+  PERFETTO_DCHECK(!invoking_method_reply_);
   OnDisconnect(nullptr);  // The UnixSocket* ptr is not used in OnDisconnect().
 }
 
 void ClientImpl::BindService(base::WeakPtr<ServiceProxy> service_proxy) {
-  if (!service_proxy) {
+  if (!service_proxy)
     return;
-  }
-  if (!sock_->is_connected()) {
+  if (!sock_->is_connected())
     return queued_bindings_.emplace_back(service_proxy);
-  }
   RequestID request_id = ++last_request_id_;
   Frame frame;
   frame.set_request_id(request_id);
@@ -135,9 +135,8 @@ void ClientImpl::OnDisconnect(UnixSocket*) {
   for (auto it : service_bindings_) {
     base::WeakPtr<ServiceProxy>& service_proxy = it.second;
     task_runner_->PostTask([service_proxy] {
-      if (service_proxy) {
+      if (service_proxy)
         service_proxy->OnDisconnect();
-      }
     });
   }
   service_bindings_.clear();
@@ -157,13 +156,12 @@ void ClientImpl::OnDataAvailable(UnixSocket*) {
     if (!frame_deserializer_.EndReceive(rsize)) {
       // The endpoint tried to send a frame that is way too large.
       return sock_->Shutdown();  // In turn will trigger an OnDisconnect().
-      // TODO: check this.
+      // TODO(fmayer): check this.
     }
   } while (rsize > 0);
 
-  while (std::unique_ptr<Frame> frame = frame_deserializer_.PopNextFrame()) {
+  while (std::unique_ptr<Frame> frame = frame_deserializer_.PopNextFrame())
     OnFrameReceived(*frame);
-}
 }
 
 void ClientImpl::OnFrameReceived(const Frame& frame) {
@@ -198,9 +196,8 @@ void ClientImpl::OnFrameReceived(const Frame& frame) {
 void ClientImpl::OnBindServiceReply(QueuedRequest req,
                                     const Frame::BindServiceReply& reply) {
   base::WeakPtr<ServiceProxy>& service_proxy = req.service_proxy;
-  if (!service_proxy) {
+  if (!service_proxy)
     return;
-  }
   const char* svc_name = service_proxy->GetDescriptor().service_name;
   if (!reply.success()) {
     PERFETTO_DLOG("BindService(): unknown service_name=\"%s\"", svc_name);
@@ -235,12 +232,11 @@ void ClientImpl::OnBindServiceReply(QueuedRequest req,
 void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
                                      const Frame::InvokeMethodReply& reply) {
   base::WeakPtr<ServiceProxy> service_proxy = req.service_proxy;
-  if (!service_proxy) {
+  if (!service_proxy)
     return;
-  }
   std::unique_ptr<ProtoMessage> decoded_reply;
   if (reply.success()) {
-    // TODO: this could be optimized, stop doing method name string
+    // TODO(fmayer): this could be optimized, stop doing method name string
     // lookups.
     for (const auto& method : service_proxy->GetDescriptor().methods) {
       if (req.method_name == method.name) {
@@ -250,14 +246,15 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
     }
   }
   const RequestID request_id = req.request_id;
+  invoking_method_reply_ = true;
   service_proxy->EndInvoke(request_id, std::move(decoded_reply),
                            reply.has_more());
+  invoking_method_reply_ = false;
 
   // If this is a streaming method and future replies will be resolved, put back
   // the |req| with the callback into the set of active requests.
-  if (reply.has_more()) {
+  if (reply.has_more())
     queued_requests_.emplace(request_id, std::move(req));
-}
 }
 
 ClientImpl::QueuedRequest::QueuedRequest() = default;

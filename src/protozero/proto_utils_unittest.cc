@@ -63,9 +63,8 @@ const VarIntExpectation kVarIntExpectations[] = {
 TEST(ProtoUtilsTest, FieldPreambleEncoding) {
   // According to C++ standard, right shift of negative value has
   // implementation-defined resulting value.
-  if ((static_cast<int32_t>(0x80000000u) >> 31) != -1) {
+  if ((static_cast<int32_t>(0x80000000u) >> 31) != -1)
     FAIL() << "Platform has unsupported negative number format or arithmetic";
-  }
 
   EXPECT_EQ(0x08u, MakeTagVarInt(1));
   EXPECT_EQ(0x09u, MakeTagFixed<uint64_t>(1));

@@ -45,9 +45,8 @@ void ScatteredStreamWriter::WriteBytesSlowPath(const uint8_t* src,
                                                size_t size) {
   size_t bytes_left = size;
   while (bytes_left > 0) {
-    if (write_ptr_ >= cur_range_.end) {
+    if (write_ptr_ >= cur_range_.end)
       Extend();
-    }
     const size_t burst_size = std::min(bytes_available(), bytes_left);
     WriteBytesUnsafe(src, burst_size);
     bytes_left -= burst_size;
