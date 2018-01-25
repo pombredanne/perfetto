@@ -17,7 +17,6 @@
 #include "cpu_reader.h"
 
 #include "event_info.h"
-#include "ftrace_procfs.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "proto_translation_table.h"
@@ -30,6 +29,7 @@
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "src/ftrace_reader/test/cpu_reader_support.h"
 #include "src/ftrace_reader/test/test_messages.pb.h"
 #include "src/ftrace_reader/test/test_messages.pbzero.h"
 
@@ -57,14 +57,6 @@ const uint64_t kNanoInMicro = 1000;
            << expected_s << "." << expected_us;
   }
 }
-
-struct ExamplePage {
-  // The name of the format file set used in the collection of this example
-  // page. Should name a directory under src/ftrace_reader/test/data
-  const char* name;
-  // The non-zero prefix of xxd'ing the page.
-  const char* data;
-};
 
 // Single class to manage the whole protozero -> scattered stream -> chunks ->
 // single buffer -> real proto dance. Has a method: writer() to get an
@@ -100,54 +92,13 @@ class ProtoProvider {
   ProtoProvider& operator=(const ProtoProvider&) = delete;
 
   size_t chunk_size_;
-  perfetto::ScatteredStreamDelegateForTesting delegate_;
+  ScatteredStreamDelegateForTesting delegate_;
   protozero::ScatteredStreamWriter stream_;
   ZeroT writer_;
 };
 
 using BundleProvider =
     ProtoProvider<protos::pbzero::FtraceEventBundle, protos::FtraceEventBundle>;
-
-// Create a ProtoTranslationTable uing the fomat files in
-// directory |name|. Caches the table for subsequent lookups.
-std::map<std::string, std::unique_ptr<ProtoTranslationTable>>* g_tables;
-ProtoTranslationTable* GetTable(const std::string& name) {
-  if (!g_tables)
-    g_tables =
-        new std::map<std::string, std::unique_ptr<ProtoTranslationTable>>();
-  if (!g_tables->count(name)) {
-    std::string path = "src/ftrace_reader/test/data/" + name + "/";
-    FtraceProcfs ftrace(path);
-    auto table = ProtoTranslationTable::Create(&ftrace, GetStaticEventInfo(),
-                                               GetStaticCommonFieldsInfo());
-    g_tables->emplace(name, std::move(table));
-  }
-  return g_tables->at(name).get();
-}
-
-// Convert xxd output into binary data.
-std::unique_ptr<uint8_t[]> PageFromXxd(const std::string& text) {
-  auto buffer = std::unique_ptr<uint8_t[]>(new uint8_t[base::kPageSize]);
-  const char* ptr = text.data();
-  memset(buffer.get(), 0xfa, base::kPageSize);
-  uint8_t* out = buffer.get();
-  while (*ptr != '\0') {
-    if (*(ptr++) != ':')
-      continue;
-    for (int i = 0; i < 8; i++) {
-      PERFETTO_CHECK(text.size() >=
-                     static_cast<size_t>((ptr - text.data()) + 5));
-      PERFETTO_CHECK(*(ptr++) == ' ');
-      int n = sscanf(ptr, "%02hhx%02hhx", out, out + 1);
-      PERFETTO_CHECK(n == 2);
-      out += n;
-      ptr += 4;
-    }
-    while (*ptr != '\n')
-      ptr++;
-  }
-  return buffer;
-}
 
 class BinaryWriter {
  public:

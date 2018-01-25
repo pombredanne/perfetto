@@ -68,6 +68,8 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "gn:default_deps",
+      "src/base:benchmark_main",
+      "src/ftrace_reader:ftrace_reader_benchmarks",
       "src/tracing:tracing_benchmarks",
     ]
   }

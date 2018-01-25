@@ -81,6 +81,19 @@ source_set("test_support") {
   ]
 }
 
+if (!build_with_chromium) {
+  source_set("benchmark_main") {
+    testonly = true
+    deps = [
+      "../../gn:default_deps",
+      "//buildtools:benchmark",
+    ]
+    sources = [
+      "test/benchmark_main.cc",
+    ]
+  }
+}
+
 source_set("base_unittests") {
   testonly = true
   deps = [
