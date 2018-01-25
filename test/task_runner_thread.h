@@ -18,6 +18,8 @@
 #define TEST_TASK_RUNNER_THREAD_H_
 
 #include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "perfetto/base/task_runner.h"
 #include "src/base/test/test_task_runner.h"
