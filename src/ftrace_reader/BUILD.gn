@@ -126,3 +126,18 @@ if (!build_with_chromium) {
     ]
   }
 }
+
+if (use_libfuzzer) {
+  executable("cpu_reader_fuzzer") {
+    testonly = true
+    sources = [
+      "cpu_reader_fuzzer.cc",
+    ]
+    deps = [
+      ":ftrace_reader",
+      ":test_support",
+      "../../gn:default_deps",
+    ]
+    configs += [ "../../gn:fuzzer_config" ]
+  }
+}
