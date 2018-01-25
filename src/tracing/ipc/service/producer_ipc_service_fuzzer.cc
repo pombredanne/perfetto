@@ -26,10 +26,12 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ipc/host.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/base/test/test_task_runner.h"
+#include "test/fake_consumer.h"
 #include "test/task_runner_thread.h"
 
 #define PRODUCER_SOCKET "/tmp/perfetto-producer"
@@ -75,6 +77,24 @@ class FakeProducer : public perfetto::Producer {
   std::unique_ptr<perfetto::Service::ProducerEndpoint> endpoint_;
 };
 
+class FakeProducerDelegate : public perfetto::ThreadDelegate {
+ public:
+  FakeProducerDelegate(const uint8_t* data, size_t size)
+      : data_(data), size_(size) {}
+  ~FakeProducerDelegate() override = default;
+
+  void Initialize(perfetto::base::TaskRunner* task_runner) override {
+    producer_.reset(
+        new FakeProducer("android.perfetto.FakeProducer", data_, size_));
+    producer_->Connect(PRODUCER_SOCKET, task_runner);
+  }
+
+ private:
+  std::unique_ptr<FakeProducer> producer_;
+  const uint8_t* data_;
+  size_t size_;
+};
+
 class ServiceDelegate : public perfetto::ThreadDelegate {
  public:
   ServiceDelegate() = default;
@@ -97,9 +117,27 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   perfetto::TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate()));
+
+  perfetto::TaskRunnerThread producer_thread;
+  producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
+      new FakeProducerDelegate(data, size)));
+
+  auto function = [](std::vector<perfetto::TracePacket> packets,
+                     bool has_more) {};
+  // Setip the TraceConfig for the consumer.
+  perfetto::TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(200);
+
+  // Create the buffer for ftrace.
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->set_target_buffer(0);
+
   perfetto::base::TestTaskRunner task_runner;
-  FakeProducer producer("fuzzing", data, size);
-  producer.Connect(PRODUCER_SOCKET, &task_runner);
+  perfetto::FakeConsumer consumer(trace_config, std::move(function),
+                                  &task_runner);
+  consumer.Connect(CONSUMER_SOCKET);
   task_runner.RunUntilIdle();
   return 0;
 }

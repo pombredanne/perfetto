@@ -151,6 +151,7 @@ if (use_libfuzzer) {
       "../../gn:default_deps",
       "../../src/base:test_support",
       "../../src/protozero",
+      "../../test:fake_consumer",
       "../../test:task_runner_thread",
     ]
     configs += [ "../../gn:fuzzer_config" ]

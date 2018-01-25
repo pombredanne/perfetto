@@ -38,6 +38,28 @@ source_set("end_to_end_integrationtests") {
   }
 }
 
+# DO NOT MERGE: fix this up.
+source_set("fake_consumer") {
+  testonly = true
+  deps = [
+    ":task_runner_thread",
+    "../gn:default_deps",
+    "../gn:gtest_deps",
+    "../protos/perfetto/trace:lite",
+    "../src/base:base",
+    "../src/base:test_support",
+    "../src/traced/probes:ftrace_producer",
+    "../src/tracing:ipc",
+  ]
+  sources = [
+    "fake_consumer.cc",
+    "fake_consumer.h",
+  ]
+  if (is_android && !build_with_chromium) {
+    deps += [ "../src/base:android_task_runner" ]
+  }
+}
+
 source_set("task_runner_thread") {
   testonly = true
   deps = [
