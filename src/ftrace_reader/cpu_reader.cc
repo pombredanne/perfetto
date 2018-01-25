@@ -182,7 +182,7 @@ size_t CpuReader::ParsePage(size_t cpu,
         // Left over page padding or discarded event.
         if (event_header.time_delta == 0) {
           // TODO(hjd): Look at the next few bytes for read size;
-          // PERFETTO_CHECK(false);  // TODO(hjd): Handle
+          PERFETTO_CHECK(false);  // TODO(hjd): Handle
         }
         uint32_t length;
         if (!ReadAndAdvance<uint32_t>(&ptr, end, &length))
@@ -213,7 +213,7 @@ size_t CpuReader::ParsePage(size_t cpu,
         // type_or_length is <=28 so it represents the length of a data record.
         if (event_header.type_or_length == 0) {
           // TODO(hjd): Look at the next few bytes for real size.
-          // PERFETTO_CHECK(false);
+          PERFETTO_CHECK(false);
           return 0;
         }
         const uint8_t* start = ptr;
@@ -253,7 +253,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   // TODO(hjd): Test truncated events.
   // If the end of the buffer is before the end of the event give up.
   if (info.size > length) {
-    // PERFETTO_DCHECK(false);
+    PERFETTO_DCHECK(false);
     return false;
   }
 
