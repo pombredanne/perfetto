@@ -100,5 +100,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   perfetto::base::TestTaskRunner task_runner;
   FakeProducer producer("fuzzing", data, size);
   producer.Connect(PRODUCER_SOCKET, &task_runner);
+  task_runner.RunUntilIdle();
   return 0;
 }
