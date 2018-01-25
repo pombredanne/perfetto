@@ -149,7 +149,9 @@ if (use_libfuzzer) {
       ":ipc",
       ":tracing",
       "../../gn:default_deps",
-      "../../src/base:test_task_runner",
+      "../../src/base:test_support",
+      "../../src/protozero",
+      "../../test:task_runner_thread",
     ]
     configs += [ "../../gn:fuzzer_config" ]
   }

@@ -28,6 +28,8 @@
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 
+class FakeProducer;
+
 namespace protozero {
 
 class ProtoZeroMessageHandleBase;
@@ -39,6 +41,7 @@ class ProtoZeroMessageHandleBase;
 class ProtoZeroMessage {
  public:
   friend class ProtoZeroMessageHandleBase;
+  friend class ::FakeProducer;
   // Adjust the |nested_messages_arena_| size when changing this, or the
   // static_assert in the .cc file will bark.
   static constexpr uint32_t kMaxNestingDepth = 8;
