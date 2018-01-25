@@ -262,7 +262,7 @@ TEST_F(ClientImplTest, BindAndInvokeMethod) {
 
 // Tests that when invoking a method without binding a callback, the resulting
 // request has the |drop_reply| flag set.
-TEST_F(ClientImplTest, InvokeMethodNoReply) {
+TEST_F(ClientImplTest, InvokeMethodDropReply) {
   auto* host_svc = host_->AddFakeService("FakeSvc");
   auto* host_method = host_svc->AddFakeMethod("FakeMethod1");
 

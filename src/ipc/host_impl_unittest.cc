@@ -268,7 +268,7 @@ TEST_F(HostImplTest, InvokeMethod) {
   task_runner_->RunUntilCheckpoint("on_reply_received");
 }
 
-TEST_F(HostImplTest, InvokeMethodNoReply) {
+TEST_F(HostImplTest, InvokeMethodDropReply) {
   FakeService* fake_service = new FakeService("FakeService");
   ASSERT_TRUE(host_->ExposeService(std::unique_ptr<Service>(fake_service)));
   auto on_bind = task_runner_->CreateCheckpoint("on_bind");
