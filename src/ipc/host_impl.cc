@@ -180,11 +180,13 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
   base::WeakPtr<HostImpl> host_weak_ptr = weak_ptr_factory_.GetWeakPtr();
   ClientID client_id = client->id;
 
-  if (req.dont_reply()) {
+  if (req.drop_reply()) {
     deferred_reply.Bind([](AsyncResult<ProtoMessage> reply) {
       if (reply.success()) {
         PERFETTO_DLOG(
-            "Dropping reply because dont_reply=true in the client request");
+            "The service is replying to an IPC request but the client hasn't "
+            "any callback attached to it (the request was sent with "
+            "drop_reply=true). Dropping reply.");
       }
     });
   } else {
@@ -213,9 +215,9 @@ void HostImpl::ReplyToMethodInvocation(ClientID client_id,
   Frame reply_frame;
   reply_frame.set_request_id(request_id);
 
-  // TODO: add a test to guarantee that the reply is consumed within the same
-  // call stack and not kept around. ConsumerIPCService::OnTraceData() relies
-  // on this behavior.
+  // TODO(fmayer): add a test to guarantee that the reply is consumed within the
+  // same call stack and not kept around. ConsumerIPCService::OnTraceData()
+  // relies on this behavior.
   auto* reply_frame_data = reply_frame.mutable_msg_invoke_method_reply();
   reply_frame_data->set_has_more(reply.has_more());
   if (reply.success()) {

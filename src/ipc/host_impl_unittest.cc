@@ -63,7 +63,7 @@ class FakeService : public Service {
     return reply;
   }
 
-  FakeService(const char* service_name) {
+  explicit FakeService(const char* service_name) {
     descriptor_.service_name = service_name;
     descriptor_.methods.push_back(
         {"FakeMethod1", &RequestDecoder, nullptr, &Invoker});
@@ -101,14 +101,14 @@ class FakeClient : public UnixSocket::EventListener {
   void InvokeMethod(ServiceID service_id,
                     MethodID method_id,
                     const ProtoMessage& args,
-                    bool dont_reply = false) {
+                    bool drop_reply = false) {
     Frame frame;
     uint64_t request_id = requests_.empty() ? 1 : requests_.rbegin()->first + 1;
     requests_.emplace(request_id, 0);
     frame.set_request_id(request_id);
     frame.mutable_msg_invoke_method()->set_service_id(service_id);
     frame.mutable_msg_invoke_method()->set_method_id(method_id);
-    frame.mutable_msg_invoke_method()->set_dont_reply(dont_reply);
+    frame.mutable_msg_invoke_method()->set_drop_reply(drop_reply);
     frame.mutable_msg_invoke_method()->set_args_proto(args.SerializeAsString());
     SendFrame(frame);
   }
@@ -277,12 +277,12 @@ TEST_F(HostImplTest, InvokeMethodNoReply) {
   task_runner_->RunUntilCheckpoint("on_bind");
 
   // OnFakeMethod1 will:
-  // - Do nothing on the 1st call, when |dont_reply| == true.
-  // - Reply on the the 2nd call, when |dont_reply| == false.
+  // - Do nothing on the 1st call, when |drop_reply| == true.
+  // - Reply on the the 2nd call, when |drop_reply| == false.
   EXPECT_CALL(*fake_service, OnFakeMethod1(_, _))
       .Times(2)
       .WillRepeatedly(Invoke([](const RequestProto& req, DeferredBase* reply) {
-        if (req.data() == "dont_reply")
+        if (req.data() == "drop_reply")
           return;
         std::unique_ptr<ReplyProto> reply_args(new ReplyProto());
         reply_args->set_data("the_reply");
@@ -301,12 +301,12 @@ TEST_F(HostImplTest, InvokeMethodNoReply) {
             on_reply_received();
           }));
 
-  // Invoke the method first with |dont_reply|=true, then |dont_reply|=false.
+  // Invoke the method first with |drop_reply|=true, then |drop_reply|=false.
   RequestProto rp;
-  rp.set_data("dont_reply");
-  cli_->InvokeMethod(cli_->last_bound_service_id_, 1, rp, true /*dont_reply*/);
+  rp.set_data("drop_reply");
+  cli_->InvokeMethod(cli_->last_bound_service_id_, 1, rp, true /*drop_reply*/);
   rp.set_data("do_reply");
-  cli_->InvokeMethod(cli_->last_bound_service_id_, 1, rp, false /*dont_reply*/);
+  cli_->InvokeMethod(cli_->last_bound_service_id_, 1, rp, false /*drop_reply*/);
 
   task_runner_->RunUntilCheckpoint("on_reply_received");
 }
@@ -432,7 +432,7 @@ TEST_F(HostImplTest, MoveReplyObjectAndReplyAsynchronously) {
 // TEST(HostImplTest, ManyClients) {}
 // TEST(HostImplTest, OverlappingRequstsOutOfOrder) {}
 // TEST(HostImplTest, StreamingRequest) {}
-// TEST(HostImplTest, ManyDontReplyRequestsDontLeakMemory) {}
+// TEST(HostImplTest, ManyDropReplyRequestsDontLeakMemory) {}
 
 }  // namespace
 }  // namespace ipc

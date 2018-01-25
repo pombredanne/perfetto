@@ -138,7 +138,7 @@ class FakeHost : public UnixSocket::EventListener {
     if (req.msg_case() == Frame::kMsgBindService) {
       auto svc_it = services.find(req.msg_bind_service().service_name());
       ASSERT_NE(services.end(), svc_it);
-      const FakeService& svc = *svc_it->second.get();
+      const FakeService& svc = *svc_it->second;
       Frame reply;
       reply.set_request_id(req.request_id());
       reply.mutable_msg_bind_service_reply()->set_success(true);
@@ -261,7 +261,7 @@ TEST_F(ClientImplTest, BindAndInvokeMethod) {
 }
 
 // Tests that when invoking a method without binding a callback, the resulting
-// request has the |dont_reply| flag set.
+// request has the |drop_reply| flag set.
 TEST_F(ClientImplTest, InvokeMethodNoReply) {
   auto* host_svc = host_->AddFakeService("FakeSvc");
   auto* host_method = host_svc->AddFakeMethod("FakeMethod1");
@@ -279,7 +279,7 @@ TEST_F(ClientImplTest, InvokeMethodNoReply) {
       .WillOnce(Invoke([on_req_received](const Frame::InvokeMethod& req,
                                          Frame::InvokeMethodReply*) {
         RequestProto req_args;
-        EXPECT_TRUE(req.dont_reply());
+        EXPECT_TRUE(req.drop_reply());
         on_req_received();
       }));
 

@@ -44,7 +44,7 @@ message Frame {
     // is a method with an empty, where the client doesn't care about the
     // success/failure of the method invocation and rather prefers avoiding the
     // IPC roundtrip + context switch associated with the reply.
-    optional bool dont_reply = 4;
+    optional bool drop_reply = 4;
   }
 
   // Host -> Client.
