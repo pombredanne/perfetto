@@ -32,12 +32,16 @@
 namespace perfetto {
 namespace {
 
-uint64_t kInitialBackoffMs = 100;
-uint64_t kMaxBackoffMs = 30 * 1000;
+bool IsGoodPunctuation(char c) {
+  return c == '_' || c == '.';
+}
 
-bool IsAlnum(const std::string& str) {
+uint64_t kInitialConnectionBackoffMs = 100;
+uint64_t kMaxConnectionBackoffMs = 30 * 1000;
+
+bool IsValid(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && str[i] != '_')
+    if (!isalnum(str[i]) && !IsGoodPunctuation(str[i]))
       return false;
   }
   return true;
@@ -56,9 +60,9 @@ bool IsAlnum(const std::string& str) {
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
-  PERFETTO_CHECK(state_ == kConnecting);
+  PERFETTO_DCHECK(state_ == kConnecting);
   state_ = kConnected;
-  ResetBackoff();
+  ResetConnectionBackoff();
   PERFETTO_LOG("Connected to the service");
 
   DataSourceDescriptor descriptor;
@@ -68,12 +72,13 @@ void FtraceProducer::OnConnect() {
 }
 
 void FtraceProducer::OnDisconnect() {
-  PERFETTO_CHECK(state_ == kConnected || state_ == kConnecting);
+  PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
   state_ = kNotConnected;
   PERFETTO_LOG("Disconnected from tracing service");
-  IncreaseBackoff();
+  IncreaseConnectionBackoff();
 
-  task_runner_->PostDelayedTask([this] { this->Connect(); }, backoff_ms_);
+  task_runner_->PostDelayedTask([this] { this->Connect(); },
+                                connection_backoff_ms_);
 }
 
 void FtraceProducer::CreateDataSourceInstance(
@@ -87,11 +92,26 @@ void FtraceProducer::CreateDataSourceInstance(
       source_config.ftrace_config();
 
   FtraceConfig config;
+  // TODO(b/72082266): We shouldn't have to do this.
   for (const std::string& event_name : proto_config.event_names()) {
-    if (IsAlnum(event_name)) {
+    if (IsValid(event_name)) {
       config.AddEvent(event_name.c_str());
     } else {
-      PERFETTO_LOG("Bad event name '%s'", event_name.c_str());
+      PERFETTO_ELOG("Bad event name '%s'", event_name.c_str());
+    }
+  }
+  for (const std::string& category : proto_config.atrace_categories()) {
+    if (IsValid(category)) {
+      config.AddAtraceCategory(category.c_str());
+    } else {
+      PERFETTO_ELOG("Bad category name '%s'", category.c_str());
+    }
+  }
+  for (const std::string& app : proto_config.atrace_apps()) {
+    if (IsValid(app)) {
+      config.AddAtraceApp(app.c_str());
+    } else {
+      PERFETTO_ELOG("Bad app '%s'", app.c_str());
     }
   }
 
@@ -111,12 +131,12 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
-void FtraceProducer::Initialize(const char* socket_name,
-                                base::TaskRunner* task_runner) {
-  PERFETTO_CHECK(state_ == kNotStarted);
+void FtraceProducer::ConnectWithRetries(const char* socket_name,
+                                        base::TaskRunner* task_runner) {
+  PERFETTO_DCHECK(state_ == kNotStarted);
   state_ = kNotConnected;
 
-  ResetBackoff();
+  ResetConnectionBackoff();
   socket_name_ = socket_name;
   task_runner_ = task_runner;
   ftrace_ = FtraceController::Create(task_runner);
@@ -126,19 +146,19 @@ void FtraceProducer::Initialize(const char* socket_name,
 }
 
 void FtraceProducer::Connect() {
-  PERFETTO_CHECK(state_ == kNotConnected);
+  PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
   endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
 }
 
-void FtraceProducer::IncreaseBackoff() {
-  backoff_ms_ *= 2;
-  if (backoff_ms_ > kMaxBackoffMs)
-    backoff_ms_ = kMaxBackoffMs;
+void FtraceProducer::IncreaseConnectionBackoff() {
+  connection_backoff_ms_ *= 2;
+  if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
+    connection_backoff_ms_ = kMaxConnectionBackoffMs;
 }
 
-void FtraceProducer::ResetBackoff() {
-  backoff_ms_ = kInitialBackoffMs;
+void FtraceProducer::ResetConnectionBackoff() {
+  connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
 FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)

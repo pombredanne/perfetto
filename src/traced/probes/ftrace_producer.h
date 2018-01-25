@@ -40,7 +40,8 @@ class FtraceProducer : public Producer {
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
   // Our Impl
-  void Initialize(const char* socket_name, base::TaskRunner* task_runner);
+  void ConnectWithRetries(const char* socket_name,
+                          base::TaskRunner* task_runner);
 
  private:
   using BundleHandle =
@@ -71,16 +72,16 @@ class FtraceProducer : public Producer {
   };
 
   void Connect();
-  void ResetBackoff();
-  void IncreaseBackoff();
+  void ResetConnectionBackoff();
+  void IncreaseConnectionBackoff();
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   DataSourceID data_source_id_ = 0;
-  uint64_t backoff_ms_ = 0;
-  const char* socket_name_;
+  uint64_t connection_backoff_ms_ = 0;
+  const char* socket_name_ = nullptr;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
 };
 }  // namespace perfetto
