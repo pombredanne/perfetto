@@ -214,7 +214,6 @@ size_t CpuReader::ParsePage(size_t cpu,
         if (event_header.type_or_length == 0) {
           // TODO(hjd): Look at the next few bytes for real size.
           PERFETTO_CHECK(false);
-          return 0;
         }
         const uint8_t* start = ptr;
         const uint8_t* next = ptr + 4 * event_header.type_or_length;

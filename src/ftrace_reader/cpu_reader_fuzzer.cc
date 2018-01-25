@@ -46,7 +46,7 @@ void FuzzCpuReaderParsePage(const uint8_t* data, size_t size) {
   memset(g_page, 0, base::kPageSize);
   memcpy(g_page, data, std::min(base::kPageSize, size));
 
-  EventFilter filter(*table, std::set<std::string>({"sched_switch", "print"}));
+  EventFilter filter(*table, {"sched_switch", "print"});
 
   writer.Reset(&stream);
   CpuReader::ParsePage(42 /* cpu number */, g_page, &filter, &writer, table);
