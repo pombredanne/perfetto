@@ -17,6 +17,8 @@
 #ifndef TEST_TASK_RUNNER_THREAD_H_
 #define TEST_TASK_RUNNER_THREAD_H_
 
+#include <condition_variable>
+
 #include "perfetto/base/task_runner.h"
 #include "src/base/test/test_task_runner.h"
 
