@@ -154,6 +154,31 @@ cc_binary {
   ],
 }
 
+cc_binary {
+  name: "dropbox_leak",
+  srcs: [
+    "src/base/android_task_runner.cc",
+    "src/base/thread_checker.cc",
+    "dropbox_leak.cc",
+  ],
+  shared_libs: [
+    "libandroid",
+    "libbinder",
+    "liblog",
+    "libservices",
+    "libutils",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
+}
+
+
 cc_defaults {
   name: "perfetto_defaults",
   cflags: [

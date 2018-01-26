@@ -142,6 +142,24 @@ if (!build_with_chromium) {
       ]
     }
   }
+
+  executable("dropbox_leak") {
+      deps = [
+        "gn:default_deps",
+      ]
+      sources = [
+        "dropbox_leak.cc",
+      ]
+      if (build_with_android) {
+        cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
+        deps += [ "src/base:android_task_runner" ]
+        libs = [
+          "binder",
+          "services",
+          "utils",
+        ]
+      }
+    }
 } else {
   group("lib") {
     public_configs = [ "gn:public_config" ]
