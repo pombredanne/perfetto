@@ -46,7 +46,15 @@ void FakeConsumer::OnConnect() {
   endpoint_->EnableTracing(trace_config_);
   task_runner_->PostDelayedTask(std::bind([this]() {
                                   endpoint_->DisableTracing();
-                                  endpoint_->ReadBuffers();
+                                  // TODO(skyostil): There's a race here where
+                                  // we try to read the trace buffers before the
+                                  // producer has even connected and started
+                                  // tracing. Wait a bit as a hack.
+                                  task_runner_->PostDelayedTask(
+                                      std::bind([this]() {
+                                        endpoint_->ReadBuffers();
+                                      }),
+                                      3000);
                                 }),
                                 trace_config_.duration_ms());
 }
