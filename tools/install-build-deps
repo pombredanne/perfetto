@@ -173,7 +173,7 @@ TEST_DEPS_ANDROID = [
 
   # Android emulator images.
   ('buildtools/aosp-x64.zip',
-   'https://storage.googleapis.com/perfetto-aosp-binaries/aosp-25012018-x64.zip',
+   'https://storage.googleapis.com/perfetto/aosp-25012018-x64.zip',
    'c54c64964e127e510ddc2971efa4701da8e86bdb',
    'linux2'
   ),
