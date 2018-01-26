@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
 source_set("end_to_end_integrationtests") {
@@ -34,6 +35,25 @@ source_set("end_to_end_integrationtests") {
   ]
   if (is_android && !build_with_chromium) {
     deps += [ "../src/base:android_task_runner" ]
+  }
+}
+
+if (use_libfuzzer) {
+  executable("end_to_end_shared_memory_fuzzer") {
+    sources = [
+      "end_to_end_shared_memory_fuzzer.cc",
+    ]
+    testonly = true
+    deps = [
+      ":fake_consumer",
+      ":task_runner_thread",
+      "../gn:default_deps",
+      "../src/base:test_support",
+      "../src/protozero",
+      "../src/tracing",
+      "../src/tracing:ipc",
+    ]
+    configs += [ "../gn:fuzzer_config" ]
   }
 }
 

@@ -138,22 +138,3 @@ if (!build_with_chromium) {
     ]
   }
 }
-
-if (use_libfuzzer) {
-  executable("producer_ipc_service_fuzzer") {
-    sources = [
-      "ipc/service/producer_ipc_service_fuzzer.cc",
-    ]
-    testonly = true
-    deps = [
-      ":ipc",
-      ":tracing",
-      "../../gn:default_deps",
-      "../../src/base:test_support",
-      "../../src/protozero",
-      "../../test:fake_consumer",
-      "../../test:task_runner_thread",
-    ]
-    configs += [ "../../gn:fuzzer_config" ]
-  }
-}
