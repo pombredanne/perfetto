@@ -64,14 +64,17 @@ bool PacketStreamValidator::Eof() const {
 }
 
 bool PacketStreamValidator::SkipBytes(size_t count) {
-  read_size_ += count;
+  if (read_size_ + count > total_size_)
+    return false;
   while (count > 0 && size_ > 0) {
     pos_++;
+    read_size_++;
     size_--;
     count--;
   }
   if (!size_ && count) {
     pos_ = nullptr;
+    read_size_ += count;
     return stream_.Skip(count) || Eof();
   }
   return true;

@@ -67,8 +67,6 @@ class ServiceImpl : public Service {
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
-    Producer* producer() const { return producer_; }
-
    private:
     friend class ServiceImpl;
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
@@ -162,7 +160,7 @@ class ServiceImpl : public Service {
       return reinterpret_cast<uint8_t*>(data.get()) + page * kBufferPageSize;
     }
 
-    uid_t get_page_owner(size_t page) {
+    uid_t get_page_owner(size_t page) const {
       PERFETTO_DCHECK(page < num_pages());
       return page_owners[page];
     }

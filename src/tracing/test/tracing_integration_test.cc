@@ -168,7 +168,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   for (size_t i = 0; i < kNumPackets; i++) {
     char buf[8];
     sprintf(buf, "evt_%zu", i);
-    writer->NewTracePacket()->set_test_event()->set_str(buf, strlen(buf));
+    writer->NewTracePacket()->set_for_testing()->set_str(buf, strlen(buf));
   }
 
   // Allow the service to see the NotifySharedMemoryUpdate() before disabling

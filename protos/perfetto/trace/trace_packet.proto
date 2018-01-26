@@ -24,13 +24,13 @@ package perfetto.protos;
 
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
-// TODO(skyostil): Can we remove the test fields from here?
 message TracePacket {
   oneof data {
     FtraceEventBundle ftrace_events = 1;
-    TestEvent test_event = 536870911;  // 2^29 - 1, max field id for protos.
+
+    // This field is only used for testing.
+    TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.
   }
-  optional string test = 2;
   // Trusted user id of the producer which generated this packet.
   optional int32 trusted_uid = 3;
 }

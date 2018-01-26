@@ -23,6 +23,7 @@
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/test/aligned_buffer_test.h"
 
+#include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -62,9 +63,10 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
     auto packet = writer->NewTracePacket();
     char str[16];
     sprintf(str, "foobar %d", i);
-    packet->set_test(str);
+    packet->set_for_testing()->set_str(str);
   }
-  writer->NewTracePacket()->set_test("workaround for returing the last chunk");
+  writer->NewTracePacket()->set_for_testing()->set_str(
+      "workaround for returing the last chunk");
   writer.reset();
 
   SharedMemoryABI* abi = arbiter_->shmem_abi_for_testing();

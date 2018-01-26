@@ -80,7 +80,7 @@ class Producer {
 
   // Returns the UID of the producer process or -1 if one isn't available (e.g.,
   // the producer is in-process).
-  virtual uid_t uid() = 0;
+  virtual uid_t uid() { return -1; }
 };
 
 }  // namespace perfetto

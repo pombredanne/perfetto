@@ -90,7 +90,7 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
     DeferredGetAsyncCommandResponse async_producer_commands;
 
    private:
-    uid_t uid_;
+    const uid_t uid_;
   };
 
   ProducerIPCService(const ProducerIPCService&) = delete;

@@ -37,7 +37,6 @@ class FtraceProducer : public Producer {
   void CreateDataSourceInstance(DataSourceInstanceID,
                                 const DataSourceConfig&) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
-  uid_t uid() override;
 
   // Our Impl
   void Run();

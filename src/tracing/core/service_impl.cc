@@ -332,7 +332,9 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
             // don't contain any trusted UID fields. For added safety we append
             // instead of prepending because according to protobuf semantics, if
             // the same field is encountered multiple times the last instance
-            // takes priority.
+            // takes priority. Note that truncated packets are also rejected, so
+            // the producer can't give us a partial packet (e.g., a truncated
+            // string) which only becomes valid when the UID is appended here.
             uint8_t uid_field[16];
             uint8_t* pos = uid_field;
             pos = WriteVarInt(
@@ -464,7 +466,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // log buffer that has nothing to do with it.
 
   PERFETTO_DCHECK(size == kBufferPageSize);
-  uid_t uid = GetProducer(producer_id)->producer()->uid();
+  uid_t uid = GetProducer(producer_id)->producer_->uid();
   uint8_t* dst = buf.acquire_next_page(uid);
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
