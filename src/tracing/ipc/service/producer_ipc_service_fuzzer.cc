@@ -65,6 +65,13 @@ class FakeProducer : public perfetto::Producer {
 
     auto packet = trace_writer->NewTracePacket();
     packet->stream_writer_->WriteBytes(data_, size_);
+    packet->Finalize();
+
+    auto end_packet = trace_writer->NewTracePacket();
+    end_packet->set_test("end");
+    end_packet->Finalize();
+
+    trace_writer->NewTracePacket();
   }
 
   void TearDownDataSourceInstance(perfetto::DataSourceInstanceID) override {}
@@ -122,8 +129,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size)));
 
-  auto function = [](std::vector<perfetto::TracePacket> packets,
-                     bool has_more) {};
   // Setip the TraceConfig for the consumer.
   perfetto::TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
@@ -135,9 +140,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   ds_config->set_target_buffer(0);
 
   perfetto::base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
+  auto function = [&finish](std::vector<perfetto::TracePacket> packets,
+                            bool has_more) {
+    for (auto& p : packets) {
+      p.Decode();
+      if (p->test() == "end")
+        finish();
+    }
+  };
   perfetto::FakeConsumer consumer(trace_config, std::move(function),
                                   &task_runner);
   consumer.Connect(CONSUMER_SOCKET);
-  task_runner.RunUntilIdle();
+  task_runner.RunUntilCheckpoint("no.more.packets");
   return 0;
 }
