@@ -137,6 +137,19 @@ BUILD_DEPS_HOST = [
 # - https://dl.google.com/android/repository/repository-11.xml
 # - https://dl.google.com/android/repository/sys-img/android/sys-img.xml
 BUILD_DEPS_ANDROID = [
+  # platform-tools.zip contains adb binaries.
+  ('buildtools/android_sdk/platform-tools.zip',
+   'https://dl.google.com/android/repository/platform-tools_r26.0.0-darwin.zip',
+   'e75b6137dc444f777eb02f44a6d9819b3aabff82',
+   'darwin'
+  ),
+  ('buildtools/android_sdk/platform-tools.zip',
+   'https://dl.google.com/android/repository/platform-tools_r26.0.0-linux.zip',
+   '00de8a6631405b617c10f68cd11ff2e1cd528e23',
+   'linux2'
+  ),
+
+
   # Android NDK
   ('buildtools/ndk.zip',
    'https://dl.google.com/android/repository/android-ndk-r15c-darwin-x86_64.zip',
@@ -152,18 +165,6 @@ BUILD_DEPS_ANDROID = [
 
 # Dependencies required to run Android tests.
 TEST_DEPS_ANDROID = [
-  # platform-tools.zip contains adb binaries.
-  ('buildtools/android_sdk/platform-tools.zip',
-   'https://dl.google.com/android/repository/platform-tools_r26.0.0-darwin.zip',
-   'e75b6137dc444f777eb02f44a6d9819b3aabff82',
-   'darwin'
-  ),
-  ('buildtools/android_sdk/platform-tools.zip',
-   'https://dl.google.com/android/repository/platform-tools_r26.0.0-linux.zip',
-   '00de8a6631405b617c10f68cd11ff2e1cd528e23',
-   'linux2'
-  ),
-
   # Android emulator binaries.
   ('buildtools/emulator',
    'https://android.googlesource.com/platform/prebuilts/android-emulator.git',
@@ -175,7 +176,7 @@ TEST_DEPS_ANDROID = [
   ('buildtools/aosp-x64.zip',
    'https://storage.googleapis.com/perfetto-aosp-binaries/aosp-25012018-x64.zip',
    'c54c64964e127e510ddc2971efa4701da8e86bdb',
-   'android-x64'
+   'linux2'
   ),
 ]
 
@@ -225,10 +226,9 @@ def CheckoutGitRepo(path, git_url, revision):
     shutil.rmtree(path)
   MkdirRecursive(path)
   logging.info('Fetching %s @ %s into %s', git_url, revision, path)
+  subprocess.check_call(['git', 'init', path], cwd=path)
   subprocess.check_call(
-    ['git', 'clone', '--depth', '1', git_url, path], cwd=path)
-  subprocess.check_call(
-    ['git', 'fetch', '--depth', '1', 'origin', revision], cwd=path)
+    ['git', 'fetch', '--depth', '1', git_url, revision], cwd=path)
   subprocess.check_call(['git', 'checkout', revision, '--quiet'], cwd=path)
   assert(IsGitRepoCheckoutOutAtRevision(path, revision))
 
@@ -236,7 +236,7 @@ def CheckoutGitRepo(path, git_url, revision):
 def Main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--no-android', action='store_true')
-  parser.add_argument('--emulator', action='append', help='x86')
+  parser.add_argument('--emulator', action='append', help='x64')
   args = parser.parse_args()
   andriod_emulator_images = ['android-' + arch for arch in args.emulator or []]
   deps = BUILD_DEPS_HOST

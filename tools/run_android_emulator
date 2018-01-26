@@ -42,7 +42,6 @@ def Main():
                    '-kernel', os.path.join(aosp_path, 'kernel-ranchu'),
                    '-ramdisk', os.path.join(aosp_path, 'ramdisk.img'),
                    '-vendor', os.path.join(aosp_path, 'vendor-qemu.img'),
-                   '-initdata', os.path.join(aosp_path, 'userdata.img'),
                    '-data', os.path.join(aosp_path, 'userdata-qemu.img')]
   print '\n'.join('='.join(x) for x in env.items())
   print ' '.join([emulator_bin] + emulator_args)

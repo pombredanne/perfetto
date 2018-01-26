@@ -107,6 +107,7 @@ cache:
   timeout: 1800  # 30 mins
   directories:
     - buildtools/benchmark
+    - buildtools/emulator
     - buildtools/googletest
     - buildtools/libcxx
     - buildtools/libcxxabi
