@@ -132,7 +132,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size)));
 
-  // Setip the TraceConfig for the consumer.
+  // Setup the TraceConfig for the consumer.
   perfetto::TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(200);
