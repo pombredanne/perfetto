@@ -37,6 +37,9 @@
 #define PRODUCER_SOCKET "/tmp/perfetto-producer"
 #define CONSUMER_SOCKET "/tmp/perfetto-consumer"
 
+// Fake producer writing a protozero message of data into shared memory
+// buffer, followed by a sentinel message to signal completion to the
+// consumer.
 class FakeProducer : public perfetto::Producer {
  public:
   FakeProducer(std::string name, const uint8_t* data, size_t size)
@@ -141,6 +144,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   perfetto::base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
+  // Wait for sentinel message from Producer, then signal no.more.packets.
   auto function = [&finish](std::vector<perfetto::TracePacket> packets,
                             bool has_more) {
     for (auto& p : packets) {
