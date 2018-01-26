@@ -43,13 +43,15 @@ int main() {
     int fd = open(path, O_RDWR | O_CLOEXEC | O_CREAT, 0666);
     PERFETTO_CHECK(fd >= 0);
     write(fd, "foo\n", 4);
+    close(fd);
 
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
     android::binder::Status status = dropbox->addFile(
         android::String16("leaktest"), path, 0 /* flags */);
     unlink(path);
-    printf("Binder result %d: %d", i, status.isOk());
+    printf("Binder result %d: %d\n", i, status.isOk());
   }
+  printf("Done, now look at /proc/%d/fd")
   task_runner.Run();
 }
