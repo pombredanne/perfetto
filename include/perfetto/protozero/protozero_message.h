@@ -28,7 +28,11 @@
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 
+namespace perfetto {
+namespace shm_fuzz {
 class FakeProducer;
+}  // namespace shm_fuzz
+}  // namespace perfetto
 
 namespace protozero {
 
@@ -43,7 +47,7 @@ class ProtoZeroMessage {
   friend class ProtoZeroMessageHandleBase;
   // Grant end_to_end_shared_memory_fuzzer access in order to write raw
   // bytes into the buffer.
-  friend class ::FakeProducer;
+  friend class ::perfetto::shm_fuzz::FakeProducer;
   // Adjust the |nested_messages_arena_| size when changing this, or the
   // static_assert in the .cc file will bark.
   static constexpr uint32_t kMaxNestingDepth = 8;

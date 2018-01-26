@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "include/perfetto/tracing/core/data_source_descriptor.h"
-#include "include/perfetto/tracing/core/producer.h"
-#include "include/perfetto/tracing/core/trace_writer.h"
-#include "include/perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
@@ -29,6 +25,10 @@
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/tracing/core/data_source_config.h"
+#include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/trace_writer.h"
+#include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/base/test/test_task_runner.h"
 #include "test/fake_consumer.h"
@@ -37,34 +37,35 @@
 #define PRODUCER_SOCKET "/tmp/perfetto-producer"
 #define CONSUMER_SOCKET "/tmp/perfetto-consumer"
 
+namespace perfetto {
+namespace shm_fuzz {
+
 // Fake producer writing a protozero message of data into shared memory
 // buffer, followed by a sentinel message to signal completion to the
 // consumer.
-class FakeProducer : public perfetto::Producer {
+class FakeProducer : public Producer {
  public:
   FakeProducer(std::string name, const uint8_t* data, size_t size)
       : name_(std::move(name)), data_(data), size_(size) {}
 
-  void Connect(const char* socket_name,
-               perfetto::base::TaskRunner* task_runner) {
-    endpoint_ =
-        perfetto::ProducerIPCClient::Connect(socket_name, this, task_runner);
+  void Connect(const char* socket_name, base::TaskRunner* task_runner) {
+    endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
   }
 
   void OnConnect() override {
-    perfetto::DataSourceDescriptor descriptor;
+    DataSourceDescriptor descriptor;
     descriptor.set_name(name_);
-    endpoint_->RegisterDataSource(
-        descriptor, [this](perfetto::DataSourceID id) { id_ = id; });
+    endpoint_->RegisterDataSource(descriptor,
+                                  [this](DataSourceID id) { id_ = id; });
   }
 
   void OnDisconnect() override {}
 
   void CreateDataSourceInstance(
-      perfetto::DataSourceInstanceID,
-      const perfetto::DataSourceConfig& source_config) override {
+      DataSourceInstanceID,
+      const DataSourceConfig& source_config) override {
     auto trace_writer = endpoint_->CreateTraceWriter(
-        static_cast<perfetto::BufferID>(source_config.target_buffer()));
+        static_cast<BufferID>(source_config.target_buffer()));
 
     auto packet = trace_writer->NewTracePacket();
     packet->stream_writer_->WriteBytes(data_, size_);
@@ -80,23 +81,23 @@ class FakeProducer : public perfetto::Producer {
     trace_writer->NewTracePacket();
   }
 
-  void TearDownDataSourceInstance(perfetto::DataSourceInstanceID) override {}
+  void TearDownDataSourceInstance(DataSourceInstanceID) override {}
 
  private:
   const std::string name_;
   const uint8_t* data_;
-  size_t size_;
-  perfetto::DataSourceID id_ = 0;
-  std::unique_ptr<perfetto::Service::ProducerEndpoint> endpoint_;
+  const size_t size_;
+  DataSourceID id_ = 0;
+  std::unique_ptr<Service::ProducerEndpoint> endpoint_;
 };
 
-class FakeProducerDelegate : public perfetto::ThreadDelegate {
+class FakeProducerDelegate : public ThreadDelegate {
  public:
   FakeProducerDelegate(const uint8_t* data, size_t size)
       : data_(data), size_(size) {}
   ~FakeProducerDelegate() override = default;
 
-  void Initialize(perfetto::base::TaskRunner* task_runner) override {
+  void Initialize(base::TaskRunner* task_runner) override {
     producer_.reset(
         new FakeProducer("android.perfetto.FakeProducer", data_, size_));
     producer_->Connect(PRODUCER_SOCKET, task_runner);
@@ -105,38 +106,38 @@ class FakeProducerDelegate : public perfetto::ThreadDelegate {
  private:
   std::unique_ptr<FakeProducer> producer_;
   const uint8_t* data_;
-  size_t size_;
+  const size_t size_;
 };
 
-class ServiceDelegate : public perfetto::ThreadDelegate {
+class ServiceDelegate : public ThreadDelegate {
  public:
   ServiceDelegate() = default;
   ~ServiceDelegate() override = default;
-  void Initialize(perfetto::base::TaskRunner* task_runner) override {
-    svc_ = perfetto::ServiceIPCHost::CreateInstance(task_runner);
+  void Initialize(base::TaskRunner* task_runner) override {
+    svc_ = ServiceIPCHost::CreateInstance(task_runner);
     unlink(PRODUCER_SOCKET);
     unlink(CONSUMER_SOCKET);
     svc_->Start(PRODUCER_SOCKET, CONSUMER_SOCKET);
   }
 
  private:
-  std::unique_ptr<perfetto::ServiceIPCHost> svc_;
-  perfetto::base::ScopedFile producer_fd_;
-  perfetto::base::ScopedFile consumer_fd_;
+  std::unique_ptr<ServiceIPCHost> svc_;
+  base::ScopedFile producer_fd_;
+  base::ScopedFile consumer_fd_;
 };
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+int FuzzSharedMemory(const uint8_t* data, size_t size);
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  perfetto::TaskRunnerThread service_thread;
+int FuzzSharedMemory(const uint8_t* data, size_t size) {
+  TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate()));
 
-  perfetto::TaskRunnerThread producer_thread;
+  TaskRunnerThread producer_thread;
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size)));
 
   // Setup the TraceConfig for the consumer.
-  perfetto::TraceConfig trace_config;
+  TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(200);
 
@@ -145,20 +146,27 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
 
-  perfetto::base::TestTaskRunner task_runner;
+  base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
   // Wait for sentinel message from Producer, then signal no.more.packets.
-  auto function = [&finish](std::vector<perfetto::TracePacket> packets,
-                            bool has_more) {
+  auto function = [&finish](std::vector<TracePacket> packets, bool has_more) {
     for (auto& p : packets) {
       p.Decode();
       if (p->test() == "end")
         finish();
     }
   };
-  perfetto::FakeConsumer consumer(trace_config, std::move(function),
-                                  &task_runner);
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(CONSUMER_SOCKET);
   task_runner.RunUntilCheckpoint("no.more.packets");
   return 0;
+}
+
+}  // namespace shm_fuzz
+}  // namespace perfetto
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+  return perfetto::shm_fuzz::FuzzSharedMemory(data, size);
 }
