@@ -124,7 +124,7 @@ class ProtoZeroMessageTest : public ::testing::Test {
 
 TEST_F(ProtoZeroMessageTest, ZeroLengthArraysAndStrings) {
   ProtoZeroMessage* msg = NewMessage();
-  msg->AppendBytes(1 /* field_id */, kTestBytes, 0);
+  msg->AppendBytes(1 /* field_id */, nullptr, 0);
   msg->AppendString(2 /* field_id */, "");
 
   EXPECT_EQ(4u, msg->Finalize());
