@@ -48,12 +48,13 @@ bool PacketStreamValidator::Validate() {
 }
 
 bool PacketStreamValidator::ReadByte(uint8_t* value) {
-  while (size_ < 1) {
-    if (!stream_.Next(reinterpret_cast<const void**>(&pos_), &size_))
+  while (chunk_size_ < 1) {
+    if (!stream_.Next(reinterpret_cast<const void**>(&chunk_pos_),
+                      &chunk_size_))
       return false;
   }
-  *value = *pos_++;
-  size_--;
+  *value = *chunk_pos_++;
+  chunk_size_--;
   read_size_++;
   return true;
 }
@@ -66,14 +67,17 @@ bool PacketStreamValidator::Eof() const {
 bool PacketStreamValidator::SkipBytes(size_t count) {
   if (read_size_ + count > total_size_)
     return false;
-  while (count > 0 && size_ > 0) {
-    pos_++;
-    read_size_++;
-    size_--;
-    count--;
-  }
-  if (!size_ && count) {
-    pos_ = nullptr;
+  // First skip inside the current chunk.
+  size_t chunk_skip = std::min(static_cast<size_t>(chunk_size_), count);
+  chunk_pos_ += chunk_skip;
+  read_size_ += chunk_skip;
+  chunk_size_ -= chunk_skip;
+  count -= chunk_skip;
+  PERFETTO_DCHECK(chunk_size_ >= 0);
+  PERFETTO_DCHECK(count >= 0);
+  // If there are still bytes left to skip, continue in the stream.
+  if (!chunk_size_ && count) {
+    chunk_pos_ = nullptr;
     read_size_ += count;
     return stream_.Skip(count) || Eof();
   }
@@ -98,6 +102,7 @@ bool PacketStreamValidator::ConsumeField(uint64_t* field_id) {
   if (!ConsumeVarInt(field_id))
     return false;
 
+  // See proto_utils.cc in protozero.
   const uint8_t kFieldTypeNumBits = 3;
   const uint8_t kFieldTypeMask = (1 << kFieldTypeNumBits) - 1;  // 0000 0111;
   int field_type = static_cast<FieldType>(*field_id & kFieldTypeMask);

@@ -39,12 +39,24 @@ group("gtest_deps") {
     public_deps = [
       "//buildtools:gmock",
       "//buildtools:gtest",
-      "//buildtools:gtest_main",
     ]
   } else {
     public_deps = [
       "//testing/gmock",
       "//testing/gtest",
+    ]
+  }
+}
+
+group("gtest_main") {
+  testonly = true
+
+  if (!build_with_chromium) {
+    public_deps = [
+      "//buildtools:gtest_main",
+    ]
+  } else {
+    public_deps = [
       "//testing/gtest:gtest_main",
     ]
   }
@@ -118,5 +130,13 @@ config("public_config") {
     # The below are needed due to generated protobuf headers including other
     # headers with a path relative to the perfetto root.
     "${root_gen_dir}/${perfetto_root_path}/protos",
+  ]
+}
+
+config("fuzzer_config") {
+  cflags = [ "-fsanitize=fuzzer" ]
+  ldflags = [
+    "-fsanitize=fuzzer",
+    "-fsanitize-coverage=trace-pc-guard",
   ]
 }

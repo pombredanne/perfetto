@@ -24,6 +24,8 @@
 namespace perfetto {
 
 // Checks that the stream of trace packets sent by the producer is well formed.
+// Note that we only validate top-level fields in the trace proto; sub-messages
+// are simply skipped.
 class PacketStreamValidator {
  public:
   explicit PacketStreamValidator(const ChunkSequence* sequence);
@@ -41,8 +43,8 @@ class PacketStreamValidator {
   size_t total_size_ = 0;
   size_t read_size_ = 0;
 
-  const uint8_t* pos_ = nullptr;
-  int size_ = 0;
+  const uint8_t* chunk_pos_ = nullptr;
+  int chunk_size_ = 0;
 };
 
 }  // namespace perfetto

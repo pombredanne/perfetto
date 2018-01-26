@@ -18,6 +18,7 @@
 #include <memory>
 #include <utility>
 
+#include "perfetto/base/task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -39,7 +40,8 @@ class FtraceProducer : public Producer {
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
   // Our Impl
-  void Run();
+  void ConnectWithRetries(const char* socket_name,
+                          base::TaskRunner* task_runner);
 
  private:
   using BundleHandle =
@@ -62,9 +64,24 @@ class FtraceProducer : public Producer {
     std::unique_ptr<TraceWriter> writer_;
   };
 
+  enum State {
+    kNotStarted = 0,
+    kNotConnected,
+    kConnecting,
+    kConnected,
+  };
+
+  void Connect();
+  void ResetConnectionBackoff();
+  void IncreaseConnectionBackoff();
+
+  State state_ = kNotStarted;
+  base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   DataSourceID data_source_id_ = 0;
+  uint64_t connection_backoff_ms_ = 0;
+  const char* socket_name_ = nullptr;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
 };
 }  // namespace perfetto

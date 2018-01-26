@@ -97,7 +97,7 @@ const uint8_t* ParseField(const uint8_t* start,
     case kFieldTypeLengthDelimited: {
       pos = ParseVarInt(pos, end, field_intvalue);
       pos += *field_intvalue;
-      // PERFETTO_CHECK_PTR_LE(pos, end);
+      PERFETTO_CHECK_PTR_LE(pos, end);
       break;
     }
   }

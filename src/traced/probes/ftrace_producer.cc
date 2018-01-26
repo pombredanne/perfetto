@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -33,9 +32,16 @@
 namespace perfetto {
 namespace {
 
-bool IsAlnum(const std::string& str) {
+bool IsGoodPunctuation(char c) {
+  return c == '_' || c == '.';
+}
+
+uint64_t kInitialConnectionBackoffMs = 100;
+uint64_t kMaxConnectionBackoffMs = 30 * 1000;
+
+bool IsValid(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && str[i] != '_')
+    if (!isalnum(str[i]) && !IsGoodPunctuation(str[i]))
       return false;
   }
   return true;
@@ -43,9 +49,20 @@ bool IsAlnum(const std::string& str) {
 
 }  // namespace.
 
+// State transition diagram:
+//                    +----------------------------+
+//                    v                            +
+// NotStarted -> NotConnected -> Connecting -> Connected
+//                    ^              +
+//                    +--------------+
+//
+
 FtraceProducer::~FtraceProducer() = default;
 
 void FtraceProducer::OnConnect() {
+  PERFETTO_DCHECK(state_ == kConnecting);
+  state_ = kConnected;
+  ResetConnectionBackoff();
   PERFETTO_LOG("Connected to the service");
 
   DataSourceDescriptor descriptor;
@@ -55,8 +72,13 @@ void FtraceProducer::OnConnect() {
 }
 
 void FtraceProducer::OnDisconnect() {
+  PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
+  state_ = kNotConnected;
   PERFETTO_LOG("Disconnected from tracing service");
-  exit(1);
+  IncreaseConnectionBackoff();
+
+  task_runner_->PostDelayedTask([this] { this->Connect(); },
+                                connection_backoff_ms_);
 }
 
 void FtraceProducer::CreateDataSourceInstance(
@@ -66,15 +88,30 @@ void FtraceProducer::CreateDataSourceInstance(
                source_config.target_buffer());
 
   // TODO(hjd): Would be nice if ftrace_reader could use generate the config.
-  const DataSourceConfig::FtraceConfig proto_config =
+  const DataSourceConfig::FtraceConfig& proto_config =
       source_config.ftrace_config();
 
   FtraceConfig config;
+  // TODO(b/72082266): We shouldn't have to do this.
   for (const std::string& event_name : proto_config.event_names()) {
-    if (IsAlnum(event_name)) {
+    if (IsValid(event_name)) {
       config.AddEvent(event_name.c_str());
     } else {
-      PERFETTO_LOG("Bad event name '%s'", event_name.c_str());
+      PERFETTO_ELOG("Bad event name '%s'", event_name.c_str());
+    }
+  }
+  for (const std::string& category : proto_config.atrace_categories()) {
+    if (IsValid(category)) {
+      config.AddAtraceCategory(category.c_str());
+    } else {
+      PERFETTO_ELOG("Bad category name '%s'", category.c_str());
+    }
+  }
+  for (const std::string& app : proto_config.atrace_apps()) {
+    if (IsValid(app)) {
+      config.AddAtraceApp(app.c_str());
+    } else {
+      PERFETTO_ELOG("Bad app '%s'", app.c_str());
     }
   }
 
@@ -94,14 +131,34 @@ void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   delegates_.erase(id);
 }
 
-void FtraceProducer::Run() {
-  base::UnixTaskRunner task_runner;
-  ftrace_ = FtraceController::Create(&task_runner);
-  endpoint_ = ProducerIPCClient::Connect(PERFETTO_PRODUCER_SOCK_NAME, this,
-                                         &task_runner);
+void FtraceProducer::ConnectWithRetries(const char* socket_name,
+                                        base::TaskRunner* task_runner) {
+  PERFETTO_DCHECK(state_ == kNotStarted);
+  state_ = kNotConnected;
+
+  ResetConnectionBackoff();
+  socket_name_ = socket_name;
+  task_runner_ = task_runner;
+  ftrace_ = FtraceController::Create(task_runner);
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
-  task_runner.Run();
+  Connect();
+}
+
+void FtraceProducer::Connect() {
+  PERFETTO_DCHECK(state_ == kNotConnected);
+  state_ = kConnecting;
+  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
+}
+
+void FtraceProducer::IncreaseConnectionBackoff() {
+  connection_backoff_ms_ *= 2;
+  if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
+    connection_backoff_ms_ = kMaxConnectionBackoffMs;
+}
+
+void FtraceProducer::ResetConnectionBackoff() {
+  connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
 FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
