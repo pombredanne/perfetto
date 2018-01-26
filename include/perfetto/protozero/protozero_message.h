@@ -41,6 +41,8 @@ class ProtoZeroMessageHandleBase;
 class ProtoZeroMessage {
  public:
   friend class ProtoZeroMessageHandleBase;
+  // Grant end_to_end_shared_memory_fuzzer access in order to write raw
+  // bytes into the buffer.
   friend class ::FakeProducer;
   // Adjust the |nested_messages_arena_| size when changing this, or the
   // static_assert in the .cc file will bark.
