@@ -70,10 +70,6 @@ class TracePacket {
   // Total size of all chunks.
   size_t size() const { return size_; }
 
-  // The uid of the process which generated this packet.
-  uid_t uid() const { return uid_; }
-  void set_uid(uid_t uid) { uid_ = uid; }
-
  private:
   TracePacket(const TracePacket&) = delete;
   TracePacket& operator=(const TracePacket&) = delete;
@@ -82,7 +78,6 @@ class TracePacket {
 
   ChunkSequence chunks_;  // Not owned.
   size_t size_ = 0;       // SUM(chunk.size for chunk in chunks_).
-  uid_t uid_ = -1;
   std::unique_ptr<DecodedTracePacket> decoded_packet_;
 };
 

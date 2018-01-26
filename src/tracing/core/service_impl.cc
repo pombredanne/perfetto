@@ -24,11 +24,13 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/protozero/proto_utils.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "src/tracing/core/packet_stream_validator.h"
 
 // General note: this class must assume that Producers are malicious and will
 // try to crash / exploit this class. We can trust pointers because they come
@@ -39,7 +41,9 @@ namespace perfetto {
 
 // TODO add ThreadChecker everywhere.
 
+using protozero::proto_utils::MakeTagVarInt;
 using protozero::proto_utils::ParseVarInt;
+using protozero::proto_utils::WriteVarInt;
 
 namespace {
 constexpr size_t kSystemPageSize = 4096;
@@ -273,6 +277,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       const size_t page_idx = (i + tbuf.cur_page) % tbuf.num_pages();
       if (abi.is_page_free(page_idx))
         continue;
+      const uid_t page_owner = tbuf.get_page_owner(page_idx);
       uint32_t layout = abi.page_layout_dbg(page_idx);
       size_t num_chunks = abi.GetNumChunksForLayout(layout);
       for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
@@ -303,16 +308,38 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
                        flags & SharedMemoryABI::ChunkHeader::
                                    kLastPacketContinuesOnNextChunk);
 
-          PERFETTO_DLOG("  #%-3zu len:%" PRIu64 " skip: %d\n", pack_idx,
+          PERFETTO_DLOG("  #%-3zu len:%" PRIu64 " skip: %d", pack_idx,
                         pack_size, skip);
           if (ptr > chunk.end() - pack_size) {
-            PERFETTO_DLOG("out of bounds!\n");
+            PERFETTO_DLOG("out of bounds!");
             break;
           }
+          ChunkSequence chunk_seq;
+          chunk_seq.emplace_back(ptr, pack_size);
+          PacketStreamValidator validator(&chunk_seq);
+          if (!skip && !validator.Validate()) {
+            PERFETTO_DLOG("Dropping invalid packet");
+            skip = true;
+          }
+
           if (!skip) {
             packets->emplace_back();
-            packets->back().AddChunk(Chunk(ptr, pack_size));
-            packets->back().set_uid(tbuf.uid);
+            for (Chunk& validated_chunk : chunk_seq)
+              packets->back().AddChunk(std::move(validated_chunk));
+
+            // Append a chunk with the trusted UID of the producer. This can't
+            // be spoofed because above we validated that the existing chunks
+            // don't contain any trusted UID fields. For added safety we append
+            // instead of prepending because according to protobuf semantics, if
+            // the same field is encountered multiple times the last instance
+            // takes priority.
+            uint8_t uid_field[16];
+            uint8_t* pos = uid_field;
+            pos = WriteVarInt(
+                MakeTagVarInt(protos::TracePacket::kTrustedUidFieldNumber),
+                pos);
+            pos = WriteVarInt(static_cast<int32_t>(page_owner), pos);
+            packets->back().AddChunk(Chunk::Copy(uid_field, pos - uid_field));
           }
           ptr += pack_size;
         }  // for(packet)
@@ -437,8 +464,8 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // log buffer that has nothing to do with it.
 
   PERFETTO_DCHECK(size == kBufferPageSize);
-  buf.uid = GetProducer(producer_id)->producer()->uid();
-  uint8_t* dst = buf.get_next_page();
+  uid_t uid = GetProducer(producer_id)->producer()->uid();
+  uint8_t* dst = buf.acquire_next_page(uid);
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
   // a file descriptor (just use SharedMemory without sharing it).
@@ -600,6 +627,8 @@ bool ServiceImpl::TraceBuffer::Create(size_t sz) {
   }
   size = sz;
   abi.reset(new SharedMemoryABI(get_page(0), size, kBufferPageSize));
+  PERFETTO_DCHECK(page_owners.size() == 0);
+  page_owners.resize(sz, -1);
   return true;
 }
 

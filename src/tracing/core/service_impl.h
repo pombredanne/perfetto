@@ -162,15 +162,20 @@ class ServiceImpl : public Service {
       return reinterpret_cast<uint8_t*>(data.get()) + page * kBufferPageSize;
     }
 
-    uint8_t* get_next_page() {
+    uid_t get_page_owner(size_t page) {
+      PERFETTO_DCHECK(page < num_pages());
+      return page_owners[page];
+    }
+
+    uint8_t* acquire_next_page(uid_t uid) {
       size_t cur = cur_page;
       cur_page = cur_page == num_pages() - 1 ? 0 : cur_page + 1;
+      page_owners[cur] = uid;
       return get_page(cur);
     }
 
     size_t size = 0;
     size_t cur_page = 0;  // Write pointer in the ring buffer.
-    uid_t uid = -1;
     base::PageAllocator::UniquePtr data;
 
     // TODO(primiano): The TraceBuffer is not shared and there is no reason to
@@ -178,6 +183,9 @@ class ServiceImpl : public Service {
     // the convenience of SharedMemoryABI for bookkeeping of the buffer when
     // implementing ReadBuffers().
     std::unique_ptr<SharedMemoryABI> abi;
+
+    // Trusted uid for each acquired page.
+    std::vector<uid_t> page_owners;
   };
 
   // Holds the state of a tracing session. A tracing session is uniquely bound

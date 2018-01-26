@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 
+#include <memory>
 #include <vector>
 
 namespace perfetto {
@@ -26,9 +27,29 @@ namespace perfetto {
 // A simple wrapper around a virtually contiguous memory range that contains a
 // TracePacket, or just a portion of it.
 struct Chunk {
+  Chunk() : start(nullptr), size(0) {}
   Chunk(const void* st, size_t sz) : start(st), size(sz) {}
+  Chunk(Chunk&& other) noexcept {
+    size = other.size;
+    start = other.start;
+    own_data_ = std::move(other.own_data_);
+  }
+
+  // Create a Chunk which contains (and owns) a copy of the given memory.
+  static Chunk Copy(const void* start, size_t size) {
+    Chunk c;
+    c.own_data_.reset(new uint8_t[size]);
+    c.size = size;
+    c.start = &c.own_data_[0];
+    memcpy(&c.own_data_[0], start, size);
+    return c;
+  }
+
   const void* start;
   size_t size;
+
+ private:
+  std::unique_ptr<uint8_t[]> own_data_;
 };
 
 // TODO(primiano): most TracePacket(s) fit in a chunk or two. We need something

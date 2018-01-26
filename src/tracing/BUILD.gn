@@ -19,11 +19,12 @@ import("//build_overrides/build.gni")
 source_set("tracing") {
   public_deps = [
     "../../include/perfetto/tracing/core",
+    "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace:zero",
   ]
   deps = [
     "../../gn:default_deps",
-    "../../protos:lite",
-    "../../protos:zero",
+    "../../protos/perfetto/config",
     "../base",
   ]
   sources = [
@@ -33,6 +34,8 @@ source_set("tracing") {
     "core/data_source_descriptor.cc",
     "core/id_allocator.cc",
     "core/id_allocator.h",
+    "core/packet_stream_validator.cc",
+    "core/packet_stream_validator.h",
     "core/service_impl.cc",
     "core/service_impl.h",
     "core/shared_memory_abi.cc",
@@ -69,9 +72,30 @@ static_library("ipc") {
   deps = [
     ":tracing",
     "../../gn:default_deps",
-    "../../protos/tracing_service",
+    "../../protos/perfetto/ipc",
     "../base",
     "../ipc",
+  ]
+}
+
+# IPC transport: only consumer side
+# TODO(fmayer): Remove duplication between this and ipc.
+source_set("ipc_consumer") {
+  public_deps = [
+    "../../include/perfetto/tracing/core",
+    "../../include/perfetto/tracing/ipc",
+  ]
+  sources = [
+    "ipc/consumer/consumer_ipc_client_impl.cc",
+    "ipc/consumer/consumer_ipc_client_impl.h",
+    "ipc/posix_shared_memory.cc",
+    "ipc/posix_shared_memory.h",
+  ]
+  deps = [
+    ":tracing",
+    "../../gn:default_deps",
+    "../../protos/perfetto/ipc",
+    "../base",
   ]
 }
 
@@ -82,14 +106,15 @@ source_set("tracing_unittests") {
     ":tracing",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
-    "../../protos:lite",
-    "../../protos:zero",
+    "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace:zero",
     "../base",
     "../base:test_support",
   ]
   sources = [
     "core/chunked_protobuf_input_stream_unittest.cc",
     "core/id_allocator_unittest.cc",
+    "core/packet_stream_validator_unittest.cc",
     "core/service_impl_unittest.cc",
     "core/shared_memory_abi_unittest.cc",
     "core/shared_memory_arbiter_impl_unittest.cc",

@@ -69,6 +69,7 @@ const uint8_t* ParseField(const uint8_t* start,
 
   uint64_t raw_field_id;
   pos = ParseVarInt(pos, end, &raw_field_id);
+  printf("header: %zu\n", pos - start);
   raw_field_id >>= kFieldTypeNumBits;
 
   PERFETTO_DCHECK(raw_field_id <= std::numeric_limits<uint32_t>::max());
@@ -97,10 +98,11 @@ const uint8_t* ParseField(const uint8_t* start,
     case kFieldTypeLengthDelimited: {
       pos = ParseVarInt(pos, end, field_intvalue);
       pos += *field_intvalue;
-      PERFETTO_CHECK_PTR_LE(pos, end);
+      // PERFETTO_CHECK_PTR_LE(pos, end);
       break;
     }
   }
+  printf("contents: %zu\n", pos - start);
   return pos;
 }
 

@@ -18,7 +18,7 @@
 
 #include "src/tracing/core/chunked_protobuf_input_stream.h"
 
-#include "protos/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
 
@@ -41,8 +41,8 @@ bool TracePacket::Decode() {
 }
 
 void TracePacket::AddChunk(Chunk chunk) {
-  chunks_.push_back(chunk);
   size_ += chunk.size;
+  chunks_.push_back(std::move(chunk));
 }
 
 }  // namespace perfetto

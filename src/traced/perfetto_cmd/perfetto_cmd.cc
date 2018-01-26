@@ -30,6 +30,7 @@
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
+#include "perfetto/trace/trace.pb.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
@@ -38,7 +39,7 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
-#include "protos/tracing_service/trace_config.pb.h"
+#include "perfetto/config/trace_config.pb.h"
 
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
 #include "perfetto/base/android_task_runner.h"
@@ -263,7 +264,8 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
     for (const Chunk& chunk : packet) {
       uint8_t preamble[16];
       uint8_t* pos = preamble;
-      pos = WriteVarInt(MakeTagLengthDelimited(1 /* field_id */), pos);
+      pos = WriteVarInt(
+          MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber), pos);
       pos = WriteVarInt(static_cast<uint32_t>(chunk.size), pos);
       fwrite(reinterpret_cast<const char*>(preamble), pos - preamble, 1,
              trace_out_stream_.get());
