@@ -229,8 +229,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 // and then drain the buffers. The actual teardown of the TracingSession happens
 // in FreeBuffers().
 void ServiceImpl::DisableTracing(TracingSessionID tsid) {
-  PERFETTO_DLOG("Disabling tracing session %" PRIu64 ", total sessions:%zu",
-                tsid, tracing_sessions_.size());
+  PERFETTO_LOG("Disabling tracing session %" PRIu64 ", total sessions:%zu",
+               tsid, tracing_sessions_.size());
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
     // Can happen if the consumer calls this before EnableTracing() or after
