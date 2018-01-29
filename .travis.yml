@@ -126,8 +126,7 @@ install:
     if [[ "$CFG" != android-* ]]; then
       tools/install-build-deps --no-android
     else
-      ARCH=$(echo "$CFG" | cut -d- -f3)
-      tools/install-build-deps --emulator="$ARCH"
+      tools/install-build-deps
     fi
   - |
     if [[ -e buildtools/clang/bin/llvm-symbolizer ]]; then
