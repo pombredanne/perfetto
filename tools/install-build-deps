@@ -152,15 +152,10 @@ BUILD_DEPS_ANDROID = [
 
 # Dependencies required to run Android tests.
 TEST_DEPS_ANDROID = [
-  # platform-tools.zip contains adb binaries.
-  ('buildtools/android_sdk/platform-tools.zip',
-   'https://dl.google.com/android/repository/platform-tools_r26.0.0-darwin.zip',
-   'e75b6137dc444f777eb02f44a6d9819b3aabff82',
-   'darwin'
-  ),
-  ('buildtools/android_sdk/platform-tools.zip',
-   'https://dl.google.com/android/repository/platform-tools_r26.0.0-linux.zip',
-   '00de8a6631405b617c10f68cd11ff2e1cd528e23',
+  # Android emulator images.
+  ('buildtools/aosp-x64.zip',
+   'https://storage.googleapis.com/perfetto/aosp-25012018-x64.zip',
+   'c54c64964e127e510ddc2971efa4701da8e86bdb',
    'linux2'
   ),
 
@@ -171,10 +166,15 @@ TEST_DEPS_ANDROID = [
    'all'
   ),
 
-  # Android emulator images.
-  ('buildtools/aosp-x64.zip',
-   'https://storage.googleapis.com/perfetto/aosp-25012018-x64.zip',
-   'c54c64964e127e510ddc2971efa4701da8e86bdb',
+  # platform-tools.zip contains adb binaries.
+  ('buildtools/android_sdk/platform-tools.zip',
+   'https://dl.google.com/android/repository/platform-tools_r26.0.0-darwin.zip',
+   'e75b6137dc444f777eb02f44a6d9819b3aabff82',
+   'darwin'
+  ),
+  ('buildtools/android_sdk/platform-tools.zip',
+   'https://dl.google.com/android/repository/platform-tools_r26.0.0-linux.zip',
+   '00de8a6631405b617c10f68cd11ff2e1cd528e23',
    'linux2'
   ),
 ]
@@ -235,15 +235,13 @@ def CheckoutGitRepo(path, git_url, revision):
 def Main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--no-android', action='store_true')
-  parser.add_argument('--emulator', action='append', help='x64')
   args = parser.parse_args()
-  andriod_emulator_images = ['android-' + arch for arch in args.emulator or []]
   deps = BUILD_DEPS_HOST
   if not args.no_android:
-    deps += BUILD_DEPS_ANDROID + TEST_DEPS_ANDROID
+    # Test deps require more space so download/extract them first.
+    deps += TEST_DEPS_ANDROID + BUILD_DEPS_ANDROID
   for rel_path, url, expected_sha1, platform in deps:
-    if (platform != 'all' and platform != sys.platform and
-        platform not in andriod_emulator_images):
+    if (platform != 'all' and platform != sys.platform):
       continue
     local_path = os.path.join(ROOT_DIR, rel_path)
     if url.endswith('.git'):
