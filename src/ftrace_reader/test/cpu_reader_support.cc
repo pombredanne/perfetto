@@ -18,7 +18,7 @@
 
 #include "src/ftrace_reader/ftrace_procfs.h"
 
-#include <cstring>
+#include <string.h>
 
 namespace perfetto {
 namespace {
