@@ -169,7 +169,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     TraceBuffer& trace_buffer = it_and_inserted.first->second;
     // TODO(primiano): make TraceBuffer::kBufferPageSize dynamic.
     const size_t buf_size = buffer_cfg.size_kb() * 1024u;
-    total_buf_size_kb += buf_size;
+    total_buf_size_kb += buffer_cfg.size_kb();
     if (!trace_buffer.Create(buf_size)) {
       did_allocate_all_buffers = false;
       break;
@@ -220,9 +220,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
-               cfg.data_sources().size(), cfg.duration_ms(),
-               cfg.buffers_size() / 1024, total_buf_size_kb,
-               tracing_sessions_.size());
+               cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
+               total_buf_size_kb, tracing_sessions_.size());
 }
 
 // DisableTracing just stops the data sources but doesn't free up any buffer.
