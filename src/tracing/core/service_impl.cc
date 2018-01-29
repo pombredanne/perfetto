@@ -220,8 +220,9 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
 
   PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
-               cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
-               total_buf_size_kb, tracing_sessions_.size());
+               cfg.data_sources().size(), cfg.duration_ms(),
+               cfg.buffers_size() / 1024, total_buf_size_kb,
+               tracing_sessions_.size());
 }
 
 // DisableTracing just stops the data sources but doesn't free up any buffer.
