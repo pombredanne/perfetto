@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("../../perfetto.gni")
-
 declare_args() {
   # Address Sanitizer: memory bugs (e.g., UAF).
   is_asan = false
@@ -29,6 +27,9 @@ declare_args() {
 
   # Undefined Behaviour Sanitizer.
   is_ubsan = false
+
+  # # Compile for fuzzing with LLVM LibFuzzer.
+  use_libfuzzer = false
 }
 
 declare_args() {
