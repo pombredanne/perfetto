@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import("../../perfetto.gni")
+
 declare_args() {
   # Address Sanitizer: memory bugs (e.g., UAF).
   is_asan = false
@@ -30,7 +32,8 @@ declare_args() {
 }
 
 declare_args() {
-  using_sanitizer = is_asan || is_lsan || is_tsan || is_msan || is_ubsan
+  using_sanitizer =
+      is_asan || is_lsan || is_tsan || is_msan || is_ubsan || use_libfuzzer
 }
 
 assert(!using_sanitizer || is_clang, "is_*san requires is_clang=true'")
