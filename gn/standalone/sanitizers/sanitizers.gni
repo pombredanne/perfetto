@@ -16,8 +16,6 @@ import("//gn/standalone/android.gni")
 import("//gn/standalone/sanitizers/vars.gni")
 import("//gn/standalone/toolchain/llvm.gni")
 
-import("../../perfetto.gni")
-
 declare_args() {
   sanitizer_lib_base_name_ = ""
   if (is_asan || is_tsan || is_ubsan) {
