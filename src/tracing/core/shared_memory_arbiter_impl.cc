@@ -59,7 +59,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     size_t size_hint) {
   PERFETTO_DCHECK(size_hint == 0);  // Not implemented yet.
   int stall_count = 0;
-  const useconds_t kStallIntervalUs = 10000;
+  const useconds_t kStallIntervalUs = 100000;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
