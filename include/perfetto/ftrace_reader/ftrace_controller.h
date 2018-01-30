@@ -19,8 +19,10 @@
 
 #include <unistd.h>
 
+#include <condition_variable>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,6 +42,7 @@ class FtraceEventBundle;
 }  // namespace protos
 
 const size_t kMaxSinks = 32;
+const size_t kMaxCpus = 64;
 
 class FtraceController;
 class ProtoTranslationTable;
@@ -135,10 +138,9 @@ class FtraceController {
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
 
-  // Called to read  data from the raw pipe
-  // for the given |cpu|. Kicks off the reading/parsing
-  // of the pipe. Returns true if there is probably more to read.
-  // Protected and virtual for testing.
+  // Called to read data from the raw pipe for the given |cpu|. Kicks off the
+  // reading/parsing of the pipe. Returns true if there is probably more to
+  // read. Protected and virtual for testing.
   virtual bool OnRawFtraceDataAvailable(size_t cpu);
 
  private:
@@ -148,9 +150,7 @@ class FtraceController {
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
-  static void PeriodicDrainCPU(base::WeakPtr<FtraceController>,
-                               size_t generation,
-                               int cpu);
+  static void DrainCPUs(base::WeakPtr<FtraceController>, size_t generation);
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
@@ -163,9 +163,13 @@ class FtraceController {
   void StartIfNeeded();
   void StopIfNeeded();
 
-  // Returns a cached CpuReader for |cpu|.
-  // CpuReaders are constructed lazily and owned by the controller.
-  CpuReader* GetCpuReader(size_t cpu);
+  OnDataAvailable(base::WeakPtr<FtraceContoller>,
+                  size_t generation,
+                  size_t cpu);
+
+  std::mutex reader_lock_;
+  std::condition_variable data_drained_;
+  std::bitset<kMaxCpus> cpus_to_drain_;
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   size_t generation_ = 0;

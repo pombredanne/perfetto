@@ -73,6 +73,12 @@ bool RunAtrace(std::vector<std::string> args) {
   return status == 0;
 }
 
+int64_t NowMs() {
+  timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (now.tv_sec * 1000000000L + now.tv_nsec) / 1000000L;
+}
+
 }  // namespace
 
 // static
@@ -118,10 +124,8 @@ FtraceController::~FtraceController() {
 }
 
 // static
-void FtraceController::PeriodicDrainCPU(
-    base::WeakPtr<FtraceController> weak_this,
-    size_t generation,
-    int cpu) {
+void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
+                                 size_t generation) {
   // The controller might be gone.
   if (!weak_this)
     return;
@@ -133,11 +137,24 @@ void FtraceController::PeriodicDrainCPU(
   if (weak_this->generation_ != generation)
     return;
 
-  bool has_more = weak_this->OnRawFtraceDataAvailable(cpu);
-  weak_this->task_runner_->PostDelayedTask(
-      std::bind(&FtraceController::PeriodicDrainCPU, weak_this, generation,
-                cpu),
-      has_more ? 0 : kDrainPeriodMs);
+  std::bitset<kMaxCpus> cpus_to_drain;
+  {
+    std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
+    std::swap(cpus_to_drain, weak_this->cpus_to_drain_);
+  }
+
+  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
+    if (!cpus_to_drain[cpu])
+      continue;
+    weak_this->OnRawFtraceDataAvailable(cpu);
+  }
+
+  {
+    // Unblock all waiting readers to start moving more data into their
+    // respective staging pipes.
+    std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
+    weak_this->data_drained_.notify_all();
+  }
 }
 
 void FtraceController::StartIfNeeded() {
@@ -149,10 +166,11 @@ void FtraceController::StartIfNeeded() {
   ftrace_procfs_->EnableTracing();
   generation_++;
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
-    base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
-                                            weak_this, generation_, cpu),
-                                  kDrainPeriodMs);
+    readers_.emplace(
+        cpu, std::unique_ptr<CpuReader>(new CpuReader(
+                 table_.get(), cpu, ftrace_procfs_->OpenPipeForCpu(cpu),
+                 std::bind(&FtraceController::OnDataAvailable, this, weak_this,
+                           generation_, cpu))));
   }
 }
 
@@ -173,12 +191,19 @@ void FtraceController::StopIfNeeded() {
     return;
   PERFETTO_CHECK(listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = false;
+  {
+    // Unblock any readers that are waiting for us to drain data.
+    std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
+    cpus_to_drain_.reset();
+    data_drained_.notify_all();
+  }
   readers_.clear();
   ftrace_procfs_->DisableTracing();
 }
 
-bool FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
-  CpuReader* reader = GetCpuReader(cpu);
+void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
+  PERFETTO_CHECK(cpu < ftrace_procfs_->NumberOfCpus());
+  CpuReader* reader = readers_[cpu].get();
   using BundleHandle =
       protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
   std::array<const EventFilter*, kMaxSinks> filters{};
@@ -189,22 +214,11 @@ bool FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
     filters[i] = sink->get_event_filter();
     bundles[i++] = sink->GetBundleForCpu(cpu);
   }
-  bool res = reader->Drain(filters, bundles);
+  reader->Drain(filters, bundles);
   i = 0;
   for (FtraceSink* sink : sinks_)
     sink->OnBundleComplete(cpu, std::move(bundles[i++]));
   PERFETTO_DCHECK(sinks_.size() == sink_count);
-  return res;
-}
-
-CpuReader* FtraceController::GetCpuReader(size_t cpu) {
-  PERFETTO_CHECK(cpu < ftrace_procfs_->NumberOfCpus());
-  if (!readers_.count(cpu)) {
-    readers_.emplace(
-        cpu, std::unique_ptr<CpuReader>(new CpuReader(
-                 table_.get(), cpu, ftrace_procfs_->OpenPipeForCpu(cpu))));
-  }
-  return readers_.at(cpu).get();
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
@@ -221,6 +235,28 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
                      std::move(filter), delegate));
   Register(sink.get());
   return sink;
+}
+
+void FtraceController
+    : OnDataAvailable(base::WeakPtr<FtraceContoller> weak_this,
+                      size_t generation,
+                      size_t cpu) {
+  PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
+  std::unique_lock<std::mutex> lock(reader_lock_);
+  if (cpus_to_drain_.none()) {
+    // If this was the first CPU to wake up, schedule a drain for the next drain
+    // interval.
+    uint64_t delay_ms = NowMs() % kDrainPeriodMs;
+    task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
+                                            weak_this, generation, cpu),
+                                  static_cast<int>(delay_ms));
+  }
+  cpus_to_drain_[cpu] = true;
+
+  // Wait until the main thread has finished draining.
+  // TODO(skyostil): The threads waiting here will all try to grab reader_lock_
+  // when woken up. Find a way to avoid this.
+  data_drained_.wait(lock, [this] { return !cpus_to_drain_[cpu]; });
 }
 
 void FtraceController::Register(FtraceSink* sink) {
