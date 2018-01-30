@@ -55,7 +55,7 @@ namespace perfetto {
 namespace {
 
 // Temporary directory for DropBox traces. Note that this is automatically
-// created by the system.
+// created by the system by setting setprop persist.traced.enable=1.
 const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
 const char kDefaultDropBoxTag[] = "perfetto";
 
@@ -267,6 +267,7 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   consumer_endpoint_->FreeBuffers();
   task_runner_.Quit();
 
+  fflush(*trace_out_stream_);
   long bytes_written = ftell(*trace_out_stream_);
   if (!dropbox_tag_.empty()) {
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
@@ -274,9 +275,9 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
         new android::os::DropBoxManager();
     fseek(*trace_out_stream_, 0, SEEK_SET);
     // DropBox takes ownership of the file descriptor, so give it a duplicate.
-    int fd = dup(fileno(*trace_out_stream_));
+    base::ScopedFile fd(dup(fileno(*trace_out_stream_)));
     android::binder::Status status = dropbox->addFile(
-        android::String16(dropbox_tag_.c_str()), fd, 0 /* flags */);
+        android::String16(dropbox_tag_.c_str()), fd.release(), 0 /* flags */);
     if (!status.isOk()) {
       PERFETTO_ELOG("DropBox upload failed: %s", status.toString8().c_str());
       return;
@@ -299,6 +300,8 @@ bool PerfettoCmd::OpenOutputFile() {
   if (!dropbox_tag_.empty()) {
     // If we are tracing to DropBox, there's no need to make a
     // filesystem-visible temporary file.
+    // TODO(skyostil): Fall back to mkstemp() + open() + unlink() for older
+    // devices.
     fd.reset(open(kTempDropBoxTraceDir, O_TMPFILE | O_RDWR, 0600));
     if (!fd) {
       PERFETTO_ELOG("Could not create a temporary trace file in %s",
