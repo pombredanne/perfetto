@@ -148,12 +148,6 @@ function LoadGerritCLs() {
   xhr.send();
 }
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('/sw.js');
-  });
-}
-
 GetColumnIndexes();
 CreateRowForBranch('master', REPO_URL, '*** master branch ***', 'MASTER', '', '');
 LoadGerritCLs();
