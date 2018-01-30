@@ -26,7 +26,8 @@ def Main():
   args = parser.parse_args()
 
   root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-  emulator_root = os.path.join(root_dir, 'buildtools', 'emulator', 'linux-x86_64')
+  emulator_root = os.path.join(
+    root_dir, 'buildtools', 'emulator', 'linux-x86_64')
   emulator_path = os.path.join(emulator_root, 'qemu', 'linux-x86_64')
   aosp_path = os.path.join(root_dir, 'buildtools', 'aosp-x64')
 
@@ -34,7 +35,7 @@ def Main():
       # Travis CI doesn't set this and causes the emulator to fallback in
       # 32-bit mode with a "Cannot decide host bitness because $SHELL" error.
       'SHELL': '/bin/bash',
-      'DYLD_LIBRARY_PATH': os.path.join(emulator_root, 'lib64', 'qt', 'lib'),
+      'LD_LIBRARY_PATH': os.path.join(emulator_root, 'lib64', 'qt', 'lib'),
   }
   emulator_bin = os.path.join(emulator_path, 'qemu-system-x86_64')
   emulator_args = ['-no-window', '-no-snapshot',  '-gpu', 'off',
