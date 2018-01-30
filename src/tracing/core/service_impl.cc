@@ -147,11 +147,12 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // in a state where it stalls by design by having more TraceWriterImpl
   // instances than free pages in the buffer. This is a very fragile heuristic
   // though, because this assumes that each tracing session creates at most one
-  // data source instance in each Producer, and each data source has only
+  // data source instance in each Producer, and each data source has only one
   // TraceWriter.
   if (tracing_sessions_.size() >= kDefaultShmSize / kBufferPageSize / 2) {
     PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
                   tracing_sessions_.size());
+    // TODO(primiano): make this a bool and return failure to the IPC layer.
     return;
   }
 

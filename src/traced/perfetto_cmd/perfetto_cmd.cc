@@ -250,7 +250,7 @@ void PerfettoCmd::OnStopTraceTimer() {
 }
 
 void PerfettoCmd::OnTimeout() {
-  PERFETTO_LOG("Timed out while waiting for trace form the service, aborting.");
+  PERFETTO_ELOG("Timed out while waiting for trace from the service, aborting");
   task_runner_.Quit();
 }
 
