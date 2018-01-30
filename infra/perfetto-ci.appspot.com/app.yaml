@@ -24,9 +24,9 @@ handlers:
   upload: static/index.html
   secure: always
   redirect_http_response_code: 301
-- url: /sw.js
-  static_files: static/sw.js
-  upload: static/sw.js
+- url: /service_worker.js
+  static_files: static/service_worker.js
+  upload: static/service_worker.js
   secure: always
   redirect_http_response_code: 301
 - url: /static/

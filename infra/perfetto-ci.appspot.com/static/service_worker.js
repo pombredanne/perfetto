@@ -38,13 +38,9 @@ async function FetchAndCacheIfJob(event) {
 
   // Extract the JSON from the response.
   const json = await response.clone().json();
-  let jobState = json.state;
-  if (json.state == 'finished' && json.result !== 0)
-    jobState = 'errored';
-
-  if (jobState != 'errored' && jobState != 'cancelled' 
-      && jobState != 'finished')
-    return response
+  if (json.state != 'cancelled' && json.state != 'finished') {
+    return response;
+  }
 
   var responseToCache = response.clone();
   caches.open(CACHE_NAME)

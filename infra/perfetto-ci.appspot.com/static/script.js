@@ -147,7 +147,7 @@ function LoadGerritCLs() {
 
 // Register the service worker to cache job requests.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js', { scope: '/' });
+  navigator.serviceWorker.register('/service_worker.js', { scope: '/' });
 }
 
 // Fetch the CLs and the corresponding status for the Travis jobs.
