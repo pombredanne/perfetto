@@ -38,33 +38,33 @@ function GetTravisStatusForJob(jobId, div) {
   fetch('https://api.travis-ci.org/jobs/' + jobId)
     .then(response => {
       if (response.status != 200)
-        return response;
-
-      return response.json().then(resp => {
-        let jobName = resp.config.env.split(' ')[0];
-        if (jobName.startsWith('CFG='))
-          jobName = jobName.substring(4);
-        if (!(jobName in botIndex))
-          return;
-        let link = document.createElement('a');
-        link.href = 'https://travis-ci.org/' + REPO + '/jobs/' + jobId;
-        link.title = resp.state + ' [' + jobName + ']';
-        let jobState = resp.state;
-        if (resp.state == 'finished' && resp.result !== 0)
-          jobState = 'errored';
-        link.classList.add(jobState);
-        if (jobState == 'finished')
-          link.innerHTML = '<i class="material-icons">check_circle</i>';
-        else if (jobState == 'created')
-          link.innerHTML = '<i class="material-icons">autorenew</i>';
-        else if (jobState == 'errored' || jobState == 'cancelled')
-          link.innerHTML = '<i class="material-icons">bug_report</i>';
-        else
-          link.innerHTML = '<i class="material-icons">hourglass_full</i>';
-        let td = div.children[botIndex[jobName]];
-        td.innerHTML = '';
-        td.appendChild(link);
-      });
+        throw 'Unable to make request to Travis';
+      return response.json();
+    })
+    .then(resp => {
+      let jobName = resp.config.env.split(' ')[0];
+      if (jobName.startsWith('CFG='))
+        jobName = jobName.substring(4);
+      if (!(jobName in botIndex))
+        return;
+      let link = document.createElement('a');
+      link.href = 'https://travis-ci.org/' + REPO + '/jobs/' + jobId;
+      link.title = resp.state + ' [' + jobName + ']';
+      let jobState = resp.state;
+      if (resp.state == 'finished' && resp.result !== 0)
+        jobState = 'errored';
+      link.classList.add(jobState);
+      if (jobState == 'finished')
+        link.innerHTML = '<i class="material-icons">check_circle</i>';
+      else if (jobState == 'created')
+        link.innerHTML = '<i class="material-icons">autorenew</i>';
+      else if (jobState == 'errored' || jobState == 'cancelled')
+        link.innerHTML = '<i class="material-icons">bug_report</i>';
+      else
+        link.innerHTML = '<i class="material-icons">hourglass_full</i>';
+      let td = div.children[botIndex[jobName]];
+      td.innerHTML = '';
+      td.appendChild(link);
     });
 }
 
@@ -72,12 +72,12 @@ function GetTravisStatusForBranch(branch, div) {
   fetch('https://api.travis-ci.org/repos/' + REPO + '/branches/' + branch)
     .then(response => {
       if (response.status != 200)
-        return;
-
-      return response.json().then(resp => {
-        for (const jobId of resp.branch.job_ids)
-          GetTravisStatusForJob(jobId, div);
-      });
+        throw 'Unable to make request to Travis';
+      return response.json()
+    })
+    .then(resp => {
+      for (const jobId of resp.branch.job_ids)
+        GetTravisStatusForJob(jobId, div);
     });
 }
 
@@ -118,30 +118,31 @@ function LoadGerritCLs() {
   fetch(CHANGES_URL)
     .then(response => {
       if (response.status != 200)
-        return;
-      return response.text().then(text => {
-        let json;
-        if (text.startsWith(')]}\''))
-          json = text.substring(4);
+        throw 'Unable to make request to Travis';
+      return response.json();
+    })
+    .then(text => {
+      let json;
+      if (text.startsWith(')]}\''))
+        json = text.substring(4);
+      else
+        json = text;
+      let resp = JSON.parse(json);
+      for (const cl of resp) {
+        const branch = 'changes/' + cl._number;
+        const href = GERRIT_REVIEW_URL + '/+/' + cl._number;;
+        const lastUpdate = new Date(cl.updated + ' UTC');
+        const lastUpdateMins = Math.ceil((Date.now() - lastUpdate) / 60000);
+        let lastUpdateText = '';
+        if (lastUpdateMins < 60)
+          lastUpdateText = lastUpdateMins + ' mins ago';
+        else if (lastUpdateMins < 60 * 24)
+          lastUpdateText = Math.ceil(lastUpdateMins / 60) + ' hours ago';
         else
-          json = text;
-        let resp = JSON.parse(json);
-        for (const cl of resp) {
-          const branch = 'changes/' + cl._number;
-          const href = GERRIT_REVIEW_URL + '/+/' + cl._number;;
-          const lastUpdate = new Date(cl.updated + ' UTC');
-          const lastUpdateMins = Math.ceil((Date.now() - lastUpdate) / 60000);
-          let lastUpdateText = '';
-          if (lastUpdateMins < 60)
-            lastUpdateText = lastUpdateMins + ' mins ago';
-          else if (lastUpdateMins < 60 * 24)
-            lastUpdateText = Math.ceil(lastUpdateMins / 60) + ' hours ago';
-          else
-            lastUpdateText = lastUpdate.toLocaleDateString();
-          CreateRowForBranch(branch, href, cl.subject, cl.status,
-              cl.owner.email.replace('@google.com', '@'), lastUpdateText);
-        }
-      });
+          lastUpdateText = lastUpdate.toLocaleDateString();
+        CreateRowForBranch(branch, href, cl.subject, cl.status,
+            cl.owner.email.replace('@google.com', '@'), lastUpdateText);
+      }
     });
 }
 
