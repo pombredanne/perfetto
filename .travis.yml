@@ -148,7 +148,7 @@ script:
       done
     else
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
-      tools/run_android_emulator $TARGET_ARCH --pid /tmp/emulator.pid -v &
+      tools/run_android_emulator --pid /tmp/emulator.pid -v &
       for TEST_TARGET in $TEST_TARGETS; do
         tools/run_android_test out/dist "$TEST_TARGET"
       done
