@@ -159,13 +159,6 @@ TEST_DEPS_ANDROID = [
    'linux2'
   ),
 
-  # Android emulator binaries.
-  ('buildtools/emulator',
-   'https://android.googlesource.com/platform/prebuilts/android-emulator.git',
-   '4b260028dc27bc92c39bee9129cb2ba839970956',
-   'all'
-  ),
-
   # platform-tools.zip contains adb binaries.
   ('buildtools/android_sdk/platform-tools.zip',
    'https://dl.google.com/android/repository/platform-tools_r26.0.0-darwin.zip',
@@ -176,6 +169,13 @@ TEST_DEPS_ANDROID = [
    'https://dl.google.com/android/repository/platform-tools_r26.0.0-linux.zip',
    '00de8a6631405b617c10f68cd11ff2e1cd528e23',
    'linux2'
+  ),
+
+  # Android emulator binaries.
+  ('buildtools/emulator',
+   'https://android.googlesource.com/platform/prebuilts/android-emulator.git',
+   '4b260028dc27bc92c39bee9129cb2ba839970956',
+   'all'
   ),
 ]
 
@@ -238,8 +238,7 @@ def Main():
   args = parser.parse_args()
   deps = BUILD_DEPS_HOST
   if not args.no_android:
-    # Test deps require more space so download/extract them first.
-    deps += TEST_DEPS_ANDROID + BUILD_DEPS_ANDROID
+    deps += BUILD_DEPS_ANDROID + TEST_DEPS_ANDROID
   for rel_path, url, expected_sha1, platform in deps:
     if (platform != 'all' and platform != sys.platform):
       continue
