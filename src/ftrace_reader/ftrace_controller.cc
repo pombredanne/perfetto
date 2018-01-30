@@ -73,7 +73,7 @@ bool RunAtrace(std::vector<std::string> args) {
   return status == 0;
 }
 
-int64_t NowMs() {
+uint64_t NowMs() {
   timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
   return (now.tv_sec * 1000000000L + now.tv_nsec) / 1000000L;
@@ -143,7 +143,7 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
     std::swap(cpus_to_drain, weak_this->cpus_to_drain_);
   }
 
-  for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
+  for (size_t cpu = 0; cpu < weak_this->ftrace_procfs_->NumberOfCpus(); cpu++) {
     if (!cpus_to_drain[cpu])
       continue;
     weak_this->OnRawFtraceDataAvailable(cpu);
@@ -165,6 +165,7 @@ void FtraceController::StartIfNeeded() {
   listening_for_raw_trace_data_ = true;
   ftrace_procfs_->EnableTracing();
   generation_++;
+  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
     readers_.emplace(
         cpu, std::unique_ptr<CpuReader>(new CpuReader(
@@ -193,7 +194,7 @@ void FtraceController::StopIfNeeded() {
   listening_for_raw_trace_data_ = false;
   {
     // Unblock any readers that are waiting for us to drain data.
-    std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
+    std::unique_lock<std::mutex> lock(reader_lock_);
     cpus_to_drain_.reset();
     data_drained_.notify_all();
   }
@@ -237,26 +238,26 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
   return sink;
 }
 
-void FtraceController
-    : OnDataAvailable(base::WeakPtr<FtraceContoller> weak_this,
-                      size_t generation,
-                      size_t cpu) {
+void FtraceController::OnDataAvailable(
+    base::WeakPtr<FtraceController> weak_this,
+    size_t generation,
+    size_t cpu) {
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
   std::unique_lock<std::mutex> lock(reader_lock_);
   if (cpus_to_drain_.none()) {
     // If this was the first CPU to wake up, schedule a drain for the next drain
     // interval.
     uint64_t delay_ms = NowMs() % kDrainPeriodMs;
-    task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
-                                            weak_this, generation, cpu),
-                                  static_cast<int>(delay_ms));
+    task_runner_->PostDelayedTask(
+        std::bind(&FtraceController::DrainCPUs, weak_this, generation),
+        static_cast<int>(delay_ms));
   }
   cpus_to_drain_[cpu] = true;
 
   // Wait until the main thread has finished draining.
   // TODO(skyostil): The threads waiting here will all try to grab reader_lock_
   // when woken up. Find a way to avoid this.
-  data_drained_.wait(lock, [this] { return !cpus_to_drain_[cpu]; });
+  data_drained_.wait(lock, [this, cpu] { return !cpus_to_drain_[cpu]; });
 }
 
 void FtraceController::Register(FtraceSink* sink) {

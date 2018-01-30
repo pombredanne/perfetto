@@ -19,6 +19,7 @@
 
 #include <unistd.h>
 
+#include <bitset>
 #include <condition_variable>
 #include <map>
 #include <memory>
@@ -138,10 +139,9 @@ class FtraceController {
                    base::TaskRunner*,
                    std::unique_ptr<ProtoTranslationTable>);
 
-  // Called to read data from the raw pipe for the given |cpu|. Kicks off the
-  // reading/parsing of the pipe. Returns true if there is probably more to
-  // read. Protected and virtual for testing.
-  virtual bool OnRawFtraceDataAvailable(size_t cpu);
+  // Called to read data from the staging pipe for the given |cpu| and parse it
+  // into the sinks. Protected and virtual for testing.
+  virtual void OnRawFtraceDataAvailable(size_t cpu);
 
  private:
   friend FtraceSink;
@@ -163,9 +163,9 @@ class FtraceController {
   void StartIfNeeded();
   void StopIfNeeded();
 
-  OnDataAvailable(base::WeakPtr<FtraceContoller>,
-                  size_t generation,
-                  size_t cpu);
+  void OnDataAvailable(base::WeakPtr<FtraceController>,
+                       size_t generation,
+                       size_t cpu);
 
   std::mutex reader_lock_;
   std::condition_variable data_drained_;

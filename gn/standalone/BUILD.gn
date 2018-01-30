@@ -44,7 +44,7 @@ config("no_rtti") {
 }
 
 config("visibility_hidden") {
-  cflags = [ "-fvisibility=hidden" ]
+  #cflags = [ "-fvisibility=hidden" ]
 }
 
 config("default") {

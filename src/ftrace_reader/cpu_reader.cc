@@ -16,6 +16,8 @@
 
 #include "cpu_reader.h"
 
+#include <signal.h>
+
 #include <utility>
 
 #include "perfetto/base/logging.h"
@@ -113,8 +115,16 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
 
+  // Make reads from the raw pipe blocking so that splice() can sleep.
+  SetBlocking(*trace_fd_, true);
+
   // Reads from the staging pipe are always non-blocking.
   SetBlocking(*staging_read_fd_, false);
+
+  // Note: O_NONBLOCK seems to be ignored by splice() on the target pipe. The
+  // blocking vs non-blocking behavior is controlled solely by the
+  // SPLICE_F_NONBLOCK flag passed to splice().
+  SetBlocking(*staging_write_fd_, false);
 
   // We need a non-default SIGPIPE handler to make it so that the blocking
   // splice() is woken up when the ~CpuReader() dtor destroys the pipes.
@@ -136,7 +146,7 @@ CpuReader::~CpuReader() {
   // exit.
   staging_read_fd_.reset();
   staging_write_fd_.reset();
-  trace_pipe_raw_.reset();
+  trace_fd_.reset();
   // Not strictly required, but let's also raise the pipe signal explicitly just
   // to be safe.
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
@@ -193,7 +203,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     long bytes =
         PERFETTO_EINTR(read(*staging_read_fd_, buffer, base::kPageSize));
     if (bytes == -1 && errno == EAGAIN)
-      return false;
+      return true;
     PERFETTO_CHECK(static_cast<size_t>(bytes) == base::kPageSize);
 
     size_t evt_size = 0;
@@ -204,7 +214,6 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
       PERFETTO_DCHECK(evt_size);
     }
   }
-  return true;
 }
 
 uint8_t* CpuReader::GetBuffer() {

@@ -22,6 +22,7 @@
 
 #include <array>
 #include <memory>
+#include <thread>
 
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/scoped_file.h"
