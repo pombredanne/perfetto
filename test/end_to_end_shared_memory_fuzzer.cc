@@ -139,9 +139,6 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4);
-  // TODO(fmayer): Figure out why this has to be set to non-zero.
-  // If this is set to 0, there are errors for failing to reach
-  // the "no.more.packets" checkpoint.
   trace_config.set_duration_ms(10);
 
   // Create the buffer for ftrace.
