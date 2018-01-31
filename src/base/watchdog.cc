@@ -24,7 +24,7 @@
 namespace perfetto {
 namespace base {
 
-WatchDog::WatchDog(int64_t millisecs) {
+WatchDog::WatchDog(time_t millisecs) {
   struct sigevent sev;
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_signo = SIGABRT;
