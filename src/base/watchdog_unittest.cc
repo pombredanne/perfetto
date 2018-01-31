@@ -28,20 +28,14 @@ TEST(WatchDogTest, Crash) {
   EXPECT_DEATH(
       {
         WatchDog watchdog(1);
-        timespec spec;
-        spec.tv_sec = 0;
-        spec.tv_nsec = 20;
-        nanosleep(&spec, nullptr);
+        usleep(5000);
       },
       "");
 }
 
 TEST(WatchDogTest, NoCrash) {
   WatchDog watchdog(100000);
-  timespec spec;
-  spec.tv_sec = 0;
-  spec.tv_nsec = 20;
-  nanosleep(&spec, nullptr);
+  usleep(5000);
 }
 
 }  // namespace
