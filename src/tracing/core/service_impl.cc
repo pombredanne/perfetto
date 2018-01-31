@@ -38,8 +38,6 @@
 
 namespace perfetto {
 
-// TODO(fmayer): add ThreadChecker everywhere.
-
 using protozero::proto_utils::ParseVarInt;
 
 namespace {
@@ -535,6 +533,7 @@ void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
 
 base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>
 ServiceImpl::ConsumerEndpointImpl::GetWeakPtr() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   return weak_ptr_factory_.GetWeakPtr();
 }
 
