@@ -78,6 +78,7 @@ using protos::FtraceEvent;
 using protos::FtraceEventBundle;
 using protos::PrintFtraceEvent;
 using protos::SchedSwitchFtraceEvent;
+using protos::SchedWakeupFtraceEvent;
 using protos::CpuFrequencyFtraceEvent;
 using protos::CpuFrequencyLimitsFtraceEvent;
 using protos::CpuIdleFtraceEvent;
@@ -158,6 +159,16 @@ std::string FormatSchedSwitch(const SchedSwitchFtraceEvent& sched_switch) {
   return std::string(line);
 }
 
+std::string FormatSchedWakeup(const SchedWakeupFtraceEvent& sched_wakeup) {
+  char line[2048];
+  sprintf(line,
+          "sched_wakeup: comm=%s "
+          "pid=%d prio=%d success=%d target_cpu=%03d\\n",
+          sched_wakeup.comm().c_str(), sched_wakeup.pid(), sched_wakeup.prio(),
+          sched_wakeup.success(), sched_wakeup.target_cpu());
+  return std::string(line);
+}
+
 std::string FormatPrint(const PrintFtraceEvent& print) {
   char line[2048];
   std::string msg = print.buf();
@@ -215,6 +226,8 @@ std::string FormatClockDisable(const ClockDisableFtraceEvent& event) {
           event.cpu_id());
   return std::string(line);
 }
+
+// End of Format Functions
 
 int TraceToText(std::istream* input, std::ostream* output) {
   DiskSourceTree dst;

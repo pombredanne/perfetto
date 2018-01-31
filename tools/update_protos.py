@@ -120,7 +120,8 @@ def main():
 
   if update_build_files:
     names = sorted(os.listdir(output_dir))
-    names = [name for name in names if name.endswith('.proto')]
+    names = [name for name in names if name.endswith('.proto') and not
+        name.startswith('ftrace')]
     names = ''.join(['  "{}",\n'.format(name) for name in names])
     body = 'ftrace_proto_names = [\n{}]'.format(names)
     with open(os.path.join(output_dir, 'all_protos.gni'), 'wb') as f:
@@ -132,4 +133,3 @@ def main():
 
 if __name__ == '__main__':
   sys.exit(main())
-
