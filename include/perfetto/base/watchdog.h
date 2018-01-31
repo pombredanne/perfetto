@@ -29,7 +29,7 @@ namespace base {
  */
 class WatchDog {
  public:
-  explicit WatchDog(int64_t millisecs);
+  explicit WatchDog(time_t millisecs);
   ~WatchDog();
 
   WatchDog(const WatchDog&) = delete;
