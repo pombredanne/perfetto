@@ -153,9 +153,9 @@ BUILD_DEPS_ANDROID = [
 # Dependencies required to run Android tests.
 TEST_DEPS_ANDROID = [
   # Android emulator images.
-  ('buildtools/aosp-x64.zip',
-   'https://storage.googleapis.com/perfetto/aosp-25012018-x64.zip',
-   '12ec778dac161ff31f41f1b991fd19fe7da00db7',
+  ('buildtools/aosp-arm.zip',
+   'https://storage.googleapis.com/perfetto/aosp-31012018-arm.zip',
+   'a19b7b681aa2b1a9c9c0d534e7ee7a0d9e2b6fe9',
    'linux2'
   ),
 

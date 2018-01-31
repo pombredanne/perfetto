@@ -29,7 +29,7 @@ def Main():
   emulator_root = os.path.join(
     root_dir, 'buildtools', 'emulator', 'linux-x86_64')
   emulator_path = os.path.join(emulator_root, 'qemu', 'linux-x86_64')
-  aosp_path = os.path.join(root_dir, 'buildtools', 'aosp-x64')
+  aosp_path = os.path.join(root_dir, 'buildtools', 'aosp-arm')
 
   env = {
       # Travis CI doesn't set this and causes the emulator to fallback in
@@ -37,8 +37,8 @@ def Main():
       'SHELL': '/bin/bash',
       'LD_LIBRARY_PATH': os.path.join(emulator_root, 'lib64', 'qt', 'lib'),
   }
-  emulator_bin = os.path.join(emulator_path, 'qemu-system-x86_64')
-  emulator_args = ['-no-window', '-no-snapshot',  '-gpu', 'off',
+  emulator_bin = os.path.join(emulator_path, 'qemu-system-armel')
+  emulator_args = ['-no-window', '-no-snapshot',  '-gpu', 'off', '-no-accel',
                    '-sysdir', aosp_path,
                    '-system', os.path.join(aosp_path, 'system-qemu.img'),
                    '-kernel', os.path.join(aosp_path, 'kernel-ranchu'),
