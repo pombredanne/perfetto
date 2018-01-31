@@ -24,7 +24,7 @@ namespace base {
 WatchDog::WatchDog(int64_t nanosecs) {
   struct sigevent sev;
   sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = SIGTERM;
+  sev.sigev_signo = SIGABRT;
   sev.sigev_value.sival_ptr = &timerid_;
   PERFETTO_CHECK(timer_create(CLOCK_REALTIME, &sev, &timerid_) != -1);
   struct itimerspec its;
@@ -35,6 +35,10 @@ WatchDog::WatchDog(int64_t nanosecs) {
 
 WatchDog::~WatchDog() {
   timer_delete(timerid_);
+  sigset_t set;
+  PERFETTO_CHECK(sigpending(&set) == 0);
+  // Crash if we have a pending SIGABRT.
+  PERFETTO_CHECK(!sigismember(&set, SIGABRT));
 }
 
 }  // namespace base
