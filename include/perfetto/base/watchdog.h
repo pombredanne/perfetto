@@ -17,17 +17,23 @@
 #ifndef INCLUDE_PERFETTO_BASE_WATCHDOG_H_
 #define INCLUDE_PERFETTO_BASE_WATCHDOG_H_
 
-#include <signal.h>
 #include <stdint.h>
 #include <time.h>
 
 namespace perfetto {
 namespace base {
 
+/* WatchDog crashes the calling program using SIGABRT if it does
+ * not go out of scope within the number of milliseconds passed
+ * to the constructor.
+ */
 class WatchDog {
  public:
-  WatchDog(int64_t nanosecs);
+  explicit WatchDog(int64_t millisecs);
   ~WatchDog();
+
+  WatchDog(const WatchDog&) = delete;
+  WatchDog& operator=(const WatchDog&) = delete;
 
  private:
   timer_t timerid_;

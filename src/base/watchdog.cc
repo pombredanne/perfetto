@@ -18,18 +18,21 @@
 
 #include "perfetto/base/logging.h"
 
+#include <signal.h>
+#include <stdint.h>
+
 namespace perfetto {
 namespace base {
 
-WatchDog::WatchDog(int64_t nanosecs) {
+WatchDog::WatchDog(int64_t millisecs) {
   struct sigevent sev;
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_signo = SIGABRT;
   sev.sigev_value.sival_ptr = &timerid_;
   PERFETTO_CHECK(timer_create(CLOCK_REALTIME, &sev, &timerid_) != -1);
   struct itimerspec its;
-  its.it_value.tv_sec = nanosecs / 1000000000;
-  its.it_value.tv_nsec = nanosecs % 1000000000;
+  its.it_value.tv_sec = millisecs / 1000;
+  its.it_value.tv_nsec = 1000000 * (millisecs % 1000);
   its.it_interval.tv_sec = 0;
   its.it_interval.tv_nsec = 0;
   PERFETTO_CHECK(timer_settime(timerid_, 0, &its, nullptr) != -1);

@@ -141,13 +141,13 @@ void UnixTaskRunner::RunImmediateAndDelayedTask() {
 
   errno = 0;
   if (immediate_task) {
-    base::WatchDog w(kWatchdogNanos);
+    base::WatchDog w(kWatchdogMillis);
     immediate_task();
   }
 
   errno = 0;
   if (delayed_task) {
-    base::WatchDog w(kWatchdogNanos);
+    base::WatchDog w(kWatchdogMillis);
     delayed_task();
   }
 }
@@ -201,7 +201,7 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     task = it->second.callback;
   }
   errno = 0;
-  base::WatchDog w(kWatchdogNanos);
+  base::WatchDog w(kWatchdogMillis);
   task();
 }
 

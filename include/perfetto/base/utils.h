@@ -34,7 +34,7 @@ namespace perfetto {
 namespace base {
 
 constexpr size_t kPageSize = 4096;
-constexpr int64_t kWatchdogNanos = 30000000000;  // 30s
+constexpr int64_t kWatchdogMillis = 30000;  // 30s
 
 template <typename T>
 constexpr size_t ArraySize(const T& array) {

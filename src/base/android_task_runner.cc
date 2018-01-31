@@ -115,7 +115,7 @@ void AndroidTaskRunner::RunImmediateTask() {
   if (has_next)
     ScheduleImmediateWakeUp();
   errno = 0;
-  base::WatchDog w(kWatchdogNanos);
+  base::WatchDog w(kWatchdogMillis);
   immediate_task();
 }
 
@@ -142,7 +142,7 @@ void AndroidTaskRunner::RunDelayedTask() {
   if (next_wake_up)
     ScheduleDelayedWakeUp(next_wake_up);
   errno = 0;
-  base::WatchDog w(kWatchdogNanos);
+  base::WatchDog w(kWatchdogMillis);
   delayed_task();
 }
 
@@ -225,7 +225,7 @@ bool AndroidTaskRunner::OnFileDescriptorEvent(int signalled_fd, int events) {
     task = it->second;
   }
   errno = 0;
-  base::WatchDog w(kWatchdogNanos);
+  base::WatchDog w(kWatchdogMillis);
   task();
   return true;
 }
