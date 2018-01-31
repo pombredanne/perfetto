@@ -38,6 +38,7 @@ WatchDog::~WatchDog() {
   sigset_t set;
   PERFETTO_CHECK(sigpending(&set) != -1);
   // Crash if we have a pending SIGABRT.
+  // This is so we never crash after this object has been destructed.
   PERFETTO_CHECK(!sigismember(&set, SIGABRT));
 }
 
