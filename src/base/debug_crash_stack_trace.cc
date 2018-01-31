@@ -151,6 +151,9 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
   }
 
   Print("------------------ END OF CRASH ------------------\n");
+  if (sig_num == SIGABRT) {
+    abort();
+  }
 }
 
 // __attribute__((constructor)) causes a static initializer that automagically
