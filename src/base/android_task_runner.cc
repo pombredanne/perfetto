@@ -17,6 +17,7 @@
 #include "perfetto/base/android_task_runner.h"
 
 #include "perfetto/base/utils.h"
+#include "perfetto/base/watchdog.h"
 
 #include <errno.h>
 #include <sys/eventfd.h>
