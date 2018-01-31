@@ -34,9 +34,9 @@ WatchDog::WatchDog(int64_t nanosecs) {
 }
 
 WatchDog::~WatchDog() {
-  timer_delete(timerid_);
+  PERFETTO_CHECK(timer_delete(timerid_) != -1);
   sigset_t set;
-  PERFETTO_CHECK(sigpending(&set) == 0);
+  PERFETTO_CHECK(sigpending(&set) != -1);
   // Crash if we have a pending SIGABRT.
   PERFETTO_CHECK(!sigismember(&set, SIGABRT));
 }
