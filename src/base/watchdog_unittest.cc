@@ -37,7 +37,7 @@ TEST(WatchDogTest, Crash) {
 }
 
 TEST(WatchDogTest, NoCrash) {
-  WatchDog watchdog(1000000);
+  WatchDog watchdog(100000);
   timespec spec;
   spec.tv_sec = 0;
   spec.tv_nsec = 20;

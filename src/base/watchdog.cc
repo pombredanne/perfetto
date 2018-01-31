@@ -30,6 +30,8 @@ WatchDog::WatchDog(int64_t nanosecs) {
   struct itimerspec its;
   its.it_value.tv_sec = nanosecs / 1000000000;
   its.it_value.tv_nsec = nanosecs % 1000000000;
+  its.it_interval.tv_sec = 0;
+  its.it_interval.tv_nsec = 0;
   PERFETTO_CHECK(timer_settime(timerid_, 0, &its, nullptr) != -1);
 }
 
