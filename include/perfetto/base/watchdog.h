@@ -23,10 +23,9 @@
 namespace perfetto {
 namespace base {
 
-/* WatchDog crashes the calling program using SIGABRT if it does
- * not go out of scope within the number of milliseconds passed
- * to the constructor.
- */
+// WatchDog crashes the calling program using SIGABRT if it does
+// not go out of scope within the number of milliseconds passed
+// to the constructor.
 class WatchDog {
  public:
   explicit WatchDog(time_t millisecs);
