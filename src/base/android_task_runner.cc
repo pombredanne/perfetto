@@ -16,9 +16,6 @@
 
 #include "perfetto/base/android_task_runner.h"
 
-#include "perfetto/base/utils.h"
-#include "perfetto/base/watchdog.h"
-
 #include <errno.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
@@ -116,8 +113,7 @@ void AndroidTaskRunner::RunImmediateTask() {
   if (has_next)
     ScheduleImmediateWakeUp();
   errno = 0;
-  base::WatchDog w(kWatchdogMillis);
-  immediate_task();
+  RunTask(immediate_task);
 }
 
 void AndroidTaskRunner::RunDelayedTask() {
@@ -143,8 +139,7 @@ void AndroidTaskRunner::RunDelayedTask() {
   if (next_wake_up)
     ScheduleDelayedWakeUp(next_wake_up);
   errno = 0;
-  base::WatchDog w(kWatchdogMillis);
-  delayed_task();
+  RunTask(delayed_task);
 }
 
 void AndroidTaskRunner::ScheduleImmediateWakeUp() {
@@ -226,8 +221,7 @@ bool AndroidTaskRunner::OnFileDescriptorEvent(int signalled_fd, int events) {
     task = it->second;
   }
   errno = 0;
-  base::WatchDog w(kWatchdogMillis);
-  task();
+  RunTask(task);
   return true;
 }
 

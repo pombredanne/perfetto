@@ -17,8 +17,6 @@
 #include "perfetto/base/unix_task_runner.h"
 
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/utils.h"
-#include "perfetto/base/watchdog.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -140,16 +138,11 @@ void UnixTaskRunner::RunImmediateAndDelayedTask() {
   }
 
   errno = 0;
-  if (immediate_task) {
-    base::WatchDog w(kWatchdogMillis);
-    immediate_task();
-  }
-
+  if (immediate_task)
+    RunTask(immediate_task);
   errno = 0;
-  if (delayed_task) {
-    base::WatchDog w(kWatchdogMillis);
-    delayed_task();
-  }
+  if (delayed_task)
+    RunTask(delayed_task);
 }
 
 void UnixTaskRunner::PostFileDescriptorWatches() {
@@ -201,8 +194,7 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     task = it->second.callback;
   }
   errno = 0;
-  base::WatchDog w(kWatchdogMillis);
-  task();
+  RunTask(task);
 }
 
 UnixTaskRunner::TimeDurationMs UnixTaskRunner::GetDelayToNextTaskLocked()

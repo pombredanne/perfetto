@@ -34,9 +34,6 @@ namespace perfetto {
 namespace base {
 
 constexpr size_t kPageSize = 4096;
-// Maximum time a single task can take in a TaskRunner before the
-// program suicides.
-constexpr int64_t kWatchdogMillis = 30000;  // 30s
 
 template <typename T>
 constexpr size_t ArraySize(const T& array) {
