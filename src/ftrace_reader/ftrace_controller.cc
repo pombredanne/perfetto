@@ -196,7 +196,7 @@ void FtraceController::StartIfNeeded() {
 uint32_t FtraceController::GetDrainPeriodMs() {
   if (sinks_.size() == 0)
     return kDefaultDrainPeriodMs;
-  uint32_t min_drain_period_ms = kMaxDrainPeriodMs;
+  uint32_t min_drain_period_ms = kMaxDrainPeriodMs + 1;
   for (const FtraceSink* sink : sinks_) {
     if (sink->config().drain_period_ms() < min_drain_period_ms)
       min_drain_period_ms = sink->config().drain_period_ms();
