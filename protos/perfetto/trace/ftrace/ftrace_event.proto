@@ -188,7 +188,7 @@ message FtraceEvent {
     RegulatorEnableFtraceEvent regulator_enable = 62;
     RegulatorEnableCompleteFtraceEvent regulator_enable_complete = 63;
     RegulatorEnableDelayFtraceEvent regulator_enable_delay = 64;
-    RegulatorSetVoltageCompleteFtraceEvent regulator_set_voltage = 65;
+    RegulatorSetVoltageFtraceEvent regulator_set_voltage = 65;
     RegulatorSetVoltageCompleteFtraceEvent regulator_set_voltage_complete = 66;
     CgroupAttachTaskFtraceEvent cgroup_attach_task = 67;
     CgroupMkdirFtraceEvent cgroup_mkdir = 68;

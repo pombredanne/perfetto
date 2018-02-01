@@ -85,6 +85,76 @@ using protos::CpuIdleFtraceEvent;
 using protos::ClockEnableFtraceEvent;
 using protos::ClockDisableFtraceEvent;
 using protos::ClockSetRateFtraceEvent;
+using protos::SchedCpuHotplugFtraceEvent;
+using protos::SchedWakingFtraceEvent;
+using protos::IpiEntryFtraceEvent;
+using protos::IpiExitFtraceEvent;
+using protos::IpiRaiseFtraceEvent;
+using protos::I2cReadFtraceEvent;
+using protos::I2cWriteFtraceEvent;
+using protos::I2cResultFtraceEvent;
+using protos::I2cReplyFtraceEvent;
+using protos::SmbusReadFtraceEvent;
+using protos::SmbusWriteFtraceEvent;
+using protos::SmbusResultFtraceEvent;
+using protos::SmbusReplyFtraceEvent;
+using protos::IrqHandlerEntryFtraceEvent;
+using protos::IrqHandlerExitFtraceEvent;
+using protos::SyncPtFtraceEvent;
+using protos::SyncTimelineFtraceEvent;
+using protos::SyncWaitFtraceEvent;
+using protos::Ext4DaWriteBeginFtraceEvent;
+using protos::Ext4DaWriteEndFtraceEvent;
+using protos::Ext4SyncFileEnterFtraceEvent;
+using protos::Ext4SyncFileExitFtraceEvent;
+using protos::BlockRqIssueFtraceEvent;
+using protos::MmVmscanKswapdWakeFtraceEvent;
+using protos::MmVmscanKswapdSleepFtraceEvent;
+using protos::BinderTransactionFtraceEvent;
+using protos::BinderTransactionReceivedFtraceEvent;
+using protos::BinderSetPriorityFtraceEvent;
+using protos::BinderLockFtraceEvent;
+using protos::BinderLockedFtraceEvent;
+using protos::BinderUnlockFtraceEvent;
+using protos::RegulatorDisableFtraceEvent;
+using protos::RegulatorDisableCompleteFtraceEvent;
+using protos::RegulatorEnableFtraceEvent;
+using protos::RegulatorEnableCompleteFtraceEvent;
+using protos::RegulatorEnableDelayFtraceEvent;
+using protos::RegulatorSetVoltageFtraceEvent;
+using protos::RegulatorSetVoltageCompleteFtraceEvent;
+using protos::CgroupAttachTaskFtraceEvent;
+using protos::CgroupMkdirFtraceEvent;
+using protos::CgroupRemountFtraceEvent;
+using protos::CgroupRmdirFtraceEvent;
+using protos::CgroupTransferTasksFtraceEvent;
+using protos::CgroupDestroyRootFtraceEvent;
+using protos::CgroupReleaseFtraceEvent;
+using protos::CgroupRenameFtraceEvent;
+using protos::CgroupSetupRootFtraceEvent;
+using protos::MdpCmdKickoffFtraceEvent;
+using protos::MdpCommitFtraceEvent;
+using protos::MdpPerfSetOtFtraceEvent;
+using protos::MdpSsppChangeFtraceEvent;
+using protos::TracingMarkWriteFtraceEvent;
+using protos::MdpCmdPingpongDoneFtraceEvent;
+using protos::MdpCompareBwFtraceEvent;
+using protos::MdpPerfSetPanicLutsFtraceEvent;
+using protos::MdpSsppSetFtraceEvent;
+using protos::MdpCmdReadptrDoneFtraceEvent;
+using protos::MdpMisrCrcFtraceEvent;
+using protos::MdpPerfSetQosLutsFtraceEvent;
+using protos::MdpTraceCounterFtraceEvent;
+using protos::MdpCmdReleaseBwFtraceEvent;
+using protos::MdpMixerUpdateFtraceEvent;
+using protos::MdpPerfSetWmLevelsFtraceEvent;
+using protos::MdpVideoUnderrunDoneFtraceEvent;
+using protos::MdpCmdWaitPingpongFtraceEvent;
+using protos::MdpPerfPrefillCalcFtraceEvent;
+using protos::MdpPerfUpdateBusFtraceEvent;
+using protos::RotatorBwAoAsContextFtraceEvent;
+using protos::MmFilemapAddToPageCacheFtraceEvent;
+using protos::MmFilemapDeleteFromPageCacheFtraceEvent;
 using protos::Trace;
 using protos::TracePacket;
 
@@ -227,7 +297,223 @@ std::string FormatClockDisable(const ClockDisableFtraceEvent& event) {
   return std::string(line);
 }
 
-// End of Format Functions
+std::string FormatTracingMarkWrite(const TracingMarkWriteFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "tracing_mark_write: %s|%d|%s\\n",
+          event.trace_begin() ? "B" : "E", event.pid(),
+          event.trace_name().c_str());
+  return std::string(line);
+}
+
+std::string FormatBinderLocked(const BinderLockedFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "binder_locked: tag=%s\\n", event.tag().c_str());
+  return std::string(line);
+}
+
+std::string FormatBinderUnlock(const BinderUnlockFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "binder_unlock: tag=%s\\n", event.tag().c_str());
+  return std::string(line);
+}
+
+std::string FormatBinderLock(const BinderLockFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "binder_lock: tag=%s\\n", event.tag().c_str());
+  return std::string(line);
+}
+
+std::string FormatBinderTransaction(const BinderTransactionFtraceEvent& event) {
+  char line[2048];
+  sprintf(line,
+          "binder_transaction: transaction=%d dest_node=%d dest_proc=%d "
+          "dest_thread=%d reply=%d flags=0x%x code=0x%x\\n",
+          event.debug_id(), event.target_node(), event.to_proc(),
+          event.to_thread(), event.reply(), event.flags(), event.code());
+  return std::string(line);
+}
+
+std::string FormatBinderTransactionReceived(
+    const BinderTransactionReceivedFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "binder_transaction_received: transaction=%d\\n",
+          event.debug_id());
+  return std::string(line);
+}
+
+std::string FormatExt4SyncFileEnter(const Ext4SyncFileEnterFtraceEvent& event) {
+  char line[2048];
+  sprintf(line,
+          "ext4_sync_file_enter: dev %d,%d ino %lu parent %lu datasync %d \\n",
+          (unsigned int)(event.dev() >> 20),
+          (unsigned int)(event.dev() & ((1U << 20) - 1)),
+          (unsigned long)event.ino(), (unsigned long)event.parent(),
+          event.datasync());
+  return std::string(line);
+}
+
+std::string FormatExt4SyncFileExit(const Ext4SyncFileExitFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "ext4_sync_file_exit: dev %d,%d ino %lu ret %d\\n",
+          (unsigned int)(event.dev() >> 20),
+          (unsigned int)(event.dev() & ((1U << 20) - 1)),
+          (unsigned long)event.ino(), event.ret());
+  return std::string(line);
+}
+
+std::string FormatExt4DaWriteBegin(const Ext4DaWriteBeginFtraceEvent& event) {
+  char line[2048];
+  sprintf(line,
+          "ext4_da_write_begin: dev %d,%d ino %lu pos %lld len %u flags %u\\n",
+          (unsigned int)(event.dev() >> 20),
+          (unsigned int)(event.dev() & ((1U << 20) - 1)),
+          (unsigned long)event.ino(), event.pos(), event.len(), event.flags());
+  return std::string(line);
+}
+
+std::string FormatExt4DaWriteEnd(const Ext4DaWriteEndFtraceEvent& event) {
+  char line[2048];
+  sprintf(line,
+          "ext4_da_write_end: dev %d,%d ino %lu pos %lld len %u copied %u\\n",
+          (unsigned int)(event.dev() >> 20),
+          (unsigned int)(event.dev() & ((1U << 20) - 1)),
+          (unsigned long)event.ino(), event.pos(), event.len(), event.copied());
+  return std::string(line);
+}
+
+std::string FormatBlockRqIssue(const BlockRqIssueFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "block_rq_issue: %d,%d %s %u (%s) %llu + %u [%s]\\n",
+          (unsigned int)(event.dev() >> 20),
+          (unsigned int)(event.dev() & ((1U << 20) - 1)), event.rwbs().c_str(),
+          event.bytes(), event.cmd().c_str(),
+          (unsigned long long)event.sector(), event.nr_sector(),
+          event.comm().c_str());
+  return std::string(line);
+}
+
+std::string FormatI2cRead(const I2cReadFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "i2c_read: i2c-%d #%u a=%03x f=%04x l=%u\\n",
+          event.adapter_nr(), event.msg_nr(), event.addr(), event.flags(),
+          event.len());
+  return std::string(line);
+}
+
+std::string FormatI2cResult(const I2cResultFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "i2c_result: i2c-%d n=%u ret=%d\\n", event.adapter_nr(),
+          event.nr_msgs(), event.ret());
+  return std::string(line);
+}
+
+std::string FormatIrqHandlerEntry(const IrqHandlerEntryFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "irq_handler_entry: irq=%d name=%s\\n", event.irq(),
+          event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatIrqHandlerExit(const IrqHandlerExitFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "irq_handler_exit: irq=%d ret=%s\\n", event.irq(),
+          event.ret() ? "handled" : "unhandled");
+  return std::string(line);
+}
+
+std::string FormatMmVmscanKswapdWake(
+    const MmVmscanKswapdWakeFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "mm_vmscan_kswapd_wake: nid=%d order=%d\\n", event.nid(),
+          event.order());
+  return std::string(line);
+}
+
+std::string FormatMmVmscanKswapdSleep(
+    const MmVmscanKswapdSleepFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "mm_vmscan_kswapd_sleep: nid=%d\\n", event.nid());
+  return std::string(line);
+}
+
+std::string FormatRegulatorEnable(const RegulatorEnableFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_enable: name=%s\\n", event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatRegulatorEnableDelay(
+    const RegulatorEnableDelayFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_enable_delay: name=%s\\n", event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatRegulatorEnableComplete(
+    const RegulatorEnableCompleteFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_enable_complete: name=%s\\n", event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatRegulatorDisable(const RegulatorDisableFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_disable: name=%s\\n", event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatRegulatorDisableComplete(
+    const RegulatorDisableCompleteFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_disable_complete: name=%s\\n", event.name().c_str());
+  return std::string(line);
+}
+
+std::string FormatRegulatorSetVoltage(
+    const RegulatorSetVoltageFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_set_voltage: name=%s (%d-%d)\\n",
+          event.name().c_str(), event.min(), event.max());
+  return std::string(line);
+}
+
+std::string FormatRegulatorSetVoltageComplete(
+    const RegulatorSetVoltageCompleteFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "regulator_set_voltage_complete: name=%s, val=%u\\n",
+          event.name().c_str(), event.val());
+  return std::string(line);
+}
+
+std::string FormatSchedCpuHotplug(const SchedCpuHotplugFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "sched_cpu_hotplug: cpu %d %s error=%d\\n",
+          event.affected_cpu(), event.status() ? "online" : "offline",
+          event.error());
+  return std::string(line);
+}
+
+std::string FormatSyncTimeline(const SyncTimelineFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "sync_timeline: name=%s value=%s\\n", event.name().c_str(),
+          event.value().c_str());
+  return std::string(line);
+}
+
+std::string FormatSyncWait(const SyncWaitFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "sync_wait: %s name=%s state=%d\\n",
+          event.begin() ? "begin" : "end", event.name().c_str(),
+          event.status());
+  return std::string(line);
+}
+
+std::string FormatSyncPt(const SyncPtFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "sync_pt: name=%s value=%s\\n", event.timeline().c_str(),
+          event.value().c_str());
+  return std::string(line);
+}
 
 int TraceToText(std::istream* input, std::ostream* output) {
   DiskSourceTree dst;
@@ -273,6 +559,93 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
       if (event.has_sched_switch()) {
         const auto& inner = event.sched_switch();
         line = FormatSchedSwitch(inner);
+      } else if (event.has_sched_wakeup()) {
+        const auto& inner = event.sched_wakeup();
+        line = FormatSchedWakeup(inner);
+      } else if (event.has_tracing_mark_write()) {
+        const auto& inner = event.tracing_mark_write();
+        line = FormatTracingMarkWrite(inner);
+      } else if (event.has_binder_locked()) {
+        const auto& inner = event.binder_locked();
+        line = FormatBinderLocked(inner);
+      } else if (event.has_binder_unlock()) {
+        const auto& inner = event.binder_unlock();
+        line = FormatBinderUnlock(inner);
+      } else if (event.has_binder_lock()) {
+        const auto& inner = event.binder_lock();
+        line = FormatBinderLock(inner);
+      } else if (event.has_binder_transaction()) {
+        const auto& inner = event.binder_transaction();
+        line = FormatBinderTransaction(inner);
+      } else if (event.has_binder_transaction_received()) {
+        const auto& inner = event.binder_transaction_received();
+        line = FormatBinderTransactionReceived(inner);
+      } else if (event.has_ext4_sync_file_enter()) {
+        const auto& inner = event.ext4_sync_file_enter();
+        line = FormatExt4SyncFileEnter(inner);
+      } else if (event.has_ext4_sync_file_exit()) {
+        const auto& inner = event.ext4_sync_file_exit();
+        line = FormatExt4SyncFileExit(inner);
+      } else if (event.has_ext4_da_write_begin()) {
+        const auto& inner = event.ext4_da_write_begin();
+        line = FormatExt4DaWriteBegin(inner);
+      } else if (event.has_ext4_da_write_end()) {
+        const auto& inner = event.ext4_da_write_end();
+        line = FormatExt4DaWriteEnd(inner);
+      } else if (event.has_block_rq_issue()) {
+        const auto& inner = event.block_rq_issue();
+        line = FormatBlockRqIssue(inner);
+      } else if (event.has_i2c_read()) {
+        const auto& inner = event.i2c_read();
+        line = FormatI2cRead(inner);
+      } else if (event.has_i2c_result()) {
+        const auto& inner = event.i2c_result();
+        line = FormatI2cResult(inner);
+      } else if (event.has_irq_handler_entry()) {
+        const auto& inner = event.irq_handler_entry();
+        line = FormatIrqHandlerEntry(inner);
+      } else if (event.has_irq_handler_exit()) {
+        const auto& inner = event.irq_handler_exit();
+        line = FormatIrqHandlerExit(inner);
+      } else if (event.has_mm_vmscan_kswapd_wake()) {
+        const auto& inner = event.mm_vmscan_kswapd_wake();
+        line = FormatMmVmscanKswapdWake(inner);
+      } else if (event.has_mm_vmscan_kswapd_sleep()) {
+        const auto& inner = event.mm_vmscan_kswapd_sleep();
+        line = FormatMmVmscanKswapdSleep(inner);
+      } else if (event.has_regulator_enable()) {
+        const auto& inner = event.regulator_enable();
+        line = FormatRegulatorEnable(inner);
+      } else if (event.has_regulator_enable_delay()) {
+        const auto& inner = event.regulator_enable_delay();
+        line = FormatRegulatorEnableDelay(inner);
+      } else if (event.has_regulator_enable_complete()) {
+        const auto& inner = event.regulator_enable_complete();
+        line = FormatRegulatorEnableComplete(inner);
+      } else if (event.has_regulator_disable()) {
+        const auto& inner = event.regulator_disable();
+        line = FormatRegulatorDisable(inner);
+      } else if (event.has_regulator_disable_complete()) {
+        const auto& inner = event.regulator_disable_complete();
+        line = FormatRegulatorDisableComplete(inner);
+      } else if (event.has_regulator_set_voltage()) {
+        const auto& inner = event.regulator_set_voltage();
+        line = FormatRegulatorSetVoltage(inner);
+      } else if (event.has_regulator_set_voltage_complete()) {
+        const auto& inner = event.regulator_set_voltage_complete();
+        line = FormatRegulatorSetVoltageComplete(inner);
+      } else if (event.has_sched_cpu_hotplug()) {
+        const auto& inner = event.sched_cpu_hotplug();
+        line = FormatSchedCpuHotplug(inner);
+      } else if (event.has_sync_timeline()) {
+        const auto& inner = event.sync_timeline();
+        line = FormatSyncTimeline(inner);
+      } else if (event.has_sync_wait()) {
+        const auto& inner = event.sync_wait();
+        line = FormatSyncWait(inner);
+      } else if (event.has_sync_pt()) {
+        const auto& inner = event.sync_pt();
+        line = FormatSyncPt(inner);
       } else if (event.has_print()) {
         const auto& inner = event.print();
         line = FormatPrint(inner);
