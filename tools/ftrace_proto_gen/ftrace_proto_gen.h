@@ -16,6 +16,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #include "perfetto/ftrace_reader/format_parser.h"
 

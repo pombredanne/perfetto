@@ -19,15 +19,13 @@
 #include <set>
 #include <sstream>
 #include <string>
-//#include <dirent.h>
 
 #include "ftrace_proto_gen.h"
-#include "perfetto/base/logging.h"
 #include "perfetto/ftrace_reader/format_parser.h"
 
 int main(int argc, const char** argv) {
   if (argc != 4) {
-    printf("Usage: ./%s in.format out.proto\n", argv[0]);
+    printf("Usage: ./%s whitelist_dir input_dir output_dir\n", argv[0]);
     return 1;
   }
 

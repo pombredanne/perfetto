@@ -15,7 +15,6 @@
  */
 
 #include "ftrace_proto_gen.h"
-#include "perfetto/base/logging.h"
 
 #include <fstream>
 #include <regex>
