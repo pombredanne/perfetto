@@ -52,7 +52,7 @@ char ReadOneCharFromFile(const std::string& path) {
   return result;
 }
 
-std::string ReadFileIntoString(std::string path) {
+std::string ReadFileIntoString(const std::string& path) {
   std::ifstream fin(path, std::ios::in);
   if (!fin) {
     PERFETTO_DLOG("Could not read '%s'", path.c_str());

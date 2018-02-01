@@ -162,9 +162,9 @@ SharedMemoryABI::Chunk SharedMemoryABI::TryAcquireChunk(
   next_layout |= (desired_chunk_state << (chunk_idx * kChunkShift));
   if (!phdr->layout.compare_exchange_strong(layout, next_layout,
                                             std::memory_order_acq_rel)) {
-    // TODO: returning here is too pessimistic. We should look at the returned
-    // |layout| to figure out if some other writer thread took the same chunk
-    // (in which case we should immediately return false) or if they took
+    // TODO(fmayer): returning here is too pessimistic. We should look at the
+    // returned |layout| to figure out if some other writer thread took the same
+    // chunk (in which case we should immediately return false) or if they took
     // another chunk in the same page (in which case we should just retry).
     return Chunk();
   }
@@ -228,6 +228,10 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
     PageHeader* phdr = page_header(page_idx);
     uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
     const size_t page_chunk_size = GetChunkSizeForLayout(layout);
+
+    // TODO(primiano): this should not be a CHECK, because a malicious producer
+    // could crash us by putting the chunk in an invalid state. This should
+    // gracefully fail. Keep a CHECK until then.
     PERFETTO_CHECK(chunk.size() == page_chunk_size);
     const uint32_t chunk_state =
         ((layout >> (chunk_idx * kChunkShift)) & kChunkMask);
@@ -247,6 +251,8 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
     }
     const size_t num_chunks = GetNumChunksForLayout(layout);
     all_chunks_state &= (1 << (num_chunks * kChunkShift)) - 1;
+
+    // TODO(primiano): should not be a CHECK (same rationale of comment above).
     PERFETTO_CHECK(chunk_state == expected_chunk_state);
     uint32_t next_layout = layout;
     next_layout &= ~(kChunkMask << (chunk_idx * kChunkShift));
@@ -254,7 +260,7 @@ size_t SharedMemoryABI::ReleaseChunk(Chunk chunk,
 
     // If we are freeing a chunk and all the other chunks in the page are free
     // we should de-partition the page and mark it as clear.
-    // TODO: maybe even madvise() it?
+    // TODO(fmayer): maybe even madvise() it?
     if ((next_layout & kAllChunksMask) == kAllChunksFree)
       next_layout = 0;
 
@@ -302,7 +308,7 @@ void SharedMemoryABI::ReleaseAllChunksAsFree(size_t page_idx) {
   PageHeader* phdr = page_header(page_idx);
   phdr->layout.store(0, std::memory_order_release);
   uint8_t* page_start = start_ + page_idx * page_size_;
-  // TODO: On Linux/Android this should be MADV_REMOVE if we use
+  // TODO(fmayer): On Linux/Android this should be MADV_REMOVE if we use
   // memfd_create() and tmpfs supports hole punching (need to consult kernel
   // sources).
   int ret = madvise(reinterpret_cast<uint8_t*>(page_start), page_size_,

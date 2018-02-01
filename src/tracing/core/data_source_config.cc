@@ -90,6 +90,25 @@ void DataSourceConfig::FtraceConfig::FromProto(
         static_cast<decltype(event_names_)::value_type>(field);
   }
 
+  atrace_categories_.clear();
+  for (const auto& field : proto.atrace_categories()) {
+    atrace_categories_.emplace_back();
+    static_assert(
+        sizeof(atrace_categories_.back()) == sizeof(proto.atrace_categories(0)),
+        "size mismatch");
+    atrace_categories_.back() =
+        static_cast<decltype(atrace_categories_)::value_type>(field);
+  }
+
+  atrace_apps_.clear();
+  for (const auto& field : proto.atrace_apps()) {
+    atrace_apps_.emplace_back();
+    static_assert(sizeof(atrace_apps_.back()) == sizeof(proto.atrace_apps(0)),
+                  "size mismatch");
+    atrace_apps_.back() =
+        static_cast<decltype(atrace_apps_)::value_type>(field);
+  }
+
   static_assert(
       sizeof(total_buffer_size_kb_) == sizeof(proto.total_buffer_size_kb()),
       "size mismatch");
@@ -111,6 +130,19 @@ void DataSourceConfig::FtraceConfig::ToProto(
     auto* entry = proto->add_event_names();
     static_assert(sizeof(it) == sizeof(proto->event_names(0)), "size mismatch");
     *entry = static_cast<decltype(proto->event_names(0))>(it);
+  }
+
+  for (const auto& it : atrace_categories_) {
+    auto* entry = proto->add_atrace_categories();
+    static_assert(sizeof(it) == sizeof(proto->atrace_categories(0)),
+                  "size mismatch");
+    *entry = static_cast<decltype(proto->atrace_categories(0))>(it);
+  }
+
+  for (const auto& it : atrace_apps_) {
+    auto* entry = proto->add_atrace_apps();
+    static_assert(sizeof(it) == sizeof(proto->atrace_apps(0)), "size mismatch");
+    *entry = static_cast<decltype(proto->atrace_apps(0))>(it);
   }
 
   static_assert(

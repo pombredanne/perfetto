@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <array>
 #include <string>
@@ -28,6 +29,7 @@
 #include "cpu_reader.h"
 #include "event_info.h"
 #include "ftrace_procfs.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
@@ -78,11 +80,33 @@ size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb,
   if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
     requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
 
-  size_t pages = (requested_buffer_size_kb / cpu_count) / (kPageSize / 1024);
+  size_t pages =
+      (requested_buffer_size_kb / cpu_count) / (base::kPageSize / 1024);
   if (pages == 0)
     return 1;
 
   return pages;
+}
+
+bool RunAtrace(std::vector<std::string> args) {
+  int status = 1;
+
+  std::vector<char*> argv;
+  // args, and then a null.
+  argv.reserve(1 + args.size());
+  for (const auto& arg : args)
+    argv.push_back(const_cast<char*>(arg.c_str()));
+  argv.push_back(nullptr);
+
+  pid_t pid = fork();
+  PERFETTO_CHECK(pid >= 0);
+  if (pid == 0) {
+    execv("/system/bin/atrace", &argv[0]);
+    // Reached only if execv fails.
+    _exit(1);
+  }
+  waitpid(pid, &status, 0);
+  return status == 0;
 }
 
 }  // namespace
@@ -172,12 +196,12 @@ void FtraceController::StartIfNeeded() {
 uint32_t FtraceController::GetDrainPeriodMs() {
   if (sinks_.size() == 0)
     return kDefaultDrainPeriodMs;
-  uint32_t max_drain_period_ms = 0;
+  uint32_t min_drain_period_ms = kMaxDrainPeriodMs;
   for (const FtraceSink* sink : sinks_) {
-    if (sink->config().drain_period_ms() > max_drain_period_ms)
-      max_drain_period_ms = sink->config().drain_period_ms();
+    if (sink->config().drain_period_ms() < min_drain_period_ms)
+      min_drain_period_ms = sink->config().drain_period_ms();
   }
-  return ClampDrainPeriodMs(max_drain_period_ms);
+  return ClampDrainPeriodMs(min_drain_period_ms);
 }
 
 uint32_t FtraceController::GetCpuBufferSizeInPages() {
@@ -242,7 +266,7 @@ CpuReader* FtraceController::GetCpuReader(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    FtraceConfig config,
+    const FtraceConfig& config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (sinks_.size() >= kMaxSinks)
@@ -260,6 +284,8 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it_and_inserted = sinks_.insert(sink);
   PERFETTO_DCHECK(it_and_inserted.second);
+  if (sink->config().RequiresAtrace())
+    StartAtrace(sink->config());
 
   StartIfNeeded();
   for (const std::string& name : sink->enabled_events())
@@ -297,7 +323,37 @@ void FtraceController::Unregister(FtraceSink* sink) {
 
   for (const std::string& name : sink->enabled_events())
     UnregisterForEvent(name);
+  if (sink->config().RequiresAtrace())
+    StopAtrace();
   StopIfNeeded();
+}
+
+void FtraceController::StartAtrace(const FtraceConfig& config) {
+  PERFETTO_CHECK(atrace_running_ == false);
+  atrace_running_ = true;
+  PERFETTO_DLOG("Start atrace...");
+  std::vector<std::string> args;
+  args.push_back("atrace");  // argv0 for exec()
+  args.push_back("--async_start");
+  for (const auto& category : config.atrace_categories())
+    args.push_back(category);
+  if (!config.atrace_apps().empty()) {
+    args.push_back("-a");
+    for (const auto& app : config.atrace_apps())
+      args.push_back(app);
+  }
+
+  PERFETTO_CHECK(RunAtrace(std::move(args)));
+  PERFETTO_DLOG("...done");
+}
+
+void FtraceController::StopAtrace() {
+  PERFETTO_CHECK(atrace_running_ == true);
+  atrace_running_ = false;
+  PERFETTO_DLOG("Stop atrace...");
+  PERFETTO_CHECK(
+      RunAtrace(std::vector<std::string>({"atrace", "--async_stop"})));
+  PERFETTO_DLOG("...done");
 }
 
 FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
@@ -320,12 +376,33 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 
 FtraceConfig::FtraceConfig() = default;
 FtraceConfig::FtraceConfig(std::set<std::string> events)
-    : events_(std::move(events)) {}
+    : ftrace_events_(std::move(events)) {}
 
 FtraceConfig::~FtraceConfig() = default;
 
 void FtraceConfig::AddEvent(const std::string& event) {
-  events_.insert(event);
+  ftrace_events_.insert(event);
+}
+
+void FtraceConfig::AddAtraceApp(const std::string& app) {
+  // You implicitly need the print ftrace event if you
+  // are using atrace.
+  AddEvent("print");
+  atrace_apps_.insert(app);
+}
+
+void FtraceConfig::AddAtraceCategory(const std::string& category) {
+  // You implicitly need the print ftrace event if you
+  // are using atrace.
+  AddEvent("print");
+  if (category == "sched") {
+    AddEvent("sched_switch");
+  }
+  atrace_categories_.insert(category);
+}
+
+bool FtraceConfig::RequiresAtrace() const {
+  return !atrace_categories_.empty() || !atrace_apps_.empty();
 }
 
 }  // namespace perfetto

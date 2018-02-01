@@ -32,7 +32,6 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include "perfetto/base/build_config.h"
 
 // Forward declarations for protobuf types.
 namespace perfetto {
@@ -68,6 +67,26 @@ class DataSourceConfig {
       return &event_names_.back();
     }
 
+    int atrace_categories_size() const {
+      return static_cast<int>(atrace_categories_.size());
+    }
+    const std::vector<std::string>& atrace_categories() const {
+      return atrace_categories_;
+    }
+    std::string* add_atrace_categories() {
+      atrace_categories_.emplace_back();
+      return &atrace_categories_.back();
+    }
+
+    int atrace_apps_size() const {
+      return static_cast<int>(atrace_apps_.size());
+    }
+    const std::vector<std::string>& atrace_apps() const { return atrace_apps_; }
+    std::string* add_atrace_apps() {
+      atrace_apps_.emplace_back();
+      return &atrace_apps_.back();
+    }
+
     uint32_t total_buffer_size_kb() const { return total_buffer_size_kb_; }
     void set_total_buffer_size_kb(uint32_t value) {
       total_buffer_size_kb_ = value;
@@ -78,6 +97,8 @@ class DataSourceConfig {
 
    private:
     std::vector<std::string> event_names_;
+    std::vector<std::string> atrace_categories_;
+    std::vector<std::string> atrace_apps_;
     uint32_t total_buffer_size_kb_ = {};
     uint32_t drain_period_ms_ = {};
 

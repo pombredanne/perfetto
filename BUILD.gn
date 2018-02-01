@@ -50,6 +50,7 @@ executable("perfetto_unittests") {
   testonly = true
   deps = [
     "gn:default_deps",
+    "gn:gtest_main",
     "src/base:base_unittests",
     "src/ftrace_reader:ftrace_reader_unittests",
     "src/ipc:perfetto_ipc_unittests",
@@ -67,7 +68,9 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "gn:default_deps",
+      "src/ftrace_reader:ftrace_reader_benchmarks",
       "src/tracing:tracing_benchmarks",
+      "test:benchmark_main",
     ]
   }
 
@@ -75,6 +78,7 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "gn:default_deps",
+      "gn:gtest_main",
       "src/ftrace_reader:ftrace_reader_integrationtests",
       "test:end_to_end_integrationtests",
     ]
