@@ -16,49 +16,69 @@
 
 #include <fstream>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
+//#include <dirent.h>
 
 #include "ftrace_proto_gen.h"
+#include "perfetto/base/logging.h"
 #include "perfetto/ftrace_reader/format_parser.h"
 
 int main(int argc, const char** argv) {
-  if (argc != 3) {
+  if (argc != 4) {
     printf("Usage: ./%s in.format out.proto\n", argv[0]);
     return 1;
   }
 
-  const char* input_path = argv[1];
-  const char* output_path = argv[2];
+  const char* whitelist_path = argv[1];
+  const char* input_dir = argv[2];
+  const char* output_dir = argv[3];
 
-  std::ifstream fin(input_path, std::ios::in);
-  if (!fin) {
-    fprintf(stderr, "Failed to open %s\n", input_path);
-    return 1;
+  std::set<std::string> events = perfetto::GetWhitelistedEvents(whitelist_path);
+  std::vector<std::string> events_info;
+
+  for (auto event : events) {
+    std::string proto_file_name =
+        event.substr(event.find('/') + 1, std::string::npos) + ".proto";
+    std::string group = event.substr(0, event.find('/'));
+    std::string input_path = input_dir + event + std::string("/format");
+    std::string output_path = output_dir + std::string("/") + proto_file_name;
+
+    std::ifstream fin(input_path.c_str(), std::ios::in);
+    if (!fin) {
+      fprintf(stderr, "Failed to open %s\n", input_path.c_str());
+      return 1;
+    }
+    std::ostringstream stream;
+    stream << fin.rdbuf();
+    fin.close();
+    std::string contents = stream.str();
+
+    perfetto::FtraceEvent format;
+    if (!perfetto::ParseFtraceEvent(contents, &format)) {
+      fprintf(stderr, "Could not parse file %s.\n", input_path.c_str());
+      return 1;
+    }
+
+    perfetto::Proto proto;
+    if (!perfetto::GenerateProto(format, &proto)) {
+      fprintf(stderr, "Could not generate proto for file %s\n",
+              input_path.c_str());
+      return 1;
+    }
+
+    events_info.push_back(perfetto::SingleEventInfo(format, proto, group));
+
+    std::ofstream fout(output_path.c_str(), std::ios::out);
+    if (!fout) {
+      fprintf(stderr, "Failed to open %s\n", output_path.c_str());
+      return 1;
+    }
+
+    fout << proto.ToString();
+    fout.close();
   }
-  std::ostringstream stream;
-  stream << fin.rdbuf();
-  fin.close();
-  std::string contents = stream.str();
 
-  perfetto::FtraceEvent format;
-  if (!perfetto::ParseFtraceEvent(contents, &format)) {
-    fprintf(stderr, "Could not parse file %s.\n", input_path);
-    return 1;
-  }
-
-  perfetto::Proto proto;
-  if (!perfetto::GenerateProto(format, &proto)) {
-    fprintf(stderr, "Could not generate proto for file %s\n", input_path);
-    return 1;
-  }
-
-  std::ofstream fout(output_path, std::ios::out);
-  if (!fout) {
-    fprintf(stderr, "Failed to open %s\n", output_path);
-    return 1;
-  }
-
-  fout << proto.ToString();
-  fout.close();
+  perfetto::GenerateEventInfo(events_info);
 }

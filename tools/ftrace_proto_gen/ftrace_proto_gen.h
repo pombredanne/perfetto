@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
+#include <set>
 #include <string>
-#include <vector>
 
 #include "perfetto/ftrace_reader/format_parser.h"
 
@@ -35,5 +35,11 @@ struct Proto {
 
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out);
 std::string InferProtoType(const FtraceEvent::Field& field);
+
+std::set<std::string> GetWhitelistedEvents(std::string whitelistPath);
+std::string SingleEventInfo(perfetto::FtraceEvent format,
+                            perfetto::Proto proto,
+                            std::string group);
+void GenerateEventInfo(std::vector<std::string> events_info);
 
 }  // namespace perfetto
