@@ -28,7 +28,7 @@ TEST(WatchDogTest, Crash) {
   EXPECT_DEATH(
       {
         WatchDog watchdog(1);
-        usleep(2000000);
+        usleep(20000000);
       },
       "");
 }
