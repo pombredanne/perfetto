@@ -13,7 +13,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_already";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 701;
+    event->proto_field_id = 5;
     event->fields.push_back(FieldFromNameIdType("cpu_id", 1, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("load", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("curtarg", 3, kProtoUint64));
@@ -26,7 +26,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_boost";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 703;
+    event->proto_field_id = 6;
     event->fields.push_back(FieldFromNameIdType("s", 1, kProtoString));
   }
 
@@ -35,7 +35,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_notyet";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 702;
+    event->proto_field_id = 7;
     event->fields.push_back(FieldFromNameIdType("cpu_id", 1, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("load", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("curtarg", 3, kProtoUint64));
@@ -48,7 +48,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_setspeed";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 699;
+    event->proto_field_id = 8;
     event->fields.push_back(FieldFromNameIdType("cpu_id", 1, kProtoUint32));
     event->fields.push_back(FieldFromNameIdType("targfreq", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("actualfreq", 3, kProtoUint64));
@@ -59,7 +59,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_target";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 700;
+    event->proto_field_id = 9;
     event->fields.push_back(FieldFromNameIdType("cpu_id", 1, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("load", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("curtarg", 3, kProtoUint64));
@@ -72,7 +72,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpufreq_interactive_unboost";
     event->group = "cpufreq_interactive";
-    event->proto_field_id = 704;
+    event->proto_field_id = 10;
     event->fields.push_back(FieldFromNameIdType("s", 1, kProtoString));
   }
 
@@ -81,7 +81,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "print";
     event->group = "ftrace";
-    event->proto_field_id = 5;
+    event->proto_field_id = 3;
     event->fields.push_back(FieldFromNameIdType("ip", 1, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("buf", 2, kProtoString));
   }
@@ -91,7 +91,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "clock_disable";
     event->group = "power";
-    event->proto_field_id = 125;
+    event->proto_field_id = 15;
     event->fields.push_back(FieldFromNameIdType("name", 1, kProtoString));
     event->fields.push_back(FieldFromNameIdType("state", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 3, kProtoUint64));
@@ -102,7 +102,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "clock_enable";
     event->group = "power";
-    event->proto_field_id = 124;
+    event->proto_field_id = 14;
     event->fields.push_back(FieldFromNameIdType("name", 1, kProtoString));
     event->fields.push_back(FieldFromNameIdType("state", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 3, kProtoUint64));
@@ -113,7 +113,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "clock_set_rate";
     event->group = "power";
-    event->proto_field_id = 126;
+    event->proto_field_id = 16;
     event->fields.push_back(FieldFromNameIdType("name", 1, kProtoString));
     event->fields.push_back(FieldFromNameIdType("state", 2, kProtoUint64));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 3, kProtoUint64));
@@ -124,7 +124,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpu_frequency";
     event->group = "power";
-    event->proto_field_id = 116;
+    event->proto_field_id = 11;
     event->fields.push_back(FieldFromNameIdType("state", 1, kProtoUint32));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 2, kProtoUint32));
   }
@@ -134,7 +134,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpu_frequency_limits";
     event->group = "power";
-    event->proto_field_id = 117;
+    event->proto_field_id = 12;
     event->fields.push_back(FieldFromNameIdType("min_freq", 1, kProtoUint32));
     event->fields.push_back(FieldFromNameIdType("max_freq", 2, kProtoUint32));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 3, kProtoUint32));
@@ -145,7 +145,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "cpu_idle";
     event->group = "power";
-    event->proto_field_id = 114;
+    event->proto_field_id = 13;
     event->fields.push_back(FieldFromNameIdType("state", 1, kProtoUint32));
     event->fields.push_back(FieldFromNameIdType("cpu_id", 2, kProtoUint32));
   }
@@ -155,7 +155,7 @@ std::vector<Event> GetStaticEventInfo() {
     Event* event = &events.back();
     event->name = "sched_switch";
     event->group = "sched";
-    event->proto_field_id = 47;
+    event->proto_field_id = 4;
     event->fields.push_back(FieldFromNameIdType("prev_comm", 1, kProtoString));
     event->fields.push_back(FieldFromNameIdType("prev_pid", 2, kProtoInt32));
     event->fields.push_back(FieldFromNameIdType("prev_prio", 3, kProtoInt32));

@@ -16,16 +16,19 @@
 
 #include <fstream>
 #include <memory>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
 
 #include "ftrace_proto_gen.h"
 #include "perfetto/ftrace_reader/format_parser.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 
 int main(int argc, const char** argv) {
   if (argc != 4) {
-    printf("Usage: ./%s whitelist_dir input_dir output_dir\n", argv[0]);
+    fprintf(stderr, "Usage: ./%s whitelist_dir input_dir output_dir\n",
+            argv[0]);
     return 1;
   }
 
@@ -35,6 +38,17 @@ int main(int argc, const char** argv) {
 
   std::set<std::string> events = perfetto::GetWhitelistedEvents(whitelist_path);
   std::vector<std::string> events_info;
+
+  // proto_field_id for each event is read from this file.
+  std::ifstream input("protos/perfetto/trace/ftrace/ftrace_event.proto",
+                      std::ios::in | std::ios::binary);
+  if (!input) {
+    fprintf(stderr, "Failed to open %s\n",
+            "protos/perfetto/trace/ftrace/ftrace_event.proto");
+    return 1;
+  }
+  std::ostringstream ftrace_stream;
+  ftrace_stream << input.rdbuf();
 
   for (auto event : events) {
     std::string proto_file_name =
@@ -66,7 +80,20 @@ int main(int argc, const char** argv) {
       return 1;
     }
 
-    events_info.push_back(perfetto::SingleEventInfo(format, proto, group));
+    std::smatch match;
+    std::regex event_regex(format.name + "\\s*=\\s*(\\d+)");
+    std::regex_search(ftrace_stream.str(), match, event_regex);
+    std::string proto_field_id = match[1].str().c_str();
+    if (proto_field_id == "") {
+      fprintf(stderr,
+              "Could not find proto_field_id for %s in ftrace_event.proto. "
+              "Please add it.\n",
+              format.name.c_str());
+      return 1;
+    }
+
+    events_info.push_back(
+        perfetto::SingleEventInfo(format, proto, group, proto_field_id));
 
     std::ofstream fout(output_path.c_str(), std::ios::out);
     if (!fout) {
@@ -78,5 +105,6 @@ int main(int argc, const char** argv) {
     fout.close();
   }
 
+  input.close();
   perfetto::GenerateEventInfo(events_info);
 }
