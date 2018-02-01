@@ -30,7 +30,10 @@ TEST(WatchDogTest, Crash) {
   EXPECT_DEATH(
       {
         WatchDog watchdog(1);
-        sleep(20);
+        int sleep_s = 20;
+        while (sleep_s != 0) {
+          sleep_s = sleep(sleep_s);
+        }
       },
       "");
 }
