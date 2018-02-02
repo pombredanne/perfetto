@@ -41,6 +41,9 @@ class FtraceEventBundle;
 
 const size_t kMaxSinks = 32;
 
+// Method of last resort to reset ftrace state.
+void HardResetFtraceState();
+
 class FtraceController;
 class ProtoTranslationTable;
 class CpuReader;
