@@ -155,6 +155,17 @@ using protos::MdpPerfUpdateBusFtraceEvent;
 using protos::RotatorBwAoAsContextFtraceEvent;
 using protos::MmFilemapAddToPageCacheFtraceEvent;
 using protos::MmFilemapDeleteFromPageCacheFtraceEvent;
+using protos::SchedBlockedReasonFtraceEvent;
+using protos::LowmemoryKillFtraceEvent;
+using protos::SoftirqEntryFtraceEvent;
+using protos::SoftirqExitFtraceEvent;
+using protos::SoftirqRaiseFtraceEvent;
+using protos::MmVmscanDirectReclaimBeginFtraceEvent;
+using protos::MmVmscanDirectReclaimEndFtraceEvent;
+using protos::WorkqueueExecuteEndFtraceEvent;
+using protos::WorkqueueExecuteStartFtraceEvent;
+using protos::WorkqueueActivateWorkFtraceEvent;
+using protos::WorkqueueQueueWorkFtraceEvent;
 using protos::Trace;
 using protos::TracePacket;
 
@@ -236,6 +247,14 @@ std::string FormatSchedWakeup(const SchedWakeupFtraceEvent& sched_wakeup) {
           "pid=%d prio=%d success=%d target_cpu=%03d\\n",
           sched_wakeup.comm().c_str(), sched_wakeup.pid(), sched_wakeup.prio(),
           sched_wakeup.success(), sched_wakeup.target_cpu());
+  return std::string(line);
+}
+
+std::string FormatSchedBlockedReason(
+    const SchedBlockedReasonFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "sched_blocked_reason: pid=%d iowait=%d caller=%llxS\\n",
+          event.pid(), event.io_wait(), event.caller());
   return std::string(line);
 }
 
@@ -537,6 +556,109 @@ int TraceToText(std::istream* input, std::ostream* output) {
   return 0;
 }
 
+std::string FormatSoftirqRaise(const SoftirqRaiseFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "softirq_raise: vec=%u [action=%s]\\n", event.vec(),
+          "({ 0, 'HI' }, {1, 'TIMER' }, { 2, 'NET_TX' }, { 3, 'NET_RX' }, { 4, "
+          "'BLOCK' }, { 5, 'BLOCK_IOPOLL' }, { 6, 'TASKLET' }, { 7, 'SCHED' }, "
+          "{ 8, 'HRTIMER' }, { 9, 'RCU' })");
+  return std::string(line);
+}
+
+std::string FormatSoftirqEntry(const SoftirqEntryFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "softirq_entry: vec=%u [action=%s]\\n", event.vec(),
+          "({ 0, 'HI' }, {1, 'TIMER' }, { 2, 'NET_TX' }, { 3, 'NET_RX' }, { 4, "
+          "'BLOCK' }, { 5, 'BLOCK_IOPOLL' }, { 6, 'TASKLET' }, { 7, 'SCHED' }, "
+          "{ 8, 'HRTIMER' }, { 9, 'RCU' })");
+  return std::string(line);
+}
+
+std::string FormatSoftirqExit(const SoftirqExitFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "softirq_exit: vec=%u [action=%s]\\n", event.vec(),
+          "({ 0, 'HI' }, {1, 'TIMER' }, { 2, 'NET_TX' }, { 3, 'NET_RX' }, { 4, "
+          "'BLOCK' }, { 5, 'BLOCK_IOPOLL' }, { 6, 'TASKLET' }, { 7, 'SCHED' }, "
+          "{ 8, 'HRTIMER' }, { 9, 'RCU' })");
+  return std::string(line);
+}
+
+std::string FormatI2cWrite(const I2cWriteFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "i2c_write: i2c-%d #%u a=%03x f=%04x l=%u [%*xhD]\\n",
+          event.adapter_nr(), event.msg_nr(), event.addr(), event.flags(),
+          event.len(), event.len(), event.buf());
+  return std::string(line);
+}
+
+std::string FormatI2cReply(const I2cReplyFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "i2c_reply: i2c-%d #%u a=%03x f=%04x l=%u [%*xhD]\\n",
+          event.adapter_nr(), event.msg_nr(), event.addr(), event.flags(),
+          event.len(), event.len(), event.buf());
+  return std::string(line);
+}
+
+std::string FormatMmVmscanDirectReclaimBegin(
+    const MmVmscanDirectReclaimBeginFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "mm_vmscan_direct_reclaim_begin: order=%d may_writepage=%d\\n",
+          event.order(), event.may_writepage());
+  return std::string(line);
+}
+
+std::string FormatMmVmscanDirectReclaimEnd(
+    const MmVmscanDirectReclaimEndFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "mm_vmscan_direct_reclaim_end: nr_reclaimed=%llu\\n",
+          event.nr_reclaimed());
+  return std::string(line);
+}
+
+std::string FormatLowmemoryKill(const LowmemoryKillFtraceEvent& event) {
+  char line[2048];
+  sprintf(line,
+          "lowmemory_kill: %s (%d), page cache %lldkB (limit %lldkB), free "
+          "%lldKb\\n",
+          event.comm().c_str(), event.pid(), event.pagecache_size(),
+          event.pagecache_limit(), event.free());
+  return std::string(line);
+}
+
+std::string FormatWorkqueueExecuteStart(
+    const WorkqueueExecuteStartFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "workqueue_execute_start: work struct %llx: function %llxf\\n",
+          event.work(), event.function());
+  return std::string(line);
+}
+
+std::string FormatWorkqueueExecuteEnd(
+    const WorkqueueExecuteEndFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "workqueue_execute_end: work struct %llx\\n", event.work());
+  return std::string(line);
+}
+
+std::string FormatWorkqueueQueueWork(
+    const WorkqueueQueueWorkFtraceEvent& event) {
+  char line[2048];
+  sprintf(
+      line,
+      "workqueue_queue_work: work struct=%llx function=%llxf workqueue=%llx "
+      "req_cpu=%u cpu=%u\\n",
+      event.work(), event.function(), event.workqueue(), event.req_cpu(),
+      event.cpu());
+  return std::string(line);
+}
+
+std::string FormatWorkqueueActivateWork(
+    const WorkqueueActivateWorkFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "workqueue_activate_work: work struct %llx\\n", event.work());
+  return std::string(line);
+}
+
 int TraceToSystrace(std::istream* input, std::ostream* output) {
   std::multimap<uint64_t, std::string> sorted;
 
@@ -562,6 +684,9 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
       } else if (event.has_sched_wakeup()) {
         const auto& inner = event.sched_wakeup();
         line = FormatSchedWakeup(inner);
+      } else if (event.has_sched_blocked_reason()) {
+        const auto& inner = event.sched_blocked_reason();
+        line = FormatSchedBlockedReason(inner);
       } else if (event.has_tracing_mark_write()) {
         const auto& inner = event.tracing_mark_write();
         line = FormatTracingMarkWrite(inner);
@@ -667,6 +792,42 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
       } else if (event.has_clock_disable()) {
         const auto& inner = event.clock_disable();
         line = FormatClockDisable(inner);
+      } else if (event.has_i2c_write()) {
+        const auto& inner = event.i2c_write();
+        line = FormatI2cWrite(inner);
+      } else if (event.has_i2c_reply()) {
+        const auto& inner = event.i2c_reply();
+        line = FormatI2cReply(inner);
+      } else if (event.has_softirq_raise()) {
+        const auto& inner = event.softirq_raise();
+        line = FormatSoftirqRaise(inner);
+      } else if (event.has_softirq_entry()) {
+        const auto& inner = event.softirq_entry();
+        line = FormatSoftirqEntry(inner);
+      } else if (event.has_softirq_exit()) {
+        const auto& inner = event.softirq_exit();
+        line = FormatSoftirqExit(inner);
+      } else if (event.has_mm_vmscan_direct_reclaim_begin()) {
+        const auto& inner = event.mm_vmscan_direct_reclaim_begin();
+        line = FormatMmVmscanDirectReclaimBegin(inner);
+      } else if (event.has_mm_vmscan_direct_reclaim_end()) {
+        const auto& inner = event.mm_vmscan_direct_reclaim_end();
+        line = FormatMmVmscanDirectReclaimEnd(inner);
+      } else if (event.has_lowmemory_kill()) {
+        const auto& inner = event.lowmemory_kill();
+        line = FormatLowmemoryKill(inner);
+      } else if (event.has_workqueue_execute_start()) {
+        const auto& inner = event.workqueue_execute_start();
+        line = FormatWorkqueueExecuteStart(inner);
+      } else if (event.has_workqueue_execute_end()) {
+        const auto& inner = event.workqueue_execute_end();
+        line = FormatWorkqueueExecuteEnd(inner);
+      } else if (event.has_workqueue_queue_work()) {
+        const auto& inner = event.workqueue_queue_work();
+        line = FormatWorkqueueQueueWork(inner);
+      } else if (event.has_workqueue_activate_work()) {
+        const auto& inner = event.workqueue_activate_work();
+        line = FormatWorkqueueActivateWork(inner);
       } else {
         continue;
       }

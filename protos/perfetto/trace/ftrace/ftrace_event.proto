@@ -151,7 +151,7 @@ message FtraceEvent {
     SoftirqExitFtraceEvent softirq_exit = 25;
     SoftirqRaiseFtraceEvent softirq_raise = 26;
     I2cReadFtraceEvent i2c_read = 27;
-    I2cWriteFtraceEvent i2c_wrote = 28;
+    I2cWriteFtraceEvent i2c_write = 28;
     I2cResultFtraceEvent i2c_result = 29;
     I2cReplyFtraceEvent i2c_reply = 30;
     SmbusReadFtraceEvent smbus_read = 31;
