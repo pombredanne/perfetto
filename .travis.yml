@@ -111,6 +111,11 @@ matrix:
       sudo: true
       compiler: clang
       env: CFG=android-clang-arm64-asan GN_ARGS="is_debug=false target_os=\"android\" target_cpu=\"arm64\" is_asan=true"
+    - os: linux
+      dist: trusty
+      sudo: true
+      compiler: clang
+      env: CFG=linux_trusty-clang-x86_64-libfuzzer GN_ARGS="is_clang=true is_debug=false use_libfuzzer=true is_asan=true use_custom_libcxx=false"
 
 # Cache the deps that get git-pulled to avoid hitting quota limits (b/68252114).
 # Do not cache NDK/SDK and things that come from .zip files rather than git.
@@ -155,6 +160,11 @@ script:
       for TEST_TARGET in $TEST_TARGETS; do
         "out/dist/$TEST_TARGET"
       done
+      if [[ "$CFG" == *-libfuzzer ]]; then
+        # Run a single iteration each to make sure they are not crashing.
+        out/linux_fuzzer/end_to_end_shared_memory_fuzzer -steps=1
+        out/linux_fuzzer/buffered_frame_deserializer_fuzzer -steps=1
+      fi
     else
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
       tools/run_android_emulator $TARGET_ARCH --pid /tmp/emulator.pid -v &
