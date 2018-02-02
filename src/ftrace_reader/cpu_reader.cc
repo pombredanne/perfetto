@@ -35,7 +35,7 @@ namespace {
 bool ReadIntoString(const uint8_t* start,
                     const uint8_t* end,
                     size_t field_id,
-                    protozero::ProtoZeroMessage* out) {
+                    protozero::Message* out) {
   for (const uint8_t* c = start; c < end; c++) {
     if (*c != '\0')
       continue;
@@ -46,7 +46,7 @@ bool ReadIntoString(const uint8_t* start,
 }
 
 using BundleHandle =
-    protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+    protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
 
 const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
                                            const std::set<std::string>& names) {
@@ -242,7 +242,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* start,
                            const uint8_t* end,
                            const ProtoTranslationTable* table,
-                           protozero::ProtoZeroMessage* message) {
+                           protozero::Message* message) {
   PERFETTO_DCHECK(start < end);
   const size_t length = end - start;
 
@@ -260,9 +260,8 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   for (const Field& field : table->common_fields())
     success &= ParseField(field, start, end, message);
 
-  protozero::ProtoZeroMessage* nested =
-      message->BeginNestedMessage<protozero::ProtoZeroMessage>(
-          info.proto_field_id);
+  protozero::Message* nested =
+      message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
   for (const Field& field : info.fields)
     success &= ParseField(field, start, end, nested);
@@ -280,7 +279,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 bool CpuReader::ParseField(const Field& field,
                            const uint8_t* start,
                            const uint8_t* end,
-                           protozero::ProtoZeroMessage* message) {
+                           protozero::Message* message) {
   PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
   const uint8_t* field_start = start + field.ftrace_offset;
   uint32_t field_id = field.proto_field_id;

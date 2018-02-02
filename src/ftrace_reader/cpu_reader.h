@@ -69,11 +69,10 @@ class CpuReader {
   CpuReader(const ProtoTranslationTable*, size_t cpu, base::ScopedFile fd);
   ~CpuReader();
 
-  bool Drain(
-      const std::array<const EventFilter*, kMaxSinks>&,
-      const std::array<
-          protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
-          kMaxSinks>&);
+  bool Drain(const std::array<const EventFilter*, kMaxSinks>&,
+             const std::array<
+                 protozero::MessageHandle<protos::pbzero::FtraceEventBundle>,
+                 kMaxSinks>&);
   int GetFileDescriptor();
 
   template <typename T>
@@ -91,7 +90,7 @@ class CpuReader {
   template <typename T>
   static void ReadIntoVarInt(const uint8_t* start,
                              size_t field_id,
-                             protozero::ProtoZeroMessage* out) {
+                             protozero::Message* out) {
     T t;
     memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
     out->AppendVarInt<T>(field_id, t);
@@ -120,12 +119,12 @@ class CpuReader {
                          const uint8_t* start,
                          const uint8_t* end,
                          const ProtoTranslationTable* table,
-                         protozero::ProtoZeroMessage* message);
+                         protozero::Message* message);
 
   static bool ParseField(const Field& field,
                          const uint8_t* start,
                          const uint8_t* end,
-                         protozero::ProtoZeroMessage* message);
+                         protozero::Message* message);
 
  private:
   uint8_t* GetBuffer();
