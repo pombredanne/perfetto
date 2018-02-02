@@ -152,9 +152,13 @@ config("default") {
 
 config("debug_symbols") {
   cflags = [ "-O0" ]
+  ldflags = []
   if (is_android || is_linux) {
     cflags += [ "-funwind-tables" ]
-    ldflags = [ "-rdynamic" ]
+    ldflags += [ "-rdynamic" ]
+  }
+  if (!is_clang) {
+    ldflags += [ "-ldl" ]
   }
 }
 

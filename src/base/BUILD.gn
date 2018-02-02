@@ -29,6 +29,7 @@ source_set("base") {
   ]
   if (is_debug) {
     deps += [ ":debug_crash_stack_trace" ]
+    ldflags = [ "-ldl" ]
   }
 }
 
