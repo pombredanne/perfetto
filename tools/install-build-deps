@@ -154,8 +154,8 @@ BUILD_DEPS_ANDROID = [
 TEST_DEPS_ANDROID = [
   # Android emulator images.
   ('buildtools/aosp-arm.zip',
-   'https://storage.googleapis.com/perfetto/aosp-31012018-arm.zip',
-   'a19b7b681aa2b1a9c9c0d534e7ee7a0d9e2b6fe9',
+   'https://storage.googleapis.com/perfetto/aosp-02022018-arm.zip',
+   'a480d5e7d3ca888b0a58fe15ce76b1791537429a',
    'linux2'
   ),
 
