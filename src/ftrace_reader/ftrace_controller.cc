@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <array>
 #include <string>
@@ -71,17 +72,15 @@ uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
 
 // Post-conditions:
 // 1. result >= 1 (should have at least one page per CPU)
-// 2. result * num_cpus * 4 < kMaxTotalBufferSizeKb
+// 2. result * 4 < kMaxTotalBufferSizeKb
 // 3. If input is 0 output is a good default number.
-size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb,
-                                   size_t cpu_count) {
+size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb) {
   if (requested_buffer_size_kb == 0)
     requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
   if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
     requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
 
-  size_t pages =
-      (requested_buffer_size_kb / cpu_count) / (base::kPageSize / 1024);
+  size_t pages = requested_buffer_size_kb / (base::kPageSize / 1024);
   if (pages == 0)
     return 1;
 
@@ -109,7 +108,36 @@ bool RunAtrace(std::vector<std::string> args) {
   return status == 0;
 }
 
+void WriteToFile(const char* path, const char* str) {
+  int fd = open(path, O_WRONLY);
+  if (fd == -1)
+    return;
+  write(fd, str, strlen(str));
+  close(fd);
+}
+
+void ClearFile(const char* path) {
+  int fd = open(path, O_WRONLY | O_TRUNC);
+  if (fd == -1)
+    return;
+  close(fd);
+}
+
 }  // namespace
+
+// Method of last resort to reset ftrace state.
+// Used in a signal handler: don't do any allocation.
+void HardResetFtraceState() {
+  WriteToFile("/sys/kernel/debug/tracing/tracing_on", "0");
+  WriteToFile("/sys/kernel/debug/tracing/buffer_size_kb", "4");
+  WriteToFile("/sys/kernel/debug/tracing/events/enable", "0");
+  ClearFile("/sys/kernel/debug/tracing/trace");
+
+  WriteToFile("/sys/kernel/tracing/tracing_on", "0");
+  WriteToFile("/sys/kernel/tracing/buffer_size_kb", "4");
+  WriteToFile("/sys/kernel/tracing/events/enable", "0");
+  ClearFile("/sys/kernel/tracing/trace");
+}
 
 // static
 // TODO(taylori): Add a test for tracing paths in integration tests.
@@ -205,13 +233,12 @@ uint32_t FtraceController::GetDrainPeriodMs() {
 }
 
 uint32_t FtraceController::GetCpuBufferSizeInPages() {
-  uint32_t max_total_buffer_size_kb = 0;
+  uint32_t max_buffer_size_kb = 0;
   for (const FtraceSink* sink : sinks_) {
-    if (sink->config().total_buffer_size_kb() > max_total_buffer_size_kb)
-      max_total_buffer_size_kb = sink->config().total_buffer_size_kb();
+    if (sink->config().buffer_size_kb() > max_buffer_size_kb)
+      max_buffer_size_kb = sink->config().buffer_size_kb();
   }
-  return ComputeCpuBufferSizeInPages(max_total_buffer_size_kb,
-                                     ftrace_procfs_->NumberOfCpus());
+  return ComputeCpuBufferSizeInPages(max_buffer_size_kb);
 }
 
 void FtraceController::ClearTrace() {
