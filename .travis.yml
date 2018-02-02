@@ -113,7 +113,7 @@ matrix:
       env: CFG=android-clang-arm64-asan GN_ARGS="is_debug=false target_os=\"android\" target_cpu=\"arm64\" is_asan=true"
     - os: linux
       dist: trusty
-      sudo: false
+      sudo: true
       compiler: clang
       env: CFG=linux_trusty-clang-x86_64-libfuzzer GN_ARGS="is_clang=true is_debug=false use_libfuzzer=true is_asan=true use_custom_libcxx=false"
 
