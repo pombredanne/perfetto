@@ -65,7 +65,9 @@ class TaskRunner {
 
  protected:
   static void RunTask(const std::function<void()>& task) {
+#if !BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
     base::WatchDog w(kWatchdogMillis);
+#endif
     task();
   }
 };
