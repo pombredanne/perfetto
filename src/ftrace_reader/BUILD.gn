@@ -16,6 +16,13 @@ import("../../gn/perfetto.gni")
 import("../../gn/proto_library.gni")
 import("../protozero/protozero_library.gni")
 
+# For use_libfuzzer.
+if (!build_with_chromium) {
+  import("//gn/standalone/sanitizers/vars.gni")
+} else {
+  import("//build/config/sanitizers/sanitizers.gni")
+}
+
 source_set("test_support") {
   testonly = true
   deps = [
@@ -103,6 +110,8 @@ source_set("ftrace_reader") {
     "cpu_reader.h",
     "event_info.cc",
     "event_info.h",
+    "event_info_constants.cc",
+    "event_info_constants.h",
     "format_parser.cc",
     "ftrace_controller.cc",
     "ftrace_procfs.cc",
