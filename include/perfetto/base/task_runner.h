@@ -18,6 +18,7 @@
 #define INCLUDE_PERFETTO_BASE_TASK_RUNNER_H_
 
 #include <functional>
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/watchdog.h"
 
 namespace perfetto {
