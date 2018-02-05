@@ -49,16 +49,32 @@ class EventFilter;
 
 class FtraceConfig {
  public:
-  FtraceConfig();
   explicit FtraceConfig(std::set<std::string> events);
+  FtraceConfig();
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
+  void AddAtraceApp(const std::string& app);
+  void AddAtraceCategory(const std::string&);
+  bool RequiresAtrace() const;
 
-  const std::set<std::string>& events() const { return events_; }
+  const std::set<std::string>& events() const { return ftrace_events_; }
+  const std::set<std::string>& atrace_categories() const {
+    return atrace_categories_;
+  }
+  const std::set<std::string>& atrace_apps() const { return atrace_apps_; }
+
+  uint32_t buffer_size_kb() const { return buffer_size_kb_; }
+  uint32_t drain_period_ms() const { return drain_period_ms_; }
+  void set_buffer_size_kb(uint32_t v) { buffer_size_kb_ = v; }
+  void set_drain_period_ms(uint32_t v) { drain_period_ms_ = v; }
 
  private:
-  std::set<std::string> events_;
+  std::set<std::string> ftrace_events_;
+  std::set<std::string> atrace_categories_;
+  std::set<std::string> atrace_apps_;
+  uint32_t buffer_size_kb_ = 0;
+  uint32_t drain_period_ms_ = 0;
 };
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
@@ -79,9 +95,12 @@ class FtraceSink {
   };
 
   FtraceSink(base::WeakPtr<FtraceController>,
+             FtraceConfig config,
              std::unique_ptr<EventFilter>,
              Delegate*);
   ~FtraceSink();
+
+  const FtraceConfig& config() const { return config_; }
 
  private:
   friend FtraceController;
@@ -99,6 +118,7 @@ class FtraceSink {
 
   const std::set<std::string>& enabled_events();
   base::WeakPtr<FtraceController> controller_weak_;
+  FtraceConfig config_;
   std::unique_ptr<EventFilter> filter_;
   FtraceSink::Delegate* delegate_;
 };
@@ -109,7 +129,8 @@ class FtraceController {
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
   virtual ~FtraceController();
 
-  std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
+  std::unique_ptr<FtraceSink> CreateSink(const FtraceConfig&,
+                                         FtraceSink::Delegate*);
 
   void DisableAllEvents();
   void WriteTraceMarker(const std::string& s);
@@ -138,10 +159,16 @@ class FtraceController {
                                size_t generation,
                                int cpu);
 
+  uint32_t GetDrainPeriodMs();
+  uint32_t GetCpuBufferSizeInPages();
+
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
   void RegisterForEvent(const std::string& event_name);
   void UnregisterForEvent(const std::string& event_name);
+
+  void StartAtrace(const FtraceConfig&);
+  void StopAtrace();
 
   void StartIfNeeded();
   void StopIfNeeded();
@@ -153,6 +180,7 @@ class FtraceController {
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   size_t generation_ = 0;
   bool listening_for_raw_trace_data_ = false;
+  bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
   std::vector<size_t> enabled_count_;
   std::unique_ptr<ProtoTranslationTable> table_;

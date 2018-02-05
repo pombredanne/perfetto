@@ -22,6 +22,7 @@
 #include "src/tracing/core/trace_writer_impl.h"
 
 #include <limits>
+#include <utility>
 
 namespace perfetto {
 
@@ -39,7 +40,7 @@ std::unique_ptr<SharedMemoryArbiter> SharedMemoryArbiter::CreateInstance(
     base::TaskRunner* task_runner) {
   return std::unique_ptr<SharedMemoryArbiterImpl>(
       new SharedMemoryArbiterImpl(shared_memory->start(), shared_memory->size(),
-                                  page_size, callback, task_runner));
+                                  page_size, std::move(callback), task_runner));
 }
 SharedMemoryArbiterImpl::SharedMemoryArbiterImpl(
     void* start,
@@ -57,6 +58,8 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     BufferID target_buffer,
     size_t size_hint) {
   PERFETTO_DCHECK(size_hint == 0);  // Not implemented yet.
+  int stall_count = 0;
+  const useconds_t kStallIntervalUs = 100000;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
@@ -112,20 +115,36 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
           if (!chunk.is_valid())
             continue;
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
+          if (stall_count) {
+            PERFETTO_LOG(
+                "Recovered from stall after %" PRIu64 " ms",
+                static_cast<uint64_t>(kStallIntervalUs * stall_count / 1000));
+          }
           return chunk;
         }
-        // TODO: we should have some policy to guarantee fairness of the SMB
-        // page allocator w.r.t |target_buffer|? Or is the SMB best-effort. All
-        // chunks in the page are busy (either kBeingRead or kBeingWritten), or
-        // all the pages are assigned to a different target buffer. Try with the
-        // next page.
+        // TODO(fmayer): we should have some policy to guarantee fairness of the
+        // SMB page allocator w.r.t |target_buffer|? Or is the SMB best-effort.
+        // All chunks in the page are busy (either kBeingRead or kBeingWritten),
+        // or all the pages are assigned to a different target buffer. Try with
+        // the next page.
       }
     }  // std::lock_guard<std::mutex>
+
     // All chunks are taken (either kBeingWritten by us or kBeingRead by the
     // Service). TODO: at this point we should return a bankrupcy chunk, not
     // crash the process.
-    PERFETTO_ELOG("Shared memory buffer overrun! Stalling");
-    usleep(250000);
+    if (stall_count++ == 0) {
+      PERFETTO_ELOG("Shared memory buffer overrun! Stalling");
+
+      // TODO(primiano): sending the IPC synchronously is a temporary workaround
+      // until the backpressure logic in FtraceProducer is sorted out. Until
+      // then the risk is that we stall the message loop waiting for the
+      // tracing service to  consume the shared memory buffer (SMB) and, for
+      // this reason, never run the task that tells the service to purge the
+      // SMB.
+      NotifySharedMemoryUpdate();
+    }
+    usleep(kStallIntervalUs);
   }
 }
 
@@ -139,22 +158,24 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
       pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
     }
   }
+
   if (should_post_callback) {
-    // TODO what happens if the arbiter gets destroyed?
-    task_runner_->PostTask(std::bind(
-        &SharedMemoryArbiterImpl::InvokeOnPagesCompleteCallback, this));
+    // TODO(primiano): what happens if the arbiter gets destroyed?
+    task_runner_->PostTask(
+        std::bind(&SharedMemoryArbiterImpl::NotifySharedMemoryUpdate, this));
   }
 }
 
 // This is always invoked on the |task_runner_| thread.
-void SharedMemoryArbiterImpl::InvokeOnPagesCompleteCallback() {
+void SharedMemoryArbiterImpl::NotifySharedMemoryUpdate() {
   std::vector<uint32_t> pages_to_notify;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     pages_to_notify = std::move(pages_to_notify_);
     pages_to_notify_.clear();
   }
-  on_pages_complete_callback_(pages_to_notify);
+  if (!pages_to_notify.empty())
+    on_pages_complete_callback_(pages_to_notify);
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(

@@ -67,8 +67,38 @@ class DataSourceConfig {
       return &event_names_.back();
     }
 
+    int atrace_categories_size() const {
+      return static_cast<int>(atrace_categories_.size());
+    }
+    const std::vector<std::string>& atrace_categories() const {
+      return atrace_categories_;
+    }
+    std::string* add_atrace_categories() {
+      atrace_categories_.emplace_back();
+      return &atrace_categories_.back();
+    }
+
+    int atrace_apps_size() const {
+      return static_cast<int>(atrace_apps_.size());
+    }
+    const std::vector<std::string>& atrace_apps() const { return atrace_apps_; }
+    std::string* add_atrace_apps() {
+      atrace_apps_.emplace_back();
+      return &atrace_apps_.back();
+    }
+
+    uint32_t buffer_size_kb() const { return buffer_size_kb_; }
+    void set_buffer_size_kb(uint32_t value) { buffer_size_kb_ = value; }
+
+    uint32_t drain_period_ms() const { return drain_period_ms_; }
+    void set_drain_period_ms(uint32_t value) { drain_period_ms_ = value; }
+
    private:
     std::vector<std::string> event_names_;
+    std::vector<std::string> atrace_categories_;
+    std::vector<std::string> atrace_apps_;
+    uint32_t buffer_size_kb_ = {};
+    uint32_t drain_period_ms_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility
     // with future versions of .proto files.
