@@ -98,7 +98,7 @@ matrix:
       env: CFG=android-clang-arm-release GN_ARGS="is_debug=false target_os=\"android\" target_cpu=\"arm\""
     - os: linux
       dist: trusty
-      sudo: false
+      sudo: true
       compiler: clang
       env: CFG=android-clang-arm-asan GN_ARGS="is_debug=false target_os=\"android\" target_cpu=\"arm\" is_asan=true"
 
@@ -118,6 +118,8 @@ cache:
 before_install:
   - set -e
   - echo "$CFG" && echo "$GN_ARGS"
+  - export ASAN_SYMBOLIZER_PATH="$(which llvm-symbolizer
+      || echo /usr/bin/llvm-symbolizer-*)"
 
 install:
   - |
@@ -126,17 +128,14 @@ install:
     else
       tools/install-build-deps
     fi
-
-script:
-  - export LSAN_OPTIONS=verbosity=1:log_threads=1
-  - tools/gn gen out/dist --args="${GN_ARGS}" --check
-  - tools/ninja -C out/dist -j8 all
-  - export ASAN_SYMBOLIZER_PATH="$(which llvm-symbolizer
-      || echo /usr/bin/llvm-symbolizer-*)"
   - |
     if [[ -e buildtools/clang/bin/llvm-symbolizer ]]; then
       export ASAN_SYMBOLIZER_PATH="buildtools/clang/bin/llvm-symbolizer"
     fi
+
+script:
+  - tools/gn gen out/dist --args="${GN_ARGS}" --check
+  - tools/ninja -C out/dist -j8 all
   - |
     TEST_TARGETS="
     perfetto_integrationtests
