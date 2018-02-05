@@ -119,6 +119,9 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
          nested_msg = nested_msg->nested_message()) {
       uint8_t* const cur_hdr = nested_msg->size_field();
 #if PERFETTO_DCHECK_IS_ON()
+      // Ensure that the size field of the nested message either points to
+      // somewhere in the current chunk or a size field of a patch in the
+      // patch list.
       bool size_in_current_chunk =
           cur_hdr >= cur_chunk_.payload_begin() &&
           cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end();
