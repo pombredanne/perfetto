@@ -128,6 +128,7 @@ install:
     fi
 
 script:
+  - export LSAN_OPTIONS=verbosity=1:log_threads=1
   - tools/gn gen out/dist --args="${GN_ARGS}" --check
   - tools/ninja -C out/dist -j8 all
   - export ASAN_SYMBOLIZER_PATH="$(which llvm-symbolizer
