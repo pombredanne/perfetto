@@ -599,6 +599,7 @@ std::string FormatI2cReply(const I2cReplyFtraceEvent& event) {
   return std::string(line);
 }
 
+// TODO(hjd): Check gfp_flags
 std::string FormatMmVmscanDirectReclaimBegin(
     const MmVmscanDirectReclaimBeginFtraceEvent& event) {
   char line[2048];
