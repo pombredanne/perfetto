@@ -167,7 +167,7 @@ std::string FtraceProcfs::GetClock() {
   if (end == std::string::npos)
     return "";
 
-  return s.substr(start+1, end-start-1);
+  return s.substr(start + 1, end - start - 1);
 }
 
 std::set<std::string> FtraceProcfs::AvailableClocks() {
@@ -178,11 +178,11 @@ std::set<std::string> FtraceProcfs::AvailableClocks() {
   size_t start = 0;
   size_t end = 0;
 
-  while  ((end = s.find(" ", start)) != std::string::npos) {
-    std::string name = s.substr(start, end-start);
+  while ((end = s.find(" ", start)) != std::string::npos) {
+    std::string name = s.substr(start, end - start);
 
     if (name[0] == '[')
-      name = name.substr(1, name.size()-2);
+      name = name.substr(1, name.size() - 2);
 
     names.insert(name);
 
