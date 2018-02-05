@@ -23,7 +23,7 @@ import android.content.Intent;
 public class ProducerService extends Service {
     @Override
     public void onCreate() {
-        System.loadLibrary("perfettoctsproducer_jni");
+        System.loadLibrary("perfettocts_jni");
         new Thread(new Runnable() {
             @Override
             public void run() {

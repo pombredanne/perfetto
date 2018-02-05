@@ -29,9 +29,8 @@ LOCAL_SRC_FILES := $(call all-java-files-under, src)
 LOCAL_PACKAGE_NAME := CtsPerfettoProducerApp
 
 LOCAL_JNI_SHARED_LIBRARIES := \
-    libperfettoctsproducer_jni \
+    libperfettocts_jni \
     libnativehelper_compat_libc++
 
-include $(BUILD_PACKAGE)
 
-include $(call all-makefiles-under,$(LOCAL_PATH))
+# include $(BUILD_PACKAGE)

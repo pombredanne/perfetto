@@ -28,7 +28,7 @@ public class ProducerActivity extends Activity {
         startService(new Intent(this, ProducerService.class));
         startService(new Intent(this, ProducerIsolatedService.class));
 
-        System.loadLibrary("perfettoctsproducer_jni");
+        System.loadLibrary("perfettocts_jni");
         new Thread(new Runnable() {
             public void run() {
                 try {
