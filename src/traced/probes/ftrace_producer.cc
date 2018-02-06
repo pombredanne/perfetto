@@ -65,6 +65,13 @@ void FtraceProducer::OnConnect() {
   ResetConnectionBackoff();
   PERFETTO_LOG("Connected to the service");
 
+  // This can legitimately happen on user builds where we cannot access the
+  // debug paths because of SELinux rules.
+  // TODO(hjd): remove this when we have SELinux rules for everything.
+  if (!ftrace_) {
+    return;
+  }
+
   DataSourceDescriptor descriptor;
   descriptor.set_name("com.google.perfetto.ftrace");
   endpoint_->RegisterDataSource(
@@ -143,7 +150,15 @@ void FtraceProducer::ConnectWithRetries(const char* socket_name,
   socket_name_ = socket_name;
   task_runner_ = task_runner;
   ftrace_ = FtraceController::Create(task_runner);
-  PERFETTO_CHECK(ftrace_);
+
+  // This can legitimately happen on user builds where we cannot access the
+  // debug paths because of SELinux rules.
+  // TODO(hjd): remove this when we have SELinux rules for everything.
+  if (!ftrace) {
+    Connect();
+    return;
+  }
+
   ftrace_->DisableAllEvents();
   ftrace_->ClearTrace();
   Connect();
