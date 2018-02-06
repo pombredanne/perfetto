@@ -155,6 +155,7 @@ void FtraceProducer::ConnectWithRetries(const char* socket_name,
   // debug paths because of SELinux rules.
   // TODO(hjd): remove this when we have SELinux rules for everything.
   if (!ftrace) {
+    PEFETTO_ELOG("Unable to create ftrace controller.");
     Connect();
     return;
   }
