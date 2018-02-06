@@ -21,11 +21,13 @@
 #include "gmock/gmock.h"
 #include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
+
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
+#include "perfetto/tracing/core/data_source_config.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
@@ -106,7 +108,9 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
 
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
-  FtraceConfig config(std::set<std::string>({"print", "sched_switch"}));
+  DataSourceConfig::FtraceConfig config;
+  *config.add_event_names() = "print";
+  *config.add_event_names() = "sched_switch";
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.
