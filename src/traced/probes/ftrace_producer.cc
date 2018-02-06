@@ -68,9 +68,12 @@ void FtraceProducer::OnConnect() {
   // This can legitimately happen on user builds where we cannot access the
   // debug paths because of SELinux rules.
   // TODO(hjd): remove this when we have SELinux rules for everything.
-  if (!ftrace_) {
+  ftrace_ = FtraceController::Create(task_runner);
+  if (!ftrace_)
     return;
-  }
+
+  ftrace_->DisableAllEvents();
+  ftrace_->ClearTrace();
 
   DataSourceDescriptor descriptor;
   descriptor.set_name("com.google.perfetto.ftrace");
@@ -149,19 +152,6 @@ void FtraceProducer::ConnectWithRetries(const char* socket_name,
   ResetConnectionBackoff();
   socket_name_ = socket_name;
   task_runner_ = task_runner;
-  ftrace_ = FtraceController::Create(task_runner);
-
-  // This can legitimately happen on user builds where we cannot access the
-  // debug paths because of SELinux rules.
-  // TODO(hjd): remove this when we have SELinux rules for everything.
-  if (!ftrace) {
-    PEFETTO_ELOG("Unable to create ftrace controller.");
-    Connect();
-    return;
-  }
-
-  ftrace_->DisableAllEvents();
-  ftrace_->ClearTrace();
   Connect();
 }
 
