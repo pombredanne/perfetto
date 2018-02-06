@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <set>
 #include <string>
 #include <vector>
 
@@ -36,12 +35,5 @@ struct Proto {
 
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out);
 std::string InferProtoType(const FtraceEvent::Field& field);
-
-std::set<std::string> GetWhitelistedEvents(const std::string& whitelist_path);
-std::string SingleEventInfo(perfetto::FtraceEvent format,
-                            perfetto::Proto proto,
-                            const std::string& group,
-                            const std::string& proto_field_id);
-void GenerateEventInfo(const std::vector<std::string>& events_info);
 
 }  // namespace perfetto
