@@ -81,8 +81,10 @@ int main(int argc, const char** argv) {
     }
 
     std::smatch match;
+    std::string ftrace =
+        ftrace_stream.str();  // regex_search requires a non-temporary string
     std::regex event_regex(format.name + "\\s*=\\s*(\\d+)");
-    std::regex_search(ftrace_stream.str(), match, event_regex);
+    std::regex_search(ftrace, match, event_regex);
     std::string proto_field_id = match[1].str().c_str();
     if (proto_field_id == "") {
       fprintf(stderr,
