@@ -168,7 +168,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
 #if BUILDFLAG(OS_MACOSX)
     if (kill(getpid(), sig_num) < 0) {
 #else
-    if (tgkill(getpid(), gettid(), sig_num) < 0) {
+    if (syscall(__NR_tgkill, getpid(), syscall(__NR_gettid), sig_num) < 0) {
 #endif
       // If we failed to kill ourselves (e.g. because a sandbox disallows us
       // to do so), we instead resort to terminating our process. This will
