@@ -92,6 +92,9 @@ uint32_t ProtoZeroMessage::Finalize() {
   if (nested_message_)
     EndNestedMessage();
 
+  if (finalized_)
+    return size_;
+
   // Write the length of the nested message a posteriori, using a leading-zero
   // redundant varint encoding.
   if (size_field_) {
