@@ -157,8 +157,6 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
 
   Print("------------------ END OF CRASH ------------------\n");
 
-#include "perfetto/base/build_config.h"
-
   // info->si_code <= 0 iff SI_FROMUSER (SI_FROMKERNEL otherwise).
   if (info->si_code <= 0 || sig_num == SIGABRT) {
     // This signal was triggered by somebody sending us the signal with kill().
