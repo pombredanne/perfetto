@@ -89,11 +89,11 @@ void ProtoZeroMessage::AppendBytes(uint32_t field_id,
 }
 
 uint32_t ProtoZeroMessage::Finalize() {
-  if (nested_message_)
-    EndNestedMessage();
-
   if (finalized_)
     return size_;
+
+  if (nested_message_)
+    EndNestedMessage();
 
   // Write the length of the nested message a posteriori, using a leading-zero
   // redundant varint encoding.
