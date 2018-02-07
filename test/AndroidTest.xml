@@ -18,13 +18,15 @@
     <option name="test-suite-tag" value="apct" />
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="perfett_unittests->/data/local/tmp/perfetto_unittests" />
+        <option name="push" value="perfetto_unittests->/data/local/tmp/perfetto_unittests" />
+        <option name="push" value="perfetto_integrationtests->/data/local/tmp/perfetto_integrationtests" />
     </target_preparer>
     <test class="com.android.tradefed.testtype.GTest" >
-        <option name="native-test-device-path" value="/data/local/tmp" />
-        <option name="module-name" value="perfetto_unittests" />
-        <option name="runtime-hint" value="0m5s" />
-        <!-- test-timeout unit is ms, value = 10 seconds -->
-        <option name="native-test-timeout" value="10000" />
+      <option name="native-test-device-path" value="/data/local/tmp/perfetto_unittests" />
+      <option name="module-name" value="perfetto_unittests" />
+    </test>
+    <test class="com.android.tradefed.testtype.GTest" >
+      <option name="native-test-device-path" value="/data/local/tmp/perfetto_integrationtests" />
+      <option name="module-name" value="perfetto_integrationtests" />
     </test>
 </configuration>
