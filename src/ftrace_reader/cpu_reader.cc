@@ -106,17 +106,15 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
                      size_t cpu,
                      base::ScopedFile fd,
                      std::function<void()> on_data_available)
-    : table_(table),
-      cpu_(cpu),
-      trace_fd_(std::move(fd)),
-      on_data_available_(std::move(on_data_available)) {
+    : table_(table), cpu_(cpu), trace_fd_(std::move(fd)) {
   int pipe_fds[2];
   PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
   staging_read_fd_.reset(pipe_fds[0]);
   staging_write_fd_.reset(pipe_fds[1]);
 
   // Make reads from the raw pipe blocking so that splice() can sleep.
-  SetBlocking(*trace_fd_, true);
+  if (trace_fd_)
+    SetBlocking(*trace_fd_, true);
 
   // Reads from the staging pipe are always non-blocking.
   SetBlocking(*staging_read_fd_, false);
@@ -138,7 +136,9 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
     PERFETTO_CHECK(sigaction(SIGPIPE, &act, nullptr) == 0);
   }
 
-  worker_thread_ = std::thread([this] { RunWorkerThread(); });
+  worker_thread_ =
+      std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
+                            *staging_write_fd_, on_data_available));
 }
 
 CpuReader::~CpuReader() {
@@ -153,7 +153,11 @@ CpuReader::~CpuReader() {
   worker_thread_.join();
 }
 
-void CpuReader::RunWorkerThread() {
+// static
+void CpuReader::RunWorkerThread(size_t cpu,
+                                int trace_fd,
+                                int staging_write_fd,
+                                std::function<void()> on_data_available) {
   // This thread is responsible for moving data from the trace pipe into the
   // staging pipe at least one page at a time. This is done using the splice(2)
   // system call, which unlike poll/select makes it possible to block until at
@@ -161,16 +165,19 @@ void CpuReader::RunWorkerThread() {
   // call is blocking we need a dedicated thread for each trace pipe (i.e.,
   // CPU).
   char thread_name[16];
-  snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu_);
+  snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
 
   while (true) {
     // First do a blocking splice which sleeps until there is at least one
     // page of data available and enough space to write it into the staging
     // pipe.
-    int splice_res = splice(*trace_fd_, nullptr, *staging_write_fd_, nullptr,
+    int splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                             base::kPageSize, SPLICE_F_MOVE);
     if (splice_res < 0) {
+      // Splice can occasionally with these errors -- just try again.
+      if (errno == ENOMEM || errno == EBUSY)
+        continue;
       PERFETTO_DCHECK(errno == EPIPE || errno == EINTR || errno == EBADF);
       break;  // ~CpuReader is waiting to join this thread.
     }
@@ -179,17 +186,17 @@ void CpuReader::RunWorkerThread() {
     // pages from the trace pipe into the staging pipe as long as there is
     // data in the former and space in the latter.
     while (true) {
-      splice_res = splice(*trace_fd_, nullptr, *staging_write_fd_, nullptr,
+      splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                           base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
       if (splice_res < 0) {
-        if (errno != EAGAIN)
+        if (errno != EAGAIN && errno != ENOMEM && errno != EBUSY)
           PERFETTO_DPLOG("splice");
         break;
       }
     }
 
     // This callback will block until we are allowed to read more data.
-    on_data_available_();
+    on_data_available();
   }
 }
 

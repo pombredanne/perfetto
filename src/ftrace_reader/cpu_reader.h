@@ -136,7 +136,10 @@ class CpuReader {
                          protozero::ProtoZeroMessage* message);
 
  private:
-  void RunWorkerThread();
+  static void RunWorkerThread(size_t cpu,
+                              int trace_fd,
+                              int staging_write_fd,
+                              std::function<void()> on_data_available);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
@@ -147,7 +150,6 @@ class CpuReader {
   base::ScopedFile trace_fd_;
   base::ScopedFile staging_read_fd_;
   base::ScopedFile staging_write_fd_;
-  std::function<void()> on_data_available_;
   std::unique_ptr<uint8_t[]> buffer_;
   std::thread worker_thread_;
 };

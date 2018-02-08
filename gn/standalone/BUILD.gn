@@ -44,7 +44,7 @@ config("no_rtti") {
 }
 
 config("visibility_hidden") {
-  #cflags = [ "-fvisibility=hidden" ]
+  cflags = [ "-fvisibility=hidden" ]
 }
 
 config("default") {
@@ -106,6 +106,10 @@ config("default") {
 
   if (is_android) {
     libs += [ "log" ]
+  }
+
+  if (is_debug) {
+    libs += [ "dl" ]
   }
 
   if (is_android) {

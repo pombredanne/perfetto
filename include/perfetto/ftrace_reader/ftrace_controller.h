@@ -53,8 +53,8 @@ class EventFilter;
 
 class FtraceConfig {
  public:
-  FtraceConfig();
   explicit FtraceConfig(std::set<std::string> events);
+  FtraceConfig();
   ~FtraceConfig();
 
   void AddEvent(const std::string&);
@@ -68,10 +68,17 @@ class FtraceConfig {
   }
   const std::set<std::string>& atrace_apps() const { return atrace_apps_; }
 
+  uint32_t buffer_size_kb() const { return buffer_size_kb_; }
+  uint32_t drain_period_ms() const { return drain_period_ms_; }
+  void set_buffer_size_kb(uint32_t v) { buffer_size_kb_ = v; }
+  void set_drain_period_ms(uint32_t v) { drain_period_ms_ = v; }
+
  private:
   std::set<std::string> ftrace_events_;
   std::set<std::string> atrace_categories_;
   std::set<std::string> atrace_apps_;
+  uint32_t buffer_size_kb_ = 0;
+  uint32_t drain_period_ms_ = 0;
 };
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
@@ -143,14 +150,29 @@ class FtraceController {
   // into the sinks. Protected and virtual for testing.
   virtual void OnRawFtraceDataAvailable(size_t cpu);
 
+  // Protected and virtual for testing.
+  virtual uint64_t NowMs() const;
+
  private:
   friend FtraceSink;
+  friend class TestFtraceController;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
+  // Called on a worker thread when |cpu| has at least one page of data
+  // available for reading.
+  void OnDataAvailable(base::WeakPtr<FtraceController>,
+                       size_t generation,
+                       size_t cpu,
+                       uint32_t drain_period_ms);
+
   static void DrainCPUs(base::WeakPtr<FtraceController>, size_t generation);
+  static void UnblockReaders(base::WeakPtr<FtraceController>);
+
+  uint32_t GetDrainPeriodMs();
+  uint32_t GetCpuBufferSizeInPages();
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
@@ -163,17 +185,15 @@ class FtraceController {
   void StartIfNeeded();
   void StopIfNeeded();
 
-  void OnDataAvailable(base::WeakPtr<FtraceController>,
-                       size_t generation,
-                       size_t cpu);
-
+  // Begin lock-protected members.
   std::mutex reader_lock_;
   std::condition_variable data_drained_;
   std::bitset<kMaxCpus> cpus_to_drain_;
+  bool listening_for_raw_trace_data_ = false;
+  // End lock-protected members.
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   size_t generation_ = 0;
-  bool listening_for_raw_trace_data_ = false;
   bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
   std::vector<size_t> enabled_count_;
