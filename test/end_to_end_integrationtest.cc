@@ -118,9 +118,9 @@ class PerfettoTest : public ::testing::Test {
 };
 
 #if BUILDFLAG(OS_ANDROID)
-#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
-#else
 #define MAYBE_TestFtraceProducer TestFtraceProducer
+#else
+#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
 TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
