@@ -44,17 +44,6 @@ class FakeConsumer : public Consumer {
   void OnDisconnect() override;
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
-  void BusyWaitReadBuffers() {
-    task_runner_->PostDelayedTask(
-        std::bind([this]() {
-          endpoint_->ReadBuffers();
-
-          task_runner_->PostDelayedTask(
-              std::bind([this]() { BusyWaitReadBuffers(); }), 1);
-        }),
-        1);
-  }
-
  private:
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
   std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
