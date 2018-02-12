@@ -24,18 +24,17 @@
 #include "perfetto/ipc/host.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
+#include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/trace_config.h"
+#include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/base/test/test_task_runner.h"
-
-#include "perfetto/tracing/core/consumer.h"
-#include "perfetto/tracing/core/trace_config.h"
-#include "perfetto/tracing/core/trace_packet.h"
-#include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
 #include "test/task_runner_thread.h"
 
@@ -207,7 +206,6 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
       new FakeProducerDelegate(data, size, &consumer)));
 
   task_runner.RunUntilCheckpoint("no.more.packets");
-
   return 0;
 }
 
