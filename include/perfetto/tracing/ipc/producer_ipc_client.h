@@ -31,6 +31,7 @@ class Producer;
 //   Producer(s) of the tracing library.
 // Implemented in:
 //   src/ipc/producer/producer_ipc_client_impl.cc
+//   src/tracing/ipc/producer/producer_ipc_client_impl.cc
 class ProducerIPCClient {
  public:
   // Connects to the producer port of the Service listening on the given
