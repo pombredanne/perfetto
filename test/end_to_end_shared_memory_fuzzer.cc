@@ -74,11 +74,6 @@ class FakeProducer : public Producer {
     auto end_packet = trace_writer->NewTracePacket();
     end_packet->set_test("end");
     end_packet->Finalize();
-
-    // Temporarily create a new packet to flush the final packet to the
-    // consumer.
-    // TODO(primiano): remove this hack once flushing the final packet is fixed.
-    trace_writer->NewTracePacket();
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {}
@@ -138,7 +133,7 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(4);
+  trace_config.add_buffers()->set_size_kb(8);
   trace_config.set_duration_ms(10);
 
   // Create the buffer for ftrace.
