@@ -16,6 +16,8 @@
 
 namespace file_utils {
 
+// TODO(taylori): Migrate to using perfetto:base:ScopedFD.
+
 // RAII classes for auto-releasing fd/dirs.
 template <typename RESOURCE_TYPE, int (*CLOSE_FN)(RESOURCE_TYPE)>
 struct ScopedResource {
