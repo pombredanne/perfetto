@@ -45,8 +45,8 @@ namespace shm_fuzz {
 // consumer.
 class FakeProducer : public Producer {
  public:
-  FakeProducer(std::string name, const uint8_t* data, size_t size)
-      : name_(std::move(name)), data_(data), size_(size) {}
+  FakeProducer(std::string name, const uint8_t* data, size_t size, FakeConsumer* consumer)
+      : name_(std::move(name)), data_(data), size_(size), consumer_(consumer) {}
 
   void Connect(const char* socket_name, base::TaskRunner* task_runner) {
     endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
@@ -75,10 +75,8 @@ class FakeProducer : public Producer {
     end_packet->set_test("end");
     end_packet->Finalize();
 
-    // Temporarily create a new packet to flush the final packet to the
-    // consumer.
-    // TODO(primiano): remove this hack once flushing the final packet is fixed.
-    trace_writer->NewTracePacket();
+    printf("ASDASDSAD\n");
+    consumer_->DisableTracing();
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {}
@@ -89,17 +87,18 @@ class FakeProducer : public Producer {
   const size_t size_;
   DataSourceID id_ = 0;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
+  FakeConsumer* consumer_;
 };
 
 class FakeProducerDelegate : public ThreadDelegate {
  public:
-  FakeProducerDelegate(const uint8_t* data, size_t size)
-      : data_(data), size_(size) {}
+  FakeProducerDelegate(const uint8_t* data, size_t size, FakeConsumer* consumer)
+      : data_(data), size_(size), consumer_(consumer) {}
   ~FakeProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
     producer_.reset(
-        new FakeProducer("android.perfetto.FakeProducer", data_, size_));
+        new FakeProducer("android.perfetto.FakeProducer", data_, size_, consumer_));
     producer_->Connect(PRODUCER_SOCKET, task_runner);
   }
 
@@ -107,6 +106,7 @@ class FakeProducerDelegate : public ThreadDelegate {
   std::unique_ptr<FakeProducer> producer_;
   const uint8_t* data_;
   const size_t size_;
+  FakeConsumer* consumer_;
 };
 
 class ServiceDelegate : public ThreadDelegate {
@@ -132,14 +132,10 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate()));
 
-  TaskRunnerThread producer_thread;
-  producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
-      new FakeProducerDelegate(data, size)));
-
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(8);
-  trace_config.set_duration_ms(10);
+  trace_config.set_duration_ms(1000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -150,6 +146,7 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
   // Wait for sentinel message from Producer, then signal no.more.packets.
   auto function = [&finish](std::vector<TracePacket> packets, bool has_more) {
+    printf("YYYY");
     for (auto& p : packets) {
       p.Decode();
       if (p->test() == "end")
@@ -158,7 +155,13 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   };
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(CONSUMER_SOCKET);
+
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
+      new FakeProducerDelegate(data, size, &consumer)));
+
   task_runner.RunUntilCheckpoint("no.more.packets");
+
   return 0;
 }
 
