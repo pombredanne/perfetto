@@ -45,7 +45,10 @@ namespace shm_fuzz {
 // consumer.
 class FakeProducer : public Producer {
  public:
-  FakeProducer(std::string name, const uint8_t* data, size_t size, FakeConsumer* consumer)
+  FakeProducer(std::string name,
+               const uint8_t* data,
+               size_t size,
+               FakeConsumer* consumer)
       : name_(std::move(name)), data_(data), size_(size), consumer_(consumer) {}
 
   void Connect(const char* socket_name, base::TaskRunner* task_runner) {
@@ -75,8 +78,7 @@ class FakeProducer : public Producer {
     end_packet->set_test("end");
     end_packet->Finalize();
 
-    printf("ASDASDSAD\n");
-    consumer_->DisableTracing();
+    consumer_->BusyWaitReadBuffers();
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {}
@@ -97,8 +99,8 @@ class FakeProducerDelegate : public ThreadDelegate {
   ~FakeProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(
-        new FakeProducer("android.perfetto.FakeProducer", data_, size_, consumer_));
+    producer_.reset(new FakeProducer("android.perfetto.FakeProducer", data_,
+                                     size_, consumer_));
     producer_->Connect(PRODUCER_SOCKET, task_runner);
   }
 
@@ -146,7 +148,6 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
   // Wait for sentinel message from Producer, then signal no.more.packets.
   auto function = [&finish](std::vector<TracePacket> packets, bool has_more) {
-    printf("YYYY");
     for (auto& p : packets) {
       p.Decode();
       if (p->test() == "end")
