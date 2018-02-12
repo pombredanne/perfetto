@@ -49,8 +49,42 @@ const char* kTracingPaths[] = {
 };
 #endif
 
-// TODO(hjd): Expose this as a configurable variable.
-const int kDrainPeriodMs = 100;
+const int kDefaultDrainPeriodMs = 100;
+const int kMinDrainPeriodMs = 1;
+const int kMaxDrainPeriodMs = 1000 * 60;
+
+const int kDefaultTotalBufferSizeKb = 1024 * 4;  // 4mb
+const int kMaxTotalBufferSizeKb = 1024 * 8;      // 8mb
+
+uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
+  if (drain_period_ms == 0) {
+    return kDefaultDrainPeriodMs;
+  }
+  if (drain_period_ms < kMinDrainPeriodMs ||
+      kMaxDrainPeriodMs < drain_period_ms) {
+    PERFETTO_LOG("drain_period_ms was %u should be between %u and %u",
+                 drain_period_ms, kMinDrainPeriodMs, kMaxDrainPeriodMs);
+    return kDefaultDrainPeriodMs;
+  }
+  return drain_period_ms;
+}
+
+// Post-conditions:
+// 1. result >= 1 (should have at least one page per CPU)
+// 2. result * 4 < kMaxTotalBufferSizeKb
+// 3. If input is 0 output is a good default number.
+size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb) {
+  if (requested_buffer_size_kb == 0)
+    requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
+  if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
+    requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
+
+  size_t pages = requested_buffer_size_kb / (base::kPageSize / 1024);
+  if (pages == 0)
+    return 1;
+
+  return pages;
+}
 
 bool RunAtrace(std::vector<std::string> args) {
   int status = 1;
@@ -137,7 +171,7 @@ void FtraceController::PeriodicDrainCPU(
   weak_this->task_runner_->PostDelayedTask(
       std::bind(&FtraceController::PeriodicDrainCPU, weak_this, generation,
                 cpu),
-      has_more ? 0 : kDrainPeriodMs);
+      has_more ? 0 : weak_this->GetDrainPeriodMs());
 }
 
 void FtraceController::StartIfNeeded() {
@@ -146,14 +180,35 @@ void FtraceController::StartIfNeeded() {
   PERFETTO_CHECK(sinks_.size() != 0);
   PERFETTO_CHECK(!listening_for_raw_trace_data_);
   listening_for_raw_trace_data_ = true;
+  ftrace_procfs_->SetCpuBufferSizeInPages(GetCpuBufferSizeInPages());
   ftrace_procfs_->EnableTracing();
   generation_++;
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
     base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(std::bind(&FtraceController::PeriodicDrainCPU,
                                             weak_this, generation_, cpu),
-                                  kDrainPeriodMs);
+                                  GetDrainPeriodMs());
   }
+}
+
+uint32_t FtraceController::GetDrainPeriodMs() {
+  if (sinks_.size() == 0)
+    return kDefaultDrainPeriodMs;
+  uint32_t min_drain_period_ms = kMaxDrainPeriodMs + 1;
+  for (const FtraceSink* sink : sinks_) {
+    if (sink->config().drain_period_ms() < min_drain_period_ms)
+      min_drain_period_ms = sink->config().drain_period_ms();
+  }
+  return ClampDrainPeriodMs(min_drain_period_ms);
+}
+
+uint32_t FtraceController::GetCpuBufferSizeInPages() {
+  uint32_t max_buffer_size_kb = 0;
+  for (const FtraceSink* sink : sinks_) {
+    if (sink->config().buffer_size_kb() > max_buffer_size_kb)
+      max_buffer_size_kb = sink->config().buffer_size_kb();
+  }
+  return ComputeCpuBufferSizeInPages(max_buffer_size_kb);
 }
 
 void FtraceController::ClearTrace() {
@@ -208,17 +263,20 @@ CpuReader* FtraceController::GetCpuReader(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    const FtraceConfig& config,
+    FtraceConfig config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (sinks_.size() >= kMaxSinks)
     return nullptr;
+  if (!ValidConfig(config))
+    return nullptr;
   auto controller_weak = weak_factory_.GetWeakPtr();
-  auto filter =
-      std::unique_ptr<EventFilter>(new EventFilter(*table_, config.events()));
-  auto sink = std::unique_ptr<FtraceSink>(
-      new FtraceSink(std::move(controller_weak), std::move(config),
-                     std::move(filter), delegate));
+  auto filter = std::unique_ptr<EventFilter>(
+      new EventFilter(*table_.get(), FtraceEventsAsSet(config)));
+  for (const std::string& event : config.event_names())
+    PERFETTO_LOG("%s", event.c_str());
+  auto sink = std::unique_ptr<FtraceSink>(new FtraceSink(
+      std::move(controller_weak), config, std::move(filter), delegate));
   Register(sink.get());
   return sink;
 }
@@ -227,7 +285,7 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it_and_inserted = sinks_.insert(sink);
   PERFETTO_DCHECK(it_and_inserted.second);
-  if (sink->config().RequiresAtrace())
+  if (RequiresAtrace(sink->config()))
     StartAtrace(sink->config());
 
   StartIfNeeded();
@@ -266,7 +324,7 @@ void FtraceController::Unregister(FtraceSink* sink) {
 
   for (const std::string& name : sink->enabled_events())
     UnregisterForEvent(name);
-  if (sink->config().RequiresAtrace())
+  if (RequiresAtrace(sink->config()))
     StopAtrace();
   StopIfNeeded();
 }
@@ -304,7 +362,7 @@ FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
                        std::unique_ptr<EventFilter> filter,
                        Delegate* delegate)
     : controller_weak_(std::move(controller_weak)),
-      config_(std::move(config)),
+      config_(config),
       filter_(std::move(filter)),
       delegate_(delegate){};
 
@@ -315,36 +373,6 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
-}
-
-FtraceConfig::FtraceConfig() = default;
-FtraceConfig::FtraceConfig(std::set<std::string> events)
-    : ftrace_events_(std::move(events)) {}
-FtraceConfig::~FtraceConfig() = default;
-
-void FtraceConfig::AddEvent(const std::string& event) {
-  ftrace_events_.insert(event);
-}
-
-void FtraceConfig::AddAtraceApp(const std::string& app) {
-  // You implicitly need the print ftrace event if you
-  // are using atrace.
-  AddEvent("print");
-  atrace_apps_.insert(app);
-}
-
-void FtraceConfig::AddAtraceCategory(const std::string& category) {
-  // You implicitly need the print ftrace event if you
-  // are using atrace.
-  AddEvent("print");
-  if (category == "sched") {
-    AddEvent("sched_switch");
-  }
-  atrace_categories_.insert(category);
-}
-
-bool FtraceConfig::RequiresAtrace() const {
-  return !atrace_categories_.empty() || !atrace_apps_.empty();
 }
 
 }  // namespace perfetto

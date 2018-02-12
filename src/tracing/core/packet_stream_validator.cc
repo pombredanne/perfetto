@@ -19,126 +19,27 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trusted_packet.pb.h"
 
-using protozero::proto_utils::FieldType;
-using protozero::proto_utils::kFieldTypeVarInt;
-using protozero::proto_utils::kFieldTypeFixed64;
-using protozero::proto_utils::kFieldTypeLengthDelimited;
-using protozero::proto_utils::kFieldTypeFixed32;
+#include "src/tracing/core/chunked_protobuf_input_stream.h"
 
 namespace perfetto {
 
 PacketStreamValidator::PacketStreamValidator(const ChunkSequence* sequence)
     : stream_(sequence) {
+  static_assert(protos::TracePacket::kTrustedUidFieldNumber ==
+                    protos::TrustedPacket::kTrustedUidFieldNumber,
+                "trusted uid field id mismatch");
   for (const Chunk& chunk : *sequence)
-    total_size_ += chunk.size;
+    size_ += chunk.size;
 }
 
 bool PacketStreamValidator::Validate() {
-  while (!Eof()) {
-    uint64_t field_id;
-    if (!ConsumeField(&field_id))
-      return false;
-
-    // Only the service is allowed to emit the trusted uid field.
-    if (field_id == protos::TracePacket::kTrustedUidFieldNumber)
-      return false;
-  }
-  return true;
-}
-
-bool PacketStreamValidator::ReadByte(uint8_t* value) {
-  while (chunk_size_ < 1) {
-    if (!stream_.Next(reinterpret_cast<const void**>(&chunk_pos_),
-                      &chunk_size_))
-      return false;
-  }
-  *value = *chunk_pos_++;
-  chunk_size_--;
-  read_size_++;
-  return true;
-}
-
-bool PacketStreamValidator::Eof() const {
-  PERFETTO_DCHECK(read_size_ <= total_size_);
-  return read_size_ == total_size_;
-}
-
-bool PacketStreamValidator::SkipBytes(size_t count) {
-  if (read_size_ + count > total_size_)
+  protos::TrustedPacket packet;
+  if (!packet.ParseFromBoundedZeroCopyStream(&stream_, size_))
     return false;
-  // First skip inside the current chunk.
-  size_t chunk_skip = std::min(static_cast<size_t>(chunk_size_), count);
-  chunk_pos_ += chunk_skip;
-  read_size_ += chunk_skip;
-  chunk_size_ -= chunk_skip;
-  count -= chunk_skip;
-  PERFETTO_DCHECK(chunk_size_ >= 0);
-  PERFETTO_DCHECK(count >= 0);
-  // If there are still bytes left to skip, continue in the stream.
-  if (!chunk_size_ && count) {
-    chunk_pos_ = nullptr;
-    read_size_ += count;
-    return stream_.Skip(count) || Eof();
-  }
-  return true;
-}
-
-bool PacketStreamValidator::ConsumeVarInt(uint64_t* value) {
-  uint64_t shift = 0;
-  *value = 0;
-  uint8_t byte;
-  do {
-    if (!ReadByte(&byte))
-      return false;
-    PERFETTO_DCHECK(shift < 64ull);
-    *value |= static_cast<uint64_t>(byte & 0x7f) << shift;
-    shift += 7;
-  } while (byte & 0x80);
-  return true;
-}
-
-bool PacketStreamValidator::ConsumeField(uint64_t* field_id) {
-  if (!ConsumeVarInt(field_id))
-    return false;
-
-  // See proto_utils.cc in protozero.
-  const uint8_t kFieldTypeNumBits = 3;
-  const uint8_t kFieldTypeMask = (1 << kFieldTypeNumBits) - 1;  // 0000 0111;
-  int field_type = static_cast<FieldType>(*field_id & kFieldTypeMask);
-
-  *field_id >>= kFieldTypeNumBits;
-  PERFETTO_DCHECK(*field_id <= std::numeric_limits<uint32_t>::max());
-
-  switch (field_type) {
-    case kFieldTypeFixed64: {
-      if (!SkipBytes(8))
-        return false;
-      break;
-    }
-    case kFieldTypeFixed32: {
-      if (!SkipBytes(4))
-        return false;
-      break;
-    }
-    case kFieldTypeVarInt: {
-      uint64_t unused;
-      if (!ConsumeVarInt(&unused))
-        return false;
-      break;
-    }
-    case kFieldTypeLengthDelimited: {
-      uint64_t length;
-      if (!ConsumeVarInt(&length))
-        return false;
-      if (!SkipBytes(length))
-        return false;
-      break;
-    }
-    default:
-      return false;
-  }
-  return true;
+  // Only the service is allowed to fill in the trusted uid.
+  return !packet.has_trusted_uid();
 }
 
 }  // namespace perfetto

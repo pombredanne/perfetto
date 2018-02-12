@@ -15,7 +15,9 @@
  */
 
 #include <fstream>
+#include <set>
 #include <sstream>
+#include <string>
 
 #include "ftrace_procfs.h"
 #include "gmock/gmock.h"
@@ -23,12 +25,12 @@
 
 using testing::HasSubstr;
 using testing::Not;
+using testing::Contains;
 
 namespace perfetto {
 namespace {
 
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
-const char kTracePath[] = "/sys/kernel/debug/tracing/trace";
 
 void ResetFtrace(FtraceProcfs* ftrace) {
   ftrace->DisableAllEvents();
@@ -36,16 +38,24 @@ void ResetFtrace(FtraceProcfs* ftrace) {
   ftrace->EnableTracing();
 }
 
-std::string GetTraceOutput() {
-  std::ifstream fin(kTracePath, std::ios::in);
+std::string ReadFile(const std::string& name) {
+  std::string path = std::string(kTracingPath) + name;
+  std::ifstream fin(path, std::ios::in);
   if (!fin) {
-    ADD_FAILURE() << "Could not read trace output";
     return "";
   }
   std::ostringstream stream;
   stream << fin.rdbuf();
   fin.close();
   return stream.str();
+}
+
+std::string GetTraceOutput() {
+  std::string output = ReadFile("trace");
+  if (output.empty()) {
+    ADD_FAILURE() << "Could not read trace output";
+  }
+  return output;
 }
 
 }  // namespace
@@ -119,6 +129,26 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_ReadAvailableEvents) {
 TEST(FtraceProcfsIntegrationTest, DISABLED_CanOpenTracePipeRaw) {
   FtraceProcfs ftrace(kTracingPath);
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
+}
+
+TEST(FtraceProcfsIntegrationTest, DISABLED_Clock) {
+  FtraceProcfs ftrace(kTracingPath);
+  std::set<std::string> clocks = ftrace.AvailableClocks();
+  EXPECT_THAT(clocks, Contains("local"));
+  EXPECT_THAT(clocks, Contains("global"));
+
+  EXPECT_TRUE(ftrace.SetClock("global"));
+  EXPECT_EQ(ftrace.GetClock(), "global");
+  EXPECT_TRUE(ftrace.SetClock("local"));
+  EXPECT_EQ(ftrace.GetClock(), "local");
+}
+
+TEST(FtraceProcfsIntegrationTest, DISABLED_CanSetBufferSize) {
+  FtraceProcfs ftrace(kTracingPath);
+  EXPECT_TRUE(ftrace.SetCpuBufferSizeInPages(4ul));
+  EXPECT_EQ(ReadFile("buffer_size_kb"), "16\n");  // (4096 * 4) / 1024
+  EXPECT_TRUE(ftrace.SetCpuBufferSizeInPages(5ul));
+  EXPECT_EQ(ReadFile("buffer_size_kb"), "20\n");  // (4096 * 5) / 1024
 }
 
 }  // namespace perfetto

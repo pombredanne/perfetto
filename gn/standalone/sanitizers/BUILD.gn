@@ -86,6 +86,15 @@ config("sanitizers_cflags") {
     ]
     defines += [ "UNDEFINED_SANITIZER" ]
   }
+  if (use_libfuzzer) {
+    cflags += [ "-fsanitize=fuzzer" ]
+    if (is_asan) {
+      cflags += [
+        "-mllvm",
+        "-asan-use-private-alias",
+      ]
+    }
+  }
 }
 
 config("sanitizer_options_link_helper") {

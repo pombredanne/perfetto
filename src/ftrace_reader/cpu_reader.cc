@@ -182,7 +182,9 @@ size_t CpuReader::ParsePage(size_t cpu,
         // Left over page padding or discarded event.
         if (event_header.time_delta == 0) {
           // TODO(hjd): Look at the next few bytes for read size;
-          PERFETTO_CHECK(false);  // TODO(hjd): Handle
+          PERFETTO_ELOG("Padding time_delta == 0 not handled.");
+          PERFETTO_DCHECK(false);  // TODO(hjd): Handle
+          return 0;
         }
         uint32_t length;
         if (!ReadAndAdvance<uint32_t>(&ptr, end, &length))
@@ -213,7 +215,9 @@ size_t CpuReader::ParsePage(size_t cpu,
         // type_or_length is <=28 so it represents the length of a data record.
         if (event_header.type_or_length == 0) {
           // TODO(hjd): Look at the next few bytes for real size.
-          PERFETTO_CHECK(false);
+          PERFETTO_ELOG("Data type_or_length == 0 not handled.");
+          PERFETTO_DCHECK(false);
+          return 0;
         }
         const uint8_t* start = ptr;
         const uint8_t* next = ptr + 4 * event_header.type_or_length;
@@ -286,6 +290,8 @@ bool CpuReader::ParseField(const Field& field,
   uint32_t field_id = field.proto_field_id;
 
   switch (field.strategy) {
+    case kUint8ToUint32:
+    case kUint16ToUint32:
     case kUint32ToUint32:
     case kUint32ToUint64:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
@@ -293,6 +299,7 @@ bool CpuReader::ParseField(const Field& field,
     case kUint64ToUint64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
+    case kInt16ToInt32:
     case kInt32ToInt32:
     case kInt32ToInt64:
       ReadIntoVarInt<int32_t>(field_start, field_id, message);
@@ -309,6 +316,9 @@ bool CpuReader::ParseField(const Field& field,
       return ReadIntoString(field_start, end, field.proto_field_id, message);
     case kStringPtrToString:
       // TODO(hjd): Figure out how to read these.
+      return true;
+    case kBoolToUint32:
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
   }
   // Not reached, for gcc.

@@ -123,6 +123,15 @@ bool FtraceProcfs::WriteTraceMarker(const std::string& str) {
   return WriteToFile(path, str);
 }
 
+bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
+  if (pages * base::kPageSize > 1 * 1024 * 1024 * 1024) {
+    PERFETTO_ELOG("Tried to set the per CPU buffer size to more than 1gb.");
+    return false;
+  }
+  std::string path = root_ + "buffer_size_kb";
+  return WriteNumberToFile(path, pages * (base::kPageSize / 1024ul));
+}
+
 bool FtraceProcfs::EnableTracing() {
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
@@ -136,6 +145,57 @@ bool FtraceProcfs::DisableTracing() {
 bool FtraceProcfs::IsTracingEnabled() {
   std::string path = root_ + "tracing_on";
   return ReadOneCharFromFile(path) == '1';
+}
+
+bool FtraceProcfs::SetClock(const std::string& clock_name) {
+  std::string path = root_ + "trace_clock";
+  return WriteToFile(path, clock_name);
+}
+
+std::string FtraceProcfs::GetClock() {
+  std::string path = root_ + "trace_clock";
+  std::string s = ReadFileIntoString(path);
+
+  size_t start = s.find("[");
+  if (start == std::string::npos)
+    return "";
+
+  size_t end = s.find("]", start);
+  if (end == std::string::npos)
+    return "";
+
+  return s.substr(start + 1, end - start - 1);
+}
+
+std::set<std::string> FtraceProcfs::AvailableClocks() {
+  std::string path = root_ + "trace_clock";
+  std::string s = ReadFileIntoString(path);
+  std::set<std::string> names;
+
+  size_t start = 0;
+  size_t end = 0;
+
+  while ((end = s.find(" ", start)) != std::string::npos) {
+    std::string name = s.substr(start, end - start);
+
+    if (name[0] == '[')
+      name = name.substr(1, name.size() - 2);
+
+    names.insert(name);
+
+    start = end + 1;
+  }
+
+  return names;
+}
+
+bool FtraceProcfs::WriteNumberToFile(const std::string& path, size_t value) {
+  // 2^65 requires 20 digits to write.
+  char buf[21];
+  int res = snprintf(buf, 21, "%zu", value);
+  if (res < 0 || res >= 21)
+    return false;
+  return WriteToFile(path, std::string(buf));
 }
 
 bool FtraceProcfs::WriteToFile(const std::string& path,

@@ -31,6 +31,7 @@ message TracePacket {
     // This field is only used for testing.
     TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.
   }
-  // Trusted user id of the producer which generated this packet.
+  // Trusted user id of the producer which generated this packet. Keep in sync
+  // with TrustedPacket.trusted_uid.
   optional int32 trusted_uid = 3;
 }

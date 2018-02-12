@@ -18,9 +18,18 @@
 #define INCLUDE_PERFETTO_BASE_TASK_RUNNER_H_
 
 #include <functional>
+#include "perfetto/base/build_config.h"
+
+#if BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID)
+#include "perfetto/base/watchdog.h"
+#endif
 
 namespace perfetto {
 namespace base {
+
+// Maximum time a single task can take in a TaskRunner before the
+// program suicides.
+constexpr int64_t kWatchdogMillis = 30000;  // 30s
 
 // A generic interface to allow the library clients to interleave the execution
 // of the tracing internals in their runtime environment.
@@ -57,6 +66,15 @@ class TaskRunner {
   // will not be executed after this function call. Can be called from any
   // thread.
   virtual void RemoveFileDescriptorWatch(int fd) = 0;
+
+ protected:
+  static void RunTask(const std::function<void()>& task) {
+#if !BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+    (BUILDFLAG(OS_LINUX) || BUILDFLAG(OS_ANDROID))
+    base::WatchDog w(kWatchdogMillis);
+#endif
+    task();
+  }
 };
 
 }  // namespace base

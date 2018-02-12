@@ -62,12 +62,11 @@ void ProducerIPCService::InitializeConnection(
   }
 
   // Create a new entry.
-  std::unique_ptr<RemoteProducer> producer(
-      new RemoteProducer(client_info.uid()));
+  std::unique_ptr<RemoteProducer> producer(new RemoteProducer());
 
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
-      producer.get(), req.shared_buffer_size_hint_bytes());
+      producer.get(), client_info.uid(), req.shared_buffer_size_hint_bytes());
   const int shm_fd = static_cast<PosixSharedMemory*>(
                          producer->service_endpoint->shared_memory())
                          ->fd();
@@ -210,7 +209,7 @@ void ProducerIPCService::GetAsyncCommand(
 // RemoteProducer methods
 ////////////////////////////////////////////////////////////////////////////////
 
-ProducerIPCService::RemoteProducer::RemoteProducer(uid_t uid) : uid_(uid) {}
+ProducerIPCService::RemoteProducer::RemoteProducer() = default;
 ProducerIPCService::RemoteProducer::~RemoteProducer() = default;
 
 // Invoked by the |core_service_| business logic after the ConnectProducer()
@@ -252,10 +251,6 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
   cmd.set_has_more(true);
   cmd->mutable_stop_data_source()->set_instance_id(dsid);
   async_producer_commands.Resolve(std::move(cmd));
-}
-
-uid_t ProducerIPCService::RemoteProducer::uid() {
-  return uid_;
 }
 
 }  // namespace perfetto

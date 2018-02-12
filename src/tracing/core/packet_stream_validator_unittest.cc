@@ -148,5 +148,17 @@ TEST(PacketStreamValidatorTest, TruncatedPacket) {
   }
 }
 
+TEST(PacketStreamValidatorTest, TrailingGarbage) {
+  protos::TracePacket proto;
+  proto.mutable_for_testing()->set_str("string field");
+  std::string ser_buf = proto.SerializeAsString();
+  ser_buf += "bike is short for bichael";
+
+  ChunkSequence seq;
+  seq.emplace_back(&ser_buf[0], ser_buf.size());
+  PacketStreamValidator validator(&seq);
+  EXPECT_FALSE(validator.Validate());
+}
+
 }  // namespace
 }  // namespace perfetto

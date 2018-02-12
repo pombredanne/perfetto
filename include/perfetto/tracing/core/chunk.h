@@ -29,11 +29,7 @@ namespace perfetto {
 struct Chunk {
   Chunk() : start(nullptr), size(0) {}
   Chunk(const void* st, size_t sz) : start(st), size(sz) {}
-  Chunk(Chunk&& other) noexcept {
-    size = other.size;
-    start = other.start;
-    own_data_ = std::move(other.own_data_);
-  }
+  Chunk(Chunk&& other) noexcept = default;
 
   // Create a Chunk which contains (and owns) a copy of the given memory.
   static Chunk Copy(const void* start, size_t size) {
@@ -49,6 +45,9 @@ struct Chunk {
   size_t size;
 
  private:
+  Chunk(const Chunk&) = delete;
+  void operator=(const Chunk&) = delete;
+
   std::unique_ptr<uint8_t[]> own_data_;
 };
 

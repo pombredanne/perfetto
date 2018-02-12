@@ -30,7 +30,10 @@ FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
 
 void FakeProducer::Connect(const char* socket_name,
-                           base::TaskRunner* task_runner) {
+                           base::TaskRunner* task_runner,
+                           std::function<void()> data_produced_callback) {
+  task_runner_ = task_runner;
+  data_produced_callback_ = std::move(data_produced_callback);
   endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
 }
 
@@ -54,14 +57,14 @@ void FakeProducer::CreateDataSourceInstance(
     handle->Finalize();
   }
 
-  // Temporarily create a new packet to flush the final packet to the
-  // consumer.
-  // TODO(primiano): remove this hack once flushing the final packet is fixed.
-  trace_writer->NewTracePacket();
-
   // TODO(primiano): reenable this once UnregisterDataSource is specified in
   // ServiceImpl.
   // endpoint_->UnregisterDataSource(id_);
+
+  // TODO(skyostil): There's a race here before the service processes our data
+  // and the consumer tries to retrieve it. For now wait a bit until the service
+  // is done, but we should add explicit flushing to avoid this.
+  task_runner_->PostDelayedTask(data_produced_callback_, 1000);
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}

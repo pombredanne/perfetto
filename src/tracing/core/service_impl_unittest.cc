@@ -56,9 +56,9 @@ TEST(ServiceImpl, RegisterAndUnregister) {
   MockProducer mock_producer_1;
   MockProducer mock_producer_2;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_1 =
-      svc->ConnectProducer(&mock_producer_1);
+      svc->ConnectProducer(&mock_producer_1, 123u /* uid */);
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_2 =
-      svc->ConnectProducer(&mock_producer_2);
+      svc->ConnectProducer(&mock_producer_2, 456u /* uid */);
 
   ASSERT_TRUE(producer_endpoint_1);
   ASSERT_TRUE(producer_endpoint_2);
@@ -71,6 +71,8 @@ TEST(ServiceImpl, RegisterAndUnregister) {
   ASSERT_EQ(2u, svc->num_producers());
   ASSERT_EQ(producer_endpoint_1.get(), svc->GetProducer(1));
   ASSERT_EQ(producer_endpoint_2.get(), svc->GetProducer(2));
+  ASSERT_EQ(123u, svc->GetProducer(1)->uid());
+  ASSERT_EQ(456u, svc->GetProducer(2)->uid());
 
   DataSourceDescriptor ds_desc1;
   ds_desc1.set_name("foo");

@@ -104,16 +104,19 @@ class PerfettoTest : public ::testing::Test {
 
   class FakeProducerDelegate : public ThreadDelegate {
    public:
-    FakeProducerDelegate() = default;
+    FakeProducerDelegate(std::function<void()> connect_callback)
+        : connect_callback_(std::move(connect_callback)) {}
     ~FakeProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
-      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner,
+                         std::move(connect_callback_));
     }
 
    private:
     std::unique_ptr<FakeProducer> producer_;
+    std::function<void()> connect_callback_;
   };
 };
 
@@ -222,15 +225,21 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 #if !BUILDFLAG(PERFETTO_ANDROID_BUILD)
   TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
-
-  TaskRunnerThread producer_thread;
-  producer_thread.Start(
-      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate));
 #endif
+
+  auto data_produced = task_runner.CreateCheckpoint("data.produced");
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
+      new FakeProducerDelegate([&task_runner, &data_produced] {
+        task_runner.PostTask(data_produced);
+      })));
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+
+  task_runner.RunUntilCheckpoint("data.produced");
+  consumer.ReadTraceData();
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }

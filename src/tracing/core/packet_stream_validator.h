@@ -24,27 +24,24 @@
 namespace perfetto {
 
 // Checks that the stream of trace packets sent by the producer is well formed.
+// This includes:
+//
+// - Checking that the packets are not truncated.
+// - There are no dangling bytes left over in the packets.
+// - Any trusted fields (e.g., uid) are not set.
+//
 // Note that we only validate top-level fields in the trace proto; sub-messages
 // are simply skipped.
 class PacketStreamValidator {
  public:
+  // |sequence| needs to remain valid for the lifetime of this class.
   explicit PacketStreamValidator(const ChunkSequence* sequence);
 
   bool Validate();
 
  private:
-  bool ReadByte(uint8_t* value);
-  bool SkipBytes(size_t count);
-  bool ConsumeField(uint64_t* field_id);
-  bool ConsumeVarInt(uint64_t* value);
-  bool Eof() const;
-
   ChunkedProtobufInputStream stream_;
-  size_t total_size_ = 0;
-  size_t read_size_ = 0;
-
-  const uint8_t* chunk_pos_ = nullptr;
-  int chunk_size_ = 0;
+  size_t size_ = 0;
 };
 
 }  // namespace perfetto

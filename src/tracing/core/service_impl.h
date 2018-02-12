@@ -52,6 +52,7 @@ class ServiceImpl : public Service {
   class ProducerEndpointImpl : public Service::ProducerEndpoint {
    public:
     ProducerEndpointImpl(ProducerID,
+                         uid_t uid,
                          ServiceImpl*,
                          base::TaskRunner*,
                          Producer*,
@@ -67,18 +68,22 @@ class ServiceImpl : public Service {
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
+    uid_t uid() const { return uid_; }
+
    private:
     friend class ServiceImpl;
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
     ProducerEndpointImpl& operator=(const ProducerEndpointImpl&) = delete;
 
     ProducerID const id_;
+    const uid_t uid_;
     ServiceImpl* const service_;
     base::TaskRunner* const task_runner_;
     Producer* producer_;
     std::unique_ptr<SharedMemory> shared_memory_;
     SharedMemoryABI shmem_abi_;
     DataSourceID last_data_source_id_ = 0;
+    PERFETTO_THREAD_CHECKER(thread_checker_)
   };
 
   // The implementation behind the service endpoint exposed to each consumer.
@@ -103,6 +108,9 @@ class ServiceImpl : public Service {
     ServiceImpl* const service_;
     Consumer* const consumer_;
     TracingSessionID tracing_session_id_ = 0;
+
+    PERFETTO_THREAD_CHECKER(thread_checker_)
+
     base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
   };
 
@@ -130,6 +138,7 @@ class ServiceImpl : public Service {
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
       Producer*,
+      uid_t uid,
       size_t shared_buffer_size_hint_bytes = 0) override;
 
   std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
@@ -238,6 +247,8 @@ class ServiceImpl : public Service {
   std::set<ConsumerEndpointImpl*> consumers_;
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
   std::map<BufferID, TraceBuffer> buffers_;
+
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 
   base::WeakPtrFactory<ServiceImpl> weak_ptr_factory_;  // Keep at the end.
 };

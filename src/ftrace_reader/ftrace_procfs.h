@@ -18,6 +18,7 @@
 #define SRC_FTRACE_READER_FTRACE_PROCFS_H_
 
 #include <memory>
+#include <set>
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
@@ -48,6 +49,11 @@ class FtraceProcfs {
   // Read the available_events file.
   std::string ReadAvailableEvents() const;
 
+  // Set ftrace buffer size in pages.
+  // This size is *per cpu* so for the total size you have to multiply
+  // by the number of CPUs.
+  bool SetCpuBufferSizeInPages(size_t pages);
+
   // Returns the number of CPUs.
   // This will match the number of tracing/per_cpu/cpuXX directories.
   size_t virtual NumberOfCpus() const;
@@ -69,6 +75,16 @@ class FtraceProcfs {
   // point.
   bool IsTracingEnabled();
 
+  // Set the clock. |clock_name| should be one of the names returned by
+  // AvailableClocks. Setting the clock clears the buffer.
+  bool SetClock(const std::string& clock_name);
+
+  // Get the currently set clock.
+  std::string GetClock();
+
+  // Get all the avaiable clocks.
+  std::set<std::string> AvailableClocks();
+
   // Open the raw pipe for |cpu|.
   virtual base::ScopedFile OpenPipeForCpu(size_t cpu);
 
@@ -78,6 +94,8 @@ class FtraceProcfs {
  private:
   // Checks the trace file is present at the given root path.
   static bool CheckRootPath(const std::string& root);
+
+  bool WriteNumberToFile(const std::string& path, size_t value);
 
   const std::string root_;
 };
