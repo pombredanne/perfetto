@@ -153,8 +153,8 @@ script:
       done
       if [[ "$CFG" == *-libfuzzer ]]; then
         # Run a single iteration each to make sure they are not crashing.
-        out/linux_fuzzer/end_to_end_shared_memory_fuzzer -steps=1
-        out/linux_fuzzer/buffered_frame_deserializer_fuzzer -steps=1
+        out/dist/end_to_end_shared_memory_fuzzer -steps=1
+        out/dist/buffered_frame_deserializer_fuzzer -steps=1
       fi
     else
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
