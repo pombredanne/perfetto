@@ -117,9 +117,12 @@ class PerfettoTest : public ::testing::Test {
   };
 };
 
-// TODO(lalitm): reenable this when we have a solution for running ftrace
-// on travis.
-TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
+#if BUILDFLAG(OS_ANDROID)
+#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
+#else
+#define MAYBE_TestFtraceProducer TestFtraceProducer
+#endif
+TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
