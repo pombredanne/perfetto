@@ -37,13 +37,13 @@
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 
-#if PERFETTO_BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #include "perfetto/base/android_task_runner.h"
 #endif
 
 namespace perfetto {
 
-#if PERFETTO_BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
 using PlatformTaskRunner = base::UnixTaskRunner;
@@ -51,7 +51,8 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 
 // If we're building on Android and starting the daemons ourselves,
 // create the sockets in a world-writable location.
-#if PERFETTO_BUILDFLAG(OS_ANDROID) && PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
+    PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
 #define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
 #define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
 #else
