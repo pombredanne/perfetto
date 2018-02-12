@@ -134,7 +134,7 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   printf("%s\n", output_as_text.c_str());
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(OS_ANDROID)
 TEST_F(EndToEndIntegrationTest, DISABLED_Atrace) {
   FtraceProcfs procfs(kTracingPath);
   procfs.ClearTrace();

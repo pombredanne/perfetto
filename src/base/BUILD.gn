@@ -23,6 +23,7 @@ source_set("base") {
   ]
   sources = [
     "page_allocator.cc",
+    "task_runner.cc",
     "thread_checker.cc",
     "unix_task_runner.cc",
   ]
