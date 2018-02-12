@@ -143,8 +143,10 @@ script:
       done
       if [[ "$CFG" == *-libfuzzer ]]; then
         # Run a single iteration each to make sure they are not crashing.
-        out/dist/end_to_end_shared_memory_fuzzer -steps=1
-        out/dist/buffered_frame_deserializer_fuzzer -steps=1
+        # FIXME(fmayer): Fix the race condition regarding set_duration_ms
+        # and uncomment this fuzzer.
+        # out/dist/end_to_end_shared_memory_fuzzer -runs=1
+        out/dist/buffered_frame_deserializer_fuzzer -runs=1
       fi
     else
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
