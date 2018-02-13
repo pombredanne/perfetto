@@ -57,6 +57,8 @@ source_set("ftrace_reader_unittests") {
     "format_parser_unittest.cc",
     "ftrace_config_unittest.cc",
     "ftrace_controller_unittest.cc",
+    "ftrace_model_unittest.cc",
+    "ftrace_procfs_unittest.cc",
     "proto_translation_table_unittest.cc",
   ]
 }
@@ -118,6 +120,8 @@ source_set("ftrace_reader") {
     "format_parser.cc",
     "ftrace_config.cc",
     "ftrace_controller.cc",
+    "ftrace_model.cc",
+    "ftrace_model.h",
     "ftrace_procfs.cc",
     "ftrace_procfs.h",
     "proto_translation_table.cc",

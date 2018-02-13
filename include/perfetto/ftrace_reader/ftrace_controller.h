@@ -42,11 +42,12 @@ class FtraceEventBundle;
 
 const size_t kMaxSinks = 32;
 
-class FtraceController;
-class ProtoTranslationTable;
 class CpuReader;
-class FtraceProcfs;
 class EventFilter;
+class FtraceController;
+class FtraceModel;
+class FtraceProcfs;
+class ProtoTranslationTable;
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
 // to create a |FtraceSink|. While the FtraceSink lives FtraceController will
@@ -75,6 +76,9 @@ class FtraceSink {
 
  private:
   friend FtraceController;
+
+  FtraceSink(const FtraceSink&) = delete;
+  FtraceSink& operator=(const FtraceSink&) = delete;
 
   EventFilter* get_event_filter() { return filter_.get(); }
   protozero::ProtoZeroMessageHandle<FtraceEventBundle> GetBundleForCpu(
@@ -109,8 +113,9 @@ class FtraceController {
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
-                   base::TaskRunner*,
-                   std::unique_ptr<ProtoTranslationTable>);
+                   std::unique_ptr<ProtoTranslationTable>,
+                   std::unique_ptr<FtraceModel>,
+                   base::TaskRunner*);
 
   // Called to read  data from the raw pipe
   // for the given |cpu|. Kicks off the reading/parsing
@@ -134,8 +139,6 @@ class FtraceController {
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
-  void RegisterForEvent(const std::string& event_name);
-  void UnregisterForEvent(const std::string& event_name);
 
   void StartAtrace(const FtraceConfig&);
   void StopAtrace();
@@ -148,12 +151,12 @@ class FtraceController {
   CpuReader* GetCpuReader(size_t cpu);
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
+  std::unique_ptr<ProtoTranslationTable> table_;
+  std::unique_ptr<FtraceModel> ftrace_model_;
   size_t generation_ = 0;
   bool listening_for_raw_trace_data_ = false;
   bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
-  std::vector<size_t> enabled_count_;
-  std::unique_ptr<ProtoTranslationTable> table_;
   std::map<size_t, std::unique_ptr<CpuReader>> readers_;
   std::set<FtraceSink*> sinks_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
