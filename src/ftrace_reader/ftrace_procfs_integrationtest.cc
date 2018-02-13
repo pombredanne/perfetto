@@ -120,12 +120,6 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_ReadFormatFile) {
   EXPECT_THAT(format, HasSubstr("field:char buf"));
 }
 
-TEST(FtraceProcfsIntegrationTest, DISABLED_ReadAvailableEvents) {
-  FtraceProcfs ftrace(kTracingPath);
-  std::string format = ftrace.ReadAvailableEvents();
-  EXPECT_THAT(format, HasSubstr("sched:sched_switch"));
-}
-
 TEST(FtraceProcfsIntegrationTest, DISABLED_CanOpenTracePipeRaw) {
   FtraceProcfs ftrace(kTracingPath);
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
