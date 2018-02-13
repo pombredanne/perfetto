@@ -61,7 +61,7 @@ std::string GetTraceOutput() {
 }  // namespace
 
 // TODO(lalitm): reenable these tests (see b/72306171).
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_CreateWithGoodPath CreateWithGoodPath
 #else
 #define MAYBE_CreateWithGoodPath DISABLED_CreateWithGoodPath
@@ -70,7 +70,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_CreateWithGoodPath) {
   EXPECT_TRUE(FtraceProcfs::Create(kTracingPath));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_CreateWithBadPath CreateWithBadPath
 #else
 #define MAYBE_CreateWithBadPath DISABLED_CreateWithBadath
@@ -79,7 +79,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_CreateWithBadPath) {
   EXPECT_FALSE(FtraceProcfs::Create(kTracingPath + std::string("bad_path")));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_ClearTrace ClearTrace
 #else
 #define MAYBE_ClearTrace DISABLED_ClearTrace
@@ -92,7 +92,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_ClearTrace) {
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("Hello, World!")));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_TraceMarker TraceMarker
 #else
 #define MAYBE_TraceMarker DISABLED_TraceMarker
@@ -104,7 +104,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_TraceMarker) {
   EXPECT_THAT(GetTraceOutput(), HasSubstr("Hello, World!"));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_EnableDisableEvent EnableDisableEvent
 #else
 #define MAYBE_EnableDisableEvent DISABLED_EnableDisableEvent
@@ -122,7 +122,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_EnableDisableEvent) {
   EXPECT_THAT(GetTraceOutput(), Not(HasSubstr("sched_switch")));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_EnableDisableTracing EnableDisableTracing
 #else
 #define MAYBE_EnableDisableTracing DISABLED_EnableDisableTracing
@@ -143,7 +143,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_EnableDisableTracing) {
   EXPECT_THAT(GetTraceOutput(), HasSubstr("After"));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_ReadFormatFile ReadFormatFile
 #else
 #define MAYBE_ReadFormatFile DISABLED_ReadFormatFile
@@ -155,7 +155,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_ReadFormatFile) {
   EXPECT_THAT(format, HasSubstr("field:char buf"));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_ReadAvailableEvents ReadAvailableEvents
 #else
 #define MAYBE_ReadAvailableEvents DISABLED_ReadAvailableEvents
@@ -166,7 +166,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_ReadAvailableEvents) {
   EXPECT_THAT(format, HasSubstr("sched:sched_switch"));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_CanOpenTracePipeRaw CanOpenTracePipeRaw
 #else
 #define MAYBE_CanOpenTracePipeRaw DISABLED_CanOpenTracePipeRaw
@@ -176,7 +176,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_CanOpenTracePipeRaw) {
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_Clock Clock
 #else
 #define MAYBE_Clock DISABLED_Clock
@@ -193,7 +193,7 @@ TEST(FtraceProcfsIntegrationTest, MAYBE_Clock) {
   EXPECT_EQ(ftrace.GetClock(), "local");
 }
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_CanSetBufferSize CanSetBufferSize
 #else
 #define MAYBE_CanSetBufferSize DISABLED_CanSetBufferSize
