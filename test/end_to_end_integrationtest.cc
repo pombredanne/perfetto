@@ -160,12 +160,14 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
     }
   };
 
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(
       std::unique_ptr<FtraceProducerDelegate>(new FtraceProducerDelegate));
+#endif
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
