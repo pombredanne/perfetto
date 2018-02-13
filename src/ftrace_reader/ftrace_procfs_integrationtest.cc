@@ -15,7 +15,9 @@
  */
 
 #include <fstream>
+#include <set>
 #include <sstream>
+#include <string>
 
 #include "ftrace_procfs.h"
 #include "gmock/gmock.h"
@@ -24,6 +26,7 @@
 
 using testing::HasSubstr;
 using testing::Not;
+using testing::Contains;
 
 namespace perfetto {
 namespace {
@@ -129,7 +132,19 @@ TEST(FtraceProcfsIntegrationTest, DISABLED_CanOpenTracePipeRaw) {
   EXPECT_TRUE(ftrace.OpenPipeForCpu(0));
 }
 
-TEST(FtraceProcfsIntegrationTest, CanSetBufferSize) {
+TEST(FtraceProcfsIntegrationTest, DISABLED_Clock) {
+  FtraceProcfs ftrace(kTracingPath);
+  std::set<std::string> clocks = ftrace.AvailableClocks();
+  EXPECT_THAT(clocks, Contains("local"));
+  EXPECT_THAT(clocks, Contains("global"));
+
+  EXPECT_TRUE(ftrace.SetClock("global"));
+  EXPECT_EQ(ftrace.GetClock(), "global");
+  EXPECT_TRUE(ftrace.SetClock("local"));
+  EXPECT_EQ(ftrace.GetClock(), "local");
+}
+
+TEST(FtraceProcfsIntegrationTest, DISABLED_CanSetBufferSize) {
   FtraceProcfs ftrace(kTracingPath);
   EXPECT_TRUE(ftrace.SetCpuBufferSizeInPages(4ul));
   EXPECT_EQ(ReadFile("buffer_size_kb"), "16\n");  // (4096 * 4) / 1024
@@ -145,6 +160,11 @@ TEST(FtraceProcfsIntegrationTest, FtraceControllerHardReset) {
   ftrace.EnableTracing();
   ftrace.EnableEvent("sched", "sched_switch");
   ftrace.WriteTraceMarker("Hello, World!");
+
+  EXPECT_EQ(ReadFile("buffer_size_kb"), "16\n");
+  EXPECT_EQ(ReadFile("tracing_on"), "1\n");
+  EXPECT_EQ(ReadFile("events/enable"), "X\n");
+  EXPECT_THAT(GetTraceOutput(), HasSubstr("Hello"));
 
   HardResetFtraceState();
 

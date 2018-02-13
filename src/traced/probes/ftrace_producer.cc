@@ -32,20 +32,8 @@
 namespace perfetto {
 namespace {
 
-bool IsGoodPunctuation(char c) {
-  return c == '_' || c == '.';
-}
-
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
-
-bool IsValid(const std::string& str) {
-  for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && !IsGoodPunctuation(str[i]))
-      return false;
-  }
-  return true;
-}
 
 }  // namespace.
 
@@ -84,39 +72,31 @@ void FtraceProducer::OnDisconnect() {
 void FtraceProducer::CreateDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
+  // Don't retry if FtraceController::Create() failed once.
+  // This can legitimately happen on user builds where we cannot access the
+  // debug paths, e.g., because of SELinux rules.
+  if (ftrace_creation_failed_)
+    return;
+
+  // Lazily create on the first instance.
+  if (!ftrace_) {
+    ftrace_ = FtraceController::Create(task_runner_);
+
+    if (!ftrace_) {
+      PERFETTO_ELOG("Failed to create FtraceController");
+      ftrace_creation_failed_ = true;
+      return;
+    }
+
+    ftrace_->DisableAllEvents();
+    ftrace_->ClearTrace();
+  }
+
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                source_config.target_buffer());
 
   // TODO(hjd): Would be nice if ftrace_reader could use the generated config.
-  const DataSourceConfig::FtraceConfig proto_config =
-      source_config.ftrace_config();
-
-  FtraceConfig config;
-  // TODO(b/72082266): We shouldn't have to do this.
-  for (const std::string& event_name : proto_config.event_names()) {
-    if (IsValid(event_name)) {
-      config.AddEvent(event_name.c_str());
-    } else {
-      PERFETTO_ELOG("Bad event name '%s'", event_name.c_str());
-    }
-  }
-  for (const std::string& category : proto_config.atrace_categories()) {
-    if (IsValid(category)) {
-      config.AddAtraceCategory(category.c_str());
-    } else {
-      PERFETTO_ELOG("Bad category name '%s'", category.c_str());
-    }
-  }
-  for (const std::string& app : proto_config.atrace_apps()) {
-    if (IsValid(app)) {
-      config.AddAtraceApp(app.c_str());
-    } else {
-      PERFETTO_ELOG("Bad app '%s'", app.c_str());
-    }
-  }
-
-  config.set_total_buffer_size_kb(proto_config.total_buffer_size_kb());
-  config.set_drain_period_ms(proto_config.drain_period_ms());
+  DataSourceConfig::FtraceConfig config = source_config.ftrace_config();
 
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
   auto trace_writer = endpoint_->CreateTraceWriter(
@@ -142,10 +122,6 @@ void FtraceProducer::ConnectWithRetries(const char* socket_name,
   ResetConnectionBackoff();
   socket_name_ = socket_name;
   task_runner_ = task_runner;
-  ftrace_ = FtraceController::Create(task_runner);
-  PERFETTO_CHECK(ftrace_);
-  ftrace_->DisableAllEvents();
-  ftrace_->ClearTrace();
   Connect();
 }
 
@@ -171,13 +147,12 @@ FtraceProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
 FtraceProducer::SinkDelegate::~SinkDelegate() = default;
 
 FtraceProducer::BundleHandle FtraceProducer::SinkDelegate::GetBundleForCpu(
-    size_t cpu) {
+    size_t) {
   trace_packet_ = writer_->NewTracePacket();
   return BundleHandle(trace_packet_->set_ftrace_events());
 }
 
-void FtraceProducer::SinkDelegate::OnBundleComplete(size_t cpu,
-                                                    BundleHandle bundle) {
+void FtraceProducer::SinkDelegate::OnBundleComplete(size_t, BundleHandle) {
   trace_packet_->Finalize();
 }
 
