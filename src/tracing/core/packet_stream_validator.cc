@@ -16,30 +16,31 @@
 
 #include "src/tracing/core/packet_stream_validator.h"
 
+#include <inttypes.h>
+#include <stddef.h>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
-#include "src/tracing/core/chunked_protobuf_input_stream.h"
-
 namespace perfetto {
 
-PacketStreamValidator::PacketStreamValidator(const ChunkSequence* sequence)
-    : stream_(sequence) {
+// static
+bool PacketStreamValidator::Validate(const ChunkSequence& sequence) {
   static_assert(protos::TracePacket::kTrustedUidFieldNumber ==
                     protos::TrustedPacket::kTrustedUidFieldNumber,
                 "trusted uid field id mismatch");
-  for (const Chunk& chunk : *sequence)
-    size_ += chunk.size;
-}
+  ChunkedProtobufInputStream stream(&sequence);
+  size_t size = 0;
+  for (const Chunk& chunk : sequence)
+    size += chunk.size;
 
-bool PacketStreamValidator::Validate() {
   protos::TrustedPacket packet;
-  if (!packet.ParseFromBoundedZeroCopyStream(&stream_, size_))
+  if (!packet.ParseFromBoundedZeroCopyStream(&stream, size))
     return false;
   // Only the service is allowed to fill in the trusted uid.
-  return !packet.has_trusted_uid();
+  return !packet.trusted_uid_size();
 }
 
 }  // namespace perfetto

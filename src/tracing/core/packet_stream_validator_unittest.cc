@@ -28,8 +28,7 @@ namespace {
 TEST(PacketStreamValidatorTest, NullPacket) {
   std::string ser_buf;
   ChunkSequence seq;
-  PacketStreamValidator validator(&seq);
-  EXPECT_TRUE(validator.Validate());
+  EXPECT_TRUE(PacketStreamValidator::Validate(seq));
 }
 
 TEST(PacketStreamValidatorTest, SimplePacket) {
@@ -39,8 +38,7 @@ TEST(PacketStreamValidatorTest, SimplePacket) {
 
   ChunkSequence seq;
   seq.emplace_back(&ser_buf[0], ser_buf.size());
-  PacketStreamValidator validator(&seq);
-  EXPECT_TRUE(validator.Validate());
+  EXPECT_TRUE(PacketStreamValidator::Validate(seq));
 }
 
 TEST(PacketStreamValidatorTest, ComplexPacket) {
@@ -57,19 +55,48 @@ TEST(PacketStreamValidatorTest, ComplexPacket) {
 
   ChunkSequence seq;
   seq.emplace_back(&ser_buf[0], ser_buf.size());
-  PacketStreamValidator validator(&seq);
-  EXPECT_TRUE(validator.Validate());
+  EXPECT_TRUE(PacketStreamValidator::Validate(seq));
 }
 
 TEST(PacketStreamValidatorTest, SimplePacketWithUid) {
   protos::TracePacket proto;
-  proto.set_trusted_uid(123);
+  proto.add_trusted_uid(123);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
   seq.emplace_back(&ser_buf[0], ser_buf.size());
-  PacketStreamValidator validator(&seq);
-  EXPECT_FALSE(validator.Validate());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
+}
+
+TEST(PacketStreamValidatorTest, SimplePacketWithZeroUid) {
+  protos::TracePacket proto;
+  proto.add_trusted_uid(0);
+  std::string ser_buf = proto.SerializeAsString();
+
+  ChunkSequence seq;
+  seq.emplace_back(&ser_buf[0], ser_buf.size());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
+}
+
+TEST(PacketStreamValidatorTest, SimplePacketWithMultipleUids) {
+  protos::TracePacket proto;
+  proto.add_trusted_uid(0);
+  proto.add_trusted_uid(123);
+  std::string ser_buf = proto.SerializeAsString();
+
+  ChunkSequence seq;
+  seq.emplace_back(&ser_buf[0], ser_buf.size());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
+}
+
+TEST(PacketStreamValidatorTest, SimplePacketWithNegativeOneUid) {
+  protos::TracePacket proto;
+  proto.add_trusted_uid(-1);
+  std::string ser_buf = proto.SerializeAsString();
+
+  ChunkSequence seq;
+  seq.emplace_back(&ser_buf[0], ser_buf.size());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
 }
 
 TEST(PacketStreamValidatorTest, ComplexPacketWithUid) {
@@ -82,13 +109,12 @@ TEST(PacketStreamValidatorTest, ComplexPacketWithUid) {
   ft->mutable_sched_switch()->set_prev_pid(123);
   ft->mutable_sched_switch()->set_next_comm("jerry");
   ft->mutable_sched_switch()->set_next_pid(456);
-  proto.set_trusted_uid(123);
+  proto.add_trusted_uid(123);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
   seq.emplace_back(&ser_buf[0], ser_buf.size());
-  PacketStreamValidator validator(&seq);
-  EXPECT_FALSE(validator.Validate());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
 }
 
 TEST(PacketStreamValidatorTest, FragmentedPacket) {
@@ -107,15 +133,14 @@ TEST(PacketStreamValidatorTest, FragmentedPacket) {
     ChunkSequence seq;
     seq.emplace_back(&ser_buf[0], i);
     seq.emplace_back(&ser_buf[i], ser_buf.size() - i);
-    PacketStreamValidator validator(&seq);
-    EXPECT_TRUE(validator.Validate());
+    EXPECT_TRUE(PacketStreamValidator::Validate(seq));
   }
 }
 
 TEST(PacketStreamValidatorTest, FragmentedPacketWithUid) {
   protos::TracePacket proto;
   proto.mutable_for_testing()->set_str("string field");
-  proto.set_trusted_uid(123);
+  proto.add_trusted_uid(123);
   proto.mutable_ftrace_events()->set_cpu(0);
   auto* ft = proto.mutable_ftrace_events()->add_event();
   ft->set_pid(42);
@@ -130,8 +155,7 @@ TEST(PacketStreamValidatorTest, FragmentedPacketWithUid) {
     ChunkSequence seq;
     seq.emplace_back(&ser_buf[0], i);
     seq.emplace_back(&ser_buf[i], ser_buf.size() - i);
-    PacketStreamValidator validator(&seq);
-    EXPECT_FALSE(validator.Validate());
+    EXPECT_FALSE(PacketStreamValidator::Validate(seq));
   }
 }
 
@@ -143,8 +167,7 @@ TEST(PacketStreamValidatorTest, TruncatedPacket) {
   for (size_t i = 1; i < ser_buf.size(); i++) {
     ChunkSequence seq;
     seq.emplace_back(&ser_buf[0], i);
-    PacketStreamValidator validator(&seq);
-    EXPECT_FALSE(validator.Validate());
+    EXPECT_FALSE(PacketStreamValidator::Validate(seq));
   }
 }
 
@@ -156,8 +179,7 @@ TEST(PacketStreamValidatorTest, TrailingGarbage) {
 
   ChunkSequence seq;
   seq.emplace_back(&ser_buf[0], ser_buf.size());
-  PacketStreamValidator validator(&seq);
-  EXPECT_FALSE(validator.Validate());
+  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
 }
 
 }  // namespace

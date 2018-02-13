@@ -14,7 +14,16 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
+// Use proto3 syntax as an optimization. The difference is that proto2 stores
+// unknown fields seen while decoding in an internal buffer (std::string) while
+// proto3 completely drops them. Since during validation we only need to check
+// for the presence of the trusted fields below, we can use proto3 as a way to
+// speed up this process.
+//
+// See https://developers.google.com/protocol-buffers/docs/proto3#unknowns and
+// https://android-review.googlesource.com/c/platform/external/perfetto/+/
+// 591673#17 for details.
+syntax = "proto3";
 option optimize_for = LITE_RUNTIME;
 
 package perfetto.protos;
@@ -23,6 +32,9 @@ package perfetto.protos;
 // by the service (as opposed to the untrusted producers). Note that the field
 // ids here must be kept in sync with TracePacket.
 message TrustedPacket {
-  // User id of the producer which generated this packet.
-  optional int32 trusted_uid = 3;
+  // User id of the producer which generated this packet. Note that we are using
+  // a repeated field because proto3 has no way to check whether a numeric field
+  // was omitted or whether it had the default value (0, which can't be
+  // changed).
+  repeated int32 trusted_uid = 3 [packed = false];
 }

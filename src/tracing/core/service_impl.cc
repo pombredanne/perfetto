@@ -343,8 +343,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
           }
           ChunkSequence chunk_seq;
           chunk_seq.emplace_back(ptr, pack_size);
-          PacketStreamValidator validator(&chunk_seq);
-          if (!skip && !validator.Validate()) {
+          if (!skip && !PacketStreamValidator::Validate(chunk_seq)) {
             PERFETTO_DLOG("Dropping invalid packet");
             skip = true;
           }
@@ -363,7 +362,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
             // the producer can't give us a partial packet (e.g., a truncated
             // string) which only becomes valid when the UID is appended here.
             protos::TrustedPacket trusted_packet;
-            trusted_packet.set_trusted_uid(page_owner);
+            trusted_packet.add_trusted_uid(page_owner);
             uint8_t trusted_buf[16];
             PERFETTO_CHECK(trusted_packet.SerializeToArray(
                 &trusted_buf, sizeof(trusted_buf)));
@@ -499,7 +498,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // log buffer that has nothing to do with it.
 
   PERFETTO_DCHECK(size == kBufferPageSize);
-  uid_t uid = GetProducer(producer_id)->uid();
+  uid_t uid = GetProducer(producer_id)->uid_;
   uint8_t* dst = buf.acquire_next_page(uid);
 
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
@@ -676,7 +675,7 @@ bool ServiceImpl::TraceBuffer::Create(size_t sz) {
   size = sz;
   abi.reset(new SharedMemoryABI(get_page(0), size, kBufferPageSize));
   PERFETTO_DCHECK(page_owners.empty());
-  page_owners.resize(sz, -1);
+  page_owners.resize(size, -1);
   return true;
 }
 

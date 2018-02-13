@@ -22,6 +22,7 @@
 #include <memory>
 #include <set>
 
+#include "gtest/gtest_prod.h"
 #include "perfetto/base/page_allocator.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -68,10 +69,9 @@ class ServiceImpl : public Service {
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
-    uid_t uid() const { return uid_; }
-
    private:
     friend class ServiceImpl;
+    FRIEND_TEST(ServiceImplTest, RegisterAndUnregister);
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
     ProducerEndpointImpl& operator=(const ProducerEndpointImpl&) = delete;
 

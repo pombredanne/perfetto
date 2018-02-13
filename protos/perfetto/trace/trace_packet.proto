@@ -33,5 +33,5 @@ message TracePacket {
   }
   // Trusted user id of the producer which generated this packet. Keep in sync
   // with TrustedPacket.trusted_uid.
-  optional int32 trusted_uid = 3;
+  repeated int32 trusted_uid = 3 [packed = false];
 }
