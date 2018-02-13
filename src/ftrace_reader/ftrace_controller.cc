@@ -40,7 +40,7 @@
 namespace perfetto {
 namespace {
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 const char* kTracingPaths[] = {
     "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
 };

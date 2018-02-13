@@ -16,6 +16,8 @@
 
 #include "src/base/test/vm_test_utils.h"
 
+#include <memory>
+
 #include <errno.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -29,7 +31,7 @@ namespace base {
 namespace vm_test_utils {
 
 bool IsMapped(void* start, size_t size) {
-#if BUILDFLAG(OS_MACOSX)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   using PageState = char;
 #else
   using PageState = unsigned char;
