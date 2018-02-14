@@ -28,8 +28,6 @@
 #include "perfetto/trace/process_data.pbzero.h"
 #include "perfetto/trace/process_data_bundle.pb.h"
 #include "perfetto/trace/process_data_bundle.pbzero.h"
-#include "perfetto/trace/test_event.pb.h"
-#include "perfetto/trace/test_event.pbzero.h"
 
 #ifndef SRC_TRACED_PROBES_PRODUCER_H_
 #define SRC_TRACED_PROBES_PRODUCER_H_
@@ -53,8 +51,6 @@ class ProducerImpl : public Producer {
  private:
   using FtraceBundleHandle =
       protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
-  using ProcessBundleHandle =
-      protozero::ProtoZeroMessageHandle<protos::pbzero::ProcessDataBundle>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
@@ -69,8 +65,11 @@ class ProducerImpl : public Producer {
 
    private:
     std::unique_ptr<FtraceSink> sink_ = nullptr;
-    TraceWriter::TracePacketHandle trace_packet_;
     std::unique_ptr<TraceWriter> writer_;
+
+    // Keep this after the TraceWriter because TracePackets must not outlive
+    // their originating writer.
+    TraceWriter::TracePacketHandle trace_packet_;
   };
 
   enum State {

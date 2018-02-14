@@ -84,7 +84,7 @@ class PerfettoTest : public ::testing::Test {
   };
 
   // This is used only in daemon starting integrations tests.
-  class FtraceProducerDelegate : public ThreadDelegate {
+  class ProducerImplDelegate : public ThreadDelegate {
    public:
     ProducerImplDelegate() = default;
     ~ProducerImplDelegate() override = default;
