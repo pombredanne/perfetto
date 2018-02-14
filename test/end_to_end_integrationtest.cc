@@ -128,7 +128,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(3000);
+  trace_config.set_duration_ms(10000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -175,6 +175,12 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+
+  // TODO(skyostil): There's a race here before the service processes our data
+  // and the consumer tries to retrieve it. For now wait a bit until the service
+  // is done, but we should add explicit flushing to avoid this.
+  task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
+                              1000);
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }
