@@ -113,8 +113,8 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
   staging_write_fd_.reset(pipe_fds[1]);
 
   // Make reads from the raw pipe blocking so that splice() can sleep.
-  if (trace_fd_)
-    SetBlocking(*trace_fd_, true);
+  PERFETTO_CHECK(trace_fd_);
+  SetBlocking(*trace_fd_, true);
 
   // Reads from the staging pipe are always non-blocking.
   SetBlocking(*staging_read_fd_, false);
@@ -147,6 +147,7 @@ CpuReader::~CpuReader() {
   staging_read_fd_.reset();
   staging_write_fd_.reset();
   trace_fd_.reset();
+
   // Not strictly required, but let's also raise the pipe signal explicitly just
   // to be safe.
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
@@ -165,7 +166,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
   // call is blocking we need a dedicated thread for each trace pipe (i.e.,
   // CPU).
   char thread_name[16];
-  snprintf(thread_name, sizeof(thread_name), "traced_probes.%zu", cpu);
+  snprintf(thread_name, sizeof(thread_name), "traced_probes%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
 
   while (true) {
@@ -175,9 +176,14 @@ void CpuReader::RunWorkerThread(size_t cpu,
     int splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                             base::kPageSize, SPLICE_F_MOVE);
     if (splice_res < 0) {
-      // Splice can occasionally with these errors -- just try again.
-      if (errno == ENOMEM || errno == EBUSY)
+      // The kernel ftrace code has its own splice() implementation that can
+      // occasionally fail with transient errors not reported in man 2 splice.
+      // Just try again if we see these.
+      if (errno == ENOMEM || errno == EBUSY) {
+        PERFETTO_DPLOG("Transient splice failure -- retrying");
+        usleep(100 * 1000);
         continue;
+      }
       PERFETTO_DCHECK(errno == EPIPE || errno == EINTR || errno == EBADF);
       break;  // ~CpuReader is waiting to join this thread.
     }
@@ -190,7 +196,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
                           base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
       if (splice_res < 0) {
         if (errno != EAGAIN && errno != ENOMEM && errno != EBUSY)
-          PERFETTO_DPLOG("splice");
+          PERFETTO_PLOG("splice");
         break;
       }
     }
@@ -202,9 +208,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
-  if (!staging_read_fd_)
-    return false;
-
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   while (true) {
     uint8_t* buffer = GetBuffer();
     long bytes =
@@ -224,6 +228,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
 }
 
 uint8_t* CpuReader::GetBuffer() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   // TODO(primiano): Guard against overflows, like BufferedFrameDeserializer.
   if (!buffer_)
     buffer_ = std::unique_ptr<uint8_t[]>(new uint8_t[base::kPageSize]);
@@ -274,7 +279,9 @@ size_t CpuReader::ParsePage(size_t cpu,
         // Left over page padding or discarded event.
         if (event_header.time_delta == 0) {
           // TODO(hjd): Look at the next few bytes for read size;
-          PERFETTO_CHECK(false);  // TODO(hjd): Handle
+          PERFETTO_ELOG("Padding time_delta == 0 not handled.");
+          PERFETTO_DCHECK(false);  // TODO(hjd): Handle
+          return 0;
         }
         uint32_t length;
         if (!ReadAndAdvance<uint32_t>(&ptr, end, &length))
@@ -305,7 +312,9 @@ size_t CpuReader::ParsePage(size_t cpu,
         // type_or_length is <=28 so it represents the length of a data record.
         if (event_header.type_or_length == 0) {
           // TODO(hjd): Look at the next few bytes for real size.
-          PERFETTO_CHECK(false);
+          PERFETTO_ELOG("Data type_or_length == 0 not handled.");
+          PERFETTO_DCHECK(false);
+          return 0;
         }
         const uint8_t* start = ptr;
         const uint8_t* next = ptr + 4 * event_header.type_or_length;

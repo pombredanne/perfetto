@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <array>
 #include <string>
@@ -39,7 +40,7 @@
 namespace perfetto {
 namespace {
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 const char* kTracingPaths[] = {
     "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
 };
@@ -107,7 +108,38 @@ bool RunAtrace(std::vector<std::string> args) {
   return status == 0;
 }
 
+void WriteToFile(const char* path, const char* str) {
+  int fd = open(path, O_WRONLY);
+  if (fd == -1)
+    return;
+  perfetto::base::ignore_result(write(fd, str, strlen(str)));
+  perfetto::base::ignore_result(close(fd));
+}
+
+void ClearFile(const char* path) {
+  int fd = open(path, O_WRONLY | O_TRUNC);
+  if (fd == -1)
+    return;
+  perfetto::base::ignore_result(close(fd));
+}
+
 }  // namespace
+
+// TODO(fmayer): Actually call this on shutdown.
+// Method of last resort to reset ftrace state.
+// We don't know what state the rest of the system and process is so as far
+// as possible avoid allocations.
+void HardResetFtraceState() {
+  WriteToFile("/sys/kernel/debug/tracing/tracing_on", "0");
+  WriteToFile("/sys/kernel/debug/tracing/buffer_size_kb", "4");
+  WriteToFile("/sys/kernel/debug/tracing/events/enable", "0");
+  ClearFile("/sys/kernel/debug/tracing/trace");
+
+  WriteToFile("/sys/kernel/tracing/tracing_on", "0");
+  WriteToFile("/sys/kernel/tracing/buffer_size_kb", "4");
+  WriteToFile("/sys/kernel/tracing/events/enable", "0");
+  ClearFile("/sys/kernel/tracing/trace");
+}
 
 // static
 // TODO(taylori): Add a test for tracing paths in integration tests.
@@ -139,21 +171,15 @@ FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
       weak_factory_(this) {}
 
 FtraceController::~FtraceController() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   for (size_t id = 1; id <= table_->largest_id(); id++) {
     if (enabled_count_[id]) {
       const Event* event = table_->GetEventById(id);
       ftrace_procfs_->DisableEvent(event->group, event->name);
     }
   }
-  bool was_listening;
-  {
-    std::unique_lock<std::mutex> lock(reader_lock_);
-    was_listening = listening_for_raw_trace_data_;
-  }
-  if (was_listening) {
-    sinks_.clear();
-    StopIfNeeded();
-  }
+  sinks_.clear();
+  StopIfNeeded();
 }
 
 uint64_t FtraceController::NowMs() const {
@@ -173,9 +199,10 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
   if (weak_this->generation_ != generation)
     return;
 
+  PERFETTO_DCHECK_THREAD(weak_this->thread_checker_);
   std::bitset<kMaxCpus> cpus_to_drain;
   {
-    std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
+    std::unique_lock<std::mutex> lock(weak_this->lock_);
     // We might have stopped caring about events.
     if (!weak_this->listening_for_raw_trace_data_)
       return;
@@ -203,7 +230,6 @@ void FtraceController::UnblockReaders(
     return;
   // Unblock all waiting readers to start moving more data into their
   // respective staging pipes.
-  std::unique_lock<std::mutex> lock(weak_this->reader_lock_);
   weak_this->data_drained_.notify_all();
 }
 
@@ -212,7 +238,7 @@ void FtraceController::StartIfNeeded() {
     return;
   PERFETTO_CHECK(sinks_.size() != 0);
   {
-    std::unique_lock<std::mutex> lock(reader_lock_);
+    std::unique_lock<std::mutex> lock(lock_);
     PERFETTO_CHECK(!listening_for_raw_trace_data_);
     listening_for_raw_trace_data_ = true;
   }
@@ -266,14 +292,14 @@ void FtraceController::StopIfNeeded() {
     return;
   {
     // Unblock any readers that are waiting for us to drain data.
-    std::unique_lock<std::mutex> lock(reader_lock_);
-    PERFETTO_CHECK(listening_for_raw_trace_data_);
+    std::unique_lock<std::mutex> lock(lock_);
+    if (listening_for_raw_trace_data_)
+      ftrace_procfs_->DisableTracing();
     listening_for_raw_trace_data_ = false;
     cpus_to_drain_.reset();
-    data_drained_.notify_all();
   }
+  data_drained_.notify_all();
   readers_.clear();
-  ftrace_procfs_->DisableTracing();
 }
 
 void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
@@ -297,14 +323,18 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    const FtraceConfig& config,
+    FtraceConfig config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (sinks_.size() >= kMaxSinks)
     return nullptr;
+  if (!ValidConfig(config))
+    return nullptr;
   auto controller_weak = weak_factory_.GetWeakPtr();
   auto filter = std::unique_ptr<EventFilter>(
-      new EventFilter(*table_.get(), config.events()));
+      new EventFilter(*table_.get(), FtraceEventsAsSet(config)));
+  for (const std::string& event : config.event_names())
+    PERFETTO_LOG("%s", event.c_str());
   auto sink = std::unique_ptr<FtraceSink>(new FtraceSink(
       std::move(controller_weak), config, std::move(filter), delegate));
   Register(sink.get());
@@ -318,7 +348,7 @@ void FtraceController::OnDataAvailable(
     uint32_t drain_period_ms) {
   // Called on the worker thread.
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
-  std::unique_lock<std::mutex> lock(reader_lock_);
+  std::unique_lock<std::mutex> lock(lock_);
   if (!listening_for_raw_trace_data_)
     return;
   if (cpus_to_drain_.none()) {
@@ -334,7 +364,7 @@ void FtraceController::OnDataAvailable(
   cpus_to_drain_[cpu] = true;
 
   // Wait until the main thread has finished draining.
-  // TODO(skyostil): The threads waiting here will all try to grab reader_lock_
+  // TODO(skyostil): The threads waiting here will all try to grab lock_
   // when woken up. Find a way to avoid this.
   data_drained_.wait(lock, [this, cpu] {
     return !cpus_to_drain_[cpu] || !listening_for_raw_trace_data_;
@@ -345,7 +375,7 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it_and_inserted = sinks_.insert(sink);
   PERFETTO_DCHECK(it_and_inserted.second);
-  if (sink->config().RequiresAtrace())
+  if (RequiresAtrace(sink->config()))
     StartAtrace(sink->config());
 
   StartIfNeeded();
@@ -384,7 +414,7 @@ void FtraceController::Unregister(FtraceSink* sink) {
 
   for (const std::string& name : sink->enabled_events())
     UnregisterForEvent(name);
-  if (sink->config().RequiresAtrace())
+  if (RequiresAtrace(sink->config()))
     StopAtrace();
   StopIfNeeded();
 }
@@ -433,37 +463,6 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
-}
-
-FtraceConfig::FtraceConfig() = default;
-FtraceConfig::FtraceConfig(std::set<std::string> events)
-    : ftrace_events_(std::move(events)) {}
-
-FtraceConfig::~FtraceConfig() = default;
-
-void FtraceConfig::AddEvent(const std::string& event) {
-  ftrace_events_.insert(event);
-}
-
-void FtraceConfig::AddAtraceApp(const std::string& app) {
-  // You implicitly need the print ftrace event if you
-  // are using atrace.
-  AddEvent("print");
-  atrace_apps_.insert(app);
-}
-
-void FtraceConfig::AddAtraceCategory(const std::string& category) {
-  // You implicitly need the print ftrace event if you
-  // are using atrace.
-  AddEvent("print");
-  if (category == "sched") {
-    AddEvent("sched_switch");
-  }
-  atrace_categories_.insert(category);
-}
-
-bool FtraceConfig::RequiresAtrace() const {
-  return !atrace_categories_.empty() || !atrace_apps_.empty();
 }
 
 }  // namespace perfetto

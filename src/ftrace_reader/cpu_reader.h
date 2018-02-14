@@ -26,6 +26,7 @@
 
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/thread_checker.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/protozero_message.h"
 #include "proto_translation_table.h"
@@ -152,6 +153,7 @@ class CpuReader {
   base::ScopedFile staging_write_fd_;
   std::unique_ptr<uint8_t[]> buffer_;
   std::thread worker_thread_;
+  PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
 }  // namespace perfetto
