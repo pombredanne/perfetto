@@ -56,6 +56,7 @@ cc_library_shared {
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/id_allocator.cc",
+    "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
@@ -125,6 +126,7 @@ cc_binary {
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/id_allocator.cc",
+    "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
@@ -234,6 +236,7 @@ cc_test {
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/id_allocator.cc",
+    "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
@@ -1351,6 +1354,7 @@ genrule {
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
+    "protos/perfetto/trace/trusted_packet.proto",
   ],
   tools: [
     "aprotoc",
@@ -1360,6 +1364,7 @@ genrule {
     "external/perfetto/protos/perfetto/trace/test_event.pb.cc",
     "external/perfetto/protos/perfetto/trace/trace.pb.cc",
     "external/perfetto/protos/perfetto/trace/trace_packet.pb.cc",
+    "external/perfetto/protos/perfetto/trace/trusted_packet.pb.cc",
   ],
 }
 
@@ -1370,6 +1375,7 @@ genrule {
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
+    "protos/perfetto/trace/trusted_packet.proto",
   ],
   tools: [
     "aprotoc",
@@ -1379,6 +1385,7 @@ genrule {
     "external/perfetto/protos/perfetto/trace/test_event.pb.h",
     "external/perfetto/protos/perfetto/trace/trace.pb.h",
     "external/perfetto/protos/perfetto/trace/trace_packet.pb.h",
+    "external/perfetto/protos/perfetto/trace/trusted_packet.pb.h",
   ],
   export_include_dirs: [
     "protos",
@@ -1460,6 +1467,7 @@ genrule {
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
+    "protos/perfetto/trace/trusted_packet.proto",
   ],
   tools: [
     "aprotoc",
@@ -1470,6 +1478,7 @@ genrule {
     "external/perfetto/protos/perfetto/trace/test_event.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/trace.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/trace_packet.pbzero.cc",
+    "external/perfetto/protos/perfetto/trace/trusted_packet.pbzero.cc",
   ],
 }
 
@@ -1480,6 +1489,7 @@ genrule {
     "protos/perfetto/trace/test_event.proto",
     "protos/perfetto/trace/trace.proto",
     "protos/perfetto/trace/trace_packet.proto",
+    "protos/perfetto/trace/trusted_packet.proto",
   ],
   tools: [
     "aprotoc",
@@ -1490,6 +1500,7 @@ genrule {
     "external/perfetto/protos/perfetto/trace/test_event.pbzero.h",
     "external/perfetto/protos/perfetto/trace/trace.pbzero.h",
     "external/perfetto/protos/perfetto/trace/trace_packet.pbzero.h",
+    "external/perfetto/protos/perfetto/trace/trusted_packet.pbzero.h",
   ],
   export_include_dirs: [
     "protos",
@@ -1807,6 +1818,7 @@ cc_library_static {
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/id_allocator.cc",
+    "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
@@ -1938,6 +1950,8 @@ cc_test {
     "src/tracing/core/data_source_descriptor.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/id_allocator_unittest.cc",
+    "src/tracing/core/packet_stream_validator.cc",
+    "src/tracing/core/packet_stream_validator_unittest.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/service_impl_unittest.cc",
     "src/tracing/core/shared_memory_abi.cc",
