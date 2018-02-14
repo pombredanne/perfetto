@@ -27,6 +27,7 @@ package perfetto.protos;
 message TracePacket {
   oneof data {
     FtraceEventBundle ftrace_events = 1;
+    ProcessTree process_tree = 2;
     TestEvent test_event = 536870911;  // 2^29 - 1, max field id for protos.
   }
   optional string test = 2;
