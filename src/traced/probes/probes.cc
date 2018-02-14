@@ -26,9 +26,7 @@ namespace perfetto {
 
 int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   static struct option long_options[] = {
-      /* These options set a flag. */
-      {"cleanup-after-crash", no_argument, 0, 'd'},
-      {0, 0, 0, 0}};
+      {"cleanup-after-crash", no_argument, 0, 'd'}, {0, 0, 0, 0}};
   int option_index;
   int c;
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
