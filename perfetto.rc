@@ -27,7 +27,7 @@ service traced_probes /system/bin/traced_probes
     user nobody
     group shell
     writepid /dev/cpuset/system-background/tasks
-    onrestart /system/bin/traced_probes --cleanup-after-crash
+    onrestart exec_background - nobody shell -- /system/bin/traced_probes --cleanup-after-crash
 
 on property:persist.traced.enable=1
     # Trace files need to be:
