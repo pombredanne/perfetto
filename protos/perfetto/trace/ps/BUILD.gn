@@ -15,19 +15,17 @@
 import("../../../../gn/perfetto.gni")
 import("../../../../src/protozero/protozero_library.gni")
 
+ps_proto_names = [ "process_tree.proto" ]
+
 proto_library("lite") {
   generate_python = false
-  sources = [
-    "process_tree.proto",
-  ]
+  sources = ps_proto_names
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
 }
 
 protozero_library("zero") {
-  sources = [
-    "process_tree.proto",
-  ]
+  sources = ps_proto_names
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
   generator_plugin_options = "wrapper_namespace=pbzero"

@@ -37,7 +37,7 @@ message ProcessTree {
     int32 ppid = 2;
 
     // The command line for the process, as per /proc/pid/cmdline.
-    // The first item in the list (i.e. argc[0]) is the process name.
+    // The first item in the list is the process name (i.e. argv[0]).
     repeated string cmdline = 3;
 
     // The list of all threads in the process.
