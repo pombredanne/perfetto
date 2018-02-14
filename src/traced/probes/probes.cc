@@ -23,6 +23,15 @@
 namespace perfetto {
 
 int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
+  int c;
+  while ((c = getopt(argc, argv, "d")) != -1) {
+    switch (c) {
+      case 'd':
+        HardResetFtraceState();
+        return 0;
+    }
+  }
+
   PERFETTO_LOG("Starting %s service", argv[0]);
   base::UnixTaskRunner task_runner;
   FtraceProducer producer;
