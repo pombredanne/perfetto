@@ -45,7 +45,7 @@ bool ReadIntoString(const uint8_t* start,
   return false;
 }
 
-using BundleHandle =
+using FtraceBundleHandle =
     protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
 
 const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
@@ -103,8 +103,9 @@ int CpuReader::GetFileDescriptor() {
   return fd_.get();
 }
 
-bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
-                      const std::array<BundleHandle, kMaxSinks>& bundles) {
+bool CpuReader::Drain(
+    const std::array<const EventFilter*, kMaxSinks>& filters,
+    const std::array<FtraceBundleHandle, kMaxSinks>& bundles) {
   if (!fd_)
     return false;
 

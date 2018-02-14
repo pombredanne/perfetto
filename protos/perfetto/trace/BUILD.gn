@@ -21,6 +21,8 @@ proto_sources = [
   "trace_packet.proto",
   "trace.proto",
   "trusted_packet.proto",
+  "process_data_bundle.proto",
+  "process_data.proto",
 ]
 
 # Protozero generated stubs, for writers.

@@ -24,13 +24,20 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 
-#ifndef SRC_TRACED_PROBES_FTRACE_PRODUCER_H_
-#define SRC_TRACED_PROBES_FTRACE_PRODUCER_H_
+#include "perfetto/trace/process_data.pb.h"
+#include "perfetto/trace/process_data.pbzero.h"
+#include "perfetto/trace/process_data_bundle.pb.h"
+#include "perfetto/trace/process_data_bundle.pbzero.h"
+#include "perfetto/trace/test_event.pb.h"
+#include "perfetto/trace/test_event.pbzero.h"
+
+#ifndef SRC_TRACED_PROBES_PRODUCER_H_
+#define SRC_TRACED_PROBES_PRODUCER_H_
 
 namespace perfetto {
-class FtraceProducer : public Producer {
+class ProducerImpl : public Producer {
  public:
-  ~FtraceProducer() override;
+  ~ProducerImpl() override;
 
   // Producer Impl:
   void OnConnect() override;
@@ -44,8 +51,10 @@ class FtraceProducer : public Producer {
                           base::TaskRunner* task_runner);
 
  private:
-  using BundleHandle =
+  using FtraceBundleHandle =
       protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+  using ProcessBundleHandle =
+      protozero::ProtoZeroMessageHandle<protos::pbzero::ProcessDataBundle>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
@@ -53,18 +62,15 @@ class FtraceProducer : public Producer {
     ~SinkDelegate() override;
 
     // FtraceDelegateImpl
-    BundleHandle GetBundleForCpu(size_t cpu) override;
-    void OnBundleComplete(size_t cpu, BundleHandle bundle) override;
+    FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
+    void OnBundleComplete(size_t cpu, FtraceBundleHandle bundle) override;
 
     void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
 
    private:
     std::unique_ptr<FtraceSink> sink_ = nullptr;
-    std::unique_ptr<TraceWriter> writer_;
-
-    // Keep this after the TraceWriter because TracePackets must not outlive
-    // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
+    std::unique_ptr<TraceWriter> writer_;
   };
 
   enum State {
@@ -90,4 +96,4 @@ class FtraceProducer : public Producer {
 };
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_FTRACE_PRODUCER_H_
+#endif  // SRC_TRACED_PROBES_PRODUCER_H_

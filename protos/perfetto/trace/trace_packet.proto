@@ -18,6 +18,7 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "perfetto/trace/ftrace/ftrace_event_bundle.proto";
+import "perfetto/trace/process_data_bundle.proto";
 import "perfetto/trace/test_event.proto";
 
 package perfetto.protos;
@@ -27,9 +28,14 @@ package perfetto.protos;
 message TracePacket {
   oneof data {
     FtraceEventBundle ftrace_events = 1;
+<<<<<<< HEAD
 
     // This field is only used for testing.
     TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.
+=======
+    ProcessDataBundle process_data_bundle = 3;
+    TestEvent test_event = 536870911;  // 2^29 - 1, max field id for protos.
+>>>>>>> FREEZE.unindexed
   }
   // Trusted user id of the producer which generated this packet. Keep in sync
   // with TrustedPacket.trusted_uid.

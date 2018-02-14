@@ -1,0 +1,10 @@
+packet {
+  process_data_bundle {
+    processes {
+      name: "process_name"
+    }
+    processes {
+      name: "second process name"
+    }
+  }
+}

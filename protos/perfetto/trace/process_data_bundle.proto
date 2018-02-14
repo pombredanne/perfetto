@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,21 +14,13 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/logging.h"
-#include "perfetto/base/unix_task_runner.h"
-#include "perfetto/traced/traced.h"
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
 
-#include "src/traced/probes/producer_impl.h"
+import "perfetto/trace/process_data.proto";
 
-namespace perfetto {
+package perfetto.protos;
 
-int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
-  PERFETTO_LOG("Starting %s service", argv[0]);
-  base::UnixTaskRunner task_runner;
-  ProducerImpl producer;
-  producer.ConnectWithRetries(PERFETTO_PRODUCER_SOCK_NAME, &task_runner);
-  task_runner.Run();
-  return 0;
+message ProcessDataBundle {
+  repeated ProcessData processes = 1;
 }
-
-}  // namespace perfetto

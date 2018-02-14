@@ -12,31 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("probes") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    ":producer_impl",
-    "../../../gn:default_deps",
-  ]
-  sources = [
-    "probes.cc",
-  ]
-}
+import webapp2
 
-source_set("producer_impl") {
-  public_deps = [
-    "../../ftrace_reader",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-    "../../process_stats:process_stats",
-    "../../tracing:tracing",
-  ]
-  sources = [
-    "producer_impl.cc",
-    "producer_impl.h",
-  ]
-}
+from google.appengine.api import urlfetch
+
+
+class ChangesHandler(webapp2.RequestHandler):
+  def get(self):
+    url = ('https://android-review.googlesource.com/changes/?' +
+        self.request.query_string)
+    result = urlfetch.fetch(url)
+    self.response.status_int = result.status_code
+    self.response.write(result.content)
+
+
+app = webapp2.WSGIApplication([
+    ('/changes/', ChangesHandler),
+], debug=True)

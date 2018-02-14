@@ -32,7 +32,7 @@
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
 #include "src/base/test/test_task_runner.h"
-#include "src/traced/probes/ftrace_producer.h"
+#include "src/traced/probes/producer_impl.h"
 #include "test/fake_consumer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
@@ -86,16 +86,16 @@ class PerfettoTest : public ::testing::Test {
   // This is used only in daemon starting integrations tests.
   class FtraceProducerDelegate : public ThreadDelegate {
    public:
-    FtraceProducerDelegate() = default;
-    ~FtraceProducerDelegate() override = default;
+    ProducerImplDelegate() = default;
+    ~ProducerImplDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
-      producer_.reset(new FtraceProducer);
+      producer_.reset(new ProducerImpl);
       producer_->ConnectWithRetries(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
 
    private:
-    std::unique_ptr<FtraceProducer> producer_;
+    std::unique_ptr<ProducerImpl> producer_;
   };
 
   class FakeProducerDelegate : public ThreadDelegate {
@@ -169,7 +169,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(
-      std::unique_ptr<FtraceProducerDelegate>(new FtraceProducerDelegate));
+      std::unique_ptr<ProducerImplDelegate>(new ProducerImplDelegate));
 #endif
 
   // Finally, make the consumer connect to the service.

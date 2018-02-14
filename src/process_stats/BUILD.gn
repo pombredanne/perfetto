@@ -1,4 +1,4 @@
-# Copyright (C) 2017 The Android Open Source Project
+# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,31 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("probes") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    ":producer_impl",
-    "../../../gn:default_deps",
-  ]
-  sources = [
-    "probes.cc",
-  ]
-}
-
-source_set("producer_impl") {
-  public_deps = [
-    "../../ftrace_reader",
-  ]
+source_set("process_stats") {
+  public_deps = []
   deps = [
     "../../../gn:default_deps",
-    "../../base",
-    "../../process_stats:process_stats",
-    "../../tracing:tracing",
+    "../../../protos/perfetto/config",
   ]
   sources = [
-    "producer_impl.cc",
-    "producer_impl.h",
+    "file_utils.cc",
+    "file_utils.h",
+    "process_info.h",
+    "procfs_utils.cc",
+    "procfs_utils.h",
   ]
 }

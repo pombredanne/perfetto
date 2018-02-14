@@ -12,31 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("probes") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    ":producer_impl",
-    "../../../gn:default_deps",
-  ]
-  sources = [
-    "probes.cc",
-  ]
-}
-
-source_set("producer_impl") {
-  public_deps = [
-    "../../ftrace_reader",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-    "../../process_stats:process_stats",
-    "../../tracing:tracing",
-  ]
-  sources = [
-    "producer_impl.cc",
-    "producer_impl.h",
-  ]
-}
+runtime: python27
+api_version: 1
+threadsafe: yes
+instance_class: B1
+manual_scaling:
+  instances: 1
+handlers:
+- url: /
+  static_files: static/index.html
+  upload: static/index.html
+  secure: always
+  redirect_http_response_code: 301
+- url: /service_worker.js
+  static_files: static/service_worker.js
+  upload: static/service_worker.js
+  secure: always
+  redirect_http_response_code: 301
+- url: /static/
+  static_dir: static/
+  secure: always
+  redirect_http_response_code: 301
+- url: /changes/.*
+  script: main.app

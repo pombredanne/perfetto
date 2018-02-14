@@ -76,6 +76,8 @@ using google::protobuf::compiler::MultiFileErrorCollector;
 using google::protobuf::io::OstreamOutputStream;
 using protos::FtraceEvent;
 using protos::FtraceEventBundle;
+using protos::ProcessData;
+using protos::ProcessDataBundle;
 using protos::PrintFtraceEvent;
 using protos::SchedSwitchFtraceEvent;
 using protos::SchedWakeupFtraceEvent;
@@ -838,6 +840,12 @@ std::string FormatSchedWakeupNew(const SchedWakeupNewFtraceEvent& event) {
   return std::string(line);
 }
 
+std::string FormatProcess(const ProcessData& process) {
+  char line[2048];
+  sprintf(line, "process name: %s", process.name().c_str());
+  return std::string(line);
+}
+
 int TraceToSystrace(std::istream* input, std::ostream* output) {
   std::multimap<uint64_t, std::string> sorted;
 
@@ -851,6 +859,16 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   }
 
   for (const TracePacket& packet : trace.packet()) {
+    if (packet.has_process_data_bundle()) {
+      printf("Found process data bundle");
+      const ProcessDataBundle& process_data_bundle =
+          packet.process_data_bundle();
+      for (const ProcessData& process : process_data_bundle.processes()) {
+        std::string line = FormatProcess(process);
+        sorted.emplace(0, line);
+      }
+    }
+
     if (!packet.has_ftrace_events())
       continue;
 
