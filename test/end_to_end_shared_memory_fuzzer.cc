@@ -121,7 +121,6 @@ class FakeProducer : public Producer {
     auto end_packet = trace_writer->NewTracePacket();
     end_packet->set_test("end");
     end_packet->Finalize();
-
     consumer_->BusyWaitReadBuffers();
   }
 

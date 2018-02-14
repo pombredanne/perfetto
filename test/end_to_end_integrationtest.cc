@@ -37,13 +37,13 @@
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #include "perfetto/base/android_task_runner.h"
 #endif
 
 namespace perfetto {
 
-#if BUILDFLAG(OS_ANDROID)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else
 using PlatformTaskRunner = base::UnixTaskRunner;
@@ -51,7 +51,8 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 
 // If we're building on Android and starting the daemons ourselves,
 // create the sockets in a world-writable location.
-#if BUILDFLAG(OS_ANDROID) && BUILDFLAG(PERFETTO_START_DAEMONS)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
+    PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
 #define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
 #define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
 #else
@@ -99,29 +100,35 @@ class PerfettoTest : public ::testing::Test {
 
   class FakeProducerDelegate : public ThreadDelegate {
    public:
-    FakeProducerDelegate() = default;
+    FakeProducerDelegate(std::function<void()> connect_callback)
+        : connect_callback_(std::move(connect_callback)) {}
     ~FakeProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
       producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
-      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner);
+      producer_->Connect(TEST_PRODUCER_SOCK_NAME, task_runner,
+                         std::move(connect_callback_));
     }
 
    private:
     std::unique_ptr<FakeProducer> producer_;
+    std::function<void()> connect_callback_;
   };
 };
 
-// TODO(lalitm): reenable this when we have a solution for running ftrace
-// on travis.
-TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_TestFtraceProducer TestFtraceProducer
+#else
+#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
+#endif
+TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(200);
+  trace_config.set_duration_ms(3000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -156,7 +163,7 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
     }
   };
 
-#if BUILDFLAG(PERFETTO_START_DAEMONS)
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
 
@@ -176,7 +183,7 @@ TEST_F(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
-  // Setip the TraceConfig for the consumer.
+  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(200);
@@ -193,8 +200,10 @@ TEST_F(PerfettoTest, TestFakeProducer) {
     if (has_more) {
       for (auto& packet : packets) {
         packet.Decode();
-        ASSERT_TRUE(packet->has_test());
-        ASSERT_EQ(packet->test(), "test");
+        ASSERT_TRUE(packet->has_for_testing());
+        ASSERT_EQ(protos::TracePacket::kTrustedUid,
+                  packet->optional_trusted_uid_case());
+        ASSERT_EQ(packet->for_testing().str(), "test");
       }
       total += packets.size();
 
@@ -207,18 +216,24 @@ TEST_F(PerfettoTest, TestFakeProducer) {
     }
   };
 
-#if BUILDFLAG(PERFETTO_START_DAEMONS)
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate));
 #endif
 
+  auto data_produced = task_runner.CreateCheckpoint("data.produced");
   TaskRunnerThread producer_thread;
-  producer_thread.Start(
-      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate));
+  producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
+      new FakeProducerDelegate([&task_runner, &data_produced] {
+        task_runner.PostTask(data_produced);
+      })));
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+
+  task_runner.RunUntilCheckpoint("data.produced");
+  consumer.ReadTraceData();
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }
