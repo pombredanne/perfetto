@@ -27,6 +27,7 @@ service traced_probes /system/bin/traced_probes
     user nobody
     group shell
     writepid /dev/cpuset/system-background/tasks
+    onrestart /system/bin/traced_probes -d
 
 on property:persist.traced.enable=1
     # Trace files need to be:
