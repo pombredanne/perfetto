@@ -201,7 +201,8 @@ TEST_F(PerfettoTest, TestFakeProducer) {
       for (auto& packet : packets) {
         packet.Decode();
         ASSERT_TRUE(packet->has_for_testing());
-        ASSERT_EQ(1, packet->trusted_uid_size());
+        ASSERT_EQ(protos::TracePacket::kTrustedUid,
+                  packet->optional_trusted_uid_case());
         ASSERT_EQ(packet->for_testing().str(), "test");
       }
       total += packets.size();

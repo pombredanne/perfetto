@@ -32,9 +32,6 @@ package perfetto.protos;
 // by the service (as opposed to the untrusted producers). Note that the field
 // ids here must be kept in sync with TracePacket.
 message TrustedPacket {
-  // User id of the producer which generated this packet. Note that we are using
-  // a repeated field because proto3 has no way to check whether a numeric field
-  // was omitted or whether it had the default value (0, which can't be
-  // changed).
-  repeated int32 trusted_uid = 3 [packed = false];
+  // User id of the producer which generated this packet.
+  oneof optional_trusted_uid { int32 trusted_uid = 3; };
 }

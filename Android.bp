@@ -158,6 +158,11 @@ cc_binary {
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
+  product_variables: {
+    pdk: {
+      enabled: false,
+    },
+  },
 }
 
 cc_defaults {
@@ -259,6 +264,11 @@ cc_test {
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
+  product_variables: {
+    pdk: {
+      enabled: false,
+    },
+  },
 }
 
 // GN target: //protos/perfetto/config:config_gen
@@ -1904,6 +1914,11 @@ cc_test {
     "-DGOOGLE_PROTOBUF_NO_RTTI",
     "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ],
+  product_variables: {
+    pdk: {
+      enabled: false,
+    },
+  },
 }
 
 // GN target: //:traced

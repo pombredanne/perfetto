@@ -362,7 +362,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
             // the producer can't give us a partial packet (e.g., a truncated
             // string) which only becomes valid when the UID is appended here.
             protos::TrustedPacket trusted_packet;
-            trusted_packet.add_trusted_uid(page_owner);
+            trusted_packet.set_trusted_uid(page_owner);
             uint8_t trusted_buf[16];
             PERFETTO_CHECK(trusted_packet.SerializeToArray(
                 &trusted_buf, sizeof(trusted_buf)));

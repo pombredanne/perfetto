@@ -60,7 +60,7 @@ TEST(PacketStreamValidatorTest, ComplexPacket) {
 
 TEST(PacketStreamValidatorTest, SimplePacketWithUid) {
   protos::TracePacket proto;
-  proto.add_trusted_uid(123);
+  proto.set_trusted_uid(123);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
@@ -70,18 +70,7 @@ TEST(PacketStreamValidatorTest, SimplePacketWithUid) {
 
 TEST(PacketStreamValidatorTest, SimplePacketWithZeroUid) {
   protos::TracePacket proto;
-  proto.add_trusted_uid(0);
-  std::string ser_buf = proto.SerializeAsString();
-
-  ChunkSequence seq;
-  seq.emplace_back(&ser_buf[0], ser_buf.size());
-  EXPECT_FALSE(PacketStreamValidator::Validate(seq));
-}
-
-TEST(PacketStreamValidatorTest, SimplePacketWithMultipleUids) {
-  protos::TracePacket proto;
-  proto.add_trusted_uid(0);
-  proto.add_trusted_uid(123);
+  proto.set_trusted_uid(0);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
@@ -91,7 +80,7 @@ TEST(PacketStreamValidatorTest, SimplePacketWithMultipleUids) {
 
 TEST(PacketStreamValidatorTest, SimplePacketWithNegativeOneUid) {
   protos::TracePacket proto;
-  proto.add_trusted_uid(-1);
+  proto.set_trusted_uid(-1);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
@@ -109,7 +98,7 @@ TEST(PacketStreamValidatorTest, ComplexPacketWithUid) {
   ft->mutable_sched_switch()->set_prev_pid(123);
   ft->mutable_sched_switch()->set_next_comm("jerry");
   ft->mutable_sched_switch()->set_next_pid(456);
-  proto.add_trusted_uid(123);
+  proto.set_trusted_uid(123);
   std::string ser_buf = proto.SerializeAsString();
 
   ChunkSequence seq;
@@ -140,7 +129,7 @@ TEST(PacketStreamValidatorTest, FragmentedPacket) {
 TEST(PacketStreamValidatorTest, FragmentedPacketWithUid) {
   protos::TracePacket proto;
   proto.mutable_for_testing()->set_str("string field");
-  proto.add_trusted_uid(123);
+  proto.set_trusted_uid(123);
   proto.mutable_ftrace_events()->set_cpu(0);
   auto* ft = proto.mutable_ftrace_events()->add_event();
   ft->set_pid(42);
