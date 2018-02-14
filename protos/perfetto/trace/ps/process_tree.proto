@@ -22,19 +22,19 @@ message ProcessTree {
   // Representation of a thread
   message Thread {
     // The thread id (as per gettid())
-    int32 tid = 1;
+    optional int32 tid = 1;
 
     // The name of the thread.
-    string name = 2;
+    optional string name = 2;
   }
 
   // Representation of a processs.
   message Process {
     // The UNIX process ID, aka thread group ID (as per getpid()).
-    int32 pid = 1;
+    optional int32 pid = 1;
 
     // The parent process ID, as per getppid().
-    int32 ppid = 2;
+    optional int32 ppid = 2;
 
     // The command line for the process, as per /proc/pid/cmdline.
     // The first item in the list is the process name (i.e. argv[0]).
