@@ -19,6 +19,7 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message ProcessTree {
+  // Representation of a thread
   message Thread {
     // The thread id (as per gettid())
     int32 tid = 1;
@@ -27,6 +28,7 @@ message ProcessTree {
     string name = 2;
   }
 
+  // Representation of a processs.
   message Process {
     // The UNIX process ID, aka thread group ID (as per getpid()).
     int32 pid = 1;
