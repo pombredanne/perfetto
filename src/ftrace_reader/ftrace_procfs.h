@@ -29,6 +29,7 @@ class FtraceProcfs {
  public:
   static std::unique_ptr<FtraceProcfs> Create(const std::string& root);
 
+  FtraceProcfs(const std::string& root, int breadcrumb_fd);
   FtraceProcfs(const std::string& root);
   virtual ~FtraceProcfs();
 
@@ -90,6 +91,7 @@ class FtraceProcfs {
 
   // virtual and public for testing.
   virtual bool WriteToFile(const std::string& path, const std::string& str);
+  virtual bool WriteToFileDescriptor(int fd, const std::string& str);
 
  private:
   // Checks the trace file is present at the given root path.
@@ -98,6 +100,7 @@ class FtraceProcfs {
   bool WriteNumberToFile(const std::string& path, size_t value);
 
   const std::string root_;
+  const int breadcrumb_fd_;
 };
 
 }  // namespace perfetto

@@ -27,6 +27,13 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <cutils/android_get_control_file.h>
+#define OPEN_BREADCRUMB(name) android_get_control_file(name)
+#else
+#define OPEN_BREADCRUMB(name) open(name, 0, "w")
+#endif
+
 namespace perfetto {
 namespace {
 
@@ -73,10 +80,15 @@ std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
   if (!CheckRootPath(root)) {
     return nullptr;
   }
-  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root));
+  int breadcrumb_fd = OPEN_BREADCRUMB("/dev/kmsg");
+  PERFETTO_CHECK(breadcrumb_fd != -1);
+  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root, breadcrumb_fd));
 }
 
-FtraceProcfs::FtraceProcfs(const std::string& root) : root_(root) {}
+FtraceProcfs::FtraceProcfs(const std::string& root, int breadcrumb_fd)
+    : root_(root), breadcrumb_fd_(breadcrumb_fd) {}
+FtraceProcfs::FtraceProcfs(const std::string& root) : FtraceProcfs(root, -1) {}
+
 FtraceProcfs::~FtraceProcfs() = default;
 
 bool FtraceProcfs::EnableEvent(const std::string& group,
@@ -133,11 +145,17 @@ bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
 }
 
 bool FtraceProcfs::EnableTracing() {
+  if (breadcrumb_fd_ != -1) {
+    WriteToFileDescriptor(breadcrumb_fd_, "Perfetto started ftrace.\n");
+  }
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
 }
 
 bool FtraceProcfs::DisableTracing() {
+  if (breadcrumb_fd_ != -1) {
+    WriteToFileDescriptor(breadcrumb_fd_, "Perfetto stopped ftrace.\n");
+  }
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
 }
@@ -198,16 +216,18 @@ bool FtraceProcfs::WriteNumberToFile(const std::string& path, size_t value) {
   return WriteToFile(path, std::string(buf));
 }
 
-bool FtraceProcfs::WriteToFile(const std::string& path,
-                               const std::string& str) {
-  base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
-  if (!fd)
-    return false;
-  ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
+bool FtraceProcfs::WriteToFileDescriptor(int fd, const std::string& str) {
+  ssize_t written = PERFETTO_EINTR(write(fd, str.c_str(), str.length()));
   ssize_t length = static_cast<ssize_t>(str.length());
   // This should either fail or write fully.
   PERFETTO_CHECK(written == length || written == -1);
   return written == length;
+}
+
+bool FtraceProcfs::WriteToFile(const std::string& path,
+                               const std::string& str) {
+  base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
+  return WriteToFileDescriptor(fd.get(), str);
 }
 
 base::ScopedFile FtraceProcfs::OpenPipeForCpu(size_t cpu) {
