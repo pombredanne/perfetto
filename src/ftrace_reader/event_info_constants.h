@@ -56,6 +56,7 @@ enum FtraceFieldType {
   kFtraceCString,
   kFtraceStringPtr,
   kFtraceBool,
+  kFtraceInode,
 };
 
 // Joint enum of FtraceFieldType (left) and ProtoFieldType (right).
@@ -75,6 +76,8 @@ enum TranslationStrategy {
   kCStringToString,
   kStringPtrToString,
   kBoolToUint32,
+  kInode32ToInt64,
+  kInode64ToInt64,
 };
 
 inline const char* ToString(ProtoFieldType v) {
@@ -139,6 +142,8 @@ inline const char* ToString(FtraceFieldType v) {
       return "string ptr";
     case kFtraceBool:
       return "bool";
+    case kFtraceInode:
+      return "inode";
   }
   // For gcc:
   PERFETTO_CHECK(false);

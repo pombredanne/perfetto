@@ -169,6 +169,7 @@ size_t CpuReader::ParsePage(size_t cpu,
     return 0;
 
   uint64_t timestamp = page_header.timestamp;
+  std::set<int> inode_numbers;
 
   while (ptr < end) {
     EventHeader event_header;
@@ -228,7 +229,8 @@ size_t CpuReader::ParsePage(size_t cpu,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, table, event))
+          if (!ParseEvent(ftrace_event_id, start, next, table, event,
+                          inode_numbers))
             return 0;
         }
 
@@ -246,7 +248,8 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* start,
                            const uint8_t* end,
                            const ProtoTranslationTable* table,
-                           protozero::ProtoZeroMessage* message) {
+                           protozero::ProtoZeroMessage* message,
+                           std::set<int>& inode_numbers) {
   PERFETTO_DCHECK(start < end);
   const size_t length = end - start;
 
@@ -262,14 +265,14 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   bool success = true;
   for (const Field& field : table->common_fields())
-    success &= ParseField(field, start, end, message);
+    success &= ParseField(field, start, end, message, inode_numbers);
 
   protozero::ProtoZeroMessage* nested =
       message->BeginNestedMessage<protozero::ProtoZeroMessage>(
           info.proto_field_id);
 
   for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested);
+    success &= ParseField(field, start, end, nested, inode_numbers);
 
   // This finalizes |nested| automatically.
   message->Finalize();
@@ -284,7 +287,8 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 bool CpuReader::ParseField(const Field& field,
                            const uint8_t* start,
                            const uint8_t* end,
-                           protozero::ProtoZeroMessage* message) {
+                           protozero::ProtoZeroMessage* message,
+                           std::set<int>& inode_numbers) {
   PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
   const uint8_t* field_start = start + field.ftrace_offset;
   uint32_t field_id = field.proto_field_id;
@@ -319,6 +323,16 @@ bool CpuReader::ParseField(const Field& field,
       return true;
     case kBoolToUint32:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+      return true;
+    case kInode32ToInt64:
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+      // read from field_start and save in a set
+      AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
+      return true;
+    case kInode64ToInt64:
+      ReadIntoVarInt<uint64_t>(field_start, field_id, message);
+      // read from field_start and save in a set
+      AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
       return true;
   }
   // Not reached, for gcc.
