@@ -1,0 +1,35 @@
+cc_test {
+  name: "CtsPerfettoTestCases",
+  srcs: [
+    "end_to_end_integrationtest_cts.cc",
+  ],
+  static_libs: [
+    "libgmock",
+    "libgtest",
+    "libgtest_main",
+    "perfetto_src_tracing_ipc",
+    "perfetto_cts_deps",
+  ],
+  shared_libs: [
+    "libandroid",
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  test_suites: [
+    "cts",
+    "vts",
+    "general-tests",
+  ],
+  compile_multilib: "both",
+  multilib: {
+    lib32: {
+        suffix: "32",
+    },
+    lib64: {
+        suffix: "64",
+    },
+  },
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
+}

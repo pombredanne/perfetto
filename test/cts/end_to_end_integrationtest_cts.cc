@@ -48,8 +48,10 @@ class PerfettoCtsTest : public ::testing::Test {
       if (has_more) {
         for (auto& packet : packets) {
           packet.Decode();
-          ASSERT_TRUE(packet->has_test());
-          ASSERT_EQ(packet->test(), "test");
+          ASSERT_TRUE(packet->has_for_testing());
+          ASSERT_EQ(protos::TracePacket::kTrustedUid,
+                    packet->optional_trusted_uid_case());
+          ASSERT_EQ(packet->for_testing().str(), "test");
         }
         total += packets.size();
 

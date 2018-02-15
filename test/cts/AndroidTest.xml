@@ -14,20 +14,21 @@
      limitations under the License.
 -->
 <!-- The Android.mk file that defines these target lives in /external/perfetto/cts -->
-<configuration description="Config for APCT Perfetto test cases">
-    <option name="test-suite-tag" value="apct" />
+<configuration description="Config for CTS Perfetto test cases">
+    <option name="test-suite-tag" value="cts" />
+    <target_preparer class="com.android.tradefed.targetprep.suite.SuiteApkInstaller">
+        <option name="cleanup-apks" value="true" />
+        <option name="test-file-name" value="CtsPerfettoProducerApp.apk" />
+    </target_preparer>
     <target_preparer class="com.android.compatibility.common.tradefed.targetprep.FilePusher">
         <option name="cleanup" value="true" />
-        <option name="push" value="perfetto_unittests->/data/local/tmp/perfetto_unittests" />
-        <option name="push" value="perfetto_integrationtests->/data/local/tmp/perfetto_integrationtests" />
+        <option name="push" value="CtsPerfettoTestCases->/data/local/tmp/CtsPerfettoTestCases" />
     </target_preparer>
-    <option name="post-boot-command" value="setprop persist.traced.enable 1" />
     <test class="com.android.tradefed.testtype.GTest" >
-      <option name="native-test-device-path" value="/data/local/tmp/perfetto_unittests" />
-      <option name="module-name" value="perfetto_unittests" />
-    </test>
-    <test class="com.android.tradefed.testtype.GTest" >
-      <option name="native-test-device-path" value="/data/local/tmp/perfetto_integrationtests" />
-      <option name="module-name" value="perfetto_integrationtests" />
+        <option name="native-test-device-path" value="/data/local/tmp" />
+        <option name="module-name" value="CtsPerfettoTestCases" />
+        <option name="runtime-hint" value="0m5s" />
+        <!-- test-timeout unit is ms, value = 10 seconds -->
+        <option name="native-test-timeout" value="10000" />
     </test>
 </configuration>
