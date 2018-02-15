@@ -81,7 +81,6 @@ std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
     return nullptr;
   }
   int breadcrumb_fd = OPEN_BREADCRUMB("/dev/kmsg");
-  PERFETTO_CHECK(breadcrumb_fd != -1);
   return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root, breadcrumb_fd));
 }
 
