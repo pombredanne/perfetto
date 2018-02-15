@@ -25,18 +25,14 @@
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
-#include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
-#include "perfetto/tracing/core/trace_config.h"
-#include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
-#include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/base/test/test_task_runner.h"
-
+#include "test/fake_consumer.h"
 #include "test/task_runner_thread.h"
 
 #define PRODUCER_SOCKET "/tmp/perfetto-producer"
@@ -44,46 +40,6 @@
 
 namespace perfetto {
 namespace shm_fuzz {
-
-class FakeConsumer : public Consumer {
- public:
-  FakeConsumer(
-      const TraceConfig& trace_config,
-      std::function<void(std::vector<TracePacket>, bool)> packet_callback,
-      base::TaskRunner* task_runner)
-      : packet_callback_(std::move(packet_callback)),
-        trace_config_(trace_config),
-        task_runner_(task_runner) {}
-  ~FakeConsumer() = default;
-
-  void Connect(const char* socket_name) {
-    endpoint_ = ConsumerIPCClient::Connect(socket_name, this, task_runner_);
-  }
-
-  void OnConnect() { endpoint_->EnableTracing(trace_config_); }
-
-  void OnDisconnect() { PERFETTO_CHECK(false); }
-
-  void OnTraceData(std::vector<TracePacket> data, bool has_more) {
-    packet_callback_(std::move(data), has_more);
-  }
-
-  void BusyWaitReadBuffers() {
-    task_runner_->PostDelayedTask(
-        std::bind([this]() {
-          endpoint_->ReadBuffers();
-          task_runner_->PostDelayedTask(
-              std::bind([this]() { BusyWaitReadBuffers(); }), 1);
-        }),
-        1);
-  }
-
- private:
-  std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
-  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
-  const TraceConfig trace_config_;
-  base::TaskRunner* const task_runner_;
-};
 
 // Fake producer writing a protozero message of data into shared memory
 // buffer, followed by a sentinel message to signal completion to the
