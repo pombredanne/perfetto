@@ -18,7 +18,9 @@
 #include <unistd.h>
 #include <chrono>
 #include <condition_variable>
+#include <fstream>
 #include <functional>
+#include <sstream>
 #include <thread>
 
 #include "perfetto/base/logging.h"
@@ -42,6 +44,19 @@
 #endif
 
 namespace perfetto {
+namespace {
+
+std::string ReadFile(const std::string& name) {
+  std::ifstream fin(name, std::ios::in);
+  if (!fin) {
+    return "";
+  }
+  std::ostringstream stream;
+  stream << fin.rdbuf();
+  fin.close();
+  return stream.str();
+}
+}  // namespace
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
@@ -237,5 +252,46 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 
   task_runner.RunUntilCheckpoint("no.more.packets");
 }
+
+#if !PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+
+TEST_F(PerfettoTest, KillFtrace) {
+  base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("ftrace.killed");
+
+  // Setip the TraceConfig for the consumer.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(1000);
+
+  // Create the buffer for ftrace.
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("com.google.perfetto.ftrace");
+  ds_config->set_target_buffer(0);
+
+  // Setup the config for ftrace.
+  auto* ftrace_config = ds_config->mutable_ftrace_config();
+  *ftrace_config->add_event_names() = "cpu_frequency";
+
+  auto function = [](std::vector<TracePacket> packets, bool has_more) {};
+
+  task_runner.PostDelayedTask(
+      [&finish] {
+        ASSERT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "1\n");
+        system("pkill -9 traced_probes");
+        finish();
+      },
+      700);
+
+  // Finally, make the consumer connect to the service.
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+
+  task_runner.RunUntilCheckpoint("ftrace.killed");
+  usleep(50000);
+  EXPECT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "0\n");
+}
+
+#endif
 
 }  // namespace perfetto
