@@ -288,7 +288,15 @@ TEST_F(PerfettoTest, KillFtrace) {
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("ftrace.killed");
-  usleep(500000);
+
+  time_t start = time(nullptr);
+  while (time(nullptr) - start < 10) {
+    if (ReadFile("/sys/kernel/debug/tracing/tracing_on") == "0\n") {
+      break;
+    }
+    usleep(100000);
+  }
+
   EXPECT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "0\n");
 }
 
