@@ -151,7 +151,7 @@ bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
 
 bool FtraceProcfs::EnableTracing() {
   if (breadcrumb_fd_ != -1) {
-    WriteToFileDescriptor(breadcrumb_fd_, "Perfetto started ftrace.\n");
+    WriteToFileDescriptor(breadcrumb_fd_, "perfetto: started ftrace.\n");
   }
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
@@ -159,7 +159,7 @@ bool FtraceProcfs::EnableTracing() {
 
 bool FtraceProcfs::DisableTracing() {
   if (breadcrumb_fd_ != -1) {
-    WriteToFileDescriptor(breadcrumb_fd_, "Perfetto stopped ftrace.\n");
+    WriteToFileDescriptor(breadcrumb_fd_, "perfetto: stopped ftrace.\n");
   }
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
