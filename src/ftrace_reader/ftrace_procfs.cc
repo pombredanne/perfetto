@@ -27,13 +27,6 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-#include <cutils/android_get_control_file.h>
-#define OPEN_BREADCRUMB(name) android_get_control_file(name)
-#else
-#define OPEN_BREADCRUMB(name) open(name, 0, "w")
-#endif
-
 namespace perfetto {
 namespace {
 
@@ -80,7 +73,14 @@ std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
   if (!CheckRootPath(root)) {
     return nullptr;
   }
-  int breadcrumb_fd = OPEN_BREADCRUMB("/dev/kmsg");
+  int breadcrumb_fd = -1;
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  breadcrumb_fd = open("/dev/kmsg", 0, "w");
+#else
+  const char* env = getenv("ANDROID_FILE__dev_kmsg");
+  if (env != nullptr)
+    breadcrumb_fd = atoi(env);
+#endif
   return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root, breadcrumb_fd));
 }
 
@@ -88,7 +88,13 @@ FtraceProcfs::FtraceProcfs(const std::string& root, int breadcrumb_fd)
     : root_(root), breadcrumb_fd_(breadcrumb_fd) {}
 FtraceProcfs::FtraceProcfs(const std::string& root) : FtraceProcfs(root, -1) {}
 
-FtraceProcfs::~FtraceProcfs() = default;
+FtraceProcfs::~FtraceProcfs() {
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  if (breadcrumb_fd_ != -1)
+    close(breadcrumb_fd_);
+#endif
+}
+
 
 bool FtraceProcfs::EnableEvent(const std::string& group,
                                const std::string& name) {
