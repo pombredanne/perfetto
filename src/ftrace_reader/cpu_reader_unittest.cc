@@ -627,6 +627,18 @@ TEST(CpuReaderTest, ParseAllFields) {
       SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                              &field->strategy);
     }
+    {
+      // ino_t -> uint64
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->ftrace_offset = 28;
+      field->ftrace_size = 8;
+      field->ftrace_type = kFtraceInode;
+      field->proto_field_id = 503;
+      field->proto_field_type = kProtoUint64;
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
+    }
   }
   ProtoTranslationTable table(events, std::move(common_fields));
 

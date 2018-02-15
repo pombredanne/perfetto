@@ -76,8 +76,8 @@ enum TranslationStrategy {
   kCStringToString,
   kStringPtrToString,
   kBoolToUint32,
-  kInode32ToInt64,
-  kInode64ToInt64,
+  kInode32ToUint32,
+  kInode64ToUint64,
 };
 
 inline const char* ToString(ProtoFieldType v) {

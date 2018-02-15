@@ -65,7 +65,6 @@ static void AddToInodeNumbers(const uint8_t* start,
                               std::set<int>& inode_numbers) {
   T t;
   memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
-  printf("Inode numbers : %i", (int)t);
   inode_numbers.insert((int)t);
 }
 
@@ -333,11 +332,11 @@ bool CpuReader::ParseField(const Field& field,
     case kBoolToUint32:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
-    case kInode32ToInt64:
+    case kInode32ToUint32:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
       return true;
-    case kInode64ToInt64:
+    case kInode64ToUint64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
       return true;

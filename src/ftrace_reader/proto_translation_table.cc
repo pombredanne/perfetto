@@ -60,7 +60,6 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field, Field* field) {
                                  ftrace_field.is_signed, &field->ftrace_type);
   field->ftrace_offset = ftrace_field.offset;
   field->ftrace_size = ftrace_field.size;
-  // add field is_inode to track if it's an is_inode
   success = success &&
             SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                                    &field->strategy);
