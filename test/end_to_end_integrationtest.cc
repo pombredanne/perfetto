@@ -288,7 +288,7 @@ TEST_F(PerfettoTest, KillFtrace) {
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("ftrace.killed");
-  usleep(50000);
+  usleep(500000);
   EXPECT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "0\n");
 }
 
