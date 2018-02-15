@@ -116,6 +116,7 @@ class PerfettoTest : public ::testing::Test {
   };
 };
 
+// TODO(b/73453011): reenable this when fixed.
 TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
