@@ -327,6 +327,7 @@ TEST(FtraceControllerTest, TaskScheduling) {
   sink.reset();
 }
 
+// TODO(b/73452932): Fix and reenable this test.
 TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   MockTaskRunner task_runner;
   auto ftrace_procfs =
