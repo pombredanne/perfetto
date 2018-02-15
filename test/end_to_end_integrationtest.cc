@@ -180,7 +180,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // and the consumer tries to retrieve it. For now wait a bit until the service
   // is done, but we should add explicit flushing to avoid this.
   task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                              2000);
+                              6000);
 
   task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
