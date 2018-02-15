@@ -251,13 +251,13 @@ TEST(TranslationTableTest, InferFtraceType) {
   ASSERT_TRUE(InferFtraceType("char[] foo", 8, false, &type));
   EXPECT_EQ(type, kFtraceStringPtr);
 
-  ASSERT_TRUE(InferFtraceType("asdchaasdr * foo", 8, false, &type));
+  ASSERT_TRUE(InferFtraceType("char * foo", 8, false, &type));
   EXPECT_EQ(type, kFtraceStringPtr);
 
-  ASSERT_TRUE(InferFtraceType("", 64, false, &type));
+  ASSERT_TRUE(InferFtraceType("char foo[64]", 64, false, &type));
   EXPECT_EQ(type, kFtraceFixedCString);
 
-  ASSERT_TRUE(InferFtraceType("u3f2 foo", 4, false, &type));
+  ASSERT_TRUE(InferFtraceType("u32 foo", 4, false, &type));
   EXPECT_EQ(type, kFtraceUint32);
 
   ASSERT_TRUE(InferFtraceType("ino_t foo", 4, false, &type));

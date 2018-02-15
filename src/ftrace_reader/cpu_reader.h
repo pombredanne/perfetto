@@ -97,15 +97,6 @@ class CpuReader {
     out->AppendVarInt<T>(field_id, t);
   }
 
-  template <typename T>
-  static void AddToInodeNumbers(const uint8_t* start,
-                                std::set<int> inode_numbers) {
-    T t;
-    memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
-    printf("Inode numbers : %i", (int)t);
-    inode_numbers.insert((int)t);
-  }
-
   // Parse a raw ftrace page beginning at ptr and write the events a protos
   // into the provided bundle respecting the given event filter.
   // |table| contains the mix of compile time (e.g. proto field ids) and

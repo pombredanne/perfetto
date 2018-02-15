@@ -60,6 +60,15 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   return enabled;
 }
 
+template <typename T>
+static void AddToInodeNumbers(const uint8_t* start,
+                              std::set<int>& inode_numbers) {
+  T t;
+  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
+  printf("Inode numbers : %i", (int)t);
+  inode_numbers.insert((int)t);
+}
+
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
 // Some information about the values of these constants are exposed to user
@@ -326,12 +335,10 @@ bool CpuReader::ParseField(const Field& field,
       return true;
     case kInode32ToInt64:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
-      // read from field_start and save in a set
       AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
       return true;
     case kInode64ToInt64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
-      // read from field_start and save in a set
       AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
       return true;
   }
