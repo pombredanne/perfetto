@@ -327,7 +327,7 @@ TEST(FtraceControllerTest, TaskScheduling) {
   sink.reset();
 }
 
-TEST(FtraceControllerTest, DrainPeriodRespected) {
+TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   MockTaskRunner task_runner;
   auto ftrace_procfs =
       std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
