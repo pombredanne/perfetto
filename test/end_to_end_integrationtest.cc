@@ -128,7 +128,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(5000);
+  trace_config.set_duration_ms(10000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -180,7 +180,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // and the consumer tries to retrieve it. For now wait a bit until the service
   // is done, but we should add explicit flushing to avoid this.
   task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                              6000);
+                              13000);
 
   task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
