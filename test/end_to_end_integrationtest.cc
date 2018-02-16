@@ -116,8 +116,14 @@ class PerfettoTest : public ::testing::Test {
   };
 };
 
-// TODO(b/73453011): reenable this when fixed.
-TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#define MAYBE_TestFtraceProducer TestFtraceProducer
+#else
+#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
+#endif
+TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
@@ -181,6 +187,13 @@ TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
   task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
 
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#define MAYBE_TestFakeProducer TestFakeProducer
+#else
+#define MAYBE_TestFakeProducer DISABLED_TestFakeProducer
+#endif
 TEST_F(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
