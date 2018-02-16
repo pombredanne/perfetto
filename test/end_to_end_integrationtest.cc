@@ -34,6 +34,7 @@
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
 #include "src/base/test/test_task_runner.h"
+#include "src/ftrace_reader/ftrace_procfs.h"
 #include "src/traced/probes/ftrace_producer.h"
 #include "test/fake_consumer.h"
 #include "test/fake_producer.h"
@@ -129,6 +130,15 @@ class PerfettoTest : public ::testing::Test {
     std::unique_ptr<FakeProducer> producer_;
     std::function<void()> connect_callback_;
   };
+
+  static std::string FindTracingRoot() {
+    for (size_t i = 0; kTracingPaths[i] != nullptr; ++i) {
+      if (FtraceProcfs::CheckRootPath(kTracingPaths[i])) {
+        return kTracingPaths[i];
+      }
+    }
+    PERFETTO_CHECK(false);
+  }
 };
 
 // TODO(b/73453011): reenable this on more platforms (including standalone
@@ -274,6 +284,8 @@ TEST_F(PerfettoTest, KillFtrace) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("ftrace.killed");
 
+  std::string tracing_root = FindTracingRoot();
+
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
@@ -291,8 +303,8 @@ TEST_F(PerfettoTest, KillFtrace) {
   auto function = [](std::vector<TracePacket> packets, bool has_more) {};
 
   task_runner.PostDelayedTask(
-      [&finish] {
-        ASSERT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "1\n");
+      [&finish, &tracing_root] {
+        ASSERT_TRUE(ReadFile(tracing_root + "tracing_on").find('1') == 0);
         system("pkill -9 traced_probes");
         finish();
       },
@@ -305,14 +317,13 @@ TEST_F(PerfettoTest, KillFtrace) {
   task_runner.RunUntilCheckpoint("ftrace.killed");
 
   time_t start = time(nullptr);
-  while (time(nullptr) - start < 10) {
-    if (ReadFile("/sys/kernel/debug/tracing/tracing_on") == "0\n") {
-      break;
-    }
+  bool tracing_off = false;
+  while (time(nullptr) - start < 10 && !tracing_off) {
+    tracing_off = ReadFile(tracing_root + "tracing_on").find('0') == 0;
     usleep(100000);
   }
 
-  EXPECT_EQ(ReadFile("/sys/kernel/debug/tracing/tracing_on"), "0\n");
+  ASSERT_TRUE(tracing_off);
 }
 
 #endif

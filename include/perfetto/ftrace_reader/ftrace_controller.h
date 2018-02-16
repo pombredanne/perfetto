@@ -43,6 +43,7 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
+extern const char* kTracingPaths[];
 const size_t kMaxSinks = 32;
 const size_t kMaxCpus = 64;
 

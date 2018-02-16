@@ -91,10 +91,10 @@ class FtraceProcfs {
   // virtual and public for testing.
   virtual bool WriteToFile(const std::string& path, const std::string& str);
 
- private:
   // Checks the trace file is present at the given root path.
   static bool CheckRootPath(const std::string& root);
 
+ private:
   bool WriteNumberToFile(const std::string& path, size_t value);
 
   const std::string root_;
