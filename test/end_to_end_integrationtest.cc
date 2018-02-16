@@ -194,7 +194,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 #else
 #define MAYBE_TestFakeProducer DISABLED_TestFakeProducer
 #endif
-TEST_F(PerfettoTest, TestFakeProducer) {
+TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
