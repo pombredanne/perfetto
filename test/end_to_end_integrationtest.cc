@@ -123,7 +123,7 @@ class PerfettoTest : public ::testing::Test {
 #else
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
-TEST_F(PerfettoTest, DISABLED_TestFtraceProducer) {
+TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
