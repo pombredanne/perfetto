@@ -629,26 +629,12 @@ TEST(CpuReaderTest, ParseAllFields) {
     }
     {
       // ino_t -> uint64
-      // inode_number: 1819043144U
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 12;
       field->ftrace_size = 4;
       field->ftrace_type = kFtraceInode32;
       field->proto_field_id = 503;
-      field->proto_field_type = kProtoUint64;
-      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
-                             &field->strategy);
-    }
-    {
-      // ino_t -> uint64
-      // inode_number: 18446744073709486191U
-      event->fields.emplace_back(Field{});
-      Field* field = &event->fields.back();
-      field->ftrace_offset = 16;
-      field->ftrace_size = 8;
-      field->ftrace_type = kFtraceInode64;
-      field->proto_field_id = 504;
       field->proto_field_type = kProtoUint64;
       SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                              &field->strategy);
@@ -680,10 +666,6 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_uint32(), 1002ul);
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
-  std::set<uint64_t> test_inode_numbers;
-  test_inode_numbers.insert(1819043144U);
-  test_inode_numbers.insert(18446744073709486191U);
-  EXPECT_EQ(inode_numbers, test_inode_numbers);
 }
 
 // # tracer: nop

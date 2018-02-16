@@ -333,9 +333,6 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
-      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
-      AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
-      return true;
     case kInode64ToUint64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
