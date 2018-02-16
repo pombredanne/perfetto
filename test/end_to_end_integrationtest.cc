@@ -116,7 +116,9 @@ class PerfettoTest : public ::testing::Test {
   };
 };
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
 #define MAYBE_TestFtraceProducer TestFtraceProducer
 #else
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
@@ -128,7 +130,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(5000);
+  trace_config.set_duration_ms(10000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -180,12 +182,19 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // and the consumer tries to retrieve it. For now wait a bit until the service
   // is done, but we should add explicit flushing to avoid this.
   task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                              2000);
+                              13000);
 
   task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
 
-TEST_F(PerfettoTest, TestFakeProducer) {
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#define MAYBE_TestFakeProducer TestFakeProducer
+#else
+#define MAYBE_TestFakeProducer DISABLED_TestFakeProducer
+#endif
+TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 

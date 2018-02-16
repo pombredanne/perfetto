@@ -24,6 +24,9 @@
         <option name="cleanup" value="true" />
         <option name="push" value="CtsPerfettoTestCases->/data/local/tmp/CtsPerfettoTestCases" />
     </target_preparer>
+    <target_preparer class="com.android.tradefed.targetprep.RunCommandTargetPreparer">
+        <option name="run-command" value="am start -n android.perfetto.producer/.ProducerActivity" />
+    </target_preparer>
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="CtsPerfettoTestCases" />

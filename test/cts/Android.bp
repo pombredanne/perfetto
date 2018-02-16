@@ -7,13 +7,13 @@ cc_test {
     "libgmock",
     "libgtest",
     "libgtest_main",
+    "libprotobuf-cpp-lite",
     "perfetto_src_tracing_ipc",
     "perfetto_cts_deps",
   ],
   shared_libs: [
     "libandroid",
     "liblog",
-    "libprotobuf-cpp-lite",
   ],
   test_suites: [
     "cts",
@@ -29,6 +29,7 @@ cc_test {
         suffix: "64",
     },
   },
+  stl: "libc++_static",
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],

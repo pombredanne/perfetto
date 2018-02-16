@@ -25,6 +25,9 @@ cc_library_static {
     "perfetto_src_tracing_ipc",
     "libgtest_prod",
   ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
+  ],
 }
 
 cc_library_static {
@@ -42,5 +45,8 @@ cc_library_static {
   ],
   static_libs: [
     "perfetto_src_tracing_ipc",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
