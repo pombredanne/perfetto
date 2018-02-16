@@ -66,6 +66,20 @@ std::string ReadFileIntoString(const std::string& path) {
   return str;
 }
 
+int OpenKmesgFD() {
+  int breadcrumb_fd = -1;
+  const char* env = getenv("ANDROID_FILE__dev_kmsg");
+  if (env != nullptr)
+    breadcrumb_fd = atoi(env);
+  return breadcrumb_fd;
+}
+
+void KernelLogWrite(const char* s) {
+  static int kmesg_fd = OpenKmesgFD();
+  if (kmesg_fd != -1)
+    write(kmesg_fd, s, strlen(s));
+}
+
 }  // namespace
 
 // static
@@ -73,28 +87,11 @@ std::unique_ptr<FtraceProcfs> FtraceProcfs::Create(const std::string& root) {
   if (!CheckRootPath(root)) {
     return nullptr;
   }
-  int breadcrumb_fd = -1;
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  breadcrumb_fd = open("/dev/kmsg", 0, "w");
-#else
-  const char* env = getenv("ANDROID_FILE__dev_kmsg");
-  if (env != nullptr)
-    breadcrumb_fd = atoi(env);
-#endif
-  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root, breadcrumb_fd));
+  return std::unique_ptr<FtraceProcfs>(new FtraceProcfs(root));
 }
 
-FtraceProcfs::FtraceProcfs(const std::string& root, int breadcrumb_fd)
-    : root_(root), breadcrumb_fd_(breadcrumb_fd) {}
-FtraceProcfs::FtraceProcfs(const std::string& root) : FtraceProcfs(root, -1) {}
-
-FtraceProcfs::~FtraceProcfs() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  if (breadcrumb_fd_ != -1)
-    close(breadcrumb_fd_);
-#endif
-}
-
+FtraceProcfs::FtraceProcfs(const std::string& root) : root_(root) {}
+FtraceProcfs::~FtraceProcfs() = default;
 
 bool FtraceProcfs::EnableEvent(const std::string& group,
                                const std::string& name) {
@@ -150,15 +147,13 @@ bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
 }
 
 bool FtraceProcfs::EnableTracing() {
-  if (breadcrumb_fd_ != -1)
-    WriteToFileDescriptor(breadcrumb_fd_, "perfetto: started ftrace.\n");
+  KernelLogWrite("perfetto: enabled ftrace\n");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
 }
 
 bool FtraceProcfs::DisableTracing() {
-  if (breadcrumb_fd_ != -1)
-    WriteToFileDescriptor(breadcrumb_fd_, "perfetto: stopped ftrace.\n");
+  KernelLogWrite("perfetto: disabled ftrace\n");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
 }
@@ -219,18 +214,16 @@ bool FtraceProcfs::WriteNumberToFile(const std::string& path, size_t value) {
   return WriteToFile(path, std::string(buf));
 }
 
-bool FtraceProcfs::WriteToFileDescriptor(int fd, const std::string& str) {
-  ssize_t written = PERFETTO_EINTR(write(fd, str.c_str(), str.length()));
+bool FtraceProcfs::WriteToFile(const std::string& path,
+                               const std::string& str) {
+  base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
+  if (!fd)
+    return false;
+  ssize_t written = PERFETTO_EINTR(write(fd.get(), str.c_str(), str.length()));
   ssize_t length = static_cast<ssize_t>(str.length());
   // This should either fail or write fully.
   PERFETTO_CHECK(written == length || written == -1);
   return written == length;
-}
-
-bool FtraceProcfs::WriteToFile(const std::string& path,
-                               const std::string& str) {
-  base::ScopedFile fd = base::OpenFile(path.c_str(), O_WRONLY);
-  return WriteToFileDescriptor(fd.get(), str);
 }
 
 base::ScopedFile FtraceProcfs::OpenPipeForCpu(size_t cpu) {
