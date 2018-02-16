@@ -68,17 +68,17 @@ std::string ReadFileIntoString(const std::string& path) {
 }
 
 int OpenKmesgFD() {
-  int breadcrumb_fd = -1;
+  // This environment variable gets set to a fd to /dev/kmsg opened for writing.
+  // The file gets opened by init as configured in perfetto.rc. We cannot open
+  // the file directly due to permissions.
   const char* env = getenv("ANDROID_FILE__dev_kmsg");
-  if (env != nullptr)
-    breadcrumb_fd = atoi(env);
-  return breadcrumb_fd;
+  return env != nullptr ? atoi(env) : -1;
 }
 
 void KernelLogWrite(const char* s) {
   static int kmesg_fd = OpenKmesgFD();
   if (kmesg_fd != -1)
-    write(kmesg_fd, s, strlen(s));
+    base::ignore_result(write(kmesg_fd, s, strlen(s)));
 }
 
 }  // namespace
@@ -148,13 +148,13 @@ bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
 }
 
 bool FtraceProcfs::EnableTracing() {
-  KernelLogWrite("perfetto: enabled ftrace\n");
+  KernelLogWrite("perfetto: enabled ftrace");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
 }
 
 bool FtraceProcfs::DisableTracing() {
-  KernelLogWrite("perfetto: disabled ftrace\n");
+  KernelLogWrite("perfetto: disabled ftrace");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
 }
