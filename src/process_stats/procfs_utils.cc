@@ -53,17 +53,28 @@ int ReadTgid(int pid) {
   return atoi(tgid_line + sizeof(kTgid) - 1);
 }
 
+int ReadPPid(int pid) {
+  static const char kPPid[] = "\nPPid:";
+  char buf[512];
+  ssize_t rsize = ReadProcFile(pid, "status", buf, sizeof(buf));
+  if (rsize <= 0)
+    return -1;
+  const char* ppid_line = strstr(buf, kPPid);
+  return atoi(ppid_line + sizeof(kPPid) - 1);
+}
+
 std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
   ProcessInfo* process = new ProcessInfo();
   process->pid = pid;
-  ReadProcString(pid, "cmdline", process->name, sizeof(process->name));
-  if (process->name[0] != 0) {
+  ReadProcString(pid, "cmdline", process->cmdline, sizeof(process->cmdline));
+  if (process->cmdline[0] != 0) {
     ReadExePath(pid, process->exe, sizeof(process->exe));
-    process->is_app = IsApp(process->name, process->exe);
+    process->is_app = IsApp(process->cmdline, process->exe);
   } else {
-    ReadProcString(pid, "comm", process->name, sizeof(process->name));
+    ReadProcString(pid, "comm", process->cmdline, sizeof(process->cmdline));
     process->in_kernel = true;
   }
+  process->ppid = ReadPPid(pid);
   return std::unique_ptr<ProcessInfo>(process);
 }
 
@@ -91,7 +102,7 @@ void SerializeProcesses(ProcessMap* processes, FILE* out) {
   for (auto it = processes->begin(); it != processes->end();) {
     const ProcessInfo* process = it->second.get();
     fprintf(out, "\"%d\":{", process->pid);
-    fprintf(out, "\"name\":\"%s\"", process->name);
+    fprintf(out, "\"cmdline\":\"%s\"", process->cmdline);
 
     if (!process->in_kernel) {
       fprintf(out, ",\"exe\":\"%s\",", process->exe);

@@ -12,31 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("probes") {
-  public_deps = [
-    "../../../include/perfetto/traced",
-  ]
-  deps = [
-    ":probes_src",
-    "../../../gn:default_deps",
-  ]
-  sources = [
-    "probes.cc",
-  ]
+import("../../../../gn/perfetto.gni")
+import("../../../../src/protozero/protozero_library.gni")
+
+ps_proto_names = [ "process_tree.proto" ]
+
+proto_library("lite") {
+  generate_python = false
+  sources = ps_proto_names
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
 }
 
-source_set("probes_src") {
-  public_deps = [
-    "../../ftrace_reader",
-  ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-    "../../process_stats:process_stats",
-    "../../tracing:tracing",
-  ]
-  sources = [
-    "probes_producer.cc",
-    "probes_producer.h",
-  ]
+protozero_library("zero") {
+  sources = ps_proto_names
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
+  generator_plugin_options = "wrapper_namespace=pbzero"
 }

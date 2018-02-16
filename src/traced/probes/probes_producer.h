@@ -24,18 +24,13 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 
-#include "perfetto/trace/process_data.pb.h"
-#include "perfetto/trace/process_data.pbzero.h"
-#include "perfetto/trace/process_data_bundle.pb.h"
-#include "perfetto/trace/process_data_bundle.pbzero.h"
-
 #ifndef SRC_TRACED_PROBES_PRODUCER_H_
 #define SRC_TRACED_PROBES_PRODUCER_H_
 
 namespace perfetto {
-class ProducerImpl : public Producer {
+class ProbesProducer : public Producer {
  public:
-  ~ProducerImpl() override;
+  ~ProbesProducer() override;
 
   // Producer Impl:
   void OnConnect() override;
@@ -47,6 +42,10 @@ class ProducerImpl : public Producer {
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
                           base::TaskRunner* task_runner);
+  void CreateFtraceDataSourceInstance(DataSourceInstanceID id,
+                                      const DataSourceConfig& source_config);
+  void CreateProcessStatsDataSourceInstance(
+      const DataSourceConfig& source_config);
 
  private:
   using FtraceBundleHandle =
@@ -88,9 +87,10 @@ class ProducerImpl : public Producer {
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   bool ftrace_creation_failed_ = false;
-  DataSourceID data_source_id_ = 0;
   uint64_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
+  // Keeps track of id for each type of data source.
+  std::map<DataSourceInstanceID, std::string> instances_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
 };
 }  // namespace perfetto

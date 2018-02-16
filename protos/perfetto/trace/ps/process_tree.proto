@@ -16,20 +16,34 @@
 
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
-
 package perfetto.protos;
 
-message ProcessData {
-  optional uint32 pid = 1;
-  optional bool in_kernel = 2;
-  optional bool is_app = 3;
-  optional string name = 4;
-  optional string exe = 5;
+message ProcessTree {
+  // Representation of a thread
+  message Thread {
+    // The thread id (as per gettid())
+    optional int32 tid = 1;
 
-  message ThreadData {
-    optional uint32 tid = 1;
+    // The name of the thread.
     optional string name = 2;
   }
 
-  repeated ThreadData threads = 6;
+  // Representation of a processs.
+  message Process {
+    // The UNIX process ID, aka thread group ID (as per getpid()).
+    optional int32 pid = 1;
+
+    // The parent process ID, as per getppid().
+    optional int32 ppid = 2;
+
+    // The command line for the process, as per /proc/pid/cmdline.
+    // If it is a kernel thread this will contain /proc/pid/comm.
+    optional string cmdline = 3;
+
+    // The list of all threads in the process.
+    repeated Thread threads = 4;
+  }
+
+  // List of all processes in the client.
+  repeated Process processes = 1;
 }

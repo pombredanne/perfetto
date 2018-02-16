@@ -14,10 +14,11 @@ struct ThreadInfo {
 
 struct ProcessInfo {
   int pid;
+  int ppid;
   bool in_kernel;
   bool is_app;
-  char name[256];
   char exe[256];
+  char cmdline[256];
   std::map<int, ThreadInfo> threads;
 };
 

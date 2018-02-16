@@ -18,6 +18,7 @@ using ProcessMap = std::map<int, std::unique_ptr<ProcessInfo>>;
 // ProcFS doesn't necessarly distinguish PID vs. TID, but all threads of a
 // process have the same Thread Group ID which is equal to Process ID.
 int ReadTgid(int pid);
+int ReadPPid(int pid);
 std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
 void ReadProcessThreads(ProcessInfo* process);
 void SerializeProcesses(ProcessMap* processes, FILE* out);

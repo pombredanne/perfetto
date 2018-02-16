@@ -32,7 +32,7 @@
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 
 #include "src/base/test/test_task_runner.h"
-#include "src/traced/probes/producer_impl.h"
+#include "src/traced/probes/probes_producer.h"
 #include "test/fake_consumer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
@@ -84,18 +84,18 @@ class PerfettoTest : public ::testing::Test {
   };
 
   // This is used only in daemon starting integrations tests.
-  class ProducerImplDelegate : public ThreadDelegate {
+  class ProbesProducerDelegate : public ThreadDelegate {
    public:
-    ProducerImplDelegate() = default;
-    ~ProducerImplDelegate() override = default;
+    ProbesProducerDelegate() = default;
+    ~ProbesProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
-      producer_.reset(new ProducerImpl);
+      producer_.reset(new ProbesProducer);
       producer_->ConnectWithRetries(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
 
    private:
-    std::unique_ptr<ProducerImpl> producer_;
+    std::unique_ptr<ProbesProducer> producer_;
   };
 
   class FakeProducerDelegate : public ThreadDelegate {
@@ -116,7 +116,9 @@ class PerfettoTest : public ::testing::Test {
   };
 };
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
 #define MAYBE_TestFtraceProducer TestFtraceProducer
 #else
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
@@ -128,7 +130,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(3000);
+  trace_config.set_duration_ms(10000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -169,14 +171,20 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(
-      std::unique_ptr<ProducerImplDelegate>(new ProducerImplDelegate));
+      std::unique_ptr<ProbesProducerDelegate>(new ProbesProducerDelegate));
 #endif
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
-  task_runner.RunUntilCheckpoint("no.more.packets");
+  // TODO(skyostil): There's a race here before the service processes our data
+  // and the consumer tries to retrieve it. For now wait a bit until the service
+  // is done, but we should add explicit flushing to avoid this.
+  task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
+                              13000);
+
+  task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
 
 TEST_F(PerfettoTest, TestFakeProducer) {

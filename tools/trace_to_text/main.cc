@@ -152,8 +152,7 @@ using protos::MmVmscanDirectReclaimEndFtraceEvent;
 using protos::MmVmscanKswapdSleepFtraceEvent;
 using protos::MmVmscanKswapdWakeFtraceEvent;
 using protos::PrintFtraceEvent;
-using protos::ProcessData;
-using protos::ProcessDataBundle;
+using protos::ProcessTree;
 using protos::RegulatorDisableCompleteFtraceEvent;
 using protos::RegulatorDisableFtraceEvent;
 using protos::RegulatorEnableCompleteFtraceEvent;
@@ -186,6 +185,9 @@ using protos::WorkqueueActivateWorkFtraceEvent;
 using protos::WorkqueueExecuteEndFtraceEvent;
 using protos::WorkqueueExecuteStartFtraceEvent;
 using protos::WorkqueueQueueWorkFtraceEvent;
+using Process = protos::ProcessTree::Process;
+
+// TODO(hjd): Add tests.
 
 class MFE : public MultiFileErrorCollector {
   virtual void AddError(const std::string& filename,
@@ -840,10 +842,19 @@ std::string FormatSchedWakeupNew(const SchedWakeupNewFtraceEvent& event) {
   return std::string(line);
 }
 
-std::string FormatProcess(const ProcessData& process) {
+// TODO(taylori): Confirm correct format for this.
+std::string FormatProcess(const Process& process) {
   char line[2048];
-  sprintf(line, "process name: %s", process.name().c_str());
-  return std::string(line);
+  sprintf(line, "process: pid=%d ppid=%d cmdline=%s\\n", process.pid(),
+          process.ppid(), process.cmdline().c_str());
+  std::string output = std::string(line);
+  for (auto thread : process.threads()) {
+    char thread_line[2048];
+    sprintf(thread_line, "thread: tid=%d name=%s\\n", thread.tid(),
+            thread.name().c_str());
+    output += thread_line;
+  }
+  return output;
 }
 
 int TraceToSystrace(std::istream* input, std::ostream* output) {
@@ -859,10 +870,9 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   }
 
   for (const TracePacket& packet : trace.packet()) {
-    if (packet.has_process_data_bundle()) {
-      const ProcessDataBundle& process_data_bundle =
-          packet.process_data_bundle();
-      for (const ProcessData& process : process_data_bundle.processes()) {
+    if (packet.has_process_tree()) {
+      const ProcessTree& process_tree = packet.process_tree();
+      for (const auto& process : process_tree.processes()) {
         std::string line = FormatProcess(process);
         sorted.emplace(0, line);
       }
