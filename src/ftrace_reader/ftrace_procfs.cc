@@ -77,8 +77,10 @@ int OpenKmesgFD() {
 
 void KernelLogWrite(const char* s) {
   static int kmesg_fd = OpenKmesgFD();
-  if (kmesg_fd != -1)
+  if (kmesg_fd != -1) {
     base::ignore_result(write(kmesg_fd, s, strlen(s)));
+    base::ignore_result(write(kmesg_fd, "\n", 1));
+  }
 }
 
 }  // namespace
