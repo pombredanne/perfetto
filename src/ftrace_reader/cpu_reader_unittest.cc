@@ -657,7 +657,7 @@ TEST(CpuReaderTest, ParseAllFields) {
 
   ASSERT_TRUE(CpuReader::ParseEvent(ftrace_event_id, input.get(),
                                     input.get() + length, &table,
-                                    provider.writer(), inode_numbers));
+                                    provider.writer(), &inode_numbers));
 
   auto event = provider.ParseProto();
   ASSERT_TRUE(event);
