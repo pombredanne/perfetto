@@ -122,13 +122,13 @@ class CpuReader {
                          const uint8_t* end,
                          const ProtoTranslationTable* table,
                          protozero::ProtoZeroMessage* message,
-                         std::set<int>& inode_numbers);
+                         std::set<uint64_t>& inode_numbers);
 
   static bool ParseField(const Field& field,
                          const uint8_t* start,
                          const uint8_t* end,
                          protozero::ProtoZeroMessage* message,
-                         std::set<int>& inode_numbers);
+                         std::set<uint64_t>& inode_numbers);
 
  private:
   uint8_t* GetBuffer();

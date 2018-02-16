@@ -62,10 +62,10 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
 
 template <typename T>
 static void AddToInodeNumbers(const uint8_t* start,
-                              std::set<int>& inode_numbers) {
+                              std::set<uint64_t>& inode_numbers) {
   T t;
   memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
-  inode_numbers.insert((int)t);
+  inode_numbers.insert(t);
 }
 
 // For further documentation of these constants see the kernel source:
@@ -177,7 +177,7 @@ size_t CpuReader::ParsePage(size_t cpu,
     return 0;
 
   uint64_t timestamp = page_header.timestamp;
-  std::set<int> inode_numbers;
+  std::set<uint64_t> inode_numbers;
 
   while (ptr < end) {
     EventHeader event_header;
@@ -257,7 +257,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* end,
                            const ProtoTranslationTable* table,
                            protozero::ProtoZeroMessage* message,
-                           std::set<int>& inode_numbers) {
+                           std::set<uint64_t>& inode_numbers) {
   PERFETTO_DCHECK(start < end);
   const size_t length = end - start;
 
@@ -296,7 +296,7 @@ bool CpuReader::ParseField(const Field& field,
                            const uint8_t* start,
                            const uint8_t* end,
                            protozero::ProtoZeroMessage* message,
-                           std::set<int>& inode_numbers) {
+                           std::set<uint64_t>& inode_numbers) {
   PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
   const uint8_t* field_start = start + field.ftrace_offset;
   uint32_t field_id = field.proto_field_id;
@@ -332,7 +332,7 @@ bool CpuReader::ParseField(const Field& field,
     case kBoolToUint32:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
-    case kInode32ToUint32:
+    case kInode32ToUint64:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
       return true;
