@@ -85,7 +85,6 @@ class CpuReader {
       const std::array<
           protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>,
           kMaxSinks>&);
-  int GetFileDescriptor();
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
