@@ -22,10 +22,19 @@
 
 namespace perfetto {
 
+// Unique within the scope of the tracing service.
 using ProducerID = uint64_t;
+
+// Unique within the scope of the tracing service.
 using DataSourceID = uint64_t;
+
+// Unique within the scope of the tracing service.
 using DataSourceInstanceID = uint64_t;
+
+// Unique within the scope of a Producer.
 using WriterID = uint16_t;
+
+// Unique within the scope of the tracing service.
 using BufferID = uint16_t;
 
 // Keep this in sync with SharedMemoryABI::PageHeader::target_buffer.

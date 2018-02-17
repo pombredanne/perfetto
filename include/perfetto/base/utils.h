@@ -30,6 +30,9 @@
     eintr_wrapper_result;                                   \
   })
 
+#define PERFETTO_LIKELY(_x) __builtin_expect(!!(_x), 1)
+#define PERFETTO_UNLIKELY(_x) __builtin_expect(!!(_x), 0)
+
 namespace perfetto {
 namespace base {
 
@@ -57,6 +60,13 @@ constexpr T AssumeLittleEndian(T value) {
   static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__,
                 "Unimplemented on big-endian archs");
   return value;
+}
+
+// Round up |size| to a multiple of |alignment| (must be a power of two).
+template <int alignment>
+constexpr size_t Align(size_t size) {
+  static_assert((alignment & (alignment - 1)) == 0, "alignment must be a pow2");
+  return (size + alignment - 1) & ~(alignment - 1);
 }
 
 }  // namespace base

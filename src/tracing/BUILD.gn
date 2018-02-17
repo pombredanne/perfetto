@@ -42,6 +42,8 @@ source_set("tracing") {
     "core/shared_memory_abi.cc",
     "core/shared_memory_arbiter_impl.cc",
     "core/shared_memory_arbiter_impl.h",
+    "core/trace_buffer.cc",
+    "core/trace_buffer.h",
     "core/trace_config.cc",
     "core/trace_packet.cc",
     "core/trace_writer_impl.cc",
