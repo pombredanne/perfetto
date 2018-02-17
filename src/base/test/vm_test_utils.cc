@@ -47,7 +47,7 @@ bool IsMapped(void* start, size_t size) {
     return false;
   EXPECT_EQ(0, res);
   for (size_t i = 0; i < num_pages; i++) {
-    if (!page_states[i])
+    if (!(page_states[i] & MINCORE_INCORE))
       return false;
   }
   return true;
