@@ -36,11 +36,12 @@ class TraceBuffez {
   bool Create(size_t size);
 
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
-  void CopyChunk(uint16_t producer_id,
-                 uint16_t writer_id,
-                 uint16_t chunk_id,
-                 const uint8_t* payload,
-                 size_t payload_size);
+  void CopyChunkFromUntrustedShmem(uint16_t producer_id,
+                                   uint16_t writer_id,
+                                   uint16_t chunk_id,
+                                   uint8_t flags,
+                                   const uint8_t* payload,
+                                   size_t payload_size);
 
  private:
   // This struct has to be exactly (sizeof(PageHeader) + sizeof(ChunkHeader))
@@ -58,7 +59,8 @@ class TraceBuffez {
     uint16_t writer_id;
 
     uint16_t chunk_id;  // Monotonic counter within the same writer id.
-    uint16_t padding_unused;
+    uint8_t flags;      // see SharedMemoryABI::ChunkHeader::flags.
+    uint8_t padding_unused;
     uint64_t producer_id;
   };
 

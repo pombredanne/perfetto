@@ -16,6 +16,7 @@
 
 #include "src/tracing/core/trace_buffer.h"
 
+#include <sys/mman.h>
 #include <limits>
 
 #include "perfetto/base/logging.h"
@@ -56,11 +57,7 @@ bool TraceBuffez::Create(size_t size) {
 }
 
 void TraceBuffez::ClearContentsAndResetRWCursors() {
-  // HMM maybe rely on zeroes? Or pre-fault? Who knows.
-  wptr_ = rptr_ = begin();
-  while (writable_size()) {
-    AddPaddingRecord(std::min(writable_size(), kMaxChunkRecordSize));
-  }
+  madvise(begin(), size_, MADV_DONTNEED);
   wptr_ = rptr_ = begin();
 }
 
@@ -68,11 +65,12 @@ void TraceBuffez::ClearContentsAndResetRWCursors() {
 // that the producer is malicious and will change the content of [src, src+size]
 // while we execute here. Don't do any processing on |src| other than memcpy()
 // or reading atomic words at fixed positions.
-void TraceBuffez::CopyChunk(uint16_t producer_id,
-                            uint16_t writer_id,
-                            uint16_t chunk_id,
-                            const uint8_t* payload,
-                            size_t payload_size) {
+void TraceBuffez::CopyChunkFromUntrustedShmem(uint16_t producer_id,
+                                              uint16_t writer_id,
+                                              uint16_t chunk_id,
+                                              uint8_t flags,
+                                              const uint8_t* payload,
+                                              size_t payload_size) {
   PERFETTO_DCHECK(writer_id != ChunkRecord::kWriterIdPadding);
 
   // Ensure that we never end up in a fragmented state where available_size()
@@ -105,64 +103,70 @@ void TraceBuffez::CopyChunk(uint16_t producer_id,
   size_t chunk_size = ReadChunkRecordSizeAt(wptr_);
   PERFETTO_DCHECK(chunk_size > 0 && !(chunk_size & (sizeof(ChunkRecord) - 1)));
   DcheckIsAlignedAndWithinBounds(wptr_);
-  if (chunk_size == 0) {
-    // The buffer is clear and this is the first time we are writing a record in
-    // this region of the buffer.
-    WriteChunkRecord(record, payload, payload_size);
-  } else {
-    // We are overwriting another (or more than one) ChunkRecord. In this case
-    // we need to first clear up the next ChunkRecord(s) to keep the buffer
-    // consistent. e.g. (in the example below, (w) == write cursor):
-    //
-    // Initial state:
-    // (w)
-    // |0        |10               |30                  |50
-    // +---------+-----------------+--------------------+--------------------+
-    // | Chunk 1 | Chunk 2         | Chunk 3            | Chunk 4            |
-    // +---------+-----------------+--------------------+--------------------+
-    //
-    // Let's assume we now want now write a 5th Chunk of size == 35, the final
-    // state should look like this:
-    //                                   (w)
-    // |0                                |35             |50
-    // +---------------------------------+---------------+--------------------+
-    // | Chunk 5                         | Padding Chunk | Chunk 4            |
-    // +---------------------------------+---------------+--------------------+
-    //
 
-    // Find the starting position of the first chunk which begins at or after
-    // |wptr_| + new chunk size (Chunk 4 in the example above). Note that such a
-    // chunk might not exist and we might reach the end of the buffer.
-    // Once found, write a padding chunk exactly at:
-    // (position found) - (end of new chunk, that is |wptr_| + |rounded_size|).
-    uint8_t* next_chunk = wptr_;
-    for (;;) {
-      size_t next_chunk_size = ReadChunkRecordSizeAt(next_chunk);
+  // At this point either |wptr_| points to an untouched part of the buffer
+  // (i.e. *wptr_ == 0) or we are about to overwrite one or more ChunkRecord(s).
+  // In this case we need to first figure out where the next valid ChunkRecord
+  // is going to be (if exists) and add padding between the new record and the
+  // latter.
+  // Example ((w) == write cursor):
+  //
+  // Initial state:
+  // |0 (w)    |10               |30                  |50
+  // +---------+-----------------+--------------------+--------------------+
+  // | Chunk 1 | Chunk 2         | Chunk 3            | Chunk 4            |
+  // +---------+-----------------+--------------------+--------------------+
+  //
+  // Let's assume we now want now write a 5th Chunk of size == 35, the final
+  // state should look like this:
+  // |0                                |35 (w)         |50
+  // +---------------------------------+---------------+--------------------+
+  // | Chunk 5                         | Padding Chunk | Chunk 4            |
+  // +---------------------------------+---------------+--------------------+
+  //
 
-      // We should never hit this, unless we managed to screw up while writing
-      // to the buffer and breaking the ChunkRecord(s) chain.
-      if (PERFETTO_UNLIKELY(next_chunk_size + next_chunk > end())) {
-        PERFETTO_DCHECK(false);
-        PERFETTO_ELOG("TraceBuffer corruption detected. Clearing buffer");
-        ClearContentsAndResetRWCursors();
-        return;
-      }
+  // Find the position of the first chunk which begins at or after
+  // (|wptr_| + |rounded_size\), e.g., Chunk 4 in the example above. Note that
+  // such a chunk might not exist and we might either reach the end of the
+  // buffer or a zeroed region of the buffer.
+  // If such a record is found, write a padding chunk exactly at:
+  // (position found) - (end of new chunk == |wptr_| + |rounded_size|).
+  size_t padding_size = 0;
+  for (uint8_t* next_chunk = wptr_;;) {
+    size_t next_chunk_size = ReadChunkRecordSizeAt(next_chunk);
 
-      if ((next_chunk - wptr_) + next_chunk_size >= rounded_size)
-        break;
+    // We just reached the untouched part of the buffer, it's going to be all
+    // zeroes from here to end().
+    if (next_chunk_size == 0)
+      break;
 
-      next_chunk += next_chunk_size;
+    // We should never hit this, unless we managed to screw up while writing
+    // to the buffer and breaking the ChunkRecord(s) chain.
+    if (PERFETTO_UNLIKELY(next_chunk + next_chunk_size > end())) {
+      PERFETTO_DCHECK(false);
+      PERFETTO_ELOG("TraceBuffer corruption detected. Clearing buffer");
+      ClearContentsAndResetRWCursors();
+      return;
     }
 
-    WriteChunkRecord(record, payload, payload_size);
-    PERFETTO_DCHECK(next_chunk >= wptr_ && next_chunk <= end());
+    // |gap_size| is the diff between the end of |next_chunk| and the beginning
+    // of the chunk we are about to write @ |wptr_|.
+    const size_t gap_size = next_chunk + next_chunk_size - wptr_;
+    if (gap_size >= rounded_size) {
+      padding_size = gap_size - rounded_size;
+      break;
+    }
 
-    // TODO: add test for the case of: wptr @ Chunk4, New chunk size >>
-    // remainder (to force wrapping) but identical to Chunk 1.
-
-    if (next_chunk > wptr_)
-      AddPaddingRecord(next_chunk - wptr_);
+    next_chunk += next_chunk_size;
+    PERFETTO_DCHECK(next_chunk >= wptr_ && next_chunk < end());
   }
+
+  WriteChunkRecord(record, payload, payload_size);
+  if (padding_size)
+    AddPaddingRecord(padding_size);
+
+  // TODO: add test for the case of: wptr @ Chunk4, New chunk size >>
+  // remainder (to force wrapping) but identical to Chunk 1.
 }
 
 void TraceBuffez::AddPaddingRecord(size_t size) {
