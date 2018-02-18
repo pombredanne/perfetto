@@ -20,14 +20,23 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <map>
+#include <tuple>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/page_allocator.h"
+#include "perfetto/tracing/core/basic_types.h"
 
 namespace perfetto {
 
 // Overlay on the buffer |data_| itself?
 class TraceBuffez {
  public:
+  struct Stats {
+    size_t failed_patches = 0;
+    size_t succeeded_patches = 0;
+  };
+
   TraceBuffez();
   TraceBuffez(TraceBuffez&&) noexcept;
   TraceBuffez& operator=(TraceBuffez&&);
@@ -36,12 +45,22 @@ class TraceBuffez {
   bool Create(size_t size);
 
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
-  void CopyChunkFromUntrustedShmem(uint16_t producer_id,
-                                   uint16_t writer_id,
+  void CopyChunkFromUntrustedShmem(ProducerID producer_id,
+                                   WriterID writer_id,
                                    uint16_t chunk_id,
                                    uint8_t flags,
                                    const uint8_t* payload,
                                    size_t payload_size);
+
+  // Patches SharedMemoryABI::kPacketHeaderSize bytes at offset |patch_offset|
+  // replacing them with the contents of patch_value if the given chunk exists.
+  void MaybePatchChunkContents(ProducerID,
+                               WriterID,
+                               ChunkID,
+                               size_t patch_offset,
+                               uint32_t patch_value);
+
+  const Stats& stats() const { return stats_; }
 
  private:
   // This struct has to be exactly (sizeof(PageHeader) + sizeof(ChunkHeader))
@@ -51,17 +70,40 @@ class TraceBuffez {
   // on top of the moved (page + chunk) header.
   // This is checked via static_assert(s) in the .cc file.
   struct ChunkRecord {
-    static constexpr uint16_t kWriterIdPadding = 0;
-    uint16_t size;  // Size (including the size of the ChunkRecord itself).
+    static constexpr WriterID kWriterIdPadding = 0;
+
+    bool is_padding() const { return writer_id == kWriterIdPadding; }
+
+    uint16_t size;  // Size in bytes, incl. the size of the ChunkRecord itself.
 
     // Unique per Producer (but not within the service).
     // If writer_id == kWriterIdPadding the record should just be skipped.
-    uint16_t writer_id;
+    WriterID writer_id;
 
-    uint16_t chunk_id;  // Monotonic counter within the same writer id.
-    uint8_t flags;      // see SharedMemoryABI::ChunkHeader::flags.
+    ChunkID chunk_id;  // Monotonic counter within the same writer id.
+    uint8_t flags;     // see SharedMemoryABI::ChunkHeader::flags.
     uint8_t padding_unused;
-    uint64_t producer_id;
+
+    ProducerID producer_id;
+  };
+
+  struct IndexKey : public std::tuple<ProducerID, WriterID, ChunkID> {
+    IndexKey(ProducerID p, WriterID w, ChunkID c)
+        : std::tuple<ProducerID, WriterID, ChunkID>{p, w, c} {}
+
+    explicit IndexKey(const ChunkRecord& cr)
+        : IndexKey{cr.producer_id, cr.writer_id, cr.chunk_id} {}
+
+    ProducerID producer_id() const { return std::get<0>(*this); }
+    WriterID writer_id() const { return std::get<1>(*this); }
+    ChunkID chunk_id() const { return std::get<2>(*this); }
+  };
+
+  struct IndexValue {
+    uint8_t* end() const { return begin + size; }
+
+    uint8_t* begin;  // Points to the beginning of the ChunkRecord.
+    size_t size;     // Rounded up size of ChunkRecord.
   };
 
   TraceBuffez(const TraceBuffez&) = delete;
@@ -82,33 +124,41 @@ class TraceBuffez {
   // memcpy(). The cast hints to the compiler to assume that the pointer is
   // aligned, which in turn short-circuits the memcpy() that the caller into a
   // simpler mov.
-  const ChunkRecord* GetAlignedPtrForMemcpy(const uint8_t* off) const {
+  // const ChunkRecord* GetAlignedPtrForMemcpy(const uint8_t* off) const {
+  //   DcheckIsAlignedAndWithinBounds(off);
+  //   return reinterpret_cast<const ChunkRecord*>(off);
+  // }
+
+  // size_t ReadChunkRecordSizeAt(const uint8_t* off) const {
+  //   const ChunkRecord* aligned_ptr = GetAlignedPtrForMemcpy(off);
+  //   decltype(aligned_ptr->size) size;
+  //   memcpy(&size, &aligned_ptr->size, sizeof(size));
+  //
+  //   // We should saturate the size read from the record, to prevent that a
+  //   // corrupted record causes overflows. Right now |size| is a uint16_t and
+  //   // the saturation is implicit. However, if that should change this
+  //   function
+  //   // (and also ReadChunkRecordAt below) will require an explicit
+  //   saturation. static_assert(sizeof(size) < sizeof(size_t), "Add saturation
+  //   logic");
+  //
+  //   return size;
+  // }
+
+  ChunkRecord ReadChunkRecordAt(const uint8_t* off) const {
     DcheckIsAlignedAndWithinBounds(off);
-    return reinterpret_cast<const ChunkRecord*>(off);
-  }
+    ChunkRecord res;
 
-  size_t ReadChunkRecordSizeAt(const uint8_t* off) const {
-    const ChunkRecord* aligned_ptr = GetAlignedPtrForMemcpy(off);
-    decltype(aligned_ptr->size) size;
-    memcpy(&size, &aligned_ptr->size, sizeof(size));
-
-    // We should saturate the size read from the record, to prevent that a
-    // corrupted record causes overflows. Right now |size| is a uint16_t and
-    // the saturation is implicit. However, if that should change this function
-    // (and also ReadChunkRecordAt below) will require an explicit saturation.
-    static_assert(sizeof(size) < sizeof(size_t), "Add saturation logic");
-
-    return size;
-  }
-
-  void ReadChunkRecordAt(const uint8_t* off, ChunkRecord* chunk_record) const {
-    const ChunkRecord* aligned_ptr = GetAlignedPtrForMemcpy(off);
-    memcpy(chunk_record, aligned_ptr, sizeof(ChunkRecord));
+    // The reinterpret_cast hints the compiler about the fact that |off| is
+    // aligned and hence allows it to perform an optimized memcpy().
+    memcpy(&res, reinterpret_cast<const ChunkRecord*>(off), sizeof(res));
+    return res;
   }
 
   // |payload| can be nullptr (in which case payload_size must be == 0), for the
   // case of writing a pading record. In this case the |wptr_| is advanced
   // regularly (accordingly to |record.size|) but no payload is copied.
+  // TODO: this seems used in one place only.
   void WriteChunkRecord(const ChunkRecord& record,
                         const uint8_t* payload,
                         size_t payload_size) {
@@ -137,13 +187,6 @@ class TraceBuffez {
     DcheckIsAlignedAndWithinBounds(wptr_);
   }
 
-  // Do not keep any metadata about the contents of the buffer outside of
-  // the |data_| buffer itself. In future we'll want to be able to resurrect
-  // the contents of the buffer from a crash report. The |data_| buffer should
-  // be self-describing.
-
-  // TODO(primiano): Move wptr_ inside |data_| somehow. How will we know where
-  // to start reading a resurrected buffer?
   base::PageAllocator::UniquePtr data_;
   size_t size_ = 0;
 
@@ -153,6 +196,10 @@ class TraceBuffez {
 
   uint8_t* wptr_ = nullptr;
   uint8_t* rptr_ = nullptr;
+
+  // An index that keep track of the positions of each ChunkRecord.
+  std::map<IndexKey, IndexValue> index_;
+  Stats stats_ = {};
 };
 
 }  // namespace perfetto

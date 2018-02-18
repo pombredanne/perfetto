@@ -65,8 +65,8 @@ void TraceBuffez::ClearContentsAndResetRWCursors() {
 // that the producer is malicious and will change the content of [src, src+size]
 // while we execute here. Don't do any processing on |src| other than memcpy()
 // or reading atomic words at fixed positions.
-void TraceBuffez::CopyChunkFromUntrustedShmem(uint16_t producer_id,
-                                              uint16_t writer_id,
+void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
+                                              WriterID writer_id,
                                               uint16_t chunk_id,
                                               uint8_t flags,
                                               const uint8_t* payload,
@@ -100,10 +100,6 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(uint16_t producer_id,
   record.writer_id = writer_id;
   record.producer_id = producer_id;
 
-  size_t chunk_size = ReadChunkRecordSizeAt(wptr_);
-  PERFETTO_DCHECK(chunk_size > 0 && !(chunk_size & (sizeof(ChunkRecord) - 1)));
-  DcheckIsAlignedAndWithinBounds(wptr_);
-
   // At this point either |wptr_| points to an untouched part of the buffer
   // (i.e. *wptr_ == 0) or we are about to overwrite one or more ChunkRecord(s).
   // In this case we need to first figure out where the next valid ChunkRecord
@@ -131,37 +127,47 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(uint16_t producer_id,
   // buffer or a zeroed region of the buffer.
   // If such a record is found, write a padding chunk exactly at:
   // (position found) - (end of new chunk == |wptr_| + |rounded_size|).
+  DcheckIsAlignedAndWithinBounds(wptr_);
   size_t padding_size = 0;
-  for (uint8_t* next_chunk = wptr_;;) {
-    size_t next_chunk_size = ReadChunkRecordSizeAt(next_chunk);
+  for (uint8_t* next_chunk_ptr = wptr_;;) {
+    ChunkRecord next_chunk = ReadChunkRecordAt(next_chunk_ptr);
 
     // We just reached the untouched part of the buffer, it's going to be all
     // zeroes from here to end().
-    if (next_chunk_size == 0)
+    if (next_chunk.size == 0)
       break;
 
     // We should never hit this, unless we managed to screw up while writing
     // to the buffer and breaking the ChunkRecord(s) chain.
-    if (PERFETTO_UNLIKELY(next_chunk + next_chunk_size > end())) {
+    if (PERFETTO_UNLIKELY(next_chunk_ptr + next_chunk.size > end())) {
       PERFETTO_DCHECK(false);
       PERFETTO_ELOG("TraceBuffer corruption detected. Clearing buffer");
       ClearContentsAndResetRWCursors();
       return;
     }
 
+    // Remove |next_chunk| from the index, as we are about to overwrite it.
+    IndexKey key(next_chunk);
+    const size_t removed = index_.erase(key);
+    PERFETTO_DCHECK(next_chunk.is_padding() || removed);
+
     // |gap_size| is the diff between the end of |next_chunk| and the beginning
     // of the chunk we are about to write @ |wptr_|.
-    const size_t gap_size = next_chunk + next_chunk_size - wptr_;
+    const size_t gap_size = next_chunk_ptr + next_chunk.size - wptr_;
     if (gap_size >= rounded_size) {
       padding_size = gap_size - rounded_size;
       break;
     }
 
-    next_chunk += next_chunk_size;
-    PERFETTO_DCHECK(next_chunk >= wptr_ && next_chunk < end());
+    next_chunk_ptr += next_chunk.size;
+    PERFETTO_DCHECK(next_chunk_ptr >= wptr_ && next_chunk_ptr < end());
   }
 
+  IndexKey key(record);
+  auto it_and_inserted = index_.emplace(key, IndexValue{wptr_, record.size});
+  PERFETTO_DCHECK(it_and_inserted.second);
   WriteChunkRecord(record, payload, payload_size);
+
   if (padding_size)
     AddPaddingRecord(padding_size);
 
@@ -175,6 +181,40 @@ void TraceBuffez::AddPaddingRecord(size_t size) {
   record.size = static_cast<decltype(record.size)>(size);
   record.writer_id = ChunkRecord::kWriterIdPadding;
   WriteChunkRecord(record, nullptr, 0);
+}
+
+void TraceBuffez::MaybePatchChunkContents(ProducerID producer_id,
+                                          WriterID writer_id,
+                                          ChunkID chunk_id,
+                                          size_t patch_offset,
+                                          uint32_t patch_value) {
+  IndexKey key(producer_id, writer_id, chunk_id);
+  auto it = index_.find(key);
+  if (it == index_.end()) {
+    stats_.failed_patches++;
+    return;
+  }
+  const IndexValue& chunk_pos = it->second;
+
+  // Check that the index is consistent with the actual contents of the buffer.
+  PERFETTO_DCHECK(IndexKey(ReadChunkRecordAt(chunk_pos.begin)) == key);
+
+  constexpr size_t kPatchLen = SharedMemoryABI::kPacketHeaderSize;
+  static_assert(kPatchLen == sizeof(patch_value),
+                "patch_value out of sync with SharedMemoryABI");
+
+  uint8_t* off = chunk_pos.begin + patch_offset;
+  if (off >= chunk_pos.end() || off < begin() || off >= end() - kPatchLen) {
+    // Either the IPC was so slow and in the meantime the writer managed to wrap
+    // over |chunk_id| or the producer is malicious.
+    stats_.failed_patches++;
+    return;
+  }
+
+  char zero[kPatchLen]{};
+  PERFETTO_DCHECK(memcmp(off, &zero, kPatchLen) == 0);
+  memcpy(off, &patch_value, kPatchLen);
+  stats_.succeeded_patches++;
 }
 
 }  // namespace perfetto

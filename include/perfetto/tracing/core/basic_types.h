@@ -34,6 +34,9 @@ using DataSourceInstanceID = uint64_t;
 // Unique within the scope of a Producer.
 using WriterID = uint16_t;
 
+// Unique within the scope of a {ProducerID, WriterID} tuple.
+using ChunkID = uint16_t;
+
 // Unique within the scope of the tracing service.
 using BufferID = uint16_t;
 
