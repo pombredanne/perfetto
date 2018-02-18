@@ -27,6 +27,9 @@ namespace perfetto {
 
 // A simple wrapper around a virtually contiguous memory range that contains a
 // TracePacket, or just a portion of it.
+// TODO(primiano): this should be renamed to PacketFragment or similar. This has
+// nothing to do with the notion of Chunk in the shmem buffers (i.e.
+// SharedMemoryABI::ChunkHeader).
 struct Chunk {
   Chunk() : start(nullptr), size(0) {}
   Chunk(const void* st, size_t sz) : start(st), size(sz) {}

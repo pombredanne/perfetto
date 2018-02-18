@@ -40,6 +40,8 @@ using ChunkID = uint16_t;
 // Unique within the scope of the tracing service.
 using BufferID = uint16_t;
 
+static constexpr ChunkID kMaxChunkID = static_cast<ChunkID>(-1);
+
 // Keep this in sync with SharedMemoryABI::PageHeader::target_buffer.
 static constexpr BufferID kMaxTraceBufferID = (1ul << 16) - 1;
 

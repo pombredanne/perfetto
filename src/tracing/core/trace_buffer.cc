@@ -58,8 +58,9 @@ bool TraceBuffez::Create(size_t size) {
 
 void TraceBuffez::ClearContentsAndResetRWCursors() {
   madvise(begin(), size_, MADV_DONTNEED);
-  wptr_ = rptr_ = begin();
+  wptr_ = begin();
   index_.clear();
+  last_chunk_id_.clear();
 }
 
 // Note: |src| points to a shmem region that is shared with the producer. Assume
@@ -68,7 +69,8 @@ void TraceBuffez::ClearContentsAndResetRWCursors() {
 // or reading atomic words at fixed positions.
 void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
                                               WriterID writer_id,
-                                              uint16_t chunk_id,
+                                              ChunkID chunk_id,
+                                              uint8_t num_packets,
                                               uint8_t flags,
                                               const uint8_t* payload,
                                               size_t payload_size) {
@@ -100,6 +102,7 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
   record.chunk_id = chunk_id;
   record.writer_id = writer_id;
   record.producer_id = producer_id;
+  record.num_packets = num_packets;
 
   // At this point either |wptr_| points to an untouched part of the buffer
   // (i.e. *wptr_ == 0) or we are about to overwrite one or more ChunkRecord(s).
@@ -168,6 +171,7 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
   auto it_and_inserted = index_.emplace(key, ChunkMeta(wptr_));
   PERFETTO_DCHECK(it_and_inserted.second);
   WriteChunkRecord(record, payload, payload_size);
+  last_chunk_id_[std::make_pair(producer_id, writer_id)] = chunk_id;
 
   if (padding_size)
     AddPaddingRecord(padding_size);
@@ -224,9 +228,71 @@ void TraceBuffez::MaybePatchChunkContents(ProducerID producer_id,
   memcpy(off, &patch_value, kPatchLen);
   stats_.succeeded_patches++;
 }
+
+bool TraceBuffez::ReadNextTracePacket(ChunkSequence* fragments) {
+  // constexpr uint8_t kFirstPacketContinuesFromPrevChunk =
+  //     SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
+  // constexpr uint8_t kLastPacketContinuesOnNextChunk =
+  //     SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk;
+
+  // The index stores ChunkMeta(s) sorted by {ProducerID, WriterID, ChunkID}.
+  // Hence all the ChunkID(s) for the same {Producers, WriterID} are contiguous.
+  // Keep in mind however that the sorting by ChunkID is strictly numeric and
+  // doesn't keep into account the fact that ChunkID(s) easily wrap over.
+  // When iterating over the index, we first identify the subsequence of
+  // ChunkMeta(s) that belong to the same {ProducerID, WriterID} and then we
+  // iterate over that keeping into account the rounding, using the ChunkID
+  // cached into |last_chunk_id_|.
+  for (; read_iter_ != index_.end(); read_iter_++) {
+    const ChunkMeta::Key& key = read_iter_->first;
+    // ChunkMeta& chunk_meta = read_iter_->second;
+    auto next_writer_it = index_.upper_bound(
+        ChunkMeta::Key(key.producer_id, key.writer_id, kMaxChunkID));
+
+    auto producer_writer_id = std::make_pair(key.producer_id, key.writer_id);
+    PERFETTO_DCHECK(last_chunk_id_.count(producer_writer_id));
+    const ChunkID last_chunk_id = last_chunk_id_[producer_writer_id];
+    const auto& begin_it = read_iter_;
+    const auto& end_it = next_writer_it;
+
+    // At this point [begin_it, end_it[ contains ChunkMeta(s) belonging to the
+    // same {ProducerID, WriterID}, ordered artithmeticaly by ChunkID.
+    // Now we want to find the iterator of the |last_chunk_id| and iterate over
+    // the sequence in FIFO order, that is:
+    // [last_chunk_it, end_it[, [begin_it, last_chunk_it[
+    // Note that until we have wrapped at least once, |last_chunk_it| will be
+    // == |end_it|.
+    auto last_chunk_it = index_.upper_bound(
+        ChunkMeta::Key(key.producer_id, key.writer_id, last_chunk_id));
+
+    for (read_iter_ = last_chunk_it; read_iter_ != end_it; read_iter_++) {
+      // if (ReadOnePacket(fragments))
+      // return true;
+    }
+
+    for (read_iter_ = begin_it; read_iter_ != last_chunk_it; read_iter_++) {
+      // if (ReadOnePacket(fragments))
+      // return true;
+    }
+
+    read_iter_ = next_writer_it;
+  }
+  return false;
+}
+
+// bool TraceBuffez::ReadOnePacket(ChunkSequence* fragments) {
+//   if (chunk_meta.read_state == ChunkMeta::kReadAllPackets)
+//     return false;
+//   uint8_t* chunk_ptr = chunk_meta.begin;
+//   ChunkRecord chunk_record = ReadChunkRecordAt(chunk_ptr);
+//   PERFETTO_DCHECK(ChunkMeta::Key(chunk_record) == it->first);
+//   PERFETTO_DCHECK(chunk_ptr >= begin() && chunk_ptr < end());
+//   return false;
+//   //
+//   // if (read_iter_packet_  >= chunk_record.num_packets)
+//   //   return false;
 //
-// void TraceBuffez::ReadBuffer() {
-//
+//   // chunk_record.flags & kFirstPacketContinuesFromPrevChunk;
 // }
 
 }  // namespace perfetto

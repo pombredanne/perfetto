@@ -26,11 +26,23 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/page_allocator.h"
 #include "perfetto/tracing/core/basic_types.h"
+#include "perfetto/tracing/core/chunk.h"
 
 namespace perfetto {
 
+// TODO(primiano): we need some flag to figure out if the packets on the
+// boundary require patching or have alrady been patched. The current
+// implementation considers all packets eligible to be read once we have all the
+// chunks that compose them.
+
+// - The buffer contains data written by several Producer(s), identified by
+// their
+//   ProducerID.
+// - Each producer writes several sequences identified by the same WriterID.
+// - Each Writer writes, in order, several chunks.
+// - Each Chunk contains a fragment, one, or more TracePacket(s)
+
 // TODO description.
-// explain the difference between ChunkRecord and ChunkMeta.
 class TraceBuffez {
  public:
   struct Stats {
@@ -48,7 +60,8 @@ class TraceBuffez {
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
   void CopyChunkFromUntrustedShmem(ProducerID producer_id,
                                    WriterID writer_id,
-                                   uint16_t chunk_id,
+                                   ChunkID chunk_id,
+                                   uint8_t num_packets,
                                    uint8_t flags,
                                    const uint8_t* payload,
                                    size_t payload_size);
@@ -61,14 +74,43 @@ class TraceBuffez {
                                size_t patch_offset,
                                uint32_t patch_value);
 
+  // To read the contents the caller needs to:
+  //   BeginRead()
+  //   while (ReadNext(packet_fragments)) { ... }
+  // No other calls should be interleaved between BeginRead() and ReadNext().
+  // Reads in the TraceBuffer are NOT idempotent.
+
+  void BeginRead() { read_iter_ = index_.begin(); }
+
+  // Returns the next packet in the buffer if any. This function returns only
+  // complete packets. Specifically:
+  // When there is at least one whole packet in the buffer, this function
+  // returns true and populates the |fragments| argument with the boundaries of
+  // each fragment for one packet (|fragments|.size() will be >= 1).
+  // When there are no whole packets eligible to read (e.g. we are still missing
+  // fragments) this function returns false and doesn't touch |fragments|.
+  // This function guarantees also that packets for a given
+  // {ProducerID, WriterID} are read in FIFO order.
+  // This function does not guarantee any ordering w.r.t. packets belonging to
+  // different WriterID(s). For instance, given the following packets copied
+  // into the buffer:
+  //   {ProducerID: 1, WriterID: 1}: P1 P2 P3
+  //   {ProducerID: 1, WriterID: 2}: P4 P5 P6
+  //   {ProducerID: 2, WriterID: 1}: P7 P8 P9
+  // The following read sequence is possible:
+  //   P1, P4, P7, P2, P3, P5, P8, P9, P6
+  // But the following is guaranteed to NOT happen:
+  //   P1, P5, P7, P4 (! cannot come after P5)
+  bool ReadNextTracePacket(ChunkSequence* fragments);
+
   const Stats& stats() const { return stats_; }
 
  private:
   // ChunkRecord is a Chunk header stored inlined in the |data_| buffer, before
   // each copied chunk's payload. The |data_| buffer looks like this:
-  // +---------------+-------------------++---------------+----------------+
-  // | ChunkRecord 1 | Chunk payload 1   || ChunkRecord 2 | Chunk payload 2| ...
-  // +---------------+-------------------++---------------+----------------+
+  // +---------------+------------------++---------------+-----------------+
+  // | ChunkRecord 1 | Chunk payload 1  || ChunkRecord 2 | Chunk payload 2 | ...
+  // +---------------+------------------++---------------+-----------------+
   // It contains all the data necessary to reconstruct the contents of the
   // |data_| buffer from a coredump in the case of a crash (i.e. without using
   // any data in the lookaside |index_|).
@@ -96,7 +138,11 @@ class TraceBuffez {
 
     ChunkID chunk_id;  // Monotonic counter within the same writer id.
     uint8_t flags;     // see SharedMemoryABI::ChunkHeader::flags.
-    uint8_t padding_unused;
+
+    // TODO(primiano): In the SharedMemoryABI num_packets is a uint16_t, so here
+    // we'll lose data in the unlikely case there were > 255 packets in the
+    // original SMB chunk. Either make this a uint16_t or change the ABI.
+    uint8_t num_packets;
 
     ProducerID producer_id;
   };
@@ -119,6 +165,8 @@ class TraceBuffez {
           : Key(cr.producer_id, cr.writer_id, cr.chunk_id) {}
 
       bool operator<(const Key& other) const {
+        // TODO(primiano): This is wrong because doesn't take into account
+        // the fact that chunk_id easily wraps over.
         return std::tie(producer_id, writer_id, chunk_id) <
                std::tie(other.producer_id, other.writer_id, other.chunk_id);
       }
@@ -138,8 +186,9 @@ class TraceBuffez {
 
     ChunkMeta(uint8_t* addr) : begin{addr} {}
 
-    // Address of the corresponding ChunkRecord in |data_|.
-    uint8_t* begin;
+    uint8_t* const
+        begin;  // Address of the corresponding ChunkRecord in |data_|.
+    uint16_t num_packets_read = 0;
   };
 
   TraceBuffez(const TraceBuffez&) = delete;
@@ -155,32 +204,6 @@ class TraceBuffez {
         (reinterpret_cast<uintptr_t>(off) & (alignof(ChunkRecord) - 1)) == 0);
   }
 
-  // This function simply casts a pointer within |data_| to an aligned pointer
-  // to ChunkRecord. This pointer should NOT be used directly but passed to
-  // memcpy(). The cast hints to the compiler to assume that the pointer is
-  // aligned, which in turn short-circuits the memcpy() that the caller into a
-  // simpler mov.
-  // const ChunkRecord* GetAlignedPtrForMemcpy(const uint8_t* off) const {
-  //   DcheckIsAlignedAndWithinBounds(off);
-  //   return reinterpret_cast<const ChunkRecord*>(off);
-  // }
-
-  // size_t ReadChunkRecordSizeAt(const uint8_t* off) const {
-  //   const ChunkRecord* aligned_ptr = GetAlignedPtrForMemcpy(off);
-  //   decltype(aligned_ptr->size) size;
-  //   memcpy(&size, &aligned_ptr->size, sizeof(size));
-  //
-  //   // We should saturate the size read from the record, to prevent that a
-  //   // corrupted record causes overflows. Right now |size| is a uint16_t and
-  //   // the saturation is implicit. However, if that should change this
-  //   function
-  //   // (and also ReadChunkRecordAt below) will require an explicit
-  //   saturation. static_assert(sizeof(size) < sizeof(size_t), "Add saturation
-  //   logic");
-  //
-  //   return size;
-  // }
-
   ChunkRecord ReadChunkRecordAt(const uint8_t* off) const {
     DcheckIsAlignedAndWithinBounds(off);
     ChunkRecord res;
@@ -194,7 +217,6 @@ class TraceBuffez {
   // |payload| can be nullptr (in which case payload_size must be == 0), for the
   // case of writing a pading record. In this case the |wptr_| is advanced
   // regularly (accordingly to |record.size|) but no payload is copied.
-  // TODO: this seems used in one place only.
   void WriteChunkRecord(const ChunkRecord& record,
                         const uint8_t* payload,
                         size_t payload_size) {
@@ -216,7 +238,6 @@ class TraceBuffez {
       memcpy(wptr_ + sizeof(record), payload, payload_size);
     wptr_ += record.size;
 
-    // TODO advance rptr as well in case of wrapping.
     if (wptr_ >= end() - sizeof(ChunkRecord))
       wptr_ = begin();
 
@@ -230,11 +251,20 @@ class TraceBuffez {
   uint8_t* end() const { return begin() + size_; }
   size_t writable_size() const { return end() - wptr_; }
 
-  uint8_t* wptr_ = nullptr;
-  uint8_t* rptr_ = nullptr;
+  uint8_t* wptr_ = nullptr;  // Write pointer.
 
-  // An index that keep track of the positions and metadata of each ChunkRecord.
+  // An index that keep track of the positions and metadata of each
+  // ChunkRecord.
   std::map<ChunkMeta::Key, ChunkMeta> index_;
+
+  // Keeps track of the last ChunkID written for a given writer.
+  // TODO(primiano): we should clean up keys from this map. Right now this map
+  // grows without bounds (although realistically is not a problem unless we
+  // have too many producers within the same trace session).
+  std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_;
+
+  // Read iterator used for ReadNext(). It is reset by calling BeginRead().
+  std::map<ChunkMeta::Key, ChunkMeta>::iterator read_iter_;
 
   Stats stats_ = {};
 };
