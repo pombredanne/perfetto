@@ -59,6 +59,7 @@ bool TraceBuffez::Create(size_t size) {
 void TraceBuffez::ClearContentsAndResetRWCursors() {
   madvise(begin(), size_, MADV_DONTNEED);
   wptr_ = rptr_ = begin();
+  index_.clear();
 }
 
 // Note: |src| points to a shmem region that is shared with the producer. Assume
@@ -147,7 +148,7 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
     }
 
     // Remove |next_chunk| from the index, as we are about to overwrite it.
-    IndexKey key(next_chunk);
+    ChunkMeta::Key key(next_chunk);
     const size_t removed = index_.erase(key);
     PERFETTO_DCHECK(next_chunk.is_padding() || removed);
 
@@ -163,8 +164,8 @@ void TraceBuffez::CopyChunkFromUntrustedShmem(ProducerID producer_id,
     PERFETTO_DCHECK(next_chunk_ptr >= wptr_ && next_chunk_ptr < end());
   }
 
-  IndexKey key(record);
-  auto it_and_inserted = index_.emplace(key, IndexValue{wptr_, record.size});
+  ChunkMeta::Key key(record);
+  auto it_and_inserted = index_.emplace(key, ChunkMeta(wptr_));
   PERFETTO_DCHECK(it_and_inserted.second);
   WriteChunkRecord(record, payload, payload_size);
 
@@ -186,35 +187,46 @@ void TraceBuffez::AddPaddingRecord(size_t size) {
 void TraceBuffez::MaybePatchChunkContents(ProducerID producer_id,
                                           WriterID writer_id,
                                           ChunkID chunk_id,
-                                          size_t patch_offset,
+                                          size_t patch_offset_untrusted,
                                           uint32_t patch_value) {
-  IndexKey key(producer_id, writer_id, chunk_id);
+  ChunkMeta::Key key(producer_id, writer_id, chunk_id);
   auto it = index_.find(key);
   if (it == index_.end()) {
     stats_.failed_patches++;
     return;
   }
-  const IndexValue& chunk_pos = it->second;
+  const ChunkMeta& chunk_meta = it->second;
+  ChunkRecord chunk_record = ReadChunkRecordAt(chunk_meta.begin);
 
   // Check that the index is consistent with the actual contents of the buffer.
-  PERFETTO_DCHECK(IndexKey(ReadChunkRecordAt(chunk_pos.begin)) == key);
+  PERFETTO_DCHECK(ChunkMeta::Key(chunk_record) == key);
+  PERFETTO_DCHECK(chunk_meta.begin >= begin());
+  uint8_t* chunk_end = chunk_meta.begin + chunk_record.size;
+  PERFETTO_DCHECK(chunk_end <= end());
 
   constexpr size_t kPatchLen = SharedMemoryABI::kPacketHeaderSize;
   static_assert(kPatchLen == sizeof(patch_value),
                 "patch_value out of sync with SharedMemoryABI");
 
-  uint8_t* off = chunk_pos.begin + patch_offset;
-  if (off >= chunk_pos.end() || off < begin() || off >= end() - kPatchLen) {
+  uint8_t* off = chunk_meta.begin + patch_offset_untrusted;
+  if (off < chunk_meta.begin || off >= chunk_end - kPatchLen) {
     // Either the IPC was so slow and in the meantime the writer managed to wrap
-    // over |chunk_id| or the producer is malicious.
+    // over |chunk_id| or the producer sent a malicious IPC.
     stats_.failed_patches++;
     return;
   }
 
+  // DCHECK that we are writing into a size-field reserved and zero-filled by
+  // trace_writer_impl.cc and that we are not writing over other data.
   char zero[kPatchLen]{};
   PERFETTO_DCHECK(memcmp(off, &zero, kPatchLen) == 0);
+
   memcpy(off, &patch_value, kPatchLen);
   stats_.succeeded_patches++;
 }
+//
+// void TraceBuffez::ReadBuffer() {
+//
+// }
 
 }  // namespace perfetto

@@ -29,7 +29,8 @@
 
 namespace perfetto {
 
-// Overlay on the buffer |data_| itself?
+// TODO description.
+// explain the difference between ChunkRecord and ChunkMeta.
 class TraceBuffez {
  public:
   struct Stats {
@@ -63,12 +64,25 @@ class TraceBuffez {
   const Stats& stats() const { return stats_; }
 
  private:
-  // This struct has to be exactly (sizeof(PageHeader) + sizeof(ChunkHeader))
-  // (from shared_memory_abi.h) to allow full page moving optimizations.
-  // In the special case of moving a full 4K page that contains only one chunk,
-  // in fact, we can just move the full SHM page and overlay the ChunkRecord
-  // on top of the moved (page + chunk) header.
-  // This is checked via static_assert(s) in the .cc file.
+  // ChunkRecord is a Chunk header stored inlined in the |data_| buffer, before
+  // each copied chunk's payload. The |data_| buffer looks like this:
+  // +---------------+-------------------++---------------+----------------+
+  // | ChunkRecord 1 | Chunk payload 1   || ChunkRecord 2 | Chunk payload 2| ...
+  // +---------------+-------------------++---------------+----------------+
+  // It contains all the data necessary to reconstruct the contents of the
+  // |data_| buffer from a coredump in the case of a crash (i.e. without using
+  // any data in the lookaside |index_|).
+  // Most of the ChunkRecord fields are copied from SharedMemoryABI::ChunkHeader
+  // (the chunk header used in the the shared memory buffers).
+  // Furthermore a ChunkRecord can be a special "padding" record. In this case
+  // the payload should be ignored and the record just skipped.
+  // Full page move optimizations:
+  //   This struct has to be exactly (sizeof(PageHeader) + sizeof(ChunkHeader))
+  //   (from shared_memory_abi.h) to allow full page move optimizations (TODO
+  //   not yet implemented). In the special case of moving a full 4k page that
+  //   contains only one chunk, in fact, we can just move the full SHM page and
+  //   overlay the ChunkRecord on top of the moved SMB's (page + chunk) header.
+  //   This is checked via static_assert(s) in the .cc file.
   struct ChunkRecord {
     static constexpr WriterID kWriterIdPadding = 0;
 
@@ -87,23 +101,45 @@ class TraceBuffez {
     ProducerID producer_id;
   };
 
-  struct IndexKey : public std::tuple<ProducerID, WriterID, ChunkID> {
-    IndexKey(ProducerID p, WriterID w, ChunkID c)
-        : std::tuple<ProducerID, WriterID, ChunkID>{p, w, c} {}
+  // Lookaside structure stored outside of the |data_| buffer (hence not easily
+  // accessible at crash dump time). This structure serves two purposes:
+  // 1) Allow a fast lookup of ChunkRecord by their address (the tuple
+  //   {ProducerID, WriterID, ChunkID}). This is used when applying out-of-band
+  //   patches to the contents of the chunks.
+  // 2) Keep metadata about the status of the chunk, e.g. whether the contents
+  //   have been read already and should be skipped in a future read pass.
+  // This struct should not have any field that is essential for reconstructing
+  // the contents of the buffer from a coredump (use ChunkRecord in that case).
+  struct ChunkMeta {
+    struct Key {
+      Key(ProducerID p, WriterID w, ChunkID c)
+          : producer_id{p}, writer_id{w}, chunk_id{c} {}
 
-    explicit IndexKey(const ChunkRecord& cr)
-        : IndexKey{cr.producer_id, cr.writer_id, cr.chunk_id} {}
+      explicit Key(const ChunkRecord& cr)
+          : Key(cr.producer_id, cr.writer_id, cr.chunk_id) {}
 
-    ProducerID producer_id() const { return std::get<0>(*this); }
-    WriterID writer_id() const { return std::get<1>(*this); }
-    ChunkID chunk_id() const { return std::get<2>(*this); }
-  };
+      bool operator<(const Key& other) const {
+        return std::tie(producer_id, writer_id, chunk_id) <
+               std::tie(other.producer_id, other.writer_id, other.chunk_id);
+      }
 
-  struct IndexValue {
-    uint8_t* end() const { return begin + size; }
+      bool operator==(const Key& other) const {
+        return std::tie(producer_id, writer_id, chunk_id) ==
+               std::tie(other.producer_id, other.writer_id, other.chunk_id);
+      }
 
-    uint8_t* begin;  // Points to the beginning of the ChunkRecord.
-    size_t size;     // Rounded up size of ChunkRecord.
+      // These fields should match at all times the corresponding fields in
+      // the ChunkRecord @ |begin|. They are copied here purely for efficiency
+      // purposes as they are the key used for the lookup in the set.
+      ProducerID producer_id;
+      WriterID writer_id;
+      ChunkID chunk_id;
+    };
+
+    ChunkMeta(uint8_t* addr) : begin{addr} {}
+
+    // Address of the corresponding ChunkRecord in |data_|.
+    uint8_t* begin;
   };
 
   TraceBuffez(const TraceBuffez&) = delete;
@@ -197,8 +233,9 @@ class TraceBuffez {
   uint8_t* wptr_ = nullptr;
   uint8_t* rptr_ = nullptr;
 
-  // An index that keep track of the positions of each ChunkRecord.
-  std::map<IndexKey, IndexValue> index_;
+  // An index that keep track of the positions and metadata of each ChunkRecord.
+  std::map<ChunkMeta::Key, ChunkMeta> index_;
+
   Stats stats_ = {};
 };
 
