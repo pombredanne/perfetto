@@ -30,6 +30,15 @@
     eintr_wrapper_result;                                   \
   })
 
+#define PERFETTO_EAGAIN(x)                                   \
+  ({                                                         \
+    decltype(x) eintr_wrapper_result;                        \
+    do {                                                     \
+      eintr_wrapper_result = (x);                            \
+    } while (eintr_wrapper_result == -1 && errno == EAGAIN); \
+    eintr_wrapper_result;                                    \
+  })
+
 namespace perfetto {
 namespace base {
 

@@ -28,7 +28,8 @@ WatchDog::WatchDog(time_t millisecs) {
   struct sigevent sev = {};
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_signo = SIGABRT;
-  PERFETTO_CHECK(timer_create(CLOCK_MONOTONIC, &sev, &timerid_) != -1);
+  PERFETTO_CHECK(
+      PERFETTO_EAGAIN(timer_create(CLOCK_MONOTONIC, &sev, &timerid_)) != -1);
   struct itimerspec its = {};
   its.it_value.tv_sec = millisecs / 1000;
   its.it_value.tv_nsec = 1000000L * (millisecs % 1000);
