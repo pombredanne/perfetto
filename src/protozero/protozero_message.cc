@@ -87,6 +87,9 @@ void Message::AppendBytes(uint32_t field_id, const void* src, size_t size) {
 }
 
 uint32_t Message::Finalize() {
+  if (finalized_)
+    return size_;
+
   if (nested_message_)
     EndNestedMessage();
 
