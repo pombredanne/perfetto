@@ -42,8 +42,13 @@ namespace {
 
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
+<<<<<<< HEAD
+using BundleHandle =
+    protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
+=======
 using FtraceBundleHandle =
     protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+>>>>>>> FREEZE.unindexed
 
 class EndToEndIntegrationTest : public ::testing::Test,
                                 public FtraceSink::Delegate {
