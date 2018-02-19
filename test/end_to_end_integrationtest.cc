@@ -45,19 +45,6 @@
 #endif
 
 namespace perfetto {
-namespace {
-
-std::string ReadFile(const std::string& name) {
-  std::ifstream fin(name, std::ios::in);
-  if (!fin) {
-    return "";
-  }
-  std::ostringstream stream;
-  stream << fin.rdbuf();
-  fin.close();
-  return stream.str();
-}
-}  // namespace
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
@@ -130,15 +117,6 @@ class PerfettoTest : public ::testing::Test {
     std::unique_ptr<FakeProducer> producer_;
     std::function<void()> connect_callback_;
   };
-
-  static std::string FindTracingRoot() {
-    for (size_t i = 0; kTracingPaths[i] != nullptr; ++i) {
-      if (FtraceProcfs::CheckRootPath(kTracingPaths[i])) {
-        return kTracingPaths[i];
-      }
-    }
-    PERFETTO_CHECK(false);
-  }
 };
 
 // TODO(b/73453011): reenable this on more platforms (including standalone
@@ -280,11 +258,25 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
 
+namespace {
+std::string ReadFile(const std::string& name) {
+  std::ifstream fin(name, std::ios::in);
+  if (!fin) {
+    return "";
+  }
+  std::ostringstream stream;
+  stream << fin.rdbuf();
+  fin.close();
+  return stream.str();
+}
+}  // namespace
+
 TEST_F(PerfettoTest, KillFtrace) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("ftrace.killed");
 
-  std::string tracing_root = FindTracingRoot();
+  std::string tracing_root = FtraceController::FindTracingRoot();
+  PERFETTO_CHECK(!tracing_root.empty());
 
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;

@@ -142,18 +142,25 @@ void HardResetFtraceState() {
 }
 
 // static
+std::string FtraceController::FindTracingRoot() {
+  for (size_t i = 0; kTracingPaths[i] != nullptr; ++i) {
+    if (FtraceProcfs::CheckRootPath(kTracingPaths[i])) {
+      return kTracingPaths[i];
+    }
+  }
+  return "";
+}
+
+// static
 // TODO(taylori): Add a test for tracing paths in integration tests.
 std::unique_ptr<FtraceController> FtraceController::Create(
     base::TaskRunner* runner) {
-  size_t index = 0;
-  std::unique_ptr<FtraceProcfs> ftrace_procfs = nullptr;
-  while (!ftrace_procfs && kTracingPaths[index]) {
-    ftrace_procfs = FtraceProcfs::Create(kTracingPaths[index++]);
-  }
-
-  if (!ftrace_procfs) {
+  std::string tracing_root = FindTracingRoot();
+  if (tracing_root.empty()) {
     return nullptr;
   }
+  std::unique_ptr<FtraceProcfs> ftrace_procfs =
+      FtraceProcfs::Create(tracing_root);
 
   auto table = ProtoTranslationTable::Create(
       ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());

@@ -113,6 +113,7 @@ class FtraceController {
   void DisableAllEvents();
   void WriteTraceMarker(const std::string& s);
   void ClearTrace();
+  static std::string FindTracingRoot();
 
  protected:
   // Protected for testing.
