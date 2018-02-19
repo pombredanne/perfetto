@@ -48,8 +48,8 @@ class ProbesProducer : public Producer {
       const DataSourceConfig& source_config);
 
  private:
-  using BundleHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
+  using FtraceBundleHandle =
+      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
@@ -57,8 +57,8 @@ class ProbesProducer : public Producer {
     ~SinkDelegate() override;
 
     // FtraceDelegateImpl
-    BundleHandle GetBundleForCpu(size_t cpu) override;
-    void OnBundleComplete(size_t cpu, BundleHandle bundle) override;
+    FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
+    void OnBundleComplete(size_t cpu, FtraceBundleHandle bundle) override;
 
     void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
 
