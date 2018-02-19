@@ -38,6 +38,8 @@ namespace {
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
+const char* kFtraceSourceName = "com.google.perfetto.ftrace";
+const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
 
 }  // namespace.
 
@@ -58,12 +60,12 @@ void ProbesProducer::OnConnect() {
   PERFETTO_LOG("Connected to the service");
 
   DataSourceDescriptor ftrace_descriptor;
-  ftrace_descriptor.set_name("com.google.perfetto.ftrace");
+  ftrace_descriptor.set_name(kFtraceSourceName);
   endpoint_->RegisterDataSource(ftrace_descriptor,
                                 [](DataSourceInstanceID id) {});
 
   DataSourceDescriptor process_stats_descriptor;
-  process_stats_descriptor.set_name("com.google.perfetto.process_stats");
+  process_stats_descriptor.set_name(kProcessStatsSourceName);
   endpoint_->RegisterDataSource(process_stats_descriptor,
                                 [](DataSourceInstanceID id) {});
 }
@@ -84,9 +86,9 @@ void ProbesProducer::CreateDataSourceInstance(
     const DataSourceConfig& source_config) {
   instances_[id] = source_config.name();
   // PERFETTO_LOG("DataSourceInstanceID: %llu", id);
-  if (source_config.name() == "com.google.perfetto.ftrace") {
+  if (source_config.name() == kFtraceSourceName) {
     CreateFtraceDataSourceInstance(id, source_config);
-  } else if (source_config.name() == "com.google.perfetto.process_stats") {
+  } else if (source_config.name() == kProcessStatsSourceName) {
     CreateProcessStatsDataSourceInstance(source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
@@ -154,7 +156,7 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
         auto* process_writer = process_tree->add_processes();
         process_writer->set_pid(process->pid);
         process_writer->set_ppid(process->ppid);
-        process_writer->set_cmdline(process->cmdline);
+        process_writer->add_cmdline(process->cmdline);
 
         for (auto& thread : process->threads) {
           auto* thread_writer = process_writer->add_threads();
@@ -168,8 +170,9 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
   PERFETTO_DCHECK(instances_.count(id));
-  if (instances_[id] == "com.google.perfetto.ftrace") {
-    delegates_.erase(id);
+  if (instances_[id] == kFtraceSourceName) {
+    size_t removed = delegates_.erase(id);
+    PERFETTO_DCHECK(removed == 1);
   }
 }
 

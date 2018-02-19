@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef PROCESS_INFO_H_
-#define PROCESS_INFO_H_
+#ifndef SRC_PROCESS_STATS_PROCESS_INFO_H_
+#define SRC_PROCESS_STATS_PROCESS_INFO_H_
 
 #include <map>
 
@@ -22,4 +22,4 @@ struct ProcessInfo {
   std::map<int, ThreadInfo> threads;
 };
 
-#endif  // PROCESS_INFO_H_
+#endif  // SRC_PROCESS_STATS_PROCESS_INFO_H_

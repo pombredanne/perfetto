@@ -846,7 +846,7 @@ std::string FormatSchedWakeupNew(const SchedWakeupNewFtraceEvent& event) {
 std::string FormatProcess(const Process& process) {
   char line[2048];
   sprintf(line, "process: pid=%d ppid=%d cmdline=%s\\n", process.pid(),
-          process.ppid(), process.cmdline().c_str());
+          process.ppid(), process.cmdline(0).c_str());
   std::string output = std::string(line);
   for (auto thread : process.threads()) {
     char thread_line[2048];

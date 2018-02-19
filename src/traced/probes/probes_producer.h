@@ -24,8 +24,8 @@
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 
-#ifndef SRC_TRACED_PROBES_PRODUCER_H_
-#define SRC_TRACED_PROBES_PRODUCER_H_
+#ifndef SRC_TRACED_PROBES_PROBES_PRODUCER_H_
+#define SRC_TRACED_PROBES_PROBES_PRODUCER_H_
 
 namespace perfetto {
 class ProbesProducer : public Producer {
@@ -95,4 +95,4 @@ class ProbesProducer : public Producer {
 };
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_PRODUCER_H_
+#endif  // SRC_TRACED_PROBES_PROBES_PRODUCER_H_
