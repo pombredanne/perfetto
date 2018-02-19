@@ -79,7 +79,6 @@ void KernelLogWrite(const char* s) {
   static int kmesg_fd = OpenKmesgFD();
   if (kmesg_fd != -1) {
     base::ignore_result(write(kmesg_fd, s, strlen(s)));
-    base::ignore_result(write(kmesg_fd, "\n", 1));
   }
 }
 
@@ -150,13 +149,13 @@ bool FtraceProcfs::SetCpuBufferSizeInPages(size_t pages) {
 }
 
 bool FtraceProcfs::EnableTracing() {
-  KernelLogWrite("perfetto: enabled ftrace");
+  KernelLogWrite("perfetto: enabled ftrace\n");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "1");
 }
 
 bool FtraceProcfs::DisableTracing() {
-  KernelLogWrite("perfetto: disabled ftrace");
+  KernelLogWrite("perfetto: disabled ftrace\n");
   std::string path = root_ + "tracing_on";
   return WriteToFile(path, "0");
 }
