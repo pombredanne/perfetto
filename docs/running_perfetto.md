@@ -49,7 +49,7 @@ $ adb shell perfetto --config :test --dropbox perfetto
 an arbitrary trace config by doing the following:
 ```
 cat > /tmp/config.txpb <<EOF
-# This is a text-encoded protobuf for /protos/config/trace_config.proto
+# This is a text-encoded protobuf for /protos/perfetto/config/trace_config.proto
 duration_ms: 2000
 buffers {
   size_kb: 1024
