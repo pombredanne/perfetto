@@ -22,6 +22,7 @@
 
 #include <array>
 #include <memory>
+#include <set>
 #include <thread>
 
 #include "gtest/gtest_prod.h"
@@ -128,12 +129,14 @@ class CpuReader {
                          const uint8_t* start,
                          const uint8_t* end,
                          const ProtoTranslationTable* table,
-                         protozero::Message* message);
+                         protozero::Message* message,
+                         std::set<uint64_t>* inode_numbers);
 
   static bool ParseField(const Field& field,
                          const uint8_t* start,
                          const uint8_t* end,
-                         protozero::Message* message);
+                         protozero::Message* message,
+                         std::set<uint64_t>* inode_numbers);
 
  private:
   static void RunWorkerThread(size_t cpu,
