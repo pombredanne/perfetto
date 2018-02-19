@@ -76,6 +76,7 @@ int OpenKmesgFD() {
 }
 
 void KernelLogWrite(const char* s) {
+  PERFETTO_DCHECK(*s && s[strlen(s) - 1] == '\n');
   static int kmesg_fd = OpenKmesgFD();
   if (kmesg_fd != -1) {
     base::ignore_result(write(kmesg_fd, s, strlen(s)));
