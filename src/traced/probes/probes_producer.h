@@ -49,7 +49,7 @@ class ProbesProducer : public Producer {
 
  private:
   using FtraceBundleHandle =
-      protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
