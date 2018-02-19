@@ -50,17 +50,30 @@ const char kBarEnablePath[] = "/root/events/group/bar/enable";
 class MockTaskRunner : public base::TaskRunner {
  public:
   MockTaskRunner() {
+    ON_CALL(*this, PostTask(_))
+        .WillByDefault(Invoke(this, &MockTaskRunner::OnPostTask));
     ON_CALL(*this, PostDelayedTask(_, _))
         .WillByDefault(Invoke(this, &MockTaskRunner::OnPostDelayedTask));
   }
 
-  void OnPostDelayedTask(std::function<void()> task, int _delay) {
+  void OnPostTask(std::function<void()> task) {
+    std::unique_lock<std::mutex> lock(lock_);
+    EXPECT_FALSE(task_);
     task_ = std::move(task);
   }
 
-  void RunLastTask() { task_(); }
+  void OnPostDelayedTask(std::function<void()> task, int _delay) {
+    std::unique_lock<std::mutex> lock(lock_);
+    EXPECT_FALSE(task_);
+    task_ = std::move(task);
+  }
 
-  std::function<void()> TakeTask() { return std::move(task_); }
+  void RunLastTask() { TakeTask()(); }
+
+  std::function<void()> TakeTask() {
+    std::unique_lock<std::mutex> lock(lock_);
+    return std::move(task_);
+  }
 
   MOCK_METHOD1(PostTask, void(std::function<void()>));
   MOCK_METHOD2(PostDelayedTask, void(std::function<void()>, int delay_ms));
@@ -68,6 +81,7 @@ class MockTaskRunner : public base::TaskRunner {
   MOCK_METHOD1(RemoveFileDescriptorWatch, void(int fd));
 
  private:
+  std::mutex lock_;
   std::function<void()> task_;
 };
 
@@ -116,8 +130,8 @@ std::unique_ptr<FtraceModel> FakeModel(FtraceProcfs* ftrace,
 
 class MockFtraceProcfs : public FtraceProcfs {
  public:
-  MockFtraceProcfs() : FtraceProcfs("/root/") {
-    ON_CALL(*this, NumberOfCpus()).WillByDefault(Return(1));
+  MockFtraceProcfs(size_t cpu_count = 1) : FtraceProcfs("/root/") {
+    ON_CALL(*this, NumberOfCpus()).WillByDefault(Return(cpu_count));
     EXPECT_CALL(*this, NumberOfCpus()).Times(AnyNumber());
 
     ON_CALL(*this, ReadFileIntoString("/root/trace_clock"))
@@ -127,6 +141,27 @@ class MockFtraceProcfs : public FtraceProcfs {
 
     ON_CALL(*this, WriteToFile(_, _)).WillByDefault(Return(true));
     ON_CALL(*this, ClearFile(_)).WillByDefault(Return(true));
+
+    ON_CALL(*this, WriteToFile("/root/tracing_on", _))
+        .WillByDefault(Invoke(this, &MockFtraceProcfs::WriteTracingOn));
+    ON_CALL(*this, ReadOneCharFromFile("/root/tracing_on"))
+        .WillByDefault(Invoke(this, &MockFtraceProcfs::ReadTracingOn));
+    EXPECT_CALL(*this, ReadOneCharFromFile("/root/tracing_on"))
+        .Times(AnyNumber());
+  }
+
+  bool WriteTracingOn(const std::string& path, const std::string& value) {
+    PERFETTO_CHECK(value == "1" || value == "0");
+    tracing_on_ = value == "1";
+    return true;
+  }
+
+  char ReadTracingOn(const std::string& path) {
+    return tracing_on_ ? '1' : '0';
+  }
+
+  base::ScopedFile OpenPipeForCpu(size_t cpu) override {
+    return base::ScopedFile(open("/dev/null", O_RDONLY));
   }
 
   MOCK_METHOD2(WriteToFile,
@@ -135,7 +170,14 @@ class MockFtraceProcfs : public FtraceProcfs {
   MOCK_METHOD1(ReadOneCharFromFile, char(const std::string& path));
   MOCK_METHOD1(ClearFile, bool(const std::string& path));
   MOCK_CONST_METHOD1(ReadFileIntoString, std::string(const std::string& path));
+
+  bool is_tracing_on() { return tracing_on_; }
+
+ private:
+  bool tracing_on_ = false;
 };
+
+}  // namespace
 
 class TestFtraceController : public FtraceController {
  public:
@@ -151,10 +193,35 @@ class TestFtraceController : public FtraceController {
         runner_(std::move(runner)),
         procfs_(raw_procfs) {}
 
-  MOCK_METHOD1(OnRawFtraceDataAvailable, bool(size_t cpu));
+  MOCK_METHOD1(OnRawFtraceDataAvailable, void(size_t cpu));
 
   MockTaskRunner* runner() { return runner_.get(); }
   MockFtraceProcfs* procfs() { return procfs_; }
+
+  uint64_t NowMs() const override { return now_ms; }
+
+  uint32_t drain_period_ms() { return GetDrainPeriodMs(); }
+
+  std::function<void()> GetDataAvailableCallback(size_t cpu) {
+    base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+    size_t generation = generation_;
+    return [this, weak_this, generation, cpu] {
+      OnDataAvailable(weak_this, generation, cpu, GetDrainPeriodMs());
+    };
+  }
+
+  void WaitForData(size_t cpu) {
+    while (true) {
+      {
+        std::unique_lock<std::mutex> lock(lock_);
+        if (cpus_to_drain_[cpu])
+          return;
+      }
+      usleep(5000);
+    }
+  }
+
+  uint64_t now_ms = 0;
 
  private:
   TestFtraceController(const TestFtraceController&) = delete;
@@ -164,9 +231,12 @@ class TestFtraceController : public FtraceController {
   MockFtraceProcfs* procfs_;
 };
 
+namespace {
+
 std::unique_ptr<TestFtraceController> CreateTestController(
     bool runner_is_nice_mock,
-    bool procfs_is_nice_mock) {
+    bool procfs_is_nice_mock,
+    size_t cpu_count = 1) {
   std::unique_ptr<MockTaskRunner> runner;
   if (runner_is_nice_mock) {
     runner = std::unique_ptr<MockTaskRunner>(new NiceMock<MockTaskRunner>());
@@ -178,10 +248,11 @@ std::unique_ptr<TestFtraceController> CreateTestController(
 
   std::unique_ptr<MockFtraceProcfs> ftrace_procfs;
   if (procfs_is_nice_mock) {
-    ftrace_procfs =
-        std::unique_ptr<MockFtraceProcfs>(new NiceMock<MockFtraceProcfs>());
+    ftrace_procfs = std::unique_ptr<MockFtraceProcfs>(
+        new NiceMock<MockFtraceProcfs>(cpu_count));
   } else {
-    ftrace_procfs = std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs());
+    ftrace_procfs =
+        std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs(cpu_count));
   }
 
   MockFtraceProcfs* raw_procfs = ftrace_procfs.get();
@@ -210,6 +281,7 @@ TEST(FtraceControllerTest, RejectsBadEventNames) {
   MockDelegate delegate;
   FtraceConfig config = CreateFtraceConfig({"../try/to/escape"});
   EXPECT_FALSE(controller->CreateSink(config, &delegate));
+  EXPECT_FALSE(controller->procfs()->is_tracing_on());
 }
 
 TEST(FtraceControllerTest, OneSink) {
@@ -219,23 +291,21 @@ TEST(FtraceControllerTest, OneSink) {
   MockDelegate delegate;
   FtraceConfig config = CreateFtraceConfig({"foo"});
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/tracing_on", "1"));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, _));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", "0"));
   EXPECT_CALL(*controller->procfs(), ClearFile("/root/trace"))
       .WillOnce(Return(true));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "0"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/tracing_on", "0"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/events/enable", "0"));
+  EXPECT_TRUE(controller->procfs()->is_tracing_on());
+
   sink.reset();
+  EXPECT_FALSE(controller->procfs()->is_tracing_on());
 }
 
 TEST(FtraceControllerTest, MultipleSinks) {
@@ -247,27 +317,18 @@ TEST(FtraceControllerTest, MultipleSinks) {
   FtraceConfig configA = CreateFtraceConfig({"foo"});
   FtraceConfig configB = CreateFtraceConfig({"foo", "bar"});
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, _));
   std::unique_ptr<FtraceSink> sinkA =
       controller->CreateSink(configA, &delegate);
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kBarEnablePath, "1"));
   std::unique_ptr<FtraceSink> sinkB =
       controller->CreateSink(configB, &delegate);
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
   sinkA.reset();
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "0"));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kBarEnablePath, "0"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", "0"));
@@ -284,16 +345,11 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
   MockDelegate delegate;
   FtraceConfig config = CreateFtraceConfig({"foo"});
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, _));
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "0"));
   EXPECT_CALL(*controller->procfs(), ClearFile("/root/trace"))
       .WillOnce(Return(true));
@@ -306,6 +362,51 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
 }
 
 TEST(FtraceControllerTest, TaskScheduling) {
+  auto controller = CreateTestController(
+      false /* nice runner */, false /* nice procfs */, 2 /* num cpus */);
+
+  // For this test we don't care about calls to WriteToFile/ClearFile.
+  EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
+  EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
+
+  MockDelegate delegate;
+  FtraceConfig config = CreateFtraceConfig({"foo"});
+
+  std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
+
+  // Only one call to drain should be scheduled for the next drain period.
+  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
+
+  // However both CPUs should be drained.
+  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(2);
+
+  // Finally, another task should be posted to unblock the workers.
+  EXPECT_CALL(*controller->runner(), PostTask(_));
+
+  // Simulate two worker threads reporting available data.
+  auto on_data_available0 = controller->GetDataAvailableCallback(0u);
+  std::thread worker0([on_data_available0] { on_data_available0(); });
+
+  auto on_data_available1 = controller->GetDataAvailableCallback(1u);
+  std::thread worker1([on_data_available1] { on_data_available1(); });
+
+  // Poll until both worker threads have reported available data.
+  controller->WaitForData(0u);
+  controller->WaitForData(1u);
+
+  // Run the task to drain all CPUs.
+  controller->runner()->RunLastTask();
+
+  // Run the task to unblock all workers.
+  controller->runner()->RunLastTask();
+
+  worker0.join();
+  worker1.join();
+
+  sink.reset();
+}
+
+TEST(FtraceControllerTest, DrainPeriodRespected) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
 
@@ -316,30 +417,34 @@ TEST(FtraceControllerTest, TaskScheduling) {
   MockDelegate delegate;
   FtraceConfig config = CreateFtraceConfig({"foo"});
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
+  // Test several cycles of a worker producing data and make sure the drain
+  // delay is consistent with the drain period.
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
-  // Running task will call OnRawFtraceDataAvailable:
-  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).WillOnce(Return(true));
-  // And since we return true (= there is more data) we re-schedule immediately:
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 0));
-  controller->runner()->RunLastTask();
+  const int kCycles = 50;
+  EXPECT_CALL(*controller->runner(),
+              PostDelayedTask(_, controller->drain_period_ms()))
+      .Times(kCycles);
+  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(kCycles);
+  EXPECT_CALL(*controller->runner(), PostTask(_)).Times(kCycles);
 
-  // Running task will call OnRawFtraceDataAvailable:
-  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).WillOnce(Return(false));
-  // And since we return false (= no more data) we re-schedule in 100ms:
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
-  controller->runner()->RunLastTask();
+  // Simulate a worker thread continually reporting pages of available data.
+  auto on_data_available = controller->GetDataAvailableCallback(0u);
+  std::thread worker([on_data_available] {
+    for (int i = 0; i < kCycles; i++)
+      on_data_available();
+  });
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
+  for (int i = 0; i < kCycles; i++) {
+    controller->WaitForData(0u);
+    // Run two tasks: one to drain each CPU and another to unblock the worker.
+    controller->runner()->RunLastTask();
+    controller->runner()->RunLastTask();
+    controller->now_ms += controller->drain_period_ms();
+  }
+
+  worker.join();
   sink.reset();
-
-  // The task may be run after the sink is gone, in this case we shouldn't call
-  // OnRawFtraceDataAvailable and shouldn't reschedule.
-  controller->runner()->RunLastTask();
 }
 
 TEST(FtraceControllerTest, BackToBackEnableDisable) {
@@ -349,41 +454,36 @@ TEST(FtraceControllerTest, BackToBackEnableDisable) {
   // For this test we don't care about calls to WriteToFile/ClearFile.
   EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
   EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-  ON_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillByDefault(Return('0'));
   EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
       .Times(AnyNumber());
 
   MockDelegate delegate;
   FtraceConfig config = CreateFtraceConfig({"foo"});
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
+  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100)).Times(2);
   std::unique_ptr<FtraceSink> sink_a =
       controller->CreateSink(config, &delegate);
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
-  sink_a.reset();
-  std::function<void()> task_a = controller->runner()->TakeTask();
 
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('0'));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
+  auto on_data_available = controller->GetDataAvailableCallback(0u);
+  std::thread worker([on_data_available] { on_data_available(); });
+  controller->WaitForData(0u);
+
+  // Disable the first sink and run the delayed task that it generated. It
+  // should be a no-op.
+  sink_a.reset();
+  controller->runner()->RunLastTask();
+  worker.join();
+
+  // Register another sink and wait for it to generate data.
   std::unique_ptr<FtraceSink> sink_b =
       controller->CreateSink(config, &delegate);
-  std::function<void()> task_b = controller->runner()->TakeTask();
+  std::thread worker2([on_data_available] { on_data_available(); });
+  controller->WaitForData(0u);
 
-  // Task A shouldn't reschedule:
-  task_a();
-  // But task B should:
-  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).WillOnce(Return(false));
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
-  task_b();
-
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillOnce(Return('1'));
+  // This drain should also be a no-op after the sink is unregistered.
   sink_b.reset();
+  controller->runner()->RunLastTask();
+  worker2.join();
 }
 
 TEST(FtraceControllerTest, BufferSize) {
@@ -393,71 +493,52 @@ TEST(FtraceControllerTest, BufferSize) {
   // For this test we don't care about most calls to WriteToFile/ClearFile.
   EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
   EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-  ON_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillByDefault(Return('0'));
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .Times(AnyNumber());
   MockDelegate delegate;
 
   {
     // No buffer size -> good default.
     // 8192kb = 8mb
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "512"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 
   {
     // Way too big buffer size -> good default.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "512"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_buffer_size_kb(10 * 1024 * 1024);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 
   {
     // The limit is 8mb, 9mb is too much.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "512"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     ON_CALL(*controller->procfs(), NumberOfCpus()).WillByDefault(Return(2));
     config.set_buffer_size_kb(9 * 1024);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 
   {
     // Your size ends up with less than 1 page per cpu -> 1 page.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "4"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_buffer_size_kb(1);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 
   {
     // You picked a good size -> your size rounded to nearest page.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "40"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_buffer_size_kb(42);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 
   {
@@ -481,53 +562,37 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
   // For this test we don't care about calls to WriteToFile/ClearFile.
   EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
   EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-  ON_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .WillByDefault(Return('0'));
-  EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-      .Times(AnyNumber());
   MockDelegate delegate;
 
   {
     // No period -> good default.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
-    EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
+    EXPECT_EQ(100u, controller->drain_period_ms());
   }
 
   {
     // Pick a tiny value -> good default.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
-    EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_drain_period_ms(0);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
+    EXPECT_EQ(100u, controller->drain_period_ms());
   }
 
   {
     // Pick a huge value -> good default.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
-    EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_drain_period_ms(1000 * 60 * 60);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
+    EXPECT_EQ(100u, controller->drain_period_ms());
   }
 
   {
     // Pick a resonable value -> get that value.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
-    EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 200));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     config.set_drain_period_ms(200);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
+    EXPECT_EQ(200u, controller->drain_period_ms());
   }
 }
 
