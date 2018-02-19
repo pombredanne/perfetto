@@ -107,11 +107,14 @@ void FtraceProducer::CreateDataSourceInstance(
   PERFETTO_CHECK(sink);
   delegate->sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
+  watchdogs_.emplace(std::piecewise_construct, std::forward_as_tuple(id),
+                     std::forward_as_tuple(2 * source_config.duration_ms()));
 }
 
 void FtraceProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Ftrace stop (id=%" PRIu64 ")", id);
   delegates_.erase(id);
+  watchdogs_.erase(id);
 }
 
 void FtraceProducer::ConnectWithRetries(const char* socket_name,

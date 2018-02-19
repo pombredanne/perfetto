@@ -87,6 +87,7 @@ class FtraceProducer : public Producer {
   uint64_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
+  std::map<DataSourceInstanceID, base::WatchDog> watchdogs_;
 };
 }  // namespace perfetto
 
