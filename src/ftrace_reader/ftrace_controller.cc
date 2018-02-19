@@ -38,6 +38,7 @@
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
+namespace {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 const char* kTracingPaths[] = {
@@ -49,7 +50,6 @@ const char* kTracingPaths[] = {
 };
 #endif
 
-namespace {
 const int kDefaultDrainPeriodMs = 100;
 const int kMinDrainPeriodMs = 1;
 const int kMaxDrainPeriodMs = 1000 * 60;
