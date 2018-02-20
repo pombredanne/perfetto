@@ -26,23 +26,6 @@ namespace perfetto {
 namespace base {
 namespace {
 
-TEST(WatchDogTest, Crash) {
-  EXPECT_DEATH(
-      {
-        WatchDog watchdog(1);
-        int sleep_s = 20;
-        while (sleep_s != 0) {
-          sleep_s = sleep(sleep_s);
-        }
-      },
-      "");
-}
-
-TEST(WatchDogTest, NoCrash) {
-  WatchDog watchdog(100000);
-  PERFETTO_CHECK(usleep(5000) != -1);
-}
-
 }  // namespace
 }  // namespace base
 }  // namespace perfetto
