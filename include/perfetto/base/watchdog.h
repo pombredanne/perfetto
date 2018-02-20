@@ -25,17 +25,24 @@
 namespace perfetto {
 namespace base {
 
+// Ensures that the calling program does not exceed certain hard limits on
+// resource usage e.g. time, memory and CPU. If exceeded, the program is
+// crashed.
 class Watchdog {
  public:
-  static const uint32_t kInvalidMemoryLimit;
-  static const uint32_t kInvalidCpuPercentage;
+  // Constants used to reset the limits on resources.
+  static const uint32_t kNoMemoryLimit;
+  static const uint32_t kNoCpuLimit;
 
+  // Possible reasons for setting a timer limit.
   enum TimerReason {
     TASK_DEADLINE = 0,
     TRACE_DEADLINE = 1,
     MAX = TRACE_DEADLINE + 1,
   };
 
+  // Handle to the timer set to crash the program. If the handle is dropped,
+  // the timer is removed so the program does not crash.
   class TimerHandle {
    public:
     TimerHandle(TimerReason reason);
@@ -49,60 +56,103 @@ class Watchdog {
     TimerReason reason_;
   };
 
-  class SlidingWindow {
+  static Watchdog* GetInstance();
+
+  // Sets a timer which will crash the program in |ms| milliseconds if the
+  // returned handle is not destroyed.
+  // Note: only one timer with each reason can exist at any one time.
+  // Note: |ms| has to be a multiple of |polling_interval_ms_|.
+  TimerHandle CreateFatalTimer(uint32_t ms, TimerReason reason);
+
+  // Sets a limit on the memory (defined as the RSS) used by the program
+  // averaged over the last |window_ms| milliseconds.
+  // Note: |window_ms| has to be a multiple of |polling_interval_ms_|.
+  void SetMemoryLimit(uint32_t kb, uint32_t window_ms);
+
+  // Sets a limit on the CPU usage used by the program averaged over the last
+  // |window_ms| milliseconds.
+  // Note: |window_ms| has to be a multiple of |polling_interval_ms_|.
+  void SetCpuLimit(uint32_t percentage, uint32_t window_ms);
+
+  // Sets the time between polls of the CPU and memory as well as checks of
+  // expired times.
+  // Note: this method clears all existing limits so callers must readd limits
+  // after calling this method.
+  void SetPollingTimeForTesting(uint32_t polling_interval_ms);
+
+ private:
+  static const uint32_t kPollingIntervalMs;
+  static const int32_t kNoTimer;
+
+  // Represents a ring buffer in which integer values can be stored.
+  class RingBuffer {
    public:
+    // Pushes a new value into a ring buffer wrapping if necessary and returns
+    // whether the ring buffer is full.
     bool Push(uint64_t sample);
+
+    // Returns the mean of the values in the buffer.
     uint64_t Mean() const;
+
+    // Clears the ring buffer while keeping the existing size.
     void Clear();
+
+    // Resets the size of the buffer as well as clearing it.
     void Reset(size_t new_size);
 
+    // Gets the oldest value inserted in the buffer. The buffer must be full
+    // (i.e. Push returned true) before this method can be called.
     uint64_t OldestWhenFull() const {
       PERFETTO_CHECK(filled_);
-      return window_[position_];
+      return buffer_[position_];
     }
 
+    // Gets the newest value inserted in the buffer. The buffer must be full
+    // (i.e. Push returned true) before this method can be called.
     uint64_t NewestWhenFull() const {
       PERFETTO_CHECK(filled_);
-      return window_[(position_ + size_ - 1) % size_];
+      return buffer_[(position_ + size_ - 1) % size_];
     }
 
+    // Returns the size of the ring buffer.
     size_t size() const { return size_; }
 
    private:
     bool filled_ = false;
     size_t position_ = 0;
     size_t size_ = 0;
-    std::unique_ptr<uint64_t[]> window_;
+    std::unique_ptr<uint64_t[]> buffer_;
   };
 
-  static Watchdog* GetInstance();
-
-  TimerHandle CreateFatalTimer(uint32_t ms, TimerReason reason);
-  void SetMemoryLimit(uint32_t kb, uint32_t window_ms);
-  void SetCpuLimit(uint32_t percentage, uint32_t window_ms);
-  void SetPollingTimeForTesting(uint32_t polling_interval_ms);
-
- private:
-  static const uint32_t kPollingIntervalMs;
-  static const uint32_t kInvalidTimer;
-
+  // Contains resource information about the containing process.
   struct StatInfo {
+    // The CPU time consumed by the process.
     uint64_t cpu_time = 0;
+
+    // The RSS consumed by the process.
     uint32_t rss_kb = 0;
   };
 
   Watchdog();
   ~Watchdog() = default;
 
+  // Main method for the watchdog thread.
   [[noreturn]] void ThreadMain();
+
+  // Check each type of resource every |polling_interval_ms_| miillis.
   void CheckMemory(const StatInfo& stat_info);
   void CheckCpu(const StatInfo& stat_info);
   void CheckTimers();
 
+  // Clears the timer with the given reason.
   void ClearTimer(TimerReason reason);
 
+  // Computs the stat info of the containing program in a OS-specific manner.
   StatInfo GetStatInfo();
-  uint32_t WindowTimeForSlidingWindow(const SlidingWindow& window);
+
+  // Computes the time interval spanned by a given ring buffer with respect
+  // to |polling_interval_ms_|.
+  uint32_t WindowTimeForRingBuffer(const RingBuffer& window);
 
   std::thread thread_;
 
@@ -110,14 +160,14 @@ class Watchdog {
 
   std::mutex mutex_;
 
-  uint32_t memory_limit_kb_ = kInvalidMemoryLimit;
-  SlidingWindow memory_window_kb_;
+  uint32_t memory_limit_kb_ = kNoMemoryLimit;
+  RingBuffer memory_window_kb_;
 
-  uint32_t cpu_limit_percentage_ = kInvalidCpuPercentage;
-  SlidingWindow cpu_window_time_;
+  uint32_t cpu_limit_percentage_ = kNoCpuLimit;
+  RingBuffer cpu_window_time_;
 
   uint32_t polling_interval_ms_ = kPollingIntervalMs;
-  uint32_t timer_window_countdown_[TimerReason::MAX] = {kInvalidTimer};
+  int32_t timer_window_countdown_[TimerReason::MAX] = {kNoTimer};
 
   // --- End lock-protected members ---
 };

@@ -19,6 +19,7 @@
 #include "perfetto/base/logging.h"
 
 #include <fcntl.h>
+#include <condition_variable>
 #include <thread>
 
 namespace perfetto {
@@ -40,10 +41,10 @@ uint64_t MeanForArray(uint64_t array[], size_t size) {
 
 }  //  namespace
 
-const uint32_t Watchdog::kInvalidMemoryLimit = 0;
-const uint32_t Watchdog::kInvalidCpuPercentage = 0;
+const uint32_t Watchdog::kNoMemoryLimit = 0;
+const uint32_t Watchdog::kNoCpuLimit = 0;
 const uint32_t Watchdog::kPollingIntervalMs = 30 * 1000;
-const uint32_t Watchdog::kInvalidTimer = 0;
+const int32_t Watchdog::kNoTimer = -1;
 
 Watchdog::Watchdog() : thread_(&Watchdog::ThreadMain, this) {}
 
@@ -54,40 +55,42 @@ Watchdog* Watchdog::GetInstance() {
 
 Watchdog::TimerHandle Watchdog::CreateFatalTimer(uint32_t ms,
                                                  TimerReason reason) {
-  // std::lock_guard<std::mutex> guard(mutex_);
+  std::lock_guard<std::mutex> guard(mutex_);
 
   PERFETTO_CHECK(IsMultipleOf(ms, polling_interval_ms_));
-  PERFETTO_CHECK(timer_window_countdown_[reason] == kInvalidTimer);
+  PERFETTO_CHECK(timer_window_countdown_[reason] == kNoTimer);
 
   // Update the countdown array with the number of intervals remaining.
-  timer_window_countdown_[reason] = ms / polling_interval_ms_;
+  timer_window_countdown_[reason] =
+      static_cast<int32_t>(ms / polling_interval_ms_);
   return Watchdog::TimerHandle(reason);
 }
 
 void Watchdog::SetMemoryLimit(uint32_t kb, uint32_t window_ms) {
   // Update the fields under the lock.
   std::lock_guard<std::mutex> guard(mutex_);
-  PERFETTO_CHECK(kb > 0 || kb == kInvalidMemoryLimit);
-  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) ||
-                 kb == kInvalidMemoryLimit);
 
-  size_t size =
-      kb == kInvalidMemoryLimit ? 0 : window_ms / polling_interval_ms_ + 1;
+  PERFETTO_CHECK(kb > 0 || kb == kNoMemoryLimit);
+  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) ||
+                 kb == kNoMemoryLimit);
+
+  // Update the fields under the lock.
+  size_t size = kb == kNoMemoryLimit ? 0 : window_ms / polling_interval_ms_ + 1;
   memory_window_kb_.Reset(size);
   memory_limit_kb_ = kb;
 }
 
 void Watchdog::SetCpuLimit(uint32_t percentage, uint32_t window_ms) {
-  // Update the fields under the lock.
   std::lock_guard<std::mutex> guard(mutex_);
-  PERFETTO_CHECK(percentage > 0 && percentage <= 100 ||
-                 percentage == kInvalidCpuPercentage);
-  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) ||
-                 percentage == kInvalidCpuPercentage);
 
-  size_t size = percentage == kInvalidCpuPercentage
-                    ? 0
-                    : window_ms / polling_interval_ms_ + 1;
+  PERFETTO_CHECK(percentage > 0 && percentage <= 100 ||
+                 percentage == kNoCpuLimit);
+  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) ||
+                 percentage == kNoCpuLimit);
+
+  // Update the fields under the lock.
+  size_t size =
+      percentage == kNoCpuLimit ? 0 : window_ms / polling_interval_ms_ + 1;
   cpu_window_time_.Reset(size);
   cpu_limit_percentage_ = percentage;
 }
@@ -101,17 +104,16 @@ void Watchdog::SetPollingTimeForTesting(uint32_t polling_interval_ms) {
   memory_window_kb_.Clear();
   cpu_window_time_.Clear();
   for (size_t i = 0; i < TimerReason::MAX; i++) {
-    timer_window_countdown_[i] = kInvalidTimer;
+    timer_window_countdown_[i] = kNoTimer;
   }
 }
 
 void Watchdog::ClearTimer(TimerReason reason) {
   std::lock_guard<std::mutex> guard(mutex_);
-  timer_window_countdown_[reason] = kInvalidTimer;
+  timer_window_countdown_[reason] = kNoTimer;
 }
 
 void Watchdog::ThreadMain() {
-  /*
   std::unique_lock<std::mutex> guard(mutex_);
   std::condition_variable var;
   for (;;) {
@@ -124,35 +126,37 @@ void Watchdog::ThreadMain() {
     CheckCpu(stat_info);
     CheckTimers();
   }
-  */
-  for (;;) {
-  }
 }
 
 void Watchdog::CheckMemory(const StatInfo& stat_info) {
-  if (memory_limit_kb_ == kInvalidMemoryLimit)
+  if (memory_limit_kb_ == kNoMemoryLimit)
     return;
 
+  // Add the current stat value to the ring buffer and check that the mean
+  // remains under our threshold.
   if (memory_window_kb_.Push(stat_info.rss_kb))
     PERFETTO_CHECK(memory_window_kb_.Mean() <= memory_limit_kb_);
 }
 
 void Watchdog::CheckCpu(const StatInfo& stat_info) {
-  if (cpu_limit_percentage_ == kInvalidMemoryLimit)
+  if (cpu_limit_percentage_ == kNoCpuLimit)
     return;
 
+  // Add the cpu time to the ring buffer.
   if (cpu_window_time_.Push(stat_info.cpu_time)) {
+    // Compute the percentage over the whole window and check that it remains
+    // under the threshold.
     uint64_t difference = static_cast<uint64_t>(
         cpu_window_time_.NewestWhenFull() - cpu_window_time_.OldestWhenFull());
     uint64_t percentage =
-        difference / WindowTimeForSlidingWindow(cpu_window_time_);
+        difference / WindowTimeForRingBuffer(cpu_window_time_);
     PERFETTO_CHECK(percentage <= cpu_limit_percentage_);
   }
 }
 
 void Watchdog::CheckTimers() {
   for (size_t i = 0; i < TRACE_DEADLINE; i++) {
-    if (timer_window_countdown_[i] == kInvalidTimer)
+    if (timer_window_countdown_[i] == kNoTimer)
       continue;
 
     // If we hit a timer of 0 and we haven't had the flag cleared, then
@@ -173,7 +177,7 @@ Watchdog::StatInfo Watchdog::GetStatInfo() {
   FILE* file = fopen("/proc/self/stat", "r");
   PERFETTO_CHECK(file);
 
-  // Read the data we want into the struct.
+  // Read utime, stime and rss.
   unsigned long utime = 0;
   unsigned long stime = 0;
   long rss_pages = -1l;
@@ -182,8 +186,11 @@ Watchdog::StatInfo Watchdog::GetStatInfo() {
              "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %lu %lu "
              "%*ld %*ld %*ld %*ld %*ld %*ld %*llu %*lu %ld",
              &utime, &stime, &rss_pages) == 3);
+
+  // Close the stat file.
   perfetto::base::ignore_result(fclose(file));
 
+  // Add the data to the struct.
   stat_info.cpu_time = utime + stime;
   stat_info.rss_kb = static_cast<uint32_t>(rss_pages) * 4096;
 #endif
@@ -191,13 +198,13 @@ Watchdog::StatInfo Watchdog::GetStatInfo() {
   return stat_info;
 }
 
-uint32_t Watchdog::WindowTimeForSlidingWindow(const SlidingWindow& window) {
+uint32_t Watchdog::WindowTimeForRingBuffer(const RingBuffer& window) {
   return static_cast<uint32_t>(window.size() - 1) * polling_interval_ms_;
 }
 
-bool Watchdog::SlidingWindow::Push(uint64_t sample) {
+bool Watchdog::RingBuffer::Push(uint64_t sample) {
   // Add the sample to the current position in the ring buffer.
-  window_[position_] = sample;
+  buffer_[position_] = sample;
 
   // Update the position with next one circularily.
   position_ = (position_ + 1) % size_;
@@ -207,20 +214,20 @@ bool Watchdog::SlidingWindow::Push(uint64_t sample) {
   return filled_;
 }
 
-uint64_t Watchdog::SlidingWindow::Mean() const {
-  return MeanForArray(window_.get(), size_);
+uint64_t Watchdog::RingBuffer::Mean() const {
+  return MeanForArray(buffer_.get(), size_);
 }
 
-void Watchdog::SlidingWindow::Clear() {
+void Watchdog::RingBuffer::Clear() {
   position_ = 0;
-  window_.reset(new uint64_t[size_]());
+  buffer_.reset(new uint64_t[size_]());
 }
 
-void Watchdog::SlidingWindow::Reset(size_t new_size) {
+void Watchdog::RingBuffer::Reset(size_t new_size) {
   PERFETTO_CHECK(new_size >= 0);
   position_ = 0;
   size_ = new_size;
-  window_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
+  buffer_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
 }
 
 Watchdog::TimerHandle::TimerHandle(TimerReason reason) : reason_(reason) {}
