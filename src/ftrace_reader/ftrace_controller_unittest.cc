@@ -88,14 +88,12 @@ class MockTaskRunner : public base::TaskRunner {
 class MockDelegate : public perfetto::FtraceSink::Delegate {
  public:
   MOCK_METHOD1(GetBundleForCpu,
-               protozero::ProtoZeroMessageHandle<FtraceEventBundle>(size_t));
+               protozero::MessageHandle<FtraceEventBundle>(size_t));
   MOCK_METHOD2(OnBundleComplete_,
-               void(size_t,
-                    protozero::ProtoZeroMessageHandle<FtraceEventBundle>&));
+               void(size_t, protozero::MessageHandle<FtraceEventBundle>&));
 
-  void OnBundleComplete(
-      size_t cpu,
-      protozero::ProtoZeroMessageHandle<FtraceEventBundle> bundle) {
+  void OnBundleComplete(size_t cpu,
+                        protozero::MessageHandle<FtraceEventBundle> bundle) {
     OnBundleComplete_(cpu, bundle);
   }
 };
@@ -406,7 +404,8 @@ TEST(FtraceControllerTest, TaskScheduling) {
   sink.reset();
 }
 
-TEST(FtraceControllerTest, DrainPeriodRespected) {
+// TODO(b/73452932): Fix and reenable this test.
+TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
 
@@ -543,15 +542,12 @@ TEST(FtraceControllerTest, BufferSize) {
 
   {
     // You picked a good size -> your size rounded to nearest page.
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"));
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "40"));
     FtraceConfig config = CreateFtraceConfig({"foo"});
     ON_CALL(*controller->procfs(), NumberOfCpus()).WillByDefault(Return(2));
     config.set_buffer_size_kb(42);
     auto sink = controller->CreateSink(config, &delegate);
-    EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
-        .WillOnce(Return('1'));
   }
 }
 
