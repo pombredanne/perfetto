@@ -35,7 +35,11 @@
 #include "src/ftrace_reader/test/test_messages.pb.h"
 #include "src/ftrace_reader/test/test_messages.pbzero.h"
 
+using testing::Each;
+using testing::ElementsAre;
 using testing::ElementsAreArray;
+using testing::Eq;
+using testing::Pair;
 
 namespace perfetto {
 
@@ -655,7 +659,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   std::string filename =
       "./src/ftrace_reader/test/data/android_seed_N2F62_3.10.49/events";
   struct stat buf;
-  stat(filename.c_str(), &buf);
+  PERFETTO_CHECK(stat(filename.c_str(), &buf) != -1);
   writer.Write<int32_t>(buf.st_ino);
   writer.WriteFixedString(300, "Goodbye");
 
@@ -675,15 +679,10 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
   // Check inode number gets added and linked to the correct file
-  std::set<uint64_t> fake_inode_numbers;
-  fake_inode_numbers.insert(buf.st_ino);
-  EXPECT_EQ(inode_numbers, fake_inode_numbers);
+  EXPECT_THAT(inode_numbers, Each(Eq(buf.st_ino)));
   std::map<uint64_t, std::string> inode_to_filename =
-      CpuReader::GetFilenamesForInodeNumbers(&inode_numbers);
-  std::map<uint64_t, std::string> fake_inode_to_filename;
-  fake_inode_to_filename.insert(
-      std::pair<uint64_t, std::string>(buf.st_ino, filename));
-  EXPECT_EQ(inode_to_filename, fake_inode_to_filename);
+      CpuReader::GetFilenamesForInodeNumbers(inode_numbers);
+  EXPECT_THAT(inode_to_filename, ElementsAre(Pair(buf.st_ino, filename)));
 }
 
 // # tracer: nop

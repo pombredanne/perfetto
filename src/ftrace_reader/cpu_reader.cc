@@ -219,36 +219,35 @@ void CpuReader::RunWorkerThread(size_t cpu,
 }
 
 std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
-    std::set<uint64_t>* inode_numbers) {
+    const std::set<uint64_t>& inode_numbers) {
   std::map<uint64_t, std::string> inode_to_filename;
+  if (inode_numbers.size() == 0)
+    return inode_to_filename;
   std::queue<std::string> queue;
   // Starts reading files from current directory
   queue.push(".");
-  while (!queue.empty() && inode_numbers->size() > 0) {
+  while (!queue.empty() && inode_numbers.size() > 0) {
     struct dirent* entry;
     std::string filepath = queue.front();
     filepath += "/";
     DIR* dir = opendir(queue.front().c_str());
     queue.pop();
-    if (dir != NULL) {
-      while ((entry = readdir(dir)) != NULL) {
-        std::string filename = entry->d_name;
-        if (filename.compare(".") != 0 && filename.compare("..") != 0) {
-          uint64_t inode_number = entry->d_ino;
-          // Check if this inode number matches any of the passed in inode
-          // numbers from events
-          if (inode_numbers->find(inode_number) != inode_numbers->end()) {
-            inode_to_filename.insert(std::pair<uint64_t, std::string>(
-                inode_number, filepath + filename));
-          }
-          // Continue iterating through files if current entry is a directory
-          if (entry->d_type == DT_DIR) {
-            queue.push(filepath + filename);
-          }
-        }
-      }
-      closedir(dir);
+    if (dir == nullptr)
+      continue;
+    while ((entry = readdir(dir)) != nullptr) {
+      std::string filename = entry->d_name;
+      if (filename.compare(".") == 0 || filename.compare("..") == 0)
+        continue;
+      uint64_t inode_number = entry->d_ino;
+      // Check if this inode number matches any of the passed in inode
+      // numbers from events
+      if (inode_numbers.find(inode_number) != inode_numbers.end())
+        inode_to_filename.emplace(inode_number, filepath + filename);
+      // Continue iterating through files if current entry is a directory
+      if (entry->d_type == DT_DIR)
+        queue.push(filepath + filename);
     }
+    closedir(dir);
   }
   return inode_to_filename;
 }

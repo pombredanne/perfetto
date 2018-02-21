@@ -112,7 +112,7 @@ class CpuReader {
   // found in the filesystem. If the inode number saved from events is not
   // found, nothing is added to the map.
   static std::map<uint64_t, std::string> GetFilenamesForInodeNumbers(
-      std::set<uint64_t>* inode_numbers);
+      const std::set<uint64_t>& inode_numbers);
 
   // Parse a raw ftrace page beginning at ptr and write the events a protos
   // into the provided bundle respecting the given event filter.
