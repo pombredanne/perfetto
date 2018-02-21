@@ -37,10 +37,6 @@ const char* kClocks[] = {
     "boot", "global", "local", nullptr,
 };
 
-// const int kDefaultDrainPeriodMs = 100;
-// const int kMinDrainPeriodMs = 1;
-// const int kMaxDrainPeriodMs = 1000 * 60;
-
 const int kDefaultPerCpuBufferSizeKb = 512;   // 512kb
 const int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
 
