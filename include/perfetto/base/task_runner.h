@@ -70,6 +70,13 @@ class TaskRunner {
 
  protected:
   static void RunTask(const std::function<void()>& task) {
+#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+    (PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||       \
+     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID))
+    base::Watchdog::TimerHandle handle =
+        base::Watchdog::GetInstance()->CreateFatalTimer(
+            kWatchdogMillis, base::Watchdog::TimerReason::TASK_DEADLINE);
+#endif
     task();
   }
 };
