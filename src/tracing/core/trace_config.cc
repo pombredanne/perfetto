@@ -56,10 +56,9 @@ void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
                 "size mismatch");
   duration_ms_ = static_cast<decltype(duration_ms_)>(proto.duration_ms());
 
-  static_assert(sizeof(saved_to_dropbox_) == sizeof(proto.saved_to_dropbox()),
+  static_assert(sizeof(data_sink_) == sizeof(proto.data_sink()),
                 "size mismatch");
-  saved_to_dropbox_ =
-      static_cast<decltype(saved_to_dropbox_)>(proto.saved_to_dropbox());
+  data_sink_ = static_cast<decltype(data_sink_)>(proto.data_sink());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -81,10 +80,9 @@ void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
   proto->set_duration_ms(
       static_cast<decltype(proto->duration_ms())>(duration_ms_));
 
-  static_assert(sizeof(saved_to_dropbox_) == sizeof(proto->saved_to_dropbox()),
+  static_assert(sizeof(data_sink_) == sizeof(proto->data_sink()),
                 "size mismatch");
-  proto->set_saved_to_dropbox(
-      static_cast<decltype(proto->saved_to_dropbox())>(saved_to_dropbox_));
+  proto->set_data_sink(static_cast<decltype(proto->data_sink())>(data_sink_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
