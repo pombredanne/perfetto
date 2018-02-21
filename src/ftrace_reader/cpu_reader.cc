@@ -18,6 +18,12 @@
 
 #include <signal.h>
 
+#include <dirent.h>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <queue>
+#include <string>
 #include <utility>
 
 #include "perfetto/base/logging.h"
@@ -66,7 +72,7 @@ template <typename T>
 static void AddToInodeNumbers(const uint8_t* start,
                               std::set<uint64_t>* inode_numbers) {
   T t;
-  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
+  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(t));
   inode_numbers->insert(t);
 }
 
@@ -214,6 +220,41 @@ void CpuReader::RunWorkerThread(size_t cpu,
   }
 }
 
+std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
+    std::set<uint64_t>* inode_numbers) {
+  std::map<uint64_t, std::string> inode_to_filename;
+  std::queue<std::string> queue;
+  // Starts reading files from current directory
+  queue.push(".");
+  while (!queue.empty() && inode_numbers->size() > 0) {
+    struct dirent* entry;
+    std::string filepath = queue.front();
+    filepath += "/";
+    DIR* dir = opendir(queue.front().c_str());
+    queue.pop();
+    if (dir != NULL) {
+      while ((entry = readdir(dir)) != NULL) {
+        std::string filename = entry->d_name;
+        if (filename.compare(".") != 0 && filename.compare("..") != 0) {
+          uint64_t inode_number = entry->d_ino;
+          // Check if this inode number matches any of the passed in inode
+          // numbers from events
+          if (inode_numbers->find(inode_number) != inode_numbers->end()) {
+            inode_to_filename.insert(std::pair<uint64_t, std::string>(
+                inode_number, filepath + filename));
+          }
+          // Continue iterating through files if current entry is a directory
+          if (entry->d_type == DT_DIR) {
+            queue.push(filepath + filename);
+          }
+        }
+      }
+      closedir(dir);
+    }
+  }
+  return inode_to_filename;
+}
+
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
@@ -318,7 +359,8 @@ size_t CpuReader::ParsePage(size_t cpu,
       // Data record:
       default: {
         PERFETTO_CHECK(event_header.type_or_length <= kTypeDataTypeLengthMax);
-        // type_or_length is <=28 so it represents the length of a data record.
+        // type_or_length is <=28 so it represents the length of a data
+        // record.
         if (event_header.type_or_length == 0) {
           // TODO(hjd): Look at the next few bytes for real size.
           PERFETTO_ELOG("Data type_or_length == 0 not handled.");
@@ -344,100 +386,105 @@ size_t CpuReader::ParsePage(size_t cpu,
       }
     }
   }
+  std::map<uint64_t, std::string> inode_to_filename =
+      GetFilenamesForInodeNumbers(&inode_numbers);
   return static_cast<size_t>(ptr - start_of_page);
-}
+  }
 
-// |start| is the start of the current event.
-// |end| is the end of the buffer.
-bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
-                           const uint8_t* start,
-                           const uint8_t* end,
-                           const ProtoTranslationTable* table,
-                           protozero::ProtoZeroMessage* message,
-                           std::set<uint64_t>* inode_numbers) {
-  PERFETTO_DCHECK(start < end);
-  const size_t length = end - start;
+  // |start| is the start of the current event.
+  // |end| is the end of the buffer.
+  bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
+                             const uint8_t* start,
+                             const uint8_t* end,
+                             const ProtoTranslationTable* table,
+                             protozero::ProtoZeroMessage* message,
+                             std::set<uint64_t>* inode_numbers) {
+    PERFETTO_DCHECK(start < end);
+    const size_t length = end - start;
 
-  // TODO(hjd): Rework to work even if the event is unknown.
-  const Event& info = *table->GetEventById(ftrace_event_id);
+    // TODO(hjd): Rework to work even if the event is unknown.
+    const Event& info = *table->GetEventById(ftrace_event_id);
 
-  // TODO(hjd): Test truncated events.
-  // If the end of the buffer is before the end of the event give up.
-  if (info.size > length) {
-    PERFETTO_DCHECK(false);
+    // TODO(hjd): Test truncated events.
+    // If the end of the buffer is before the end of the event give up.
+    if (info.size > length) {
+      PERFETTO_DCHECK(false);
+      return false;
+    }
+
+    bool success = true;
+    for (const Field& field : table->common_fields())
+      success &= ParseField(field, start, end, message, inode_numbers);
+
+    protozero::ProtoZeroMessage* nested =
+        message->BeginNestedMessage<protozero::ProtoZeroMessage>(
+            info.proto_field_id);
+
+    for (const Field& field : info.fields)
+      success &= ParseField(field, start, end, nested, inode_numbers);
+
+    // This finalizes |nested| automatically.
+    message->Finalize();
+    return success;
+  }
+
+  // Caller must guarantee that the field fits in the range,
+  // explicitly: start + field.ftrace_offset + field.ftrace_size <= end
+  // The only exception is fields with strategy = kCStringToString
+  // where the total size isn't known up front. In this case ParseField
+  // will check the string terminates in the bounds and won't read past |end|.
+  bool CpuReader::ParseField(const Field& field,
+                             const uint8_t* start,
+                             const uint8_t* end,
+                             protozero::ProtoZeroMessage* message,
+                             std::set<uint64_t>* inode_numbers) {
+    PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
+    const uint8_t* field_start = start + field.ftrace_offset;
+    uint32_t field_id = field.proto_field_id;
+
+    switch (field.strategy) {
+      case kUint8ToUint32:
+      case kUint16ToUint32:
+      case kUint32ToUint32:
+      case kUint32ToUint64:
+        ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+        return true;
+      case kUint64ToUint64:
+        ReadIntoVarInt<uint64_t>(field_start, field_id, message);
+        return true;
+      case kInt16ToInt32:
+      case kInt32ToInt32:
+      case kInt32ToInt64:
+        ReadIntoVarInt<int32_t>(field_start, field_id, message);
+        return true;
+      case kInt64ToInt64:
+        ReadIntoVarInt<int64_t>(field_start, field_id, message);
+        return true;
+      case kFixedCStringToString:
+        // TODO(hjd): Add AppendMaxLength string to protozero.
+        return ReadIntoString(field_start, field_start + field.ftrace_size,
+                              field_id, message);
+      case kCStringToString:
+        // TODO(hjd): Kernel-dive to check this how size:0 char fields work.
+        return ReadIntoString(field_start, end, field.proto_field_id, message);
+      case kStringPtrToString:
+        // TODO(hjd): Figure out how to read these.
+        return true;
+      case kBoolToUint32:
+        ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+        return true;
+      case kInode32ToUint64:
+        ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+        AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
+        return true;
+      case kInode64ToUint64:
+        ReadIntoVarInt<uint64_t>(field_start, field_id, message);
+        AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
+        return true;
+    }
+    // Not reached, for gcc.
+    PERFETTO_CHECK(false);
     return false;
   }
-
-  bool success = true;
-  for (const Field& field : table->common_fields())
-    success &= ParseField(field, start, end, message, inode_numbers);
-
-  protozero::ProtoZeroMessage* nested =
-      message->BeginNestedMessage<protozero::ProtoZeroMessage>(
-          info.proto_field_id);
-
-  for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, inode_numbers);
-
-  // This finalizes |nested| automatically.
-  message->Finalize();
-  return success;
-}
-
-// Caller must guarantee that the field fits in the range,
-// explicitly: start + field.ftrace_offset + field.ftrace_size <= end
-// The only exception is fields with strategy = kCStringToString
-// where the total size isn't known up front. In this case ParseField
-// will check the string terminates in the bounds and won't read past |end|.
-bool CpuReader::ParseField(const Field& field,
-                           const uint8_t* start,
-                           const uint8_t* end,
-                           protozero::ProtoZeroMessage* message,
-                           std::set<uint64_t>* inode_numbers) {
-  PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
-  const uint8_t* field_start = start + field.ftrace_offset;
-  uint32_t field_id = field.proto_field_id;
-
-  switch (field.strategy) {
-    case kUint8ToUint32:
-    case kUint16ToUint32:
-    case kUint32ToUint32:
-    case kUint32ToUint64:
-      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
-      return true;
-    case kUint64ToUint64:
-      ReadIntoVarInt<uint64_t>(field_start, field_id, message);
-      return true;
-    case kInt16ToInt32:
-    case kInt32ToInt32:
-    case kInt32ToInt64:
-      ReadIntoVarInt<int32_t>(field_start, field_id, message);
-      return true;
-    case kInt64ToInt64:
-      ReadIntoVarInt<int64_t>(field_start, field_id, message);
-      return true;
-    case kFixedCStringToString:
-      // TODO(hjd): Add AppendMaxLength string to protozero.
-      return ReadIntoString(field_start, field_start + field.ftrace_size,
-                            field_id, message);
-    case kCStringToString:
-      // TODO(hjd): Kernel-dive to check this how size:0 char fields work.
-      return ReadIntoString(field_start, end, field.proto_field_id, message);
-    case kStringPtrToString:
-      // TODO(hjd): Figure out how to read these.
-      return true;
-    case kBoolToUint32:
-      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
-      return true;
-    case kInode32ToUint64:
-    case kInode64ToUint64:
-      ReadIntoVarInt<uint64_t>(field_start, field_id, message);
-      AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
-      return true;
-  }
-  // Not reached, for gcc.
-  PERFETTO_CHECK(false);
-  return false;
-}
 
 }  // namespace perfetto
