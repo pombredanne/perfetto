@@ -23,5 +23,6 @@ package perfetto.protos;
 
 message FtraceEventBundle {
   optional uint32 cpu = 1;
+  optional uint32 overwrite = 3;
   repeated FtraceEvent event = 2;
 }
