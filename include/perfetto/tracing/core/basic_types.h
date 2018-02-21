@@ -34,9 +34,8 @@ using DataSourceInstanceID = uint64_t;
 // Unique within the scope of a Producer.
 using WriterID = uint16_t;
 
-// 1024 Writers per process seems a resonable bound. This reduces the ability of
-// Producers to memory-DoS the service by having to keep track of too many
-// writer IDs.
+// 1024 Writers per producer seems a resonable bound. This reduces the ability
+// to memory-DoS the service by having to keep track of too many writer IDs.
 static constexpr WriterID kMaxWriterID = static_cast<WriterID>((1 << 10) - 1);
 
 // Unique within the scope of a {ProducerID, WriterID} tuple.

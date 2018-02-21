@@ -185,6 +185,11 @@ class SharedMemoryABI {
   static constexpr const char* kChunkStateStr[] = {"Free", "BeingWritten",
                                                    "BeingRead", "Complete"};
 
+  // TODO(primiano): In next CLs get rid of kChunkBeingRead (useless if we
+  // assume only the service can transition into kChunkFree) and introduce
+  // instead a state to capture the notion of "chunk is complete but the last
+  // packet still needs patching and cannot be consumed".
+
   enum PageLayout : uint32_t {
     // The page is fully free and has not been partitioned yet.
     kPageNotPartitioned = 0,
@@ -296,11 +301,6 @@ class SharedMemoryABI {
       // If set, the last TracePacket in the chunk is partial and continues on
       // |chunk_id| + 1 (within the same |writer_id|).
       kLastPacketContinuesOnNextChunk = 1 << 1,
-
-      // TODO(primiano): use this in the next CLs to determine whether the
-      // service can read the last packet of a chunk marked as kChunkComplete
-      // or has to wait to see the patching IPC first.
-      // kLastPacketNeedsPatching = 1 << 2,
     };
 
     struct Packets {
