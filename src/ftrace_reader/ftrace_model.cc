@@ -76,7 +76,7 @@ bool RunAtrace(std::vector<std::string> args) {
 
 std::set<std::string> GetFtraceEvents(const FtraceConfig& request) {
   std::set<std::string> events;
-  events.insert(request.event_names().begin(), request.event_names().end());
+  events.insert(request.ftrace_events().begin(), request.ftrace_events().end());
   if (RequiresAtrace(request)) {
     events.insert("print");
   }
@@ -138,12 +138,12 @@ FtraceConfigId FtraceModel::RequestConfig(const FtraceConfig& request) {
     }
     if (current_state_.ftrace_events().count(name) ||
         std::string("ftrace") == event->group) {
-      *actual.add_event_names() = name;
+      *actual.add_ftrace_events() = name;
       continue;
     }
     if (ftrace_->EnableEvent(event->group, event->name)) {
       current_state_.mutable_ftrace_events()->insert(name);
-      *actual.add_event_names() = name;
+      *actual.add_ftrace_events() = name;
     }
   }
 
@@ -168,8 +168,8 @@ bool FtraceModel::RemoveConfig(FtraceConfigId id) {
   std::set<std::string> expected_ftrace_events;
   for (const auto& id_config : configs_) {
     const FtraceConfig& config = id_config.second;
-    expected_ftrace_events.insert(config.event_names().begin(),
-                                  config.event_names().end());
+    expected_ftrace_events.insert(config.ftrace_events().begin(),
+                                  config.ftrace_events().end());
   }
 
   std::vector<std::string> events_to_disable =

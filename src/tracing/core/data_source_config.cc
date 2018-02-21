@@ -92,13 +92,14 @@ DataSourceConfig::FtraceConfig& DataSourceConfig::FtraceConfig::operator=(
 
 void DataSourceConfig::FtraceConfig::FromProto(
     const perfetto::protos::DataSourceConfig_FtraceConfig& proto) {
-  event_names_.clear();
-  for (const auto& field : proto.event_names()) {
-    event_names_.emplace_back();
-    static_assert(sizeof(event_names_.back()) == sizeof(proto.event_names(0)),
-                  "size mismatch");
-    event_names_.back() =
-        static_cast<decltype(event_names_)::value_type>(field);
+  ftrace_events_.clear();
+  for (const auto& field : proto.ftrace_events()) {
+    ftrace_events_.emplace_back();
+    static_assert(
+        sizeof(ftrace_events_.back()) == sizeof(proto.ftrace_events(0)),
+        "size mismatch");
+    ftrace_events_.back() =
+        static_cast<decltype(ftrace_events_)::value_type>(field);
   }
 
   atrace_categories_.clear();
@@ -136,10 +137,11 @@ void DataSourceConfig::FtraceConfig::ToProto(
     perfetto::protos::DataSourceConfig_FtraceConfig* proto) const {
   proto->Clear();
 
-  for (const auto& it : event_names_) {
-    auto* entry = proto->add_event_names();
-    static_assert(sizeof(it) == sizeof(proto->event_names(0)), "size mismatch");
-    *entry = static_cast<decltype(proto->event_names(0))>(it);
+  for (const auto& it : ftrace_events_) {
+    auto* entry = proto->add_ftrace_events();
+    static_assert(sizeof(it) == sizeof(proto->ftrace_events(0)),
+                  "size mismatch");
+    *entry = static_cast<decltype(proto->ftrace_events(0))>(it);
   }
 
   for (const auto& it : atrace_categories_) {
