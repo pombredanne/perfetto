@@ -19,8 +19,6 @@
 #include <signal.h>
 
 #include <dirent.h>
-#include <fstream>
-#include <iostream>
 #include <map>
 #include <queue>
 #include <string>
@@ -72,7 +70,7 @@ template <typename T>
 static void AddToInodeNumbers(const uint8_t* start,
                               std::set<uint64_t>* inode_numbers) {
   T t;
-  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(t));
+  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
   inode_numbers->insert(t);
 }
 
@@ -478,5 +476,9 @@ bool CpuReader::ParseField(const Field& field,
       AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
       return true;
   }
+  // Not reached, for gcc.
+  PERFETTO_CHECK(false);
+  return false;
+}
 
 }  // namespace perfetto
