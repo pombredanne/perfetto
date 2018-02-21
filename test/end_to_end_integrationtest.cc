@@ -35,7 +35,7 @@
 
 #include "src/base/test/test_task_runner.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
-#include "src/traced/probes/ftrace_producer.h"
+#include "src/traced/probes/probes_producer.h"
 #include "test/fake_consumer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
@@ -87,18 +87,18 @@ class PerfettoTest : public ::testing::Test {
   };
 
   // This is used only in daemon starting integrations tests.
-  class FtraceProducerDelegate : public ThreadDelegate {
+  class ProbesProducerDelegate : public ThreadDelegate {
    public:
-    FtraceProducerDelegate() = default;
-    ~FtraceProducerDelegate() override = default;
+    ProbesProducerDelegate() = default;
+    ~ProbesProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
-      producer_.reset(new FtraceProducer);
+      producer_.reset(new ProbesProducer);
       producer_->ConnectWithRetries(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
 
    private:
-    std::unique_ptr<FtraceProducer> producer_;
+    std::unique_ptr<ProbesProducer> producer_;
   };
 
   class FakeProducerDelegate : public ThreadDelegate {
@@ -174,7 +174,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(
-      std::unique_ptr<FtraceProducerDelegate>(new FtraceProducerDelegate));
+      std::unique_ptr<ProbesProducerDelegate>(new ProbesProducerDelegate));
 #endif
 
   // Finally, make the consumer connect to the service.
