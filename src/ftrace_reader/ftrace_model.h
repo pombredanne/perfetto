@@ -27,8 +27,11 @@ class FtraceState {
   FtraceState();
   virtual ~FtraceState();
 
-  void set_ftrace_on(bool enabled) { ftrace_on_ = enabled; }
-  bool ftrace_on() const { return ftrace_on_; }
+  void set_tracing_on(bool enabled) { tracing_on_ = enabled; }
+  bool tracing_on() const { return tracing_on_; }
+
+  void set_atrace_on(bool enabled) { atrace_on_ = enabled; }
+  bool atrace_on() const { return atrace_on_; }
 
   void set_cpu_buffer_size_pages(size_t sz) { cpu_buffer_size_pages_ = sz; }
   size_t cpu_buffer_size_pages() const { return cpu_buffer_size_pages_; }
@@ -54,11 +57,9 @@ class FtraceState {
   std::set<std::string> atrace_categories_;
   std::set<std::string> atrace_apps_;
 
-  bool ftrace_on_ = false;
+  bool tracing_on_ = false;
+  bool atrace_on_ = false;
   size_t cpu_buffer_size_pages_ = 0;
-
-  // FtraceState(const FtraceState&) = delete;
-  // FtraceState& operator=(const FtraceState&) = delete;
 };
 
 class FtraceModel {
@@ -66,27 +67,37 @@ class FtraceModel {
   FtraceModel(FtraceProcfs* ftrace, const ProtoTranslationTable* table);
   virtual ~FtraceModel();
 
-  bool AddConfig(const FtraceConfig* config);
-  bool RemoveConfig(const FtraceConfig* config);
+  FtraceConfigId RequestConfig(const FtraceConfig& request);
+  bool RemoveConfig(FtraceConfigId id);
 
   // public for testing
-  void SetupClockForTesting() { SetupClock(); }
+  void SetupClockForTesting(const FtraceConfig& request) {
+    SetupClock(request);
+  }
+
+  const FtraceConfig* GetConfig(FtraceConfigId id);
 
  private:
   FtraceModel(const FtraceModel&) = delete;
   FtraceModel& operator=(const FtraceModel&) = delete;
 
-  void SetupClock();
-  bool Update();
+  void SetupClock(const FtraceConfig& request);
+  void SetupBufferSize(const FtraceConfig& request);
+  void EnableAtrace(const FtraceConfig& request);
+  void DisableAtrace();
 
+  FtraceConfigId GetNextId();
+
+  FtraceConfigId last_id_ = 1;
   FtraceProcfs* ftrace_;
   const ProtoTranslationTable* table_;
 
   FtraceState current_state_;
-  std::set<const FtraceConfig*> configs_;
+  std::map<FtraceConfigId, FtraceConfig> configs_;
 };
 
-FtraceState ComputeFtraceState(std::set<const FtraceConfig*> configs);
+std::set<std::string> GetFtraceEvents(const FtraceConfig& request);
+size_t ComputeCpuBufferSizeInPages(size_t requested_buffer_size_kb);
 
 }  // namespace perfetto
 

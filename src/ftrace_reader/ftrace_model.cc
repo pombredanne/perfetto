@@ -16,6 +16,14 @@
 
 #include "ftrace_model.h"
 
+#include <fcntl.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <algorithm>
 
 #include "perfetto/base/utils.h"
@@ -36,6 +44,49 @@ const char* kClocks[] = {
 const int kDefaultPerCpuBufferSizeKb = 512;   // 512kb
 const int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
 
+std::vector<std::string> difference(const std::set<std::string>& a,
+                                    const std::set<std::string>& b) {
+  std::vector<std::string> result(std::max(b.size(), a.size()));
+  {
+    auto it = std::set_difference(a.begin(), a.end(), b.begin(), b.end(),
+                                  result.begin());
+    result.resize(it - result.begin());
+  }
+  return result;
+}
+
+bool RunAtrace(std::vector<std::string> args) {
+  int status = 1;
+
+  std::vector<char*> argv;
+  // args, and then a null.
+  argv.reserve(1 + args.size());
+  for (const auto& arg : args)
+    argv.push_back(const_cast<char*>(arg.c_str()));
+  argv.push_back(nullptr);
+
+  pid_t pid = fork();
+  PERFETTO_CHECK(pid >= 0);
+  if (pid == 0) {
+    execv("/system/bin/atrace", &argv[0]);
+    // Reached only if execv fails.
+    _exit(1);
+  }
+  waitpid(pid, &status, 0);
+  return status == 0;
+}
+
+}  // namespace
+
+std::set<std::string> GetFtraceEvents(const FtraceConfig& request) {
+  std::set<std::string> events;
+  events.insert(request.event_names().begin(), request.event_names().end());
+  if (RequiresAtrace(request)) {
+    events.insert("print");
+  }
+  return events;
+}
+
 // Post-conditions:
 // 1. result >= 1 (should have at least one page per CPU)
 // 2. result * 4 < kMaxTotalBufferSizeKb
@@ -53,120 +104,80 @@ size_t ComputeCpuBufferSizeInPages(size_t requested_buffer_size_kb) {
   return pages;
 }
 
-std::vector<std::string> difference(const std::set<std::string>& a,
-                                    const std::set<std::string>& b) {
-  std::vector<std::string> result(std::max(b.size(), a.size()));
-  {
-    auto it = std::set_difference(a.begin(), a.end(), b.begin(), b.end(),
-                                  result.begin());
-    result.resize(it - result.begin());
-  }
-  return result;
-}
-
-}  // namespace
-
-FtraceState ComputeFtraceState(std::set<const FtraceConfig*> configs) {
-  FtraceState state;
-
-  if (configs.empty()) {
-    state.set_ftrace_on(false);
-    state.set_cpu_buffer_size_pages(0);
-    return state;
-  }
-
-  state.set_ftrace_on(true);
-
-  size_t max_buffer_size_kb = 0;
-  for (const FtraceConfig* config : configs)
-    max_buffer_size_kb =
-        std::max<size_t>(config->buffer_size_kb(), max_buffer_size_kb);
-  state.set_cpu_buffer_size_pages(
-      ComputeCpuBufferSizeInPages(max_buffer_size_kb));
-
-  std::set<std::string> ftrace_events;
-  for (const FtraceConfig* config : configs)
-    ftrace_events.insert(config->event_names().begin(),
-                         config->event_names().end());
-  state.set_ftrace_events(std::move(ftrace_events));
-
-  std::set<std::string> atrace_categories;
-  for (const FtraceConfig* config : configs)
-    atrace_categories.insert(config->atrace_categories().begin(),
-                             config->atrace_categories().end());
-  state.set_atrace_categories(std::move(atrace_categories));
-
-  std::set<std::string> atrace_apps;
-  for (const FtraceConfig* config : configs)
-    atrace_apps.insert(config->atrace_apps().begin(),
-                       config->atrace_apps().end());
-  state.set_atrace_apps(std::move(atrace_apps));
-
-  return state;
-}
-
 FtraceModel::FtraceModel(FtraceProcfs* ftrace,
                          const ProtoTranslationTable* table)
-    : ftrace_(ftrace), table_(table), current_state_(){};
+    : ftrace_(ftrace), table_(table), current_state_(), configs_(){};
 FtraceModel::~FtraceModel() = default;
 
-bool FtraceModel::AddConfig(const FtraceConfig* config) {
-  configs_.insert(config);
-  bool result = Update();
-  if (!result)
-    configs_.erase(config);
-  return result;
-}
-
-bool FtraceModel::RemoveConfig(const FtraceConfig* config) {
-  size_t removed = configs_.erase(config);
-  PERFETTO_DCHECK(removed == 1);
-  Update();
-  return true;
-}
-
-bool FtraceModel::Update() {
-  FtraceState ideal_state = ComputeFtraceState(configs_);
+FtraceConfigId FtraceModel::RequestConfig(const FtraceConfig& request) {
+  FtraceConfig actual;
 
   bool is_ftrace_enabled = ftrace_->IsTracingEnabled();
-  bool switching_tracing = false;
+  if (configs_.empty()) {
+    PERFETTO_DCHECK(!current_state_.tracing_on());
 
-  if (current_state_.ftrace_on() != ideal_state.ftrace_on()) {
     // If someone else is using ftrace give up now.
-    if (is_ftrace_enabled != current_state_.ftrace_on())
-      return false;
+    if (is_ftrace_enabled)
+      return kInvalidFtraceConfig;
 
-    switching_tracing = true;
+// If we're about to turn tracing on use this opportunity do some setup:
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+    EnableAtrace(request);
+#endif
+    SetupClock(request);
+    SetupBufferSize(request);
+  } else {
+    // Did someone turn ftrace off behind our back? If so give up.
+    if (!is_ftrace_enabled)
+      return kInvalidFtraceConfig;
   }
 
-  // If we're about to turn tracing on use this opportunity to set up the
-  // clock:
-  if (switching_tracing && ideal_state.ftrace_on())
-    SetupClock();
+  std::set<std::string> events = GetFtraceEvents(request);
 
-  // Changing the buffer size clears the buffer so it's not worth it if we're
-  // already tracing.
-  if (switching_tracing && ideal_state.ftrace_on()) {
-    if (current_state_.cpu_buffer_size_pages() !=
-        ideal_state.cpu_buffer_size_pages())
-      ftrace_->SetCpuBufferSizeInPages(ideal_state.cpu_buffer_size_pages());
-  }
-
-  std::vector<std::string> events_to_enable =
-      difference(ideal_state.ftrace_events(), current_state_.ftrace_events());
-
-  std::vector<std::string> events_to_disable =
-      difference(current_state_.ftrace_events(), ideal_state.ftrace_events());
-
-  for (auto& name : events_to_enable) {
+  for (auto& name : events) {
     const Event* event = table_->GetEventByName(name);
     if (!event) {
       PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
       continue;
     }
-    if (ftrace_->EnableEvent(event->group, event->name))
+    if (current_state_.ftrace_events().count(name) ||
+        std::string("ftrace") == event->group) {
+      *actual.add_event_names() = name;
+      continue;
+    }
+    if (ftrace_->EnableEvent(event->group, event->name)) {
       current_state_.mutable_ftrace_events()->insert(name);
+      *actual.add_event_names() = name;
+    }
   }
+
+  if (configs_.empty()) {
+    PERFETTO_DCHECK(!current_state_.tracing_on());
+    ftrace_->EnableTracing();
+    current_state_.set_tracing_on(true);
+  }
+
+  FtraceConfigId id = GetNextId();
+  configs_.emplace(id, std::move(actual));
+  return id;
+}
+
+bool FtraceModel::RemoveConfig(FtraceConfigId id) {
+  if (!configs_.count(id))
+    return false;
+
+  size_t removed = configs_.erase(id);
+  PERFETTO_DCHECK(removed == 1);
+
+  std::set<std::string> expected_ftrace_events;
+  for (const auto& id_config : configs_) {
+    const FtraceConfig& config = id_config.second;
+    expected_ftrace_events.insert(config.event_names().begin(),
+                                  config.event_names().end());
+  }
+
+  std::vector<std::string> events_to_disable =
+      difference(current_state_.ftrace_events(), expected_ftrace_events);
 
   for (auto& name : events_to_disable) {
     const Event* event = table_->GetEventByName(name);
@@ -176,22 +187,33 @@ bool FtraceModel::Update() {
       current_state_.mutable_ftrace_events()->erase(name);
   }
 
-  if (switching_tracing) {
-    ftrace_->SetTracingOn(ideal_state.ftrace_on());
-    current_state_.set_ftrace_on(ideal_state.ftrace_on());
-  }
-
-  // If we just turned tracing off lets take this opportunity to clean up:
-  if (switching_tracing && !ideal_state.ftrace_on()) {
+  if (configs_.empty()) {
+    PERFETTO_DCHECK(current_state_.tracing_on());
+    ftrace_->DisableTracing();
     ftrace_->SetCpuBufferSizeInPages(0);
     ftrace_->DisableAllEvents();
     ftrace_->ClearTrace();
+    current_state_.set_tracing_on(false);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+    if (current_state_.atrace_on())
+      DisableAtrace();
+#endif
   }
 
   return true;
 }
 
-void FtraceModel::SetupClock() {
+FtraceConfigId FtraceModel::GetNextId() {
+  return ++last_id_;
+}
+
+const FtraceConfig* FtraceModel::GetConfig(FtraceConfigId id) {
+  if (!configs_.count(id))
+    return nullptr;
+  return &configs_.at(id);
+}
+
+void FtraceModel::SetupClock(const FtraceConfig& _) {
   std::string current_clock = ftrace_->GetClock();
   std::set<std::string> clocks = ftrace_->AvailableClocks();
 
@@ -205,6 +227,42 @@ void FtraceModel::SetupClock() {
     ftrace_->SetClock(clock);
     break;
   }
+}
+
+void FtraceModel::SetupBufferSize(const FtraceConfig& request) {
+  size_t pages = ComputeCpuBufferSizeInPages(request.buffer_size_kb());
+  ftrace_->SetCpuBufferSizeInPages(pages);
+}
+
+void FtraceModel::EnableAtrace(const FtraceConfig& request) {
+  PERFETTO_DCHECK(!current_state_.atrace_on());
+  current_state_.set_atrace_on(true);
+
+  PERFETTO_DLOG("Start atrace...");
+  std::vector<std::string> args;
+  args.push_back("atrace");  // argv0 for exec()
+  args.push_back("--async_start");
+  for (const auto& category : request.atrace_categories())
+    args.push_back(category);
+  if (!request.atrace_apps().empty()) {
+    args.push_back("-a");
+    for (const auto& app : request.atrace_apps())
+      args.push_back(app);
+  }
+
+  PERFETTO_CHECK(RunAtrace(std::move(args)));
+  PERFETTO_DLOG("...done");
+}
+
+void FtraceModel::DisableAtrace() {
+  PERFETTO_DCHECK(!current_state_.atrace_on());
+
+  PERFETTO_DLOG("Stop atrace...");
+  PERFETTO_CHECK(
+      RunAtrace(std::vector<std::string>({"atrace", "--async_stop"})));
+  PERFETTO_DLOG("...done");
+
+  current_state_.set_atrace_on(false);
 }
 
 FtraceState::FtraceState() = default;

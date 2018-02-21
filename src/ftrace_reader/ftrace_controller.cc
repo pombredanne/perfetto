@@ -88,27 +88,6 @@ size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb) {
   return pages;
 }
 
-bool RunAtrace(std::vector<std::string> args) {
-  int status = 1;
-
-  std::vector<char*> argv;
-  // args, and then a null.
-  argv.reserve(1 + args.size());
-  for (const auto& arg : args)
-    argv.push_back(const_cast<char*>(arg.c_str()));
-  argv.push_back(nullptr);
-
-  pid_t pid = fork();
-  PERFETTO_CHECK(pid >= 0);
-  if (pid == 0) {
-    execv("/system/bin/atrace", &argv[0]);
-    // Reached only if execv fails.
-    _exit(1);
-  }
-  waitpid(pid, &status, 0);
-  return status == 0;
-}
-
 void WriteToFile(const char* path, const char* str) {
   int fd = open(path, O_WRONLY);
   if (fd == -1)
@@ -177,7 +156,7 @@ FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
 FtraceController::~FtraceController() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (const auto* sink : sinks_)
-    ftrace_model_->RemoveConfig(&sink->config());
+    ftrace_model_->RemoveConfig(sink->id_);
   sinks_.clear();
   StopIfNeeded();
 }
@@ -326,11 +305,17 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
     return nullptr;
   if (!ValidConfig(config))
     return nullptr;
+
+  FtraceConfigId id = ftrace_model_->RequestConfig(config);
+  if (id == kInvalidFtraceConfig)
+    return nullptr;
+
   auto controller_weak = weak_factory_.GetWeakPtr();
-  auto filter = std::unique_ptr<EventFilter>(
-      new EventFilter(*table_.get(), FtraceEventsAsSet(config)));
+  auto filter = std::unique_ptr<EventFilter>(new EventFilter(
+      *table_.get(), FtraceEventsAsSet(*ftrace_model_->GetConfig(id))));
+
   auto sink = std::unique_ptr<FtraceSink>(new FtraceSink(
-      std::move(controller_weak), config, std::move(filter), delegate));
+      std::move(controller_weak), id, config, std::move(filter), delegate));
   Register(sink.get());
   return sink;
 }
@@ -369,59 +354,27 @@ void FtraceController::Register(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto it_and_inserted = sinks_.insert(sink);
   PERFETTO_DCHECK(it_and_inserted.second);
-  if (RequiresAtrace(sink->config()))
-    StartAtrace(sink->config());
-
-  ftrace_model_->AddConfig(&sink->config());
-
   StartIfNeeded();
 }
 
 void FtraceController::Unregister(FtraceSink* sink) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+
   size_t removed = sinks_.erase(sink);
   PERFETTO_DCHECK(removed == 1);
 
-  ftrace_model_->RemoveConfig(&sink->config());
+  ftrace_model_->RemoveConfig(sink->id_);
 
-  if (RequiresAtrace(sink->config()))
-    StopAtrace();
   StopIfNeeded();
 }
 
-void FtraceController::StartAtrace(const FtraceConfig& config) {
-  PERFETTO_CHECK(atrace_running_ == false);
-  atrace_running_ = true;
-  PERFETTO_DLOG("Start atrace...");
-  std::vector<std::string> args;
-  args.push_back("atrace");  // argv0 for exec()
-  args.push_back("--async_start");
-  for (const auto& category : config.atrace_categories())
-    args.push_back(category);
-  if (!config.atrace_apps().empty()) {
-    args.push_back("-a");
-    for (const auto& app : config.atrace_apps())
-      args.push_back(app);
-  }
-
-  PERFETTO_CHECK(RunAtrace(std::move(args)));
-  PERFETTO_DLOG("...done");
-}
-
-void FtraceController::StopAtrace() {
-  PERFETTO_CHECK(atrace_running_ == true);
-  atrace_running_ = false;
-  PERFETTO_DLOG("Stop atrace...");
-  PERFETTO_CHECK(
-      RunAtrace(std::vector<std::string>({"atrace", "--async_stop"})));
-  PERFETTO_DLOG("...done");
-}
-
 FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
+                       FtraceConfigId id,
                        FtraceConfig config,
                        std::unique_ptr<EventFilter> filter,
                        Delegate* delegate)
     : controller_weak_(std::move(controller_weak)),
+      id_(id),
       config_(config),
       filter_(std::move(filter)),
       delegate_(delegate){};

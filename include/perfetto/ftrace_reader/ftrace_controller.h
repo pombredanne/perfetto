@@ -74,6 +74,7 @@ class FtraceSink {
   };
 
   FtraceSink(base::WeakPtr<FtraceController>,
+             FtraceConfigId id,
              FtraceConfig config,
              std::unique_ptr<EventFilter>,
              Delegate*);
@@ -97,8 +98,10 @@ class FtraceSink {
   }
 
   const std::set<std::string>& enabled_events();
+
   base::WeakPtr<FtraceController> controller_weak_;
-  FtraceConfig config_;
+  const FtraceConfigId id_;
+  const FtraceConfig config_;
   std::unique_ptr<EventFilter> filter_;
   FtraceSink::Delegate* delegate_;
 };
@@ -152,9 +155,6 @@ class FtraceController {
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
-
-  void StartAtrace(const FtraceConfig&);
-  void StopAtrace();
 
   void StartIfNeeded();
   void StopIfNeeded();
