@@ -24,6 +24,11 @@
 
 namespace perfetto {
 
+//
+using FtraceConfigId = int64_t;
+
+const FtraceConfigId kInvalidFtraceConfig = 0;
+
 // Alias FtraceConfig to avoid unnecessary typing.
 using FtraceConfig = DataSourceConfig::FtraceConfig;
 
