@@ -1968,6 +1968,7 @@ cc_test {
     "src/tracing/core/sliced_protobuf_input_stream.cc",
     "src/tracing/core/sliced_protobuf_input_stream_unittest.cc",
     "src/tracing/core/trace_buffer.cc",
+    "src/tracing/core/trace_buffer_unittest.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_packet_unittest.cc",

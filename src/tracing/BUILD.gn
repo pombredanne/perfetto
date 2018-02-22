@@ -121,6 +121,7 @@ source_set("tracing_unittests") {
     "core/shared_memory_abi_unittest.cc",
     "core/shared_memory_arbiter_impl_unittest.cc",
     "core/sliced_protobuf_input_stream_unittest.cc",
+    "core/trace_buffer_unittest.cc",
     "core/trace_packet_unittest.cc",
     "core/trace_writer_impl_unittest.cc",
     "ipc/posix_shared_memory_unittest.cc",

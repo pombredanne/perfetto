@@ -260,8 +260,8 @@ void TraceBuffez::BeginRead() {
 //     1           2          3
 //     2           1          1
 //     2           1          2
-TraceBuffez::IndexIterator TraceBuffez::GetReadIterForSequence(
-    IndexMap::iterator begin) {
+TraceBuffez::ChunkIterator TraceBuffez::GetReadIterForSequence(
+    ChunkMap::iterator begin) {
 // Note: |begin| might be == index_.end() if |index_| is empty.
 
 #if PERFETTO_DCHECK_IS_ON()
@@ -274,7 +274,7 @@ TraceBuffez::IndexIterator TraceBuffez::GetReadIterForSequence(
       std::tie(prev_it->first.producer_id, prev_it->first.writer_id) <
           std::tie(begin->first.producer_id, begin->first.writer_id));
 #endif
-  IndexIterator iter;
+  ChunkIterator iter;
   iter.begin = begin;
 
   // Find the first entry that has a greater {ProducerID, WriterID} (or just
@@ -302,7 +302,7 @@ TraceBuffez::IndexIterator TraceBuffez::GetReadIterForSequence(
   // TODO: add separate test coverage for the iterator.
 }
 
-void TraceBuffez::IndexIterator::MoveNext() {
+void TraceBuffez::ChunkIterator::MoveNext() {
   // Note: |begin| might be == |end|.
   if (cur == end || cur->first.chunk_id == wrapping_id) {
     cur = end;
@@ -405,7 +405,7 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
       static_assert(static_cast<ChunkID>(kMaxChunkID + 1) == 0,
                     "relying on kMaxChunkID to wrap naturally");
       ChunkID next_chunk_id = read_iter_.chunk_id() + 1;
-      for (IndexIterator it = read_iter_; it.is_valid();
+      for (ChunkIterator it = read_iter_; it.is_valid();
            it.MoveNext(), next_chunk_id++) {
         PERFETTO_DCHECK(it.producer_id() == read_iter_.producer_id() &&
                         it.writer_id() == read_iter_.writer_id());

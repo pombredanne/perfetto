@@ -174,7 +174,7 @@ class TraceBuffez {
           : Key(cr.producer_id, cr.writer_id, cr.chunk_id) {}
 
       // Note that this sorting doesn't keep into account the fact that ChunkID
-      // will wrap over at some point. The extra logic in IndexIterator deals
+      // will wrap over at some point. The extra logic in ChunkIterator deals
       // with that.
       bool operator<(const Key& other) const {
         return std::tie(producer_id, writer_id, chunk_id) <
@@ -217,7 +217,7 @@ class TraceBuffez {
     uint16_t last_packet_patch_offset = 0;
   };
 
-  using IndexMap = std::map<ChunkMeta::Key, ChunkMeta>;
+  using ChunkMap = std::map<ChunkMeta::Key, ChunkMeta>;
 
   // Allows to iterate over a sub-sequence of |index_| for all keys belonging to
   // the same {ProducerID,WriterID}. Furthermore takes into the wrapping of
@@ -232,15 +232,15 @@ class TraceBuffez {
   // - Assume wrapping_id = 4 (c4 is the last chunk copied over
   //   through a CopyChunkUntrusted()).
   // The resulting iteration order will be: c5, c6, c7, c0, c1, c2, c3, c4.
-  struct IndexIterator {
+  struct ChunkIterator {
     // Points to the 1st key (the one with the numerically min ChunkID).
-    IndexMap::iterator begin;
+    ChunkMap::iterator begin;
 
     // Points one past the last key (the one with the numerically max ChunkID).
-    IndexMap::iterator end;
+    ChunkMap::iterator end;
 
     // Current iterator, always >= begin && <= end.
-    IndexMap::iterator cur;
+    ChunkMap::iterator cur;
 
     // The latest ChunkID written. Determines the start/end of the sequence.
     ChunkID wrapping_id;
@@ -283,7 +283,7 @@ class TraceBuffez {
   // different {ProducerID, WriterID} from the previous one (or index_.begin()).
   // It is valid for |begin| to be == index_.end().
   // The iteration takes care of ChunkID wrapping, by using |last_chunk_id_|.
-  IndexIterator GetReadIterForSequence(IndexMap::iterator begin);
+  ChunkIterator GetReadIterForSequence(ChunkMap::iterator begin);
 
   // Used in the last resort case when a buffer corruption is detected.
   void ClearContentsAndResetRWCursors();
@@ -350,11 +350,11 @@ class TraceBuffez {
 
   // An index that keep track of the positions and metadata of each
   // ChunkRecord.
-  IndexMap index_;
+  ChunkMap index_;
 
   // Read iterator used for ReadNext(). It is reset by calling BeginRead().
   // It becomes invalid after any call to methods that alters the |_index|.
-  IndexIterator read_iter_;
+  ChunkIterator read_iter_;
 
   // Keeps track of the last ChunkID written for a given writer.
   // TODO(primiano): we should clean up keys from this map. Right now this map
