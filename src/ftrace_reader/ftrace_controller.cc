@@ -55,9 +55,6 @@ const int kDefaultDrainPeriodMs = 100;
 const int kMinDrainPeriodMs = 1;
 const int kMaxDrainPeriodMs = 1000 * 60;
 
-const int kDefaultTotalBufferSizeKb = 1024 * 4;  // 4mb
-const int kMaxTotalBufferSizeKb = 1024 * 8;      // 8mb
-
 uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
   if (drain_period_ms == 0) {
     return kDefaultDrainPeriodMs;
@@ -69,23 +66,6 @@ uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
     return kDefaultDrainPeriodMs;
   }
   return drain_period_ms;
-}
-
-// Post-conditions:
-// 1. result >= 1 (should have at least one page per CPU)
-// 2. result * 4 < kMaxTotalBufferSizeKb
-// 3. If input is 0 output is a good default number.
-size_t ComputeCpuBufferSizeInPages(uint32_t requested_buffer_size_kb) {
-  if (requested_buffer_size_kb == 0)
-    requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
-  if (requested_buffer_size_kb > kMaxTotalBufferSizeKb)
-    requested_buffer_size_kb = kDefaultTotalBufferSizeKb;
-
-  size_t pages = requested_buffer_size_kb / (base::kPageSize / 1024);
-  if (pages == 0)
-    return 1;
-
-  return pages;
 }
 
 void WriteToFile(const char* path, const char* str) {
@@ -241,15 +221,6 @@ uint32_t FtraceController::GetDrainPeriodMs() {
       min_drain_period_ms = sink->config().drain_period_ms();
   }
   return ClampDrainPeriodMs(min_drain_period_ms);
-}
-
-uint32_t FtraceController::GetCpuBufferSizeInPages() {
-  uint32_t max_buffer_size_kb = 0;
-  for (const FtraceSink* sink : sinks_) {
-    if (sink->config().buffer_size_kb() > max_buffer_size_kb)
-      max_buffer_size_kb = sink->config().buffer_size_kb();
-  }
-  return ComputeCpuBufferSizeInPages(max_buffer_size_kb);
 }
 
 void FtraceController::ClearTrace() {
