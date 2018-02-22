@@ -97,7 +97,6 @@ void Watchdog::ClearTimer(TimerReason reason) {
 }
 
 void Watchdog::ThreadMain() {
-  /*
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   base::ScopedFstream file(fopen("/proc/self/stat", "r"));
@@ -139,8 +138,6 @@ void Watchdog::ThreadMain() {
     CheckCpu(cpu_time);
     CheckTimers();
   }
-  */
-  return;
 }
 
 void Watchdog::CheckMemory(uint64_t rss_kb) {

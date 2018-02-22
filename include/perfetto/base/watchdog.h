@@ -125,7 +125,7 @@ class Watchdog {
   Watchdog& operator=(const Watchdog&) = delete;
 
   // Main method for the watchdog thread.
-  void ThreadMain();
+  [[noreturn]] void ThreadMain();
 
   // Check each type of resource every |polling_interval_ms_| miillis.
   void CheckMemory(uint64_t rss_kb);
