@@ -100,12 +100,16 @@ class EndToEndIntegrationTest : public ::testing::Test,
 
 }  // namespace
 
-TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_SchedSwitchAndPrint SchedSwitchAndPrint
+#else
+#define MAYBE_SchedSwitchAndPrint DISABLED_SchedSwitchAndPrint
+#endif
+TEST_F(EndToEndIntegrationTest, MAYBE_SchedSwitchAndPrint) {
   FtraceProcfs procfs(kTracingPath);
   procfs.ClearTrace();
   procfs.WriteTraceMarker("Hello, World!");
 
-  /*
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   FtraceConfig config;
@@ -133,7 +137,6 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   std::string output_as_text;
   // TODO(hjd): Use reflection print code.
   printf("%s\n", output_as_text.c_str());
-  */
 }
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
