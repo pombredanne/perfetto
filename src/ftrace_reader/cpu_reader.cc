@@ -152,7 +152,6 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
 CpuReader::~CpuReader() {
   // Close the staging pipe to cause any pending splice on the worker thread to
   // exit.
-  staging_read_fd_.reset();
   staging_write_fd_.reset();
   trace_fd_.reset();
 
@@ -160,6 +159,9 @@ CpuReader::~CpuReader() {
   // to be safe.
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
+
+  // Reset the read fd to release the other end of the pipe.
+  staging_read_fd_.reset();
 }
 
 // static
