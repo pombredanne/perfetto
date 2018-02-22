@@ -61,7 +61,7 @@ class TraceBuffez {
   void CopyChunkUntrusted(ProducerID producer_id,
                           WriterID writer_id,
                           ChunkID chunk_id,
-                          uint8_t num_packets,
+                          uint16_t num_packets,
                           uint8_t flags,
                           const uint8_t* payload,
                           size_t payload_size);
@@ -195,10 +195,7 @@ class TraceBuffez {
     };
 
     ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f)
-        : chunk_record{c},
-          flags{f},
-          num_packets{p},
-          cur_packet_offset{sizeof(ChunkRecord)} {}
+        : chunk_record{c}, flags{f}, num_packets{p} {}
 
     ChunkRecord* const chunk_record;  // Addr of ChunkRecord within |data_|.
     const uint8_t flags = 0;

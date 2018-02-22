@@ -79,7 +79,7 @@ void TraceBuffez::ClearContentsAndResetRWCursors() {
 void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
                                      WriterID writer_id,
                                      ChunkID chunk_id,
-                                     uint8_t num_packets,
+                                     uint16_t num_packets,
                                      uint8_t flags,
                                      const uint8_t* src,
                                      size_t size) {
@@ -108,8 +108,6 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
     AddPaddingRecord(writable_size());  // Takes care of wrapping |wptr_|.
     PERFETTO_DCHECK(rounded_size <= writable_size());
   }
-  // TODO(primiano): add a test for the case of exactly sizeof(ChunkRecord)
-  // bytes left at the end of the buffer.
 
   record.producer_id = producer_id;
   record.chunk_id = chunk_id;
@@ -184,7 +182,7 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
 
   ChunkMeta::Key key(record);
   auto it_and_inserted = index_.emplace(
-      key, ChunkMeta(GetChunkRecordAt(wptr_), flags, num_packets));
+      key, ChunkMeta(GetChunkRecordAt(wptr_), num_packets, flags));
   PERFETTO_DCHECK(it_and_inserted.second);
   WriteChunkRecord(record, src, size);
   last_chunk_id_[std::make_pair(producer_id, writer_id)] = chunk_id;
@@ -295,11 +293,9 @@ TraceBuffez::ChunkIterator TraceBuffez::GetReadIterForSequence(
   iter.wrapping_id = last_chunk_id_[producer_and_writer_id];
   key.chunk_id = iter.wrapping_id;
   iter.cur = index_.upper_bound(key);
-  PERFETTO_DCHECK(iter.cur != iter.end);
   if (iter.cur == iter.end)
     iter.cur = iter.begin;
   return iter;
-  // TODO: add separate test coverage for the iterator.
 }
 
 void TraceBuffez::ChunkIterator::MoveNext() {
@@ -448,8 +444,8 @@ Slice TraceBuffez::ReadNextPacket(ChunkMeta* chunk_meta) {
 
   const uint8_t* record_begin =
       reinterpret_cast<const uint8_t*>(chunk_meta->chunk_record);
-  const uint8_t* packets_begin = record_begin + sizeof(ChunkRecord);
   const uint8_t* record_end = record_begin + chunk_meta->chunk_record->size();
+  const uint8_t* packets_begin = record_begin + sizeof(ChunkRecord);
   const uint8_t* packet_begin = packets_begin + chunk_meta->cur_packet_offset;
   if (packet_begin < begin() || packet_begin >= end()) {
     PERFETTO_DCHECK(false);
@@ -459,11 +455,17 @@ Slice TraceBuffez::ReadNextPacket(ChunkMeta* chunk_meta) {
 
   // A packet (or a fragment) starts with a varint stating its size, followed
   // by its content.
-  uint64_t packet_size_64 = 0;
+  uint64_t packet_size = 0;
   using protozero::proto_utils::ParseVarInt;
   const uint8_t* packet_data =
-      ParseVarInt(packet_begin, record_end, &packet_size_64);
-  const size_t packet_size = static_cast<size_t>(packet_size_64);
+      ParseVarInt(packet_begin, record_end, &packet_size);
+  // PERFETTO_ILOG("\nb:  %p\ne:  %p\nrb: %p\nre: %p\nPb: %p\npb: %p\n",
+  //               reinterpret_cast<const void*>(begin()),
+  //               reinterpret_cast<const void*>(end()),
+  //               reinterpret_cast<const void*>(record_begin),
+  //               reinterpret_cast<const void*>(record_end),
+  //               reinterpret_cast<const void*>(packets_begin),
+  //               reinterpret_cast<const void*>(packet_begin));
   const uint8_t* next_packet = packet_data + packet_size;
   if (next_packet <= packet_begin || next_packet > record_end) {
     PERFETTO_DCHECK(false);
@@ -475,7 +477,7 @@ Slice TraceBuffez::ReadNextPacket(ChunkMeta* chunk_meta) {
   chunk_meta->cur_packet_offset =
       static_cast<uint16_t>(next_packet - packets_begin);
   chunk_meta->num_packets_read++;
-  return Slice(packet_data, packet_size);
+  return Slice(packet_data, static_cast<size_t>(packet_size));
   // TODO recheck all this.
 }
 
