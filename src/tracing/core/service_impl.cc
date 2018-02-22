@@ -50,6 +50,10 @@ namespace {
 constexpr size_t kDefaultShmSize = base::kPageSize * 64;  // 256 KB.
 constexpr size_t kMaxShmSize = base::kPageSize * 1024;    // 4 MB.
 constexpr int kMaxBuffersPerConsumer = 128;
+
+constexpr uint64_t kMillisPerHour = 3600000;
+constexpr uint64_t kMaxTracingDuration = 24 * kMillisPerHour;
+constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
 }  // namespace
 
 // static
@@ -147,6 +151,16 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
         "is already active (forgot a call to FreeBuffers() ?)");
     // TODO(primiano): make this a bool and return failure to the IPC layer.
     return;
+  }
+
+  if (cfg.enable_extra_guardrails()) {
+    if (cfg.duration_ms() > kMaxTracingDuration)
+      return;
+    uint64_t buf_size_sum = 0;
+    for (const auto& buf : cfg.buffers())
+      buf_size_sum += buf.size_kb();
+    if (buf_size_sum > kMaxTracingBufferSizeKb)
+      return;
   }
 
   if (cfg.buffers_size() > kMaxBuffersPerConsumer) {
