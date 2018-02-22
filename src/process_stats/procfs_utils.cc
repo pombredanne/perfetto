@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <fstream>
+#include <sstream>
+#include <vector>
 
 #include "file_utils.h"
 
@@ -53,6 +55,13 @@ inline int ReadStatusLine(int pid, const char* status_string) {
   return atoi(line + sizeof(status_string) - 1);
 }
 
+inline std::vector<std::string> SplitOnSpace(std::string input) {
+  std::istringstream iss(input);
+  std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
+                                   std::istream_iterator<std::string>());
+  return results;
+}
+
 }  // namespace
 
 int ReadTgid(int pid) {
@@ -66,14 +75,18 @@ int ReadPpid(int pid) {
 std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
   ProcessInfo* process = new ProcessInfo();
   process->pid = pid;
-  // TODO(taylori) Parse full cmdline into a vector.
-  ReadProcString(pid, "cmdline", process->cmdline, sizeof(process->cmdline));
-  if (process->cmdline[0] == 0) {
-    ReadProcString(pid, "comm", process->cmdline, sizeof(process->cmdline));
+  char cmdline_buf[256];
+  ReadProcString(pid, "cmdline", cmdline_buf, sizeof(cmdline_buf));
+  if (cmdline_buf[0] == 0) {
+    // Nothing in cmdline_buf so read name from /comm instead.
+    char name[256];
+    ReadProcString(pid, "comm", name, sizeof(name));
+    process->cmdline.push_back(name);
     process->in_kernel = true;
   } else {
+    process->cmdline = SplitOnSpace(std::string(buf));
     ReadExePath(pid, process->exe, sizeof(process->exe));
-    process->is_app = IsApp(process->cmdline, process->exe);
+    process->is_app = IsApp(process->cmdline[0].c_str(), process->exe);
   }
   process->ppid = ReadPpid(pid);
   return std::unique_ptr<ProcessInfo>(process);
