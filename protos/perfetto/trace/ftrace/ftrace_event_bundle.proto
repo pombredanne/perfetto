@@ -25,8 +25,8 @@ message FtraceEventBundle {
   optional uint32 cpu = 1;
   // Total of all overwrite fields from the headers of all kernel
   // ftrace pages we parsed into this FtraceEventBundle. Zero if
-  // no overwriting occured, a number larger than zero if some overwriting
-  // occured.
+  // no overwriting occurred, a number larger than zero if some overwriting
+  // occurred.
   optional uint32 overwrite = 3;
   repeated FtraceEvent event = 2;
 }
