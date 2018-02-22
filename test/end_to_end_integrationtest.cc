@@ -283,7 +283,7 @@ TEST_F(PerfettoTest, KillFtrace) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(1000);
+  trace_config.set_duration_ms(100000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -296,16 +296,19 @@ TEST_F(PerfettoTest, KillFtrace) {
 
   auto function = [](std::vector<TracePacket> packets, bool has_more) {};
 
+  FakeConsumer* consumer_predef;
+
   task_runner.PostDelayedTask(
-      [&finish, &tracing_on_file] {
+      [&finish, &tracing_on_file, &consumer_predef] {
         ASSERT_TRUE(ReadFile(tracing_on_file).find('1') == 0);
-        system("pkill -9 traced_probes");
+        consumer_predef->KillProducersForTesting();
         finish();
       },
       700);
 
   // Finally, make the consumer connect to the service.
   FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  consumer_predef = &consumer;
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
   task_runner.RunUntilCheckpoint("ftrace.killed");

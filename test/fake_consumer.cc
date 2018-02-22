@@ -42,6 +42,10 @@ void FakeConsumer::Connect(const char* socket_name) {
   endpoint_ = ConsumerIPCClient::Connect(socket_name, this, task_runner_);
 }
 
+void FakeConsumer::KillProducersForTesting() {
+  endpoint_->KillProducersForTesting();
+}
+
 void FakeConsumer::OnConnect() {
   endpoint_->EnableTracing(trace_config_);
 }
