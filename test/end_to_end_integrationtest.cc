@@ -186,9 +186,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
                               4000);
 
-  PERFETTO_LOG("Consumer: %ld", syscall(__NR_gettid));
   task_runner.RunUntilCheckpoint("no.more.packets");
-  PERFETTO_LOG("Ending process");
 }
 
 // TODO(b/73453011): reenable this on more platforms (including standalone

@@ -33,7 +33,7 @@ bool IsMultipleOf(uint32_t number, uint32_t divisor) {
   return number >= divisor && number % divisor == 0;
 }
 
-uint64_t MeanForArray(uint64_t array[], size_t size) {
+double MeanForArray(uint64_t array[], size_t size) {
   uint64_t total = 0;
   for (size_t i = 0; i < size; i++) {
     total += array[i];
@@ -45,8 +45,15 @@ uint64_t MeanForArray(uint64_t array[], size_t size) {
 
 Watchdog::Watchdog(uint32_t polling_interval_ms)
     : thread_(&Watchdog::ThreadMain, this),
-      polling_interval_ms_(polling_interval_ms) {
-  thread_.detach();
+      polling_interval_ms_(polling_interval_ms) {}
+
+Watchdog::~Watchdog() {
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    quit_ = true;
+  }
+  condition_variable_.notify_one();
+  thread_.join();
 }
 
 Watchdog* Watchdog::GetInstance() {
@@ -64,7 +71,7 @@ Watchdog::TimerHandle Watchdog::CreateFatalTimer(uint32_t ms,
   // Update the countdown array with the number of intervals remaining + 1.
   timer_window_countdown_[reason] =
       static_cast<int32_t>(ms / polling_interval_ms_) + 1;
-  return Watchdog::TimerHandle(reason);
+  return Watchdog::TimerHandle(this, reason);
 }
 
 void Watchdog::SetMemoryLimit(uint32_t kb, uint32_t window_ms) {
@@ -104,11 +111,12 @@ void Watchdog::ThreadMain() {
     PERFETTO_ELOG("Failed to open stat file to enforce resource limits.");
 #endif
 
+  std::unique_lock<std::mutex> guard(mutex_);
   for (;;) {
-    // Sleep for the polling interval amount of useconds.
-    usleep(polling_interval_ms_ * 1000);
-
-    std::unique_lock<std::mutex> guard(mutex_);
+    condition_variable_.wait_for(
+        guard, std::chrono::milliseconds(polling_interval_ms_));
+    if (quit_)
+      return;
 
     uint64_t cpu_time = 0;
     uint64_t rss_kb = 0;
@@ -123,11 +131,11 @@ void Watchdog::ThreadMain() {
       // Read the file from the beginning for utime, stime and rss.
       rewind(file.get());
       PERFETTO_CHECK(
-          fscanf(
-              file.get(),
-              "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu %lu %lu "
-              "%*ld %*ld %*ld %*ld %*ld %*ld %*llu %*lu %ld",
-              &utime, &stime, &rss_pages) == 3);
+          fscanf(file.get(),
+                 "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu "
+                 "%*d %*d %*d %*d %*d %*d %*u %*u %ld",
+                 &utime, &stime, &rss_pages) == 3);
+      PERFETTO_LOG("%ld", rss_pages);
 
       cpu_time = utime + stime;
       rss_kb = static_cast<uint32_t>(rss_pages) * base::kPageSize;
@@ -146,8 +154,11 @@ void Watchdog::CheckMemory(uint64_t rss_kb) {
 
   // Add the current stat value to the ring buffer and check that the mean
   // remains under our threshold.
-  if (memory_window_kb_.Push(rss_kb))
+  PERFETTO_LOG("%f", memory_window_kb_.Mean());
+  if (memory_window_kb_.Push(rss_kb)) {
+    PERFETTO_LOG("%f", memory_window_kb_.Mean());
     PERFETTO_CHECK(memory_window_kb_.Mean() <= memory_limit_kb_);
+  }
 }
 
 void Watchdog::CheckCpu(uint64_t cpu_time) {
@@ -196,7 +207,7 @@ bool Watchdog::WindowedInterval::Push(uint64_t sample) {
   return filled_;
 }
 
-uint64_t Watchdog::WindowedInterval::Mean() const {
+double Watchdog::WindowedInterval::Mean() const {
   return MeanForArray(buffer_.get(), size_);
 }
 
@@ -212,9 +223,10 @@ void Watchdog::WindowedInterval::Reset(size_t new_size) {
   buffer_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
 }
 
-Watchdog::TimerHandle::TimerHandle(TimerReason reason) : reason_(reason) {}
+Watchdog::TimerHandle::TimerHandle(Watchdog* watchdog, TimerReason reason)
+    : watchdog_(watchdog), reason_(reason) {}
 Watchdog::TimerHandle::~TimerHandle() {
-  Watchdog::GetInstance()->ClearTimer(reason_);
+  watchdog_->ClearTimer(reason_);
 }
 Watchdog::TimerHandle::TimerHandle(TimerHandle&& other) = default;
 

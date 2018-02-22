@@ -38,15 +38,53 @@ class TestWatchdog : public Watchdog {
 };
 
 TEST(WatchdogTest, TimerCrash) {
+  // Create a timer for 20 seconds and don't release wihin the time. We sleep
+  // for 26ms because we need to wait an extra 5ms for the watchdog to poll
+  // the timer once.
   EXPECT_DEATH(
       {
-        TestWatchdog watchdog = TestWatchdog::Create(10);
-        watchdog.CreateFatalTimer(50, Watchdog::TimerReason::kTaskDeadline);
-        sleep(1);
+        TestWatchdog watchdog = TestWatchdog::Create(5);
+        auto handle =
+            watchdog.CreateFatalTimer(20, Watchdog::TimerReason::kTaskDeadline);
+        usleep(26 * 1000);
       },
       "");
 }
 
+TEST(WatchdogTest, NoTimerCrash) {
+  // Set a timer for 25ms and release the handle in 20ms.
+  TestWatchdog watchdog = TestWatchdog::Create(5);
+  auto handle =
+      watchdog.CreateFatalTimer(25, Watchdog::TimerReason::kTaskDeadline);
+  PERFETTO_CHECK(usleep(20 * 1000) != -1);
+}
+
+// TODO(lalitm): this test does not seem to work as intended and gives very
+// high values for RSS.
+TEST(WatchdogTest, DISABLED_CrashMemory) {
+  EXPECT_DEATH(
+      {
+        TestWatchdog watchdog = TestWatchdog::Create(5);
+        watchdog.SetMemoryLimit(100 * 1024, 25);
+
+        // Allocate over 50MB of data.
+        // malloc(50 * 1024 + 20);
+
+        // Sleep so that the watchdog has some time to pick it up.
+        usleep(35 * 1000);
+      },
+      "");
+}
+
+// TODO(lalitm): this test does not seem to work as intended and gives very
+// high values for RSS.
+TEST(WatchdogTest, DISABLED_NoCrashMemory) {
+  TestWatchdog watchdog = TestWatchdog::Create(5);
+  watchdog.SetMemoryLimit(100 * 1024, 25);
+
+  // Sleep so that the watchdog has some time to pick it up.
+  PERFETTO_CHECK(usleep(100 * 1000) != -1);
+}
 
 }  // namespace
 }  // namespace base

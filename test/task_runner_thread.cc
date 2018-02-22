@@ -27,7 +27,6 @@ TaskRunnerThread::~TaskRunnerThread() {
     if (runner_)
       runner_->Quit();
   }
-  PERFETTO_LOG("Ending thread");
 
   if (thread_.joinable())
     thread_.join();

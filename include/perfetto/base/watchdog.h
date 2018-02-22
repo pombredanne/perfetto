@@ -19,6 +19,7 @@
 
 #include "perfetto/base/thread_checker.h"
 
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -43,7 +44,7 @@ class Watchdog {
   // the timer is removed so the program does not crash.
   class TimerHandle {
    public:
-    TimerHandle(TimerReason reason);
+    TimerHandle(Watchdog* watchdog, TimerReason reason);
     ~TimerHandle();
     TimerHandle(TimerHandle&& other) noexcept;
 
@@ -51,9 +52,10 @@ class Watchdog {
     TimerHandle(const TimerHandle&) = delete;
     TimerHandle& operator=(const TimerHandle&) = delete;
 
-    TimerReason reason_;
+    Watchdog* watchdog_;
+    const TimerReason reason_;
   };
-  virtual ~Watchdog() = default;
+  virtual ~Watchdog();
 
   static Watchdog* GetInstance();
 
@@ -89,7 +91,7 @@ class Watchdog {
     bool Push(uint64_t sample);
 
     // Returns the mean of the values in the buffer.
-    uint64_t Mean() const;
+    double Mean() const;
 
     // Clears the ring buffer while keeping the existing size.
     void Clear();
@@ -125,7 +127,7 @@ class Watchdog {
   Watchdog& operator=(const Watchdog&) = delete;
 
   // Main method for the watchdog thread.
-  [[noreturn]] void ThreadMain();
+  void ThreadMain();
 
   // Check each type of resource every |polling_interval_ms_| miillis.
   void CheckMemory(uint64_t rss_kb);
@@ -140,10 +142,12 @@ class Watchdog {
   uint32_t WindowTimeForRingBuffer(const WindowedInterval& window);
 
   std::thread thread_;
+  std::condition_variable condition_variable_;
 
   // --- Begin lock-protected members ---
 
   std::mutex mutex_;
+  bool quit_ = false;
 
   uint32_t memory_limit_kb_ = 0;
   WindowedInterval memory_window_kb_;
