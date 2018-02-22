@@ -239,6 +239,19 @@ void ProducerIPCService::RemoteProducer::CreateDataSourceInstance(
   async_producer_commands.Resolve(std::move(cmd));
 }
 
+void ProducerIPCService::RemoteProducer::DieForTesting() {
+  if (!async_producer_commands.IsBound()) {
+    PERFETTO_DLOG(
+        "The Service tried to start a new data source but the remote Producer "
+        "has not yet initialized the connection");
+    return;
+  }
+  auto cmd = ipc::AsyncResult<GetAsyncCommandResponse>::Create();
+  cmd.set_has_more(true);
+  cmd->mutable_die_for_testing();
+  async_producer_commands.Resolve(std::move(cmd));
+}
+
 void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
     DataSourceInstanceID dsid) {
   if (!async_producer_commands.IsBound()) {

@@ -73,6 +73,7 @@ class ProducerIPCService : public ProducerPort /* from producer_port.proto */ {
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&) override;
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
+    void DieForTesting() override;
 
     // RegisterDataSource requests that haven't been replied yet.
     std::map<std::string, DeferredRegisterDataSourceResponse>

@@ -146,6 +146,10 @@ void ProducerIPCClientImpl::OnServiceRequest(
     return;
   }
 
+  if (cmd.cmd_case() == GetAsyncCommandResponse::kDieForTesting) {
+    producer_->DieForTesting();
+  }
+
   PERFETTO_DLOG("Unknown async request %d received from tracing service",
                 cmd.cmd_case());
 }

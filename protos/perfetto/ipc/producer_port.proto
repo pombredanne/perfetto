@@ -110,8 +110,11 @@ message GetAsyncCommandResponse {
 
   message StopDataSource { optional uint64 instance_id = 1; }
 
+  message DieForTesting {}
+
   oneof cmd {
     StartDataSource start_data_source = 1;
     StopDataSource stop_data_source = 2;
+    DieForTesting die_for_testing = 3;
   }
 }
