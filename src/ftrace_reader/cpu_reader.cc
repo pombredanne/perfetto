@@ -18,6 +18,10 @@
 
 #include <signal.h>
 
+#include <dirent.h>
+#include <map>
+#include <queue>
+#include <string>
 #include <utility>
 
 #include "perfetto/base/logging.h"
@@ -152,14 +156,15 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
 CpuReader::~CpuReader() {
   // Close the staging pipe to cause any pending splice on the worker thread to
   // exit.
-  staging_read_fd_.reset();
   staging_write_fd_.reset();
   trace_fd_.reset();
 
-  // Not strictly required, but let's also raise the pipe signal explicitly just
-  // to be safe.
+  // Required to ensure that the close of read does not hang.
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
+
+  // Reset the read fd to release the other end of the pipe.
+  staging_read_fd_.reset();
 }
 
 // static
@@ -212,6 +217,41 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // This callback will block until we are allowed to read more data.
     on_data_available();
   }
+}
+
+// static
+std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
+    const std::set<uint64_t>& inode_numbers) {
+  std::map<uint64_t, std::string> inode_to_filename;
+  if (inode_numbers.empty())
+    return inode_to_filename;
+  std::queue<std::string> queue;
+  // Starts reading files from current directory
+  queue.push(".");
+  while (!queue.empty()) {
+    struct dirent* entry;
+    std::string filepath = queue.front();
+    filepath += "/";
+    DIR* dir = opendir(queue.front().c_str());
+    queue.pop();
+    if (dir == nullptr)
+      continue;
+    while ((entry = readdir(dir)) != nullptr) {
+      std::string filename = entry->d_name;
+      if (filename.compare(".") == 0 || filename.compare("..") == 0)
+        continue;
+      uint64_t inode_number = entry->d_ino;
+      // Check if this inode number matches any of the passed in inode
+      // numbers from events
+      if (inode_numbers.find(inode_number) != inode_numbers.end())
+        inode_to_filename.emplace(inode_number, filepath + filename);
+      // Continue iterating through files if current entry is a directory
+      if (entry->d_type == DT_DIR)
+        queue.push(filepath + filename);
+    }
+    closedir(dir);
+  }
+  return inode_to_filename;
 }
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
@@ -429,6 +469,9 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+      AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
+      return true;
     case kInode64ToUint64:
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       AddToInodeNumbers<uint64_t>(field_start, inode_numbers);

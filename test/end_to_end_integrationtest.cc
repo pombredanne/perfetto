@@ -73,6 +73,7 @@ class PerfettoTest : public ::testing::Test {
     ~ServiceDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
+      PERFETTO_LOG("Service: %ld", syscall(__NR_gettid));
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
       unlink(TEST_PRODUCER_SOCK_NAME);
       unlink(TEST_CONSUMER_SOCK_NAME);
@@ -90,6 +91,7 @@ class PerfettoTest : public ::testing::Test {
     ~ProbesProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
+      PERFETTO_LOG("Producer: %ld", syscall(__NR_gettid));
       producer_.reset(new ProbesProducer);
       producer_->ConnectWithRetries(TEST_PRODUCER_SOCK_NAME, task_runner);
     }
@@ -130,7 +132,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(10000);
+  trace_config.set_duration_ms(3000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -182,9 +184,11 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   // and the consumer tries to retrieve it. For now wait a bit until the service
   // is done, but we should add explicit flushing to avoid this.
   task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                              13000);
+                              4000);
 
-  task_runner.RunUntilCheckpoint("no.more.packets", 20000);
+  PERFETTO_LOG("Consumer: %ld", syscall(__NR_gettid));
+  task_runner.RunUntilCheckpoint("no.more.packets");
+  PERFETTO_LOG("Ending process");
 }
 
 // TODO(b/73453011): reenable this on more platforms (including standalone

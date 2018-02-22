@@ -26,6 +26,28 @@ namespace perfetto {
 namespace base {
 namespace {
 
+class TestWatchdog : public Watchdog {
+ public:
+  TestWatchdog(uint32_t polling_interval_ms) : Watchdog(polling_interval_ms) {}
+  ~TestWatchdog() override {}
+  TestWatchdog(TestWatchdog&& other) noexcept = default;
+
+  static TestWatchdog Create(uint32_t polling_interval_ms) {
+    return TestWatchdog(polling_interval_ms);
+  }
+};
+
+TEST(WatchdogTest, TimerCrash) {
+  EXPECT_DEATH(
+      {
+        TestWatchdog watchdog = TestWatchdog::Create(10);
+        watchdog.CreateFatalTimer(50, Watchdog::TimerReason::kTaskDeadline);
+        sleep(1);
+      },
+      "");
+}
+
+
 }  // namespace
 }  // namespace base
 }  // namespace perfetto

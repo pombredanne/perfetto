@@ -25,6 +25,8 @@
 namespace perfetto {
 namespace base {
 
+class TestWatchdog;
+
 // Ensures that the calling program does not exceed certain hard limits on
 // resource usage e.g. time, memory and CPU. If exceeded, the program is
 // crashed.
@@ -51,6 +53,7 @@ class Watchdog {
 
     TimerReason reason_;
   };
+  virtual ~Watchdog() = default;
 
   static Watchdog* GetInstance();
 
@@ -71,6 +74,11 @@ class Watchdog {
   // removed.
   // Note: |window_ms| has to be a multiple of |polling_interval_ms_|.
   void SetCpuLimit(uint32_t percentage, uint32_t window_ms);
+
+ protected:
+  // Protected for testing.
+  Watchdog(uint32_t polling_interval_ms);
+  Watchdog(Watchdog&& other) noexcept;
 
  private:
   // Represents a ring buffer in which integer values can be stored.
@@ -113,11 +121,11 @@ class Watchdog {
     std::unique_ptr<uint64_t[]> buffer_;
   };
 
-  Watchdog(uint32_t polling_interval_ms);
-  ~Watchdog() = default;
+  Watchdog(const Watchdog&) = delete;
+  Watchdog& operator=(const Watchdog&) = delete;
 
   // Main method for the watchdog thread.
-  [[noreturn]] void ThreadMain();
+  void ThreadMain();
 
   // Check each type of resource every |polling_interval_ms_| miillis.
   void CheckMemory(uint64_t rss_kb);
@@ -144,7 +152,7 @@ class Watchdog {
   WindowedInterval cpu_window_time_;
 
   const uint32_t polling_interval_ms_;
-  int32_t timer_window_countdown_[TimerReason::kMax];
+  int32_t timer_window_countdown_[TimerReason::kMax] = {};
 
   // --- End lock-protected members ---
 };

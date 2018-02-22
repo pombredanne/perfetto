@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 namespace perfetto {
@@ -75,13 +76,18 @@ void UnixTaskRunner::Run() {
     int poll_timeout_ms;
     {
       std::lock_guard<std::mutex> lock(lock_);
-      if (quit_)
+      PERFETTO_LOG("%ld: Quit value %d", syscall(__NR_gettid), quit_);
+      if (quit_) {
+        PERFETTO_LOG("Quitting %ld", syscall(__NR_gettid));
         return;
+      }
       poll_timeout_ms = static_cast<int>(GetDelayToNextTaskLocked().count());
       UpdateWatchTasksLocked();
     }
+    PERFETTO_LOG("Starting poll %ld", syscall(__NR_gettid));
     int ret = PERFETTO_EINTR(poll(
         &poll_fds_[0], static_cast<nfds_t>(poll_fds_.size()), poll_timeout_ms));
+    PERFETTO_LOG("Found task %ld", syscall(__NR_gettid));
     PERFETTO_CHECK(ret >= 0);
 
     // To avoid starvation we always interleave all types of tasks -- immediate,
@@ -92,9 +98,11 @@ void UnixTaskRunner::Run() {
 }
 
 void UnixTaskRunner::Quit() {
+  PERFETTO_LOG("%ld: Quit called", syscall(__NR_gettid));
   {
     std::lock_guard<std::mutex> lock(lock_);
     quit_ = true;
+    PERFETTO_LOG("%ld: Quit value in method %d", syscall(__NR_gettid), quit_);
   }
   WakeUp();
 }
@@ -158,6 +166,7 @@ void UnixTaskRunner::PostFileDescriptorWatches() {
       // Drain the byte(s) written to the wake-up pipe. We can potentially read
       // more than one byte if several wake-ups have been scheduled.
       char buffer[16];
+      PERFETTO_LOG("Draining");
       if (read(control_read_.get(), &buffer[0], sizeof(buffer)) <= 0 &&
           errno != EAGAIN) {
         PERFETTO_DPLOG("read()");
@@ -194,7 +203,12 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     task = it->second.callback;
   }
   errno = 0;
-  RunTask(task);
+
+  // TODO(b/TODO): this should be replaced with a call to RunTask but this has
+  // the problem of introducting reentrancy to the RunTask method which we
+  // do not support. Figure out a more solution to use future changes to
+  // RunTask.
+  task();
 }
 
 UnixTaskRunner::TimeDurationMs UnixTaskRunner::GetDelayToNextTaskLocked()
