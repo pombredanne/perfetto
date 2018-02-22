@@ -103,6 +103,7 @@ class FtraceSink {
 class FtraceController {
  public:
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
+  static const char* FindTracingRoot();
   virtual ~FtraceController();
 
   std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
@@ -110,7 +111,6 @@ class FtraceController {
   void DisableAllEvents();
   void WriteTraceMarker(const std::string& s);
   void ClearTrace();
-  static const char* FindTracingRoot();
 
  protected:
   // Protected for testing.
