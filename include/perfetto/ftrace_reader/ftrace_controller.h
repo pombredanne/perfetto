@@ -33,7 +33,7 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
-#include "perfetto/protozero/protozero_message_handle.h"
+#include "perfetto/protozero/message_handle.h"
 
 namespace perfetto {
 
@@ -64,11 +64,11 @@ class FtraceSink {
   using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
   class Delegate {
    public:
-    virtual protozero::ProtoZeroMessageHandle<FtraceEventBundle>
-        GetBundleForCpu(size_t) = 0;
+    virtual protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(
+        size_t) = 0;
     virtual void OnBundleComplete(
         size_t,
-        protozero::ProtoZeroMessageHandle<FtraceEventBundle>) = 0;
+        protozero::MessageHandle<FtraceEventBundle>) = 0;
     virtual ~Delegate() = default;
   };
 
@@ -84,13 +84,11 @@ class FtraceSink {
   friend FtraceController;
 
   EventFilter* get_event_filter() { return filter_.get(); }
-  protozero::ProtoZeroMessageHandle<FtraceEventBundle> GetBundleForCpu(
-      size_t cpu) {
+  protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(size_t cpu) {
     return delegate_->GetBundleForCpu(cpu);
   }
-  void OnBundleComplete(
-      size_t cpu,
-      protozero::ProtoZeroMessageHandle<FtraceEventBundle> bundle) {
+  void OnBundleComplete(size_t cpu,
+                        protozero::MessageHandle<FtraceEventBundle> bundle) {
     delegate_->OnBundleComplete(cpu, std::move(bundle));
   }
 
