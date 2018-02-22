@@ -29,7 +29,7 @@
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/thread_checker.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
-#include "perfetto/protozero/protozero_message.h"
+#include "perfetto/protozero/message.h"
 #include "proto_translation_table.h"
 
 namespace perfetto {
@@ -105,6 +105,14 @@ class CpuReader {
     memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
     out->AppendVarInt<T>(field_id, t);
   }
+
+  // Iterate through every file in the current directory and check if the inode
+  // number of each file matches any of the inode numbers saved in events.
+  // Returns map of inode number to filename for every inode number that is
+  // found in the filesystem. If the inode number saved from events is not
+  // found, nothing is added to the map.
+  static std::map<uint64_t, std::string> GetFilenamesForInodeNumbers(
+      const std::set<uint64_t>& inode_numbers);
 
   // Parse a raw ftrace page beginning at ptr and write the events a protos
   // into the provided bundle respecting the given event filter.
