@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ftrace_model.h"
+#include "ftrace_config_muxer.h"
 
 #include <memory>
 
@@ -92,7 +92,7 @@ std::unique_ptr<ProtoTranslationTable> CreateFakeTable() {
       new ProtoTranslationTable(events, std::move(common_fields)));
 }
 
-TEST(FtraceModel, ComputeCpuBufferSizeInPages) {
+TEST(FtraceConfigMuxer, ComputeCpuBufferSizeInPages) {
   // No buffer size given: good default (128 pages = 512kb).
   EXPECT_EQ(ComputeCpuBufferSizeInPages(0), 128u);
   // Buffer size given way too big: good default.
@@ -105,13 +105,13 @@ TEST(FtraceModel, ComputeCpuBufferSizeInPages) {
   EXPECT_EQ(ComputeCpuBufferSizeInPages(42), 10u);
 }
 
-TEST(FtraceModelTest, TurnFtraceOnOff) {
+TEST(FtraceConfigMuxerTest, TurnFtraceOnOff) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   MockFtraceProcfs ftrace;
 
   FtraceConfig config = CreateFtraceConfig({"sched_switch", "foo"});
 
-  FtraceModel model(&ftrace, table.get());
+  FtraceConfigMuxer model(&ftrace, table.get());
 
   ON_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
       .WillByDefault(Return("[local] global boot"));
@@ -142,13 +142,13 @@ TEST(FtraceModelTest, TurnFtraceOnOff) {
   ASSERT_TRUE(model.RemoveConfig(id));
 }
 
-TEST(FtraceModelTest, FtraceIsAlreadyOn) {
+TEST(FtraceConfigMuxerTest, FtraceIsAlreadyOn) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   MockFtraceProcfs ftrace;
 
   FtraceConfig config = CreateFtraceConfig({"sched_switch"});
 
-  FtraceModel model(&ftrace, table.get());
+  FtraceConfigMuxer model(&ftrace, table.get());
 
   // If someone is using ftrace already don't stomp on what they are doing.
   EXPECT_CALL(ftrace, ReadOneCharFromFile("/root/tracing_on"))
@@ -157,14 +157,14 @@ TEST(FtraceModelTest, FtraceIsAlreadyOn) {
   ASSERT_FALSE(id);
 }
 
-TEST(FtraceModelTest, Atrace) {
+TEST(FtraceConfigMuxerTest, Atrace) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   NiceMock<MockFtraceProcfs> ftrace;
 
   FtraceConfig config = CreateFtraceConfig({"sched_switch"});
   *config.add_atrace_categories() = "sched";
 
-  FtraceModel model(&ftrace, table.get());
+  FtraceConfigMuxer model(&ftrace, table.get());
 
   EXPECT_CALL(ftrace, ReadOneCharFromFile("/root/tracing_on"))
       .WillOnce(Return('0'));
@@ -180,12 +180,12 @@ TEST(FtraceModelTest, Atrace) {
   ASSERT_TRUE(model.RemoveConfig(id));
 }
 
-TEST(FtraceModelTest, SetupClockForTesting) {
+TEST(FtraceConfigMuxerTest, SetupClockForTesting) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   MockFtraceProcfs ftrace;
   FtraceConfig config;
 
-  FtraceModel model(&ftrace, table.get());
+  FtraceConfigMuxer model(&ftrace, table.get());
 
   EXPECT_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
       .Times(AnyNumber());

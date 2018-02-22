@@ -29,7 +29,7 @@
 
 #include "cpu_reader.h"
 #include "event_info.h"
-#include "ftrace_model.h"
+#include "ftrace_config_muxer.h"
 #include "ftrace_procfs.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
@@ -137,26 +137,26 @@ std::unique_ptr<FtraceController> FtraceController::Create(
   auto table = ProtoTranslationTable::Create(
       ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());
 
-  std::unique_ptr<FtraceModel> model = std::unique_ptr<FtraceModel>(
-      new FtraceModel(ftrace_procfs.get(), table.get()));
+  std::unique_ptr<FtraceConfigMuxer> model = std::unique_ptr<FtraceConfigMuxer>(
+      new FtraceConfigMuxer(ftrace_procfs.get(), table.get()));
   return std::unique_ptr<FtraceController>(new FtraceController(
       std::move(ftrace_procfs), std::move(table), std::move(model), runner));
 }
 
 FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
                                    std::unique_ptr<ProtoTranslationTable> table,
-                                   std::unique_ptr<FtraceModel> model,
+                                   std::unique_ptr<FtraceConfigMuxer> model,
                                    base::TaskRunner* task_runner)
     : ftrace_procfs_(std::move(ftrace_procfs)),
       table_(std::move(table)),
-      ftrace_model_(std::move(model)),
+      ftrace_config_muxer_(std::move(model)),
       task_runner_(task_runner),
       weak_factory_(this) {}
 
 FtraceController::~FtraceController() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   for (const auto* sink : sinks_)
-    ftrace_model_->RemoveConfig(sink->id_);
+    ftrace_config_muxer_->RemoveConfig(sink->id_);
   sinks_.clear();
   StopIfNeeded();
 }
@@ -306,13 +306,13 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
   if (!ValidConfig(config))
     return nullptr;
 
-  FtraceConfigId id = ftrace_model_->RequestConfig(config);
-  if (id == kInvalidFtraceConfig)
+  FtraceConfigId id = ftrace_config_muxer_->RequestConfig(config);
+  if (!id)
     return nullptr;
 
   auto controller_weak = weak_factory_.GetWeakPtr();
   auto filter = std::unique_ptr<EventFilter>(new EventFilter(
-      *table_.get(), FtraceEventsAsSet(*ftrace_model_->GetConfig(id))));
+      *table_.get(), FtraceEventsAsSet(*ftrace_config_muxer_->GetConfig(id))));
 
   auto sink = std::unique_ptr<FtraceSink>(new FtraceSink(
       std::move(controller_weak), id, config, std::move(filter), delegate));
@@ -363,7 +363,7 @@ void FtraceController::Unregister(FtraceSink* sink) {
   size_t removed = sinks_.erase(sink);
   PERFETTO_DCHECK(removed == 1);
 
-  ftrace_model_->RemoveConfig(sink->id_);
+  ftrace_config_muxer_->RemoveConfig(sink->id_);
 
   StopIfNeeded();
 }

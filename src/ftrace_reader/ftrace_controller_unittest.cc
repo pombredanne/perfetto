@@ -21,7 +21,7 @@
 #include <sys/types.h>
 
 #include "cpu_reader.h"
-#include "ftrace_model.h"
+#include "ftrace_config_muxer.h"
 #include "ftrace_procfs.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
@@ -121,9 +121,11 @@ std::unique_ptr<Table> FakeTable() {
   return std::unique_ptr<Table>(new Table(events, std::move(common_fields)));
 }
 
-std::unique_ptr<FtraceModel> FakeModel(FtraceProcfs* ftrace,
-                                       const ProtoTranslationTable* table) {
-  return std::unique_ptr<FtraceModel>(new FtraceModel(ftrace, table));
+std::unique_ptr<FtraceConfigMuxer> FakeModel(
+    FtraceProcfs* ftrace,
+    const ProtoTranslationTable* table) {
+  return std::unique_ptr<FtraceConfigMuxer>(
+      new FtraceConfigMuxer(ftrace, table));
 }
 
 class MockFtraceProcfs : public FtraceProcfs {
@@ -181,7 +183,7 @@ class TestFtraceController : public FtraceController {
  public:
   TestFtraceController(std::unique_ptr<MockFtraceProcfs> ftrace_procfs,
                        std::unique_ptr<Table> table,
-                       std::unique_ptr<FtraceModel> model,
+                       std::unique_ptr<FtraceConfigMuxer> model,
                        std::unique_ptr<MockTaskRunner> runner,
                        MockFtraceProcfs* raw_procfs)
       : FtraceController(std::move(ftrace_procfs),

@@ -33,7 +33,7 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
-#include "perfetto/protozero/protozero_message_handle.h"
+#include "perfetto/protozero/message_handle.h"
 
 namespace perfetto {
 
@@ -52,7 +52,7 @@ void HardResetFtraceState();
 class CpuReader;
 class EventFilter;
 class FtraceController;
-class FtraceModel;
+class FtraceConfigMuxer;
 class FtraceProcfs;
 class ProtoTranslationTable;
 
@@ -122,7 +122,7 @@ class FtraceController {
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
                    std::unique_ptr<ProtoTranslationTable>,
-                   std::unique_ptr<FtraceModel>,
+                   std::unique_ptr<FtraceConfigMuxer>,
                    base::TaskRunner*);
 
   // Called to read data from the staging pipe for the given |cpu| and parse it
@@ -168,7 +168,7 @@ class FtraceController {
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   std::unique_ptr<ProtoTranslationTable> table_;
-  std::unique_ptr<FtraceModel> ftrace_model_;
+  std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;
   size_t generation_ = 0;
   bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
