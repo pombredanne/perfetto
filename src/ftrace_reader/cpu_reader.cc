@@ -218,15 +218,16 @@ void CpuReader::RunWorkerThread(size_t cpu,
   }
 }
 
+// static
 std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
     const std::set<uint64_t>& inode_numbers) {
   std::map<uint64_t, std::string> inode_to_filename;
-  if (inode_numbers.size() == 0)
+  if (inode_numbers.empty())
     return inode_to_filename;
   std::queue<std::string> queue;
   // Starts reading files from current directory
   queue.push(".");
-  while (!queue.empty() && inode_numbers.size() > 0) {
+  while (!queue.empty()) {
     struct dirent* entry;
     std::string filepath = queue.front();
     filepath += "/";

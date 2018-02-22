@@ -659,7 +659,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   std::string filename =
       "./src/ftrace_reader/test/data/android_seed_N2F62_3.10.49/events";
   struct stat buf;
-  PERFETTO_CHECK(stat(filename.c_str(), &buf) != -1);
+  ASSERT_NE(stat(filename.c_str(), &buf), -1);
   writer.Write<int32_t>(buf.st_ino);
   writer.WriteFixedString(300, "Goodbye");
 
@@ -678,6 +678,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_uint32(), 1002ul);
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
+  EXPECT_EQ(event->all_fields().field_inode(), buf.st_ino);
   // Check inode number gets added and linked to the correct file
   EXPECT_THAT(inode_numbers, Each(Eq(buf.st_ino)));
   std::map<uint64_t, std::string> inode_to_filename =
