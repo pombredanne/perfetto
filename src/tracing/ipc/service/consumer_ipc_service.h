@@ -52,6 +52,9 @@ class ConsumerIPCService : public ConsumerPort /* from consumer_port.proto */ {
                    DeferredReadBuffersResponse) override;
   void FreeBuffers(const FreeBuffersRequest&,
                    DeferredFreeBuffersResponse) override;
+  void KillProducersForTesting(
+      const KillProducersForTestingRequest&,
+      DeferredKillProducersForTestingResponse) override;
   void OnClientDisconnected() override;
 
  private:

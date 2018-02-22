@@ -99,6 +99,7 @@ class ServiceImpl : public Service {
     void DisableTracing() override;
     void ReadBuffers() override;
     void FreeBuffers() override;
+    void KillProducersForTesting() override;
 
    private:
     friend class ServiceImpl;
@@ -134,6 +135,7 @@ class ServiceImpl : public Service {
   void DisableTracing(TracingSessionID);
   void ReadBuffers(TracingSessionID, ConsumerEndpointImpl*);
   void FreeBuffers(TracingSessionID);
+  void KillProducersForTesting();
 
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(

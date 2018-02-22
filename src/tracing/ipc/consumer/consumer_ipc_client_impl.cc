@@ -148,4 +148,21 @@ void ConsumerIPCClientImpl::FreeBuffers() {
   consumer_port_.FreeBuffers(req, std::move(async_response));
 }
 
+void ConsumerIPCClientImpl::KillProducersForTesting() {
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot KillProducersForTesting(), not connected to tracing service");
+    return;
+  }
+
+  KillProducersForTestingRequest req;
+  ipc::Deferred<KillProducersForTestingResponse> async_response;
+  async_response.Bind(
+      [](ipc::AsyncResult<KillProducersForTestingResponse> response) {
+        if (!response)
+          PERFETTO_DLOG("KillProducersForTesting() failed");
+      });
+  consumer_port_.KillProducersForTesting(req, std::move(async_response));
+}
+
 }  // namespace perfetto

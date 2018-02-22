@@ -85,6 +85,14 @@ void ConsumerIPCService::FreeBuffers(const FreeBuffersRequest& req,
   resp.Resolve(ipc::AsyncResult<FreeBuffersResponse>::Create());
 }
 
+// Called by the IPC layer.
+void ConsumerIPCService::KillProducersForTesting(
+    const KillProducersForTestingRequest& req,
+    DeferredKillProducersForTestingResponse resp) {
+  GetConsumerForCurrentRequest()->service_endpoint->KillProducersForTesting();
+  resp.Resolve(ipc::AsyncResult<KillProducersForTestingResponse>::Create());
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // RemoteConsumer methods
 ////////////////////////////////////////////////////////////////////////////////

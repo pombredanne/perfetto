@@ -61,6 +61,7 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
   void DisableTracing() override;
   void ReadBuffers() override;
   void FreeBuffers() override;
+  void KillProducersForTesting() override;
 
   // ipc::ServiceProxy::EventListener implementation.
   // These methods are invoked by the IPC layer, which knows nothing about

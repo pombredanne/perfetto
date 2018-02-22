@@ -112,6 +112,8 @@ class Service {
     virtual void ReadBuffers() = 0;
 
     virtual void FreeBuffers() = 0;
+
+    virtual void KillProducersForTesting() = 0;
   };  // class ConsumerEndpoint.
 
   // Implemented in src/core/service_impl.cc .

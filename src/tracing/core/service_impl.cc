@@ -406,6 +406,11 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
                tracing_sessions_.size());
 }
 
+void ServiceImpl::KillProducersForTesting() {
+  for (const auto& producer_pair : producers_)
+    producer_pair.second->producer_->DieForTesting();
+}
+
 void ServiceImpl::RegisterDataSource(ProducerID producer_id,
                                      DataSourceID ds_id,
                                      const DataSourceDescriptor& desc) {
@@ -563,6 +568,11 @@ void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
   } else {
     PERFETTO_LOG("Consumer called FreeBuffers() but tracing was not active");
   }
+}
+
+void ServiceImpl::ConsumerEndpointImpl::KillProducersForTesting() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  service_->KillProducersForTesting();
 }
 
 base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>

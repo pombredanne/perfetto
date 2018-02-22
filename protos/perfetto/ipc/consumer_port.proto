@@ -54,6 +54,9 @@ service ConsumerPort {
   // implicitly if the Consumer disconnects.
   rpc FreeBuffers(FreeBuffersRequest) returns (FreeBuffersResponse) {}
 
+  rpc KillProducersForTesting(KillProducersForTestingRequest)
+      returns (KillProducersForTestingResponse) {}
+
   // TODO rpc ListDataSources(), for the UI.
   // TODO rpc KillSwitch().
 }
@@ -107,3 +110,6 @@ message FreeBuffersRequest {
 }
 
 message FreeBuffersResponse {}
+
+message KillProducersForTestingRequest {}
+message KillProducersForTestingResponse {}
