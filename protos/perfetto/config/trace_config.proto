@@ -29,11 +29,6 @@ package perfetto.protos;
 // It contains the general config for the logging buffer(s) and the configs for
 // all the data source being enabled.
 message TraceConfig {
-  enum DataSink {
-    UNKNOWN_SINK = 1;
-    DROPBOX_SINK = 2;
-  }
-
   message BufferConfig {
     optional uint32 size_kb = 1;
     // TODO: uint32 page_size = 2;
