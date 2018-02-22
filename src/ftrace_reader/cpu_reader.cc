@@ -159,8 +159,7 @@ CpuReader::~CpuReader() {
   staging_write_fd_.reset();
   trace_fd_.reset();
 
-  // Not strictly required, but let's also raise the pipe signal explicitly just
-  // to be safe.
+  // Required to ensure that the close of read does not hang.
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
 
