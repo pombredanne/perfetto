@@ -32,6 +32,7 @@ int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
       case 'd':
+        PERFETTO_LOG("Hard resetting ftrace state.");
         HardResetFtraceState();
         return 0;
       default:

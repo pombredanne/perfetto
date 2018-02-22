@@ -275,8 +275,10 @@ TEST_F(PerfettoTest, KillFtrace) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("ftrace.killed");
 
-  std::string tracing_root = FtraceController::FindTracingRoot();
-  PERFETTO_CHECK(!tracing_root.empty());
+  const char* tracing_root = FtraceController::FindTracingRoot();
+  PERFETTO_CHECK(tracing_root);
+  std::string tracing_on_file = tracing_root;
+  tracing_on_file += "tracing_on";
 
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
@@ -295,8 +297,8 @@ TEST_F(PerfettoTest, KillFtrace) {
   auto function = [](std::vector<TracePacket> packets, bool has_more) {};
 
   task_runner.PostDelayedTask(
-      [&finish, &tracing_root] {
-        ASSERT_TRUE(ReadFile(tracing_root + "tracing_on").find('1') == 0);
+      [&finish, &tracing_on_file] {
+        ASSERT_TRUE(ReadFile(tracing_on_file).find('1') == 0);
         system("pkill -9 traced_probes");
         finish();
       },
@@ -311,7 +313,7 @@ TEST_F(PerfettoTest, KillFtrace) {
   time_t start = time(nullptr);
   bool tracing_off = false;
   while (time(nullptr) - start < 10 && !tracing_off) {
-    tracing_off = ReadFile(tracing_root + "tracing_on").find('0') == 0;
+    tracing_off = ReadFile(tracing_on_file).find('0') == 0;
     usleep(100000);
   }
 
