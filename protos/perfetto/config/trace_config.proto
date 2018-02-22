@@ -87,4 +87,5 @@ message TraceConfig {
   repeated DataSource data_sources = 2;
 
   optional uint32 duration_ms = 3;
+  optional bool enable_extra_guardrails = 4;
 }
