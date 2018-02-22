@@ -238,8 +238,7 @@ void PerfettoCmd::OnConnect() {
       "Connected to the Perfetto traced service, starting tracing for %d ms",
       trace_config_->duration_ms());
   PERFETTO_DCHECK(trace_config_);
-  if (!dropbox_tag_.empty())
-    trace_config_->set_data_sink(TraceConfig::DataSink::DROPBOX_SINK);
+  trace_config_->set_enable_extra_guardrails(!dropbox_tag_.empty());
   consumer_endpoint_->EnableTracing(*trace_config_);
   task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnStopTraceTimer, this),
                                trace_config_->duration_ms());

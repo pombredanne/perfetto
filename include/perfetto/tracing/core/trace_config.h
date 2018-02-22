@@ -126,10 +126,6 @@ class TraceConfig {
     std::string unknown_fields_;
   };
 
-  enum DataSink {
-    UNKNOWN_SINK = 1,
-    DROPBOX_SINK = 2,
-  };
   TraceConfig();
   ~TraceConfig();
   TraceConfig(TraceConfig&&) noexcept;
@@ -160,14 +156,16 @@ class TraceConfig {
   uint32_t duration_ms() const { return duration_ms_; }
   void set_duration_ms(uint32_t value) { duration_ms_ = value; }
 
-  DataSink data_sink() const { return data_sink_; }
-  void set_data_sink(DataSink value) { data_sink_ = value; }
+  bool enable_extra_guardrails() const { return enable_extra_guardrails_; }
+  void set_enable_extra_guardrails(bool value) {
+    enable_extra_guardrails_ = value;
+  }
 
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
   uint32_t duration_ms_ = {};
-  DataSink data_sink_ = {};
+  bool enable_extra_guardrails_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.
