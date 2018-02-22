@@ -154,13 +154,20 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   if (cfg.enable_extra_guardrails()) {
-    if (cfg.duration_ms() > kMaxTracingDuration)
+    if (cfg.duration_ms() > kMaxTracingDuration) {
+      PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  %" PRIu64 " ms)",
+                    cfg.duration_ms(), kMaxTracingDuration);
       return;
+    }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
       buf_size_sum += buf.size_kb();
-    if (buf_size_sum > kMaxTracingBufferSizeKb)
+    if (buf_size_sum > kMaxTracingBufferSizeKb) {
+      PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64 "kB  %" PRIu64
+                    " kB)",
+                    buf_size_sum, kMaxTracingBufferSizeKb);
       return;
+    }
   }
 
   if (cfg.buffers_size() > kMaxBuffersPerConsumer) {
