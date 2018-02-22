@@ -8,7 +8,6 @@
 #include <string.h>
 #include <fstream>
 #include <sstream>
-#include <vector>
 
 #include "file_utils.h"
 
@@ -84,7 +83,7 @@ std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
     process->cmdline.push_back(name);
     process->in_kernel = true;
   } else {
-    process->cmdline = SplitOnSpace(std::string(buf));
+    process->cmdline = SplitOnSpace(std::string(cmdline_buf));
     ReadExePath(pid, process->exe, sizeof(process->exe));
     process->is_app = IsApp(process->cmdline[0].c_str(), process->exe);
   }

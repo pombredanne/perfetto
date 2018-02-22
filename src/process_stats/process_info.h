@@ -6,7 +6,6 @@
 #define SRC_PROCESS_STATS_PROCESS_INFO_H_
 
 #include <map>
-#include <string>
 #include <vector>
 
 struct ThreadInfo {
