@@ -151,7 +151,7 @@ class CpuReader {
                               int trace_fd,
                               int staging_write_fd,
                               std::function<void()> on_data_available,
-                              std::atomic<bool>* worker_exiting);
+                              std::atomic<bool>* worker_exited);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
