@@ -143,10 +143,15 @@ TEST(TraceBufferTest, VariableSizePackets_OneStream_NoFragments) {
 // TODO test padding
 // TODO test stats
 // TODO test multiple streams
+// TODO test write one chunk that is exactly as big as the buffer.
 // TODO test long packet
 // TODO test OOO chunks don't block / fill up
 // TODO test malicious packets
 // TODO: case of exactly sizeof(ChunkRecord) bytes left at the end of the buf.
+// TODO: test patching precisely at the end of the chunk (aligned or not).
+// TODO: test GetReadIterForSequence() when index_ is empty.
+// TODO: test the speculation logic on packet merging.
+// TODO: test the case of a malicious producer sending the same ChunkID twice.
 
 }  // namespace
 }  // namespace perfetto

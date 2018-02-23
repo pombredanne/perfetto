@@ -25,17 +25,21 @@
 
 // TODO(primiano): Sanitize packets using PacketStreamValidator.
 
+// TODO(primiano): we need some flag to figure out if the packets on the
+// boundary require patching or have alrady been patched. The current
+// implementation considers all packets eligible to be read once we have all the
+// chunks that compose them.
+
+// TODO(primiano): copy over skyostil@'s trusted_uid logic.
+
+// TODO(primiano): ensure that the producer writes a 0 terminator after the
+// last packet because we have no space to store num_packets in the ChunkRecord.
+
 namespace perfetto {
 
 namespace {
-// TODO check this constant. I think we went for 4k max.
-constexpr size_t kMaxChunkRecordSize =
-    0xffff - sizeof(SharedMemoryABI::PageHeader);
-constexpr uint8_t kFirstPacketContinuesFromPrevChunk =
-    SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
-constexpr uint8_t kLastPacketContinuesOnNextChunk =
-    SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk;
-
+// Max size of a chunk, including sizeof(ChunkRecord)
+constexpr size_t kMaxChunkRecordSize = base::kPageSize;
 }  // namespace.
 
 TraceBuffez::TraceBuffez() {
@@ -85,35 +89,36 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
                                      size_t size) {
   PERFETTO_DCHECK(writer_id != ChunkRecord::kWriterIdPadding);
 
-  // TODO(primiano): return if size > 4k.
+  ChunkRecord record{};
+  static_assert(
+      kMaxChunkRecordSize <=
+          std::numeric_limits<decltype(record.payload_size_div_16)>::max() *
+                  16 +
+              sizeof(ChunkRecord),
+      "kMaxChunkRecordSize is too big");
 
-  // Avoids that we end up in a fragmented state where available_size()
-  // is > 0 but < sizeof(ChunkRecord).
+  // |rounded_size| payload |size| + sizeof(ChunkRecord), rounded up to avoid
+  // that we end up in a fragmented state where available_size() is > 0 but
+  // < sizeof(ChunkRecord).
   size_t rounded_size =
       base::Align<sizeof(ChunkRecord)>(size + sizeof(ChunkRecord));
-
-  ChunkRecord record{};
-  static_assert(kMaxChunkRecordSize <=
-                    std::numeric_limits<decltype(record.size())>::max(),
-                "kMaxChunkRecordSize too big");
-
   if (PERFETTO_UNLIKELY(rounded_size > kMaxChunkRecordSize)) {
     PERFETTO_DCHECK(false);
     return;
   }
 
-  // If there isn't enough room from the given write position, write a padding
-  // record to clear the trailing remainder of the buffer and wrap back.
-  if (PERFETTO_UNLIKELY(rounded_size > writable_size())) {
-    AddPaddingRecord(writable_size());  // Takes care of wrapping |wptr_|.
-    PERFETTO_DCHECK(rounded_size <= writable_size());
+  // If there isn't enough room from the given write position. Write a padding
+  // record to clear the enf of the buffer and wrap back.
+  if (PERFETTO_UNLIKELY(rounded_size > size_to_end())) {
+    AddPaddingRecord(size_to_end());  // Takes care of wrapping |wptr_|.
+    PERFETTO_DCHECK(rounded_size <= size_to_end());
   }
 
   record.producer_id = producer_id;
   record.chunk_id = chunk_id;
   record.writer_id = writer_id;
   record.flags = flags;
-  record.set_size(rounded_size);
+  record.set_size_including_header(rounded_size);
 
   // At this point either |wptr_| points to an untouched part of the buffer
   // (i.e. *wptr_ == 0) or we are about to overwrite one or more ChunkRecord(s).
@@ -178,12 +183,18 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
 
     next_chunk_ptr += next_chunk.size();
     PERFETTO_DCHECK(next_chunk_ptr >= wptr_ && next_chunk_ptr < end());
-  }
+  }  // for (next_chunk_ptr...)
 
   ChunkMeta::Key key(record);
+
   auto it_and_inserted = index_.emplace(
       key, ChunkMeta(GetChunkRecordAt(wptr_), num_packets, flags));
-  PERFETTO_DCHECK(it_and_inserted.second);
+  if (PERFETTO_UNLIKELY(!it_and_inserted.second)) {
+    // More likely a producer bug, but could also be a bugged producer.
+    PERFETTO_DCHECK(false);
+    index_.erase(it_and_inserted.first);
+    index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_packets, flags));
+  }
   WriteChunkRecord(record, src, size);
   last_chunk_id_[std::make_pair(producer_id, writer_id)] = chunk_id;
 
@@ -197,7 +208,7 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id,
 void TraceBuffez::AddPaddingRecord(size_t size) {
   PERFETTO_DCHECK(size <= kMaxChunkRecordSize);
   ChunkRecord record{};
-  record.set_size(size);
+  record.set_size_including_header(size);
   record.writer_id = ChunkRecord::kWriterIdPadding;
   WriteChunkRecord(record, nullptr, 0);
 }
@@ -227,15 +238,15 @@ void TraceBuffez::MaybePatchChunkContents(ProducerID producer_id,
                 "patch_value out of sync with SharedMemoryABI");
 
   uint8_t* off = chunk_begin + patch_offset_untrusted;
-  if (off < chunk_begin || off >= chunk_end - kPatchLen) {
+  if (off < chunk_begin || off > chunk_end - kPatchLen) {
     // Either the IPC was so slow and in the meantime the writer managed to wrap
     // over |chunk_id| or the producer sent a malicious IPC.
     stats_.failed_patches++;
     return;
   }
 
-  // DCHECK that we are writing into a size-field reserved and zero-filled by
-  // trace_writer_impl.cc and that we are not writing over other data.
+  // DCHECK that we are writing into a size-field zero-filled by
+  // trace_writer_impl.cc and that we are not writing over other valid data.
   char zero[kPatchLen]{};
   PERFETTO_DCHECK(memcmp(off, &zero, kPatchLen) == 0);
 
@@ -247,20 +258,24 @@ void TraceBuffez::BeginRead() {
   read_iter_ = GetReadIterForSequence(index_.begin());
 }
 
-// The index_ looks like this:
-// ProducerID | WriterID  | ChunkID | ChunkMeta
-// -----------+-----------+---------+----------
-//     1           1          1
-//     1           1          2
-//     1           1          3
-//     1           2          1
-//     1           2          2
-//     1           2          3
-//     2           1          1
-//     2           1          2
 TraceBuffez::ChunkIterator TraceBuffez::GetReadIterForSequence(
     ChunkMap::iterator begin) {
-// Note: |begin| might be == index_.end() if |index_| is empty.
+  // Note: |begin| might be == index_.end() if |index_| is empty.
+
+  // |index_| looks like this:
+  // ProducerID | WriterID  | ChunkID | ChunkMeta
+  // -----------+-----------+---------+----------
+  //     1           1          1
+  //     1           1          2
+  //     1           1          3
+  //     1           2          1
+  //     1           2          2
+  //     1           2          3
+  //     2           1          1
+  //     2           1          2
+
+  ChunkIterator iter;
+  iter.begin = begin;
 
 #if PERFETTO_DCHECK_IS_ON()
   // Either |begin| is == index_.begin() or the item immediately before must
@@ -272,8 +287,6 @@ TraceBuffez::ChunkIterator TraceBuffez::GetReadIterForSequence(
       std::tie(prev_it->first.producer_id, prev_it->first.writer_id) <
           std::tie(begin->first.producer_id, begin->first.writer_id));
 #endif
-  ChunkIterator iter;
-  iter.begin = begin;
 
   // Find the first entry that has a greater {ProducerID, WriterID} (or just
   // index_.end() if we reached the end).
@@ -312,7 +325,7 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
   // Note: MoveNext() moves only within the next chunk within the same
   // {ProducerID, WriterID} sequence. Here we want to:
   // - return the next packet in the current sequence, if any.
-  // - return the first packed in the next sequence, if any.
+  // - return the first packet in the next sequence, if any.
   // - return false if none of the above is found.
   for (;; read_iter_.MoveNext()) {
     if (PERFETTO_UNLIKELY(!read_iter_.is_valid())) {
@@ -354,6 +367,11 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
 
     PERFETTO_DCHECK(chunk_meta.num_packets_read <= chunk_meta.num_packets);
     while (chunk_meta.num_packets_read < chunk_meta.num_packets) {
+      constexpr uint8_t kFirstPacketContinuesFromPrevChunk =
+          SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
+      constexpr uint8_t kLastPacketContinuesOnNextChunk =
+          SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk;
+
       enum { kSkip = 0, kReadOnePacket, kTryReadAhead } action;
       if (chunk_meta.num_packets_read == 0) {
         if (chunk_meta.flags & kFirstPacketContinuesFromPrevChunk) {
@@ -372,12 +390,12 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
       }
 
       if (action == kSkip) {
-        ReadNextPacket(&chunk_meta);
+        ReadNextPacketInChunk(&chunk_meta);
         continue;
       }
 
       if (action == kReadOnePacket) {
-        slices->push_back(ReadNextPacket(&chunk_meta));
+        slices->push_back(ReadNextPacketInChunk(&chunk_meta));
         return true;
       }
 
@@ -386,14 +404,16 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
       // This is the complex case. At this point we have to look ahead in the
       // |index_| to see if we have all the chunks required to complete this
       // packet. If we do, we want to mark all those chunks as read and put
-      // them into |slices|. If we don't we do NOT want to chang their read
+      // them into |slices|. If we don't we do NOT want to change their read
       // state but we want to skip to the next {ProducerID, WriterID}
       // sequence.
 
-      // Here we are going to speculatively fill |slices| until we either
-      // find out that we had all packets, or we should just skip and move
-      // to the next {ProducerID,WriterID} sequence.
-      slices->push_back(ReadNextPacket(&chunk_meta));
+      // Here we are going to speculatively fill |slices| and increase the
+      // |num_packets_read| until we either find out that we had all packets
+      // and hence suceeded, or we should just skip and move to the next
+      // {ProducerID,WriterID} sequence. We are optimizing for the former case.
+
+      slices->push_back(ReadNextPacketInChunk(&chunk_meta));
 
       // TODO(primiano): optimization: here we are copying over the full
       // iterator object, but the only thing we change is the |cur| and
@@ -403,29 +423,34 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
       ChunkID next_chunk_id = read_iter_.chunk_id() + 1;
       for (ChunkIterator it = read_iter_; it.is_valid();
            it.MoveNext(), next_chunk_id++) {
+        // We should stay within the same sequence while iterating here.
         PERFETTO_DCHECK(it.producer_id() == read_iter_.producer_id() &&
                         it.writer_id() == read_iter_.writer_id());
 
         if (it.chunk_id() != next_chunk_id || (*it).num_packets == 0) {
-          // The sequence is broken, we missed a ChunkID.
-          // Now we have to unwind the |num_packets_read| that have been
-          // incremented by mis-speculating on the success of having all chunks.
-
-          // TODO update |stats_|.
-
-          for (; read_iter_.cur != it.cur; read_iter_.MoveNext()) {
+          // The sequence is broken, we missed a ChunkID (num_packets == 0 is
+          // the edge case of a buggy or malicious producer). Our speculation
+          // failed. Now we have to decrement the |num_packets_read| that have
+          // been incremented by speculatively calling ReadNextPacketInChunk().
+          // TODO(primiano): update |stats_| with speculation stats.
+          do {
             PERFETTO_DCHECK(read_iter_.is_valid());
-            if (PERFETTO_UNLIKELY((*read_iter_).num_packets_read == 0))
-              continue;
-            (*read_iter_).num_packets_read--;
-            // TODO: add a test for this.
-          }
+            if (PERFETTO_LIKELY((*read_iter_).num_packets_read > 0))
+              (*read_iter_).num_packets_read--;
+            read_iter_.MoveNext();
+          } while (read_iter_.cur != it.cur);
+
           slices->clear();
+
+          // this break will to back to beginning of the for(;;MoveNext()) (see
+          // other break below). That will move to the next sequence if we set
+          // the read iterator to its end.
           read_iter_.cur = read_iter_.end;
-          break;  // goes back to the for(;;MoveNext()) (see other break below).
+          PERFETTO_DCHECK(!read_iter_.is_valid());
+          break;
         }
 
-        slices->push_back(ReadNextPacket(&chunk_meta));
+        slices->push_back(ReadNextPacketInChunk(&chunk_meta));
 
         if (!((*it).flags & kLastPacketContinuesOnNextChunk))
           return true;  // We made it.
@@ -438,27 +463,24 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
   }    // for(;;MoveNext())
 }
 
-Slice TraceBuffez::ReadNextPacket(ChunkMeta* chunk_meta) {
+Slice TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta) {
   PERFETTO_DCHECK(chunk_meta->num_packets_read < chunk_meta->num_packets);
-  // TODO DCHECK for unpatched.
+  // TODO DCHECK for chunks that are still awaiting patching (by looking at
+  // |last_packet_patch_offset).
 
   const uint8_t* record_begin =
       reinterpret_cast<const uint8_t*>(chunk_meta->chunk_record);
   const uint8_t* record_end = record_begin + chunk_meta->chunk_record->size();
   const uint8_t* packets_begin = record_begin + sizeof(ChunkRecord);
   const uint8_t* packet_begin = packets_begin + chunk_meta->cur_packet_offset;
-  if (packet_begin < begin() || packet_begin >= end()) {
-    PERFETTO_DCHECK(false);
-    // TODO What to do with num_packets_read?
-    return Slice();  // TODO(primiano): add test coverage.
-  }
+  PERFETTO_CHECK(packet_begin >= begin() && packet_begin < end());
 
   // A packet (or a fragment) starts with a varint stating its size, followed
   // by its content.
   uint64_t packet_size = 0;
-  using protozero::proto_utils::ParseVarInt;
-  const uint8_t* packet_data =
-      ParseVarInt(packet_begin, record_end, &packet_size);
+  const uint8_t* packet_data = protozero::proto_utils::ParseVarInt(
+      packet_begin, record_end, &packet_size);
+
   // PERFETTO_ILOG("\nb:  %p\ne:  %p\nrb: %p\nre: %p\nPb: %p\npb: %p\n",
   //               reinterpret_cast<const void*>(begin()),
   //               reinterpret_cast<const void*>(end()),
@@ -466,19 +488,13 @@ Slice TraceBuffez::ReadNextPacket(ChunkMeta* chunk_meta) {
   //               reinterpret_cast<const void*>(record_end),
   //               reinterpret_cast<const void*>(packets_begin),
   //               reinterpret_cast<const void*>(packet_begin));
+
   const uint8_t* next_packet = packet_data + packet_size;
-  if (next_packet <= packet_begin || next_packet > record_end) {
-    PERFETTO_DCHECK(false);
-    // TODO What to do with num_packets_read?
-    return Slice();  // TODO(primiano): add test coverage.
-  }
-  PERFETTO_CHECK(next_packet - packets_begin <
-                 static_cast<ptrdiff_t>(chunk_meta->chunk_record->size()));
+  PERFETTO_CHECK(next_packet > packet_begin && next_packet <= record_end);
   chunk_meta->cur_packet_offset =
       static_cast<uint16_t>(next_packet - packets_begin);
   chunk_meta->num_packets_read++;
   return Slice(packet_data, static_cast<size_t>(packet_size));
-  // TODO recheck all this.
 }
 
 }  // namespace perfetto
