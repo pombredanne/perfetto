@@ -46,7 +46,7 @@ class FtraceConfigMuxer {
   // match the requested config. Returns an id to manage this
   // config or zero on failure.
   // This is best effort. FtraceConfigMuxer may not be able to adjust the
-  // buffer size right now. Events may missing or there may be extra events
+  // buffer size right now. Events may be missing or there may be extra events
   // (if you enable an atrace catagory we try to give you the matching events).
   // If someone else is tracing we won't touch atrace (since it resets the
   // buffer).

@@ -209,5 +209,22 @@ TEST(FtraceConfigMuxerTest, SetupClockForTesting) {
   model.SetupClockForTesting(config);
 }
 
+TEST(FtraceConfigMuxerTest, GetFtraceEvents) {
+  FtraceConfig config = CreateFtraceConfig({"sched_switch"});
+  std::set<std::string> events = GetFtraceEvents(config);
+
+  EXPECT_THAT(events, Contains("sched_switch"));
+  EXPECT_THAT(events, Not(Contains("print")));
+}
+
+TEST(FtraceConfigMuxerTest, GetFtraceEventsAtrace) {
+  FtraceConfig config = CreateFtraceConfig({"sched_switch"});
+  *config.add_atrace_categories() = "sched";
+  std::set<std::string> events = GetFtraceEvents(config);
+
+  EXPECT_THAT(events, Contains("sched_switch"));
+  EXPECT_THAT(events, Contains("print"));
+}
+
 }  // namespace
 }  // namespace perfetto

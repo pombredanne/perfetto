@@ -40,10 +40,10 @@ const int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
 
 std::vector<std::string> difference(const std::set<std::string>& a,
                                     const std::set<std::string>& b) {
-  std::vector<std::string> result(std::max(b.size(), a.size()));
-  auto it = std::set_difference(a.begin(), a.end(), b.begin(), b.end(),
-                                result.begin());
-  result.resize(it - result.begin());
+  std::vector<std::string> result;
+  result.reserve(std::max(b.size(), a.size()));
+  std::set_difference(a.begin(), a.end(), b.begin(), b.end(),
+                      std::inserter(result, result.begin()));
   return result;
 }
 
@@ -156,9 +156,7 @@ FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
 }
 
 bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
-  if (!id)
-    return false;
-  if (!configs_.erase(id))
+  if (!id || !configs_.erase(id))
     return false;
 
   std::set<std::string> expected_ftrace_events;
@@ -246,8 +244,7 @@ void FtraceConfigMuxer::DisableAtrace() {
   PERFETTO_DCHECK(!current_state_.atrace_on);
 
   PERFETTO_DLOG("Stop atrace...");
-  PERFETTO_CHECK(
-      RunAtrace(std::vector<std::string>({"atrace", "--async_stop"})));
+  PERFETTO_CHECK(RunAtrace({"atrace", "--async_stop"}));
   PERFETTO_DLOG("...done");
 
   current_state_.atrace_on = false;
