@@ -54,7 +54,7 @@ inline int ReadStatusLine(int pid, const char* status_string) {
   return atoi(line + sizeof(status_string) - 1);
 }
 
-inline std::vector<std::string> SplitOnSpace(std::string input) {
+inline std::vector<std::string> SplitOnSpace(const std::string& input) {
   std::istringstream iss(input);
   std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
                                    std::istream_iterator<std::string>());
