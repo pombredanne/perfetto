@@ -52,7 +52,9 @@ constexpr size_t kMaxShmSize = base::kPageSize * 1024;    // 4 MB.
 constexpr int kMaxBuffersPerConsumer = 128;
 
 constexpr uint64_t kMillisPerHour = 3600000;
-constexpr uint64_t kMaxTracingDuration = 24 * kMillisPerHour;
+
+// These apply only if enable_extra_guardrails is true.
+constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
 constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
 }  // namespace
 
@@ -154,17 +156,18 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   if (cfg.enable_extra_guardrails()) {
-    if (cfg.duration_ms() > kMaxTracingDuration) {
-      PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  %" PRIu64 " ms)",
-                    cfg.duration_ms(), kMaxTracingDuration);
+    if (cfg.duration_ms() > kMaxTracingDurationMillis) {
+      PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
+                    " ms)",
+                    cfg.duration_ms(), kMaxTracingDurationMillis);
       return;
     }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
       buf_size_sum += buf.size_kb();
     if (buf_size_sum > kMaxTracingBufferSizeKb) {
-      PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64 "kB  %" PRIu64
-                    " kB)",
+      PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64
+                    "kB  > %" PRIu64 " kB)",
                     buf_size_sum, kMaxTracingBufferSizeKb);
       return;
     }
