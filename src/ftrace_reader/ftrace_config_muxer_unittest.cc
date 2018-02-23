@@ -157,7 +157,13 @@ TEST(FtraceConfigMuxerTest, FtraceIsAlreadyOn) {
   ASSERT_FALSE(id);
 }
 
-TEST(FtraceConfigMuxerTest, Atrace) {
+// TODO(hjd): Mock atrace on Android.
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_Atrace DISABLED_Atrace
+#else
+#define MAYBE_Atrace Atrace
+#endif
+TEST(FtraceConfigMuxerTest, MAYBE_Atrace) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   NiceMock<MockFtraceProcfs> ftrace;
 
