@@ -113,10 +113,9 @@ FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
     if (is_ftrace_enabled)
       return 0;
 
-// If we're about to turn tracing on use this opportunity do some setup:
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-    EnableAtrace(request);
-#endif
+    // If we're about to turn tracing on use this opportunity do some setup:
+    if (RequiresAtrace(request))
+      EnableAtraceOnAndroid(request);
     SetupClock(request);
     SetupBufferSize(request);
   } else {
@@ -184,10 +183,8 @@ bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
     ftrace_->DisableAllEvents();
     ftrace_->ClearTrace();
     current_state_.tracing_on = false;
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
     if (current_state_.atrace_on)
-      DisableAtrace();
-#endif
+      DisableAtraceOnAndroid();
   }
 
   return true;
@@ -220,6 +217,14 @@ void FtraceConfigMuxer::SetupBufferSize(const FtraceConfig& request) {
   current_state_.cpu_buffer_size_pages = pages;
 }
 
+void FtraceConfigMuxer::EnableAtraceOnAndroid(const FtraceConfig& request) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  EnableAtrace(request);
+#else
+  PERFETTO_LOG("Atrace only supported on Android.");
+#endif
+}
+
 void FtraceConfigMuxer::EnableAtrace(const FtraceConfig& request) {
   PERFETTO_DCHECK(!current_state_.atrace_on);
   current_state_.atrace_on = true;
@@ -236,8 +241,16 @@ void FtraceConfigMuxer::EnableAtrace(const FtraceConfig& request) {
       args.push_back(app);
   }
 
-  PERFETTO_CHECK(RunAtrace(std::move(args)));
+  PERFETTO_CHECK(RunAtrace(args));
   PERFETTO_DLOG("...done");
+}
+
+void FtraceConfigMuxer::DisableAtraceOnAndroid() {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  DisableAtrace();
+#else
+  PERFETTO_LOG("Atrace only supported on Android.");
+#endif
 }
 
 void FtraceConfigMuxer::DisableAtrace() {
