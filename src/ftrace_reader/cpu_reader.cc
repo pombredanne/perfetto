@@ -148,21 +148,20 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
     PERFETTO_CHECK(sigaction(SIGPIPE, &act, nullptr) == 0);
   }
 
-  worker_thread_ =
-      std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
-                            *staging_write_fd_, on_data_available));
+  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
+                                         *staging_write_fd_, on_data_available,
+                                         &worker_exited_));
 }
 
 CpuReader::~CpuReader() {
-  // Close the staging pipe to cause any pending splice on the worker thread to
-  // exit.
-  staging_read_fd_.reset();
-  staging_write_fd_.reset();
-  trace_fd_.reset();
-
-  // Not strictly required, but let's also raise the pipe signal explicitly just
-  // to be safe.
-  pthread_kill(worker_thread_.native_handle(), SIGPIPE);
+  // There's a kernel bug (b/73807072) which can cause any of the three close()
+  // calls on the trace fd or the staging pipe to hang if the worker thread is
+  // currently blocked in splice(). As a workaround, use a signal to interrupt
+  // any call to splice and wait for the thread to exit.
+  while (!worker_exited_.load(std::memory_order_relaxed)) {
+    pthread_kill(worker_thread_.native_handle(), SIGPIPE);
+    usleep(500);
+  }
   worker_thread_.join();
 }
 
@@ -170,7 +169,8 @@ CpuReader::~CpuReader() {
 void CpuReader::RunWorkerThread(size_t cpu,
                                 int trace_fd,
                                 int staging_write_fd,
-                                std::function<void()> on_data_available) {
+                                std::function<void()> on_data_available,
+                                std::atomic<bool>* worker_exited) {
   // This thread is responsible for moving data from the trace pipe into the
   // staging pipe at least one page at a time. This is done using the splice(2)
   // system call, which unlike poll/select makes it possible to block until at
@@ -216,6 +216,8 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // This callback will block until we are allowed to read more data.
     on_data_available();
   }
+
+  worker_exited->store(true, std::memory_order_relaxed);
 }
 
 // static
