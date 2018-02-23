@@ -22,6 +22,8 @@
 
 #include "perfetto/tracing/core/ftrace_config.h"
 
+namespace perfetto {
+
 // 0 is invalid.
 using FtraceConfigId = uint64_t;
 
