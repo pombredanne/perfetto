@@ -54,11 +54,14 @@ inline int ReadStatusLine(int pid, const char* status_string) {
   return atoi(line + sizeof(status_string) - 1);
 }
 
-inline std::vector<std::string> SplitOnSpace(const std::string& input) {
-  std::istringstream iss(input);
-  std::vector<std::string> results((std::istream_iterator<std::string>(iss)),
-                                   std::istream_iterator<std::string>());
-  return results;
+inline std::vector<std::string> SplitOnNull(const char* input) {
+  std::vector<std::string> output;
+  do {
+    // This works because it will only push the string up to a null character.
+    output.push_back(std::string(input));
+    input += output.back().size() + 1;
+  } while (input[0] != 0);
+  return output;
 }
 
 }  // namespace
@@ -83,7 +86,7 @@ std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
     process->cmdline.push_back(name);
     process->in_kernel = true;
   } else {
-    process->cmdline = SplitOnSpace(std::string(cmdline_buf));
+    process->cmdline = SplitOnNull(cmdline_buf);
     ReadExePath(pid, process->exe, sizeof(process->exe));
     process->is_app = IsApp(process->cmdline[0].c_str(), process->exe);
   }
