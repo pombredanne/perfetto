@@ -151,7 +151,6 @@ class FtraceController {
   static void UnblockReaders(base::WeakPtr<FtraceController>);
 
   uint32_t GetDrainPeriodMs();
-  uint32_t GetCpuBufferSizeInPages();
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
