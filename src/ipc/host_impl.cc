@@ -103,7 +103,12 @@ void HostImpl::OnDataAvailable(UnixSocket* sock) {
   size_t rsize;
   do {
     auto buf = frame_deserializer.BeginReceive();
-    rsize = client->sock->Receive(buf.data, buf.size);
+    base::ScopedFile fd;
+    rsize = client->sock->Receive(buf.data, buf.size, &fd);
+    if (fd) {
+      PERFETTO_DCHECK(!client->received_fd);
+      client->received_fd = std::move(fd);
+    }
     if (!frame_deserializer.EndReceive(rsize))
       return OnDisconnect(client->sock.get());
   } while (rsize > 0);
