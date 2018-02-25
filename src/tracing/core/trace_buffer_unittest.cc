@@ -688,8 +688,8 @@ TEST_F(TraceBufferTest, Iterator_ManyStreamsWrapping) {
   ASSERT_TRUE(IteratorSeqEq(ProducerID(3), WriterID(1), {Neg(-1), 2, 4}));
 }
 
-// TODO test stats
-// TODO test multiple streams
-// TODO test the speculation logic on packet merging.
+// TODO(primiano): test stats().
+// TODO(primiano): test multiple streams interleaved.
+// TODO(primiano): more testing on packet merging.
 
 }  // namespace perfetto

@@ -543,8 +543,11 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
         // on the next ReadPacket() call.
         stats_.fragment_lookahead_failures++;
         read_iter_.MoveToEnd();
-        // the for(;;MoveNext) will MoveNext when this is @ end. It's okay but
-        // can we rely on that?.
+
+        // TODO(primiano): optimization: this MoveToEnd() is the reason why
+        // MoveNext() (that is called in the outer for(;;MoveNext)) needs to
+        // deal gracefully with the case of |cur|==|end|. Maybe we can do
+        // something to avoid that check by reshuffling the code here?
 
         // This break will to back to beginning of the for(;;MoveNext()) (see
         // other break below). That will move to the next sequence because we
