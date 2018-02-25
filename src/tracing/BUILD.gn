@@ -127,6 +127,8 @@ source_set("tracing_unittests") {
     "ipc/posix_shared_memory_unittest.cc",
     "test/aligned_buffer_test.cc",
     "test/aligned_buffer_test.h",
+    "test/fake_packet.cc",
+    "test/fake_packet.h",
     "test/test_shared_memory.cc",
     "test/test_shared_memory.h",
     "test/tracing_integration_test.cc",
