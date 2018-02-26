@@ -219,7 +219,7 @@ Watchdog::Timer::~Timer() {
 
 Watchdog::Timer::Timer(Timer&& other) {
   timerid_ = other.timerid_;
-  // other.timerid_ = nullptr;
+  other.timerid_ = nullptr;
 }
 
 }  // namespace base
