@@ -179,6 +179,8 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   if (instances_[id] == kFtraceSourceName) {
     size_t removed = delegates_.erase(id);
     PERFETTO_DCHECK(removed == 1);
+    // Might return 0 if trace_duration_ms == 0.
+    watchdogs_.erase(id);
   }
 }
 
