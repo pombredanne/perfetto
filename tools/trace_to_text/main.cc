@@ -2402,7 +2402,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
         const auto& inner = event.ext4_collapse_range();
         line = FormatExt4CollapseRange(inner);
       } else if (event.has_ext4_da_release_space()) {
-        Ext4DirectIOEnter const auto& inner = event.ext4_da_release_space();
+        const auto& inner = event.ext4_da_release_space();
         line = FormatExt4DaReleaseSpace(inner);
       } else if (event.has_ext4_da_reserve_space()) {
         const auto& inner = event.ext4_da_reserve_space();

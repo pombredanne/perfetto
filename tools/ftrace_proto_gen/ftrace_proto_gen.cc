@@ -21,8 +21,6 @@
 #include <set>
 #include <string>
 
-#include "perfetto/base/logging.h"
-
 namespace perfetto {
 
 namespace {
@@ -88,46 +86,44 @@ std::string InferProtoType(const FtraceEvent::Field& field) {
   return "";
 }
 
-void LogFtraceEventProtoAdditions(const std::set<std::string>& events) {
-  PERFETTO_LOG(
-      "Number appropriately and add output to "
-      "protos/perfetto/trace/ftrace/ftrace_event.proto");
+void PrintFtraceEventProtoAdditions(const std::set<std::string>& events) {
+  printf(
+      "\nNumber appropriately and add output to "
+      "protos/perfetto/trace/ftrace/ftrace_event.proto\n");
   for (auto event : events) {
-    PERFETTO_LOG("%sFtraceEvent %s = ;", ToCamelCase(event).c_str(),
-                 event.c_str());
+    printf("%sFtraceEvent %s = ;\n", ToCamelCase(event).c_str(), event.c_str());
   }
 }
 
-void LogTraceToTextMain(const std::set<std::string>& events) {
-  PERFETTO_LOG(
-      "Add output to TraceToSystrace for loop in "
-      "tools/ftrace_proto_gen/main.cc");
+void PrintTraceToTextMain(const std::set<std::string>& events) {
+  printf(
+      "\nAdd output to TraceToSystrace for loop in "
+      "tools/ftrace_proto_gen/main.cc\n");
   for (auto event : events) {
-    PERFETTO_LOG(
+    printf(
         "else if (event.has_%s()) {\nconst auto& inner = event.%s();\nline = "
         "Format%s(inner);\n} ",
         event.c_str(), event.c_str(), ToCamelCase(event).c_str());
   }
 }
 
-void LogTraceToTextUsingStatements(const std::set<std::string>& events) {
-  PERFETTO_LOG("Add output to tools/ftrace_proto_gen/main.cc");
+void PrintTraceToTextUsingStatements(const std::set<std::string>& events) {
+  printf("\nAdd output to tools/ftrace_proto_gen/main.cc\n");
   for (auto event : events) {
-    PERFETTO_LOG("using protos::%sFtraceEvent;", ToCamelCase(event).c_str());
+    printf("using protos::%sFtraceEvent;\n", ToCamelCase(event).c_str());
   }
 }
 
-void LogTraceToTextFunctions(const std::set<std::string>& events) {
-  PERFETTO_LOG(
-      "Add output to tools/ftrace_proto_gen/main.cc and then manually go "
-      "through format files to match fields");
+void PrintTraceToTextFunctions(const std::set<std::string>& events) {
+  printf(
+      "\nAdd output to tools/ftrace_proto_gen/main.cc and then manually go "
+      "through format files to match fields\n");
   for (auto event : events) {
-    PERFETTO_LOG(
+    printf(
         "std::string Format%s(const %sFtraceEvent& event) {"
         "\nchar line[2048];"
-        "\nsprintf(line,\"%s: ",
+        "\nsprintf(line,\"%s: );\nreturn std::string(line);\n}\n",
         ToCamelCase(event).c_str(), ToCamelCase(event).c_str(), event.c_str());
-    PERFETTO_LOG(");\nreturn std::string(line);\n}\n");
   }
 }
 
