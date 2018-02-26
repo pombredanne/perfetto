@@ -36,6 +36,7 @@ cc_library_shared {
     "src/ftrace_reader/event_info_constants.cc",
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/ftrace_config.cc",
+    "src/ftrace_reader/ftrace_config_muxer.cc",
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
     "src/ftrace_reader/proto_translation_table.cc",
@@ -56,6 +57,7 @@ cc_library_shared {
     "src/traced/service/service.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/ftrace_config.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
@@ -126,6 +128,7 @@ cc_binary {
     "src/traced/perfetto_cmd/perfetto_cmd.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/ftrace_config.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
@@ -216,6 +219,7 @@ cc_test {
     "src/ftrace_reader/event_info_constants.cc",
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/ftrace_config.cc",
+    "src/ftrace_reader/ftrace_config_muxer.cc",
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
     "src/ftrace_reader/ftrace_procfs_integrationtest.cc",
@@ -238,6 +242,7 @@ cc_test {
     "src/traced/probes/probes_producer.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/ftrace_config.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
@@ -294,6 +299,7 @@ genrule {
   srcs: [
     "protos/perfetto/config/data_source_config.proto",
     "protos/perfetto/config/data_source_descriptor.proto",
+    "protos/perfetto/config/ftrace/ftrace_config.proto",
     "protos/perfetto/config/trace_config.proto",
   ],
   tools: [
@@ -303,6 +309,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/config/data_source_config.pb.cc",
     "external/perfetto/protos/perfetto/config/data_source_descriptor.pb.cc",
+    "external/perfetto/protos/perfetto/config/ftrace/ftrace_config.pb.cc",
     "external/perfetto/protos/perfetto/config/trace_config.pb.cc",
   ],
 }
@@ -313,6 +320,7 @@ genrule {
   srcs: [
     "protos/perfetto/config/data_source_config.proto",
     "protos/perfetto/config/data_source_descriptor.proto",
+    "protos/perfetto/config/ftrace/ftrace_config.proto",
     "protos/perfetto/config/trace_config.proto",
   ],
   tools: [
@@ -322,6 +330,7 @@ genrule {
   out: [
     "external/perfetto/protos/perfetto/config/data_source_config.pb.h",
     "external/perfetto/protos/perfetto/config/data_source_descriptor.pb.h",
+    "external/perfetto/protos/perfetto/config/ftrace/ftrace_config.pb.h",
     "external/perfetto/protos/perfetto/config/trace_config.pb.h",
   ],
   export_include_dirs: [
@@ -1821,6 +1830,7 @@ cc_library_static {
     "src/protozero/scattered_stream_writer.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/ftrace_config.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/service_impl.cc",
@@ -1918,10 +1928,13 @@ cc_test {
     "src/ftrace_reader/format_parser.cc",
     "src/ftrace_reader/format_parser_unittest.cc",
     "src/ftrace_reader/ftrace_config.cc",
+    "src/ftrace_reader/ftrace_config_muxer.cc",
+    "src/ftrace_reader/ftrace_config_muxer_unittest.cc",
     "src/ftrace_reader/ftrace_config_unittest.cc",
     "src/ftrace_reader/ftrace_controller.cc",
     "src/ftrace_reader/ftrace_controller_unittest.cc",
     "src/ftrace_reader/ftrace_procfs.cc",
+    "src/ftrace_reader/ftrace_procfs_unittest.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/ftrace_reader/proto_translation_table_unittest.cc",
     "src/ftrace_reader/test/cpu_reader_support.cc",
@@ -1951,6 +1964,7 @@ cc_test {
     "src/protozero/test/protozero_conformance_unittest.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
+    "src/tracing/core/ftrace_config.cc",
     "src/tracing/core/id_allocator.cc",
     "src/tracing/core/id_allocator_unittest.cc",
     "src/tracing/core/packet_stream_validator.cc",
