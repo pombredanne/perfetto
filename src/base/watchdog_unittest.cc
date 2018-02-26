@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 
 #include <time.h>
+#include <map>
 
 namespace perfetto {
 namespace base {
@@ -43,6 +44,17 @@ TEST(WatchdogTest, TimerCrash) {
       {
         TestWatchdog watchdog = TestWatchdog::Create(100);
         auto handle = watchdog.CreateFatalTimer(20);
+        usleep(21 * 1000);
+      },
+      "");
+}
+
+TEST(WatchdogTest, CrashEvenWhenMove) {
+  std::map<int, Watchdog::Timer> timers;
+  EXPECT_DEATH(
+      {
+        TestWatchdog watchdog = TestWatchdog::Create(100);
+        timers.emplace(0, watchdog.CreateFatalTimer(20));
         usleep(21 * 1000);
       },
       "");
