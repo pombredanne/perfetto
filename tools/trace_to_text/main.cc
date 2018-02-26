@@ -2227,9 +2227,15 @@ std::string FormatExt4ZeroRange(const Ext4ZeroRangeFtraceEvent& event) {
 // TODO(taylori): Confirm correct format for this.
 std::string FormatProcess(const Process& process) {
   char line[2048];
-  sprintf(line, "process: pid=%d ppid=%d cmdline=%s\\n", process.pid(),
-          process.ppid(), process.cmdline(0).c_str());
+  sprintf(line, "process: pid=%d ppid=%d cmdline=", process.pid(),
+          process.ppid());
   std::string output = std::string(line);
+  for (auto field : process.cmdline()) {
+    char cmd[2048];
+    sprintf(cmd, "%s ", field.c_str());
+    output += std::string(cmd);
+  }
+  output += "\\n";
   for (auto thread : process.threads()) {
     char thread_line[2048];
     sprintf(thread_line, "thread: tid=%d name=%s\\n", thread.tid(),
@@ -2396,7 +2402,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
         const auto& inner = event.ext4_collapse_range();
         line = FormatExt4CollapseRange(inner);
       } else if (event.has_ext4_da_release_space()) {
-        const auto& inner = event.ext4_da_release_space();
+        Ext4DirectIOEnter const auto& inner = event.ext4_da_release_space();
         line = FormatExt4DaReleaseSpace(inner);
       } else if (event.has_ext4_da_reserve_space()) {
         const auto& inner = event.ext4_da_reserve_space();
