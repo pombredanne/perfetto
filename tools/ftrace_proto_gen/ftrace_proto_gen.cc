@@ -21,6 +21,8 @@
 #include <set>
 #include <string>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 
 namespace {
@@ -84,6 +86,49 @@ std::string InferProtoType(const FtraceEvent::Field& field) {
   if (field.size <= 8 && !field.is_signed)
     return "uint64";
   return "";
+}
+
+void LogFtraceEventProtoAdditions(const std::set<std::string>& events) {
+  PERFETTO_LOG(
+      "Number appropriately and add output to "
+      "protos/perfetto/trace/ftrace/ftrace_event.proto");
+  for (auto event : events) {
+    PERFETTO_LOG("%sFtraceEvent %s = ;", ToCamelCase(event).c_str(),
+                 event.c_str());
+  }
+}
+
+void LogTraceToTextMain(const std::set<std::string>& events) {
+  PERFETTO_LOG(
+      "Add output to TraceToSystrace for loop in "
+      "tools/ftrace_proto_gen/main.cc");
+  for (auto event : events) {
+    PERFETTO_LOG(
+        "else if (event.has_%s()) {\nconst auto& inner = event.%s();\nline = "
+        "Format%s(inner);\n} ",
+        event.c_str(), event.c_str(), ToCamelCase(event).c_str());
+  }
+}
+
+void LogTraceToTextUsingStatements(const std::set<std::string>& events) {
+  PERFETTO_LOG("Add output to tools/ftrace_proto_gen/main.cc");
+  for (auto event : events) {
+    PERFETTO_LOG("using protos::%sFtraceEvent;", ToCamelCase(event).c_str());
+  }
+}
+
+void LogTraceToTextFunctions(const std::set<std::string>& events) {
+  PERFETTO_LOG(
+      "Add output to tools/ftrace_proto_gen/main.cc and then manually go "
+      "through format files to match fields");
+  for (auto event : events) {
+    PERFETTO_LOG(
+        "std::string Format%s(const %sFtraceEvent& event) {"
+        "\nchar line[2048];"
+        "\nsprintf(line,\"%s: ",
+        ToCamelCase(event).c_str(), ToCamelCase(event).c_str(), event.c_str());
+    PERFETTO_LOG(");\nreturn std::string(line);\n}\n");
+  }
 }
 
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
