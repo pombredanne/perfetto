@@ -10,6 +10,8 @@
 
 #include "file_utils.h"
 
+#include "perfetto/base/logging.h"
+
 using file_utils::ForEachPidInProcPath;
 using file_utils::ReadProcFile;
 using file_utils::ReadProcFileTrimmed;
@@ -41,29 +43,54 @@ inline bool IsApp(const char* name, const char* exe) {
          strncmp(name, kZygotePrefix, sizeof(kZygotePrefix) - 1) != 0;
 }
 
-}  // namespace
-
-int ReadTgid(int pid) {
-  static const char kTgid[] = "\nTgid:";
+inline int ReadStatusLine(int pid, const char* status_string) {
   char buf[512];
   ssize_t rsize = ReadProcFile(pid, "status", buf, sizeof(buf));
   if (rsize <= 0)
     return -1;
-  const char* tgid_line = strstr(buf, kTgid);
-  return atoi(tgid_line + sizeof(kTgid) - 1);
+  const char* line = strstr(buf, status_string);
+  PERFETTO_DCHECK(line);
+  return atoi(line + strlen(status_string));
+}
+
+inline std::vector<std::string> SplitOnNull(const char* input) {
+  std::vector<std::string> output;
+  do {
+    // This works because it will only push the string up to a null character.
+    output.push_back(std::string(input));
+    input += output.back().size() + 1;
+  } while (input[0] != 0);
+  return output;
+}
+
+}  // namespace
+
+int ReadTgid(int pid) {
+  return ReadStatusLine(pid, "\nTgid:");
+}
+
+int ReadPpid(int pid) {
+  return ReadStatusLine(pid, "\nPPid:");
 }
 
 std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
   ProcessInfo* process = new ProcessInfo();
   process->pid = pid;
-  ReadProcString(pid, "cmdline", process->name, sizeof(process->name));
-  if (process->name[0] != 0) {
-    ReadExePath(pid, process->exe, sizeof(process->exe));
-    process->is_app = IsApp(process->name, process->exe);
-  } else {
-    ReadProcString(pid, "comm", process->name, sizeof(process->name));
+  char cmdline_buf[256];
+  process->cmdline = SplitOnNull("\0");
+  ReadProcString(pid, "cmdline", cmdline_buf, sizeof(cmdline_buf));
+  if (cmdline_buf[0] == 0) {
+    // Nothing in cmdline_buf so read name from /comm instead.
+    char name[256];
+    ReadProcString(pid, "comm", name, sizeof(name));
+    process->cmdline.push_back(name);
     process->in_kernel = true;
+  } else {
+    process->cmdline = SplitOnNull(cmdline_buf);
+    ReadExePath(pid, process->exe, sizeof(process->exe));
+    process->is_app = IsApp(process->cmdline[0].c_str(), process->exe);
   }
+  process->ppid = ReadPpid(pid);
   return std::unique_ptr<ProcessInfo>(process);
 }
 
@@ -84,38 +111,6 @@ void ReadProcessThreads(ProcessInfo* process) {
       strcpy(thread.name, "UI Thread");
     process->threads[tid] = thread;
   });
-}
-
-void SerializeProcesses(ProcessMap* processes, FILE* out) {
-  fprintf(out, "\"processes\":{");
-  for (auto it = processes->begin(); it != processes->end();) {
-    const ProcessInfo* process = it->second.get();
-    fprintf(out, "\"%d\":{", process->pid);
-    fprintf(out, "\"name\":\"%s\"", process->name);
-
-    if (!process->in_kernel) {
-      fprintf(out, ",\"exe\":\"%s\",", process->exe);
-      fprintf(out, "\"threads\":{\n");
-      const auto threads = &process->threads;
-      for (auto thread_it = threads->begin(); thread_it != threads->end();) {
-        const ThreadInfo* thread = &(thread_it->second);
-        fprintf(out, "\"%d\":{", thread->tid);
-        fprintf(out, "\"name\":\"%s\"", thread->name);
-
-        if (++thread_it != threads->end())
-          fprintf(out, "},\n");
-        else
-          fprintf(out, "}\n");
-      }
-      fprintf(out, "}");
-    }
-
-    if (++it != processes->end())
-      fprintf(out, "},\n");
-    else
-      fprintf(out, "}\n");
-  }
-  fprintf(out, "}");
 }
 
 }  // namespace procfs_utils
