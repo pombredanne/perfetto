@@ -2137,4 +2137,3 @@ cc_library_shared {
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
-*/
