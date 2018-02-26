@@ -38,9 +38,7 @@ class TestWatchdog : public Watchdog {
 };
 
 TEST(WatchdogTest, TimerCrash) {
-  // Create a timer for 20 seconds and don't release wihin the time. We sleep
-  // for 26ms because we need to wait an extra 5ms for the watchdog to poll
-  // the timer once.
+  // Create a timer for 20 seconds and don't release wihin the time.
   EXPECT_DEATH(
       {
         TestWatchdog watchdog = TestWatchdog::Create(100);
@@ -57,9 +55,7 @@ TEST(WatchdogTest, NoTimerCrash) {
   PERFETTO_CHECK(usleep(24 * 1000) != -1);
 }
 
-// TODO(lalitm): this test does not seem to work as intended and gives very
-// high values for RSS.
-TEST(WatchdogTest, DISABLED_CrashMemory) {
+TEST(WatchdogTest, CrashMemory) {
   EXPECT_DEATH(
       {
         // Allocate 10MB of data and use it to increase RSS.
@@ -77,11 +73,28 @@ TEST(WatchdogTest, DISABLED_CrashMemory) {
       "");
 }
 
-// TODO(lalitm): this test does not seem to work as intended and gives very
-// high values for RSS.
-TEST(WatchdogTest, DISABLED_NoCrashMemory) {
+TEST(WatchdogTest, NoCrashMemory) {
   TestWatchdog watchdog = TestWatchdog::Create(5);
   watchdog.SetMemoryLimit(10 * 1024 * 1024, 25);
+
+  // Sleep so that the watchdog has some time to pick it up.
+  PERFETTO_CHECK(usleep(55 * 1000) != -1);
+}
+
+TEST(WatchdogTest, CrashCpu) {
+  EXPECT_DEATH(
+      {
+        TestWatchdog watchdog = TestWatchdog::Create(1);
+        watchdog.SetCpuLimit(10, 25);
+        while (true) {
+        }
+      },
+      "");
+}
+
+TEST(WatchdogTest, NoCrashCpu) {
+  TestWatchdog watchdog = TestWatchdog::Create(5);
+  watchdog.SetCpuLimit(1, 25);
 
   // Sleep so that the watchdog has some time to pick it up.
   PERFETTO_CHECK(usleep(55 * 1000) != -1);

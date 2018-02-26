@@ -17,7 +17,6 @@
 #ifndef INCLUDE_PERFETTO_BASE_TASK_RUNNER_H_
 #define INCLUDE_PERFETTO_BASE_TASK_RUNNER_H_
 
-#include <sys/syscall.h>
 #include <functional>
 
 #include "perfetto/base/build_config.h"
@@ -76,10 +75,8 @@ class TaskRunner {
 #if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
     (PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||       \
      PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID))
-    if (PERFETTO_LIKELY(getpid() == syscall(__NR_gettid))) {
-      base::Watchdog::TimerHandle handle =
-          base::Watchdog::GetInstance()->CreateFatalTimer(kWatchdogMillis);
-    }
+    base::Watchdog::Timer handle =
+        base::Watchdog::GetInstance()->CreateFatalTimer(kWatchdogMillis);
 #endif
     task();
   }

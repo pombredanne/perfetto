@@ -73,7 +73,6 @@ class PerfettoTest : public ::testing::Test {
     ~ServiceDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
-      PERFETTO_LOG("Service: %ld", syscall(__NR_gettid));
       svc_ = ServiceIPCHost::CreateInstance(task_runner);
       unlink(TEST_PRODUCER_SOCK_NAME);
       unlink(TEST_CONSUMER_SOCK_NAME);
@@ -91,7 +90,6 @@ class PerfettoTest : public ::testing::Test {
     ~ProbesProducerDelegate() override = default;
 
     void Initialize(base::TaskRunner* task_runner) override {
-      PERFETTO_LOG("Producer: %ld", syscall(__NR_gettid));
       producer_.reset(new ProbesProducer);
       producer_->ConnectWithRetries(TEST_PRODUCER_SOCK_NAME, task_runner);
     }

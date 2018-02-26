@@ -35,17 +35,17 @@ class Watchdog {
  public:
   // Handle to the timer set to crash the program. If the handle is dropped,
   // the timer is removed so the program does not crash.
-  class TimerHandle {
+  class Timer {
    public:
-    ~TimerHandle();
-    TimerHandle(TimerHandle&& other) noexcept;
+    ~Timer();
+    Timer(Timer&& other) noexcept;
 
    private:
     friend class Watchdog;
 
-    TimerHandle(uint32_t ms);
-    TimerHandle(const TimerHandle&) = delete;
-    TimerHandle& operator=(const TimerHandle&) = delete;
+    explicit Timer(uint32_t ms);
+    Timer(const Timer&) = delete;
+    Timer& operator=(const Timer&) = delete;
 
     timer_t timerid_;
   };
@@ -54,8 +54,8 @@ class Watchdog {
   static Watchdog* GetInstance();
 
   // Sets a timer which will crash the program in |ms| milliseconds if the
-  // returned handle is not destroyed.
-  TimerHandle CreateFatalTimer(uint32_t ms);
+  // returned handle is not destroyed before this point.
+  Timer CreateFatalTimer(uint32_t ms);
 
   // Sets a limit on the memory (defined as the RSS) used by the program
   // averaged over the last |window_ms| milliseconds. If |kb| is 0, any
@@ -115,7 +115,7 @@ class Watchdog {
     std::unique_ptr<uint64_t[]> buffer_;
   };
 
-  Watchdog(const Watchdog&) = delete;
+  explicit Watchdog(const Watchdog&) = delete;
   Watchdog& operator=(const Watchdog&) = delete;
 
   // Main method for the watchdog thread.
@@ -129,8 +129,9 @@ class Watchdog {
   // to |polling_interval_ms_|.
   uint32_t WindowTimeForRingBuffer(const WindowedInterval& window);
 
+  const uint32_t polling_interval_ms_;
   std::thread thread_;
-  std::condition_variable condition_variable_;
+  std::condition_variable exit_signal_;
 
   // --- Begin lock-protected members ---
 
@@ -141,9 +142,7 @@ class Watchdog {
   WindowedInterval memory_window_bytes_;
 
   uint32_t cpu_limit_percentage_ = 0;
-  WindowedInterval cpu_window_time_;
-
-  const uint32_t polling_interval_ms_;
+  WindowedInterval cpu_window_time_ticks_;
 
   // --- End lock-protected members ---
 };

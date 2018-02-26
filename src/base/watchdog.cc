@@ -22,6 +22,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
+#include <fstream>
 #include <thread>
 
 namespace perfetto {
@@ -46,15 +47,19 @@ double MeanForArray(uint64_t array[], size_t size) {
 }  //  namespace
 
 Watchdog::Watchdog(uint32_t polling_interval_ms)
-    : thread_(&Watchdog::ThreadMain, this),
-      polling_interval_ms_(polling_interval_ms) {}
+    : polling_interval_ms_(polling_interval_ms) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  thread_ = std::thread(&Watchdog::ThreadMain, this);
+#endif
+}
 
 Watchdog::~Watchdog() {
   {
     std::lock_guard<std::mutex> guard(mutex_);
     quit_ = true;
   }
-  condition_variable_.notify_one();
+  exit_signal_.notify_one();
   thread_.join();
 }
 
@@ -63,8 +68,8 @@ Watchdog* Watchdog::GetInstance() {
   return watchdog;
 }
 
-Watchdog::TimerHandle Watchdog::CreateFatalTimer(uint32_t ms) {
-  return Watchdog::TimerHandle(ms);
+Watchdog::Timer Watchdog::CreateFatalTimer(uint32_t ms) {
+  return Watchdog::Timer(ms);
 }
 
 void Watchdog::SetMemoryLimit(uint32_t bytes, uint32_t window_ms) {
@@ -86,47 +91,43 @@ void Watchdog::SetCpuLimit(uint32_t percentage, uint32_t window_ms) {
                  percentage == 0);
 
   size_t size = percentage == 0 ? 0 : window_ms / polling_interval_ms_ + 1;
-  cpu_window_time_.Reset(size);
+  cpu_window_time_ticks_.Reset(size);
   cpu_limit_percentage_ = percentage;
 }
 
 void Watchdog::ThreadMain() {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  base::ScopedFstream file(fopen("/proc/self/stat", "r"));
+  base::ScopedFile file(open("/proc/self/stat", O_RDONLY));
   if (!file)
     PERFETTO_ELOG("Failed to open stat file to enforce resource limits.");
-#endif
 
   std::unique_lock<std::mutex> guard(mutex_);
   for (;;) {
-    condition_variable_.wait_for(
-        guard, std::chrono::milliseconds(polling_interval_ms_));
+    exit_signal_.wait_for(guard,
+                          std::chrono::milliseconds(polling_interval_ms_));
     if (quit_)
       return;
 
     uint64_t cpu_time = 0;
     uint64_t rss_bytes = 0;
-
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
     if (file) {
-      unsigned long utime = 0;
-      unsigned long stime = 0;
-      long rss_pages = -1l;
+      unsigned long int utime = 0l;
+      unsigned long int stime = 0l;
+      long int rss_pages = -1l;
 
       // Read the file from the beginning for utime, stime and rss.
-      rewind(file.get());
+      lseek(file.get(), 0, SEEK_SET);
+      char c[256];
+      read(file.get(), c, 256);
+
       PERFETTO_CHECK(
-          fscanf(file.get(),
-                 "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu "
-                 "%*d %*d %*d %*d %*d %*d %*u %*u %ld",
+          sscanf(c,
+                 "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu"
+                 "%lu %*d %*d %*d %*d %*d %*d %*u %*lu %ld",
                  &utime, &stime, &rss_pages) == 3);
 
       cpu_time = utime + stime;
       rss_bytes = static_cast<uint32_t>(rss_pages) * base::kPageSize;
     }
-#endif
 
     CheckMemory(rss_bytes);
     CheckCpu(cpu_time);
@@ -151,13 +152,17 @@ void Watchdog::CheckCpu(uint64_t cpu_time) {
     return;
 
   // Add the cpu time to the ring buffer.
-  if (cpu_window_time_.Push(cpu_time)) {
+  if (cpu_window_time_ticks_.Push(cpu_time)) {
     // Compute the percentage over the whole window and check that it remains
     // under the threshold.
-    uint64_t difference = static_cast<uint64_t>(
-        cpu_window_time_.NewestWhenFull() - cpu_window_time_.OldestWhenFull());
-    uint64_t percentage =
-        difference / WindowTimeForRingBuffer(cpu_window_time_);
+    uint64_t difference_ticks = cpu_window_time_ticks_.NewestWhenFull() -
+                                cpu_window_time_ticks_.OldestWhenFull();
+    double window_interval_ticks =
+        (static_cast<double>(WindowTimeForRingBuffer(cpu_window_time_ticks_)) /
+         1000.0) *
+        sysconf(_SC_CLK_TCK);
+    double percentage = static_cast<double>(difference_ticks) /
+                        static_cast<double>(window_interval_ticks) * 100;
     if (percentage > cpu_limit_percentage_) {
       kill(getpid(), SIGABRT);
     }
@@ -196,7 +201,7 @@ void Watchdog::WindowedInterval::Reset(size_t new_size) {
   buffer_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
 }
 
-Watchdog::TimerHandle::TimerHandle(uint32_t ms) {
+Watchdog::Timer::Timer(uint32_t ms) {
   struct sigevent sev = {};
   sev.sigev_notify = SIGEV_SIGNAL;
   sev.sigev_signo = SIGABRT;
@@ -207,11 +212,16 @@ Watchdog::TimerHandle::TimerHandle(uint32_t ms) {
   PERFETTO_CHECK(timer_settime(timerid_, 0, &its, nullptr) != -1);
 }
 
-Watchdog::TimerHandle::~TimerHandle() {
-  PERFETTO_CHECK(timer_delete(timerid_) != -1);
+Watchdog::Timer::~Timer() {
+  if (timerid_ != nullptr) {
+    timer_delete(timerid_);
+  }
 }
 
-Watchdog::TimerHandle::TimerHandle(TimerHandle&& other) = default;
+Watchdog::Timer::Timer(Timer&& other) {
+  timerid_ = other.timerid_;
+  // other.timerid_ = nullptr;
+}
 
 }  // namespace base
 }  // namespace perfetto

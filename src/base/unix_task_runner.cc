@@ -194,12 +194,7 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
     task = it->second.callback;
   }
   errno = 0;
-
-  // TODO(b/TODO): this should be replaced with a call to RunTask but this has
-  // the problem of introducting reentrancy to the RunTask method which we
-  // do not support. Figure out a more solution to use future changes to
-  // RunTask.
-  task();
+  RunTask(task);
 }
 
 UnixTaskRunner::TimeDurationMs UnixTaskRunner::GetDelayToNextTaskLocked()
