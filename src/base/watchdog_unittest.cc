@@ -43,20 +43,18 @@ TEST(WatchdogTest, TimerCrash) {
   // the timer once.
   EXPECT_DEATH(
       {
-        TestWatchdog watchdog = TestWatchdog::Create(5);
-        auto handle =
-            watchdog.CreateFatalTimer(20, Watchdog::TimerReason::kTaskDeadline);
-        usleep(26 * 1000);
+        TestWatchdog watchdog = TestWatchdog::Create(100);
+        auto handle = watchdog.CreateFatalTimer(20);
+        usleep(21 * 1000);
       },
       "");
 }
 
 TEST(WatchdogTest, NoTimerCrash) {
   // Set a timer for 25ms and release the handle in 20ms.
-  TestWatchdog watchdog = TestWatchdog::Create(5);
-  auto handle =
-      watchdog.CreateFatalTimer(25, Watchdog::TimerReason::kTaskDeadline);
-  PERFETTO_CHECK(usleep(20 * 1000) != -1);
+  TestWatchdog watchdog = TestWatchdog::Create(1);
+  auto handle = watchdog.CreateFatalTimer(25);
+  PERFETTO_CHECK(usleep(24 * 1000) != -1);
 }
 
 // TODO(lalitm): this test does not seem to work as intended and gives very
@@ -64,11 +62,14 @@ TEST(WatchdogTest, NoTimerCrash) {
 TEST(WatchdogTest, DISABLED_CrashMemory) {
   EXPECT_DEATH(
       {
-        TestWatchdog watchdog = TestWatchdog::Create(5);
-        watchdog.SetMemoryLimit(100 * 1024, 25);
+        // Allocate 10MB of data and use it to increase RSS.
+        uint8_t* ptr = static_cast<uint8_t*>(malloc(10 * 1024 * 1024));
+        for (int i = 0; i < 10 * 1024 * 1024 + 1024; i++) {
+          ptr[i] = 1;
+        }
 
-        // Allocate over 50MB of data.
-        // malloc(50 * 1024 + 20);
+        TestWatchdog watchdog = TestWatchdog::Create(5);
+        watchdog.SetMemoryLimit(10 * 1024 * 1024, 25);
 
         // Sleep so that the watchdog has some time to pick it up.
         usleep(35 * 1000);
@@ -80,10 +81,10 @@ TEST(WatchdogTest, DISABLED_CrashMemory) {
 // high values for RSS.
 TEST(WatchdogTest, DISABLED_NoCrashMemory) {
   TestWatchdog watchdog = TestWatchdog::Create(5);
-  watchdog.SetMemoryLimit(100 * 1024, 25);
+  watchdog.SetMemoryLimit(10 * 1024 * 1024, 25);
 
   // Sleep so that the watchdog has some time to pick it up.
-  PERFETTO_CHECK(usleep(100 * 1000) != -1);
+  PERFETTO_CHECK(usleep(55 * 1000) != -1);
 }
 
 }  // namespace

@@ -33,27 +33,21 @@ class TestWatchdog;
 // crashed.
 class Watchdog {
  public:
-  // Possible reasons for setting a timer limit.
-  enum TimerReason {
-    kTaskDeadline = 0,
-    kTraceDeadline = 1,
-    kMax = kTraceDeadline + 1,
-  };
-
   // Handle to the timer set to crash the program. If the handle is dropped,
   // the timer is removed so the program does not crash.
   class TimerHandle {
    public:
-    TimerHandle(Watchdog* watchdog, TimerReason reason);
     ~TimerHandle();
     TimerHandle(TimerHandle&& other) noexcept;
 
    private:
+    friend class Watchdog;
+
+    TimerHandle(uint32_t ms);
     TimerHandle(const TimerHandle&) = delete;
     TimerHandle& operator=(const TimerHandle&) = delete;
 
-    Watchdog* watchdog_;
-    const TimerReason reason_;
+    timer_t timerid_;
   };
   virtual ~Watchdog();
 
@@ -61,15 +55,13 @@ class Watchdog {
 
   // Sets a timer which will crash the program in |ms| milliseconds if the
   // returned handle is not destroyed.
-  // Note: only one timer with each reason can exist at any one time.
-  // Note: |ms| has to be a multiple of |polling_interval_ms_|.
-  TimerHandle CreateFatalTimer(uint32_t ms, TimerReason reason);
+  TimerHandle CreateFatalTimer(uint32_t ms);
 
   // Sets a limit on the memory (defined as the RSS) used by the program
   // averaged over the last |window_ms| milliseconds. If |kb| is 0, any
   // existing limit is removed.
   // Note: |window_ms| has to be a multiple of |polling_interval_ms_|.
-  void SetMemoryLimit(uint32_t kb, uint32_t window_ms);
+  void SetMemoryLimit(uint32_t bytes, uint32_t window_ms);
 
   // Sets a limit on the CPU usage used by the program averaged over the last
   // |window_ms| milliseconds. If |percentage| is 0, any existing limit is
@@ -130,12 +122,8 @@ class Watchdog {
   void ThreadMain();
 
   // Check each type of resource every |polling_interval_ms_| miillis.
-  void CheckMemory(uint64_t rss_kb);
+  void CheckMemory(uint64_t rss_bytes);
   void CheckCpu(uint64_t cpu_time);
-  void CheckTimers();
-
-  // Clears the timer with the given reason.
-  void ClearTimer(TimerReason reason);
 
   // Computes the time interval spanned by a given ring buffer with respect
   // to |polling_interval_ms_|.
@@ -149,14 +137,13 @@ class Watchdog {
   std::mutex mutex_;
   bool quit_ = false;
 
-  uint32_t memory_limit_kb_ = 0;
-  WindowedInterval memory_window_kb_;
+  uint32_t memory_limit_bytes_ = 0;
+  WindowedInterval memory_window_bytes_;
 
   uint32_t cpu_limit_percentage_ = 0;
   WindowedInterval cpu_window_time_;
 
   const uint32_t polling_interval_ms_;
-  int32_t timer_window_countdown_[TimerReason::kMax] = {};
 
   // --- End lock-protected members ---
 };

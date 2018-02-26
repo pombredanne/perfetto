@@ -78,8 +78,7 @@ class TaskRunner {
      PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID))
     if (PERFETTO_LIKELY(getpid() == syscall(__NR_gettid))) {
       base::Watchdog::TimerHandle handle =
-          base::Watchdog::GetInstance()->CreateFatalTimer(
-              kWatchdogMillis, base::Watchdog::TimerReason::kTaskDeadline);
+          base::Watchdog::GetInstance()->CreateFatalTimer(kWatchdogMillis);
     }
 #endif
     task();

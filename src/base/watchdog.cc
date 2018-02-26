@@ -20,6 +20,8 @@
 #include "perfetto/base/scoped_file.h"
 
 #include <fcntl.h>
+#include <signal.h>
+#include <stdint.h>
 #include <thread>
 
 namespace perfetto {
@@ -61,28 +63,19 @@ Watchdog* Watchdog::GetInstance() {
   return watchdog;
 }
 
-Watchdog::TimerHandle Watchdog::CreateFatalTimer(uint32_t ms,
-                                                 TimerReason reason) {
-  std::lock_guard<std::mutex> guard(mutex_);
-
-  PERFETTO_CHECK(IsMultipleOf(ms, polling_interval_ms_));
-  PERFETTO_CHECK(timer_window_countdown_[reason] == 0);
-
-  // Update the countdown array with the number of intervals remaining + 1.
-  timer_window_countdown_[reason] =
-      static_cast<int32_t>(ms / polling_interval_ms_) + 1;
-  return Watchdog::TimerHandle(this, reason);
+Watchdog::TimerHandle Watchdog::CreateFatalTimer(uint32_t ms) {
+  return Watchdog::TimerHandle(ms);
 }
 
-void Watchdog::SetMemoryLimit(uint32_t kb, uint32_t window_ms) {
+void Watchdog::SetMemoryLimit(uint32_t bytes, uint32_t window_ms) {
   // Update the fields under the lock.
   std::lock_guard<std::mutex> guard(mutex_);
 
-  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) || kb == 0);
+  PERFETTO_CHECK(IsMultipleOf(window_ms, polling_interval_ms_) || bytes == 0);
 
-  size_t size = kb == 0 ? 0 : window_ms / polling_interval_ms_ + 1;
-  memory_window_kb_.Reset(size);
-  memory_limit_kb_ = kb;
+  size_t size = bytes == 0 ? 0 : window_ms / polling_interval_ms_ + 1;
+  memory_window_bytes_.Reset(size);
+  memory_limit_bytes_ = bytes;
 }
 
 void Watchdog::SetCpuLimit(uint32_t percentage, uint32_t window_ms) {
@@ -95,12 +88,6 @@ void Watchdog::SetCpuLimit(uint32_t percentage, uint32_t window_ms) {
   size_t size = percentage == 0 ? 0 : window_ms / polling_interval_ms_ + 1;
   cpu_window_time_.Reset(size);
   cpu_limit_percentage_ = percentage;
-}
-
-void Watchdog::ClearTimer(TimerReason reason) {
-  std::lock_guard<std::mutex> guard(mutex_);
-  PERFETTO_DCHECK(timer_window_countdown_[reason] != 0);
-  timer_window_countdown_[reason] = 0;
 }
 
 void Watchdog::ThreadMain() {
@@ -119,7 +106,7 @@ void Watchdog::ThreadMain() {
       return;
 
     uint64_t cpu_time = 0;
-    uint64_t rss_kb = 0;
+    uint64_t rss_bytes = 0;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
@@ -135,29 +122,27 @@ void Watchdog::ThreadMain() {
                  "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu "
                  "%*d %*d %*d %*d %*d %*d %*u %*u %ld",
                  &utime, &stime, &rss_pages) == 3);
-      PERFETTO_LOG("%ld", rss_pages);
 
       cpu_time = utime + stime;
-      rss_kb = static_cast<uint32_t>(rss_pages) * base::kPageSize;
+      rss_bytes = static_cast<uint32_t>(rss_pages) * base::kPageSize;
     }
 #endif
 
-    CheckMemory(rss_kb);
+    CheckMemory(rss_bytes);
     CheckCpu(cpu_time);
-    CheckTimers();
   }
 }
 
-void Watchdog::CheckMemory(uint64_t rss_kb) {
-  if (memory_limit_kb_ == 0)
+void Watchdog::CheckMemory(uint64_t rss_bytes) {
+  if (memory_limit_bytes_ == 0)
     return;
 
   // Add the current stat value to the ring buffer and check that the mean
   // remains under our threshold.
-  PERFETTO_LOG("%f", memory_window_kb_.Mean());
-  if (memory_window_kb_.Push(rss_kb)) {
-    PERFETTO_LOG("%f", memory_window_kb_.Mean());
-    PERFETTO_CHECK(memory_window_kb_.Mean() <= memory_limit_kb_);
+  if (memory_window_bytes_.Push(rss_bytes)) {
+    if (memory_window_bytes_.Mean() > memory_limit_bytes_) {
+      kill(getpid(), SIGABRT);
+    }
   }
 }
 
@@ -173,21 +158,9 @@ void Watchdog::CheckCpu(uint64_t cpu_time) {
         cpu_window_time_.NewestWhenFull() - cpu_window_time_.OldestWhenFull());
     uint64_t percentage =
         difference / WindowTimeForRingBuffer(cpu_window_time_);
-    PERFETTO_CHECK(percentage <= cpu_limit_percentage_);
-  }
-}
-
-void Watchdog::CheckTimers() {
-  for (size_t i = 0; i < TimerReason::kMax; i++) {
-    if (timer_window_countdown_[i] == 0)
-      continue;
-
-    // If we hit a timer of 1 and we haven't had the flag cleared, then
-    // we should crash the program.
-    PERFETTO_CHECK(timer_window_countdown_[i] != 1);
-
-    // Otherwise decrement the counter.
-    timer_window_countdown_[i]--;
+    if (percentage > cpu_limit_percentage_) {
+      kill(getpid(), SIGABRT);
+    }
   }
 }
 
@@ -223,11 +196,21 @@ void Watchdog::WindowedInterval::Reset(size_t new_size) {
   buffer_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
 }
 
-Watchdog::TimerHandle::TimerHandle(Watchdog* watchdog, TimerReason reason)
-    : watchdog_(watchdog), reason_(reason) {}
-Watchdog::TimerHandle::~TimerHandle() {
-  watchdog_->ClearTimer(reason_);
+Watchdog::TimerHandle::TimerHandle(uint32_t ms) {
+  struct sigevent sev = {};
+  sev.sigev_notify = SIGEV_SIGNAL;
+  sev.sigev_signo = SIGABRT;
+  PERFETTO_CHECK(timer_create(CLOCK_MONOTONIC, &sev, &timerid_) != -1);
+  struct itimerspec its = {};
+  its.it_value.tv_sec = ms / 1000;
+  its.it_value.tv_nsec = 1000000L * (ms % 1000);
+  PERFETTO_CHECK(timer_settime(timerid_, 0, &its, nullptr) != -1);
 }
+
+Watchdog::TimerHandle::~TimerHandle() {
+  PERFETTO_CHECK(timer_delete(timerid_) != -1);
+}
+
 Watchdog::TimerHandle::TimerHandle(TimerHandle&& other) = default;
 
 }  // namespace base
