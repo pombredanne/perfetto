@@ -195,7 +195,6 @@ void Watchdog::WindowedInterval::Clear() {
 }
 
 void Watchdog::WindowedInterval::Reset(size_t new_size) {
-  PERFETTO_CHECK(new_size >= 0);
   position_ = 0;
   size_ = new_size;
   buffer_.reset(new_size == 0 ? nullptr : new uint64_t[new_size]());
