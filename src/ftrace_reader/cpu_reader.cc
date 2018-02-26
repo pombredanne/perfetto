@@ -148,20 +148,20 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
     PERFETTO_CHECK(sigaction(SIGPIPE, &act, nullptr) == 0);
   }
 
-  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
-                                         *staging_write_fd_, on_data_available,
-                                         &worker_exited_));
+  worker_thread_ =
+      std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
+                            *staging_write_fd_, on_data_available));
 }
 
 CpuReader::~CpuReader() {
-  // There's a kernel bug (b/73807072) which can cause any of the three close()
-  // calls on the trace fd or the staging pipe to hang if the worker thread is
-  // currently blocked in splice(). As a workaround, use a signal to interrupt
-  // any call to splice and wait for the thread to exit.
-  while (!worker_exited_.load(std::memory_order_relaxed)) {
-    pthread_kill(worker_thread_.native_handle(), SIGPIPE);
-    usleep(500);
-  }
+  // The kernel's splice implementation for the trace pipe doesn't generate a
+  // SIGPIPE if the output pipe is closed (b/73807072). Instead, the call to
+  // close() on the pipe hangs forever. To work around this, we first close the
+  // trace fd (which prevents another splice from starting), raise SIGPIPE and
+  // wait for the worker to exit (i.e., to guarantee no splice is in progress)
+  // and only then close the staging pipe.
+  trace_fd_.reset();
+  pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
 }
 
@@ -169,8 +169,7 @@ CpuReader::~CpuReader() {
 void CpuReader::RunWorkerThread(size_t cpu,
                                 int trace_fd,
                                 int staging_write_fd,
-                                std::function<void()> on_data_available,
-                                std::atomic<bool>* worker_exited) {
+                                std::function<void()> on_data_available) {
   // This thread is responsible for moving data from the trace pipe into the
   // staging pipe at least one page at a time. This is done using the splice(2)
   // system call, which unlike poll/select makes it possible to block until at
@@ -216,8 +215,6 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // This callback will block until we are allowed to read more data.
     on_data_available();
   }
-
-  worker_exited->store(true, std::memory_order_relaxed);
 }
 
 // static

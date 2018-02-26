@@ -150,8 +150,7 @@ class CpuReader {
   static void RunWorkerThread(size_t cpu,
                               int trace_fd,
                               int staging_write_fd,
-                              std::function<void()> on_data_available,
-                              std::atomic<bool>* worker_exited);
+                              std::function<void()> on_data_available);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
@@ -164,7 +163,6 @@ class CpuReader {
   base::ScopedFile staging_write_fd_;
   std::unique_ptr<uint8_t[]> buffer_;
   std::thread worker_thread_;
-  std::atomic<bool> worker_exited_ = {0};
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
