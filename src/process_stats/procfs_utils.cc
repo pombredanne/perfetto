@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <fstream>
-#include <sstream>
 
 #include "file_utils.h"
 
@@ -51,7 +50,7 @@ inline int ReadStatusLine(int pid, const char* status_string) {
     return -1;
   const char* line = strstr(buf, status_string);
   PERFETTO_DCHECK(line);
-  return atoi(line + sizeof(status_string) - 1);
+  return atoi(line + strlen(status_string));
 }
 
 inline std::vector<std::string> SplitOnNull(const char* input) {
@@ -78,6 +77,7 @@ std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
   ProcessInfo* process = new ProcessInfo();
   process->pid = pid;
   char cmdline_buf[256];
+  process->cmdline = SplitOnNull("\0");
   ReadProcString(pid, "cmdline", cmdline_buf, sizeof(cmdline_buf));
   if (cmdline_buf[0] == 0) {
     // Nothing in cmdline_buf so read name from /comm instead.
