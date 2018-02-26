@@ -136,9 +136,10 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   delegates_.emplace(id, std::move(delegate));
   // Building on Android, watchdogs_.emplace(id, 2* source_config.duration_ms())
   // does not compile. Presumably, this is due to some detail in its libc++.
-  watchdogs_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(id),
-      std::forward_as_tuple(2 * source_config.trace_duration_ms()));
+  if (source_config.trace_duration_ms() != 0)
+    watchdogs_.emplace(
+        std::piecewise_construct, std::forward_as_tuple(id),
+        std::forward_as_tuple(2 * source_config.trace_duration_ms()));
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
