@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,10 +130,12 @@ class TraceBuffez {
   // with an untrusted producer. "untrusted" here means: the producer might be
   // malicious and might change |src| concurrently while we write it (internally
   // this method memcpy()-s first the chunk before processing it).
-  void CopyChunkUntrusted(ProducerID producer_id,
+  // None of the arguments should be trusted, unless otherwise stated. We can
+  // trust that |src| points to a valid memory area, but not its contents.
+  void CopyChunkUntrusted(ProducerID producer_id_trusted,
                           WriterID writer_id,
                           ChunkID chunk_id,
-                          uint16_t num_packets,
+                          uint16_t num_fragments,
                           uint8_t flags,
                           const uint8_t* src,
                           size_t size);
@@ -150,8 +152,9 @@ class TraceBuffez {
 
   // To read the contents of the buffer the caller needs to:
   //   BeginRead()
-  //   while (ReadNext(packet_fragments)) { ... }
-  // No other calls should be interleaved between BeginRead() and ReadNext().
+  //   while (ReadNextTracePacket(packet_fragments)) { ... }
+  // No other calls to any other method should be interleaved between
+  // BeginRead() and ReadNextTracePacket().
   // Reads in the TraceBuffer are NOT idempotent.
   void BeginRead();
 
@@ -159,11 +162,11 @@ class TraceBuffez {
   // can be read at this point.
   // This function returns only complete packets. Specifically:
   // When there is at least one complete packet in the buffer, this function
-  // returns true and populates the |fragments| argument with the boundaries of
+  // returns true and populates the |slices| argument with the boundaries of
   // each fragment for one packet.
-  // The output |fragments|.size() will be >= 1 when this function returns true.
+  // The output |slices|.size() will be >= 1 when this function returns true.
   // When there are no whole packets eligible to read (e.g. we are still missing
-  // fragments) this function returns false and clears |fragments|.
+  // fragments) this function returns false.
   // This function guarantees also that packets for a given
   // {ProducerID, WriterID} are read in FIFO order.
   // This function does not guarantee any ordering w.r.t. packets belonging to
@@ -264,21 +267,21 @@ class TraceBuffez {
 
       // These fields should match at all times the corresponding fields in
       // the ChunkRecord @ |begin|. They are copied here purely for efficiency
-      // to avoid dereferencing the buffer all the times.
+      // to avoid dereferencing the buffer all the time.
       ProducerID producer_id;
       WriterID writer_id;
       ChunkID chunk_id;
     };
 
     ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f)
-        : chunk_record{c}, flags{f}, num_packets{p} {}
+        : chunk_record{c}, flags{f}, num_fragments{p} {}
 
-    ChunkRecord* const chunk_record;  // Addr of ChunkRecord within |data_|.
-    const uint8_t flags = 0;          // See SharedMemoryABI::flags.
-    const uint16_t num_packets = 0;   // Total number of packets.
-    uint16_t num_packets_read = 0;    // Number of packets already read.
+    ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
+    const uint8_t flags = 0;           // See SharedMemoryABI::flags.
+    const uint16_t num_fragments = 0;  // Total number of packets.
+    uint16_t num_fragments_read = 0;   // Number of packets already read.
 
-    // The start offset of the next packet (the |num_packets_read|-th) to be
+    // The start offset of the next packet (the |num_fragments_read|-th) to be
     // read. This is the offset in bytes from the beginning of the ChunkRecord's
     // payload (the 1st packet starts at |chunk_record| + sizeof(ChunkRecord)).
     uint16_t cur_packet_offset = 0;
@@ -287,7 +290,7 @@ class TraceBuffez {
     // subsequent ChunkID is already available, until a patch at offset
     // |last_packet_patch_offset| is applied through MaybePatchChunkContents().
     // TODO(primiano): use this, currently unused.
-    uint16_t last_packet_patch_offset = 0;
+    // uint16_t last_packet_patch_offset = 0;
   };
 
   using ChunkMap = std::map<ChunkMeta::Key, ChunkMeta>;
@@ -368,7 +371,7 @@ class TraceBuffez {
 
   // Decodes the boundaries of the next packet (or a fragment) pointed by
   // ChunkMeta and pushes that into |Slices*|. It also increments the
-  // |num_packets_read| counter.
+  // |num_fragments_read| counter.
   // The Slices pointer can be nullptr, in which case the read state is still
   // advanced.
   bool ReadNextPacketInChunk(ChunkMeta*, Slices*);

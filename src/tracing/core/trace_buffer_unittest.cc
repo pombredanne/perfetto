@@ -271,11 +271,11 @@ TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
 // the end of the buffer.
 TEST_F(TraceBufferTest, ReadWrite_WrappingCases) {
   ASSERT_TRUE(trace_buffer()->Create(4096));
-  ASSERT_EQ(4096u - 16, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
-                            .AddPacket(4096 - 32, 'a')
-                            .CopyIntoTraceBuffer());
+  ASSERT_EQ(4080u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+                       .AddPacket(4080 - 16, 'a')
+                       .CopyIntoTraceBuffer());
   trace_buffer()->BeginRead();
-  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(4096 - 32, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(4080 - 16, 'a')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
 
   ASSERT_EQ(16u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
@@ -289,6 +289,69 @@ TEST_F(TraceBufferTest, ReadWrite_WrappingCases) {
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048 - 16, 'b')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048 - 16, 'c')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Tests that when records are removed when adding padding at the end because
+// there is no space left. The scenario is the following:
+// Initial condition: [ c0: 2048 ][ c1: 2048 ]
+// 2nd iteration:     [ c2: 2048] <-- write pointer is here
+// At this point we try to add a 3072 bytes chunk. It won't fit because the
+// space left till the end is just 2048 bytes. At this point we expect that a
+// padding record is added in place of c1, and c1 is removed from the index.
+// Final situation:   [ c3: 3072     ][ PAD ]
+TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndex) {
+  ASSERT_TRUE(trace_buffer()->Create(4096));
+  // Setup initial condition: [ c0: 2048 ][ c1: 2048 ]
+  ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+                       .AddPacket(2048 - 16, 'a')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+                       .AddPacket(2048 - 16, 'b')
+                       .CopyIntoTraceBuffer());
+
+  // Wrap and get to this: [ c2: 2048] <-- write pointer is here
+  ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
+                       .AddPacket(2048 - 16, 'c')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(2048u, size_to_end());
+
+  // Force wrap because of lack of space and get: [ c3: 3072     ][ PAD ].
+  ASSERT_EQ(3072u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(3))
+                       .AddPacket(3072 - 16, 'd')
+                       .CopyIntoTraceBuffer());
+
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(3072 - 16, 'd')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Similar to ReadWrite_PaddingAtEndUpdatesIndex but makes it so that the
+// various chunks don't perfectly align when wrapping.
+TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
+  ASSERT_TRUE(trace_buffer()->Create(4096));
+
+  // [c0: 512][c1: 512][c2: 512][c3: 512][c4: 512][c5: 512][c6: 512][c7: 512]
+  for (uint8_t i = 0; i < 8; i++) {
+    ASSERT_EQ(512u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(i))
+                        .AddPacket(512 - 16, 'a' + i)
+                        .CopyIntoTraceBuffer());
+  }
+
+  // [c8: 2080..........................][PAD][c5: 512][c6: 512][c7: 512]
+  //                                     ^ write pointer is here.
+  ASSERT_EQ(2080u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(8))
+                       .AddPacket(2080 - 16, 'i')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(2016u, size_to_end());
+
+  // [ c3: 3104....................................][ PAD...............].
+  ASSERT_EQ(3104u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(9))
+                       .AddPacket(3104 - 16, 'j')
+                       .CopyIntoTraceBuffer());
+
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(3104u - 16, 'j')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
