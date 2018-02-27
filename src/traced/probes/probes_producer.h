@@ -47,6 +47,9 @@ class ProbesProducer : public Producer {
   void CreateProcessStatsDataSourceInstance(
       const DataSourceConfig& source_config);
 
+  void OnMetadata(Metadata* metadata);
+  void OnInodes(std::set<uint64_t> inodes);
+
  private:
   using FtraceBundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
@@ -59,10 +62,12 @@ class ProbesProducer : public Producer {
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
     void OnBundleComplete(size_t cpu, FtraceBundleHandle bundle) override;
+    void OnMetadata(Metadata* metadata) override;
 
     void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
 
    private:
+    ProbesProducer* producer_ = nullptr;
     std::unique_ptr<FtraceSink> sink_ = nullptr;
     std::unique_ptr<TraceWriter> writer_;
 
@@ -82,6 +87,7 @@ class ProbesProducer : public Producer {
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
 
+  bool is_inode_tracing_enabled_ = false;
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;

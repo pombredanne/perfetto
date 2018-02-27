@@ -212,12 +212,24 @@ void ProbesProducer::ResetConnectionBackoff() {
   connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
+void ProbesProducer::OnMetadata(Metadata* metadata) {
+  if (is_inode_tracing_enabled_) {
+    task_runner_->PostTask(std::bind(&ProbesProducer::OnInodes, this,
+                                     std::move(metadata->inodes)));
+  }
+}
+
+void ProbesProducer::OnInodes(std::set<uint64_t> inodes) {
+  // Do something.
+}
+
 ProbesProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
     : writer_(std::move(writer)) {}
 
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
 ProbesProducer::FtraceBundleHandle
+
 ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
   trace_packet_ = writer_->NewTracePacket();
   return FtraceBundleHandle(trace_packet_->set_ftrace_events());
@@ -226,6 +238,10 @@ ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
 void ProbesProducer::SinkDelegate::OnBundleComplete(size_t,
                                                     FtraceBundleHandle) {
   trace_packet_->Finalize();
+}
+
+void ProbesProducer::SinkDelegate::OnMetadata(Metadata* metadata) {
+  producer_->OnMetadata(metadata);
 }
 
 }  // namespace perfetto

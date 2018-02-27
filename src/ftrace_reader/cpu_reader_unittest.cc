@@ -338,14 +338,14 @@ TEST(CpuReaderTest, ParseSinglePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   size_t bytes = CpuReader::ParsePage(
-      page.get(), &filter, bundle_provider.writer(), table, &stats);
+      page.get(), &filter, bundle_provider.writer(), table, &metadata);
   EXPECT_EQ(bytes, 60ul);
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712ul);
@@ -375,13 +375,13 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
 
   EventFilter filter(*table, {"print"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_FALSE(CpuReader::ParsePage(
-      page.get(), &filter, bundle_provider.writer(), table, &stats));
+      page.get(), &filter, bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   // Although one field is malformed we still see data for the rest
   // since we write the fields as we parse them for speed.
@@ -400,13 +400,13 @@ TEST(CpuReaderTest, FilterByEvent) {
 
   EventFilter filter(*table, {});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &stats));
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 0);
 }
 
@@ -450,13 +450,13 @@ TEST(CpuReaderTest, ParseThreePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &stats));
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 3);
 
   {
@@ -553,13 +553,13 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &stats));
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 6);
 
   {
@@ -670,11 +670,11 @@ TEST(CpuReaderTest, ParseAllFields) {
 
   auto input = writer.GetCopy();
   auto length = writer.written();
-  std::set<uint64_t> inode_numbers;
+  Metadata metadata{};
 
   ASSERT_TRUE(CpuReader::ParseEvent(ftrace_event_id, input.get(),
                                     input.get() + length, &table,
-                                    provider.writer(), &inode_numbers));
+                                    provider.writer(), &metadata));
 
   auto event = provider.ParseProto();
   ASSERT_TRUE(event);
@@ -685,9 +685,9 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
   EXPECT_EQ(event->all_fields().field_inode(), buf.st_ino);
   // Check inode number gets added and linked to the correct file
-  EXPECT_THAT(inode_numbers, Each(Eq(buf.st_ino)));
+  EXPECT_THAT(metadata.inodes, Each(Eq(buf.st_ino)));
   std::map<uint64_t, std::string> inode_to_filename =
-      CpuReader::GetFilenamesForInodeNumbers(inode_numbers);
+      CpuReader::GetFilenamesForInodeNumbers(metadata.inodes);
   EXPECT_THAT(inode_to_filename, ElementsAre(Pair(buf.st_ino, filename)));
 }
 
@@ -1151,13 +1151,13 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &stats));
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 0ul);
+  EXPECT_EQ(metadata.overwrite_count, 0ul);
   EXPECT_EQ(bundle->event().size(), 59);
 }
 
@@ -1578,13 +1578,13 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  ParserStats stats{};
+  Metadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &stats));
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite_count, 192ul);
+  EXPECT_EQ(metadata.overwrite_count, 192ul);
 }
 
 }  // namespace perfetto

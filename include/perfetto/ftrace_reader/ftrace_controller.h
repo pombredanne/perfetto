@@ -37,6 +37,12 @@
 
 namespace perfetto {
 
+struct Metadata {
+  size_t overwrite_count;
+  std::set<uint64_t> inodes;
+  std::set<uint64_t> pids;
+};
+
 namespace protos {
 namespace pbzero {
 class FtraceEventBundle;
@@ -49,6 +55,7 @@ const size_t kMaxCpus = 64;
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
 
+struct Metadata;
 class CpuReader;
 class EventFilter;
 class FtraceController;
@@ -70,6 +77,7 @@ class FtraceSink {
     virtual void OnBundleComplete(
         size_t,
         protozero::MessageHandle<FtraceEventBundle>) = 0;
+    virtual void OnMetadata(Metadata*) {}
     virtual ~Delegate() = default;
   };
 

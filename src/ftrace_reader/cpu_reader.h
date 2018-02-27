@@ -42,10 +42,6 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
-struct ParserStats {
-  size_t overwrite_count;
-};
-
 // Class for efficient 'is event with id x enabled?' tests.
 // Mirrors the data in a FtraceConfig but in a format better suited
 // to be consumed by CpuReader.
@@ -110,6 +106,17 @@ class CpuReader {
     out->AppendVarInt<T>(field_id, t);
   }
 
+  template <typename T>
+  static void AddInode(const uint8_t* start,
+                       size_t field_id,
+                       protozero::Message* out,
+                       Metadata* metadata) {
+    ReadIntoVarInt<T>(start, field_id, out);
+    T t;
+    memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
+    metadata->inodes.insert(t);
+  }
+
   // Iterate through every file in the current directory and check if the inode
   // number of each file matches any of the inode numbers saved in events.
   // Returns map of inode number to filename for every inode number that is
@@ -128,7 +135,7 @@ class CpuReader {
                           const EventFilter*,
                           protos::pbzero::FtraceEventBundle*,
                           const ProtoTranslationTable* table,
-                          ParserStats*);
+                          Metadata*);
 
   // Parse a single raw ftrace event beginning at |start| and ending at |end|
   // and write it into the provided bundle as a proto.
@@ -142,13 +149,13 @@ class CpuReader {
                          const uint8_t* end,
                          const ProtoTranslationTable* table,
                          protozero::Message* message,
-                         std::set<uint64_t>* inode_numbers);
+                         Metadata* metadata);
 
   static bool ParseField(const Field& field,
                          const uint8_t* start,
                          const uint8_t* end,
                          protozero::Message* message,
-                         std::set<uint64_t>* inode_numbers);
+                         Metadata* metadata);
 
  private:
   static void RunWorkerThread(size_t cpu,
