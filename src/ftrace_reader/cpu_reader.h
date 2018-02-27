@@ -43,7 +43,7 @@ class FtraceEventBundle;
 }  // namespace protos
 
 struct ParserStats {
-  size_t overwrite;
+  size_t overwrite_count;
 };
 
 // Class for efficient 'is event with id x enabled?' tests.

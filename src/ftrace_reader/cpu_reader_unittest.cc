@@ -345,7 +345,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712ul);
@@ -381,7 +381,7 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   // Although one field is malformed we still see data for the rest
   // since we write the fields as we parse them for speed.
@@ -406,7 +406,7 @@ TEST(CpuReaderTest, FilterByEvent) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 0);
 }
 
@@ -456,7 +456,7 @@ TEST(CpuReaderTest, ParseThreePrint) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 3);
 
   {
@@ -559,7 +559,7 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   ASSERT_EQ(bundle->event().size(), 6);
 
   {
@@ -1157,7 +1157,7 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite_count, 0ul);
   EXPECT_EQ(bundle->event().size(), 59);
 }
 
@@ -1584,7 +1584,7 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(stats.overwrite, 192ul);
+  EXPECT_EQ(stats.overwrite_count, 192ul);
 }
 
 }  // namespace perfetto

@@ -277,7 +277,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     if (!filters[i])
       break;
     bundles[i]->set_cpu(cpu_);
-    bundles[i]->set_overwrite_count(statss[i].overwrite);
+    bundles[i]->set_overwrite_count(statss[i].overwrite_count);
   }
 
   return true;
@@ -319,7 +319,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
   page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
 
-  stats->overwrite = page_header.overwrite;
+  stats->overwrite_count = page_header.overwrite;
 
   const uint8_t* const end = ptr + page_header.size;
   if (end > end_of_page)
