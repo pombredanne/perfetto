@@ -149,6 +149,8 @@ class ServiceImpl : public Service {
   ProducerEndpointImpl* GetProducer(ProducerID) const;
 
  private:
+  FRIEND_TEST(ServiceImplTest, ProducerIDWrapping);
+
   struct RegisteredDataSource {
     ProducerID producer_id;
     DataSourceID data_source_id;
@@ -223,6 +225,9 @@ class ServiceImpl : public Service {
       const TraceConfig::DataSource& cfg_data_source,
       ProducerEndpointImpl* producer,
       TracingSession* tracing_session);
+
+  // Returns the next available ProducerID that is not in |producers_|.
+  ProducerID GetNextProducerID();
 
   // Returns a pointer to the |tracing_sessions_| entry or nullptr if the
   // session doesn't exists.

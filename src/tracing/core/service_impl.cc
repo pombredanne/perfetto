@@ -84,8 +84,8 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     uid_t uid,
     size_t shared_buffer_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  const ProducerID id = ++last_producer_id_;
-  PERFETTO_DLOG("Producer %" PRIu64 " connected", id);
+  const ProducerID id = GetNextProducerID();
+  PERFETTO_DLOG("Producer %" PRIu16 " connected", id);
   size_t shm_size = std::min(shared_buffer_size_hint_bytes, kMaxShmSize);
   if (shm_size % base::kPageSize || shm_size < base::kPageSize)
     shm_size = kDefaultShmSize;
@@ -104,7 +104,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
 
 void ServiceImpl::DisconnectProducer(ProducerID id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DLOG("Producer %" PRIu64 " disconnected", id);
+  PERFETTO_DLOG("Producer %" PRIu16 " disconnected", id);
   PERFETTO_DCHECK(producers_.count(id));
   producers_.erase(id);
 }
@@ -434,7 +434,7 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
                                      DataSourceID ds_id,
                                      const DataSourceDescriptor& desc) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DLOG("Producer %" PRIu64
+  PERFETTO_DLOG("Producer %" PRIu16
                 " registered data source \"%s\", ID: %" PRIu64,
                 producer_id, desc.name().c_str(), ds_id);
 
@@ -510,7 +510,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto buf_iter = buffers_.find(target_buffer_id);
   if (buf_iter == buffers_.end()) {
-    PERFETTO_DLOG("Could not find target buffer %u for producer %" PRIu64,
+    PERFETTO_DLOG("Could not find target buffer %u for producer %" PRIu16,
                   target_buffer_id, producer_id);
     return;
   }
@@ -529,7 +529,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // TODO(primiano): use sendfile(). Requires to make the tbuf itself
   // a file descriptor (just use SharedMemory without sharing it).
   PERFETTO_DLOG(
-      "Copying page %p from producer %" PRIu64 " into buffer %" PRIu16,
+      "Copying page %p from producer %" PRIu16 " into buffer %" PRIu16,
       reinterpret_cast<const void*>(src), producer_id, target_buffer_id);
   memcpy(dst, src, size);
 }
@@ -541,6 +541,15 @@ ServiceImpl::TracingSession* ServiceImpl::GetTracingSession(
   if (it == tracing_sessions_.end())
     return nullptr;
   return &it->second;
+}
+
+ProducerID ServiceImpl::GetNextProducerID() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  do {
+    ++last_producer_id_;
+  } while (producers_.count(last_producer_id_) || last_producer_id_ == 0);
+  PERFETTO_DCHECK(last_producer_id_ > 0 && last_producer_id_ <= kMaxProducerID);
+  return last_producer_id_;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
