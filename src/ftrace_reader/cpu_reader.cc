@@ -254,7 +254,7 @@ std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
                       const std::array<BundleHandle, kMaxSinks>& bundles) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  std::array<Metadata, kMaxSinks> metadatas{};
+  std::array<ParserStats, kMaxSinks> statss{};
   while (true) {
     uint8_t* buffer = GetBuffer();
     long bytes =
@@ -268,7 +268,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
       if (!filters[i])
         break;
       evt_size =
-          ParsePage(buffer, filters[i], &*bundles[i], table_, &metadatas[i]);
+          ParsePage(buffer, filters[i], &*bundles[i], table_, &statss[i]);
       PERFETTO_DCHECK(evt_size);
     }
   }
@@ -277,7 +277,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     if (!filters[i])
       break;
     bundles[i]->set_cpu(cpu_);
-    bundles[i]->set_overwrite(metadatas[i].overwrite);
+    bundles[i]->set_overwrite_count(statss[i].overwrite);
   }
 
   return true;
@@ -303,7 +303,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
                             const EventFilter* filter,
                             protos::pbzero::FtraceEventBundle* bundle,
                             const ProtoTranslationTable* table,
-                            Metadata* metadata) {
+                            ParserStats* stats) {
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + base::kPageSize;
 
@@ -319,7 +319,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
   page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
 
-  metadata->overwrite = page_header.overwrite;
+  stats->overwrite = page_header.overwrite;
 
   const uint8_t* const end = ptr + page_header.size;
   if (end > end_of_page)

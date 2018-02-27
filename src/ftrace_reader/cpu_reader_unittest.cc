@@ -338,14 +338,14 @@ TEST(CpuReaderTest, ParseSinglePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   size_t bytes = CpuReader::ParsePage(
-      page.get(), &filter, bundle_provider.writer(), table, &metadata);
+      page.get(), &filter, bundle_provider.writer(), table, &stats);
   EXPECT_EQ(bytes, 60ul);
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712ul);
@@ -375,13 +375,13 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_FALSE(CpuReader::ParsePage(
-      page.get(), &filter, bundle_provider.writer(), table, &metadata));
+      page.get(), &filter, bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   ASSERT_EQ(bundle->event().size(), 1);
   // Although one field is malformed we still see data for the rest
   // since we write the fields as we parse them for speed.
@@ -400,13 +400,13 @@ TEST(CpuReaderTest, FilterByEvent) {
 
   EventFilter filter(*table, {});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &metadata));
+                                   bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   ASSERT_EQ(bundle->event().size(), 0);
 }
 
@@ -450,13 +450,13 @@ TEST(CpuReaderTest, ParseThreePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &metadata));
+                                   bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   ASSERT_EQ(bundle->event().size(), 3);
 
   {
@@ -553,13 +553,13 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &metadata));
+                                   bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   ASSERT_EQ(bundle->event().size(), 6);
 
   {
@@ -1151,13 +1151,13 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &metadata));
+                                   bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 0ul);
+  EXPECT_EQ(stats.overwrite, 0ul);
   EXPECT_EQ(bundle->event().size(), 59);
 }
 
@@ -1578,13 +1578,13 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  ParserStats stats{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
-                                   bundle_provider.writer(), table, &metadata));
+                                   bundle_provider.writer(), table, &stats));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
-  EXPECT_EQ(metadata.overwrite, 192ul);
+  EXPECT_EQ(stats.overwrite, 192ul);
 }
 
 }  // namespace perfetto

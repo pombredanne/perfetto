@@ -42,7 +42,7 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
-struct Metadata {
+struct ParserStats {
   size_t overwrite;
 };
 
@@ -128,7 +128,7 @@ class CpuReader {
                           const EventFilter*,
                           protos::pbzero::FtraceEventBundle*,
                           const ProtoTranslationTable* table,
-                          Metadata*);
+                          ParserStats*);
 
   // Parse a single raw ftrace event beginning at |start| and ending at |end|
   // and write it into the provided bundle as a proto.
