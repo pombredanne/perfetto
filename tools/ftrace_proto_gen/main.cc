@@ -63,10 +63,10 @@ int main(int argc, const char** argv) {
   }
 
   if (!new_events.empty()) {
-    perfetto::LogFtraceEventProtoAdditions(new_events);
-    perfetto::LogTraceToTextMain(new_events);
-    perfetto::LogTraceToTextUsingStatements(new_events);
-    perfetto::LogTraceToTextFunctions(new_events);
+    perfetto::PrintFtraceEventProtoAdditions(new_events);
+    perfetto::PrintTraceToTextMain(new_events);
+    perfetto::PrintTraceToTextUsingStatements(new_events);
+    perfetto::PrintTraceToTextFunctions(new_events);
   }
 
   for (auto event : events) {
