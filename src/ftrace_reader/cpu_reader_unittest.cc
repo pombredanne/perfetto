@@ -450,8 +450,9 @@ TEST(CpuReaderTest, ReallyLongEvent) {
 
   EventFilter filter(*table, {"print"});
 
-  CpuReader::ParsePage(42 /* cpu number */, page.get(), &filter,
-                                      bundle_provider.writer(), table);
+  ParserStats stats{};
+  CpuReader::ParsePage(page.get(), &filter,
+                                      bundle_provider.writer(), table, &stats);
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
