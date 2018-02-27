@@ -280,9 +280,9 @@ TEST_F(TraceBufferTest, ReadWrite_MinimalPadding) {
 
 TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
   for (int seed = 1; seed <= 32; seed++) {
-    std::default_random_engine rnd_engine(seed);
+    std::minstd_rand0 rnd_engine(seed);
     ASSERT_TRUE(trace_buffer()->Create(4096 * (1 + rnd_engine() % 32)));
-    std::uniform_int_distribution<size_t> size_dist(17, 4096);
+    std::uniform_int_distribution<size_t> size_dist(18, 4096);
     std::uniform_int_distribution<ProducerID> prod_dist(1, kMaxProducerID);
     std::uniform_int_distribution<WriterID> wri_dist(1, kMaxWriterID);
     ChunkID chunk_id = 0;

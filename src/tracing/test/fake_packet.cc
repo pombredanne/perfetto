@@ -23,6 +23,7 @@
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "src/tracing/core/trace_buffer.h"
 
+using protozero::proto_utils::ParseVarInt;
 using protozero::proto_utils::WriteVarInt;
 
 namespace perfetto {
@@ -84,10 +85,16 @@ void FakePacketFragment::CopyInto(std::vector<uint8_t>* data) const {
   data->insert(data->end(), payload_.begin(), payload_.end());
 }
 
+size_t FakePacketFragment::GetSizeHeader() const {
+  uint64_t size = 0;
+  ParseVarInt(&header_[0], &header_[0] + header_size_, &size);
+  return static_cast<size_t>(size);
+}
+
 bool FakePacketFragment::operator==(const FakePacketFragment& o) const {
   if (payload_ != o.payload_)
     return false;
-  PERFETTO_CHECK(header_ == o.header_ && header_size_ == o.header_size_);
+  PERFETTO_CHECK(GetSizeHeader() == o.GetSizeHeader());
   return true;
 }
 

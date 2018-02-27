@@ -36,6 +36,7 @@ class FakePacketFragment {
   FakePacketFragment(size_t size, char prefix);
   FakePacketFragment(const void* payload, size_t payload_size);
   void CopyInto(std::vector<uint8_t>* data) const;
+  size_t GetSizeHeader() const;
   bool operator==(const FakePacketFragment& other) const;
   const std::string& payload() const { return payload_; }
 
