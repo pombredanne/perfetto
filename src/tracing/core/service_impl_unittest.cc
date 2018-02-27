@@ -192,32 +192,19 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   producer_endpoint->RegisterDataSource(ds_desc, [](DataSourceID) {});
   task_runner.RunUntilIdle();
 
-  // Disconnecting the producer while tracing should trigger data source
+  // Disconnecting the consumer while tracing should trigger data source
   // teardown.
   EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
   EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  EXPECT_CALL(mock_producer, OnDisconnect());
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("foo");
   ds_config->set_target_buffer(0);
   consumer_endpoint->EnableTracing(trace_config);
-  producer_endpoint.reset();
-  task_runner.RunUntilIdle();
-
-  // Reconnecting a producer with a matching data source should see that data
-  // source getting enabled.
-  EXPECT_CALL(mock_producer, OnConnect());
-  producer_endpoint = svc->ConnectProducer(&mock_producer, 123u /* uid */);
-  task_runner.RunUntilIdle();
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  producer_endpoint->RegisterDataSource(ds_desc, [](DataSourceID) {});
   task_runner.RunUntilIdle();
 
   EXPECT_CALL(mock_consumer, OnDisconnect());
-  consumer_endpoint->DisableTracing();
   consumer_endpoint.reset();
   task_runner.RunUntilIdle();
 
