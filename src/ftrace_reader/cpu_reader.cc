@@ -326,7 +326,6 @@ size_t CpuReader::ParsePage(size_t cpu,
         // Left over page padding or discarded event.
         if (event_header.time_delta == 0) {
           // Not clear what the correct behaviour is in this case.
-          PERFETTO_ELOG("Padding time_delta == 0 not handled.");
           PERFETTO_DCHECK(false);
           return 0;
         }
@@ -351,20 +350,23 @@ size_t CpuReader::ParsePage(size_t cpu,
         if (!ReadAndAdvance<TimeStamp>(&ptr, end, &time_stamp))
           return 0;
         // Not implemented in the kernel, nothing should generate this.
-        PERFETTO_ELOG("Unexpected timestamp.");
+        PERFETTO_DCHECK(false);
         break;
       }
       // Data record:
       default: {
         PERFETTO_CHECK(event_header.type_or_length <= kTypeDataTypeLengthMax);
         // type_or_length is <=28 so it represents the length of a data record.
+        // if == 0, this is an extended record and the size of the record is
+        // stored in the first uint32_t word in the payload.
+        // See Kernel's include/linux/ring_buffer.h
         uint32_t event_size;
         if (event_header.type_or_length == 0) {
           if (!ReadAndAdvance<uint32_t>(&ptr, end, &event_size))
             return 0;
+          // Size includes the size field itself.
           if (event_size < 4)
             return 0;
-          // Size includes the size field itself.
           event_size -= 4;
         } else {
           event_size = 4 * event_header.type_or_length;

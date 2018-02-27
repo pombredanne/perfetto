@@ -440,7 +440,7 @@ ExamplePage g_really_long_event{
   )",
 };
 
-TEST(CpuReaderTest, ParseWithGap) {
+TEST(CpuReaderTest, ReallyLongEvent) {
   const ExamplePage* test_case = &g_really_long_event;
 
   BundleProvider bundle_provider(base::kPageSize);
@@ -497,8 +497,6 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
   EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 608934, 535199));
   EXPECT_EQ(event.print().buf(), "");
 }
-
-
 
 TEST(CpuReaderTest, FilterByEvent) {
   const ExamplePage* test_case = &g_single_print;
