@@ -129,6 +129,14 @@ import "perfetto/trace/ftrace/mm_compaction_try_to_compact_pages.proto";
 import "perfetto/trace/ftrace/mm_compaction_wakeup_kcompactd.proto";
 import "perfetto/trace/ftrace/suspend_resume.proto";
 import "perfetto/trace/ftrace/sched_wakeup_new.proto";
+import "perfetto/trace/ftrace/task_newtask.proto";
+import "perfetto/trace/ftrace/task_rename.proto";
+import "perfetto/trace/ftrace/sched_process_exec.proto";
+import "perfetto/trace/ftrace/sched_process_exit.proto";
+import "perfetto/trace/ftrace/sched_process_fork.proto";
+import "perfetto/trace/ftrace/sched_process_hang.proto";
+import "perfetto/trace/ftrace/sched_process_wait.proto";
+import "perfetto/trace/ftrace/sched_process_free.proto";
 
 package perfetto.protos;
 
@@ -258,5 +266,13 @@ message FtraceEvent {
     MmCompactionWakeupKcompactdFtraceEvent mm_compaction_wakeup_kcompactd = 112;
     SuspendResumeFtraceEvent suspend_resume = 113;
     SchedWakeupNewFtraceEvent sched_wakeup_new = 114;
+    TaskNewtaskFtraceEvent task_newtask = 115;
+    TaskRenameFtraceEvent task_rename = 116;
+    SchedProcessExecFtraceEvent sched_process_exec = 117;
+    SchedProcessExitFtraceEvent sched_process_exit = 118;
+    SchedProcessForkFtraceEvent sched_process_fork = 119;
+    SchedProcessFreeFtraceEvent sched_process_free = 120;
+    SchedProcessHangFtraceEvent sched_process_hang = 121;
+    SchedProcessWaitFtraceEvent sched_process_wait = 122;
   }
 }
