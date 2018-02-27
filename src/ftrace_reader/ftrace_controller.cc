@@ -35,6 +35,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
+#include "system_wrapper.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
@@ -117,17 +118,24 @@ std::unique_ptr<FtraceController> FtraceController::Create(
   auto table = ProtoTranslationTable::Create(
       ftrace_procfs.get(), GetStaticEventInfo(), GetStaticCommonFieldsInfo());
 
-  std::unique_ptr<FtraceConfigMuxer> model = std::unique_ptr<FtraceConfigMuxer>(
-      new FtraceConfigMuxer(ftrace_procfs.get(), table.get()));
-  return std::unique_ptr<FtraceController>(new FtraceController(
-      std::move(ftrace_procfs), std::move(table), std::move(model), runner));
+  std::unique_ptr<SystemWrapper> system_wrapper;
+
+  std::unique_ptr<FtraceConfigMuxer> model =
+      std::unique_ptr<FtraceConfigMuxer>(new FtraceConfigMuxer(
+          ftrace_procfs.get(), system_wrapper.get(), table.get()));
+  return std::unique_ptr<FtraceController>(
+      new FtraceController(std::move(ftrace_procfs), std::move(system_wrapper),
+                           std::move(table), std::move(model), runner));
 }
 
-FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
-                                   std::unique_ptr<ProtoTranslationTable> table,
-                                   std::unique_ptr<FtraceConfigMuxer> model,
-                                   base::TaskRunner* task_runner)
+FtraceController::FtraceController(
+    std::unique_ptr<FtraceProcfs> ftrace_procfs,
+    std::unique_ptr<SystemWrapper> system_wrapper,
+    std::unique_ptr<ProtoTranslationTable> table,
+    std::unique_ptr<FtraceConfigMuxer> model,
+    base::TaskRunner* task_runner)
     : ftrace_procfs_(std::move(ftrace_procfs)),
+      system_wrapper_(std::move(system_wrapper)),
       table_(std::move(table)),
       ftrace_config_muxer_(std::move(model)),
       task_runner_(task_runner),

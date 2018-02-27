@@ -26,6 +26,7 @@
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "proto_translation_table.h"
+#include "system_wrapper.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -123,9 +124,10 @@ std::unique_ptr<Table> FakeTable() {
 
 std::unique_ptr<FtraceConfigMuxer> FakeModel(
     FtraceProcfs* ftrace,
+    SystemWrapper* system_wrapper,
     const ProtoTranslationTable* table) {
   return std::unique_ptr<FtraceConfigMuxer>(
-      new FtraceConfigMuxer(ftrace, table));
+      new FtraceConfigMuxer(ftrace, system_wrapper, table));
 }
 
 class MockFtraceProcfs : public FtraceProcfs {
@@ -182,11 +184,13 @@ class MockFtraceProcfs : public FtraceProcfs {
 class TestFtraceController : public FtraceController {
  public:
   TestFtraceController(std::unique_ptr<MockFtraceProcfs> ftrace_procfs,
+                       std::unique_ptr<SystemWrapper> system_wrapper,
                        std::unique_ptr<Table> table,
                        std::unique_ptr<FtraceConfigMuxer> model,
                        std::unique_ptr<MockTaskRunner> runner,
                        MockFtraceProcfs* raw_procfs)
       : FtraceController(std::move(ftrace_procfs),
+                         std::move(system_wrapper),
                          std::move(table),
                          std::move(model),
                          runner.get()),
@@ -255,11 +259,15 @@ std::unique_ptr<TestFtraceController> CreateTestController(
         std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs(cpu_count));
   }
 
+  std::unique_ptr<SystemWrapper> system_wrapper;
+
+  auto model =
+      FakeModel(ftrace_procfs.get(), system_wrapper.get(), table.get());
+
   MockFtraceProcfs* raw_procfs = ftrace_procfs.get();
-  auto model = FakeModel(ftrace_procfs.get(), table.get());
   return std::unique_ptr<TestFtraceController>(new TestFtraceController(
-      std::move(ftrace_procfs), std::move(table), std::move(model),
-      std::move(runner), raw_procfs));
+      std::move(ftrace_procfs), std::move(system_wrapper), std::move(table),
+      std::move(model), std::move(runner), raw_procfs));
 }
 
 }  // namespace

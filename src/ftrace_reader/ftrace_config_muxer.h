@@ -19,6 +19,7 @@
 
 #include "ftrace_procfs.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
+#include "system_wrapper.h"
 
 namespace perfetto {
 
@@ -38,8 +39,11 @@ namespace perfetto {
 // |RemoveConfig|.
 class FtraceConfigMuxer {
  public:
-  // The ProtoTranslationTable table should outlive this instance.
-  FtraceConfigMuxer(FtraceProcfs* ftrace, const ProtoTranslationTable* table);
+  // The FtraceConfigMuxer, SystemWrapper and ProtoTranslationTable
+  // should outlive this instance.
+  FtraceConfigMuxer(FtraceProcfs* ftrace,
+                    SystemWrapper* system,
+                    const ProtoTranslationTable* table);
   virtual ~FtraceConfigMuxer();
 
   // Ask FtraceConfigMuxer to adjust ftrace procfs settings to
@@ -88,6 +92,7 @@ class FtraceConfigMuxer {
 
   FtraceConfigId last_id_ = 1;
   FtraceProcfs* ftrace_;
+  SystemWrapper* system_;
   const ProtoTranslationTable* table_;
 
   FtraceState current_state_;

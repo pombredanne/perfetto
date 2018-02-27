@@ -54,6 +54,7 @@ class EventFilter;
 class FtraceController;
 class FtraceConfigMuxer;
 class FtraceProcfs;
+class SystemWrapper;
 class ProtoTranslationTable;
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
@@ -121,6 +122,7 @@ class FtraceController {
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
+                   std::unique_ptr<SystemWrapper>,
                    std::unique_ptr<ProtoTranslationTable>,
                    std::unique_ptr<FtraceConfigMuxer>,
                    base::TaskRunner*);
@@ -166,6 +168,7 @@ class FtraceController {
   // End lock-protected members.
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
+  std::unique_ptr<SystemWrapper> system_wrapper_;
   std::unique_ptr<ProtoTranslationTable> table_;
   std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;
   size_t generation_ = 0;
