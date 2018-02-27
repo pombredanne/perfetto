@@ -591,8 +591,8 @@ ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(ServiceImpl* service,
     : service_(service), consumer_(consumer), weak_ptr_factory_(this) {}
 
 ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
-  consumer_->OnDisconnect();
   service_->DisconnectConsumer(this);
+  consumer_->OnDisconnect();
 }
 
 void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg) {
@@ -659,8 +659,8 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
 }
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
-  producer_->OnDisconnect();
   service_->DisconnectProducer(id_);
+  producer_->OnDisconnect();
 }
 
 void ServiceImpl::ProducerEndpointImpl::RegisterDataSource(
