@@ -26,8 +26,6 @@
 namespace perfetto {
 namespace base {
 
-class TestWatchdog;
-
 // Ensures that the calling program does not exceed certain hard limits on
 // resource usage e.g. time, memory and CPU. If exceeded, the program is
 // crashed.
@@ -38,7 +36,7 @@ class Watchdog {
   class Timer {
    public:
     ~Timer();
-    Timer(Timer&& other) noexcept;
+    Timer(Timer&&) noexcept;
 
    private:
     friend class Watchdog;
@@ -72,7 +70,6 @@ class Watchdog {
  protected:
   // Protected for testing.
   Watchdog(uint32_t polling_interval_ms);
-  Watchdog(Watchdog&& other) noexcept;
 
  private:
   // Represents a ring buffer in which integer values can be stored.

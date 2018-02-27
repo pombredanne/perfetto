@@ -96,9 +96,11 @@ void Watchdog::SetCpuLimit(uint32_t percentage, uint32_t window_ms) {
 }
 
 void Watchdog::ThreadMain() {
-  base::ScopedFile file(open("/proc/self/stat", O_RDONLY));
-  if (!file)
+  base::ScopedFile stat_fd(open("/proc/self/stat", O_RDONLY));
+  if (!stat_fd) {
     PERFETTO_ELOG("Failed to open stat file to enforce resource limits.");
+    return;
+  }
 
   std::unique_lock<std::mutex> guard(mutex_);
   for (;;) {
@@ -107,27 +109,22 @@ void Watchdog::ThreadMain() {
     if (quit_)
       return;
 
-    uint64_t cpu_time = 0;
-    uint64_t rss_bytes = 0;
-    if (file) {
-      unsigned long int utime = 0l;
-      unsigned long int stime = 0l;
-      long int rss_pages = -1l;
+    lseek(stat_fd.get(), 0, SEEK_SET);
 
-      // Read the file from the beginning for utime, stime and rss.
-      lseek(file.get(), 0, SEEK_SET);
-      char c[256];
-      read(file.get(), c, 256);
+    char c[256];
+    read(stat_fd.get(), c, 256);
 
-      PERFETTO_CHECK(
-          sscanf(c,
-                 "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu"
-                 "%lu %*d %*d %*d %*d %*d %*d %*u %*lu %ld",
-                 &utime, &stime, &rss_pages) == 3);
+    unsigned long int utime = 0l;
+    unsigned long int stime = 0l;
+    long int rss_pages = -1l;
+    PERFETTO_CHECK(
+        sscanf(c,
+               "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu"
+               "%lu %*d %*d %*d %*d %*d %*d %*u %*u %ld",
+               &utime, &stime, &rss_pages) == 3);
 
-      cpu_time = utime + stime;
-      rss_bytes = static_cast<uint32_t>(rss_pages) * base::kPageSize;
-    }
+    uint64_t cpu_time = utime + stime;
+    uint64_t rss_bytes = static_cast<uint32_t>(rss_pages) * base::kPageSize;
 
     CheckMemory(rss_bytes);
     CheckCpu(cpu_time);

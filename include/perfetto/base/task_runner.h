@@ -75,7 +75,7 @@ class TaskRunner {
 #if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
     (PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||       \
      PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID))
-    base::Watchdog::Timer handle =
+    Watchdog::Timer handle =
         base::Watchdog::GetInstance()->CreateFatalTimer(kWatchdogMillis);
 #endif
     task();

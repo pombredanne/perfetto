@@ -86,7 +86,6 @@ void ProbesProducer::CreateDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
   instances_[id] = source_config.name();
-  // PERFETTO_LOG("DataSourceInstanceID: %llu", id);
   if (source_config.name() == kFtraceSourceName) {
     CreateFtraceDataSourceInstance(id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
@@ -136,7 +135,7 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   delegates_.emplace(id, std::move(delegate));
   if (source_config.trace_duration_ms() != 0)
     watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               2 * source_config.trace_duration_ms()));
+                               5000 + 2 * source_config.trace_duration_ms()));
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
