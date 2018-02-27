@@ -156,6 +156,12 @@ class ServiceImpl : public Service {
     DataSourceDescriptor descriptor;
   };
 
+  // Represents an active data source for a tracing session.
+  struct DataSourceInstance {
+    DataSourceInstanceID instance_id;
+    DataSourceID data_source_id;
+  };
+
   struct TraceBuffer {
     TraceBuffer();
     ~TraceBuffer();
@@ -194,12 +200,6 @@ class ServiceImpl : public Service {
 
     // Trusted uid for each acquired page.
     std::vector<uid_t> page_owners;
-  };
-
-  // Represents an active data source for a tracing session.
-  struct DataSourceInstance {
-    DataSourceInstanceID instance_id;
-    DataSourceID data_source_id;
   };
 
   // Holds the state of a tracing session. A tracing session is uniquely bound

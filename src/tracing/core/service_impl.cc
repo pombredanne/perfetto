@@ -107,8 +107,7 @@ void ServiceImpl::DisconnectProducer(ProducerID id) {
   PERFETTO_DLOG("Producer %" PRIu64 " disconnected", id);
   PERFETTO_DCHECK(producers_.count(id));
 
-  auto it = data_sources_.begin();
-  while (it != data_sources_.end()) {
+  for (auto it = data_sources_.begin(); it != data_sources_.end();) {
     auto next = it;
     next++;
     if (it->second.producer_id == id)
@@ -441,8 +440,8 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
                 producer_id, desc.name().c_str(), ds_id);
 
   PERFETTO_DCHECK(!desc.name().empty());
-  RegisteredDataSource reg_ds{producer_id, ds_id, desc};
-  data_sources_.emplace(desc.name(), reg_ds);
+  auto reg_ds = data_sources_.emplace(
+      desc.name(), RegisteredDataSource{producer_id, ds_id, desc});
 
   // If there are existing tracing sessions, we need to check if the new
   // data source is enabled by any of them.
@@ -460,7 +459,8 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
       if (cfg_data_source.config().name() == desc.name())
-        CreateDataSourceInstance(cfg_data_source, reg_ds, &tracing_session);
+        CreateDataSourceInstance(cfg_data_source, reg_ds->second,
+                                 &tracing_session);
     }
   }
 }
@@ -484,19 +484,17 @@ void ServiceImpl::UnregisterDataSource(ProducerID producer_id,
     }
   }
 
-  bool found = false;
   for (auto it = data_sources_.begin(); it != data_sources_.end(); ++it) {
     if (it->second.producer_id == producer_id &&
         it->second.data_source_id == ds_id) {
       data_sources_.erase(it);
-      found = true;
-      break;
+      return;
     }
   }
-  if (!found) {
-    PERFETTO_DLOG("Tried to unregister a non-existent data source: %zu", ds_id);
-    PERFETTO_DCHECK(false);
-  }
+  PERFETTO_DLOG("Tried to unregister a non-existent data source %" PRIu64
+                " for producer %" PRIu64,
+                ds_id, producer_id);
+  PERFETTO_DCHECK(false);
 }
 
 void ServiceImpl::CreateDataSourceInstance(
