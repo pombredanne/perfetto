@@ -118,6 +118,15 @@ class Watchdog {
   // Main method for the watchdog thread.
   void ThreadMain();
 
+  // Change whether the thread is running or not based on resource limits.
+  void UpdateThreadStateUnlocked();
+
+  // Starts the thread if not already started.
+  void StartThreadUnlocked();
+
+  // Quits the thread if not already quit.
+  void QuitThreadUnlocked();
+
   // Check each type of resource every |polling_interval_ms_| miillis.
   void CheckMemory(uint64_t rss_bytes);
   void CheckCpu(uint64_t cpu_time);
@@ -133,7 +142,7 @@ class Watchdog {
   // --- Begin lock-protected members ---
 
   std::mutex mutex_;
-  bool quit_ = false;
+  bool quit_ = true;
 
   uint32_t memory_limit_bytes_ = 0;
   WindowedInterval memory_window_bytes_;
