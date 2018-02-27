@@ -45,7 +45,7 @@ class Watchdog {
     Timer(const Timer&) = delete;
     Timer& operator=(const Timer&) = delete;
 
-    timer_t timerid_;
+    timer_t timerid_ = nullptr;
   };
   virtual ~Watchdog();
 

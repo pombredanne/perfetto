@@ -112,7 +112,10 @@ void Watchdog::ThreadMain() {
     lseek(stat_fd.get(), 0, SEEK_SET);
 
     char c[256];
-    read(stat_fd.get(), c, 256);
+    if (read(stat_fd.get(), c, 256) < 0) {
+      PERFETTO_ELOG("Failed to read stat file to enforce resource limits.");
+      return;
+    }
 
     unsigned long int utime = 0l;
     unsigned long int stime = 0l;

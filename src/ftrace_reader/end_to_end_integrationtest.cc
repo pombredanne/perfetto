@@ -100,12 +100,7 @@ class EndToEndIntegrationTest : public ::testing::Test,
 
 }  // namespace
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-#define MAYBE_SchedSwitchAndPrint SchedSwitchAndPrint
-#else
-#define MAYBE_SchedSwitchAndPrint DISABLED_SchedSwitchAndPrint
-#endif
-TEST_F(EndToEndIntegrationTest, MAYBE_SchedSwitchAndPrint) {
+TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   FtraceProcfs procfs(kTracingPath);
   procfs.ClearTrace();
   procfs.WriteTraceMarker("Hello, World!");
