@@ -89,16 +89,11 @@ bool TraceBuffez::Create(size_t size) {
     return false;
   }
   size_ = size;
-  ClearContentsAndResetRWCursors();
-  return true;
-}
-
-void TraceBuffez::ClearContentsAndResetRWCursors() {
-  madvise(begin(), size_, MADV_DONTNEED);
   wptr_ = begin();
   index_.clear();
   last_chunk_id_.clear();
   read_iter_ = GetReadIterForSequence(index_.end());
+  return true;
 }
 
 // Note: |src| points to a shmem region that is shared with the producer. Assume
@@ -125,12 +120,14 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
 
   // If there isn't enough room from the given write position. Write a padding
   // record to clear the end of the buffer and wrap back.
-  if (PERFETTO_UNLIKELY(rounded_size > size_to_end())) {
-    AddPaddingRecord(size_to_end());  // Takes care of wrapping |wptr_|.
+  const size_t cached_size_to_end = size_to_end();
+  if (PERFETTO_UNLIKELY(rounded_size > cached_size_to_end)) {
+    size_t res = DeleteNextChunksFor(cached_size_to_end);
+    PERFETTO_DCHECK(res <= cached_size_to_end);
+    AddPaddingRecord(cached_size_to_end);  // Takes care of wrapping |wptr_|.
     wptr_ = begin();
-    PERFETTO_DCHECK(rounded_size <= size_to_end());
-    // TODO(primiano): This is broken, we need to delete all chunks from the
-    // index at this point. See ReadWrite_UpdateIndexWhenPaddingAtEnd test.
+    stats_.write_wrap_count++;
+    PERFETTO_DCHECK(size_to_end() >= rounded_size);
   }
 
   ChunkRecord record(rounded_size);
@@ -163,66 +160,12 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
   // +---------------------------------+---------------+--------------------+
   // | Chunk 5                         | Padding Chunk | Chunk 4            |
   // +---------------------------------+---------------+--------------------+
-  //
 
-  // Find the position of the first chunk which begins at or after
-  // (|wptr_| + |rounded_size|), e.g., Chunk 4 in the example above. Note that
-  // such a chunk might not exist and we might either reach the end of the
-  // buffer or a zeroed region of the buffer.
-  // If such a record is found, write a padding chunk exactly at:
-  // (position found) - (end of new chunk, that is |wptr_| + |rounded_size|).
-  DcheckIsAlignedAndWithinBounds(wptr_);
-  size_t padding_size = 0;
+  // Deletes all chunks from |wptr_| to |wptr_| + |rounded_size|.
+  size_t padding_size = DeleteNextChunksFor(rounded_size);
 
-  // This loop removes from the index all the chunks that are going to be
-  // overwritten (chunks 1-3 in the example above) and computes the padding.
-  for (uint8_t* next_chunk_ptr = wptr_;;) {
-    const ChunkRecord& next_chunk = *GetChunkRecordAt(next_chunk_ptr);
-    TRACE_BUFFER_DLOG(
-        "  scanning chunk [%zu %zu] (valid=%d)", next_chunk_ptr - begin(),
-        next_chunk_ptr - begin() + next_chunk.size(), next_chunk.is_valid);
-
-    // We just reached the untouched part of the buffer, it's going to be all
-    // zeroes from here to end().
-    if (!next_chunk.is_valid)
-      break;
-
-    // We should never hit this, unless we managed to screw up while writing
-    // to the buffer and breaking the ChunkRecord(s) chain.
-    if (PERFETTO_UNLIKELY(next_chunk_ptr + next_chunk.size() > end())) {
-      PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
-      PERFETTO_ELOG("TraceBuffer corruption detected. Clearing buffer");
-      ClearContentsAndResetRWCursors();
-      return;
-    }
-
-    // Remove |next_chunk| from the index (unless it's a padding record), as we
-    // are about to overwrite it.
-    if (!next_chunk.is_padding) {
-      ChunkMeta::Key key(next_chunk);
-      const size_t removed = index_.erase(key);
-      TRACE_BUFFER_DLOG("  del index {%" PRIu64 ",%" PRIu32
-                        ",%u} @ [%lu - %lu] %zu",
-                        key.producer_id_trusted, key.writer_id, key.chunk_id,
-                        next_chunk_ptr - begin(),
-                        next_chunk_ptr - begin() + next_chunk.size(), removed);
-      PERFETTO_DCHECK(removed);
-    }
-
-    // |gap_size| is the diff between the end of |next_chunk| and the beginning
-    // of the chunk we are about to write @ |wptr_|.
-    const size_t gap_size = next_chunk_ptr + next_chunk.size() - wptr_;
-    if (gap_size >= rounded_size) {
-      padding_size = gap_size - rounded_size;
-      break;
-    }
-
-    next_chunk_ptr += next_chunk.size();
-    PERFETTO_DCHECK(next_chunk_ptr >= wptr_ && next_chunk_ptr < end());
-  }  // for (next_chunk_ptr...)
-
+  // Now first insert the new chunk. At the end, if necessary, add the padding.
   ChunkMeta::Key key(record);
-
   auto it_and_inserted = index_.emplace(
       key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, flags));
   if (PERFETTO_UNLIKELY(!it_and_inserted.second)) {
@@ -237,8 +180,11 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
   WriteChunkRecord(record, src, size);
   TRACE_BUFFER_DLOG("Chunk raw: %s", HexDump(wptr_, record.size()).c_str());
   wptr_ += record.size();
-  if (wptr_ >= end())
+  if (wptr_ >= end()) {
+    PERFETTO_DCHECK(padding_size == 0);
     wptr_ = begin();
+    stats_.write_wrap_count++;
+  }
   DcheckIsAlignedAndWithinBounds(wptr_);
 
   last_chunk_id_[std::make_pair(producer_id_trusted, writer_id)] = chunk_id;
@@ -247,8 +193,58 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
     AddPaddingRecord(padding_size);
 }
 
+size_t TraceBuffez::DeleteNextChunksFor(size_t bytes_to_clear) {
+  // Find the position of the first chunk which begins at or after
+  // (|wptr_| + |bytes|). Note that such a chunk might not exist and we might
+  // either reach the end of the buffer or a zeroed region of the buffer.
+  uint8_t* next_chunk_ptr = wptr_;
+  uint8_t* search_end = wptr_ + bytes_to_clear;
+  TRACE_BUFFER_DLOG("Delete [%zu %zu]", wptr_ - begin(), search_end - begin());
+  DcheckIsAlignedAndWithinBounds(wptr_);
+  PERFETTO_DCHECK(search_end <= end());
+  while (next_chunk_ptr < search_end) {
+    const ChunkRecord& next_chunk = *GetChunkRecordAt(next_chunk_ptr);
+    TRACE_BUFFER_DLOG(
+        "  scanning chunk [%zu %zu] (valid=%d)", next_chunk_ptr - begin(),
+        next_chunk_ptr - begin() + next_chunk.size(), next_chunk.is_valid);
+
+    // We just reached the untouched part of the buffer, it's going to be all
+    // zeroes from here to end().
+    if (!next_chunk.is_valid) {
+      // This should happen only at the first iteration. The zeroed area can
+      // only begin precisely at the |wptr_|, not after. Otherwise it means that
+      // we wrapped but screwed up the ChunkRecord chain.
+      PERFETTO_DCHECK(next_chunk_ptr == wptr_);
+      return 0;
+    }
+
+    // Remove |next_chunk| from the index, unless it's a padding record (padding
+    // records are not part of the index).
+    if (PERFETTO_LIKELY(!next_chunk.is_padding)) {
+      ChunkMeta::Key key(next_chunk);
+      const size_t removed = index_.erase(key);
+      TRACE_BUFFER_DLOG("  del index {%" PRIu64 ",%" PRIu32
+                        ",%u} @ [%lu - %lu] %zu",
+                        key.producer_id_trusted, key.writer_id, key.chunk_id,
+                        next_chunk_ptr - begin(),
+                        next_chunk_ptr - begin() + next_chunk.size(), removed);
+      PERFETTO_DCHECK(removed);
+    }
+
+    next_chunk_ptr += next_chunk.size();
+
+    // We should never hit this, unless we managed to screw up while writing
+    // to the buffer and breaking the ChunkRecord(s) chain.
+    // TODO(primiano): Write more meaningful logging with the status of the
+    // buffer, to get more actionable bugs in case we hit this.
+    PERFETTO_CHECK(next_chunk_ptr <= end());
+  }
+  PERFETTO_DCHECK(next_chunk_ptr >= search_end && next_chunk_ptr <= end());
+  return next_chunk_ptr - search_end;
+}
+
 void TraceBuffez::AddPaddingRecord(size_t size) {
-  PERFETTO_DCHECK(size <= kMaxChunkRecordSize);
+  PERFETTO_DCHECK(size >= sizeof(ChunkRecord) && size <= kMaxChunkRecordSize);
   ChunkRecord record(size);
   record.is_padding = 1;
   TRACE_BUFFER_DLOG("AddPaddingRecord @ [%lu - %lu] %zu", wptr_ - begin(),

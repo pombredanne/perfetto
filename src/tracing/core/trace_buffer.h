@@ -114,7 +114,7 @@ class TraceBuffez {
     size_t succeeded_patches = 0;
     size_t fragment_lookahead_successes = 0;
     size_t fragment_lookahead_failures = 0;
-    size_t broken_sequences = 0;
+    size_t write_wrap_count = 0;
     // TODO(primiano): add packets_{read,written}.
     // TODO(primiano): add bytes_{read,written}.
   };
@@ -368,6 +368,21 @@ class TraceBuffez {
   // Adds a padding record of the given size (must be a multiple of
   // sizeof(ChunkRecord)).
   void AddPaddingRecord(size_t);
+
+  // Deletes (by marking the record invalid and removing form the index) all
+  // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
+  // gap left between the next valid Chunk and the end of the deletion range, or
+  // 0 if such next valid chunk doesn't exist (if the buffer is still zeroed).
+  // Graphically, assume the initial situation is the following (|wptr_| = 10).
+  // |0        |10 (wptr_)       |30       |40                 |60
+  // +---------+-----------------+---------+-------------------+---------+
+  // | Chunk 1 | Chunk 2         | Chunk 3 | Chunk 4           | Chunk 5 |
+  // +---------+-----------------+---------+-------------------+---------+
+  //           |_________Deletion range_______|~~return value~~|
+  //
+  // A call to DeleteNextChunksFor(32) will remove chunks 2,3,4 and return 18
+  // (60 - 42), the distance between chunk 5 and the end of the deletion range.
+  size_t DeleteNextChunksFor(size_t bytes_to_clear);
 
   // Decodes the boundaries of the next packet (or a fragment) pointed by
   // ChunkMeta and pushes that into |Slices*|. It also increments the

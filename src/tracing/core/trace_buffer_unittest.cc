@@ -33,8 +33,8 @@
 namespace perfetto {
 
 using ::testing::ContainerEq;
-using ::testing::IsEmpty;
 using ::testing::ElementsAre;
+using ::testing::IsEmpty;
 
 class TraceBufferTest : public testing::Test {
  public:
@@ -201,7 +201,7 @@ TEST_F(TraceBufferTest, ReadWrite_FillTillEnd) {
 // At this point we try to insert a 512 Bytes chunk (c5). The result should be:
 // [ c5: 512              ]{ padding }[c3: 1024 ][ c4: 2048 ]{ 128 padding }
 // | ------------------------------- 4k buffer ------------------------------ |
-TEST_F(TraceBufferTest, ReadWrite_PaddingCases) {
+TEST_F(TraceBufferTest, ReadWrite_Padding) {
   ASSERT_TRUE(trace_buffer()->Create(4096));
   ASSERT_EQ(128u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                       .AddPacket(128 - 16, 'a')
@@ -232,6 +232,50 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingCases) {
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2048 - 16, 'e')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(512 - 16, 'f')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Like ReadWrite_Padding, but this time the padding introduces is the minimum
+// allowed (16 bytes). This is to exercise edge cases in the padding logic.
+// [c0: 2048               ][c1: 1024         ][c2: 1008       ][c3: 16]
+// [c4: 2032            ][c5: 1040                ][c6 :16][c7: 1080   ]
+TEST_F(TraceBufferTest, ReadWrite_MinimalPadding) {
+  ASSERT_TRUE(trace_buffer()->Create(4096));
+
+  ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+                       .AddPacket(2048 - 16, 'a')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(1024u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+                       .AddPacket(1024 - 16, 'b')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(1008u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
+                       .AddPacket(1008 - 16, 'c')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(16u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(3))
+                     .CopyIntoTraceBuffer());
+
+  ASSERT_EQ(4096u, size_to_end());
+
+  ASSERT_EQ(2032u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(4))
+                       .AddPacket(2032 - 16, 'd')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(1040u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(5))
+                       .AddPacket(1040 - 16, 'e')
+                       .CopyIntoTraceBuffer());
+  ASSERT_EQ(16u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(6))
+                     .CopyIntoTraceBuffer());
+  ASSERT_EQ(1008u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(7))
+                       .AddPacket(1008 - 16, 'f')
+                       .CopyIntoTraceBuffer());
+
+  ASSERT_EQ(4096u, size_to_end());
+
+  // The expected read sequence now is: c3, c4, c5.
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(2032 - 16, 'd')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(1040 - 16, 'e')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(1008 - 16, 'f')));
+  for (int i = 0; i < 3; i++)
+    ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
 TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
