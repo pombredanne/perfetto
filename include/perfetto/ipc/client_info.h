@@ -55,11 +55,10 @@ class ClientInfo {
   // Posix User ID. Comes from the kernel, can be trusted.
   uid_t uid() const { return uid_; }
 
-  bool has_received_fd() { return received_fd_ != nullptr; }
-
   base::ScopedFile ConsumeReceivedFD() {
-    PERFETTO_CHECK(received_fd_ != nullptr);
-    return std::move(*received_fd_);
+    if (received_fd_ != nullptr)
+      return std::move(*received_fd_);
+    return base::ScopedFile();
   }
 
  private:
