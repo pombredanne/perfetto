@@ -18,11 +18,10 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
-// Representation of InodesForBlock
-message InodesForBlock {
-  // Representation of Inode
-  message Inode {
-    // The inode number of the file
+// Representation of InodeFileMap
+message InodeFileMap {
+  // Representation of Entry
+  message Entry {
     optional uint64 inode_number = 1;
 
     // The path to the file, e.g. "etc/file.xml"
@@ -37,12 +36,11 @@ message InodesForBlock {
     optional Type type = 3;
   }
 
-  // The id of the block device
   optional uint64 block_device_id = 1;
 
-  // The mount point of the blocks, e.g. "/system"
+  // The mount points of the block device, e.g. ["system"].
   repeated string mount_points = 2;
 
-  // The list of all the inodes in the block
-  repeated Inode inode = 3;
+  // The list of all the entries from the block device
+  repeated Entry entry = 3;
 }

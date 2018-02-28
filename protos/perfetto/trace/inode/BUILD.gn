@@ -15,7 +15,7 @@
 import("../../../../gn/perfetto.gni")
 import("../../../../src/protozero/protozero_library.gni")
 
-inode_proto_names = [ "inodes_for_block.proto" ]
+inode_proto_names = [ "inode_file_map.proto" ]
 
 proto_library("lite") {
   generate_python = false
