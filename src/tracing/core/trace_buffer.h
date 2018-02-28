@@ -205,32 +205,42 @@ class TraceBuffez {
   // ChunkRecord on top of the moved SMB's header (page + chunk header).
   // This special requirement is covered by static_assert(s) in the .cc file.
   struct ChunkRecord {
-    explicit ChunkRecord(size_t size) : flags{0}, is_padding{0}, is_valid{1} {
-      static_assert(sizeof(ChunkRecord) == 16, "sizeof(ChunkRecord) != 16");
-      PERFETTO_DCHECK(size > 0 && size % 16 == 0 && size <= 4096);
-      payload_size_div_16 = static_cast<uint8_t>((size - 16) / 16);
+    explicit ChunkRecord(size_t sz) : flags{0}, is_padding{0} {
+      PERFETTO_DCHECK(sz > 0 && sz % sizeof(ChunkRecord) == 0 &&
+                      sz <= kMaxSize);
+      size = static_cast<decltype(size)>(sz);
     }
 
-    // Returns the size of the chunk, including the size of the ChunkRecord.
-    size_t size() const { return payload_size_div_16 * 16UL + 16; }
+    bool is_valid() const { return size != 0; }
 
-    // [64 bits] ID of the Producer from which the Chunk was copied from.
-    ProducerID producer_id = 0;
+    // Keep this structure packed and exactly 16 bytes (128 bits) big.
 
     // [32 bits] Monotonic counter within the same writer_id.
     ChunkID chunk_id = 0;
+
+    // [16 bits] ID of the Producer from which the Chunk was copied from.
+    ProducerID producer_id = 0;
 
     // [16 bits] Unique per Producer (but not within the service).
     // If writer_id == kWriterIdPadding the record should just be skipped.
     WriterID writer_id = 0;
 
+    // Number of fragments contained in the chunk.
+    uint16_t num_fragments = 0;
+
+    // Size in bytes, including sizeof(ChunkRecord) itself.
+    uint16_t size;
+
     uint8_t flags : 6;  // See SharedMemoryABI::ChunkHeader::flags.
     uint8_t is_padding : 1;
-    uint8_t is_valid : 1;
+    uint8_t unused_flag : 1;
 
-    // Size in 16B blocks, does NOT include sizeof(ChunkRecord).
-    // (all this is so that 0xff -> size() == 4096).
-    uint8_t payload_size_div_16;
+    // Not strictly needed, can be reused for more fields in the future. But
+    // right now helps to spot chunks in hex dumps.
+    char unused[3] = {'C', 'H', 'U'};
+
+    static constexpr size_t kMaxSize =
+        std::numeric_limits<decltype(size)>::max();
   };
 
   // Lookaside index. This serves two purposes:
@@ -351,6 +361,12 @@ class TraceBuffez {
     void MoveToEnd() { cur = end; }
   };
 
+  enum class ReadAheadResult {
+    kSuccededReturnSlices,
+    kFailedMoveToNextSequence,
+    kFailedStayOnSameSequence,
+  };
+
   TraceBuffez(const TraceBuffez&) = delete;
   TraceBuffez& operator=(const TraceBuffez&) = delete;
 
@@ -368,6 +384,8 @@ class TraceBuffez {
   // Adds a padding record of the given size (must be a multiple of
   // sizeof(ChunkRecord)).
   void AddPaddingRecord(size_t);
+
+  ReadAheadResult ReadAhead(Slices* slices);
 
   // Deletes (by marking the record invalid and removing form the index) all
   // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
@@ -403,28 +421,28 @@ class TraceBuffez {
   }
 
   // |src| can be nullptr (in which case |size| must be ==
-  // record.size() - sizeof(ChunkRecord)), for the case of writing a padding
+  // record.size - sizeof(ChunkRecord)), for the case of writing a padding
   // record. In this case the |wptr_| is advanced regularly (accordingly to
-  // |record.size()|) but no payload is copied.
+  // |record.size|) but no payload is copied.
   void WriteChunkRecord(const ChunkRecord& record,
                         const uint8_t* src,
                         size_t size) {
     // Note: |record.size| might be slightly bigger than |size| because
     // of rounding, to ensure that all ChunkRecord(s) are multiple of
     // sizeof(ChunkRecord). The invariant is:
-    // record.size() >= |size| + sizeof(ChunkRecord) (== if no rounding).
-    PERFETTO_DCHECK(record.size() <= size_to_end());
-    PERFETTO_DCHECK(record.size() >= sizeof(record));
-    PERFETTO_DCHECK(record.size() % sizeof(record) == 0);
-    PERFETTO_DCHECK(record.size() >= size + sizeof(record));
+    // record.size >= |size| + sizeof(ChunkRecord) (== if no rounding).
+    PERFETTO_DCHECK(record.size <= size_to_end());
+    PERFETTO_DCHECK(record.size >= sizeof(record));
+    PERFETTO_DCHECK(record.size % sizeof(record) == 0);
+    PERFETTO_DCHECK(record.size >= size + sizeof(record));
     DcheckIsAlignedAndWithinBounds(wptr_);
     memcpy(wptr_, &record, sizeof(record));
     if (PERFETTO_LIKELY(src)) {
       memcpy(wptr_ + sizeof(record), src, size);
     } else {
-      PERFETTO_DCHECK(size == record.size() - sizeof(record));
+      PERFETTO_DCHECK(size == record.size - sizeof(record));
     }
-    const size_t rounding_size = record.size() - sizeof(record) - size;
+    const size_t rounding_size = record.size - sizeof(record) - size;
     memset(wptr_ + sizeof(record) + size, 0, rounding_size);
   }
 
@@ -433,8 +451,9 @@ class TraceBuffez {
   size_t size_to_end() const { return end() - wptr_; }
 
   base::PageAllocator::UniquePtr data_;
-  size_t size_ = 0;          // Size in bytes of |data_|.
-  uint8_t* wptr_ = nullptr;  // Write pointer.
+  size_t size_ = 0;            // Size in bytes of |data_|.
+  size_t max_chunk_size_ = 0;  // Max size  in bytes allowed for a chunk.
+  uint8_t* wptr_ = nullptr;    // Write pointer.
 
   // An index that keeps track of the positions and metadata of each
   // ChunkRecord.
@@ -451,7 +470,7 @@ class TraceBuffez {
   std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_;
 
   // Statistics about buffer usage.
-  Stats stats_ = {};
+  Stats stats_;
 
   // When true disable some DCHECKs that have been put in place to detect
   // bugs in the producers. This is for tests that feed malicious inputs and
