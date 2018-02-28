@@ -385,6 +385,11 @@ class TraceBuffez {
   // sizeof(ChunkRecord)).
   void AddPaddingRecord(size_t);
 
+  // Look for contiguous fragment of the same packet starting from |read_iter_|.
+  // If a contiguous packet is found, all the fragments are pushed into |slices|
+  // and the function returns kSuccededReturnSlices. If not, the function
+  // returns either kFailedMoveToNextSequence or kFailedStayOnSameSequence,
+  // telling the caller to continue looking for packets.
   ReadAheadResult ReadAhead(Slices* slices);
 
   // Deletes (by marking the record invalid and removing form the index) all
