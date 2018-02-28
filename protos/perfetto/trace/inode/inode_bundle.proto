@@ -29,9 +29,9 @@ message InodeBundle {
 
     // The file type
     enum Type {
-      FILE = 0;
-      DIRECTORY = 1;
-      OTHER = 2;
+      UNKNOWN = 0;
+      FILE = 1;
+      DIRECTORY = 2;
     }
     optional Type type = 3;
   }
