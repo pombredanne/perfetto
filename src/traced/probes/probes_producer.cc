@@ -52,6 +52,8 @@ const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
 //                    +--------------+
 //
 
+ProbesProducer::ProbesProducer() : weak_factory_(this) {}
+
 ProbesProducer::~ProbesProducer() = default;
 
 void ProbesProducer::OnConnect() {
@@ -127,10 +129,13 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  auto delegate =
-      std::unique_ptr<SinkDelegate>(new SinkDelegate(std::move(trace_writer)));
+  auto delegate = std::unique_ptr<SinkDelegate>(
+      new SinkDelegate(this, std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
-  PERFETTO_CHECK(sink);
+  if (!sink) {
+    PERFETTO_ELOG("Failed to create FtraceSink.");
+    return;
+  }
   delegate->sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
   // Building on Android, watchdogs_.emplace(id, 2* source_config.duration_ms())
@@ -212,19 +217,24 @@ void ProbesProducer::ResetConnectionBackoff() {
   connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
-void ProbesProducer::OnMetadata(Metadata* metadata) {
+void ProbesProducer::OnMetadata(const FtraceMetadata& metadata) {
   if (is_inode_tracing_enabled_) {
-    task_runner_->PostTask(std::bind(&ProbesProducer::OnInodes, this,
-                                     std::move(metadata->inodes)));
+    auto inodes = metadata.inodes;
+    base::WeakPtr<ProbesProducer> weak_this = weak_factory_.GetWeakPtr();
+    task_runner_->PostTask([weak_this, inodes] {
+      if (weak_this)
+        weak_this->OnInodes(inodes);
+    });
   }
 }
 
-void ProbesProducer::OnInodes(std::set<uint64_t> inodes) {
-  // Do something.
+void ProbesProducer::OnInodes(const std::set<uint64_t>& inodes) {
+  PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
 }
 
-ProbesProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
-    : writer_(std::move(writer)) {}
+ProbesProducer::SinkDelegate::SinkDelegate(ProbesProducer* producer,
+                                           std::unique_ptr<TraceWriter> writer)
+    : producer_(producer), writer_(std::move(writer)) {}
 
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
@@ -235,12 +245,11 @@ ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
   return FtraceBundleHandle(trace_packet_->set_ftrace_events());
 }
 
-void ProbesProducer::SinkDelegate::OnBundleComplete(size_t,
-                                                    FtraceBundleHandle) {
+void ProbesProducer::SinkDelegate::OnBundleComplete(
+    size_t,
+    FtraceBundleHandle,
+    const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
-}
-
-void ProbesProducer::SinkDelegate::OnMetadata(Metadata* metadata) {
   producer_->OnMetadata(metadata);
 }
 

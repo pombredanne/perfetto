@@ -338,7 +338,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   size_t bytes = CpuReader::ParsePage(
       page.get(), &filter, bundle_provider.writer(), table, &metadata);
   EXPECT_EQ(bytes, 60ul);
@@ -375,7 +375,7 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_FALSE(CpuReader::ParsePage(
       page.get(), &filter, bundle_provider.writer(), table, &metadata));
 
@@ -400,7 +400,7 @@ TEST(CpuReaderTest, FilterByEvent) {
 
   EventFilter filter(*table, {});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
                                    bundle_provider.writer(), table, &metadata));
 
@@ -450,7 +450,7 @@ TEST(CpuReaderTest, ParseThreePrint) {
 
   EventFilter filter(*table, {"print"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
                                    bundle_provider.writer(), table, &metadata));
 
@@ -553,7 +553,7 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
                                    bundle_provider.writer(), table, &metadata));
 
@@ -670,7 +670,7 @@ TEST(CpuReaderTest, ParseAllFields) {
 
   auto input = writer.GetCopy();
   auto length = writer.written();
-  Metadata metadata{};
+  FtraceMetadata metadata{};
 
   ASSERT_TRUE(CpuReader::ParseEvent(ftrace_event_id, input.get(),
                                     input.get() + length, &table,
@@ -1151,7 +1151,7 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
                                    bundle_provider.writer(), table, &metadata));
 
@@ -1578,7 +1578,7 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
 
   EventFilter filter(*table, {"sched_switch"});
 
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
                                    bundle_provider.writer(), table, &metadata));
 

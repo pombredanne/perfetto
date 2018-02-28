@@ -49,7 +49,7 @@ void FuzzCpuReaderParsePage(const uint8_t* data, size_t size) {
   EventFilter filter(*table, {"sched_switch", "print"});
 
   writer.Reset(&stream);
-  Metadata metadata{};
+  FtraceMetadata metadata{};
   CpuReader::ParsePage(g_page, &filter, &writer, table, &metadata);
 }
 

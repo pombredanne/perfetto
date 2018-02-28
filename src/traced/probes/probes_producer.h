@@ -30,6 +30,7 @@
 namespace perfetto {
 class ProbesProducer : public Producer {
  public:
+  ProbesProducer();
   ~ProbesProducer() override;
 
   // Producer Impl:
@@ -47,8 +48,8 @@ class ProbesProducer : public Producer {
   void CreateProcessStatsDataSourceInstance(
       const DataSourceConfig& source_config);
 
-  void OnMetadata(Metadata* metadata);
-  void OnInodes(std::set<uint64_t> inodes);
+  void OnMetadata(const FtraceMetadata& metadata);
+  void OnInodes(const std::set<uint64_t>& inodes);
 
  private:
   using FtraceBundleHandle =
@@ -56,13 +57,15 @@ class ProbesProducer : public Producer {
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    explicit SinkDelegate(std::unique_ptr<TraceWriter> writer);
+    explicit SinkDelegate(ProbesProducer* producer,
+                          std::unique_ptr<TraceWriter> writer);
     ~SinkDelegate() override;
 
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
-    void OnBundleComplete(size_t cpu, FtraceBundleHandle bundle) override;
-    void OnMetadata(Metadata* metadata) override;
+    void OnBundleComplete(size_t cpu,
+                          FtraceBundleHandle bundle,
+                          const FtraceMetadata& metadata) override;
 
     void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
 
@@ -87,7 +90,7 @@ class ProbesProducer : public Producer {
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
 
-  bool is_inode_tracing_enabled_ = false;
+  bool is_inode_tracing_enabled_ = true;
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
@@ -99,6 +102,7 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, std::string> instances_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::WatchDog> watchdogs_;
+  base::WeakPtrFactory<ProbesProducer> weak_factory_;
 };
 }  // namespace perfetto
 

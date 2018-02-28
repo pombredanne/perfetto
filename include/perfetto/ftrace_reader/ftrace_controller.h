@@ -37,10 +37,15 @@
 
 namespace perfetto {
 
-struct Metadata {
+struct FtraceMetadata {
   size_t overwrite_count;
   std::set<uint64_t> inodes;
   std::set<uint64_t> pids;
+
+  void Clear() {
+    inodes.clear();
+    pids.clear();
+  }
 };
 
 namespace protos {
@@ -55,7 +60,7 @@ const size_t kMaxCpus = 64;
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
 
-struct Metadata;
+struct FtraceMetadata;
 class CpuReader;
 class EventFilter;
 class FtraceController;
@@ -74,10 +79,9 @@ class FtraceSink {
    public:
     virtual protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(
         size_t) = 0;
-    virtual void OnBundleComplete(
-        size_t,
-        protozero::MessageHandle<FtraceEventBundle>) = 0;
-    virtual void OnMetadata(Metadata*) {}
+    virtual void OnBundleComplete(size_t,
+                                  protozero::MessageHandle<FtraceEventBundle>,
+                                  const FtraceMetadata&) = 0;
     virtual ~Delegate() = default;
   };
 
@@ -96,13 +100,17 @@ class FtraceSink {
   FtraceSink(const FtraceSink&) = delete;
   FtraceSink& operator=(const FtraceSink&) = delete;
 
-  EventFilter* get_event_filter() { return filter_.get(); }
+  EventFilter* event_filter() { return filter_.get(); }
+  const FtraceMetadata& metadata() const { return metadata_; }
+  FtraceMetadata* metadata_mutable() { return &metadata_; }
+
   protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(size_t cpu) {
     return delegate_->GetBundleForCpu(cpu);
   }
   void OnBundleComplete(size_t cpu,
-                        protozero::MessageHandle<FtraceEventBundle> bundle) {
-    delegate_->OnBundleComplete(cpu, std::move(bundle));
+                        protozero::MessageHandle<FtraceEventBundle> bundle,
+                        const FtraceMetadata& metadata) {
+    delegate_->OnBundleComplete(cpu, std::move(bundle), metadata);
   }
 
   const std::set<std::string>& enabled_events();
@@ -111,6 +119,7 @@ class FtraceSink {
   const FtraceConfigId id_;
   const FtraceConfig config_;
   std::unique_ptr<EventFilter> filter_;
+  FtraceMetadata metadata_;
   FtraceSink::Delegate* delegate_;
 };
 
