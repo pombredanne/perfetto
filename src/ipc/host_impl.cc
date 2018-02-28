@@ -204,7 +204,8 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
     });
   }
 
-  service->client_info_ = ClientInfo(client->id, client->sock->peer_uid());
+  service->client_info_ =
+      ClientInfo(client->id, client->sock->peer_uid(), &client->received_fd);
   method.invoker(service, *decoded_req_args, std::move(deferred_reply));
   service->client_info_ = ClientInfo();
 }

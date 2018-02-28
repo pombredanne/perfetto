@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/ipc/basic_types.h"
 
 namespace perfetto {
@@ -29,8 +30,11 @@ namespace ipc {
 class ClientInfo {
  public:
   ClientInfo() = default;
+  ClientInfo(ClientID client_id, uid_t uid, base::ScopedFile* received_fd)
+      : client_id_(client_id), uid_(uid), received_fd_(received_fd) {}
+
   ClientInfo(ClientID client_id, uid_t uid)
-      : client_id_(client_id), uid_(uid) {}
+      : ClientInfo(client_id, uid, nullptr) {}
 
   bool operator==(const ClientInfo& other) const {
     return (client_id_ == other.client_id_ && uid_ == other.uid_);
@@ -51,9 +55,17 @@ class ClientInfo {
   // Posix User ID. Comes from the kernel, can be trusted.
   uid_t uid() const { return uid_; }
 
+  bool has_received_fd() { return received_fd_ != nullptr; }
+
+  base::ScopedFile ConsumeReceivedFD() {
+    PERFETTO_CHECK(received_fd_ != nullptr);
+    return std::move(*received_fd_);
+  }
+
  private:
   ClientID client_id_ = 0;
   uid_t uid_ = -1;
+  base::ScopedFile* received_fd_ = nullptr;
 };
 
 }  // namespace ipc
