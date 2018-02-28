@@ -55,14 +55,12 @@ inline int ReadStatusLine(int pid, const char* status_string) {
 
 inline std::vector<std::string> SplitOnNull(const char* input, size_t size) {
   std::vector<std::string> output;
-  int chars_left = size;
+  const char* end = input + size;
   do {
     // This works because it will only push the string up to a null character.
     output.push_back(std::string(input));
-    // Ensures we don't read any extra characters in the case of a long cmdline.
-    chars_left -= output.back().size() + 1;
     input += output.back().size() + 1;
-  } while (input[0] != 0 && chars_left > 0);
+  } while (input[0] != 0 && input < end);
   return output;
 }
 
