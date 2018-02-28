@@ -84,6 +84,11 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     uid_t uid,
     size_t shared_buffer_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+
+  if (producers_.size() >= kMaxProducerID) {
+    PERFETTO_DCHECK(false);
+    return nullptr;
+  }
   const ProducerID id = GetNextProducerID();
   PERFETTO_DLOG("Producer %" PRIu16 " connected", id);
   size_t shm_size = std::min(shared_buffer_size_hint_bytes, kMaxShmSize);
@@ -581,6 +586,7 @@ ServiceImpl::TracingSession* ServiceImpl::GetTracingSession(
 
 ProducerID ServiceImpl::GetNextProducerID() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_CHECK(producers_.size() < kMaxProducerID);
   do {
     ++last_producer_id_;
   } while (producers_.count(last_producer_id_) || last_producer_id_ == 0);
@@ -735,17 +741,17 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 
 ServiceImpl::TraceBuffer::TraceBuffer() = default;
 
-bool ServiceImpl::TraceBuffer::Create(size_t sz) {
-  data = base::PageAllocator::AllocateMayFail(sz);
+bool ServiceImpl::TraceBuffer::Create(size_t size_in_bytes) {
+  data = base::PageAllocator::AllocateMayFail(size_in_bytes);
   if (!data) {
     PERFETTO_ELOG("Trace buffer allocation failed (size: %zu, page_size: %zu)",
-                  sz, kBufferPageSize);
+                  size_in_bytes, kBufferPageSize);
     return false;
   }
-  size = sz;
-  abi.reset(new SharedMemoryABI(get_page(0), size, kBufferPageSize));
+  size = size_in_bytes;
+  abi.reset(new SharedMemoryABI(get_page(0), size_in_bytes, kBufferPageSize));
   PERFETTO_DCHECK(page_owners.empty());
-  page_owners.resize(size, -1);
+  page_owners.resize(num_pages(), -1);
   return true;
 }
 

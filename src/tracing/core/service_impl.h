@@ -170,7 +170,7 @@ class ServiceImpl : public Service {
     TraceBuffer(TraceBuffer&&) noexcept;
     TraceBuffer& operator=(TraceBuffer&&);
 
-    bool Create(size_t size);
+    bool Create(size_t size_in_bytes);
     size_t num_pages() const { return size / kBufferPageSize; }
 
     uint8_t* get_page(size_t page) {
