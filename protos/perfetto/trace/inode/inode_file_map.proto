@@ -25,7 +25,9 @@ message InodeFileMap {
     optional uint64 inode_number = 1;
 
     // The path to the file, e.g. "etc/file.xml"
-    repeated string path = 2;
+    // The path must be reconstructed from the list of strings, each added
+    // as a directory is traversed.
+    repeated string paths = 2;
 
     // The file type
     enum Type {
@@ -42,5 +44,5 @@ message InodeFileMap {
   repeated string mount_points = 2;
 
   // The list of all the entries from the block device
-  repeated Entry entry = 3;
+  repeated Entry entries = 3;
 }
