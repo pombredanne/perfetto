@@ -18,7 +18,8 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
-message InodeBundle {
+// Representation of InodesForBlock
+message InodesForBlock {
   // Representation of Inode
   message Inode {
     // The inode number of the file
@@ -36,18 +37,12 @@ message InodeBundle {
     optional Type type = 3;
   }
 
-  // Representation of InodesForBlock
-  message InodesForBlock {
-    // The id of the block device
-    optional uint64 block_device_id = 1;
+  // The id of the block device
+  optional uint64 block_device_id = 1;
 
-    // The mount point of the blocks, e.g. "/system"
-    repeated string mount_points = 2;
+  // The mount point of the blocks, e.g. "/system"
+  repeated string mount_points = 2;
 
-    // The list of all the inodes in the block
-    repeated Inode inode = 3;
-  }
-
-  // List of all blocks of inodes in the bundle
-  repeated InodesForBlock inodes_for_block = 1;
+  // The list of all the inodes in the block
+  repeated Inode inode = 3;
 }
