@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -30,6 +31,7 @@
 
 namespace perfetto {
 
+class CommitDataRequest;
 class TraceWriter;
 
 namespace base {
@@ -50,11 +52,11 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // pages. See tradeoff considerations in shared_memory_abi.h.
   // |OnPagesCompleteCallback|: a callback that will be posted on the passed
   // |TaskRunner| when one or more pages are complete (and hence the Producer
-  // should send a NotifySharedMemoryUpdate() to the Service).
+  // should send a CommitData request to the Service).
   SharedMemoryArbiterImpl(void* start,
                           size_t size,
                           size_t page_size,
-                          OnPagesCompleteCallback,
+                          Service::ProducerEndpoint*,
                           base::TaskRunner*);
 
   // Returns a new Chunk to write tracing data. The call always returns a valid
@@ -62,10 +64,9 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // in the SMB. In the long term the caller should be allowed to pick a policy
   // and handle the retry itself asynchronously.
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
-                                     BufferID target_buffer,
                                      size_t size_hint = 0);
 
-  void ReturnCompletedChunk(SharedMemoryABI::Chunk chunk);
+  void ReturnCompletedChunk(SharedMemoryABI::Chunk, BufferID target_buffer);
 
   SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 
@@ -89,17 +90,17 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
 
-  void NotifySharedMemoryUpdate();
+  void SendPendingCommitDataRequest();
 
   base::TaskRunner* const task_runner_;
-  OnPagesCompleteCallback on_pages_complete_callback_;
+  Service::ProducerEndpoint* const producer_endpoint_;
 
   // --- Begin lock-protected members ---
   std::mutex lock_;
   SharedMemoryABI shmem_abi_;
   size_t page_idx_ = 0;
+  std::unique_ptr<CommitDataRequest> commit_data_req_;
   IdAllocator<WriterID> active_writer_ids_;
-  std::vector<uint32_t> pages_to_notify_;
   // --- End lock-protected members ---
 };
 

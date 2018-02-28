@@ -189,34 +189,30 @@ class SharedMemoryABI {
     // The page is fully free and has not been partitioned yet.
     kPageNotPartitioned = 0,
 
-    // This is a transitional state, set by TryPartitionPage(), after having
-    // succesfully acquired a kPageNotPartitioned page, but before having set
-    // other flags in the page header (e.g., target_buffer).
-    kPageBeingPartitioned = 1,
-
     // TODO(primiano): Aligning a chunk @ 16 bytes could allow to use faster
     // intrinsics based on quad-word moves. Do the path and check what is the
     // fragmentation loss.
 
     // align4(X) := the largest integer N s.t. (N % 4) == 0 && N <= X.
     // 8 == sizeof(PageHeader).
-    kPageDiv1 = 2,   // Only one chunk of size: PAGE_SIZE - 8.
-    kPageDiv2 = 3,   // Two chunks of size: align4((PAGE_SIZE - 8) / 2).
-    kPageDiv4 = 4,   // Four chunks of size: align4((PAGE_SIZE - 8) / 4).
-    kPageDiv7 = 5,   // Seven chunks of size: align4((PAGE_SIZE - 8) / 7).
-    kPageDiv14 = 6,  // Fourteen chunks of size: align4((PAGE_SIZE - 8) / 14).
+    kPageDiv1 = 1,   // Only one chunk of size: PAGE_SIZE - 8.
+    kPageDiv2 = 2,   // Two chunks of size: align4((PAGE_SIZE - 8) / 2).
+    kPageDiv4 = 3,   // Four chunks of size: align4((PAGE_SIZE - 8) / 4).
+    kPageDiv7 = 4,   // Seven chunks of size: align4((PAGE_SIZE - 8) / 7).
+    kPageDiv14 = 5,  // Fourteen chunks of size: align4((PAGE_SIZE - 8) / 14).
 
     // The rationale for 7 and 14 above is to maximize the page usage for the
     // likely case of |page_size| == 4096:
     // (((4096 - 8) / 14) % 4) == 0, while (((4096 - 8) / 16 % 4)) == 3. So
     // Div16 would waste 3 * 16 = 48 bytes per page for chunk alignment gaps.
 
-    kPageDivReserved = 7,
+    kPageDivReserved1 = 6,
+    kPageDivReserved2 = 7,
     kNumPageLayouts = 8,
   };
 
   // Keep this consistent with the PageLayout enum above.
-  static constexpr size_t kNumChunksForLayout[] = {0, 0, 1, 2, 4, 7, 14, 0};
+  static constexpr uint8_t kNumChunksForLayout[] = {0, 1, 2, 4, 7, 14, 0, 0};
 
   // Layout of a Page.
   // +===================================================+
@@ -276,13 +272,10 @@ class SharedMemoryABI {
     //  +------------------------------------ Reserved for future use
     std::atomic<uint32_t> layout;
 
-    // Tells the Service on which logging buffer partition the chunks contained
-    // in the page should be moved into. This is reflecting the
-    // DataSourceConfig.target_buffer received at registration time.
-    // kMaxTraceBufferID in basic_types.h relies on the size of this.
-    // TODO(primiano): remove this and move to the NotifySharedMemoryUpdate IPC.
-    std::atomic<uint16_t> target_buffer;
-    uint16_t reserved;
+    // If we'll ever going to use this in the future it might come handy
+    // reviving the kPageBeingPartitioned logic (look in git log, it was there
+    // at some point in the past).
+    uint32_t reserved;
   };
 
   // There is one Chunk header per chunk (hence PageLayout per page) at the
@@ -346,14 +339,16 @@ class SharedMemoryABI {
     Chunk& operator=(Chunk&&) = default;
 
     uint8_t* begin() const { return begin_; }
-    uint8_t* end() const { return end_; }
+    uint8_t* end() const { return begin_ + size_; }
 
     // Size, including Chunk header.
-    size_t size() const { return static_cast<size_t>(end_ - begin_); }
+    size_t size() const { return size_; }
 
     uint8_t* payload_begin() const { return begin_ + sizeof(ChunkHeader); }
 
-    bool is_valid() const { return begin_ && end_ > begin_; }
+    bool is_valid() const { return begin_ && size_; }
+
+    uint8_t chunk_idx() const { return chunk_idx_; }
 
     ChunkHeader* header() { return reinterpret_cast<ChunkHeader*>(begin_); }
 
@@ -390,11 +385,12 @@ class SharedMemoryABI {
 
    private:
     friend class SharedMemoryABI;
-    Chunk(uint8_t* begin, size_t size);
+    Chunk(uint8_t* begin, uint16_t size, uint8_t chunk_idx);
 
     // Don't add extra fields, keep the move operator fast.
     uint8_t* begin_ = nullptr;
-    uint8_t* end_ = nullptr;
+    uint16_t size_ = 0;
+    uint8_t chunk_idx_ = 0;
   };
 
   // Construct an instace from an existing shared memory buffer.
@@ -435,12 +431,6 @@ class SharedMemoryABI {
            (kAllChunksComplete & ((1 << (num_chunks * kChunkShift)) - 1));
   }
 
-  // It is safe to call this only from the Service after having observed, with
-  // acquire semantics, that the page has been properly partitioned.
-  uint16_t get_target_buffer(size_t page_idx) {
-    return page_header(page_idx)->target_buffer.load(std::memory_order_relaxed);
-  }
-
   // For testing / debugging only.
   std::string page_header_dbg(size_t page_idx) {
     uint32_t x = page_header(page_idx)->layout.load(std::memory_order_relaxed);
@@ -460,31 +450,23 @@ class SharedMemoryABI {
   // Tries to atomically partition a page with the given |layout|. Returns true
   // if the page was free and has been partitioned with the given |layout|,
   // false if the page wasn't free anymore by the time we got there.
-  // If succeeds all the chunks are atomically set in the kChunkFree state and
-  // the target_buffer is stored with release-store semantics.
-  bool TryPartitionPage(size_t page_idx,
-                        PageLayout layout,
-                        size_t target_buffer);
+  // If succeeds all the chunks are atomically set in the kChunkFree state.
+  bool TryPartitionPage(size_t page_idx, PageLayout layout);
 
   // Tries to atomically mark a single chunk within the page as
   // kChunkBeingWritten. Returns an invalid chunk if the page is not partitioned
   // or the chunk is not in the kChunkFree state. If succeeds sets the chunk
   // header to |header|.
   Chunk TryAcquireChunkForWriting(size_t page_idx,
-                                  size_t chunk_idx,
-                                  size_t expected_target_buffer,
+                                  uint8_t chunk_idx,
                                   const ChunkHeader* header) {
-    return TryAcquireChunk(page_idx, chunk_idx, expected_target_buffer,
-                           kChunkBeingWritten, header);
+    return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingWritten, header);
   }
 
   // Similar to TryAcquireChunkForWriting. Fails if the chunk isn't in the
   // kChunkComplete state.
-  Chunk TryAcquireChunkForReading(size_t page_idx,
-                                  size_t chunk_idx,
-                                  size_t expected_target_buffer) {
-    return TryAcquireChunk(page_idx, chunk_idx, expected_target_buffer,
-                           kChunkBeingRead, nullptr);
+  Chunk TryAcquireChunkForReading(size_t page_idx, uint8_t chunk_idx) {
+    return TryAcquireChunk(page_idx, chunk_idx, kChunkBeingRead, nullptr);
   }
 
   // Used by the Service to take full ownership of all the chunks in the a page
@@ -498,7 +480,7 @@ class SharedMemoryABI {
   // The caller must have successfully TryAcquireAllChunksForReading().
   Chunk GetChunkUnchecked(size_t page_idx,
                           uint32_t page_layout,
-                          size_t chunk_idx);
+                          uint8_t chunk_idx);
 
   // Puts a chunk into the kChunkComplete state.
   // If all chunks in the page are kChunkComplete returns the page index,
@@ -514,16 +496,16 @@ class SharedMemoryABI {
     return ReleaseChunk(std::move(chunk), kChunkFree);
   }
 
-  ChunkState GetChunkState(size_t page_idx, size_t chunk_idx) {
+  ChunkState GetChunkState(size_t page_idx, uint8_t chunk_idx) {
     PageHeader* phdr = page_header(page_idx);
     uint32_t layout = phdr->layout.load(std::memory_order_relaxed);
     return static_cast<ChunkState>((layout >> (chunk_idx * kChunkShift)) &
                                    kChunkMask);
   }
 
-  std::pair<size_t, size_t> GetPageAndChunkIndex(const Chunk& chunk);
+  std::pair<size_t, uint8_t> GetPageAndChunkIndex(const Chunk& chunk);
 
-  static constexpr size_t GetNumChunksForLayout(uint32_t page_layout) {
+  static constexpr uint8_t GetNumChunksForLayout(uint32_t page_layout) {
     return kNumChunksForLayout[(page_layout & kLayoutMask) >> kLayoutShift];
   }
 
@@ -531,13 +513,12 @@ class SharedMemoryABI {
   SharedMemoryABI(const SharedMemoryABI&) = delete;
   SharedMemoryABI& operator=(const SharedMemoryABI&) = delete;
 
-  size_t GetChunkSizeForLayout(uint32_t page_layout) const {
+  uint16_t GetChunkSizeForLayout(uint32_t page_layout) const {
     return chunk_sizes_[(page_layout & kLayoutMask) >> kLayoutShift];
   }
 
   Chunk TryAcquireChunk(size_t page_idx,
-                        size_t chunk_idx,
-                        size_t expected_target_buffer,
+                        uint8_t chunk_idx,
                         ChunkState,
                         const ChunkHeader*);
   size_t ReleaseChunk(Chunk chunk, ChunkState);
@@ -546,7 +527,7 @@ class SharedMemoryABI {
   const size_t size_;
   const size_t page_size_;
   const size_t num_pages_;
-  std::array<size_t, kNumPageLayouts> const chunk_sizes_;
+  std::array<uint16_t, kNumPageLayouts> const chunk_sizes_;
 };
 
 }  // namespace perfetto

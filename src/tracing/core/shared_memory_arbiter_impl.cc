@@ -18,6 +18,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/shared_memory.h"
 #include "src/tracing/core/trace_writer_impl.h"
 
@@ -36,26 +37,26 @@ SharedMemoryABI::PageLayout SharedMemoryArbiterImpl::default_page_layout =
 std::unique_ptr<SharedMemoryArbiter> SharedMemoryArbiter::CreateInstance(
     SharedMemory* shared_memory,
     size_t page_size,
-    OnPagesCompleteCallback callback,
+    Service::ProducerEndpoint* producer_endpoint,
     base::TaskRunner* task_runner) {
   return std::unique_ptr<SharedMemoryArbiterImpl>(
       new SharedMemoryArbiterImpl(shared_memory->start(), shared_memory->size(),
-                                  page_size, std::move(callback), task_runner));
+                                  page_size, producer_endpoint, task_runner));
 }
+
 SharedMemoryArbiterImpl::SharedMemoryArbiterImpl(
     void* start,
     size_t size,
     size_t page_size,
-    OnPagesCompleteCallback callback,
+    Service::ProducerEndpoint* producer_endpoint,
     base::TaskRunner* task_runner)
     : task_runner_(task_runner),
-      on_pages_complete_callback_(std::move(callback)),
+      producer_endpoint_(producer_endpoint),
       shmem_abi_(reinterpret_cast<uint8_t*>(start), size, page_size),
       active_writer_ids_(kMaxWriterID) {}
 
 Chunk SharedMemoryArbiterImpl::GetNewChunk(
     const SharedMemoryABI::ChunkHeader& header,
-    BufferID target_buffer,
     size_t size_hint) {
   PERFETTO_DCHECK(size_hint == 0);  // Not implemented yet.
   int stall_count = 0;
@@ -68,8 +69,6 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     {
       std::lock_guard<std::mutex> scoped_lock(lock_);
       const size_t initial_page_idx = page_idx_;
-      // TODO(primiano): instead of scanning, we could maintain a bitmap of
-      // free chunks for each |target_buffer| and one for fully free pages.
       for (size_t i = 0; i < shmem_abi_.num_pages(); i++) {
         page_idx_ = (initial_page_idx + i) % shmem_abi_.num_pages();
         bool is_new_page = false;
@@ -79,39 +78,23 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
 
         if (shmem_abi_.is_page_free(page_idx_)) {
           // TODO(primiano): Use the |size_hint| here to decide the layout.
-          is_new_page =
-              shmem_abi_.TryPartitionPage(page_idx_, layout, target_buffer);
+          is_new_page = shmem_abi_.TryPartitionPage(page_idx_, layout);
         }
         uint32_t free_chunks;
-        size_t tbuf;
         if (is_new_page) {
           free_chunks = (1 << SharedMemoryABI::kNumChunksForLayout[layout]) - 1;
-          tbuf = target_buffer;
         } else {
           free_chunks = shmem_abi_.GetFreeChunks(page_idx_);
-
-          // |tbuf| here is advisory only and could change at any point, before
-          // or after this read. The only use of |tbuf| here is to to skip pages
-          // that are more likely to belong to other target_buffers, avoiding
-          // the more epxensive atomic operations in those cases. The
-          // authoritative check on |tbuf| happens atomically in the
-          // TryAcquireChunkForWriting() call below.
-          tbuf = shmem_abi_.page_header(page_idx_)->target_buffer.load(
-              std::memory_order_relaxed);
         }
-        PERFETTO_DLOG("Free chunks for page %zu: %x. Target buffer: %zu",
-                      page_idx_, free_chunks, tbuf);
+        PERFETTO_DLOG("Free chunks for page %zu: %x", page_idx_, free_chunks);
 
-        if (tbuf != target_buffer)
-          continue;
-
-        for (uint32_t chunk_idx = 0; free_chunks;
+        for (uint8_t chunk_idx = 0; free_chunks;
              chunk_idx++, free_chunks >>= 1) {
           if (!(free_chunks & 1))
             continue;
           // We found a free chunk.
           Chunk chunk = shmem_abi_.TryAcquireChunkForWriting(
-              page_idx_, chunk_idx, tbuf, &header);
+              page_idx_, chunk_idx, &header);
           if (!chunk.is_valid())
             continue;
           PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
@@ -122,11 +105,6 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
           }
           return chunk;
         }
-        // TODO(fmayer): we should have some policy to guarantee fairness of the
-        // SMB page allocator w.r.t |target_buffer|? Or is the SMB best-effort.
-        // All chunks in the page are busy (either kBeingRead or kBeingWritten),
-        // or all the pages are assigned to a different target buffer. Try with
-        // the next page.
       }
     }  // std::lock_guard<std::mutex>
 
@@ -142,40 +120,55 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // tracing service to  consume the shared memory buffer (SMB) and, for
       // this reason, never run the task that tells the service to purge the
       // SMB.
-      NotifySharedMemoryUpdate();
+      SendPendingCommitDataRequest();
     }
     usleep(kStallIntervalUs);
   }
 }
 
-void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
+void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
+                                                   BufferID target_buffer) {
   bool should_post_callback = false;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
+
     size_t page_index = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
+    PERFETTO_ELOG("post: %zu", page_index);
+
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
-      should_post_callback = pages_to_notify_.empty();
-      pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
+      if (!commit_data_req_) {
+        commit_data_req_.reset(new CommitDataRequest());
+        should_post_callback = true;
+      }
+      CommitDataRequest::ChunksToMove* ctm =
+          commit_data_req_->add_chunks_to_move();
+      ctm->set_page_number(static_cast<uint32_t>(page_index));
+      // TODO(primiano): implement per-chunk notifications.
+      // ctm->add_chunk_numbers(...)
+      ctm->set_target_buffer(target_buffer);
     }
   }
 
   if (should_post_callback) {
-    // TODO(primiano): what happens if the arbiter gets destroyed?
-    task_runner_->PostTask(
-        std::bind(&SharedMemoryArbiterImpl::NotifySharedMemoryUpdate, this));
+    // TODO(primiano): make this a WeakPtr. Otherwise what happens if the
+    // arbiter gets destroyed?
+    task_runner_->PostTask(std::bind(
+        &SharedMemoryArbiterImpl::SendPendingCommitDataRequest, this));
   }
 }
 
 // This is always invoked on the |task_runner_| thread.
-void SharedMemoryArbiterImpl::NotifySharedMemoryUpdate() {
+void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
+  std::unique_ptr<CommitDataRequest> req;
   std::vector<uint32_t> pages_to_notify;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
-    pages_to_notify = std::move(pages_to_notify_);
-    pages_to_notify_.clear();
+    req = std::move(commit_data_req_);
   }
-  if (!pages_to_notify.empty())
-    on_pages_complete_callback_(pages_to_notify);
+  // |commit_data_req_| could become nullptr if the forced sync flush happens
+  // in GetNewChunk().
+  if (req)
+    producer_endpoint_->CommitData(*req);
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(

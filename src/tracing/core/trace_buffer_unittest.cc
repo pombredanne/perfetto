@@ -647,6 +647,8 @@ TEST_F(TraceBufferTest, Patching_AtBoundariesOfChunk) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
+// Tests kChunkNeedsPatching logic: chunks that are marked as "pending patch"
+// should not be read until the patch has happened.
 TEST_F(TraceBufferTest, Patching_ReadWaitsForPatchComplete) {
   ASSERT_TRUE(trace_buffer()->Create(4096));
 

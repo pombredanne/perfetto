@@ -18,6 +18,8 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/utils.h"
+#include "perfetto/tracing/core/commit_data_request.h"
+#include "perfetto/tracing/core/service.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
@@ -29,16 +31,27 @@
 namespace perfetto {
 namespace {
 
+class FakeProducerEndpoint : public Service::ProducerEndpoint {
+  void RegisterDataSource(const DataSourceDescriptor&,
+                          RegisterDataSourceCallback) override {}
+  void UnregisterDataSource(DataSourceID) override {}
+  void CommitData(const CommitDataRequest&) override {}
+  SharedMemory* shared_memory() const override { return nullptr; }
+  std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override {
+    return nullptr;
+  }
+};
+
 class TraceWriterImplTest : public AlignedBufferTest {
  public:
   void SetUp() override {
     SharedMemoryArbiterImpl::set_default_layout_for_testing(
         SharedMemoryABI::PageLayout::kPageDiv4);
     AlignedBufferTest::SetUp();
-    auto callback = [](const std::vector<uint32_t>& arg) {};
     task_runner_.reset(new base::TestTaskRunner());
     arbiter_.reset(new SharedMemoryArbiterImpl(buf(), buf_size(), page_size(),
-                                               callback, task_runner_.get()));
+                                               &fake_producer_endpoint_,
+                                               task_runner_.get()));
   }
 
   void TearDown() override {
@@ -46,6 +59,7 @@ class TraceWriterImplTest : public AlignedBufferTest {
     task_runner_.reset();
   }
 
+  FakeProducerEndpoint fake_producer_endpoint_;
   std::unique_ptr<base::TestTaskRunner> task_runner_;
   std::unique_ptr<SharedMemoryArbiterImpl> arbiter_;
   std::function<void(const std::vector<uint32_t>&)> on_pages_complete_;
@@ -75,12 +89,12 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
   size_t packets_count = 0;
   for (size_t page_idx = 0; page_idx < kNumPages; page_idx++) {
     uint32_t page_layout = abi->page_layout_dbg(page_idx);
-    size_t num_chunks = SharedMemoryABI::GetNumChunksForLayout(page_layout);
-    for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
+    uint8_t num_chunks = SharedMemoryABI::GetNumChunksForLayout(page_layout);
+    for (uint8_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
       auto chunk_state = abi->GetChunkState(page_idx, chunk_idx);
       ASSERT_TRUE(chunk_state == SharedMemoryABI::kChunkFree ||
                   chunk_state == SharedMemoryABI::kChunkComplete);
-      auto chunk = abi->TryAcquireChunkForReading(page_idx, chunk_idx, kBufId);
+      auto chunk = abi->TryAcquireChunkForReading(page_idx, chunk_idx);
       if (!chunk.is_valid())
         continue;
       packets_count += chunk.header()->packets.load().count;
