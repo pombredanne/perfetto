@@ -92,4 +92,7 @@ message TraceConfig {
   // and enables guardrails that limit resource usage for traces requested
   // by statsd.
   optional bool enable_extra_guardrails = 4;
+
+  // Reject producers that are not com.google.perfetto.ftrace.
+  optional bool enable_lockdown_mode = 5;
 }

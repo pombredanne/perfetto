@@ -161,11 +161,15 @@ class TraceConfig {
     enable_extra_guardrails_ = value;
   }
 
+  bool enable_lockdown_mode() const { return enable_lockdown_mode_; }
+  void set_enable_lockdown_mode(bool value) { enable_lockdown_mode_ = value; }
+
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
   uint32_t duration_ms_ = {};
   bool enable_extra_guardrails_ = {};
+  bool enable_lockdown_mode_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

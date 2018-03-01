@@ -85,6 +85,12 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     size_t shared_buffer_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
+  if (lockdown_mode_ && uid != getuid()) {
+    PERFETTO_ELOG("Lockdown mode. Rejecting producer with UID %jd",
+                  static_cast<intmax_t>(uid));
+    return nullptr;
+  }
+
   if (producers_.size() >= kMaxProducerID) {
     PERFETTO_DCHECK(false);
     return nullptr;
@@ -161,6 +167,20 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Enabling tracing for consumer %p",
                 reinterpret_cast<void*>(consumer));
+  if (cfg.enable_lockdown_mode()) {
+    lockdown_mode_ = true;
+    // Disconnect all producers except traced_probes.
+    for (auto it = producers_.cbegin(); it != producers_.cend();) {
+      if (it->second->uid_ != getuid()) {
+        PERFETTO_ELOG(
+            "Entering lockdown mode. Disconnecting producer with UID %jd",
+            static_cast<intmax_t>(it->second->uid_));
+        it = producers_.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
   if (consumer->tracing_session_id_) {
     PERFETTO_DLOG(
         "A Consumer is trying to EnableTracing() but another tracing session "
