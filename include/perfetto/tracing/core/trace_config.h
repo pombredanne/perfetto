@@ -161,11 +161,25 @@ class TraceConfig {
     enable_extra_guardrails_ = value;
   }
 
+  uint32_t max_shm_size() const { return max_shm_size_; }
+  void set_max_shm_size(uint32_t value) { max_shm_size_ = value; }
+
+  uint32_t buffer_drain_interval() const { return buffer_drain_interval_; }
+  void set_buffer_drain_interval(uint32_t value) {
+    buffer_drain_interval_ = value;
+  }
+
+  uint32_t page_size() const { return page_size_; }
+  void set_page_size(uint32_t value) { page_size_ = value; }
+
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
   uint32_t duration_ms_ = {};
   bool enable_extra_guardrails_ = {};
+  uint32_t max_shm_size_ = {};
+  uint32_t buffer_drain_interval_ = {};
+  uint32_t page_size_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

@@ -61,6 +61,20 @@ void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
                 "size mismatch");
   enable_extra_guardrails_ = static_cast<decltype(enable_extra_guardrails_)>(
       proto.enable_extra_guardrails());
+
+  static_assert(sizeof(max_shm_size_) == sizeof(proto.max_shm_size()),
+                "size mismatch");
+  max_shm_size_ = static_cast<decltype(max_shm_size_)>(proto.max_shm_size());
+
+  static_assert(
+      sizeof(buffer_drain_interval_) == sizeof(proto.buffer_drain_interval()),
+      "size mismatch");
+  buffer_drain_interval_ = static_cast<decltype(buffer_drain_interval_)>(
+      proto.buffer_drain_interval());
+
+  static_assert(sizeof(page_size_) == sizeof(proto.page_size()),
+                "size mismatch");
+  page_size_ = static_cast<decltype(page_size_)>(proto.page_size());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -88,6 +102,22 @@ void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
   proto->set_enable_extra_guardrails(
       static_cast<decltype(proto->enable_extra_guardrails())>(
           enable_extra_guardrails_));
+
+  static_assert(sizeof(max_shm_size_) == sizeof(proto->max_shm_size()),
+                "size mismatch");
+  proto->set_max_shm_size(
+      static_cast<decltype(proto->max_shm_size())>(max_shm_size_));
+
+  static_assert(
+      sizeof(buffer_drain_interval_) == sizeof(proto->buffer_drain_interval()),
+      "size mismatch");
+  proto->set_buffer_drain_interval(
+      static_cast<decltype(proto->buffer_drain_interval())>(
+          buffer_drain_interval_));
+
+  static_assert(sizeof(page_size_) == sizeof(proto->page_size()),
+                "size mismatch");
+  proto->set_page_size(static_cast<decltype(proto->page_size())>(page_size_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 
@@ -169,9 +199,10 @@ void TraceConfig::DataSource::ToProto(
   config_.ToProto(proto->mutable_config());
 
   for (const auto& it : producer_name_filter_) {
-    proto->add_producer_name_filter(it);
+    auto* entry = proto->add_producer_name_filter();
     static_assert(sizeof(it) == sizeof(proto->producer_name_filter(0)),
                   "size mismatch");
+    *entry = static_cast<decltype(proto->producer_name_filter(0))>(it);
   }
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }

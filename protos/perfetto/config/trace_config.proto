@@ -92,4 +92,10 @@ message TraceConfig {
   // and enables guardrails that limit resource usage for traces requested
   // by statsd.
   optional bool enable_extra_guardrails = 4;
+
+  optional uint32 max_shm_size = 5;
+
+  optional uint32 buffer_drain_interval = 6;
+
+  optional uint32 page_size = 7;
 }
