@@ -83,8 +83,6 @@ class FtraceConfigMuxer {
 
   void SetupClock(const FtraceConfig& request);
   void SetupBufferSize(const FtraceConfig& request);
-  void EnableAtraceOnAndroid(const FtraceConfig& request);
-  void DisableAtraceOnAndroid();
   void EnableAtrace(const FtraceConfig& request);
   void DisableAtrace();
 

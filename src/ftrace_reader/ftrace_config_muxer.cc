@@ -197,9 +197,6 @@ void FtraceConfigMuxer::SetupBufferSize(const FtraceConfig& request) {
   current_state_.cpu_buffer_size_pages = pages;
 }
 
-void FtraceConfigMuxer::EnableAtraceOnAndroid(const FtraceConfig& request) {
-}
-
 void FtraceConfigMuxer::EnableAtrace(const FtraceConfig& request) {
   PERFETTO_DCHECK(!current_state_.atrace_on);
 

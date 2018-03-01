@@ -49,7 +49,7 @@ ProducerIPCService::GetProducerForCurrentRequest() {
 
 // Called by the remote Producer through the IPC channel soon after connecting.
 void ProducerIPCService::InitializeConnection(
-    const InitializeConnectionRequest& req,
+    const protos::InitializeConnectionRequest& req,
     DeferredInitializeConnectionResponse response) {
   const auto& client_info = ipc::Service::client_info();
   const ipc::ClientID ipc_client_id = client_info.client_id();
@@ -67,20 +67,26 @@ void ProducerIPCService::InitializeConnection(
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
       producer.get(), client_info.uid(), req.shared_buffer_size_hint_bytes());
+
+  // Could happen if the service has too many producers connected.
+  if (!producer->service_endpoint)
+    response.Reject();
+
   const int shm_fd = static_cast<PosixSharedMemory*>(
                          producer->service_endpoint->shared_memory())
                          ->fd();
   producers_.emplace(ipc_client_id, std::move(producer));
   // Because of the std::move() |producer| is invalid after this point.
 
-  auto async_res = ipc::AsyncResult<InitializeConnectionResponse>::Create();
+  auto async_res =
+      ipc::AsyncResult<protos::InitializeConnectionResponse>::Create();
   async_res.set_fd(shm_fd);
   response.Resolve(std::move(async_res));
 }
 
 // Called by the remote Producer through the IPC channel.
 void ProducerIPCService::RegisterDataSource(
-    const RegisterDataSourceRequest& req,
+    const protos::RegisterDataSourceRequest& req,
     DeferredRegisterDataSourceResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
@@ -133,7 +139,8 @@ void ProducerIPCService::OnDataSourceRegistered(
 
   DeferredRegisterDataSourceResponse ipc_response = std::move(it->second);
   producer->pending_data_sources.erase(it);
-  auto response = ipc::AsyncResult<RegisterDataSourceResponse>::Create();
+  auto response =
+      ipc::AsyncResult<protos::RegisterDataSourceResponse>::Create();
   response->set_data_source_id(id);
   ipc_response.Resolve(std::move(response));
 }
@@ -151,7 +158,7 @@ void ProducerIPCService::OnClientDisconnected() {
 // ReqisterDataSource and UnregisterDataSource speculating on the next id.
 // Called by the remote Service through the IPC channel.
 void ProducerIPCService::UnregisterDataSource(
-    const UnregisterDataSourceRequest& req,
+    const protos::UnregisterDataSourceRequest& req,
     DeferredUnregisterDataSourceResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
@@ -163,11 +170,12 @@ void ProducerIPCService::UnregisterDataSource(
   producer->service_endpoint->UnregisterDataSource(req.data_source_id());
 
   // UnregisterDataSource doesn't expect any meaningful response.
-  response.Resolve(ipc::AsyncResult<UnregisterDataSourceResponse>::Create());
+  response.Resolve(
+      ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
 }
 
 void ProducerIPCService::NotifySharedMemoryUpdate(
-    const NotifySharedMemoryUpdateRequest& req,
+    const protos::NotifySharedMemoryUpdateRequest& req,
     DeferredNotifySharedMemoryUpdateResponse) {
   // The response object is deliberately not resolved. NotifySharedMemoryUpdate
   // messages don't expect any response (i.e. the client sends them with the
@@ -190,7 +198,7 @@ void ProducerIPCService::NotifySharedMemoryUpdate(
 }
 
 void ProducerIPCService::GetAsyncCommand(
-    const GetAsyncCommandRequest&,
+    const protos::GetAsyncCommandRequest&,
     DeferredGetAsyncCommandResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
@@ -232,7 +240,7 @@ void ProducerIPCService::RemoteProducer::CreateDataSourceInstance(
         "has not yet initialized the connection");
     return;
   }
-  auto cmd = ipc::AsyncResult<GetAsyncCommandResponse>::Create();
+  auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd->mutable_start_data_source()->set_new_instance_id(dsid);
   cfg.ToProto(cmd->mutable_start_data_source()->mutable_config());
@@ -247,7 +255,7 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
         "has not yet initialized the connection");
     return;
   }
-  auto cmd = ipc::AsyncResult<GetAsyncCommandResponse>::Create();
+  auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd->mutable_stop_data_source()->set_instance_id(dsid);
   async_producer_commands.Resolve(std::move(cmd));
