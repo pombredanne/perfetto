@@ -18,6 +18,7 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/shared_memory.h"
 #include "src/tracing/core/trace_writer_impl.h"
 
@@ -36,20 +37,21 @@ SharedMemoryABI::PageLayout SharedMemoryArbiterImpl::default_page_layout =
 std::unique_ptr<SharedMemoryArbiter> SharedMemoryArbiter::CreateInstance(
     SharedMemory* shared_memory,
     size_t page_size,
-    OnPagesCompleteCallback callback,
+    Service::ProducerEndpoint* producer_endpoint,
     base::TaskRunner* task_runner) {
   return std::unique_ptr<SharedMemoryArbiterImpl>(
       new SharedMemoryArbiterImpl(shared_memory->start(), shared_memory->size(),
-                                  page_size, std::move(callback), task_runner));
+                                  page_size, producer_endpoint, task_runner));
 }
+
 SharedMemoryArbiterImpl::SharedMemoryArbiterImpl(
     void* start,
     size_t size,
     size_t page_size,
-    OnPagesCompleteCallback callback,
+    Service::ProducerEndpoint* producer_endpoint,
     base::TaskRunner* task_runner)
     : task_runner_(task_runner),
-      on_pages_complete_callback_(std::move(callback)),
+      producer_endpoint_(producer_endpoint),
       shmem_abi_(reinterpret_cast<uint8_t*>(start), size, page_size),
       active_writer_ids_(kMaxWriterID) {}
 
@@ -142,7 +144,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // tracing service to  consume the shared memory buffer (SMB) and, for
       // this reason, never run the task that tells the service to purge the
       // SMB.
-      NotifySharedMemoryUpdate();
+      SendPendingCommitDataRequest();
     }
     usleep(kStallIntervalUs);
   }
@@ -153,29 +155,41 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     size_t page_index = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
+
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
-      should_post_callback = pages_to_notify_.empty();
-      pages_to_notify_.push_back(static_cast<uint32_t>(page_index));
+      if (!commit_data_req_) {
+        commit_data_req_.reset(new CommitDataRequest());
+        should_post_callback = true;
+      }
+      CommitDataRequest::ChunksToMove* ctm =
+          commit_data_req_->add_chunks_to_move();
+      ctm->set_page_number(static_cast<uint32_t>(page_index));
+      // TODO(primiano): implement per-chunk notifications.
+      // ctm->add_chunk_numbers(...)
+      // ctm->set_target_buffer(target_buffer);
     }
   }
 
   if (should_post_callback) {
-    // TODO(primiano): what happens if the arbiter gets destroyed?
-    task_runner_->PostTask(
-        std::bind(&SharedMemoryArbiterImpl::NotifySharedMemoryUpdate, this));
+    // TODO(primiano): make this a WeakPtr. Otherwise what happens if the
+    // arbiter gets destroyed?
+    task_runner_->PostTask(std::bind(
+        &SharedMemoryArbiterImpl::SendPendingCommitDataRequest, this));
   }
 }
 
 // This is always invoked on the |task_runner_| thread.
-void SharedMemoryArbiterImpl::NotifySharedMemoryUpdate() {
+void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
+  std::unique_ptr<CommitDataRequest> req;
   std::vector<uint32_t> pages_to_notify;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
-    pages_to_notify = std::move(pages_to_notify_);
-    pages_to_notify_.clear();
+    req = std::move(commit_data_req_);
   }
-  if (!pages_to_notify.empty())
-    on_pages_complete_callback_(pages_to_notify);
+  // |commit_data_req_| could become nullptr if the forced sync flush happens
+  // in GetNewChunk().
+  if (req)
+    producer_endpoint_->CommitData(*req);
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
