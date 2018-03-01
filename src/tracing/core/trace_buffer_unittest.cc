@@ -38,7 +38,7 @@ using ::testing::IsEmpty;
 
 class TraceBufferTest : public testing::Test {
  public:
-  using ChunkIterator = TraceBuffez::ChunkIterator;
+  using SequenceIterator = TraceBuffez::SequenceIterator;
   using ChunkMap = TraceBuffez::ChunkMap;
 
   static constexpr uint8_t kContFromPrevChunk =
@@ -47,22 +47,27 @@ class TraceBufferTest : public testing::Test {
       SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk;
 
   FakeChunk CreateChunk(ProducerID p, WriterID w, ChunkID c) {
-    return FakeChunk(&trace_buffer_, p, w, c);
+    return FakeChunk(trace_buffer_.get(), p, w, c);
   }
 
-  bool MaybePatchChunkContents(
+  void ResetBuffer(size_t size_) {
+    trace_buffer_ = TraceBuffez::Create(size_);
+    ASSERT_TRUE(trace_buffer_);
+  }
+
+  bool TryPatchChunkContents(
       ProducerID p,
       WriterID w,
       ChunkID c,
       size_t offset,
       std::array<uint8_t, TraceBuffez::kPatchLen> patch) {
-    return trace_buffer_.MaybePatchChunkContents(p, w, c, offset, patch);
+    return trace_buffer_->TryPatchChunkContents(p, w, c, offset, patch);
   }
 
   std::vector<FakePacketFragment> ReadPacket() {
     std::vector<FakePacketFragment> fragments;
     Slices slices;
-    if (!trace_buffer_.ReadNextTracePacket(&slices))
+    if (!trace_buffer_->ReadNextTracePacket(&slices))
       return fragments;
     for (const Slice& slice : slices)
       fragments.emplace_back(slice.start, slice.size);
@@ -98,22 +103,22 @@ class TraceBufferTest : public testing::Test {
     return expected_seq_str == actual_seq_str;
   }
 
-  ChunkIterator GetReadIterForSequence(ProducerID p, WriterID w) {
+  SequenceIterator GetReadIterForSequence(ProducerID p, WriterID w) {
     TraceBuffez::ChunkMeta::Key key(p, w, 0);
-    return trace_buffer_.GetReadIterForSequence(
-        trace_buffer_.index_.lower_bound(key));
+    return trace_buffer_->GetReadIterForSequence(
+        trace_buffer_->index_.lower_bound(key));
   }
 
   void SuppressSanityDchecksForTesting() {
-    trace_buffer_.suppress_sanity_dchecks_for_testing_ = true;
+    trace_buffer_->suppress_sanity_dchecks_for_testing_ = true;
   }
 
-  TraceBuffez* trace_buffer() { return &trace_buffer_; }
-  size_t size_to_end() { return trace_buffer_.size_to_end(); }
-  const ChunkMap& chunk_index() { return trace_buffer_.index_; }
+  TraceBuffez* trace_buffer() { return trace_buffer_.get(); }
+  size_t size_to_end() { return trace_buffer_->size_to_end(); }
+  const ChunkMap& chunk_index() { return trace_buffer_->index_; }
 
  private:
-  TraceBuffez trace_buffer_;
+  std::unique_ptr<TraceBuffez> trace_buffer_;
 };
 
 // ----------------------
@@ -126,13 +131,14 @@ class TraceBufferTest : public testing::Test {
 // rounding logic, might be a good idea to create chunks of that size.
 
 TEST_F(TraceBufferTest, ReadWrite_EmptyBuffer) {
+  ResetBuffer(4096);
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
 // On each iteration writes a fixed-size chunk and reads it back.
 TEST_F(TraceBufferTest, ReadWrite_Simple) {
-  ASSERT_TRUE(trace_buffer()->Create(64 * 1024));
+  ResetBuffer(64 * 1024);
   for (ChunkID chunk_id = 0; chunk_id < 1000; chunk_id++) {
     char seed = static_cast<char>(chunk_id);
     CreateChunk(ProducerID(1), WriterID(1), chunk_id)
@@ -146,7 +152,7 @@ TEST_F(TraceBufferTest, ReadWrite_Simple) {
 
 TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
   for (uint8_t num_writers = 1; num_writers <= 10; num_writers++) {
-    ASSERT_TRUE(trace_buffer()->Create(4096));
+    ResetBuffer(4096);
     for (uint8_t i = 1; i <= num_writers; i++) {
       ASSERT_EQ(32u, CreateChunk(ProducerID(i), WriterID(i), ChunkID(i))
                          .AddPacket(32 - 16, i)
@@ -165,7 +171,7 @@ TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
 // [ c0: 512 ][ c1: 512 ][ c2: 1024 ][ c3: 2048 ]
 // | ---------------- 4k buffer --------------- |
 TEST_F(TraceBufferTest, ReadWrite_FillTillEnd) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   for (int i = 0; i < 3; i++) {
     ASSERT_EQ(512u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                         .AddPacket(512 - 16, 'a')
@@ -202,7 +208,7 @@ TEST_F(TraceBufferTest, ReadWrite_FillTillEnd) {
 // [ c5: 512              ]{ padding }[c3: 1024 ][ c4: 2048 ]{ 128 padding }
 // | ------------------------------- 4k buffer ------------------------------ |
 TEST_F(TraceBufferTest, ReadWrite_Padding) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   ASSERT_EQ(128u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                       .AddPacket(128 - 16, 'a')
                       .CopyIntoTraceBuffer());
@@ -239,7 +245,7 @@ TEST_F(TraceBufferTest, ReadWrite_Padding) {
 // [c0: 2048               ][c1: 1024         ][c2: 1008       ][c3: 16]
 // [c4: 2032            ][c5: 1040                ][c6 :16][c7: 1080   ]
 TEST_F(TraceBufferTest, ReadWrite_MinimalPadding) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
 
   ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                        .AddPacket(2048 - 16, 'a')
@@ -281,7 +287,7 @@ TEST_F(TraceBufferTest, ReadWrite_MinimalPadding) {
 TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
   for (int seed = 1; seed <= 32; seed++) {
     std::minstd_rand0 rnd_engine(seed);
-    ASSERT_TRUE(trace_buffer()->Create(4096 * (1 + rnd_engine() % 32)));
+    ResetBuffer(4096 * (1 + rnd_engine() % 32));
     std::uniform_int_distribution<size_t> size_dist(18, 4096);
     std::uniform_int_distribution<ProducerID> prod_dist(1, kMaxProducerID);
     std::uniform_int_distribution<WriterID> wri_dist(1, kMaxWriterID);
@@ -289,7 +295,7 @@ TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
     std::map<std::tuple<ProducerID, WriterID, ChunkID>, size_t> expected_chunks;
     for (;;) {
       const size_t chunk_size = size_dist(rnd_engine);
-      if (base::Align<16>(chunk_size) >= size_to_end())
+      if (base::AlignUp<16>(chunk_size) >= size_to_end())
         break;
       ProducerID p = prod_dist(rnd_engine);
       WriterID w = wri_dist(rnd_engine);
@@ -314,7 +320,7 @@ TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
 // Tests the case of writing a chunk that leaves just sizeof(ChunkRecord) at
 // the end of the buffer.
 TEST_F(TraceBufferTest, ReadWrite_WrappingCases) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   ASSERT_EQ(4080u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                        .AddPacket(4080 - 16, 'a')
                        .CopyIntoTraceBuffer());
@@ -345,7 +351,7 @@ TEST_F(TraceBufferTest, ReadWrite_WrappingCases) {
 // padding record is added in place of c1, and c1 is removed from the index.
 // Final situation:   [ c3: 3072     ][ PAD ]
 TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndex) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   // Setup initial condition: [ c0: 2048 ][ c1: 2048 ]
   ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
                        .AddPacket(2048 - 16, 'a')
@@ -373,7 +379,7 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndex) {
 // Similar to ReadWrite_PaddingAtEndUpdatesIndex but makes it so that the
 // various chunks don't perfectly align when wrapping.
 TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
 
   // [c0: 512][c1: 512][c2: 512][c3: 512][c4: 512][c5: 512][c6: 512][c7: 512]
   for (uint8_t i = 0; i < 8; i++) {
@@ -404,7 +410,7 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
 // --------------------------------------
 
 TEST_F(TraceBufferTest, Fragments_Simple) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(10, 'a', kContFromPrevChunk)
       .AddPacket(20, 'b')
@@ -428,7 +434,7 @@ TEST_F(TraceBufferTest, Fragments_Simple) {
 }
 
 TEST_F(TraceBufferTest, Fragments_EdgeCases) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(2, 'a', kContFromPrevChunk)
       .CopyIntoTraceBuffer();
@@ -452,7 +458,7 @@ TEST_F(TraceBufferTest, Fragments_EdgeCases) {
 // and verify that they still get realigned properly, without breaking other
 // sequences.
 TEST_F(TraceBufferTest, Fragments_OutOfOrder) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(10, 'a', kContOnNextChunk)
       .CopyIntoTraceBuffer();
@@ -481,7 +487,7 @@ TEST_F(TraceBufferTest, Fragments_OutOfOrder) {
 }
 
 TEST_F(TraceBufferTest, Fragments_EmptyChunkBefore) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0)).CopyIntoTraceBuffer();
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
       .AddPacket(10, 'a')
@@ -499,7 +505,7 @@ TEST_F(TraceBufferTest, Fragments_EmptyChunkBefore) {
 }
 
 TEST_F(TraceBufferTest, Fragments_EmptyChunkAfter) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(10, 'a')
       .AddPacket(10, 'b', kContOnNextChunk)
@@ -513,7 +519,7 @@ TEST_F(TraceBufferTest, Fragments_EmptyChunkAfter) {
 // Set up a fragmented packet that happens to also have an empty chunk in the
 // middle of the sequence. Test that it just gets skipped.
 TEST_F(TraceBufferTest, Fragments_EmptyChunkInTheMiddle) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(10, 'a', kContOnNextChunk)
       .CopyIntoTraceBuffer();
@@ -534,7 +540,7 @@ TEST_F(TraceBufferTest, Fragments_EmptyChunkInTheMiddle) {
 // read as one packet.
 TEST_F(TraceBufferTest, Fragments_LongPackets) {
   for (unsigned seq_len = 1; seq_len <= 10; seq_len++) {
-    ASSERT_TRUE(trace_buffer()->Create(4096));
+    ResetBuffer(4096);
     std::vector<FakePacketFragment> expected_fragments;
     expected_fragments.emplace_back(20, 'b');
     CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
@@ -565,7 +571,7 @@ TEST_F(TraceBufferTest, Fragments_LongPackets) {
 // Similar to Fragments_LongPacket, but covers also the case of ChunkID wrapping
 // over its max value.
 TEST_F(TraceBufferTest, Fragments_LongPacketWithWrappingID) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   std::vector<FakePacketFragment> expected_fragments;
 
   for (ChunkID chunk_id = -2; chunk_id <= 2; chunk_id++) {
@@ -585,7 +591,7 @@ TEST_F(TraceBufferTest, Fragments_LongPacketWithWrappingID) {
 // --------------------------
 
 TEST_F(TraceBufferTest, Patching_Simple) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(100, 'a')
       .CopyIntoTraceBuffer();
@@ -596,8 +602,8 @@ TEST_F(TraceBufferTest, Patching_Simple) {
   CreateChunk(ProducerID(3), WriterID(1), ChunkID(0))
       .AddPacket(100, 'c')
       .CopyIntoTraceBuffer();
-  ASSERT_TRUE(MaybePatchChunkContents(ProducerID(2), WriterID(1), ChunkID(0), 5,
-                                      {{'Y', 'M', 'C', 'A'}}));
+  ASSERT_TRUE(TryPatchChunkContents(ProducerID(2), WriterID(1), ChunkID(0), 5,
+                                    {{'Y', 'M', 'C', 'A'}}));
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'a')));
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment("b00-YMCA", 8)));
@@ -606,23 +612,23 @@ TEST_F(TraceBufferTest, Patching_Simple) {
 }
 
 TEST_F(TraceBufferTest, Patching_SkipIfChunkDoesntExist) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(100, 'a')
       .CopyIntoTraceBuffer();
-  ASSERT_FALSE(MaybePatchChunkContents(ProducerID(1), WriterID(2), ChunkID(0),
-                                       0, {{'X', 'X', 'X', 'X'}}));
-  ASSERT_FALSE(MaybePatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
-                                       0, {{'X', 'X', 'X', 'X'}}));
-  ASSERT_FALSE(MaybePatchChunkContents(ProducerID(1), WriterID(1), ChunkID(-1),
-                                       0, {{'X', 'X', 'X', 'X'}}));
+  ASSERT_FALSE(TryPatchChunkContents(ProducerID(1), WriterID(2), ChunkID(0), 0,
+                                     {{'X', 'X', 'X', 'X'}}));
+  ASSERT_FALSE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1), 0,
+                                     {{'X', 'X', 'X', 'X'}}));
+  ASSERT_FALSE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(-1), 0,
+                                     {{'X', 'X', 'X', 'X'}}));
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(100, 'a')));
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
 TEST_F(TraceBufferTest, Patching_AtBoundariesOfChunk) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(100, 'a', kContOnNextChunk)
       .CopyIntoTraceBuffer();
@@ -634,10 +640,10 @@ TEST_F(TraceBufferTest, Patching_AtBoundariesOfChunk) {
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
       .AddPacket(100, 'c', kContFromPrevChunk)
       .CopyIntoTraceBuffer();
-  ASSERT_TRUE(MaybePatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1), 1,
-                                      {{'P', 'E', 'R', 'F'}}));
-  ASSERT_TRUE(MaybePatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
-                                      16 - 4, {{'E', 'T', 'T', 'O'}}));
+  ASSERT_TRUE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1), 1,
+                                    {{'P', 'E', 'R', 'F'}}));
+  ASSERT_TRUE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
+                                    16 - 4, {{'E', 'T', 'T', 'O'}}));
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(),
               ElementsAre(FakePacketFragment(100, 'a'),
@@ -651,8 +657,8 @@ TEST_F(TraceBufferTest, Patching_AtBoundariesOfChunk) {
 // ---------------------
 
 TEST_F(TraceBufferTest, Malicious_RepeatedChunkID) {
+  ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
-  ASSERT_TRUE(trace_buffer()->Create(4096));
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(2048, 'a')
       .CopyIntoTraceBuffer();
@@ -665,8 +671,8 @@ TEST_F(TraceBufferTest, Malicious_RepeatedChunkID) {
 }
 
 TEST_F(TraceBufferTest, Malicious_ZeroVarintHeader) {
+  ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
-  ASSERT_TRUE(trace_buffer()->Create(4096));
   // Create a standalone chunk where the varint header is == 0.
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(4, 'a')
@@ -684,8 +690,8 @@ TEST_F(TraceBufferTest, Malicious_ZeroVarintHeader) {
 // Like the Malicious_ZeroVarintHeader, but put the chunk in the middle of a
 // sequence that would be otherwise valid.
 TEST_F(TraceBufferTest, Malicious_ZeroVarintHeaderInSequence) {
+  ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
-  ASSERT_TRUE(trace_buffer()->Create(4096));
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(4, 'a', kContOnNextChunk)
       .CopyIntoTraceBuffer();
@@ -711,7 +717,7 @@ TEST_F(TraceBufferTest, Malicious_ZeroVarintHeaderInSequence) {
 }
 
 TEST_F(TraceBufferTest, Malicious_PatchOutOfBounds) {
-  ASSERT_TRUE(trace_buffer()->Create(4096));
+  ResetBuffer(4096);
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
       .AddPacket(2048, 'a')
       .CopyIntoTraceBuffer();
@@ -720,16 +726,16 @@ TEST_F(TraceBufferTest, Malicious_PatchOutOfBounds) {
       .CopyIntoTraceBuffer();
   size_t offsets[] = {13, 16, size_t(-17), size_t(-32), size_t(-1024)};
   for (size_t offset : offsets) {
-    ASSERT_FALSE(MaybePatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
-                                         offset, {{'0', 'd', 'a', 'y'}}));
+    ASSERT_FALSE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
+                                       offset, {{'0', 'd', 'a', 'y'}}));
   }
 }
 
 // -------------------
-// ChunkIterator tests
+// SequenceIterator tests
 // -------------------
 TEST_F(TraceBufferTest, Iterator_OneStreamOrdered) {
-  ASSERT_TRUE(trace_buffer()->Create(64 * 1024));
+  ResetBuffer(64 * 1024);
   AppendChunks({
       {ProducerID(1), WriterID(1), ChunkID(0)},
       {ProducerID(1), WriterID(1), ChunkID(1)},
@@ -744,7 +750,7 @@ TEST_F(TraceBufferTest, Iterator_OneStreamOrdered) {
 }
 
 TEST_F(TraceBufferTest, Iterator_OneStreamWrapping) {
-  ASSERT_TRUE(trace_buffer()->Create(64 * 1024));
+  ResetBuffer(64 * 1024);
   AppendChunks({
       {ProducerID(1), WriterID(1), ChunkID(5)},
       {ProducerID(1), WriterID(1), ChunkID(6)},
@@ -759,7 +765,7 @@ TEST_F(TraceBufferTest, Iterator_OneStreamWrapping) {
 }
 
 TEST_F(TraceBufferTest, Iterator_ManyStreamsOrdered) {
-  ASSERT_TRUE(trace_buffer()->Create(64 * 1024));
+  ResetBuffer(64 * 1024);
   AppendChunks({
       {ProducerID(1), WriterID(1), ChunkID(0)},
       {ProducerID(1), WriterID(1), ChunkID(1)},
@@ -777,7 +783,7 @@ TEST_F(TraceBufferTest, Iterator_ManyStreamsOrdered) {
 }
 
 TEST_F(TraceBufferTest, Iterator_ManyStreamsWrapping) {
-  ASSERT_TRUE(trace_buffer()->Create(64 * 1024));
+  ResetBuffer(64 * 1024);
   auto Neg = [](int x) { return kMaxChunkID + x; };
   AppendChunks({
       {ProducerID(1), WriterID(1), ChunkID(Neg(-4))},

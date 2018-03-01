@@ -49,8 +49,8 @@ namespace perfetto {
 //   fragments of packets (when they span across several chunks).
 //
 // So at any point in time, the buffer will contain a variable number of logical
-// sequences identified by the {ProducerID, WriterID} tuple. Any chunk contains
-// packets (or fragments) belonging to the same sequence.
+// sequences identified by the {ProducerID, WriterID} tuple. Any given chunk
+// will only contain packets (or fragments) belonging to the same sequence.
 //
 // The buffer operates by default as a ring buffer. Chunks are (over-)written
 // in the same order of the CopyChunkUntrusted() calls. When overwriting old
@@ -62,7 +62,25 @@ namespace perfetto {
 // an inline header (ChunkRecord), which contains most of the fields of the
 // SharedMemoryABI ChunkHeader + the ProducerID + the size of the payload.
 // It's a conventional binary object stream essentially, where each ChunkRecord
-// tells where it ends and hence where to find the next one.
+// tells where it ends and hence where to find the next one, like this:
+//
+//          .-------------------------. 16 byte boundary
+//          | ChunkRecord:   16 bytes |
+//          | - chunk id:     4 bytes |
+//          | - producer id:  2 bytes |
+//          | - writer id:    2 bytes |
+//          | - #fragments:   2 bytes |
+//    +-----+ - record size:  2 bytes |
+//    |     | - flags+pad:    4 bytes |
+//    |     +-------------------------+
+//    |     |                         |
+//    |     :     Chunk payload       :
+//    |     |                         |
+//    |     +-------------------------+
+//    |     |    Optional padding     |
+//    +---> +-------------------------+ 16 byte boundary
+//          |      ChunkRecord        |
+//          :                         :
 // Chunks stored in the buffer are always rounded up to 16 bytes (that is
 // sizeof(ChunkRecord)), in order to avoid further inner fragmentation.
 // Special "padding" chunks can be put in the buffer, e.g. in the case when we
@@ -95,9 +113,9 @@ namespace perfetto {
 // are available.
 // This class takes care of:
 // - Gluing packets within the same sequence, even if they are not stored
-//  adjacently in the buffer.
+//   adjacently in the buffer.
 // - Re-ordering chunks within a sequence (using the ChunkID, which wraps).
-// - Detecting holes in packet framents (because of loss of chunks).
+// - Detecting holes in packet fragments (because of loss of chunks).
 // Reads guarantee that packets for the same sequence are read in FIFO order
 // (according to their ChunkID), but don't give any guarantee about the read
 // order of packets from different sequences (see ReadPacket() comments below).
@@ -112,23 +130,23 @@ class TraceBuffez {
   struct Stats {
     size_t failed_patches = 0;
     size_t succeeded_patches = 0;
-    size_t fragment_lookahead_successes = 0;
-    size_t fragment_lookahead_failures = 0;
+    size_t fragment_readahead_successes = 0;
+    size_t fragment_readahead_failures = 0;
     size_t write_wrap_count = 0;
     // TODO(primiano): add packets_{read,written}.
     // TODO(primiano): add bytes_{read,written}.
+    // TODO(primiano): add bytes_lost_for_padding.
   };
 
-  TraceBuffez();
-  TraceBuffez(TraceBuffez&&) noexcept;
-  TraceBuffez& operator=(TraceBuffez&&);
+  // Can return nullptr if the memory allocation fails.
+  static std::unique_ptr<TraceBuffez> Create(size_t size_in_bytes);
 
-  bool Create(size_t size);
+  ~TraceBuffez();
 
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
   // |src| points to the first packet in the SharedMemoryABI's chunk shared
   // with an untrusted producer. "untrusted" here means: the producer might be
-  // malicious and might change |src| concurrently while we write it (internally
+  // malicious and might change |src| concurrently while we read it (internally
   // this method memcpy()-s first the chunk before processing it).
   // None of the arguments should be trusted, unless otherwise stated. We can
   // trust that |src| points to a valid memory area, but not its contents.
@@ -136,19 +154,19 @@ class TraceBuffez {
                           WriterID writer_id,
                           ChunkID chunk_id,
                           uint16_t num_fragments,
-                          uint8_t flags,
+                          uint8_t chunk_flags,
                           const uint8_t* src,
                           size_t size);
 
   // Patches SharedMemoryABI::kPacketHeaderSize bytes at the given
   // |patch_offset|, replacing them with the contents of |patch_value|, if the
-  // given chunk exists. Does nothig if the given ChunkID is gone.
+  // given chunk exists. Does nothing if the given ChunkID is gone.
   // Returns true if the chunk has been found and patched, false otherwise.
-  bool MaybePatchChunkContents(ProducerID,
-                               WriterID,
-                               ChunkID,
-                               size_t patch_offset,
-                               std::array<uint8_t, kPatchLen> patch);
+  bool TryPatchChunkContents(ProducerID,
+                             WriterID,
+                             ChunkID,
+                             size_t patch_offset,
+                             std::array<uint8_t, kPatchLen> patch);
 
   // To read the contents of the buffer the caller needs to:
   //   BeginRead()
@@ -206,8 +224,8 @@ class TraceBuffez {
   // This special requirement is covered by static_assert(s) in the .cc file.
   struct ChunkRecord {
     explicit ChunkRecord(size_t sz) : flags{0}, is_padding{0} {
-      PERFETTO_DCHECK(sz > 0 && sz % sizeof(ChunkRecord) == 0 &&
-                      sz <= kMaxSize);
+      PERFETTO_DCHECK(sz >= sizeof(ChunkRecord) &&
+                      sz % sizeof(ChunkRecord) == 0 && sz <= kMaxSize);
       size = static_cast<decltype(size)>(sz);
     }
 
@@ -243,14 +261,14 @@ class TraceBuffez {
         std::numeric_limits<decltype(size)>::max();
   };
 
-  // Lookaside index. This serves two purposes:
+  // Lookaside index entry. This serves two purposes:
   // 1) Allow a fast lookup of ChunkRecord by their ID (the tuple
   //   {ProducerID, WriterID, ChunkID}). This is used when applying out-of-band
   //   patches to the contents of the chunks after they have been copied into
   //   the TraceBuffer.
   // 2) keep the chunks ordered by their ID. This is used when reading back.
   // 3) Keep metadata about the status of the chunk, e.g. whether the contents
-  //   have been read already and should be skipped in a future read pass.
+  //    have been read already and should be skipped in a future read pass.
   // This struct should not have any field that is essential for reconstructing
   // the contents of the buffer from a crash dump.
   struct ChunkMeta {
@@ -263,7 +281,7 @@ class TraceBuffez {
           : Key(cr.producer_id, cr.writer_id, cr.chunk_id) {}
 
       // Note that this sorting doesn't keep into account the fact that ChunkID
-      // will wrap over at some point. The extra logic in ChunkIterator deals
+      // will wrap over at some point. The extra logic in SequenceIterator deals
       // with that.
       bool operator<(const Key& other) const {
         return std::tie(producer_id, writer_id, chunk_id) <
@@ -276,8 +294,8 @@ class TraceBuffez {
       }
 
       // These fields should match at all times the corresponding fields in
-      // the ChunkRecord @ |begin|. They are copied here purely for efficiency
-      // to avoid dereferencing the buffer all the time.
+      // the |chunk_record|. They are copied here purely for efficiency to avoid
+      // dereferencing the buffer all the time.
       ProducerID producer_id;
       WriterID writer_id;
       ChunkID chunk_id;
@@ -288,19 +306,19 @@ class TraceBuffez {
 
     ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
     const uint8_t flags = 0;           // See SharedMemoryABI::flags.
-    const uint16_t num_fragments = 0;  // Total number of packets.
-    uint16_t num_fragments_read = 0;   // Number of packets already read.
+    const uint16_t num_fragments = 0;  // Total number of packet fragments.
+    uint16_t num_fragments_read = 0;   // Number of fragments already read.
 
-    // The start offset of the next packet (the |num_fragments_read|-th) to be
+    // The start offset of the next fragment (the |num_fragments_read|-th) to be
     // read. This is the offset in bytes from the beginning of the ChunkRecord's
-    // payload (the 1st packet starts at |chunk_record| + sizeof(ChunkRecord)).
-    uint16_t cur_packet_offset = 0;
+    // payload (the 1st fragment starts at |chunk_record| +
+    // sizeof(ChunkRecord)).
+    uint16_t cur_fragment_offset = 0;
 
-    // If != 0 the last packet in the chunk cannot be read, even if the
-    // subsequent ChunkID is already available, until a patch at offset
-    // |last_packet_patch_offset| is applied through MaybePatchChunkContents().
-    // TODO(primiano): use this, currently unused.
-    // uint16_t last_packet_patch_offset = 0;
+    // If != 0 the last fragment in the chunk cannot be read, even if the
+    // subsequent ChunkID is already available, until a patch is applied through
+    // MaybePatchChunkContents().
+    // TODO(primiano): implement this logic in next CL.
   };
 
   using ChunkMap = std::map<ChunkMeta::Key, ChunkMeta>;
@@ -310,28 +328,28 @@ class TraceBuffez {
   // of ChunkID. Instances are valid only as long as the |index_| is not
   // altered (can be used safely only between adjacent ReadPacket() calls).
   // The order of the iteration will proceed in the following order:
-  // |wrapping_id| + 1 -> |end|, |begin| -> |wrapping_id|.
+  // |wrapping_id| + 1 -> |seq_end|, |seq_begin| -> |wrapping_id|.
   // Practical example:
   // - Assume that kMaxChunkID == 7
   // - Assume that we have all 8 chunks in the range (0..7).
-  // - Hence, |begin| == c0, |end| == c7
+  // - Hence, |seq_begin| == c0, |seq_end| == c7
   // - Assume |wrapping_id| = 4 (c4 is the last chunk copied over
   //   through a CopyChunkUntrusted()).
   // The resulting iteration order will be: c5, c6, c7, c0, c1, c2, c3, c4.
-  struct ChunkIterator {
+  struct SequenceIterator {
     // Points to the 1st key (the one with the numerically min ChunkID).
-    ChunkMap::iterator begin;
+    ChunkMap::iterator seq_begin;
 
     // Points one past the last key (the one with the numerically max ChunkID).
-    ChunkMap::iterator end;
+    ChunkMap::iterator seq_end;
 
-    // Current iterator, always >= begin && <= end.
+    // Current iterator, always >= seq_begin && <= seq_end.
     ChunkMap::iterator cur;
 
     // The latest ChunkID written. Determines the start/end of the sequence.
     ChunkID wrapping_id;
 
-    bool is_valid() const { return cur != end; }
+    bool is_valid() const { return cur != seq_end; }
 
     ProducerID producer_id() const {
       PERFETTO_DCHECK(is_valid());
@@ -358,25 +376,29 @@ class TraceBuffez {
     // entry of the sequence.
     void MoveNext();
 
-    void MoveToEnd() { cur = end; }
+    void MoveToEnd() { cur = seq_end; }
   };
 
   enum class ReadAheadResult {
-    kSuccededReturnSlices,
+    kSucceededReturnSlices,
     kFailedMoveToNextSequence,
     kFailedStayOnSameSequence,
   };
 
+  TraceBuffez();
   TraceBuffez(const TraceBuffez&) = delete;
   TraceBuffez& operator=(const TraceBuffez&) = delete;
 
+  bool Initialize(size_t size);
+
   // Returns an object that allows to iterate over chunks in the |index_| that
-  // have the same {ProducerID, WriterID} of |begin.first.{producer,writer}_id|.
-  // |beging| must be an iterator to the first entry in the |index_| that has a
-  // different {ProducerID, WriterID} from the previous one.
-  // It is valid for |begin| to be == index_.end() (i.e. if the index is empty).
-  // The iteration takes care of ChunkID wrapping, by using |last_chunk_id_|.
-  ChunkIterator GetReadIterForSequence(ChunkMap::iterator begin);
+  // have the same {ProducerID, WriterID} of
+  // |seq_begin.first.{producer,writer}_id|. |seq_begin| must be an iterator to
+  // the first entry in the |index_| that has a different {ProducerID, WriterID}
+  // from the previous one. It is valid for |seq_begin| to be == index_.end()
+  // (i.e. if the index is empty). The iteration takes care of ChunkID wrapping,
+  // by using |last_chunk_id_|.
+  SequenceIterator GetReadIterForSequence(ChunkMap::iterator seq_begin);
 
   // Used as a last resort when a buffer corruption is detected.
   void ClearContentsAndResetRWCursors();
@@ -387,7 +409,7 @@ class TraceBuffez {
 
   // Look for contiguous fragment of the same packet starting from |read_iter_|.
   // If a contiguous packet is found, all the fragments are pushed into |slices|
-  // and the function returns kSuccededReturnSlices. If not, the function
+  // and the function returns kSucceededReturnSlices. If not, the function
   // returns either kFailedMoveToNextSequence or kFailedStayOnSameSequence,
   // telling the caller to continue looking for packets.
   ReadAheadResult ReadAhead(Slices* slices);
@@ -414,33 +436,36 @@ class TraceBuffez {
   // advanced.
   bool ReadNextPacketInChunk(ChunkMeta*, Slices*);
 
-  void DcheckIsAlignedAndWithinBounds(const uint8_t* off) const {
-    PERFETTO_DCHECK(off >= begin() && off <= end() - sizeof(ChunkRecord));
+  void DcheckIsAlignedAndWithinBounds(const uint8_t* ptr) const {
+    PERFETTO_DCHECK(ptr >= begin() && ptr <= end() - sizeof(ChunkRecord));
     PERFETTO_DCHECK(
-        (reinterpret_cast<uintptr_t>(off) & (alignof(ChunkRecord) - 1)) == 0);
+        (reinterpret_cast<uintptr_t>(ptr) & (alignof(ChunkRecord) - 1)) == 0);
   }
 
-  ChunkRecord* GetChunkRecordAt(uint8_t* off) const {
-    DcheckIsAlignedAndWithinBounds(off);
-    return reinterpret_cast<ChunkRecord*>(off);
+  ChunkRecord* GetChunkRecordAt(uint8_t* ptr) const {
+    DcheckIsAlignedAndWithinBounds(ptr);
+    return reinterpret_cast<ChunkRecord*>(ptr);
   }
 
   // |src| can be nullptr (in which case |size| must be ==
   // record.size - sizeof(ChunkRecord)), for the case of writing a padding
-  // record. In this case the |wptr_| is advanced regularly (accordingly to
-  // |record.size|) but no payload is copied.
+  // record. |wptr_| is NOT advanced by this function, the caller must do that.
   void WriteChunkRecord(const ChunkRecord& record,
                         const uint8_t* src,
                         size_t size) {
-    // Note: |record.size| might be slightly bigger than |size| because
-    // of rounding, to ensure that all ChunkRecord(s) are multiple of
-    // sizeof(ChunkRecord). The invariant is:
+    // Note: |record.size| will be slightly bigger than |size| because of the
+    // ChunkRecord header and rounding, to ensure that all ChunkRecord(s) are
+    // multiple of sizeof(ChunkRecord). The invariant is:
     // record.size >= |size| + sizeof(ChunkRecord) (== if no rounding).
-    PERFETTO_DCHECK(record.size <= size_to_end());
+    PERFETTO_DCHECK(size <= ChunkRecord::kMaxSize);
     PERFETTO_DCHECK(record.size >= sizeof(record));
     PERFETTO_DCHECK(record.size % sizeof(record) == 0);
     PERFETTO_DCHECK(record.size >= size + sizeof(record));
+    PERFETTO_CHECK(record.size <= size_to_end());
     DcheckIsAlignedAndWithinBounds(wptr_);
+
+    // Deliberately not a *D*CHECK.
+    PERFETTO_CHECK(wptr_ + sizeof(record) + size <= end());
     memcpy(wptr_, &record, sizeof(record));
     if (PERFETTO_LIKELY(src)) {
       memcpy(wptr_ + sizeof(record), src, size);
@@ -457,7 +482,7 @@ class TraceBuffez {
 
   base::PageAllocator::UniquePtr data_;
   size_t size_ = 0;            // Size in bytes of |data_|.
-  size_t max_chunk_size_ = 0;  // Max size  in bytes allowed for a chunk.
+  size_t max_chunk_size_ = 0;  // Max size in bytes allowed for a chunk.
   uint8_t* wptr_ = nullptr;    // Write pointer.
 
   // An index that keeps track of the positions and metadata of each
@@ -465,8 +490,8 @@ class TraceBuffez {
   ChunkMap index_;
 
   // Read iterator used for ReadNext(). It is reset by calling BeginRead().
-  // It becomes invalid after any call to methods that alters the |_index|.
-  ChunkIterator read_iter_;
+  // It becomes invalid after any call to methods that alters the |index_|.
+  SequenceIterator read_iter_;
 
   // Keeps track of the last ChunkID written for a given writer.
   // TODO(primiano): should clean up keys from this map. Right now this map
@@ -476,6 +501,10 @@ class TraceBuffez {
 
   // Statistics about buffer usage.
   Stats stats_;
+
+#if PERFETTO_DCHECK_IS_ON()
+  bool changed_since_last_read_ = false;
+#endif
 
   // When true disable some DCHECKs that have been put in place to detect
   // bugs in the producers. This is for tests that feed malicious inputs and
