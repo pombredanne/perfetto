@@ -719,10 +719,10 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     // TODO(fmayer): we should start collecting individual chunks from non fully
     // complete pages after a while.
 
-    // TODO(primiano): in next CL, use chunks.target_buffer() instead.
-    service_->CopyProducerPageIntoLogBuffer(
-        id_, shmem_abi_.get_target_buffer(page_idx),
-        shmem_abi_.page_start(page_idx), shmem_abi_.page_size());
+    BufferID target_buffer = static_cast<BufferID>(chunks.target_buffer());
+    service_->CopyProducerPageIntoLogBuffer(id_, target_buffer,
+                                            shmem_abi_.page_start(page_idx),
+                                            shmem_abi_.page_size());
 
     shmem_abi_.ReleaseAllChunksAsFree(page_idx);
   }
