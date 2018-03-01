@@ -74,6 +74,43 @@ class FakeService : public Service {
   ServiceDescriptor descriptor_;
 };
 
+// For ReceiveFileDescriptor, as we cannot use client_info from a mock
+// method closure.
+class FDService : public Service {
+ public:
+  MOCK_METHOD0(Destroyed, void());
+  void OnFakeMethod1(const RequestProto&, DeferredBase*) {
+    received_fd_ = ipc::Service::client_info().ConsumeReceivedFD();
+    callb_();
+  }
+  static void Invoker(Service* service,
+                      const ProtoMessage& req,
+                      DeferredBase deferred_reply) {
+    static_cast<FDService*>(service)->OnFakeMethod1(
+        static_cast<const RequestProto&>(req), &deferred_reply);
+  }
+
+  static std::unique_ptr<ProtoMessage> RequestDecoder(
+      const std::string& proto) {
+    std::unique_ptr<ProtoMessage> reply(new RequestProto());
+    EXPECT_TRUE(reply->ParseFromString(proto));
+    return reply;
+  }
+
+  explicit FDService(const char* service_name, std::function<void()> callb) {
+    descriptor_.service_name = service_name;
+    descriptor_.methods.push_back(
+        {"FakeMethod1", &RequestDecoder, nullptr, &Invoker});
+    callb_ = callb;
+  }
+
+  const ServiceDescriptor& GetDescriptor() override { return descriptor_; }
+
+  ServiceDescriptor descriptor_;
+  base::ScopedFile received_fd_;
+  std::function<void()> callb_;
+};
+
 class FakeClient : public UnixSocket::EventListener {
  public:
   MOCK_METHOD0(OnConnect, void());
@@ -101,7 +138,8 @@ class FakeClient : public UnixSocket::EventListener {
   void InvokeMethod(ServiceID service_id,
                     MethodID method_id,
                     const ProtoMessage& args,
-                    bool drop_reply = false) {
+                    bool drop_reply = false,
+                    int fd = -1) {
     Frame frame;
     uint64_t request_id = requests_.empty() ? 1 : requests_.rbegin()->first + 1;
     requests_.emplace(request_id, 0);
@@ -110,7 +148,7 @@ class FakeClient : public UnixSocket::EventListener {
     frame.mutable_msg_invoke_method()->set_method_id(method_id);
     frame.mutable_msg_invoke_method()->set_drop_reply(drop_reply);
     frame.mutable_msg_invoke_method()->set_args_proto(args.SerializeAsString());
-    SendFrame(frame);
+    SendFrame(frame, fd);
   }
 
   // UnixSocket::EventListener implementation.
@@ -145,9 +183,9 @@ class FakeClient : public UnixSocket::EventListener {
     }
   }
 
-  void SendFrame(const Frame& frame) {
+  void SendFrame(const Frame& frame, int fd = -1) {
     std::string buf = BufferedFrameDeserializer::Serialize(frame);
-    ASSERT_TRUE(sock_->Send(buf.data(), buf.size()));
+    ASSERT_TRUE(sock_->Send(buf.data(), buf.size(), fd));
   }
 
   BufferedFrameDeserializer frame_deserializer_;
@@ -351,6 +389,35 @@ TEST_F(HostImplTest, SendFileDescriptor) {
       }));
   EXPECT_CALL(*cli_, OnInvokeMethodReply(_));
   task_runner_->RunUntilCheckpoint("on_fd_received");
+}
+
+TEST_F(HostImplTest, ReceiveFileDescriptor) {
+  auto received = task_runner_->CreateCheckpoint("received");
+  FDService* fake_service = new FDService("FakeService", received);
+  ASSERT_TRUE(host_->ExposeService(std::unique_ptr<Service>(fake_service)));
+  auto on_bind = task_runner_->CreateCheckpoint("on_bind");
+  cli_->BindService("FakeService");
+  EXPECT_CALL(*cli_, OnServiceBound(_)).WillOnce(InvokeWithoutArgs(on_bind));
+  task_runner_->RunUntilCheckpoint("on_bind");
+
+  static constexpr char kFileContent[] = "shared file";
+  RequestProto req_args;
+  FILE* tx_file = tmpfile();
+  fwrite(kFileContent, sizeof(kFileContent), 1, tx_file);
+  fflush(tx_file);
+  cli_->InvokeMethod(cli_->last_bound_service_id_, 1, req_args, false,
+                     fileno(tx_file));
+  EXPECT_CALL(*cli_, OnInvokeMethodReply(_));
+  task_runner_->RunUntilCheckpoint("received");
+
+  ASSERT_TRUE(fake_service->received_fd_);
+  int recv_fd = fake_service->received_fd_.get();
+  char buf[sizeof(kFileContent)] = {};
+  ASSERT_EQ(0, lseek(recv_fd, 0, SEEK_SET));
+  ASSERT_EQ(static_cast<int32_t>(sizeof(buf)),
+            PERFETTO_EINTR(read(recv_fd, buf, sizeof(buf))));
+  ASSERT_STREQ(kFileContent, buf);
+  fclose(tx_file);
 }
 
 // Invoke a method and immediately after disconnect the client.
