@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,6 +116,12 @@ FakeChunk& FakeChunk::AddPacket(size_t size, char seed, uint8_t packet_flag) {
       !(flags & SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk));
   flags |= packet_flag;
   FakePacketFragment(size, seed).CopyInto(&data);
+  num_packets++;
+  return *this;
+}
+
+FakeChunk& FakeChunk::AddPacket(std::initializer_list<uint8_t> raw) {
+  data.insert(data.end(), raw.begin(), raw.end());
   num_packets++;
   return *this;
 }

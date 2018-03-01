@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <limits>
 #include <map>
 #include <tuple>
 

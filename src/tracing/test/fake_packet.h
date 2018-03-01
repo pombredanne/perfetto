@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include <array>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,9 @@ class FakeChunk {
   // NOT a valid proto and is just filled with pseudo-random bytes generated
   // from |seed|.
   FakeChunk& AddPacket(size_t size, char seed, uint8_t packet_flag = 0);
+
+  // Appends a packet with the given raw content (including varint header).
+  FakeChunk& AddPacket(std::initializer_list<uint8_t>);
 
   FakeChunk& ClearBytes(size_t offset, size_t len);
 

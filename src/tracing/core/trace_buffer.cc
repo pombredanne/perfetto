@@ -117,7 +117,7 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
   const size_t record_size =
       base::AlignUp<sizeof(ChunkRecord)>(size + sizeof(ChunkRecord));
   if (PERFETTO_UNLIKELY(record_size > max_chunk_size_)) {
-    PERFETTO_DCHECK(false);
+    PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
     return;
   }
 
@@ -229,9 +229,9 @@ size_t TraceBuffez::DeleteNextChunksFor(size_t bytes_to_clear) {
     if (PERFETTO_LIKELY(!next_chunk.is_padding)) {
       ChunkMeta::Key key(next_chunk);
       const size_t removed = index_.erase(key);
-      TRACE_BUFFER_DLOG("  del index {%" PRIu64 ",%" PRIu32
+      TRACE_BUFFER_DLOG("  del index {%" PRIu32 ",%" PRIu32
                         ",%u} @ [%lu - %lu] %zu",
-                        key.producer_id_trusted, key.writer_id, key.chunk_id,
+                        key.producer_id, key.writer_id, key.chunk_id,
                         next_chunk_ptr - begin(),
                         next_chunk_ptr - begin() + next_chunk.size, removed);
       PERFETTO_DCHECK(removed);
@@ -284,7 +284,7 @@ bool TraceBuffez::TryPatchChunkContents(ProducerID producer_id,
                 "kPatchLen out of sync with SharedMemoryABI");
 
   uint8_t* ptr = chunk_begin + sizeof(ChunkRecord) + patch_offset_untrusted;
-  TRACE_BUFFER_DLOG("PatchChunk {%" PRIu64 ",%" PRIu32
+  TRACE_BUFFER_DLOG("PatchChunk {%" PRIu32 ",%" PRIu32
                     ",%u} size=%zu @ %zu with {%02x %02x %02x %02x}",
                     producer_id, writer_id, chunk_id, chunk_end - chunk_begin,
                     patch_offset_untrusted, patch[0], patch[1], patch[2],
@@ -375,7 +375,9 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
   // - return the first patched+complete packet in the next sequence, if any.
   // - return false if none of the above is found.
   TRACE_BUFFER_DLOG("ReadNextTracePacket()");
+#if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!changed_since_last_read_);
+#endif
   for (;; read_iter_.MoveNext()) {
     if (PERFETTO_UNLIKELY(!read_iter_.is_valid())) {
       // We ran out of chunks in the current {ProducerID, WriterID} sequence or
@@ -571,10 +573,13 @@ bool TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta, Slices* slices) {
   PERFETTO_CHECK(packet_begin >= packets_begin && packet_begin < record_end);
 
   // A packet (or a fragment) starts with a varint stating its size, followed
-  // by its content.
+  // by its content. The varint shouldn't be larger than 4 bytes (just in case
+  // the producer is using a redundant encoding)
   uint64_t packet_size = 0;
   const uint8_t* packet_data = protozero::proto_utils::ParseVarInt(
-      packet_begin, record_end, &packet_size);
+      packet_begin,
+      packet_begin + protozero::proto_utils::kMessageLengthFieldSize,
+      &packet_size);
 
   const uint8_t* next_packet = packet_data + packet_size;
   if (PERFETTO_UNLIKELY(next_packet <= packet_begin ||

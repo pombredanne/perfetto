@@ -39,7 +39,8 @@ using ::testing::IsEmpty;
 class TraceBufferTest : public testing::Test {
  public:
   using SequenceIterator = TraceBuffez::SequenceIterator;
-  using ChunkMap = TraceBuffez::ChunkMap;
+  using ChunkMetaKey = TraceBuffez::ChunkMeta::Key;
+  using ChunkRecord = TraceBuffez::ChunkRecord;
 
   static constexpr uint8_t kContFromPrevChunk =
       SharedMemoryABI::ChunkHeader::kFirstPacketContinuesFromPrevChunk;
@@ -113,9 +114,16 @@ class TraceBufferTest : public testing::Test {
     trace_buffer_->suppress_sanity_dchecks_for_testing_ = true;
   }
 
+  std::vector<ChunkMetaKey> GetIndex() {
+    std::vector<ChunkMetaKey> keys;
+    keys.reserve(trace_buffer_->index_.size());
+    for (const auto& it : trace_buffer_->index_)
+      keys.push_back(it.first);
+    return keys;
+  }
+
   TraceBuffez* trace_buffer() { return trace_buffer_.get(); }
   size_t size_to_end() { return trace_buffer_->size_to_end(); }
-  const ChunkMap& chunk_index() { return trace_buffer_->index_; }
 
  private:
   std::unique_ptr<TraceBuffez> trace_buffer_;
@@ -240,7 +248,7 @@ TEST_F(TraceBufferTest, ReadWrite_Padding) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
-// Like ReadWrite_Padding, but this time the padding introduces is the minimum
+// Like ReadWrite_Padding, but this time the padding introduced is the minimum
 // allowed (16 bytes). This is to exercise edge cases in the padding logic.
 // [c0: 2048               ][c1: 1024         ][c2: 1008       ][c3: 16]
 // [c4: 2032            ][c5: 1040                ][c6 :16][c7: 1080   ]
@@ -359,17 +367,22 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndex) {
   ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
                        .AddPacket(2048 - 16, 'b')
                        .CopyIntoTraceBuffer());
+  ASSERT_THAT(GetIndex(),
+              ElementsAre(ChunkMetaKey(1, 1, 0), ChunkMetaKey(1, 1, 1)));
 
   // Wrap and get to this: [ c2: 2048] <-- write pointer is here
   ASSERT_EQ(2048u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
                        .AddPacket(2048 - 16, 'c')
                        .CopyIntoTraceBuffer());
   ASSERT_EQ(2048u, size_to_end());
+  ASSERT_THAT(GetIndex(),
+              ElementsAre(ChunkMetaKey(1, 1, 1), ChunkMetaKey(1, 1, 2)));
 
   // Force wrap because of lack of space and get: [ c3: 3072     ][ PAD ].
   ASSERT_EQ(3072u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(3))
                        .AddPacket(3072 - 16, 'd')
                        .CopyIntoTraceBuffer());
+  ASSERT_THAT(GetIndex(), ElementsAre(ChunkMetaKey(1, 1, 3)));
 
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(3072 - 16, 'd')));
@@ -387,6 +400,7 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
                         .AddPacket(512 - 16, 'a' + i)
                         .CopyIntoTraceBuffer());
   }
+  ASSERT_EQ(8u, GetIndex().size());
 
   // [c8: 2080..........................][PAD][c5: 512][c6: 512][c7: 512]
   //                                     ^ write pointer is here.
@@ -394,11 +408,15 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
                        .AddPacket(2080 - 16, 'i')
                        .CopyIntoTraceBuffer());
   ASSERT_EQ(2016u, size_to_end());
+  ASSERT_THAT(GetIndex(),
+              ElementsAre(ChunkMetaKey(1, 1, 5), ChunkMetaKey(1, 1, 6),
+                          ChunkMetaKey(1, 1, 7), ChunkMetaKey(1, 1, 8)));
 
-  // [ c3: 3104....................................][ PAD...............].
+  // [ c9: 3104....................................][ PAD...............].
   ASSERT_EQ(3104u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(9))
                        .AddPacket(3104 - 16, 'j')
                        .CopyIntoTraceBuffer());
+  ASSERT_THAT(GetIndex(), ElementsAre(ChunkMetaKey(1, 1, 9)));
 
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(3104u - 16, 'j')));
@@ -535,7 +553,7 @@ TEST_F(TraceBufferTest, Fragments_EmptyChunkInTheMiddle) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
-// Generates sequences of fragmented packets of increasing legth (|seq_len|),
+// Generates sequences of fragmented packets of increasing length (|seq_len|),
 // from [P0, P1a][P1y] to [P0, P1a][P1b][P1c]...[P1y]. Test that they are always
 // read as one packet.
 TEST_F(TraceBufferTest, Fragments_LongPackets) {
@@ -656,6 +674,41 @@ TEST_F(TraceBufferTest, Patching_AtBoundariesOfChunk) {
 // Malicious input tests
 // ---------------------
 
+TEST_F(TraceBufferTest, Malicious_ZeroSizedChunk) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(32, 'a')
+      .CopyIntoTraceBuffer();
+
+  uint8_t valid_ptr = 0;
+  trace_buffer()->CopyChunkUntrusted(ProducerID(1), WriterID(1), ChunkID(1),
+                                     1 /* num packets */, 0 /* flags*/,
+                                     &valid_ptr, sizeof(valid_ptr));
+
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
+      .AddPacket(32, 'b')
+      .CopyIntoTraceBuffer();
+
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32, 'b')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Attempting to write a chunk bigger than ChunkRecord::kMaxSize should end up
+// in a no-op.
+TEST_F(TraceBufferTest, Malicious_ChunkTooBig) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(4096, 'a')
+      .AddPacket(2048, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
 TEST_F(TraceBufferTest, Malicious_RepeatedChunkID) {
   ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
@@ -684,6 +737,64 @@ TEST_F(TraceBufferTest, Malicious_ZeroVarintHeader) {
       .CopyIntoTraceBuffer();
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(4, 'c')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Malicious_VarintHeaderTooBig) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+
+  // Add a valid chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(32, 'a')
+      .CopyIntoTraceBuffer();
+
+  // Forge a packet which has a varint header that is just off by one.
+  CreateChunk(ProducerID(2), WriterID(1), ChunkID(0))
+      .AddPacket({0x16, '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b',
+                  'c', 'd', 'e', 'f'})
+      .CopyIntoTraceBuffer();
+
+  // Forge a packet which has a varint header that tries to hit an overflow.
+  CreateChunk(ProducerID(3), WriterID(1), ChunkID(0))
+      .AddPacket({0xff, 0xff, 0xff, 0x7f})
+      .CopyIntoTraceBuffer();
+
+  // Forge a packet which has a jumbo varint header: 0xff, 0xff .. 0x7f.
+  std::vector<uint8_t> chunk;
+  chunk.insert(chunk.end(), 128 - sizeof(ChunkRecord), 0xff);
+  chunk.back() = 0x7f;
+  trace_buffer()->CopyChunkUntrusted(ProducerID(4), WriterID(1), ChunkID(1),
+                                     1 /* num packets */, 0 /* flags*/,
+                                     chunk.data(), chunk.size());
+
+  // Add a valid chunk.
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(32, 'b')
+      .CopyIntoTraceBuffer();
+
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32, 'b')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Similar to Malicious_VarintHeaderTooBig, but this time the full chunk
+// contains an enormous varint number that tries to overflow.
+TEST_F(TraceBufferTest, Malicious_JumboVarint) {
+  ResetBuffer(64 * 1024);
+  SuppressSanityDchecksForTesting();
+
+  std::vector<uint8_t> chunk;
+  chunk.insert(chunk.end(), 64 * 1024 - sizeof(ChunkRecord) * 2, 0xff);
+  chunk.back() = 0x7f;
+  for (int i = 0; i < 3; i++) {
+    trace_buffer()->CopyChunkUntrusted(ProducerID(1), WriterID(1), ChunkID(1),
+                                       1 /* num packets */, 0 /* flags*/,
+                                       chunk.data(), chunk.size());
+  }
+
+  trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
