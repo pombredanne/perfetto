@@ -703,7 +703,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   for (const auto& chunks : req_untrusted.chunks_to_move()) {
-    const uint32_t page_idx = chunks.page_number();
+    const uint32_t page_idx = chunks.page();
     if (page_idx >= shmem_abi_.num_pages())
       continue;  // A buggy or malicious producer.
 
@@ -711,7 +711,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
       continue;
 
     // TODO(primiano): implement per-chunk move.
-    PERFETTO_DCHECK(chunks.chunk_numbers_size() == 0);
+    PERFETTO_DCHECK(chunks.chunk() == 0);
 
     if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))
       continue;

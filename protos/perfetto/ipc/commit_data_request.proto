@@ -24,8 +24,8 @@ message CommitDataRequest {
   // move the given chunks form the share memory buffer into the central
   // trace buffer(s).
   message ChunksToMove {
-    optional uint32 page_number = 1;
-    repeated uint32 chunk_numbers = 2 [packed = true];
+    optional uint32 page = 1;
+    optional uint32 chunk = 2;
     optional uint32 target_buffer = 3;
   }
   repeated ChunksToMove chunks_to_move = 1;

@@ -84,19 +84,11 @@ CommitDataRequest::ChunksToMove& CommitDataRequest::ChunksToMove::operator=(
 
 void CommitDataRequest::ChunksToMove::FromProto(
     const perfetto::protos::CommitDataRequest_ChunksToMove& proto) {
-  static_assert(sizeof(page_number_) == sizeof(proto.page_number()),
-                "size mismatch");
-  page_number_ = static_cast<decltype(page_number_)>(proto.page_number());
+  static_assert(sizeof(page_) == sizeof(proto.page()), "size mismatch");
+  page_ = static_cast<decltype(page_)>(proto.page());
 
-  chunk_numbers_.clear();
-  for (const auto& field : proto.chunk_numbers()) {
-    chunk_numbers_.emplace_back();
-    static_assert(
-        sizeof(chunk_numbers_.back()) == sizeof(proto.chunk_numbers(0)),
-        "size mismatch");
-    chunk_numbers_.back() =
-        static_cast<decltype(chunk_numbers_)::value_type>(field);
-  }
+  static_assert(sizeof(chunk_) == sizeof(proto.chunk()), "size mismatch");
+  chunk_ = static_cast<decltype(chunk_)>(proto.chunk());
 
   static_assert(sizeof(target_buffer_) == sizeof(proto.target_buffer()),
                 "size mismatch");
@@ -108,16 +100,11 @@ void CommitDataRequest::ChunksToMove::ToProto(
     perfetto::protos::CommitDataRequest_ChunksToMove* proto) const {
   proto->Clear();
 
-  static_assert(sizeof(page_number_) == sizeof(proto->page_number()),
-                "size mismatch");
-  proto->set_page_number(
-      static_cast<decltype(proto->page_number())>(page_number_));
+  static_assert(sizeof(page_) == sizeof(proto->page()), "size mismatch");
+  proto->set_page(static_cast<decltype(proto->page())>(page_));
 
-  for (const auto& it : chunk_numbers_) {
-    proto->add_chunk_numbers(it);
-    static_assert(sizeof(it) == sizeof(proto->chunk_numbers(0)),
-                  "size mismatch");
-  }
+  static_assert(sizeof(chunk_) == sizeof(proto->chunk()), "size mismatch");
+  proto->set_chunk(static_cast<decltype(proto->chunk())>(chunk_));
 
   static_assert(sizeof(target_buffer_) == sizeof(proto->target_buffer()),
                 "size mismatch");
