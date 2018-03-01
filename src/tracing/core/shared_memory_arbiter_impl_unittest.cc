@@ -157,9 +157,9 @@ TEST_P(SharedMemoryArbiterImplTest, GetAndReturnChunks) {
   EXPECT_CALL(mock_producer_endpoint_, CommitData(_))
       .WillOnce(Invoke([on_callback](const CommitDataRequest& req) {
         ASSERT_EQ(2, req.chunks_to_move_size());
-        ASSERT_EQ(0u, req.chunks_to_move()[0].page_number());
-        ASSERT_EQ(3u, req.chunks_to_move()[1].page_number());
-        // TODO(primiano): ASSERT_EQ on buffer and chunk number.
+        ASSERT_EQ(0u, req.chunks_to_move()[0].page());
+        ASSERT_EQ(3u, req.chunks_to_move()[1].page());
+        // TODO(primiano): In next CL, ASSERT_EQ on buffer and chunk number.
         on_callback();
       }));
   for (size_t i = 0; i < 14; i++) {

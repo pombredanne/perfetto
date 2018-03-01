@@ -60,26 +60,18 @@ class CommitDataRequest {
     void FromProto(const perfetto::protos::CommitDataRequest_ChunksToMove&);
     void ToProto(perfetto::protos::CommitDataRequest_ChunksToMove*) const;
 
-    uint32_t page_number() const { return page_number_; }
-    void set_page_number(uint32_t value) { page_number_ = value; }
+    uint32_t page() const { return page_; }
+    void set_page(uint32_t value) { page_ = value; }
 
-    int chunk_numbers_size() const {
-      return static_cast<int>(chunk_numbers_.size());
-    }
-    const std::vector<uint32_t>& chunk_numbers() const {
-      return chunk_numbers_;
-    }
-    uint32_t* add_chunk_numbers() {
-      chunk_numbers_.emplace_back();
-      return &chunk_numbers_.back();
-    }
+    uint32_t chunk() const { return chunk_; }
+    void set_chunk(uint32_t value) { chunk_ = value; }
 
     uint32_t target_buffer() const { return target_buffer_; }
     void set_target_buffer(uint32_t value) { target_buffer_ = value; }
 
    private:
-    uint32_t page_number_ = {};
-    std::vector<uint32_t> chunk_numbers_;
+    uint32_t page_ = {};
+    uint32_t chunk_ = {};
     uint32_t target_buffer_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility

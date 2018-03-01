@@ -169,7 +169,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
       }
       CommitDataRequest::ChunksToMove* ctm =
           commit_data_req_->add_chunks_to_move();
-      ctm->set_page_number(static_cast<uint32_t>(page_index));
+      ctm->set_page(static_cast<uint32_t>(page_index));
       // TODO(primiano): implement per-chunk notifications.
       // ctm->add_chunk_numbers(...)
       // ctm->set_target_buffer(target_buffer);
