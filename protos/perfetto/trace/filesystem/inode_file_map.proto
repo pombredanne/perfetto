@@ -18,7 +18,8 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
-// Representation of InodeFileMap
+// Represents the mapping between inode numbers in a block device and their path
+// on the filesystem
 message InodeFileMap {
   // Representation of Entry
   message Entry {
