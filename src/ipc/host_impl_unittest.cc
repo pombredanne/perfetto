@@ -411,8 +411,8 @@ TEST_F(HostImplTest, ReceiveFileDescriptor) {
   task_runner_->RunUntilCheckpoint("received");
 
   fclose(tx_file);
-  ASSERT_TRUE(fake_service->received_fd_);
   base::ScopedFile rx_fd = std::move(fake_service->received_fd_);
+  ASSERT_TRUE(rx_fd);
   char buf[sizeof(kFileContent)] = {};
   ASSERT_EQ(0, lseek(*rx_fd, 0, SEEK_SET));
   ASSERT_EQ(static_cast<int32_t>(sizeof(buf)),
