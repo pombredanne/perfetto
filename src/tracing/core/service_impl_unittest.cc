@@ -174,6 +174,58 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   Mock::VerifyAndClearExpectations(&mock_consumer);
 }
 
+TEST_F(ServiceImplTest, LockdownMode) {
+  MockProducer mock_producer;
+  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
+      svc->ConnectProducer(&mock_producer, getuid() - 1 /* uid */);
+
+  MockProducer mock_producer_nobody;
+  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_nobody =
+      svc->ConnectProducer(&mock_producer_nobody, getuid() /* uid */);
+
+  MockConsumer mock_consumer;
+  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
+      svc->ConnectConsumer(&mock_consumer);
+
+  InSequence seq;
+  EXPECT_CALL(mock_producer, OnConnect());
+  EXPECT_CALL(mock_producer_nobody, OnConnect());
+  EXPECT_CALL(mock_consumer, OnConnect());
+  task_runner.RunUntilIdle();
+
+  DataSourceDescriptor ds_desc;
+  ds_desc.set_name("foo");
+  producer_endpoint->RegisterDataSource(ds_desc, [](DataSourceID) {});
+  ds_desc.set_name("bar");
+  producer_endpoint_nobody->RegisterDataSource(ds_desc, [](DataSourceID) {});
+  task_runner.RunUntilIdle();
+
+  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _)).Times(0);
+  EXPECT_CALL(mock_producer_nobody, CreateDataSourceInstance(_, _));
+  EXPECT_CALL(mock_producer_nobody, TearDownDataSourceInstance(_));
+  TraceConfig trace_config;
+  trace_config.set_enable_lockdown_mode(true);
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("foo");
+  ds_config->set_name("bar");
+  ds_config->set_target_buffer(0);
+  consumer_endpoint->EnableTracing(trace_config);
+  task_runner.RunUntilIdle();
+
+  EXPECT_CALL(mock_producer, OnDisconnect());
+  EXPECT_CALL(mock_producer_nobody, OnDisconnect());
+  EXPECT_CALL(mock_consumer, OnDisconnect());
+  consumer_endpoint->DisableTracing();
+  producer_endpoint.reset();
+  producer_endpoint_nobody.reset();
+  consumer_endpoint.reset();
+  task_runner.RunUntilIdle();
+  Mock::VerifyAndClearExpectations(&mock_producer);
+  Mock::VerifyAndClearExpectations(&mock_producer_nobody);
+  Mock::VerifyAndClearExpectations(&mock_consumer);
+}
+
 TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   MockProducer mock_producer;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =

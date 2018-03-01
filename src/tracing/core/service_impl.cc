@@ -167,20 +167,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Enabling tracing for consumer %p",
                 reinterpret_cast<void*>(consumer));
-  if (cfg.enable_lockdown_mode()) {
+  if (cfg.enable_lockdown_mode())
     lockdown_mode_ = true;
-    // Disconnect all producers except those running as nobody.
-    for (auto it = producers_.cbegin(); it != producers_.cend();) {
-      if (it->second->uid_ != getuid()) {
-        PERFETTO_ELOG(
-            "Entering lockdown mode. Disconnecting producer with UID %jd",
-            static_cast<intmax_t>(it->second->uid_));
-        it = producers_.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
   if (consumer->tracing_session_id_) {
     PERFETTO_DLOG(
         "A Consumer is trying to EnableTracing() but another tracing session "
@@ -529,6 +517,10 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   ProducerEndpointImpl* producer = GetProducer(data_source.producer_id);
   PERFETTO_DCHECK(producer);
+  if (lockdown_mode_ && producer->uid_ != getuid()) {
+    PERFETTO_ELOG("Lockdown mode: not enabling producer %hu", producer->id_);
+    return;
+  }
   // TODO(primiano): match against |producer_name_filter| and add tests
   // for registration ordering (data sources vs consumers).
 
