@@ -80,7 +80,7 @@ class FDService : public Service {
  public:
   MOCK_METHOD0(Destroyed, void());
   void OnFakeMethod1(const RequestProto&, DeferredBase*) {
-    received_fd_ = ipc::Service::client_info().ConsumeReceivedFD();
+    received_fd_ = ipc::Service::client_info().TakeReceivedFD();
     callb_();
   }
   static void Invoker(Service* service,
