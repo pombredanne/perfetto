@@ -15,6 +15,7 @@
 source_set("perfetto_cmd") {
   public_deps = [
     "../../include/perfetto/traced",
+    "../../protos/perfetto/perfetto_cmd",
   ]
   deps = [
     "../../gn:default_deps",
@@ -25,5 +26,19 @@ source_set("perfetto_cmd") {
   ]
   sources = [
     "perfetto_cmd.cc",
+    "perfetto_cmd.h",
+  ]
+}
+
+source_set("perfetto_cmd_unittests") {
+  testonly = true
+  public_deps = []
+  deps = [
+    ":perfetto_cmd",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+  ]
+  sources = [
+    "perfetto_cmd_unittest.cc",
   ]
 }

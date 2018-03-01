@@ -14,42 +14,33 @@
  * limitations under the License.
  */
 
+#include "perfetto_cmd.h"
+
 #include <fcntl.h>
 #include <getopt.h>
+#include <stdio.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <sstream>
-#include <string>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/scoped_file.h"
-#include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/traced/traced.h"
-#include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
-#include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
 #include "perfetto/config/trace_config.pb.h"
 #include "perfetto/trace/trace.pb.h"
 
-#if defined(PERFETTO_OS_ANDROID)
-#include "perfetto/base/android_task_runner.h"
-#endif  // defined(PERFETTO_OS_ANDROID)
-
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
-#include <android/os/DropBoxManager.h>
-#include <utils/Looper.h>
-#include <utils/StrongPointer.h>
-#endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
 // TODO(primiano): add the ability to pass the file descriptor directly to the
 // traced service instead of receiving a copy of the slices and writing them
@@ -73,40 +64,6 @@ std::string GetDirName(const std::string& path) {
 
 using protozero::proto_utils::WriteVarInt;
 using protozero::proto_utils::MakeTagLengthDelimited;
-
-#if defined(PERFETTO_OS_ANDROID)
-using PlatformTaskRunner = base::AndroidTaskRunner;
-#else
-using PlatformTaskRunner = base::UnixTaskRunner;
-#endif
-
-class PerfettoCmd : public Consumer {
- public:
-  int Main(int argc, char** argv);
-  int PrintUsage(const char* argv0);
-  void OnStopTraceTimer();
-  void OnTimeout();
-
-  // perfetto::Consumer implementation.
-  void OnConnect() override;
-  void OnDisconnect() override;
-  void OnTraceData(std::vector<TracePacket>, bool has_more) override;
-
- private:
-  bool OpenOutputFile();
-
-  PlatformTaskRunner task_runner_;
-  std::unique_ptr<perfetto::Service::ConsumerEndpoint> consumer_endpoint_;
-  std::unique_ptr<TraceConfig> trace_config_;
-  base::ScopedFstream trace_out_stream_;
-  std::string trace_out_path_;
-
-  // Only used if linkat(AT_FDCWD) isn't available.
-  std::string tmp_trace_out_path_;
-
-  std::string dropbox_tag_;
-  bool did_process_full_trace_ = false;
-};
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
   PERFETTO_ELOG(R"(
@@ -227,11 +184,22 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_DLOG("Continuing in background");
   }
 
+  PerfettoCmdLogic logic(this);
+  PerfettoCmdLogic::Args args{};
+  args.is_dropbox = !dropbox_tag_.empty();
+  args.current_timestamp = GetTimestamp();
+
+  return logic.Run(args);
+}
+
+bool PerfettoCmd::DoTrace(uint64_t* bytes_uploaded) {
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
   task_runner_.Run();
-  return did_process_full_trace_ ? 0 : 1;
-}  // namespace perfetto
+  if (bytes_uploaded && did_process_full_trace_)
+    *bytes_uploaded = 0;
+  return did_process_full_trace_;
+}
 
 void PerfettoCmd::OnConnect() {
   PERFETTO_LOG(
@@ -288,7 +256,13 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   fflush(*trace_out_stream_);
   long bytes_written = ftell(*trace_out_stream_);
 
-  if (!dropbox_tag_.empty()) {
+  if (dropbox_tag_.empty()) {
+    trace_out_stream_.reset();
+    PERFETTO_CHECK(
+        rename(tmp_trace_out_path_.c_str(), trace_out_path_.c_str()) == 0);
+    PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
+                  trace_out_path_.c_str());
+  } else {
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
     android::sp<android::os::DropBoxManager> dropbox =
         new android::os::DropBoxManager();
@@ -311,12 +285,6 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
     PERFETTO_ILOG("Uploaded %ld bytes into DropBox with tag %s", bytes_written,
                   dropbox_tag_.c_str());
 #endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
-  } else {
-    trace_out_stream_.reset();
-    PERFETTO_CHECK(
-        rename(tmp_trace_out_path_.c_str(), trace_out_path_.c_str()) == 0);
-    PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
-                  trace_out_path_.c_str());
   }
   did_process_full_trace_ = true;
 }
@@ -343,6 +311,113 @@ bool PerfettoCmd::OpenOutputFile() {
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
   return true;
+}
+
+bool PerfettoCmd::LoadState(PerfettoCmdState* state) {
+  base::ScopedFile fd = base::OpenFile(GetStatePath(), O_RDONLY | O_CREAT);
+  return ReadState(fd.get(), state);
+}
+
+bool PerfettoCmd::SaveState(const PerfettoCmdState& state) {
+  base::ScopedFile fd = base::OpenFile(GetStatePath(), O_WRONLY | O_CREAT);
+  return WriteState(fd.get(), state);
+}
+
+uint64_t PerfettoCmd::GetTimestamp() {
+  time_t now = time(nullptr);
+  if (now < 0)
+    return 0;
+  return now;
+}
+
+std::string PerfettoCmd::GetStatePath() {
+  return std::string(kTempDropBoxTraceDir) + "/perfetto_cmd_state.protobuf";
+}
+
+// static
+bool PerfettoCmd::ReadState(int in_fd, PerfettoCmdState* state) {
+  if (in_fd == -1)
+    return false;
+  char buf[1024];
+  ssize_t bytes = read(in_fd, &buf, sizeof(buf));
+  if (bytes <= 0)
+    return false;
+  ::google::protobuf::io::ArrayInputStream stream(buf, bytes);
+  return state->ParseFromZeroCopyStream(&stream);
+}
+
+// static
+bool PerfettoCmd::WriteState(int out_fd, const PerfettoCmdState& state) {
+  if (out_fd == -1)
+    return false;
+  char buf[1024];
+  ::google::protobuf::io::ArrayOutputStream stream(buf, sizeof(buf));
+  if (!state.SerializeToZeroCopyStream(&stream))
+    return false;
+
+  ssize_t written = write(out_fd, &buf, stream.ByteCount());
+  return written == stream.ByteCount();
+}
+
+PerfettoCmdLogic::PerfettoCmdLogic(Delegate* delegate) : delegate_(delegate) {}
+PerfettoCmdLogic::~PerfettoCmdLogic() = default;
+
+int PerfettoCmdLogic::Run(const Args& args) {
+  // Not uploading? We can just trace.
+  if (!args.is_dropbox)
+    return delegate_->DoTrace() ? 0 : 1;
+
+  PerfettoCmdState state{};
+  bool loaded_state = delegate_->LoadState(&state);
+
+  // Failed to load the state?
+  // Current time is before either saved times?
+  // Last saved trace time is before first saved trace time?
+  // -> Try to save a clean state but don't trace.
+  if (!loaded_state || args.current_timestamp < state.first_trace_timestamp() ||
+      args.current_timestamp < state.last_trace_timestamp() ||
+      state.last_trace_timestamp() < state.first_trace_timestamp()) {
+    PerfettoCmdState output{};
+    delegate_->SaveState(output);
+    return 1;
+  }
+
+  // If we've uploaded in the last 5mins we shouldn't trace now.
+  if ((args.current_timestamp - state.last_trace_timestamp()) < 60 * 5)
+    return 1;
+
+  // First trace was more than 24h ago? Reset state.
+  if ((args.current_timestamp - state.first_trace_timestamp()) > 60 * 60 * 24) {
+    state.set_first_trace_timestamp(0);
+    state.set_last_trace_timestamp(0);
+    state.set_total_bytes_uploaded(0);
+  }
+
+  // If we've uploaded more than 10mb in the last 24 hours we shouldn't trace
+  // now.
+  if (state.total_bytes_uploaded() > 10 * 1024 * 1024)
+    return 1;
+
+  uint64_t uploaded = 0;
+  bool success = delegate_->DoTrace(&uploaded);
+
+  // Failed to upload? Don't update the state.
+  if (!success)
+    return 1;
+
+  // If the first trace timestamp is 0 (either because this is the
+  // first time or because it was reset for being more than 24h ago).
+  // -> We update it to the time of this trace.
+  if (state.first_trace_timestamp() == 0)
+    state.set_first_trace_timestamp(args.current_timestamp);
+  // Always updated the last trace timestamp.
+  state.set_last_trace_timestamp(args.current_timestamp);
+  // Add the amount we uploded to the running total.
+  state.set_total_bytes_uploaded(state.total_bytes_uploaded() + uploaded);
+
+  bool save_success = delegate_->SaveState(state);
+
+  return save_success ? 0 : 1;
 }
 
 int __attribute__((visibility("default")))
