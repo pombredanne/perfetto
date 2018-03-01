@@ -169,7 +169,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                 reinterpret_cast<void*>(consumer));
   if (cfg.enable_lockdown_mode()) {
     lockdown_mode_ = true;
-    // Disconnect all producers except traced_probes.
+    // Disconnect all producers except those running as nobody.
     for (auto it = producers_.cbegin(); it != producers_.cend();) {
       if (it->second->uid_ != getuid()) {
         PERFETTO_ELOG(

@@ -133,7 +133,7 @@ message TraceConfig {
   // by statsd.
   optional bool enable_extra_guardrails = 4;
 
-  // Reject producers that are not com.google.perfetto.ftrace.
+  // Reject producers that are not running as nobody.
   optional bool enable_lockdown_mode = 5;
 }
 
