@@ -53,7 +53,8 @@ SharedMemoryArbiterImpl::SharedMemoryArbiterImpl(
     : task_runner_(task_runner),
       producer_endpoint_(producer_endpoint),
       shmem_abi_(reinterpret_cast<uint8_t*>(start), size, page_size),
-      active_writer_ids_(kMaxWriterID) {}
+      active_writer_ids_(kMaxWriterID),
+      weak_ptr_factory_(this) {}
 
 Chunk SharedMemoryArbiterImpl::GetNewChunk(
     const SharedMemoryABI::ChunkHeader& header,
@@ -144,6 +145,9 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // tracing service to  consume the shared memory buffer (SMB) and, for
       // this reason, never run the task that tells the service to purge the
       // SMB.
+      // TODO(primiano): We cannot call this if we aren't on the |task_runner_|
+      // thread. Works for now because all traced_probes writes happen on the
+      // main thread.
       SendPendingCommitDataRequest();
     }
     usleep(kStallIntervalUs);
@@ -152,6 +156,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
 
 void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
   bool should_post_callback = false;
+  base::WeakPtr<SharedMemoryArbiterImpl> weak_this;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     size_t page_index = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
@@ -159,6 +164,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
     if (page_index != SharedMemoryABI::kInvalidPageIdx) {
       if (!commit_data_req_) {
         commit_data_req_.reset(new CommitDataRequest());
+        weak_this = weak_ptr_factory_.GetWeakPtr();
         should_post_callback = true;
       }
       CommitDataRequest::ChunksToMove* ctm =
@@ -171,15 +177,17 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk) {
   }
 
   if (should_post_callback) {
-    // TODO(primiano): make this a WeakPtr. Otherwise what happens if the
-    // arbiter gets destroyed?
-    task_runner_->PostTask(std::bind(
-        &SharedMemoryArbiterImpl::SendPendingCommitDataRequest, this));
+    PERFETTO_DCHECK(weak_this);
+    task_runner_->PostTask([weak_this] {
+      if (weak_this)
+        weak_this->SendPendingCommitDataRequest();
+    });
   }
 }
 
 // This is always invoked on the |task_runner_| thread.
 void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   std::unique_ptr<CommitDataRequest> req;
   std::vector<uint32_t> pages_to_notify;
   {
