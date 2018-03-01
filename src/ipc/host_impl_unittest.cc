@@ -410,14 +410,14 @@ TEST_F(HostImplTest, ReceiveFileDescriptor) {
   EXPECT_CALL(*cli_, OnInvokeMethodReply(_));
   task_runner_->RunUntilCheckpoint("received");
 
-  ASSERT_TRUE(fake_service->received_fd_);
-  int recv_fd = fake_service->received_fd_.get();
-  char buf[sizeof(kFileContent)] = {};
-  ASSERT_EQ(0, lseek(recv_fd, 0, SEEK_SET));
-  ASSERT_EQ(static_cast<int32_t>(sizeof(buf)),
-            PERFETTO_EINTR(read(recv_fd, buf, sizeof(buf))));
-  ASSERT_STREQ(kFileContent, buf);
   fclose(tx_file);
+  ASSERT_TRUE(fake_service->received_fd_);
+  base::ScopedFile rx_fd = std::move(fake_service->received_fd_);
+  char buf[sizeof(kFileContent)] = {};
+  ASSERT_EQ(0, lseek(*rx_fd, 0, SEEK_SET));
+  ASSERT_EQ(static_cast<int32_t>(sizeof(buf)),
+            PERFETTO_EINTR(read(*rx_fd, buf, sizeof(buf))));
+  ASSERT_STREQ(kFileContent, buf);
 }
 
 // Invoke a method and immediately after disconnect the client.
