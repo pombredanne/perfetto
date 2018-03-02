@@ -44,13 +44,10 @@ struct FtraceMetadata {
 
   // A vector not a set to keep the writer_fast.
   std::vector<uint64_t> inodes;
-  std::vector<uint64_t> pids;
+  std::vector<uint32_t> pids;
 
-  void Clear() {
-    inodes.clear();
-    pids.clear();
-    overwrite_count = 0;
-  }
+  void AddPid(uint64_t);
+  void Clear();
 };
 
 namespace protos {

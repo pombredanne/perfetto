@@ -483,6 +483,9 @@ bool CpuReader::ParseField(const Field& field,
     case kInode64ToUint64:
       AddInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
+    case kPid32ToInt32:
+      AddPid<uint32_t>(field_start, field_id, message, metadata);
+      return true;
   }
   // Not reached, for gcc.
   PERFETTO_CHECK(false);

@@ -118,6 +118,15 @@ class CpuReader {
     metadata->inodes.push_back(t);
   }
 
+  template <typename T>
+  static void AddPid(const uint8_t* start,
+                     size_t field_id,
+                     protozero::Message* out,
+                     FtraceMetadata* metadata) {
+    T t = ReadIntoVarInt<T>(start, field_id, out);
+    metadata->AddPid(t);
+  }
+
   // Iterate through every file in the current directory and check if the inode
   // number of each file matches any of the inode numbers saved in events.
   // Returns map of inode number to filename for every inode number that is

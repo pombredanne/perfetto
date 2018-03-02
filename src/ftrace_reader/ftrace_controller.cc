@@ -367,4 +367,16 @@ FtraceMetadata::FtraceMetadata() {
   pids.reserve(10);
 }
 
+void FtraceMetadata::AddPid(uint64_t pid) {
+  if (pids.back() == pid)
+    return;
+  pids.push_back(pid);
+}
+
+void FtraceMetadata::Clear() {
+  inodes.clear();
+  pids.clear();
+  overwrite_count = 0;
+}
+
 }  // namespace perfetto
