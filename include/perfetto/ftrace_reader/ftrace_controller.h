@@ -33,7 +33,7 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
-#include "perfetto/protozero/protozero_message_handle.h"
+#include "perfetto/protozero/message_handle.h"
 
 namespace perfetto {
 
@@ -49,11 +49,12 @@ const size_t kMaxCpus = 64;
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
 
-class FtraceController;
-class ProtoTranslationTable;
 class CpuReader;
-class FtraceProcfs;
 class EventFilter;
+class FtraceController;
+class FtraceConfigMuxer;
+class FtraceProcfs;
+class ProtoTranslationTable;
 
 // To consume ftrace data clients implement a |FtraceSink::Delegate| and use it
 // to create a |FtraceSink|. While the FtraceSink lives FtraceController will
@@ -64,15 +65,16 @@ class FtraceSink {
   using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
   class Delegate {
    public:
-    virtual protozero::ProtoZeroMessageHandle<FtraceEventBundle>
-        GetBundleForCpu(size_t) = 0;
+    virtual protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(
+        size_t) = 0;
     virtual void OnBundleComplete(
         size_t,
-        protozero::ProtoZeroMessageHandle<FtraceEventBundle>) = 0;
+        protozero::MessageHandle<FtraceEventBundle>) = 0;
     virtual ~Delegate() = default;
   };
 
   FtraceSink(base::WeakPtr<FtraceController>,
+             FtraceConfigId id,
              FtraceConfig config,
              std::unique_ptr<EventFilter>,
              Delegate*);
@@ -83,20 +85,23 @@ class FtraceSink {
  private:
   friend FtraceController;
 
+  FtraceSink(const FtraceSink&) = delete;
+  FtraceSink& operator=(const FtraceSink&) = delete;
+
   EventFilter* get_event_filter() { return filter_.get(); }
-  protozero::ProtoZeroMessageHandle<FtraceEventBundle> GetBundleForCpu(
-      size_t cpu) {
+  protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(size_t cpu) {
     return delegate_->GetBundleForCpu(cpu);
   }
-  void OnBundleComplete(
-      size_t cpu,
-      protozero::ProtoZeroMessageHandle<FtraceEventBundle> bundle) {
+  void OnBundleComplete(size_t cpu,
+                        protozero::MessageHandle<FtraceEventBundle> bundle) {
     delegate_->OnBundleComplete(cpu, std::move(bundle));
   }
 
   const std::set<std::string>& enabled_events();
+
   base::WeakPtr<FtraceController> controller_weak_;
-  FtraceConfig config_;
+  const FtraceConfigId id_;
+  const FtraceConfig config_;
   std::unique_ptr<EventFilter> filter_;
   FtraceSink::Delegate* delegate_;
 };
@@ -116,8 +121,9 @@ class FtraceController {
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
-                   base::TaskRunner*,
-                   std::unique_ptr<ProtoTranslationTable>);
+                   std::unique_ptr<ProtoTranslationTable>,
+                   std::unique_ptr<FtraceConfigMuxer>,
+                   base::TaskRunner*);
 
   // Called to read data from the staging pipe for the given |cpu| and parse it
   // into the sinks. Protected and virtual for testing.
@@ -145,15 +151,9 @@ class FtraceController {
   static void UnblockReaders(base::WeakPtr<FtraceController>);
 
   uint32_t GetDrainPeriodMs();
-  uint32_t GetCpuBufferSizeInPages();
 
   void Register(FtraceSink*);
   void Unregister(FtraceSink*);
-  void RegisterForEvent(const std::string& event_name);
-  void UnregisterForEvent(const std::string& event_name);
-
-  void StartAtrace(const FtraceConfig&);
-  void StopAtrace();
 
   void StartIfNeeded();
   void StopIfNeeded();
@@ -166,11 +166,11 @@ class FtraceController {
   // End lock-protected members.
 
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
+  std::unique_ptr<ProtoTranslationTable> table_;
+  std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;
   size_t generation_ = 0;
   bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
-  std::vector<size_t> enabled_count_;
-  std::unique_ptr<ProtoTranslationTable> table_;
   std::map<size_t, std::unique_ptr<CpuReader>> readers_;
   std::set<FtraceSink*> sinks_;
   base::WeakPtrFactory<FtraceController> weak_factory_;

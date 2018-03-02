@@ -42,8 +42,8 @@ namespace {
 
 const char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
-using BundleHandle =
-    protozero::ProtoZeroMessageHandle<protos::pbzero::FtraceEventBundle>;
+using FtraceBundleHandle =
+    protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
 
 class EndToEndIntegrationTest : public ::testing::Test,
                                 public FtraceSink::Delegate {
@@ -70,14 +70,14 @@ class EndToEndIntegrationTest : public ::testing::Test,
     message->set_before("--- Bundle wrapper before ---");
   }
 
-  virtual BundleHandle GetBundleForCpu(size_t cpu) {
+  virtual FtraceBundleHandle GetBundleForCpu(size_t cpu) {
     PERFETTO_CHECK(!currently_writing_);
     currently_writing_ = true;
     cpu_being_written_ = cpu;
-    return BundleHandle(message->add_bundle());
+    return FtraceBundleHandle(message->add_bundle());
   }
 
-  virtual void OnBundleComplete(size_t cpu, BundleHandle bundle) {
+  virtual void OnBundleComplete(size_t cpu, FtraceBundleHandle bundle) {
     PERFETTO_CHECK(currently_writing_);
     currently_writing_ = false;
     EXPECT_NE(cpu_being_written_, 9999ul);
@@ -108,8 +108,8 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   FtraceConfig config;
-  *config.add_event_names() = "print";
-  *config.add_event_names() = "sched_switch";
+  *config.add_ftrace_events() = "print";
+  *config.add_ftrace_events() = "sched_switch";
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.
@@ -142,8 +142,8 @@ TEST_F(EndToEndIntegrationTest, DISABLED_Atrace) {
   // Create a sink listening for our favorite events:
   std::unique_ptr<FtraceController> ftrace = FtraceController::Create(runner());
   FtraceConfig config;
-  *config.add_event_names() = "print";
-  *config.add_event_names() = "sched_switch";
+  *config.add_ftrace_events() = "print";
+  *config.add_ftrace_events() = "sched_switch";
   std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
 
   // Let some events build up.
