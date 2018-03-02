@@ -30,11 +30,8 @@ namespace ipc {
 class ClientInfo {
  public:
   ClientInfo() = default;
-  ClientInfo(ClientID client_id, uid_t uid, base::ScopedFile* received_fd)
-      : client_id_(client_id), uid_(uid), received_fd_(received_fd) {}
-
   ClientInfo(ClientID client_id, uid_t uid)
-      : ClientInfo(client_id, uid, nullptr) {}
+      : client_id_(client_id), uid_(uid) {}
 
   bool operator==(const ClientInfo& other) const {
     return (client_id_ == other.client_id_ && uid_ == other.uid_);
@@ -55,16 +52,9 @@ class ClientInfo {
   // Posix User ID. Comes from the kernel, can be trusted.
   uid_t uid() const { return uid_; }
 
-  base::ScopedFile TakeReceivedFD() {
-    if (received_fd_ != nullptr)
-      return std::move(*received_fd_);
-    return base::ScopedFile();
-  }
-
  private:
   ClientID client_id_ = 0;
   uid_t uid_ = -1;
-  base::ScopedFile* received_fd_ = nullptr;
 };
 
 }  // namespace ipc

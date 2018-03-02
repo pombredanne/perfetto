@@ -392,10 +392,11 @@ TEST_F(ClientImplTest, SendFileDescriptor) {
   EXPECT_CALL(proxy_events_, OnConnect()).WillOnce(Invoke(on_connect));
   task_runner_->RunUntilCheckpoint("on_connect");
 
-  FILE* tx_file = tmpfile();  // Automatically unlinked from the filesystem.
+  base::ScopedFstream tx_file(
+      tmpfile());  // Automatically unlinked from the filesystem.
   static constexpr char kFileContent[] = "shared file";
-  fwrite(kFileContent, sizeof(kFileContent), 1, tx_file);
-  fflush(tx_file);
+  fwrite(kFileContent, sizeof(kFileContent), 1, tx_file.get());
+  fflush(tx_file.get());
 
   EXPECT_CALL(*host_method, OnInvoke(_, _))
       .WillOnce(Invoke(
@@ -413,10 +414,9 @@ TEST_F(ClientImplTest, SendFileDescriptor) {
         on_reply();
       });
   proxy->BeginInvoke("FakeMethod1", req, std::move(deferred_reply),
-                     fileno(tx_file));
+                     fileno(tx_file.get()));
   task_runner_->RunUntilCheckpoint("on_reply");
 
-  fclose(tx_file);
   base::ScopedFile rx_fd = std::move(host_->received_fd_);
   ASSERT_TRUE(rx_fd);
   char buf[sizeof(kFileContent)] = {};

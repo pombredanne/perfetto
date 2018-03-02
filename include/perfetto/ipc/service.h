@@ -40,14 +40,21 @@ class Service {
 
   // Returns the ClientInfo for the current IPC request. Returns an invalid
   // ClientInfo if called outside the scope of an IPC method.
-  ClientInfo client_info() const {
+  const ClientInfo& client_info() {
     PERFETTO_DCHECK(client_info_.is_valid());
     return client_info_;
+  }
+
+  base::ScopedFile TakeReceivedFD() {
+    if (received_fd_)
+      return std::move(*received_fd_);
+    return base::ScopedFile();
   }
 
  private:
   friend class HostImpl;
   ClientInfo client_info_;
+  base::ScopedFile* received_fd_;
 };
 
 }  // namespace ipc

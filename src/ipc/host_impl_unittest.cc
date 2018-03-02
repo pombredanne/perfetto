@@ -71,44 +71,10 @@ class FakeService : public Service {
 
   const ServiceDescriptor& GetDescriptor() override { return descriptor_; }
 
-  ServiceDescriptor descriptor_;
-};
+  base::ScopedFile TakeReceivedFD() { return ipc::Service::TakeReceivedFD(); }
 
-// For ReceiveFileDescriptor, as we cannot use client_info from a mock
-// method closure.
-class FDService : public Service {
- public:
-  MOCK_METHOD0(Destroyed, void());
-  void OnFakeMethod1(const RequestProto&, DeferredBase*) {
-    received_fd_ = ipc::Service::client_info().TakeReceivedFD();
-    callb_();
-  }
-  static void Invoker(Service* service,
-                      const ProtoMessage& req,
-                      DeferredBase deferred_reply) {
-    static_cast<FDService*>(service)->OnFakeMethod1(
-        static_cast<const RequestProto&>(req), &deferred_reply);
-  }
-
-  static std::unique_ptr<ProtoMessage> RequestDecoder(
-      const std::string& proto) {
-    std::unique_ptr<ProtoMessage> reply(new RequestProto());
-    EXPECT_TRUE(reply->ParseFromString(proto));
-    return reply;
-  }
-
-  explicit FDService(const char* service_name, std::function<void()> callb) {
-    descriptor_.service_name = service_name;
-    descriptor_.methods.push_back(
-        {"FakeMethod1", &RequestDecoder, nullptr, &Invoker});
-    callb_ = callb;
-  }
-
-  const ServiceDescriptor& GetDescriptor() override { return descriptor_; }
-
-  ServiceDescriptor descriptor_;
   base::ScopedFile received_fd_;
-  std::function<void()> callb_;
+  ServiceDescriptor descriptor_;
 };
 
 class FakeClient : public UnixSocket::EventListener {
@@ -393,7 +359,7 @@ TEST_F(HostImplTest, SendFileDescriptor) {
 
 TEST_F(HostImplTest, ReceiveFileDescriptor) {
   auto received = task_runner_->CreateCheckpoint("received");
-  FDService* fake_service = new FDService("FakeService", received);
+  FakeService* fake_service = new FakeService("FakeService");
   ASSERT_TRUE(host_->ExposeService(std::unique_ptr<Service>(fake_service)));
   auto on_bind = task_runner_->CreateCheckpoint("on_bind");
   cli_->BindService("FakeService");
@@ -402,16 +368,23 @@ TEST_F(HostImplTest, ReceiveFileDescriptor) {
 
   static constexpr char kFileContent[] = "shared file";
   RequestProto req_args;
-  FILE* tx_file = tmpfile();
-  fwrite(kFileContent, sizeof(kFileContent), 1, tx_file);
-  fflush(tx_file);
+  base::ScopedFstream tx_file(
+      tmpfile());  // Automatically unlinked from the filesystem.
+  fwrite(kFileContent, sizeof(kFileContent), 1, tx_file.get());
+  fflush(tx_file.get());
   cli_->InvokeMethod(cli_->last_bound_service_id_, 1, req_args, false,
-                     fileno(tx_file));
+                     fileno(tx_file.get()));
   EXPECT_CALL(*cli_, OnInvokeMethodReply(_));
+  base::ScopedFile rx_fd;
+  EXPECT_CALL(*fake_service, OnFakeMethod1(_, _))
+      .WillOnce(Invoke([received, &fake_service, &rx_fd](
+                           const RequestProto& req, DeferredBase* reply) {
+        rx_fd = fake_service->TakeReceivedFD();
+        received();
+      }));
+
   task_runner_->RunUntilCheckpoint("received");
 
-  fclose(tx_file);
-  base::ScopedFile rx_fd = std::move(fake_service->received_fd_);
   ASSERT_TRUE(rx_fd);
   char buf[sizeof(kFileContent)] = {};
   ASSERT_EQ(0, lseek(*rx_fd, 0, SEEK_SET));
