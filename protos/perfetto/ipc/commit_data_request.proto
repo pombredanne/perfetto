@@ -20,12 +20,18 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message CommitDataRequest {
-  // When |chunks_to_move| is filled, the producer is requesting the service to
+  // When |chunks_to_move| is present, the producer is requesting the service to
   // move the given chunks form the share memory buffer into the central
   // trace buffer(s).
   message ChunksToMove {
+    // The 0-based index of the page in the Shared Memory Buffer.
     optional uint32 page = 1;
+
+    // The 0-based chunk index [0..13] within the page.
     optional uint32 chunk = 2;
+
+    // The target buffer it should be moved onto. The service will check that
+    // the producer is allowed to write into that buffer before the move.
     optional uint32 target_buffer = 3;
   }
   repeated ChunksToMove chunks_to_move = 1;
@@ -36,7 +42,8 @@ message CommitDataRequest {
   // It is perfectly valid to patch a chunk that is being notified in the same
   // message (a chunk can show up both in the |changed_pages| and |patches|
   // field within the same CommitDataRequest message).
-
+  // In other words, |chunks_to_patch| is always processed after
+  // |chunks_to_move|.
   message ChunkToPatch {
     message Patch {
       // Offset in bytes from the start of the chunk payload. e.g., offset == 0
