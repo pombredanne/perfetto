@@ -265,10 +265,8 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   }
   reader->Drain(filters, bundles, metadatas);
   i = 0;
-  for (FtraceSink* sink : sinks_) {
-    sink->OnBundleComplete(cpu, std::move(bundles[i]), *metadatas[i]);
-    metadatas[i++]->Clear();
-  }
+  for (FtraceSink* sink : sinks_)
+    sink->OnBundleComplete(cpu, std::move(bundles[i++]));
   PERFETTO_DCHECK(sinks_.size() == sink_count);
 }
 
@@ -361,6 +359,12 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
+}
+
+FtraceMetadata::FtraceMetadata() {
+  // A lot of the time there will only be a small number of inodes.
+  inodes.reserve(10);
+  pids.reserve(10);
 }
 
 }  // namespace perfetto

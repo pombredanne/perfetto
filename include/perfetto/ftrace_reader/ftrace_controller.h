@@ -38,13 +38,18 @@
 namespace perfetto {
 
 struct FtraceMetadata {
+  FtraceMetadata();
+
   size_t overwrite_count;
-  std::set<uint64_t> inodes;
-  std::set<uint64_t> pids;
+
+  // A vector not a set to keep the writer_fast.
+  std::vector<uint64_t> inodes;
+  std::vector<uint64_t> pids;
 
   void Clear() {
     inodes.clear();
     pids.clear();
+    overwrite_count = 0;
   }
 };
 
@@ -60,7 +65,6 @@ const size_t kMaxCpus = 64;
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
 
-struct FtraceMetadata;
 class CpuReader;
 class EventFilter;
 class FtraceController;
@@ -101,16 +105,15 @@ class FtraceSink {
   FtraceSink& operator=(const FtraceSink&) = delete;
 
   EventFilter* event_filter() { return filter_.get(); }
-  const FtraceMetadata& metadata() const { return metadata_; }
   FtraceMetadata* metadata_mutable() { return &metadata_; }
 
   protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(size_t cpu) {
     return delegate_->GetBundleForCpu(cpu);
   }
   void OnBundleComplete(size_t cpu,
-                        protozero::MessageHandle<FtraceEventBundle> bundle,
-                        const FtraceMetadata& metadata) {
-    delegate_->OnBundleComplete(cpu, std::move(bundle), metadata);
+                        protozero::MessageHandle<FtraceEventBundle> bundle) {
+    delegate_->OnBundleComplete(cpu, std::move(bundle), metadata_);
+    metadata_.Clear();
   }
 
   const std::set<std::string>& enabled_events();

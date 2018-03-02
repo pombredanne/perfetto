@@ -49,7 +49,6 @@ class ProbesProducer : public Producer {
       const DataSourceConfig& source_config);
 
   void OnMetadata(const FtraceMetadata& metadata);
-  void OnInodes(const std::set<uint64_t>& inodes);
 
  private:
   using FtraceBundleHandle =
@@ -57,7 +56,7 @@ class ProbesProducer : public Producer {
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    explicit SinkDelegate(ProbesProducer* producer,
+    explicit SinkDelegate(base::TaskRunner* task_runner,
                           std::unique_ptr<TraceWriter> writer);
     ~SinkDelegate() override;
 
@@ -68,15 +67,18 @@ class ProbesProducer : public Producer {
                           const FtraceMetadata& metadata) override;
 
     void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
+    void OnInodes(const std::vector<uint64_t>& inodes);
 
    private:
-    ProbesProducer* producer_ = nullptr;
+    base::TaskRunner* task_runner_;
     std::unique_ptr<FtraceSink> sink_ = nullptr;
     std::unique_ptr<TraceWriter> writer_;
 
     // Keep this after the TraceWriter because TracePackets must not outlive
     // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
+    // Keep this last.
+    base::WeakPtrFactory<SinkDelegate> weak_factory_;
   };
 
   enum State {
@@ -90,7 +92,6 @@ class ProbesProducer : public Producer {
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
 
-  bool is_inode_tracing_enabled_ = true;
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
@@ -102,7 +103,6 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, std::string> instances_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::WatchDog> watchdogs_;
-  base::WeakPtrFactory<ProbesProducer> weak_factory_;
 };
 }  // namespace perfetto
 

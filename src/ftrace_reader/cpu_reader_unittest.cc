@@ -770,12 +770,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   writer.Write<int32_t>(9999);  // A gap we shouldn't read.
   writer.Write<int32_t>(1002);
   writer.WriteFixedString(16, "Hello");
-  // Use a file that is pushed for both linux and android to ensure this passes
-  std::string filename =
-      "./src/ftrace_reader/test/data/android_seed_N2F62_3.10.49/events";
-  struct stat buf;
-  ASSERT_NE(stat(filename.c_str(), &buf), -1);
-  writer.Write<int32_t>(buf.st_ino);
+  writer.Write<int32_t>(99);
   writer.WriteFixedString(300, "Goodbye");
 
   auto input = writer.GetCopy();
@@ -793,12 +788,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_uint32(), 1002ul);
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
-  EXPECT_EQ(event->all_fields().field_inode(), buf.st_ino);
-  // Check inode number gets added and linked to the correct file
-  EXPECT_THAT(metadata.inodes, Each(Eq(buf.st_ino)));
-  std::map<uint64_t, std::string> inode_to_filename =
-      CpuReader::GetFilenamesForInodeNumbers(metadata.inodes);
-  EXPECT_THAT(inode_to_filename, ElementsAre(Pair(buf.st_ino, filename)));
+  EXPECT_EQ(event->all_fields().field_inode(), 99u);
 }
 
 // # tracer: nop

@@ -98,13 +98,15 @@ class CpuReader {
 
   // Caller must do the bounds check:
   // [start + offset, start + offset + sizeof(T))
+  // Returns the raw value not the varint.
   template <typename T>
-  static void ReadIntoVarInt(const uint8_t* start,
-                             size_t field_id,
-                             protozero::Message* out) {
+  static T ReadIntoVarInt(const uint8_t* start,
+                          size_t field_id,
+                          protozero::Message* out) {
     T t;
     memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
     out->AppendVarInt<T>(field_id, t);
+    return t;
   }
 
   template <typename T>
@@ -112,10 +114,8 @@ class CpuReader {
                        size_t field_id,
                        protozero::Message* out,
                        FtraceMetadata* metadata) {
-    ReadIntoVarInt<T>(start, field_id, out);
-    T t;
-    memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
-    metadata->inodes.insert(t);
+    T t = ReadIntoVarInt<T>(start, field_id, out);
+    metadata->inodes.push_back(t);
   }
 
   // Iterate through every file in the current directory and check if the inode
