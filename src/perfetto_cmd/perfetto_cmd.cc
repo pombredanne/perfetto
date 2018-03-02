@@ -205,6 +205,8 @@ bool PerfettoCmd::DoTrace(uint64_t* bytes_uploaded) {
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
   task_runner_.Run();
+
+  // TODO(hjd): Actually set bytes_uploaded.
   if (bytes_uploaded && did_process_full_trace_)
     *bytes_uploaded = 0;
   return did_process_full_trace_;
