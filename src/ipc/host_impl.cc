@@ -205,13 +205,6 @@ void HostImpl::OnInvokeMethod(ClientConnection* client,
   }
 
   service->client_info_ = ClientInfo(client->id, client->sock->peer_uid());
-  // This is a pointer because the received fd needs to remain owned by the
-  // ClientConnection, as we will provide it to all method invocations
-  // until one of them calls Service::TakeReceivedFD.
-  //
-  // Note that this means that there can always only be one outstanding
-  // invocation per client that supplies an FD and the client needs to
-  // wait for this one to return before calling another one.
   service->received_fd_ = &client->received_fd;
   method.invoker(service, *decoded_req_args, std::move(deferred_reply));
   service->received_fd_ = nullptr;
