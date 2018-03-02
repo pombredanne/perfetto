@@ -54,6 +54,7 @@ class PerfettoCmdLogic {
  public:
   struct Args {
     bool is_dropbox = false;
+    bool ignore_guardrails = false;
     uint64_t current_timestamp = 0;
   };
 

@@ -68,11 +68,12 @@ using protozero::proto_utils::MakeTagLengthDelimited;
 int PerfettoCmd::PrintUsage(const char* argv0) {
   PERFETTO_ELOG(R"(
 Usage: %s
-  --background  -b     : Exits immediately and continues tracing in background
-  --config      -c     : /path/to/trace/config/file or - for stdin
-  --out         -o     : /path/to/out/trace/file
-  --dropbox     -d TAG : Upload trace into DropBox using tag TAG (default: %s)
-  --help        -h
+  --background         -b     : Exits immediately and continues tracing in background
+  --config             -c     : /path/to/trace/config/file or - for stdin
+  --out                -o     : /path/to/out/trace/file
+  --dropbox            -d TAG : Upload trace into DropBox using tag TAG (default: %s)
+  --ignore-guardrails  -i     : Ingnore guardrails
+  --help               -h
 )",
                 argv0, kDefaultDropBoxTag);
   return 1;
@@ -86,14 +87,16 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"out", required_argument, 0, 'o'},
       {"background", no_argument, 0, 'b'},
       {"dropbox", optional_argument, 0, 'd'},
+      {"ignore-guardrails", optional_argument, 0, 'i'},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
   std::string trace_config_raw;
   bool background = false;
+  bool ignore_guardrails = false;
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:bd::", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:bd::i", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -106,7 +109,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
         // TODO(primiano): temporary for testing only.
         perfetto::protos::TraceConfig test_config;
         test_config.add_buffers()->set_size_kb(4096);
-        test_config.set_duration_ms(10000);
+        test_config.set_duration_ms(2000);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("com.google.perfetto.ftrace");
         ds_config->mutable_ftrace_config()->add_ftrace_events("sched_switch");
@@ -146,6 +149,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
       background = true;
       continue;
     }
+
+    if (option == 'i') {
+      ignore_guardrails = true;
+      continue;
+    }
+
     return PrintUsage(argv[0]);
   }
 
@@ -188,7 +197,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   PerfettoCmdLogic::Args args{};
   args.is_dropbox = !dropbox_tag_.empty();
   args.current_timestamp = GetTimestamp();
-
+  args.ignore_guardrails = ignore_guardrails;
   return logic.Run(args);
 }
 
@@ -314,12 +323,14 @@ bool PerfettoCmd::OpenOutputFile() {
 }
 
 bool PerfettoCmd::LoadState(PerfettoCmdState* state) {
-  base::ScopedFile fd = base::OpenFile(GetStatePath(), O_RDONLY | O_CREAT);
+  base::ScopedFile fd;
+  fd.reset(open(GetStatePath().c_str(), O_RDONLY | O_CREAT, 0600));
   return ReadState(fd.get(), state);
 }
 
 bool PerfettoCmd::SaveState(const PerfettoCmdState& state) {
-  base::ScopedFile fd = base::OpenFile(GetStatePath(), O_WRONLY | O_CREAT);
+  base::ScopedFile fd;
+  fd.reset(open(GetStatePath().c_str(), O_WRONLY | O_CREAT, 0600));
   return WriteState(fd.get(), state);
 }
 
@@ -331,7 +342,7 @@ uint64_t PerfettoCmd::GetTimestamp() {
 }
 
 std::string PerfettoCmd::GetStatePath() {
-  return std::string(kTempDropBoxTraceDir) + "/perfetto_cmd_state.protobuf";
+  return std::string(kTempDropBoxTraceDir) + "/.guardraildata";
 }
 
 // static
@@ -340,7 +351,7 @@ bool PerfettoCmd::ReadState(int in_fd, PerfettoCmdState* state) {
     return false;
   char buf[1024];
   ssize_t bytes = read(in_fd, &buf, sizeof(buf));
-  if (bytes <= 0)
+  if (bytes < 0)
     return false;
   ::google::protobuf::io::ArrayInputStream stream(buf, bytes);
   return state->ParseFromZeroCopyStream(&stream);
@@ -363,7 +374,8 @@ PerfettoCmdLogic::PerfettoCmdLogic(Delegate* delegate) : delegate_(delegate) {}
 PerfettoCmdLogic::~PerfettoCmdLogic() = default;
 
 int PerfettoCmdLogic::Run(const Args& args) {
-  // Not uploading? We can just trace.
+  // Not uploading?
+  // -> We can just trace.
   if (!args.is_dropbox)
     return delegate_->DoTrace() ? 0 : 1;
 
@@ -379,12 +391,16 @@ int PerfettoCmdLogic::Run(const Args& args) {
       state.last_trace_timestamp() < state.first_trace_timestamp()) {
     PerfettoCmdState output{};
     delegate_->SaveState(output);
+    PERFETTO_ELOG("Guardrail: guardrail state invalid.");
     return 1;
   }
 
   // If we've uploaded in the last 5mins we shouldn't trace now.
-  if ((args.current_timestamp - state.last_trace_timestamp()) < 60 * 5)
-    return 1;
+  if ((args.current_timestamp - state.last_trace_timestamp()) < 60 * 5) {
+    PERFETTO_ELOG("Guardrail: Uploaded to DropBox in the last 5mins.");
+    if (!args.ignore_guardrails)
+      return 1;
+  }
 
   // First trace was more than 24h ago? Reset state.
   if ((args.current_timestamp - state.first_trace_timestamp()) > 60 * 60 * 24) {
@@ -395,8 +411,11 @@ int PerfettoCmdLogic::Run(const Args& args) {
 
   // If we've uploaded more than 10mb in the last 24 hours we shouldn't trace
   // now.
-  if (state.total_bytes_uploaded() > 10 * 1024 * 1024)
-    return 1;
+  if (state.total_bytes_uploaded() > 10 * 1024 * 1024) {
+    PERFETTO_ELOG("Guardrail: Uploaded >10mb DropBox in the last 24h.");
+    if (!args.ignore_guardrails)
+      return 1;
+  }
 
   uint64_t uploaded = 0;
   bool success = delegate_->DoTrace(&uploaded);

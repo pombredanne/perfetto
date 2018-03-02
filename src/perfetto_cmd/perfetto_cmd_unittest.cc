@@ -90,6 +90,14 @@ TEST(PerfettoCmdTest, RoundTripState) {
   ASSERT_EQ(output.total_bytes_uploaded(), 42u);
 }
 
+TEST(PerfettoCmdTest, LoadFromEmpty) {
+  auto a_pipe = CreatePipe();
+  PerfettoCmdState output;
+  a_pipe.second.reset();
+  ASSERT_TRUE(PerfettoCmd::ReadState(*a_pipe.first, &output));
+  ASSERT_EQ(output.total_bytes_uploaded(), 0u);
+}
+
 TEST(PerfettoCmdTest, NotDropBox) {
   StrictMock<DelegateMock> delegate;
   PerfettoCmdLogic logic(&delegate);
@@ -98,12 +106,28 @@ TEST(PerfettoCmdTest, NotDropBox) {
   EXPECT_EQ(logic.Run({}), 0);
 }
 
-TEST(PerfettoCmdTest, NotDropBoxFailedToTrace) {
+TEST(PerfettoCmdTest, NotDropBox_FailedToTrace) {
   StrictMock<DelegateMock> delegate;
   PerfettoCmdLogic logic(&delegate);
 
   EXPECT_CALL(delegate, DoTrace(_)).WillOnce(Return(false));
   EXPECT_EQ(logic.Run({}), 1);
+}
+
+TEST(PerfettoCmdTest, DropBox_IgnoreGuardrails) {
+  StrictMock<DelegateMock> delegate;
+  PerfettoCmdLogic logic(&delegate);
+  PerfettoCmdLogic::Args args;
+
+  EXPECT_CALL(delegate, LoadState(_));
+  EXPECT_CALL(delegate, DoTrace(_));
+  EXPECT_CALL(delegate, SaveState(_));
+
+  delegate.input_total_bytes_uploaded = 1024 * 1024 * 100;
+  args.is_dropbox = true;
+  args.ignore_guardrails = true;
+
+  ASSERT_EQ(logic.Run(args), 0);
 }
 
 TEST(PerfettoCmdTest, DropBox_EmptyState) {
