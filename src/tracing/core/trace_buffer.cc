@@ -292,9 +292,11 @@ bool TraceBuffez::TryPatchChunkContents(ProducerID producer_id,
     TRACE_BUFFER_DLOG("PatchChunk {%" PRIu32 ",%" PRIu32
                       ",%u} size=%zu @ %zu with {%02x %02x %02x %02x}",
                       producer_id, writer_id, chunk_id, chunk_end - chunk_begin,
-                      patch_offset_untrusted, patch[0], patch[1], patch[2],
-                      patch[3]);
-    if (ptr < chunk_begin || ptr > chunk_end - Patch::kSize) {
+                      patches[i].offset_untrusted, patches[i].data[0],
+                      patches[i].data[1], patches[i].data[2],
+                      patches[i].data[3]);
+    if (ptr < chunk_begin + sizeof(ChunkRecord) ||
+        ptr > chunk_end - Patch::kSize) {
       // Either the IPC was so slow and in the meantime the writer managed to
       // wrap over |chunk_id| or the producer sent a malicious IPC.
       stats_.failed_patches++;
@@ -312,7 +314,7 @@ bool TraceBuffez::TryPatchChunkContents(ProducerID producer_id,
       "Chunk raw (after patch): %s",
       HexDump(chunk_begin, chunk_meta.chunk_record->size).c_str());
 
-  stats_.succeeded_patches++;
+  stats_.succeeded_patches += patches_size;
   if (!other_patches_pending) {
     chunk_meta.flags &= ~kChunkNeedsPatching;
     chunk_meta.chunk_record->flags = chunk_meta.flags;
