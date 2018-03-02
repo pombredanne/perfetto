@@ -46,6 +46,8 @@ class ProbesProducer : public Producer {
                                       const DataSourceConfig& source_config);
   void CreateProcessStatsDataSourceInstance(
       const DataSourceConfig& source_config);
+  void CreateInodeFileMapDataSourceInstance(
+      const DataSourceConfig& source_config);
 
  private:
   using FtraceBundleHandle =

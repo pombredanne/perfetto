@@ -30,6 +30,7 @@
 #include "src/process_stats/file_utils.h"
 #include "src/process_stats/procfs_utils.h"
 
+#include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "perfetto/trace/ps/process_tree.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -41,6 +42,7 @@ uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
 const char* kFtraceSourceName = "com.google.perfetto.ftrace";
 const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
+const char* kInodeFileMapSourceName = "com.google.perfetto.inode_file_map";
 
 }  // namespace.
 
@@ -69,6 +71,11 @@ void ProbesProducer::OnConnect() {
   process_stats_descriptor.set_name(kProcessStatsSourceName);
   endpoint_->RegisterDataSource(process_stats_descriptor,
                                 [](DataSourceInstanceID id) {});
+
+  DataSourceDescriptor inode_map_descriptor;
+  inode_map_descriptor.set_name(kInodeFileMapSourceName);
+  endpoint_->RegisterDataSource(inode_map_descriptor,
+                                [](DataSourceInstanceID id) {});
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -90,6 +97,8 @@ void ProbesProducer::CreateDataSourceInstance(
     CreateFtraceDataSourceInstance(id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
     CreateProcessStatsDataSourceInstance(source_config);
+  } else if (source_config.name() == kInodeFileMapSourceName) {
+    CreateInodeFileMapDataSourceInstance(source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
@@ -144,6 +153,23 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
     watchdogs_.emplace(
         std::piecewise_construct, std::forward_as_tuple(id),
         std::forward_as_tuple(5000 + 2 * source_config.trace_duration_ms()));
+}
+
+void ProbesProducer::CreateInodeFileMapDataSourceInstance(
+    const DataSourceConfig& source_config) {
+  auto trace_writer = endpoint_->CreateTraceWriter(
+      static_cast<BufferID>(source_config.target_buffer()));
+  auto trace_packet = trace_writer->NewTracePacket();
+  protos::pbzero::InodeFileMap* inode_file_map =
+      trace_packet->set_inode_file_map();
+  // TODO(azappone): Add block_device_id and mount_points
+  std::vector<uint64_t> inodes;  // TODO(azappone) Actually get inodes
+  for (const auto& inode : inodes) {
+    auto* entry_writer = inode_file_map->add_entries();
+    entry_writer->set_inode_number(inode);
+    // TODO(azappone): Add resolving filepaths and type
+  }
+  trace_packet->Finalize();
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
