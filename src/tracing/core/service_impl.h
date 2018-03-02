@@ -64,8 +64,7 @@ class ServiceImpl : public Service {
     void RegisterDataSource(const DataSourceDescriptor&,
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;
-    void NotifySharedMemoryUpdate(
-        const std::vector<uint32_t>& changed_pages) override;
+    void CommitData(const CommitDataRequest&) override;
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
@@ -150,6 +149,8 @@ class ServiceImpl : public Service {
   ProducerEndpointImpl* GetProducer(ProducerID) const;
 
  private:
+  FRIEND_TEST(ServiceImplTest, ProducerIDWrapping);
+
   struct RegisteredDataSource {
     ProducerID producer_id;
     DataSourceID data_source_id;
@@ -168,7 +169,7 @@ class ServiceImpl : public Service {
     TraceBuffer(TraceBuffer&&) noexcept;
     TraceBuffer& operator=(TraceBuffer&&);
 
-    bool Create(size_t size);
+    bool Create(size_t size_in_bytes);
     size_t num_pages() const { return size / kBufferPageSize; }
 
     uint8_t* get_page(size_t page) {
@@ -229,6 +230,9 @@ class ServiceImpl : public Service {
   void CreateDataSourceInstance(const TraceConfig::DataSource&,
                                 const RegisteredDataSource&,
                                 TracingSession*);
+
+  // Returns the next available ProducerID that is not in |producers_|.
+  ProducerID GetNextProducerID();
 
   // Returns a pointer to the |tracing_sessions_| entry or nullptr if the
   // session doesn't exists.
