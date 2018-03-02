@@ -20,7 +20,6 @@
 #include <unistd.h>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/scoped_file.h"
 #include "perfetto/ipc/basic_types.h"
 
 namespace perfetto {

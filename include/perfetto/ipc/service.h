@@ -18,6 +18,7 @@
 #define INCLUDE_PERFETTO_IPC_SERVICE_H_
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/ipc/client_info.h"
 
 namespace perfetto {
