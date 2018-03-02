@@ -57,7 +57,10 @@ class Service {
   ClientInfo client_info_;
   // This is a pointer because the received fd needs to remain owned by the
   // ClientConnection, as we will provide it to all method invocations
-  // until one of them calls Service::TakeReceivedFD.
+  // for that client until one of them calls Service::TakeReceivedFD.
+  //
+  // Different clients might have sent different FDs so this cannot be owned
+  // here.
   //
   // Note that this means that there can always only be one outstanding
   // invocation per client that supplies an FD and the client needs to
