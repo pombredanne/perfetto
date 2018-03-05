@@ -241,6 +241,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       break;
     }
   }
+  UpdateMemoryGuardrail();
 
   // This can happen if either:
   // - All the kMaxTraceBufferID slots are taken.
