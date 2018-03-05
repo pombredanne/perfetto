@@ -94,8 +94,6 @@ class ProbesProducer : public Producer {
    private:
     std::unique_ptr<TraceWriter> writer_;
 
-    // Keep this after the TraceWriter because TracePackets must not outlive
-    // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
   };
 

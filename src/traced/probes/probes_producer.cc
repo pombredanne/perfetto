@@ -208,7 +208,6 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   } else if (instances_[id] == kInodeFileMapSourceName) {
     size_t removed = file_map_sources_.erase(id);
     PERFETTO_DCHECK(removed == 1);
-    // Might return 0 if trace_duration_ms == 0.
     watchdogs_.erase(id);
   }
 }
