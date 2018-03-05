@@ -325,7 +325,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   // IPC. This is not an upper bound, we just stop accumulating packets and send
   // an IPC out every time we cross this threshold (i.e. all IPCs % last one
   // will be >= this).
-  static constexpr size_t kMaxPacketBytesPerRead = 4096;
+  static constexpr size_t kApproxBytesPerRead = 4096;
   bool did_hit_threshold = false;
 
   // TODO(primiano): Extend the ReadBuffers API to allow reading only some
@@ -342,8 +342,10 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      if (!tbuf.ReadNextTracePacket(&packet))
+      uid_t producer_uid = -1;
+      if (!tbuf.ReadNextTracePacket(&packet, &producer_uid))
         break;
+      PERFETTO_DCHECK(producer_uid != static_cast<uid_t>(-1));
       PERFETTO_DCHECK(packet.size() > 0);
       if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
@@ -359,8 +361,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       // the producer can't give us a partial packet (e.g., a truncated
       // string) which only becomes valid when the UID is appended here.
       protos::TrustedPacket trusted_packet;
-      trusted_packet.set_trusted_uid(
-          /*page_owner*/ 0);  // TODO here before landing
+      trusted_packet.set_trusted_uid(producer_uid);
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -371,7 +372,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
       // Append the packet (inclusive of the trusted uid) to |packets|.
       packets_bytes += packet.size();
-      did_hit_threshold = packets_bytes >= kMaxPacketBytesPerRead;
+      did_hit_threshold = packets_bytes >= kApproxBytesPerRead;
       packets.emplace_back(std::move(packet));
     }  // for(packets...)
   }    // for(buffers...)
@@ -520,6 +521,7 @@ void ServiceImpl::CreateDataSourceInstance(
 // Producer might be lying / returning garbage contents. |src| and |size| can
 // be trusted in terms of being a valid pointer, but not the contents.
 void ServiceImpl::CommitData(ProducerID producer_id_trusted,
+                             uid_t producer_uid_trusted,
                              WriterID writer_id,
                              ChunkID chunk_id,
                              BufferID buffer_id,
@@ -542,8 +544,8 @@ void ServiceImpl::CommitData(ProducerID producer_id_trusted,
   // log buffer that has nothing to do with it.
 
   TraceBuffez& buf = *buf_iter->second;
-  buf.CopyChunkUntrusted(producer_id_trusted, writer_id, chunk_id,
-                         num_fragments, chunk_flags, src, size);
+  buf.CopyChunkUntrusted(producer_id_trusted, producer_uid_trusted, writer_id,
+                         chunk_id, num_fragments, chunk_flags, src, size);
 }
 
 ServiceImpl::TracingSession* ServiceImpl::GetTracingSession(
@@ -685,6 +687,10 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
       continue;
     }
 
+    // TryAcquireChunkForReading() has load-acquire semantics. Once acquired,
+    // the ABI contract expects the producer to not touch the chunk anymore
+    // (until the service marks that as free). This is why all the reads below
+    // are just memory_order_relaxed.
     BufferID buffer_id = static_cast<BufferID>(entry.target_buffer());
     const SharedMemoryABI::ChunkHeader& chunk_header = *chunk.header();
     WriterID writer_id = chunk_header.writer_id.load(std::memory_order_relaxed);
@@ -696,10 +702,11 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     PERFETTO_DLOG("Commit req %d:%d", entry.page(), entry.chunk());
 
     // TODO(primiano): before landing: check payload_size(), untrusetd.
-    service_->CommitData(id_, writer_id, chunk_id, buffer_id, num_fragments,
-                         chunk_flags, chunk.payload_begin(),
+    service_->CommitData(id_, uid_, writer_id, chunk_id, buffer_id,
+                         num_fragments, chunk_flags, chunk.payload_begin(),
                          chunk.payload_size());
 
+    // This one has release-store semantics.
     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
   }
 }

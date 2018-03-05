@@ -125,6 +125,7 @@ class ServiceImpl : public Service {
                           const DataSourceDescriptor&);
   void UnregisterDataSource(ProducerID, DataSourceID);
   void CommitData(ProducerID,
+                  uid_t,
                   WriterID,
                   ChunkID,
                   BufferID,

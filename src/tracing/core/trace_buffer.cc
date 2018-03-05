@@ -102,6 +102,7 @@ bool TraceBuffez::Initialize(size_t size) {
 // that the producer is malicious and will change the content of |src|
 // while we execute here. Don't do any processing on it other than memcpy().
 void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
+                                     uid_t producer_uid_trusted,
                                      WriterID writer_id,
                                      ChunkID chunk_id,
                                      uint16_t num_fragments,
@@ -166,14 +167,15 @@ void TraceBuffez::CopyChunkUntrusted(ProducerID producer_id_trusted,
 
   // Now first insert the new chunk. At the end, if necessary, add the padding.
   ChunkMeta::Key key(record);
-  auto it_and_inserted = index_.emplace(
-      key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_flags));
+  auto it_and_inserted =
+      index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
+                                    chunk_flags, producer_uid_trusted));
   if (PERFETTO_UNLIKELY(!it_and_inserted.second)) {
     // More likely a producer bug, but could also be a malicious producer.
     PERFETTO_DCHECK(suppress_sanity_dchecks_for_testing_);
     index_.erase(it_and_inserted.first);
-    index_.emplace(
-        key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments, chunk_flags));
+    index_.emplace(key, ChunkMeta(GetChunkRecordAt(wptr_), num_fragments,
+                                  chunk_flags, producer_uid_trusted));
   }
   TRACE_BUFFER_DLOG("  copying @ [%lu - %lu] %zu", wptr_ - begin(),
                     wptr_ - begin() + record_size, record_size);
@@ -375,7 +377,8 @@ void TraceBuffez::SequenceIterator::MoveNext() {
     cur = seq_begin;
 }
 
-bool TraceBuffez::ReadNextTracePacket(TracePacket* packet) {
+bool TraceBuffez::ReadNextTracePacket(TracePacket* packet,
+                                      uid_t* producer_uid) {
   // Note: MoveNext() moves only within the next chunk within the same
   // {ProducerID, WriterID} sequence. Here we want to:
   // - return the next patched+complete packet in the current sequence, if any.
@@ -408,6 +411,8 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet) {
       read_iter_.MoveToEnd();
       continue;
     }
+
+    const uid_t trusted_uid = chunk_meta.trusted_uid;
 
     // At this point we have a chunk in |chunk_meta| that has not been fully
     // read. We don't know yet whether we have enough data to read the full
@@ -467,8 +472,10 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet) {
 
       if (action == kReadOnePacket) {
         // The easy peasy case B.
-        if (PERFETTO_LIKELY(ReadNextPacketInChunk(&chunk_meta, packet)))
+        if (PERFETTO_LIKELY(ReadNextPacketInChunk(&chunk_meta, packet))) {
+          *producer_uid = trusted_uid;
           return true;
+        }
 
         // In extremely rare cases (producer bugged / malicious) the chunk might
         // contain an invalid fragment. In such case we don't want to stall the
@@ -480,6 +487,7 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet) {
       ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
         stats_.fragment_readahead_successes++;
+        *producer_uid = trusted_uid;
         return true;
       }
 

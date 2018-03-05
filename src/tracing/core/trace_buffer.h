@@ -163,6 +163,7 @@ class TraceBuffez {
   // None of the arguments should be trusted, unless otherwise stated. We can
   // trust that |src| points to a valid memory area, but not its contents.
   void CopyChunkUntrusted(ProducerID producer_id_trusted,
+                          uid_t producer_uid_trusted,
                           WriterID writer_id,
                           ChunkID chunk_id,
                           uint16_t num_fragments,
@@ -212,7 +213,7 @@ class TraceBuffez {
   //   P1, P4, P7, P2, P3, P5, P8, P9, P6
   // But the following is guaranteed to NOT happen:
   //   P1, P5, P7, P4 (P4 cannot come after P5)
-  bool ReadNextTracePacket(TracePacket*);
+  bool ReadNextTracePacket(TracePacket*, uid_t* producer_uid);
 
   const Stats& stats() const { return stats_; }
 
@@ -316,8 +317,8 @@ class TraceBuffez {
       ChunkID chunk_id;
     };
 
-    ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f)
-        : chunk_record{c}, flags{f}, num_fragments{p} {}
+    ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f, uid_t u)
+        : chunk_record{c}, flags{f}, num_fragments{p}, trusted_uid{u} {}
 
     ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
     uint8_t flags = 0;                 // See SharedMemoryABI::flags.
@@ -330,10 +331,7 @@ class TraceBuffez {
     // sizeof(ChunkRecord)).
     uint16_t cur_fragment_offset = 0;
 
-    // If != 0 the last fragment in the chunk cannot be read, even if the
-    // subsequent ChunkID is already available, until a patch is applied through
-    // MaybePatchChunkContents().
-    // TODO(primiano): implement this logic in next CL.
+    uid_t trusted_uid = 0;
   };
 
   using ChunkMap = std::map<ChunkMeta::Key, ChunkMeta>;
@@ -449,6 +447,8 @@ class TraceBuffez {
   // ChunkMeta and pushes that into |TracePacket|. It also increments the
   // |num_fragments_read| counter.
   // TracePacket can be nullptr, in which case the read state is still advanced.
+  // When TracePacket is not nullptr, ProducerID must also be not null and will
+  // be updated with the ProducerID that originally wrote the chunk.
   bool ReadNextPacketInChunk(ChunkMeta*, TracePacket*);
 
   void DcheckIsAlignedAndWithinBounds(const uint8_t* ptr) const {

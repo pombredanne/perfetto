@@ -137,19 +137,24 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
-    // if (page_idx != SharedMemoryABI::kInvalidPageIdx) {
     if (!commit_data_req_) {
       commit_data_req_.reset(new CommitDataRequest());
       weak_this = weak_ptr_factory_.GetWeakPtr();
       should_post_callback = true;
-      }
-      CommitDataRequest::ChunksToMove* ctm =
-          commit_data_req_->add_chunks_to_move();
-      ctm->set_page(static_cast<uint32_t>(page_idx));
-      ctm->set_chunk(chunk_idx);
-      ctm->set_target_buffer(target_buffer);
-      // }
+    }
+    CommitDataRequest::ChunksToMove* ctm =
+        commit_data_req_->add_chunks_to_move();
+    ctm->set_page(static_cast<uint32_t>(page_idx));
+    ctm->set_chunk(chunk_idx);
+    ctm->set_target_buffer(target_buffer);
   }
+
+  // TODO(primiano): optimization: at this point, if most of the SMB is full of
+  // completed chunks that are pending a commit, we should send a sync IPC
+  // without waiting for the next task. The risk is that, if a writer writes too
+  // quickly, we end up in bubbles in the pipeline. If we have to first wait
+  // that the writer completely fills the SMB before we send the sync IPC,
+  // the writer will systematically stall and lose bandwidth.
 
   if (should_post_callback) {
     PERFETTO_DCHECK(weak_this);
