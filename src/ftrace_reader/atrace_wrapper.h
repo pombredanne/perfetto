@@ -14,28 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef SRC_FTRACE_READER_SYSTEM_WRAPPER_H_
-#define SRC_FTRACE_READER_SYSTEM_WRAPPER_H_
+#ifndef SRC_FTRACE_READER_ATRACE_WRAPPER_H_
+#define SRC_FTRACE_READER_ATRACE_WRAPPER_H_
 
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace perfetto {
 
-class SystemWrapper {
- public:
-  SystemWrapper();
-  virtual ~SystemWrapper();
+using RunAtraceFunction =
+    std::add_pointer<bool(const std::vector<std::string>& /*args*/)>::type;
 
-  virtual bool RunAtrace(
-
-      const std::vector<std::string>& args);
-
- private:
-  SystemWrapper(const SystemWrapper&) = delete;
-  SystemWrapper& operator=(const SystemWrapper&) = delete;
-};
+bool RunAtrace(const std::vector<std::string>& args);
+void SetRunAtraceForTesting(RunAtraceFunction f);
 
 }  // namespace perfetto
 
-#endif  // SRC_FTRACE_READER_SYSTEM_WRAPPER_H_
+#endif  // SRC_FTRACE_READER_ATRACE_WRAPPER_H_

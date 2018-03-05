@@ -23,6 +23,7 @@
 
 #include <algorithm>
 
+#include "atrace_wrapper.h"
 #include "perfetto/base/utils.h"
 #include "proto_translation_table.h"
 
@@ -73,13 +74,8 @@ size_t ComputeCpuBufferSizeInPages(size_t requested_buffer_size_kb) {
 }
 
 FtraceConfigMuxer::FtraceConfigMuxer(FtraceProcfs* ftrace,
-                                     SystemWrapper* system,
                                      const ProtoTranslationTable* table)
-    : ftrace_(ftrace),
-      system_(system),
-      table_(table),
-      current_state_(),
-      configs_() {}
+    : ftrace_(ftrace), table_(table), current_state_(), configs_() {}
 FtraceConfigMuxer::~FtraceConfigMuxer() = default;
 
 FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
@@ -213,7 +209,7 @@ void FtraceConfigMuxer::EnableAtrace(const FtraceConfig& request) {
       args.push_back(app);
   }
 
-  if (system_->RunAtrace(args))
+  if (RunAtrace(args))
     current_state_.atrace_on = true;
 
   PERFETTO_DLOG("...done");
@@ -224,7 +220,7 @@ void FtraceConfigMuxer::DisableAtrace() {
 
   PERFETTO_DLOG("Stop atrace...");
 
-  if (system_->RunAtrace({"atrace", "--async_stop"}))
+  if (RunAtrace({"atrace", "--async_stop"}))
     current_state_.atrace_on = false;
 
   PERFETTO_DLOG("...done");

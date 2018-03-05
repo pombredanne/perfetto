@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "system_wrapper.h"
+#include "atrace_wrapper.h"
 
 #include <fcntl.h>
 #include <stdint.h>
@@ -29,6 +29,8 @@
 namespace perfetto {
 
 namespace {
+
+RunAtraceFunction g_run_atrace = nullptr;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 // Args should include "atrace" for argv[0].
@@ -56,18 +58,19 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
 }  // namespace
 
-SystemWrapper::SystemWrapper() = default;
-SystemWrapper::~SystemWrapper() = default;
-
-bool SystemWrapper::RunAtrace(
-
-    const std::vector<std::string>& args) {
+bool RunAtrace(const std::vector<std::string>& args) {
+  if (g_run_atrace)
+    return g_run_atrace(args);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   return ExecvAtrace(args);
 #else
   PERFETTO_LOG("Atrace only supported on Android.");
   return false;
 #endif
+}
+
+void SetRunAtraceForTesting(RunAtraceFunction f) {
+  g_run_atrace = f;
 }
 
 }  // namespace perfetto
