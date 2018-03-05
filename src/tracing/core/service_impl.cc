@@ -362,11 +362,12 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       trusted_packet.set_trusted_uid(
           /*page_owner*/ 0);  // TODO here before landing
       static constexpr size_t kTrustedBufSize = 16;
-      Slice* slice = packet.AllocateSlice(kTrustedBufSize);
+      Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
-          trusted_packet.SerializeToArray(slice->own_data(), kTrustedBufSize));
-      slice->size = static_cast<size_t>(trusted_packet.GetCachedSize());
-      PERFETTO_DCHECK(slice->size > 0 && slice->size <= kTrustedBufSize);
+          trusted_packet.SerializeToArray(slice.own_data(), kTrustedBufSize));
+      slice.size = static_cast<size_t>(trusted_packet.GetCachedSize());
+      PERFETTO_DCHECK(slice.size > 0 && slice.size <= kTrustedBufSize);
+      packet.AddSlice(std::move(slice));
 
       // Append the packet (inclusive of the trusted uid) to |packets|.
       packets_bytes += packet.size();
