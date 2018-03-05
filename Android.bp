@@ -2945,6 +2945,7 @@ cc_test {
     ":perfetto_src_protozero_testing_messages_lite_gen",
     ":perfetto_src_protozero_testing_messages_zero_gen",
     "src/base/android_task_runner.cc",
+    "src/base/lru_unittest.cc",
     "src/base/page_allocator.cc",
     "src/base/page_allocator_unittest.cc",
     "src/base/scoped_file_unittest.cc",

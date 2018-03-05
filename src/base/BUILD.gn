@@ -34,6 +34,17 @@ source_set("base") {
   }
 }
 
+# Here for completeness and in case we ever want to add a
+# lru.cc without changing the build structure.
+source_set("lru") {
+  deps = [
+    "../../gn:default_deps",
+  ]
+  public_deps = [
+    "../../include/perfetto/base:lru",
+  ]
+}
+
 # The "android_task_runner" should be depended on only by targets that
 # explicitly need it, as it pulls in a dependency on libandroid.so that in turn
 # pulls dozen of other .so(s).
@@ -88,6 +99,7 @@ source_set("base_unittests") {
   testonly = true
   deps = [
     ":base",
+    ":lru",
     ":test_support",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
@@ -96,6 +108,7 @@ source_set("base_unittests") {
     deps += [ ":android_task_runner" ]
   }
   sources = [
+    "lru_unittest.cc",
     "page_allocator_unittest.cc",
     "scoped_file_unittest.cc",
     "task_runner_unittest.cc",
