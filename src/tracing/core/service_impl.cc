@@ -105,6 +105,8 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
+
+  UpdateMemoryGuardrail();
   return std::move(endpoint);
 }
 
@@ -122,6 +124,7 @@ void ServiceImpl::DisconnectProducer(ProducerID id) {
   }
 
   producers_.erase(id);
+  UpdateMemoryGuardrail();
 }
 
 ServiceImpl::ProducerEndpointImpl* ServiceImpl::GetProducer(
@@ -433,6 +436,8 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
     buffers_.erase(buffer_id);
   }
   tracing_sessions_.erase(tsid);
+  UpdateMemoryGuardrail();
+
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
 }
@@ -593,6 +598,25 @@ ProducerID ServiceImpl::GetNextProducerID() {
   } while (producers_.count(last_producer_id_) || last_producer_id_ == 0);
   PERFETTO_DCHECK(last_producer_id_ > 0 && last_producer_id_ <= kMaxProducerID);
   return last_producer_id_;
+}
+
+void ServiceImpl::UpdateMemoryGuardrail() {
+  uint64_t total_buffer_bytes = 0;
+
+  // Sum up all the shared memory buffers.
+  for (const auto& id_to_producer : producers_) {
+    total_buffer_bytes += id_to_producer.second->shared_memory()->size();
+  }
+
+  // Sum up all the trace buffers.
+  for (const auto& id_to_buffer : buffers_) {
+    total_buffer_bytes += id_to_buffer.second.size;
+  }
+
+  // Set the guard rail to 32MB + the sum of all the buffers over a 30 second
+  // interval.
+  uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
+  base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

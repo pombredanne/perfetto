@@ -41,8 +41,11 @@ int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   }
 
   // Set the watchdog to kill the process if we average more than 32MB of
-  // memory over a 30 second window.
-  base::Watchdog::GetInstance()->SetMemoryLimit(32 * 1024 * 1024, 30 * 1000);
+  // memory or 75% CPU over a 30 second window.
+  base::Watchdog* watchdog = base::Watchdog::GetInstance();
+  watchdog->SetCpuLimit(75, 30 * 1000);
+  watchdog->SetMemoryLimit(32 * 1024 * 1024, 30 * 1000);
+  watchdog->Start();
 
   PERFETTO_LOG("Starting %s service", argv[0]);
   base::UnixTaskRunner task_runner;
