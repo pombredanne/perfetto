@@ -54,6 +54,7 @@ const char* kInodeFileMapSourceName = "com.google.perfetto.inode_file_map";
 //                    +--------------+
 //
 
+ProbesProducer::ProbesProducer() {}
 ProbesProducer::~ProbesProducer() = default;
 
 void ProbesProducer::OnConnect() {
@@ -98,7 +99,7 @@ void ProbesProducer::CreateDataSourceInstance(
   } else if (source_config.name() == kProcessStatsSourceName) {
     CreateProcessStatsDataSourceInstance(source_config);
   } else if (source_config.name() == kInodeFileMapSourceName) {
-    CreateInodeFileMapDataSourceInstance(source_config);
+    CreateInodeFileMapDataSourceInstance(id, source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
@@ -136,8 +137,8 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  auto delegate =
-      std::unique_ptr<SinkDelegate>(new SinkDelegate(std::move(trace_writer)));
+  auto delegate = std::unique_ptr<SinkDelegate>(
+      new SinkDelegate(task_runner_, std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
   if (!sink) {
     PERFETTO_ELOG("Failed to start tracing (maybe someone else is using it?)");
@@ -151,20 +152,18 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
 }
 
 void ProbesProducer::CreateInodeFileMapDataSourceInstance(
+    DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
+  PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
+               id, source_config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  auto trace_packet = trace_writer->NewTracePacket();
-  protos::pbzero::InodeFileMap* inode_file_map =
-      trace_packet->set_inode_file_map();
-  // TODO(azappone): Add block_device_id and mount_points
-  std::vector<uint64_t> inodes;  // TODO(azappone) Actually get inodes
-  for (const auto& inode : inodes) {
-    auto* entry_writer = inode_file_map->add_entries();
-    entry_writer->set_inode_number(inode);
-    // TODO(azappone): Add resolving filepaths and type
-  }
-  trace_packet->Finalize();
+  auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
+      new InodeFileMapDataSource(std::move(trace_writer)));
+  file_map_sources_.emplace(id, std::move(file_map_source));
+  if (source_config.trace_duration_ms() != 0)
+    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
+                               5000 + 2 * source_config.trace_duration_ms()));
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
@@ -206,6 +205,11 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
     PERFETTO_DCHECK(removed == 1);
     // Might return 0 if trace_duration_ms == 0.
     watchdogs_.erase(id);
+  } else if (instances_[id] == kInodeFileMapSourceName) {
+    size_t removed = file_map_sources_.erase(id);
+    PERFETTO_DCHECK(removed == 1);
+    // Might return 0 if trace_duration_ms == 0.
+    watchdogs_.erase(id);
   }
 }
 
@@ -236,19 +240,59 @@ void ProbesProducer::ResetConnectionBackoff() {
   connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
-ProbesProducer::SinkDelegate::SinkDelegate(std::unique_ptr<TraceWriter> writer)
-    : writer_(std::move(writer)) {}
+ProbesProducer::SinkDelegate::SinkDelegate(base::TaskRunner* task_runner,
+                                           std::unique_ptr<TraceWriter> writer)
+    : task_runner_(task_runner),
+      writer_(std::move(writer)),
+      weak_factory_(this) {}
 
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
 ProbesProducer::FtraceBundleHandle
+
 ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
   trace_packet_ = writer_->NewTracePacket();
   return FtraceBundleHandle(trace_packet_->set_ftrace_events());
 }
 
-void ProbesProducer::SinkDelegate::OnBundleComplete(size_t,
-                                                    FtraceBundleHandle) {
+void ProbesProducer::SinkDelegate::OnBundleComplete(
+    size_t,
+    FtraceBundleHandle,
+    const FtraceMetadata& metadata) {
+  trace_packet_->Finalize();
+  if (!metadata.inodes.empty()) {
+    auto weak_this = weak_factory_.GetWeakPtr();
+    auto inodes = metadata.inodes;
+    task_runner_->PostTask([weak_this, inodes] {
+      if (weak_this)
+        weak_this->OnInodes(inodes);
+    });
+  }
+}
+
+void ProbesProducer::SinkDelegate::OnInodes(
+    const std::vector<uint64_t>& inodes) {
+  PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
+}
+
+ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
+    std::unique_ptr<TraceWriter> writer)
+    : writer_(std::move(writer)) {}
+
+ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
+
+void ProbesProducer::InodeFileMapDataSource::WriteInodes(
+    const FtraceMetadata& metadata) {
+  trace_packet_ = writer_->NewTracePacket();
+  protos::pbzero::InodeFileMap* inode_file_map =
+      trace_packet_->set_inode_file_map();
+  // TODO(azappone): Add block_device_id and mount_points
+  auto inodes = metadata.inodes;
+  for (const auto& inode : inodes) {
+    auto* entry_writer = inode_file_map->add_entries();
+    entry_writer->set_inode_number(inode);
+    // TODO(azappone): Add resolving filepaths and type
+  }
   trace_packet_->Finalize();
 }
 
