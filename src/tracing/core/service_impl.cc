@@ -520,6 +520,13 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   ProducerEndpointImpl* producer = GetProducer(data_source.producer_id);
   PERFETTO_DCHECK(producer);
+  // An existing producer that is not ftrace could have registered itself as
+  // ftrace, we must not enable it in that case.
+  if (lockdown_mode_ && producer->uid_ != getuid()) {
+    PERFETTO_ELOG("Lockdown mode: not enabling producer %hu", producer->id_);
+
+    return;
+  }
   // TODO(primiano): match against |producer_name_filter| and add tests
   // for registration ordering (data sources vs consumers).
 
