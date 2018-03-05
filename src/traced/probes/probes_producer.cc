@@ -17,6 +17,7 @@
 #include "src/traced/probes/probes_producer.h"
 
 #include <stdio.h>
+#include <queue>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -30,6 +31,7 @@
 #include "src/process_stats/file_utils.h"
 #include "src/process_stats/procfs_utils.h"
 
+#include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "perfetto/trace/ps/process_tree.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -41,6 +43,7 @@ uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
 const char* kFtraceSourceName = "com.google.perfetto.ftrace";
 const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
+const char* kInodeFileMapSourceName = "com.google.perfetto.inode_file_map";
 
 }  // namespace.
 
@@ -70,6 +73,11 @@ void ProbesProducer::OnConnect() {
   process_stats_descriptor.set_name(kProcessStatsSourceName);
   endpoint_->RegisterDataSource(process_stats_descriptor,
                                 [](DataSourceInstanceID id) {});
+
+  DataSourceDescriptor inode_map_descriptor;
+  inode_map_descriptor.set_name(kInodeFileMapSourceName);
+  endpoint_->RegisterDataSource(inode_map_descriptor,
+                                [](DataSourceInstanceID id) {});
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -91,10 +99,19 @@ void ProbesProducer::CreateDataSourceInstance(
     CreateFtraceDataSourceInstance(id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
     CreateProcessStatsDataSourceInstance(source_config);
+  } else if (source_config.name() == kInodeFileMapSourceName) {
+    CreateInodeFileMapDataSourceInstance(id, source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
   }
+}
+
+void ProbesProducer::AddWatchdogsTimer(DataSourceInstanceID id,
+                                       const DataSourceConfig& source_config) {
+  if (source_config.trace_duration_ms() != 0)
+    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
+                               5000 + 2 * source_config.trace_duration_ms()));
 }
 
 void ProbesProducer::CreateFtraceDataSourceInstance(
@@ -137,9 +154,20 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   }
   delegate->sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
-  if (source_config.trace_duration_ms() != 0)
-    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               5000 + 2 * source_config.trace_duration_ms()));
+  AddWatchdogsTimer(id, source_config);
+}
+
+void ProbesProducer::CreateInodeFileMapDataSourceInstance(
+    DataSourceInstanceID id,
+    const DataSourceConfig& source_config) {
+  PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
+               id, source_config.target_buffer());
+  auto trace_writer = endpoint_->CreateTraceWriter(
+      static_cast<BufferID>(source_config.target_buffer()));
+  auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
+      new InodeFileMapDataSource(std::move(trace_writer)));
+  file_map_sources_.emplace(id, std::move(file_map_source));
+  AddWatchdogsTimer(id, source_config);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
@@ -180,6 +208,10 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
     size_t removed = delegates_.erase(id);
     PERFETTO_DCHECK(removed == 1);
     // Might return 0 if trace_duration_ms == 0.
+    watchdogs_.erase(id);
+  } else if (instances_[id] == kInodeFileMapSourceName) {
+    size_t removed = file_map_sources_.erase(id);
+    PERFETTO_DCHECK(removed == 1);
     watchdogs_.erase(id);
   }
 }
@@ -241,9 +273,80 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
   }
 }
 
+// Call as "/system/"
+void ProbesProducer::InodeFileMapDataSource::CreateSystemInodeMap(
+    const std::string& root_directory) {
+  std::queue<std::string> queue;
+  queue.push(root_directory);
+  while (!queue.empty()) {
+    struct dirent* entry;
+    std::string filepath = queue.front();
+    filepath += "/";
+    DIR* dir = opendir(queue.front().c_str());
+    queue.pop();
+    if (dir == nullptr)
+      continue;
+    while ((entry = readdir(dir)) != nullptr) {
+      std::string filename = entry->d_name;
+      if (filename.compare(".") == 0 || filename.compare("..") == 0)
+        continue;
+      uint64_t inode_number = entry->d_ino;
+      // TODO(azappone) get block device id
+      uint64_t block_device_id = 0;
+      protos::pbzero::InodeFileMap_Entry_Type type =
+          protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;  // Default
+      if (entry->d_type == DT_REG)
+        type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
+      else if (entry->d_type == DT_DIR)
+        type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
+      auto key = std::make_pair(block_device_id, inode_number);
+      std::string path = filepath + filename;
+      auto inode_data = system_inodes_.find(key);
+      // If key exists, there's multiple hard links so add this path to the list
+      if (inode_data != system_inodes_.end()) {
+        std::set<std::string> paths = inode_data->second.second;
+        if (paths.find(path) != paths.end())
+          paths.insert(filepath + filename);
+        system_inodes_.emplace(key, std::make_pair(type, paths));
+      } else {
+        std::set<std::string> paths{path};
+        system_inodes_.emplace(key, std::make_pair(type, paths));
+      }
+    }
+    closedir(dir);
+  }
+}
+
 void ProbesProducer::SinkDelegate::OnInodes(
     const std::vector<uint64_t>& inodes) {
   PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
+}
+
+ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
+    std::unique_ptr<TraceWriter> writer)
+    : writer_(std::move(writer)) {}
+
+ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
+
+void ProbesProducer::InodeFileMapDataSource::WriteInodes(
+    const FtraceMetadata& metadata) {
+  auto trace_packet = writer_->NewTracePacket();
+  auto inode_file_map = trace_packet->set_inode_file_map();
+  // TODO(azappone): Get block_device_id and mount_points & add to the proto
+  uint64_t block_device_id = 0;
+  auto inodes = metadata.inodes;
+  for (const auto& inode : inodes) {
+    auto* entry = inode_file_map->add_entries();
+    entry->set_inode_number(inode);
+    auto inode_data =
+        system_inodes_.find(std::make_pair(block_device_id, inode));
+    if (inode_data != system_inodes_.end()) {
+      entry->set_type(inode_data->second.first);
+      for (const auto& path : inode_data->second.second)
+        entry->add_paths(path.c_str());
+    }
+  }
+  trace_packet->Finalize();
 }
 
 }  // namespace perfetto
