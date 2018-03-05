@@ -44,9 +44,9 @@ struct FtraceMetadata {
 
   // A vector not a set to keep the writer_fast.
   std::vector<uint64_t> inodes;
-  std::vector<uint32_t> pids;
+  std::vector<int32_t> pids;
 
-  void AddPid(uint64_t);
+  void AddPid(int32_t);
   void Clear();
 };
 

@@ -484,7 +484,7 @@ bool CpuReader::ParseField(const Field& field,
       ReadInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
     case kPid32ToInt32:
-      ReadPid<uint32_t>(field_start, field_id, message, metadata);
+      ReadPid(field_start, field_id, message, metadata);
       return true;
   }
   // Not reached, for gcc.
