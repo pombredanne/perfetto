@@ -51,11 +51,6 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 
 class PerfettoCmd : public Consumer, RateLimiter::Delegate {
  public:
-  // De-serialize state from fd.
-  static bool ReadState(int in_fd, PerfettoCmdState* state);
-  // Serialize state to fd.
-  static bool WriteState(int out_fd, const PerfettoCmdState& state);
-
   int Main(int argc, char** argv);
   int PrintUsage(const char* argv0);
   void OnStopTraceTimer();
@@ -65,11 +60,6 @@ class PerfettoCmd : public Consumer, RateLimiter::Delegate {
   void OnConnect() override;
   void OnDisconnect() override;
   void OnTraceData(std::vector<TracePacket>, bool has_more) override;
-
-  // RateLimiter::Delegate implementation.
-  virtual bool LoadState(PerfettoCmdState* state) override;
-  virtual bool SaveState(const PerfettoCmdState& state) override;
-  virtual bool DoTrace(uint64_t* uploaded_bytes) override;
 
  private:
   bool OpenOutputFile();

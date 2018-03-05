@@ -17,76 +17,111 @@
 #include "rate_limiter.h"
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 
-RateLimiter::RateLimiter(Delegate* delegate) : delegate_(delegate) {}
+RateLimiter::RateLimiter(const std::string& path) : path_(path) {}
 RateLimiter::~RateLimiter() = default;
 
-int RateLimiter::Run(const Args& args) {
+bool RateLimiter::ShouldTrace(const Args& args) {
   // Not uploading?
   // -> We can just trace.
   if (!args.is_dropbox)
-    return delegate_->DoTrace() ? 0 : 1;
+    return true;
 
-  PerfettoCmdState state{};
-  bool loaded_state = delegate_->LoadState(&state);
+  bool loaded_state = LoadState(&state_);
 
   // Failed to load the state?
   // Current time is before either saved times?
   // Last saved trace time is before first saved trace time?
   // -> Try to save a clean state but don't trace.
-  if (!loaded_state || args.current_timestamp < state.first_trace_timestamp() ||
-      args.current_timestamp < state.last_trace_timestamp() ||
-      state.last_trace_timestamp() < state.first_trace_timestamp()) {
+  if (!loaded_state || args.current_timestamp < state_.first_trace_timestamp() ||
+      args.current_timestamp < state_.last_trace_timestamp() ||
+      state_.last_trace_timestamp() < state_.first_trace_timestamp()) {
     PerfettoCmdState output{};
-    delegate_->SaveState(output);
+    SaveState(output);
     PERFETTO_ELOG("Guardrail: guardrail state invalid.");
-    return 1;
+    return false;
   }
 
   // If we've uploaded in the last 5mins we shouldn't trace now.
   if ((args.current_timestamp - state.last_trace_timestamp()) < 60 * 5) {
     PERFETTO_ELOG("Guardrail: Uploaded to DropBox in the last 5mins.");
     if (!args.ignore_guardrails)
-      return 1;
+      return false;
   }
 
   // First trace was more than 24h ago? Reset state.
   if ((args.current_timestamp - state.first_trace_timestamp()) > 60 * 60 * 24) {
-    state.set_first_trace_timestamp(0);
-    state.set_last_trace_timestamp(0);
-    state.set_total_bytes_uploaded(0);
+    state_.set_first_trace_timestamp(0);
+    state_.set_last_trace_timestamp(0);
+    state_.set_total_bytes_uploaded(0);
   }
 
   // If we've uploaded more than 10mb in the last 24 hours we shouldn't trace
   // now.
-  if (state.total_bytes_uploaded() > 10 * 1024 * 1024) {
+  if (state_.total_bytes_uploaded() > 10 * 1024 * 1024) {
     PERFETTO_ELOG("Guardrail: Uploaded >10mb DropBox in the last 24h.");
     if (!args.ignore_guardrails)
-      return 1;
+      return false;
   }
+  
+  return true;
+}
 
-  uint64_t uploaded = 0;
-  bool success = delegate_->DoTrace(&uploaded);
-
+bool TraceDone(bool success, size_t bytes) {
   // Failed to upload? Don't update the state.
   if (!success)
-    return 1;
+    return false;
 
   // If the first trace timestamp is 0 (either because this is the
   // first time or because it was reset for being more than 24h ago).
   // -> We update it to the time of this trace.
-  if (state.first_trace_timestamp() == 0)
-    state.set_first_trace_timestamp(args.current_timestamp);
+  if (state_.first_trace_timestamp() == 0)
+    state_.set_first_trace_timestamp(args.current_timestamp);
   // Always updated the last trace timestamp.
-  state.set_last_trace_timestamp(args.current_timestamp);
+  state_.set_last_trace_timestamp(args.current_timestamp);
   // Add the amount we uploded to the running total.
-  state.set_total_bytes_uploaded(state.total_bytes_uploaded() + uploaded);
+  state_.set_total_bytes_uploaded(state.total_bytes_uploaded() + bytes);
 
-  bool save_success = delegate_->SaveState(state);
+  return SaveState(state_);
+}
 
-  return save_success ? 0 : 1;
+bool RateLimiter::LoadState(PerfettoCmdState* state) {
+  base::ScopedFile fd;
+  fd.reset(open(GetStatePath().c_str(), O_RDONLY | O_CREAT, 0600));
+  return ReadState(fd.get(), state);
+}
+
+bool RateLimiter::SaveState(const PerfettoCmdState& state) {
+  base::ScopedFile fd;
+  fd.reset(open(GetStatePath().c_str(), O_WRONLY | O_CREAT, 0600));
+  return WriteState(fd.get(), state);
+}
+
+// static
+bool RateLimiter::ReadState(int in_fd, PerfettoCmdState* state) {
+  if (in_fd == -1)
+    return false;
+  char buf[1024];
+  ssize_t bytes = read(in_fd, &buf, sizeof(buf));
+  if (bytes < 0)
+    return false;
+  return state->ParseFromArray(&buf, bytes);
+}
+
+// static
+bool RateLimiter::WriteState(int out_fd, const PerfettoCmdState& state) {
+  if (out_fd == -1)
+    return false;
+  char buf[1024];
+  size_t size = state.ByteSize();
+  if (!state.SerializeToArray(&buf, size))
+    return false;
+
+  ssize_t written = write(out_fd, &buf, size);
+  return written >= 0 && static_cast<size_t>(written) == size;
 }
 
 }  // namespace perfetto

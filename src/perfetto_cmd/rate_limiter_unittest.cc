@@ -28,6 +28,8 @@ namespace perfetto {
 
 namespace {
 
+using base::ScopedFile;
+
 class DelegateMock : public RateLimiter::Delegate {
  public:
   DelegateMock() {
@@ -68,6 +70,34 @@ class DelegateMock : public RateLimiter::Delegate {
   MOCK_METHOD1(SaveState, bool(const PerfettoCmdState&));
   MOCK_METHOD1(DoTrace, bool(uint64_t* uploaded_bytes));
 };
+
+std::pair<ScopedFile, ScopedFile> CreatePipe() {
+  int pipe_fds[2];
+  PERFETTO_CHECK(pipe(pipe_fds) == 0);
+  ScopedFile read_fd(pipe_fds[0]);
+  ScopedFile write_fd(pipe_fds[1]);
+  return std::pair<ScopedFile, ScopedFile>(std::move(read_fd),
+                                           std::move(write_fd));
+}
+
+TEST(RateLimiterTest, RoundTripState) {
+  auto a_pipe = CreatePipe();
+  PerfettoCmdState input;
+  PerfettoCmdState output;
+  input.set_total_bytes_uploaded(42);
+  ASSERT_TRUE(RateLimiter::WriteState(*a_pipe.second, input));
+  ASSERT_TRUE(RateLimiter::ReadState(*a_pipe.first, &output));
+  ASSERT_EQ(output.total_bytes_uploaded(), 42u);
+}
+
+TEST(RateLimiterTest, LoadFromEmpty) {
+  auto a_pipe = CreatePipe();
+  PerfettoCmdState output;
+  a_pipe.second.reset();
+  ASSERT_TRUE(RateLimiter::ReadState(*a_pipe.first, &output));
+  ASSERT_EQ(output.total_bytes_uploaded(), 0u);
+}
+
 
 TEST(RateLimiterTest, NotDropBox) {
   StrictMock<DelegateMock> delegate;

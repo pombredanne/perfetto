@@ -193,23 +193,20 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_DLOG("Continuing in background");
   }
 
-  RateLimiter limiter(this);
+  RateLimiter limiter(std::string(kTempDropBoxTraceDir) + "/.guardraildata");
   RateLimiter::Args args{};
   args.is_dropbox = !dropbox_tag_.empty();
   args.current_timestamp = GetTimestamp();
   args.ignore_guardrails = ignore_guardrails;
-  return limiter.Run(args);
-}
+  if (!limiter.ShouldTrace(args))
+    return 1;
 
-bool PerfettoCmd::DoTrace(uint64_t* bytes_uploaded) {
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
   task_runner_.Run();
 
   // TODO(hjd): Actually set bytes_uploaded.
-  if (bytes_uploaded && did_process_full_trace_)
-    *bytes_uploaded = 0;
-  return did_process_full_trace_;
+  return limiter.TraceDone(did_process_full_trace_, 0) ? 0 : 1;
 }
 
 void PerfettoCmd::OnConnect() {
@@ -324,51 +321,11 @@ bool PerfettoCmd::OpenOutputFile() {
   return true;
 }
 
-bool PerfettoCmd::LoadState(PerfettoCmdState* state) {
-  base::ScopedFile fd;
-  fd.reset(open(GetStatePath().c_str(), O_RDONLY | O_CREAT, 0600));
-  return ReadState(fd.get(), state);
-}
-
-bool PerfettoCmd::SaveState(const PerfettoCmdState& state) {
-  base::ScopedFile fd;
-  fd.reset(open(GetStatePath().c_str(), O_WRONLY | O_CREAT, 0600));
-  return WriteState(fd.get(), state);
-}
-
 uint64_t PerfettoCmd::GetTimestamp() {
   time_t now = time(nullptr);
   if (now < 0)
     return 0;
   return now;
-}
-
-std::string PerfettoCmd::GetStatePath() {
-  return std::string(kTempDropBoxTraceDir) + "/.guardraildata";
-}
-
-// static
-bool PerfettoCmd::ReadState(int in_fd, PerfettoCmdState* state) {
-  if (in_fd == -1)
-    return false;
-  char buf[1024];
-  ssize_t bytes = read(in_fd, &buf, sizeof(buf));
-  if (bytes < 0)
-    return false;
-  return state->ParseFromArray(&buf, bytes);
-}
-
-// static
-bool PerfettoCmd::WriteState(int out_fd, const PerfettoCmdState& state) {
-  if (out_fd == -1)
-    return false;
-  char buf[1024];
-  size_t size = state.ByteSize();
-  if (!state.SerializeToArray(&buf, size))
-    return false;
-
-  ssize_t written = write(out_fd, &buf, size);
-  return written >= 0 && static_cast<size_t>(written) == size;
 }
 
 int __attribute__((visibility("default")))

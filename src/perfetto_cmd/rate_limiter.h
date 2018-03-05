@@ -29,21 +29,22 @@ class RateLimiter {
     uint64_t current_timestamp = 0;
   };
 
-  class Delegate {
-   public:
-    virtual ~Delegate() = default;
-    virtual bool LoadState(PerfettoCmdState* state) = 0;
-    virtual bool SaveState(const PerfettoCmdState& state) = 0;
-    virtual bool DoTrace(uint64_t* bytes = nullptr) = 0;
-  };
-
-  RateLimiter(Delegate* delegate);
+  RateLimiter(const std::string& path);
   virtual ~RateLimiter();
 
-  int Run(const Args& args);
+  bool ShouldTrace(const Args& args);
+  bool TraceDone(bool success, size_t bytes);
 
- private:
-  Delegate* delegate_;
+  virtual bool LoadState(PerfettoCmdState* state);
+  virtual bool SaveState(const PerfettoCmdState& state);
+
+  // De-serialize state from fd.
+  static bool ReadState(int in_fd, PerfettoCmdState* state);
+  // Serialize state to fd.
+  static bool WriteState(int out_fd, const PerfettoCmdState& state);
+
+  PerfettoCmdState state_;
+  std::string path_;
 };
 
 }  // namespace perfetto
