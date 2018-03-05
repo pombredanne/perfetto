@@ -40,6 +40,7 @@ TEST(LRUTest, Overflow) {
   cache.get("foo");
   cache.get("qux");
   cache.insert("spam", "eggs");
+  // foo is the LRU and should be evicted.
   EXPECT_EQ(cache.get("foo"), nullptr);
   EXPECT_EQ(*cache.get("qux"), "asd");
   EXPECT_EQ(*cache.get("spam"), "eggs");
