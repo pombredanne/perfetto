@@ -17,10 +17,11 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-package perfetto.protos;
+package perfetto;
 
 message PerfettoCmdState {
   optional uint64 first_trace_timestamp = 1;
   optional uint64 last_trace_timestamp = 2;
+  // Total of bytes uploaded since first_trace_timestamp.
   optional uint64 total_bytes_uploaded = 3;
 }

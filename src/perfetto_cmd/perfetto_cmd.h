@@ -27,8 +27,9 @@
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
+#include "rate_limiter.h"
 
-#include "perfetto/perfetto_cmd/perfetto_cmd_state.pb.h"
+#include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
 
 #if defined(PERFETTO_OS_ANDROID)
 #include "perfetto/base/android_task_runner.h"
@@ -48,35 +49,7 @@ using PlatformTaskRunner = base::AndroidTaskRunner;
 using PlatformTaskRunner = base::UnixTaskRunner;
 #endif
 
-using perfetto::protos::PerfettoCmdState;
-
-class PerfettoCmdLogic {
- public:
-  struct Args {
-    bool is_dropbox = false;
-    bool ignore_guardrails = false;
-    uint64_t current_timestamp = 0;
-  };
-
-  class Delegate {
-   public:
-    virtual ~Delegate() = default;
-    virtual bool LoadState(PerfettoCmdState* state) = 0;
-    virtual bool SaveState(const PerfettoCmdState& state) = 0;
-    virtual bool DoTrace(uint64_t* bytes = nullptr) = 0;
-  };
-
-  PerfettoCmdLogic(Delegate* delegate);
-  virtual ~PerfettoCmdLogic();
-
-  //
-  int Run(const Args& args);
-
- private:
-  Delegate* delegate_;
-};
-
-class PerfettoCmd : public Consumer, PerfettoCmdLogic::Delegate {
+class PerfettoCmd : public Consumer, RateLimiter::Delegate {
  public:
   // De-serialize state from fd.
   static bool ReadState(int in_fd, PerfettoCmdState* state);
@@ -93,7 +66,7 @@ class PerfettoCmd : public Consumer, PerfettoCmdLogic::Delegate {
   void OnDisconnect() override;
   void OnTraceData(std::vector<TracePacket>, bool has_more) override;
 
-  // PerfettoCmdLogic::Delegate implementation.
+  // RateLimiter::Delegate implementation.
   virtual bool LoadState(PerfettoCmdState* state) override;
   virtual bool SaveState(const PerfettoCmdState& state) override;
   virtual bool DoTrace(uint64_t* uploaded_bytes) override;
