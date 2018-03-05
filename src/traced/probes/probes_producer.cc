@@ -106,6 +106,13 @@ void ProbesProducer::CreateDataSourceInstance(
   }
 }
 
+void ProbesProducer::addWatchdogsTimer(DataSourceInstanceID id,
+                                       const DataSourceConfig& source_config) {
+  if (source_config.trace_duration_ms() != 0)
+    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
+                               5000 + 2 * source_config.trace_duration_ms()));
+}
+
 void ProbesProducer::CreateFtraceDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
@@ -146,9 +153,7 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   }
   delegate->sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
-  if (source_config.trace_duration_ms() != 0)
-    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               5000 + 2 * source_config.trace_duration_ms()));
+  addWatchdogsTimer(id, source_config);
 }
 
 void ProbesProducer::CreateInodeFileMapDataSourceInstance(
@@ -161,9 +166,7 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
   auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
       new InodeFileMapDataSource(std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
-  if (source_config.trace_duration_ms() != 0)
-    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               5000 + 2 * source_config.trace_duration_ms()));
+  addWatchdogsTimer(id, source_config);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
@@ -282,17 +285,16 @@ ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
 
 void ProbesProducer::InodeFileMapDataSource::WriteInodes(
     const FtraceMetadata& metadata) {
-  trace_packet_ = writer_->NewTracePacket();
-  protos::pbzero::InodeFileMap* inode_file_map =
-      trace_packet_->set_inode_file_map();
+  auto trace_packet = writer_->NewTracePacket();
+  auto inode_file_map = trace_packet->set_inode_file_map();
   // TODO(azappone): Add block_device_id and mount_points
   auto inodes = metadata.inodes;
   for (const auto& inode : inodes) {
-    auto* entry_writer = inode_file_map->add_entries();
-    entry_writer->set_inode_number(inode);
+    auto* entry = inode_file_map->add_entries();
+    entry->set_inode_number(inode);
     // TODO(azappone): Add resolving filepaths and type
   }
-  trace_packet_->Finalize();
+  trace_packet->Finalize();
 }
 
 }  // namespace perfetto

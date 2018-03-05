@@ -51,6 +51,8 @@ class ProbesProducer : public Producer {
       DataSourceInstanceID id,
       const DataSourceConfig& source_config);
 
+  void addWatchdogsTimer(DataSourceInstanceID id,
+                         const DataSourceConfig& source_config);
   void OnMetadata(const FtraceMetadata& metadata);
 
  private:
@@ -93,8 +95,6 @@ class ProbesProducer : public Producer {
 
    private:
     std::unique_ptr<TraceWriter> writer_;
-
-    TraceWriter::TracePacketHandle trace_packet_;
   };
 
   enum State {
