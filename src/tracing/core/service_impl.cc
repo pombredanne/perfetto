@@ -524,7 +524,6 @@ void ServiceImpl::CreateDataSourceInstance(
   // ftrace, we must not enable it in that case.
   if (lockdown_mode_ && producer->uid_ != getuid()) {
     PERFETTO_ELOG("Lockdown mode: not enabling producer %hu", producer->id_);
-
     return;
   }
   // TODO(primiano): match against |producer_name_filter| and add tests
