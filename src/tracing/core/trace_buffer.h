@@ -32,6 +32,8 @@
 
 namespace perfetto {
 
+class TracePacket;
+
 // The main buffer, owned by the tracing service, where all the trace data is
 // ultimately stored into. The service will own several instances of this class,
 // at least one per active consumer (as defined in the |buffers| section of
@@ -193,9 +195,9 @@ class TraceBuffez {
   // can be read at this point.
   // This function returns only complete packets. Specifically:
   // When there is at least one complete packet in the buffer, this function
-  // returns true and populates the |slices| argument with the boundaries of
+  // returns true and populates the TracePacket argument with the boundaries of
   // each fragment for one packet.
-  // The output |slices|.size() will be >= 1 when this function returns true.
+  // TracePacket will have at least one slice when this function returns true.
   // When there are no whole packets eligible to read (e.g. we are still missing
   // fragments) this function returns false.
   // This function guarantees also that packets for a given
@@ -210,7 +212,7 @@ class TraceBuffez {
   //   P1, P4, P7, P2, P3, P5, P8, P9, P6
   // But the following is guaranteed to NOT happen:
   //   P1, P5, P7, P4 (P4 cannot come after P5)
-  bool ReadNextTracePacket(Slices* slices);
+  bool ReadNextTracePacket(TracePacket*);
 
   const Stats& stats() const { return stats_; }
 
@@ -421,11 +423,12 @@ class TraceBuffez {
   void AddPaddingRecord(size_t);
 
   // Look for contiguous fragment of the same packet starting from |read_iter_|.
-  // If a contiguous packet is found, all the fragments are pushed into |slices|
-  // and the function returns kSucceededReturnSlices. If not, the function
-  // returns either kFailedMoveToNextSequence or kFailedStayOnSameSequence,
-  // telling the caller to continue looking for packets.
-  ReadAheadResult ReadAhead(Slices* slices);
+  // If a contiguous packet is found, all the fragments are pushed into
+  // TracePacket and the function returns kSucceededReturnSlices. If not, the
+  // function returns either kFailedMoveToNextSequence or
+  // kFailedStayOnSameSequence, telling the caller to continue looking for
+  // packets.
+  ReadAheadResult ReadAhead(TracePacket*);
 
   // Deletes (by marking the record invalid and removing form the index) all
   // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
@@ -443,11 +446,10 @@ class TraceBuffez {
   size_t DeleteNextChunksFor(size_t bytes_to_clear);
 
   // Decodes the boundaries of the next packet (or a fragment) pointed by
-  // ChunkMeta and pushes that into |Slices*|. It also increments the
+  // ChunkMeta and pushes that into |TracePacket|. It also increments the
   // |num_fragments_read| counter.
-  // The Slices pointer can be nullptr, in which case the read state is still
-  // advanced.
-  bool ReadNextPacketInChunk(ChunkMeta*, Slices*);
+  // TracePacket can be nullptr, in which case the read state is still advanced.
+  bool ReadNextPacketInChunk(ChunkMeta*, TracePacket*);
 
   void DcheckIsAlignedAndWithinBounds(const uint8_t* ptr) const {
     PERFETTO_DCHECK(ptr >= begin() && ptr <= end() - sizeof(ChunkRecord));

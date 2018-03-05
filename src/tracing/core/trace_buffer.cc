@@ -22,13 +22,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
-
-// TODO(primiano): we need some flag to figure out if the packets on the
-// boundary require patching or have already been patched. The current
-// implementation considers all packets eligible to be read once we have all the
-// chunks that compose them.
-
-// TODO(primiano): copy over skyostil@'s trusted_uid logic.
+#include "perfetto/tracing/core/trace_packet.h"
 
 #define TRACE_BUFFER_VERBOSE_LOGGING() 0  // Set to 1 when debugging unittests.
 #if TRACE_BUFFER_VERBOSE_LOGGING()
@@ -381,7 +375,7 @@ void TraceBuffez::SequenceIterator::MoveNext() {
     cur = seq_begin;
 }
 
-bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
+bool TraceBuffez::ReadNextTracePacket(TracePacket* packet) {
   // Note: MoveNext() moves only within the next chunk within the same
   // {ProducerID, WriterID} sequence. Here we want to:
   // - return the next patched+complete packet in the current sequence, if any.
@@ -473,7 +467,7 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
 
       if (action == kReadOnePacket) {
         // The easy peasy case B.
-        if (PERFETTO_LIKELY(ReadNextPacketInChunk(&chunk_meta, slices)))
+        if (PERFETTO_LIKELY(ReadNextPacketInChunk(&chunk_meta, packet)))
           return true;
 
         // In extremely rare cases (producer bugged / malicious) the chunk might
@@ -483,7 +477,7 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
       }
 
       PERFETTO_DCHECK(action == kTryReadAhead);
-      ReadAheadResult ra_res = ReadAhead(slices);
+      ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
         stats_.fragment_readahead_successes++;
         return true;
@@ -511,7 +505,7 @@ bool TraceBuffez::ReadNextTracePacket(Slices* slices) {
   }    // for(;;MoveNext()) [iterate over chunks].
 }
 
-TraceBuffez::ReadAheadResult TraceBuffez::ReadAhead(Slices* slices) {
+TraceBuffez::ReadAheadResult TraceBuffez::ReadAhead(TracePacket* packet) {
   static_assert(static_cast<ChunkID>(kMaxChunkID + 1) == 0,
                 "relying on kMaxChunkID to wrap naturally");
   TRACE_BUFFER_DLOG(" readahead start @ chunk %u", read_iter_.chunk_id());
@@ -563,7 +557,7 @@ TraceBuffez::ReadAheadResult TraceBuffez::ReadAhead(Slices* slices) {
         // In the unlikely case of a corrupted packet, invalidate the all
         // stitching and move on to the next chunk in the same sequence,
         // if any.
-        packet_corruption |= !ReadNextPacketInChunk(&*read_iter_, slices);
+        packet_corruption |= !ReadNextPacketInChunk(&*read_iter_, packet);
       }
       if (read_iter_.cur == it.cur)
         break;
@@ -572,7 +566,7 @@ TraceBuffez::ReadAheadResult TraceBuffez::ReadAhead(Slices* slices) {
     PERFETTO_DCHECK(read_iter_.cur == it.cur);
 
     if (PERFETTO_UNLIKELY(packet_corruption)) {
-      slices->clear();
+      *packet = TracePacket();  // clear.
       return ReadAheadResult::kFailedStayOnSameSequence;
     }
 
@@ -581,7 +575,8 @@ TraceBuffez::ReadAheadResult TraceBuffez::ReadAhead(Slices* slices) {
   return ReadAheadResult::kFailedMoveToNextSequence;
 }
 
-bool TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta, Slices* slices) {
+bool TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
+                                        TracePacket* packet) {
   PERFETTO_DCHECK(chunk_meta->num_fragments_read < chunk_meta->num_fragments);
   // TODO DCHECK for chunks that are still awaiting patching.
 
@@ -616,8 +611,8 @@ bool TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta, Slices* slices) {
   if (PERFETTO_UNLIKELY(packet_size == 0))
     return false;
 
-  if (PERFETTO_LIKELY(slices))
-    slices->emplace_back(packet_data, static_cast<size_t>(packet_size));
+  if (PERFETTO_LIKELY(packet))
+    packet->AddSlice(Slice(packet_data, static_cast<size_t>(packet_size)));
 
   return true;
 }

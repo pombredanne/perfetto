@@ -344,11 +344,13 @@ class SharedMemoryABI {
     // Size, including Chunk header.
     size_t size() const { return size_; }
 
+    // Begin of the first packet (or packet fragment).
     uint8_t* payload_begin() const { return begin_ + sizeof(ChunkHeader); }
     size_t payload_size() const { return size_ - sizeof(ChunkHeader); }
 
     bool is_valid() const { return begin_ && size_; }
 
+    // Index of the chunk within the page [0..13] (13 comnes from kPageDiv14).
     uint8_t chunk_idx() const { return chunk_idx_; }
 
     ChunkHeader* header() { return reinterpret_cast<ChunkHeader*>(begin_); }
@@ -488,7 +490,7 @@ class SharedMemoryABI {
     return ReleaseChunk(std::move(chunk), kChunkComplete);
   }
 
-  // Puts a chunk into the kChunkFree state.  Returns the page index.
+  // Puts a chunk into the kChunkFree state. Returns the page index.
   size_t ReleaseChunkAsFree(Chunk chunk) {
     return ReleaseChunk(std::move(chunk), kChunkFree);
   }

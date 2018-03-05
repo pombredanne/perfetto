@@ -24,6 +24,7 @@
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "perfetto/tracing/core/trace_packet.h"
 #include "src/tracing/core/trace_buffer.h"
 #include "src/tracing/test/fake_packet.h"
 
@@ -69,10 +70,10 @@ class TraceBufferTest : public testing::Test {
 
   std::vector<FakePacketFragment> ReadPacket() {
     std::vector<FakePacketFragment> fragments;
-    Slices slices;
-    if (!trace_buffer_->ReadNextTracePacket(&slices))
+    TracePacket packet;
+    if (!trace_buffer_->ReadNextTracePacket(&packet))
       return fragments;
-    for (const Slice& slice : slices)
+    for (const Slice& slice : packet)
       fragments.emplace_back(slice.start, slice.size);
     return fragments;
   }

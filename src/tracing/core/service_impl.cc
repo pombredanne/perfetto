@@ -318,37 +318,40 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
         "Consumer invoked ReadBuffers() but no tracing session is active");
     return;  // TODO(primiano): signal failure?
   }
-  auto weak_consumer = consumer->GetWeakPtr();
-  bool did_send_eof = false;
+  std::vector<TracePacket> packets;
+  size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
+
+  // This is a rough threshold to determine how to split packets within each
+  // IPC. This is not an upper bound, we just stop accumulating packets and send
+  // an IPC out every time we cross this threshold (i.e. all IPCs % last one
+  // will be >= this).
+  static constexpr size_t kMaxPacketBytesPerRead = 4096;
+  bool did_hit_threshold = false;
+
   // TODO(primiano): Extend the ReadBuffers API to allow reading only some
   // buffers, not all of them in one go.
-  for (size_t buf_idx = 0; buf_idx < tracing_session->num_buffers();
+  for (size_t buf_idx = 0;
+       buf_idx < tracing_session->num_buffers() && !did_hit_threshold;
        buf_idx++) {
-    const bool is_last_buffer = buf_idx == tracing_session->num_buffers() - 1;
     auto tbuf_iter = buffers_.find(tracing_session->buffers_index[buf_idx]);
     if (tbuf_iter == buffers_.end()) {
       PERFETTO_DCHECK(false);
       continue;
     }
     TraceBuffez& tbuf = *tbuf_iter->second;
-    // shared_ptr is really a workardound for the fact that is not possible
-    // to std::move() move-only types in labmdas until C++17.
-    std::shared_ptr<std::vector<TracePacket>> packets(
-        new std::vector<TracePacket>());
     tbuf.BeginRead();
-    for (;;) {
+    while (!did_hit_threshold) {
       TracePacket packet;
-      Slices* slices = packet.mutable_slices();
-      if (!tbuf.ReadNextTracePacket(slices))
+      if (!tbuf.ReadNextTracePacket(&packet))
         break;
-      PERFETTO_DCHECK(!slices->empty());
-      if (!PacketStreamValidator::Validate(*slices)) {
+      PERFETTO_DCHECK(packet.size() > 0);
+      if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
         continue;
       }
 
-      // Append a chunk with the trusted UID of the producer. This can't
-      // be spoofed because above we validated that the existing chunks
+      // Append a slice with the trusted UID of the producer. This can't
+      // be spoofed because above we validated that the existing slices
       // don't contain any trusted UID fields. For added safety we append
       // instead of prepending because according to protobuf semantics, if
       // the same field is encountered multiple times the last instance
@@ -358,31 +361,33 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       protos::TrustedPacket trusted_packet;
       trusted_packet.set_trusted_uid(
           /*page_owner*/ 0);  // TODO here before landing
-      uint8_t* trusted_buf = nullptr;
       static constexpr size_t kTrustedBufSize = 16;
-      slices->emplace_back(Slice::Allocate(kTrustedBufSize, &trusted_buf));
+      Slice* slice = packet.AllocateSlice(kTrustedBufSize);
       PERFETTO_CHECK(
-          trusted_packet.SerializeToArray(trusted_buf, kTrustedBufSize));
+          trusted_packet.SerializeToArray(slice->own_data(), kTrustedBufSize));
+      slice->size = static_cast<size_t>(trusted_packet.GetCachedSize());
+      PERFETTO_DCHECK(slice->size > 0 && slice->size <= kTrustedBufSize);
 
-      packets->emplace_back(std::move(packet));
+      // Append the packet (inclusive of the trusted uid) to |packets|.
+      packets_bytes += packet.size();
+      did_hit_threshold = packets_bytes >= kMaxPacketBytesPerRead;
+      packets.emplace_back(std::move(packet));
     }  // for(packets...)
+  }    // for(buffers...)
 
-    task_runner_->PostTask([weak_consumer, packets, is_last_buffer]() {
-      if (weak_consumer)
-        weak_consumer->consumer_->OnTraceData(std::move(*packets),
-                                              /*has_more=*/!is_last_buffer);
-    });
-    PERFETTO_DCHECK(!did_send_eof);
-    did_send_eof |= is_last_buffer;
-  }  // for(buffers...)
-
-  if (!did_send_eof) {
-    task_runner_->PostTask([weak_consumer]() {
-      if (weak_consumer)
-        weak_consumer->consumer_->OnTraceData(std::vector<TracePacket>(),
-                                              /*has_more=*/false);
+  const bool has_more = did_hit_threshold;
+  if (has_more) {
+    auto weak_consumer = consumer->GetWeakPtr();
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostTask([weak_this, weak_consumer, tsid] {
+      if (!weak_this || !weak_consumer)
+        return;
+      weak_this->ReadBuffers(tsid, weak_consumer.get());
     });
   }
+
+  // Keep this as tail call, just in case the consumer re-enters.
+  consumer->consumer_->OnTraceData(std::move(packets), has_more);
 }
 
 void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
@@ -510,6 +515,9 @@ void ServiceImpl::CreateDataSourceInstance(
   producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
 }
 
+// Note: all the fields % |producer_id_trusted| are untrusted, as in, the
+// Producer might be lying / returning garbage contents. |src| and |size| can
+// be trusted in terms of being a valid pointer, but not the contents.
 void ServiceImpl::CommitData(ProducerID producer_id_trusted,
                              WriterID writer_id,
                              ChunkID chunk_id,
