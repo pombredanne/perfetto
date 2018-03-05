@@ -42,18 +42,16 @@ class LRUCache {
  public:
   explicit LRUCache(size_t capacity) : capacity_(capacity) {}
 
-  const V* get(const K k) {
+  const V* get(const K& k) {
     const auto& it = item_map_.find(&k);
     if (it == item_map_.end()) {
       return nullptr;
     }
     auto list_entry = it->second;
     // Bump this item to the front of the cache.
-    // We can borrow the existing item's value because insert
+    // We can borrow the existing item's key and value because insert
     // does not care about it.
-    // We can't borrow the existing element's key because a pointer
-    // to it is contained withint item_map_.
-    insert(it, std::move(k), std::move(list_entry->second));
+    insert(it, std::move(list_entry->first), std::move(list_entry->second));
     return &item_list_.cbegin()->second;
   }
 
