@@ -51,8 +51,6 @@ class ProbesProducer : public Producer {
       DataSourceInstanceID id,
       const DataSourceConfig& source_config);
 
-  void addWatchdogsTimer(DataSourceInstanceID id,
-                         const DataSourceConfig& source_config);
   void OnMetadata(const FtraceMetadata& metadata);
 
  private:
@@ -107,6 +105,8 @@ class ProbesProducer : public Producer {
   void Connect();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
+  void AddWatchdogsTimer(DataSourceInstanceID id,
+                         const DataSourceConfig& source_config);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;

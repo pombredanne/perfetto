@@ -106,7 +106,7 @@ void ProbesProducer::CreateDataSourceInstance(
   }
 }
 
-void ProbesProducer::addWatchdogsTimer(DataSourceInstanceID id,
+void ProbesProducer::AddWatchdogsTimer(DataSourceInstanceID id,
                                        const DataSourceConfig& source_config) {
   if (source_config.trace_duration_ms() != 0)
     watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
@@ -153,7 +153,7 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   }
   delegate->sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
-  addWatchdogsTimer(id, source_config);
+  AddWatchdogsTimer(id, source_config);
 }
 
 void ProbesProducer::CreateInodeFileMapDataSourceInstance(
@@ -166,7 +166,7 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
   auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
       new InodeFileMapDataSource(std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
-  addWatchdogsTimer(id, source_config);
+  AddWatchdogsTimer(id, source_config);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
