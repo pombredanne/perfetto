@@ -32,7 +32,7 @@ class PtrLess {
 }  // namespace
 
 /*
- * LRUCache is a memory efficient LRU map.
+ * LRUCache is a memory efficient LRU map for moveable types.
  *
  * It does not store the value of the key twice but rather
  * stores a pointer in the key of the map.
