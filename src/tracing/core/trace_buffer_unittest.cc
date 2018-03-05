@@ -899,7 +899,9 @@ TEST_F(TraceBufferTest, Malicious_PatchOutOfBounds) {
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
       .AddPacket(16, 'b')
       .CopyIntoTraceBuffer();
-  size_t offsets[] = {13, 16, size_t(-17), size_t(-32), size_t(-1024)};
+  size_t offsets[] = {13,          16,          size_t(-4),
+                      size_t(-8),  size_t(-12), size_t(-16),
+                      size_t(-20), size_t(-32), size_t(-1024)};
   for (size_t offset : offsets) {
     ASSERT_FALSE(TryPatchChunkContents(ProducerID(1), WriterID(1), ChunkID(1),
                                        {{offset, {{'0', 'd', 'a', 'y'}}}}));

@@ -139,7 +139,7 @@ class TraceBuffez {
     // TODO(primiano): add bytes_lost_for_padding.
   };
 
-  // Argument for out-of-band patches applied through MaybePatchChunkContents().
+  // Argument for out-of-band patches applied through TryPatchChunkContents().
   struct Patch {
     // From SharedMemoryABI::kPacketHeaderSize.
     static constexpr size_t kSize = 4;
@@ -167,7 +167,7 @@ class TraceBuffez {
                           uint8_t chunk_flags,
                           const uint8_t* src,
                           size_t size);
-  // Applies a batch of |patches| at to the given chunk, if the given chunk is
+  // Applies a batch of |patches| to the given chunk, if the given chunk is
   // still in the buffer. Does nothing if the given ChunkID is gone.
   // Returns true if the chunk has been found and patched, false otherwise.
   // |other_patches_pending| is used to determine whether this is the only

@@ -710,14 +710,12 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     if (!shmem_abi_.is_page_complete(page_idx))
       continue;
 
-    // TODO(primiano): implement per-chunk move.
+    // TODO(primiano): implement per-chunk move and replace
+    // ReleaseAllChunksAsFree() with just ReleaseChunk.
     PERFETTO_DCHECK(chunks.chunk() == 0);
 
     if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))
       continue;
-
-    // TODO(fmayer): we should start collecting individual chunks from non fully
-    // complete pages after a while.
 
     BufferID target_buffer = static_cast<BufferID>(chunks.target_buffer());
     service_->CopyProducerPageIntoLogBuffer(id_, target_buffer,
