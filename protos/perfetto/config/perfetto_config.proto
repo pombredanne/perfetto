@@ -133,8 +133,14 @@ message TraceConfig {
   // by statsd.
   optional bool enable_extra_guardrails = 4;
 
-  // Reject producers that are not running as nobody.
-  optional bool enable_lockdown_mode = 5;
+  enum LockdownModeOperation {
+    LOCKDOWN_UNCHANGED = 0;
+    LOCKDOWN_CLEAR = 1;
+    LOCKDOWN_SET = 2;
+  }
+  // Reject producers that are not running under the same UID as the tracing
+  // service.
+  optional LockdownModeOperation lockdown_mode = 5;
 }
 
 // End of protos/perfetto/config/trace_config.proto

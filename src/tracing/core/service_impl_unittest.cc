@@ -204,7 +204,8 @@ TEST_F(ServiceImplTest, LockdownMode) {
   EXPECT_CALL(mock_producer_nobody, CreateDataSourceInstance(_, _));
   EXPECT_CALL(mock_producer_nobody, TearDownDataSourceInstance(_));
   TraceConfig trace_config;
-  trace_config.set_enable_lockdown_mode(true);
+  trace_config.set_lockdown_mode(
+      TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("foo");
