@@ -110,19 +110,19 @@ class CpuReader {
   }
 
   template <typename T>
-  static void AddInode(const uint8_t* start,
-                       size_t field_id,
-                       protozero::Message* out,
-                       FtraceMetadata* metadata) {
+  static void ReadInode(const uint8_t* start,
+                        size_t field_id,
+                        protozero::Message* out,
+                        FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
     metadata->inodes.push_back(t);
   }
 
   template <typename T>
-  static void AddPid(const uint8_t* start,
-                     size_t field_id,
-                     protozero::Message* out,
-                     FtraceMetadata* metadata) {
+  static void ReadPid(const uint8_t* start,
+                      size_t field_id,
+                      protozero::Message* out,
+                      FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
     metadata->AddPid(t);
   }
