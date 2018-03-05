@@ -137,18 +137,18 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
-    if (page_idx != SharedMemoryABI::kInvalidPageIdx) {
-      if (!commit_data_req_) {
-        commit_data_req_.reset(new CommitDataRequest());
-        weak_this = weak_ptr_factory_.GetWeakPtr();
-        should_post_callback = true;
+    // if (page_idx != SharedMemoryABI::kInvalidPageIdx) {
+    if (!commit_data_req_) {
+      commit_data_req_.reset(new CommitDataRequest());
+      weak_this = weak_ptr_factory_.GetWeakPtr();
+      should_post_callback = true;
       }
       CommitDataRequest::ChunksToMove* ctm =
           commit_data_req_->add_chunks_to_move();
       ctm->set_page(static_cast<uint32_t>(page_idx));
       ctm->set_chunk(chunk_idx);
       ctm->set_target_buffer(target_buffer);
-    }
+      // }
   }
 
   if (should_post_callback) {

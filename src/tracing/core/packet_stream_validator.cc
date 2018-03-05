@@ -39,6 +39,7 @@ bool PacketStreamValidator::Validate(const Slices& slices) {
   protos::TrustedPacket packet;
   if (!packet.ParseFromBoundedZeroCopyStream(&stream, size))
     return false;
+
   // Only the service is allowed to fill in the trusted uid.
   return packet.optional_trusted_uid_case() ==
          protos::TrustedPacket::OPTIONAL_TRUSTED_UID_NOT_SET;

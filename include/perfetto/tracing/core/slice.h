@@ -32,6 +32,15 @@ struct Slice {
   Slice(const void* st, size_t sz) : start(st), size(sz) {}
   Slice(Slice&& other) noexcept = default;
 
+  // Create a Slice which owns |size| bytes of memory.
+  static Slice Allocate(size_t size, uint8_t** ptr) {
+    Slice slice;
+    slice.own_data_.reset(new uint8_t[size]);
+    slice.start = *ptr = &slice.own_data_[0];
+    slice.size = size;
+    return slice;
+  }
+
   // Create a Slice which contains (and owns) a copy of the given memory.
   static Slice Copy(const void* start, size_t size) {
     Slice c;

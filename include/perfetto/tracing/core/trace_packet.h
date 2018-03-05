@@ -70,6 +70,8 @@ class TracePacket {
   // Total size of all slices.
   size_t size() const { return size_; }
 
+  Slices* mutable_slices() { return &slices_; }
+
  private:
   TracePacket(const TracePacket&) = delete;
   TracePacket& operator=(const TracePacket&) = delete;

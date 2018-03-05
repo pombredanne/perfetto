@@ -29,7 +29,7 @@
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 // TODO(primiano): right now this class is accumulating a patchlist but not
-// sending it to the service.
+// sending it to the service. Right now it just grows without bounds.
 
 using protozero::proto_utils::kMessageLengthFieldSize;
 using protozero::proto_utils::WriteRedundantVarInt;
@@ -132,10 +132,8 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
         PERFETTO_DCHECK(patch_it != patch_list_.end());
       }
 #endif
-      // TODO(primiano): this needs to be adjusted to be the offset within the
-      // payload, not from the start of the chunk header.
-      auto cur_hdr_offset = static_cast<uint16_t>(cur_hdr - cur_chunk_.begin());
-      patch_list_.emplace_front(cur_chunk_id_, cur_hdr_offset);
+      auto offset = static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
+      patch_list_.emplace_front(cur_chunk_id_, offset);
       Patch& patch = patch_list_.front();
       nested_msg->set_size_field(patch.size_field);
       PERFETTO_DLOG("Created new patchlist entry for protobuf nested message");

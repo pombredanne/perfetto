@@ -345,6 +345,7 @@ class SharedMemoryABI {
     size_t size() const { return size_; }
 
     uint8_t* payload_begin() const { return begin_ + sizeof(ChunkHeader); }
+    size_t payload_size() const { return size_ - sizeof(ChunkHeader); }
 
     bool is_valid() const { return begin_ && size_; }
 
