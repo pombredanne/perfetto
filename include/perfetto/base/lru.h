@@ -42,24 +42,37 @@ class LRUCache {
  public:
   explicit LRUCache(size_t capacity) : capacity_(capacity) {}
 
-  V* get(K k) {
+  const V* get(const K k) {
     const auto& it = item_map_.find(&k);
     if (it == item_map_.end()) {
       return nullptr;
     }
     auto list_entry = it->second;
     // Bump this item to the front of the cache.
-    insert(list_entry->first, list_entry->second);
-    return &(list_entry->second);
+    // We can borrow the existing item's value because insert
+    // does not care about it.
+    // We can't borrow the existing element's key because a pointer
+    // to it is contained withint item_map_.
+    insert(it, std::move(k), std::move(list_entry->second));
+    return &item_list_.cbegin()->second;
   }
 
-  void insert(K k, V v) {
-    auto existing = item_map_.find(&k);
+  void insert(const K k, const V v) {
+    return insert(item_map_.find(&k), std::move(k), std::move(v));
+  }
+
+ private:
+  using list_item_type_ = std::pair<const K, const V>;
+  using list_iterator_type_ = typename std::list<list_item_type_>::iterator;
+  using map_type_ = std::map<const K*, list_iterator_type_, PtrLess<const K>>;
+
+  void insert(typename map_type_::iterator existing, const K k, const V v) {
     if (existing != item_map_.end()) {
-      // This MUST happen before the following line to avoid
-      // a dangling pointer.
+      auto snd = existing->second;
+      // The entry in the map contains a pointer to the element in
+      // item_list_, so delete that first.
       item_map_.erase(existing);
-      item_list_.erase(existing->second);
+      item_list_.erase(snd);
     }
 
     if (item_map_.size() == capacity_) {
@@ -68,15 +81,13 @@ class LRUCache {
       item_map_.erase(&(last_elem->first));
       item_list_.erase(last_elem);
     }
-    item_list_.emplace_front(k, v);
+    item_list_.emplace_front(std::move(k), std::move(v));
     item_map_.emplace(&(item_list_.begin()->first), item_list_.begin());
   }
 
- private:
   size_t capacity_;
-  std::map<K*, typename std::list<std::pair<K, V>>::iterator, PtrLess<K>>
-      item_map_;
-  std::list<std::pair<K, V>> item_list_;
+  map_type_ item_map_;
+  std::list<list_item_type_> item_list_;
 };
 
 }  // namespace base
