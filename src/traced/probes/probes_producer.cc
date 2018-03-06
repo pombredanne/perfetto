@@ -17,6 +17,7 @@
 #include "src/traced/probes/probes_producer.h"
 
 #include <stdio.h>
+#include <queue>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -70,12 +71,12 @@ void ProbesProducer::OnConnect() {
   DataSourceDescriptor process_stats_descriptor;
   process_stats_descriptor.set_name(kProcessStatsSourceName);
   endpoint_->RegisterDataSource(process_stats_descriptor,
-                                [](DataSourceInstanceID id) {});
+                                [](DataSourceInstanceID) {});
 
   DataSourceDescriptor inode_map_descriptor;
   inode_map_descriptor.set_name(kInodeFileMapSourceName);
   endpoint_->RegisterDataSource(inode_map_descriptor,
-                                [](DataSourceInstanceID id) {});
+                                [](DataSourceInstanceID) {});
 }
 
 void ProbesProducer::OnDisconnect() {
