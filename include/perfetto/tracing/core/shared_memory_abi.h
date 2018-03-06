@@ -349,7 +349,7 @@ class SharedMemoryABI {
 
     bool is_valid() const { return begin_ && size_; }
 
-    // Index of the chunk within the page [0..13] (13 comnes from kPageDiv14).
+    // Index of the chunk within the page [0..13] (13 comes from kPageDiv14).
     uint8_t chunk_idx() const { return chunk_idx_; }
 
     ChunkHeader* header() { return reinterpret_cast<ChunkHeader*>(begin_); }
