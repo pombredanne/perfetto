@@ -103,24 +103,6 @@ struct TimeStamp {
   uint64_t tv_sec;
 };
 
-std::map<dev_t, std::vector<std::string>> ParseMounts(std::string path) {
-  std::map<dev_t, std::vector<std::string>> r;
-  std::ifstream f(path);
-  std::string line;
-  std::string mountpoint;
-  struct stat buf;
-  while (std::getline(f, line)) {
-    std::istringstream s(line);
-    // Discard first column.
-    s >> mountpoint;
-    s >> mountpoint;
-    if (stat(mountpoint.c_str(), &buf) == -1)
-      continue;
-    r[buf.st_dev].emplace_back(mountpoint);
-  }
-  return r;
-}
-
 }  // namespace
 
 EventFilter::EventFilter(const ProtoTranslationTable& table,
@@ -178,6 +160,25 @@ CpuReader::~CpuReader() {
   trace_fd_.reset();
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
+}
+
+// static
+std::map<dev_t, std::vector<std::string>> CpuReader::ParseMounts(
+    std::istream& f) {
+  std::map<dev_t, std::vector<std::string>> r;
+  std::string line;
+  std::string mountpoint;
+  struct stat buf;
+  while (std::getline(f, line)) {
+    std::istringstream s(line);
+    // Discard first column.
+    s >> mountpoint;
+    s >> mountpoint;
+    if (stat(mountpoint.c_str(), &buf) == -1)
+      continue;
+    r[buf.st_dev].emplace_back(mountpoint);
+  }
+  return r;
 }
 
 // static

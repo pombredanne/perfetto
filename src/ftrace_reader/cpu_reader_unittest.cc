@@ -17,6 +17,7 @@
 #include "cpu_reader.h"
 
 #include <sys/stat.h>
+#include <sstream>
 
 #include "event_info.h"
 #include "gmock/gmock.h"
@@ -462,6 +463,16 @@ TEST(CpuReaderTest, ReallyLongEvent) {
   EXPECT_THAT(long_print.print().buf(), EndsWith("ppp\n"));
   const protos::FtraceEvent& newline = bundle->event().Get(1);
   EXPECT_EQ(newline.print().buf(), "\n");
+}
+
+TEST(CpuReaderTest, ParseMounts) {
+  std::string tab = R"(sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0)";
+  std::istringstream i(tab);
+  auto mounts = CpuReader::ParseMounts(i);
+  struct stat buf;
+  ASSERT_NE(stat("/proc", &buf), -1);
+  EXPECT_THAT(mounts[buf.st_dev], ElementsAre("/proc"));
 }
 
 // This event is as the event for ParseSinglePrint above except the string

@@ -166,6 +166,8 @@ class CpuReader {
                          protozero::Message* message,
                          FtraceMetadata* metadata);
 
+  static std::map<dev_t, std::vector<std::string>> ParseMounts(std::istream& f);
+
  private:
   static void RunWorkerThread(size_t cpu,
                               int trace_fd,
