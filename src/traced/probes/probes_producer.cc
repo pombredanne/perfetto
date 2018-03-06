@@ -40,7 +40,7 @@ namespace perfetto {
 namespace {
 
 using Type = protos::pbzero::InodeFileMap_Entry_Type;
-using InodeMapKey = std::pair<uint64_t, uint64_t>;
+using InodeMapKey = std::pair<dev_t, ino_t>;
 using InodeMapValue =
     std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>;
 
@@ -83,9 +83,7 @@ void ProbesProducer::OnConnect() {
   endpoint_->RegisterDataSource(inode_map_descriptor,
                                 [](DataSourceInstanceID) {});
 
-  CreateInodeMap("/system/",
-                 std::unique_ptr<std::map<InodeMapKey, InodeMapValue>>(
-                     new std::map<InodeMapKey, InodeMapValue>(system_inodes_)));
+  CreateInodeMap("/system/", &system_inodes_);
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -172,8 +170,7 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
                id, source_config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  auto system_inodes = std::unique_ptr<std::map<InodeMapKey, InodeMapValue>>(
-      new std::map<InodeMapKey, InodeMapValue>(system_inodes_));
+  auto system_inodes = &system_inodes_;
   auto file_map_source =
       std::unique_ptr<InodeFileMapDataSource>(new InodeFileMapDataSource(
           std::move(system_inodes), std::move(trace_writer)));
@@ -214,7 +211,7 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 
 void ProbesProducer::CreateInodeMap(
     const std::string& root_directory,
-    std::unique_ptr<std::map<InodeMapKey, InodeMapValue>> inode_map) {
+    std::map<InodeMapKey, InodeMapValue>* inode_map) {
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -230,7 +227,6 @@ void ProbesProducer::CreateInodeMap(
       if (filename.compare(".") == 0 || filename.compare("..") == 0)
         continue;
       uint64_t inode_number = entry->d_ino;
-      // TODO(azappone) get block device id
       uint64_t block_device_id = 0;
       Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;  // Default
       if (entry->d_type == DT_REG)
@@ -333,7 +329,7 @@ void ProbesProducer::SinkDelegate::OnInodes(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
-    std::unique_ptr<std::map<InodeMapKey, InodeMapValue>> file_system_inodes,
+    std::map<InodeMapKey, InodeMapValue>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
     : file_system_inodes_(std::move(file_system_inodes)),
       writer_(std::move(writer)) {}
