@@ -50,21 +50,26 @@ Watchdog::Watchdog(uint32_t polling_interval_ms)
     : polling_interval_ms_(polling_interval_ms) {}
 
 Watchdog::~Watchdog() {
-  if (thread_.joinable()) {
-    {
-      std::lock_guard<std::mutex> guard(mutex_);
-      PERFETTO_DCHECK(!quit_);
-      quit_ = true;
-    }
-    exit_signal_.notify_one();
-    thread_.join();
-    thread_ = std::thread();
-  } else {
+  if (!thread_.joinable()) {
     PERFETTO_DCHECK(quit_);
+    return;
   }
+
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    PERFETTO_DCHECK(!quit_);
+    quit_ = true;
+  }
+  exit_signal_.notify_one();
+  thread_.join();
 }
 
 Watchdog* Watchdog::GetInstance() {
+#if PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
+  // Ensure that it is impossible to use watchdog on a Chromium build.
+  PERFETTO_CHECK(false);
+#endif
+
   static Watchdog* watchdog = new Watchdog(kDefaultPollingInterval);
   return watchdog;
 }
@@ -74,13 +79,10 @@ Watchdog::Timer Watchdog::CreateFatalTimer(uint32_t ms) {
 }
 
 void Watchdog::Start() {
+  std::lock_guard<std::mutex> guard(mutex_);
   if (thread_.joinable()) {
-#if PERFETTO_DCHECK_IS_ON()
-    std::lock_guard<std::mutex> guard(mutex_);
     PERFETTO_DCHECK(!quit_);
-#endif
   } else {
-    // Don't need to lock because thread is not running.
     PERFETTO_DCHECK(quit_);
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
