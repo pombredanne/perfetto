@@ -19,10 +19,16 @@
 #include <signal.h>
 
 #include <dirent.h>
+#include <fstream>
 #include <map>
 #include <queue>
+#include <sstream>
 #include <string>
 #include <utility>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
@@ -96,6 +102,24 @@ struct TimeStamp {
   uint64_t tv_nsec;
   uint64_t tv_sec;
 };
+
+std::map<dev_t, std::vector<std::string>> ParseMounts(std::string path) {
+  std::map<dev_t, std::vector<std::string>> r;
+  std::ifstream f(path);
+  std::string line;
+  std::string mountpoint;
+  struct stat buf;
+  while (std::getline(f, line)) {
+    std::istringstream s(line);
+    // Discard first column.
+    s >> mountpoint;
+    s >> mountpoint;
+    if (stat(mountpoint.c_str(), &buf) == -1)
+      continue;
+    r[buf.st_dev].emplace_back(mountpoint);
+  }
+  return r;
+}
 
 }  // namespace
 
