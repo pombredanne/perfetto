@@ -164,8 +164,9 @@ CpuReader::~CpuReader() {
 
 // static
 std::map<dev_t, std::vector<std::string>> CpuReader::ParseMounts(
-    std::istream& f) {
+    std::string path) {
   std::map<dev_t, std::vector<std::string>> r;
+  std::ifstream f(path);
   std::string line;
   std::string mountpoint;
   struct stat buf;

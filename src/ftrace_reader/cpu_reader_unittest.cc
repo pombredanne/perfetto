@@ -466,10 +466,7 @@ TEST(CpuReaderTest, ReallyLongEvent) {
 }
 
 TEST(CpuReaderTest, ParseMounts) {
-  std::string tab = R"(sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
-proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0)";
-  std::istringstream i(tab);
-  auto mounts = CpuReader::ParseMounts(i);
+  auto mounts = CpuReader::ParseMounts();
   struct stat buf;
   ASSERT_NE(stat("/proc", &buf), -1);
   EXPECT_THAT(mounts[buf.st_dev], ElementsAre("/proc"));
