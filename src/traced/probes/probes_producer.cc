@@ -39,11 +39,6 @@
 namespace perfetto {
 namespace {
 
-using Type = protos::pbzero::InodeFileMap_Entry_Type;
-using InodeMapKey = std::pair<dev_t, ino_t>;
-using InodeMapValue =
-    std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>;
-
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
 const char* kFtraceSourceName = "com.google.perfetto.ftrace";
@@ -170,10 +165,8 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
                id, source_config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  auto system_inodes = &system_inodes_;
-  auto file_map_source =
-      std::unique_ptr<InodeFileMapDataSource>(new InodeFileMapDataSource(
-          std::move(system_inodes), std::move(trace_writer)));
+  auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
+      new InodeFileMapDataSource(&system_inodes_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
 }
@@ -209,9 +202,10 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
   trace_packet->Finalize();
 }
 
+// static
 void ProbesProducer::CreateInodeMap(
     const std::string& root_directory,
-    std::map<InodeMapKey, InodeMapValue>* inode_map) {
+    std::map<dev_t, BlockDeviceMapValue>* block_device_map) {
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -226,26 +220,21 @@ void ProbesProducer::CreateInodeMap(
       std::string filename = entry->d_name;
       if (filename.compare(".") == 0 || filename.compare("..") == 0)
         continue;
-      uint64_t inode_number = entry->d_ino;
-      uint64_t block_device_id = 0;
+      ino_t inode_number = entry->d_ino;
+      // TODO(azappone): set block device id with lstat
+      dev_t block_device_id = 0;
+      BlockDeviceMapValue inode_map;
+      auto block_device_data = block_device_map->find(block_device_id);
+      if (block_device_data != block_device_map->end())
+        inode_map = block_device_data->second;
       Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;  // Default
       if (entry->d_type == DT_REG)
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       else if (entry->d_type == DT_DIR)
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
-      auto key = std::make_pair(block_device_id, inode_number);
-      std::string path = filepath + filename;
-      auto inode_data = inode_map->find(key);
-      // If key exists, there's multiple hard links so add this path to the list
-      if (inode_data != inode_map->end()) {
-        std::set<std::string> paths = inode_data->second.second;
-        if (paths.find(path) != paths.end())
-          paths.insert(filepath + filename);
-        inode_map->emplace(key, std::make_pair(type, paths));
-      } else {
-        std::set<std::string> paths{path};
-        inode_map->emplace(key, std::make_pair(type, paths));
-      }
+      inode_map[inode_number].first = type;
+      inode_map[inode_number].second.emplace(filepath + filename);
+      (*block_device_map)[block_device_id] = inode_map;
     }
     closedir(dir);
   }
@@ -329,7 +318,7 @@ void ProbesProducer::SinkDelegate::OnInodes(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
-    std::map<InodeMapKey, InodeMapValue>* file_system_inodes,
+    std::map<dev_t, BlockDeviceMapValue>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
     : file_system_inodes_(std::move(file_system_inodes)),
       writer_(std::move(writer)) {}
@@ -346,12 +335,14 @@ void ProbesProducer::InodeFileMapDataSource::WriteInodes(
   for (const auto& inode : inodes) {
     auto* entry = inode_file_map->add_entries();
     entry->set_inode_number(inode);
-    auto inode_data =
-        file_system_inodes_->find(std::make_pair(block_device_id, inode));
-    if (inode_data != file_system_inodes_->end()) {
-      entry->set_type(inode_data->second.first);
-      for (const auto& path : inode_data->second.second)
-        entry->add_paths(path.c_str());
+    auto block_device_map = file_system_inodes_->find(block_device_id);
+    if (block_device_map != file_system_inodes_->end()) {
+      auto inode_map = block_device_map->second.find(inode);
+      if (inode_map != block_device_map->second.end()) {
+        entry->set_type(inode_map->second.first);
+        for (const auto& path : inode_map->second.second)
+          entry->add_paths(path.c_str());
+      }
     }
   }
   trace_packet->Finalize();
