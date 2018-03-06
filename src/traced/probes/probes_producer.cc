@@ -124,9 +124,8 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
 
   FtraceConfig proto_config = source_config.ftrace_config();
 
-  // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+  auto trace_writer =
+      endpoint_->CreateTraceWriter(source_config.target_buffer());
   auto delegate = std::unique_ptr<SinkDelegate>(
       new SinkDelegate(task_runner_, std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
@@ -143,8 +142,8 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
     const DataSourceConfig& source_config) {
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+  auto trace_writer =
+      endpoint_->CreateTraceWriter(source_config.target_buffer());
   procfs_utils::ProcessMap processes;
   auto trace_packet = trace_writer->NewTracePacket();
   protos::pbzero::ProcessTree* process_tree = trace_packet->set_process_tree();

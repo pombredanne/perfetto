@@ -33,6 +33,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/ftrace_config.h"
 
 // Forward declarations for protobuf types.
@@ -61,8 +62,8 @@ class DataSourceConfig {
   const std::string& name() const { return name_; }
   void set_name(const std::string& value) { name_ = value; }
 
-  uint32_t target_buffer() const { return target_buffer_; }
-  void set_target_buffer(uint32_t value) { target_buffer_ = value; }
+  BufferID target_buffer() const { return target_buffer_; }
+  void set_target_buffer(BufferID value) { target_buffer_ = value; }
 
   uint32_t trace_duration_ms() const { return trace_duration_ms_; }
   void set_trace_duration_ms(uint32_t value) { trace_duration_ms_ = value; }
@@ -72,7 +73,7 @@ class DataSourceConfig {
 
  private:
   std::string name_ = {};
-  uint32_t target_buffer_ = {};
+  BufferID target_buffer_ = {};
   uint32_t trace_duration_ms_ = {};
   FtraceConfig ftrace_config_ = {};
 

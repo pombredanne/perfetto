@@ -79,6 +79,11 @@ class ErrorPrinter : public MultiFileErrorCollector {
   }
 };
 
+bool IsBufferIDField(const FieldDescriptor* field) {
+  return field->name() == "target_buffer" &&
+         field->type() == FieldDescriptor::TYPE_UINT32;
+}
+
 std::string GetProtoHeader(const FileDescriptor* proto_file) {
   return StringReplace(proto_file->name(), ".proto", ".pb.h", false);
 }
@@ -163,6 +168,9 @@ std::string ProtoToCpp::GetIncludePath(const FileDescriptor* proto_file) {
 
 std::string ProtoToCpp::GetCppType(const FieldDescriptor* field,
                                    bool constref) {
+  if (IsBufferIDField(field))
+    return "BufferID";
+
   switch (field->type()) {
     case FieldDescriptor::TYPE_DOUBLE:
       return "double";
@@ -229,6 +237,7 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   header_printer.Print("#include <string>\n");
   header_printer.Print("#include <type_traits>\n\n");
 
+  header_printer.Print("#include \"perfetto/tracing/core/basic_types.h\"\n");
   cpp_printer.Print(kHeader, "f", __FILE__, "p", src_proto);
   PERFETTO_CHECK(dst_header.find("include/") == 0);
   cpp_printer.Print("#include \"$f$\"\n", "f",
@@ -387,18 +396,8 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
   for (int i = 0; i < msg->field_count(); i++) {
     p->Print("\n");
     const FieldDescriptor* field = msg->field(i);
-    if (!field->is_repeated()) {
-      if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
-        p->Print("$n$_.FromProto(proto.$n$());\n", "n", field->name());
-      } else {
-        p->Print(
-            "static_assert(sizeof($n$_) == sizeof(proto.$n$()), \"size "
-            "mismatch\");\n",
-            "n", field->name());
-        p->Print("$n$_ = static_cast<decltype($n$_)>(proto.$n$());\n", "n",
-                 field->name());
-      }
-    } else {  // is_repeated()
+
+    if (field->is_repeated()) {
       p->Print("$n$_.clear();\n", "n", field->name());
       p->Print("for (const auto& field : proto.$n$()) {\n", "n", field->name());
       p->Print("  $n$_.emplace_back();\n", "n", field->name());
@@ -414,6 +413,24 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
             "n", field->name());
       }
       p->Print("}\n");
+    } else {  // !is_repeated()
+      if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
+        p->Print("$n$_.FromProto(proto.$n$());\n", "n", field->name());
+      } else if (IsBufferIDField(field)) {
+        p->Print(
+            "static_assert(sizeof($n$_) < sizeof(proto.$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
+        p->Print("$n$_ = static_cast<decltype($n$_)>(proto.$n$());\n", "n",
+                 field->name());
+      } else {
+        p->Print(
+            "static_assert(sizeof($n$_) == sizeof(proto.$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
+        p->Print("$n$_ = static_cast<decltype($n$_)>(proto.$n$());\n", "n",
+                 field->name());
+      }
     }
   }
   p->Print("unknown_fields_ = proto.unknown_fields();\n");
@@ -428,18 +445,7 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
   for (int i = 0; i < msg->field_count(); i++) {
     p->Print("\n");
     const FieldDescriptor* field = msg->field(i);
-    if (!field->is_repeated()) {
-      if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
-        p->Print("$n$_.ToProto(proto->mutable_$n$());\n", "n", field->name());
-      } else {
-        p->Print(
-            "static_assert(sizeof($n$_) == sizeof(proto->$n$()), \"size "
-            "mismatch\");\n",
-            "n", field->name());
-        p->Print("proto->set_$n$(static_cast<decltype(proto->$n$())>($n$_));\n",
-                 "n", field->name());
-      }
-    } else {  // is_repeated()
+    if (field->is_repeated()) {
       p->Print("for (const auto& it : $n$_) {\n", "n", field->name());
       if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
         p->Print("  auto* entry = proto->add_$n$();\n", "n", field->name());
@@ -452,6 +458,24 @@ void ProtoToCpp::GenCpp(const Descriptor* msg, Printer* p, std::string prefix) {
             "n", field->name());
       }
       p->Print("}\n");
+    } else {  // !is_repeated()
+      if (field->type() == FieldDescriptor::TYPE_MESSAGE) {
+        p->Print("$n$_.ToProto(proto->mutable_$n$());\n", "n", field->name());
+      } else if (IsBufferIDField(field)) {
+        p->Print(
+            "static_assert(sizeof($n$_) < sizeof(proto->$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
+        p->Print("proto->set_$n$(static_cast<decltype(proto->$n$())>($n$_));\n",
+                 "n", field->name());
+      } else {
+        p->Print(
+            "static_assert(sizeof($n$_) == sizeof(proto->$n$()), \"size "
+            "mismatch\");\n",
+            "n", field->name());
+        p->Print("proto->set_$n$(static_cast<decltype(proto->$n$())>($n$_));\n",
+                 "n", field->name());
+      }
     }
   }
   p->Print("*(proto->mutable_unknown_fields()) = unknown_fields_;\n");

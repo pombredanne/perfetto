@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/tracing/core/basic_types.h"
+
 // Forward declarations for protobuf types.
 namespace perfetto {
 namespace protos {

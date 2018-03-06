@@ -49,8 +49,8 @@ void FakeProducer::OnDisconnect() {}
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+  auto trace_writer =
+      endpoint_->CreateTraceWriter(source_config.target_buffer());
   for (int i = 0; i < 10; i++) {
     auto handle = trace_writer->NewTracePacket();
     handle->set_for_testing()->set_str("test");

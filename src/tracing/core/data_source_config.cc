@@ -45,7 +45,7 @@ void DataSourceConfig::FromProto(
   static_assert(sizeof(name_) == sizeof(proto.name()), "size mismatch");
   name_ = static_cast<decltype(name_)>(proto.name());
 
-  static_assert(sizeof(target_buffer_) == sizeof(proto.target_buffer()),
+  static_assert(sizeof(target_buffer_) < sizeof(proto.target_buffer()),
                 "size mismatch");
   target_buffer_ = static_cast<decltype(target_buffer_)>(proto.target_buffer());
 
@@ -65,7 +65,7 @@ void DataSourceConfig::ToProto(
   static_assert(sizeof(name_) == sizeof(proto->name()), "size mismatch");
   proto->set_name(static_cast<decltype(proto->name())>(name_));
 
-  static_assert(sizeof(target_buffer_) == sizeof(proto->target_buffer()),
+  static_assert(sizeof(target_buffer_) < sizeof(proto->target_buffer()),
                 "size mismatch");
   proto->set_target_buffer(
       static_cast<decltype(proto->target_buffer())>(target_buffer_));

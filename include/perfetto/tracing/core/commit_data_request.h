@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/tracing/core/basic_types.h"
+
 // Forward declarations for protobuf types.
 namespace perfetto {
 namespace protos {
@@ -66,13 +68,13 @@ class CommitDataRequest {
     uint32_t chunk() const { return chunk_; }
     void set_chunk(uint32_t value) { chunk_ = value; }
 
-    uint32_t target_buffer() const { return target_buffer_; }
-    void set_target_buffer(uint32_t value) { target_buffer_ = value; }
+    BufferID target_buffer() const { return target_buffer_; }
+    void set_target_buffer(BufferID value) { target_buffer_ = value; }
 
    private:
     uint32_t page_ = {};
     uint32_t chunk_ = {};
-    uint32_t target_buffer_ = {};
+    BufferID target_buffer_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility
     // with future versions of .proto files.

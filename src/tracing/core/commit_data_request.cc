@@ -90,7 +90,7 @@ void CommitDataRequest::ChunksToMove::FromProto(
   static_assert(sizeof(chunk_) == sizeof(proto.chunk()), "size mismatch");
   chunk_ = static_cast<decltype(chunk_)>(proto.chunk());
 
-  static_assert(sizeof(target_buffer_) == sizeof(proto.target_buffer()),
+  static_assert(sizeof(target_buffer_) < sizeof(proto.target_buffer()),
                 "size mismatch");
   target_buffer_ = static_cast<decltype(target_buffer_)>(proto.target_buffer());
   unknown_fields_ = proto.unknown_fields();
@@ -106,7 +106,7 @@ void CommitDataRequest::ChunksToMove::ToProto(
   static_assert(sizeof(chunk_) == sizeof(proto->chunk()), "size mismatch");
   proto->set_chunk(static_cast<decltype(proto->chunk())>(chunk_));
 
-  static_assert(sizeof(target_buffer_) == sizeof(proto->target_buffer()),
+  static_assert(sizeof(target_buffer_) < sizeof(proto->target_buffer()),
                 "size mismatch");
   proto->set_target_buffer(
       static_cast<decltype(proto->target_buffer())>(target_buffer_));

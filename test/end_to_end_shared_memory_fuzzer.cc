@@ -68,8 +68,8 @@ class FakeProducer : public Producer {
   void CreateDataSourceInstance(
       DataSourceInstanceID,
       const DataSourceConfig& source_config) override {
-    auto trace_writer = endpoint_->CreateTraceWriter(
-        static_cast<BufferID>(source_config.target_buffer()));
+    auto trace_writer =
+        endpoint_->CreateTraceWriter(source_config.target_buffer());
 
     auto packet = trace_writer->NewTracePacket();
     packet->stream_writer_->WriteBytes(data_, size_);

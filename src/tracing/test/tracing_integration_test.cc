@@ -148,7 +148,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
             ASSERT_NE(0u, id);
             ds_iid = id;
             ASSERT_EQ("perfetto.test", cfg.name());
-            global_buf_id = static_cast<BufferID>(cfg.target_buffer());
+            global_buf_id = cfg.target_buffer();
             ASSERT_NE(0u, global_buf_id);
             ASSERT_LE(global_buf_id, std::numeric_limits<BufferID>::max());
             on_create_ds_instance();
