@@ -602,6 +602,7 @@ ProducerID ServiceImpl::GetNextProducerID() {
 }
 
 void ServiceImpl::UpdateMemoryGuardrail() {
+#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
   uint64_t total_buffer_bytes = 0;
 
   // Sum up all the shared memory buffers.
@@ -618,6 +619,7 @@ void ServiceImpl::UpdateMemoryGuardrail() {
   // interval.
   uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
   base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
