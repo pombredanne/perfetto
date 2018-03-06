@@ -87,8 +87,8 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   if (lockdown_mode_ && uid != geteuid()) {
-    PERFETTO_ELOG("Lockdown mode. Rejecting producer with UID %jd",
-                  static_cast<intmax_t>(uid));
+    PERFETTO_DLOG("Lockdown mode. Rejecting producer with UID %ld",
+                  static_cast<unsigned long>(uid));
     return nullptr;
   }
 
@@ -523,7 +523,7 @@ void ServiceImpl::CreateDataSourceInstance(
   // An existing producer that is not ftrace could have registered itself as
   // ftrace, we must not enable it in that case.
   if (lockdown_mode_ && producer->uid_ != getuid()) {
-    PERFETTO_ELOG("Lockdown mode: not enabling producer %hu", producer->id_);
+    PERFETTO_DLOG("Lockdown mode: not enabling producer %hu", producer->id_);
     return;
   }
   // TODO(primiano): match against |producer_name_filter| and add tests
