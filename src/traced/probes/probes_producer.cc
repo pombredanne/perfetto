@@ -40,6 +40,9 @@ namespace perfetto {
 namespace {
 
 using Type = protos::pbzero::InodeFileMap_Entry_Type;
+using InodeMapKey = std::pair<uint64_t, uint64_t>;
+using InodeMapValue =
+    std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>;
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
@@ -73,12 +76,16 @@ void ProbesProducer::OnConnect() {
   DataSourceDescriptor process_stats_descriptor;
   process_stats_descriptor.set_name(kProcessStatsSourceName);
   endpoint_->RegisterDataSource(process_stats_descriptor,
-                                [](DataSourceInstanceID id) {});
+                                [](DataSourceInstanceID) {});
 
   DataSourceDescriptor inode_map_descriptor;
   inode_map_descriptor.set_name(kInodeFileMapSourceName);
   endpoint_->RegisterDataSource(inode_map_descriptor,
-                                [](DataSourceInstanceID id) {});
+                                [](DataSourceInstanceID) {});
+
+  CreateInodeMap("/system/",
+                 std::unique_ptr<std::map<InodeMapKey, InodeMapValue>>(
+                     new std::map<InodeMapKey, InodeMapValue>(system_inodes_)));
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -165,25 +172,11 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
                id, source_config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-
-  // std::unique_ptr<std::map<std::pair<uint64_t, uint64_t>,
-  //                          std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-  //                                    std::set<std::string>>>>
-  //     system_inodes = std::make_unique<
-  //         std::map<std::pair<uint64_t, uint64_t>,
-  //                  std::pair<Type,
-  //                            std::set<std::string>>>>(
-  //         std::move(system_inodes_));
-
-  auto system_inodes =
-      std::unique_ptr<std::map<std::pair<uint64_t, uint64_t>,
-                               std::pair<Type, std::set<std::string>>>>(
-          new std::map<std::pair<uint64_t, uint64_t>,
-                       std::pair<Type, std::set<std::string>>>(system_inodes_));
-
+  auto system_inodes = std::unique_ptr<std::map<InodeMapKey, InodeMapValue>>(
+      new std::map<InodeMapKey, InodeMapValue>(system_inodes_));
   auto file_map_source =
       std::unique_ptr<InodeFileMapDataSource>(new InodeFileMapDataSource(
-          std::move(trace_writer), std::move(system_inodes)));
+          std::move(system_inodes), std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
 }
@@ -219,8 +212,9 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
   trace_packet->Finalize();
 }
 
-// Call as "/system/"
-void ProbesProducer::CreateSystemInodeMap(const std::string& root_directory) {
+void ProbesProducer::CreateInodeMap(
+    const std::string& root_directory,
+    std::unique_ptr<std::map<InodeMapKey, InodeMapValue>> inode_map) {
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -245,16 +239,16 @@ void ProbesProducer::CreateSystemInodeMap(const std::string& root_directory) {
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
       auto key = std::make_pair(block_device_id, inode_number);
       std::string path = filepath + filename;
-      auto inode_data = system_inodes_.find(key);
+      auto inode_data = inode_map->find(key);
       // If key exists, there's multiple hard links so add this path to the list
-      if (inode_data != system_inodes_.end()) {
+      if (inode_data != inode_map->end()) {
         std::set<std::string> paths = inode_data->second.second;
         if (paths.find(path) != paths.end())
           paths.insert(filepath + filename);
-        system_inodes_.emplace(key, std::make_pair(type, paths));
+        inode_map->emplace(key, std::make_pair(type, paths));
       } else {
         std::set<std::string> paths{path};
-        system_inodes_.emplace(key, std::make_pair(type, paths));
+        inode_map->emplace(key, std::make_pair(type, paths));
       }
     }
     closedir(dir);
@@ -339,19 +333,15 @@ void ProbesProducer::SinkDelegate::OnInodes(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
-    std::unique_ptr<TraceWriter> writer,
-    std::unique_ptr<std::map<std::pair<uint64_t, uint64_t>,
-                             std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                                       std::set<std::string>>>> system_inodes)
-    : writer_(std::move(writer)) {}
+    std::unique_ptr<std::map<InodeMapKey, InodeMapValue>> file_system_inodes,
+    std::unique_ptr<TraceWriter> writer)
+    : file_system_inodes_(std::move(file_system_inodes)),
+      writer_(std::move(writer)) {}
 
 ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
 
 void ProbesProducer::InodeFileMapDataSource::WriteInodes(
-    const FtraceMetadata& metadata,
-    std::unique_ptr<std::map<std::pair<uint64_t, uint64_t>,
-                             std::pair<Type, std::set<std::string>>>>
-        system_inodes) {
+    const FtraceMetadata& metadata) {
   auto trace_packet = writer_->NewTracePacket();
   auto inode_file_map = trace_packet->set_inode_file_map();
   // TODO(azappone): Get block_device_id and mount_points & add to the proto
@@ -361,8 +351,8 @@ void ProbesProducer::InodeFileMapDataSource::WriteInodes(
     auto* entry = inode_file_map->add_entries();
     entry->set_inode_number(inode);
     auto inode_data =
-        system_inodes->find(std::make_pair(block_device_id, inode));
-    if (inode_data != system_inodes->end()) {
+        file_system_inodes_->find(std::make_pair(block_device_id, inode));
+    if (inode_data != file_system_inodes_->end()) {
       entry->set_type(inode_data->second.first);
       for (const auto& path : inode_data->second.second)
         entry->add_paths(path.c_str());

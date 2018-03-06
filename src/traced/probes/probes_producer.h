@@ -90,23 +90,21 @@ class ProbesProducer : public Producer {
   class InodeFileMapDataSource {
    public:
     explicit InodeFileMapDataSource(
-        std::unique_ptr<TraceWriter> writer,
         std::unique_ptr<
             std::map<std::pair<uint64_t, uint64_t>,
                      std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                               std::set<std::string>>>> system_inodes);
+                               std::set<std::string>>>> file_system_inodes,
+        std::unique_ptr<TraceWriter> writer);
     ~InodeFileMapDataSource();
 
-    void WriteInodes(
-        const FtraceMetadata& metadata,
-        std::unique_ptr<
-            std::map<std::pair<uint64_t, uint64_t>,
-                     std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                               std::set<std::string>>>> system_inodes);
+    void WriteInodes(const FtraceMetadata& metadata);
 
    private:
+    std::unique_ptr<std::map<std::pair<uint64_t, uint64_t>,
+                             std::pair<protos::pbzero::InodeFileMap_Entry_Type,
+                                       std::set<std::string>>>>
+        file_system_inodes_;
     std::unique_ptr<TraceWriter> writer_;
-    // toodo set of inode pairs that have been seen
   };
 
   enum State {
@@ -121,7 +119,12 @@ class ProbesProducer : public Producer {
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
-  void CreateSystemInodeMap(const std::string& root_directory);
+  void CreateInodeMap(
+      const std::string& root_directory,
+      std::unique_ptr<
+          std::map<std::pair<uint64_t, uint64_t>,
+                   std::pair<protos::pbzero::InodeFileMap_Entry_Type,
+                             std::set<std::string>>>> inode_map);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
