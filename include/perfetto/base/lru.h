@@ -23,27 +23,13 @@
 namespace perfetto {
 namespace base {
 
-namespace {
-template <typename T>
-class PtrLess {
- public:
-  bool operator()(T* lhs, T* rhs) const { return lhs != rhs && *lhs < *rhs; }
-};
-}  // namespace
-
-/*
- * LRUCache is a memory efficient LRU map for moveable types.
- *
- * It does not store the value of the key twice but rather
- * stores a pointer in the key of the map.
- */
 template <typename K, typename V>
 class LRUCache {
  public:
   explicit LRUCache(size_t capacity) : capacity_(capacity) {}
 
   const V* get(const K& k) {
-    const auto& it = item_map_.find(&k);
+    const auto& it = item_map_.find(k);
     if (it == item_map_.end()) {
       return nullptr;
     }
@@ -56,31 +42,29 @@ class LRUCache {
   }
 
   void insert(const K k, const V v) {
-    return insert(item_map_.find(&k), std::move(k), std::move(v));
+    return insert(item_map_.find(k), std::move(k), std::move(v));
   }
 
  private:
   using list_item_type_ = std::pair<const K, const V>;
   using list_iterator_type_ = typename std::list<list_item_type_>::iterator;
-  using map_type_ = std::map<const K*, list_iterator_type_, PtrLess<const K>>;
+  using map_type_ = std::map<const K, list_iterator_type_>;
 
   void insert(typename map_type_::iterator existing, const K k, const V v) {
+    item_list_.emplace_front(std::move(k), std::move(v));
     if (existing != item_map_.end()) {
-      auto snd = existing->second;
-      // The entry in the map contains a pointer to the element in
-      // item_list_, so delete that first.
-      item_map_.erase(existing);
-      item_list_.erase(snd);
+      item_list_.erase(existing->second);
+      existing->second = item_list_.begin();
+    } else {
+      item_map_.emplace(k, item_list_.begin());
     }
 
-    if (item_map_.size() == capacity_) {
+    if (item_map_.size() > capacity_) {
       auto last_elem = item_list_.end();
       last_elem--;
-      item_map_.erase(&(last_elem->first));
+      item_map_.erase(last_elem->first);
       item_list_.erase(last_elem);
     }
-    item_list_.emplace_front(std::move(k), std::move(v));
-    item_map_.emplace(&(item_list_.begin()->first), item_list_.begin());
   }
 
   size_t capacity_;
