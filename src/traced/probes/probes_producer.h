@@ -30,6 +30,7 @@
 #define SRC_TRACED_PROBES_PROBES_PRODUCER_H_
 
 namespace perfetto {
+
 class ProbesProducer : public Producer {
  public:
   ProbesProducer();
@@ -88,18 +89,24 @@ class ProbesProducer : public Producer {
 
   class InodeFileMapDataSource {
    public:
-    explicit InodeFileMapDataSource(std::unique_ptr<TraceWriter> writer);
+    explicit InodeFileMapDataSource(
+        std::unique_ptr<TraceWriter> writer,
+        std::unique_ptr<
+            std::map<std::pair<uint64_t, uint64_t>,
+                     std::pair<protos::pbzero::InodeFileMap_Entry_Type,
+                               std::set<std::string>>>> system_inodes);
     ~InodeFileMapDataSource();
 
-    void WriteInodes(const FtraceMetadata& metadata);
-    void CreateSystemInodeMap(const std::string& root_directory);
+    void WriteInodes(
+        const FtraceMetadata& metadata,
+        std::unique_ptr<
+            std::map<std::pair<uint64_t, uint64_t>,
+                     std::pair<protos::pbzero::InodeFileMap_Entry_Type,
+                               std::set<std::string>>>> system_inodes);
 
    private:
     std::unique_ptr<TraceWriter> writer_;
-    std::map<std::pair<uint64_t, uint64_t>,
-             std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                       std::set<std::string>>>
-        system_inodes_;
+    // toodo set of inode pairs that have been seen
   };
 
   enum State {
@@ -114,6 +121,7 @@ class ProbesProducer : public Producer {
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
+  void CreateSystemInodeMap(const std::string& root_directory);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
@@ -128,6 +136,10 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>
       file_map_sources_;
+  std::map<
+      std::pair<uint64_t, uint64_t>,
+      std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>>
+      system_inodes_;
 };
 }  // namespace perfetto
 
