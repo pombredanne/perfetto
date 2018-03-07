@@ -69,6 +69,14 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
                                      size_t size_hint = 0);
 
+  // Puts back a Chunk that has been completed and sends a request to the
+  // service to move it to the central tracing buffer. |target_buffer| is the
+  // absolute trace buffer ID where the service should move the chunk onto (the
+  // producer is just to copy back the same number received in the
+  // DataSourceConfig upon the CreateDataSourceInstance() reques).
+  // PatchList is a pointer to the list of patches for previous chunks. The
+  // first patched entries will be removed from the patched list and sent over
+  // to the service in the same CommitData() IPC request.
   void ReturnCompletedChunk(SharedMemoryABI::Chunk,
                             BufferID target_buffer,
                             PatchList*);

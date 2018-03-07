@@ -156,7 +156,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
 
     // Get the patches completed for the previous chunk from the |patch_list|
     // and update it.
-    ChunkID last_chunk_id = 0;  // The initialization value doens't matter.
+    ChunkID last_chunk_id = 0;  // 0 is irrelevant but keeps the compiler happy.
     CommitDataRequest::ChunkToPatch* last_chunk_req = nullptr;
     while (!patch_list->empty() && patch_list->front().is_patched()) {
       if (!last_chunk_req || last_chunk_id != patch_list->front().chunk_id) {
@@ -182,12 +182,11 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     }
   }
 
-  // TODO(primiano): optimization: at this point, if most of the SMB is full of
-  // completed chunks that are pending a commit, we should send a sync IPC
-  // without waiting for the next task. The risk is that, if a writer writes too
-  // quickly, we end up in bubbles in the pipeline. If we have to first wait
-  // that the writer completely fills the SMB before we send the sync IPC,
-  // the writer will systematically stall and lose bandwidth.
+  // TODO(primiano): optimization: at this point, if most of the SMB is almost
+  // full (say 75%) of completed chunks that are pending a commit, we should
+  // send a sync IPC without waiting neither for the next task nor to reach the
+  // 100% full state that will stall the writer. If we hit the writer-stalling
+  // case, it will kill the tracing bandwidth.
 
   if (should_post_callback) {
     PERFETTO_DCHECK(weak_this);
