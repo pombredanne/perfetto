@@ -29,7 +29,7 @@ constexpr const char* kMountsPath = "/proc/mounts";
 }
 
 std::map<dev_t, std::vector<std::string>> ParseMounts() {
-  std::map<dev_t, std::vector<std::string>> r;
+  std::map<dev_t, std::vector<std::string>> device_to_mountpoints;
   std::ifstream f(kMountsPath);
   std::string line;
   std::string mountpoint;
@@ -41,9 +41,9 @@ std::map<dev_t, std::vector<std::string>> ParseMounts() {
     s >> mountpoint;
     if (stat(mountpoint.c_str(), &buf) == -1)
       continue;
-    r[buf.st_dev].emplace_back(mountpoint);
+    device_to_mountpoints[buf.st_dev].emplace_back(mountpoint);
   }
-  return r;
+  return device_to_mountpoints;
 }
 
 }  // namespace perfetto
