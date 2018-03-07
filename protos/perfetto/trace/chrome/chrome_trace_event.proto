@@ -18,6 +18,8 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
+// TODO(oysteine) : Separate out commonly repeated values into a separate
+// message (primarily |name| and |category_group_name|).
 message ChromeTraceEvent {
   optional string name = 1;
   optional int64 timestamp = 2;
@@ -35,5 +37,5 @@ message ChromeTraceEvent {
 }
 
 message ChromeEventBundle {
-  repeated ChromeTraceEvent events = 1;
+  repeated ChromeTraceEvent trace_events = 1;
 }
