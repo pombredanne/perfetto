@@ -73,6 +73,7 @@ class DataSourceConfig {
   const std::string& chrome_trace_config() const {
     return chrome_trace_config_;
   }
+
   void set_chrome_trace_config(const std::string& config) {
     chrome_trace_config_ = config;
   }

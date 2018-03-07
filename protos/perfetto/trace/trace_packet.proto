@@ -32,7 +32,7 @@ message TracePacket {
     FtraceEventBundle ftrace_events = 1;
     ProcessTree process_tree = 2;
     InodeFileMap inode_file_map = 4;
-    ChromeTraceEventBundle chrome_trace_events = 5;
+    ChromeEventBundle chrome_events = 5;
 
     // This field is only used for testing.
     TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.

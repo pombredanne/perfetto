@@ -34,6 +34,6 @@ message ChromeTraceEvent {
   optional uint32 bind_id = 13;
 }
 
-message ChromeTraceEventBundle {
+message ChromeEventBundle {
   repeated ChromeTraceEvent events = 1;
 }
