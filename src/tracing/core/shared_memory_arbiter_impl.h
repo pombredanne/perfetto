@@ -34,6 +34,7 @@
 namespace perfetto {
 
 class CommitDataRequest;
+class PatchList;
 class TraceWriter;
 
 namespace base {
@@ -68,7 +69,9 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
                                      size_t size_hint = 0);
 
-  void ReturnCompletedChunk(SharedMemoryABI::Chunk, BufferID target_buffer);
+  void ReturnCompletedChunk(SharedMemoryABI::Chunk,
+                            BufferID target_buffer,
+                            PatchList*);
 
   SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 

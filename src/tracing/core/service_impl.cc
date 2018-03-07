@@ -701,7 +701,6 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
 
     PERFETTO_DLOG("Commit req %d:%d", entry.page(), entry.chunk());
 
-    // TODO(primiano): before landing: check payload_size(), untrusetd.
     service_->CommitData(id_, uid_, writer_id, chunk_id, buffer_id,
                          num_fragments, chunk_flags, chunk.payload_begin(),
                          chunk.payload_size());

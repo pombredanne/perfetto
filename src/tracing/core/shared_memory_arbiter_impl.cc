@@ -130,13 +130,19 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
 }
 
 void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
-                                                   BufferID target_buffer) {
+                                                   BufferID target_buffer,
+                                                   PatchList* patch_list) {
   bool should_post_callback = false;
   base::WeakPtr<SharedMemoryArbiterImpl> weak_this;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
+    const WriterID writer_id =
+        chunk.header()->writer_id.load(std::memory_order_relaxed);
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
+
+    // DO NOT access |chunk| after this point, has been std::move()-d above.
+
     if (!commit_data_req_) {
       commit_data_req_.reset(new CommitDataRequest());
       weak_this = weak_ptr_factory_.GetWeakPtr();
@@ -147,6 +153,33 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     ctm->set_page(static_cast<uint32_t>(page_idx));
     ctm->set_chunk(chunk_idx);
     ctm->set_target_buffer(target_buffer);
+
+    // Get the patches completed for the previous chunk from the |patch_list|
+    // and update it.
+    ChunkID last_chunk_id = 0;  // The initialization value doens't matter.
+    CommitDataRequest::ChunkToPatch* last_chunk_req = nullptr;
+    while (!patch_list->empty() && patch_list->front().is_patched()) {
+      if (!last_chunk_req || last_chunk_id != patch_list->front().chunk_id) {
+        last_chunk_req = commit_data_req_->add_chunks_to_patch();
+        last_chunk_req->set_writer_id(writer_id);
+        last_chunk_id = patch_list->front().chunk_id;
+        last_chunk_req->set_chunk_id(last_chunk_id);
+      }
+      auto* patch_req = last_chunk_req->add_patches();
+      patch_req->set_offset(patch_list->front().offset_in_chunk);
+      patch_req->set_data(&patch_list->front().size_field[0],
+                          patch_list->front().size_field.size());
+      patch_list->pop_front();
+    }
+    // Patches are enqueued in order in the |patch_list| in order and are
+    // notified here when the chunk is returned. The only case when the current
+    // patch list is incompelte is if there is an unpatches entry at the head
+    // of the |patch_list| that belongs to the same ChunkID of the last one we
+    // are about to send to the server.
+    if (last_chunk_req && !patch_list->empty() &&
+        patch_list->front().chunk_id == last_chunk_id) {
+      last_chunk_req->set_has_more_patches(true);
+    }
   }
 
   // TODO(primiano): optimization: at this point, if most of the SMB is full of
