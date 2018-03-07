@@ -30,7 +30,7 @@ TEST(TracePacketTest, Simple) {
   proto.mutable_for_testing()->set_str("string field");
   std::string ser_buf = proto.SerializeAsString();
   TracePacket tp;
-  tp.AddSlice({ser_buf.data(), ser_buf.size()});
+  tp.AddSlice(ser_buf.data(), ser_buf.size());
   auto slice = tp.slices().begin();
   ASSERT_NE(tp.slices().end(), slice);
   ASSERT_EQ(ser_buf.data(), slice->start);

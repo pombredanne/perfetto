@@ -192,8 +192,9 @@ class TraceBuffez {
   // Reads in the TraceBuffer are NOT idempotent.
   void BeginRead();
 
-  // Returns the next packet in the buffer, if any. Returns false if no packets
-  // can be read at this point.
+  // Returns the next packet in the buffer, if any, and the uid of the producer
+  // that wrote it (as passed in the CopyChunkUntrusted() call). Returns false
+  // if no packets can be read at this point.
   // This function returns only complete packets. Specifically:
   // When there is at least one complete packet in the buffer, this function
   // returns true and populates the TracePacket argument with the boundaries of
@@ -319,9 +320,10 @@ class TraceBuffez {
     };
 
     ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f, uid_t u)
-        : chunk_record{c}, flags{f}, num_fragments{p}, trusted_uid{u} {}
+        : chunk_record{c}, trusted_uid{u}, flags{f}, num_fragments{p} {}
 
     ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
+    const uid_t trusted_uid;           // uid of the producer.
     uint8_t flags = 0;                 // See SharedMemoryABI::flags.
     const uint16_t num_fragments = 0;  // Total number of packet fragments.
     uint16_t num_fragments_read = 0;   // Number of fragments already read.
@@ -331,8 +333,6 @@ class TraceBuffez {
     // payload (the 1st fragment starts at |chunk_record| +
     // sizeof(ChunkRecord)).
     uint16_t cur_fragment_offset = 0;
-
-    uid_t trusted_uid = 0;
   };
 
   using ChunkMap = std::map<ChunkMeta::Key, ChunkMeta>;

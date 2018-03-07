@@ -86,6 +86,11 @@ class PatchList {
     return list_.front();
   }
 
+  const Patch& back() const {
+    PERFETTO_DCHECK(!list_.empty());
+    return *last_;
+  }
+
   ListType::const_iterator begin() const { return list_.begin(); }
   ListType::const_iterator end() const { return list_.end(); }
   bool empty() const { return list_.empty(); }

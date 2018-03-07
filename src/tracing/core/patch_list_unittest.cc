@@ -35,7 +35,7 @@ std::ostream& operator<<(std::ostream& o, const Patch& p) {
 
 namespace {
 
-TEST(PatchListTest, Ordering) {
+TEST(PatchListTest, InsertAndRemove) {
   PatchList pl;
 
   ASSERT_TRUE(pl.empty());
@@ -47,6 +47,7 @@ TEST(PatchListTest, Ordering) {
   ASSERT_THAT(pl, ElementsAre(Patch(ChunkID(5), 50), Patch(ChunkID(6), 60)));
 
   ASSERT_EQ(pl.front(), Patch(ChunkID(5), 50));
+  ASSERT_EQ(pl.back(), Patch(ChunkID(6), 60));
 
   pl.pop_front();
   ASSERT_EQ(pl.front(), Patch(ChunkID(6), 60));
@@ -54,6 +55,7 @@ TEST(PatchListTest, Ordering) {
 
   pl.pop_front();
   ASSERT_EQ(pl.front(), Patch(ChunkID(7), 70));
+  ASSERT_EQ(pl.back(), Patch(ChunkID(7), 70));
 
   pl.pop_front();
 
@@ -66,6 +68,24 @@ TEST(PatchListTest, Ordering) {
 
     pl.pop_front();
     pl.pop_front();
+  }
+}
+
+TEST(PatchListTest, PointerStability) {
+  PatchList pl;
+  const uint8_t* ptrs[10]{};
+  for (uint16_t i = 0; i < 1000; i++) {
+    pl.emplace_back(ChunkID(i), i);
+    if (i >= 1000 - 10)
+      ptrs[i - (1000 - 10)] = &pl.back().size_field[0];
+  }
+
+  for (uint16_t i = 0; i < 1000 - 10; i++)
+    pl.pop_front();
+
+  auto it = pl.begin();
+  for (uint16_t i = 0; it != pl.end(); it++, i++) {
+    EXPECT_EQ(ptrs[i], &it->size_field[0]);
   }
 }
 

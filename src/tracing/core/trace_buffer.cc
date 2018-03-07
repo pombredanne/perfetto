@@ -620,7 +620,7 @@ bool TraceBuffez::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
     return false;
 
   if (PERFETTO_LIKELY(packet))
-    packet->AddSlice(Slice(packet_data, static_cast<size_t>(packet_size)));
+    packet->AddSlice(packet_data, static_cast<size_t>(packet_size));
 
   return true;
 }

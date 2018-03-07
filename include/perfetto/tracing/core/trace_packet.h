@@ -65,6 +65,7 @@ class TracePacket {
 
   // Mutator, used only by the service and tests.
   void AddSlice(Slice);
+  void AddSlice(const void* start, size_t size);
 
   // Total size of all slices.
   size_t size() const { return size_; }
