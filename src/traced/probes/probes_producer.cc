@@ -226,8 +226,8 @@ void ProbesProducer::CreateDeviceToInodeMap(
       InodeMap& inode_map = (*block_device_map)[block_device_id];
       // Default
       Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
-      // Continue iterating through files if current entry is a directory
       if (entry->d_type == DT_DIR) {
+        // Continue iterating through files if current entry is a directory
         queue.push(filepath + filename);
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
       } else if (entry->d_type == DT_REG) {
