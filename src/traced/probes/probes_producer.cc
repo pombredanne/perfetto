@@ -77,8 +77,6 @@ void ProbesProducer::OnConnect() {
   inode_map_descriptor.set_name(kInodeFileMapSourceName);
   endpoint_->RegisterDataSource(inode_map_descriptor,
                                 [](DataSourceInstanceID) {});
-
-  CreateDeviceToInodeMap("/system/", &system_inodes_);
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -169,6 +167,7 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
       new InodeFileMapDataSource(&system_inodes_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
+  CreateDeviceToInodeMap("/system/", &system_inodes_);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
@@ -205,7 +204,12 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 // static
 void ProbesProducer::CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<dev_t, InodeMap>* block_device_map) {
+    std::map<uint64_t, InodeMap>* block_device_map) {
+  // Return immediately if we've already filled in the system map
+  if (!block_device_map->empty())
+    return;
+  struct timespec start, stop;
+  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &start) != -1);
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -218,11 +222,11 @@ void ProbesProducer::CreateDeviceToInodeMap(
       continue;
     while ((entry = readdir(dir)) != nullptr) {
       std::string filename = entry->d_name;
-      if (filename == "." | filename == "..")
+      if (filename == "." || filename == "..")
         continue;
-      ino_t inode_number = entry->d_ino;
+      uint64_t inode_number = entry->d_ino;
       // TODO(azappone): set block device id with lstat
-      dev_t block_device_id = 0;
+      uint64_t block_device_id = 0;
       InodeMap& inode_map = (*block_device_map)[block_device_id];
       // Default
       Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
@@ -238,6 +242,10 @@ void ProbesProducer::CreateDeviceToInodeMap(
     }
     closedir(dir);
   }
+  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &stop) != -1);
+  PERFETTO_LOG("Creating block device to inode file map took %ldms",
+               (stop.tv_sec - start.tv_sec) +
+                   (stop.tv_nsec - start.tv_nsec) / (1000 * 1000));
 }
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
@@ -318,7 +326,7 @@ void ProbesProducer::SinkDelegate::OnInodes(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
-    std::map<dev_t, InodeMap>* file_system_inodes,
+    std::map<uint64_t, InodeMap>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
     : writer_(std::move(writer)) {}
 
