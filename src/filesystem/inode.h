@@ -17,6 +17,7 @@
 #ifndef SRC_FILESYSTEM_INODE_H_
 #define SRC_FILESYSTEM_INODE_H_
 
+#include <sys/stat.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -24,7 +25,7 @@
 namespace perfetto {
 
 // On ARM, st_dev is not dev_t but unsigned long long.
-using block_device_t = unsigned long long;
+using block_device_t = decltype(stat::st_dev);
 
 std::map<block_device_t, std::vector<std::string>> ParseMounts();
 }  // namespace perfetto
