@@ -22,7 +22,11 @@
 #include <vector>
 
 namespace perfetto {
-std::map<dev_t, std::vector<std::string>> ParseMounts();
-}
+
+// On ARM, st_dev is not dev_t but unsigned long long.
+using block_device_t = unsigned long long;
+
+std::map<block_device_t, std::vector<std::string>> ParseMounts();
+}  // namespace perfetto
 
 #endif  // SRC_FILESYSTEM_INODE_H_

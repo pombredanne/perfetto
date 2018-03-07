@@ -28,8 +28,8 @@ namespace {
 constexpr const char* kMountsPath = "/proc/mounts";
 }
 
-std::map<dev_t, std::vector<std::string>> ParseMounts() {
-  std::map<dev_t, std::vector<std::string>> device_to_mountpoints;
+std::map<block_device_t, std::vector<std::string>> ParseMounts() {
+  std::map<block_device_t, std::vector<std::string>> device_to_mountpoints;
   std::ifstream f(kMountsPath);
   std::string line;
   std::string mountpoint;
