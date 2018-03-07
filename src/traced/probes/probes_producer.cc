@@ -94,6 +94,9 @@ void ProbesProducer::CreateDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
   instances_[id] = source_config.name();
+
+  struct timespec start, stop;
+  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &start) != -1);
   if (source_config.name() == kFtraceSourceName) {
     CreateFtraceDataSourceInstance(id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
@@ -104,6 +107,12 @@ void ProbesProducer::CreateDataSourceInstance(
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
   }
+
+  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &stop) != -1);
+
+  PERFETTO_LOG("Took %ldms",
+               (stop.tv_sec - start.tv_sec) +
+                   (stop.tv_nsec - start.tv_nsec) / (1000 * 1000));
 }
 
 void ProbesProducer::AddWatchdogsTimer(DataSourceInstanceID id,
