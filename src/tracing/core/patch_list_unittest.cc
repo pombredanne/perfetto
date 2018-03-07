@@ -27,9 +27,9 @@ namespace perfetto {
 
 std::ostream& operator<<(std::ostream& o, const Patch& p);
 std::ostream& operator<<(std::ostream& o, const Patch& p) {
-  o << p.chunk_id << "@" << p.offset_in_chunk << " : {" << std::hex
-    << p.size_field[0] << "," << p.size_field[1] << "," << p.size_field[2]
-    << "," << p.size_field[3] << "}";
+  o << p.chunk_id << "@" << p.offset << " : {" << std::hex << p.size_field[0]
+    << "," << p.size_field[1] << "," << p.size_field[2] << ","
+    << p.size_field[3] << "}";
   return o;
 }
 
