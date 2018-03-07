@@ -17,7 +17,6 @@
 #include "src/traced/probes/probes_producer.h"
 
 #include <stdio.h>
-#include <sys/stat.h>
 #include <queue>
 #include <string>
 
@@ -224,19 +223,15 @@ void ProbesProducer::CreateDeviceToInodeMap(
       if (filename == "." || filename == "..")
         continue;
       uint64_t inode_number = entry->d_ino;
-      struct stat buf;
-      if (lstat(filepath.c_str(), &buf) != 0)
-        continue;
-      uint64_t block_device_id = buf.st_dev;
+      uint64_t block_device_id = 0;
       InodeMap& inode_map = (*block_device_map)[block_device_id];
       // Default
       Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
-      // Readdir and stat not guaranteed to have directory info for all systems
-      if (entry->d_type == DT_DIR || S_ISDIR(buf.st_mode)) {
+      if (entry->d_type == DT_DIR) {
         // Continue iterating through files if current entry is a directory
         queue.push(filepath + filename);
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
-      } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
+      } else if (entry->d_type == DT_REG) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
       inode_map[inode_number].first = type;
