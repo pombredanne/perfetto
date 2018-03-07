@@ -629,7 +629,7 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Sum up all the trace buffers.
   for (const auto& id_to_buffer : buffers_) {
-    total_buffer_bytes += id_to_buffer.second.size();
+    total_buffer_bytes += id_to_buffer.second->size();
   }
 
   // Set the guard rail to 32MB + the sum of all the buffers over a 30 second
