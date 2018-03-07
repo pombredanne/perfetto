@@ -85,7 +85,6 @@ void ClearFile(const char* path) {
 
 }  // namespace
 
-// TODO(fmayer): Actually call this on shutdown.
 // Method of last resort to reset ftrace state.
 // We don't know what state the rest of the system and process is so as far
 // as possible avoid allocations.
@@ -365,6 +364,20 @@ FtraceMetadata::FtraceMetadata() {
   // A lot of the time there will only be a small number of inodes.
   inodes.reserve(10);
   pids.reserve(10);
+}
+
+void FtraceMetadata::AddPid(int32_t pid) {
+  // Speculative optimization aginst repated pid's while keeping
+  // faster insertion than a set.
+  if (pids.size() && pids.back() == pid)
+    return;
+  pids.push_back(pid);
+}
+
+void FtraceMetadata::Clear() {
+  inodes.clear();
+  pids.clear();
+  overwrite_count = 0;
 }
 
 }  // namespace perfetto
