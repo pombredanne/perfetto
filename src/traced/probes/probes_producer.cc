@@ -93,13 +93,12 @@ void ProbesProducer::OnDisconnect() {
 void ProbesProducer::CreateDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
-  instances_[id] = source_config.name();
   if (source_config.name() == kFtraceSourceName) {
     CreateFtraceDataSourceInstance(id, source_config);
-  } else if (source_config.name() == kProcessStatsSourceName) {
-    CreateProcessStatsDataSourceInstance(source_config);
   } else if (source_config.name() == kInodeFileMapSourceName) {
     CreateInodeFileMapDataSourceInstance(id, source_config);
+  } else if (source_config.name() == kProcessStatsSourceName) {
+    CreateProcessStatsDataSourceInstance(id, source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
@@ -170,7 +169,9 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
+    DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
+  ps_data_sources_.insert(id);
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   procfs_utils::ProcessMap processes;
@@ -202,17 +203,12 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
-  PERFETTO_DCHECK(instances_.count(id));
-  if (instances_[id] == kFtraceSourceName) {
-    size_t removed = delegates_.erase(id);
-    PERFETTO_DCHECK(removed == 1);
-    // Might return 0 if trace_duration_ms == 0.
-    watchdogs_.erase(id);
-  } else if (instances_[id] == kInodeFileMapSourceName) {
-    size_t removed = file_map_sources_.erase(id);
-    PERFETTO_DCHECK(removed == 1);
-    watchdogs_.erase(id);
-  }
+  PERFETTO_DCHECK((delegates_.count(id) + ps_data_sources_.count(id) +
+                   file_map_sources_.count(id)) == 1);
+  delegates_.erase(id);
+  ps_data_sources_.erase(id);
+  file_map_sources_.erase(id);
+  watchdogs_.erase(id);
 }
 
 void ProbesProducer::ConnectWithRetries(const char* socket_name,
