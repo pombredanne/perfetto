@@ -172,8 +172,7 @@ bool InferFtraceType(const std::string& type_and_name,
     if (size == 4) {
       *out = kFtraceInode32;
       return true;
-    }
-    if (size == 8) {
+    } else if (size == 8) {
       *out = kFtraceInode64;
       return true;
     }
@@ -189,8 +188,7 @@ bool InferFtraceType(const std::string& type_and_name,
   if (size == 1 && !is_signed) {
     *out = kFtraceUint8;
     return true;
-  }
-  if (size == 2 && is_signed) {
+  } else if (size == 2 && is_signed) {
     *out = kFtraceInt16;
     return true;
   } else if (size == 2 && !is_signed) {
