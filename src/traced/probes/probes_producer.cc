@@ -208,8 +208,6 @@ void ProbesProducer::CreateDeviceToInodeMap(
   // Return immediately if we've already filled in the system map
   if (!block_device_map->empty())
     return;
-  struct timespec start, stop;
-  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &start) != -1);
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -242,10 +240,6 @@ void ProbesProducer::CreateDeviceToInodeMap(
     }
     closedir(dir);
   }
-  PERFETTO_CHECK(clock_gettime(CLOCK_REALTIME, &stop) != -1);
-  PERFETTO_LOG("Creating block device to inode file map took %ldms",
-               (stop.tv_sec - start.tv_sec) +
-                   (stop.tv_nsec - start.tv_nsec) / (1000 * 1000));
 }
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
