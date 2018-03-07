@@ -74,7 +74,7 @@ class TraceBufferTest : public testing::Test {
     uint32_t ignore;
     if (!trace_buffer_->ReadNextTracePacket(&packet, uid ? uid : &ignore))
       return fragments;
-    for (const Slice& slice : packet)
+    for (const Slice& slice : packet.slices())
       fragments.emplace_back(slice.start, slice.size);
     return fragments;
   }
@@ -605,6 +605,44 @@ TEST_F(TraceBufferTest, Fragments_LongPacketWithWrappingID) {
   }
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ContainerEq(expected_fragments));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+TEST_F(TraceBufferTest, Fragments_PreserveUID) {
+  ResetBuffer(4096);
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(10, 'a')
+      .AddPacket(10, 'b', kContOnNextChunk)
+      .SetUID(11)
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(2), WriterID(1), ChunkID(0))
+      .AddPacket(10, 'c')
+      .AddPacket(10, 'd')
+      .SetUID(22)
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
+      .AddPacket(10, 'e', kContFromPrevChunk)
+      .AddPacket(10, 'f')
+      .SetUID(11)
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  uid_t uid = -1;
+  ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'a')));
+  ASSERT_EQ(11u, uid);
+
+  ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'b'),
+                                            FakePacketFragment(10, 'e')));
+  ASSERT_EQ(11u, uid);
+
+  ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'f')));
+  ASSERT_EQ(11u, uid);
+
+  ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'c')));
+  ASSERT_EQ(22u, uid);
+
+  ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'd')));
+  ASSERT_EQ(22u, uid);
+
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 

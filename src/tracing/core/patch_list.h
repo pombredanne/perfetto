@@ -20,7 +20,9 @@
 #include <array>
 #include <forward_list>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/basic_types.h"
+#include "perfetto/tracing/core/shared_memory_abi.h"
 
 namespace perfetto {
 
@@ -32,6 +34,7 @@ class Patch {
  public:
   using PatchContent = std::array<uint8_t, SharedMemoryABI::kPacketHeaderSize>;
   Patch(ChunkID c, uint16_t o) : chunk_id(c), offset_in_chunk(o) {}
+  Patch(const Patch&) = default;  // For tests.
 
   const ChunkID chunk_id;
   const uint16_t offset_in_chunk;
@@ -43,9 +46,14 @@ class Patch {
   // iff we never wrote any varint into that.
   bool is_patched() const { return size_field[0] != 0; }
 
+  // For tests.
+  bool operator==(const Patch& o) const {
+    return chunk_id == o.chunk_id && offset_in_chunk == o.offset_in_chunk &&
+           size_field == o.size_field;
+  }
+
  private:
-  Patch(const Patch&) = delete;
-  Patch& operator=(const Patch&) = delete;
+  Patch& operator=(const Patch&) = default;
   Patch(Patch&&) noexcept = delete;
   Patch& operator=(Patch&&) = delete;
 };
@@ -54,17 +62,42 @@ class Patch {
 // these entries. This container must guarantee that the Patch objects are never
 // moved around (i.e. cannot be a vector because of reallocations can change
 // addresses of pre-existing entries).
-class PatchList : public std::forward_list<Patch> {
+class PatchList {
  public:
-  PatchList() : std::forward_list<Patch>(), last_(begin()) {}
+  using ListType = std::forward_list<Patch>;
+  using value_type = ListType::value_type;          // For gtest.
+  using const_iterator = ListType::const_iterator;  // For gtest.
+
+  PatchList() : last_(list_.before_begin()) {}
 
   Patch* emplace_back(ChunkID chunk_id, uint16_t offset) {
-    last_ = emplace_after(last_, chunk_id, offset);
+    last_ = list_.emplace_after(last_, chunk_id, offset);
     return &*last_;
   }
 
+  void pop_front() {
+    list_.pop_front();
+    if (empty())
+      last_ = list_.before_begin();
+  }
+
+  const Patch& front() const {
+    PERFETTO_DCHECK(!list_.empty());
+    return list_.front();
+  }
+
+  const Patch& back() const {
+    PERFETTO_DCHECK(!list_.empty());
+    return *last_;
+  }
+
+  ListType::const_iterator begin() const { return list_.begin(); }
+  ListType::const_iterator end() const { return list_.end(); }
+  bool empty() const { return list_.empty(); }
+
  private:
-  std::forward_list<Patch>::iterator last_;
+  ListType list_;
+  ListType::iterator last_;
 };
 
 }  // namespace perfetto
