@@ -163,11 +163,11 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
                id, source_config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
+  CreateDeviceToInodeMap("/system/", &system_inodes_);
   auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
       new InodeFileMapDataSource(&system_inodes_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
-  CreateDeviceToInodeMap("/system/", &system_inodes_);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
