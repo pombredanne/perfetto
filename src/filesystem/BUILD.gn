@@ -1,0 +1,21 @@
+source_set("inode") {
+  deps = [
+    "../../gn:default_deps",
+  ]
+  sources = [
+    "inode.cc",
+    "inode.h",
+  ]
+}
+
+source_set("filesystem_unittests") {
+  testonly = true
+  deps = [
+    ":inode",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+  ]
+  sources = [
+    "inode_unittest.cc",
+  ]
+}

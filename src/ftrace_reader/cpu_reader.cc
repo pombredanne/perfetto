@@ -19,16 +19,10 @@
 #include <signal.h>
 
 #include <dirent.h>
-#include <fstream>
 #include <map>
 #include <queue>
-#include <sstream>
 #include <string>
 #include <utility>
-
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
@@ -160,26 +154,6 @@ CpuReader::~CpuReader() {
   trace_fd_.reset();
   pthread_kill(worker_thread_.native_handle(), SIGPIPE);
   worker_thread_.join();
-}
-
-// static
-std::map<dev_t, std::vector<std::string>> CpuReader::ParseMounts(
-    std::string path) {
-  std::map<dev_t, std::vector<std::string>> r;
-  std::ifstream f(path);
-  std::string line;
-  std::string mountpoint;
-  struct stat buf;
-  while (std::getline(f, line)) {
-    std::istringstream s(line);
-    // Discard first column.
-    s >> mountpoint;
-    s >> mountpoint;
-    if (stat(mountpoint.c_str(), &buf) == -1)
-      continue;
-    r[buf.st_dev].emplace_back(mountpoint);
-  }
-  return r;
 }
 
 // static
