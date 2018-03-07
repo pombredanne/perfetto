@@ -23,12 +23,13 @@ namespace perfetto {
 namespace {
 
 using testing::Contains;
+using testing::Pair;
 
 TEST(InodeTest, ParseMounts) {
   auto mounts = ParseMounts();
   struct stat buf;
   ASSERT_NE(stat("/proc", &buf), -1);
-  EXPECT_THAT(mounts[buf.st_dev], Contains("/proc"));
+  EXPECT_THAT(mounts, Contains(Pair(buf.st_dev, Contains("/proc"))));
 }
 
 }  // namespace
