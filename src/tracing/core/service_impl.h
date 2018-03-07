@@ -26,6 +26,7 @@
 #include "perfetto/base/page_allocator.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
+#include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/service.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
@@ -124,15 +125,17 @@ class ServiceImpl : public Service {
                           DataSourceID,
                           const DataSourceDescriptor&);
   void UnregisterDataSource(ProducerID, DataSourceID);
-  void CommitData(ProducerID,
-                  uid_t,
-                  WriterID,
-                  ChunkID,
-                  BufferID,
-                  uint16_t num_fragments,
-                  uint8_t chunk_flags,
-                  const uint8_t* src,
-                  size_t size);
+  void CopyProducerPageIntoLogBuffer(ProducerID,
+                                     uid_t,
+                                     WriterID,
+                                     ChunkID,
+                                     BufferID,
+                                     uint16_t num_fragments,
+                                     uint8_t chunk_flags,
+                                     const uint8_t* src,
+                                     size_t size);
+  void ApplyChunkPatches(ProducerID,
+                         const std::vector<CommitDataRequest::ChunkToPatch>&);
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
@@ -207,6 +210,8 @@ class ServiceImpl : public Service {
   // Update the memory guard rail by using the latest information from the
   // shared memory and trace buffers.
   void UpdateMemoryGuardrail();
+
+  TraceBuffez* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;
   std::unique_ptr<SharedMemory::Factory> shm_factory_;

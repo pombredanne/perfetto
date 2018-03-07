@@ -385,6 +385,7 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet,
   // - return the first patched+complete packet in the next sequence, if any.
   // - return false if none of the above is found.
   TRACE_BUFFER_DLOG("ReadNextTracePacket()");
+  *producer_uid = -1;  // Just in case we forget to initialize it below.
 #if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!changed_since_last_read_);
 #endif

@@ -25,7 +25,6 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
-#include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
@@ -539,22 +538,23 @@ void ServiceImpl::CreateDataSourceInstance(
   producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
 }
 
-// Note: all the fields % |producer_id_trusted| are untrusted, as in, the
-// Producer might be lying / returning garbage contents. |src| and |size| can
-// be trusted in terms of being a valid pointer, but not the contents.
-void ServiceImpl::CommitData(ProducerID producer_id_trusted,
-                             uid_t producer_uid_trusted,
-                             WriterID writer_id,
-                             ChunkID chunk_id,
-                             BufferID buffer_id,
-                             uint16_t num_fragments,
-                             uint8_t chunk_flags,
-                             const uint8_t* src,
-                             size_t size) {
+// Note: all the fields % *_trusted ones are untrusted, as in, the Producer
+// might be lying / returning garbage contents. |src| and |size| can be trusted
+// in terms of being a valid pointer, but not the contents.
+void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id_trusted,
+                                                uid_t producer_uid_trusted,
+                                                WriterID writer_id,
+                                                ChunkID chunk_id,
+                                                BufferID buffer_id,
+                                                uint16_t num_fragments,
+                                                uint8_t chunk_flags,
+                                                const uint8_t* src,
+                                                size_t size) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  auto buf_iter = buffers_.find(buffer_id);
-  if (buf_iter == buffers_.end()) {
-    PERFETTO_DLOG("Could not find target buffer %u for producer %" PRIu16,
+  TraceBuffez* buf = GetBufferByID(buffer_id);
+  if (!buf) {
+    PERFETTO_DLOG("Could not find target buffer %" PRIu16
+                  " for producer %" PRIu16,
                   buffer_id, producer_id_trusted);
     return;
   }
@@ -565,9 +565,54 @@ void ServiceImpl::CommitData(ProducerID producer_id_trusted,
   // Essentially we want to prevent a malicious producer to inject data into a
   // log buffer that has nothing to do with it.
 
-  TraceBuffez& buf = *buf_iter->second;
-  buf.CopyChunkUntrusted(producer_id_trusted, producer_uid_trusted, writer_id,
-                         chunk_id, num_fragments, chunk_flags, src, size);
+  buf->CopyChunkUntrusted(producer_id_trusted, producer_uid_trusted, writer_id,
+                          chunk_id, num_fragments, chunk_flags, src, size);
+}
+
+void ServiceImpl::ApplyChunkPatches(
+    ProducerID producer_id_trusted,
+    const std::vector<CommitDataRequest::ChunkToPatch>& chunks_to_patch) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+
+  for (const auto& chunk : chunks_to_patch) {
+    const ChunkID chunk_id = static_cast<ChunkID>(chunk.chunk_id());
+    const WriterID writer_id = static_cast<WriterID>(chunk.writer_id());
+    TraceBuffez* buf =
+        GetBufferByID(static_cast<BufferID>(chunk.target_buffer()));
+    if (!chunk_id || chunk_id > kMaxChunkID || !writer_id ||
+        writer_id > kMaxWriterID || !buf) {
+      PERFETTO_DLOG(
+          "Received invalid chunks_to_patch request from Producer: %" PRIu16
+          ", BufferID: %" PRIu32 " ChunkdID: %" PRIu32 " WriterID: %" PRIu16,
+          producer_id_trusted, chunk.target_buffer(), chunk_id, writer_id);
+      continue;
+    }
+    // Speculate on the fact that there are going to be a limited amount of
+    // patches per request, so we can allocate the |patches| array on the stack.
+    std::array<TraceBuffez::Patch, 1024> patches;  // Uninitialized.
+    if (chunk.patches().size() > patches.size()) {
+      PERFETTO_DLOG("Too many patches (%zu) batched in the same request",
+                    patches.size());
+      PERFETTO_DCHECK(false);
+      continue;
+    }
+
+    size_t i = 0;
+    for (const auto& patch : chunk.patches()) {
+      const std::string& patch_data = patch.data();
+      if (patch_data.size() != patches[i].data.size()) {
+        PERFETTO_DLOG("Received patch from producer: %" PRIu16
+                      " of unexpected size %zu",
+                      producer_id_trusted, patch_data.size());
+        continue;
+      }
+      patches[i].offset_untrusted = patch.offset();
+      memcpy(&patches[i].data[0], patch_data.data(), patches[i].data.size());
+      i++;
+    }
+    buf->TryPatchChunkContents(producer_id_trusted, writer_id, chunk_id,
+                               &patches[0], i, chunk.has_more_patches());
+  }
 }
 
 ServiceImpl::TracingSession* ServiceImpl::GetTracingSession(
@@ -587,6 +632,13 @@ ProducerID ServiceImpl::GetNextProducerID() {
   } while (producers_.count(last_producer_id_) || last_producer_id_ == 0);
   PERFETTO_DCHECK(last_producer_id_ > 0 && last_producer_id_ <= kMaxProducerID);
   return last_producer_id_;
+}
+
+TraceBuffez* ServiceImpl::GetBufferByID(BufferID buffer_id) {
+  auto buf_iter = buffers_.find(buffer_id);
+  if (buf_iter == buffers_.end())
+    return nullptr;
+  return &*buf_iter->second;
 }
 
 void ServiceImpl::UpdateMemoryGuardrail() {
@@ -734,7 +786,8 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     // TryAcquireChunkForReading() has load-acquire semantics. Once acquired,
     // the ABI contract expects the producer to not touch the chunk anymore
     // (until the service marks that as free). This is why all the reads below
-    // are just memory_order_relaxed.
+    // are just memory_order_relaxed. Also, the code here assumes that all this
+    // data can be malicious and just gives up if anything is malformed.
     BufferID buffer_id = static_cast<BufferID>(entry.target_buffer());
     const SharedMemoryABI::ChunkHeader& chunk_header = *chunk.header();
     WriterID writer_id = chunk_header.writer_id.load(std::memory_order_relaxed);
@@ -745,13 +798,15 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
 
     PERFETTO_DLOG("Commit req %d:%d", entry.page(), entry.chunk());
 
-    service_->CommitData(id_, uid_, writer_id, chunk_id, buffer_id,
-                         num_fragments, chunk_flags, chunk.payload_begin(),
-                         chunk.payload_size());
+    service_->CopyProducerPageIntoLogBuffer(
+        id_, uid_, writer_id, chunk_id, buffer_id, num_fragments, chunk_flags,
+        chunk.payload_begin(), chunk.payload_size());
 
     // This one has release-store semantics.
     shmem_abi_.ReleaseChunkAsFree(std::move(chunk));
-  }
+  }  // for(chunks_to_move)
+
+  service_->ApplyChunkPatches(id_, req_untrusted.chunks_to_patch());
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {

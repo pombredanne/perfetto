@@ -33,22 +33,22 @@ namespace perfetto {
 class Patch {
  public:
   using PatchContent = std::array<uint8_t, SharedMemoryABI::kPacketHeaderSize>;
-  Patch(ChunkID c, uint16_t o) : chunk_id(c), offset_in_chunk(o) {}
+  Patch(ChunkID c, uint16_t o) : chunk_id(c), offset(o) {}
   Patch(const Patch&) = default;  // For tests.
 
   const ChunkID chunk_id;
-  const uint16_t offset_in_chunk;
+  const uint16_t offset;
   PatchContent size_field{};
 
   // |size_field| contains a varint. Any varint must start with != 0. Even in
-  // the case we want to encode a size == 0, protozero will write a rendundant
+  // the case we want to encode a size == 0, protozero will write a redundant
   // varint for that, that is [0x80, 0x80, 0x80, 0x00]. So the first byte is 0
   // iff we never wrote any varint into that.
   bool is_patched() const { return size_field[0] != 0; }
 
   // For tests.
   bool operator==(const Patch& o) const {
-    return chunk_id == o.chunk_id && offset_in_chunk == o.offset_in_chunk &&
+    return chunk_id == o.chunk_id && offset == o.offset &&
            size_field == o.size_field;
   }
 
@@ -71,6 +71,8 @@ class PatchList {
   PatchList() : last_(list_.before_begin()) {}
 
   Patch* emplace_back(ChunkID chunk_id, uint16_t offset) {
+    PERFETTO_DCHECK(empty() || last_->chunk_id != chunk_id ||
+                    offset >= last_->offset + sizeof(Patch::PatchContent));
     last_ = list_.emplace_after(last_, chunk_id, offset);
     return &*last_;
   }

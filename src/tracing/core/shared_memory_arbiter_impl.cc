@@ -164,6 +164,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
         last_chunk_req->set_writer_id(writer_id);
         last_chunk_id = patch_list->front().chunk_id;
         last_chunk_req->set_chunk_id(last_chunk_id);
+        last_chunk_req->set_target_buffer(target_buffer);
       }
       auto* patch_req = last_chunk_req->add_patches();
       patch_req->set_offset(patch_list->front().offset_in_chunk);
@@ -171,11 +172,11 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
                           patch_list->front().size_field.size());
       patch_list->pop_front();
     }
-    // Patches are enqueued in order in the |patch_list| in order and are
-    // notified here when the chunk is returned. The only case when the current
-    // patch list is incompelte is if there is an unpatches entry at the head
-    // of the |patch_list| that belongs to the same ChunkID of the last one we
-    // are about to send to the server.
+    // Patches are enqueued in the |patch_list| in order and are notified to
+    // the service when the chunk is returned. The only case when the current
+    // patch list is incomplete is if there is an unpatched entry at the head of
+    // the |patch_list| that belongs to the same ChunkID as the last one we are
+    // about to send to the service.
     if (last_chunk_req && !patch_list->empty() &&
         patch_list->front().chunk_id == last_chunk_id) {
       last_chunk_req->set_has_more_patches(true);
