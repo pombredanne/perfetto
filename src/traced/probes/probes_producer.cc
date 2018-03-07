@@ -230,8 +230,9 @@ void ProbesProducer::CreateDeviceToInodeMap(
       if (entry->d_type == DT_DIR) {
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
         queue.push(filepath + filename);
-      } else if (entry->d_type == DT_REG)
+      } else if (entry->d_type == DT_REG) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
+      }
       inode_map[inode_number].first = type;
       inode_map[inode_number].second.emplace(filepath + filename);
     }
