@@ -55,6 +55,7 @@ void DataSourceConfig::FromProto(
       static_cast<decltype(trace_duration_ms_)>(proto.trace_duration_ms());
 
   ftrace_config_.FromProto(proto.ftrace_config());
+  chrome_trace_config_ = proto.chrome_trace_config();
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -77,6 +78,7 @@ void DataSourceConfig::ToProto(
       static_cast<decltype(proto->trace_duration_ms())>(trace_duration_ms_));
 
   ftrace_config_.ToProto(proto->mutable_ftrace_config());
+  proto->set_chrome_trace_config(chrome_trace_config_);
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

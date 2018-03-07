@@ -39,6 +39,7 @@ message DataSourceConfig {
   // data-sources and needs to be processed by the traced daemon.
 
   optional FtraceConfig ftrace_config = 100;
+  optional string chrome_trace_config = 101;
 }
 
 // End of protos/perfetto/config/data_source_config.proto

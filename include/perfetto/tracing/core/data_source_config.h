@@ -70,11 +70,19 @@ class DataSourceConfig {
   const FtraceConfig& ftrace_config() const { return ftrace_config_; }
   FtraceConfig* mutable_ftrace_config() { return &ftrace_config_; }
 
+  const std::string& chrome_trace_config() const {
+    return chrome_trace_config_;
+  }
+  void set_chrome_trace_config(const std::string& config) {
+    chrome_trace_config_ = config;
+  }
+
  private:
   std::string name_ = {};
   uint32_t target_buffer_ = {};
   uint32_t trace_duration_ms_ = {};
   FtraceConfig ftrace_config_ = {};
+  std::string chrome_trace_config_;
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.
