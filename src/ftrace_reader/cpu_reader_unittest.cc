@@ -59,12 +59,11 @@ const uint64_t kNanoInMicro = 1000;
   uint64_t total_expected_us = expected_s * 1000 * 1000 + expected_us;
   if (actual_us == total_expected_us) {
     return ::testing::AssertionSuccess();
-  } else {
-    return ::testing::AssertionFailure()
-           << actual_ns / kNanoInSecond << "."
-           << (actual_ns % kNanoInSecond) / kNanoInMicro << " vs. "
-           << expected_s << "." << expected_us;
   }
+  return ::testing::AssertionFailure()
+         << actual_ns / kNanoInSecond << "."
+         << (actual_ns % kNanoInSecond) / kNanoInMicro << " vs. " << expected_s
+         << "." << expected_us;
 }
 
 // Single class to manage the whole protozero -> scattered stream -> chunks ->

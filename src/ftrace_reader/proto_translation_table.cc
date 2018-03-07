@@ -172,7 +172,8 @@ bool InferFtraceType(const std::string& type_and_name,
     if (size == 4) {
       *out = kFtraceInode32;
       return true;
-    } else if (size == 8) {
+    }
+    if (size == 8) {
       *out = kFtraceInode64;
       return true;
     }
@@ -188,7 +189,8 @@ bool InferFtraceType(const std::string& type_and_name,
   if (size == 1 && !is_signed) {
     *out = kFtraceUint8;
     return true;
-  } else if (size == 2 && is_signed) {
+  }
+  if (size == 2 && is_signed) {
     *out = kFtraceInt16;
     return true;
   } else if (size == 2 && !is_signed) {
@@ -229,7 +231,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
     std::string contents =
         ftrace_procfs->ReadEventFormat(event.group, event.name);
     FtraceEvent ftrace_event;
-    if (contents == "" || !ParseFtraceEvent(contents, &ftrace_event)) {
+    if (contents.empty() || !ParseFtraceEvent(contents, &ftrace_event)) {
       continue;
     }
 
