@@ -151,9 +151,8 @@ class FakeHost : public UnixSocket::EventListener {
         method->set_name(method_it.first);
         method->set_id(method_it.second->id);
       }
-      return Reply(reply);
-    }
-    if (req.msg_case() == Frame::kMsgInvokeMethod) {
+      Reply(reply);
+    } else if (req.msg_case() == Frame::kMsgInvokeMethod) {
       // Lookup the service and method.
       bool has_more = false;
       do {
