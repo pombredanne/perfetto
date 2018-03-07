@@ -103,7 +103,6 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   // to go away.
   std::unique_ptr<ProducerEndpointImpl> endpoint(
       new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
-  PERFETTO_LOG("created endpoint");
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
@@ -250,7 +249,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       break;
     }
   }
-  // TODO(taylori): Is it safe to delete this?
+  // TODO(taylori): Is it safe to delete this? Becuase memory is not
+  // allocated yet.
   // UpdateMemoryGuardrail();
 
   // This can happen if either:
@@ -562,7 +562,6 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (inst_id == 1) {
-    PERFETTO_LOG("allocating");
     // TODO(taylori): Handle multiple producers/producer configs.
     auto first_producer_config = tracing_session->config.producers()[0];
     auto shared_memory =
@@ -600,7 +599,8 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // Essentially we want to prevent a malicious producer to inject data into a
   // log buffer that has nothing to do with it.
 
-  // PERFETTO_DCHECK(size == first_producer_config.page_size_kb());
+  // TODO(taylori) This is failing. Why?
+  // PERFETTO_DCHECK(size == kBufferPageSize);
   uid_t uid = GetProducer(producer_id)->uid_;
   uint8_t* dst = buf.acquire_next_page(uid);
 

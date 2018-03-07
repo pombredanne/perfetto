@@ -67,10 +67,8 @@ void ProducerIPCService::InitializeConnection(
   std::unique_ptr<RemoteProducer> producer(new RemoteProducer());
 
   // ConnectProducer will call OnConnect() on the next task.
-  PERFETTO_LOG("Connecting producer");
   producer->service_endpoint =
       core_service_->ConnectProducer(producer.get(), client_info.uid());
-  PERFETTO_LOG("Connected producer");
 
   // Could happen if the service has too many producers connected.
   if (!producer->service_endpoint)

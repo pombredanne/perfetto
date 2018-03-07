@@ -111,7 +111,6 @@ message GetAsyncCommandResponse {
 
   message AllocateShm {
     optional protos.TraceConfig.ProducerConfig producer_config = 1;
-    optional uint64 shmem_fd = 2;
   }
 
   message StopDataSource { optional uint64 instance_id = 1; }
