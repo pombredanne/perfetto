@@ -134,10 +134,8 @@ class Service {
   // is unreasonably large).
   // Can return null in the unlikely event that service has too many producers
   // connected.
-  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
-      Producer*,
-      uid_t uid,
-      size_t shared_buffer_size_hint_bytes = 0) = 0;
+  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(Producer*,
+                                                            uid_t uid) = 0;
 
   // Coonects a Consumer instance and obtains a ConsumerEndpoint, which is
   // essentially a 1:1 channel between one Consumer and the Service.

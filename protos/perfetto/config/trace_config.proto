@@ -101,4 +101,14 @@ message TraceConfig {
   // Reject producers that are not running under the same UID as the tracing
   // service.
   optional LockdownModeOperation lockdown_mode = 5;
+
+  message ProducerConfig {
+    optional string producer_name = 1;
+
+    optional uint32 shm_size_kb = 2;
+
+    optional uint32 page_size_kb = 3;
+  }
+
+  repeated ProducerConfig producers = 6;
 }

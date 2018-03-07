@@ -18,6 +18,7 @@
 #define INCLUDE_PERFETTO_TRACING_CORE_PRODUCER_H_
 
 #include "perfetto/tracing/core/basic_types.h"
+#include "perfetto/tracing/core/trace_config.h"
 
 namespace perfetto {
 
@@ -75,6 +76,12 @@ class Producer {
 
   // Called by the Service to shut down an existing data source instance.
   virtual void TearDownDataSourceInstance(DataSourceInstanceID) = 0;
+
+  virtual void AllocateSharedMemory(const TraceConfig::ProducerConfig&,
+                                    const int&) = 0;
+
+  // TODO(taylori)
+  virtual void TearDownSharedMemory(const TraceConfig::ProducerConfig&) = 0;
 };
 
 }  // namespace perfetto

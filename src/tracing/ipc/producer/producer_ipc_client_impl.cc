@@ -26,6 +26,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/shared_memory_arbiter.h"
+#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/tracing/ipc/posix_shared_memory.h"
 
@@ -97,16 +98,6 @@ void ProducerIPCClientImpl::OnConnectionInitialized(bool connection_succeeded) {
   // and there we'll notify the |producer_|. TODO: add a test for this.
   if (!connection_succeeded)
     return;
-
-  base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
-  PERFETTO_CHECK(shmem_fd);
-
-  // TODO(primiano): handle mmap failure in case of OOM.
-  shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
-
-  shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-      shared_memory_.get(), kBufferPageSize, this, task_runner_);
-
   producer_->OnConnect();
 }
 
@@ -127,6 +118,28 @@ void ProducerIPCClientImpl::OnServiceRequest(
     const DataSourceInstanceID dsid = cmd.stop_data_source().instance_id();
     producer_->TearDownDataSourceInstance(dsid);
     return;
+  }
+
+  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kAllocateShm) {
+    auto cfg = cmd.allocate_shm().producer_config();
+    // base::ScopedFile shmem_fd = cmd.fd();
+    // base::ScopedFile shmem_fd = cmd.allocate_shm().shmem_fd();
+    TraceConfig::ProducerConfig producer_config;
+    producer_config.FromProto(cfg);
+    base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
+    PERFETTO_CHECK(shmem_fd);
+    PERFETTO_LOG("client allocate");
+
+    // TODO(primiano): handle mmap failure in case of OOM.
+    shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
+    shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
+        shared_memory_.get(), producer_config.page_size_kb(), this,
+        task_runner_);
+    // producer_->AllocateSharedMemory(producer_config);
+  }
+
+  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kTearDownShm) {
+    // TODO (taylori) Tear down the shm.
   }
 
   PERFETTO_DLOG("Unknown async request %d received from tracing service",

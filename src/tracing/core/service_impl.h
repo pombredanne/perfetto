@@ -56,8 +56,7 @@ class ServiceImpl : public Service {
                          uid_t uid,
                          ServiceImpl*,
                          base::TaskRunner*,
-                         Producer*,
-                         std::unique_ptr<SharedMemory>);
+                         Producer*);
     ~ProducerEndpointImpl() override;
 
     // Service::ProducerEndpoint implementation.
@@ -65,6 +64,7 @@ class ServiceImpl : public Service {
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;
     void CommitData(const CommitDataRequest&) override;
+    void setSharedMemory(std::unique_ptr<SharedMemory>, int);
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
@@ -138,8 +138,7 @@ class ServiceImpl : public Service {
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
       Producer*,
-      uid_t uid,
-      size_t shared_buffer_size_hint_bytes = 0) override;
+      uid_t uid) override;
 
   std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
       Consumer*) override;

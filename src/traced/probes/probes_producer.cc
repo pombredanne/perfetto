@@ -138,15 +138,16 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                source_config.target_buffer());
-
+  PERFETTO_LOG("1");
   FtraceConfig proto_config = source_config.ftrace_config();
-
+  PERFETTO_LOG("Creating trace_writer");
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   auto delegate = std::unique_ptr<SinkDelegate>(
       new SinkDelegate(task_runner_, std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
+  PERFETTO_LOG("Created sink");
   if (!sink) {
     PERFETTO_ELOG("Failed to start tracing (maybe someone else is using it?)");
     return;
@@ -213,6 +214,17 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
     PERFETTO_DCHECK(removed == 1);
     watchdogs_.erase(id);
   }
+}
+
+void ProbesProducer::AllocateSharedMemory(
+    const TraceConfig::ProducerConfig& config,
+    const int& shmem_fd) {
+  // TODO(taylori) Implement.
+}
+
+void ProbesProducer::TearDownSharedMemory(
+    const TraceConfig::ProducerConfig& config) {
+  // TODO(taylori) Implement.
 }
 
 void ProbesProducer::ConnectWithRetries(const char* socket_name,

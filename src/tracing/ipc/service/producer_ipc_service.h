@@ -72,6 +72,9 @@ class ProducerIPCService : public protos::ProducerPort {
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&) override;
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
+    void AllocateSharedMemory(const TraceConfig::ProducerConfig&,
+                              const int&) override;
+    void TearDownSharedMemory(const TraceConfig::ProducerConfig&) override;
 
     // RegisterDataSource requests that haven't been replied yet.
     std::map<std::string, DeferredRegisterDataSourceResponse>

@@ -20,6 +20,7 @@ option optimize_for = LITE_RUNTIME;
 import "perfetto/config/data_source_config.proto";
 import "perfetto/config/data_source_descriptor.proto";
 import "perfetto/ipc/commit_data_request.proto";
+import "perfetto/config/trace_config.proto";
 
 package perfetto.protos;
 
@@ -59,6 +60,8 @@ message InitializeConnectionRequest {
   // of the shared memory buffer. The service is not required to respect this
   // and might return a smaller buffer.
   optional uint32 shared_buffer_size_hint_bytes = 2;
+
+  optional string producer_name = 3;
 }
 
 message InitializeConnectionResponse {
@@ -106,10 +109,21 @@ message GetAsyncCommandResponse {
     optional protos.DataSourceConfig config = 2;
   }
 
+  message AllocateShm {
+    optional protos.TraceConfig.ProducerConfig producer_config = 1;
+    optional uint64 shmem_fd = 2;
+  }
+
   message StopDataSource { optional uint64 instance_id = 1; }
+
+  message TearDownShm {
+    optional protos.TraceConfig.ProducerConfig producer_config = 1;
+  }
 
   oneof cmd {
     StartDataSource start_data_source = 1;
     StopDataSource stop_data_source = 2;
+    AllocateShm allocate_shm = 3;
+    TearDownShm tear_down_shm = 4;
   }
 }

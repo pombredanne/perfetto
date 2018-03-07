@@ -25,6 +25,7 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/service.h"
+#include "perfetto/tracing/core/trace_config.h"
 #include "src/tracing/ipc/posix_shared_memory.h"
 
 // The remote Producer(s) are not trusted. All the methods from the ProducerPort
@@ -66,22 +67,20 @@ void ProducerIPCService::InitializeConnection(
   std::unique_ptr<RemoteProducer> producer(new RemoteProducer());
 
   // ConnectProducer will call OnConnect() on the next task.
-  producer->service_endpoint = core_service_->ConnectProducer(
-      producer.get(), client_info.uid(), req.shared_buffer_size_hint_bytes());
+  PERFETTO_LOG("Connecting producer");
+  producer->service_endpoint =
+      core_service_->ConnectProducer(producer.get(), client_info.uid());
+  PERFETTO_LOG("Connected producer");
 
   // Could happen if the service has too many producers connected.
   if (!producer->service_endpoint)
     response.Reject();
 
-  const int shm_fd = static_cast<PosixSharedMemory*>(
-                         producer->service_endpoint->shared_memory())
-                         ->fd();
   producers_.emplace(ipc_client_id, std::move(producer));
   // Because of the std::move() |producer| is invalid after this point.
 
   auto async_res =
       ipc::AsyncResult<protos::InitializeConnectionResponse>::Create();
-  async_res.set_fd(shm_fd);
   response.Resolve(std::move(async_res));
 }
 
@@ -253,6 +252,29 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
   cmd.set_has_more(true);
   cmd->mutable_stop_data_source()->set_instance_id(dsid);
   async_producer_commands.Resolve(std::move(cmd));
+}
+
+void ProducerIPCService::RemoteProducer::AllocateSharedMemory(
+    const TraceConfig::ProducerConfig& config,
+    const int& shm_fd) {
+  if (!async_producer_commands.IsBound()) {
+    PERFETTO_DLOG(
+        "The Service tried to allocate the shared memory but the remote "
+        "Producer "
+        "has not yet initialized the connection");
+    return;
+  }
+  PERFETTO_LOG("ProducerIPCallocate");
+  auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
+  cmd.set_has_more(true);
+  cmd.set_fd(shm_fd);
+  config.ToProto(cmd->mutable_allocate_shm()->mutable_producer_config());
+  async_producer_commands.Resolve(std::move(cmd));
+}
+
+void ProducerIPCService::RemoteProducer::TearDownSharedMemory(
+    const TraceConfig::ProducerConfig& config) {
+  // TODO(taylori): Implement.
 }
 
 }  // namespace perfetto
