@@ -78,7 +78,7 @@ void ProbesProducer::OnConnect() {
   endpoint_->RegisterDataSource(inode_map_descriptor,
                                 [](DataSourceInstanceID) {});
 
-  CreateInodeMap("/system/", &system_inodes_);
+  CreateDeviceToInodeMap("/system/", &system_inodes_);
 }
 
 void ProbesProducer::OnDisconnect() {
@@ -203,38 +203,37 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 }
 
 // static
-void ProbesProducer::CreateInodeMap(
+void ProbesProducer::CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<dev_t, BlockDeviceMapValue>* block_device_map) {
+    std::map<dev_t, InodeMap>* block_device_map) {
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
     struct dirent* entry;
     std::string filepath = queue.front();
-    filepath += "/";
-    DIR* dir = opendir(queue.front().c_str());
     queue.pop();
+    DIR* dir = opendir(filepath.c_str());
+    filepath += "/";
     if (dir == nullptr)
       continue;
     while ((entry = readdir(dir)) != nullptr) {
       std::string filename = entry->d_name;
-      if (filename.compare(".") == 0 || filename.compare("..") == 0)
+      if (filename == "." | filename == "..")
         continue;
       ino_t inode_number = entry->d_ino;
       // TODO(azappone): set block device id with lstat
       dev_t block_device_id = 0;
-      BlockDeviceMapValue inode_map;
-      auto block_device_data = block_device_map->find(block_device_id);
-      if (block_device_data != block_device_map->end())
-        inode_map = block_device_data->second;
-      Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;  // Default
-      if (entry->d_type == DT_REG)
-        type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
-      else if (entry->d_type == DT_DIR)
+      InodeMap& inode_map = (*block_device_map)[block_device_id];
+      // Default
+      Type type = protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
+      // Continue iterating through files if current entry is a directory
+      if (entry->d_type == DT_DIR) {
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
+        queue.push(filepath + filename);
+      } else if (entry->d_type == DT_REG)
+        type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       inode_map[inode_number].first = type;
       inode_map[inode_number].second.emplace(filepath + filename);
-      (*block_device_map)[block_device_id] = inode_map;
     }
     closedir(dir);
   }
@@ -318,10 +317,9 @@ void ProbesProducer::SinkDelegate::OnInodes(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
-    std::map<dev_t, BlockDeviceMapValue>* file_system_inodes,
+    std::map<dev_t, InodeMap>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
-    : file_system_inodes_(std::move(file_system_inodes)),
-      writer_(std::move(writer)) {}
+    : writer_(std::move(writer)) {}
 
 ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
 

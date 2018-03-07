@@ -60,10 +60,9 @@ class ProbesProducer : public Producer {
   using FtraceBundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
   using Type = protos::pbzero::InodeFileMap_Entry_Type;
-  using BlockDeviceMapValue =
-      std::map<ino_t,
-               std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                         std::set<std::string>>>;
+  using InodeMap = std::map<ino_t,
+                            std::pair<protos::pbzero::InodeFileMap_Entry_Type,
+                                      std::set<std::string>>>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
@@ -95,14 +94,14 @@ class ProbesProducer : public Producer {
   class InodeFileMapDataSource {
    public:
     explicit InodeFileMapDataSource(
-        std::map<dev_t, BlockDeviceMapValue>* file_system_inodes,
+        std::map<dev_t, InodeMap>* file_system_inodes,
         std::unique_ptr<TraceWriter> writer);
     ~InodeFileMapDataSource();
 
     void WriteInodes(const FtraceMetadata& metadata);
 
    private:
-    std::map<dev_t, BlockDeviceMapValue>* file_system_inodes_;
+    std::map<dev_t, InodeMap>* file_system_inodes_;
     std::unique_ptr<TraceWriter> writer_;
   };
 
@@ -118,8 +117,9 @@ class ProbesProducer : public Producer {
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
-  static void CreateInodeMap(const std::string& root_directory,
-                             std::map<dev_t, BlockDeviceMapValue>* inode_map);
+  static void CreateDeviceToInodeMap(
+      const std::string& root_directory,
+      std::map<dev_t, InodeMap>* block_device_map);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
@@ -134,7 +134,7 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>
       file_map_sources_;
-  std::map<dev_t, BlockDeviceMapValue> system_inodes_;
+  std::map<dev_t, InodeMap> system_inodes_;
 };
 }  // namespace perfetto
 
