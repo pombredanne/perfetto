@@ -167,7 +167,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
         last_chunk_req->set_target_buffer(target_buffer);
       }
       auto* patch_req = last_chunk_req->add_patches();
-      patch_req->set_offset(patch_list->front().offset_in_chunk);
+      patch_req->set_offset(patch_list->front().offset);
       patch_req->set_data(&patch_list->front().size_field[0],
                           patch_list->front().size_field.size());
       patch_list->pop_front();

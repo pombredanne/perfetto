@@ -121,26 +121,27 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     for (auto* nested_msg = cur_packet_->nested_message(); nested_msg;
          nested_msg = nested_msg->nested_message()) {
       uint8_t* const cur_hdr = nested_msg->size_field();
-#if PERFETTO_DCHECK_IS_ON()
-      // Ensure that the size field of the nested message either points to
-      // somewhere in the current chunk or a size field of a patch in the
-      // patch list.
       bool size_in_current_chunk =
           cur_hdr >= cur_chunk_.payload_begin() &&
           cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end();
-      if (!size_in_current_chunk) {
+      if (size_in_current_chunk) {
+        auto off = static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
+        Patch* patch = patch_list_.emplace_back(cur_chunk_id_, off);
+        nested_msg->set_size_field(&patch->size_field[0]);
+        PERFETTO_DLOG("Adding patch for chunk %u @ %x", cur_chunk_id_, off);
+      } else {
+#if PERFETTO_DCHECK_IS_ON()
+        // Ensure that the size field of the nested message either points to
+        // somewhere in the current chunk or a size field of a patch in the
+        // patch list.
         auto patch_it = std::find_if(
             patch_list_.begin(), patch_list_.end(),
             [cur_hdr](const Patch& p) { return &p.size_field[0] == cur_hdr; });
         PERFETTO_DCHECK(patch_it != patch_list_.end());
-      }
 #endif
-      auto offset = static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
-      Patch* patch = patch_list_.emplace_back(cur_chunk_id_, offset);
-      nested_msg->set_size_field(&patch->size_field[0]);
-      PERFETTO_DLOG("Created new patchlist entry for protobuf nested message");
-    }
-  }
+      }
+    }  // for(nested_msg
+  }    // if(fragmenting_packet)
 
   if (cur_chunk_.is_valid()) {
     // ReturnCompletedChunk will consume the first patched entries from
