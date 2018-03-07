@@ -24,6 +24,7 @@
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
+#include "perfetto/tracing/core/trace_packet.h"
 #include "src/tracing/core/trace_buffer.h"
 #include "src/tracing/test/fake_packet.h"
 
@@ -67,12 +68,13 @@ class TraceBufferTest : public testing::Test {
         p, w, c, patches.data(), patches.size(), other_patches_pending);
   }
 
-  std::vector<FakePacketFragment> ReadPacket() {
+  std::vector<FakePacketFragment> ReadPacket(uint32_t* uid = nullptr) {
     std::vector<FakePacketFragment> fragments;
-    Slices slices;
-    if (!trace_buffer_->ReadNextTracePacket(&slices))
+    TracePacket packet;
+    uint32_t ignore;
+    if (!trace_buffer_->ReadNextTracePacket(&packet, uid ? uid : &ignore))
       return fragments;
-    for (const Slice& slice : slices)
+    for (const Slice& slice : packet.slices())
       fragments.emplace_back(slice.start, slice.size);
     return fragments;
   }
@@ -746,9 +748,9 @@ TEST_F(TraceBufferTest, Malicious_ZeroSizedChunk) {
       .CopyIntoTraceBuffer();
 
   uint8_t valid_ptr = 0;
-  trace_buffer()->CopyChunkUntrusted(ProducerID(1), WriterID(1), ChunkID(1),
-                                     1 /* num packets */, 0 /* flags*/,
-                                     &valid_ptr, sizeof(valid_ptr));
+  trace_buffer()->CopyChunkUntrusted(
+      ProducerID(1), uid_t(0), WriterID(1), ChunkID(1), 1 /* num packets */,
+      0 /* flags*/, &valid_ptr, sizeof(valid_ptr));
 
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(2))
       .AddPacket(32, 'b')
@@ -828,9 +830,9 @@ TEST_F(TraceBufferTest, Malicious_VarintHeaderTooBig) {
   std::vector<uint8_t> chunk;
   chunk.insert(chunk.end(), 128 - sizeof(ChunkRecord), 0xff);
   chunk.back() = 0x7f;
-  trace_buffer()->CopyChunkUntrusted(ProducerID(4), WriterID(1), ChunkID(1),
-                                     1 /* num packets */, 0 /* flags*/,
-                                     chunk.data(), chunk.size());
+  trace_buffer()->CopyChunkUntrusted(ProducerID(4), uid_t(0), WriterID(1),
+                                     ChunkID(1), 1 /* num packets */,
+                                     0 /* flags*/, chunk.data(), chunk.size());
 
   // Add a valid chunk.
   CreateChunk(ProducerID(1), WriterID(1), ChunkID(1))
@@ -853,9 +855,9 @@ TEST_F(TraceBufferTest, Malicious_JumboVarint) {
   chunk.insert(chunk.end(), 64 * 1024 - sizeof(ChunkRecord) * 2, 0xff);
   chunk.back() = 0x7f;
   for (int i = 0; i < 3; i++) {
-    trace_buffer()->CopyChunkUntrusted(ProducerID(1), WriterID(1), ChunkID(1),
-                                       1 /* num packets */, 0 /* flags*/,
-                                       chunk.data(), chunk.size());
+    trace_buffer()->CopyChunkUntrusted(
+        ProducerID(1), uid_t(0), WriterID(1), ChunkID(1), 1 /* num packets */,
+        0 /* flags*/, chunk.data(), chunk.size());
   }
 
   trace_buffer()->BeginRead();

@@ -618,7 +618,8 @@ ProducerID ServiceImpl::GetNextProducerID() {
 }
 
 void ServiceImpl::UpdateMemoryGuardrail() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
+#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   uint64_t total_buffer_bytes = 0;
 
   // Sum up all the shared memory buffers.
@@ -628,7 +629,7 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Sum up all the trace buffers.
   for (const auto& id_to_buffer : buffers_) {
-    total_buffer_bytes += id_to_buffer.second.size;
+    total_buffer_bytes += id_to_buffer.second.size();
   }
 
   // Set the guard rail to 32MB + the sum of all the buffers over a 30 second

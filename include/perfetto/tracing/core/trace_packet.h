@@ -51,8 +51,7 @@ class TracePacket {
   TracePacket& operator=(TracePacket&&);
 
   // Accesses all the raw slices in the packet, for saving them to file/network.
-  const_iterator begin() const { return slices_.begin(); }
-  const_iterator end() const { return slices_.end(); }
+  const Slices& slices() const { return slices_; }
 
   // Decodes the packet for inline use.
   bool Decode();
