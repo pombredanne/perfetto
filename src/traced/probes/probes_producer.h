@@ -119,8 +119,7 @@ class ProbesProducer : public Producer {
   bool ftrace_creation_failed_ = false;
   uint64_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
-  // Keeps track of id for each type of data source.
-  std::set<DataSourceInstanceID> ps_data_sources_;
+  std::set<DataSourceInstanceID> process_stats_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>

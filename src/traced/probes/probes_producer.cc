@@ -171,7 +171,7 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
-  ps_data_sources_.insert(id);
+  process_stats_sources_.insert(id);
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   procfs_utils::ProcessMap processes;
@@ -203,10 +203,10 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
-  PERFETTO_DCHECK((delegates_.count(id) + ps_data_sources_.count(id) +
+  PERFETTO_DCHECK((delegates_.count(id) + process_stats_sources_.count(id) +
                    file_map_sources_.count(id)) == 1);
   delegates_.erase(id);
-  ps_data_sources_.erase(id);
+  process_stats_sources_.erase(id);
   file_map_sources_.erase(id);
   watchdogs_.erase(id);
 }
