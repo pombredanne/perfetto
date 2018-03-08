@@ -298,7 +298,7 @@ using perfetto::GetTable;
 using perfetto::PageFromXxd;
 using perfetto::protos::pbzero::FtraceEventBundle;
 using perfetto::CpuReader;
-using perfetto::FtraceMetadata;
+using perfetto::ParserStats;
 
 static void BM_ParsePageFullOfSchedSwitch(benchmark::State& state) {
   const ExamplePage* test_case = &g_full_page_sched_switch;
@@ -312,10 +312,10 @@ static void BM_ParsePageFullOfSchedSwitch(benchmark::State& state) {
 
   EventFilter filter(*table, std::set<std::string>({"sched_switch"}));
 
-  FtraceMetadata metadata{};
+  ParserStats stats{};
   while (state.KeepRunning()) {
     writer.Reset(&stream);
-    CpuReader::ParsePage(page.get(), &filter, &writer, table, &metadata);
+    CpuReader::ParsePage(page.get(), &filter, &writer, table, &stats);
   }
 }
 BENCHMARK(BM_ParsePageFullOfSchedSwitch);
