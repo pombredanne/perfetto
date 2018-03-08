@@ -38,7 +38,7 @@ namespace perfetto {
 // |RemoveConfig|.
 class FtraceConfigMuxer {
  public:
-  // The FtraceConfigMuxer, and ProtoTranslationTable
+  // The FtraceConfigMuxer and ProtoTranslationTable
   // should outlive this instance.
   FtraceConfigMuxer(FtraceProcfs* ftrace, const ProtoTranslationTable* table);
   virtual ~FtraceConfigMuxer();

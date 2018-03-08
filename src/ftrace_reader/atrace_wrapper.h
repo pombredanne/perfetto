@@ -27,7 +27,7 @@ using RunAtraceFunction =
     std::add_pointer<bool(const std::vector<std::string>& /*args*/)>::type;
 
 bool RunAtrace(const std::vector<std::string>& args);
-void SetRunAtraceForTesting(RunAtraceFunction f);
+void SetRunAtraceForTesting(RunAtraceFunction);
 
 }  // namespace perfetto
 

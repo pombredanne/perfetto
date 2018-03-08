@@ -30,7 +30,7 @@ namespace perfetto {
 
 namespace {
 
-RunAtraceFunction g_run_atrace = nullptr;
+RunAtraceFunction g_run_atrace_for_testing = nullptr;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 // Args should include "atrace" for argv[0].
@@ -59,8 +59,8 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 }  // namespace
 
 bool RunAtrace(const std::vector<std::string>& args) {
-  if (g_run_atrace)
-    return g_run_atrace(args);
+  if (g_run_atrace_for_testing)
+    return g_run_atrace_for_testing(args);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   return ExecvAtrace(args);
 #else
@@ -70,7 +70,7 @@ bool RunAtrace(const std::vector<std::string>& args) {
 }
 
 void SetRunAtraceForTesting(RunAtraceFunction f) {
-  g_run_atrace = f;
+  g_run_atrace_for_testing = f;
 }
 
 }  // namespace perfetto
