@@ -28,6 +28,7 @@ from collections import defaultdict
 
 HEADER_RE = re.compile(r'#include "(.*)"')
 HEADER_DIRS = ['include', 'src']
+SOURCE_DIRS = ['src']
 
 
 def GetIncludes(filename):
@@ -93,8 +94,9 @@ if __name__ == '__main__':
     prefix = sys.argv[1]
   changed = set()
   newchanged = GetChangedFiles(GetUpstream())
-  hdr_db = BuildHeaderDatabase('src')
-  UpdateHeaderDatabase(hdr_db, BuildHeaderDatabase('include'))
+  hdr_db = defaultdict(set)
+  for d in set(HEADER_DIRS) & set(SOURCE_DIRS):
+    UpdateHeaderDatabase(hdr_db, BuildHeaderDatabase(d))
 
   while newchanged - changed:
     changed |= newchanged
