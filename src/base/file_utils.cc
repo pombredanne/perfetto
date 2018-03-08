@@ -27,8 +27,10 @@ const size_t kBufSize = 2048;
 
 bool ReadFile(const std::string& path, std::string* out) {
   base::ScopedFile fd = base::OpenFile(path.c_str(), O_RDONLY);
-  if (!fd)
+  if (!fd) {
     PERFETTO_PLOG("open");
+    return false;
+  }
 
   char buf[kBufSize + 1];
 
