@@ -579,8 +579,9 @@ void ServiceImpl::ApplyChunkPatches(
     const WriterID writer_id = static_cast<WriterID>(chunk.writer_id());
     TraceBuffez* buf =
         GetBufferByID(static_cast<BufferID>(chunk.target_buffer()));
-    if (!chunk_id || chunk_id > kMaxChunkID || !writer_id ||
-        writer_id > kMaxWriterID || !buf) {
+    static_assert(std::numeric_limits<ChunkID>::max() == kMaxChunkID,
+                  "Add a '|| chunk_id > kMaxChunkID' below if this fails");
+    if (!chunk_id || !writer_id || writer_id > kMaxWriterID || !buf) {
       PERFETTO_DLOG(
           "Received invalid chunks_to_patch request from Producer: %" PRIu16
           ", BufferID: %" PRIu32 " ChunkdID: %" PRIu32 " WriterID: %" PRIu16,
