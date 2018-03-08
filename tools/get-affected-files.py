@@ -73,7 +73,7 @@ def GetUpstream():
       exit(1)
     else:
       upstream = 'origin/master'
-  return upstream
+  return upstream.strip()
 
 
 def GetChangedFiles(upstream):
