@@ -27,7 +27,7 @@ ScatteredStreamDelegateForTesting::~ScatteredStreamDelegateForTesting() {}
 protozero::ContiguousMemoryRange
 ScatteredStreamDelegateForTesting::GetNewBuffer() {
   PERFETTO_CHECK(writer_);
-  if (!chunks_.empty()) {
+  if (chunks_.size()) {
     size_t used = chunk_size_ - writer_->bytes_available();
     chunks_used_size_.push_back(used);
   }
