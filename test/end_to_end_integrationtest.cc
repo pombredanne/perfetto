@@ -19,6 +19,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <random>
 #include <thread>
 
 #include "perfetto/base/logging.h"
@@ -156,20 +157,28 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
 
-  // Set the event count.
+  // The parameters for the producer.
+  static constexpr uint32_t kRandomSeed = 42;
   static constexpr uint32_t kEventCount = 10;
+
+  // Setup the test to use a random number generator.
+  ds_config->mutable_for_testing()->set_seed(kRandomSeed);
+  ds_config->mutable_for_testing()->set_message_count(kEventCount);
+
+  // Create the random generator with the same seed.
+  std::minstd_rand0 random(kRandomSeed);
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto function = [&total, &finish](std::vector<TracePacket> packets,
-                                    bool has_more) {
+  auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
+                                             bool has_more) {
     if (has_more) {
       for (auto& packet : packets) {
         packet.Decode();
         ASSERT_TRUE(packet->has_for_testing());
         ASSERT_EQ(protos::TracePacket::kTrustedUid,
                   packet->optional_trusted_uid_case());
-        ASSERT_EQ(packet->for_testing().str(), "test");
+        ASSERT_EQ(packet->for_testing().seq_value(), random());
       }
       total += packets.size();
 
@@ -192,7 +201,7 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   TaskRunnerThread producer_thread;
   producer_thread.Start(
       std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate(
-          TEST_PRODUCER_SOCK_NAME, kEventCount, [&task_runner, &data_produced] {
+          TEST_PRODUCER_SOCK_NAME, [&task_runner, &data_produced] {
             task_runner.PostTask(data_produced);
           })));
 

@@ -64,24 +64,19 @@ class ProbesProducerDelegate : public ThreadDelegate {
 class FakeProducerDelegate : public ThreadDelegate {
  public:
   FakeProducerDelegate(const std::string& producer_socket,
-                       uint32_t event_count,
                        std::function<void()> connect_callback)
       : producer_socket_(producer_socket),
-        event_count_(event_count),
         connect_callback_(std::move(connect_callback)) {}
   ~FakeProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(
-        new FakeProducer("android.perfetto.FakeProducer", event_count_));
+    producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
     producer_->Connect(producer_socket_.c_str(), task_runner,
                        std::move(connect_callback_));
   }
 
  private:
   std::string producer_socket_;
-  const uint32_t event_count_;
-
   std::unique_ptr<FakeProducer> producer_;
   std::function<void()> connect_callback_;
 };

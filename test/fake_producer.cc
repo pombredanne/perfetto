@@ -16,6 +16,8 @@
 
 #include "test/fake_producer.h"
 
+#include <random>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -26,8 +28,7 @@
 
 namespace perfetto {
 
-FakeProducer::FakeProducer(const std::string& name, uint32_t event_count)
-    : name_(name), event_count_(event_count) {}
+FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
 
 void FakeProducer::Connect(const char* socket_name,
@@ -52,9 +53,12 @@ void FakeProducer::CreateDataSourceInstance(
     const DataSourceConfig& source_config) {
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  for (size_t i = 0; i < event_count_; i++) {
+
+  const TestConfig& config = source_config.for_testing();
+  std::minstd_rand0 random(config.seed());
+  for (size_t i = 0; i < config.message_count(); i++) {
     auto handle = trace_writer->NewTracePacket();
-    handle->set_for_testing()->set_str("test");
+    handle->set_for_testing()->set_seq_value(random());
     handle->Finalize();
   }
 
