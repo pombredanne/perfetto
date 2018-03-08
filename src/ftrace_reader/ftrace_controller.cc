@@ -26,6 +26,7 @@
 
 #include <array>
 #include <string>
+#include <utility>
 
 #include "cpu_reader.h"
 #include "event_info.h"
@@ -85,7 +86,6 @@ void ClearFile(const char* path) {
 
 }  // namespace
 
-// TODO(fmayer): Actually call this on shutdown.
 // Method of last resort to reset ftrace state.
 // We don't know what state the rest of the system and process is so as far
 // as possible avoid allocations.
@@ -184,7 +184,7 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
 
 // static
 void FtraceController::UnblockReaders(
-    base::WeakPtr<FtraceController> weak_this) {
+    const base::WeakPtr<FtraceController>& weak_this) {
   if (!weak_this)
     return;
   // Unblock all waiting readers to start moving more data into their
@@ -195,7 +195,7 @@ void FtraceController::UnblockReaders(
 void FtraceController::StartIfNeeded() {
   if (sinks_.size() > 1)
     return;
-  PERFETTO_CHECK(sinks_.size() != 0);
+  PERFETTO_CHECK(!sinks_.empty());
   {
     std::unique_lock<std::mutex> lock(lock_);
     PERFETTO_CHECK(!listening_for_raw_trace_data_);
@@ -213,7 +213,7 @@ void FtraceController::StartIfNeeded() {
 }
 
 uint32_t FtraceController::GetDrainPeriodMs() {
-  if (sinks_.size() == 0)
+  if (sinks_.empty())
     return kDefaultDrainPeriodMs;
   uint32_t min_drain_period_ms = kMaxDrainPeriodMs + 1;
   for (const FtraceSink* sink : sinks_) {
@@ -236,7 +236,7 @@ void FtraceController::WriteTraceMarker(const std::string& s) {
 }
 
 void FtraceController::StopIfNeeded() {
-  if (sinks_.size() != 0)
+  if (!sinks_.empty())
     return;
   {
     // Unblock any readers that are waiting for us to drain data.
@@ -271,7 +271,7 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
 }
 
 std::unique_ptr<FtraceSink> FtraceController::CreateSink(
-    FtraceConfig config,
+    const FtraceConfig& config,
     FtraceSink::Delegate* delegate) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (sinks_.size() >= kMaxSinks)
@@ -285,7 +285,7 @@ std::unique_ptr<FtraceSink> FtraceController::CreateSink(
 
   auto controller_weak = weak_factory_.GetWeakPtr();
   auto filter = std::unique_ptr<EventFilter>(new EventFilter(
-      *table_.get(), FtraceEventsAsSet(*ftrace_config_muxer_->GetConfig(id))));
+      *table_, FtraceEventsAsSet(*ftrace_config_muxer_->GetConfig(id))));
 
   auto sink = std::unique_ptr<FtraceSink>(new FtraceSink(
       std::move(controller_weak), id, config, std::move(filter), delegate));
@@ -348,7 +348,7 @@ FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
                        Delegate* delegate)
     : controller_weak_(std::move(controller_weak)),
       id_(id),
-      config_(config),
+      config_(std::move(config)),
       filter_(std::move(filter)),
       delegate_(delegate){};
 
@@ -370,7 +370,7 @@ FtraceMetadata::FtraceMetadata() {
 void FtraceMetadata::AddPid(int32_t pid) {
   // Speculative optimization aginst repated pid's while keeping
   // faster insertion than a set.
-  if (pids.size() && pids.back() == pid)
+  if (!pids.empty() && pids.back() == pid)
     return;
   pids.push_back(pid);
 }
