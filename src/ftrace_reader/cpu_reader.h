@@ -126,13 +126,6 @@ class CpuReader {
     metadata->AddPid(pid);
   }
 
-  // Iterate through every file in the current directory and check if the inode
-  // number of each file matches any of the inode numbers saved in events.
-  // Returns map of inode number to filename for every inode number that is
-  // found in the filesystem. If the inode number saved from events is not
-  // found, nothing is added to the map.
-  static std::map<uint64_t, std::string> GetFilenamesForInodeNumbers(
-      const std::set<uint64_t>& inode_numbers);
 
   // Parse a raw ftrace page beginning at ptr and write the events a protos
   // into the provided bundle respecting the given event filter.
@@ -170,7 +163,7 @@ class CpuReader {
   static void RunWorkerThread(size_t cpu,
                               int trace_fd,
                               int staging_write_fd,
-                              std::function<void()> on_data_available);
+                              const std::function<void()>& on_data_available);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;

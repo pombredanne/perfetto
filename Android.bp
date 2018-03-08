@@ -33,6 +33,7 @@ cc_library_shared {
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/event_info.cc",
     "src/ftrace_reader/event_info_constants.cc",
@@ -227,6 +228,7 @@ cc_test {
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/end_to_end_integrationtest.cc",
     "src/ftrace_reader/event_info.cc",
@@ -2958,6 +2960,7 @@ cc_test {
     "src/base/watchdog.cc",
     "src/base/watchdog_unittest.cc",
     "src/base/weak_ptr_unittest.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/cpu_reader_unittest.cc",
     "src/ftrace_reader/event_info.cc",
@@ -3120,7 +3123,9 @@ cc_library_static {
     "src/ftrace_reader/ftrace_procfs.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/traced/probes/probes_producer.cc",
+    "test/fake_producer.cc",
     "test/fake_consumer.cc",
+    "test/task_runner_thread.cc",
     "test/end_to_end_integrationtest.cc",
   ],
   export_include_dirs: [
@@ -3132,6 +3137,9 @@ cc_library_static {
   static_libs: [
     "perfetto_src_tracing_ipc",
     "libgtest_prod",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
@@ -3150,5 +3158,8 @@ cc_library_static {
   ],
   static_libs: [
     "perfetto_src_tracing_ipc",
+  ],
+  cflags: [
+    "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }

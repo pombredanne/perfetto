@@ -165,7 +165,7 @@ class FtraceController {
                        uint32_t drain_period_ms);
 
   static void DrainCPUs(base::WeakPtr<FtraceController>, size_t generation);
-  static void UnblockReaders(base::WeakPtr<FtraceController>);
+  static void UnblockReaders(const base::WeakPtr<FtraceController>&);
 
   uint32_t GetDrainPeriodMs();
 
