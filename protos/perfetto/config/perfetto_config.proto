@@ -12,6 +12,7 @@ syntax = "proto2";
 package perfetto.protos;
 
 // Begin of protos/perfetto/config/data_source_config.proto
+import "perfetto/config/ftrace/ftrace_config.proto";
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
 // to reflect changes in the corresponding C++ headers.
@@ -39,7 +40,7 @@ message DataSourceConfig {
   // data-sources and needs to be processed by the traced daemon.
 
   optional FtraceConfig ftrace_config = 100;
-  optional string chrome_trace_config = 101;
+  optional ChromeConfig chrome_config = 101;
 }
 
 // End of protos/perfetto/config/data_source_config.proto
@@ -133,15 +134,6 @@ message TraceConfig {
   // and enables guardrails that limit resource usage for traces requested
   // by statsd.
   optional bool enable_extra_guardrails = 4;
-
-  enum LockdownModeOperation {
-    LOCKDOWN_UNCHANGED = 0;
-    LOCKDOWN_CLEAR = 1;
-    LOCKDOWN_SET = 2;
-  }
-  // Reject producers that are not running under the same UID as the tracing
-  // service.
-  optional LockdownModeOperation lockdown_mode = 5;
 }
 
 // End of protos/perfetto/config/trace_config.proto

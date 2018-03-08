@@ -43,6 +43,7 @@ class TraceConfig_BufferConfig;
 class TraceConfig_DataSource;
 class DataSourceConfig;
 class FtraceConfig;
+class ChromeConfig;
 }  // namespace protos
 }  // namespace perfetto
 
@@ -126,11 +127,6 @@ class TraceConfig {
     std::string unknown_fields_;
   };
 
-  enum LockdownModeOperation {
-    LOCKDOWN_UNCHANGED = 0,
-    LOCKDOWN_CLEAR = 1,
-    LOCKDOWN_SET = 2,
-  };
   TraceConfig();
   ~TraceConfig();
   TraceConfig(TraceConfig&&) noexcept;
@@ -166,17 +162,11 @@ class TraceConfig {
     enable_extra_guardrails_ = value;
   }
 
-  LockdownModeOperation lockdown_mode() const { return lockdown_mode_; }
-  void set_lockdown_mode(LockdownModeOperation value) {
-    lockdown_mode_ = value;
-  }
-
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
   uint32_t duration_ms_ = {};
   bool enable_extra_guardrails_ = {};
-  LockdownModeOperation lockdown_mode_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

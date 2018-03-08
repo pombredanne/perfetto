@@ -85,6 +85,7 @@ void ClearFile(const char* path) {
 
 }  // namespace
 
+// TODO(fmayer): Actually call this on shutdown.
 // Method of last resort to reset ftrace state.
 // We don't know what state the rest of the system and process is so as far
 // as possible avoid allocations.
@@ -254,15 +255,13 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
   std::array<const EventFilter*, kMaxSinks> filters{};
   std::array<BundleHandle, kMaxSinks> bundles{};
-  std::array<FtraceMetadata*, kMaxSinks> metadatas{};
   size_t sink_count = sinks_.size();
   size_t i = 0;
   for (FtraceSink* sink : sinks_) {
-    filters[i] = sink->event_filter();
-    metadatas[i] = sink->metadata_mutable();
+    filters[i] = sink->get_event_filter();
     bundles[i++] = sink->GetBundleForCpu(cpu);
   }
-  reader->Drain(filters, bundles, metadatas);
+  reader->Drain(filters, bundles);
   i = 0;
   for (FtraceSink* sink : sinks_)
     sink->OnBundleComplete(cpu, std::move(bundles[i++]));
@@ -358,26 +357,6 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
-}
-
-FtraceMetadata::FtraceMetadata() {
-  // A lot of the time there will only be a small number of inodes.
-  inodes.reserve(10);
-  pids.reserve(10);
-}
-
-void FtraceMetadata::AddPid(int32_t pid) {
-  // Speculative optimization aginst repated pid's while keeping
-  // faster insertion than a set.
-  if (pids.size() && pids.back() == pid)
-    return;
-  pids.push_back(pid);
-}
-
-void FtraceMetadata::Clear() {
-  inodes.clear();
-  pids.clear();
-  overwrite_count = 0;
 }
 
 }  // namespace perfetto
