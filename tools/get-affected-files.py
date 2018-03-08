@@ -88,6 +88,9 @@ def UpdateHeaderDatabase(old, new):
 
 
 if __name__ == '__main__':
+  prefix = ''
+  if len(sys.argv) > 1:
+    prefix = sys.argv[1]
   changed = set()
   newchanged = GetChangedFiles(GetUpstream())
   hdr_db = BuildHeaderDatabase('src')
@@ -100,4 +103,8 @@ if __name__ == '__main__':
       if filename.endswith('.h'):
         newchanged |= hdr_db[filename]
 
-  print('\n'.join(changed))
+  for filename in changed:
+    if prefix:
+      print(os.path.join(prefix, filename))
+    else:
+      print(filename)
