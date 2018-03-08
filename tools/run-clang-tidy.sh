@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -eu
+
 # Let's not run this against dirty working trees for now.
 if ! git diff-index --quiet HEAD --; then
   echo "Untracked changes. Stopping. Please commit your changes";
@@ -19,8 +21,11 @@ if ! git diff-index --quiet HEAD --; then
 fi;
 
 cd "$(dirname "$0")/..";
-affected_files=$(python tools/get-affected-files.py '../../' | grep '.cc$');
+# cat prevents this from failing if there is no match.
+affected_files=$(python tools/get-affected-files.py '../../'\
+  | grep '.cc$' | cat);
 cd "$(dirname "$0")";
+
 
 if [[ ! -z "${affected_files// }" ]]; then
   gn gen clang_tidy_build \
