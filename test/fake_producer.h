@@ -30,7 +30,7 @@ namespace perfetto {
 
 class FakeProducer : public Producer {
  public:
-  explicit FakeProducer(const std::string& name);
+  explicit FakeProducer(const std::string& name, const uint32_t event_count);
   ~FakeProducer() override;
 
   void Connect(const char* socket_name,
@@ -49,6 +49,8 @@ class FakeProducer : public Producer {
 
   std::string name_;
   DataSourceID id_ = 0;
+  const uint32_t event_count_;
+
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   base::TaskRunner* task_runner_ = nullptr;
   std::function<void()> data_produced_callback_;

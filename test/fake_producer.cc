@@ -26,7 +26,8 @@
 
 namespace perfetto {
 
-FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
+FakeProducer::FakeProducer(const std::string& name, uint32_t event_count)
+    : name_(name), event_count_(event_count) {}
 FakeProducer::~FakeProducer() = default;
 
 void FakeProducer::Connect(const char* socket_name,
@@ -51,7 +52,7 @@ void FakeProducer::CreateDataSourceInstance(
     const DataSourceConfig& source_config) {
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  for (int i = 0; i < 10; i++) {
+  for (size_t i = 0; i < event_count_; i++) {
     auto handle = trace_writer->NewTracePacket();
     handle->set_for_testing()->set_str("test");
     handle->Finalize();
