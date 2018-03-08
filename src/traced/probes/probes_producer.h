@@ -125,11 +125,12 @@ class ProbesProducer : public Producer {
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
 
-  // Fills in a map of device id to inode data.
-  // If the map already has entries, will return immediately.
-  // If given an empty set, will create map with every file found in the root
-  // directory. If given a set of inode numbers, only adds to the map for the
-  // provided inode numbers' files found in the root directory.
+  // Fills in block_device_map of device id to inode data.
+  // If the block_device_map already has entries, will return immediately.
+  // Accepts a map of inode_number to block_device_id. If given non-empty map,
+  // only adds to the map for the provided unresolved inodes found in the
+  // root directory. If given an empty map, adds to the block_device_map for
+  // every file found in the root directory.
   static void FillDeviceToInodeDataMap(
       const std::string& root_directory,
       std::map<uint64_t, InodeDataMap>* block_device_map,
