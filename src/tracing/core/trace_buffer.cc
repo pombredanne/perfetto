@@ -286,11 +286,12 @@ bool TraceBuffez::TryPatchChunkContents(ProducerID producer_id,
     uint8_t* ptr =
         chunk_begin + sizeof(ChunkRecord) + patches[i].offset_untrusted;
     TRACE_BUFFER_DLOG("PatchChunk {%" PRIu32 ",%" PRIu32
-                      ",%u} size=%zu @ %zu with {%02x %02x %02x %02x}",
+                      ",%u} size=%zu @ %zu with {%02x %02x %02x %02x} cur "
+                      "{%02x %02x %02x %02x}",
                       producer_id, writer_id, chunk_id, chunk_end - chunk_begin,
                       patches[i].offset_untrusted, patches[i].data[0],
                       patches[i].data[1], patches[i].data[2],
-                      patches[i].data[3]);
+                      patches[i].data[3], ptr[0], ptr[1], ptr[2], ptr[3]);
     if (ptr < chunk_begin + sizeof(ChunkRecord) ||
         ptr > chunk_end - Patch::kSize) {
       // Either the IPC was so slow and in the meantime the writer managed to

@@ -125,10 +125,15 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
           cur_hdr >= cur_chunk_.payload_begin() &&
           cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end();
       if (size_in_current_chunk) {
-        auto off = static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
-        Patch* patch = patch_list_.emplace_back(cur_chunk_id_, off);
+        auto offset =
+            static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
+        const ChunkID cur_chunk_id =
+            cur_chunk_.header()->chunk_id.load(std::memory_order_relaxed);
+        Patch* patch = patch_list_.emplace_back(cur_chunk_id, offset);
         nested_msg->set_size_field(&patch->size_field[0]);
-        PERFETTO_DLOG("Adding patch for chunk %u @ %x", cur_chunk_id_, off);
+        PERFETTO_DLOG("Starting patch for Chunk: %u @ 0x%x {%x, %x, %x, %x}",
+                      cur_chunk_id, offset, cur_hdr[0], cur_hdr[1], cur_hdr[2],
+                      cur_hdr[3]);
       } else {
 #if PERFETTO_DCHECK_IS_ON()
         // Ensure that the size field of the nested message either points to
@@ -163,7 +168,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
   // into the shared buffer with the proper barriers.
   ChunkHeader header = {};
   header.writer_id.store(id_, std::memory_order_relaxed);
-  header.chunk_id.store(cur_chunk_id_++, std::memory_order_relaxed);
+  header.chunk_id.store(next_chunk_id_++, std::memory_order_relaxed);
   header.packets.store(packets, std::memory_order_relaxed);
 
   cur_chunk_ = shmem_arbiter_->GetNewChunk(header);
