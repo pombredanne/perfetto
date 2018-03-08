@@ -13,8 +13,10 @@
 # limitations under the License.
 
 # Let's not run this against dirty working trees for now.
-git diff-index --quiet HEAD -- ||
-  echo "Untracked changes. Stopping. Please commit your changes"; exit 1;
+if ! git diff-index --quiet HEAD --; then
+  echo "Untracked changes. Stopping. Please commit your changes";
+  exit 1;
+fi;
 
 cd "$(dirname "$0")/..";
 affected_files=$(python tools/get-affected-files.py '../../' | grep '.cc$');
