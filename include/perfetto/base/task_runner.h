@@ -32,7 +32,7 @@ namespace base {
 
 // Maximum time a single task can take in a TaskRunner before the
 // program suicides.
-constexpr int64_t kWatchdogMillis = 30000;  // 30s
+constexpr int64_t kWatchdogMillis = 300000000;  // 30s
 
 // A generic interface to allow the library clients to interleave the execution
 // of the tracing internals in their runtime environment.

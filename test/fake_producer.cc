@@ -20,7 +20,6 @@
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
-#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
@@ -51,22 +50,41 @@ void FakeProducer::CreateDataSourceInstance(
     const DataSourceConfig& source_config) {
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
-  for (int i = 0; i < 10; i++) {
-    auto handle = trace_writer->NewTracePacket();
-    handle->set_for_testing()->set_str("test");
-    handle->Finalize();
-  }
 
-  // TODO(primiano): reenable this once UnregisterDataSource is specified in
-  // ServiceImpl.
-  // endpoint_->UnregisterDataSource(id_);
-
-  // TODO(skyostil): There's a race here before the service processes our data
-  // and the consumer tries to retrieve it. For now wait a bit until the service
-  // is done, but we should add explicit flushing to avoid this.
-  task_runner_->PostDelayedTask(data_produced_callback_, 1000);
+  batching_helper_.reset(new PacketBatchingHelper(
+      task_runner_, std::move(trace_writer), source_config.for_testing(),
+      data_produced_callback_));
+  batching_helper_->SendBatch();
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}
+
+FakeProducer::PacketBatchingHelper::PacketBatchingHelper(
+    base::TaskRunner* task_runner,
+    std::unique_ptr<TraceWriter> writer,
+    const TestConfig& config,
+    std::function<void()> data_produced_callback)
+    : task_runner_(task_runner),
+      writer_(std::move(writer)),
+      random_(std::minstd_rand0(config.seed())),
+      batches_remaining_(config.message_count() / 30),
+      last_batch_(config.message_count() % 30),
+      data_produced_callback_(data_produced_callback) {}
+
+void FakeProducer::PacketBatchingHelper::SendBatch() {
+  size_t count = batches_remaining_ == 0 ? last_batch_ : 30;
+  for (size_t i = 0; i < count; i++) {
+    auto handle = writer_->NewTracePacket();
+    handle->set_for_testing()->set_seq_value(random_());
+    handle->Finalize();
+  }
+  if (batches_remaining_-- > 0) {
+    task_runner_->PostDelayedTask(
+        std::bind(&PacketBatchingHelper::SendBatch, this), 1);
+  } else {
+    writer_.reset();
+    task_runner_->PostDelayedTask(data_produced_callback_, 1000);
+  }
+}
 
 }  // namespace perfetto
