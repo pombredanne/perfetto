@@ -1,0 +1,1 @@
+Checks:          'clang-diagnostic-*,clang-analyzer-*,google-*,performance-*,clang-analyzer-*,bugprone-*,readability-*,cppcoreguidelines-*,-readability-braces-around-statements,-bugprone-argument-comment,-google-readability-braces-around-statements'
