@@ -95,7 +95,9 @@ source_set("task_runner_thread") {
 source_set("task_runner_thread_delegates") {
   testonly = true
   deps = [
+    ":task_runner_thread",
     "../gn:default_deps",
+    "../src/base:test_support",
     "../src/traced/probes:probes_src",
     "../src/tracing:ipc",
   ]
