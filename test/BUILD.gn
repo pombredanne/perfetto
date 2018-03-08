@@ -85,13 +85,10 @@ source_set("task_runner_thread") {
   deps = [
     "../gn:default_deps",
     "../src/base:test_support",
-    "../src/traced/probes:probes_src",
-    "../src/tracing:ipc",
   ]
   sources = [
     "task_runner_thread.cc",
     "task_runner_thread.h",
-    "task_runner_thread_delegates.h",
   ]
 }
 
