@@ -38,7 +38,6 @@ def GetIncludes(filename):
   with open(filename) as fd:
     for inc in HEADER_RE.findall(fd.read()):
       if '/' not in inc:
-        #print('Pls fix non-absolute import in %s' % filename)
         inc = os.path.join(directory, inc)
       incs.append(inc)
   return incs
