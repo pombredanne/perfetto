@@ -19,23 +19,28 @@
 
 #include <memory>
 
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
 namespace perfetto {
-namespace {}  // namespace
 
 class ProcessStatsDataSource {
  public:
   explicit ProcessStatsDataSource(std::unique_ptr<TraceWriter> writer);
   ~ProcessStatsDataSource();
 
+  ProducerID GetProducerID();
+  base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
   void WriteAllProcesses();
+  void OnPids(const std::vector<int32_t>& pids);
 
  private:
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
 
   std::unique_ptr<TraceWriter> writer_;
+  // Keep this last.
+  base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;
 };
 
 }  // namespace perfetto

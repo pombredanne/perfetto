@@ -21,6 +21,7 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -87,17 +88,34 @@ void ProbesProducer::OnDisconnect() {
 }
 
 void ProbesProducer::CreateDataSourceInstance(
-    DataSourceInstanceID id,
+    DataSourceInstanceID source_id,
     const DataSourceConfig& source_config) {
   if (source_config.name() == kFtraceSourceName) {
-    CreateFtraceDataSourceInstance(id, source_config);
+    CreateFtraceDataSourceInstance(source_id, source_config);
   } else if (source_config.name() == kInodeFileMapSourceName) {
-    CreateInodeFileMapDataSourceInstance(id, source_config);
+    CreateInodeFileMapDataSourceInstance(source_id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
-    CreateProcessStatsDataSourceInstance(id, source_config);
+    CreateProcessStatsDataSourceInstance(source_id, source_config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
                   source_config.name().c_str());
+    return;
+  }
+
+  std::map<ProducerID, InodeFileMapDataSource*> file_sources;
+  std::map<ProducerID, ProcessStatsDataSource*> ps_sources;
+  for (const auto& pair : file_map_sources_)
+    file_sources[pair.second->GetProducerID()] = pair.second.get();
+  for (const auto& pair : process_stats_sources_)
+    ps_sources[pair.second->GetProducerID()] = pair.second.get();
+
+  for (const auto& id_to_source : delegates_) {
+    const auto& source = id_to_source.second;
+    ProducerID id = source->GetProducerID();
+    if (!source->weak_ps_source() && ps_sources.count(id))
+      source->set_weak_ps_source(ps_sources[id]->GetWeakPtr());
+    if (!source->weak_file_source() && file_sources.count(id))
+      source->set_weak_file_source(file_sources[id]->GetWeakPtr());
   }
 }
 
@@ -263,8 +281,11 @@ ProbesProducer::SinkDelegate::SinkDelegate(base::TaskRunner* task_runner,
 
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
-ProbesProducer::FtraceBundleHandle
+ProducerID ProbesProducer::SinkDelegate::GetProducerID() {
+  return 0;
+}
 
+ProbesProducer::FtraceBundleHandle
 ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
   trace_packet_ = writer_->NewTracePacket();
   return FtraceBundleHandle(trace_packet_->set_ftrace_events());
@@ -275,27 +296,43 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     FtraceBundleHandle,
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
-  if (!metadata.inodes.empty()) {
-    auto weak_this = weak_factory_.GetWeakPtr();
+
+  if (weak_file_source_ && !metadata.inodes.empty()) {
     auto inodes = metadata.inodes;
-    task_runner_->PostTask([weak_this, inodes] {
-      if (weak_this)
-        weak_this->OnInodes(inodes);
+    auto weak = weak_file_source_;
+    task_runner_->PostTask([weak, inodes] {
+      if (weak)
+        weak->OnInodes(inodes);
     });
   }
-}
 
-void ProbesProducer::SinkDelegate::OnInodes(
-    const std::vector<uint64_t>& inodes) {
-  PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
+  if (weak_ps_source_ && !metadata.pids.empty()) {
+    auto pids = metadata.pids;
+    auto weak = weak_ps_source_;
+    task_runner_->PostTask([weak, pids] {
+      if (weak)
+        weak->OnPids(pids);
+    });
+  }
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
     std::map<uint64_t, InodeMap>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
-    : file_system_inodes_(file_system_inodes), writer_(std::move(writer)) {}
+    : file_system_inodes_(file_system_inodes),
+      writer_(std::move(writer)),
+      weak_factory_(this) {}
 
 ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
+
+ProducerID ProbesProducer::InodeFileMapDataSource::GetProducerID() {
+  return 0;
+}
+
+base::WeakPtr<ProbesProducer::InodeFileMapDataSource>
+ProbesProducer::InodeFileMapDataSource::GetWeakPtr() const {
+  return weak_factory_.GetWeakPtr();
+}
 
 void ProbesProducer::InodeFileMapDataSource::WriteInodes(
     const FtraceMetadata& metadata) {
@@ -318,6 +355,11 @@ void ProbesProducer::InodeFileMapDataSource::WriteInodes(
     }
   }
   trace_packet->Finalize();
+}
+
+void ProbesProducer::InodeFileMapDataSource::OnInodes(
+    const std::vector<uint64_t>& inodes) {
+  PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
 }
 
 }  // namespace perfetto

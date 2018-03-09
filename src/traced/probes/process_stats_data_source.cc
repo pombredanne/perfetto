@@ -28,8 +28,17 @@ namespace perfetto {
 
 ProcessStatsDataSource::ProcessStatsDataSource(
     std::unique_ptr<TraceWriter> writer)
-    : writer_(std::move(writer)) {}
+    : writer_(std::move(writer)), weak_factory_(this) {}
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
+
+ProducerID ProcessStatsDataSource::GetProducerID() {
+  return 0;
+}
+
+base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
+    const {
+  return weak_factory_.GetWeakPtr();
+}
 
 void ProcessStatsDataSource::WriteAllProcesses() {
   procfs_utils::ProcessMap processes;
@@ -57,6 +66,10 @@ void ProcessStatsDataSource::WriteAllProcesses() {
         }
       });
   trace_packet->Finalize();
+}
+
+void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
+  PERFETTO_DLOG("Saw FtraceBundle with %zu pids.", pids.size());
 }
 
 }  // namespace perfetto
