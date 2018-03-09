@@ -317,7 +317,7 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
 }
 
 void ProbesProducer::SinkDelegate::OnInodes(
-    const std::map<uint64_t, uint32_t>& inodes) {
+    const std::vector<std::pair<uint64_t, uint32_t>>& inodes) {
   PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
 }
 
