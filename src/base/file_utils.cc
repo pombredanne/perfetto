@@ -30,17 +30,17 @@ const size_t kBufSize = 2048;
 bool ReadFile(const std::string& path, std::string* out) {
   // Do not override existing data in string.
   size_t i = out->size();
-  struct stat buf;
-
-  if (stat(path.c_str(), &buf) != -1) {
-    if (buf.st_size > 0)
-      out->resize(i + static_cast<size_t>(buf.st_size));
-  }
 
   base::ScopedFile fd = base::OpenFile(path.c_str(), O_RDONLY);
   if (!fd) {
     PERFETTO_PLOG(path.c_str());
     return false;
+  }
+
+  struct stat buf {};
+  if (fstat(*fd, &buf) != -1) {
+    if (buf.st_size > 0)
+      out->resize(i + static_cast<size_t>(buf.st_size));
   }
 
   ssize_t bytes_read;

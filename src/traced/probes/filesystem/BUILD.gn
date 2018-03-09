@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source_set("fs_mount") {
+source_set("filesystem") {
   deps = [
     "../../../../gn:default_deps",
   ]
@@ -25,7 +25,7 @@ source_set("fs_mount") {
 source_set("filesystem_unittests") {
   testonly = true
   deps = [
-    ":fs_mount",
+    ":filesystem",
     "../../../../gn:default_deps",
     "../../../../gn:gtest_deps",
   ]
