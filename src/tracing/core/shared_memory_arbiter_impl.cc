@@ -97,7 +97,6 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
               page_idx_, chunk_idx, &header);
           if (!chunk.is_valid())
             continue;
-          PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           if (stall_count) {
             PERFETTO_LOG(
                 "Recovered from stall after %" PRIu64 " ms",

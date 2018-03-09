@@ -324,7 +324,6 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
 void ServiceImpl::ReadBuffers(TracingSessionID tsid,
                               ConsumerEndpointImpl* consumer) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DLOG("Reading buffers for session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
     PERFETTO_DLOG(
@@ -425,6 +424,7 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
 
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
+  exit(0);
 }
 
 void ServiceImpl::RegisterDataSource(ProducerID producer_id,
@@ -581,7 +581,7 @@ void ServiceImpl::ApplyChunkPatches(
         GetBufferByID(static_cast<BufferID>(chunk.target_buffer()));
     static_assert(std::numeric_limits<ChunkID>::max() == kMaxChunkID,
                   "Add a '|| chunk_id > kMaxChunkID' below if this fails");
-    if (!chunk_id || !writer_id || writer_id > kMaxWriterID || !buf) {
+    if (!writer_id || writer_id > kMaxWriterID || !buf) {
       PERFETTO_DLOG(
           "Received invalid chunks_to_patch request from Producer: %" PRIu16
           ", BufferID: %" PRIu32 " ChunkdID: %" PRIu32 " WriterID: %" PRIu16,
@@ -705,6 +705,7 @@ void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (tracing_session_id_) {
     service_->FreeBuffers(tracing_session_id_);
+    tracing_session_id_ = 0;
   } else {
     PERFETTO_LOG("Consumer called FreeBuffers() but tracing was not active");
   }
@@ -796,8 +797,6 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     auto packets = chunk_header.packets.load(std::memory_order_relaxed);
     uint16_t num_fragments = packets.count;
     uint8_t chunk_flags = packets.flags;
-
-    PERFETTO_DLOG("Commit req %d:%d", entry.page(), entry.chunk());
 
     service_->CopyProducerPageIntoLogBuffer(
         id_, uid_, writer_id, chunk_id, buffer_id, num_fragments, chunk_flags,
