@@ -28,6 +28,7 @@ const size_t kBufSize = 2048;
 }
 
 bool ReadFile(const std::string& path, std::string* out) {
+  // Do not override existing data in string.
   size_t i = out->size();
   struct stat buf;
 
