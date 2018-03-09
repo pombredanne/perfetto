@@ -61,12 +61,12 @@ std::multimap<BlockDeviceID, std::string> ParseMounts() {
       PERFETTO_DLOG("Encountered incomplete row in %s: %s.", kMountsPath, line);
       continue;
     }
-    std::string mountpoint = words[1];
+    std::string& mountpoint = words[1];
     if (stat(mountpoint.c_str(), &buf) == -1) {
       PERFETTO_PLOG("stat");
       continue;
     }
-    device_to_mountpoints.emplace(buf.st_dev, mountpoint);
+    device_to_mountpoints.emplace(buf.st_dev, std::move(mountpoint));
   }
   return device_to_mountpoints;
 }

@@ -24,7 +24,6 @@ namespace base {
 
 bool ReadFile(const std::string& path, std::string* out);
 }
-
 }  // namespace perfetto
 
 #endif  // INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
