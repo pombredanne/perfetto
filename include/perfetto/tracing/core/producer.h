@@ -18,7 +18,6 @@
 #define INCLUDE_PERFETTO_TRACING_CORE_PRODUCER_H_
 
 #include "perfetto/tracing/core/basic_types.h"
-#include "perfetto/tracing/core/trace_config.h"
 
 namespace perfetto {
 
