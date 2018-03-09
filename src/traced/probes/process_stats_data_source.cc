@@ -25,7 +25,6 @@
 #include "src/process_stats/procfs_utils.h"
 
 namespace perfetto {
-namespace {}  // namespace
 
 ProcessStatsDataSource::ProcessStatsDataSource(
     std::unique_ptr<TraceWriter> writer)

@@ -142,6 +142,7 @@ class ProbesProducer : public Producer {
       file_map_sources_;
   std::map<uint64_t, InodeMap> system_inodes_;
 };
+
 }  // namespace perfetto
 
 #endif  // SRC_TRACED_PROBES_PROBES_PRODUCER_H_
