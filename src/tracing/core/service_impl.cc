@@ -248,9 +248,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       break;
     }
   }
-  // TODO(taylori): Is it safe to delete this? Becuase memory is not
-  // allocated yet.
-  // UpdateMemoryGuardrail();
+
+  UpdateMemoryGuardrail();
 
   // This can happen if either:
   // - All the kMaxTraceBufferID slots are taken.
@@ -645,7 +644,9 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Sum up all the shared memory buffers.
   for (const auto& id_to_producer : producers_) {
-    total_buffer_bytes += id_to_producer.second->shared_memory()->size();
+    if (id_to_producer.second->shared_memory()) {
+      total_buffer_bytes += id_to_producer.second->shared_memory()->size();
+    }
   }
 
   // Sum up all the trace buffers.
