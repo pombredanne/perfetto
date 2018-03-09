@@ -51,9 +51,7 @@ bool ReadFile(const std::string& path, std::string* out) {
     if (bytes_read > 0) {
       i += static_cast<size_t>(bytes_read);
     } else {
-      if (out->size() != i) {
-        out->resize(i);
-      }
+      out->resize(i);
       return bytes_read == 0;
     }
   }
