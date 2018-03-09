@@ -66,6 +66,14 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   return enabled;
 }
 
+template <typename T>
+static void AddToInodeNumbers(const uint8_t* start,
+                              std::set<uint64_t>* inode_numbers) {
+  T t;
+  memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
+  inode_numbers->insert(t);
+}
+
 void SetBlocking(int fd, bool is_blocking) {
   int flags = fcntl(fd, F_GETFL, 0);
   flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
@@ -157,11 +165,10 @@ CpuReader::~CpuReader() {
 }
 
 // static
-void CpuReader::RunWorkerThread(
-    size_t cpu,
-    int trace_fd,
-    int staging_write_fd,
-    const std::function<void()>& on_data_available) {
+void CpuReader::RunWorkerThread(size_t cpu,
+                                int trace_fd,
+                                int staging_write_fd,
+                                std::function<void()> on_data_available) {
   // This thread is responsible for moving data from the trace pipe into the
   // staging pipe at least one page at a time. This is done using the splice(2)
   // system call, which unlike poll/select makes it possible to block until at
@@ -245,9 +252,9 @@ std::map<uint64_t, std::string> CpuReader::GetFilenamesForInodeNumbers(
 }
 
 bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
-                      const std::array<BundleHandle, kMaxSinks>& bundles,
-                      const std::array<FtraceMetadata*, kMaxSinks>& metadatas) {
+                      const std::array<BundleHandle, kMaxSinks>& bundles) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  std::array<ParserStats, kMaxSinks> statss{};
   while (true) {
     uint8_t* buffer = GetBuffer();
     long bytes =
@@ -261,7 +268,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
       if (!filters[i])
         break;
       evt_size =
-          ParsePage(buffer, filters[i], &*bundles[i], table_, metadatas[i]);
+          ParsePage(buffer, filters[i], &*bundles[i], table_, &statss[i]);
       PERFETTO_DCHECK(evt_size);
     }
   }
@@ -270,7 +277,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     if (!filters[i])
       break;
     bundles[i]->set_cpu(cpu_);
-    bundles[i]->set_overwrite_count(metadatas[i]->overwrite_count);
+    bundles[i]->set_overwrite_count(statss[i].overwrite_count);
   }
 
   return true;
@@ -296,9 +303,10 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
                             const EventFilter* filter,
                             protos::pbzero::FtraceEventBundle* bundle,
                             const ProtoTranslationTable* table,
-                            FtraceMetadata* metadata) {
+                            ParserStats* stats) {
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + base::kPageSize;
+
 
   // TODO(hjd): Read this format dynamically?
   PageHeader page_header;
@@ -311,13 +319,14 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
   page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
 
-  metadata->overwrite_count = page_header.overwrite;
+  stats->overwrite_count = page_header.overwrite;
 
   const uint8_t* const end = ptr + page_header.size;
   if (end > end_of_page)
     return 0;
 
   uint64_t timestamp = page_header.timestamp;
+  std::set<uint64_t> inode_numbers;
 
   while (ptr < end) {
     EventHeader event_header;
@@ -385,7 +394,8 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, table, event, metadata))
+          if (!ParseEvent(ftrace_event_id, start, next, table, event,
+                          &inode_numbers))
             return 0;
         }
 
@@ -404,7 +414,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
                            const uint8_t* end,
                            const ProtoTranslationTable* table,
                            protozero::Message* message,
-                           FtraceMetadata* metadata) {
+                           std::set<uint64_t>* inode_numbers) {
   PERFETTO_DCHECK(start < end);
   const size_t length = end - start;
 
@@ -420,13 +430,13 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   bool success = true;
   for (const Field& field : table->common_fields())
-    success &= ParseField(field, start, end, message, metadata);
+    success &= ParseField(field, start, end, message, inode_numbers);
 
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
   for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, metadata);
+    success &= ParseField(field, start, end, nested, inode_numbers);
 
   // This finalizes |nested| automatically.
   message->Finalize();
@@ -442,7 +452,7 @@ bool CpuReader::ParseField(const Field& field,
                            const uint8_t* start,
                            const uint8_t* end,
                            protozero::Message* message,
-                           FtraceMetadata* metadata) {
+                           std::set<uint64_t>* inode_numbers) {
   PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
   const uint8_t* field_start = start + field.ftrace_offset;
   uint32_t field_id = field.proto_field_id;
@@ -479,13 +489,12 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
-      ReadInode<uint32_t>(field_start, field_id, message, metadata);
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+      AddToInodeNumbers<uint32_t>(field_start, inode_numbers);
       return true;
     case kInode64ToUint64:
-      ReadInode<uint64_t>(field_start, field_id, message, metadata);
-      return true;
-    case kPid32ToInt32:
-      ReadPid(field_start, field_id, message, metadata);
+      ReadIntoVarInt<uint64_t>(field_start, field_id, message);
+      AddToInodeNumbers<uint64_t>(field_start, inode_numbers);
       return true;
   }
   // Not reached, for gcc.

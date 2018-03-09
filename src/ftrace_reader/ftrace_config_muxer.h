@@ -38,8 +38,7 @@ namespace perfetto {
 // |RemoveConfig|.
 class FtraceConfigMuxer {
  public:
-  // The FtraceConfigMuxer and ProtoTranslationTable
-  // should outlive this instance.
+  // The ProtoTranslationTable table should outlive this instance.
   FtraceConfigMuxer(FtraceProcfs* ftrace, const ProtoTranslationTable* table);
   virtual ~FtraceConfigMuxer();
 
@@ -80,6 +79,8 @@ class FtraceConfigMuxer {
 
   void SetupClock(const FtraceConfig& request);
   void SetupBufferSize(const FtraceConfig& request);
+  void EnableAtraceOnAndroid(const FtraceConfig& request);
+  void DisableAtraceOnAndroid();
   void EnableAtrace(const FtraceConfig& request);
   void DisableAtrace();
 

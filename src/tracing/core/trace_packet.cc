@@ -45,9 +45,4 @@ void TracePacket::AddSlice(Slice slice) {
   slices_.push_back(std::move(slice));
 }
 
-void TracePacket::AddSlice(const void* start, size_t size) {
-  size_ += size;
-  slices_.emplace_back(start, size);
-}
-
 }  // namespace perfetto

@@ -48,10 +48,8 @@ class PerfettoCtsTest : public ::testing::Test {
       if (has_more) {
         for (auto& packet : packets) {
           packet.Decode();
-          ASSERT_TRUE(packet->has_for_testing());
-          // ASSERT_EQ(protos::TracePacket::kTrustedUid,
-          //          packet->optional_trusted_uid_case());
-          ASSERT_EQ(packet->for_testing().str(), "test");
+          ASSERT_TRUE(packet->has_test());
+          ASSERT_EQ(packet->test(), "test");
         }
         total += packets.size();
 
@@ -69,13 +67,7 @@ class PerfettoCtsTest : public ::testing::Test {
     FakeConsumer consumer(trace_config, std::move(function), &task_runner);
     consumer.Connect(PERFETTO_CONSUMER_SOCK_NAME);
 
-    // TODO(skyostil): There's a race here before the service processes our data
-    // and the consumer tries to retrieve it. For now wait a bit until the
-    // service is done, but we should add explicit flushing to avoid this.
-    task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                                2500);
-
-    task_runner.RunUntilCheckpoint("no.more.packets", 10000);
+    task_runner.RunUntilCheckpoint("no.more.packets");
   }
 };
 

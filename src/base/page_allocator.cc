@@ -26,7 +26,7 @@ namespace base {
 
 namespace {
 
-constexpr size_t kGuardSize = kPageSize;
+static constexpr size_t kGuardSize = kPageSize;
 
 // static
 PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {

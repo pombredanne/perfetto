@@ -51,7 +51,8 @@ class TracePacket {
   TracePacket& operator=(TracePacket&&);
 
   // Accesses all the raw slices in the packet, for saving them to file/network.
-  const Slices& slices() const { return slices_; }
+  const_iterator begin() const { return slices_.begin(); }
+  const_iterator end() const { return slices_.end(); }
 
   // Decodes the packet for inline use.
   bool Decode();
@@ -65,7 +66,6 @@ class TracePacket {
 
   // Mutator, used only by the service and tests.
   void AddSlice(Slice);
-  void AddSlice(const void* start, size_t size);
 
   // Total size of all slices.
   size_t size() const { return size_; }

@@ -18,18 +18,14 @@
 
 #include <memory>
 
+#include "ftrace_procfs.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "atrace_wrapper.h"
-#include "ftrace_procfs.h"
 #include "proto_translation_table.h"
 
 using testing::_;
 using testing::AnyNumber;
 using testing::Contains;
-using testing::ElementsAreArray;
-using testing::Eq;
 using testing::IsEmpty;
 using testing::NiceMock;
 using testing::Not;
@@ -54,20 +50,6 @@ class MockFtraceProcfs : public FtraceProcfs {
   MOCK_METHOD1(ClearFile, bool(const std::string& path));
   MOCK_CONST_METHOD1(ReadFileIntoString, std::string(const std::string& path));
   MOCK_CONST_METHOD0(NumberOfCpus, size_t());
-};
-
-struct MockRunAtrace {
-  MockRunAtrace() {
-    static MockRunAtrace* instance;
-    instance = this;
-    SetRunAtraceForTesting([](const std::vector<std::string>& args) {
-      return instance->RunAtrace(args);
-    });
-  }
-
-  ~MockRunAtrace() { SetRunAtraceForTesting(nullptr); }
-
-  MOCK_METHOD1(RunAtrace, bool(const std::vector<std::string>&));
 };
 
 std::unique_ptr<ProtoTranslationTable> CreateFakeTable() {
@@ -175,10 +157,15 @@ TEST(FtraceConfigMuxerTest, FtraceIsAlreadyOn) {
   ASSERT_FALSE(id);
 }
 
-TEST(FtraceConfigMuxerTest, Atrace) {
+// TODO(hjd): Mock atrace on Android.
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_Atrace DISABLED_Atrace
+#else
+#define MAYBE_Atrace Atrace
+#endif
+TEST(FtraceConfigMuxerTest, MAYBE_Atrace) {
   std::unique_ptr<ProtoTranslationTable> table = CreateFakeTable();
   NiceMock<MockFtraceProcfs> ftrace;
-  MockRunAtrace atrace;
 
   FtraceConfig config = CreateFtraceConfig({"sched_switch"});
   *config.add_atrace_categories() = "sched";
@@ -187,9 +174,6 @@ TEST(FtraceConfigMuxerTest, Atrace) {
 
   EXPECT_CALL(ftrace, ReadOneCharFromFile("/root/tracing_on"))
       .WillOnce(Return('0'));
-  EXPECT_CALL(atrace,
-              RunAtrace(ElementsAreArray({"atrace", "--async_start", "sched"})))
-      .WillOnce(Return(true));
 
   FtraceConfigId id = model.RequestConfig(config);
   ASSERT_TRUE(id);
@@ -199,8 +183,6 @@ TEST(FtraceConfigMuxerTest, Atrace) {
   EXPECT_THAT(actual_config->ftrace_events(), Contains("sched_switch"));
   EXPECT_THAT(actual_config->ftrace_events(), Contains("print"));
 
-  EXPECT_CALL(atrace, RunAtrace(ElementsAreArray({"atrace", "--async_stop"})))
-      .WillOnce(Return(true));
   ASSERT_TRUE(model.RemoveConfig(id));
 }
 

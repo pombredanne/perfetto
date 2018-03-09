@@ -66,9 +66,10 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // in the SMB. In the long term the caller should be allowed to pick a policy
   // and handle the retry itself asynchronously.
   SharedMemoryABI::Chunk GetNewChunk(const SharedMemoryABI::ChunkHeader&,
+                                     BufferID target_buffer,
                                      size_t size_hint = 0);
 
-  void ReturnCompletedChunk(SharedMemoryABI::Chunk, BufferID target_buffer);
+  void ReturnCompletedChunk(SharedMemoryABI::Chunk chunk);
 
   SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 
