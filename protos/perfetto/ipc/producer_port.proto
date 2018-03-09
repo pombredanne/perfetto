@@ -20,7 +20,6 @@ option optimize_for = LITE_RUNTIME;
 import "perfetto/config/data_source_config.proto";
 import "perfetto/config/data_source_descriptor.proto";
 import "perfetto/ipc/commit_data_request.proto";
-import "perfetto/config/trace_config.proto";
 
 package perfetto.protos;
 
@@ -109,15 +108,11 @@ message GetAsyncCommandResponse {
     optional protos.DataSourceConfig config = 2;
   }
 
-  message AllocateShm {
-    optional protos.TraceConfig.ProducerConfig producer_config = 1;
-  }
+  message AllocateShm { optional uint64 page_size_kb = 1; }
 
   message StopDataSource { optional uint64 instance_id = 1; }
 
-  message TearDownShm {
-    optional protos.TraceConfig.ProducerConfig producer_config = 1;
-  }
+  message TearDownShm {}
 
   oneof cmd {
     StartDataSource start_data_source = 1;

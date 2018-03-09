@@ -121,19 +121,14 @@ void ProducerIPCClientImpl::OnServiceRequest(
   }
 
   if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kAllocateShm) {
-    auto cfg = cmd.allocate_shm().producer_config();
-    TraceConfig::ProducerConfig producer_config;
-    producer_config.FromProto(cfg);
     base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
     PERFETTO_CHECK(shmem_fd);
 
     // TODO(primiano): handle mmap failure in case of OOM.
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), producer_config.page_size_kb(), this,
+        shared_memory_.get(), cmd.allocate_shm().page_size_kb(), this,
         task_runner_);
-    // TODO(taylori): This method is not implemented yet. Perhaps unecessary?
-    // producer_->AllocateSharedMemory(producer_config);
   }
 
   if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kTearDownShm) {

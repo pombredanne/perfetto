@@ -81,6 +81,8 @@ class Service {
     // SHM object but only the TraceWriter (below).
     virtual SharedMemory* shared_memory() const = 0;
 
+    int page_size_kb;
+
     // Creates a trace writer, which allows to create events, handling the
     // underying shared memory buffer and signalling to the Service. This method
     // is thread-safe but the returned object is not. A TraceWriter should be
@@ -134,8 +136,10 @@ class Service {
   // is unreasonably large).
   // Can return null in the unlikely event that service has too many producers
   // connected.
-  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(Producer*,
-                                                            uid_t uid) = 0;
+  virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
+      Producer*,
+      uid_t uid,
+      size_t shared_buffer_size_hint_bytes = 0) = 0;
 
   // Coonects a Consumer instance and obtains a ConsumerEndpoint, which is
   // essentially a 1:1 channel between one Consumer and the Service.

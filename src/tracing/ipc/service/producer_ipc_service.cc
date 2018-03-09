@@ -252,26 +252,23 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
   async_producer_commands.Resolve(std::move(cmd));
 }
 
-void ProducerIPCService::RemoteProducer::AllocateSharedMemory(
-    const TraceConfig::ProducerConfig& config,
-    const int& shm_fd) {
+void ProducerIPCService::RemoteProducer::OnTracingStart() {
   if (!async_producer_commands.IsBound()) {
     PERFETTO_DLOG(
         "The Service tried to allocate the shared memory but the remote "
-        "Producer "
-        "has not yet initialized the connection");
+        "Producer has not yet initialized the connection");
     return;
   }
-  PERFETTO_LOG("ProducerIPCallocate");
+  const int shm_fd =
+      static_cast<PosixSharedMemory*>(service_endpoint->shared_memory())->fd();
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd.set_fd(shm_fd);
-  config.ToProto(cmd->mutable_allocate_shm()->mutable_producer_config());
+  cmd->mutable_allocate_shm()->set_page_size_kb(service_endpoint->page_size_kb);
   async_producer_commands.Resolve(std::move(cmd));
 }
 
-void ProducerIPCService::RemoteProducer::TearDownSharedMemory(
-    const TraceConfig::ProducerConfig& config) {
+void ProducerIPCService::RemoteProducer::OnTracingStop() {
   // TODO(taylori): Implement.
 }
 

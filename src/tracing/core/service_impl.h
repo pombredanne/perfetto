@@ -64,7 +64,7 @@ class ServiceImpl : public Service {
                             RegisterDataSourceCallback) override;
     void UnregisterDataSource(DataSourceID) override;
     void CommitData(const CommitDataRequest&) override;
-    void setSharedMemory(std::unique_ptr<SharedMemory>, int);
+    void SetSharedMemory(std::unique_ptr<SharedMemory>);
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
 
@@ -138,7 +138,8 @@ class ServiceImpl : public Service {
   // Service implementation.
   std::unique_ptr<Service::ProducerEndpoint> ConnectProducer(
       Producer*,
-      uid_t uid) override;
+      uid_t uid,
+      size_t shared_buffer_size_hint_bytes = 0) override;
 
   std::unique_ptr<Service::ConsumerEndpoint> ConnectConsumer(
       Consumer*) override;

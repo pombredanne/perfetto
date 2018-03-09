@@ -33,7 +33,6 @@
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "src/tracing/core/packet_stream_validator.h"
-#include "src/tracing/ipc/posix_shared_memory.h"
 
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
@@ -50,6 +49,8 @@ using protozero::proto_utils::ParseVarInt;
 using protozero::proto_utils::WriteVarInt;
 
 namespace {
+constexpr size_t kDefaultShmSize = base::kPageSize * 64;  // 256 KB.
+constexpr size_t kMaxShmSize = base::kPageSize * 1024;    // 4 MB.
 constexpr int kMaxBuffersPerConsumer = 128;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -82,7 +83,8 @@ ServiceImpl::~ServiceImpl() {
 
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     Producer* producer,
-    uid_t uid) {
+    uid_t uid,
+    size_t shared_buffer_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   if (lockdown_mode_ && uid != geteuid()) {
@@ -98,9 +100,6 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   const ProducerID id = GetNextProducerID();
   PERFETTO_DLOG("Producer %" PRIu16 " connected", id);
 
-  // TODO(primiano): right now Create() will suicide in case of OOM if the mmap
-  // fails. We should instead gracefully fail the request and tell the client
-  // to go away.
   std::unique_ptr<ProducerEndpointImpl> endpoint(
       new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
@@ -208,9 +207,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // TraceWriter.
   // TODO(taylori): Handle multiple producers/producer_configs.
   auto first_producer_config = cfg.producers()[0];
-  if (tracing_sessions_.size() >= first_producer_config.shm_size_kb() /
-                                      first_producer_config.page_size_kb() /
-                                      2) {
+  if (tracing_sessions_.size() >=
+      (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
     PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
                   tracing_sessions_.size());
     // TODO(primiano): make this a bool and return failure to the IPC layer.
@@ -351,7 +349,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
         continue;
       const uid_t page_owner = tbuf.get_page_owner(page_idx);
       uint32_t layout = abi.page_layout_dbg(page_idx);
-      size_t num_chunks = abi.GetNumChunksForLayout(layout);
+      size_t num_chunks = SharedMemoryABI::GetNumChunksForLayout(layout);
       for (size_t chunk_idx = 0; chunk_idx < num_chunks; chunk_idx++) {
         if (abi.GetChunkState(page_idx, chunk_idx) ==
             SharedMemoryABI::kChunkFree) {
@@ -561,20 +559,23 @@ void ServiceImpl::CreateDataSourceInstance(
       producer->id_, DataSourceInstance{inst_id, data_source.data_source_id});
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
-  if (inst_id == 1) {
+  if (tracing_session->data_source_instances.count(producer->id_) == 1) {
     // TODO(taylori): Handle multiple producers/producer configs.
     auto first_producer_config = tracing_session->config.producers()[0];
-    auto shared_memory =
-        shm_factory_->CreateSharedMemory(first_producer_config.shm_size_kb());
-    producer->setSharedMemory(std::move(shared_memory),
-                              first_producer_config.page_size_kb());
-    const int shm_fd =
-        static_cast<PosixSharedMemory*>(producer->shared_memory())->fd();
-    producer->producer_->AllocateSharedMemory(first_producer_config, shm_fd);
+    // TODO(primiano): right now Create() will suicide in case of OOM if the
+    // mmap fails. We should instead gracefully fail the request and tell the
+    // client to go away.
+    producer->page_size_kb = first_producer_config.page_size_kb();
+    size_t shm_size =
+        std::min(first_producer_config.shm_size_kb(), kMaxShmSize);
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
+      shm_size = kDefaultShmSize;
+    auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
+    producer->SetSharedMemory(std::move(shared_memory));
+    producer->producer_->OnTracingStart();
     UpdateMemoryGuardrail();
   }
   producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
-  PERFETTO_LOG("createdDataSourceInstance");
 }
 
 void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
@@ -632,7 +633,8 @@ ProducerID ServiceImpl::GetNextProducerID() {
 }
 
 void ServiceImpl::UpdateMemoryGuardrail() {
-#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
+#if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   uint64_t total_buffer_bytes = 0;
 
   // Sum up all the shared memory buffers.
@@ -754,36 +756,33 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     const CommitDataRequest& req_untrusted) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
+  PERFETTO_DCHECK(shared_memory_->start());
   for (const auto& chunks : req_untrusted.chunks_to_move()) {
     const uint32_t page_idx = chunks.page();
-    PERFETTO_DCHECK(shmem_abi_.num_pages());
     if (page_idx >= shmem_abi_.num_pages())
       continue;  // A buggy or malicious producer.
 
     if (!shmem_abi_.is_page_complete(page_idx))
       continue;
 
-    // TODO(primiano): implement per-chunk move.
+    // TODO(primiano): implement per-chunk move and replace
+    // ReleaseAllChunksAsFree() with just ReleaseChunk.
     PERFETTO_DCHECK(chunks.chunk() == 0);
 
     if (!shmem_abi_.TryAcquireAllChunksForReading(page_idx))
       continue;
 
-    // TODO(fmayer): we should start collecting individual chunks from non fully
-    // complete pages after a while.
-
-    // TODO(primiano): in next CL, use chunks.target_buffer() instead.
-    service_->CopyProducerPageIntoLogBuffer(
-        id_, shmem_abi_.get_target_buffer(page_idx),
-        shmem_abi_.page_start(page_idx), shmem_abi_.page_size());
+    BufferID target_buffer = static_cast<BufferID>(chunks.target_buffer());
+    service_->CopyProducerPageIntoLogBuffer(id_, target_buffer,
+                                            shmem_abi_.page_start(page_idx),
+                                            shmem_abi_.page_size());
 
     shmem_abi_.ReleaseAllChunksAsFree(page_idx);
   }
 }
 
-void ServiceImpl::ProducerEndpointImpl::setSharedMemory(
-    std::unique_ptr<SharedMemory> shared_memory,
-    int page_size_kb) {
+void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
+    std::unique_ptr<SharedMemory> shared_memory) {
   shared_memory_ = std::move(shared_memory);
   shmem_abi_ =
       SharedMemoryABI(reinterpret_cast<uint8_t*>(shared_memory_->start()),
