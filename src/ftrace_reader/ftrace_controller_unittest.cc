@@ -602,7 +602,7 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
 
 TEST(FtraceMetadataTest, Clear) {
   FtraceMetadata metadata;
-  metadata.inodes.push_back(1);
+  metadata.inodes.emplace(1, 1);
   metadata.pids.push_back(2);
   metadata.overwrite_count = 3;
   metadata.Clear();

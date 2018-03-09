@@ -43,8 +43,9 @@ struct FtraceMetadata {
   size_t overwrite_count;
 
   // A vector not a set to keep the writer_fast.
-  std::vector<uint64_t> inodes;
+  std::map<uint64_t, uint32_t> inodes;
   std::vector<int32_t> pids;
+  uint32_t block_device_id;
 
   void AddPid(int32_t);
   void Clear();

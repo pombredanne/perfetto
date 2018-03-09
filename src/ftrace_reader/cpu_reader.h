@@ -115,7 +115,16 @@ class CpuReader {
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
-    metadata->inodes.push_back(t);
+    uint32_t dev_id = metadata->block_device_id;
+    metadata->inodes.emplace(t, dev_id);
+  }
+
+  static void ReadDevId(const uint8_t* start,
+                        size_t field_id,
+                        protozero::Message* out,
+                        FtraceMetadata* metadata) {
+    uint32_t dev_id = ReadIntoVarInt<uint32_t>(start, field_id, out);
+    metadata->block_device_id = dev_id;
   }
 
   static void ReadPid(const uint8_t* start,
