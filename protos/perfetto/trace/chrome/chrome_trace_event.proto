@@ -16,18 +16,26 @@
 
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
-
 package perfetto.protos;
 
-// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
-// to reflect changes in the corresponding C++ headers.
+// TODO(oysteine) : Separate out commonly repeated values into a separate
+// message (primarily |name| and |category_group_name|).
+message ChromeTraceEvent {
+  optional string name = 1;
+  optional int64 timestamp = 2;
+  optional int32 phase = 3;
+  optional int32 thread_id = 4;
+  optional int64 duration = 5;
+  optional int64 thread_duration = 6;
+  optional string scope = 7;
+  optional uint64 id = 8;
+  optional uint32 flags = 9;
+  optional string category_group_name = 10;
+  optional int32 process_id = 11;
+  optional int64 thread_timestamp = 12;
+  optional uint32 bind_id = 13;
+}
 
-// The configuration for a fake producer used in tests.
-message TestConfig {
-  // The number of messages the fake producer should send.
-  optional uint32 message_count = 1;
-
-  // The seed value for a simple multiplicative congruential pseudo-random
-  // number sequence.
-  optional uint32 seed = 2;
+message ChromeEventBundle {
+  repeated ChromeTraceEvent trace_events = 1;
 }
