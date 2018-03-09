@@ -57,8 +57,10 @@ std::map<block_device_t, std::vector<std::string>> ParseMounts() {
   struct stat buf;
   for (const std::string& line : lines) {
     std::vector<std::string> words = split(line, ' ');
-    if (words.size() < 2)
+    if (words.size() < 2) {
+      PERFETTO_DLOG("Encountered incomplete row in %s: %s.", kMountsPath, line);
       continue;
+    }
     std::string mountpoint = words[1];
     if (stat(mountpoint.c_str(), &buf) == -1) {
       PERFETTO_PLOG("stat");
