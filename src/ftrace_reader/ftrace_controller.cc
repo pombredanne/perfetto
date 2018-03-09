@@ -379,6 +379,7 @@ void FtraceMetadata::Clear() {
   inodes.clear();
   pids.clear();
   overwrite_count = 0;
+  block_device_id = 0;
 }
 
 }  // namespace perfetto

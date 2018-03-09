@@ -605,10 +605,12 @@ TEST(FtraceMetadataTest, Clear) {
   metadata.inodes.emplace(1, 1);
   metadata.pids.push_back(2);
   metadata.overwrite_count = 3;
+  metadata.block_device_id = 100;
   metadata.Clear();
   EXPECT_THAT(metadata.inodes, IsEmpty());
   EXPECT_THAT(metadata.pids, IsEmpty());
   EXPECT_EQ(metadata.overwrite_count, 0u);
+  EXPECT_EQ(metadata.block_device_id, 0u);
 }
 
 TEST(FtraceMetadataTest, AddPid) {
