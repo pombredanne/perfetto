@@ -28,6 +28,7 @@ namespace perfetto {
 using block_device_t = decltype(stat::st_dev);
 
 std::map<block_device_t, std::vector<std::string>> ParseMounts();
+
 }  // namespace perfetto
 
 #endif  // SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_

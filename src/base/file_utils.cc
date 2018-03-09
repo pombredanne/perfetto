@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <sys/stat.h>
+
 #include "perfetto/base/file_utils.h"
 
 #include "perfetto/base/logging.h"
@@ -26,28 +28,35 @@ const size_t kBufSize = 2048;
 }
 
 bool ReadFile(const std::string& path, std::string* out) {
+  size_t i = out->size();
+  struct stat buf;
+
+  if (stat(path.c_str(), &buf) != -1) {
+    if (buf.st_size > 0)
+      out->resize(i + static_cast<size_t>(buf.st_size));
+  }
+
   base::ScopedFile fd = base::OpenFile(path.c_str(), O_RDONLY);
   if (!fd) {
-    PERFETTO_PLOG("open");
+    PERFETTO_PLOG(path.c_str());
     return false;
   }
-
-  char buf[kBufSize + 1];
 
   ssize_t bytes_read;
-  do {
-    bytes_read = PERFETTO_EINTR(read(fd.get(), &buf, kBufSize));
-    if (bytes_read > 0) {
-      buf[bytes_read] = '\0';
-      *out += buf;
-    }
-  } while (bytes_read > 0);
+  for (;;) {
+    if (out->size() < i + kBufSize)
+      out->resize(out->size() + kBufSize);
 
-  if (bytes_read == -1) {
-    PERFETTO_PLOG("read");
-    return false;
+    bytes_read = PERFETTO_EINTR(read(fd.get(), &((*out)[i]), kBufSize));
+    if (bytes_read > 0) {
+      i += static_cast<size_t>(bytes_read);
+    } else {
+      if (out->size() != i) {
+        out->resize(i);
+      }
+      return bytes_read == 0;
+    }
   }
-  return true;
 }
 
 }  // namespace base

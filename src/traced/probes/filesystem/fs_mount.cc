@@ -30,8 +30,6 @@ namespace {
 constexpr const char kMountsPath[] = "/proc/mounts";
 
 std::vector<std::string> split(const std::string& text, char s) {
-  // This does not use strok_r because that needs a non const* char,
-  // and c_str only gives us a const char*.
   std::vector<std::string> result;
   size_t start = 0;
   size_t end = 0;
@@ -51,7 +49,7 @@ std::vector<std::string> split(const std::string& text, char s) {
 std::map<block_device_t, std::vector<std::string>> ParseMounts() {
   std::string data;
   if (!base::ReadFile(kMountsPath, &data)) {
-    PERFETTO_ELOG("Failed to read mount points.");
+    PERFETTO_ELOG("Failed to read %s.", kMountsPath);
     return {};
   }
   std::map<block_device_t, std::vector<std::string>> device_to_mountpoints;
