@@ -196,7 +196,7 @@ class UnixSocket {
   void SetBlockingIO(bool is_blocking);
 
   void OnEvent();
-  void NotifyConnectionState(bool success, bool immediate_notify = false);
+  void NotifyConnectionState(bool success);
 
   base::ScopedFile fd_;
   State state_ = State::kDisconnected;

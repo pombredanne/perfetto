@@ -286,12 +286,11 @@ void UnixSocket::OnEvent() {
     if (res == 0 && sock_err == 0) {
       ReadPeerCredentials();
       state_ = State::kConnected;
-      // We do not want to PostTask because we are already in an event handler.
-      return NotifyConnectionState(true, true /* immediate_notify */);
+      return event_listener_->OnConnect(this, true /* connected */);
     }
     last_error_ = sock_err;
-    // We do not want to PostTask because we are already in an event handler.
-    return NotifyConnectionState(false, true /* immediate_notify */);
+    Shutdown(false);
+    return event_listener_->OnConnect(this, false /* connected */);
   }
 
   // New incoming connection.
@@ -473,19 +472,15 @@ std::string UnixSocket::ReceiveString(size_t max_length) {
   return std::string(buf.get());
 }
 
-void UnixSocket::NotifyConnectionState(bool success, bool immediate_notify) {
+void UnixSocket::NotifyConnectionState(bool success) {
   if (!success)
     Shutdown(false);
 
-  if (immediate_notify) {
-    event_listener_->OnConnect(this, success);
-  } else {
-    base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
-    task_runner_->PostTask([weak_ptr, success]() {
-      if (weak_ptr)
-        weak_ptr->event_listener_->OnConnect(weak_ptr.get(), success);
-    });
-  }
+  base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_ptr, success]() {
+    if (weak_ptr)
+      weak_ptr->event_listener_->OnConnect(weak_ptr.get(), success);
+  });
 }
 
 void UnixSocket::SetBlockingIO(bool is_blocking) {
