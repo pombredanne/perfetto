@@ -25,9 +25,9 @@
 namespace perfetto {
 
 // On ARM, st_dev is not dev_t but unsigned long long.
-using block_device_t = decltype(stat::st_dev);
+using BlockDeviceID = decltype(stat::st_dev);
 
-std::multimap<block_device_t, std::string> ParseMounts();
+std::multimap<BlockDeviceID, std::string> ParseMounts();
 
 }  // namespace perfetto
 
