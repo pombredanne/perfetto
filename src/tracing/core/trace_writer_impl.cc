@@ -28,9 +28,6 @@
 
 #include "perfetto/trace/trace_packet.pbzero.h"
 
-// TODO(primiano): right now this class is accumulating a patchlist but not
-// sending it to the service. Right now it just grows without bounds.
-
 using protozero::proto_utils::kMessageLengthFieldSize;
 using protozero::proto_utils::WriteRedundantVarInt;
 using ChunkHeader = perfetto::SharedMemoryABI::ChunkHeader;
@@ -121,10 +118,14 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     for (auto* nested_msg = cur_packet_->nested_message(); nested_msg;
          nested_msg = nested_msg->nested_message()) {
       uint8_t* const cur_hdr = nested_msg->size_field();
-      bool size_in_current_chunk =
+
+      // If this is false the protozero Message has already been instructed to
+      // write, upon Finalize(), its size into the patch list.
+      bool size_field_points_within_chunk =
           cur_hdr >= cur_chunk_.payload_begin() &&
           cur_hdr + kMessageLengthFieldSize <= cur_chunk_.end();
-      if (size_in_current_chunk) {
+
+      if (size_field_points_within_chunk) {
         auto offset =
             static_cast<uint16_t>(cur_hdr - cur_chunk_.payload_begin());
         const ChunkID cur_chunk_id =
@@ -136,8 +137,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
                       cur_hdr[3]);
       } else {
 #if PERFETTO_DCHECK_IS_ON()
-        // Ensure that the size field of the nested message either points to
-        // somewhere in the current chunk or a size field of a patch in the
+        // Ensure that the size field of the message points to an element of the
         // patch list.
         auto patch_it = std::find_if(
             patch_list_.begin(), patch_list_.end(),
