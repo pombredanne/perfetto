@@ -143,7 +143,7 @@ class UnixSocket {
   // Shuts down the current connection, if any. If the socket was Listen()-ing,
   // stops listening. The socket goes back to kNotInitialized state, so it can
   // be reused with Listen() or Connect().
-  void Shutdown();
+  void Shutdown(bool notify = true);
 
   // Returns true is the message was queued, false if there was no space in the
   // output buffer, in which case the client should retry or give up.
@@ -196,7 +196,7 @@ class UnixSocket {
   void SetBlockingIO(bool is_blocking);
 
   void OnEvent();
-  void NotifyConnectionState(bool success);
+  void NotifyConnectionState(bool success, bool immediate_notify = false);
 
   base::ScopedFile fd_;
   State state_ = State::kDisconnected;
