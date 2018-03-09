@@ -104,6 +104,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
       new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
+  endpoint.get()->shared_buffer_size_hint_bytes = shared_buffer_size_hint_bytes;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
   return std::move(endpoint);
@@ -562,14 +563,19 @@ void ServiceImpl::CreateDataSourceInstance(
   if (tracing_session->data_source_instances.count(producer->id_) == 1) {
     // TODO(taylori): Handle multiple producers/producer configs.
     auto first_producer_config = tracing_session->config.producers()[0];
-    // TODO(primiano): right now Create() will suicide in case of OOM if the
-    // mmap fails. We should instead gracefully fail the request and tell the
-    // client to go away.
+
     producer->page_size_kb = first_producer_config.page_size_kb();
+
     size_t shm_size =
         std::min(first_producer_config.shm_size_kb(), kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
+      shm_size = std::min(producer->shared_buffer_size_hint_bytes, kMaxShmSize);
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = kDefaultShmSize;
+
+    // TODO(primiano): right now Create() will suicide in case of OOM if the
+    // mmap fails. We should instead gracefully fail the request and tell the
+    // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
     producer->producer_->OnTracingStart();

@@ -67,6 +67,7 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
+    size_t shared_buffer_size_hint_bytes;
 
    private:
     friend class ServiceImpl;
