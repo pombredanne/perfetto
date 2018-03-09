@@ -46,13 +46,13 @@ std::vector<std::string> split(const std::string& text, char s) {
 }
 }  // namespace
 
-std::map<block_device_t, std::vector<std::string>> ParseMounts() {
+std::multimap<block_device_t, std::string> ParseMounts() {
   std::string data;
   if (!base::ReadFile(kMountsPath, &data)) {
     PERFETTO_ELOG("Failed to read %s.", kMountsPath);
     return {};
   }
-  std::map<block_device_t, std::vector<std::string>> device_to_mountpoints;
+  std::multimap<block_device_t, std::string> device_to_mountpoints;
   std::vector<std::string> lines = split(data, '\n');
   struct stat buf;
   for (const std::string& line : lines) {
@@ -66,7 +66,7 @@ std::map<block_device_t, std::vector<std::string>> ParseMounts() {
       PERFETTO_PLOG("stat");
       continue;
     }
-    device_to_mountpoints[buf.st_dev].emplace_back(mountpoint);
+    device_to_mountpoints.emplace(buf.st_dev, mountpoint);
   }
   return device_to_mountpoints;
 }
