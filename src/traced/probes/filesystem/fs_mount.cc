@@ -39,7 +39,7 @@ std::vector<std::string> split(const std::string& text, char s) {
       end = text.size();
     std::string sub = text.substr(start, end - start);
     if (!sub.empty())
-      result.emplace_back(sub);
+      result.emplace_back(std::move(sub));
     start = end + 1;
   } while (start < text.size());
   return result;
@@ -54,7 +54,7 @@ std::multimap<BlockDeviceID, std::string> ParseMounts() {
   }
   std::multimap<BlockDeviceID, std::string> device_to_mountpoints;
   std::vector<std::string> lines = split(data, '\n');
-  struct stat buf;
+  struct stat buf {};
   for (const std::string& line : lines) {
     std::vector<std::string> words = split(line, ' ');
     if (words.size() < 2) {
