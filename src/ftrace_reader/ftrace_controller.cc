@@ -363,6 +363,8 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 }
 
 FtraceMetadata::FtraceMetadata() {
+  // A lot of the time there will only be a small number of inodes.
+  inodes.reserve(10);
   pids.reserve(10);
 }
 
