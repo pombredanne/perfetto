@@ -58,6 +58,7 @@ TraceWriterImpl::~TraceWriterImpl() {
     cur_packet_->Finalize();
     shmem_arbiter_->ReturnCompletedChunk(std::move(cur_chunk_), target_buffer_,
                                          &patch_list_);
+    shmem_arbiter_->FlushPendingCommitDataRequests();
   } else {
     PERFETTO_DCHECK(patch_list_.empty());
   }

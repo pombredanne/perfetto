@@ -119,10 +119,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // tracing service to  consume the shared memory buffer (SMB) and, for
       // this reason, never run the task that tells the service to purge the
       // SMB.
-      // TODO(primiano): We cannot call this if we aren't on the |task_runner_|
-      // thread. Works for now because all traced_probes writes happen on the
-      // main thread.
-      SendPendingCommitDataRequest();
+      FlushPendingCommitDataRequests();
     }
     usleep(stall_interval_us);
     stall_interval_us =
@@ -161,7 +158,10 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     // which we haven't notified the service yet (i.e. they are still enqueued
     // in |commit_data_req_|), force a synchronous CommitDataRequest(), to avoid
     // stalling the writer.
-    should_commit_synchronously = bytes_pending_commit_ > shmem_abi_.size() / 2;
+    if (bytes_pending_commit_ >= shmem_abi_.size() / 2) {
+      should_commit_synchronously = true;
+      should_post_callback = false;
+    }
 
     // Get the patches completed for the previous chunk from the |patch_list|
     // and update it.
@@ -202,23 +202,22 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     PERFETTO_DCHECK(weak_this);
     task_runner_->PostTask([weak_this] {
       if (weak_this)
-        weak_this->SendPendingCommitDataRequest();
+        weak_this->FlushPendingCommitDataRequests();
     });
   }
 
-  // TODO(primiano): this is generally wrong, w.r.t. threading, because it will
-  // try to send an IPC from a different thread than the IPC thread. This works
-  // only if everything happens on the main thread and will hit the thread
-  // checker otherwise. What we really want to do here is doing this sync IPC
-  // only if task_runner_.RunsTaskOnCurrentThread(). In the other case (i.e. we
-  // are on a different thread) the PostTask above is sufficient.
   if (should_commit_synchronously)
-    SendPendingCommitDataRequest();
+    FlushPendingCommitDataRequests();
 }
 
-// This is always invoked on the |task_runner_| thread.
-void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
+// TODO(primiano): this is wrong w.r.t. threading because it will try to send
+// an IPC from a different thread than the IPC thread. Right now this works
+// only if everything happens on the main thread. It will hit the thread
+// checker otherwise. What we really want to do here is doing this sync IPC
+// only if task_runner_.RunsTaskOnCurrentThread() and PostTask() otherwise.
+void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+
   std::unique_ptr<CommitDataRequest> req;
   std::vector<uint32_t> pages_to_notify;
   {

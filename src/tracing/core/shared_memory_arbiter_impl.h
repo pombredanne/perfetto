@@ -81,6 +81,10 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
                             BufferID target_buffer,
                             PatchList*);
 
+  // Forces a synchronous commit of the completed packets without waiting for
+  // the next task.
+  void FlushPendingCommitDataRequests();
+
   SharedMemoryABI* shmem_abi_for_testing() { return &shmem_abi_; }
 
   static void set_default_layout_for_testing(SharedMemoryABI::PageLayout l) {
@@ -102,8 +106,6 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
 
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);
-
-  void SendPendingCommitDataRequest();
 
   base::TaskRunner* const task_runner_;
   Service::ProducerEndpoint* const producer_endpoint_;
