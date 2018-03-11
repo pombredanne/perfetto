@@ -94,21 +94,17 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   uint64_t total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
-    if (has_more) {
-      for (auto& packet : packets) {
-        packet.Decode();
-        ASSERT_TRUE(packet->has_ftrace_events());
-        for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
-          ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
-        }
+    for (auto& packet : packets) {
+      packet.Decode();
+      ASSERT_TRUE(packet->has_ftrace_events());
+      for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
+        ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
       }
-      total += packets.size();
+    }
+    total += packets.size();
 
-      // TODO(lalitm): renable this when stiching inside the service is present.
-      // ASSERT_FALSE(packets->empty());
-    } else {
+    if (!has_more) {
       ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
-      ASSERT_TRUE(packets.empty());
       finish();
     }
   };
@@ -136,21 +132,14 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
 
-// TODO(b/73453011): reenable this on more platforms (including standalone
-// Android).
-#if defined(PERFETTO_BUILD_WITH_ANDROID)
-#define MAYBE_TestFakeProducer TestFakeProducer
-#else
-#define MAYBE_TestFakeProducer DISABLED_TestFakeProducer
-#endif
-TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
+TEST_F(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(200);
+  trace_config.add_buffers()->set_size_kb(4096 * 100);
+  trace_config.set_duration_ms(2000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -159,34 +148,29 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  static constexpr uint32_t kEventCount = 10;
+  static constexpr uint32_t kEventCount = 100;
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(kEventCount);
 
   // Create the random generator with the same seed.
-  std::minstd_rand0 random(kRandomSeed);
+  std::minstd_rand0 rnd_engine(kRandomSeed);
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
-                                             bool has_more) {
-    if (has_more) {
-      for (auto& packet : packets) {
-        packet.Decode();
-        ASSERT_TRUE(packet->has_for_testing());
-        ASSERT_EQ(protos::TracePacket::kTrustedUid,
-                  packet->optional_trusted_uid_case());
-        ASSERT_EQ(packet->for_testing().seq_value(), random());
-      }
-      total += packets.size();
-
-      // TODO(lalitm): renable this when stiching inside the service is present.
-      // ASSERT_FALSE(packets->empty());
-    } else {
+  auto function = [&total, &finish, &rnd_engine](
+                      std::vector<TracePacket> packets, bool has_more) {
+    for (auto& packet : packets) {
+      ASSERT_TRUE(packet.Decode());
+      ASSERT_TRUE(packet->has_for_testing());
+      ASSERT_EQ(protos::TracePacket::kTrustedUid,
+                packet->optional_trusted_uid_case());
+      ASSERT_EQ(packet->for_testing().seq_value(), rnd_engine());
+    }
+    total += packets.size();
+    if (!has_more) {
       ASSERT_EQ(total, kEventCount);
-      ASSERT_TRUE(packets.empty());
       finish();
     }
   };

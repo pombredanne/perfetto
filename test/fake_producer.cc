@@ -55,10 +55,15 @@ void FakeProducer::CreateDataSourceInstance(
       static_cast<BufferID>(source_config.target_buffer()));
 
   const TestConfig& config = source_config.for_testing();
-  std::minstd_rand0 random(config.seed());
+  std::minstd_rand0 rnd_engine(config.seed());
   for (size_t i = 0; i < config.message_count(); i++) {
     auto handle = trace_writer->NewTracePacket();
-    handle->set_for_testing()->set_seq_value(random());
+    auto* testing_payload = handle->set_for_testing();
+    testing_payload->set_seq_value(rnd_engine());
+    char payload[1024];
+    memset(payload, '.', sizeof(payload));
+    payload[sizeof(payload) - 1] = 0;
+    testing_payload->set_str(payload, sizeof(payload));
     handle->Finalize();
   }
 
