@@ -114,6 +114,7 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   SharedMemoryABI shmem_abi_;
   size_t page_idx_ = 0;
   std::unique_ptr<CommitDataRequest> commit_data_req_;
+  size_t bytes_pending_commit_ = 0;  // SUM(chunk.size() : commit_data_req_).
   IdAllocator<WriterID> active_writer_ids_;
   // --- End lock-protected members ---
 

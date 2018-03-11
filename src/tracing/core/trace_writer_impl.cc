@@ -71,15 +71,18 @@ TraceWriterImpl::TracePacketHandle TraceWriterImpl::NewTracePacket() {
 
   fragmenting_packet_ = false;
 
-  // TODO(fmayer): hack to get a new page every time and reduce fragmentation
-  // (that requires stitching support in the service).
-  protobuf_stream_writer_.Reset(GetNewBuffer());
-
   // Reserve space for the size of the message. Note: this call might re-enter
   // into this class invoking GetNewBuffer() if there isn't enough space or if
   // this is the very first call to NewTracePacket().
   static_assert(kPacketHeaderSize == kMessageLengthFieldSize,
                 "The packet header must match the Message header size");
+
+  // It doesn't make sense to begin a packet that is going to fragment
+  // immediately after (8 is just an arbitrary estimation on the minimum size of
+  // a realistic packet).
+  if (protobuf_stream_writer_.bytes_available() < kPacketHeaderSize + 8)
+    protobuf_stream_writer_.Reset(GetNewBuffer());
+
   cur_packet_->Reset(&protobuf_stream_writer_);
   uint8_t* header = protobuf_stream_writer_.ReserveBytes(kPacketHeaderSize);
   memset(header, 0, kPacketHeaderSize);
@@ -107,6 +110,7 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
     PERFETTO_DCHECK(partial_size < cur_chunk_.size());
 
     // Backfill the packet header with the fragment size.
+    PERFETTO_DCHECK(partial_size > 0);
     cur_packet_->inc_size_already_written(partial_size);
     cur_chunk_.SetFlag(ChunkHeader::kLastPacketContinuesOnNextChunk);
     WriteRedundantVarInt(partial_size, cur_packet_->size_field());

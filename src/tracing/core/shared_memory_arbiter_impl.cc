@@ -61,7 +61,8 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     size_t size_hint) {
   PERFETTO_DCHECK(size_hint == 0);  // Not implemented yet.
   int stall_count = 0;
-  const useconds_t kStallIntervalUs = 100000;
+  useconds_t stall_interval_us = 0;
+  static const useconds_t kMaxStallIntervalUs = 100000;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
@@ -98,9 +99,8 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
           if (!chunk.is_valid())
             continue;
           if (stall_count) {
-            PERFETTO_LOG(
-                "Recovered from stall after %" PRIu64 " ms",
-                static_cast<uint64_t>(kStallIntervalUs * stall_count / 1000));
+            PERFETTO_LOG("Recovered from stall after %d iterations",
+                         stall_count);
           }
           return chunk;
         }
@@ -124,7 +124,9 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // main thread.
       SendPendingCommitDataRequest();
     }
-    usleep(kStallIntervalUs);
+    usleep(stall_interval_us);
+    stall_interval_us =
+        std::min(kMaxStallIntervalUs, (stall_interval_us + 1) * 8);
   }
 }
 
@@ -132,12 +134,14 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
                                                    BufferID target_buffer,
                                                    PatchList* patch_list) {
   bool should_post_callback = false;
+  bool should_commit_synchronously = false;
   base::WeakPtr<SharedMemoryArbiterImpl> weak_this;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
     const WriterID writer_id =
         chunk.header()->writer_id.load(std::memory_order_relaxed);
+    bytes_pending_commit_ += chunk.size();
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
 
     // DO NOT access |chunk| after this point, has been std::move()-d above.
@@ -152,6 +156,12 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     ctm->set_page(static_cast<uint32_t>(page_idx));
     ctm->set_chunk(chunk_idx);
     ctm->set_target_buffer(target_buffer);
+
+    // If more than half of the SMB.size() is filled with completed chunks for
+    // which we haven't notified the service yet (i.e. they are still enqueued
+    // in |commit_data_req_|), force a synchronous CommitDataRequest(), to avoid
+    // stalling the writer.
+    should_commit_synchronously = bytes_pending_commit_ > shmem_abi_.size() / 2;
 
     // Get the patches completed for the previous chunk from the |patch_list|
     // and update it.
@@ -180,7 +190,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
         patch_list->front().chunk_id == last_chunk_id) {
       last_chunk_req->set_has_more_patches(true);
     }
-  }
+  }  // scoped_lock(lock_)
 
   // TODO(primiano): optimization: at this point, if most of the SMB is almost
   // full (say 75%) of completed chunks that are pending a commit, we should
@@ -195,6 +205,15 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
         weak_this->SendPendingCommitDataRequest();
     });
   }
+
+  // TODO(primiano): this is generally wrong, w.r.t. threading, because it will
+  // try to send an IPC from a different thread than the IPC thread. This works
+  // only if everything happens on the main thread and will hit the thread
+  // checker otherwise. What we really want to do here is doing this sync IPC
+  // only if task_runner_.RunsTaskOnCurrentThread(). In the other case (i.e. we
+  // are on a different thread) the PostTask above is sufficient.
+  if (should_commit_synchronously)
+    SendPendingCommitDataRequest();
 }
 
 // This is always invoked on the |task_runner_| thread.
@@ -205,6 +224,7 @@ void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     req = std::move(commit_data_req_);
+    bytes_pending_commit_ = 0;
   }
   // |commit_data_req_| could become nullptr if the forced sync flush happens
   // in GetNewChunk().

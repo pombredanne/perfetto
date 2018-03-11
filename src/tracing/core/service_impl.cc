@@ -48,8 +48,8 @@ using protozero::proto_utils::ParseVarInt;
 using protozero::proto_utils::WriteVarInt;
 
 namespace {
-constexpr size_t kDefaultShmSize = base::kPageSize * 64;  // 256 KB.
-constexpr size_t kMaxShmSize = base::kPageSize * 1024;    // 4 MB.
+constexpr size_t kDefaultShmSize = 256 * 1024ul;
+constexpr size_t kMaxShmSize = 4096 * 1024 * 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -424,7 +424,6 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
 
   PERFETTO_LOG("Tracing session %" PRIu64 " ended, total sessions:%zu", tsid,
                tracing_sessions_.size());
-  exit(0);
 }
 
 void ServiceImpl::RegisterDataSource(ProducerID producer_id,
