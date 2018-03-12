@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "procfs_utils.h"
+#include "src/process_stats/procfs_utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -76,9 +76,9 @@ std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid) {
     process->cmdline.push_back(name);
     process->in_kernel = true;
   } else {
-    perfetto::base::StringSplitter ss(cmdline_buf, sizeof(cmdline_buf), '\0');
-    for (const char* cmd = ss.GetNextToken(); cmd; cmd = ss.GetNextToken())
-      process->cmdline.push_back(cmd);
+    using perfetto::base::StringSplitter;
+    for (StringSplitter ss(cmdline_buf, sizeof(cmdline_buf), '\0'); ss.Next();)
+      process->cmdline.push_back(ss.cur_token());
     ReadExePath(pid, process->exe, sizeof(process->exe));
     process->is_app = IsApp(process->cmdline[0].c_str(), process->exe);
   }

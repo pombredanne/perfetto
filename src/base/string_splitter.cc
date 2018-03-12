@@ -25,7 +25,8 @@ namespace base {
 
 StringSplitter::StringSplitter(std::string str, char delimiter)
     : str_(std::move(str)), delimiter_(delimiter) {
-  // Accessing str[str.size()] has defined semantic in C++11, hence the +1.
+  // It's legal to access str[str.size()] in C++11 (it always returns \0),
+  // hence the +1 (which becomes just size() after the -1 in Initialize()).
   Initialize(&str_[0], str_.size() + 1);
 }
 
@@ -34,32 +35,45 @@ StringSplitter::StringSplitter(char* str, size_t size, char delimiter)
   Initialize(str, size);
 }
 
+StringSplitter::StringSplitter(StringSplitter* outer, char delimiter)
+    : delimiter_(delimiter) {
+  Initialize(outer->cur_token(), outer->cur_token_size() + 1);
+}
+
 void StringSplitter::Initialize(char* str, size_t size) {
   PERFETTO_DCHECK(!size || str);
   next_ = str;
   end_ = str + size;
+  cur_ = nullptr;
+  cur_size_ = 0;
   if (size)
     next_[size - 1] = '\0';
 }
 
-const char* StringSplitter::GetNextToken() {
+bool StringSplitter::Next() {
   for (; next_ < end_; next_++) {
     if (*next_ == delimiter_)
       continue;
-    char* cur = next_;
+    cur_ = next_;
     for (;; next_++) {
       if (*next_ == delimiter_) {
+        cur_size_ = static_cast<size_t>(next_ - cur_);
         *(next_++) = '\0';
         break;
       }
       if (*next_ == '\0') {
+        cur_size_ = static_cast<size_t>(next_ - cur_);
         next_ = end_;
         break;
       }
     }
-    return *cur ? cur : nullptr;
+    if (*cur_)
+      return true;
+    break;
   }
-  return nullptr;
+  cur_ = nullptr;
+  cur_size_ = 0;
+  return false;
 }
 
 }  // namespace base

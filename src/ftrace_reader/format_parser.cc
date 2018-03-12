@@ -91,8 +91,8 @@ bool ParseFtraceEvent(const std::string& input, FtraceEvent* output) {
   std::vector<FtraceEvent::Field> common_fields;
   std::vector<FtraceEvent::Field> fields;
 
-  base::StringSplitter ss(input, '\n');
-  for (const char* line = ss.GetNextToken(); line; line = ss.GetNextToken()) {
+  for (base::StringSplitter ss(input, '\n'); ss.Next();) {
+    const char* line = ss.cur_token();
     if (!has_id && sscanf(line, "ID: %d", &id) == 1) {
       has_id = true;
       continue;

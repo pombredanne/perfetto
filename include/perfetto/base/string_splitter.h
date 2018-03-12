@@ -32,13 +32,28 @@ class StringSplitter {
   // StringSplitter(std::move(str), '\n');
   StringSplitter(std::string, char delimiter);
 
-  // The input string will be forcefully null-terminated. If the string is
-  // already null-terminated, the size_t arg must include the null terminator.
-  StringSplitter(char*, size_t, char delimiter);
+  // Splits a C-string. The input string will be forcefully null-terminated (so
+  // str[size - 1] should be == '\0' or the last char will be truncated).
+  StringSplitter(char* str, size_t size, char delimiter);
 
-  // Guarantees that the returned string is always null terminated.
-  // Returns nullptr if no tokens are left.
-  const char* GetNextToken();
+  // Splits the current token from an outer StringSplitter instance. This is to
+  // chain splitters as follows:
+  // for (base::StringSplitter lines(x, '\n'); ss.Next();)
+  //   for (base::StringSplitter words(&lines, ' '); words.Next();)
+  StringSplitter(StringSplitter*, char delimiter);
+
+  // Returns true if a token is found (in which case it will be stored in
+  // cur_token()), false if no more tokens are found.
+  bool Next();
+
+  // Returns the current token iff last call to Next() returned true. In this
+  // case it guarantees that the returned string is always null terminated.
+  // In all other cases (before the 1st call to Next() and after Next() returns
+  // false) returns nullptr.
+  char* cur_token() { return cur_; }
+
+  // Returns the length of the current token (excluding the null terminator).
+  size_t cur_token_size() const { return cur_size_; }
 
  private:
   StringSplitter(const StringSplitter&) = delete;
@@ -46,6 +61,8 @@ class StringSplitter {
   void Initialize(char* str, size_t size);
 
   std::string str_;
+  char* cur_;
+  size_t cur_size_;
   char* next_;
   char* end_;  // STL-style, points one past the last char.
   const char delimiter_;
