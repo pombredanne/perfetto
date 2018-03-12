@@ -24,7 +24,7 @@ namespace perfetto {
 
 const char kStatePath[] = "/data/misc/perfetto-traces/.guardraildata";
 
-RateLimiter::RateLimiter(const std::string& path) : path_(path) {}
+RateLimiter::RateLimiter() = default;
 RateLimiter::~RateLimiter() = default;
 
 bool RateLimiter::ShouldTrace(const Args& args) {

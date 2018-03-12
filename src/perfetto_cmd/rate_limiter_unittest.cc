@@ -44,7 +44,7 @@ std::pair<ScopedFile, ScopedFile> CreatePipe() {
 
 class MockRateLimiter : public RateLimiter {
  public:
-  MockRateLimiter() : RateLimiter("") {
+  MockRateLimiter() {
     ON_CALL(*this, LoadState(_))
         .WillByDefault(Invoke([this](PerfettoCmdState* state) {
           state->set_total_bytes_uploaded(this->input_total_bytes_uploaded);
@@ -61,19 +61,18 @@ class MockRateLimiter : public RateLimiter {
         }));
   }
 
-  // These are inputs we set for Run() to use.
+  // These are inputs we set for ShouldTrace() to use.
   uint64_t input_total_bytes_uploaded = 0;
   uint64_t input_start_timestamp = 0;
   uint64_t input_end_timestamp = 0;
 
-  // These are outputs we EXPECT_EQ on after Run().
+  // These are outputs we EXPECT_EQ on after ShouldTrace().
   uint64_t output_total_bytes_uploaded = 0;
   uint64_t output_start_timestamp = 0;
   uint64_t output_end_timestamp = 0;
 
   MOCK_METHOD1(LoadState, bool(PerfettoCmdState*));
   MOCK_METHOD1(SaveState, bool(const PerfettoCmdState&));
-  MOCK_METHOD1(DoTrace, bool(uint64_t* uploaded_bytes));
 };
 
 TEST(RateLimiterTest, RoundTripState) {
@@ -97,53 +96,48 @@ TEST(RateLimiterTest, LoadFromEmpty) {
 TEST(RateLimiterTest, NotDropBox) {
   StrictMock<MockRateLimiter> limiter;
 
-  EXPECT_TRUE(limiter.ShouldTrace({}));
-  limiter.TraceDone({}, true, 10000);
+  ASSERT_TRUE(limiter.ShouldTrace({}));
+  ASSERT_TRUE(limiter.TraceDone({}, true, 10000));
 }
 
-// TEST(RateLimiterTest, NotDropBox_FailedToTrace) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//
-//  EXPECT_CALL(delegate, DoTrace(_)).WillOnce(Return(false));
-//  EXPECT_EQ(limiter.Run({}), 1);
-//}
-//
-// TEST(RateLimiterTest, DropBox_IgnoreGuardrails) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, DoTrace(_));
-//  EXPECT_CALL(delegate, SaveState(_));
-//
-//  delegate.input_total_bytes_uploaded = 1024 * 1024 * 100;
-//  args.is_dropbox = true;
-//  args.ignore_guardrails = true;
-//
-//  ASSERT_EQ(limiter.Run(args), 0);
-//}
-//
-// TEST(RateLimiterTest, DropBox_EmptyState) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, DoTrace(_));
-//  EXPECT_CALL(delegate, SaveState(_));
-//
-//  args.is_dropbox = true;
-//  args.current_timestamp = 10000;
-//  delegate.input_bytes_uploaded = 1024 * 1024;
-//
-//  ASSERT_EQ(limiter.Run(args), 0);
-//  EXPECT_EQ(delegate.output_total_bytes_uploaded, 1024u * 1024u);
-//  EXPECT_EQ(delegate.output_start_timestamp, 10000u);
-//  EXPECT_EQ(delegate.output_end_timestamp, 10000u);
-//}
-//
+TEST(RateLimiterTest, NotDropBox_FailedToTrace) {
+  StrictMock<MockRateLimiter> limiter;
+
+  ASSERT_TRUE(limiter.ShouldTrace({}));
+  ASSERT_FALSE(limiter.TraceDone({}, false, 0));
+}
+
+TEST(RateLimiterTest, DropBox_IgnoreGuardrails) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+  EXPECT_CALL(limiter, SaveState(_));
+
+  args.is_dropbox = true;
+  args.ignore_guardrails = true;
+
+  ASSERT_TRUE(limiter.ShouldTrace(args));
+  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024 * 100));
+}
+
+TEST(RateLimiterTest, DropBox_EmptyState) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+  EXPECT_CALL(limiter, SaveState(_));
+
+  args.is_dropbox = true;
+  args.current_timestamp = 10000;
+
+  ASSERT_TRUE(limiter.ShouldTrace(args));
+  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024));
+  EXPECT_EQ(limiter.output_total_bytes_uploaded, 1024u * 1024u);
+  EXPECT_EQ(limiter.output_start_timestamp, 10000u);
+  EXPECT_EQ(limiter.output_end_timestamp, 10000u);
+}
+
 TEST(RateLimiterTest, DropBox_NormalUpload) {
   StrictMock<MockRateLimiter> limiter;
   RateLimiter::Args args;
@@ -163,121 +157,114 @@ TEST(RateLimiterTest, DropBox_NormalUpload) {
   EXPECT_EQ(limiter.output_start_timestamp, limiter.input_start_timestamp);
   EXPECT_EQ(limiter.output_end_timestamp, args.current_timestamp);
 }
-//
-// TEST(RateLimiterTest, DropBox_FailedToLoadState) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_)).WillOnce(Return(false));
-//  EXPECT_CALL(delegate, SaveState(_));
-//
-//  args.is_dropbox = true;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//  EXPECT_EQ(delegate.output_total_bytes_uploaded, 0u);
-//  EXPECT_EQ(delegate.output_start_timestamp, 0u);
-//  EXPECT_EQ(delegate.output_end_timestamp, 0u);
-//}
-//
-// TEST(RateLimiterTest, DropBox_NoTimeTravel) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, SaveState(_));
-//
-//  args.is_dropbox = true;
-//  args.current_timestamp = 99;
-//  delegate.input_start_timestamp = 100;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//  EXPECT_EQ(delegate.output_total_bytes_uploaded, 0u);
-//  EXPECT_EQ(delegate.output_start_timestamp, 0u);
-//  EXPECT_EQ(delegate.output_end_timestamp, 0u);
-//}
-//
-// TEST(RateLimiterTest, DropBox_TooSoon) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//
-//  args.is_dropbox = true;
-//  delegate.input_end_timestamp = 10000;
-//  args.current_timestamp = 10000 + 60 * 4;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//}
-//
-// TEST(RateLimiterTest, DropBox_TooMuch) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//
-//  args.is_dropbox = true;
-//  args.current_timestamp = 60 * 60;
-//  delegate.input_total_bytes_uploaded = 10 * 1024 * 1024 + 1;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//}
-//
-// TEST(RateLimiterTest, DropBox_TooMuchWasUploaded) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, DoTrace(_));
-//  EXPECT_CALL(delegate, SaveState(_));
-//
-//  args.is_dropbox = true;
-//  delegate.input_start_timestamp = 1;
-//  delegate.input_end_timestamp = 1;
-//  args.current_timestamp = 60 * 60 * 24 + 2;
-//  delegate.input_total_bytes_uploaded = 10 * 1024 * 1024 + 1;
-//  delegate.input_bytes_uploaded = 1024 * 1024;
-//
-//  ASSERT_EQ(limiter.Run(args), 0);
-//  EXPECT_EQ(delegate.output_total_bytes_uploaded, 1024u * 1024u);
-//  EXPECT_EQ(delegate.output_start_timestamp, args.current_timestamp);
-//  EXPECT_EQ(delegate.output_end_timestamp, args.current_timestamp);
-//}
-//
-// TEST(RateLimiterTest, DropBox_FailedToUpload) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, DoTrace(_)).WillOnce(Return(false));
-//
-//  args.is_dropbox = true;
-//  args.current_timestamp = 10000;
-//  delegate.input_bytes_uploaded = 1024 * 1024;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//}
-//
-// TEST(RateLimiterTest, DropBox_FailedToSave) {
-//  StrictMock<DelegateMock> delegate;
-//  RateLimiter limiter(&delegate);
-//  RateLimiter::Args args;
-//
-//  EXPECT_CALL(delegate, LoadState(_));
-//  EXPECT_CALL(delegate, DoTrace(_));
-//  EXPECT_CALL(delegate, SaveState(_)).WillOnce(Return(false));
-//
-//  args.is_dropbox = true;
-//  args.current_timestamp = 10000;
-//  delegate.input_bytes_uploaded = 1024 * 1024;
-//
-//  ASSERT_EQ(limiter.Run(args), 1);
-//}
+
+TEST(RateLimiterTest, DropBox_FailedToLoadState) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_)).WillOnce(Return(false));
+  EXPECT_CALL(limiter, SaveState(_));
+
+  args.is_dropbox = true;
+
+  ASSERT_FALSE(limiter.ShouldTrace(args));
+
+  EXPECT_EQ(limiter.output_total_bytes_uploaded, 0u);
+  EXPECT_EQ(limiter.output_start_timestamp, 0u);
+  EXPECT_EQ(limiter.output_end_timestamp, 0u);
+}
+
+TEST(RateLimiterTest, DropBox_NoTimeTravel) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+  EXPECT_CALL(limiter, SaveState(_));
+
+  args.is_dropbox = true;
+  args.current_timestamp = 99;
+  limiter.input_start_timestamp = 100;
+
+  ASSERT_FALSE(limiter.ShouldTrace(args));
+
+  EXPECT_EQ(limiter.output_total_bytes_uploaded, 0u);
+  EXPECT_EQ(limiter.output_start_timestamp, 0u);
+  EXPECT_EQ(limiter.output_end_timestamp, 0u);
+}
+
+TEST(RateLimiterTest, DropBox_TooSoon) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+
+  args.is_dropbox = true;
+  limiter.input_end_timestamp = 10000;
+  args.current_timestamp = 10000 + 60 * 4;
+
+  ASSERT_FALSE(limiter.ShouldTrace(args));
+}
+
+TEST(RateLimiterTest, DropBox_TooMuch) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+
+  args.is_dropbox = true;
+  args.current_timestamp = 60 * 60;
+  limiter.input_total_bytes_uploaded = 10 * 1024 * 1024 + 1;
+
+  ASSERT_FALSE(limiter.ShouldTrace(args));
+}
+
+TEST(RateLimiterTest, DropBox_TooMuchWasUploaded) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+  EXPECT_CALL(limiter, SaveState(_));
+
+  args.is_dropbox = true;
+  limiter.input_start_timestamp = 1;
+  limiter.input_end_timestamp = 1;
+  args.current_timestamp = 60 * 60 * 24 + 2;
+  limiter.input_total_bytes_uploaded = 10 * 1024 * 1024 + 1;
+
+  ASSERT_TRUE(limiter.ShouldTrace(args));
+  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024));
+
+  EXPECT_EQ(limiter.output_total_bytes_uploaded, 1024u * 1024u);
+  EXPECT_EQ(limiter.output_start_timestamp, args.current_timestamp);
+  EXPECT_EQ(limiter.output_end_timestamp, args.current_timestamp);
+}
+
+TEST(RateLimiterTest, DropBox_FailedToUpload) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+
+  args.is_dropbox = true;
+  args.current_timestamp = 10000;
+
+  ASSERT_TRUE(limiter.ShouldTrace(args));
+  ASSERT_FALSE(limiter.TraceDone(args, false, 1024 * 1024));
+}
+
+TEST(RateLimiterTest, DropBox_FailedToSave) {
+  StrictMock<MockRateLimiter> limiter;
+  RateLimiter::Args args;
+
+  EXPECT_CALL(limiter, LoadState(_));
+  EXPECT_CALL(limiter, SaveState(_)).WillOnce(Return(false));
+
+  args.is_dropbox = true;
+  args.current_timestamp = 10000;
+
+  ASSERT_TRUE(limiter.ShouldTrace(args));
+  ASSERT_FALSE(limiter.TraceDone(args, true, 1024 * 1024));
+}
 
 }  // namespace
 

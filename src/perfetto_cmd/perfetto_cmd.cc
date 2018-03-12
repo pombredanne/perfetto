@@ -190,7 +190,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_DLOG("Continuing in background");
   }
 
-  RateLimiter limiter(std::string(kTempDropBoxTraceDir) + "/.guardraildata");
+  RateLimiter limiter;
   RateLimiter::Args args{};
   args.is_dropbox = !dropbox_tag_.empty();
   args.current_timestamp = GetTimestamp();

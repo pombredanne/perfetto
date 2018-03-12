@@ -29,7 +29,7 @@ class RateLimiter {
     uint64_t current_timestamp = 0;
   };
 
-  RateLimiter(const std::string& path);
+  RateLimiter();
   virtual ~RateLimiter();
 
   bool ShouldTrace(const Args& args);
@@ -44,7 +44,6 @@ class RateLimiter {
   static bool WriteState(int out_fd, const PerfettoCmdState& state);
 
   PerfettoCmdState state_;
-  std::string path_;
 };
 
 }  // namespace perfetto
