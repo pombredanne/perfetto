@@ -137,29 +137,35 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
   auto trace_packet = writer_->NewTracePacket();
   auto inode_file_map = trace_packet->set_inode_file_map();
   auto inodes = metadata.inodes;
+  std::map<uint32_t, std::set<uint64_t>> device_to_inodes;
   for (const auto& inode : inodes) {
     uint32_t block_device_id = inode.first;
     uint64_t inode_number = inode.second;
-
-    PERFETTO_DLOG("block=%" PRIu32 ", inode=%" PRIu64, block_device_id,
-                  inode_number);
-
-    auto* entry = inode_file_map->add_entries();
-    entry->set_inode_number(inode_number);
+    device_to_inodes[block_device_id].emplace(inode_number);
+  }
+  for (const auto& inodeFileMap : device_to_inodes) {
+    uint32_t block_device_id = inodeFileMap.first;
     inode_file_map->set_block_device_id(block_device_id);
     std::pair<Mmap::iterator, Mmap::iterator> range;
     range = mount_points_.equal_range(block_device_id);
     for (Mmap::iterator it = range.first; it != range.second; ++it) {
       inode_file_map->add_mount_points(it->second.c_str());
-      PERFETTO_DLOG("Mount %s", it->second.c_str());
+      PERFETTO_DLOG("Block dev=%" PRIu32 ", Mount point=%s", block_device_id,
+                    it->second.c_str());
     }
-    auto block_device_map = file_system_inodes_->find(block_device_id);
-    if (block_device_map != file_system_inodes_->end()) {
-      auto inode_map = block_device_map->second.find(inode_number);
-      if (inode_map != block_device_map->second.end()) {
-        entry->set_type(inode_map->second.first);
-        for (const auto& path : inode_map->second.second)
-          entry->add_paths(path.c_str());
+    std::set<uint64_t> inode_numbers = inodeFileMap.second;
+    for (const auto& inode_number : inode_numbers) {
+      PERFETTO_DLOG("Inode number=%" PRIu64, inode_number);
+      auto* entry = inode_file_map->add_entries();
+      entry->set_inode_number(inode_number);
+      auto block_device_map = file_system_inodes_->find(block_device_id);
+      if (block_device_map != file_system_inodes_->end()) {
+        auto inode_map = block_device_map->second.find(inode_number);
+        if (inode_map != block_device_map->second.end()) {
+          entry->set_type(inode_map->second.first);
+          for (const auto& path : inode_map->second.second)
+            entry->add_paths(path.c_str());
+        }
       }
     }
   }
