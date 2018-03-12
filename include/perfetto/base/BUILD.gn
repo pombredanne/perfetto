@@ -16,6 +16,7 @@ source_set("base") {
   sources = [
     "build_config.h",
     "logging.h",
+    "lru.h",
     "page_allocator.h",
     "scoped_file.h",
     "task_runner.h",
@@ -28,10 +29,4 @@ source_set("base") {
   if (is_android) {
     sources += [ "android_task_runner.h" ]
   }
-}
-
-source_set("lru") {
-  sources = [
-    "lru.h",
-  ]
 }

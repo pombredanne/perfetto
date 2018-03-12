@@ -22,6 +22,7 @@ source_set("base") {
     "../../include/perfetto/base",
   ]
   sources = [
+    "lru.cc",
     "page_allocator.cc",
     "thread_checker.cc",
     "unix_task_runner.cc",
@@ -32,17 +33,6 @@ source_set("base") {
   if (is_debug) {
     deps += [ ":debug_crash_stack_trace" ]
   }
-}
-
-# Here for completeness and in case we ever want to add a
-# lru.cc without changing the build structure.
-source_set("lru") {
-  deps = [
-    "../../gn:default_deps",
-  ]
-  public_deps = [
-    "../../include/perfetto/base:lru",
-  ]
 }
 
 # The "android_task_runner" should be depended on only by targets that
@@ -99,7 +89,6 @@ source_set("base_unittests") {
   testonly = true
   deps = [
     ":base",
-    ":lru",
     ":test_support",
     "../../gn:default_deps",
     "../../gn:gtest_deps",

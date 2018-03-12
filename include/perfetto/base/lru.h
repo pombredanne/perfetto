@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,57 +19,34 @@
 
 #include <list>
 #include <map>
+#include <string>
+#include <tuple>
 
 namespace perfetto {
 namespace base {
 
-template <typename K, typename V>
-class LRUCache {
+using InodeKey = std::pair<int64_t, int64_t>;
+using InodeValue = std::string;
+
+class LRUInodeCache {
  public:
-  explicit LRUCache(size_t capacity) : capacity_(capacity) {}
+  explicit LRUInodeCache(size_t capacity) : capacity_(capacity) {}
 
-  const V* get(const K& k) {
-    const auto& it = item_map_.find(k);
-    if (it == item_map_.end()) {
-      return nullptr;
-    }
-    auto list_entry = it->second;
-    // Bump this item to the front of the cache.
-    // We can borrow the existing item's key and value because insert
-    // does not care about it.
-    insert(it, std::move(list_entry->first), std::move(list_entry->second));
-    return &item_list_.cbegin()->second;
-  }
-
-  void insert(const K k, const V v) {
-    return insert(item_map_.find(k), std::move(k), std::move(v));
-  }
+  const InodeValue* Get(const InodeKey& k);
+  void Insert(const InodeKey k, const InodeValue v);
 
  private:
-  using list_item_type_ = std::pair<const K, const V>;
-  using list_iterator_type_ = typename std::list<list_item_type_>::iterator;
-  using map_type_ = std::map<const K, list_iterator_type_>;
+  using ItemType = std::pair<const InodeKey, const InodeValue>;
+  using ListIteratorType = typename std::list<ItemType>::iterator;
+  using MapType = std::map<const InodeKey, ListIteratorType>;
 
-  void insert(typename map_type_::iterator existing, const K k, const V v) {
-    item_list_.emplace_front(std::move(k), std::move(v));
-    if (existing != item_map_.end()) {
-      item_list_.erase(existing->second);
-      existing->second = item_list_.begin();
-    } else {
-      item_map_.emplace(k, item_list_.begin());
-    }
-
-    if (item_map_.size() > capacity_) {
-      auto last_elem = item_list_.end();
-      last_elem--;
-      item_map_.erase(last_elem->first);
-      item_list_.erase(last_elem);
-    }
-  }
+  void Insert(typename MapType::iterator map_it,
+              const InodeKey k,
+              const InodeValue v);
 
   size_t capacity_;
-  map_type_ item_map_;
-  std::list<list_item_type_> item_list_;
+  MapType map_;
+  std::list<ItemType> list_;
 };
 
 }  // namespace base

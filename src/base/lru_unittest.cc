@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,34 +16,48 @@
 
 #include "perfetto/base/lru.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 #include <string>
+#include <tuple>
 
 namespace perfetto {
 namespace base {
 namespace {
 
+using ::testing::Eq;
+using ::testing::IsNull;
+using ::testing::Pointee;
+
+std::pair<int64_t, int64_t> key1{0, 0};
+std::pair<int64_t, int64_t> key2{0, 1};
+std::pair<int64_t, int64_t> key3{0, 2};
+
+const char* val1 = "foo";
+const char* val2 = "bar";
+const char* val3 = "baz";
+
 TEST(LRUTest, Basic) {
-  LRUCache<std::string, std::string> cache(2);
-  cache.insert("foo", "bar");
-  EXPECT_EQ(*cache.get("foo"), "bar");
-  cache.insert("qux", "asd");
-  EXPECT_EQ(*cache.get("foo"), "bar");
-  EXPECT_EQ(*cache.get("qux"), "asd");
+  LRUInodeCache cache(2);
+  cache.Insert(key1, val1);
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
+  cache.Insert(key2, val2);
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
 }
 
 TEST(LRUTest, Overflow) {
-  LRUCache<std::string, std::string> cache(2);
-  cache.insert("foo", "bar");
-  cache.insert("qux", "asd");
-  cache.get("foo");
-  cache.get("qux");
-  cache.insert("spam", "eggs");
+  LRUInodeCache cache(2);
+  cache.Insert(key1, val1);
+  cache.Insert(key2, val2);
+  cache.Get(key1);
+  cache.Get(key2);
+  cache.Insert(key3, val3);
   // foo is the LRU and should be evicted.
-  EXPECT_EQ(cache.get("foo"), nullptr);
-  EXPECT_EQ(*cache.get("qux"), "asd");
-  EXPECT_EQ(*cache.get("spam"), "eggs");
+  EXPECT_THAT(cache.Get(key1), IsNull());
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
+  EXPECT_THAT(cache.Get(key3), Pointee(Eq(val3)));
 }
 
 }  // namespace
