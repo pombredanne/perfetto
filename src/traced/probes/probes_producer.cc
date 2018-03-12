@@ -31,7 +31,7 @@
 
 #include "src/process_stats/file_utils.h"
 #include "src/process_stats/procfs_utils.h"
-#include "src/traced/probes/filesystem/fs_mount.h"
+#include "src/traced/probes/filesystem/inode_utils.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"

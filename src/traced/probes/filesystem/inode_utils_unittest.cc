@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/traced/probes/filesystem/fs_mount.h"
+#include "src/traced/probes/filesystem/inode_utils.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

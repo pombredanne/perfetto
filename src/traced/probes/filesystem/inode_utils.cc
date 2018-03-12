@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/traced/probes/filesystem/fs_mount.h"
+#include "src/traced/probes/filesystem/inode_utils.h"
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -116,9 +116,6 @@ void CreateDeviceToInodeMap(const std::string& root_directory,
       }
       inode_map[inode_number].first = type;
       inode_map[inode_number].second.emplace(filepath + filename);
-      PERFETTO_LOG("block=%" PRIu32 ", inode=%" PRIu64 ", filename=%s",
-                   block_device_id, inode_number,
-                   (filepath + filename).c_str());
     }
     closedir(dir);
   }
@@ -132,7 +129,7 @@ InodeFileMapDataSource::InodeFileMapDataSource(
 InodeFileMapDataSource::~InodeFileMapDataSource() = default;
 
 void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
-  PERFETTO_LOG("Write Inodes start");
+  PERFETTO_DLOG("Write Inodes start");
 
   if (mount_points_.empty()) {
     mount_points_ = ParseMounts();
@@ -144,8 +141,8 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
     uint32_t block_device_id = inode.first;
     uint64_t inode_number = inode.second;
 
-    PERFETTO_LOG("block=%" PRIu32 ", inode=%" PRIu64, block_device_id,
-                 inode_number);
+    PERFETTO_DLOG("block=%" PRIu32 ", inode=%" PRIu64, block_device_id,
+                  inode_number);
 
     auto* entry = inode_file_map->add_entries();
     entry->set_inode_number(inode_number);
@@ -154,7 +151,7 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
     range = mount_points_.equal_range(block_device_id);
     for (Mmap::iterator it = range.first; it != range.second; ++it) {
       inode_file_map->add_mount_points(it->second.c_str());
-      PERFETTO_LOG("Mount %s", it->second.c_str());
+      PERFETTO_DLOG("Mount %s", it->second.c_str());
     }
     auto block_device_map = file_system_inodes_->find(block_device_id);
     if (block_device_map != file_system_inodes_->end()) {

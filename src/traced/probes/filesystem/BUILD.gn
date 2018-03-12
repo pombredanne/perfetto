@@ -23,8 +23,8 @@ source_set("filesystem") {
     "../../../base",
   ]
   sources = [
-    "fs_mount.cc",
-    "fs_mount.h",
+    "inode_utils.cc",
+    "inode_utils.h",
   ]
 }
 
@@ -36,6 +36,6 @@ source_set("filesystem_unittests") {
     "../../../../gn:gtest_deps",
   ]
   sources = [
-    "fs_mount_unittest.cc",
+    "inode_utils_unittest.cc",
   ]
 }

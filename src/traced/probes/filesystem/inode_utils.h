@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_
-#define SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_
+#ifndef SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
+#define SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -62,4 +62,4 @@ class InodeFileMapDataSource {
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_
+#endif  // SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
