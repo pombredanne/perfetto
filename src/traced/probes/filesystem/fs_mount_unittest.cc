@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
-option optimize_for = LITE_RUNTIME;
+#include "src/traced/probes/filesystem/fs_mount.h"
 
-message FakeFtraceEvent {
-  optional uint32 common_field = 1;
-  oneof event { FakeAllFieldsFtraceEvent all_fields = 42; }
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace perfetto {
+namespace {
+
+using testing::Contains;
+using testing::Pair;
+
+TEST(InodeTest, ParseMounts) {
+  auto mounts = ParseMounts();
+  struct stat buf;
+  ASSERT_NE(stat("/proc", &buf), -1);
+  EXPECT_THAT(mounts, Contains(Pair(buf.st_dev, "/proc")));
 }
 
-message FakeAllFieldsFtraceEvent {
-  optional uint32 field_dev = 1;
-  optional int32 field_pid = 2;
-  optional uint32 field_uint32 = 5;
-  optional uint32 field_inode_32 = 3;
-  optional uint64 field_inode_64 = 4;
-  optional string field_char_16 = 500;
-  optional string field_char = 501;
-}
+}  // namespace
+}  // namespace perfetto
