@@ -64,7 +64,6 @@ class PerfettoCmd : public Consumer {
  private:
   bool OpenOutputFile();
   uint64_t GetTimestamp();
-  std::string GetStatePath();
 
   PlatformTaskRunner task_runner_;
   std::unique_ptr<perfetto::Service::ConsumerEndpoint> consumer_endpoint_;
