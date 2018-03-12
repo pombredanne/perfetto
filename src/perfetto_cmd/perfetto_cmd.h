@@ -49,7 +49,7 @@ using PlatformTaskRunner = base::AndroidTaskRunner;
 using PlatformTaskRunner = base::UnixTaskRunner;
 #endif
 
-class PerfettoCmd : public Consumer, RateLimiter::Delegate {
+class PerfettoCmd : public Consumer {
  public:
   int Main(int argc, char** argv);
   int PrintUsage(const char* argv0);

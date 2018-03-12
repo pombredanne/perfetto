@@ -20,7 +20,5 @@
 #include "gtest/gtest.h"
 
 namespace perfetto {
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 }  // namespace perfetto

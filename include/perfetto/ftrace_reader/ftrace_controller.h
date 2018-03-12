@@ -41,16 +41,16 @@ struct FtraceMetadata {
   FtraceMetadata();
 
   size_t overwrite_count;
+  uint32_t last_seen_device_id;
 
   // A vector not a set to keep the writer_fast.
-  std::vector<uint64_t> inodes;
-  std::vector<uint64_t> pids;
+  std::vector<std::pair<uint64_t, uint32_t>> inodes;
+  std::vector<int32_t> pids;
 
-  void Clear() {
-    inodes.clear();
-    pids.clear();
-    overwrite_count = 0;
-  }
+  void AddDevice(uint32_t);
+  void AddInode(uint64_t);
+  void AddPid(int32_t);
+  void Clear();
 };
 
 namespace protos {
@@ -168,7 +168,7 @@ class FtraceController {
                        uint32_t drain_period_ms);
 
   static void DrainCPUs(base::WeakPtr<FtraceController>, size_t generation);
-  static void UnblockReaders(base::WeakPtr<FtraceController>);
+  static void UnblockReaders(const base::WeakPtr<FtraceController>&);
 
   uint32_t GetDrainPeriodMs();
 

@@ -36,6 +36,9 @@ using testing::ByMove;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::IsEmpty;
+using testing::ElementsAre;
+using testing::Pair;
 
 using Table = perfetto::ProtoTranslationTable;
 using FtraceEventBundle = perfetto::protos::pbzero::FtraceEventBundle;
@@ -133,7 +136,7 @@ std::unique_ptr<FtraceConfigMuxer> FakeModel(
 
 class MockFtraceProcfs : public FtraceProcfs {
  public:
-  MockFtraceProcfs(size_t cpu_count = 1) : FtraceProcfs("/root/") {
+  explicit MockFtraceProcfs(size_t cpu_count = 1) : FtraceProcfs("/root/") {
     ON_CALL(*this, NumberOfCpus()).WillByDefault(Return(cpu_count));
     EXPECT_CALL(*this, NumberOfCpus()).Times(AnyNumber());
 
@@ -258,8 +261,9 @@ std::unique_ptr<TestFtraceController> CreateTestController(
         std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs(cpu_count));
   }
 
-  MockFtraceProcfs* raw_procfs = ftrace_procfs.get();
   auto model = FakeModel(ftrace_procfs.get(), table.get());
+
+  MockFtraceProcfs* raw_procfs = ftrace_procfs.get();
   return std::unique_ptr<TestFtraceController>(new TestFtraceController(
       std::move(ftrace_procfs), std::move(table), std::move(model),
       std::move(runner), raw_procfs));
@@ -595,6 +599,47 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
     auto sink = controller->CreateSink(config, &delegate);
     EXPECT_EQ(200u, controller->drain_period_ms());
   }
+}
+
+TEST(FtraceMetadataTest, Clear) {
+  FtraceMetadata metadata;
+  metadata.inodes.push_back(std::make_pair(1, 1));
+  metadata.pids.push_back(2);
+  metadata.overwrite_count = 3;
+  metadata.last_seen_device_id = 100;
+  metadata.Clear();
+  EXPECT_THAT(metadata.inodes, IsEmpty());
+  EXPECT_THAT(metadata.pids, IsEmpty());
+  EXPECT_EQ(metadata.overwrite_count, 0u);
+  EXPECT_EQ(metadata.last_seen_device_id, 0u);
+}
+
+TEST(FtraceMetadataTest, AddDevice) {
+  FtraceMetadata metadata;
+  metadata.AddDevice(1);
+  EXPECT_EQ(metadata.last_seen_device_id, 1u);
+  metadata.AddDevice(3);
+  EXPECT_EQ(metadata.last_seen_device_id, 3u);
+}
+
+TEST(FtraceMetadataTest, AddInode) {
+  FtraceMetadata metadata;
+  metadata.AddDevice(3);
+  metadata.AddInode(2);
+  metadata.AddInode(1);
+  // Check same inode number is added
+  metadata.AddDevice(5);
+  metadata.AddInode(2);
+  EXPECT_THAT(metadata.inodes, ElementsAre(Pair(2, 3), Pair(1, 3), Pair(2, 5)));
+}
+
+TEST(FtraceMetadataTest, AddPid) {
+  FtraceMetadata metadata;
+  metadata.AddPid(1);
+  metadata.AddPid(2);
+  metadata.AddPid(2);
+  metadata.AddPid(3);
+  EXPECT_THAT(metadata.pids, ElementsAre(1, 2, 3));
 }
 
 }  // namespace perfetto

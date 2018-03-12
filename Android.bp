@@ -20,6 +20,8 @@ cc_library_shared {
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
     ":perfetto_protos_perfetto_ipc_ipc_gen",
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_chrome_zero_gen",
     ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
     ":perfetto_protos_perfetto_trace_filesystem_zero_gen",
     ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
@@ -29,10 +31,12 @@ cc_library_shared {
     ":perfetto_protos_perfetto_trace_ps_zero_gen",
     ":perfetto_protos_perfetto_trace_zero_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
+    "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/event_info.cc",
     "src/ftrace_reader/event_info_constants.cc",
@@ -57,6 +61,7 @@ cc_library_shared {
     "src/traced/probes/probes.cc",
     "src/traced/probes/probes_producer.cc",
     "src/traced/service/service.cc",
+    "src/tracing/core/chrome_config.cc",
     "src/tracing/core/commit_data_request.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
@@ -67,6 +72,7 @@ cc_library_shared {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
@@ -83,6 +89,8 @@ cc_library_shared {
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -108,6 +116,8 @@ cc_binary {
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
     ":perfetto_protos_perfetto_ipc_ipc_gen",
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_chrome_zero_gen",
     ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
     ":perfetto_protos_perfetto_trace_filesystem_zero_gen",
     ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
@@ -119,6 +129,7 @@ cc_binary {
     ":perfetto_src_ipc_wire_protocol_gen",
     ":perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen",
     "src/base/android_task_runner.cc",
+    "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
@@ -136,6 +147,7 @@ cc_binary {
     "src/protozero/message_handle.cc",
     "src/protozero/proto_utils.cc",
     "src/protozero/scattered_stream_writer.cc",
+    "src/tracing/core/chrome_config.cc",
     "src/tracing/core/commit_data_request.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
@@ -146,6 +158,7 @@ cc_binary {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
@@ -167,6 +180,8 @@ cc_binary {
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -214,6 +229,8 @@ cc_test {
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
     ":perfetto_protos_perfetto_ipc_ipc_gen",
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_chrome_zero_gen",
     ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
     ":perfetto_protos_perfetto_trace_filesystem_zero_gen",
     ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
@@ -224,12 +241,14 @@ cc_test {
     ":perfetto_protos_perfetto_trace_zero_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
     "src/base/android_task_runner.cc",
+    "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
     "src/base/test/test_task_runner.cc",
     "src/base/test/vm_test_utils.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/end_to_end_integrationtest.cc",
     "src/ftrace_reader/event_info.cc",
@@ -257,6 +276,7 @@ cc_test {
     "src/protozero/proto_utils.cc",
     "src/protozero/scattered_stream_writer.cc",
     "src/traced/probes/probes_producer.cc",
+    "src/tracing/core/chrome_config.cc",
     "src/tracing/core/commit_data_request.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
@@ -267,6 +287,7 @@ cc_test {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
@@ -289,6 +310,8 @@ cc_test {
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -318,9 +341,11 @@ cc_test {
 genrule {
   name: "perfetto_protos_perfetto_config_config_gen",
   srcs: [
+    "protos/perfetto/config/chrome/chrome_config.proto",
     "protos/perfetto/config/data_source_config.proto",
     "protos/perfetto/config/data_source_descriptor.proto",
     "protos/perfetto/config/ftrace/ftrace_config.proto",
+    "protos/perfetto/config/test_config.proto",
     "protos/perfetto/config/trace_config.proto",
   ],
   tools: [
@@ -328,9 +353,11 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/config/chrome/chrome_config.pb.cc",
     "external/perfetto/protos/perfetto/config/data_source_config.pb.cc",
     "external/perfetto/protos/perfetto/config/data_source_descriptor.pb.cc",
     "external/perfetto/protos/perfetto/config/ftrace/ftrace_config.pb.cc",
+    "external/perfetto/protos/perfetto/config/test_config.pb.cc",
     "external/perfetto/protos/perfetto/config/trace_config.pb.cc",
   ],
 }
@@ -339,9 +366,11 @@ genrule {
 genrule {
   name: "perfetto_protos_perfetto_config_config_gen_headers",
   srcs: [
+    "protos/perfetto/config/chrome/chrome_config.proto",
     "protos/perfetto/config/data_source_config.proto",
     "protos/perfetto/config/data_source_descriptor.proto",
     "protos/perfetto/config/ftrace/ftrace_config.proto",
+    "protos/perfetto/config/test_config.proto",
     "protos/perfetto/config/trace_config.proto",
   ],
   tools: [
@@ -349,9 +378,11 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/config/chrome/chrome_config.pb.h",
     "external/perfetto/protos/perfetto/config/data_source_config.pb.h",
     "external/perfetto/protos/perfetto/config/data_source_descriptor.pb.h",
     "external/perfetto/protos/perfetto/config/ftrace/ftrace_config.pb.h",
+    "external/perfetto/protos/perfetto/config/test_config.pb.h",
     "external/perfetto/protos/perfetto/config/trace_config.pb.h",
   ],
   export_include_dirs: [
@@ -402,6 +433,74 @@ genrule {
     "external/perfetto/protos/perfetto/ipc/consumer_port.pb.h",
     "external/perfetto/protos/perfetto/ipc/producer_port.ipc.h",
     "external/perfetto/protos/perfetto/ipc/producer_port.pb.h",
+  ],
+  export_include_dirs: [
+    "protos",
+  ],
+}
+
+// GN target: //protos/perfetto/trace/chrome:lite_gen
+genrule {
+  name: "perfetto_protos_perfetto_trace_chrome_lite_gen",
+  srcs: [
+    "protos/perfetto/trace/chrome/chrome_trace_event.proto",
+  ],
+  tools: [
+    "aprotoc",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
+  out: [
+    "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pb.cc",
+  ],
+}
+
+// GN target: //protos/perfetto/trace/chrome:lite_gen
+genrule {
+  name: "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+  srcs: [
+    "protos/perfetto/trace/chrome/chrome_trace_event.proto",
+  ],
+  tools: [
+    "aprotoc",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
+  out: [
+    "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pb.h",
+  ],
+  export_include_dirs: [
+    "protos",
+  ],
+}
+
+// GN target: //protos/perfetto/trace/chrome:zero_gen
+genrule {
+  name: "perfetto_protos_perfetto_trace_chrome_zero_gen",
+  srcs: [
+    "protos/perfetto/trace/chrome/chrome_trace_event.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
+  out: [
+    "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pbzero.cc",
+  ],
+}
+
+// GN target: //protos/perfetto/trace/chrome:zero_gen
+genrule {
+  name: "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
+  srcs: [
+    "protos/perfetto/trace/chrome/chrome_trace_event.proto",
+  ],
+  tools: [
+    "aprotoc",
+    "perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_",
+  ],
+  cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
+  out: [
+    "external/perfetto/protos/perfetto/trace/chrome/chrome_trace_event.pbzero.h",
   ],
   export_include_dirs: [
     "protos",
@@ -2871,6 +2970,8 @@ cc_library_static {
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
     ":perfetto_protos_perfetto_ipc_ipc_gen",
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_chrome_zero_gen",
     ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
     ":perfetto_protos_perfetto_trace_filesystem_zero_gen",
     ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
@@ -2880,6 +2981,7 @@ cc_library_static {
     ":perfetto_protos_perfetto_trace_ps_zero_gen",
     ":perfetto_protos_perfetto_trace_zero_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
+    "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
@@ -2894,6 +2996,7 @@ cc_library_static {
     "src/protozero/message_handle.cc",
     "src/protozero/proto_utils.cc",
     "src/protozero/scattered_stream_writer.cc",
+    "src/tracing/core/chrome_config.cc",
     "src/tracing/core/commit_data_request.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
@@ -2904,6 +3007,7 @@ cc_library_static {
     "src/tracing/core/shared_memory_abi.cc",
     "src/tracing/core/shared_memory_arbiter_impl.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
+    "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
@@ -2928,6 +3032,8 @@ cc_library_static {
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -2941,6 +3047,8 @@ cc_library_static {
   export_generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -2966,6 +3074,8 @@ cc_test {
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
     ":perfetto_protos_perfetto_ipc_ipc_gen",
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_chrome_zero_gen",
     ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
     ":perfetto_protos_perfetto_trace_filesystem_zero_gen",
     ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
@@ -2982,6 +3092,7 @@ cc_test {
     ":perfetto_src_protozero_testing_messages_lite_gen",
     ":perfetto_src_protozero_testing_messages_zero_gen",
     "src/base/android_task_runner.cc",
+    "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
     "src/base/page_allocator_unittest.cc",
     "src/base/scoped_file_unittest.cc",
@@ -2995,6 +3106,7 @@ cc_test {
     "src/base/watchdog.cc",
     "src/base/watchdog_unittest.cc",
     "src/base/weak_ptr_unittest.cc",
+    "src/ftrace_reader/atrace_wrapper.cc",
     "src/ftrace_reader/cpu_reader.cc",
     "src/ftrace_reader/cpu_reader_unittest.cc",
     "src/ftrace_reader/event_info.cc",
@@ -3041,6 +3153,9 @@ cc_test {
     "src/protozero/scattered_stream_writer_unittest.cc",
     "src/protozero/test/fake_scattered_buffer.cc",
     "src/protozero/test/protozero_conformance_unittest.cc",
+    "src/traced/probes/filesystem/fs_mount.cc",
+    "src/traced/probes/filesystem/fs_mount_unittest.cc",
+    "src/tracing/core/chrome_config.cc",
     "src/tracing/core/commit_data_request.cc",
     "src/tracing/core/data_source_config.cc",
     "src/tracing/core/data_source_descriptor.cc",
@@ -3049,6 +3164,7 @@ cc_test {
     "src/tracing/core/id_allocator_unittest.cc",
     "src/tracing/core/packet_stream_validator.cc",
     "src/tracing/core/packet_stream_validator_unittest.cc",
+    "src/tracing/core/patch_list_unittest.cc",
     "src/tracing/core/service_impl.cc",
     "src/tracing/core/service_impl_unittest.cc",
     "src/tracing/core/shared_memory_abi.cc",
@@ -3057,6 +3173,7 @@ cc_test {
     "src/tracing/core/shared_memory_arbiter_impl_unittest.cc",
     "src/tracing/core/sliced_protobuf_input_stream.cc",
     "src/tracing/core/sliced_protobuf_input_stream_unittest.cc",
+    "src/tracing/core/test_config.cc",
     "src/tracing/core/trace_buffer.cc",
     "src/tracing/core/trace_buffer_unittest.cc",
     "src/tracing/core/trace_config.cc",
@@ -3088,6 +3205,8 @@ cc_test {
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_ipc_ipc_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_chrome_zero_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
     "perfetto_protos_perfetto_trace_filesystem_zero_gen_headers",
     "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
@@ -3152,12 +3271,8 @@ cc_binary {
 }
 
 // These targets are appended to the autogenerated Android.bp by tools/gen_android_bp.
-// TODO(lalitm): find a better way to do this sharing.
-
-// TODO(lalitm): uncomment these when the CTS tests are to be enabled.
-/*
-cc_test {
-  name: "CtsPerfettoTestCases",
+cc_library_static {
+  name: "perfetto_cts_deps",
   srcs: [
     "src/base/android_task_runner.cc",
     "src/base/test/test_task_runner.cc",
@@ -3168,61 +3283,43 @@ cc_test {
     "src/ftrace_reader/ftrace_procfs.cc",
     "src/ftrace_reader/proto_translation_table.cc",
     "src/traced/probes/probes_producer.cc",
+    "test/fake_producer.cc",
     "test/fake_consumer.cc",
+    "test/task_runner_thread.cc",
     "test/end_to_end_integrationtest.cc",
-    "test/end_to_end_integrationtest_cts.cc",
   ],
-  static_libs: [
-    "libgmock",
-    "libgtest",
-    "libgtest_main",
-    "perfetto_src_tracing_ipc",
+  export_include_dirs: [
+    ".",
   ],
   shared_libs: [
-    "libandroid",
-    "liblog",
     "libprotobuf-cpp-lite",
   ],
-  test_suites: [
-    "cts",
-    "vts",
-    "general-tests",
+  static_libs: [
+    "perfetto_src_tracing_ipc",
+    "libgtest_prod",
   ],
-  compile_multilib: "both",
-  multilib: {
-    lib32: {
-        suffix: "32",
-    },
-    lib64: {
-        suffix: "64",
-    },
-  },
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
 
-cc_library_shared {
-  name: "libperfettocts_jni",
+cc_library_static {
+  name: "perfetto_cts_jni_deps",
   srcs: [
     "src/base/android_task_runner.cc",
     "src/base/test/test_task_runner.cc",
     "test/fake_producer.cc",
-    "test/cts/producer/jni/fake_producer_jni.cc",
-  ],
-  static_libs: [
-    "libprotobuf-cpp-lite",
-    "perfetto_src_tracing_ipc",
   ],
   shared_libs: [
-    "libandroid",
-    "liblog",
-    "libnativehelper_compat_libc++",
+    "libprotobuf-cpp-lite",
   ],
-  compile_multilib: "both",
-  stl: "libc++_static",
+  export_include_dirs: [
+    ".",
+  ],
+  static_libs: [
+    "perfetto_src_tracing_ipc",
+  ],
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
   ],
 }
-*/

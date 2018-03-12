@@ -17,9 +17,12 @@
 #include "rate_limiter.h"
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
+
+const char kStatePath[] = "/data/misc/perfetto-traces/.guardraildata";
 
 RateLimiter::RateLimiter(const std::string& path) : path_(path) {}
 RateLimiter::~RateLimiter() = default;
@@ -36,7 +39,8 @@ bool RateLimiter::ShouldTrace(const Args& args) {
   // Current time is before either saved times?
   // Last saved trace time is before first saved trace time?
   // -> Try to save a clean state but don't trace.
-  if (!loaded_state || args.current_timestamp < state_.first_trace_timestamp() ||
+  if (!loaded_state ||
+      args.current_timestamp < state_.first_trace_timestamp() ||
       args.current_timestamp < state_.last_trace_timestamp() ||
       state_.last_trace_timestamp() < state_.first_trace_timestamp()) {
     PerfettoCmdState output{};
@@ -46,14 +50,15 @@ bool RateLimiter::ShouldTrace(const Args& args) {
   }
 
   // If we've uploaded in the last 5mins we shouldn't trace now.
-  if ((args.current_timestamp - state.last_trace_timestamp()) < 60 * 5) {
+  if ((args.current_timestamp - state_.last_trace_timestamp()) < 60 * 5) {
     PERFETTO_ELOG("Guardrail: Uploaded to DropBox in the last 5mins.");
     if (!args.ignore_guardrails)
       return false;
   }
 
   // First trace was more than 24h ago? Reset state.
-  if ((args.current_timestamp - state.first_trace_timestamp()) > 60 * 60 * 24) {
+  if ((args.current_timestamp - state_.first_trace_timestamp()) >
+      60 * 60 * 24) {
     state_.set_first_trace_timestamp(0);
     state_.set_last_trace_timestamp(0);
     state_.set_total_bytes_uploaded(0);
@@ -66,14 +71,17 @@ bool RateLimiter::ShouldTrace(const Args& args) {
     if (!args.ignore_guardrails)
       return false;
   }
-  
+
   return true;
 }
 
-bool TraceDone(bool success, size_t bytes) {
+bool RateLimiter::TraceDone(const Args& args, bool success, size_t bytes) {
   // Failed to upload? Don't update the state.
   if (!success)
     return false;
+
+  if (!args.is_dropbox)
+    return true;
 
   // If the first trace timestamp is 0 (either because this is the
   // first time or because it was reset for being more than 24h ago).
@@ -83,20 +91,20 @@ bool TraceDone(bool success, size_t bytes) {
   // Always updated the last trace timestamp.
   state_.set_last_trace_timestamp(args.current_timestamp);
   // Add the amount we uploded to the running total.
-  state_.set_total_bytes_uploaded(state.total_bytes_uploaded() + bytes);
+  state_.set_total_bytes_uploaded(state_.total_bytes_uploaded() + bytes);
 
   return SaveState(state_);
 }
 
 bool RateLimiter::LoadState(PerfettoCmdState* state) {
   base::ScopedFile fd;
-  fd.reset(open(GetStatePath().c_str(), O_RDONLY | O_CREAT, 0600));
+  fd.reset(open(kStatePath, O_RDONLY | O_CREAT, 0600));
   return ReadState(fd.get(), state);
 }
 
 bool RateLimiter::SaveState(const PerfettoCmdState& state) {
   base::ScopedFile fd;
-  fd.reset(open(GetStatePath().c_str(), O_WRONLY | O_CREAT, 0600));
+  fd.reset(open(kStatePath, O_WRONLY | O_CREAT, 0600));
   return WriteState(fd.get(), state);
 }
 
