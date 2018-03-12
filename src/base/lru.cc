@@ -45,7 +45,7 @@ void LRUInodeCache::Insert(typename MapType::iterator map_it,
     list_.erase(list_it);
     list_it = list_.begin();
   } else {
-    map_.emplace(k, list_.begin());
+    map_.emplace_hint(map_it, k, list_.begin());
   }
 
   if (map_.size() > capacity_) {
