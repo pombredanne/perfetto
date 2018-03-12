@@ -101,7 +101,7 @@ class ProbesProducer : public Producer {
                           FtraceBundleHandle bundle,
                           const FtraceMetadata& metadata) override;
 
-    void sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
+    void set_sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
 
     void set_weak_ps_source(base::WeakPtr<ProcessStatsDataSource> ptr) {
       weak_ps_source_ = std::move(ptr);
