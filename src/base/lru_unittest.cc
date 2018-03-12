@@ -54,7 +54,7 @@ TEST(LRUTest, Overflow) {
   cache.Get(key1);
   cache.Get(key2);
   cache.Insert(key3, val3);
-  // foo is the LRU and should be evicted.
+  // key1 is the LRU and should be evicted.
   EXPECT_THAT(cache.Get(key1), IsNull());
   EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
   EXPECT_THAT(cache.Get(key3), Pointee(Eq(val3)));
