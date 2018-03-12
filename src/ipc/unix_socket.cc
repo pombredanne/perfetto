@@ -209,7 +209,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
 
 UnixSocket::~UnixSocket() {
   // The implicit dtor of |weak_ptr_factory_| will no-op pending callbacks.
-  Shutdown();
+  Shutdown(true);
 }
 
 // Called only by the Connect() static constructor.
@@ -371,7 +371,7 @@ bool UnixSocket::Send(const void* msg,
   // happened.
   last_error_ = errno;
   PERFETTO_DPLOG("sendmsg() failed");
-  Shutdown();
+  Shutdown(true);
   return false;
 }
 
@@ -423,7 +423,7 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   }
   if (sz <= 0) {
     last_error_ = errno;
-    Shutdown();
+    Shutdown(true);
     return 0;
   }
   PERFETTO_CHECK(static_cast<size_t>(sz) <= len);
@@ -448,7 +448,7 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
     for (size_t i = 0; fds && i < fds_len; ++i)
       close(fds[i]);
     last_error_ = EMSGSIZE;
-    Shutdown();
+    Shutdown(true);
     return 0;
   }
 
