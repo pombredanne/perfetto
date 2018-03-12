@@ -28,6 +28,9 @@ namespace base {
 using InodeKey = std::pair<int64_t, int64_t>;
 using InodeValue = std::string;
 
+// LRUInodeCache keeps up to capacity entries in a mapping from InodeKey
+// to InodeValue. This is used to map <block device, inode> tuples to file
+// paths.
 class LRUInodeCache {
  public:
   explicit LRUInodeCache(size_t capacity) : capacity_(capacity) {}
