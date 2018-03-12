@@ -23,6 +23,7 @@
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
+#include "src/traced/probes/filesystem/fs_mount.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 
@@ -60,10 +61,6 @@ class ProbesProducer : public Producer {
  private:
   using FtraceBundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-  using Type = protos::pbzero::InodeFileMap_Entry_Type;
-  using InodeMap = std::map<uint64_t,
-                            std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                                      std::set<std::string>>>;
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
@@ -92,20 +89,6 @@ class ProbesProducer : public Producer {
     base::WeakPtrFactory<SinkDelegate> weak_factory_;
   };
 
-  class InodeFileMapDataSource {
-   public:
-    explicit InodeFileMapDataSource(
-        std::map<uint32_t, InodeMap>* file_system_inodes,
-        std::unique_ptr<TraceWriter> writer);
-    ~InodeFileMapDataSource();
-
-    void WriteInodes(const FtraceMetadata& metadata);
-
-   private:
-    std::map<uint32_t, InodeMap>* file_system_inodes_;
-    std::unique_ptr<TraceWriter> writer_;
-  };
-
   enum State {
     kNotStarted = 0,
     kNotConnected,
@@ -118,9 +101,6 @@ class ProbesProducer : public Producer {
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
-  static void CreateDeviceToInodeMap(
-      const std::string& root_directory,
-      std::map<uint32_t, InodeMap>* block_device_map);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;

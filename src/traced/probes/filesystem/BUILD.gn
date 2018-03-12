@@ -13,8 +13,14 @@
 # limitations under the License.
 
 source_set("filesystem") {
+  public_deps = [
+    "../../../../protos/perfetto/trace/filesystem:zero",
+    "../../../ftrace_reader",
+    "../../../tracing:tracing",
+  ]
   deps = [
     "../../../../gn:default_deps",
+    "../../../base",
   ]
   sources = [
     "fs_mount.cc",

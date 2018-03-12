@@ -20,7 +20,6 @@
 #include "gtest/gtest.h"
 
 namespace perfetto {
-namespace {
 
 using testing::Contains;
 using testing::Pair;
@@ -32,5 +31,4 @@ TEST(InodeTest, ParseMounts) {
   EXPECT_THAT(mounts, Contains(Pair(buf.st_dev, "/proc")));
 }
 
-}  // namespace
 }  // namespace perfetto
