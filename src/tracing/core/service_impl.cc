@@ -567,8 +567,8 @@ void ServiceImpl::CreateDataSourceInstance(
 
     producer->page_size_kb_ = first_producer_config.page_size_kb();
 
-    size_t shm_size =
-        std::min(first_producer_config.shm_size_kb(), kMaxShmSize);
+    size_t shm_size = std::min(
+        static_cast<size_t>(first_producer_config.shm_size_kb()), kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)

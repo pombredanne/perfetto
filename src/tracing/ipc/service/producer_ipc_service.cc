@@ -258,8 +258,6 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
         "Producer has not yet initialized the connection");
     return;
   }
-  PERFETTO_LOG("here2");
-
   const int shm_fd =
       static_cast<PosixSharedMemory*>(service_endpoint->shared_memory())->fd();
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();

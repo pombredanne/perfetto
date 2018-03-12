@@ -127,14 +127,15 @@ void ProducerIPCClientImpl::OnServiceRequest(
     // TODO(primiano): handle mmap failure in case of OOM.
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
     page_size_kb_ = cmd.on_tracing_start().page_size_kb();
-    PERFETTO_LOG("here");
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
         shared_memory_.get(), page_size_kb_, this, task_runner_);
     producer_->OnTracingStart();
+    return;
   }
 
   if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kOnTracingStop) {
     // TODO (taylori) Tear down the shm.
+    return;
   }
 
   PERFETTO_DLOG("Unknown async request %d received from tracing service",
