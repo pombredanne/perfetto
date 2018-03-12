@@ -44,7 +44,7 @@ static void BM_EndToEnd(benchmark::State& state) {
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(1024);
+  trace_config.add_buffers()->set_size_kb(512);
   trace_config.set_duration_ms(200);
 
   // Create the buffer for ftrace.
@@ -54,11 +54,11 @@ static void BM_EndToEnd(benchmark::State& state) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  static constexpr uint32_t kEventCount = 1000;
+  uint32_t message_count = state.range(0);
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
-  ds_config->mutable_for_testing()->set_message_count(kEventCount);
+  ds_config->mutable_for_testing()->set_message_count(message_count);
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread;
@@ -71,17 +71,20 @@ static void BM_EndToEnd(benchmark::State& state) {
   producer_thread.Start(
       std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate(
           TEST_PRODUCER_SOCK_NAME, [&task_runner, &data_produced] {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+            task_runner.PostDelayedTask(data_produced, 1000);
+#else
             task_runner.PostTask(data_produced);
+#endif
           })));
-
-  std::minstd_rand0 random(kRandomSeed);
 
   uint64_t total = 0;
   std::function<void()> finish;
+  std::minstd_rand0 random(kRandomSeed);
   auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
                                              bool has_more) {
     for (auto& packet : packets) {
-      packet.Decode();
+      ASSERT_TRUE(packet.Decode());
       ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
@@ -120,8 +123,13 @@ static void BM_EndToEnd(benchmark::State& state) {
     task_runner.RunUntilCheckpoint(finish_name);
     consumer.FreeBuffers();
 
-    state.SetBytesProcessed(sizeof(uint32_t) * kEventCount);
+    state.SetBytesProcessed(int64_t(state.iterations()) *
+                            (sizeof(uint32_t) + 1024) * message_count);
   }
 }
-BENCHMARK(BM_EndToEnd)->Threads(1);
+BENCHMARK(BM_EndToEnd)
+    ->Unit(benchmark::kMillisecond)
+    ->UseRealTime()
+    ->RangeMultiplier(2)
+    ->Range(16, 32 << 10);
 }

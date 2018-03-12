@@ -94,21 +94,17 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   uint64_t total = 0;
   auto function = [&total, &finish](std::vector<TracePacket> packets,
                                     bool has_more) {
-    if (has_more) {
-      for (auto& packet : packets) {
-        packet.Decode();
-        ASSERT_TRUE(packet->has_ftrace_events());
-        for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
-          ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
-        }
+    for (auto& packet : packets) {
+      ASSERT_TRUE(packet.Decode());
+      ASSERT_TRUE(packet->has_ftrace_events());
+      for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
+        ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
       }
-      total += packets.size();
+    }
+    total += packets.size();
 
-      // TODO(lalitm): renable this when stiching inside the service is present.
-      // ASSERT_FALSE(packets->empty());
-    } else {
+    if (!has_more) {
       ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
-      ASSERT_TRUE(packets.empty());
       finish();
     }
   };
@@ -177,21 +173,18 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   uint64_t total = 0;
   auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
                                              bool has_more) {
-    if (has_more) {
-      for (auto& packet : packets) {
-        packet.Decode();
-        ASSERT_TRUE(packet->has_for_testing());
-        ASSERT_EQ(protos::TracePacket::kTrustedUid,
-                  packet->optional_trusted_uid_case());
-        ASSERT_EQ(packet->for_testing().seq_value(), random());
-      }
-      total += packets.size();
 
-      // TODO(lalitm): renable this when stiching inside the service is present.
-      // ASSERT_FALSE(packets->empty());
-    } else {
+    for (auto& packet : packets) {
+      ASSERT_TRUE(packet.Decode());
+      ASSERT_TRUE(packet->has_for_testing());
+      ASSERT_EQ(protos::TracePacket::kTrustedUid,
+                packet->optional_trusted_uid_case());
+      ASSERT_EQ(packet->for_testing().seq_value(), random());
+    }
+    total += packets.size();
+
+    if (!has_more) {
       ASSERT_EQ(total, kEventCount);
-      ASSERT_TRUE(packets.empty());
       finish();
     }
   };
@@ -207,7 +200,7 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   producer_thread.Start(
       std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate(
           TEST_PRODUCER_SOCK_NAME, [&task_runner, &data_produced] {
-            task_runner.PostTask(data_produced);
+            task_runner.PostDelayedTask(data_produced, 1000);
           })));
 
   // Finally, make the consumer connect to the service.

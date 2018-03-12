@@ -46,24 +46,6 @@ class FakeProducer : public Producer {
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
 
  private:
-  class PacketBatchingHelper {
-   public:
-    PacketBatchingHelper(base::TaskRunner* task_runner,
-                         std::unique_ptr<TraceWriter> writer,
-                         const TestConfig& config,
-                         std::function<void()> data_produced_callback);
-    void SendBatch();
-
-   private:
-    base::TaskRunner* task_runner_ = nullptr;
-
-    std::unique_ptr<TraceWriter> writer_;
-    std::minstd_rand0 random_;
-    size_t batches_remaining_ = 0;
-    const size_t last_batch_;
-    std::function<void()> data_produced_callback_;
-  };
-
   void Shutdown();
 
   std::string name_;
@@ -72,7 +54,6 @@ class FakeProducer : public Producer {
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   base::TaskRunner* task_runner_ = nullptr;
   std::function<void()> data_produced_callback_;
-  std::unique_ptr<PacketBatchingHelper> batching_helper_;
 };
 
 }  // namespace perfetto
