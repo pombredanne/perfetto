@@ -67,7 +67,7 @@ void ProducerIPCService::InitializeConnection(
 
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
-      producer.get(), client_info.uid(), req.shared_buffer_size_hint_bytes());
+      producer.get(), client_info.uid(), req.shared_memory_size_hint_bytes());
 
   // Could happen if the service has too many producers connected.
   if (!producer->service_endpoint)
@@ -258,12 +258,15 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
         "Producer has not yet initialized the connection");
     return;
   }
+  PERFETTO_LOG("here2");
+
   const int shm_fd =
       static_cast<PosixSharedMemory*>(service_endpoint->shared_memory())->fd();
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd.set_fd(shm_fd);
-  cmd->mutable_allocate_shm()->set_page_size_kb(service_endpoint->page_size_kb);
+  cmd->mutable_on_tracing_start()->set_page_size_kb(
+      service_endpoint->page_size_kb());
   async_producer_commands.Resolve(std::move(cmd));
 }
 

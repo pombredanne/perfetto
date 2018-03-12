@@ -76,9 +76,9 @@ class Producer {
   // Called by the Service to shut down an existing data source instance.
   virtual void TearDownDataSourceInstance(DataSourceInstanceID) = 0;
 
-  virtual void OnTracingStart() = 0;
+  virtual void OnTracingStart() {}
 
-  virtual void OnTracingStop() = 0;
+  virtual void OnTracingStop() {}
 };
 
 }  // namespace perfetto

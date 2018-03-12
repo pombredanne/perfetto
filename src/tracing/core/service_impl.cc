@@ -84,7 +84,7 @@ ServiceImpl::~ServiceImpl() {
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     Producer* producer,
     uid_t uid,
-    size_t shared_buffer_size_hint_bytes) {
+    size_t shared_memory_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   if (lockdown_mode_ && uid != geteuid()) {
@@ -104,7 +104,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
       new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
-  endpoint.get()->shared_buffer_size_hint_bytes = shared_buffer_size_hint_bytes;
+  shared_memory_size_hint_bytes_ = shared_memory_size_hint_bytes;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
   return std::move(endpoint);
@@ -200,6 +200,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return;  // TODO(primiano): signal failure to the caller.
   }
 
+  // TODO(taylori): These assumptions are no longer true. Figure out a new
+  // heuristic.
   // TODO(primiano): This is a workaround to prevent that a producer gets stuck
   // in a state where it stalls by design by having more TraceWriterImpl
   // instances than free pages in the buffer. This is a very fragile heuristic
@@ -207,14 +209,14 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // data source instance in each Producer, and each data source has only one
   // TraceWriter.
   // TODO(taylori): Handle multiple producers/producer_configs.
-  auto first_producer_config = cfg.producers()[0];
-  if (tracing_sessions_.size() >=
-      (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
-    PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
-                  tracing_sessions_.size());
-    // TODO(primiano): make this a bool and return failure to the IPC layer.
-    return;
-  }
+  // auto first_producer_config = cfg.producers()[0];
+  // if (tracing_sessions_.size() >=
+  //     (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
+  //   PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
+  //                 tracing_sessions_.size());
+  //   // TODO(primiano): make this a bool and return failure to the IPC layer.
+  //   return;
+  //}
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
   TracingSession& ts =
@@ -559,16 +561,16 @@ void ServiceImpl::CreateDataSourceInstance(
       producer->id_, DataSourceInstance{inst_id, data_source.data_source_id});
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
-  if (tracing_session->data_source_instances.count(producer->id_) == 1) {
+  if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
     auto first_producer_config = tracing_session->config.producers()[0];
 
-    producer->page_size_kb = first_producer_config.page_size_kb();
+    producer->page_size_kb_ = first_producer_config.page_size_kb();
 
     size_t shm_size =
         std::min(first_producer_config.shm_size_kb(), kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
-      shm_size = std::min(producer->shared_buffer_size_hint_bytes, kMaxShmSize);
+      shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = kDefaultShmSize;
 
@@ -605,8 +607,7 @@ void ServiceImpl::CopyProducerPageIntoLogBuffer(ProducerID producer_id,
   // Essentially we want to prevent a malicious producer to inject data into a
   // log buffer that has nothing to do with it.
 
-  // TODO(taylori) This is failing. Why?
-  // PERFETTO_DCHECK(size == kBufferPageSize);
+  PERFETTO_DCHECK(size == GetProducer(producer_id)->page_size_kb());
   uid_t uid = GetProducer(producer_id)->uid_;
   uint8_t* dst = buf.acquire_next_page(uid);
 
@@ -644,9 +645,8 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Sum up all the shared memory buffers.
   for (const auto& id_to_producer : producers_) {
-    if (id_to_producer.second->shared_memory()) {
+    if (id_to_producer.second->shared_memory())
       total_buffer_bytes += id_to_producer.second->shared_memory()->size();
-    }
   }
 
   // Sum up all the trace buffers.
@@ -763,7 +763,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     const CommitDataRequest& req_untrusted) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
-  PERFETTO_DCHECK(shared_memory_->start());
+  PERFETTO_DCHECK(shared_memory_);
   for (const auto& chunks : req_untrusted.chunks_to_move()) {
     const uint32_t page_idx = chunks.page();
     if (page_idx >= shmem_abi_.num_pages())
@@ -793,12 +793,16 @@ void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
   shared_memory_ = std::move(shared_memory);
   shmem_abi_ =
       SharedMemoryABI(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                      shared_memory_->size(), page_size_kb);
+                      shared_memory_->size(), page_size_kb());
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   return shared_memory_.get();
+}
+
+size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() {
+  return page_size_kb_;
 }
 
 std::unique_ptr<TraceWriter>

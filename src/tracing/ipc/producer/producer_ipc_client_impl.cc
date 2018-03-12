@@ -120,18 +120,20 @@ void ProducerIPCClientImpl::OnServiceRequest(
     return;
   }
 
-  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kAllocateShm) {
+  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kOnTracingStart) {
     base::ScopedFile shmem_fd = ipc_channel_->TakeReceivedFD();
     PERFETTO_CHECK(shmem_fd);
 
     // TODO(primiano): handle mmap failure in case of OOM.
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
+    page_size_kb_ = cmd.on_tracing_start().page_size_kb();
+    PERFETTO_LOG("here");
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), cmd.allocate_shm().page_size_kb(), this,
-        task_runner_);
+        shared_memory_.get(), page_size_kb_, this, task_runner_);
+    producer_->OnTracingStart();
   }
 
-  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kTearDownShm) {
+  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kOnTracingStop) {
     // TODO (taylori) Tear down the shm.
   }
 
@@ -205,6 +207,10 @@ std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter(
 
 SharedMemory* ProducerIPCClientImpl::shared_memory() const {
   return shared_memory_.get();
+}
+
+size_t ProducerIPCClientImpl::page_size_kb() {
+  return page_size_kb_;
 }
 
 }  // namespace perfetto

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
-option optimize_for = LITE_RUNTIME;
+#ifndef SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_
+#define SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_
 
-message FakeFtraceEvent {
-  optional uint32 common_field = 1;
-  oneof event { FakeAllFieldsFtraceEvent all_fields = 42; }
-}
+#include <sys/stat.h>
+#include <map>
+#include <string>
+#include <vector>
 
-message FakeAllFieldsFtraceEvent {
-  optional uint32 field_dev = 1;
-  optional int32 field_pid = 2;
-  optional uint32 field_uint32 = 5;
-  optional uint32 field_inode_32 = 3;
-  optional uint64 field_inode_64 = 4;
-  optional string field_char_16 = 500;
-  optional string field_char = 501;
-}
+namespace perfetto {
+
+// On ARM, st_dev is not dev_t but unsigned long long.
+using BlockDeviceID = decltype(stat::st_dev);
+
+std::multimap<BlockDeviceID, std::string> ParseMounts();
+
+}  // namespace perfetto
+
+#endif  // SRC_TRACED_PROBES_FILESYSTEM_FS_MOUNT_H_

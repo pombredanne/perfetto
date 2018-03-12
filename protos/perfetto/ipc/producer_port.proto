@@ -58,7 +58,7 @@ message InitializeConnectionRequest {
   // Optional. Provides a hint to the tracing service about the suggested size
   // of the shared memory buffer. The service is not required to respect this
   // and might return a smaller buffer.
-  optional uint32 shared_buffer_size_hint_bytes = 2;
+  optional uint32 shared_memory_size_hint_bytes = 2;
 
   optional string producer_name = 3;
 }
@@ -108,16 +108,16 @@ message GetAsyncCommandResponse {
     optional protos.DataSourceConfig config = 2;
   }
 
-  message AllocateShm { optional uint64 page_size_kb = 1; }
-
   message StopDataSource { optional uint64 instance_id = 1; }
 
-  message TearDownShm {}
+  message OnTracingStart { optional uint64 page_size_kb = 1; }
+
+  message OnTracingStop {}
 
   oneof cmd {
     StartDataSource start_data_source = 1;
     StopDataSource stop_data_source = 2;
-    AllocateShm allocate_shm = 3;
-    TearDownShm tear_down_shm = 4;
+    OnTracingStart on_tracing_start = 3;
+    OnTracingStop on_tracing_stop = 4;
   }
 }
