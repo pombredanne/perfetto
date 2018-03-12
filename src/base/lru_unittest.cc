@@ -30,9 +30,9 @@ using ::testing::Eq;
 using ::testing::IsNull;
 using ::testing::Pointee;
 
-std::pair<int64_t, int64_t> key1{0, 0};
-std::pair<int64_t, int64_t> key2{0, 1};
-std::pair<int64_t, int64_t> key3{0, 2};
+const std::pair<int64_t, int64_t> key1{0, 0};
+const std::pair<int64_t, int64_t> key2{0, 1};
+const std::pair<int64_t, int64_t> key3{0, 2};
 
 const char* val1 = "foo";
 const char* val2 = "bar";
