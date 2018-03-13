@@ -45,7 +45,6 @@ static void BM_EndToEnd(benchmark::State& state) {
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(512);
-  trace_config.set_duration_ms(200);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -66,67 +65,65 @@ static void BM_EndToEnd(benchmark::State& state) {
       new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
 #endif
 
-  std::function<void()> data_produced;
+  std::function<void()> on_data_produced;
   TaskRunnerThread producer_thread;
-  producer_thread.Start(
-      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate(
-          TEST_PRODUCER_SOCK_NAME, [&task_runner, &data_produced] {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-            task_runner.PostDelayedTask(data_produced, 1000);
-#else
-            task_runner.PostTask(data_produced);
-#endif
-          })));
+  auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
+  std::unique_ptr<FakeProducerDelegate> producer_delegate(
+      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME, on_producer_enabled));
+  FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
+  producer_thread.Start(std::move(producer_delegate));
+  FakeProducer* producer = producer_delegate_cached->producer();
 
-  uint64_t total = 0;
-  std::function<void()> finish;
-  std::minstd_rand0 random(kRandomSeed);
-  auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
-                                             bool has_more) {
+  bool is_first_packet = false;
+  std::function<void()> on_all_packets_received;
+  std::minstd_rand0 rnd_engine(kRandomSeed);
+  auto on_consumer_data = [&is_first_packet, &on_all_packets_received,
+                           &rnd_engine](std::vector<TracePacket> packets,
+                                        bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
       ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
-      if (total++ == 0) {
-        random = std::minstd_rand0(packet->for_testing().seq_value());
+      if (!is_first_packet) {
+        rnd_engine = std::minstd_rand0(packet->for_testing().seq_value());
+        is_first_packet = false;
       } else {
-        ASSERT_EQ(packet->for_testing().seq_value(), random());
+        ASSERT_EQ(packet->for_testing().seq_value(), rnd_engine());
       }
     }
 
     if (!has_more) {
-      total = 0;
-      finish();
+      is_first_packet = false;
+      on_all_packets_received();
     }
   };
 
   // Finally, make the consumer connect to the service.
-  auto connect = task_runner.CreateCheckpoint("connected");
-  FakeConsumer consumer(trace_config, std::move(connect), std::move(function),
-                        &task_runner);
+  auto on_connect = task_runner.CreateCheckpoint("consumer_connected");
+  FakeConsumer consumer(trace_config, std::move(on_connect),
+                        std::move(on_consumer_data), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
-  task_runner.RunUntilCheckpoint("connected");
+  task_runner.RunUntilCheckpoint("consumer_connected");
+
+  consumer.EnableTracing();
+  task_runner.RunUntilCheckpoint("producer.enabled");
 
   while (state.KeepRunning()) {
-    std::string produced_name =
-        "data.produced." + std::to_string(state.iterations());
-    std::string finish_name =
+    producer->ProduceEventBatchAndWait();
+
+    auto on_all_packets_name =
         "no.more.packets." + std::to_string(state.iterations());
-
-    data_produced = task_runner.CreateCheckpoint(produced_name);
-    finish = task_runner.CreateCheckpoint(finish_name);
-
-    consumer.EnableTracing();
-    task_runner.RunUntilCheckpoint(produced_name);
+    on_all_packets_received = task_runner.CreateCheckpoint(on_all_packets_name);
     consumer.ReadTraceData();
-    task_runner.RunUntilCheckpoint(finish_name);
-    consumer.FreeBuffers();
-
-    state.SetBytesProcessed(int64_t(state.iterations()) *
-                            (sizeof(uint32_t) + 1024) * message_count);
+    task_runner.RunUntilCheckpoint(on_all_packets_name);
   }
+  consumer.FreeBuffers();
+
+  state.SetBytesProcessed(int64_t(state.iterations()) *
+                          (sizeof(uint32_t) + 1024) * message_count);
 }
+
 BENCHMARK(BM_EndToEnd)
     ->Unit(benchmark::kMillisecond)
     ->UseRealTime()
