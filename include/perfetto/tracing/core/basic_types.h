@@ -54,7 +54,7 @@ static constexpr BufferID kMaxTraceBufferID = static_cast<BufferID>(-1);
 
 // TODO(primiano): temporary. The buffer page size should be configurable by
 // consumers.
-static constexpr size_t kBufferPageSize = 8192;
+static constexpr size_t kBufferPageSize = 4096;
 
 }  // namespace perfetto
 
