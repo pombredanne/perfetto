@@ -174,8 +174,9 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
       static_cast<BufferID>(source_config.target_buffer()));
   auto source = std::unique_ptr<ProcessStatsDataSource>(
       new ProcessStatsDataSource(std::move(trace_writer)));
-  source->WriteAllProcesses();
-  process_stats_sources_.emplace(id, std::move(source));
+  auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
+  PERFETTO_DCHECK(it_and_inserted.second);
+  it_and_inserted.first->second->WriteAllProcesses();
 }
 
 // static

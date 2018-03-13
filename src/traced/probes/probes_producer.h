@@ -21,13 +21,12 @@
 #include <memory>
 #include <utility>
 
-#include "process_stats_data_source.h"
-
 #include "perfetto/base/task_runner.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
+#include "src/traced/probes/process_stats_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 

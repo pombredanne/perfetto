@@ -22,7 +22,6 @@
 #include "perfetto/tracing/core/trace_writer.h"
 
 namespace perfetto {
-namespace {}  // namespace
 
 class ProcessStatsDataSource {
  public:

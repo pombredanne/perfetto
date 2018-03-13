@@ -22,9 +22,7 @@
 namespace perfetto {
 namespace {
 
-TEST(ProcessStatsDataSourceTest, ATest) {
-  // TODO(hjd): Add tests.
-}
+// TODO(hjd): Add tests.
 
 }  // namespace
 }  // namespace perfetto

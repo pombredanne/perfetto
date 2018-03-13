@@ -29,6 +29,7 @@ namespace perfetto {
 ProcessStatsDataSource::ProcessStatsDataSource(
     std::unique_ptr<TraceWriter> writer)
     : writer_(std::move(writer)) {}
+
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 
 void ProcessStatsDataSource::WriteAllProcesses() {
@@ -37,7 +38,9 @@ void ProcessStatsDataSource::WriteAllProcesses() {
   protos::pbzero::ProcessTree* process_tree = trace_packet->set_process_tree();
 
   file_utils::ForEachPidInProcPath(
-      "/proc", [&processes, &process_tree](int pid) {
+      "/proc", [&processes, process_tree](int pid) {
+        // ForEachPid will list all processes and threads. Here we want to
+        // iterate first only by processes (for which pid == thread group id)
         if (!processes.count(pid)) {
           if (procfs_utils::ReadTgid(pid) != pid)
             return;
@@ -56,7 +59,6 @@ void ProcessStatsDataSource::WriteAllProcesses() {
           thread_writer->set_name(thread.second.name);
         }
       });
-  trace_packet->Finalize();
 }
 
 }  // namespace perfetto
