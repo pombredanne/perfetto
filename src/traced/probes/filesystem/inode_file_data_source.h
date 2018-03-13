@@ -33,6 +33,7 @@
 namespace perfetto {
 
 using Inode = uint64_t;
+using InodeFileMap = protos::pbzero::InodeFileMap;
 
 class InodeMapValue {
  public:
@@ -51,17 +52,24 @@ class InodeMapValue {
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map,
+    const std::map<Inode, BlockDeviceID>& unresolved_inodes);
 
-class InodeFileMapDataSource {
+class InodeFileDataSource {
  public:
-  explicit InodeFileMapDataSource(
+  explicit InodeFileDataSource(
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
           file_system_inodes,
       std::unique_ptr<TraceWriter> writer);
-  ~InodeFileMapDataSource();
+  ~InodeFileDataSource();
 
   void WriteInodes(const FtraceMetadata& metadata);
+  bool AddInodeFileMapEntry(
+      InodeFileMap* inode_file_map,
+      BlockDeviceID block_device_id,
+      Inode inode,
+      const std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>&
+          block_device_map);
 
  private:
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes_;
