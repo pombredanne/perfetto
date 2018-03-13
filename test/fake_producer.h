@@ -18,12 +18,13 @@
 #define TEST_FAKE_PRODUCER_H_
 
 #include <memory>
+#include <random>
 #include <string>
 
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
-
 #include "src/base/test/test_task_runner.h"
 
 namespace perfetto {

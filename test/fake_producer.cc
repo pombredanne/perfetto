@@ -16,13 +16,10 @@
 
 #include "test/fake_producer.h"
 
-#include <random>
-
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
-#include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
@@ -54,22 +51,21 @@ void FakeProducer::CreateDataSourceInstance(
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
 
-  const TestConfig& config = source_config.for_testing();
-  std::minstd_rand0 random(config.seed());
-  for (size_t i = 0; i < config.message_count(); i++) {
+  size_t message_count = source_config.for_testing().message_count();
+  std::minstd_rand0 rnd_engine(source_config.for_testing().seed());
+  for (size_t i = 0; i < message_count; i++) {
     auto handle = trace_writer->NewTracePacket();
-    handle->set_for_testing()->set_seq_value(random());
+    handle->set_for_testing()->set_seq_value(rnd_engine());
+
+    char payload[1024];
+    uint64_t string_size = 1024;
+    memset(payload, '.', string_size);
+    payload[string_size - 1] = 0;
+    handle->set_for_testing()->set_str(payload, string_size);
+
     handle->Finalize();
   }
-
-  // TODO(primiano): reenable this once UnregisterDataSource is specified in
-  // ServiceImpl.
-  // endpoint_->UnregisterDataSource(id_);
-
-  // TODO(skyostil): There's a race here before the service processes our data
-  // and the consumer tries to retrieve it. For now wait a bit until the service
-  // is done, but we should add explicit flushing to avoid this.
-  task_runner_->PostDelayedTask(data_produced_callback_, 1000);
+  data_produced_callback_();
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}
