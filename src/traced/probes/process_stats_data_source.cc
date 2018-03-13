@@ -27,12 +27,14 @@
 namespace perfetto {
 
 ProcessStatsDataSource::ProcessStatsDataSource(
+    SessionID id,
     std::unique_ptr<TraceWriter> writer)
-    : writer_(std::move(writer)), weak_factory_(this) {}
+    : session_id_(id), writer_(std::move(writer)), weak_factory_(this) {}
+
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 
-ProducerID ProcessStatsDataSource::GetProducerID() {
-  return 0;
+SessionID ProcessStatsDataSource::GetSessionID() const {
+  return session_id_;
 }
 
 base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
@@ -46,7 +48,9 @@ void ProcessStatsDataSource::WriteAllProcesses() {
   protos::pbzero::ProcessTree* process_tree = trace_packet->set_process_tree();
 
   file_utils::ForEachPidInProcPath(
-      "/proc", [&processes, &process_tree](int pid) {
+      "/proc", [&processes, process_tree](int pid) {
+        // ForEachPid will list all processes and threads. Here we want to
+        // iterate first only by processes (for which pid == thread group id)
         if (!processes.count(pid)) {
           if (procfs_utils::ReadTgid(pid) != pid)
             return;
@@ -65,7 +69,6 @@ void ProcessStatsDataSource::WriteAllProcesses() {
           thread_writer->set_name(thread.second.name);
         }
       });
-  trace_packet->Finalize();
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {

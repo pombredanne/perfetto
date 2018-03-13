@@ -88,48 +88,52 @@ void ProbesProducer::OnDisconnect() {
                                 connection_backoff_ms_);
 }
 
-void ProbesProducer::CreateDataSourceInstance(
-    DataSourceInstanceID source_id,
-    const DataSourceConfig& source_config) {
-  if (source_config.name() == kFtraceSourceName) {
-    CreateFtraceDataSourceInstance(source_id, source_config);
-  } else if (source_config.name() == kInodeFileMapSourceName) {
-    CreateInodeFileMapDataSourceInstance(source_id, source_config);
-  } else if (source_config.name() == kProcessStatsSourceName) {
-    CreateProcessStatsDataSourceInstance(source_id, source_config);
+void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID instance_id,
+                                              const DataSourceConfig& config) {
+  // TODO(hjd): This a hack since we don't actually know the session id. For
+  // now we'll
+  SessionID session_id = config.target_buffer();
+
+  if (config.name() == kFtraceSourceName) {
+    CreateFtraceDataSourceInstance(session_id, instance_id, config);
+  } else if (config.name() == kInodeFileMapSourceName) {
+    CreateInodeFileMapDataSourceInstance(session_id, instance_id, config);
+  } else if (config.name() == kProcessStatsSourceName) {
+    CreateProcessStatsDataSourceInstance(session_id, instance_id, config);
   } else {
     PERFETTO_ELOG("Data source name: %s not recognised.",
-                  source_config.name().c_str());
+                  config.name().c_str());
     return;
   }
 
-  std::map<ProducerID, InodeFileMapDataSource*> file_sources;
-  std::map<ProducerID, ProcessStatsDataSource*> ps_sources;
+  std::map<SessionID, InodeFileMapDataSource*> file_sources;
+  std::map<SessionID, ProcessStatsDataSource*> ps_sources;
   for (const auto& pair : file_map_sources_)
-    file_sources[pair.second->GetProducerID()] = pair.second.get();
+    file_sources[pair.second->GetSessionID()] = pair.second.get();
   for (const auto& pair : process_stats_sources_)
-    ps_sources[pair.second->GetProducerID()] = pair.second.get();
+    ps_sources[pair.second->GetSessionID()] = pair.second.get();
 
   for (const auto& id_to_source : delegates_) {
     const auto& source = id_to_source.second;
-    ProducerID id = source->GetProducerID();
-    if (!source->weak_ps_source() && ps_sources.count(id))
-      source->set_weak_ps_source(ps_sources[id]->GetWeakPtr());
-    if (!source->weak_file_source() && file_sources.count(id))
-      source->set_weak_file_source(file_sources[id]->GetWeakPtr());
+    SessionID id = source->GetSessionID();
+    if (!source->ps_source() && ps_sources.count(id))
+      source->set_ps_source(ps_sources[id]->GetWeakPtr());
+    if (!source->file_source() && file_sources.count(id))
+      source->set_file_source(file_sources[id]->GetWeakPtr());
   }
 }
 
 void ProbesProducer::AddWatchdogsTimer(DataSourceInstanceID id,
-                                       const DataSourceConfig& source_config) {
-  if (source_config.trace_duration_ms() != 0)
+                                       const DataSourceConfig& config) {
+  if (config.trace_duration_ms() != 0)
     watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               5000 + 2 * source_config.trace_duration_ms()));
+                               5000 + 2 * config.trace_duration_ms()));
 }
 
 void ProbesProducer::CreateFtraceDataSourceInstance(
+    SessionID session_id,
     DataSourceInstanceID id,
-    const DataSourceConfig& source_config) {
+    const DataSourceConfig& config) {
   // Don't retry if FtraceController::Create() failed once.
   // This can legitimately happen on user builds where we cannot access the
   // debug paths, e.g., because of SELinux rules.
@@ -151,15 +155,15 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   }
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
-               source_config.target_buffer());
+               config.target_buffer());
 
-  FtraceConfig proto_config = source_config.ftrace_config();
+  FtraceConfig proto_config = config.ftrace_config();
 
   // TODO(hjd): Static cast is bad, target_buffer() should return a BufferID.
   auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+      static_cast<BufferID>(config.target_buffer()));
   auto delegate = std::unique_ptr<SinkDelegate>(
-      new SinkDelegate(task_runner_, std::move(trace_writer)));
+      new SinkDelegate(session_id, task_runner_, std::move(trace_writer)));
   auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
   if (!sink) {
     PERFETTO_ELOG("Failed to start tracing (maybe someone else is using it?)");
@@ -167,33 +171,37 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   }
   delegate->set_sink(std::move(sink));
   delegates_.emplace(id, std::move(delegate));
-  AddWatchdogsTimer(id, source_config);
+  AddWatchdogsTimer(id, config);
 }
 
 void ProbesProducer::CreateInodeFileMapDataSourceInstance(
+    SessionID session_id,
     DataSourceInstanceID id,
-    const DataSourceConfig& source_config) {
+    const DataSourceConfig& config) {
   PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
-               id, source_config.target_buffer());
+               id, config.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+      static_cast<BufferID>(config.target_buffer()));
   CreateDeviceToInodeMap("/system/", &system_inodes_);
-  auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
-      new InodeFileMapDataSource(&system_inodes_, std::move(trace_writer)));
+  auto file_map_source =
+      std::unique_ptr<InodeFileMapDataSource>(new InodeFileMapDataSource(
+          session_id, &system_inodes_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
-  AddWatchdogsTimer(id, source_config);
+  AddWatchdogsTimer(id, config);
 }
 
 void ProbesProducer::CreateProcessStatsDataSourceInstance(
+    SessionID session_id,
     DataSourceInstanceID id,
-    const DataSourceConfig& source_config) {
+    const DataSourceConfig& config) {
   PERFETTO_DCHECK(process_stats_sources_.count(id) == 0);
   auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+      static_cast<BufferID>(config.target_buffer()));
   auto source = std::unique_ptr<ProcessStatsDataSource>(
-      new ProcessStatsDataSource(std::move(trace_writer)));
-  source->WriteAllProcesses();
-  process_stats_sources_.emplace(id, std::move(source));
+      new ProcessStatsDataSource(session_id, std::move(trace_writer)));
+  auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
+  PERFETTO_DCHECK(it_and_inserted.second);
+  it_and_inserted.first->second->WriteAllProcesses();
 }
 
 // static
@@ -278,16 +286,18 @@ void ProbesProducer::ResetConnectionBackoff() {
   connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
-ProbesProducer::SinkDelegate::SinkDelegate(base::TaskRunner* task_runner,
+ProbesProducer::SinkDelegate::SinkDelegate(SessionID id,
+                                           base::TaskRunner* task_runner,
                                            std::unique_ptr<TraceWriter> writer)
-    : task_runner_(task_runner),
+    : session_id_(id),
+      task_runner_(task_runner),
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
-ProducerID ProbesProducer::SinkDelegate::GetProducerID() {
-  return 0;
+SessionID ProbesProducer::SinkDelegate::GetSessionID() const {
+  return session_id_;
 }
 
 ProbesProducer::FtraceBundleHandle
@@ -302,9 +312,9 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
 
-  if (weak_file_source_ && !metadata.inodes.empty()) {
+  if (file_source_ && !metadata.inodes.empty()) {
     auto inodes = metadata.inodes;
-    auto weak = weak_file_source_;
+    auto weak = file_source_;
     task_runner_->PostTask([weak, inodes] {
       if (weak)
         weak->OnInodes(inodes);
@@ -313,16 +323,18 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
 }
 
 ProbesProducer::InodeFileMapDataSource::InodeFileMapDataSource(
+    SessionID id,
     std::map<uint32_t, InodeMap>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
-    : file_system_inodes_(file_system_inodes),
+    : session_id_(id),
+      file_system_inodes_(file_system_inodes),
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
 ProbesProducer::InodeFileMapDataSource::~InodeFileMapDataSource() = default;
 
-ProducerID ProbesProducer::InodeFileMapDataSource::GetProducerID() {
-  return 0;
+SessionID ProbesProducer::InodeFileMapDataSource::GetSessionID() const {
+  return session_id_;
 }
 
 base::WeakPtr<ProbesProducer::InodeFileMapDataSource>
