@@ -768,7 +768,8 @@ void ServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
 }
 
 void ServiceImpl::ProducerEndpointImpl::CommitData(
-    const CommitDataRequest& req_untrusted) {
+    const CommitDataRequest& req_untrusted,
+    CommitDataCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   for (const auto& entry : req_untrusted.chunks_to_move()) {
@@ -806,6 +807,9 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
   }  // for(chunks_to_move)
 
   service_->ApplyChunkPatches(id_, req_untrusted.chunks_to_patch());
+
+  if (callback)
+    callback();
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
