@@ -61,8 +61,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     size_t size_hint) {
   PERFETTO_DCHECK(size_hint == 0);  // Not implemented yet.
   int stall_count = 0;
-  useconds_t stall_interval_us = 0;
-  static const useconds_t kMaxStallIntervalUs = 100000;
+  const useconds_t kStallIntervalUs = 100000;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
@@ -98,9 +97,11 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
               page_idx_, chunk_idx, &header);
           if (!chunk.is_valid())
             continue;
+          PERFETTO_DLOG("Acquired chunk %zu:%u", page_idx_, chunk_idx);
           if (stall_count) {
-            PERFETTO_LOG("Recovered from stall after %d iterations",
-                         stall_count);
+            PERFETTO_LOG(
+                "Recovered from stall after %" PRIu64 " ms",
+                static_cast<uint64_t>(kStallIntervalUs * stall_count / 1000));
           }
           return chunk;
         }
@@ -119,111 +120,54 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // tracing service to  consume the shared memory buffer (SMB) and, for
       // this reason, never run the task that tells the service to purge the
       // SMB.
-      FlushPendingCommitDataRequests();
+      // TODO(primiano): We cannot call this if we aren't on the |task_runner_|
+      // thread. Works for now because all traced_probes writes happen on the
+      // main thread.
+      SendPendingCommitDataRequest();
     }
-    usleep(stall_interval_us);
-    stall_interval_us =
-        std::min(kMaxStallIntervalUs, (stall_interval_us + 1) * 8);
+    usleep(kStallIntervalUs);
   }
 }
 
 void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
-                                                   BufferID target_buffer,
-                                                   PatchList* patch_list) {
+                                                   BufferID target_buffer) {
   bool should_post_callback = false;
-  bool should_commit_synchronously = false;
   base::WeakPtr<SharedMemoryArbiterImpl> weak_this;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
-    const WriterID writer_id =
-        chunk.header()->writer_id.load(std::memory_order_relaxed);
-    bytes_pending_commit_ += chunk.size();
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
-
-    // DO NOT access |chunk| after this point, has been std::move()-d above.
-
-    if (!commit_data_req_) {
-      commit_data_req_.reset(new CommitDataRequest());
-      weak_this = weak_ptr_factory_.GetWeakPtr();
-      should_post_callback = true;
-    }
-    CommitDataRequest::ChunksToMove* ctm =
-        commit_data_req_->add_chunks_to_move();
-    ctm->set_page(static_cast<uint32_t>(page_idx));
-    ctm->set_chunk(chunk_idx);
-    ctm->set_target_buffer(target_buffer);
-
-    // If more than half of the SMB.size() is filled with completed chunks for
-    // which we haven't notified the service yet (i.e. they are still enqueued
-    // in |commit_data_req_|), force a synchronous CommitDataRequest(), to avoid
-    // stalling the writer.
-    if (bytes_pending_commit_ >= shmem_abi_.size() / 2) {
-      should_commit_synchronously = true;
-      should_post_callback = false;
-    }
-
-    // Get the patches completed for the previous chunk from the |patch_list|
-    // and update it.
-    ChunkID last_chunk_id = 0;  // 0 is irrelevant but keeps the compiler happy.
-    CommitDataRequest::ChunkToPatch* last_chunk_req = nullptr;
-    while (!patch_list->empty() && patch_list->front().is_patched()) {
-      if (!last_chunk_req || last_chunk_id != patch_list->front().chunk_id) {
-        last_chunk_req = commit_data_req_->add_chunks_to_patch();
-        last_chunk_req->set_writer_id(writer_id);
-        last_chunk_id = patch_list->front().chunk_id;
-        last_chunk_req->set_chunk_id(last_chunk_id);
-        last_chunk_req->set_target_buffer(target_buffer);
+    if (page_idx != SharedMemoryABI::kInvalidPageIdx) {
+      if (!commit_data_req_) {
+        commit_data_req_.reset(new CommitDataRequest());
+        weak_this = weak_ptr_factory_.GetWeakPtr();
+        should_post_callback = true;
       }
-      auto* patch_req = last_chunk_req->add_patches();
-      patch_req->set_offset(patch_list->front().offset);
-      patch_req->set_data(&patch_list->front().size_field[0],
-                          patch_list->front().size_field.size());
-      patch_list->pop_front();
+      CommitDataRequest::ChunksToMove* ctm =
+          commit_data_req_->add_chunks_to_move();
+      ctm->set_page(static_cast<uint32_t>(page_idx));
+      ctm->set_chunk(chunk_idx);
+      ctm->set_target_buffer(target_buffer);
     }
-    // Patches are enqueued in the |patch_list| in order and are notified to
-    // the service when the chunk is returned. The only case when the current
-    // patch list is incomplete is if there is an unpatched entry at the head of
-    // the |patch_list| that belongs to the same ChunkID as the last one we are
-    // about to send to the service.
-    if (last_chunk_req && !patch_list->empty() &&
-        patch_list->front().chunk_id == last_chunk_id) {
-      last_chunk_req->set_has_more_patches(true);
-    }
-  }  // scoped_lock(lock_)
-
-  // TODO(primiano): optimization: at this point, if most of the SMB is almost
-  // full (say 75%) of completed chunks that are pending a commit, we should
-  // send a sync IPC without waiting neither for the next task nor to reach the
-  // 100% full state that will stall the writer. If we hit the writer-stalling
-  // case, it will kill the tracing bandwidth.
+  }
 
   if (should_post_callback) {
     PERFETTO_DCHECK(weak_this);
     task_runner_->PostTask([weak_this] {
       if (weak_this)
-        weak_this->FlushPendingCommitDataRequests();
+        weak_this->SendPendingCommitDataRequest();
     });
   }
-
-  if (should_commit_synchronously)
-    FlushPendingCommitDataRequests();
 }
 
-// TODO(primiano): this is wrong w.r.t. threading because it will try to send
-// an IPC from a different thread than the IPC thread. Right now this works
-// only if everything happens on the main thread. It will hit the thread
-// checker otherwise. What we really want to do here is doing this sync IPC
-// only if task_runner_.RunsTaskOnCurrentThread() and PostTask() otherwise.
-void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
+// This is always invoked on the |task_runner_| thread.
+void SharedMemoryArbiterImpl::SendPendingCommitDataRequest() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-
   std::unique_ptr<CommitDataRequest> req;
   std::vector<uint32_t> pages_to_notify;
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     req = std::move(commit_data_req_);
-    bytes_pending_commit_ = 0;
   }
   // |commit_data_req_| could become nullptr if the forced sync flush happens
   // in GetNewChunk().

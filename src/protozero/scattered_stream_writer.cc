@@ -66,7 +66,7 @@ uint8_t* ScatteredStreamWriter::ReserveBytes(size_t size) {
   uint8_t* begin = write_ptr_;
   write_ptr_ += size;
 #ifndef NDEBUG
-  memset(begin, 0, size);
+  memset(begin, '\xFF', size);
 #endif
   return begin;
 }
