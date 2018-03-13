@@ -139,6 +139,12 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   trace_config.add_buffers()->set_size_kb(8);
   trace_config.set_duration_ms(1000);
 
+  // Setup the Producer config.
+  auto* producer_config = test_config.add_producers();
+  producer_config->set_producer_name("com.google.test_producer");
+  producer_config->set_shm_size_kb(4194304);
+  producer_config->set_page_size_kb(4096);
+
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");

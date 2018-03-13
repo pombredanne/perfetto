@@ -75,10 +75,16 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
   auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
-  // Setip the TraceConfig for the consumer.
+  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(10000);
+
+  // Setup the Producer config.
+  auto* producer_config = trace_config.add_producers();
+  producer_config->set_producer_name("com.google.test_producer");
+  producer_config->set_shm_size_kb(4194304);
+  producer_config->set_page_size_kb(4096);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -151,6 +157,12 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(200);
+
+  // Setup the Producer config.
+  auto* producer_config = trace_config.add_producers();
+  producer_config->set_producer_name("com.google.test_producer");
+  producer_config->set_shm_size_kb(4194304);
+  producer_config->set_page_size_kb(4096);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
