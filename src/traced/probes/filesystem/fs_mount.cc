@@ -35,10 +35,10 @@ std::multimap<BlockDeviceID, std::string> ParseMounts(const char* path) {
   }
   std::multimap<BlockDeviceID, std::string> device_to_mountpoints;
 
-  for (base::StringSplitter ss(std::move(data), '\n'); ss.Next();) {
-    base::StringSplitter words(ss.cur_token(), ' ');
+  for (base::StringSplitter lines(std::move(data), '\n'); lines.Next();) {
+    base::StringSplitter words(&lines, ' ');
     if (!words.Next() || !words.Next()) {
-      PERFETTO_DLOG("Encountered incomplete mount point: %s.", ss.cur_token());
+      PERFETTO_DLOG("Invalid mount point: %s.", lines.cur_token());
       continue;
     }
     const char* mountpoint = words.cur_token();
