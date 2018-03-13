@@ -45,14 +45,16 @@ TEST(LRUInodeCacheTest, Basic) {
   cache.Insert(key2, val2);
   EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
   EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
+  cache.Insert(key1, val2);
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val2)));
 }
 
 TEST(LRUInodeCacheTest, Overflow) {
   LRUInodeCache cache(2);
   cache.Insert(key1, val1);
   cache.Insert(key2, val2);
-  cache.Get(key1);
-  cache.Get(key2);
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
   cache.Insert(key3, val3);
   // key1 is the LRU and should be evicted.
   EXPECT_THAT(cache.Get(key1), IsNull());
