@@ -14,38 +14,39 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/lru.h"
+#include "src/traced/probes/filesystem/lru_inode_cache.h"
 
 namespace perfetto {
 namespace base {
 
-const InodeValue* LRUInodeCache::Get(const InodeKey& k) {
-  const auto& it = map_.find(k);
-  if (it == map_.end()) {
+const LRUInodeCache::InodeValue* LRUInodeCache::Get(const InodeKey& k) {
+  const auto& map_it = map_.find(k);
+  if (map_it == map_.end()) {
     return nullptr;
   }
-  auto list_entry = it->second;
+  auto list_entry = map_it->second;
   // Bump this item to the front of the cache.
-  // We can borrow the existing item's key and value because insert
-  // does not care about it.
-  Insert(it, std::move(list_entry->first), std::move(list_entry->second));
+  // We can borrow both elements of the pair stored in the list because
+  // insert does not need them.
+  Insert(map_it, std::move(list_entry->first), std::move(list_entry->second));
   return &list_.cbegin()->second;
 }
 
-void LRUInodeCache::Insert(const InodeKey k, const InodeValue v) {
-  return Insert(map_.find(k), std::move(k), std::move(v));
+void LRUInodeCache::Insert(InodeKey k, InodeValue v) {
+  auto it = map_.find(k);
+  return Insert(it, std::move(k), std::move(v));
 }
 
 void LRUInodeCache::Insert(typename MapType::iterator map_it,
-                           const InodeKey k,
-                           const InodeValue v) {
-  list_.emplace_front(std::move(k), std::move(v));
+                           InodeKey k,
+                           InodeValue v) {
+  list_.emplace_front(k, std::move(v));
   if (map_it != map_.end()) {
     ListIteratorType& list_it = map_it->second;
     list_.erase(list_it);
     list_it = list_.begin();
   } else {
-    map_.emplace_hint(map_it, k, list_.begin());
+    map_.emplace(std::move(k), list_.begin());
   }
 
   if (map_.size() > capacity_) {

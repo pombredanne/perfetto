@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/lru.h"
+#include "src/traced/probes/filesystem/lru_inode_cache.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -38,7 +38,7 @@ const char* val1 = "foo";
 const char* val2 = "bar";
 const char* val3 = "baz";
 
-TEST(LRUTest, Basic) {
+TEST(LRUInodeCacheTest, Basic) {
   LRUInodeCache cache(2);
   cache.Insert(key1, val1);
   EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
@@ -47,7 +47,7 @@ TEST(LRUTest, Basic) {
   EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
 }
 
-TEST(LRUTest, Overflow) {
+TEST(LRUInodeCacheTest, Overflow) {
   LRUInodeCache cache(2);
   cache.Insert(key1, val1);
   cache.Insert(key2, val2);

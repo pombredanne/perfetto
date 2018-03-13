@@ -17,7 +17,6 @@ source_set("base") {
     "build_config.h",
     "file_utils.h",
     "logging.h",
-    "lru.h",
     "page_allocator.h",
     "scoped_file.h",
     "task_runner.h",

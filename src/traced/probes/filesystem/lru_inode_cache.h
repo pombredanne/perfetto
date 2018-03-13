@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_LRU_H_
-#define INCLUDE_PERFETTO_BASE_LRU_H_
+#ifndef SRC_TRACED_PROBES_FILESYSTEM_LRU_INODE_CACHE_H_
+#define SRC_TRACED_PROBES_FILESYSTEM_LRU_INODE_CACHE_H_
 
 #include <list>
 #include <map>
@@ -25,29 +25,27 @@
 namespace perfetto {
 namespace base {
 
-using InodeKey = std::pair<int64_t, int64_t>;
-using InodeValue = std::string;
-
-// LRUInodeCache keeps up to capacity entries in a mapping from InodeKey
+// LRUInodeCache keeps up to |capacity| entries in a mapping from InodeKey
 // to InodeValue. This is used to map <block device, inode> tuples to file
 // paths.
 class LRUInodeCache {
  public:
+  using InodeKey = std::pair<int64_t, int64_t>;
+  using InodeValue = std::string;
+
   explicit LRUInodeCache(size_t capacity) : capacity_(capacity) {}
 
-  const InodeValue* Get(const InodeKey& k);
-  void Insert(const InodeKey k, const InodeValue v);
+  const LRUInodeCache::InodeValue* Get(const InodeKey& k);
+  void Insert(const InodeKey k, const LRUInodeCache::InodeValue v);
 
  private:
   using ItemType = std::pair<const InodeKey, const InodeValue>;
-  using ListIteratorType = typename std::list<ItemType>::iterator;
+  using ListIteratorType = std::list<ItemType>::iterator;
   using MapType = std::map<const InodeKey, ListIteratorType>;
 
-  void Insert(typename MapType::iterator map_it,
-              const InodeKey k,
-              const InodeValue v);
+  void Insert(MapType::iterator map_it, const InodeKey k, const InodeValue v);
 
-  size_t capacity_;
+  const size_t capacity_;
   MapType map_;
   std::list<ItemType> list_;
 };
@@ -55,4 +53,4 @@ class LRUInodeCache {
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // INCLUDE_PERFETTO_BASE_LRU_H_
+#endif  // SRC_TRACED_PROBES_FILESYSTEM_LRU_INODE_CACHE_H_
