@@ -73,14 +73,14 @@ void CreateDeviceToInodeMap(
   }
 }
 
-InodeFileMapDataSource::InodeFileMapDataSource(
+InodeFileDataSource::InodeFileDataSource(
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes,
     std::unique_ptr<TraceWriter> writer)
     : file_system_inodes_(file_system_inodes), writer_(std::move(writer)) {}
 
-InodeFileMapDataSource::~InodeFileMapDataSource() = default;
+InodeFileDataSource::~InodeFileDataSource() = default;
 
-void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
+void InodeFileDataSource::WriteInodes(const FtraceMetadata& metadata) {
   PERFETTO_LOG("Write Inodes start");
 
   if (mount_points_.empty()) {
