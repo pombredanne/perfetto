@@ -17,7 +17,7 @@ import("../../gn/proto_library.gni")
 
 source_set("perfetto_cmd") {
   public_deps = [
-    ":perfetto_cmd_protos",
+    ":protos",
     "../../include/perfetto/traced",
   ]
   deps = [
@@ -35,7 +35,7 @@ source_set("perfetto_cmd") {
   ]
 }
 
-proto_library("perfetto_cmd_protos") {
+proto_library("protos") {
   generate_python = false
   deps = []
   sources = [
@@ -45,7 +45,7 @@ proto_library("perfetto_cmd_protos") {
   proto_out_dir = perfetto_root_path
 }
 
-source_set("perfetto_cmd_unittests") {
+source_set("unittests") {
   testonly = true
   public_deps = []
   deps = [
@@ -54,7 +54,6 @@ source_set("perfetto_cmd_unittests") {
     "../../gn:gtest_deps",
   ]
   sources = [
-    "perfetto_cmd_unittest.cc",
     "rate_limiter_unittest.cc",
   ]
 }

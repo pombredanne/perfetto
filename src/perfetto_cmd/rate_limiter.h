@@ -29,6 +29,11 @@ class RateLimiter {
     uint64_t current_timestamp = 0;
   };
 
+  // De-serialize state from fd.
+  static bool ReadState(int in_fd, PerfettoCmdState* state);
+  // Serialize state to fd.
+  static bool WriteState(int out_fd, const PerfettoCmdState& state);
+
   RateLimiter();
   virtual ~RateLimiter();
 
@@ -38,10 +43,8 @@ class RateLimiter {
   virtual bool LoadState(PerfettoCmdState* state);
   virtual bool SaveState(const PerfettoCmdState& state);
 
-  // De-serialize state from fd.
-  static bool ReadState(int in_fd, PerfettoCmdState* state);
-  // Serialize state to fd.
-  static bool WriteState(int out_fd, const PerfettoCmdState& state);
+ private:
+  std::string GetPath();
 
   PerfettoCmdState state_;
 };

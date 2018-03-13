@@ -43,15 +43,18 @@
 
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#include <android/os/DropBoxManager.h>
+#include <utils/Looper.h>
+#include <utils/StrongPointer.h>
+#endif  // defined(PERFETTO_BUILD_WITH_ANDROID)
+
 // TODO(primiano): add the ability to pass the file descriptor directly to the
 // traced service instead of receiving a copy of the slices and writing them
 // from this process.
 namespace perfetto {
 namespace {
 
-// Temporary directory for DropBox traces. Note that this is automatically
-// created by the system by setting setprop persist.traced.enable=1.
-const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
 const char kDefaultDropBoxTag[] = "perfetto";
 
 std::string GetDirName(const std::string& path) {

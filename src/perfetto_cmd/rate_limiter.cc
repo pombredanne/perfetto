@@ -16,13 +16,12 @@
 
 #include "rate_limiter.h"
 
+#include "src/perfetto_cmd/perfetto_cmd.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
-
-const char kStatePath[] = "/data/misc/perfetto-traces/.guardraildata";
 
 RateLimiter::RateLimiter() = default;
 RateLimiter::~RateLimiter() = default;
@@ -43,9 +42,9 @@ bool RateLimiter::ShouldTrace(const Args& args) {
       args.current_timestamp < state_.first_trace_timestamp() ||
       args.current_timestamp < state_.last_trace_timestamp() ||
       state_.last_trace_timestamp() < state_.first_trace_timestamp()) {
-    PerfettoCmdState output{};
-    SaveState(output);
-    PERFETTO_ELOG("Guardrail: guardrail state invalid.");
+    PerfettoCmdState blank_state{};
+    SaveState(blank_state);
+    PERFETTO_ELOG("Guardrail: guardrail state invalid, clearing it.");
     return false;
   }
 
@@ -62,6 +61,7 @@ bool RateLimiter::ShouldTrace(const Args& args) {
     state_.set_first_trace_timestamp(0);
     state_.set_last_trace_timestamp(0);
     state_.set_total_bytes_uploaded(0);
+    return true;
   }
 
   // If we've uploaded more than 10mb in the last 24 hours we shouldn't trace
@@ -96,15 +96,19 @@ bool RateLimiter::TraceDone(const Args& args, bool success, size_t bytes) {
   return SaveState(state_);
 }
 
+std::string RateLimiter::GetPath() {
+  return std::string(kTempDropBoxTraceDir) + "/.guardraildata";
+}
+
 bool RateLimiter::LoadState(PerfettoCmdState* state) {
   base::ScopedFile fd;
-  fd.reset(open(kStatePath, O_RDONLY | O_CREAT, 0600));
+  fd.reset(open(GetPath().c_str(), O_RDONLY | O_CREAT, 0600));
   return ReadState(fd.get(), state);
 }
 
 bool RateLimiter::SaveState(const PerfettoCmdState& state) {
   base::ScopedFile fd;
-  fd.reset(open(kStatePath, O_WRONLY | O_CREAT, 0600));
+  fd.reset(open(GetPath().c_str(), O_WRONLY | O_CREAT, 0600));
   return WriteState(fd.get(), state);
 }
 

@@ -43,6 +43,10 @@
 
 namespace perfetto {
 
+// Temporary directory for DropBox traces. Note that this is automatically
+// created by the system by setting setprop persist.traced.enable=1.
+const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
+
 #if defined(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
 #else

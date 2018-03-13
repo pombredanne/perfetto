@@ -33,6 +33,7 @@ cc_library_shared {
     ":perfetto_src_ipc_wire_protocol_gen",
     "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
@@ -127,10 +128,11 @@ cc_binary {
     ":perfetto_protos_perfetto_trace_ps_zero_gen",
     ":perfetto_protos_perfetto_trace_zero_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
-    ":perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen",
+    ":perfetto_src_perfetto_cmd_protos_gen",
     "src/base/android_task_runner.cc",
     "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
@@ -191,7 +193,7 @@ cc_binary {
     "perfetto_protos_perfetto_trace_ps_zero_gen_headers",
     "perfetto_protos_perfetto_trace_zero_gen_headers",
     "perfetto_src_ipc_wire_protocol_gen_headers",
-    "perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen_headers",
+    "perfetto_src_perfetto_cmd_protos_gen_headers",
   ],
   defaults: [
     "perfetto_defaults",
@@ -243,6 +245,7 @@ cc_test {
     "src/base/android_task_runner.cc",
     "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
     "src/base/test/test_task_runner.cc",
     "src/base/test/vm_test_utils.cc",
     "src/base/thread_checker.cc",
@@ -2820,9 +2823,9 @@ genrule {
   ],
 }
 
-// GN target: //src/perfetto_cmd:perfetto_cmd_protos_gen
+// GN target: //src/perfetto_cmd:protos_gen
 genrule {
-  name: "perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen",
+  name: "perfetto_src_perfetto_cmd_protos_gen",
   srcs: [
     "src/perfetto_cmd/perfetto_cmd_state.proto",
   ],
@@ -2835,9 +2838,9 @@ genrule {
   ],
 }
 
-// GN target: //src/perfetto_cmd:perfetto_cmd_protos_gen
+// GN target: //src/perfetto_cmd:protos_gen
 genrule {
-  name: "perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen_headers",
+  name: "perfetto_src_perfetto_cmd_protos_gen_headers",
   srcs: [
     "src/perfetto_cmd/perfetto_cmd_state.proto",
   ],
@@ -2983,6 +2986,7 @@ cc_library_static {
     ":perfetto_src_ipc_wire_protocol_gen",
     "src/base/file_utils.cc",
     "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
     "src/base/thread_checker.cc",
     "src/base/unix_task_runner.cc",
     "src/base/watchdog.cc",
@@ -3088,7 +3092,7 @@ cc_test {
     ":perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen",
     ":perfetto_src_ipc_test_messages_gen",
     ":perfetto_src_ipc_wire_protocol_gen",
-    ":perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen",
+    ":perfetto_src_perfetto_cmd_protos_gen",
     ":perfetto_src_protozero_testing_messages_lite_gen",
     ":perfetto_src_protozero_testing_messages_zero_gen",
     "src/base/android_task_runner.cc",
@@ -3096,6 +3100,8 @@ cc_test {
     "src/base/page_allocator.cc",
     "src/base/page_allocator_unittest.cc",
     "src/base/scoped_file_unittest.cc",
+    "src/base/string_splitter.cc",
+    "src/base/string_splitter_unittest.cc",
     "src/base/task_runner_unittest.cc",
     "src/base/test/test_task_runner.cc",
     "src/base/test/vm_test_utils.cc",
@@ -3140,7 +3146,6 @@ cc_test {
     "src/ipc/unix_socket.cc",
     "src/ipc/unix_socket_unittest.cc",
     "src/perfetto_cmd/perfetto_cmd.cc",
-    "src/perfetto_cmd/perfetto_cmd_unittest.cc",
     "src/perfetto_cmd/rate_limiter.cc",
     "src/perfetto_cmd/rate_limiter_unittest.cc",
     "src/protozero/message.cc",
@@ -3219,7 +3224,7 @@ cc_test {
     "perfetto_src_ftrace_reader_ftrace_reader_test_messages_zero_gen_headers",
     "perfetto_src_ipc_test_messages_gen_headers",
     "perfetto_src_ipc_wire_protocol_gen_headers",
-    "perfetto_src_perfetto_cmd_perfetto_cmd_protos_gen_headers",
+    "perfetto_src_perfetto_cmd_protos_gen_headers",
     "perfetto_src_protozero_testing_messages_lite_gen_headers",
     "perfetto_src_protozero_testing_messages_zero_gen_headers",
   ],
