@@ -34,13 +34,17 @@ namespace perfetto {
 
 // On ARM, st_dev is not dev_t but unsigned long long.
 using BlockDeviceID = decltype(stat::st_dev);
+
+constexpr char kMountsPath[] = "/proc/mounts";
+
+std::multimap<BlockDeviceID, std::string> ParseMounts(
+    const char* path = kMountsPath);
+
 using InodeMap = std::map<
     uint64_t,
     std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>>;
 using Type = protos::pbzero::InodeFileMap_Entry_Type;
 using Mmap = std::multimap<BlockDeviceID, std::string>;
-
-Mmap ParseMounts();
 
 void CreateDeviceToInodeMap(const std::string& root_directory,
                             std::map<uint32_t, InodeMap>* block_device_map);

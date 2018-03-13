@@ -26,57 +26,36 @@
 #include "include/perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_splitter.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 
-namespace {
-constexpr const char kMountsPath[] = "/proc/mounts";
-
-std::vector<std::string> split(const std::string& text, char s) {
-  std::vector<std::string> result;
-  size_t start = 0;
-  size_t end = 0;
-  do {
-    end = text.find(s, start);
-    if (end == std::string::npos)
-      end = text.size();
-    std::string sub = text.substr(start, end - start);
-    if (!sub.empty())
-      result.emplace_back(std::move(sub));
-    start = end + 1;
-  } while (start < text.size());
-  return result;
-}
-}  // namespace
-
-Mmap ParseMounts() {
+std::multimap<BlockDeviceID, std::string> ParseMounts(const char* path) {
   std::string data;
-  if (!base::ReadFile(kMountsPath, &data)) {
-    PERFETTO_ELOG("Failed to read %s.", kMountsPath);
+  if (!base::ReadFile(path, &data)) {
+    PERFETTO_ELOG("Failed to read %s", path);
     return {};
   }
-  Mmap device_to_mountpoints;
-  std::vector<std::string> lines = split(data, '\n');
-  struct stat buf {};
-  for (const std::string& line : lines) {
-    std::vector<std::string> words = split(line, ' ');
-    if (words.size() < 2) {
-      PERFETTO_DLOG("Encountered incomplete row in %s: %s.", kMountsPath,
-                    line.c_str());
+  std::multimap<BlockDeviceID, std::string> device_to_mountpoints;
+
+  for (base::StringSplitter lines(std::move(data), '\n'); lines.Next();) {
+    base::StringSplitter words(&lines, ' ');
+    if (!words.Next() || !words.Next()) {
+      PERFETTO_DLOG("Invalid mount point: %s.", lines.cur_token());
       continue;
     }
-
-    std::string& mountpoint = words[1];
-    if (stat(mountpoint.c_str(), &buf) == -1) {
+    const char* mountpoint = words.cur_token();
+    struct stat buf {};
+    if (stat(mountpoint, &buf) == -1) {
       PERFETTO_PLOG("stat");
       continue;
     }
-    device_to_mountpoints.emplace(buf.st_dev, std::move(mountpoint));
+    device_to_mountpoints.emplace(buf.st_dev, mountpoint);
   }
-  return device_to_mountpoints;
+  tools / fix_include_guard return device_to_mountpoints;
 }
 
 void CreateDeviceToInodeMap(const std::string& root_directory,
@@ -134,18 +113,22 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
   if (mount_points_.empty()) {
     mount_points_ = ParseMounts();
   }
-  auto trace_packet = writer_->NewTracePacket();
-  auto inode_file_map = trace_packet->set_inode_file_map();
+  // Convert FtraceMetadata into format for InodeFileMap proto
   auto inodes = metadata.inodes;
-  std::map<uint32_t, std::set<uint64_t>> device_to_inodes;
+  std::map<uint32_t, std::set<uint64_t>> inode_file_maps;
   for (const auto& inode : inodes) {
     uint32_t block_device_id = inode.first;
     uint64_t inode_number = inode.second;
-    device_to_inodes[block_device_id].emplace(inode_number);
+    inode_file_maps[block_device_id].emplace(inode_number);
   }
-  for (const auto& inodeFileMap : device_to_inodes) {
-    uint32_t block_device_id = inodeFileMap.first;
+  // Write a TracePacket with an InodeFileMap proto for each block device id
+  for (const auto& inode_file_map_data : inode_file_maps) {
+    auto trace_packet = writer_->NewTracePacket();
+    auto inode_file_map = trace_packet->set_inode_file_map();
+    // Add block device id
+    uint32_t block_device_id = inode_file_map_data.first;
     inode_file_map->set_block_device_id(block_device_id);
+    // Add mount points
     std::pair<Mmap::iterator, Mmap::iterator> range;
     range = mount_points_.equal_range(block_device_id);
     for (Mmap::iterator it = range.first; it != range.second; ++it) {
@@ -153,7 +136,8 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
       PERFETTO_DLOG("Block dev=%" PRIu32 ", Mount point=%s", block_device_id,
                     it->second.c_str());
     }
-    std::set<uint64_t> inode_numbers = inodeFileMap.second;
+    // Add entries for each inode number
+    std::set<uint64_t> inode_numbers = inode_file_map_data.second;
     for (const auto& inode_number : inode_numbers) {
       PERFETTO_DLOG("Inode number=%" PRIu64, inode_number);
       auto* entry = inode_file_map->add_entries();
@@ -168,8 +152,8 @@ void InodeFileMapDataSource::WriteInodes(const FtraceMetadata& metadata) {
         }
       }
     }
+    trace_packet->Finalize();
   }
-  trace_packet->Finalize();
 }
 
 }  // namespace perfetto
