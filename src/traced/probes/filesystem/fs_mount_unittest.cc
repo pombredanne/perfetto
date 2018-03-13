@@ -18,10 +18,12 @@
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
 
@@ -44,8 +46,14 @@ procfs /proc proc rw,nosuid,nodev,noexec,relatime 0 0
 #INVALIDLINE
 sysfs / sysfs rw,nosuid,nodev,noexec,relatime 0 0
 )";
-  char* tmp_path = tmpnam(nullptr);
-  base::ScopedFile tmp_fd(open(tmp_path, O_WRONLY | O_CREAT, 0666));
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  char tmp_path[PATH_MAX] = "/data/local/tmp/fake_mounts.XXXXXX";
+#else
+  char tmp_path[PATH_MAX] = "/tmp/fake_mounts.XXXXXX";
+#endif
+
+  base::ScopedFile tmp_fd(mkstemp(tmp_path));
+  ASSERT_GT(*tmp_fd, -1);
   base::ignore_result(write(*tmp_fd, kMounts, sizeof(kMounts)));
   tmp_fd.reset();
 
