@@ -82,6 +82,6 @@ class PerfettoCmd : public Consumer {
   bool did_process_full_trace_ = false;
 };
 
-}  // perfetto
+}  // namespace perfetto
 
 #endif  // SRC_PERFETTO_CMD_PERFETTO_CMD_H_

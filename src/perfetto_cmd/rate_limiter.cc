@@ -16,10 +16,10 @@
 
 #include "rate_limiter.h"
 
-#include "src/perfetto_cmd/perfetto_cmd.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
+#include "src/perfetto_cmd/perfetto_cmd.h"
 
 namespace perfetto {
 
