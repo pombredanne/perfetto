@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef SRC_TRACED_PROBES_PROBES_PRODUCER_H_
+#define SRC_TRACED_PROBES_PROBES_PRODUCER_H_
+
 #include <map>
 #include <memory>
 #include <utility>
@@ -23,12 +26,10 @@
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
-#include "src/traced/probes/filesystem/inode_utils.h"
+#include "src/traced/probes/filesystem/inode_file_data_source.h"
+#include "src/traced/probes/process_stats_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
-
-#ifndef SRC_TRACED_PROBES_PROBES_PRODUCER_H_
-#define SRC_TRACED_PROBES_PROBES_PRODUCER_H_
 
 namespace perfetto {
 
@@ -75,7 +76,7 @@ class ProbesProducer : public Producer {
                           const FtraceMetadata& metadata) override;
 
     void set_sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
-    void OnInodes(const std::vector<std::pair<uint64_t, uint32_t>>& inodes);
+    void OnInodes(const std::vector<std::pair<Inode, uint32_t>>& inodes);
 
    private:
     base::TaskRunner* task_runner_;
@@ -96,6 +97,9 @@ class ProbesProducer : public Producer {
     kConnected,
   };
 
+  ProbesProducer(const ProbesProducer&) = delete;
+  ProbesProducer& operator=(const ProbesProducer&) = delete;
+
   void Connect();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
@@ -109,13 +113,15 @@ class ProbesProducer : public Producer {
   bool ftrace_creation_failed_ = false;
   uint64_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
-  std::set<DataSourceInstanceID> process_stats_sources_;
+  std::map<DataSourceInstanceID, std::unique_ptr<ProcessStatsDataSource>>
+      process_stats_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>
       file_map_sources_;
-  std::map<uint32_t, InodeMap> system_inodes_;
+  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>> system_inodes_;
 };
+
 }  // namespace perfetto
 
 #endif  // SRC_TRACED_PROBES_PROBES_PRODUCER_H_

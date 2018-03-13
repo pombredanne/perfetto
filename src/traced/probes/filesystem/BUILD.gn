@@ -16,15 +16,16 @@ source_set("filesystem") {
   public_deps = [
     "../../../../protos/perfetto/trace/filesystem:zero",
     "../../../ftrace_reader",
-    "../../../tracing:tracing",
   ]
   deps = [
     "../../../../gn:default_deps",
     "../../../base",
   ]
   sources = [
-    "inode_utils.cc",
-    "inode_utils.h",
+    "fs_mount.cc",
+    "fs_mount.h",
+    "inode_file_data_source.cc",
+    "inode_file_data_source.h",
   ]
 }
 
@@ -36,6 +37,6 @@ source_set("filesystem_unittests") {
     "../../../../gn:gtest_deps",
   ]
   sources = [
-    "inode_utils_unittest.cc",
+    "fs_mount_unittest.cc",
   ]
 }

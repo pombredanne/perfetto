@@ -14,56 +14,61 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
-#define SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
+#ifndef SRC_TRACED_PROBES_FILESYSTEM_INODE_FILE_DATA_SOURCE_H_
+#define SRC_TRACED_PROBES_FILESYSTEM_INODE_FILE_DATA_SOURCE_H_
 
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <map>
 #include <set>
 #include <string>
-#include <vector>
 
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "src/traced/probes/filesystem/fs_mount.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 
 namespace perfetto {
 
-// On ARM, st_dev is not dev_t but unsigned long long.
-using BlockDeviceID = decltype(stat::st_dev);
+using Inode = uint64_t;
 
-constexpr char kMountsPath[] = "/proc/mounts";
+class InodeMapValue {
+ public:
+  InodeMapValue() {}
 
-std::multimap<BlockDeviceID, std::string> ParseMounts(
-    const char* path = kMountsPath);
+  protos::pbzero::InodeFileMap_Entry_Type getType() const { return _type; }
+  std::set<std::string> getPaths() const { return _paths; }
+  void setType(protos::pbzero::InodeFileMap_Entry_Type type) { _type = type; }
+  void setPaths(std::set<std::string> paths) { _paths = paths; }
+  void addPath(std::string path) { _paths.emplace(path); }
 
-using InodeMap = std::map<
-    uint64_t,
-    std::pair<protos::pbzero::InodeFileMap_Entry_Type, std::set<std::string>>>;
-using Type = protos::pbzero::InodeFileMap_Entry_Type;
-using Mmap = std::multimap<BlockDeviceID, std::string>;
+ private:
+  protos::pbzero::InodeFileMap_Entry_Type _type;
+  std::set<std::string> _paths;
+};
 
-void CreateDeviceToInodeMap(const std::string& root_directory,
-                            std::map<uint32_t, InodeMap>* block_device_map);
+void CreateDeviceToInodeMap(
+    const std::string& root_directory,
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
 
 class InodeFileMapDataSource {
  public:
   explicit InodeFileMapDataSource(
-      std::map<uint32_t, InodeMap>* file_system_inodes,
+      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+          file_system_inodes,
       std::unique_ptr<TraceWriter> writer);
   ~InodeFileMapDataSource();
 
   void WriteInodes(const FtraceMetadata& metadata);
 
  private:
-  std::map<uint32_t, InodeMap>* file_system_inodes_;
-  Mmap mount_points_;
+  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes_;
+  std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
 };
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_FILESYSTEM_INODE_UTILS_H_
+#endif  // SRC_TRACED_PROBES_FILESYSTEM_INODE_FILE_DATA_SOURCE_H_
