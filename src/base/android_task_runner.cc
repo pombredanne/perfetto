@@ -27,7 +27,7 @@ AndroidTaskRunner::AndroidTaskRunner()
     : looper_(ALooper_prepare(0 /* require callbacks */)),
       immediate_event_(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC)),
       delayed_timer_(
-          timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)) {
+          timerfd_create(kWallTimeClockSource, TFD_NONBLOCK | TFD_CLOEXEC)) {
   ALooper_acquire(looper_);
   PERFETTO_CHECK(immediate_event_);
   PERFETTO_CHECK(delayed_timer_);

@@ -28,6 +28,7 @@ namespace base {
 
 using TimeMillis = std::chrono::milliseconds;
 using TimeNanos = std::chrono::nanoseconds;
+constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC_RAW;
 
 inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
@@ -36,7 +37,7 @@ inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
 }
 
 inline TimeNanos GetWallTimeNs() {
-  return GetTimeInternalNs(CLOCK_MONOTONIC_RAW);
+  return GetTimeInternalNs(kWallTimeClockSource);
 }
 
 inline TimeMillis GetWallTimeMs() {
