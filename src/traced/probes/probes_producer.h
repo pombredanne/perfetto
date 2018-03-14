@@ -75,7 +75,7 @@ class ProbesProducer : public Producer {
                           const FtraceMetadata& metadata) override;
 
     void set_sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
-    void OnInodes(const std::vector<std::pair<Inode, uint32_t>>& inodes);
+    void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
    private:
     base::TaskRunner* task_runner_;

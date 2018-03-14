@@ -118,13 +118,14 @@ class CpuReader {
     metadata->AddInode(t);
   }
 
+  template <typename T>
   static void ReadDevId(const uint8_t* start,
                         size_t field_id,
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
-    uint32_t dev_id = ReadIntoVarInt<uint32_t>(start, field_id, out);
-    PERFETTO_DCHECK(dev_id != 0);
-    metadata->AddDevice(dev_id);
+    T t = ReadIntoVarInt<T>(start, field_id, out);
+    PERFETTO_DCHECK(t != 0);
+    metadata->AddDevice(t);
   }
 
   static void ReadPid(const uint8_t* start,

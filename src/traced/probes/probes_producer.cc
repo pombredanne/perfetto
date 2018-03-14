@@ -239,9 +239,9 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     FtraceBundleHandle,
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
-  if (!metadata.inodes.empty()) {
+  if (!metadata.inode_and_device.empty()) {
     auto weak_this = weak_factory_.GetWeakPtr();
-    auto inodes = metadata.inodes;
+    auto inodes = metadata.inode_and_device;
     task_runner_->PostTask([weak_this, inodes] {
       if (weak_this)
         weak_this->OnInodes(inodes);
@@ -250,7 +250,7 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
 }
 
 void ProbesProducer::SinkDelegate::OnInodes(
-    const std::vector<std::pair<Inode, uint32_t>>& inodes) {
+    const std::vector<std::pair<Inode, BlockDeviceID>>& inodes) {
   PERFETTO_LOG("Saw FtraceBundle with %zu inodes.", inodes.size());
 }
 

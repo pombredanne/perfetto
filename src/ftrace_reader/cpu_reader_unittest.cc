@@ -713,14 +713,14 @@ TEST(CpuReaderTest, ParseAllFields) {
     event->proto_field_id = 42;
     event->ftrace_event_id = ftrace_event_id;
     {
-      // dev32 -> uint32
+      // dev32 -> uint64
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 8;
       field->ftrace_size = 4;
       field->ftrace_type = kFtraceDevId32;
       field->proto_field_id = 1;
-      field->proto_field_type = kProtoUint32;
+      field->proto_field_type = kProtoUint64;
       SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                              &field->strategy);
     }
@@ -824,7 +824,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   ASSERT_TRUE(event);
   EXPECT_EQ(event->common_field(), 1001ul);
   EXPECT_EQ(event->event_case(), FakeFtraceEvent::kAllFields);
-  EXPECT_EQ(event->all_fields().field_dev(), 1002ul);
+  EXPECT_EQ(event->all_fields().field_dev_32(), 1002ul);
   EXPECT_EQ(event->all_fields().field_pid(), 97);
   EXPECT_EQ(event->all_fields().field_uint32(), 1003u);
   EXPECT_EQ(event->all_fields().field_inode_32(), 98u);
@@ -832,9 +832,89 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
   EXPECT_THAT(metadata.pids, Contains(97));
-  EXPECT_EQ(metadata.inodes.size(), 2U);
-  EXPECT_THAT(metadata.inodes, Contains(Pair(98u, 1002)));
-  EXPECT_THAT(metadata.inodes, Contains(Pair(99u, 1002ul)));
+  EXPECT_EQ(metadata.inode_and_device.size(), 2U);
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(98u, 1002)));
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(99u, 1002ul)));
+}
+
+TEST(CpuReaderTest, ParseInode64Fields) {
+  using FakeEventProvider =
+      ProtoProvider<pbzero::FakeFtraceEvent, FakeFtraceEvent>;
+
+  uint16_t ftrace_event_id = 103;
+
+  std::vector<Field> common_fields;
+  {
+    common_fields.emplace_back(Field{});
+    Field* field = &common_fields.back();
+    field->ftrace_offset = 0;
+    field->ftrace_size = 4;
+    field->ftrace_type = kFtraceUint32;
+    field->proto_field_id = 1;
+    field->proto_field_type = kProtoUint32;
+    SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                           &field->strategy);
+  }
+
+  std::vector<Event> events;
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "";
+    event->group = "";
+    event->proto_field_id = 43;
+    event->ftrace_event_id = ftrace_event_id;
+    {
+      // dev64 -> uint64
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->ftrace_offset = 8;
+      field->ftrace_size = 8;
+      field->ftrace_type = kFtraceDevId64;
+      field->proto_field_id = 1;
+      field->proto_field_type = kProtoUint64;
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
+    }
+    {
+      // ino_t (64bit) -> uint64
+      event->fields.emplace_back(Field{});
+      Field* field = &event->fields.back();
+      field->ftrace_offset = 16;
+      field->ftrace_size = 8;
+      field->ftrace_type = kFtraceInode64;
+      field->proto_field_id = 2;
+      field->proto_field_type = kProtoUint64;
+      SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
+                             &field->strategy);
+    }
+  }
+  ProtoTranslationTable table(events, std::move(common_fields));
+
+  FakeEventProvider provider(base::kPageSize);
+
+  BinaryWriter writer;
+  writer.Write<int32_t>(1001);  // Common field.
+  writer.Write<int32_t>(9999);  // A gap we shouldn't read.
+  writer.Write<int64_t>(1002);  // Dev id 64
+  writer.Write<int64_t>(99);    // Inode 64
+
+  auto input = writer.GetCopy();
+  auto length = writer.written();
+  FtraceMetadata metadata{};
+
+  ASSERT_TRUE(CpuReader::ParseEvent(ftrace_event_id, input.get(),
+                                    input.get() + length, &table,
+                                    provider.writer(), &metadata));
+
+  auto event = provider.ParseProto();
+  ASSERT_TRUE(event);
+  EXPECT_EQ(event->common_field(), 1001ul);
+  EXPECT_EQ(event->event_case(), FakeFtraceEvent::kInodeFields);
+  EXPECT_EQ(event->inode_fields().field_dev_64(), 1002ul);
+  EXPECT_EQ(event->inode_fields().field_inode_64(), 99u);
+  EXPECT_EQ(metadata.inode_and_device.size(), 1U);
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(99u, 1002ul)));
 }
 
 // clang-format off
