@@ -261,7 +261,7 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
   const int shm_fd =
       static_cast<PosixSharedMemory*>(service_endpoint->shared_memory())->fd();
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
-  cmd.set_has_more(false);
+  cmd.set_has_more(true);
   cmd.set_fd(shm_fd);
   cmd->mutable_on_tracing_start()->set_page_size_kb(
       service_endpoint->page_size_kb());
