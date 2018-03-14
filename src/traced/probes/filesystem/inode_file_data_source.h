@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <map>
-#include <memory>
 #include <set>
 #include <string>
 
@@ -35,7 +34,6 @@ namespace perfetto {
 
 using Inode = uint64_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
-class TraceWriter;
 
 class InodeMapValue {
  public:
