@@ -37,7 +37,7 @@ inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
 }
 
 inline TimeNanos GetWallTimeNs() {
-  return GetTimeInternalNs(kWallTimeClockSource);
+  return GetTimeInternalNs(CLOCK_MONOTONIC_RAW);
 }
 
 inline TimeMillis GetWallTimeMs() {

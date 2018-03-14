@@ -24,6 +24,7 @@
 #include "include/perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/trace_writer.h"
 
 #include "perfetto/trace/trace_packet.pbzero.h"
 
