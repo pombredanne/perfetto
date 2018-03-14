@@ -160,17 +160,12 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
         finish();
     }
   };
-  auto on_connect = task_runner.CreateCheckpoint("on.connect");
-  FakeConsumer consumer(trace_config, std::move(on_connect),
-                        std::move(function), &task_runner);
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(kConsumerSocket);
-  task_runner.RunUntilCheckpoint("on.connect");
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size, &consumer)));
-
-  consumer.EnableTracing();
   task_runner.RunUntilCheckpoint("no.more.packets");
   return 0;
 }
