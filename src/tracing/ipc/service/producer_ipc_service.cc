@@ -186,14 +186,16 @@ void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
   CommitDataRequest req;
   req.FromProto(proto_req);
 
-  // This speculates on the fact that CommitData() in service_impl.cc invokes
-  // the passed callback inline, without posting it. If that assumption changes
-  // this code needs to wrap the response in a shared_ptr and use a weak ptr.
-  // In general we don't want to send a response if the client didn't attach a
-  // callback to the original request, because doing so would generate
-  // unnecessary wakeups and context switches.
+  // We don't want to send a response if the client didn't attach a callback to
+  // the original request. Doing so would generate unnecessary wakeups and
+  // context switches.
   std::function<void()> callback;
   if (resp.IsBound()) {
+    // Capturing |resp| by reference here speculates on the fact that
+    // CommitData() in service_impl.cc invokes the passed callback inline,
+    // without posting it. If that assumption changes this code needs to wrap
+    // the response in a shared_ptr (C+11 lambdas don't support move) and use
+    // a weak ptr in the caller.
     callback = [&resp] {
       resp.Resolve(ipc::AsyncResult<protos::CommitDataResponse>::Create());
     };
