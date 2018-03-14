@@ -19,7 +19,6 @@ source_set("filesystem") {
   deps = [
     "../../../../gn:default_deps",
     "../../../base",
-    "../../../ftrace_reader",
   ]
   sources = [
     "fs_mount.cc",
