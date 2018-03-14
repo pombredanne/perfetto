@@ -58,7 +58,7 @@ class UnixTaskRunner : public TaskRunner {
 
   void UpdateWatchTasksLocked();
 
-  TimeMillis GetDelayToNextTaskLocked() const;
+  int GetDelayMsToNextTaskLocked() const;
   void RunImmediateAndDelayedTask();
   void PostFileDescriptorWatches();
   void RunFileDescriptorWatch(int fd);

@@ -115,8 +115,7 @@ void AndroidTaskRunner::RunDelayedTask() {
   }
 
   std::function<void()> delayed_task;
-  TimeMillis next_wake_up = 0;
-  bool schedule_wakeup = false;
+  TimeMillis next_wake_up{};
   {
     std::lock_guard<std::mutex> lock(lock_);
     if (delayed_tasks_.empty())
@@ -125,12 +124,10 @@ void AndroidTaskRunner::RunDelayedTask() {
     PERFETTO_DCHECK(!(GetWallTimeMs() < it->first));
     delayed_task = std::move(it->second);
     delayed_tasks_.erase(it);
-    if (!delayed_tasks_.empty()) {
+    if (!delayed_tasks_.empty())
       next_wake_up = delayed_tasks_.begin()->first;
-      schedule_wakeup = true;
-    }
   }
-  if (schedule_wakeup)
+  if (next_wake_up.count())
     ScheduleDelayedWakeUp(next_wake_up);
   errno = 0;
   RunTask(delayed_task);
@@ -144,13 +141,13 @@ void AndroidTaskRunner::ScheduleImmediateWakeUp() {
   }
 }
 
-void AndroidTaskRunner::ScheduleDelayedWakeUp(TimeMillis time_ms) {
-  PERFETTO_DCHECK(time_ms);
+void AndroidTaskRunner::ScheduleDelayedWakeUp(TimeMillis time) {
+  PERFETTO_DCHECK(time.count());
   struct itimerspec wake_up = {};
-  const long time_s = time_ms / 1000;
+  const long time_s = static_cast<long>(time.count() / 1000);
   wake_up.it_value.tv_sec = time_s;
   wake_up.it_value.tv_nsec =
-      (static_cast<long>(time_ms) - time_s * 1000L) * 1000000L;
+      (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
 
   if (timerfd_settime(delayed_timer_.get(), TFD_TIMER_ABSTIME, &wake_up,
                       nullptr) == -1) {
@@ -172,7 +169,7 @@ void AndroidTaskRunner::PostTask(std::function<void()> task) {
 void AndroidTaskRunner::PostDelayedTask(std::function<void()> task,
                                         int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
-  TimeMillis runtime = GetWallTimeMs() + static_cast<TimeMillis>(delay_ms);
+  TimeMillis runtime = GetWallTimeMs() + TimeMillis(delay_ms);
   bool is_next = false;
   {
     std::lock_guard<std::mutex> lock(lock_);
