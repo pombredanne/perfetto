@@ -59,6 +59,9 @@ cc_library_shared {
     "src/protozero/message_handle.cc",
     "src/protozero/proto_utils.cc",
     "src/protozero/scattered_stream_writer.cc",
+    "src/traced/probes/filesystem/fs_mount.cc",
+    "src/traced/probes/filesystem/inode_file_data_source.cc",
+    "src/traced/probes/filesystem/lru_inode_cache.cc",
     "src/traced/probes/probes.cc",
     "src/traced/probes/probes_producer.cc",
     "src/traced/probes/process_stats_data_source.cc",
@@ -276,6 +279,9 @@ cc_test {
     "src/protozero/message_handle.cc",
     "src/protozero/proto_utils.cc",
     "src/protozero/scattered_stream_writer.cc",
+    "src/traced/probes/filesystem/fs_mount.cc",
+    "src/traced/probes/filesystem/inode_file_data_source.cc",
+    "src/traced/probes/filesystem/lru_inode_cache.cc",
     "src/traced/probes/probes_producer.cc",
     "src/traced/probes/process_stats_data_source.cc",
     "src/tracing/core/chrome_config.cc",
@@ -3125,6 +3131,9 @@ cc_test {
     "src/protozero/test/protozero_conformance_unittest.cc",
     "src/traced/probes/filesystem/fs_mount.cc",
     "src/traced/probes/filesystem/fs_mount_unittest.cc",
+    "src/traced/probes/filesystem/inode_file_data_source.cc",
+    "src/traced/probes/filesystem/lru_inode_cache.cc",
+    "src/traced/probes/filesystem/lru_inode_cache_unittest.cc",
     "src/traced/probes/probes_producer.cc",
     "src/traced/probes/process_stats_data_source.cc",
     "src/traced/probes/process_stats_data_source_unittest.cc",
@@ -3265,8 +3274,8 @@ cc_library_static {
     "libprotobuf-cpp-lite",
   ],
   static_libs: [
+    "libgtest",
     "perfetto_src_tracing_ipc",
-    "libgtest_prod",
   ],
   cflags: [
     "-DPERFETTO_BUILD_WITH_ANDROID",
@@ -3287,6 +3296,7 @@ cc_library_static {
     ".",
   ],
   static_libs: [
+    "libgtest",
     "perfetto_src_tracing_ipc",
   ],
   cflags: [
