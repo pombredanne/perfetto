@@ -219,7 +219,7 @@ void UnixTaskRunner::PostTask(std::function<void()> task) {
 
 void UnixTaskRunner::PostDelayedTask(std::function<void()> task, int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
-  TimeMillis runtime = GetWallTimeMs() + static_cast<TimeMillis>(delay_ms);
+  TimeMillis runtime = GetWallTimeMs() + TimeMillis(delay_ms);
   {
     std::lock_guard<std::mutex> lock(lock_);
     delayed_tasks_.insert(std::make_pair(runtime, std::move(task)));
