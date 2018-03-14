@@ -176,10 +176,7 @@ void ProducerIPCService::UnregisterDataSource(
 }
 
 void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
-                                    DeferredCommitDataResponse) {
-  // The response object is deliberately not resolved. CommitData messages don't
-  // expect any response (the client sends them with the |drop_reply| flag).
-  // This is to avoid useless wakeups on the client side.
+                                    DeferredCommitDataResponse resp) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
@@ -188,7 +185,17 @@ void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
   }
   CommitDataRequest req;
   req.FromProto(proto_req);
-  producer->service_endpoint->CommitData(req);
+
+  // This speculates on the fact that CommitData() in service_impl.cc invokes
+  // the passed callback inline, without posting it. If that assumption changes
+  // this code needs to wrap the response in a shared_ptr and use a weak ptr.
+  std::function<void()> callback;
+  if (resp.IsBound()) {
+    callback = [&resp] {
+      resp.Resolve(ipc::AsyncResult<protos::CommitDataResponse>::Create());
+    };
+  }
+  producer->service_endpoint->CommitData(req, callback);
 }
 
 void ProducerIPCService::GetAsyncCommand(

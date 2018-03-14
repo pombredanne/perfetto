@@ -178,7 +178,8 @@ void ProducerIPCClientImpl::UnregisterDataSource(DataSourceID id) {
       req, ipc::Deferred<protos::UnregisterDataSourceResponse>());
 }
 
-void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req) {
+void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,
+                                       CommitDataCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG("Cannot CommitData(), not connected to tracing service");
@@ -186,8 +187,22 @@ void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req) {
   }
   protos::CommitDataRequest proto_req;
   req.ToProto(&proto_req);
-  producer_port_.CommitData(proto_req,
-                            ipc::Deferred<protos::CommitDataResponse>());
+  ipc::Deferred<protos::CommitDataResponse> async_response;
+  // TODO(fmayer): add a test that destroys the IPC channel soon after this call
+  // and checks that the callback() is invoked.
+  // TODO(fmayer): add a test that destroyes ProducerIPCClientImpl soon after
+  // this call and checks that the callback is dropped.
+  if (callback) {
+    async_response.Bind(
+        [callback](ipc::AsyncResult<protos::CommitDataResponse> response) {
+          if (!response) {
+            PERFETTO_DLOG("CommitData() failed: connection reset");
+            return;
+          }
+          callback();
+        });
+  }
+  producer_port_.CommitData(proto_req, std::move(async_response));
 }
 
 std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter(

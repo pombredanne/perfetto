@@ -216,7 +216,8 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
 // only if everything happens on the main thread. It will hit the thread
 // checker otherwise. What we really want to do here is doing this sync IPC
 // only if task_runner_.RunsTaskOnCurrentThread() and PostTask() otherwise.
-void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
+void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
+    std::function<void()> callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   std::unique_ptr<CommitDataRequest> req;
@@ -229,7 +230,7 @@ void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
   // |commit_data_req_| could become nullptr if the forced sync flush happens
   // in GetNewChunk().
   if (req)
-    producer_endpoint_->CommitData(*req);
+    producer_endpoint_->CommitData(*req, callback);
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
