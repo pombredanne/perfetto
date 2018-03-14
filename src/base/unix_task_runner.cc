@@ -75,7 +75,7 @@ void UnixTaskRunner::Run() {
       std::lock_guard<std::mutex> lock(lock_);
       if (quit_)
         return;
-      poll_timeout_ms = static_cast<int>(GetDelayToNextTaskLocked());
+      poll_timeout_ms = GetDelayMsToNextTaskLocked();
       UpdateWatchTasksLocked();
     }
     int ret = PERFETTO_EINTR(poll(
@@ -195,15 +195,15 @@ void UnixTaskRunner::RunFileDescriptorWatch(int fd) {
   RunTask(task);
 }
 
-TimeMillis UnixTaskRunner::GetDelayToNextTaskLocked() const {
+int UnixTaskRunner::GetDelayMsToNextTaskLocked() const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!immediate_tasks_.empty())
-    return TimeMillis(0);
+    return 0;
   if (!delayed_tasks_.empty()) {
-    return std::max(TimeMillis(0),
-                    delayed_tasks_.begin()->first - GetWallTimeMs());
+    TimeMillis diff = delayed_tasks_.begin()->first - GetWallTimeMs();
+    return std::max(0, static_cast<int>(diff.count()));
   }
-  return std::numeric_limits<TimeMillis>::max();
+  return std::numeric_limits<int>::max();
 }
 
 void UnixTaskRunner::PostTask(std::function<void()> task) {
@@ -219,7 +219,7 @@ void UnixTaskRunner::PostTask(std::function<void()> task) {
 
 void UnixTaskRunner::PostDelayedTask(std::function<void()> task, int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
-  TimeMillis runtime = GetWallTimeMs() + static_cast<TimeMillis>(delay_ms);
+  TimeMillis runtime = GetWallTimeMs() + TimeMillis(delay_ms);
   {
     std::lock_guard<std::mutex> lock(lock_);
     delayed_tasks_.insert(std::make_pair(runtime, std::move(task)));

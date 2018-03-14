@@ -68,7 +68,7 @@ uint64_t TaskRunnerThread::GetThreadCPUTimeNs() {
     return 0;
 
   runner_->PostTask([&thread_time_ns, &cv] {
-    thread_time_ns.store(base::GetThreadCPUTimeNs());
+    thread_time_ns.store(base::GetThreadCPUTimeNs().count());
     cv.notify_one();
   });
 
