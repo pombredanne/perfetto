@@ -203,7 +203,7 @@ int UnixTaskRunner::GetDelayMsToNextTaskLocked() const {
     TimeMillis diff = delayed_tasks_.begin()->first - GetWallTimeMs();
     return std::max(0, static_cast<int>(diff.count()));
   }
-  return std::numeric_limits<int>::max();
+  return -1;
 }
 
 void UnixTaskRunner::PostTask(std::function<void()> task) {

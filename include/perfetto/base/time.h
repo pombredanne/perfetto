@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,14 @@ namespace base {
 using TimeMillis = std::chrono::milliseconds;
 using TimeNanos = std::chrono::nanoseconds;
 
-inline TimeNanos GetTimerInternalNs(clockid_t clk_id) {
+inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
   PERFETTO_CHECK(clock_gettime(clk_id, &ts) == 0);
   return TimeNanos(ts.tv_sec * 1000000000L + ts.tv_nsec);
 }
 
 inline TimeNanos GetWallTimeNs() {
-  return GetTimerInternalNs(CLOCK_MONOTONIC_RAW);
+  return GetTimeInternalNs(CLOCK_MONOTONIC_RAW);
 }
 
 inline TimeMillis GetWallTimeMs() {
@@ -44,7 +44,7 @@ inline TimeMillis GetWallTimeMs() {
 }
 
 inline TimeNanos GetThreadCPUTimeNs() {
-  return GetTimerInternalNs(CLOCK_THREAD_CPUTIME_ID);
+  return GetTimeInternalNs(CLOCK_THREAD_CPUTIME_ID);
 }
 
 inline struct timespec ToPosixTimespec(TimeMillis time) {
