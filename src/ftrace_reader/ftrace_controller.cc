@@ -30,7 +30,6 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "src/ftrace_reader/cpu_reader.h"
 #include "src/ftrace_reader/event_info.h"
@@ -143,7 +142,9 @@ FtraceController::~FtraceController() {
 }
 
 uint64_t FtraceController::NowMs() const {
-  return base::GetWallTimeMs();
+  timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (now.tv_sec * 1000000000L + now.tv_nsec) / 1000000L;
 }
 
 // static
