@@ -47,7 +47,7 @@ static void BM_EndToEnd(benchmark::State& state) {
   TraceConfig trace_config;
 
   // TODO: the buffer size should be a function of the benchmark.
-  trace_config.add_buffers()->set_size_kb(1024 * 128);
+  trace_config.add_buffers()->set_size_kb(512);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -68,14 +68,12 @@ static void BM_EndToEnd(benchmark::State& state) {
       new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
 #endif
 
-  std::function<void()> on_data_produced;
   TaskRunnerThread producer_thread("perfetto.prd");
   auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
   std::unique_ptr<FakeProducerDelegate> producer_delegate(
       new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME, on_producer_enabled));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
-  FakeProducer* producer = producer_delegate_cached->producer();
 
   bool is_first_packet = true;
   auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
@@ -114,18 +112,17 @@ static void BM_EndToEnd(benchmark::State& state) {
 
   uint64_t wall_start_ns = base::GetWallTimeNs();
   uint64_t thread_start_ns = service_thread.GetThreadCPUTimeNs();
-  auto cname = "produced.and.committed." + std::to_string(state.iterations());
-  auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
-  producer->ProduceEventBatch(on_produced_and_committed);
-  task_runner.RunUntilCheckpoint(cname);
+  while (state.KeepRunning()) {
+    auto cname = "produced.and.committed." + std::to_string(state.iterations());
+    auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
+    FakeProducer* producer = producer_delegate_cached->producer();
+    producer->ProduceEventBatch(on_produced_and_committed);
+    task_runner.RunUntilCheckpoint(cname);
+  }
   uint64_t thread_ns = service_thread.GetThreadCPUTimeNs() - thread_start_ns;
   uint64_t wall_ns = base::GetWallTimeNs() - wall_start_ns;
   PERFETTO_ILOG("Service CPU usage: %.2f,  CPU/iterations: %lf",
                 100.0 * thread_ns / wall_ns, 1.0 * thread_ns / message_count);
-
-  while (state.KeepRunning()) {
-    usleep(1000);
-  }
 
   // Read back the buffer just to check correctness.
   consumer.ReadTraceData();
@@ -141,5 +138,4 @@ BENCHMARK(BM_EndToEnd)
     ->UseRealTime()
     ->RangeMultiplier(2)
     ->Range(16, 1024 * 1024);
-// ->Range(16, 1024 * 128);
 }
