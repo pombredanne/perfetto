@@ -66,8 +66,8 @@ void CreateDeviceToInodeMap(
       } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
-      inode_map[inode_number].setType(type);
-      inode_map[inode_number].addPath(filepath + filename);
+      inode_map[inode_number].SetType(type);
+      inode_map[inode_number].AddPath(filepath + filename);
     }
     closedir(dir);
   }
@@ -81,12 +81,12 @@ InodeFileDataSource::InodeFileDataSource(
 InodeFileDataSource::~InodeFileDataSource() = default;
 
 void InodeFileDataSource::WriteInodes(const FtraceMetadata& metadata) {
-  PERFETTO_LOG("Write Inodes start");
+  PERFETTO_DLOG("Write Inodes start");
 
   if (mount_points_.empty()) {
     mount_points_ = ParseMounts();
   }
-  // Convert FtraceMetadata into format for InodeFileMap proto
+  // Group inodes from FtraceMetadata by block device
   auto inodes = metadata.inodes;
   std::map<BlockDeviceID, std::set<Inode>> inode_file_maps;
   for (const auto& inode : inodes) {
@@ -102,27 +102,22 @@ void InodeFileDataSource::WriteInodes(const FtraceMetadata& metadata) {
     BlockDeviceID block_device_id = inode_file_map_data.first;
     inode_file_map->set_block_device_id(block_device_id);
     // Add mount points
-    std::pair<std::multimap<BlockDeviceID, std::string>::iterator,
-              std::multimap<BlockDeviceID, std::string>::iterator>
-        range;
-    range = mount_points_.equal_range(block_device_id);
+    auto range = mount_points_.equal_range(block_device_id);
     for (std::multimap<BlockDeviceID, std::string>::iterator it = range.first;
          it != range.second; ++it) {
       inode_file_map->add_mount_points(it->second.c_str());
-      PERFETTO_LOG("Mount point=%s", it->second.c_str());
     }
     // Add entries for each inode number
     std::set<Inode> inode_numbers = inode_file_map_data.second;
     for (const auto& inode_number : inode_numbers) {
-      PERFETTO_LOG("Inode number=%" PRIu64, inode_number);
       auto* entry = inode_file_map->add_entries();
       entry->set_inode_number(inode_number);
       auto block_device_map = file_system_inodes_->find(block_device_id);
       if (block_device_map != file_system_inodes_->end()) {
         auto inode_map = block_device_map->second.find(inode_number);
         if (inode_map != block_device_map->second.end()) {
-          entry->set_type(inode_map->second.getType());
-          for (const auto& path : inode_map->second.getPaths())
+          entry->set_type(inode_map->second.type());
+          for (const auto& path : inode_map->second.paths())
             entry->add_paths(path.c_str());
         }
       }

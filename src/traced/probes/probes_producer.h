@@ -53,9 +53,8 @@ class ProbesProducer : public Producer {
   void CreateProcessStatsDataSourceInstance(
       DataSourceInstanceID id,
       const DataSourceConfig& source_config);
-  void CreateInodeFileMapDataSourceInstance(
-      DataSourceInstanceID id,
-      const DataSourceConfig& source_config);
+  void CreateInodeFileDataSourceInstance(DataSourceInstanceID id,
+                                         const DataSourceConfig& source_config);
 
   void OnMetadata(const FtraceMetadata& metadata);
 
@@ -117,7 +116,7 @@ class ProbesProducer : public Producer {
       process_stats_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
-  std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>
+  std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
       file_map_sources_;
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>> system_inodes_;
 };
