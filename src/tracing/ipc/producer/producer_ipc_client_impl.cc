@@ -188,9 +188,7 @@ void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,
   protos::CommitDataRequest proto_req;
   req.ToProto(&proto_req);
   ipc::Deferred<protos::CommitDataResponse> async_response;
-  // TODO(fmayer): add a test that destroys the IPC channel soon after this call
-  // and checks that the callback() is invoked.
-  // TODO(fmayer): add a test that destroyes ProducerIPCClientImpl soon after
+  // TODO(primiano): add a test that destroyes ProducerIPCClientImpl soon after
   // this call and checks that the callback is dropped.
   if (callback) {
     async_response.Bind(

@@ -64,13 +64,15 @@ class TraceWriter {
   // only if handle returned by NewTracePacket() has been destroyed (i.e. we
   // cannot Flush() while writing a TracePacket).
   // Note: Flush() also happens implicitly when destroying the TraceWriter.
-  // |callack| is an optional callback. When non-null it will request the
+  // |callback| is an optional callback. When non-null it will request the
   // service to ACK the flush and will be invoked after the service has
-  // ackwnoledged it.
+  // ackwnoledged it. Please note that the callback might be NEVER INVOKED, for
+  // instance if the service crashes or the IPC connection is dropped. The
+  // callback should be used only by tests and best-effort features (logging).
   // TODO(primiano): right now the |callback| will be called on the IPC thread.
   // This is fine in the current single-thread scenario, but long-term
   // trace_writer_impl.cc should be smarter and post it on the right thread.
-  virtual void Flush(std::function<void()> callack = {}) = 0;
+  virtual void Flush(std::function<void()> callback = {}) = 0;
 
   virtual WriterID writer_id() const = 0;
 
