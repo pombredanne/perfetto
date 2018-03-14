@@ -68,16 +68,22 @@ class FakeProducer : public Producer {
   void CreateDataSourceInstance(
       DataSourceInstanceID,
       const DataSourceConfig& source_config) override {
-    auto trace_writer = endpoint_->CreateTraceWriter(
-        static_cast<BufferID>(source_config.target_buffer()));
-
-    auto packet = trace_writer->NewTracePacket();
-    packet->stream_writer_->WriteBytes(data_, size_);
-    packet->Finalize();
-
-    auto end_packet = trace_writer->NewTracePacket();
-    end_packet->set_for_testing()->set_str("end");
-    end_packet->Finalize();
+    // The block is to destroy |packet| and |trace_writer| in order. Destroying
+    // the |trace_writer| will cause a flush of the completed packets.
+    {
+      auto trace_writer = endpoint_->CreateTraceWriter(
+          static_cast<BufferID>(source_config.target_buffer()));
+      auto packet = trace_writer->NewTracePacket();
+      packet->stream_writer_->WriteBytes(data_, size_);
+      packet->Finalize();
+    }
+    {
+      auto trace_writer = endpoint_->CreateTraceWriter(
+          static_cast<BufferID>(source_config.target_buffer()));
+      auto end_packet = trace_writer->NewTracePacket();
+      end_packet->set_for_testing()->set_str("end");
+      end_packet->Finalize();
+    }
     consumer_->BusyWaitReadBuffers();
   }
 
@@ -154,13 +160,17 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
         finish();
     }
   };
-  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  auto on_connect = task_runner.CreateCheckpoint("on.connect");
+  FakeConsumer consumer(trace_config, std::move(on_connect),
+                        std::move(function), &task_runner);
   consumer.Connect(kConsumerSocket);
+  task_runner.RunUntilCheckpoint("on.connect");
 
   TaskRunnerThread producer_thread;
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size, &consumer)));
 
+  consumer.EnableTracing();
   task_runner.RunUntilCheckpoint("no.more.packets");
   return 0;
 }
