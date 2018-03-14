@@ -239,9 +239,9 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     FtraceBundleHandle,
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
-  if (!metadata.inode_to_device.empty()) {
+  if (!metadata.inode_and_device.empty()) {
     auto weak_this = weak_factory_.GetWeakPtr();
-    auto inodes = metadata.inode_to_device;
+    auto inodes = metadata.inode_and_device;
     task_runner_->PostTask([weak_this, inodes] {
       if (weak_this)
         weak_this->OnInodes(inodes);

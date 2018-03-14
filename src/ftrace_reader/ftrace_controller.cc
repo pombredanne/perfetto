@@ -363,8 +363,8 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 }
 
 FtraceMetadata::FtraceMetadata() {
-  // A lot of the time there will only be a small number of inode_to_device.
-  inode_to_device.reserve(10);
+  // A lot of the time there will only be a small number of inode_and_device.
+  inode_and_device.reserve(10);
   pids.reserve(10);
 }
 
@@ -373,7 +373,7 @@ void FtraceMetadata::AddDevice(uint64_t device_id) {
 }
 
 void FtraceMetadata::AddInode(uint64_t inode_number) {
-  inode_to_device.push_back(std::make_pair(inode_number, last_seen_device_id));
+  inode_and_device.push_back(std::make_pair(inode_number, last_seen_device_id));
 }
 
 void FtraceMetadata::AddPid(int32_t pid) {
@@ -385,7 +385,7 @@ void FtraceMetadata::AddPid(int32_t pid) {
 }
 
 void FtraceMetadata::Clear() {
-  inode_to_device.clear();
+  inode_and_device.clear();
   pids.clear();
   overwrite_count = 0;
   last_seen_device_id = 0;

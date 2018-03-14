@@ -22,10 +22,9 @@
 #include <string>
 #include <vector>
 
-namespace perfetto {
+#include "include/perfetto/ftrace_reader/ftrace_controller.h"
 
-// On ARM, st_dev is not dev_t but unsigned long long.
-using BlockDeviceID = decltype(stat::st_dev);
+namespace perfetto {
 
 constexpr char kMountsPath[] = "/proc/mounts";
 

@@ -29,8 +29,6 @@
 
 namespace perfetto {
 
-using BlockDeviceID = decltype(stat::st_dev);
-
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {
@@ -85,9 +83,9 @@ void InodeFileDataSource::WriteInodes(const FtraceMetadata& metadata) {
     mount_points_ = ParseMounts();
   }
   // Convert FtraceMetadata into format for InodeFileMap proto
-  auto inode_to_device = metadata.inode_to_device;
+  auto inode_and_device = metadata.inode_and_device;
   std::map<BlockDeviceID, std::set<Inode>> inode_file_maps;
-  for (const auto& inode : inode_to_device) {
+  for (const auto& inode : inode_and_device) {
     BlockDeviceID block_device_id = inode.first;
     Inode inode_number = inode.second;
     inode_file_maps[block_device_id].emplace(inode_number);

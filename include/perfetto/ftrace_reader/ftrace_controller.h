@@ -37,14 +37,17 @@
 
 namespace perfetto {
 
+using BlockDeviceID = uint64_t;
+using Inode = uint64_t;
+
 struct FtraceMetadata {
   FtraceMetadata();
 
   size_t overwrite_count;
-  uint64_t last_seen_device_id;
+  BlockDeviceID last_seen_device_id;
 
   // A vector not a set to keep the writer_fast.
-  std::vector<std::pair<uint64_t, uint64_t>> inode_to_device;
+  std::vector<std::pair<Inode, BlockDeviceID>> inode_and_device;
   std::vector<int32_t> pids;
 
   void AddDevice(uint64_t);

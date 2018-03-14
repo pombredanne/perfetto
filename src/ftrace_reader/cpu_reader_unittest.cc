@@ -832,9 +832,9 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
   EXPECT_THAT(metadata.pids, Contains(97));
-  EXPECT_EQ(metadata.inode_to_device.size(), 2U);
-  EXPECT_THAT(metadata.inode_to_device, Contains(Pair(98u, 1002)));
-  EXPECT_THAT(metadata.inode_to_device, Contains(Pair(99u, 1002ul)));
+  EXPECT_EQ(metadata.inode_and_device.size(), 2U);
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(98u, 1002)));
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(99u, 1002ul)));
 }
 
 TEST(CpuReaderTest, ParseInode64Fields) {
@@ -913,8 +913,8 @@ TEST(CpuReaderTest, ParseInode64Fields) {
   EXPECT_EQ(event->event_case(), FakeFtraceEvent::kInodeFields);
   EXPECT_EQ(event->inode_fields().field_dev_64(), 1002ul);
   EXPECT_EQ(event->inode_fields().field_inode_64(), 99u);
-  EXPECT_EQ(metadata.inode_to_device.size(), 1U);
-  EXPECT_THAT(metadata.inode_to_device, Contains(Pair(99u, 1002ul)));
+  EXPECT_EQ(metadata.inode_and_device.size(), 1U);
+  EXPECT_THAT(metadata.inode_and_device, Contains(Pair(99u, 1002ul)));
 }
 
 // clang-format off
