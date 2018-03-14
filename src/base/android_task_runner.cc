@@ -80,15 +80,6 @@ bool AndroidTaskRunner::IsIdleForTesting() {
   return immediate_tasks_.empty();
 }
 
-AndroidTaskRunner::TimePoint AndroidTaskRunner::GetTime() const {
-  static_assert(sizeof(TimePoint) == sizeof(struct timespec),
-                "TimePoint layout must match struct timespec");
-  TimePoint now;
-  if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
-    PERFETTO_DPLOG("clock_gettime");
-  return now;
-}
-
 void AndroidTaskRunner::RunImmediateTask() {
   uint64_t unused = 0;
   if (read(immediate_event_.get(), &unused, sizeof(unused)) != sizeof(unused) &&
@@ -124,19 +115,22 @@ void AndroidTaskRunner::RunDelayedTask() {
   }
 
   std::function<void()> delayed_task;
-  TimePoint next_wake_up;
+  TimeMillis next_wake_up = 0;
+  bool schedule_wakeup = false;
   {
     std::lock_guard<std::mutex> lock(lock_);
     if (delayed_tasks_.empty())
       return;
     auto it = delayed_tasks_.begin();
-    PERFETTO_DCHECK(!(GetTime() < it->first));
+    PERFETTO_DCHECK(!(GetWallTimeMs() < it->first));
     delayed_task = std::move(it->second);
     delayed_tasks_.erase(it);
-    if (!delayed_tasks_.empty())
+    if (!delayed_tasks_.empty()) {
       next_wake_up = delayed_tasks_.begin()->first;
+      schedule_wakeup = true;
+    }
   }
-  if (next_wake_up)
+  if (schedule_wakeup)
     ScheduleDelayedWakeUp(next_wake_up);
   errno = 0;
   RunTask(delayed_task);
@@ -150,10 +144,14 @@ void AndroidTaskRunner::ScheduleImmediateWakeUp() {
   }
 }
 
-void AndroidTaskRunner::ScheduleDelayedWakeUp(const TimePoint& time) {
-  PERFETTO_DCHECK(time);
+void AndroidTaskRunner::ScheduleDelayedWakeUp(TimeMillis time_ms) {
+  PERFETTO_DCHECK(time_ms);
   struct itimerspec wake_up = {};
-  wake_up.it_value = time;
+  const long time_s = time_ms / 1000;
+  wake_up.it_value.tv_sec = time_s;
+  wake_up.it_value.tv_nsec =
+      (static_cast<long>(time_ms) - time_s * 1000L) * 1000000L;
+
   if (timerfd_settime(delayed_timer_.get(), TFD_TIMER_ABSTIME, &wake_up,
                       nullptr) == -1) {
     PERFETTO_DPLOG("timerfd_settime");
@@ -174,7 +172,7 @@ void AndroidTaskRunner::PostTask(std::function<void()> task) {
 void AndroidTaskRunner::PostDelayedTask(std::function<void()> task,
                                         int delay_ms) {
   PERFETTO_DCHECK(delay_ms >= 0);
-  auto runtime = GetTime().AdvanceByMs(delay_ms);
+  TimeMillis runtime = GetWallTimeMs() + static_cast<TimeMillis>(delay_ms);
   bool is_next = false;
   {
     std::lock_guard<std::mutex> lock(lock_);

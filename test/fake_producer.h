@@ -21,6 +21,7 @@
 #include <random>
 #include <string>
 
+#include "perfetto/base/thread_checker.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_config.h"
@@ -36,7 +37,11 @@ class FakeProducer : public Producer {
 
   void Connect(const char* socket_name,
                base::TaskRunner* task_runner,
-               std::function<void()> data_produced_callback);
+               std::function<void()> on_create_data_source_instance);
+
+  // Produces a batch of events (as configured in the DataSourceConfig) and
+  // posts a callback when the service acknowledges the commit.
+  void ProduceEventBatch(std::function<void()> callback);
 
   // Producer implementation.
   void OnConnect() override;
@@ -48,12 +53,15 @@ class FakeProducer : public Producer {
  private:
   void Shutdown();
 
+  base::ThreadChecker thread_checker_;
+  base::TaskRunner* task_runner_ = nullptr;
   std::string name_;
   DataSourceID id_ = 0;
-
+  std::minstd_rand0 rnd_engine_;
+  size_t message_count_ = 0;
+  std::function<void()> on_create_data_source_instance_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
-  base::TaskRunner* task_runner_ = nullptr;
-  std::function<void()> data_produced_callback_;
+  std::unique_ptr<TraceWriter> trace_writer_;
 };
 
 }  // namespace perfetto

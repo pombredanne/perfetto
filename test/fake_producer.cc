@@ -16,6 +16,11 @@
 
 #include "test/fake_producer.h"
 
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+
+#include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -28,46 +33,60 @@ namespace perfetto {
 FakeProducer::FakeProducer(const std::string& name) : name_(name) {}
 FakeProducer::~FakeProducer() = default;
 
-void FakeProducer::Connect(const char* socket_name,
-                           base::TaskRunner* task_runner,
-                           std::function<void()> data_produced_callback) {
+void FakeProducer::Connect(
+    const char* socket_name,
+    base::TaskRunner* task_runner,
+    std::function<void()> on_create_data_source_instance) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   task_runner_ = task_runner;
-  data_produced_callback_ = std::move(data_produced_callback);
   endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
+  on_create_data_source_instance_ = on_create_data_source_instance;
 }
 
 void FakeProducer::OnConnect() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   DataSourceDescriptor descriptor;
   descriptor.set_name(name_);
   endpoint_->RegisterDataSource(descriptor,
                                 [this](DataSourceID id) { id_ = id; });
 }
 
-void FakeProducer::OnDisconnect() {}
+void FakeProducer::OnDisconnect() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  FAIL() << "Producer unexpectedly disconnected from the service";
+}
 
 void FakeProducer::CreateDataSourceInstance(
     DataSourceInstanceID,
     const DataSourceConfig& source_config) {
-  auto trace_writer = endpoint_->CreateTraceWriter(
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  trace_writer_ = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
+  rnd_engine_ = std::minstd_rand0(source_config.for_testing().seed());
+  message_count_ = source_config.for_testing().message_count();
+  task_runner_->PostTask(on_create_data_source_instance_);
+}
 
-  size_t message_count = source_config.for_testing().message_count();
-  std::minstd_rand0 rnd_engine(source_config.for_testing().seed());
-  for (size_t i = 0; i < message_count; i++) {
-    auto handle = trace_writer->NewTracePacket();
-    handle->set_for_testing()->set_seq_value(rnd_engine());
+void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  trace_writer_.reset();
+}
 
+// Note: this will called on a different thread.
+void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
+  task_runner_->PostTask([this, callback] {
+    PERFETTO_CHECK(trace_writer_);
     char payload[1024];
     uint64_t string_size = 1024;
     memset(payload, '.', string_size);
     payload[string_size - 1] = 0;
-    handle->set_for_testing()->set_str(payload, string_size);
-
-    handle->Finalize();
-  }
-  data_produced_callback_();
+    for (size_t i = 0; i < message_count_; i++) {
+      auto handle = trace_writer_->NewTracePacket();
+      handle->set_for_testing()->set_seq_value(rnd_engine_());
+      handle->set_for_testing()->set_str(payload, string_size);
+    }
+    trace_writer_->Flush(callback);
+  });
 }
-
-void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {}
 
 }  // namespace perfetto
