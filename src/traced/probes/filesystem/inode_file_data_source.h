@@ -62,12 +62,6 @@ class InodeFileDataSource {
       std::unique_ptr<TraceWriter> writer);
 
   void WriteInodes(const FtraceMetadata& metadata);
-  bool AddInodeFileMapEntry(
-      InodeFileMap* inode_file_map,
-      BlockDeviceID block_device_id,
-      Inode inode,
-      const std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>&
-          block_device_map);
 
  private:
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes_;
