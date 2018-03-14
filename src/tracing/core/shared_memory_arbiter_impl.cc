@@ -222,8 +222,15 @@ void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
   }
   // |commit_data_req_| could become nullptr if the forced sync flush happens
   // in GetNewChunk().
-  if (req)
+  if (req) {
     producer_endpoint_->CommitData(*req, callback);
+  } else if (callback) {
+    // If |commit_data_req_| was nullptr, it means that an enqueued deferred
+    // commit was executed just before this. At this point send an empty commit
+    // request to the service, just to linearize with it and give the guarantee
+    // to the caller that the data has been flushed into the service.
+    producer_endpoint_->CommitData(CommitDataRequest(), callback);
+  }
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(
