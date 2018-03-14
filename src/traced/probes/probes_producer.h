@@ -26,6 +26,7 @@
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
+#include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/process_stats_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
@@ -47,55 +48,30 @@ class ProbesProducer : public Producer {
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
                           base::TaskRunner* task_runner);
-  void CreateFtraceDataSourceInstance(SessionID session_id,
+  void CreateFtraceDataSourceInstance(TracingSessionID session_id,
                                       DataSourceInstanceID id,
                                       const DataSourceConfig& config);
-  void CreateProcessStatsDataSourceInstance(SessionID session_id,
+  void CreateProcessStatsDataSourceInstance(TracingSessionID session_id,
                                             DataSourceInstanceID id,
                                             const DataSourceConfig& config);
-  void CreateInodeFileMapDataSourceInstance(SessionID session_id,
-                                            DataSourceInstanceID id,
-                                            const DataSourceConfig& config);
+  void CreateInodeFileDataSourceInstance(TracingSessionID session_id,
+                                         DataSourceInstanceID id,
+                                         const DataSourceConfig& config);
 
   void OnMetadata(const FtraceMetadata& metadata);
 
  private:
   using FtraceBundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-  using Type = protos::pbzero::InodeFileMap_Entry_Type;
-  using InodeMap = std::map<uint64_t,
-                            std::pair<protos::pbzero::InodeFileMap_Entry_Type,
-                                      std::set<std::string>>>;
-
-  class InodeFileMapDataSource {
-   public:
-    explicit InodeFileMapDataSource(
-        SessionID,
-        std::map<uint32_t, InodeMap>* file_system_inodes,
-        std::unique_ptr<TraceWriter>);
-    ~InodeFileMapDataSource();
-
-    SessionID GetSessionID() const;
-    base::WeakPtr<InodeFileMapDataSource> GetWeakPtr() const;
-    void WriteInodes(const FtraceMetadata& metadata);
-    // TODO(hjd): Combine with above.
-    void OnInodes(const std::vector<std::pair<uint64_t, uint32_t>>& inodes);
-
-   private:
-    const SessionID session_id_;
-    std::map<uint32_t, InodeMap>* file_system_inodes_;
-    std::unique_ptr<TraceWriter> writer_;
-    base::WeakPtrFactory<InodeFileMapDataSource> weak_factory_;  // Keep last.
-  };
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    explicit SinkDelegate(SessionID,
-                          base::TaskRunner*,
-                          std::unique_ptr<TraceWriter>);
+    SinkDelegate(TracingSessionID,
+                 base::TaskRunner*,
+                 std::unique_ptr<TraceWriter>);
     ~SinkDelegate() override;
 
-    SessionID GetSessionID() const;
+    TracingSessionID session_id() const { return session_id_; }
 
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
@@ -112,26 +88,27 @@ class ProbesProducer : public Producer {
       return ps_source_;
     }
 
-    void set_file_source(base::WeakPtr<InodeFileMapDataSource> ptr) {
+    void set_file_source(base::WeakPtr<InodeFileDataSource> ptr) {
       file_source_ = std::move(ptr);
     }
-    const base::WeakPtr<InodeFileMapDataSource>& file_source() const {
+    const base::WeakPtr<InodeFileDataSource>& file_source() const {
       return file_source_;
     }
 
    private:
-    const SessionID session_id_;
+    const TracingSessionID session_id_;
     base::TaskRunner* task_runner_;
     std::unique_ptr<FtraceSink> sink_ = nullptr;
     std::unique_ptr<TraceWriter> writer_;
 
     base::WeakPtr<ProcessStatsDataSource> ps_source_;
-    base::WeakPtr<InodeFileMapDataSource> file_source_;
+    base::WeakPtr<InodeFileDataSource> file_source_;
 
     // Keep this after the TraceWriter because TracePackets must not outlive
     // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
-    base::WeakPtrFactory<SinkDelegate> weak_factory_;  // Keep last.
+    // Keep this last.
+    base::WeakPtrFactory<SinkDelegate> weak_factory_;
   };
 
   enum State {
@@ -149,9 +126,6 @@ class ProbesProducer : public Producer {
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
-  static void CreateDeviceToInodeMap(
-      const std::string& root_directory,
-      std::map<uint32_t, InodeMap>* block_device_map);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_;
@@ -164,9 +138,9 @@ class ProbesProducer : public Producer {
       process_stats_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
-  std::map<DataSourceInstanceID, std::unique_ptr<InodeFileMapDataSource>>
+  std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
       file_map_sources_;
-  std::map<uint32_t, InodeMap> system_inodes_;
+  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>> system_inodes_;
 };
 
 }  // namespace perfetto
