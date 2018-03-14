@@ -60,7 +60,6 @@ class InodeFileDataSource {
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
           file_system_inodes,
       std::unique_ptr<TraceWriter> writer);
-  ~InodeFileDataSource();
 
   void WriteInodes(const FtraceMetadata& metadata);
   bool AddInodeFileMapEntry(

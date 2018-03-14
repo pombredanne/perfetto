@@ -78,8 +78,6 @@ InodeFileDataSource::InodeFileDataSource(
     std::unique_ptr<TraceWriter> writer)
     : file_system_inodes_(file_system_inodes), writer_(std::move(writer)) {}
 
-InodeFileDataSource::~InodeFileDataSource() = default;
-
 void InodeFileDataSource::WriteInodes(const FtraceMetadata& metadata) {
   PERFETTO_DLOG("Write Inodes start");
 
