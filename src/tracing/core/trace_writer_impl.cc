@@ -147,9 +147,6 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
             cur_chunk_.header()->chunk_id.load(std::memory_order_relaxed);
         Patch* patch = patch_list_.emplace_back(cur_chunk_id, offset);
         nested_msg->set_size_field(&patch->size_field[0]);
-        PERFETTO_DLOG("Starting patch for Chunk: %u @ 0x%x {%x, %x, %x, %x}",
-                      cur_chunk_id, offset, cur_hdr[0], cur_hdr[1], cur_hdr[2],
-                      cur_hdr[3]);
       } else {
 #if PERFETTO_DCHECK_IS_ON()
         // Ensure that the size field of the message points to an element of the
