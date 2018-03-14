@@ -63,6 +63,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
   int stall_count = 0;
   useconds_t stall_interval_us = 0;
   static const useconds_t kMaxStallIntervalUs = 100000;
+  static const int kLogAfterNStalls = 3;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
@@ -98,7 +99,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
               page_idx_, chunk_idx, &header);
           if (!chunk.is_valid())
             continue;
-          if (stall_count) {
+          if (stall_count > kLogAfterNStalls) {
             PERFETTO_LOG("Recovered from stall after %d iterations",
                          stall_count);
           }
@@ -110,7 +111,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     // All chunks are taken (either kBeingWritten by us or kBeingRead by the
     // Service). TODO: at this point we should return a bankrupcy chunk, not
     // crash the process.
-    if (stall_count++ == 0) {
+    if (stall_count++ == kLogAfterNStalls) {
       PERFETTO_ELOG("Shared memory buffer overrun! Stalling");
 
       // TODO(primiano): sending the IPC synchronously is a temporary workaround
