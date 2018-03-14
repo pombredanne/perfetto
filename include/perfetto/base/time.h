@@ -17,10 +17,11 @@
 #ifndef INCLUDE_PERFETTO_BASE_TIME_H_
 #define INCLUDE_PERFETTO_BASE_TIME_H_
 
-#include <stdint.h>
 #include <time.h>
 
 #include <chrono>
+
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace base {
@@ -44,6 +45,14 @@ inline TimeMillis GetWallTimeMs() {
 
 inline TimeNanos GetThreadCPUTimeNs() {
   return GetTimerInternalNs(CLOCK_THREAD_CPUTIME_ID);
+}
+
+inline struct timespec ToPosixTimespec(TimeMillis time) {
+  struct timespec ts {};
+  const long time_s = static_cast<long>(time.count() / 1000);
+  ts.tv_sec = time_s;
+  ts.tv_nsec = (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
+  return ts;
 }
 
 }  // namespace base

@@ -144,11 +144,7 @@ void AndroidTaskRunner::ScheduleImmediateWakeUp() {
 void AndroidTaskRunner::ScheduleDelayedWakeUp(TimeMillis time) {
   PERFETTO_DCHECK(time.count());
   struct itimerspec wake_up = {};
-  const long time_s = static_cast<long>(time.count() / 1000);
-  wake_up.it_value.tv_sec = time_s;
-  wake_up.it_value.tv_nsec =
-      (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
-
+  wake_up.it_value = ToPosixTimespec(time);
   if (timerfd_settime(delayed_timer_.get(), TFD_TIMER_ABSTIME, &wake_up,
                       nullptr) == -1) {
     PERFETTO_DPLOG("timerfd_settime");
