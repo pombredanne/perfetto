@@ -40,18 +40,25 @@ class ThreadDelegate {
 // task runner is quit and the thread is joined.
 class TaskRunnerThread {
  public:
-  TaskRunnerThread();
+  explicit TaskRunnerThread(const char* name);
   ~TaskRunnerThread();
 
   // Blocks until the thread has been created and Initialize() has been
   // called.
   void Start(std::unique_ptr<ThreadDelegate> delegate);
 
+  // Blocks until the thread has been stopped and joined.
+  void Stop();
+
+  uint64_t GetThreadCPUTimeNs();
+
  private:
   void Run(std::unique_ptr<ThreadDelegate> delegate);
 
+  const char* const name_;
   std::thread thread_;
   std::condition_variable ready_;
+  std::atomic<uint32_t> tid_{};
 
   // All variables below this point are protected by |mutex_|.
   std::mutex mutex_;

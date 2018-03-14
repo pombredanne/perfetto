@@ -41,6 +41,7 @@ class FakeConsumer : public Consumer {
   void EnableTracing();
   void FreeBuffers();
   void Connect(const char* socket_name);
+  void Disconnect();
   void ReadTraceData();
   void BusyWaitReadBuffers();
 
@@ -50,11 +51,11 @@ class FakeConsumer : public Consumer {
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
  private:
+  base::TaskRunner* const task_runner_;
+  const TraceConfig trace_config_;
   std::function<void()> on_connect_;
   std::function<void(std::vector<TracePacket>, bool)> packet_callback_;
-  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;
-  const TraceConfig trace_config_;
-  base::TaskRunner* const task_runner_;
+  std::unique_ptr<Service::ConsumerEndpoint> endpoint_;  // Keep last.
 };
 
 }  // namespace perfetto

@@ -54,19 +54,21 @@ TraceWriterImpl::TraceWriterImpl(SharedMemoryArbiterImpl* shmem_arbiter,
 }
 
 TraceWriterImpl::~TraceWriterImpl() {
-  cur_packet_->Finalize();
-  Flush();
+  if (cur_chunk_.is_valid()) {
+    cur_packet_->Finalize();
+    Flush();
+  }
   shmem_arbiter_->ReleaseWriterID(id_);
 }
 
-void TraceWriterImpl::Flush() {
+void TraceWriterImpl::Flush(std::function<void()> callback) {
   // Flush() cannot be called in the middle of a TracePacket.
   PERFETTO_CHECK(cur_packet_->is_finalized());
 
   if (cur_chunk_.is_valid()) {
     shmem_arbiter_->ReturnCompletedChunk(std::move(cur_chunk_), target_buffer_,
                                          &patch_list_);
-    shmem_arbiter_->FlushPendingCommitDataRequests();
+    shmem_arbiter_->FlushPendingCommitDataRequests(callback);
   } else {
     PERFETTO_DCHECK(patch_list_.empty());
   }
@@ -145,9 +147,6 @@ protozero::ContiguousMemoryRange TraceWriterImpl::GetNewBuffer() {
             cur_chunk_.header()->chunk_id.load(std::memory_order_relaxed);
         Patch* patch = patch_list_.emplace_back(cur_chunk_id, offset);
         nested_msg->set_size_field(&patch->size_field[0]);
-        // PERFETTO_DLOG("Starting patch for Chunk: %u @ 0x%x {%x, %x, %x,
-        // %x}",
-        //               cur_chunk_id, offset, cur_hdr[0], cur_hdr[1],
         //               cur_hdr[2], cur_hdr[3]);
       } else {
 #if PERFETTO_DCHECK_IS_ON()

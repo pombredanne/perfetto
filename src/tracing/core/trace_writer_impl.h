@@ -38,8 +38,8 @@ class TraceWriterImpl : public TraceWriter,
 
   // TraceWriter implementation. See documentation in trace_writer.h .
   TracePacketHandle NewTracePacket() override;
+  void Flush(std::function<void()> callback = {}) override;
   WriterID writer_id() const override;
-  void Flush() override;
 
  private:
   TraceWriterImpl(const TraceWriterImpl&) = delete;

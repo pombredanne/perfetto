@@ -137,8 +137,7 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
   {
     std::lock_guard<std::mutex> scoped_lock(lock_);
     uint8_t chunk_idx = chunk.chunk_idx();
-    const WriterID writer_id =
-        chunk.header()->writer_id.load(std::memory_order_relaxed);
+    const WriterID writer_id = chunk.writer_id();
     bytes_pending_commit_ += chunk.size();
     size_t page_idx = shmem_abi_.ReleaseChunkAsComplete(std::move(chunk));
 
@@ -157,8 +156,8 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
 
     // If more than half of the SMB.size() is filled with completed chunks for
     // which we haven't notified the service yet (i.e. they are still enqueued
-    // in |commit_data_req_|), force a synchronous CommitDataRequest(), to avoid
-    // stalling the writer.
+    // in |commit_data_req_|), force a synchronous CommitDataRequest(), to
+    // reduce the likeliness of stalling the writer.
     if (bytes_pending_commit_ >= shmem_abi_.size() / 2) {
       should_commit_synchronously = true;
       should_post_callback = false;
@@ -193,12 +192,6 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
     }
   }  // scoped_lock(lock_)
 
-  // TODO(primiano): optimization: at this point, if most of the SMB is almost
-  // full (say 75%) of completed chunks that are pending a commit, we should
-  // send a sync IPC without waiting neither for the next task nor to reach the
-  // 100% full state that will stall the writer. If we hit the writer-stalling
-  // case, it will kill the tracing bandwidth.
-
   if (should_post_callback) {
     PERFETTO_DCHECK(weak_this);
     task_runner_->PostTask([weak_this] {
@@ -213,10 +206,11 @@ void SharedMemoryArbiterImpl::ReturnCompletedChunk(Chunk chunk,
 
 // TODO(primiano): this is wrong w.r.t. threading because it will try to send
 // an IPC from a different thread than the IPC thread. Right now this works
-// only if everything happens on the main thread. It will hit the thread
-// checker otherwise. What we really want to do here is doing this sync IPC
-// only if task_runner_.RunsTaskOnCurrentThread() and PostTask() otherwise.
-void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
+// because everything is single threaded. It will hit the thread checker
+// otherwise. What we really want to do here is doing this sync IPC only if
+// task_runner_.RunsTaskOnCurrentThread(), otherwise PostTask().
+void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests(
+    std::function<void()> callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   std::unique_ptr<CommitDataRequest> req;
@@ -228,8 +222,15 @@ void SharedMemoryArbiterImpl::FlushPendingCommitDataRequests() {
   }
   // |commit_data_req_| could become nullptr if the forced sync flush happens
   // in GetNewChunk().
-  if (req)
-    producer_endpoint_->CommitData(*req);
+  if (req) {
+    producer_endpoint_->CommitData(*req, callback);
+  } else if (callback) {
+    // If |commit_data_req_| was nullptr, it means that an enqueued deferred
+    // commit was executed just before this. At this point send an empty commit
+    // request to the service, just to linearize with it and give the guarantee
+    // to the caller that the data has been flushed into the service.
+    producer_endpoint_->CommitData(CommitDataRequest(), callback);
+  }
 }
 
 std::unique_ptr<TraceWriter> SharedMemoryArbiterImpl::CreateTraceWriter(

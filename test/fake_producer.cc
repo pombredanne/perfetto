@@ -20,6 +20,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -52,6 +53,7 @@ void FakeProducer::OnConnect() {
 
 void FakeProducer::OnDisconnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  FAIL() << "Producer unexpectedly disconnected from the service";
 }
 
 void FakeProducer::CreateDataSourceInstance(
@@ -71,11 +73,8 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
 }
 
 // Note: this will called on a different thread.
-void FakeProducer::ProduceEventBatchAndWait() {
-  std::unique_lock<std::mutex> lock(lock_);
-  bool done = false;
-
-  task_runner_->PostTask([this, &done] {
+void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
+  task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
     char payload[1024];
     uint64_t string_size = 1024;
@@ -86,15 +85,8 @@ void FakeProducer::ProduceEventBatchAndWait() {
       handle->set_for_testing()->set_seq_value(rnd_engine_());
       handle->set_for_testing()->set_str(payload, string_size);
     }
-    trace_writer_->Flush();
-    {
-      std::unique_lock<std::mutex> thread_lock(lock_);
-      done = true;
-    }
-    cond_.notify_one();
+    trace_writer_->Flush(callback);
   });
-
-  cond_.wait(lock, [&done] { return done; });
 }
 
 }  // namespace perfetto

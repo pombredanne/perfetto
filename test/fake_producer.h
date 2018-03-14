@@ -40,8 +40,8 @@ class FakeProducer : public Producer {
                std::function<void()> on_create_data_source_instance);
 
   // Produces a batch of events (as configured in the DataSourceConfig) and
-  // waits until they have been written to the shmem buffer.
-  void ProduceEventBatchAndWait();
+  // posts a callback when the service acknowledges the commit.
+  void ProduceEventBatch(std::function<void()> callback);
 
   // Producer implementation.
   void OnConnect() override;
@@ -54,18 +54,14 @@ class FakeProducer : public Producer {
   void Shutdown();
 
   base::ThreadChecker thread_checker_;
+  base::TaskRunner* task_runner_ = nullptr;
   std::string name_;
   DataSourceID id_ = 0;
-
-  std::unique_ptr<Service::ProducerEndpoint> endpoint_;
-  base::TaskRunner* task_runner_ = nullptr;
-  std::unique_ptr<TraceWriter> trace_writer_;
   std::minstd_rand0 rnd_engine_;
   size_t message_count_ = 0;
   std::function<void()> on_create_data_source_instance_;
-
-  std::mutex lock_;
-  std::condition_variable cond_;
+  std::unique_ptr<Service::ProducerEndpoint> endpoint_;
+  std::unique_ptr<TraceWriter> trace_writer_;
 };
 
 }  // namespace perfetto

@@ -300,8 +300,9 @@ bool TraceBuffez::TryPatchChunkContents(ProducerID producer_id,
       return false;
     }
 
-    // DCHECK that we are writing into a size-field zero-filled by
-    // trace_writer_impl.cc and that we are not writing over other valid data.
+    // DCHECK that we are writing into a zero-filled size field and not into
+    // valid data. It relies on ScatteredStreamWriter::ReserveBytes() to
+    // zero-fill reservations in debug builds.
     char zero[Patch::kSize]{};
     PERFETTO_DCHECK(memcmp(ptr, &zero, Patch::kSize) == 0);
 
