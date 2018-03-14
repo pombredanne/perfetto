@@ -565,15 +565,17 @@ void ServiceImpl::CreateDataSourceInstance(
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
-    auto first_producer_config = tracing_session->config.producers()[0];
-
-    producer->page_size_kb_ = first_producer_config.page_size_kb();
+    producer->page_size_kb_ = (tracing_session->getDesiredPageSizeKb() == 0)
+                                  ? base::kPageSize / 1024  // default
+                                  : tracing_session->getDesiredPageSizeKb();
 
     size_t shm_size = std::min(
-        static_cast<size_t>(first_producer_config.shm_size_kb()), kMaxShmSize);
+        static_cast<size_t>(tracing_session->getDesiredShmSizeKb() * 1024),
+        kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
-    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
+        shm_size == 0)
       shm_size = kDefaultShmSize;
 
     // TODO(primiano): right now Create() will suicide in case of OOM if the
@@ -795,7 +797,7 @@ void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
   shared_memory_ = std::move(shared_memory);
   shmem_abi_ =
       SharedMemoryABI(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                      shared_memory_->size(), page_size_kb());
+                      shared_memory_->size(), page_size_kb() * 1024);
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {

@@ -128,7 +128,7 @@ void ProducerIPCClientImpl::OnServiceRequest(
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
     page_size_kb_ = cmd.on_tracing_start().page_size_kb();
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), page_size_kb_, this, task_runner_);
+        shared_memory_.get(), page_size_kb_ * 1024, this, task_runner_);
     producer_->OnTracingStart();
     return;
   }

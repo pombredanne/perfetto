@@ -60,6 +60,8 @@ message InitializeConnectionRequest {
   // and might return a smaller buffer.
   optional uint32 shared_memory_size_hint_bytes = 2;
 
+  // Required to match the producer config set by the service to the correct
+  // producer.
   optional string producer_name = 3;
 }
 

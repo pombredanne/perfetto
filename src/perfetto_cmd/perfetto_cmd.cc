@@ -154,8 +154,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
         // Setup the Producer config.
         auto* producer_config = test_config.add_producers();
         producer_config->set_producer_name("com.google.test_producer");
-        producer_config->set_shm_size_kb(4194304);
-        producer_config->set_page_size_kb(4096);
+        producer_config->set_shm_size_kb(4096);
+        producer_config->set_page_size_kb(4);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("com.google.perfetto.ftrace");
         ds_config->mutable_ftrace_config()->add_ftrace_events("sched_switch");

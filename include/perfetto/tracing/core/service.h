@@ -77,8 +77,6 @@ class Service {
     // buffer (shared between Service and Producer) have changed.
     virtual void CommitData(const CommitDataRequest&) = 0;
 
-    // TODO(primiano): remove this, we shouldn't be exposing the raw
-    // SHM object but only the TraceWriter (below).
     virtual SharedMemory* shared_memory() const = 0;
 
     virtual size_t page_size_kb() = 0;
