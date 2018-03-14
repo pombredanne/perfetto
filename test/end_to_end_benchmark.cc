@@ -110,7 +110,7 @@ static void BM_EndToEnd(benchmark::State& state) {
   consumer.EnableTracing();
   task_runner.RunUntilCheckpoint("producer.enabled");
 
-  uint64_t wall_start_ns = base::GetWallTimeNs();
+  uint64_t wall_start_ns = base::GetWallTimeNs().count();
   uint64_t thread_start_ns = service_thread.GetThreadCPUTimeNs();
   while (state.KeepRunning()) {
     auto cname = "produced.and.committed." + std::to_string(state.iterations());
@@ -120,7 +120,7 @@ static void BM_EndToEnd(benchmark::State& state) {
     task_runner.RunUntilCheckpoint(cname);
   }
   uint64_t thread_ns = service_thread.GetThreadCPUTimeNs() - thread_start_ns;
-  uint64_t wall_ns = base::GetWallTimeNs() - wall_start_ns;
+  uint64_t wall_ns = base::GetWallTimeNs().count() - wall_start_ns;
   PERFETTO_ILOG("Service CPU usage: %.2f,  CPU/iterations: %lf",
                 100.0 * thread_ns / wall_ns, 1.0 * thread_ns / message_count);
 
@@ -134,7 +134,7 @@ static void BM_EndToEnd(benchmark::State& state) {
 }
 
 BENCHMARK(BM_EndToEnd)
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
     ->Range(16, 1024 * 1024);

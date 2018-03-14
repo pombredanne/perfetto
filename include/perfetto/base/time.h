@@ -17,34 +17,42 @@
 #ifndef INCLUDE_PERFETTO_BASE_TIME_H_
 #define INCLUDE_PERFETTO_BASE_TIME_H_
 
-#include <stdint.h>
 #include <time.h>
+
+#include <chrono>
 
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace base {
 
-using TimeMillis = uint64_t;
-using TimeNanos = uint64_t;
+using TimeMillis = std::chrono::milliseconds;
+using TimeNanos = std::chrono::nanoseconds;
 
 inline TimeNanos GetTimerInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
   PERFETTO_CHECK(clock_gettime(clk_id, &ts) == 0);
-  return static_cast<uint64_t>(ts.tv_sec) * 1000000000UL +
-         static_cast<uint64_t>(ts.tv_nsec);
+  return TimeNanos(ts.tv_sec * 1000000000L + ts.tv_nsec);
 }
 
-inline TimeMillis GetWallTimeNs() {
+inline TimeNanos GetWallTimeNs() {
   return GetTimerInternalNs(CLOCK_MONOTONIC_RAW);
 }
 
 inline TimeMillis GetWallTimeMs() {
-  return GetWallTimeNs() / 1000000UL;
+  return std::chrono::duration_cast<TimeMillis>(GetWallTimeNs());
 }
 
 inline TimeNanos GetThreadCPUTimeNs() {
   return GetTimerInternalNs(CLOCK_THREAD_CPUTIME_ID);
+}
+
+inline struct timespec ToPosixTimespec(TimeMillis time) {
+  struct timespec ts {};
+  const long time_s = static_cast<long>(time.count() / 1000);
+  ts.tv_sec = time_s;
+  ts.tv_nsec = (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
+  return ts;
 }
 
 }  // namespace base
