@@ -94,7 +94,7 @@ void ProbesProducer::CreateDataSourceInstance(
   if (source_config.name() == kFtraceSourceName) {
     CreateFtraceDataSourceInstance(id, source_config);
   } else if (source_config.name() == kInodeFileMapSourceName) {
-    CreateInodeFileMapDataSourceInstance(id, source_config);
+    CreateInodeFileDataSourceInstance(id, source_config);
   } else if (source_config.name() == kProcessStatsSourceName) {
     CreateProcessStatsDataSourceInstance(id, source_config);
   } else {
@@ -153,7 +153,7 @@ void ProbesProducer::CreateFtraceDataSourceInstance(
   AddWatchdogsTimer(id, source_config);
 }
 
-void ProbesProducer::CreateInodeFileMapDataSourceInstance(
+void ProbesProducer::CreateInodeFileDataSourceInstance(
     DataSourceInstanceID id,
     const DataSourceConfig& source_config) {
   PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
@@ -162,8 +162,8 @@ void ProbesProducer::CreateInodeFileMapDataSourceInstance(
       static_cast<BufferID>(source_config.target_buffer()));
   if (system_inodes_.empty())
     CreateDeviceToInodeMap("/system/", &system_inodes_);
-  auto file_map_source = std::unique_ptr<InodeFileMapDataSource>(
-      new InodeFileMapDataSource(&system_inodes_, std::move(trace_writer)));
+  auto file_map_source = std::unique_ptr<InodeFileDataSource>(
+      new InodeFileDataSource(&system_inodes_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
 }

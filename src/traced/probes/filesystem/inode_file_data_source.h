@@ -33,33 +33,33 @@
 namespace perfetto {
 
 using Inode = uint64_t;
+using InodeFileMap = protos::pbzero::InodeFileMap;
 
 class InodeMapValue {
  public:
-  InodeMapValue() {}
-
-  protos::pbzero::InodeFileMap_Entry_Type getType() const { return _type; }
-  std::set<std::string> getPaths() const { return _paths; }
-  void setType(protos::pbzero::InodeFileMap_Entry_Type type) { _type = type; }
-  void setPaths(std::set<std::string> paths) { _paths = paths; }
-  void addPath(std::string path) { _paths.emplace(path); }
+  protos::pbzero::InodeFileMap_Entry_Type type() const { return entry_type_; }
+  std::set<std::string> paths() const { return paths_; }
+  void SetType(protos::pbzero::InodeFileMap_Entry_Type entry_type) {
+    entry_type_ = entry_type;
+  }
+  void SetPaths(std::set<std::string> paths) { paths_ = paths; }
+  void AddPath(std::string path) { paths_.emplace(path); }
 
  private:
-  protos::pbzero::InodeFileMap_Entry_Type _type;
-  std::set<std::string> _paths;
+  protos::pbzero::InodeFileMap_Entry_Type entry_type_;
+  std::set<std::string> paths_;
 };
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
 
-class InodeFileMapDataSource {
+class InodeFileDataSource {
  public:
-  explicit InodeFileMapDataSource(
+  explicit InodeFileDataSource(
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
           file_system_inodes,
       std::unique_ptr<TraceWriter> writer);
-  ~InodeFileMapDataSource();
 
   void WriteInodes(const FtraceMetadata& metadata);
 

@@ -22,7 +22,7 @@
 namespace perfetto {
 namespace {
 
-// TODO(azapone): Add tests
+// TODO(azappone): Add tests
 
 }  // namespace
 }  // namespace perfetto
