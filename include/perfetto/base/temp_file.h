@@ -38,6 +38,7 @@ class TempFile {
   int operator*() const { return *fd_; }
 
   // Unlinks the file from the filesystem but keeps the fd() open.
+  // It is safe to call this multiple times.
   void Unlink();
 
   // Releases the underlying file descriptor. Will unlink the file from the

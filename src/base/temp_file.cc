@@ -49,8 +49,7 @@ TempFile TempFile::CreateUnlinked() {
 TempFile::TempFile() = default;
 
 TempFile::~TempFile() {
-  if (!path_.empty())
-    unlink(path_.c_str());
+  Unlink();
 }
 
 ScopedFile TempFile::ReleaseFD() {
