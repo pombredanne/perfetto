@@ -119,19 +119,20 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
     }
   };
 
-  // Finally, make the consumer connect to the service.
   auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
   FakeConsumer consumer(trace_config, std::move(on_connect),
                         std::move(on_consumer_data), &task_runner);
-  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
   task_runner.RunUntilCheckpoint("consumer.connected");
-  consumer.EnableTracing();
 
   // Traced probes should flush data as it produces it.
+  consumer.EnableTracing();
   task_runner.PostDelayedTask([&consumer] { consumer.ReadTraceData(); }, 3000);
 
   task_runner.RunUntilCheckpoint("readback.complete", 10000);
+
+  consumer.Disconnect();
 }
 
 TEST_F(PerfettoTest, TestFakeProducer) {
@@ -195,10 +196,10 @@ TEST_F(PerfettoTest, TestFakeProducer) {
     }
   };
 
-  // Finally, make the consumer connect to the service.
   auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
   FakeConsumer consumer(trace_config, std::move(on_connect),
                         std::move(on_consumer_data), &task_runner);
+
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
   task_runner.RunUntilCheckpoint("consumer.connected");
 

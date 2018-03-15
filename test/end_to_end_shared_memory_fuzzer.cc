@@ -124,11 +124,14 @@ class FakeProducerDelegate : public ThreadDelegate {
 int FuzzSharedMemory(const uint8_t* data, size_t size);
 
 int FuzzSharedMemory(const uint8_t* data, size_t size) {
+  base::TestTaskRunner task_runner;
+
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
       new ServiceDelegate(kProducerSocket, kConsumerSocket)));
+#endif
 
-  base::TestTaskRunner task_runner;
   auto on_produced_and_committed =
       task_runner.CreateCheckpoint("produced.and.committed");
   auto posted_on_produced_and_committed = [&task_runner,
@@ -161,6 +164,7 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
   FakeConsumer consumer(trace_config, std::move(on_connect),
                         std::move(on_consumer_data), &task_runner);
+
   consumer.Connect(kConsumerSocket);
   task_runner.RunUntilCheckpoint("consumer.connected");
 
@@ -169,6 +173,8 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
 
   consumer.ReadTraceData();
   task_runner.RunUntilCheckpoint("readback.complete");
+
+  consumer.Disconnect();
 
   return 0;
 }
