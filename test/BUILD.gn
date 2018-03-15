@@ -54,6 +54,7 @@ if (use_libfuzzer) {
     deps = [
       ":fake_consumer",
       ":task_runner_thread",
+      ":task_runner_thread_delegates",
       "../gn:default_deps",
       "../src/base:test_support",
       "../src/protozero",
