@@ -33,6 +33,7 @@
 #include "src/tracing/core/packet_stream_validator.h"
 #include "src/tracing/core/trace_buffer.h"
 
+#include "perfetto/trace/clock_snapshot.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
@@ -51,6 +52,7 @@ namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
+constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 
 constexpr uint64_t kMillisPerHour = 3600000;
 
@@ -334,6 +336,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   }
   std::vector<TracePacket> packets;
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
+  MaybeSnapshotClocks(tracing_session, &packets);
 
   // This is a rough threshold to determine how to split packets within each
   // IPC. This is not an upper bound, we just stop accumulating packets and send
@@ -663,6 +666,37 @@ void ServiceImpl::UpdateMemoryGuardrail() {
   uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
   base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
 #endif
+}
+
+void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
+                                      std::vector<TracePacket>* packets) {
+  base::TimeMillis now = base::GetWallTimeMs();
+  if (now < tracing_session->last_clock_snapshot + kClockSnapshotInterval)
+    return;
+  tracing_session->last_clock_snapshot = now;
+  struct {
+    clockid_t id;
+    protos::ClockSnapshot::Clock::Type type;
+    struct timespec ts;
+  } clocks[] = {
+      {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+      {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+      // TODO(skyostil): Add all the Linux-specific clocks.
+  };
+  protos::TracePacket packet;
+  protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
+  // First snapshot all the clocks as atomically as we can.
+  for (auto& clock : clocks)
+    clock_gettime(clock.id, &clock.ts);
+  for (auto& clock : clocks) {
+    protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
+    c->set_type(clock.type);
+    c->set_timestamp(clock.ts.tv_sec * 1000000000L + clock.ts.tv_nsec);
+  }
+  Slice slice = Slice::Allocate(packet.ByteSize());
+  PERFETTO_CHECK(packet.SerializeToArray(slice.own_data(), packet.ByteSize()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
