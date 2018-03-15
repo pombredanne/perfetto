@@ -29,8 +29,6 @@
 
 namespace perfetto {
 
-using BlockDeviceID = decltype(stat::st_dev);
-
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {

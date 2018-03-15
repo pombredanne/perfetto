@@ -25,6 +25,7 @@
 #include <string>
 
 #include "perfetto/base/weak_ptr.h"
+#include "perfetto/traced/data_source_types.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/filesystem/fs_mount.h"
@@ -33,7 +34,6 @@
 
 namespace perfetto {
 
-using Inode = uint64_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 
