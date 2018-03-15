@@ -58,12 +58,6 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 #define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
 #endif
 
-class PerfettoTest : public ::testing::Test {
- public:
-  PerfettoTest() {}
-  ~PerfettoTest() override = default;
-};
-
 // TODO(b/73453011): reenable this on more platforms (including standalone
 // Android).
 #if defined(PERFETTO_BUILD_WITH_ANDROID)
@@ -71,7 +65,7 @@ class PerfettoTest : public ::testing::Test {
 #else
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
-TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
+TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
@@ -135,7 +129,7 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   consumer.Disconnect();
 }
 
-TEST_F(PerfettoTest, TestFakeProducer) {
+TEST(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
