@@ -34,7 +34,6 @@
 #include "src/base/test/test_task_runner.h"
 #include "test/fake_consumer.h"
 #include "test/task_runner_thread.h"
-#include "test/task_runner_thread_delegates.h"
 
 namespace perfetto {
 namespace shm_fuzz {
@@ -50,14 +49,10 @@ class FakeProducer : public Producer {
   FakeProducer(std::string name,
                const uint8_t* data,
                size_t size,
-               std::function<void()> on_create_data_source_instance)
-      : name_(std::move(name)),
-        data_(data),
-        size_(size),
-        on_create_data_source_instance_(on_create_data_source_instance) {}
+               FakeConsumer* consumer)
+      : name_(std::move(name)), data_(data), size_(size), consumer_(consumer) {}
 
   void Connect(const char* socket_name, base::TaskRunner* task_runner) {
-    task_runner_ = task_runner;
     endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
   }
 
@@ -73,54 +68,45 @@ class FakeProducer : public Producer {
   void CreateDataSourceInstance(
       DataSourceInstanceID,
       const DataSourceConfig& source_config) override {
-    trace_writer_ = endpoint_->CreateTraceWriter(
-        static_cast<BufferID>(source_config.target_buffer()));
-    task_runner_->PostTask(on_create_data_source_instance_);
-  }
-
-  void TearDownDataSourceInstance(DataSourceInstanceID) override {
-    trace_writer_.reset();
-  }
-
-  void ProduceEventBatch(std::function<void()> callback) {
-    PERFETTO_DCHECK(trace_writer_);
-
     // The block is to destroy |packet| and |trace_writer| in order. Destroying
     // the |trace_writer| will cause a flush of the completed packets.
-    auto packet = trace_writer_->NewTracePacket();
-    packet->stream_writer_->WriteBytes(data_, size_);
-    packet->Finalize();
-
-    auto end_packet = trace_writer_->NewTracePacket();
-    end_packet->set_for_testing()->set_str("end");
-    end_packet->Finalize();
+    {
+      auto trace_writer = endpoint_->CreateTraceWriter(
+          static_cast<BufferID>(source_config.target_buffer()));
+      auto packet = trace_writer->NewTracePacket();
+      packet->stream_writer_->WriteBytes(data_, size_);
+      packet->Finalize();
+    }
+    {
+      auto trace_writer = endpoint_->CreateTraceWriter(
+          static_cast<BufferID>(source_config.target_buffer()));
+      auto end_packet = trace_writer->NewTracePacket();
+      end_packet->set_for_testing()->set_str("end");
+      end_packet->Finalize();
+    }
+    consumer_->BusyWaitReadBuffers();
   }
+
+  void TearDownDataSourceInstance(DataSourceInstanceID) override {}
 
  private:
   const std::string name_;
   const uint8_t* data_;
   const size_t size_;
   DataSourceID id_ = 0;
-
-  base::TaskRunner* task_runner_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
-  std::function<void()> on_create_data_source_instance_;
-  std::unique_ptr<TraceWriter> trace_writer_;
+  FakeConsumer* consumer_;
 };
 
 class FakeProducerDelegate : public ThreadDelegate {
  public:
-  FakeProducerDelegate(const uint8_t* data,
-                       size_t size,
-                       std::function<void()> on_create_data_source_instance)
-      : data_(data),
-        size_(size),
-        on_create_data_source_instance_(on_create_data_source_instance) {}
+  FakeProducerDelegate(const uint8_t* data, size_t size, FakeConsumer* consumer)
+      : data_(data), size_(size), consumer_(consumer) {}
   ~FakeProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
     producer_.reset(new FakeProducer("android.perfetto.FakeProducer", data_,
-                                     size_, on_create_data_source_instance_));
+                                     size_, consumer_));
     producer_->Connect(kProducerSocket, task_runner);
   }
 
@@ -128,15 +114,31 @@ class FakeProducerDelegate : public ThreadDelegate {
   std::unique_ptr<FakeProducer> producer_;
   const uint8_t* data_;
   const size_t size_;
-  std::function<void()> on_create_data_source_instance_;
+  FakeConsumer* consumer_;
+};
+
+class ServiceDelegate : public ThreadDelegate {
+ public:
+  ServiceDelegate() = default;
+  ~ServiceDelegate() override = default;
+  void Initialize(base::TaskRunner* task_runner) override {
+    svc_ = ServiceIPCHost::CreateInstance(task_runner);
+    unlink(kProducerSocket);
+    unlink(kConsumerSocket);
+    svc_->Start(kProducerSocket, kConsumerSocket);
+  }
+
+ private:
+  std::unique_ptr<ServiceIPCHost> svc_;
+  base::ScopedFile producer_fd_;
+  base::ScopedFile consumer_fd_;
 };
 
 int FuzzSharedMemory(const uint8_t* data, size_t size);
 
 int FuzzSharedMemory(const uint8_t* data, size_t size) {
   TaskRunnerThread service_thread("perfetto.svc");
-  service_thread.Start(std::unique_ptr<ServiceDelegate>(
-      new ServiceDelegate(kProducerSocket, kConsumerSocket)));
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate()));
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
@@ -149,26 +151,27 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   ds_config->set_target_buffer(0);
 
   base::TestTaskRunner task_runner;
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
   // Wait for sentinel message from Producer, then signal no.more.packets.
-  auto on_consumer_data = [&on_readback_complete](
-                              std::vector<TracePacket> packets, bool has_more) {
+  auto function = [&finish](std::vector<TracePacket> packets, bool has_more) {
     for (auto& p : packets) {
       p.Decode();
       if (p->for_testing().str() == "end")
-        on_readback_complete();
+        finish();
     }
   };
   auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
   FakeConsumer consumer(trace_config, std::move(on_connect),
-                        std::move(on_consumer_data), &task_runner);
+                        std::move(function), &task_runner);
   consumer.Connect(kConsumerSocket);
   task_runner.RunUntilCheckpoint("consumer.connected");
+
+  consumer.EnableTracing();
 
   TaskRunnerThread producer_thread("perfetto.prd");
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size, &consumer)));
-  task_runner.RunUntilCheckpoint("readback.complete");
+  task_runner.RunUntilCheckpoint("no.more.packets");
   return 0;
 }
 
