@@ -22,43 +22,25 @@ import android.os.Bundle;
 import android.os.Handler;
 
 public class ProducerActivity extends Activity {
-    private boolean paused = true;
-    private final Handler handler = new Handler();
 
     @Override
     public void onResume() {
         super.onResume();
 
-        paused = false;
-        handler.post(new Runnable() {
-            @Override
+        startForegroundService(new Intent(ProducerActivity.this, ProducerService.class));
+        startForegroundService(new Intent(ProducerActivity.this, ProducerIsolatedService.class));
+
+        System.loadLibrary("perfettocts_jni");
+        new Thread(new Runnable() {
             public void run() {
-                if (paused) {
-                    return;
+                try {
+                    setupProducer();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
                 }
-
-                startService(new Intent(ProducerActivity.this, ProducerService.class));
-                startService(new Intent(ProducerActivity.this, ProducerIsolatedService.class));
-
-                System.loadLibrary("perfettocts_jni");
-                new Thread(new Runnable() {
-                    public void run() {
-                        try {
-                            setupProducer();
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                })
-                        .start();
             }
-        });
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        paused = true;
+        })
+                .start();
     }
 
     private static native void setupProducer();
