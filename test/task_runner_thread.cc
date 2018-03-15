@@ -62,18 +62,19 @@ void TaskRunnerThread::Stop() {
 uint64_t TaskRunnerThread::GetThreadCPUTimeNs() {
   std::condition_variable cv;
   std::unique_lock<std::mutex> lock(mutex_);
-  std::atomic<uint64_t> thread_time_ns{};
+  uint64_t thread_time_ns = 0;
 
   if (!runner_)
     return 0;
 
-  runner_->PostTask([&thread_time_ns, &cv] {
-    thread_time_ns.store(base::GetThreadCPUTimeNs().count());
+  runner_->PostTask([this, &thread_time_ns, &cv] {
+    std::unique_lock<std::mutex> inner_lock(mutex_);
+    thread_time_ns = base::GetThreadCPUTimeNs().count();
     cv.notify_one();
   });
 
-  cv.wait(lock, [&thread_time_ns] { return thread_time_ns.load() != 0; });
-  return thread_time_ns.load();
+  cv.wait(lock, [&thread_time_ns] { return thread_time_ns != 0; });
+  return thread_time_ns;
 }
 
 void TaskRunnerThread::Run(std::unique_ptr<ThreadDelegate> delegate) {
