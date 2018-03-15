@@ -126,6 +126,9 @@ if (!build_with_chromium) {
     sources = [
       "end_to_end_benchmark.cc",
     ]
+    if (is_android && !build_with_chromium) {
+      deps += [ "../src/base:android_task_runner" ]
+    }
     if (start_daemons_for_testing) {
       cflags = [ "-DPERFETTO_START_DAEMONS_FOR_TESTING" ]
     }

@@ -76,13 +76,12 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
     char payload[1024];
-    uint64_t string_size = 1024;
-    memset(payload, '.', string_size);
-    payload[string_size - 1] = 0;
+    memset(payload, '.', sizeof(payload));
+    payload[sizeof(payload) - 1] = 0;
     for (size_t i = 0; i < message_count_; i++) {
       auto handle = trace_writer_->NewTracePacket();
       handle->set_for_testing()->set_seq_value(rnd_engine_());
-      handle->set_for_testing()->set_str(payload, string_size);
+      handle->set_for_testing()->set_str(payload, sizeof(payload));
     }
     trace_writer_->Flush(callback);
   });
