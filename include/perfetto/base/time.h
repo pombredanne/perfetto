@@ -33,7 +33,7 @@ constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC;
 inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
   PERFETTO_CHECK(clock_gettime(clk_id, &ts) == 0);
-  return TimeNanos(ts.tv_sec * 1000000000L + ts.tv_nsec);
+  return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
 }
 
 inline TimeNanos GetWallTimeNs() {
