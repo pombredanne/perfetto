@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/temp_file.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/ipc/service.h"
 #include "perfetto/ipc/service_descriptor.h"
 #include "src/base/test/test_task_runner.h"
