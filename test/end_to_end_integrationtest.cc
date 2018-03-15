@@ -186,9 +186,13 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 #endif
 
   auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
+  auto posted_on_producer_enabled = [&task_runner, &on_producer_enabled] {
+    task_runner.PostTask(on_producer_enabled);
+  };
   TaskRunnerThread producer_thread("perfetto.prd");
   std::unique_ptr<FakeProducerDelegate> producer_delegate(
-      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME, on_producer_enabled));
+      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
+                               posted_on_producer_enabled));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
 
@@ -204,8 +208,12 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 
   auto on_produced_and_committed =
       task_runner.CreateCheckpoint("produced.and.committed");
+  auto posted_on_produced_and_committed = [&task_runner,
+                                           &on_produced_and_committed] {
+    task_runner.PostTask(on_produced_and_committed);
+  };
   FakeProducer* producer = producer_delegate_cached->producer();
-  producer->ProduceEventBatch(on_produced_and_committed);
+  producer->ProduceEventBatch(posted_on_produced_and_committed);
   task_runner.RunUntilCheckpoint("produced.and.committed");
 
   consumer.ReadTraceData();

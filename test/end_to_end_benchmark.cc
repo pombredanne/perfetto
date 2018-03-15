@@ -70,8 +70,12 @@ static void BM_EndToEnd(benchmark::State& state) {
 
   TaskRunnerThread producer_thread("perfetto.prd");
   auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
+  auto posted_on_producer_enabled = [&task_runner, &on_producer_enabled] {
+    task_runner.PostTask(on_producer_enabled);
+  };
   std::unique_ptr<FakeProducerDelegate> producer_delegate(
-      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME, on_producer_enabled));
+      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
+                               posted_on_producer_enabled));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
 
@@ -115,8 +119,12 @@ static void BM_EndToEnd(benchmark::State& state) {
   while (state.KeepRunning()) {
     auto cname = "produced.and.committed." + std::to_string(state.iterations());
     auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
+    auto posted_on_produced_and_committed = [&task_runner,
+                                             &on_produced_and_committed] {
+      task_runner.PostTask(on_produced_and_committed);
+    };
     FakeProducer* producer = producer_delegate_cached->producer();
-    producer->ProduceEventBatch(on_produced_and_committed);
+    producer->ProduceEventBatch(posted_on_produced_and_committed);
     task_runner.RunUntilCheckpoint(cname);
   }
   uint64_t thread_ns = service_thread.GetThreadCPUTimeNs() - thread_start_ns;
@@ -137,5 +145,5 @@ BENCHMARK(BM_EndToEnd)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Range(16, 1024 * 1024);
+    ->Range(16, 256);
 }
