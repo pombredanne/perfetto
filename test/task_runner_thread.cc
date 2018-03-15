@@ -78,7 +78,6 @@ uint64_t TaskRunnerThread::GetThreadCPUTimeNs() {
 }
 
 void TaskRunnerThread::Run(std::unique_ptr<ThreadDelegate> delegate) {
-  tid_.store(static_cast<uint32_t>(syscall(__NR_gettid)));
   pthread_setname_np(pthread_self(), name_);
 
   // Create the task runner and execute the specicalised code.

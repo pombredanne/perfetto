@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
 #include <unistd.h>
 #include <chrono>
 #include <condition_variable>
@@ -22,6 +21,7 @@
 #include <random>
 #include <thread>
 
+#include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"

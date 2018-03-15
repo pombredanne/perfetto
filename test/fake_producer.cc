@@ -16,7 +16,6 @@
 
 #include "test/fake_producer.h"
 
-#include <chrono>
 #include <condition_variable>
 #include <mutex>
 

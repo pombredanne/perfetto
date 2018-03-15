@@ -58,7 +58,6 @@ class TaskRunnerThread {
   const char* const name_;
   std::thread thread_;
   std::condition_variable ready_;
-  std::atomic<uint32_t> tid_{};
 
   // All variables below this point are protected by |mutex_|.
   std::mutex mutex_;

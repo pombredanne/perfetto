@@ -46,7 +46,7 @@ static void BM_EndToEnd(benchmark::State& state) {
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
 
-  // TODO: the buffer size should be a function of the benchmark.
+  // TODO(lalitm): the buffer size should be a function of the benchmark.
   trace_config.add_buffers()->set_size_kb(512);
 
   // Create the buffer for ftrace.

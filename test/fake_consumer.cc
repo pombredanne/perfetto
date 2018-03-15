@@ -61,7 +61,6 @@ void FakeConsumer::FreeBuffers() {
 }
 
 void FakeConsumer::ReadTraceData() {
-  // endpoint_->DisableTracing();
   endpoint_->ReadBuffers();
 }
 
