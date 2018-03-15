@@ -44,17 +44,17 @@ class ServiceDelegate : public ThreadDelegate {
 // This is used only in daemon starting integrations tests.
 class ProbesProducerDelegate : public ThreadDelegate {
  public:
-  ProbesProducerDelegate(const std::string& producer_socket)
+  ProbesProducerDelegate(const char* producer_socket)
       : producer_socket_(producer_socket) {}
   ~ProbesProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
     producer_.reset(new ProbesProducer);
-    producer_->ConnectWithRetries(producer_socket_.c_str(), task_runner);
+    producer_->ConnectWithRetries(producer_socket_, task_runner);
   }
 
  private:
-  std::string producer_socket_;
+  const char* producer_socket_;
   std::unique_ptr<ProbesProducer> producer_;
 };
 
