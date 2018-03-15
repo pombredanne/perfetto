@@ -145,5 +145,5 @@ BENCHMARK(BM_EndToEnd)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Range(16, 256);
+    ->Range(16, 1024 * 1024);
 }
