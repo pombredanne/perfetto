@@ -17,32 +17,19 @@
 package android.perfetto.producer;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.Service;
 import android.os.IBinder;
-import android.content.Context;
 import android.content.Intent;
 
 public class ProducerIsolatedService extends Service {
-    private static final String NOTIF_CHANNEL_ID = "default";
-    private static final String NOTIF_CHANNEL_NAME = "perfetto_isolated_service";
-    private static final int NOTIFICATION_ID = 1;
+    private static final int NOTIFICATION_ID = 123;
 
     @Override
     public void onCreate() {
-        NotificationManager manager =
-                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        NotificationChannel notificationChannel = new NotificationChannel(
-                NOTIF_CHANNEL_ID, NOTIF_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
-        notificationChannel.enableLights(true);
-        notificationChannel.setDescription("Perfetto isolated service");
-        notificationChannel.enableVibration(true);
-        notificationChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-        manager.createNotificationChannel(notificationChannel);
-
-        Notification.Builder builder = new Notification.Builder(this, NOTIF_CHANNEL_ID);
-        builder.setContentTitle("Perfetto isolated service");
+        Notification.Builder builder = new Notification.Builder(this, "isolated_service");
+        builder.setContentTitle("Perfetto isolated service")
+                .setContentText("Perfetto isolated service")
+                .setSmallIcon(R.mipmap.ic_launcher);
 
         startForeground(NOTIFICATION_ID, builder.build());
 

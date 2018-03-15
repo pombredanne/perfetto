@@ -17,6 +17,10 @@
 package android.perfetto.producer;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,6 +30,21 @@ public class ProducerActivity extends Activity {
     @Override
     public void onResume() {
         super.onResume();
+
+        NotificationManager manager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        NotificationChannel serviceChannel =
+                new NotificationChannel("service", "service", NotificationManager.IMPORTANCE_LOW);
+        serviceChannel.setDescription("Perfetto service");
+        serviceChannel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+        manager.createNotificationChannel(serviceChannel);
+
+        NotificationChannel isolatedChannel = new NotificationChannel(
+                "isolated_service", "isolated_service", NotificationManager.IMPORTANCE_LOW);
+        isolatedChannel.setDescription("Perfetto isolated service");
+        isolatedChannel.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+        manager.createNotificationChannel(isolatedChannel);
 
         startForegroundService(new Intent(ProducerActivity.this, ProducerService.class));
         startForegroundService(new Intent(ProducerActivity.this, ProducerIsolatedService.class));
