@@ -75,7 +75,9 @@ class Service {
 
     // Called by the Producer to signal that some pages in the shared memory
     // buffer (shared between Service and Producer) have changed.
-    virtual void CommitData(const CommitDataRequest&) = 0;
+    using CommitDataCallback = std::function<void()>;
+    virtual void CommitData(const CommitDataRequest&,
+                            CommitDataCallback callback = {}) = 0;
 
     virtual SharedMemory* shared_memory() const = 0;
 
