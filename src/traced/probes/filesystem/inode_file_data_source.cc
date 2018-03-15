@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <queue>
 
-//#include "include/perfetto/ftrace_reader/ftrace_controller.h"
+#include "include/perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -33,9 +33,7 @@ namespace perfetto {
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map,
-    const std::map<Inode, BlockDeviceID>& data_partition_inodes,
-    std::multimap<BlockDeviceID, std::string> mount_points) {
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {
   std::queue<std::string> queue;
   queue.push(root_directory);
   while (!queue.empty()) {
@@ -65,17 +63,6 @@ void CreateDeviceToInodeMap(
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
       } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
-      }
-
-      // If given a non-empty set of inode numbers, only add to the map for the
-      // inode numbers provided
-      if (!data_partition_inodes.empty()) {
-        auto unresolved_inode = data_partition_inodes.find(inode_number);
-        if (unresolved_inode == data_partition_inodes.end())
-          continue;
-        BlockDeviceID provided_block_device_id = unresolved_inode->second;
-        if (provided_block_device_id != block_device_id)
-          continue;
       }
 
       // Update map
@@ -164,28 +151,6 @@ void InodeFileDataSource::OnInodes(
       }
     }
 
-    // Full scan for any unresolved inodes in the /data partition
-    // Currently not enabled since we are not filtering our own scanning
-    bool fullScan = false;
-    if (fullScan && !data_partition_inodes.empty()) {
-      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>
-          data_partition_files;
-      // TODO(azappone): Make root directory a mount point
-      std::string root_directory = "/data";
-      CreateDeviceToInodeMap(root_directory, &data_partition_files,
-                             data_partition_inodes, mount_points_);
-      for (const auto& inode_number : data_partition_inodes) {
-        // Search in /data partition and add to InodeFileMap if found
-        bool inData =
-            AddInodeFileMapEntry(inode_file_map, block_device_id,
-                                 inode_number.first, data_partition_files);
-        // Could not be found, just add the inode number
-        if (!inData) {
-          auto* entry = inode_file_map->add_entries();
-          entry->set_inode_number(inode_number.first);
-        }
-      }
-    }
     trace_packet->Finalize();
   }
 }

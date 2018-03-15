@@ -34,7 +34,6 @@
 namespace perfetto {
 
 using Inode = uint64_t;
-using SessionID = uint32_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 
@@ -55,9 +54,7 @@ class InodeMapValue {
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map,
-    const std::map<Inode, BlockDeviceID>& data_partition_inodes,
-    std::multimap<BlockDeviceID, std::string> mount_points);
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
 
 class InodeFileDataSource {
  public:
