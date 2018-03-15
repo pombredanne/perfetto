@@ -26,21 +26,18 @@ namespace perfetto {
 // This is used only in daemon starting integrations tests.
 class ServiceDelegate : public ThreadDelegate {
  public:
-  ServiceDelegate(const std::string& producer_socket,
-                  const std::string& consumer_socket)
+  ServiceDelegate(const char* producer_socket, const char* consumer_socket)
       : producer_socket_(producer_socket), consumer_socket_(consumer_socket) {}
   ~ServiceDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
     svc_ = ServiceIPCHost::CreateInstance(task_runner);
-    unlink(producer_socket_.c_str());
-    unlink(consumer_socket_.c_str());
-    svc_->Start(producer_socket_.c_str(), consumer_socket_.c_str());
+    svc_->Start(producer_socket_, consumer_socket_);
   }
 
  private:
-  std::string producer_socket_;
-  std::string consumer_socket_;
+  const char* producer_socket_;
+  const char* consumer_socket_;
   std::unique_ptr<ServiceIPCHost> svc_;
 };
 
@@ -63,7 +60,7 @@ class ProbesProducerDelegate : public ThreadDelegate {
 
 class FakeProducerDelegate : public ThreadDelegate {
  public:
-  FakeProducerDelegate(const std::string& producer_socket,
+  FakeProducerDelegate(const char* producer_socket,
                        std::function<void()> connect_callback)
       : producer_socket_(producer_socket),
         connect_callback_(std::move(connect_callback)) {}
@@ -71,14 +68,14 @@ class FakeProducerDelegate : public ThreadDelegate {
 
   void Initialize(base::TaskRunner* task_runner) override {
     producer_.reset(new FakeProducer("android.perfetto.FakeProducer"));
-    producer_->Connect(producer_socket_.c_str(), task_runner,
+    producer_->Connect(producer_socket_, task_runner,
                        std::move(connect_callback_));
   }
 
   FakeProducer* producer() { return producer_.get(); }
 
  private:
-  std::string producer_socket_;
+  const char* producer_socket_;
   std::unique_ptr<FakeProducer> producer_;
   std::function<void()> connect_callback_;
 };

@@ -23,6 +23,7 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/temp_file.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
@@ -41,22 +42,45 @@
 
 namespace perfetto {
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-using PlatformTaskRunner = base::AndroidTaskRunner;
-#else
-using PlatformTaskRunner = base::UnixTaskRunner;
-#endif
+namespace {
+int UnlinkAndFreeTempPath(char* path) {
+  if (path == PERFETTO_PRODUCER_SOCK_NAME ||
+      path == PERFETTO_CONSUMER_SOCK_NAME) {
+    return 0;
+  }
+  int ret = unlink(path);
+  free(static_cast<void*>(path));
+  return ret;
+}
+using ScopedSocketPath =
+    base::ScopedResource<char*, UnlinkAndFreeTempPath, nullptr>;
 
-// If we're building on Android and starting the daemons ourselves,
-// create the sockets in a world-writable location.
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
-    PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-#define TEST_PRODUCER_SOCK_NAME "/data/local/tmp/traced_producer"
-#define TEST_CONSUMER_SOCK_NAME "/data/local/tmp/traced_consumer"
+ScopedSocketPath GetTempSocketPath() {
+  std::string path = base::TempFile::Create().ReleasePath();
+  char* malloc_path =
+      static_cast<char*>(malloc(sizeof(char) * (path.size() + 1)));
+  size_t length = path.copy(malloc_path, path.size());
+  malloc_path[length] = '\0';
+  return ScopedSocketPath(malloc_path);
+}
+
+ScopedSocketPath GetProducerPath() {
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+  return GetTempSocketPath();
 #else
-#define TEST_PRODUCER_SOCK_NAME PERFETTO_PRODUCER_SOCK_NAME
-#define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
+  return ScopedSocketPath(PERFETTO_PRODUCER_SOCK_NAME);
 #endif
+}
+
+ScopedSocketPath GetConsumerPath() {
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+  return GetTempSocketPath();
+#else
+  return ScopedSocketPath(PERFETTO_CONSUMER_SOCK_NAME);
+#endif
+}
+
+}  // namespace
 
 // TODO(b/73453011): reenable this on more platforms (including standalone
 // Android).
@@ -68,14 +92,17 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
 
+  ScopedSocketPath producer_path = GetProducerPath();
+  ScopedSocketPath consumer_path = GetConsumerPath();
+
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
-      new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
+      new ServiceDelegate(producer_path.get(), consumer_path.get())));
 
   TaskRunnerThread producer_thread("perfetto.prd");
   producer_thread.Start(std::unique_ptr<ProbesProducerDelegate>(
-      new ProbesProducerDelegate(TEST_PRODUCER_SOCK_NAME)));
+      new ProbesProducerDelegate(producer_path.get())));
 #endif
 
   // Setip the TraceConfig for the consumer.
@@ -117,7 +144,7 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   FakeConsumer consumer(trace_config, std::move(on_connect),
                         std::move(on_consumer_data), &task_runner);
 
-  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+  consumer.Connect(consumer_path.get());
   task_runner.RunUntilCheckpoint("consumer.connected");
 
   // Traced probes should flush data as it produces it.
@@ -132,10 +159,13 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
 TEST(PerfettoTest, TestFakeProducer) {
   base::TestTaskRunner task_runner;
 
+  ScopedSocketPath producer_path = GetProducerPath();
+  ScopedSocketPath consumer_path = GetConsumerPath();
+
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
-      new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
+      new ServiceDelegate(producer_path.get(), consumer_path.get())));
 #endif
 
   auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
@@ -144,7 +174,7 @@ TEST(PerfettoTest, TestFakeProducer) {
   };
   TaskRunnerThread producer_thread("perfetto.prd");
   std::unique_ptr<FakeProducerDelegate> producer_delegate(
-      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
+      new FakeProducerDelegate(producer_path.get(),
                                posted_on_producer_enabled));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
@@ -194,7 +224,7 @@ TEST(PerfettoTest, TestFakeProducer) {
   FakeConsumer consumer(trace_config, std::move(on_connect),
                         std::move(on_consumer_data), &task_runner);
 
-  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+  consumer.Connect(consumer_path.get());
   task_runner.RunUntilCheckpoint("consumer.connected");
 
   consumer.EnableTracing();

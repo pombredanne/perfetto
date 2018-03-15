@@ -57,6 +57,16 @@ ScopedFile TempFile::ReleaseFD() {
   return std::move(fd_);
 }
 
+std::string TempFile::ReleasePath() {
+  PERFETTO_DCHECK(!path_.empty());
+
+  fd_.release();
+
+  std::string path(std::move(path_));
+  path_.clear();
+  return path;
+}
+
 void TempFile::Unlink() {
   if (path_.empty())
     return;

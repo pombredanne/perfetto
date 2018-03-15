@@ -45,6 +45,11 @@ class TempFile {
   // filesystem if it was created via CreateUnlinked().
   ScopedFile ReleaseFD();
 
+  // Releases the underlying path. This function can only be called if this file
+  // was not already unlinked. It is the caller's responsibility to clean up
+  // the file.
+  std::string ReleasePath();
+
  private:
   TempFile();
   TempFile(const TempFile&) = delete;
