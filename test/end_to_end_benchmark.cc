@@ -43,25 +43,6 @@ namespace perfetto {
 static void BM_EndToEnd(benchmark::State& state) {
   base::TestTaskRunner task_runner;
 
-  // Setup the TraceConfig for the consumer.
-  TraceConfig trace_config;
-
-  // TODO(lalitm): the buffer size should be a function of the benchmark.
-  trace_config.add_buffers()->set_size_kb(512);
-
-  // Create the buffer for ftrace.
-  auto* ds_config = trace_config.add_data_sources()->mutable_config();
-  ds_config->set_name("android.perfetto.FakeProducer");
-  ds_config->set_target_buffer(0);
-
-  // The parameters for the producer.
-  static constexpr uint32_t kRandomSeed = 42;
-  uint32_t message_count = state.range(0);
-
-  // Setup the test to use a random number generator.
-  ds_config->mutable_for_testing()->set_seed(kRandomSeed);
-  ds_config->mutable_for_testing()->set_message_count(message_count);
-
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
@@ -78,6 +59,24 @@ static void BM_EndToEnd(benchmark::State& state) {
                                posted_on_producer_enabled));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
+
+  // Setup the TraceConfig for the consumer.
+  // TODO(lalitm): the buffer size should be a function of the benchmark.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(512);
+
+  // Create the buffer for ftrace.
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->set_target_buffer(0);
+
+  // The parameters for the producer.
+  static constexpr uint32_t kRandomSeed = 42;
+  uint32_t message_count = state.range(0);
+
+  // Setup the test to use a random number generator.
+  ds_config->mutable_for_testing()->set_seed(kRandomSeed);
+  ds_config->mutable_for_testing()->set_message_count(message_count);
 
   bool is_first_packet = true;
   auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
