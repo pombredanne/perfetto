@@ -32,7 +32,7 @@
 
 namespace perfetto {
 
-using Inode = uint64_t;
+using SessionID = uint32_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
 
 class InodeMapValue {
@@ -52,21 +52,37 @@ class InodeMapValue {
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map,
+    const std::map<Inode, BlockDeviceID>& unresolved_inodes,
+    std::multimap<BlockDeviceID, std::string> mount_points);
 
 class InodeFileDataSource {
  public:
   explicit InodeFileDataSource(
+      SessionID,
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
           file_system_inodes,
       std::unique_ptr<TraceWriter> writer);
 
-  void WriteInodes(const FtraceMetadata& metadata);
+  SessionID GetSessionID() const;
+  base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
+  void WriteInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
+  // TODO(hjd): Combine with above.
+  void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
+
+  bool AddInodeFileMapEntry(
+      InodeFileMap* inode_file_map,
+      BlockDeviceID block_device_id,
+      Inode inode,
+      const std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>&
+          block_device_map);
 
  private:
+  const SessionID session_id_;
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
+  base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto

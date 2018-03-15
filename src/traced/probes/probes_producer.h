@@ -48,13 +48,15 @@ class ProbesProducer : public Producer {
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
                           base::TaskRunner* task_runner);
-  void CreateFtraceDataSourceInstance(DataSourceInstanceID id,
-                                      const DataSourceConfig& source_config);
-  void CreateProcessStatsDataSourceInstance(
-      DataSourceInstanceID id,
-      const DataSourceConfig& source_config);
-  void CreateInodeFileDataSourceInstance(DataSourceInstanceID id,
-                                         const DataSourceConfig& source_config);
+  void CreateFtraceDataSourceInstance(SessionID session_id,
+                                      DataSourceInstanceID id,
+                                      const DataSourceConfig& config);
+  void CreateProcessStatsDataSourceInstance(SessionID session_id,
+                                            DataSourceInstanceID id,
+                                            const DataSourceConfig& config);
+  void CreateInodeFileDataSourceInstance(SessionID session_id,
+                                         DataSourceInstanceID id,
+                                         const DataSourceConfig& config);
 
   void OnMetadata(const FtraceMetadata& metadata);
 
@@ -64,9 +66,12 @@ class ProbesProducer : public Producer {
 
   class SinkDelegate : public FtraceSink::Delegate {
    public:
-    explicit SinkDelegate(base::TaskRunner* task_runner,
-                          std::unique_ptr<TraceWriter> writer);
+    explicit SinkDelegate(SessionID,
+                          base::TaskRunner*,
+                          std::unique_ptr<TraceWriter>);
     ~SinkDelegate() override;
+
+    SessionID GetSessionID() const;
 
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
@@ -75,18 +80,34 @@ class ProbesProducer : public Producer {
                           const FtraceMetadata& metadata) override;
 
     void set_sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
-    void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
+
+    void set_ps_source(base::WeakPtr<ProcessStatsDataSource> ptr) {
+      ps_source_ = std::move(ptr);
+    }
+    const base::WeakPtr<ProcessStatsDataSource>& ps_source() const {
+      return ps_source_;
+    }
+
+    void set_file_source(base::WeakPtr<InodeFileDataSource> ptr) {
+      file_source_ = std::move(ptr);
+    }
+    const base::WeakPtr<InodeFileDataSource>& file_source() const {
+      return file_source_;
+    }
 
    private:
+    const SessionID session_id_;
     base::TaskRunner* task_runner_;
     std::unique_ptr<FtraceSink> sink_ = nullptr;
     std::unique_ptr<TraceWriter> writer_;
 
+    base::WeakPtr<ProcessStatsDataSource> ps_source_;
+
     // Keep this after the TraceWriter because TracePackets must not outlive
     // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
-    // Keep this last.
-    base::WeakPtrFactory<SinkDelegate> weak_factory_;
+    base::WeakPtr<InodeFileDataSource> file_source_;
+    base::WeakPtrFactory<SinkDelegate> weak_factory_;  // Keep last.
   };
 
   enum State {

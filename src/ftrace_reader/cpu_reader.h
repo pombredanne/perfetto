@@ -115,7 +115,7 @@ class CpuReader {
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
-    metadata->AddInode(t);
+    metadata->AddInode(static_cast<uint64_t>(t));
   }
 
   template <typename T>
@@ -123,9 +123,13 @@ class CpuReader {
                         size_t field_id,
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
+    // uint32_t t = ReadIntoVarInt<uint32_t>(start, field_id, out);
+    // PERFETTO_LOG("READ3 block device id=%" PRIu32, t);
+    // uint64_t t = ReadIntoVarInt<uint64_t>(start, field_id, out);
+    // PERFETTO_LOG("READ6 block device id=%" PRIu64, t);
     T t = ReadIntoVarInt<T>(start, field_id, out);
     PERFETTO_DCHECK(t != 0);
-    metadata->AddDevice(t);
+    metadata->AddDevice(static_cast<uint64_t>(t));
   }
 
   static void ReadPid(const uint8_t* start,

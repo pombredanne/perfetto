@@ -368,11 +368,13 @@ FtraceMetadata::FtraceMetadata() {
   pids.reserve(10);
 }
 
-void FtraceMetadata::AddDevice(uint64_t device_id) {
+void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
 }
 
-void FtraceMetadata::AddInode(uint64_t inode_number) {
+void FtraceMetadata::AddInode(Inode inode_number) {
+  PERFETTO_LOG("GIVEN block device id=%" PRIu64 " and inode=%" PRIu64,
+               last_seen_device_id, inode_number);
   inode_and_device.push_back(std::make_pair(inode_number, last_seen_device_id));
 }
 
