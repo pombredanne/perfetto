@@ -537,7 +537,6 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    // TODO(taylori): Handle multiple producers/producer configs.
     producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb(
                                    producer->producer_->GetProducerName()) == 0)
                                   ? base::kPageSize / 1024  // default
