@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 
-#include <gtest/gtest.h>
 #include <random>
 
+#include "gtest/gtest.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
-
 #include "test/fake_consumer.h"
 
 namespace perfetto {
