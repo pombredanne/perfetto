@@ -236,6 +236,10 @@ void ProbesProducer::Connect() {
   endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
 }
 
+std::string ProbesProducer::GetProducerName() {
+  return "com.google.perfetto.probes_producer";
+}
+
 void ProbesProducer::IncreaseConnectionBackoff() {
   connection_backoff_ms_ *= 2;
   if (connection_backoff_ms_ > kMaxConnectionBackoffMs)

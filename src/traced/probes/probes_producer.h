@@ -44,6 +44,7 @@ class ProbesProducer : public Producer {
   void CreateDataSourceInstance(DataSourceInstanceID,
                                 const DataSourceConfig&) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
+  std::string GetProducerName() override;
 
   // Our Impl
   void ConnectWithRetries(const char* socket_name,

@@ -82,6 +82,10 @@ class Producer {
 
   // Called by the Service after the final DataSource is torn down.
   virtual void OnTracingStop() {}
+
+  // The producer name that is passed to the service. Used to set specific
+  // config for a producer.
+  virtual std::string GetProducerName() = 0;
 };
 
 }  // namespace perfetto

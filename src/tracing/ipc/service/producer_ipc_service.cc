@@ -64,6 +64,7 @@ void ProducerIPCService::InitializeConnection(
 
   // Create a new entry.
   std::unique_ptr<RemoteProducer> producer(new RemoteProducer());
+  producer->SetProducerName(req.producer_name());
 
   // ConnectProducer will call OnConnect() on the next task.
   producer->service_endpoint = core_service_->ConnectProducer(
@@ -282,6 +283,14 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
 
 void ProducerIPCService::RemoteProducer::OnTracingStop() {
   // TODO(taylori): Implement.
+}
+
+std::string ProducerIPCService::RemoteProducer::GetProducerName() {
+  return producer_name_;
+}
+
+void ProducerIPCService::RemoteProducer::SetProducerName(std::string name) {
+  producer_name_ = name;
 }
 
 }  // namespace perfetto

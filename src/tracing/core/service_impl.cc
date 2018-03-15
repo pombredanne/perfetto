@@ -538,12 +538,16 @@ void ServiceImpl::CreateDataSourceInstance(
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
-    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb() == 0)
+    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb(
+                                   producer->producer_->GetProducerName()) == 0)
                                   ? base::kPageSize / 1024  // default
-                                  : tracing_session->GetDesiredPageSizeKb();
+                                  : tracing_session->GetDesiredPageSizeKb(
+                                        producer->producer_->GetProducerName());
 
-    size_t shm_size =
-        std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
+    size_t shm_size = std::min(tracing_session->GetDesiredShmSizeKb(
+                                   producer->producer_->GetProducerName()) *
+                                   1024,
+                               kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
@@ -870,18 +874,22 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
     : config(new_config) {}
 
-size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb() {
-  if (config.producers_size() == 0)
-    return 0;
-  // TODO(taylori): Handle multiple producers/producer configs.
-  return config.producers()[0].shm_size_kb();
+size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb(
+    std::string producer_name) {
+  for (auto& producer_config : config.producers()) {
+    if (producer_name == producer_config.producer_name())
+      return producer_config.shm_size_kb();
+  }
+  return 0;
 }
 
-size_t ServiceImpl::TracingSession::GetDesiredPageSizeKb() {
-  if (config.producers_size() == 0)
-    return 0;
-  // TODO(taylori): Handle multiple producers/producer configs.
-  return config.producers()[0].page_size_kb();
+size_t ServiceImpl::TracingSession::GetDesiredPageSizeKb(
+    std::string producer_name) {
+  for (auto& producer_config : config.producers()) {
+    if (producer_name == producer_config.producer_name())
+      return producer_config.page_size_kb();
+  }
+  return 0;
 }
 
 }  // namespace perfetto

@@ -71,8 +71,9 @@ void ProducerIPCClientImpl::OnConnect() {
       [this](ipc::AsyncResult<protos::InitializeConnectionResponse> resp) {
         OnConnectionInitialized(resp.success());
       });
-  producer_port_.InitializeConnection(protos::InitializeConnectionRequest(),
-                                      std::move(on_init));
+  protos::InitializeConnectionRequest req;
+  req.set_producer_name(producer_->GetProducerName());
+  producer_port_.InitializeConnection(req, std::move(on_init));
 
   // Create the back channel to receive commands from the Service.
   ipc::Deferred<protos::GetAsyncCommandResponse> on_cmd;

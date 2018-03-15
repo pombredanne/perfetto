@@ -182,10 +182,10 @@ class ServiceImpl : public Service {
     size_t num_buffers() const { return buffers_index.size(); }
 
     // Retrieves the page size from the trace config.
-    size_t GetDesiredPageSizeKb();
+    size_t GetDesiredPageSizeKb(std::string producer_name);
 
     // Retrieves the SHM size from the trace config.
-    size_t GetDesiredShmSizeKb();
+    size_t GetDesiredShmSizeKb(std::string producer_name);
 
     // The original trace config provided by the Consumer when calling
     // EnableTracing().
