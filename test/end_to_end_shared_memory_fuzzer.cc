@@ -137,7 +137,7 @@ class ServiceDelegate : public ThreadDelegate {
 int FuzzSharedMemory(const uint8_t* data, size_t size);
 
 int FuzzSharedMemory(const uint8_t* data, size_t size) {
-  TaskRunnerThread service_thread;
+  TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(new ServiceDelegate()));
 
   // Setup the TraceConfig for the consumer.
@@ -151,22 +151,26 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   ds_config->set_target_buffer(0);
 
   base::TestTaskRunner task_runner;
-  auto finish = task_runner.CreateCheckpoint("no.more.packets");
+  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
   // Wait for sentinel message from Producer, then signal no.more.packets.
-  auto function = [&finish](std::vector<TracePacket> packets, bool has_more) {
+  auto on_consumer_data = [&on_readback_complete](
+                              std::vector<TracePacket> packets, bool has_more) {
     for (auto& p : packets) {
       p.Decode();
       if (p->for_testing().str() == "end")
-        finish();
+        on_readback_complete();
     }
   };
-  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+  auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
+  FakeConsumer consumer(trace_config, std::move(on_connect),
+                        std::move(on_consumer_data), &task_runner);
   consumer.Connect(kConsumerSocket);
+  task_runner.RunUntilCheckpoint("consumer.connected");
 
-  TaskRunnerThread producer_thread;
+  TaskRunnerThread producer_thread("perfetto.prd");
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
       new FakeProducerDelegate(data, size, &consumer)));
-  task_runner.RunUntilCheckpoint("no.more.packets");
+  task_runner.RunUntilCheckpoint("readback.complete");
   return 0;
 }
 
