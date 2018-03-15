@@ -538,13 +538,12 @@ void ServiceImpl::CreateDataSourceInstance(
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
-    producer->page_size_kb_ = (tracing_session->getDesiredPageSizeKb() == 0)
+    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb() == 0)
                                   ? base::kPageSize / 1024  // default
-                                  : tracing_session->getDesiredPageSizeKb();
+                                  : tracing_session->GetDesiredPageSizeKb();
 
-    size_t shm_size = std::min(
-        static_cast<size_t>(tracing_session->getDesiredShmSizeKb() * 1024),
-        kMaxShmSize);
+    size_t shm_size =
+        std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
@@ -870,5 +869,19 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 
 ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
     : config(new_config) {}
+
+size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb() {
+  if (config.producers_size() == 0)
+    return 0;
+  // TODO(taylori): Handle multiple producers/producer configs.
+  return config.producers()[0].shm_size_kb();
+}
+
+size_t ServiceImpl::TracingSession::GetDesiredPageSizeKb() {
+  if (config.producers_size() == 0)
+    return 0;
+  // TODO(taylori): Handle multiple producers/producer configs.
+  return config.producers()[0].page_size_kb();
+}
 
 }  // namespace perfetto

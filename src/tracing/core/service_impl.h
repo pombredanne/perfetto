@@ -183,21 +183,11 @@ class ServiceImpl : public Service {
 
     size_t num_buffers() const { return buffers_index.size(); }
 
-    size_t getDesiredPageSizeKb() {
-      if (config.producers_size() == 0)
-        return 0;
-      else
-        // TODO(taylori): Handle multiple producers/producer configs.
-        return config.producers()[0].page_size_kb();
-    }
+    // Retrieves the page size from the trace config.
+    size_t GetDesiredPageSizeKb();
 
-    size_t getDesiredShmSizeKb() {
-      if (config.producers_size() == 0)
-        return 0;
-      else
-        // TODO(taylori): Handle multiple producers/producer configs.
-        return config.producers()[0].shm_size_kb();
-    }
+    // Retrieves the SHM size from the trace config.
+    size_t GetDesiredShmSizeKb();
 
     // The original trace config provided by the Consumer when calling
     // EnableTracing().

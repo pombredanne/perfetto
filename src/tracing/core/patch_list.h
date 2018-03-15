@@ -71,10 +71,8 @@ class PatchList {
   PatchList() : last_(list_.before_begin()) {}
 
   Patch* emplace_back(ChunkID chunk_id, uint16_t offset) {
-    // TODO(taylori: Why does this fail?)
-    // PERFETTO_DCHECK(empty() || last_->chunk_id != chunk_id || offset >=
-    // last_->offset + sizeof(Patch::PatchContent));
-
+    PERFETTO_DCHECK(empty() || last_->chunk_id != chunk_id ||
+                    offset >= last_->offset + sizeof(Patch::PatchContent));
     last_ = list_.emplace_after(last_, chunk_id, offset);
     return &*last_;
   }

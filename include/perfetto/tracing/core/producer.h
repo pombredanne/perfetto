@@ -76,11 +76,11 @@ class Producer {
   // Called by the Service to shut down an existing data source instance.
   virtual void TearDownDataSourceInstance(DataSourceInstanceID) = 0;
 
-  // Called by the Service when the first DataSource is created. Can be used
-  // for any setup required before tracing begins.
+  // Called by the Service after OnCOnnect but before the first DataSource is
+  // created. Can be used for any setup required before tracing begins.
   virtual void OnTracingStart() {}
 
-  // Called by the Service when the final DataSource is torn down.
+  // Called by the Service after the final DataSource is torn down.
   virtual void OnTracingStop() {}
 };
 
