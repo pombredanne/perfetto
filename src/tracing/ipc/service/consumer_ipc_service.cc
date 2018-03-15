@@ -19,6 +19,7 @@
 #include <inttypes.h>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/ipc/host.h"
 #include "perfetto/tracing/core/service.h"
@@ -76,7 +77,19 @@ void ConsumerIPCService::ReadBuffers(const protos::ReadBuffersRequest& req,
                                      DeferredReadBuffersResponse resp) {
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
   remote_consumer->read_buffers_response = std::move(resp);
-  remote_consumer->service_endpoint->ReadBuffers();
+  if (req.write_to_passed_fd()) {
+    base::ScopedFile fd = ipc::Service::TakeReceivedFD();
+    if (!fd) {
+      PERFETTO_DLOG(
+          "ReadBuffers() has write_to_passed_fd=true but no FD was passed");
+      PERFETTO_DCHECK(false);
+      return;
+    }
+    remote_consumer->service_endpoint->ReadBuffersIntoFile(
+        std::move(fd), req.write_period_ms());
+  } else {
+    remote_consumer->service_endpoint->ReadBuffers();
+  }
 }
 
 // Called by the IPC layer.

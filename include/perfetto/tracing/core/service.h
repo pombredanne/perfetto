@@ -23,6 +23,7 @@
 #include <memory>
 #include <vector>
 
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory.h"
 
@@ -112,6 +113,11 @@ class Service {
 
     // Tracing data will be delivered invoking Consumer::OnTraceData().
     virtual void ReadBuffers() = 0;
+
+    // Like ReadBuffers() but, instead of handing the tracing data back to the
+    // caller, saves it into the passed file. If |period| == 0, the service will
+    // perform just a one shot read.
+    virtual void ReadBuffersIntoFile(base::ScopedFile, uint32_t period_ms) = 0;
 
     virtual void FreeBuffers() = 0;
   };  // class ConsumerEndpoint.

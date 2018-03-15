@@ -21,6 +21,7 @@
 
 #include <vector>
 
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ipc/service_proxy.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -60,6 +61,7 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
   void EnableTracing(const TraceConfig&) override;
   void DisableTracing() override;
   void ReadBuffers() override;
+  void ReadBuffersIntoFile(base::ScopedFile, uint32_t period_ms) override;
   void FreeBuffers() override;
 
   // ipc::ServiceProxy::EventListener implementation.

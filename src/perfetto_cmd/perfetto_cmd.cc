@@ -237,6 +237,11 @@ void PerfettoCmd::OnConnect() {
   PERFETTO_DCHECK(trace_config_);
   trace_config_->set_enable_extra_guardrails(!dropbox_tag_.empty());
   consumer_endpoint_->EnableTracing(*trace_config_);
+
+  base::ScopedFile fd(fileno(trace_out_stream_.release()));
+  static constexpr uint32_t kWritePeriodMs = 1000;  // TODO
+  consumer_endpoint_->ReadBuffersIntoFile(std::move(fd), kWritePeriodMs);
+
   task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnStopTraceTimer, this),
                                trace_config_->duration_ms());
 

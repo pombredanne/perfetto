@@ -76,6 +76,18 @@ message DisableTracingResponse {}
 message ReadBuffersRequest {
   // The |id|s of the buffer, as passed to CreateBuffers().
   // TODO: repeated uint32 buffer_ids = 1;
+
+  // When true, this message also transports a file descriptor (sent by the
+  // consumer) and the service will stream the contents of the trace into
+  // the passed file rather than returning them back into the
+  // ReadBufferResponse.
+  optional bool write_to_passed_fd = 2;
+
+  // When |write_to_passed_fd| == false this is ignored. When true, this
+  // determines how frequently the service will read the trace buffer(s) and
+  // draing them into the |write_to_passed_fd|. A period == 0 means that the
+  // service will perform only a one-shot read.
+  optional int32 write_period_ms = 3;
 }
 
 message ReadBuffersResponse {
@@ -83,7 +95,7 @@ message ReadBuffersResponse {
 
   // Each streaming reply returns one or more trace packets (see
   // trace_packet.proto).
-  // Why "bytes" here? If we just return the full TracePacket object, that will
+  // Why "bytes" below? If we just return the full TracePacket object, that will
   // force the Consumer to deserialize it. In many occasions, the Consumer will
   // not consume the TracePacket(s) locally but will just forward them over
   // the network or save them to a file. Deserializing them on-device would be
