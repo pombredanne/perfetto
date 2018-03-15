@@ -84,20 +84,23 @@ void FtraceConfig::ToProto(perfetto::protos::FtraceConfig* proto) const {
   proto->Clear();
 
   for (const auto& it : ftrace_events_) {
-    proto->add_ftrace_events(it);
+    auto* entry = proto->add_ftrace_events();
     static_assert(sizeof(it) == sizeof(proto->ftrace_events(0)),
                   "size mismatch");
+    *entry = static_cast<decltype(proto->ftrace_events(0))>(it);
   }
 
   for (const auto& it : atrace_categories_) {
-    proto->add_atrace_categories(it);
+    auto* entry = proto->add_atrace_categories();
     static_assert(sizeof(it) == sizeof(proto->atrace_categories(0)),
                   "size mismatch");
+    *entry = static_cast<decltype(proto->atrace_categories(0))>(it);
   }
 
   for (const auto& it : atrace_apps_) {
-    proto->add_atrace_apps(it);
+    auto* entry = proto->add_atrace_apps();
     static_assert(sizeof(it) == sizeof(proto->atrace_apps(0)), "size mismatch");
+    *entry = static_cast<decltype(proto->atrace_apps(0))>(it);
   }
 
   static_assert(sizeof(buffer_size_kb_) == sizeof(proto->buffer_size_kb()),

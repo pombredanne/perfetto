@@ -52,6 +52,10 @@ constexpr size_t SharedMemoryABI::kNumChunksForLayout[];
 constexpr const char* SharedMemoryABI::kChunkStateStr[];
 constexpr const size_t SharedMemoryABI::kInvalidPageIdx;
 
+SharedMemoryABI::SharedMemoryABI() = default;
+SharedMemoryABI::SharedMemoryABI(SharedMemoryABI&&) noexcept = default;
+SharedMemoryABI& SharedMemoryABI::operator=(SharedMemoryABI&&) = default;
+
 SharedMemoryABI::SharedMemoryABI(uint8_t* start, size_t size, size_t page_size)
     : start_(start),
       size_(size),

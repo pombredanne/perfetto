@@ -29,6 +29,7 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/shared_memory.h"
+#include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "src/tracing/core/packet_stream_validator.h"
 #include "src/tracing/core/trace_buffer.h"
@@ -83,7 +84,7 @@ ServiceImpl::~ServiceImpl() {
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     Producer* producer,
     uid_t uid,
-    size_t shared_buffer_size_hint_bytes) {
+    size_t shared_memory_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   if (lockdown_mode_ && uid != geteuid()) {
@@ -98,21 +99,14 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   }
   const ProducerID id = GetNextProducerID();
   PERFETTO_DLOG("Producer %" PRIu16 " connected", id);
-  size_t shm_size = std::min(shared_buffer_size_hint_bytes, kMaxShmSize);
-  if (shm_size % base::kPageSize || shm_size < base::kPageSize)
-    shm_size = kDefaultShmSize;
 
-  // TODO(primiano): right now Create() will suicide in case of OOM if the mmap
-  // fails. We should instead gracefully fail the request and tell the client
-  // to go away.
-  auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
-  std::unique_ptr<ProducerEndpointImpl> endpoint(new ProducerEndpointImpl(
-      id, uid, this, task_runner_, producer, std::move(shared_memory)));
+  std::unique_ptr<ProducerEndpointImpl> endpoint(
+      new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
+  shared_memory_size_hint_bytes_ = shared_memory_size_hint_bytes;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
-  UpdateMemoryGuardrail();
   return std::move(endpoint);
 }
 
@@ -208,18 +202,23 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return;  // TODO(primiano): signal failure to the caller.
   }
 
+  // TODO(taylori): These assumptions are no longer true. Figure out a new
+  // heuristic.
   // TODO(primiano): This is a workaround to prevent that a producer gets stuck
   // in a state where it stalls by design by having more TraceWriterImpl
   // instances than free pages in the buffer. This is a very fragile heuristic
   // though, because this assumes that each tracing session creates at most one
   // data source instance in each Producer, and each data source has only one
   // TraceWriter.
-  if (tracing_sessions_.size() >= kDefaultShmSize / kBufferPageSize / 2) {
-    PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
-                  tracing_sessions_.size());
-    // TODO(primiano): make this a bool and return failure to the IPC layer.
-    return;
-  }
+  // TODO(taylori): Handle multiple producers/producer_configs.
+  // auto first_producer_config = cfg.producers()[0];
+  // if (tracing_sessions_.size() >=
+  //     (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
+  //   PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
+  //                 tracing_sessions_.size());
+  //   // TODO(primiano): make this a bool and return failure to the IPC layer.
+  //   return;
+  //}
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
   TracingSession& ts =
@@ -253,6 +252,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       break;
     }
   }
+
   UpdateMemoryGuardrail();
 
   // This can happen if either:
@@ -522,7 +522,7 @@ void ServiceImpl::CreateDataSourceInstance(
   auto relative_buffer_id = ds_config.target_buffer();
   if (relative_buffer_id >= tracing_session->num_buffers()) {
     PERFETTO_LOG(
-        "The TraceConfig for DataSource %s specified a traget_buffer out of "
+        "The TraceConfig for DataSource %s specified a target_buffer out of "
         "bound (%d). Skipping it.",
         ds_config.name().c_str(), relative_buffer_id);
     return;
@@ -536,6 +536,28 @@ void ServiceImpl::CreateDataSourceInstance(
       producer->id_, DataSourceInstance{inst_id, data_source.data_source_id});
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
+  if (!producer->shared_memory()) {
+    // TODO(taylori): Handle multiple producers/producer configs.
+    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb() == 0)
+                                  ? base::kPageSize / 1024  // default
+                                  : tracing_session->GetDesiredPageSizeKb();
+
+    size_t shm_size =
+        std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
+      shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
+        shm_size == 0)
+      shm_size = kDefaultShmSize;
+
+    // TODO(primiano): right now Create() will suicide in case of OOM if the
+    // mmap fails. We should instead gracefully fail the request and tell the
+    // client to go away.
+    auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
+    producer->SetSharedMemory(std::move(shared_memory));
+    producer->producer_->OnTracingStart();
+    UpdateMemoryGuardrail();
+  }
   producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
 }
 
@@ -650,7 +672,8 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Sum up all the shared memory buffers.
   for (const auto& id_to_producer : producers_) {
-    total_buffer_bytes += id_to_producer.second->shared_memory()->size();
+    if (id_to_producer.second->shared_memory())
+      total_buffer_bytes += id_to_producer.second->shared_memory()->size();
   }
 
   // Sum up all the trace buffers.
@@ -727,17 +750,12 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
     uid_t uid,
     ServiceImpl* service,
     base::TaskRunner* task_runner,
-    Producer* producer,
-    std::unique_ptr<SharedMemory> shared_memory)
+    Producer* producer)
     : id_(id),
       uid_(uid),
       service_(service),
       task_runner_(task_runner),
-      producer_(producer),
-      shared_memory_(std::move(shared_memory)),
-      shmem_abi_(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                 shared_memory_->size(),
-                 kBufferPageSize) {
+      producer_(producer) {
   // TODO(primiano): make the page-size for the SHM dynamic and find a way to
   // communicate that to the Producer (add a field to the
   // InitializeConnectionResponse IPC).
@@ -774,6 +792,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     CommitDataCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
+  PERFETTO_DCHECK(shared_memory_);
   for (const auto& entry : req_untrusted.chunks_to_move()) {
     const uint32_t page_idx = entry.page();
     if (page_idx >= shmem_abi_.num_pages())
@@ -817,9 +836,21 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     callback();
 }
 
+void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
+    std::unique_ptr<SharedMemory> shared_memory) {
+  shared_memory_ = std::move(shared_memory);
+  shmem_abi_ =
+      SharedMemoryABI(reinterpret_cast<uint8_t*>(shared_memory_->start()),
+                      shared_memory_->size(), page_size_kb() * 1024);
+}
+
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   return shared_memory_.get();
+}
+
+size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() {
+  return page_size_kb_;
 }
 
 std::unique_ptr<TraceWriter>
@@ -838,5 +869,19 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 
 ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
     : config(new_config) {}
+
+size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb() {
+  if (config.producers_size() == 0)
+    return 0;
+  // TODO(taylori): Handle multiple producers/producer configs.
+  return config.producers()[0].shm_size_kb();
+}
+
+size_t ServiceImpl::TracingSession::GetDesiredPageSizeKb() {
+  if (config.producers_size() == 0)
+    return 0;
+  // TODO(taylori): Handle multiple producers/producer configs.
+  return config.producers()[0].page_size_kb();
+}
 
 }  // namespace perfetto

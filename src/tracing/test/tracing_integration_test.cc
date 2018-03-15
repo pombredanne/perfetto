@@ -130,6 +130,10 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   // Start tracing.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
+  auto* producer_config = trace_config.add_producers();
+  producer_config->set_producer_name("com.google.test_producer");
+  producer_config->set_shm_size_kb(4096);
+  producer_config->set_page_size_kb(4);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("perfetto.test");
   ds_config->set_target_buffer(0);
