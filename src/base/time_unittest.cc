@@ -43,8 +43,8 @@ TEST(TimeTest, Conversions) {
     EXPECT_EQ(345000000, ts.tv_nsec);
   }
   {
-    struct timespec ts = ToPosixTimespec(TimeMillis(1000000000000001LL));
-    EXPECT_EQ(1000000000000L, ts.tv_sec);
+    struct timespec ts = ToPosixTimespec(TimeMillis(1000000000001LL));
+    EXPECT_EQ(1000000000, ts.tv_sec);
     EXPECT_EQ(1000000, ts.tv_nsec);
   }
 }
