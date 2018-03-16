@@ -414,6 +414,7 @@ class SharedMemoryABI {
   size_t size() const { return size_; }
   size_t page_size() const { return page_size_; }
   size_t num_pages() const { return num_pages_; }
+  bool is_valid() { return size_ && page_size_ && num_pages_; }
 
   uint8_t* page_start(size_t page_idx) {
     PERFETTO_DCHECK(page_idx < num_pages_);
