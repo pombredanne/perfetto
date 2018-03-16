@@ -20,10 +20,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 
-#include "perfetto/ftrace_reader/ftrace_controller.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/filesystem/fs_mount.h"
@@ -32,8 +33,9 @@
 
 namespace perfetto {
 
-using Inode = uint64_t;
+using SessionID = uint32_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
+class TraceWriter;
 
 class InodeMapValue {
  public:
@@ -56,17 +58,30 @@ void CreateDeviceToInodeMap(
 
 class InodeFileDataSource {
  public:
-  explicit InodeFileDataSource(
-      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-          file_system_inodes,
-      std::unique_ptr<TraceWriter> writer);
+  InodeFileDataSource(TracingSessionID,
+                      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+                          system_partition_files,
+                      std::unique_ptr<TraceWriter> writer);
 
-  void WriteInodes(const FtraceMetadata& metadata);
+  TracingSessionID session_id() const { return session_id_; }
+  base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
+
+  void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
+
+  bool AddInodeFileMapEntry(
+      InodeFileMap* inode_file_map,
+      BlockDeviceID block_device_id,
+      Inode inode,
+      const std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>&
+          block_device_map);
 
  private:
-  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* file_system_inodes_;
+  const TracingSessionID session_id_;
+  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+      system_partition_files_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
+  base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto

@@ -20,7 +20,7 @@
 namespace perfetto {
 namespace {
 
-TEST(FtraceEventParser, InferProtoType) {
+TEST(FtraceEventParserTest, InferProtoType) {
   using Field = FtraceEvent::Field;
   EXPECT_EQ(InferProtoType(Field{"char foo[16]", 0, 16, false}), "string");
   EXPECT_EQ(InferProtoType(Field{"char bar_42[64]", 0, 64, false}), "string");
@@ -35,13 +35,16 @@ TEST(FtraceEventParser, InferProtoType) {
   EXPECT_EQ(InferProtoType(Field{"unsigned int foo", 0, 4, false}), "uint32");
   EXPECT_EQ(InferProtoType(Field{"u32 control_freq", 44, 4, false}), "uint32");
 
-  EXPECT_EQ(InferProtoType(Field{"ino_t foo", 0, 4, false}), "uint32");
+  EXPECT_EQ(InferProtoType(Field{"ino_t foo", 0, 4, false}), "uint64");
   EXPECT_EQ(InferProtoType(Field{"ino_t foo", 0, 8, false}), "uint64");
+
+  EXPECT_EQ(InferProtoType(Field{"dev_t foo", 0, 4, false}), "uint64");
+  EXPECT_EQ(InferProtoType(Field{"dev_t foo", 0, 8, false}), "uint64");
 
   EXPECT_EQ(InferProtoType(Field{"char foo", 0, 0, false}), "string");
 }
 
-TEST(FtraceEventParser, GenerateProtoName) {
+TEST(FtraceEventParserTest, GenerateProtoName) {
   FtraceEvent input;
   Proto output;
   input.name = "the_snake_case_name";
