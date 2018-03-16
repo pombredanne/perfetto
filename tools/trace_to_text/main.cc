@@ -2295,6 +2295,7 @@ std::string FormatExt4ZeroRange(const Ext4ZeroRangeFtraceEvent& event) {
 }
 
 // TODO(taylori): Confirm correct format for this.
+// Calling this breaks loading into chrome://tracing
 std::string FormatProcess(const Process& process) {
   char line[2048];
   sprintf(line, "process: pid=%d ppid=%d cmdline=", process.pid(),
@@ -2315,6 +2316,7 @@ std::string FormatProcess(const Process& process) {
   return output;
 }
 
+// Calling this breaks loading into chrome://tracing
 std::string FormatInodeFileMap(const Entry& entry) {
   char line[2048];
   sprintf(line, "inode_file_map: ino=%llu type=%s path=", entry.inode_number(),
