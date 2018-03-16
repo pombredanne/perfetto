@@ -543,9 +543,8 @@ void ServiceImpl::CreateDataSourceInstance(
                                   : tracing_session->GetDesiredPageSizeKb();
     size_t shm_size =
         std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
-    if (shm_size % base::kPageSize || shm_size < base::kPageSize) {
+    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
-    }
     if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
         shm_size == 0)
       shm_size = kDefaultShmSize;
