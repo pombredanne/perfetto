@@ -81,7 +81,7 @@ InodeFileDataSource::InodeFileDataSource(
       weak_factory_(this) {}
 
 void InodeFileDataSource::WriteInodes(
-    const std::vector<std::pair<uint64_t, uint32_t>>& inodes) {
+    const std::vector<std::pair<Inode, BlockDeviceID>>& inodes) {
   PERFETTO_DLOG("Write Inodes start");
 
   if (mount_points_.empty()) {
@@ -131,7 +131,7 @@ base::WeakPtr<InodeFileDataSource> InodeFileDataSource::GetWeakPtr() const {
 }
 
 void InodeFileDataSource::OnInodes(
-    const std::vector<std::pair<uint64_t, uint32_t>>& inodes) {
+    const std::vector<std::pair<Inode, BlockDeviceID>>& inodes) {
   PERFETTO_DLOG("Saw FtraceBundle with %zu inodes.", inodes.size());
 }
 

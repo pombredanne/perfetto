@@ -30,6 +30,7 @@
 #include "perfetto/base/thread_checker.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/message.h"
+#include "perfetto/traced/data_source_types.h"
 #include "src/ftrace_reader/proto_translation_table.h"
 
 namespace perfetto {
@@ -115,7 +116,7 @@ class CpuReader {
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
-    metadata->AddInode(t);
+    metadata->AddInode(static_cast<Inode>(t));
   }
 
   static void ReadDevId(const uint8_t* start,
@@ -124,7 +125,7 @@ class CpuReader {
                         FtraceMetadata* metadata) {
     uint32_t dev_id = ReadIntoVarInt<uint32_t>(start, field_id, out);
     PERFETTO_DCHECK(dev_id != 0);
-    metadata->AddDevice(dev_id);
+    metadata->AddDevice(static_cast<BlockDeviceID>(dev_id));
   }
 
   static void ReadPid(const uint8_t* start,

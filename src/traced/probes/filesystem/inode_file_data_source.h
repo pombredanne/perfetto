@@ -66,9 +66,9 @@ class InodeFileDataSource {
   TracingSessionID session_id() const { return session_id_; }
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
 
-  void WriteInodes(const std::vector<std::pair<uint64_t, uint32_t>>&);
+  void WriteInodes(const std::vector<std::pair<Inode, BlockDeviceID>>&);
   // TODO(hjd): Combine with above.
-  void OnInodes(const std::vector<std::pair<uint64_t, uint32_t>>& inodes);
+  void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
  private:
   const TracingSessionID session_id_;

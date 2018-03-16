@@ -367,12 +367,12 @@ FtraceMetadata::FtraceMetadata() {
   pids.reserve(10);
 }
 
-void FtraceMetadata::AddDevice(uint32_t device_id) {
+void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
 }
 
-void FtraceMetadata::AddInode(uint64_t inode_number) {
-  inodes.push_back(std::make_pair(inode_number, last_seen_device_id));
+void FtraceMetadata::AddInode(Inode inode) {
+  inodes.push_back(std::make_pair(inode, last_seen_device_id));
 }
 
 void FtraceMetadata::AddPid(int32_t pid) {

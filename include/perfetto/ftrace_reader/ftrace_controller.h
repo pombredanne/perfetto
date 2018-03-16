@@ -34,6 +34,7 @@
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/protozero/message_handle.h"
+#include "perfetto/traced/data_source_types.h"
 
 namespace perfetto {
 
@@ -41,14 +42,14 @@ struct FtraceMetadata {
   FtraceMetadata();
 
   size_t overwrite_count;
-  uint32_t last_seen_device_id;
+  BlockDeviceID last_seen_device_id;
 
   // A vector not a set to keep the writer_fast.
-  std::vector<std::pair<uint64_t, uint32_t>> inodes;
+  std::vector<std::pair<Inode, BlockDeviceID>> inodes;
   std::vector<int32_t> pids;
 
-  void AddDevice(uint32_t);
-  void AddInode(uint64_t);
+  void AddDevice(BlockDeviceID);
+  void AddInode(Inode);
   void AddPid(int32_t);
   void Clear();
 };

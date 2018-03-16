@@ -17,11 +17,15 @@
 #ifndef INCLUDE_PERFETTO_TRACED_DATA_SOURCE_TYPES_H_
 #define INCLUDE_PERFETTO_TRACED_DATA_SOURCE_TYPES_H_
 
-#include "perfetto/base/build_config.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace perfetto {
 
-using Inode = decltype(stat::st_ino);
+using Inode = ino_t;
+
+// On ARM, st_dev is not dev_t but unsigned long long.
 using BlockDeviceID = decltype(stat::st_dev);
 
 }  // namespace perfetto
