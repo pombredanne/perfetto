@@ -23,7 +23,8 @@
 
 namespace perfetto {
 
-using Inode = ino_t;
+// On ARM, st_ino is not ino_t but unsigned long long.
+using Inode = decltype(stat::st_ino);
 
 // On ARM, st_dev is not dev_t but unsigned long long.
 using BlockDeviceID = decltype(stat::st_dev);
