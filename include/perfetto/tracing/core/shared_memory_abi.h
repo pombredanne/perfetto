@@ -406,8 +406,8 @@ class SharedMemoryABI {
   // Construct an instance from an existing shared memory buffer.
   SharedMemoryABI(uint8_t* start, size_t size, size_t page_size);
   SharedMemoryABI();
-  SharedMemoryABI(SharedMemoryABI&&) noexcept;
-  SharedMemoryABI& operator=(SharedMemoryABI&&);
+
+  void Initialize(uint8_t* start, size_t size, size_t page_size);
 
   uint8_t* start() const { return start_; }
   uint8_t* end() const { return start_ + size_; }

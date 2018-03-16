@@ -189,6 +189,7 @@ message TraceConfig {
     optional uint32 shm_size_kb = 2;
 
     // Specifies the preferred size of each page in the shared memory buffer.
+    // Must be an integer mutiple of 4K.
     optional uint32 page_size_kb = 3;
   }
 

@@ -223,7 +223,7 @@ SharedMemory* ProducerIPCClientImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ProducerIPCClientImpl::page_size_kb() {
+size_t ProducerIPCClientImpl::page_size_kb() const {
   return page_size_kb_;
 }
 
