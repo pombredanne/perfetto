@@ -19,29 +19,16 @@ option optimize_for = LITE_RUNTIME;
 
 message FakeFtraceEvent {
   optional uint32 common_field = 1;
-  oneof event {
-    FakeAllFieldsFtraceEvent all_fields = 42;
-    FakeInode64FieldsFtraceEvent inode_64_fields = 43;
-    FakeInode32FieldsFtraceEvent inode_32_fields = 44;
-  }
+  oneof event { FakeAllFieldsFtraceEvent all_fields = 42; }
 }
 
 message FakeAllFieldsFtraceEvent {
-  optional uint32 field_dev_32 = 1;
+  optional uint64 field_dev_32 = 1;
   optional int32 field_pid = 2;
   optional uint32 field_uint32 = 5;
-  optional uint32 field_inode_32 = 3;
+  optional uint64 field_inode_32 = 3;
+  optional uint64 field_dev_64 = 6;
   optional uint64 field_inode_64 = 4;
   optional string field_char_16 = 500;
   optional string field_char = 501;
-}
-
-message FakeInode64FieldsFtraceEvent {
-  optional uint32 field_dev_64 = 1;
-  optional uint64 field_inode_64 = 2;
-}
-
-message FakeInode32FieldsFtraceEvent {
-  optional uint32 field_dev_32 = 1;
-  optional uint32 field_inode_32 = 2;
 }

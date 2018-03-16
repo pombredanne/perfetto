@@ -33,7 +33,6 @@
 
 namespace perfetto {
 
-using SessionID = uint32_t;
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 

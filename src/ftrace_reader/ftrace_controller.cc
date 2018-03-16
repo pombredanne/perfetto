@@ -86,13 +86,13 @@ void ClearFile(const char* path) {
   perfetto::base::ignore_result(close(fd));
 }
 
-uint32_t ConvertKernelIDToUserspaceID(uint32_t kernel_dev) {
+BlockDeviceID ConvertKernelIDToUserspaceID(BlockDeviceID kernel_dev) {
   // Provided search index s_dev from cs/kernel/include/linux/fs.h?l=1310
   // Convert to user space id using cs/kernel/include/linux/kdev_t.h
   // TODO(azappone): see if this is the same on all platforms
   unsigned int maj = ((unsigned int)((kernel_dev) >> 20));
   unsigned int min = ((unsigned int)((kernel_dev) & ((1U << 20) - 1)));
-  return static_cast<uint32_t>(makedev(maj, min));
+  return static_cast<BlockDeviceID>(makedev(maj, min));
 }
 
 }  // namespace

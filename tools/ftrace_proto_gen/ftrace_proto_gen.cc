@@ -74,6 +74,8 @@ std::string InferProtoType(const FtraceEvent::Field& field) {
   if (StartsWith(field.type_and_name, "char ") && field.size == 0)
     return "string";
 
+  // ino_t, i_ino and dev_t are 32bit on some devices 64bit on others. For the
+  // protos we need to choose the largest possible size.
   if (StartsWith(field.type_and_name, "ino_t ") ||
       StartsWith(field.type_and_name, "i_ino ") ||
       StartsWith(field.type_and_name, "dev_t ")) {
