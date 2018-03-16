@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-syntax = "proto2";
-option optimize_for = LITE_RUNTIME;
+#include "src/traced/probes/filesystem/inode_file_data_source.h"
 
-package perfetto;
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
-message PerfettoCmdState {
-  // These are fixed size so that the file is always a constant length.
-  optional fixed64 first_trace_timestamp = 1;
-  optional fixed64 last_trace_timestamp = 2;
-  // Total of bytes uploaded since first_trace_timestamp.
-  optional fixed64 total_bytes_uploaded = 3;
-}
+namespace perfetto {
+namespace {
+
+// TODO(azappone): Add tests
+
+}  // namespace
+}  // namespace perfetto

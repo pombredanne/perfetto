@@ -16,6 +16,10 @@
 
 #include "rate_limiter.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/utils.h"
@@ -32,6 +36,19 @@ bool RateLimiter::ShouldTrace(const Args& args) {
   if (!args.is_dropbox)
     return true;
 
+  // The state file is gone.
+  // Maybe we're tracing for the first time or maybe something went wrong the
+  // last time we tried to save the sate. Either way reinitialize the state
+  // file.
+  if (!StateFileExists()) {
+    // We can't write the empty state file?
+    // -> Give up.
+    if (!SaveState({})) {
+      PERFETTO_ELOG("Guardrail: failed to initialize guardrail state.");
+      return false;
+    }
+  }
+
   bool loaded_state = LoadState(&state_);
 
   // Failed to load the state?
@@ -42,8 +59,8 @@ bool RateLimiter::ShouldTrace(const Args& args) {
       args.current_timestamp < state_.first_trace_timestamp() ||
       args.current_timestamp < state_.last_trace_timestamp() ||
       state_.last_trace_timestamp() < state_.first_trace_timestamp()) {
-    PerfettoCmdState blank_state{};
-    SaveState(blank_state);
+    SaveState({});
+    PERFETTO_LOG("%s", GetPath().c_str());
     PERFETTO_ELOG("Guardrail: guardrail state invalid, clearing it.");
     return false;
   }
@@ -93,46 +110,45 @@ bool RateLimiter::TraceDone(const Args& args, bool success, size_t bytes) {
   // Add the amount we uploded to the running total.
   state_.set_total_bytes_uploaded(state_.total_bytes_uploaded() + bytes);
 
-  return SaveState(state_);
+  if (!SaveState(state_)) {
+    return false;
+  }
+
+  return true;
 }
 
-std::string RateLimiter::GetPath() {
+std::string RateLimiter::GetPath() const {
   return std::string(kTempDropBoxTraceDir) + "/.guardraildata";
 }
 
+bool RateLimiter::StateFileExists() {
+  struct stat out;
+  return stat(GetPath().c_str(), &out) != -1;
+}
+
 bool RateLimiter::LoadState(PerfettoCmdState* state) {
-  base::ScopedFile fd;
-  fd.reset(open(GetPath().c_str(), O_RDONLY | O_CREAT, 0600));
-  return ReadState(fd.get(), state);
-}
+  base::ScopedFile in_fd;
+  in_fd.reset(open(GetPath().c_str(), O_RDONLY, 0600));
 
-bool RateLimiter::SaveState(const PerfettoCmdState& state) {
-  base::ScopedFile fd;
-  fd.reset(open(GetPath().c_str(), O_WRONLY | O_CREAT, 0600));
-  return WriteState(fd.get(), state);
-}
-
-// static
-bool RateLimiter::ReadState(int in_fd, PerfettoCmdState* state) {
-  if (in_fd == -1)
+  if (!in_fd)
     return false;
   char buf[1024];
-  ssize_t bytes = read(in_fd, &buf, sizeof(buf));
+  ssize_t bytes = read(in_fd.get(), &buf, sizeof(buf));
   if (bytes < 0)
     return false;
   return state->ParseFromArray(&buf, bytes);
 }
 
-// static
-bool RateLimiter::WriteState(int out_fd, const PerfettoCmdState& state) {
-  if (out_fd == -1)
+bool RateLimiter::SaveState(const PerfettoCmdState& state) {
+  base::ScopedFile out_fd;
+  out_fd.reset(open(GetPath().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600));
+  if (!out_fd)
     return false;
   char buf[1024];
   size_t size = state.ByteSize();
   if (!state.SerializeToArray(&buf, size))
     return false;
-
-  ssize_t written = write(out_fd, &buf, size);
+  ssize_t written = write(out_fd.get(), &buf, size);
   return written >= 0 && static_cast<size_t>(written) == size;
 }
 
