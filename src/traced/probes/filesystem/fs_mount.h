@@ -22,9 +22,10 @@
 #include <string>
 #include <vector>
 
-#include "include/perfetto/ftrace_reader/ftrace_controller.h"
-
 namespace perfetto {
+
+using BlockDeviceID = decltype(stat::st_dev);
+using Inode = decltype(stat::st_ino);
 
 constexpr char kMountsPath[] = "/proc/mounts";
 

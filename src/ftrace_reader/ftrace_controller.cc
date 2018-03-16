@@ -42,7 +42,6 @@
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
-
 namespace {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)

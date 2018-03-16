@@ -77,10 +77,7 @@ std::string InferProtoType(const FtraceEvent::Field& field) {
   if (StartsWith(field.type_and_name, "ino_t ") ||
       StartsWith(field.type_and_name, "i_ino ") ||
       StartsWith(field.type_and_name, "dev_t ")) {
-    if (field.size == 8)
-      return "uint64";
-    if (field.size == 4)
-      return "uint32";
+    return "uint64";
   }
 
   // Ints of various sizes:

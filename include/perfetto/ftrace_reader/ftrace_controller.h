@@ -39,7 +39,7 @@
 namespace perfetto {
 
 using BlockDeviceID = decltype(stat::st_dev);
-using Inode = uint64_t;
+using Inode = decltype(stat::st_ino);
 
 struct FtraceMetadata {
   FtraceMetadata();

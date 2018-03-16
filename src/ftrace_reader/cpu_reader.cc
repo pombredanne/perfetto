@@ -488,7 +488,7 @@ bool CpuReader::ParseField(const Field& field,
     case kPid32ToInt32:
       ReadPid(field_start, field_id, message, metadata);
       return true;
-    case kDevId32ToUint32:
+    case kDevId32ToUint64:
       ReadDevId<uint32_t>(field_start, field_id, message, metadata);
       return true;
     case kDevId64ToUint64:
