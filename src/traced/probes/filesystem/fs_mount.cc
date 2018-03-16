@@ -24,7 +24,6 @@
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
-#include "perfetto/traced/data_source_types.h"
 
 namespace perfetto {
 
