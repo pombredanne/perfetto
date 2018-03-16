@@ -716,14 +716,14 @@ TEST(CpuReaderTest, ParseAllFields) {
     event->proto_field_id = 42;
     event->ftrace_event_id = ftrace_event_id;
     {
-      // dev32 -> uint64
+      // dev32 -> uint32
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 8;
       field->ftrace_size = 4;
       field->ftrace_type = kFtraceDevId32;
       field->proto_field_id = 1;
-      field->proto_field_type = kProtoUint64;
+      field->proto_field_type = kProtoUint32;
       SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                              &field->strategy);
     }
@@ -870,14 +870,14 @@ TEST(CpuReaderTest, ParseInode32Fields) {
     event->proto_field_id = 44;
     event->ftrace_event_id = ftrace_event_id;
     {
-      // dev32 -> uint64
+      // dev32 -> uint32
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 8;
       field->ftrace_size = 4;
       field->ftrace_type = kFtraceDevId32;
       field->proto_field_id = 1;
-      field->proto_field_type = kProtoUint64;
+      field->proto_field_type = kProtoUint32;
       SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                              &field->strategy);
     }

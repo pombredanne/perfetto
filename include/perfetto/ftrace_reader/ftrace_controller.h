@@ -19,6 +19,7 @@
 
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <bitset>
 #include <condition_variable>
 #include <map>
@@ -37,7 +38,7 @@
 
 namespace perfetto {
 
-using BlockDeviceID = uint64_t;
+using BlockDeviceID = decltype(stat::st_dev);
 using Inode = uint64_t;
 
 struct FtraceMetadata {

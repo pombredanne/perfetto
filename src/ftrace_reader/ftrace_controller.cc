@@ -378,11 +378,11 @@ FtraceMetadata::FtraceMetadata() {
   pids.reserve(10);
 }
 
-void FtraceMetadata::AddDevice(uint64_t device_id) {
+void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = ConvertKernelIDToUserspaceID(device_id);
 }
 
-void FtraceMetadata::AddInode(uint64_t inode_number) {
+void FtraceMetadata::AddInode(Inode inode_number) {
   inode_and_device.push_back(std::make_pair(inode_number, last_seen_device_id));
 }
 
