@@ -42,7 +42,7 @@ class RateLimiter {
   virtual std::string GetPath() const;
 
  private:
-  PerfettoCmdState state_;
+  PerfettoCmdState state_{};
 };
 
 }  // namespace perfetto

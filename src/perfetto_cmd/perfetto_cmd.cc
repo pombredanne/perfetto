@@ -91,7 +91,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"out", required_argument, 0, 'o'},
       {"background", no_argument, 0, 'b'},
       {"dropbox", optional_argument, 0, 'd'},
-      {"ignore-guardrails", optional_argument, 0, 'i'},
+      {"no-guardrails", optional_argument, 0, 'n'},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
@@ -100,7 +100,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   bool ignore_guardrails = false;
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:bd::i", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:bd::n", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -150,7 +150,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
-    if (option == 'i') {
+    if (option == 'n') {
       ignore_guardrails = true;
       continue;
     }

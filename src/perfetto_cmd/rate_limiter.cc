@@ -60,8 +60,7 @@ bool RateLimiter::ShouldTrace(const Args& args) {
       args.current_timestamp < state_.last_trace_timestamp() ||
       state_.last_trace_timestamp() < state_.first_trace_timestamp()) {
     SaveState({});
-    PERFETTO_LOG("%s", GetPath().c_str());
-    PERFETTO_ELOG("Guardrail: guardrail state invalid, clearing it.");
+    PERFETTO_ELOG("Guardrail: state invalid, clearing it.");
     return false;
   }
 
@@ -133,7 +132,7 @@ bool RateLimiter::LoadState(PerfettoCmdState* state) {
   if (!in_fd)
     return false;
   char buf[1024];
-  ssize_t bytes = read(in_fd.get(), &buf, sizeof(buf));
+  ssize_t bytes = PERFETTO_EINTR((read(in_fd.get(), &buf, sizeof(buf)));
   if (bytes < 0)
     return false;
   return state->ParseFromArray(&buf, bytes);
@@ -148,7 +147,7 @@ bool RateLimiter::SaveState(const PerfettoCmdState& state) {
   size_t size = state.ByteSize();
   if (!state.SerializeToArray(&buf, size))
     return false;
-  ssize_t written = write(out_fd.get(), &buf, size);
+  ssize_t written = PERFETTO_EINTR((write(out_fd.get(), &buf, size));
   return written >= 0 && static_cast<size_t>(written) == size;
 }
 
