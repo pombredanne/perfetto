@@ -81,7 +81,9 @@ class Service {
 
     virtual SharedMemory* shared_memory() const = 0;
 
-    virtual size_t page_size_kb() = 0;
+    // Size of shared memory buffer pages. It's always a multiple of 4K.
+    // See shared_memory_abi.h
+    virtual size_t page_size_kb() const = 0;
 
     // Creates a trace writer, which allows to create events, handling the
     // underying shared memory buffer and signalling to the Service. This method

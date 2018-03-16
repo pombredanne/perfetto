@@ -50,7 +50,7 @@ using protozero::proto_utils::WriteVarInt;
 
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
-constexpr size_t kMaxShmSize = 4096 * 1024 * 1024ul;
+constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -795,7 +795,12 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
     CommitDataCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
-  PERFETTO_DCHECK(shared_memory_);
+  if (!shared_memory_) {
+    PERFETTO_DLOG(
+        "Attempted to commit data before the shared memory was allocated.");
+    return;
+  }
+  PERFETTO_DCHECK(shmem_abi_.num_pages());
   for (const auto& entry : req_untrusted.chunks_to_move()) {
     const uint32_t page_idx = entry.page();
     if (page_idx >= shmem_abi_.num_pages())
@@ -841,10 +846,10 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
 
 void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
     std::unique_ptr<SharedMemory> shared_memory) {
+  PERFETTO_DCHECK(!shared_memory_ && !shmem_abi_.num_pages());
   shared_memory_ = std::move(shared_memory);
-  shmem_abi_ =
-      SharedMemoryABI(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                      shared_memory_->size(), page_size_kb() * 1024);
+  shmem_abi_.Initialize(reinterpret_cast<uint8_t*>(shared_memory_->start()),
+                        shared_memory_->size(), page_size_kb() * 1024);
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
@@ -852,7 +857,7 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() {
+size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() const {
   return page_size_kb_;
 }
 
