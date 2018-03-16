@@ -198,6 +198,12 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
     writer->NewTracePacket()->set_for_testing()->set_str(buf, strlen(buf));
   }
 
+  // Allow the service to see the CommitData() before reading back.
+  auto on_data_committed2 =
+      task_runner_->CreateCheckpoint("on_data_committed2");
+  writer->Flush(on_data_committed2);
+  task_runner_->RunUntilCheckpoint("on_data_committed2");
+
   // And ask the service to write it into a file.
   base::TempFile tmp_file = base::TempFile::CreateUnlinked();
   consumer_endpoint->ReadBuffersIntoFile(base::ScopedFile(dup(tmp_file.fd())),

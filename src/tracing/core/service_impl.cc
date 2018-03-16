@@ -405,6 +405,8 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
   // If the caller previously
   if (write_into_file) {
+    if (packets_bytes == 0)
+      return;
     std::unique_ptr<struct iovec[]> iovecs(new struct iovec[total_slices]);
     size_t i = 0;
     for (const TracePacket& packet : packets) {
