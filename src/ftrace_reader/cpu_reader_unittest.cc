@@ -716,7 +716,7 @@ TEST(CpuReaderTest, ParseAllFields) {
     event->proto_field_id = 42;
     event->ftrace_event_id = ftrace_event_id;
     {
-      // dev32 -> uint32
+      // dev32 -> uint64
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 8;
@@ -752,7 +752,7 @@ TEST(CpuReaderTest, ParseAllFields) {
                              &field->strategy);
     }
     {
-      // ino_t (32bit) -> uint32
+      // ino_t (32bit) -> uint64
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 20;
@@ -870,7 +870,7 @@ TEST(CpuReaderTest, ParseInode32Fields) {
     event->proto_field_id = 44;
     event->ftrace_event_id = ftrace_event_id;
     {
-      // dev32 -> uint32
+      // dev32 -> uint64
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 8;
@@ -882,7 +882,7 @@ TEST(CpuReaderTest, ParseInode32Fields) {
                              &field->strategy);
     }
     {
-      // ino_t (32bit) -> uint32
+      // ino_t (32bit) -> uint64
       event->fields.emplace_back(Field{});
       Field* field = &event->fields.back();
       field->ftrace_offset = 12;

@@ -88,7 +88,7 @@ void ClearFile(const char* path) {
 
 uint32_t ConvertKernelIDToUserspaceID(uint32_t kernel_dev) {
   // Provided search index s_dev from cs/kernel/include/linux/fs.h?l=1310
-  // Convert to kernel device id using cs/kernel/include/linux/kdev_t.h
+  // Convert to user space id using cs/kernel/include/linux/kdev_t.h
   // TODO(azappone): see if this is the same on all platforms
   unsigned int maj = ((unsigned int)((kernel_dev) >> 20));
   unsigned int min = ((unsigned int)((kernel_dev) & ((1U << 20) - 1)));
@@ -372,7 +372,7 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 }
 
 FtraceMetadata::FtraceMetadata() {
-  // A lot of the time there will only be a small number of inode_and_device.
+  // A lot of the time there will only be a small number of inodes.
   inode_and_device.reserve(10);
   pids.reserve(10);
 }
