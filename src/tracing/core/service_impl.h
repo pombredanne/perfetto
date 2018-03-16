@@ -83,7 +83,7 @@ class ServiceImpl : public Service {
     Producer* producer_;
     std::unique_ptr<SharedMemory> shared_memory_;
     size_t page_size_kb_ = 0;
-    SharedMemoryABI shmem_abi_;
+    SharedMemoryABI shmem_abi_ = {};
     size_t shared_memory_size_hint_bytes_ = 0;
     DataSourceID last_data_source_id_ = 0;
     PERFETTO_THREAD_CHECKER(thread_checker_)

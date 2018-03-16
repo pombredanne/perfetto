@@ -800,7 +800,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
         "Attempted to commit data before the shared memory was allocated.");
     return;
   }
-  PERFETTO_DCHECK(shmem_abi_.num_pages());
+  PERFETTO_DCHECK(shmem_abi_.is_valid());
   for (const auto& entry : req_untrusted.chunks_to_move()) {
     const uint32_t page_idx = entry.page();
     if (page_idx >= shmem_abi_.num_pages())
@@ -846,7 +846,7 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
 
 void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
     std::unique_ptr<SharedMemory> shared_memory) {
-  PERFETTO_DCHECK(!shared_memory_ && !shmem_abi_.num_pages());
+  PERFETTO_DCHECK(!shared_memory_ && !shmem_abi_.is_valid());
   shared_memory_ = std::move(shared_memory);
   shmem_abi_.Initialize(reinterpret_cast<uint8_t*>(shared_memory_->start()),
                         shared_memory_->size(), page_size_kb() * 1024);
