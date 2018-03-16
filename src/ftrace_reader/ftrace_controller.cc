@@ -42,7 +42,6 @@
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
-
 namespace {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
@@ -87,14 +86,13 @@ void ClearFile(const char* path) {
   perfetto::base::ignore_result(close(fd));
 }
 
-uint32_t ConvertUserspaceIDToKernelID(uint32_t userspace_dev) {
+uint32_t ConvertKernelIDToUserspaceID(uint32_t userspace_dev) {
   // Provided search index s_dev from cs/kernel/include/linux/fs.h?l=1310
-  // Convert to kernel device id using cs/kernel/include/linux/kdev_t.h
+  // Convert to user space id using cs/kernel/include/linux/kdev_t.h
   // TODO(azappone): see if this is the same on all platforms
   unsigned int maj = ((unsigned int)((userspace_dev) >> 20));
   unsigned int min = ((unsigned int)((userspace_dev) & ((1U << 20) - 1)));
-  dev_t formatted_device_id = makedev(maj, min);
-  return static_cast<uint32_t>(formatted_device_id);
+  return static_cast<uint32_t>(makedev(maj, min));
 }
 
 }  // namespace
@@ -380,7 +378,7 @@ FtraceMetadata::FtraceMetadata() {
 }
 
 void FtraceMetadata::AddDevice(uint32_t device_id) {
-  last_seen_device_id = ConvertUserspaceIDToKernelID(device_id);
+  last_seen_device_id = ConvertKernelIDToUserspaceID(device_id);
 }
 
 void FtraceMetadata::AddInode(uint64_t inode_number) {

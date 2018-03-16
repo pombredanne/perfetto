@@ -138,15 +138,15 @@ void InodeFileDataSource::OnInodes(
       inode_file_map->add_mount_points(it->second.c_str());
 
     // Add entries for inodes in system
-    std::map<Inode, BlockDeviceID> data_partition_inodes;
+    std::map<BlockDeviceID, std::set<Inode>> data_partition_inodes;
     for (const auto& inode_number : inode_numbers) {
       // Search in /system partition and add to InodeFileMap if found
-      bool inSystem =
+      bool in_system =
           AddInodeFileMapEntry(inode_file_map, block_device_id, inode_number,
                                *system_partition_files_);
-      if (!inSystem) {
-        // TODO(azappone): Add LRU and check before adding inode for full scan
-        data_partition_inodes.emplace(inode_number, block_device_id);
+      if (!in_system) {
+        // TODO(fmayer): Add LRU and check before adding inode for full scan
+        data_partition_inodes[block_device_id].emplace(inode_number);
       }
     }
 
