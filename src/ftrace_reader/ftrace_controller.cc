@@ -28,14 +28,15 @@
 #include <string>
 #include <utility>
 
-#include "cpu_reader.h"
-#include "event_info.h"
-#include "ftrace_config_muxer.h"
-#include "ftrace_procfs.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
-#include "proto_translation_table.h"
+#include "src/ftrace_reader/cpu_reader.h"
+#include "src/ftrace_reader/event_info.h"
+#include "src/ftrace_reader/ftrace_config_muxer.h"
+#include "src/ftrace_reader/ftrace_procfs.h"
+#include "src/ftrace_reader/proto_translation_table.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
@@ -142,9 +143,7 @@ FtraceController::~FtraceController() {
 }
 
 uint64_t FtraceController::NowMs() const {
-  timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return (now.tv_sec * 1000000000L + now.tv_nsec) / 1000000L;
+  return base::GetWallTimeMs().count();
 }
 
 // static
