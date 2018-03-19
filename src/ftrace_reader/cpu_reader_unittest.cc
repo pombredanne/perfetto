@@ -819,10 +819,12 @@ TEST(CpuReaderTest, ParseAllFields) {
   // to generate the below examples
   const uint32_t example_32_bit_kdev = 271581216;
   const uint64_t example_32_bit_userspace_dev =
-      CpuReader::TranslateBlockDeviceIDToUserspace(example_32_bit_kdev);
+      CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
+          example_32_bit_kdev);
   const uint64_t example_64_bit_kdev = 4442450946;
   const uint64_t example_64_bit_userspace_dev =
-      CpuReader::TranslateBlockDeviceIDToUserspace(example_64_bit_kdev);
+      CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
+          example_64_bit_kdev);
 
   writer.Write<int32_t>(1001);  // Common field.
   writer.Write<int32_t>(9999);  // A gap we shouldn't read.
@@ -926,7 +928,7 @@ TEST(CpuReaderTest, TranslateBlockDeviceIDToUserspace) {
   const uint64_t example_32_bit_userspace_dev = 66336;
   // Test downcasting
   const uint64_t example_64_bit_kdev = 4442450946;
-  const uint64_t example_64_bit_userspace_dev = 2797636610;
+  const uint64_t example_64_bit_userspace_dev = 17594983681026;
 
   writer.Write<int32_t>(1001);                 // Common field.
   writer.Write<int32_t>(9999);                 // A gap we shouldn't read.
@@ -949,9 +951,11 @@ TEST(CpuReaderTest, TranslateBlockDeviceIDToUserspace) {
   EXPECT_EQ(event->all_fields().field_dev_64(), example_64_bit_userspace_dev);
   EXPECT_THAT(metadata.last_seen_device_id, example_64_bit_userspace_dev);
 
-  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace(example_32_bit_kdev),
+  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
+                  example_32_bit_kdev),
               example_32_bit_userspace_dev);
-  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace(example_64_bit_kdev),
+  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
+                  example_64_bit_kdev),
               example_64_bit_userspace_dev);
 }
 
