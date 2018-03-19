@@ -168,3 +168,13 @@ if (!build_with_chromium && (is_linux || is_android)) {
     ]
   }
 }  # !build_with_chromium
+
+executable("test") {
+  deps = [
+    "gn:default_deps",
+    "src/base",
+  ]
+  sources = [
+    "test.cc",
+  ]
+}
