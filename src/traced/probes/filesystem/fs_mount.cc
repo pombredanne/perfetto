@@ -47,7 +47,6 @@ std::multimap<BlockDeviceID, std::string> ParseMounts(const char* path) {
       PERFETTO_PLOG("stat");
       continue;
     }
-    // On ARM, st_dev is not dev_t but unsigned long long.
     device_to_mountpoints.emplace(buf.st_dev, mountpoint);
   }
   return device_to_mountpoints;

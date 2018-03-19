@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sys/sysmacros.h>
 #include <array>
 #include <memory>
 #include <set>
@@ -126,7 +127,7 @@ class CpuReader {
     T t;
     memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
     BlockDeviceID dev_id =
-        TranslateBlockDeviceIDToUserspace(static_cast<BlockDeviceID>(t));
+        TranslateBlockDeviceIDToUserspace(static_cast<uint64_t>(t));
     out->AppendVarInt<BlockDeviceID>(field_id, dev_id);
     PERFETTO_DCHECK(t != 0);
     metadata->AddDevice(dev_id);
@@ -148,11 +149,10 @@ class CpuReader {
     // Provided search index s_dev from
     // https://github.com/torvalds/linux/blob/v4.12/include/linux/fs.h#L404
     // Convert to user space id using
-    // https://github.com/torvalds/linux/blob/ead751507de86d90fa250431e9990a8b881f713c/include/linux/kdev_t.h#L10
+    // https://github.com/torvalds/linux/blob/v4.12/include/linux/kdev_t.h#L10
     // TODO(azappone): see if this is the same on all platforms
-    unsigned int maj = static_cast<unsigned int>((kernel_dev) >> 20);
-    unsigned int min =
-        static_cast<unsigned int>((kernel_dev) & ((1U << 20) - 1));
+    unsigned int maj = static_cast<unsigned int>(kernel_dev) >> 20;
+    unsigned int min = static_cast<unsigned int>(kernel_dev) & ((1U << 20) - 1);
     return static_cast<BlockDeviceID>(makedev(maj, min));
   }
 
