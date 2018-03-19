@@ -123,9 +123,13 @@ class CpuReader {
                         size_t field_id,
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
-    T t = ReadIntoVarInt<T>(start, field_id, out);
+    T t;
+    memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
+    BlockDeviceID dev_id =
+        TranslateBlockDeviceIDToUserspace(static_cast<BlockDeviceID>(t));
+    out->AppendVarInt<BlockDeviceID>(field_id, dev_id);
     PERFETTO_DCHECK(t != 0);
-    metadata->AddDevice(static_cast<BlockDeviceID>(t));
+    metadata->AddDevice(dev_id);
   }
 
   static void ReadPid(const uint8_t* start,
@@ -134,6 +138,22 @@ class CpuReader {
                       FtraceMetadata* metadata) {
     int32_t pid = ReadIntoVarInt<int32_t>(start, field_id, out);
     metadata->AddPid(pid);
+  }
+
+  // Internally the kernel stores device ids in a different layout to that
+  // exposed to userspace via stat etc. There's no userspace function to convert
+  // between the formats so we have to do it ourselves.
+  static BlockDeviceID TranslateBlockDeviceIDToUserspace(
+      BlockDeviceID kernel_dev) {
+    // Provided search index s_dev from
+    // https://github.com/torvalds/linux/blob/v4.12/include/linux/fs.h#L404
+    // Convert to user space id using
+    // https://github.com/torvalds/linux/blob/ead751507de86d90fa250431e9990a8b881f713c/include/linux/kdev_t.h#L10
+    // TODO(azappone): see if this is the same on all platforms
+    unsigned int maj = static_cast<unsigned int>((kernel_dev) >> 20);
+    unsigned int min =
+        static_cast<unsigned int>((kernel_dev) & ((1U << 20) - 1));
+    return static_cast<BlockDeviceID>(makedev(maj, min));
   }
 
   // Iterate through every file in the current directory and check if the inode

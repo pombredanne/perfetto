@@ -815,12 +815,14 @@ TEST(CpuReaderTest, ParseAllFields) {
 
   BinaryWriter writer;
 
-  // Must use the bit masks to convert between kernel and userspace device ids
+  // Must use the bit masks to translate between kernel and userspace device ids
   // to generate the below examples
   const uint32_t example_32_bit_kdev = 271581216;
-  const uint64_t example_32_bit_userspace_dev = 66336;
+  const uint64_t example_32_bit_userspace_dev =
+      CpuReader::TranslateBlockDeviceIDToUserspace(example_32_bit_kdev);
   const uint64_t example_64_bit_kdev = 2147483650;
-  const uint64_t example_64_bit_userspace_dev = 524290;
+  const uint64_t example_64_bit_userspace_dev =
+      CpuReader::TranslateBlockDeviceIDToUserspace(example_64_bit_kdev);
 
   writer.Write<int32_t>(1001);  // Common field.
   writer.Write<int32_t>(9999);  // A gap we shouldn't read.
@@ -845,15 +847,16 @@ TEST(CpuReaderTest, ParseAllFields) {
   ASSERT_TRUE(event);
   EXPECT_EQ(event->common_field(), 1001ul);
   EXPECT_EQ(event->event_case(), FakeFtraceEvent::kAllFields);
-  EXPECT_EQ(event->all_fields().field_dev_32(), example_32_bit_kdev);
+  EXPECT_EQ(event->all_fields().field_dev_32(), example_32_bit_userspace_dev);
   EXPECT_EQ(event->all_fields().field_pid(), 97);
   EXPECT_EQ(event->all_fields().field_uint32(), 1003u);
   EXPECT_EQ(event->all_fields().field_inode_32(), 98u);
-  EXPECT_EQ(event->all_fields().field_dev_64(), example_64_bit_kdev);
+  EXPECT_EQ(event->all_fields().field_dev_64(), example_64_bit_userspace_dev);
   EXPECT_EQ(event->all_fields().field_inode_64(), 99u);
   EXPECT_EQ(event->all_fields().field_char_16(), "Hello");
   EXPECT_EQ(event->all_fields().field_char(), "Goodbye");
   EXPECT_THAT(metadata.pids, Contains(97));
+  EXPECT_THAT(metadata.last_seen_device_id, example_64_bit_userspace_dev);
   EXPECT_EQ(metadata.inode_and_device.size(), 2U);
   EXPECT_THAT(metadata.inode_and_device,
               Contains(Pair(98u, example_32_bit_userspace_dev)));
