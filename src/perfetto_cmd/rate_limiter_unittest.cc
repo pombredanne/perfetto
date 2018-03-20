@@ -44,13 +44,13 @@ class MockRateLimiter : public RateLimiter {
         .WillByDefault(Invoke(this, &MockRateLimiter::SaveStateConcrete));
   }
 
-  virtual std::string GetPath() const {
+  virtual std::string GetStateFilePath() const {
     return std::string(dir_.path()) + "/.guardraildata";
   }
 
   virtual ~MockRateLimiter() override {
     if (StateFileExists())
-      remove(GetPath().c_str());
+      remove(GetStateFilePath().c_str());
   }
 
   bool LoadStateConcrete(PerfettoCmdState* state) {
@@ -112,7 +112,7 @@ TEST(RateLimiterTest, LoadFromNoFileFails) {
 TEST(RateLimiterTest, LoadFromGarbageFails) {
   NiceMock<MockRateLimiter> limiter;
 
-  WriteGarbageToFile(limiter.GetPath().c_str());
+  WriteGarbageToFile(limiter.GetStateFilePath().c_str());
 
   PerfettoCmdState output{};
   ASSERT_FALSE(limiter.LoadState(&output));
@@ -123,14 +123,14 @@ TEST(RateLimiterTest, NotDropBox) {
   StrictMock<MockRateLimiter> limiter;
 
   ASSERT_TRUE(limiter.ShouldTrace({}));
-  ASSERT_TRUE(limiter.TraceDone({}, true, 10000));
+  ASSERT_TRUE(limiter.OnTraceDone({}, true, 10000));
   ASSERT_FALSE(limiter.StateFileExists());
 }
 
 TEST(RateLimiterTest, NotDropBox_FailedToTrace) {
   StrictMock<MockRateLimiter> limiter;
 
-  ASSERT_FALSE(limiter.TraceDone({}, false, 0));
+  ASSERT_FALSE(limiter.OnTraceDone({}, false, 0));
   ASSERT_FALSE(limiter.StateFileExists());
 }
 
@@ -140,14 +140,14 @@ TEST(RateLimiterTest, DropBox_IgnoreGuardrails) {
 
   args.is_dropbox = true;
   args.ignore_guardrails = true;
-  args.current_timestamp = 41;
+  args.current_time = base::TimeSeconds(41);
 
   EXPECT_CALL(limiter, SaveState(_));
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
 
   EXPECT_CALL(limiter, SaveState(_));
-  ASSERT_TRUE(limiter.TraceDone(args, true, 42u));
+  ASSERT_TRUE(limiter.OnTraceDone(args, true, 42u));
 
   PerfettoCmdState output{};
   ASSERT_TRUE(limiter.LoadStateConcrete(&output));
@@ -161,14 +161,14 @@ TEST(RateLimiterTest, DropBox_EmptyState) {
   RateLimiter::Args args;
 
   args.is_dropbox = true;
-  args.current_timestamp = 10000;
+  args.current_time = base::TimeSeconds(10000);
 
   EXPECT_CALL(limiter, SaveState(_));
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
 
   EXPECT_CALL(limiter, SaveState(_));
-  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024));
+  ASSERT_TRUE(limiter.OnTraceDone(args, true, 1024 * 1024));
 
   PerfettoCmdState output{};
   ASSERT_TRUE(limiter.LoadStateConcrete(&output));
@@ -188,19 +188,20 @@ TEST(RateLimiterTest, DropBox_NormalUpload) {
   ASSERT_TRUE(limiter.SaveStateConcrete(input));
 
   args.is_dropbox = true;
-  args.current_timestamp = input.last_trace_timestamp() + 60 * 10;
+  args.current_time = base::TimeSeconds(input.last_trace_timestamp() + 60 * 10);
 
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
 
   EXPECT_CALL(limiter, SaveState(_));
-  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024));
+  ASSERT_TRUE(limiter.OnTraceDone(args, true, 1024 * 1024));
 
   PerfettoCmdState output{};
   ASSERT_TRUE(limiter.LoadStateConcrete(&output));
   EXPECT_EQ(output.total_bytes_uploaded(), 1024u * 1024u * 3);
   EXPECT_EQ(output.first_trace_timestamp(), input.first_trace_timestamp());
-  EXPECT_EQ(output.last_trace_timestamp(), args.current_timestamp);
+  EXPECT_EQ(output.last_trace_timestamp(),
+            static_cast<uint64_t>(args.current_time.count()));
 }
 
 TEST(RateLimiterTest, DropBox_FailedToLoadState) {
@@ -209,7 +210,7 @@ TEST(RateLimiterTest, DropBox_FailedToLoadState) {
 
   args.is_dropbox = true;
 
-  WriteGarbageToFile(limiter.GetPath().c_str());
+  WriteGarbageToFile(limiter.GetStateFilePath().c_str());
 
   EXPECT_CALL(limiter, LoadState(_));
   EXPECT_CALL(limiter, SaveState(_));
@@ -232,7 +233,7 @@ TEST(RateLimiterTest, DropBox_NoTimeTravel) {
   ASSERT_TRUE(limiter.SaveStateConcrete(input));
 
   args.is_dropbox = true;
-  args.current_timestamp = 99;
+  args.current_time = base::TimeSeconds(99);
 
   EXPECT_CALL(limiter, LoadState(_));
   EXPECT_CALL(limiter, SaveState(_));
@@ -255,7 +256,7 @@ TEST(RateLimiterTest, DropBox_TooSoon) {
   ASSERT_TRUE(limiter.SaveStateConcrete(input));
 
   args.is_dropbox = true;
-  args.current_timestamp = 10000 + 60 * 4;
+  args.current_time = base::TimeSeconds(10000 + 60 * 4);
 
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_FALSE(limiter.ShouldTrace(args));
@@ -270,7 +271,7 @@ TEST(RateLimiterTest, DropBox_TooMuch) {
   ASSERT_TRUE(limiter.SaveStateConcrete(input));
 
   args.is_dropbox = true;
-  args.current_timestamp = 60 * 60;
+  args.current_time = base::TimeSeconds(60 * 60);
 
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_FALSE(limiter.ShouldTrace(args));
@@ -287,19 +288,21 @@ TEST(RateLimiterTest, DropBox_TooMuchWasUploaded) {
   ASSERT_TRUE(limiter.SaveStateConcrete(input));
 
   args.is_dropbox = true;
-  args.current_timestamp = 60 * 60 * 24 + 2;
+  args.current_time = base::TimeSeconds(60 * 60 * 24 + 2);
 
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
 
   EXPECT_CALL(limiter, SaveState(_));
-  ASSERT_TRUE(limiter.TraceDone(args, true, 1024 * 1024));
+  ASSERT_TRUE(limiter.OnTraceDone(args, true, 1024 * 1024));
 
   PerfettoCmdState output{};
   ASSERT_TRUE(limiter.LoadStateConcrete(&output));
   EXPECT_EQ(output.total_bytes_uploaded(), 1024u * 1024u);
-  EXPECT_EQ(output.first_trace_timestamp(), args.current_timestamp);
-  EXPECT_EQ(output.last_trace_timestamp(), args.current_timestamp);
+  EXPECT_EQ(output.first_trace_timestamp(),
+            static_cast<uint64_t>(args.current_time.count()));
+  EXPECT_EQ(output.last_trace_timestamp(),
+            static_cast<uint64_t>(args.current_time.count()));
 }
 
 TEST(RateLimiterTest, DropBox_FailedToUpload) {
@@ -307,12 +310,12 @@ TEST(RateLimiterTest, DropBox_FailedToUpload) {
   RateLimiter::Args args;
 
   args.is_dropbox = true;
-  args.current_timestamp = 10000;
+  args.current_time = base::TimeSeconds(10000);
 
   EXPECT_CALL(limiter, SaveState(_));
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
-  ASSERT_FALSE(limiter.TraceDone(args, false, 1024 * 1024));
+  ASSERT_FALSE(limiter.OnTraceDone(args, false, 1024 * 1024));
 }
 
 TEST(RateLimiterTest, DropBox_FailedToSave) {
@@ -320,14 +323,14 @@ TEST(RateLimiterTest, DropBox_FailedToSave) {
   RateLimiter::Args args;
 
   args.is_dropbox = true;
-  args.current_timestamp = 10000;
+  args.current_time = base::TimeSeconds(10000);
 
   EXPECT_CALL(limiter, SaveState(_));
   EXPECT_CALL(limiter, LoadState(_));
   ASSERT_TRUE(limiter.ShouldTrace(args));
 
   EXPECT_CALL(limiter, SaveState(_)).WillOnce(Return(false));
-  ASSERT_FALSE(limiter.TraceDone(args, true, 1024 * 1024));
+  ASSERT_FALSE(limiter.OnTraceDone(args, true, 1024 * 1024));
 }
 
 }  // namespace

@@ -17,6 +17,7 @@
 #ifndef SRC_PERFETTO_CMD_RATE_LIMITER_H_
 #define SRC_PERFETTO_CMD_RATE_LIMITER_H_
 
+#include "perfetto/base/time.h"
 #include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
 
 namespace perfetto {
@@ -26,21 +27,25 @@ class RateLimiter {
   struct Args {
     bool is_dropbox = false;
     bool ignore_guardrails = false;
-    uint64_t current_timestamp = 0;
+    base::TimeSeconds current_time = base::TimeSeconds(0);
   };
 
   RateLimiter();
   virtual ~RateLimiter();
 
   bool ShouldTrace(const Args& args);
-  bool TraceDone(const Args& args, bool success, size_t bytes);
+  bool OnTraceDone(const Args& args, bool success, size_t bytes);
 
   bool ClearState();
+
+  // virtual for testing.
   virtual bool LoadState(PerfettoCmdState* state);
+
+  // virtual for testing.
   virtual bool SaveState(const PerfettoCmdState& state);
 
   bool StateFileExists();
-  virtual std::string GetPath() const;
+  virtual std::string GetStateFilePath() const;
 
  private:
   PerfettoCmdState state_{};

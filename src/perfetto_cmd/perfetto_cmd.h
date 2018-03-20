@@ -45,7 +45,7 @@ namespace perfetto {
 
 // Temporary directory for DropBox traces. Note that this is automatically
 // created by the system by setting setprop persist.traced.enable=1.
-const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
+extern const char* kTempDropBoxTraceDir;
 
 #if defined(PERFETTO_OS_ANDROID)
 using PlatformTaskRunner = base::AndroidTaskRunner;
@@ -67,7 +67,6 @@ class PerfettoCmd : public Consumer {
 
  private:
   bool OpenOutputFile();
-  uint64_t GetTimestamp();
 
   PlatformTaskRunner task_runner_;
   std::unique_ptr<perfetto::Service::ConsumerEndpoint> consumer_endpoint_;
@@ -80,7 +79,7 @@ class PerfettoCmd : public Consumer {
 
   std::string dropbox_tag_;
   bool did_process_full_trace_ = false;
-  size_t bytes_uploaded_to_dropbox_ = false;
+  size_t bytes_uploaded_to_dropbox_ = 0;
 };
 
 }  // namespace perfetto

@@ -30,6 +30,7 @@
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/traced/traced.h"
@@ -65,6 +66,8 @@ std::string GetDirName(const std::string& path) {
 }
 
 }  // namespace
+
+const char* kTempDropBoxTraceDir = "/data/misc/perfetto-traces";
 
 using protozero::proto_utils::WriteVarInt;
 using protozero::proto_utils::MakeTagLengthDelimited;
@@ -196,7 +199,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   RateLimiter limiter;
   RateLimiter::Args args{};
   args.is_dropbox = !dropbox_tag_.empty();
-  args.current_timestamp = GetTimestamp();
+  args.current_time = base::GetWallTimeS();
   args.ignore_guardrails = ignore_guardrails;
   if (!limiter.ShouldTrace(args))
     return 1;
@@ -205,8 +208,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
                                                   this, &task_runner_);
   task_runner_.Run();
 
-  return limiter.TraceDone(args, did_process_full_trace_,
-                           bytes_uploaded_to_dropbox_)
+  return limiter.OnTraceDone(args, did_process_full_trace_,
+                             bytes_uploaded_to_dropbox_)
              ? 0
              : 1;
 }
@@ -321,13 +324,6 @@ bool PerfettoCmd::OpenOutputFile() {
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
   return true;
-}
-
-uint64_t PerfettoCmd::GetTimestamp() {
-  time_t now = time(nullptr);
-  if (now < 0)
-    return 0;
-  return now;
 }
 
 int __attribute__((visibility("default")))
