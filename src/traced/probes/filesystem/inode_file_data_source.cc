@@ -54,7 +54,7 @@ void ScanFilesDFS(
       if (lstat(filepath.c_str(), &buf) != 0)
         continue;
 
-      Inode inode_number = entry->d_ino;
+      Inode inode_number = static_cast<Inode>(entry->d_ino);
       BlockDeviceID block_device_id = buf.st_dev;
 
       protos::pbzero::InodeFileMap_Entry_Type type =
