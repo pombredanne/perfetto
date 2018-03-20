@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
@@ -41,7 +42,7 @@ namespace perfetto {
 namespace {
 
 constexpr size_t kMaxScans = 50000;
-constexpr Inode kMergeDistance = 0;
+constexpr Inode kMergeDistance = 100;
 constexpr size_t kSetSize = 3;
 
 template <typename T, typename... Args>
@@ -415,7 +416,11 @@ int IOTracingTestMain2(int argc, char** argv) {
     t.Insert(i, pr.GetPrefix(name));
   });
 
-  std::cout << "PID: " << getpid() << std::endl;
+  std::string out;
+  PERFETTO_CHECK(base::ReadFile(
+      std::string("/proc/") + std::to_string(getpid()) + "/smaps_rollup",
+      &out));
+  std::cout << out << std::endl;
 
   int wrong = 0;
   int total = 0;
