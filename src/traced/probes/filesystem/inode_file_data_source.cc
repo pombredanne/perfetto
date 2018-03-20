@@ -47,12 +47,16 @@ void ScanFilesDFS(
     if (dir == nullptr)
       continue;
     while ((entry = readdir(dir)) != nullptr) {
+      if (entry->d_type == DT_LNK)
+        continue;
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
 
       struct stat buf;
       if (lstat(filepath.c_str(), &buf) != 0)
+        continue;
+      if (S_ISLNK(buf.st_mode))
         continue;
 
       Inode inode_number = entry->d_ino;

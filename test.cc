@@ -136,6 +136,7 @@ class Prefixes {
 class SmallSet {
  public:
   using DataType = Prefixes::Node*;
+  // Name for consistency with STL.
   using const_iterator = std::array<DataType, kSetSize>::const_iterator;
   bool Add(DataType n) {
     if (Contains(n))
@@ -193,13 +194,18 @@ class RangeTree {
   }
 
   bool CanMergeSets(const SmallSet a, const SmallSet b, DataType y) {
-    std::set<DataType> c;
-    for (const auto x : a)
-      c.emplace(x);
-    for (const auto x : b)
-      c.emplace(x);
-    c.emplace(y);
-    return c.size() <= kSetSize;
+    SmallSet c;
+    for (const auto x : a) {
+      if (!c.Add(x))
+        return false;
+    }
+    for (const auto x : b) {
+      if (!c.Add(x))
+        return false;
+    }
+    if (!c.Add(y))
+      return false;
+    return true;
   }
 
   void Insert(Inode inode, DataType interned) {
