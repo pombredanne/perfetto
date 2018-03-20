@@ -72,8 +72,13 @@ class PerfettoCtsTest : public ::testing::Test {
     };
 
     // Finally, make the consumer connect to the service.
-    FakeConsumer consumer(trace_config, std::move(function), &task_runner);
+    auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
+    FakeConsumer consumer(trace_config, std::move(on_connect),
+                          std::move(function), &task_runner);
     consumer.Connect(PERFETTO_CONSUMER_SOCK_NAME);
+
+    task_runner.RunUntilCheckpoint("consumer.connected");
+    consumer.EnableTracing();
 
     // TODO(skyostil): There's a race here before the service processes our data
     // and the consumer tries to retrieve it. For now wait a bit until the
