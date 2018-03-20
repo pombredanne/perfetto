@@ -41,8 +41,7 @@
 namespace perfetto {
 namespace {
 
-constexpr size_t kMaxScans = 50000;
-constexpr Inode kMergeDistance = 100;
+constexpr size_t kMaxScans = 20000;
 constexpr size_t kSetSize = 3;
 
 template <typename T, typename... Args>
@@ -173,230 +172,29 @@ class RangeTree {
 
   const std::set<std::string> Get(Inode inode) {
     std::set<std::string> ret;
-    auto surr = GetSurrounding(inode);
-    auto lower = surr.first;
-    auto upper = surr.second;
-    auto overlap = GetOverlap(lower, upper, inode);
-
-    switch (overlap) {
-      case SurroundingRanges::kUpper:
-        for (const auto x : upper->second.second)
-          ret.emplace(x->ToString());
-        break;
-      case SurroundingRanges::kLower:
-        for (const auto x : lower->second.second)
-          ret.emplace(x->ToString());
-        break;
-      case SurroundingRanges::kNone:
-        break;
-    }
+    auto lower = map_.upper_bound(inode);
+    if (lower != map_.begin())
+      lower--;
+    for (const auto x : lower->second)
+      ret.emplace(x->ToString());
     return ret;
   }
 
-  bool CanMergeSets(const SmallSet a, const SmallSet b, DataType y) {
-    SmallSet c;
-    for (const auto x : a) {
-      if (!c.Add(x))
-        return false;
-    }
-    for (const auto x : b) {
-      if (!c.Add(x))
-        return false;
-    }
-    if (!c.Add(y))
-      return false;
-    return true;
-  }
-
   void Insert(Inode inode, DataType interned) {
-    const auto surr = GetSurrounding(inode);
-    const auto& lower = surr.first;
-    const auto& upper = surr.second;
-
-    // Inserting in-between two ranges that can be merged.
-    if (ConsiderLower(lower, upper) && ConsiderUpper(lower, upper) &&
-        CanMergeSets(lower->second.second, upper->second.second, interned)) {
-      for (const DataType x : upper->second.second) {
-        AddToSet(&lower->second.second, x);
-      }
-      AddToSet(&lower->second.second, interned);
-      lower->second.first = upper->second.first;
-      map_.erase(upper);
-      return;
+    auto lower = map_.rbegin();
+    if (!map_.empty()) {
+      PERFETTO_CHECK(inode > lower->first);
     }
 
-    // Simplify code below by ensuring that we never match the borders
-    // of a range by moving them away and then retrying. This is slightly
-    // more inefficient than incorporating this into the logic below.
-    if (ConsiderUpper(lower, upper) && inode == upper->first) {
-      if (upper->second.first > inode + 1)
-        CheckEmplace(map_, inode + 1, upper->second);
-      map_.erase(upper);
-      return Insert(inode, interned);
-    }
-    if (ConsiderLower(lower, upper) && lower->second.first == inode + 1) {
-      lower->second.first = inode;
-      return Insert(inode, interned);
-    }
-
-    auto merge_strategy = GetMergeStrategy(lower, upper, inode, interned);
-    auto overlap = GetOverlap(lower, upper, inode);
-
-    // We can only merge with the following range if we don't overlap
-    // with the previous one.
-    PERFETTO_DCHECK(overlap != SurroundingRanges::kUpper);
-    PERFETTO_DCHECK(merge_strategy != SurroundingRanges::kUpper ||
-                    overlap == SurroundingRanges::kNone);
-
-    if (merge_strategy == SurroundingRanges::kNone &&
-        overlap == SurroundingRanges::kLower) {
-      auto n = lower->second.first;
-      lower->second.first = inode;
-      if (n > inode + 1)
-        CheckEmplace(map_, inode + 1, std::make_pair(n, lower->second.second));
-      if (lower->first == inode)
-        map_.erase(inode);
-    }
-#if PERFETTO_DCHECK_IS_ON()
-    auto nsurr = GetSurrounding(inode);
-#endif
-    switch (merge_strategy) {
-      case SurroundingRanges::kNone: {
-        SmallSet set;
-        set.Add(interned);
-        CheckEmplace(map_, inode, std::make_pair(inode + 1, std::move(set)));
-        break;
-      }
-      case SurroundingRanges::kLower:
-#if PERFETTO_DCHECK_IS_ON()
-        PERFETTO_DCHECK(lower == nsurr.first);
-#endif
-        lower->second.first = std::max(lower->second.first, inode + 1);
-        AddToSet(&lower->second.second, interned);
-        break;
-      case SurroundingRanges::kUpper:
-#if PERFETTO_DCHECK_IS_ON()
-        PERFETTO_DCHECK(upper == nsurr.second);
-#endif
-        AddToSet(&upper->second.second, interned);
-        if (inode != upper->first) {
-          CheckEmplace(map_, inode, upper->second);
-          map_.erase(upper);
-        }
-        break;
+    if (map_.empty() || !lower->second.Add(interned)) {
+      SmallSet n;
+      n.Add(interned);
+      CheckEmplace(map_, inode, std::move(n));
     }
   }
 
  private:
-  using MapType = std::map<Inode, std::pair<Inode, SmallSet>>;
-  MapType map_;
-
-  enum class SurroundingRanges {
-    kNone = 0,
-    kLower = 1,
-    kUpper = 2,
-  };
-
-  // Whether the lower range of the surrounding ranges is valid.
-  // It is invalid if the upper range is the first element in the map.
-  bool ConsiderLower(const MapType::iterator& lower,
-                     const MapType::iterator& upper) {
-    return upper != lower;
-  }
-  // Whether the upper range of the surrounding ranges is valid.
-  // It is invalid iff the map is empty.
-  bool ConsiderUpper(const MapType::iterator& lower,
-                     const MapType::iterator& upper) {
-    return upper != map_.cend();
-  }
-
-  bool IsInSet(const SmallSet& s, DataType e) { return s.Contains(e); }
-
-  void AddToSet(SmallSet* s, DataType e) {
-    if (IsInSet(*s, e)) {
-      return;
-    }
-    PERFETTO_DCHECK(s->size() < kSetSize);
-    s->Add(e);
-    return;
-  }
-
-  // Return whether inode overlaps with lower, upper or no range.
-  SurroundingRanges GetOverlap(const MapType::iterator& lower,
-                               const MapType::iterator& upper,
-                               Inode inode) {
-    if (upper != map_.end() && inode == upper->first)
-      return SurroundingRanges::kUpper;
-    if (ConsiderLower(lower, upper) && inode < lower->second.first)
-      return SurroundingRanges::kLower;
-    return SurroundingRanges::kNone;
-  }
-
-  // Return whether inode with value should be merged with lower or upper
-  // range. Returns kUpper, kLower or kNone if it should not be merged.
-  // Always prefer merging with lower as that is cheaper to do.
-  SurroundingRanges GetMergeStrategy(const MapType::iterator& lower,
-                                     const MapType::iterator& upper,
-                                     Inode inode,
-                                     DataType value) {
-    // Sanity check passed lower / upper ranges.
-    PERFETTO_DCHECK(
-        (!ConsiderLower(lower, upper) || inode >= lower->first) &&
-        (!ConsiderUpper(lower, upper) || inode < upper->second.first));
-
-    // We cannot merge with the upper range if we overlap with the lower.
-    auto overlap = GetOverlap(lower, upper, inode);
-    bool consider_upper = ConsiderUpper(lower, upper);
-    if (overlap == SurroundingRanges::kLower)
-      consider_upper = false;
-
-    // Only merge up to kMergeDistance in order to prevent huge ranges.
-    // In theory, if the first and the last element come after each other,
-    // they will be merged into a range spanning the entire space, which will
-    // have to be split for every insert. Needless to say, this would be bad.
-    PERFETTO_DCHECK(!consider_upper || upper->first >= inode);
-    if (consider_upper && kMergeDistance != 0 &&
-        (upper->first - inode) > kMergeDistance)
-      consider_upper = false;
-
-    bool consider_lower = ConsiderLower(lower, upper);
-    if (consider_lower && kMergeDistance != 0 && inode > lower->second.first &&
-        (inode - lower->second.first) > kMergeDistance)
-      consider_lower = false;
-
-    // If the folder is already contained in either of them, merge into that.
-    // Prefer lower.
-    if (consider_lower && IsInSet(lower->second.second, value))
-      return SurroundingRanges::kLower;
-    if (consider_upper && IsInSet(upper->second.second, value))
-      return SurroundingRanges::kUpper;
-
-    size_t lower_occupation = kSetSize;
-    if (consider_lower)
-      lower_occupation = lower->second.second.size();
-    size_t upper_occupation = kSetSize;
-    if (consider_upper)
-      upper_occupation = upper->second.second.size();
-
-    // Otherwise, merge into the less occupied. Prefer lower.
-    if (upper_occupation < lower_occupation)
-      return SurroundingRanges::kUpper;
-    if (lower_occupation != kSetSize)
-      return SurroundingRanges::kLower;
-
-    // Otherwise, do not merge.
-    return SurroundingRanges::kNone;
-  }
-
-  std::pair<MapType::iterator, MapType::iterator> GetSurrounding(Inode inode) {
-    auto upper = map_.lower_bound(inode);
-    auto lower = upper;
-    if (upper != map_.begin()) {
-      lower--;
-    }
-    PERFETTO_DCHECK(!ConsiderLower(lower, upper) || lower != upper);
-    return {lower, upper};
-  }
+  std::map<Inode, SmallSet> map_;
 };
 
 std::string FmtSet(const std::set<std::string>& s);
@@ -411,16 +209,20 @@ std::string FmtSet(const std::set<std::string>& s) {
 int IOTracingTestMain2(int argc, char** argv);
 int IOTracingTestMain2(int argc, char** argv) {
   Prefixes pr(kMaxScans);
-  ScanFilesDFS("/data", [&pr](BlockDeviceID, Inode i, std::string name,
-                              protos::pbzero::InodeFileMap_Entry_Type) {
-    pr.AddPath(name);
-  });
-
   RangeTree t;
-  ScanFilesDFS("/data", [&t, &pr](BlockDeviceID, Inode i, std::string name,
-                                  protos::pbzero::InodeFileMap_Entry_Type) {
-    t.Insert(i, pr.GetPrefix(name));
-  });
+  {
+    std::map<Inode, Prefixes::Node*> mp;
+    ScanFilesDFS(
+        "/data", [&pr, &mp](BlockDeviceID, Inode i, std::string name,
+                            protos::pbzero::InodeFileMap_Entry_Type type) {
+          if (type == protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY)
+            return;
+          pr.AddPath(name);
+          mp.emplace(i, pr.GetPrefix(name));
+        });
+    for (const auto& p : mp)
+      t.Insert(p.first, p.second);
+  }
 
   std::string out;
   PERFETTO_CHECK(base::ReadFile(
@@ -430,23 +232,22 @@ int IOTracingTestMain2(int argc, char** argv) {
 
   int wrong = 0;
   int total = 0;
-  ScanFilesDFS("/data",
-               [&t, &wrong, &total](BlockDeviceID, Inode i, std::string name,
-                                    protos::pbzero::InodeFileMap_Entry_Type) {
-                 ++total;
-                 std::set<std::string> found = t.Get(i);
-                 for (const std::string& s : found) {
-                   if (name.find(s) == 0)
-                     return;
-                 }
-                 ++wrong;
-                 /*
-                 std::cout << "Expected: " << name << std::endl;
-                 std::cout << "Got: " << FmtSet(found) << std::endl;
-                 std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() <<
-                 std::endl;
-                 */
-               });
+  ScanFilesDFS("/data", [&pr, &t, &wrong, &total](
+                            BlockDeviceID, Inode i, std::string name,
+                            protos::pbzero::InodeFileMap_Entry_Type type) {
+    if (type == protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY)
+      return;
+    ++total;
+    std::set<std::string> found = t.Get(i);
+    for (const std::string& s : found) {
+      if (name.find(s) == 0)
+        return;
+    }
+    ++wrong;
+    std::cout << "Expected: " << name << std::endl;
+    std::cout << "Got: " << FmtSet(found) << std::endl;
+    std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() << std::endl;
+  });
   std::cout << wrong << " / " << total << std::endl;
   return 0;
 }
