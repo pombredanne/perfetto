@@ -34,7 +34,7 @@ void ScanFilesDFS(
     const std::string& root_directory,
     const std::function<void(BlockDeviceID block_device_id,
                              Inode inode_number,
-                             std::string path,
+                             const std::string& path,
                              protos::pbzero::InodeFileMap_Entry_Type type)>&
         fn) {
   std::vector<std::string> queue{root_directory};
@@ -81,12 +81,12 @@ void CreateDeviceToInodeMap(
   ScanFilesDFS(
       root_directory,
       [&block_device_map](BlockDeviceID block_device_id, Inode inode_number,
-                          std::string path,
+                          const std::string& path,
                           protos::pbzero::InodeFileMap_Entry_Type type) {
         std::map<Inode, InodeMapValue>& inode_map =
             (*block_device_map)[block_device_id];
         inode_map[inode_number].SetType(type);
-        inode_map[inode_number].AddPath(std::move(name));
+        inode_map[inode_number].AddPath(path);
       });
 }
 
