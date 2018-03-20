@@ -19,6 +19,7 @@
 
 #include <unistd.h>
 
+#include <sys/stat.h>
 #include <bitset>
 #include <condition_variable>
 #include <map>
@@ -38,6 +39,9 @@
 
 namespace perfetto {
 
+using BlockDeviceID = decltype(stat::st_dev);
+using Inode = decltype(stat::st_ino);
+
 struct FtraceMetadata {
   FtraceMetadata();
 
@@ -45,7 +49,7 @@ struct FtraceMetadata {
   BlockDeviceID last_seen_device_id;
 
   // A vector not a set to keep the writer_fast.
-  std::vector<std::pair<Inode, BlockDeviceID>> inodes;
+  std::vector<std::pair<Inode, BlockDeviceID>> inode_and_device;
   std::vector<int32_t> pids;
 
   void AddDevice(BlockDeviceID);
