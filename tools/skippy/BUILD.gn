@@ -16,6 +16,7 @@ executable("skippy") {
   testonly = true
   deps = [
     "../../gn:default_deps",
+    "../../src/base",
   ]
   sources = [
     "skippy.cc",

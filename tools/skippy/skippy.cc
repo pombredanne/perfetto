@@ -31,7 +31,8 @@ namespace {
 void SetAffinity(size_t cpu) {
   cpu_set_t set{};
   CPU_SET(cpu, &set);
-  sched_setaffinity(0 /* us */, sizeof(cpu_set_t), &set);
+  PERFETTO_CHECK(
+      sched_setaffinity(0 /* calling process */, sizeof(cpu_set_t), &set) == 0);
 }
 
 int SkippyMain(int argc, const char** argv) {

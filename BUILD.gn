@@ -38,7 +38,6 @@ group("all") {
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "test/configs",
       "tools:protoc_helper",
-      "tools/skippy",
       "tools/trace_to_text",
     ]
     if (is_linux || is_android) {
@@ -48,6 +47,7 @@ group("all") {
         ":perfetto_integrationtests",
         ":traced",
         ":traced_probes",
+        "tools/skippy",
       ]
     }
   }
