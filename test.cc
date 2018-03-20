@@ -36,12 +36,13 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
+#include "src/traced/probes/filesystem/prefix_finder.h"
 
 // RANGES ARE [x, y), left-inclusive and right-exlusive.
 namespace perfetto {
 namespace {
 
-constexpr size_t kMaxScans = 20000;
+constexpr size_t kMaxScans = 10000;
 constexpr size_t kSetSize = 3;
 
 template <typename T, typename... Args>
@@ -52,89 +53,9 @@ void CheckEmplace(T& m, Args&&... args) {
 
 }  // namespace
 
-// TODO(fmayer): Find a name for this.
-// This needs stable iteration order!
-class Prefixes {
- public:
-  // Opaque placeholder for a prefix that can be turned into a string
-  // using .ToString.
-  // Can not be constructed outside of Prefixes.
-  class Node {
-   public:
-    friend class Prefixes;
-
-    Node(const Node& that) = delete;
-    Node& operator=(const Node&) = delete;
-
-    std::string ToString() {
-      if (parent_ != nullptr)
-        return parent_->ToString() + "/" + name_;
-      return name_;
-    }
-
-   private:
-    Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
-
-    std::string name_;
-    std::map<std::string, std::unique_ptr<Node>> children_;
-    Node* parent_;
-  };
-
-  Prefixes(size_t limit) : limit_(limit) {}
-
-  void AddPath(std::string path) {
-    perfetto::base::StringSplitter s(std::move(path), '/');
-    for (size_t i = 0; s.Next(); ++i) {
-      char* token = s.cur_token();
-      if (i < state_.size()) {
-        std::pair<std::string, size_t>& elem = state_[i];
-        if (elem.first == token) {
-          elem.second++;
-        } else {
-          if (i == 0 || state_[i - 1].second > limit_) {
-            Node* cur = &root_;
-            for (auto it = state_.cbegin();
-                 it != state_.cbegin() + static_cast<ssize_t>(i + 1); it++) {
-              std::unique_ptr<Node>& next = cur->children_[it->first];
-              if (!next)
-                next.reset(new Node(it->first, cur));
-              cur = next.get();
-            }
-          }
-          elem.first = token;
-          elem.second = 1;
-          state_.resize(i + 1);
-        }
-      } else {
-        state_.emplace_back(token, 1);
-      }
-    }
-  }
-
-  Node* GetPrefix(std::string path) {
-    perfetto::base::StringSplitter s(std::move(path), '/');
-    Node* cur = &root_;
-    for (size_t i = 0; s.Next(); ++i) {
-      char* token = s.cur_token();
-      auto it = cur->children_.find(token);
-      if (it == cur->children_.end())
-        break;
-      cur = it->second.get();
-      PERFETTO_DCHECK(cur->name_ == token);
-    }
-    return cur;
-  }
-
- private:
-  const size_t limit_;
-  // (path element, count) tuples for last path seen.
-  std::vector<std::pair<std::string, size_t>> state_;
-  Node root_{"", nullptr};
-};
-
 class SmallSet {
  public:
-  using DataType = Prefixes::Node*;
+  using DataType = PrefixFinder::Node*;
   // Name for consistency with STL.
   using const_iterator = std::array<DataType, kSetSize>::const_iterator;
   bool Add(DataType n) {
@@ -168,7 +89,7 @@ class SmallSet {
 
 class RangeTree {
  public:
-  using DataType = Prefixes::Node*;
+  using DataType = PrefixFinder::Node*;
 
   const std::set<std::string> Get(Inode inode) {
     std::set<std::string> ret;
@@ -208,18 +129,24 @@ std::string FmtSet(const std::set<std::string>& s) {
 
 int IOTracingTestMain2(int argc, char** argv);
 int IOTracingTestMain2(int argc, char** argv) {
-  Prefixes pr(kMaxScans);
+  PrefixFinder pr(kMaxScans);
   RangeTree t;
   {
-    std::vector<std::pair<Inode, Prefixes::Node*>> inodes;
+    std::vector<std::pair<Inode, PrefixFinder::Node*>> inodes;
+    ScanFilesDFS("/data", [&pr](BlockDeviceID, Inode i, std::string name,
+                                protos::pbzero::InodeFileMap_Entry_Type type) {
+      if (type == protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY)
+        return;
+      pr.AddPath(name);
+    });
     ScanFilesDFS(
         "/data", [&pr, &inodes](BlockDeviceID, Inode i, std::string name,
                                 protos::pbzero::InodeFileMap_Entry_Type type) {
           if (type == protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY)
             return;
-          pr.AddPath(name);
           inodes.emplace_back(i, pr.GetPrefix(name));
         });
+
     std::sort(inodes.begin(), inodes.end());
     for (const auto& p : inodes)
       t.Insert(p.first, p.second);
@@ -240,13 +167,13 @@ int IOTracingTestMain2(int argc, char** argv) {
       return;
     ++total;
     std::set<std::string> found = t.Get(i);
+    std::cout << "Got: " << FmtSet(found) << std::endl;
     for (const std::string& s : found) {
       if (name.find(s) == 0)
         return;
     }
     ++wrong;
     std::cout << "Expected: " << name << std::endl;
-    std::cout << "Got: " << FmtSet(found) << std::endl;
     std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() << std::endl;
   });
   std::cout << wrong << " / " << total << std::endl;
