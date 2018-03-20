@@ -80,6 +80,7 @@ class PerfettoCmd : public Consumer {
 
   std::string dropbox_tag_;
   bool did_process_full_trace_ = false;
+  size_t bytes_uploaded_to_dropbox_ = false;
 };
 
 }  // namespace perfetto

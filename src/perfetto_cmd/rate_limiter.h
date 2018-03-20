@@ -35,6 +35,7 @@ class RateLimiter {
   bool ShouldTrace(const Args& args);
   bool TraceDone(const Args& args, bool success, size_t bytes);
 
+  bool ClearState();
   virtual bool LoadState(PerfettoCmdState* state);
   virtual bool SaveState(const PerfettoCmdState& state);
 

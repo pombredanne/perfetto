@@ -205,8 +205,10 @@ int PerfettoCmd::Main(int argc, char** argv) {
                                                   this, &task_runner_);
   task_runner_.Run();
 
-  // TODO(hjd): Actually set bytes_uploaded.
-  return limiter.TraceDone(args, did_process_full_trace_, 0) ? 0 : 1;
+  return limiter.TraceDone(args, did_process_full_trace_,
+                           bytes_uploaded_to_dropbox_)
+             ? 0
+             : 1;
 }
 
 void PerfettoCmd::OnConnect() {
@@ -289,6 +291,8 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
       PERFETTO_ELOG("DropBox upload failed: %s", status.toString8().c_str());
       return;
     }
+    // TODO(hjd): Account for compression.
+    bytes_uploaded_to_dropbox_ = bytes_written;
     PERFETTO_ILOG("Uploaded %ld bytes into DropBox with tag %s", bytes_written,
                   dropbox_tag_.c_str());
 #endif  // defined(PERFETTO_BUILD_WITH_ANDROID)

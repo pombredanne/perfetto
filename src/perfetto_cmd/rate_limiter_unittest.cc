@@ -92,6 +92,9 @@ TEST(RateLimiterTest, LoadFromEmpty) {
   NiceMock<MockRateLimiter> limiter;
 
   PerfettoCmdState input{};
+  input.set_total_bytes_uploaded(0);
+  input.set_last_trace_timestamp(0);
+  input.set_first_trace_timestamp(0);
   PerfettoCmdState output{};
 
   ASSERT_TRUE(limiter.SaveState(input));
