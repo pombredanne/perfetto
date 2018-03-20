@@ -66,8 +66,7 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field,
         event_name_for_debug, field->ftrace_name,
         ftrace_field.type_and_name.c_str(), ftrace_field.size,
         ftrace_field.is_signed);
-    // TODO(hjd): Uncomment DCHECK when proto generation is fixed.
-    // PERFETTO_DCHECK(false);
+    PERFETTO_DCHECK(false);
     return false;
   }
 
@@ -201,6 +200,16 @@ bool InferFtraceType(const std::string& type_and_name,
     }
   }
 
+  if (StartsWith(type_and_name, "dev_t ")) {
+    if (size == 4) {
+      *out = kFtraceDevId32;
+      return true;
+    } else if (size == 8) {
+      *out = kFtraceDevId64;
+      return true;
+    }
+  }
+
   // Pids (as in 'sched_switch').
   if (StartsWith(type_and_name, "pid_t ") && size == 4) {
     *out = kFtracePid32;
@@ -208,7 +217,10 @@ bool InferFtraceType(const std::string& type_and_name,
   }
 
   // Ints of various sizes:
-  if (size == 1 && !is_signed) {
+  if (size == 1 && is_signed) {
+    *out = kFtraceInt8;
+    return true;
+  } else if (size == 1 && !is_signed) {
     *out = kFtraceUint8;
     return true;
   } else if (size == 2 && is_signed) {
