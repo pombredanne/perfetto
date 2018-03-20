@@ -20,6 +20,7 @@
 
 #include "gtest/gtest.h"
 
+#include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
@@ -92,6 +93,34 @@ TEST(TracePacketTest, Corrupted) {
   TracePacket tp;
   tp.AddSlice({ser_buf.data(), ser_buf.size() - 2});  // corrupted.
   ASSERT_FALSE(tp.Decode());
+}
+
+// Tests that the GetPreamble() logic returns a valid preamble that allows to
+// encode a TracePacket as a field of the root trace.proto message.
+TEST(TracePacketTest, GetPreamble) {
+  protos::TracePacket tp_proto;
+  static const char kPayload[] = "long string 1234567890abcdefACBDEF";
+  tp_proto.mutable_for_testing()->set_str(kPayload);
+  std::string ser_buf = tp_proto.SerializeAsString();
+
+  TracePacket tp;
+  tp.AddSlice({ser_buf.data(), ser_buf.size()});
+
+  char* preamble;
+  size_t preamble_size;
+  std::tie(preamble, preamble_size) = tp.GetPreamble();
+  ASSERT_GT(preamble_size, 0u);
+  ASSERT_LE(preamble_size, 8u);
+
+  char buf[128];
+  memcpy(buf, preamble, preamble_size);
+  ASSERT_EQ(1u, tp.slices().size());
+  memcpy(&buf[preamble_size], tp.slices()[0].start, tp.slices()[0].size);
+
+  protos::Trace trace;
+  ASSERT_TRUE(trace.ParseFromArray(buf, preamble_size + tp.size()));
+  ASSERT_EQ(1, trace.packet_size());
+  ASSERT_EQ(kPayload, trace.packet(0).for_testing().str());
 }
 
 }  // namespace
