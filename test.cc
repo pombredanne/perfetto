@@ -40,7 +40,7 @@
 namespace perfetto {
 namespace {
 
-constexpr size_t kMaxScans = 2000;
+constexpr size_t kMaxScans = 50000;
 constexpr int kSortedBatchSize = 1;
 constexpr uint64_t kMergeDistance = 0;
 constexpr size_t kSetSize = 3;
@@ -419,28 +419,36 @@ int IOTracingTestMain2(int argc, char** argv) {
     pr.AddPath(name);
   });
 
+  std::cout << "PID: " << getpid() << std::endl;
+  sleep(3600);
+
   RangeTree t;
   ScanFilesDFS("/data", [&t, &pr](BlockDeviceID, Inode i, std::string name,
                                   protos::pbzero::InodeFileMap_Entry_Type) {
     t.Insert(i, pr.GetPrefix(name));
   });
 
+  std::cout << "RSS " << GetPeakRSS() << std::endl;
+
   int wrong = 0;
   int total = 0;
-  ScanFilesDFS("/data", [&t, &wrong, &total, &pr](
-                            BlockDeviceID, Inode i, std::string name,
-                            protos::pbzero::InodeFileMap_Entry_Type) {
-    ++total;
-    std::set<std::string> found = t.Get(i);
-    for (const std::string& s : found) {
-      if (name.find(s) == 0)
-        return;
-    }
-    ++wrong;
-    std::cout << "Expected: " << name << std::endl;
-    std::cout << "Got: " << FmtSet(found) << std::endl;
-    std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() << std::endl;
-  });
+  ScanFilesDFS("/data",
+               [&t, &wrong, &total](BlockDeviceID, Inode i, std::string name,
+                                    protos::pbzero::InodeFileMap_Entry_Type) {
+                 ++total;
+                 std::set<std::string> found = t.Get(i);
+                 for (const std::string& s : found) {
+                   if (name.find(s) == 0)
+                     return;
+                 }
+                 ++wrong;
+                 /*
+                 std::cout << "Expected: " << name << std::endl;
+                 std::cout << "Got: " << FmtSet(found) << std::endl;
+                 std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() <<
+                 std::endl;
+                 */
+               });
   std::cout << wrong << " / " << total << std::endl;
   return 0;
 }
