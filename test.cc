@@ -165,9 +165,7 @@ class SmallSet {
   }
 
   const_iterator begin() const { return arr_.cbegin(); }
-
   const_iterator end() const { return arr_.cbegin() + filled_; }
-
   size_t size() const { return filled_; }
 
  private:
@@ -350,16 +348,15 @@ class RangeTree {
     // In theory, if the first and the last element come after each other,
     // they will be merged into a range spanning the entire space, which will
     // have to be split for every insert. Needless to say, this would be bad.
+    PERFETTO_DCHECK(upper->first >= data.first);
     if (consider_upper && kMergeDistance != 0 &&
-        CheckedNonNegativeSubtraction(upper->first, data.first) >
-            kMergeDistance)
+        (upper->first - data.first) > kMergeDistance)
       consider_upper = false;
 
     bool consider_lower = ConsiderLower(lower, upper);
     if (consider_lower && kMergeDistance != 0 &&
         data.first > lower->second.first &&
-        CheckedNonNegativeSubtraction(data.first, lower->second.first) >
-            kMergeDistance)
+        (data.first, lower->second.first) > kMergeDistance)
       consider_lower = false;
 
     // If the folder is already contained in either of them, merge into that.
