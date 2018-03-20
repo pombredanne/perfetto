@@ -30,6 +30,8 @@ source_set("filesystem") {
     "lru_inode_cache.h",
     "prefix_finder.cc",
     "prefix_finder.h",
+    "range_tree.cc",
+    "range_tree.h",
   ]
 }
 

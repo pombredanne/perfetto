@@ -37,87 +37,13 @@
 #include "perfetto/base/string_splitter.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/filesystem/prefix_finder.h"
+#include "src/traced/probes/filesystem/range_tree.h"
 
 // RANGES ARE [x, y), left-inclusive and right-exlusive.
 namespace perfetto {
+
 namespace {
-
-constexpr size_t kMaxScans = 10000;
-constexpr size_t kSetSize = 3;
-
-template <typename T, typename... Args>
-void CheckEmplace(T& m, Args&&... args) {
-  auto x = m.emplace(args...);
-  PERFETTO_DCHECK(x.second);
-}
-
-}  // namespace
-
-class SmallSet {
- public:
-  using DataType = PrefixFinder::Node*;
-  // Name for consistency with STL.
-  using const_iterator = std::array<DataType, kSetSize>::const_iterator;
-  bool Add(DataType n) {
-    if (Contains(n))
-      return true;
-    if (filled_ < kSetSize) {
-      arr_[filled_++] = n;
-      return true;
-    }
-    return false;
-  }
-
-  bool Contains(DataType n) const {
-    if (!filled_)
-      return false;
-    for (size_t i = 0; i < filled_; ++i) {
-      if (arr_[i] == n)
-        return true;
-    }
-    return false;
-  }
-
-  const_iterator begin() const { return arr_.cbegin(); }
-  const_iterator end() const { return arr_.cbegin() + filled_; }
-  size_t size() const { return filled_; }
-
- private:
-  std::array<DataType, kSetSize> arr_;
-  size_t filled_ = 0;
-};
-
-class RangeTree {
- public:
-  using DataType = PrefixFinder::Node*;
-
-  const std::set<std::string> Get(Inode inode) {
-    std::set<std::string> ret;
-    auto lower = map_.upper_bound(inode);
-    if (lower != map_.begin())
-      lower--;
-    for (const auto x : lower->second)
-      ret.emplace(x->ToString());
-    return ret;
-  }
-
-  void Insert(Inode inode, DataType interned) {
-    auto lower = map_.rbegin();
-    if (!map_.empty()) {
-      PERFETTO_CHECK(inode > lower->first);
-    }
-
-    if (map_.empty() || !lower->second.Add(interned)) {
-      SmallSet n;
-      n.Add(interned);
-      CheckEmplace(map_, inode, std::move(n));
-    }
-  }
-
- private:
-  std::map<Inode, SmallSet> map_;
-};
-
+constexpr size_t kMaxScans = 20000;
 std::string FmtSet(const std::set<std::string>& s);
 std::string FmtSet(const std::set<std::string>& s) {
   std::string r;
@@ -167,19 +93,19 @@ int IOTracingTestMain2(int argc, char** argv) {
       return;
     ++total;
     std::set<std::string> found = t.Get(i);
-    std::cout << "Got: " << FmtSet(found) << std::endl;
     for (const std::string& s : found) {
       if (name.find(s) == 0)
         return;
     }
     ++wrong;
     std::cout << "Expected: " << name << std::endl;
+    std::cout << "Got: " << FmtSet(found) << std::endl;
     std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() << std::endl;
   });
   std::cout << wrong << " / " << total << std::endl;
   return 0;
 }
-
+}  // namespace
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
