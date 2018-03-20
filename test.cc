@@ -42,7 +42,7 @@ namespace {
 
 constexpr size_t kMaxScans = 50000;
 constexpr int kSortedBatchSize = 1;
-constexpr uint64_t kMergeDistance = 0;
+constexpr Inode kMergeDistance = 0;
 constexpr size_t kSetSize = 3;
 
 // Random util.
@@ -143,7 +143,7 @@ class Prefixes {
 class SmallSet {
  public:
   using DataType = Prefixes::Node*;
-
+  using const_iterator = std::array<DataType, kSetSize>::const_iterator;
   bool Add(DataType n) {
     if (Contains(n))
       return true;
@@ -154,7 +154,7 @@ class SmallSet {
     return false;
   }
 
-  bool Contains(DataType n) {
+  bool Contains(DataType n) const {
     if (!filled_)
       return false;
     for (size_t i = 0; i < filled_; ++i) {
@@ -163,6 +163,12 @@ class SmallSet {
     }
     return false;
   }
+
+  const_iterator begin() const { return arr_.cbegin(); }
+
+  const_iterator end() const { return arr_.cbegin() + filled_; }
+
+  size_t size() const { return filled_; }
 
  private:
   std::array<DataType, kSetSize> arr_;
@@ -173,7 +179,7 @@ class RangeTree {
  public:
   using DataType = Prefixes::Node*;
 
-  const std::set<std::string> Get(uint64_t inode) {
+  const std::set<std::string> Get(Inode inode) {
     std::set<std::string> ret;
     auto surr = GetSurrounding(inode);
     auto lower = surr.first;
@@ -195,9 +201,7 @@ class RangeTree {
     return ret;
   }
 
-  bool CanMergeSets(const std::set<DataType>& a,
-                    const std::set<DataType>& b,
-                    DataType y) {
+  bool CanMergeSets(const SmallSet a, const SmallSet b, DataType y) {
     std::set<DataType> c;
     for (const auto x : a)
       c.emplace(x);
@@ -207,7 +211,7 @@ class RangeTree {
     return c.size() <= kSetSize;
   }
 
-  void Insert(uint64_t inode, DataType interned) {
+  void Insert(Inode inode, DataType interned) {
     const auto surr = GetSurrounding(inode);
     const auto& lower = surr.first;
     const auto& upper = surr.second;
@@ -216,9 +220,9 @@ class RangeTree {
     if (ConsiderLower(lower, upper) && ConsiderUpper(lower, upper) &&
         CanMergeSets(lower->second.second, upper->second.second, interned)) {
       for (const DataType x : upper->second.second) {
-        AddToSet(lower->second.second, x);
+        AddToSet(&lower->second.second, x);
       }
-      AddToSet(lower->second.second, interned);
+      AddToSet(&lower->second.second, interned);
       lower->second.first = upper->second.first;
       map_.erase(upper);
       return;
@@ -238,7 +242,7 @@ class RangeTree {
       return Insert(inode, interned);
     }
 
-    const std::pair<uint64_t, DataType> data{inode, interned};
+    const std::pair<Inode, DataType> data{inode, interned};
     auto merge_strategy = GetMergeStrategy(lower, upper, data);
     auto overlap = GetOverlap(lower, upper, inode);
 
@@ -261,22 +265,24 @@ class RangeTree {
     auto nsurr = GetSurrounding(inode);
 #endif
     switch (merge_strategy) {
-      case SurroundingRanges::kNone:
-        CheckEmplace(map_, inode,
-                     std::make_pair(inode + 1, std::set<DataType>{interned}));
+      case SurroundingRanges::kNone: {
+        SmallSet set;
+        set.Add(interned);
+        CheckEmplace(map_, inode, std::make_pair(inode + 1, std::move(set)));
         break;
+      }
       case SurroundingRanges::kLower:
 #if PERFETTO_DCHECK_IS_ON()
         PERFETTO_DCHECK(lower == nsurr.first);
 #endif
         lower->second.first = std::max(lower->second.first, inode + 1);
-        AddToSet(lower->second.second, interned);
+        AddToSet(&lower->second.second, interned);
         break;
       case SurroundingRanges::kUpper:
 #if PERFETTO_DCHECK_IS_ON()
         PERFETTO_DCHECK(upper == nsurr.second);
 #endif
-        AddToSet(upper->second.second, interned);
+        AddToSet(&upper->second.second, interned);
         if (inode != upper->first) {
           CheckEmplace(map_, inode, upper->second);
           map_.erase(upper);
@@ -286,7 +292,7 @@ class RangeTree {
   }
 
   // private:
-  using MapType = std::map<uint64_t, std::pair<uint64_t, std::set<DataType>>>;
+  using MapType = std::map<Inode, std::pair<Inode, SmallSet>>;
   MapType map_;
 
   enum class SurroundingRanges {
@@ -305,22 +311,20 @@ class RangeTree {
     return upper != map_.cend();
   }
 
-  bool IsInSet(const std::set<DataType>& s, DataType e) {
-    return s.count(e) == 1;
-  }
+  bool IsInSet(const SmallSet& s, DataType e) { return s.Contains(e); }
 
-  void AddToSet(std::set<DataType>& s, DataType e) {
-    if (IsInSet(s, e)) {
+  void AddToSet(SmallSet* s, DataType e) {
+    if (IsInSet(*s, e)) {
       return;
     }
-    PERFETTO_DCHECK(s.size() < kSetSize);
-    s.insert(e);
+    PERFETTO_DCHECK(s->size() < kSetSize);
+    s->Add(e);
     return;
   }
 
   SurroundingRanges GetOverlap(const MapType::iterator& lower,
                                const MapType::iterator& upper,
-                               uint64_t inode) {
+                               Inode inode) {
     if (upper != map_.end() && inode == upper->first)
       return SurroundingRanges::kUpper;
     if (ConsiderLower(lower, upper) && inode < lower->second.first)
@@ -328,10 +332,9 @@ class RangeTree {
     return SurroundingRanges::kNone;
   }
 
-  SurroundingRanges GetMergeStrategy(
-      const MapType::iterator& lower,
-      const MapType::iterator& upper,
-      const std::pair<uint64_t, DataType>& data) {
+  SurroundingRanges GetMergeStrategy(const MapType::iterator& lower,
+                                     const MapType::iterator& upper,
+                                     const std::pair<Inode, DataType>& data) {
     PERFETTO_DCHECK(
         (!ConsiderLower(lower, upper) || data.first >= lower->first) &&
         (!ConsiderUpper(lower, upper) || data.first < upper->second.first));
@@ -383,8 +386,7 @@ class RangeTree {
     return SurroundingRanges::kNone;
   }
 
-  std::pair<MapType::iterator, MapType::iterator> GetSurrounding(
-      uint64_t inode) {
+  std::pair<MapType::iterator, MapType::iterator> GetSurrounding(Inode inode) {
     auto upper = map_.lower_bound(inode);
     auto lower = upper;
     if (upper != map_.begin()) {
@@ -419,9 +421,6 @@ int IOTracingTestMain2(int argc, char** argv) {
     pr.AddPath(name);
   });
 
-  std::cout << "PID: " << getpid() << std::endl;
-  sleep(3600);
-
   RangeTree t;
   ScanFilesDFS("/data", [&t, &pr](BlockDeviceID, Inode i, std::string name,
                                   protos::pbzero::InodeFileMap_Entry_Type) {
@@ -429,6 +428,9 @@ int IOTracingTestMain2(int argc, char** argv) {
   });
 
   std::cout << "RSS " << GetPeakRSS() << std::endl;
+
+  std::cout << "PID: " << getpid() << std::endl;
+  sleep(3600);
 
   int wrong = 0;
   int total = 0;
@@ -467,7 +469,7 @@ int IOTracingTestMain(int argc, char** argv) {
     std::string line;
     while (std::getline(f0, line)) {
       std::istringstream ss(line);
-      uint64_t inode;
+      Inode inode;
       std::string name;
       ss >> inode;
       ss >> name;
@@ -478,14 +480,14 @@ int IOTracingTestMain(int argc, char** argv) {
 
   std::ifstream f(input_file);
   RangeTree t;
-  std::priority_queue<std::pair<uint64_t, std::string>,
-                      std::vector<std::pair<uint64_t, std::string>>,
-                      std::greater<std::pair<uint64_t, std::string>>>
+  std::priority_queue<std::pair<Inode, std::string>,
+                      std::vector<std::pair<Inode, std::string>>,
+                      std::greater<std::pair<Inode, std::string>>>
       pq;
   for (int i = 0; i < kSortedBatchSize; ++i) {
     std::string line;
     std::string nname;
-    uint64_t ninode;
+    Inode ninode;
     if (std::getline(f, line)) {
       std::istringstream ss(line);
       ss >> ninode;
@@ -501,7 +503,7 @@ int IOTracingTestMain(int argc, char** argv) {
 
     std::string line;
     std::string nname;
-    uint64_t ninode;
+    Inode ninode;
     if (std::getline(f, line)) {
       std::istringstream ss(line);
       ss >> ninode;
@@ -532,7 +534,7 @@ int IOTracingTestMain(int argc, char** argv) {
   while (std::getline(f2, line)) {
     ninodes++;
     std::istringstream ss(line);
-    uint64_t inode;
+    Inode inode;
     std::string name;
     ss >> inode;
     ss >> name;
