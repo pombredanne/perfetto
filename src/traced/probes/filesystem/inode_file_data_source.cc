@@ -86,7 +86,7 @@ void CreateDeviceToInodeMap(
         std::map<Inode, InodeMapValue>& inode_map =
             (*block_device_map)[block_device_id];
         inode_map[inode_number].SetType(type);
-        inode_map[inode_number].AddPath(std::move(name));
+        inode_map[inode_number].AddPath(std::move(path));
       });
 }
 
