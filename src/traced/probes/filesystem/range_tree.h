@@ -14,28 +14,13 @@
  * limitations under the License.
  */
 
-#include <math.h>
-#include <sys/param.h>
-#include <sys/resource.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <array>
-#include <fstream>
-#include <iostream>
 #include <map>
-#include <memory>
-#include <queue>
 #include <set>
 #include <sstream>
-#include <unordered_map>
-#include <vector>
 
 #include <stdio.h>
 
-#include "perfetto/base/file_utils.h"
-#include "perfetto/base/logging.h"
 #include "perfetto/base/small_set.h"
-#include "perfetto/base/string_splitter.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/filesystem/prefix_finder.h"
 

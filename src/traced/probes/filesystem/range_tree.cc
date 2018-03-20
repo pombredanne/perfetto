@@ -15,6 +15,7 @@
  */
 
 #include "src/traced/probes/filesystem/range_tree.h"
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 
@@ -31,7 +32,7 @@ const std::set<std::string> RangeTree::Get(Inode inode) {
 void RangeTree::Insert(Inode inode, RangeTree::DataType interned) {
   auto lower = map_.rbegin();
   if (!map_.empty()) {
-    PERFETTO_CHECK(inode > lower->first);
+    PERFETTO_DCHECK(inode > lower->first);
   }
 
   if (map_.empty() || !lower->second.Add(interned)) {
