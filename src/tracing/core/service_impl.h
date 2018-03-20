@@ -31,6 +31,7 @@
 #include "perfetto/tracing/core/service.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_config.h"
+#include "perfetto/tracing/core/tracing_session_state.h"
 #include "src/tracing/core/id_allocator.h"
 
 namespace perfetto {
@@ -92,6 +93,10 @@ class ServiceImpl : public Service {
     ~ConsumerEndpointImpl() override;
 
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
+    void NotifyTracingSessionStateChange(
+        TracingSessionState::State,
+        TracingSessionState::DisabledReason =
+            TracingSessionState::DisabledReason::ERROR);
 
     // Service::ConsumerEndpoint implementation.
     void EnableTracing(const TraceConfig&) override;
@@ -105,6 +110,7 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl(const ConsumerEndpointImpl&) = delete;
     ConsumerEndpointImpl& operator=(const ConsumerEndpointImpl&) = delete;
 
+    base::TaskRunner* const task_runner_;
     ServiceImpl* const service_;
     Consumer* const consumer_;
     TracingSessionID tracing_session_id_ = 0;
@@ -138,8 +144,8 @@ class ServiceImpl : public Service {
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
-  void EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
-  void DisableTracing(TracingSessionID);
+  bool EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
+  void DisableTracing(TracingSessionID, TracingSessionState::DisabledReason);
   void ReadBuffers(TracingSessionID,
                    bool write_into_file,
                    ConsumerEndpointImpl*);
@@ -179,9 +185,12 @@ class ServiceImpl : public Service {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    explicit TracingSession(const TraceConfig&);
+    TracingSession(ConsumerEndpointImpl*, const TraceConfig&);
 
     size_t num_buffers() const { return buffers_index.size(); }
+
+    // The consumer that started the session.
+    ConsumerEndpointImpl* const consumer;
 
     // The original trace config provided by the Consumer when calling
     // EnableTracing().

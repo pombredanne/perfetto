@@ -26,5 +26,6 @@ ipc_library("ipc") {
     "commit_data_request.proto",
     "consumer_port.proto",
     "producer_port.proto",
+    "tracing_session_state.proto",
   ]
 }

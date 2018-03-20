@@ -69,6 +69,7 @@ class ConsumerIPCService : public protos::ConsumerPort {
     // no connection here, these methods are posted straight away.
     void OnConnect() override;
     void OnDisconnect() override;
+    void OnTracingStateChange(const TracingSessionState&) override;
     void OnTraceData(std::vector<TracePacket>, bool has_more) override;
 
     // The interface obtained from the core service business logic through
@@ -79,6 +80,10 @@ class ConsumerIPCService : public protos::ConsumerPort {
     // After DisableTracing() is invoked, this binds the async callback that
     // allows to stream trace packets back to the client.
     DeferredReadBuffersResponse read_buffers_response;
+
+    // After EnableTracing() is invoked, this binds the async callback that
+    // allows to notify about changes of state of the tracing sessions.
+    DeferredEnableTracingResponse enable_tracing_response;
   };
 
   ConsumerIPCService(const ConsumerIPCService&) = delete;

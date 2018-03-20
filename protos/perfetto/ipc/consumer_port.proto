@@ -18,6 +18,7 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
 import "perfetto/config/trace_config.proto";
+import "perfetto/ipc/tracing_session_state.proto";
 
 package perfetto.protos;
 
@@ -32,7 +33,8 @@ service ConsumerPort {
 
   // Enables tracing for one or more data sources. At least one buffer must have
   // been previously created.
-  rpc EnableTracing(EnableTracingRequest) returns (EnableTracingResponse) {}
+  rpc EnableTracing(EnableTracingRequest)
+      returns (stream EnableTracingResponse) {}
 
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
@@ -61,7 +63,9 @@ message EnableTracingRequest {
   optional protos.TraceConfig trace_config = 1;
 }
 
-message EnableTracingResponse {}
+message EnableTracingResponse {
+  optional TracingSessionState tracing_session_state = 1;
+}
 
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {
@@ -72,10 +76,7 @@ message DisableTracingRequest {
 message DisableTracingResponse {}
 
 // Arguments for rpc ReadBuffers().
-message ReadBuffersRequest {
-  // The |id|s of the buffer, as passed to CreateBuffers().
-  // TODO: repeated uint32 buffer_ids = 1;
-}
+message ReadBuffersRequest {}
 
 message ReadBuffersResponse {
   // TODO: uint32 buffer_id = 1;

@@ -24,6 +24,7 @@
 namespace perfetto {
 
 class TracePacket;
+class TracingSessionState;
 
 class Consumer {
  public:
@@ -39,6 +40,9 @@ class Consumer {
   // obtained through Service::ConnectConsumer()) or involuntarily (e.g., if the
   // Service process crashes).
   virtual void OnDisconnect() = 0;
+
+  // Called by the Service to notify changes of state of the tracing session.
+  virtual void OnTracingStateChange(const TracingSessionState&) = 0;
 
   // Called back by the Service (or transport layer) after invoking
   // Service::ConsumerEndpoint::ReadBuffers(). This function can be called more

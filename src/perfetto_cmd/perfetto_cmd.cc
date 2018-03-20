@@ -37,6 +37,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/tracing_session_state.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
 #include "perfetto/config/trace_config.pb.h"
@@ -62,6 +63,7 @@ namespace {
 // created by the system by setting setprop persist.traced.enable=1.
 const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
 const char kDefaultDropBoxTag[] = "perfetto";
+const int kDefaultLongTraceMs = 1000;
 
 std::string GetDirName(const std::string& path) {
   size_t sep = path.find_last_of('/');
@@ -91,6 +93,7 @@ class PerfettoCmd : public Consumer {
   // perfetto::Consumer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
+  void OnTracingStateChange(const TracingSessionState&) override;
   void OnTraceData(std::vector<TracePacket>, bool has_more) override;
 
  private:
@@ -107,6 +110,7 @@ class PerfettoCmd : public Consumer {
 
   std::string dropbox_tag_;
   bool did_process_full_trace_ = false;
+  int long_trace_ms_ = 0;
 };
 
 int PerfettoCmd::PrintUsage(const char* argv0) {
@@ -116,9 +120,10 @@ Usage: %s
   --config      -c     : /path/to/trace/config/file or - for stdin
   --out         -o     : /path/to/out/trace/file
   --dropbox     -d TAG : Upload trace into DropBox using tag TAG (default: %s)
+  --long-trace  -l ms  : Write periodically into the out file (default: %d)
   --help        -h
 )",
-                argv0, kDefaultDropBoxTag);
+                argv0, kDefaultDropBoxTag, kDefaultLongTraceMs);
   return 1;
 }
 
@@ -130,6 +135,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"out", required_argument, 0, 'o'},
       {"background", no_argument, 0, 'b'},
       {"dropbox", optional_argument, 0, 'd'},
+      {"long-trace", required_argument, 0, 'l'},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
@@ -137,7 +143,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   bool background = false;
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:bd::", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:bl:d::", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -150,7 +156,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
         // TODO(primiano): temporary for testing only.
         perfetto::protos::TraceConfig test_config;
         test_config.add_buffers()->set_size_kb(4096);
-        test_config.set_duration_ms(10000);
+        test_config.set_duration_ms(4000);
         auto* ds_config = test_config.add_data_sources()->mutable_config();
         ds_config->set_name("com.google.perfetto.ftrace");
         ds_config->mutable_ftrace_config()->add_ftrace_events("sched_switch");
@@ -186,6 +192,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
       background = true;
       continue;
     }
+
+    if (option == 'l') {
+      long_trace_ms_ = optarg ? atoi(optarg) : kDefaultLongTraceMs;
+      continue;
+    }
+
     return PrintUsage(argv[0]);
   }
 
@@ -237,6 +249,12 @@ void PerfettoCmd::OnConnect() {
   PERFETTO_DCHECK(trace_config_);
   trace_config_->set_enable_extra_guardrails(!dropbox_tag_.empty());
   consumer_endpoint_->EnableTracing(*trace_config_);
+  PERFETTO_ILOG("Long trace: %d", long_trace_ms_);
+  if (long_trace_ms_) {
+    base::ScopedFile fd(dup(fileno(*trace_out_stream_)));
+    trace_out_stream_.reset();
+    consumer_endpoint_->ReadBuffersIntoFile(std::move(fd), long_trace_ms_);
+  }
   task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnStopTraceTimer, this),
                                trace_config_->duration_ms());
 
@@ -253,7 +271,8 @@ void PerfettoCmd::OnDisconnect() {
 void PerfettoCmd::OnStopTraceTimer() {
   PERFETTO_LOG("Timer expired, disabling tracing and collecting results");
   consumer_endpoint_->DisableTracing();
-  consumer_endpoint_->ReadBuffers();
+  if (!long_trace_ms_)
+    consumer_endpoint_->ReadBuffers();
 }
 
 void PerfettoCmd::OnTimeout() {
@@ -261,22 +280,9 @@ void PerfettoCmd::OnTimeout() {
   task_runner_.Quit();
 }
 
-void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
-  for (TracePacket& packet : packets) {
-    for (const Slice& slice : packet.slices()) {
-      uint8_t preamble[16];
-      uint8_t* pos = preamble;
-      pos = WriteVarInt(
-          MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber), pos);
-      pos = WriteVarInt(static_cast<uint32_t>(slice.size), pos);
-      fwrite(reinterpret_cast<const char*>(preamble), pos - preamble, 1,
-             trace_out_stream_.get());
-      fwrite(reinterpret_cast<const char*>(slice.start), slice.size, 1,
-             trace_out_stream_.get());
-    }
-  }
-  if (has_more)
-    return;
+void PerfettoCmd::OnTracingStateChange(const TracingSessionState& state) {
+  if (state.state() != TracingSessionState::State::DISABLED)
+    return;  // TODO here, maybe wrong. check before landing.
 
   // Reached end of trace.
   task_runner_.Quit();
@@ -317,6 +323,22 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   did_process_full_trace_ = true;
 }
 
+void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
+  for (TracePacket& packet : packets) {
+    for (const Slice& slice : packet.slices()) {
+      uint8_t preamble[16];
+      uint8_t* pos = preamble;
+      pos = WriteVarInt(
+          MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber), pos);
+      pos = WriteVarInt(static_cast<uint32_t>(slice.size), pos);
+      fwrite(reinterpret_cast<const char*>(preamble), pos - preamble, 1,
+             trace_out_stream_.get());
+      fwrite(reinterpret_cast<const char*>(slice.start), slice.size, 1,
+             trace_out_stream_.get());
+    }
+  }
+}
+
 bool PerfettoCmd::OpenOutputFile() {
   base::ScopedFile fd;
   if (!dropbox_tag_.empty()) {
@@ -329,6 +351,8 @@ bool PerfettoCmd::OpenOutputFile() {
                     kTempDropBoxTraceDir);
       return false;
     }
+  } else if (long_trace_ms_) {
+    fd.reset(open(trace_out_path_.c_str(), O_WRONLY | O_CREAT, 0600));
   } else {
     // Otherwise create a temporary file in the directory where the final trace
     // is going to be.

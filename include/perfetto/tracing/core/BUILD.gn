@@ -31,5 +31,6 @@ source_set("core") {
     "trace_config.h",
     "trace_packet.h",
     "trace_writer.h",
+    "tracing_session_state.h",
   ]
 }

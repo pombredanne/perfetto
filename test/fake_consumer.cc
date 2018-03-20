@@ -55,6 +55,8 @@ void FakeConsumer::OnDisconnect() {
   FAIL() << "Disconnected from service unexpectedly";
 }
 
+void FakeConsumer::OnTracingStateChange(const TracingSessionState&) {}
+
 void FakeConsumer::OnTraceData(std::vector<TracePacket> data, bool has_more) {
   packet_callback_(std::move(data), has_more);
 }

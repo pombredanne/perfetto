@@ -83,6 +83,7 @@ cc_library_shared {
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_writer_impl.cc",
+    "src/tracing/core/tracing_session_state.cc",
   ],
   shared_libs: [
     "liblog",
@@ -169,6 +170,7 @@ cc_binary {
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_writer_impl.cc",
+    "src/tracing/core/tracing_session_state.cc",
     "src/tracing/ipc/consumer/consumer_ipc_client_impl.cc",
     "src/tracing/ipc/posix_shared_memory.cc",
   ],
@@ -303,6 +305,7 @@ cc_test {
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_writer_impl.cc",
+    "src/tracing/core/tracing_session_state.cc",
     "test/end_to_end_integrationtest.cc",
     "test/fake_consumer.cc",
     "test/fake_producer.cc",
@@ -408,6 +411,7 @@ genrule {
     "protos/perfetto/ipc/commit_data_request.proto",
     "protos/perfetto/ipc/consumer_port.proto",
     "protos/perfetto/ipc/producer_port.proto",
+    "protos/perfetto/ipc/tracing_session_state.proto",
   ],
   tools: [
     "aprotoc",
@@ -421,6 +425,8 @@ genrule {
     "external/perfetto/protos/perfetto/ipc/consumer_port.pb.cc",
     "external/perfetto/protos/perfetto/ipc/producer_port.ipc.cc",
     "external/perfetto/protos/perfetto/ipc/producer_port.pb.cc",
+    "external/perfetto/protos/perfetto/ipc/tracing_session_state.ipc.cc",
+    "external/perfetto/protos/perfetto/ipc/tracing_session_state.pb.cc",
   ],
 }
 
@@ -431,6 +437,7 @@ genrule {
     "protos/perfetto/ipc/commit_data_request.proto",
     "protos/perfetto/ipc/consumer_port.proto",
     "protos/perfetto/ipc/producer_port.proto",
+    "protos/perfetto/ipc/tracing_session_state.proto",
   ],
   tools: [
     "aprotoc",
@@ -444,6 +451,8 @@ genrule {
     "external/perfetto/protos/perfetto/ipc/consumer_port.pb.h",
     "external/perfetto/protos/perfetto/ipc/producer_port.ipc.h",
     "external/perfetto/protos/perfetto/ipc/producer_port.pb.h",
+    "external/perfetto/protos/perfetto/ipc/tracing_session_state.ipc.h",
+    "external/perfetto/protos/perfetto/ipc/tracing_session_state.pb.h",
   ],
   export_include_dirs: [
     "protos",
@@ -2992,6 +3001,7 @@ cc_library_static {
     "src/tracing/core/trace_config.cc",
     "src/tracing/core/trace_packet.cc",
     "src/tracing/core/trace_writer_impl.cc",
+    "src/tracing/core/tracing_session_state.cc",
     "src/tracing/ipc/consumer/consumer_ipc_client_impl.cc",
     "src/tracing/ipc/posix_shared_memory.cc",
     "src/tracing/ipc/producer/producer_ipc_client_impl.cc",
@@ -3169,6 +3179,7 @@ cc_test {
     "src/tracing/core/trace_packet_unittest.cc",
     "src/tracing/core/trace_writer_impl.cc",
     "src/tracing/core/trace_writer_impl_unittest.cc",
+    "src/tracing/core/tracing_session_state.cc",
     "src/tracing/ipc/posix_shared_memory_unittest.cc",
     "src/tracing/test/aligned_buffer_test.cc",
     "src/tracing/test/fake_packet.cc",

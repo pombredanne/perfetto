@@ -26,6 +26,7 @@
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/tracing_session_state.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/test/test_shared_memory.h"
 
@@ -56,6 +57,7 @@ class MockConsumer : public Consumer {
   // Consumer implementation.
   MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
+  MOCK_METHOD1(OnTracingStateChange, void(const TracingSessionState&));
 
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override {}
 };
@@ -155,6 +157,7 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   task_runner.RunUntilIdle();
 
   EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
@@ -184,6 +187,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   consumer_endpoint->EnableTracing(trace_config);
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   task_runner.RunUntilIdle();
 
   InSequence seq;
@@ -196,25 +200,30 @@ TEST_F(ServiceImplTest, LockdownMode) {
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_sameuid =
       svc->ConnectProducer(&mock_producer_sameuid, geteuid() /* uid */);
 
-  EXPECT_CALL(mock_producer, OnConnect()).Times(0);
   EXPECT_CALL(mock_producer_sameuid, OnConnect());
+  EXPECT_CALL(mock_producer, OnConnect()).Times(0);
   task_runner.RunUntilIdle();
 
   Mock::VerifyAndClearExpectations(&mock_producer);
 
-  consumer_endpoint->DisableTracing();
+  consumer_endpoint->FreeBuffers();
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   task_runner.RunUntilIdle();
 
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_CLEAR);
   consumer_endpoint->EnableTracing(trace_config);
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   task_runner.RunUntilIdle();
 
   EXPECT_CALL(mock_producer, OnConnect());
-  producer_endpoint_sameuid =
-      svc->ConnectProducer(&mock_producer, geteuid() + 1);
+  producer_endpoint = svc->ConnectProducer(&mock_producer, geteuid() + 1);
 
   task_runner.RunUntilIdle();
+
+  EXPECT_CALL(mock_producer_sameuid, OnDisconnect());
+  EXPECT_CALL(mock_producer, OnDisconnect());
+  EXPECT_CALL(mock_consumer, OnDisconnect());
 }
 
 TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
@@ -238,6 +247,7 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   // Disconnecting the consumer while tracing should trigger data source
   // teardown.
   EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
@@ -280,6 +290,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
   EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
   EXPECT_CALL(mock_producer, OnDisconnect());
+  EXPECT_CALL(mock_consumer, OnTracingStateChange(_));
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();

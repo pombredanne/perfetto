@@ -26,6 +26,7 @@
 #include "perfetto/tracing/core/slice.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/tracing_session_state.h"
 
 namespace perfetto {
 
@@ -60,8 +61,9 @@ void ConsumerIPCService::EnableTracing(const protos::EnableTracingRequest& req,
                                        DeferredEnableTracingResponse resp) {
   TraceConfig trace_config;
   trace_config.FromProto(req.trace_config());
-  GetConsumerForCurrentRequest()->service_endpoint->EnableTracing(trace_config);
-  resp.Resolve(ipc::AsyncResult<protos::EnableTracingResponse>::Create());
+  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
+  remote_consumer->service_endpoint->EnableTracing(trace_config);
+  remote_consumer->enable_tracing_response = std::move(resp);
 }
 
 // Called by the IPC layer.
@@ -117,6 +119,16 @@ void ConsumerIPCService::RemoteConsumer::OnConnect() {}
 // Invoked by the |core_service_| business logic after we destroy the
 // |service_endpoint| (in the RemoteConsumer dtor).
 void ConsumerIPCService::RemoteConsumer::OnDisconnect() {}
+
+void ConsumerIPCService::RemoteConsumer::OnTracingStateChange(
+    const TracingSessionState& state) {
+  if (!enable_tracing_response.IsBound())
+    return;
+
+  auto result = ipc::AsyncResult<protos::EnableTracingResponse>::Create();
+  state.ToProto(result->mutable_tracing_session_state());
+  enable_tracing_response.Resolve(std::move(result));
+}
 
 void ConsumerIPCService::RemoteConsumer::OnTraceData(
     std::vector<TracePacket> trace_packets,

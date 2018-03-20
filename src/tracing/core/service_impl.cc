@@ -164,7 +164,7 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   consumers_.erase(consumer);
 }
 
-void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
+bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                                 const TraceConfig& cfg) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Enabling tracing for consumer %p",
@@ -179,8 +179,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     PERFETTO_DLOG(
         "A Consumer is trying to EnableTracing() but another tracing session "
         "is already active (forgot a call to FreeBuffers() ?)");
-    // TODO(primiano): make this a bool and return failure to the IPC layer.
-    return;
+    return false;
   }
 
   if (cfg.enable_extra_guardrails()) {
@@ -188,7 +187,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
                     " ms)",
                     cfg.duration_ms(), kMaxTracingDurationMillis);
-      return;
+      return false;
     }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
@@ -197,13 +196,13 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64
                     "kB  > %" PRIu64 " kB)",
                     buf_size_sum, kMaxTracingBufferSizeKb);
-      return;
+      return false;
     }
   }
 
   if (cfg.buffers_size() > kMaxBuffersPerConsumer) {
     PERFETTO_DLOG("Too many buffers configured (%d)", cfg.buffers_size());
-    return;  // TODO(primiano): signal failure to the caller.
+    return false;
   }
 
   // TODO(primiano): This is a workaround to prevent that a producer gets stuck
@@ -215,13 +214,13 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   if (tracing_sessions_.size() >= kDefaultShmSize / kBufferPageSize / 2) {
     PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
                   tracing_sessions_.size());
-    // TODO(primiano): make this a bool and return failure to the IPC layer.
-    return;
+    return false;
   }
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
   TracingSession& ts =
-      tracing_sessions_.emplace(tsid, TracingSession(cfg)).first->second;
+      tracing_sessions_.emplace(tsid, TracingSession(consumer, cfg))
+          .first->second;
 
   // Initialize the log buffers.
   bool did_allocate_all_buffers = true;
@@ -264,7 +263,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       buffers_.erase(global_id);
     }
     tracing_sessions_.erase(tsid);
-    return;  // TODO(primiano): return failure condition?
+    return false;
   }
 
   consumer->tracing_session_id_ = tsid;
@@ -283,7 +282,8 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
           if (weak_this)
-            weak_this->DisableTracing(tsid);
+            weak_this->DisableTracing(
+                tsid, TracingSessionState::DisabledReason::EXPLICIT_REQUEST);
         },
         cfg.duration_ms());
   }
@@ -292,13 +292,15 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
                cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
                total_buf_size_kb, tracing_sessions_.size());
+  return true;
 }
 
 // DisableTracing just stops the data sources but doesn't free up any buffer.
 // This is to allow the consumer to freeze the buffers (by stopping the trace)
 // and then drain the buffers. The actual teardown of the TracingSession happens
 // in FreeBuffers().
-void ServiceImpl::DisableTracing(TracingSessionID tsid) {
+void ServiceImpl::DisableTracing(TracingSessionID tsid,
+                                 TracingSessionState::DisabledReason reason) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
@@ -316,6 +318,8 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     producer->producer_->TearDownDataSourceInstance(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
+  tracing_session->consumer->NotifyTracingSessionStateChange(
+      TracingSessionState::State::DISABLED, reason);
 
   // Deliberately NOT removing the session from |tracing_session_|, it's still
   // needed to call ReadBuffers(). FreeBuffers() will erase() the session.
@@ -487,7 +491,7 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
         "Consumer invoked FreeBuffers() but no tracing session is active");
     return;  // TODO(primiano): signal failure?
   }
-  DisableTracing(tsid);
+  DisableTracing(tsid, TracingSessionState::DisabledReason::EXPLICIT_REQUEST);
 
   // If the client requested us to drain periodically the buffer into the passed
   // file, force a final read pass before destroyibg the buffers.
@@ -749,25 +753,51 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 // ServiceImpl::ConsumerEndpointImpl implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(ServiceImpl* service,
-                                                        base::TaskRunner*,
-                                                        Consumer* consumer)
-    : service_(service), consumer_(consumer), weak_ptr_factory_(this) {}
+ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
+    ServiceImpl* service,
+    base::TaskRunner* task_runner,
+    Consumer* consumer)
+    : task_runner_(task_runner),
+      service_(service),
+      consumer_(consumer),
+      weak_ptr_factory_(this) {}
 
 ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   service_->DisconnectConsumer(this);
   consumer_->OnDisconnect();
 }
 
+void ServiceImpl::ConsumerEndpointImpl::NotifyTracingSessionStateChange(
+    TracingSessionState::State state,
+    TracingSessionState::DisabledReason disabled_reason) {
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this, state, disabled_reason] {
+    if (!weak_this)
+      return;
+    TracingSessionState tss;
+    tss.set_state(state);
+    tss.set_disabled_reason(disabled_reason);
+    weak_this->consumer_->OnTracingStateChange(tss);
+  });
+}
+
 void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  service_->EnableTracing(this, cfg);
+  bool enabled = service_->EnableTracing(this, cfg);
+  if (enabled) {
+    NotifyTracingSessionStateChange(TracingSessionState::State::ENABLED);
+  } else {
+    NotifyTracingSessionStateChange(TracingSessionState::State::DISABLED,
+                                    TracingSessionState::DisabledReason::ERROR);
+  }
 }
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (tracing_session_id_) {
-    service_->DisableTracing(tracing_session_id_);
+    service_->DisableTracing(
+        tracing_session_id_,
+        TracingSessionState::DisabledReason::EXPLICIT_REQUEST);
   } else {
     PERFETTO_LOG("Consumer called DisableTracing() but tracing was not active");
   }
@@ -929,7 +959,8 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 // ServiceImpl::TracingSession implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
-    : config(new_config) {}
+ServiceImpl::TracingSession::TracingSession(ConsumerEndpointImpl* consumer_ptr,
+                                            const TraceConfig& new_config)
+    : consumer(consumer_ptr), config(new_config) {}
 
 }  // namespace perfetto

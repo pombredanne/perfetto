@@ -27,6 +27,7 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "perfetto/tracing/core/tracing_session_state.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "perfetto/tracing/ipc/service_ipc_host.h"
@@ -84,6 +85,7 @@ class MockConsumer : public Consumer {
   // Producer implementation.
   MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
+  MOCK_METHOD1(OnTracingStateChange, void(const TracingSessionState&));
   MOCK_METHOD2(OnTracePackets, void(std::vector<TracePacket>*, bool));
 
   // Workaround, gmock doesn't support yet move-only types, passing a pointer.
