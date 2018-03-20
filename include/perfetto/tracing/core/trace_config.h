@@ -54,10 +54,6 @@ class TraceConfig {
  public:
   class BufferConfig {
    public:
-    enum OptimizeFor {
-      DEFAULT = 0,
-      ONE_SHOT_READ = 1,
-    };
     enum FillPolicy {
       UNSPECIFIED = 0,
       RING_BUFFER = 1,
@@ -76,15 +72,11 @@ class TraceConfig {
     uint32_t size_kb() const { return size_kb_; }
     void set_size_kb(uint32_t value) { size_kb_ = value; }
 
-    OptimizeFor optimize_for() const { return optimize_for_; }
-    void set_optimize_for(OptimizeFor value) { optimize_for_ = value; }
-
     FillPolicy fill_policy() const { return fill_policy_; }
     void set_fill_policy(FillPolicy value) { fill_policy_ = value; }
 
    private:
     uint32_t size_kb_ = {};
-    OptimizeFor optimize_for_ = {};
     FillPolicy fill_policy_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility

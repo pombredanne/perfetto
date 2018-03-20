@@ -119,6 +119,27 @@ void ConsumerIPCClientImpl::ReadBuffers() {
                              std::move(async_response));
 }
 
+void ConsumerIPCClientImpl::ReadBuffersIntoFile(base::ScopedFile fd,
+                                                uint32_t period_ms) {
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot ReadBuffersIntoFile(), not connected to tracing service");
+    return;
+  }
+
+  ipc::Deferred<protos::ReadBuffersIntoFileResponse> async_response;
+  async_response.Bind(
+      [](ipc::AsyncResult<protos::ReadBuffersIntoFileResponse> response) {
+        if (!response)
+          PERFETTO_DLOG("ReadBuffersIntoFile() failed");
+      });
+  protos::ReadBuffersIntoFileRequest req;
+  req.set_write_period_ms(period_ms);
+  consumer_port_.ReadBuffersIntoFile(req, std::move(async_response), *fd);
+  // |fd| at this point will go out of scope and close the fd. But the IPC layer
+  // has duped it just above and passed to the service.
+}
+
 void ConsumerIPCClientImpl::OnReadBuffersResponse(
     ipc::AsyncResult<protos::ReadBuffersResponse> response) {
   if (!response) {

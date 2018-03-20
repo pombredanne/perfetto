@@ -97,6 +97,7 @@ class ServiceImpl : public Service {
     void EnableTracing(const TraceConfig&) override;
     void DisableTracing() override;
     void ReadBuffers() override;
+    void ReadBuffersIntoFile(base::ScopedFile, uint32_t period_ms) override;
     void FreeBuffers() override;
 
    private:
@@ -139,7 +140,12 @@ class ServiceImpl : public Service {
   void DisconnectConsumer(ConsumerEndpointImpl*);
   void EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
   void DisableTracing(TracingSessionID);
-  void ReadBuffers(TracingSessionID, ConsumerEndpointImpl*);
+  void ReadBuffers(TracingSessionID,
+                   bool write_into_file,
+                   ConsumerEndpointImpl*);
+  void ReadBuffersIntoFile(TracingSessionID,
+                           base::ScopedFile,
+                           uint32_t period_ms);
   void FreeBuffers(TracingSessionID);
 
   // Service implementation.
@@ -189,6 +195,12 @@ class ServiceImpl : public Service {
     // BufferID (shared namespace amongst all consumers). This vector has as
     // many entries as |config.buffers_size()|.
     std::vector<BufferID> buffers_index;
+
+    // This is set when the Consumer calls ReadBuffersIntoFile(). In this case
+    // this represents the file we should stream the trace packets into, rather
+    // than returning it to the consumer via OnTraceData().
+    base::ScopedFile write_into_file_;
+    int write_period_ms_ = 0;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;

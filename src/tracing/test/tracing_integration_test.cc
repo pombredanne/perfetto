@@ -15,9 +15,11 @@
  */
 
 #include <inttypes.h>
+#include <unistd.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/temp_file.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -32,6 +34,7 @@
 #include "src/ipc/test/test_socket.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -164,24 +167,15 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
 
   const size_t kNumPackets = 10;
   for (size_t i = 0; i < kNumPackets; i++) {
-    char buf[8];
+    char buf[16];
     sprintf(buf, "evt_%zu", i);
     writer->NewTracePacket()->set_for_testing()->set_str(buf, strlen(buf));
   }
 
-  // Allow the service to see the CommitData() before disabling tracing.
+  // Allow the service to see the CommitData() before reading back.
   auto on_data_committed = task_runner_->CreateCheckpoint("on_data_committed");
   writer->Flush(on_data_committed);
   task_runner_->RunUntilCheckpoint("on_data_committed");
-  writer.reset();
-
-  // Disable tracing.
-  consumer_endpoint->DisableTracing();
-  auto on_teardown_ds_instance =
-      task_runner_->CreateCheckpoint("on_teardown_ds_instance");
-  EXPECT_CALL(producer, TearDownDataSourceInstance(ds_iid))
-      .WillOnce(InvokeWithoutArgs(on_teardown_ds_instance));
-  task_runner_->RunUntilCheckpoint("on_teardown_ds_instance");
 
   // Read the log buffer.
   consumer_endpoint->ReadBuffers();
@@ -198,6 +192,58 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
           }));
   task_runner_->RunUntilCheckpoint("all_packets_rx");
   ASSERT_EQ(kNumPackets, num_pack_rx);
+
+  // Now write some other data.
+  for (size_t i = 0; i < kNumPackets; i++) {
+    char buf[16];
+    sprintf(buf, "evt2_%zu", i);
+    writer->NewTracePacket()->set_for_testing()->set_str(buf, strlen(buf));
+  }
+
+  // Allow the service to see the CommitData() before reading back.
+  auto on_data_committed2 =
+      task_runner_->CreateCheckpoint("on_data_committed2");
+  writer->Flush(on_data_committed2);
+  task_runner_->RunUntilCheckpoint("on_data_committed2");
+
+  // And ask the service to write it into a file.
+  base::TempFile tmp_file = base::TempFile::CreateUnlinked();
+  consumer_endpoint->ReadBuffersIntoFile(base::ScopedFile(dup(tmp_file.fd())),
+                                         0);
+
+  // Doing a conventional ReadBuffers() should return no data, as all the buffer
+  // should have been drained into the |tmp_file|.
+  consumer_endpoint->ReadBuffers();
+  auto no_packets_rx = task_runner_->CreateCheckpoint("no_packets_rx");
+  EXPECT_CALL(consumer, OnTracePackets(_, false))
+      .WillOnce(
+          Invoke([no_packets_rx](std::vector<TracePacket>* packets, bool) {
+            ASSERT_EQ(0u, packets->size());
+            no_packets_rx();
+
+          }));
+  task_runner_->RunUntilCheckpoint("no_packets_rx");
+
+  // Check that |tmp_file| contains a valid trace.proto message.
+  ASSERT_EQ(0, lseek(tmp_file.fd(), 0, SEEK_SET));
+  char tmp_buf[1024];
+  ssize_t rsize = read(tmp_file.fd(), tmp_buf, sizeof(tmp_buf));
+  ASSERT_GT(rsize, 0);
+  protos::Trace tmp_trace;
+  ASSERT_TRUE(tmp_trace.ParseFromArray(tmp_buf, rsize));
+  ASSERT_EQ(kNumPackets, static_cast<size_t>(tmp_trace.packet_size()));
+  for (size_t i = 0; i < kNumPackets; i++) {
+    const protos::TracePacket& packet = tmp_trace.packet(i);
+    ASSERT_EQ("evt2_" + std::to_string(i), packet.for_testing().str());
+  }
+
+  // Disable tracing.
+  consumer_endpoint->DisableTracing();
+  auto on_teardown_ds_instance =
+      task_runner_->CreateCheckpoint("on_teardown_ds_instance");
+  EXPECT_CALL(producer, TearDownDataSourceInstance(ds_iid))
+      .WillOnce(InvokeWithoutArgs(on_teardown_ds_instance));
+  task_runner_->RunUntilCheckpoint("on_teardown_ds_instance");
 
   // TODO(primiano): cover FreeBuffers.
 
