@@ -41,21 +41,13 @@ namespace perfetto {
 namespace {
 
 constexpr size_t kMaxScans = 50000;
-constexpr int kSortedBatchSize = 1;
 constexpr Inode kMergeDistance = 0;
 constexpr size_t kSetSize = 3;
 
-// Random util.
 template <typename T, typename... Args>
 void CheckEmplace(T& m, Args&&... args) {
   auto x = m.emplace(args...);
   PERFETTO_DCHECK(x.second);
-}
-
-template <typename T>
-T CheckedNonNegativeSubtraction(T a, T b) {
-  PERFETTO_DCHECK(b <= a);
-  return a - b;
 }
 
 }  // namespace
@@ -133,7 +125,7 @@ class Prefixes {
     return cur;
   }
 
-  // private:
+ private:
   const size_t limit_;
   // (path element, count) tuples for last path seen.
   std::vector<std::pair<std::string, size_t>> state_;
@@ -170,7 +162,7 @@ class SmallSet {
 
  private:
   std::array<DataType, kSetSize> arr_;
-  size_t filled_;
+  size_t filled_ = 0;
 };
 
 class RangeTree {
@@ -240,8 +232,7 @@ class RangeTree {
       return Insert(inode, interned);
     }
 
-    const std::pair<Inode, DataType> data{inode, interned};
-    auto merge_strategy = GetMergeStrategy(lower, upper, data);
+    auto merge_strategy = GetMergeStrategy(lower, upper, inode, interned);
     auto overlap = GetOverlap(lower, upper, inode);
 
     // We can only merge with the following range if we don't overlap
@@ -289,7 +280,7 @@ class RangeTree {
     }
   }
 
-  // private:
+ private:
   using MapType = std::map<Inode, std::pair<Inode, SmallSet>>;
   MapType map_;
 
@@ -299,11 +290,14 @@ class RangeTree {
     kUpper = 2,
   };
 
+  // Whether the lower range of the surrounding ranges is valid.
+  // It is invalid if the upper range is the first element in the map.
   bool ConsiderLower(const MapType::iterator& lower,
                      const MapType::iterator& upper) {
     return upper != lower;
   }
-
+  // Whether the upper range of the surrounding ranges is valid.
+  // It is invalid iff the map is empty.
   bool ConsiderUpper(const MapType::iterator& lower,
                      const MapType::iterator& upper) {
     return upper != map_.cend();
@@ -320,6 +314,7 @@ class RangeTree {
     return;
   }
 
+  // Return whether inode overlaps with lower, upper or no range.
   SurroundingRanges GetOverlap(const MapType::iterator& lower,
                                const MapType::iterator& upper,
                                Inode inode) {
@@ -330,16 +325,20 @@ class RangeTree {
     return SurroundingRanges::kNone;
   }
 
+  // Return whether inode with value should be merged with lower or upper
+  // range. Returns kUpper, kLower or kNone if it should not be merged.
+  // Always prefer merging with lower as that is cheaper to do.
   SurroundingRanges GetMergeStrategy(const MapType::iterator& lower,
                                      const MapType::iterator& upper,
-                                     const std::pair<Inode, DataType>& data) {
+                                     Inode inode,
+                                     DataType value) {
+    // Sanity check passed lower / upper ranges.
     PERFETTO_DCHECK(
-        (!ConsiderLower(lower, upper) || data.first >= lower->first) &&
-        (!ConsiderUpper(lower, upper) || data.first < upper->second.first));
-    // Always prefer merging with lower as that is cheaper to do.
+        (!ConsiderLower(lower, upper) || inode >= lower->first) &&
+        (!ConsiderUpper(lower, upper) || inode < upper->second.first));
 
     // We cannot merge with the upper range if we overlap with the lower.
-    auto overlap = GetOverlap(lower, upper, data.first);
+    auto overlap = GetOverlap(lower, upper, inode);
     bool consider_upper = ConsiderUpper(lower, upper);
     if (overlap == SurroundingRanges::kLower)
       consider_upper = false;
@@ -348,22 +347,21 @@ class RangeTree {
     // In theory, if the first and the last element come after each other,
     // they will be merged into a range spanning the entire space, which will
     // have to be split for every insert. Needless to say, this would be bad.
-    PERFETTO_DCHECK(upper->first >= data.first);
+    PERFETTO_DCHECK(!consider_upper || upper->first >= inode);
     if (consider_upper && kMergeDistance != 0 &&
-        (upper->first - data.first) > kMergeDistance)
+        (upper->first - inode) > kMergeDistance)
       consider_upper = false;
 
     bool consider_lower = ConsiderLower(lower, upper);
-    if (consider_lower && kMergeDistance != 0 &&
-        data.first > lower->second.first &&
-        (data.first, lower->second.first) > kMergeDistance)
+    if (consider_lower && kMergeDistance != 0 && inode > lower->second.first &&
+        (inode - lower->second.first) > kMergeDistance)
       consider_lower = false;
 
     // If the folder is already contained in either of them, merge into that.
     // Prefer lower.
-    if (consider_lower && IsInSet(lower->second.second, data.second))
+    if (consider_lower && IsInSet(lower->second.second, value))
       return SurroundingRanges::kLower;
-    if (consider_upper && IsInSet(upper->second.second, data.second))
+    if (consider_upper && IsInSet(upper->second.second, value))
       return SurroundingRanges::kUpper;
 
     size_t lower_occupation = kSetSize;
@@ -394,13 +392,6 @@ class RangeTree {
   }
 };
 
-size_t GetPeakRSS();
-size_t GetPeakRSS() {
-  struct rusage r;
-  getrusage(RUSAGE_SELF, &r);
-  return static_cast<size_t>(r.ru_maxrss * 1024L);
-}
-
 std::string FmtSet(const std::set<std::string>& s);
 std::string FmtSet(const std::set<std::string>& s) {
   std::string r;
@@ -424,10 +415,7 @@ int IOTracingTestMain2(int argc, char** argv) {
     t.Insert(i, pr.GetPrefix(name));
   });
 
-  std::cout << "RSS " << GetPeakRSS() << std::endl;
-
   std::cout << "PID: " << getpid() << std::endl;
-  sleep(3600);
 
   int wrong = 0;
   int total = 0;
@@ -452,109 +440,6 @@ int IOTracingTestMain2(int argc, char** argv) {
   return 0;
 }
 
-int IOTracingTestMain(int argc, char** argv);
-int IOTracingTestMain(int argc, char** argv) {
-  std::string input_file = "finodes";
-  if (argc > 1)
-    input_file = argv[1];
-
-  auto orss = GetPeakRSS();
-
-  Prefixes pr(kMaxScans);
-  std::ifstream f0(input_file);
-  {
-    std::string line;
-    while (std::getline(f0, line)) {
-      std::istringstream ss(line);
-      Inode inode;
-      std::string name;
-      ss >> inode;
-      ss >> name;
-      if (!name.empty())
-        pr.AddPath(name);
-    }
-  }
-
-  std::ifstream f(input_file);
-  RangeTree t;
-  std::priority_queue<std::pair<Inode, std::string>,
-                      std::vector<std::pair<Inode, std::string>>,
-                      std::greater<std::pair<Inode, std::string>>>
-      pq;
-  for (int i = 0; i < kSortedBatchSize; ++i) {
-    std::string line;
-    std::string nname;
-    Inode ninode;
-    if (std::getline(f, line)) {
-      std::istringstream ss(line);
-      ss >> ninode;
-      ss >> nname;
-      pq.emplace(ninode, nname);
-    } else {
-      break;
-    }
-  }
-  while (!pq.empty()) {
-    auto p = pq.top();
-    pq.pop();
-
-    std::string line;
-    std::string nname;
-    Inode ninode;
-    if (std::getline(f, line)) {
-      std::istringstream ss(line);
-      ss >> ninode;
-      ss >> nname;
-      pq.emplace(ninode, nname);
-    }
-
-    auto inode = p.first;
-    auto name = p.second;
-    if (!name.empty())
-      t.Insert(inode, pr.GetPrefix(name));
-  }
-
-  auto prss = GetPeakRSS();
-  for (const auto& x : t.map_) {
-    std::cout << x.first << "-" << x.second.first << " "
-              << FmtSet(t.Get(x.first)) << std::endl;
-  }
-
-  std::cout << "Elems " << t.map_.size() << std::endl;
-  std::cout << orss << std::endl;
-  std::cout << prss << std::endl;
-
-  std::ifstream f2(input_file);
-  size_t ninodes = 0;
-  size_t wronginodes = 0;
-  std::string line;
-  while (std::getline(f2, line)) {
-    ninodes++;
-    std::istringstream ss(line);
-    Inode inode;
-    std::string name;
-    ss >> inode;
-    ss >> name;
-    if (inode == 0)
-      continue;
-    std::set<std::string> found = t.Get(inode);
-    bool seen = false;
-    for (const std::string& s : found) {
-      if (name.find(s) == 0)
-        seen = true;
-    }
-
-    if (!seen) {
-      std::cout << inode << std::endl;
-      std::cout << name << std::endl;
-      std::cout << FmtSet(found) << std::endl;
-      ++wronginodes;
-    }
-  }
-
-  std::cout << ninodes << " / " << wronginodes << std::endl;
-  return 0;
-}
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
