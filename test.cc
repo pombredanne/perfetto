@@ -34,12 +34,13 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
+#include "src/traced/probes/filesystem/inode_file_data_source.h"
 
 // RANGES ARE [x, y), left-inclusive and right-exlusive.
 namespace perfetto {
 namespace {
 
-constexpr size_t kMaxScans = 50000;
+constexpr size_t kMaxScans = 2000;
 constexpr int kSortedBatchSize = 1;
 constexpr uint64_t kMergeDistance = 0;
 constexpr size_t kSetSize = 3;
@@ -410,6 +411,40 @@ std::string FmtSet(const std::set<std::string>& s) {
   return r;
 }
 
+int IOTracingTestMain2(int argc, char** argv);
+int IOTracingTestMain2(int argc, char** argv) {
+  Prefixes pr(kMaxScans);
+  ScanFilesDFS("/data", [&pr](BlockDeviceID, Inode i, std::string name,
+                              protos::pbzero::InodeFileMap_Entry_Type) {
+    pr.AddPath(name);
+  });
+
+  RangeTree t;
+  ScanFilesDFS("/data", [&t, &pr](BlockDeviceID, Inode i, std::string name,
+                                  protos::pbzero::InodeFileMap_Entry_Type) {
+    t.Insert(i, pr.GetPrefix(name));
+  });
+
+  int wrong = 0;
+  int total = 0;
+  ScanFilesDFS("/data", [&t, &wrong, &total, &pr](
+                            BlockDeviceID, Inode i, std::string name,
+                            protos::pbzero::InodeFileMap_Entry_Type) {
+    ++total;
+    std::set<std::string> found = t.Get(i);
+    for (const std::string& s : found) {
+      if (name.find(s) == 0)
+        return;
+    }
+    ++wrong;
+    std::cout << "Expected: " << name << std::endl;
+    std::cout << "Got: " << FmtSet(found) << std::endl;
+    std::cout << "Prefix: " << pr.GetPrefix(name)->ToString() << std::endl;
+  });
+  std::cout << wrong << " / " << total << std::endl;
+  return 0;
+}
+
 int IOTracingTestMain(int argc, char** argv);
 int IOTracingTestMain(int argc, char** argv) {
   std::string input_file = "finodes";
@@ -516,5 +551,5 @@ int IOTracingTestMain(int argc, char** argv) {
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
-  perfetto::IOTracingTestMain(argc, argv);
+  perfetto::IOTracingTestMain2(argc, argv);
 }

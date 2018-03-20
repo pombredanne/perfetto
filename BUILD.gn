@@ -173,6 +173,7 @@ executable("test") {
   deps = [
     "gn:default_deps",
     "src/base",
+    "src/traced/probes/filesystem",
   ]
   sources = [
     "test.cc",
