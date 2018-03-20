@@ -62,6 +62,11 @@ void ScanFilesDFS(
       if (S_ISLNK(buf.st_mode))
         continue;
 
+      // This might happen on filesystems that do not return
+      // information in entry->d_type.
+      if (S_ISLNK(buf.st_mode))
+        continue;
+
       Inode inode_number = entry->d_ino;
       BlockDeviceID block_device_id = buf.st_dev;
 
