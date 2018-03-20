@@ -29,15 +29,15 @@ const std::set<std::string> RangeTree::Get(Inode inode) {
   return ret;
 }
 
-void RangeTree::Insert(Inode inode, RangeTree::DataType interned) {
+void RangeTree::Insert(Inode inode, RangeTree::DataType value) {
   auto lower = map_.rbegin();
   if (!map_.empty()) {
     PERFETTO_DCHECK(inode > lower->first);
   }
 
-  if (map_.empty() || !lower->second.Add(interned)) {
+  if (map_.empty() || !lower->second.Add(value)) {
     SmallSet<PrefixFinder::Node*, kSetSize> n;
-    n.Add(interned);
+    n.Add(value);
     map_.emplace(inode, std::move(n));
   }
 }

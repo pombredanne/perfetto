@@ -39,7 +39,7 @@ class RangeTree {
   using DataType = PrefixFinder::Node*;
 
   const std::set<std::string> Get(Inode inode);
-  void Insert(Inode inode, DataType interned);
+  void Insert(Inode inode, DataType value);
 
  private:
   std::map<Inode, SmallSet<PrefixFinder::Node*, kSetSize>> map_;
