@@ -50,6 +50,13 @@ class InodeMapValue {
   std::set<std::string> paths_;
 };
 
+void ScanFilesDFS(
+    const std::string& root_directory,
+    const std::function<void(BlockDeviceID,
+                             Inode,
+                             std::string,
+                             protos::pbzero::InodeFileMap_Entry_Type)>& fn);
+
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
