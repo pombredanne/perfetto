@@ -127,16 +127,15 @@ void ConsumerIPCClientImpl::ReadBuffersIntoFile(base::ScopedFile fd,
     return;
   }
 
-  ipc::Deferred<protos::ReadBuffersResponse> async_response;
+  ipc::Deferred<protos::ReadBuffersIntoFileResponse> async_response;
   async_response.Bind(
-      [](ipc::AsyncResult<protos::ReadBuffersResponse> response) {
+      [](ipc::AsyncResult<protos::ReadBuffersIntoFileResponse> response) {
         if (!response)
           PERFETTO_DLOG("ReadBuffersIntoFile() failed");
       });
-  protos::ReadBuffersRequest req;
-  req.set_write_to_passed_fd(true);
+  protos::ReadBuffersIntoFileRequest req;
   req.set_write_period_ms(period_ms);
-  consumer_port_.ReadBuffers(req, std::move(async_response), *fd);
+  consumer_port_.ReadBuffersIntoFile(req, std::move(async_response), *fd);
   // |fd| at this point will go out of scope and close the fd. But the IPC layer
   // has duped it just above and passed to the service.
 }

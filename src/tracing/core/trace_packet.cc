@@ -16,8 +16,11 @@
 
 #include "perfetto/tracing/core/trace_packet.h"
 
+#include "perfetto/base/logging.h"
+#include "perfetto/protozero/proto_utils.h"
 #include "src/tracing/core/sliced_protobuf_input_stream.h"
 
+#include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
@@ -48,6 +51,20 @@ void TracePacket::AddSlice(Slice slice) {
 void TracePacket::AddSlice(const void* start, size_t size) {
   size_ += size;
   slices_.emplace_back(start, size);
+}
+
+std::tuple<char*, size_t> TracePacket::GetPreamble() {
+  using protozero::proto_utils::MakeTagLengthDelimited;
+  using protozero::proto_utils::WriteVarInt;
+  uint32_t tag = MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber);
+  PERFETTO_DCHECK(tag < 0x80);  // Should fit in one byte.
+  char* ptr = &preamble_[0];
+  *(ptr++) = static_cast<char>(tag);
+  ptr = reinterpret_cast<char*>(
+      WriteVarInt(size(), reinterpret_cast<uint8_t*>(ptr)));
+  size_t preamble_size = static_cast<size_t>(ptr - &preamble_[0]);
+  PERFETTO_DCHECK(preamble_size <= sizeof(preamble_));
+  return std::make_tuple(&preamble_[0], preamble_size);
 }
 
 }  // namespace perfetto

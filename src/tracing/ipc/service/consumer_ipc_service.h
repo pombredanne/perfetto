@@ -50,6 +50,8 @@ class ConsumerIPCService : public protos::ConsumerPort {
                       DeferredDisableTracingResponse) override;
   void ReadBuffers(const protos::ReadBuffersRequest&,
                    DeferredReadBuffersResponse) override;
+  void ReadBuffersIntoFile(const protos::ReadBuffersIntoFileRequest&,
+                           DeferredReadBuffersIntoFileResponse) override;
   void FreeBuffers(const protos::FreeBuffersRequest&,
                    DeferredFreeBuffersResponse) override;
   void OnClientDisconnected() override;

@@ -116,10 +116,6 @@ void TraceConfig::BufferConfig::FromProto(
   static_assert(sizeof(size_kb_) == sizeof(proto.size_kb()), "size mismatch");
   size_kb_ = static_cast<decltype(size_kb_)>(proto.size_kb());
 
-  static_assert(sizeof(optimize_for_) == sizeof(proto.optimize_for()),
-                "size mismatch");
-  optimize_for_ = static_cast<decltype(optimize_for_)>(proto.optimize_for());
-
   static_assert(sizeof(fill_policy_) == sizeof(proto.fill_policy()),
                 "size mismatch");
   fill_policy_ = static_cast<decltype(fill_policy_)>(proto.fill_policy());
@@ -132,11 +128,6 @@ void TraceConfig::BufferConfig::ToProto(
 
   static_assert(sizeof(size_kb_) == sizeof(proto->size_kb()), "size mismatch");
   proto->set_size_kb(static_cast<decltype(proto->size_kb())>(size_kb_));
-
-  static_assert(sizeof(optimize_for_) == sizeof(proto->optimize_for()),
-                "size mismatch");
-  proto->set_optimize_for(
-      static_cast<decltype(proto->optimize_for())>(optimize_for_));
 
   static_assert(sizeof(fill_policy_) == sizeof(proto->fill_policy()),
                 "size mismatch");

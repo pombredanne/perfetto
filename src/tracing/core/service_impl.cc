@@ -26,7 +26,6 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
-#include "perfetto/protozero/proto_utils.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/producer.h"
@@ -45,14 +44,11 @@
 
 namespace perfetto {
 
-using protozero::proto_utils::MakeTagVarInt;
-using protozero::proto_utils::ParseVarInt;
-using protozero::proto_utils::WriteVarInt;
-
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
+constexpr int kMinWriteIntoFilePeriodMs = 100;
 
 constexpr uint64_t kMillisPerHour = 3600000;
 
@@ -403,36 +399,43 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     }  // for(packets...)
   }    // for(buffers...)
 
-  // If the caller previously
+  // If the caller asked us to write into a file via a ReadBuffersIntoFile()
+  // call, drain the packets read (if any) into the given file descriptor.
   if (write_into_file) {
-    if (packets_bytes == 0)
-      return;
-    std::unique_ptr<struct iovec[]> iovecs(new struct iovec[total_slices]);
+    // When writing into a file, the file should look like a root trace.proto
+    // message. Each packet should be prepended with a proto preamble stating
+    // its field id (within trace.proto) and size. Hence the addition below.
+    const size_t num_iovecs = total_slices + packets.size();
+
+    std::unique_ptr<struct iovec[]> iovecs(new struct iovec[num_iovecs]);
     size_t i = 0;
-    for (const TracePacket& packet : packets) {
+    for (TracePacket& packet : packets) {
+      std::tie(iovecs[i].iov_base, iovecs[i].iov_len) = packet.GetPreamble();
+      packets_bytes += iovecs[i].iov_len;
+      i++;
       for (const Slice& slice : packet.slices()) {
         char* start = reinterpret_cast<char*>(const_cast<void*>(slice.start));
         iovecs[i++] = {start, slice.size};
-        PERFETTO_DCHECK(i <= total_slices);
       }
     }
-    PERFETTO_DCHECK(i == total_slices);
+    PERFETTO_DCHECK(i == num_iovecs);
     int fd = *tracing_session->write_into_file_;
-    ssize_t wr_size = writev(fd, &iovecs[0], total_slices);
+    ssize_t wr_size = num_iovecs ? writev(fd, &iovecs[0], num_iovecs) : 0;
     PERFETTO_DCHECK(static_cast<size_t>(wr_size) == packets_bytes);
     if (tracing_session->write_period_ms_) {
-      int period_ms = static_cast<int>(tracing_session->write_period_ms_);
-      period_ms = std::max(100, period_ms);  // Cap to a reasonable value.
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       task_runner_->PostDelayedTask(
           [weak_this, tsid] {
             if (weak_this)
               weak_this->ReadBuffers(tsid, true /*write_into_file*/, nullptr);
           },
-          period_ms);
+          tracing_session->write_period_ms_);
+    } else {
+      // This was a one-off request. Close the file.
+      tracing_session->write_into_file_.reset();
     }
     return;
-  }
+  }  // if (write_into_file)
 
   const bool has_more = did_hit_threshold;
   if (has_more) {
@@ -469,6 +472,9 @@ void ServiceImpl::ReadBuffersIntoFile(TracingSessionID tsid,
   }
   tracing_session->write_into_file_ = std::move(fd);
   tracing_session->write_period_ms_ = period_ms;
+  if (period_ms > 0 && period_ms < kMinWriteIntoFilePeriodMs)
+    tracing_session->write_period_ms_ = kMinWriteIntoFilePeriodMs;
+
   ReadBuffers(tsid, true /*read_into_file*/, nullptr);
 }
 
@@ -482,6 +488,14 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
     return;  // TODO(primiano): signal failure?
   }
   DisableTracing(tsid);
+
+  // If the client requested us to drain periodically the buffer into the passed
+  // file, force a final read pass before destroyibg the buffers.
+  if (tracing_session->write_into_file_) {
+    tracing_session->write_period_ms_ = 0;
+    ReadBuffers(tsid, true, nullptr);
+  }
+
   for (BufferID buffer_id : tracing_session->buffers_index) {
     buffer_ids_.Free(buffer_id);
     PERFETTO_DCHECK(buffers_.count(buffer_id) == 1);

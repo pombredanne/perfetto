@@ -37,24 +37,23 @@ service ConsumerPort {
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
 
-  // Streams back the contents of one or more buffers. At the moment this can
-  // be called once only after calling DisableTracing(). In future it will be
-  // possible to call this while the trace is enabled to stream continuously the
-  // contents of the buffer(s). One call is enough to drain all the buffers. The
-  // response consists in a sequence of ReadBufferResponse messages (hence the
-  // "stream" in the return type), each carrying one or more TracePacket(s).
-  // An EOF flag is attached to the last ReadBufferResponse through the
-  // |has_more| == false field.
-  // TODO: add the ability to pass a file descriptor and just let the service
-  // write into that.
+  // Streams back the contents of one or more buffers. One call is enough to
+  // drain all the buffers. The response consists in a sequence of
+  // ReadBufferResponse messages (hence the "stream" in the return type), each
+  // carrying one or more TracePacket(s). An EOF flag is attached to the last
+  // ReadBufferResponse through the |has_more| == false field.
   rpc ReadBuffers(ReadBuffersRequest) returns (stream ReadBuffersResponse) {}
+
+  // Like ReadBuffers() but instead of returning the stream of packets to the
+  // consumer, it writes them into the passed file descriptor.
+  rpc ReadBuffersIntoFile(ReadBuffersIntoFileRequest)
+      returns (stream ReadBuffersIntoFileResponse) {}
 
   // Destroys the buffers previously created. Note: all buffers are destroyed
   // implicitly if the Consumer disconnects.
   rpc FreeBuffers(FreeBuffersRequest) returns (FreeBuffersResponse) {}
 
   // TODO rpc ListDataSources(), for the UI.
-  // TODO rpc KillSwitch().
 }
 
 // Arguments for rpc EnableTracing().
@@ -76,18 +75,6 @@ message DisableTracingResponse {}
 message ReadBuffersRequest {
   // The |id|s of the buffer, as passed to CreateBuffers().
   // TODO: repeated uint32 buffer_ids = 1;
-
-  // When true, this message also transports a file descriptor (sent by the
-  // consumer) and the service will stream the contents of the trace into
-  // the passed file rather than returning them back into the
-  // ReadBufferResponse.
-  optional bool write_to_passed_fd = 2;
-
-  // When |write_to_passed_fd| == false this is ignored. When true, this
-  // determines how frequently the service will read the trace buffer(s) and
-  // draing them into the |write_to_passed_fd|. A period == 0 means that the
-  // service will perform only a one-shot read.
-  optional int32 write_period_ms = 3;
 }
 
 message ReadBuffersResponse {
@@ -110,6 +97,17 @@ message ReadBuffersResponse {
   // Perhaps we should just cap the size of a TracePacket to a lower size?
   repeated bytes trace_packets = 2;
 }
+
+// Arguments for rpc ReadBuffersIntoFile().
+message ReadBuffersIntoFileRequest {
+  // Determines how frequently the service will read the trace buffer(s) and
+  // write them into the passed file descriptor. A period == 0 means that the
+  // service will perform only a one-shot read. When set, the period will be
+  // capped at a minimum of 100 ms.
+  optional int32 write_period_ms = 1;
+}
+
+message ReadBuffersIntoFileResponse {}
 
 // Arguments for rpc FreeBuffers().
 message FreeBuffersRequest {

@@ -115,8 +115,9 @@ class Service {
     virtual void ReadBuffers() = 0;
 
     // Like ReadBuffers() but, instead of handing the tracing data back to the
-    // caller, saves it into the passed file. If |period| == 0, the service will
-    // perform just a one shot read.
+    // caller, saves it into the passed file. If |period_ms| == 0, the service
+    // will perform just a one shot read. |period| is capped at a minimum of
+    // 100 ms when non-zero.
     virtual void ReadBuffersIntoFile(base::ScopedFile, uint32_t period_ms) = 0;
 
     virtual void FreeBuffers() = 0;

@@ -15,6 +15,7 @@
  */
 
 #include <inttypes.h>
+#include <unistd.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -33,6 +34,7 @@
 #include "src/ipc/test/test_socket.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -221,6 +223,19 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
 
           }));
   task_runner_->RunUntilCheckpoint("no_packets_rx");
+
+  // Check that |tmp_file| contains a valid trace.proto message.
+  ASSERT_EQ(0, lseek(tmp_file.fd(), 0, SEEK_SET));
+  char tmp_buf[1024];
+  ssize_t rsize = read(tmp_file.fd(), tmp_buf, sizeof(tmp_buf));
+  ASSERT_GT(rsize, 0);
+  protos::Trace tmp_trace;
+  ASSERT_TRUE(tmp_trace.ParseFromArray(tmp_buf, rsize));
+  ASSERT_EQ(kNumPackets, static_cast<size_t>(tmp_trace.packet_size()));
+  for (size_t i = 0; i < kNumPackets; i++) {
+    const protos::TracePacket& packet = tmp_trace.packet(i);
+    ASSERT_EQ("evt2_" + std::to_string(i), packet.for_testing().str());
+  }
 
   // Disable tracing.
   consumer_endpoint->DisableTracing();
