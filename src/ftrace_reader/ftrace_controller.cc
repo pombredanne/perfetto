@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -30,6 +31,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "src/ftrace_reader/cpu_reader.h"
 #include "src/ftrace_reader/event_info.h"
@@ -142,9 +144,7 @@ FtraceController::~FtraceController() {
 }
 
 uint64_t FtraceController::NowMs() const {
-  timespec now;
-  clock_gettime(CLOCK_MONOTONIC, &now);
-  return (now.tv_sec * 1000000000L + now.tv_nsec) / 1000000L;
+  return base::GetWallTimeMs().count();
 }
 
 // static
@@ -364,16 +364,16 @@ const std::set<std::string>& FtraceSink::enabled_events() {
 
 FtraceMetadata::FtraceMetadata() {
   // A lot of the time there will only be a small number of inodes.
-  inodes.reserve(10);
+  inode_and_device.reserve(10);
   pids.reserve(10);
 }
 
-void FtraceMetadata::AddDevice(uint32_t device_id) {
+void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
 }
 
-void FtraceMetadata::AddInode(uint64_t inode_number) {
-  inodes.push_back(std::make_pair(inode_number, last_seen_device_id));
+void FtraceMetadata::AddInode(Inode inode_number) {
+  inode_and_device.push_back(std::make_pair(inode_number, last_seen_device_id));
 }
 
 void FtraceMetadata::AddPid(int32_t pid) {
@@ -385,7 +385,7 @@ void FtraceMetadata::AddPid(int32_t pid) {
 }
 
 void FtraceMetadata::Clear() {
-  inodes.clear();
+  inode_and_device.clear();
   pids.clear();
   overwrite_count = 0;
   last_seen_device_id = 0;
