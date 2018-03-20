@@ -211,16 +211,17 @@ int IOTracingTestMain2(int argc, char** argv) {
   Prefixes pr(kMaxScans);
   RangeTree t;
   {
-    std::map<Inode, Prefixes::Node*> mp;
+    std::vector<std::pair<Inode, Prefixes::Node*>> inodes;
     ScanFilesDFS(
-        "/data", [&pr, &mp](BlockDeviceID, Inode i, std::string name,
-                            protos::pbzero::InodeFileMap_Entry_Type type) {
+        "/data", [&pr, &inodes](BlockDeviceID, Inode i, std::string name,
+                                protos::pbzero::InodeFileMap_Entry_Type type) {
           if (type == protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY)
             return;
           pr.AddPath(name);
-          mp.emplace(i, pr.GetPrefix(name));
+          inodes.emplace_back(i, pr.GetPrefix(name));
         });
-    for (const auto& p : mp)
+    std::sort(inodes.begin(), inodes.end());
+    for (const auto& p : inodes)
       t.Insert(p.first, p.second);
   }
 
