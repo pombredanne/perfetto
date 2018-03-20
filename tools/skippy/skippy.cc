@@ -22,8 +22,8 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
 
-// Skippy is a program that produces visually identifiable output in the
-// systrace UI that is useful for debugging.
+// Skippy is a program that produces a visually identifiable stepping pattern
+// in the systrace UI that is useful for debugging dropped or corrupted data.
 
 namespace perfetto {
 namespace {
