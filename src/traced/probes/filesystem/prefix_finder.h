@@ -49,9 +49,7 @@ class PrefixFinder {
   };
 
   PrefixFinder(size_t limit);
-
   void AddPath(std::string path);
-
   Node* GetPrefix(std::string path);
 
  private:
