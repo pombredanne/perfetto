@@ -60,9 +60,9 @@ enum FtraceFieldType {
   kFtraceInode32,
   kFtraceInode64,
   kFtracePid32,
+  kFtraceCommonPid32,
   kFtraceDevId32,
   kFtraceDevId64,
-  kFtraceCommonPid32,
 };
 
 // Joint enum of FtraceFieldType (left) and ProtoFieldType (right).
@@ -162,7 +162,7 @@ inline const char* ToString(FtraceFieldType v) {
     case kFtracePid32:
       return "pid32";
     case kFtraceCommonPid32:
-      return "common pid32";
+      return "common_pid32";
     case kFtraceDevId32:
       return "devid32";
     case kFtraceDevId64:

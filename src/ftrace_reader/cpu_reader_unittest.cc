@@ -703,11 +703,11 @@ TEST(CpuReaderTest, ParseAllFields) {
     SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                            &field->strategy);
   }
+
   {
-    // pid32 -> uint32
     common_fields.emplace_back(Field{});
     Field* field = &common_fields.back();
-    field->ftrace_offset = 12;
+    field->ftrace_offset = 4;
     field->ftrace_size = 4;
     field->ftrace_type = kFtraceCommonPid32;
     field->proto_field_id = 2;
