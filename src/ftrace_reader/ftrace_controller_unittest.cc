@@ -624,12 +624,18 @@ TEST(FtraceMetadataTest, AddDevice) {
 
 TEST(FtraceMetadataTest, AddInode) {
   FtraceMetadata metadata;
+  metadata.AddPid(getpid() + 1);
   metadata.AddDevice(3);
   metadata.AddInode(2);
   metadata.AddInode(1);
   // Check same inode number is added
+  metadata.AddPid(getpid() + 1);
   metadata.AddDevice(5);
   metadata.AddInode(2);
+  // Check activity from ourselves is excluded.
+  metadata.AddPid(getpid());
+  metadata.AddDevice(5);
+  metadata.AddInode(5);
   EXPECT_THAT(metadata.inode_and_device,
               ElementsAre(Pair(2, 3), Pair(1, 3), Pair(2, 5)));
 }
