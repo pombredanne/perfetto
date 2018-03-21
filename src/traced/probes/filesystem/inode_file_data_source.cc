@@ -32,8 +32,6 @@ namespace perfetto {
 
 void ScanFilesDFS(
     const std::string& root_directory,
-    const std::map<BlockDeviceID, std::set<Inode>>& unresolved_inodes,
-    LRUInodeCache* cache,
     const std::function<void(BlockDeviceID block_device_id,
                              Inode inode_number,
                              const std::string& path,
@@ -71,28 +69,6 @@ void ScanFilesDFS(
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
 
-      // If given a non-empty set of inode numbers, only add to the map for the
-      // inode numbers provided
-      if (!unresolved_inodes.empty()) {
-        auto block_device_entry = unresolved_inodes.find(block_device_id);
-        if (block_device_entry == unresolved_inodes.end())
-          continue;
-        auto unresolved_inode = block_device_entry->second.find(inode_number);
-        if (unresolved_inode == block_device_entry->second.end())
-          continue;
-        // std::pair<BlockDeviceID,Inode> key{block_device_id, inode_number};
-        // auto currVal = cache->Get(key);
-        std::set<std::string> paths;
-        // if (currVal != nullptr)
-        //   paths = currVal->paths();
-        // paths.emplace((filepath+filename).c_str());
-        // InodeMapValue value(type, paths);
-        //  cache->Insert(key, value);
-        PERFETTO_LOG("DATA as inode file path=%s",
-                     (filepath + filename).c_str());
-        PERFETTO_LOG("CORRECT block device id=%" PRIu64, block_device_id);
-      }
-
       fn(block_device_id, inode_number, filepath + filename, type);
     }
     closedir(dir);
@@ -101,14 +77,36 @@ void ScanFilesDFS(
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    const std::map<BlockDeviceID, std::set<Inode>>& inodes,
+    const std::map<BlockDeviceID, std::set<Inode>>& unresolved_inodes,
     LRUInodeCache* cache,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {
   ScanFilesDFS(
-      root_directory, inodes, cache,
-      [&block_device_map](BlockDeviceID block_device_id, Inode inode_number,
+      root_directory, [&block_device_map, &unresolved_inodes, cache](
+                          BlockDeviceID block_device_id, Inode inode_number,
                           const std::string& path,
                           protos::pbzero::InodeFileMap_Entry_Type type) {
+
+        // If given a non-empty set of inode numbers, only add to the map for
+        // the inode numbers provided
+        if (!unresolved_inodes.empty()) {
+          auto block_device_entry = unresolved_inodes.find(block_device_id);
+          if (block_device_entry == unresolved_inodes.end())
+            return;
+          auto unresolved_inode = block_device_entry->second.find(inode_number);
+          if (unresolved_inode == block_device_entry->second.end())
+            return;
+          std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
+          auto currVal = cache->Get(key);
+          std::set<std::string> paths;
+          if (currVal != nullptr)
+            paths = currVal->paths();
+          paths.emplace(path);
+          InodeMapValue value(type, paths);
+          // value.SetType(type);
+          // value.SetPaths(paths);
+          cache->Insert(key, value);
+        }
+
         std::map<Inode, InodeMapValue>& inode_map =
             (*block_device_map)[block_device_id];
         inode_map[inode_number].SetType(type);
@@ -195,11 +193,14 @@ void InodeFileDataSource::OnInodes(
     auto system_entry = system_partition_files_->find(block_device_id);
     if (system_entry != system_partition_files_->end())
       block_device_in_system = true;
+
+    int unresolved_count = 0;
+    int cache_found_count = 0;
+    PERFETTO_DLOG("Found %u total inodes", inode_numbers.size());
     for (const auto& inode_number : inode_numbers) {
       bool inode_in_system = false;
       if (block_device_in_system) {
         // Search in /system partition and add to InodeFileMap
-        // std::map<BlockDeviceID,  if found
         inode_in_system =
             AddInodeEntryFromMap(inode_file_map, block_device_id, inode_number,
                                  system_entry->second);
@@ -207,15 +208,19 @@ void InodeFileDataSource::OnInodes(
       if (!block_device_in_system || !inode_in_system) {
         bool inode_in_LRU =
             AddInodeEntryFromLRU(inode_file_map, block_device_id, inode_number);
-        if (!inode_in_LRU)
-          data_partition_inodes.emplace(inode_number);
+        if (!inode_in_LRU) {
+          unresolved_count++;
+          data_partition_inodes[block_device_id].emplace(inode_number);
+        } else {
+          cache_found_count++;
+        }
       }
     }
-
+    PERFETTO_DLOG("%u inodes found in cache", cache_found_count);
+    PERFETTO_DLOG("%u inodes for full file scan", unresolved_count);
     // Full scan for any unresolved inodes in the /data partition
     // Currently not enabled since we are not filtering our own scanning
-    bool full_scan = false;
-    if (full_scan && !data_partition_inodes.empty()) {
+    if (!data_partition_inodes.empty() && data_partition_inodes.size() > 0) {
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>
           data_partition_files;
       // TODO(azappone): Make root directory a mount point

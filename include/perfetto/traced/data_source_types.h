@@ -35,9 +35,11 @@ using BlockDeviceID = decltype(stat::st_dev);
 
 class InodeMapValue {
  public:
-  // InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type entry_type,
-  // std::set<std::string> paths): entry_type_(entry_type),
-  // paths_(std::move(paths)) {}
+  InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type entry_type,
+                std::set<std::string> paths)
+      : entry_type_(entry_type), paths_(std::move(paths)) {}
+
+  InodeMapValue() {}
 
   protos::pbzero::InodeFileMap_Entry_Type type() const { return entry_type_; }
   std::set<std::string> paths() const { return paths_; }

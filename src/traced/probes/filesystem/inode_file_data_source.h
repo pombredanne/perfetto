@@ -40,8 +40,6 @@ class TraceWriter;
 
 void ScanFilesDFS(
     const std::string& root_directory,
-    const std::map<BlockDeviceID, std::set<Inode>>& inodes,
-    LRUInodeCache* cache,
     const std::function<void(BlockDeviceID block_device_id,
                              Inode inode_number,
                              const std::string& path,
@@ -49,7 +47,7 @@ void ScanFilesDFS(
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
-    const std::map<BlockDeviceID, std::set<Inode>>& inodes,
+    const std::map<BlockDeviceID, std::set<Inode>>& unresolved_inodes,
     LRUInodeCache* cache,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
 
