@@ -157,7 +157,7 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  static constexpr uint32_t kEventCount = 10;
+  static constexpr uint32_t kEventCount = 10 + 1;
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
@@ -173,6 +173,8 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
+      if (packet->has_clock_snapshot())
+        continue;
       ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
