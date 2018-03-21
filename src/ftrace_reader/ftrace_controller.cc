@@ -24,7 +24,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <iostream>
 
 #include <array>
 #include <string>
@@ -380,7 +379,6 @@ void FtraceMetadata::AddInode(Inode inode_number) {
 
   PERFETTO_DCHECK(common_pid);
   PERFETTO_DCHECK(cached_pid == getpid());
-  std::cout << "Saw inode from " << common_pid << std::endl;
   // Ignore own scanning activity.
   if (cached_pid != common_pid) {
     inode_and_device.push_back(
