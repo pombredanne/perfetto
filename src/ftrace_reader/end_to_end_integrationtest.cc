@@ -40,7 +40,7 @@ using testing::Not;
 namespace perfetto {
 namespace {
 
-constexpr const char kTracingPath[] = "/sys/kernel/debug/tracing/";
+constexpr char kTracingPath[] = "/sys/kernel/debug/tracing/";
 
 using FtraceBundleHandle =
     protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
