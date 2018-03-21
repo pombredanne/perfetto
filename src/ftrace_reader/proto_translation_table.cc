@@ -216,7 +216,6 @@ bool InferFtraceType(const std::string& type_and_name,
     return true;
   }
 
-  // Pids (as in 'sched_switch').
   if (Contains(type_and_name, "common_pid") && size == 4) {
     *out = kFtraceCommonPid32;
     return true;
