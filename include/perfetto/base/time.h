@@ -30,10 +30,14 @@ using TimeMillis = std::chrono::milliseconds;
 using TimeNanos = std::chrono::nanoseconds;
 constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC;
 
+inline TimeNanos FromPosixTimespec(const struct timespec& ts) {
+  return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+}
+
 inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
   PERFETTO_CHECK(clock_gettime(clk_id, &ts) == 0);
-  return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+  return FromPosixTimespec(ts);
 }
 
 inline TimeNanos GetWallTimeNs() {
@@ -54,10 +58,6 @@ inline struct timespec ToPosixTimespec(TimeMillis time) {
   ts.tv_sec = time_s;
   ts.tv_nsec = (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
   return ts;
-}
-
-inline TimeNanos FromPosixTimespec(const struct timespec& ts) {
-  return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
 }
 
 }  // namespace base
