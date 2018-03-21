@@ -377,13 +377,17 @@ void FtraceMetadata::AddInode(Inode inode_number) {
   if (!cached_pid)
     cached_pid = getpid();
 
-  PERFETTO_DCHECK(!pids.empty());
+  PERFETTO_DCHECK(common_pid);
   PERFETTO_DCHECK(cached_pid == getpid());
   // Ignore own scanning activity.
-  if (pids.empty() || pids.back() != getpid()) {
+  if (cached_pid != common_pid) {
     inode_and_device.push_back(
         std::make_pair(inode_number, last_seen_device_id));
   }
+}
+
+void FtraceMetadata::AddCommonPid(int32_t pid) {
+  common_pid = pid;
 }
 
 void FtraceMetadata::AddPid(int32_t pid) {

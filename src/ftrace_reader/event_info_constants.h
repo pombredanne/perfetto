@@ -62,6 +62,7 @@ enum FtraceFieldType {
   kFtracePid32,
   kFtraceDevId32,
   kFtraceDevId64,
+  kFtraceCommonPid32,
 };
 
 // Joint enum of FtraceFieldType (left) and ProtoFieldType (right).
@@ -84,6 +85,7 @@ enum TranslationStrategy {
   kBoolToUint32,
   kInode32ToUint64,
   kInode64ToUint64,
+  kCommonPid32ToInt32,
   kPid32ToInt32,
   kDevId32ToUint64,
   kDevId64ToUint64,
@@ -159,6 +161,8 @@ inline const char* ToString(FtraceFieldType v) {
       return "inode64";
     case kFtracePid32:
       return "pid32";
+    case kFtraceCommonPid32:
+      return "common pid32";
     case kFtraceDevId32:
       return "devid32";
     case kFtraceDevId64:

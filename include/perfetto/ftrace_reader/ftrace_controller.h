@@ -52,9 +52,12 @@ struct FtraceMetadata {
   std::vector<std::pair<Inode, BlockDeviceID>> inode_and_device;
   std::vector<int32_t> pids;
 
+  int32_t common_pid;
+
   void AddDevice(BlockDeviceID);
   void AddInode(Inode);
   void AddPid(int32_t);
+  void AddCommonPid(int32_t);
   void Clear();
 };
 
