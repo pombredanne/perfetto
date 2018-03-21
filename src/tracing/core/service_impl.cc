@@ -538,9 +538,10 @@ void ServiceImpl::CreateDataSourceInstance(
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
-    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb() == 0)
-                                  ? base::kPageSize / 1024  // default
-                                  : tracing_session->GetDesiredPageSizeKb();
+    producer->shared_buffer_page_size_kb_ =
+        (tracing_session->GetDesiredPageSizeKb() == 0)
+            ? base::kPageSize / 1024  // default
+            : tracing_session->GetDesiredPageSizeKb();
     size_t shm_size =
         std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
@@ -845,7 +846,8 @@ void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
   PERFETTO_DCHECK(!shared_memory_ && !shmem_abi_.is_valid());
   shared_memory_ = std::move(shared_memory);
   shmem_abi_.Initialize(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                        shared_memory_->size(), page_size_kb() * 1024);
+                        shared_memory_->size(),
+                        shared_buffer_page_size_kb() * 1024);
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
@@ -853,8 +855,8 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() const {
-  return page_size_kb_;
+size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
+  return shared_buffer_page_size_kb_;
 }
 
 std::unique_ptr<TraceWriter>

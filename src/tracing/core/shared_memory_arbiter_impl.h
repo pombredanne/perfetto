@@ -113,7 +113,7 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
 
   // --- Begin lock-protected members ---
   std::mutex lock_;
-  SharedMemoryABI shmem_abi_;
+  SharedMemoryABI shmem_abi_ = {};
   size_t page_idx_ = 0;
   std::unique_ptr<CommitDataRequest> commit_data_req_;
   size_t bytes_pending_commit_ = 0;  // SUM(chunk.size() : commit_data_req_).

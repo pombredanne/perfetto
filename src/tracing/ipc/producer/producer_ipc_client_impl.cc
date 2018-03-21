@@ -126,9 +126,11 @@ void ProducerIPCClientImpl::OnServiceRequest(
 
     // TODO(primiano): handle mmap failure in case of OOM.
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
-    page_size_kb_ = cmd.on_tracing_start().page_size_kb();
+    shared_buffer_page_size_kb_ =
+        cmd.on_tracing_start().shared_buffer_page_size_kb();
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), page_size_kb_ * 1024, this, task_runner_);
+        shared_memory_.get(), shared_buffer_page_size_kb_ * 1024, this,
+        task_runner_);
     producer_->OnTracingStart();
     return;
   }
@@ -223,8 +225,8 @@ SharedMemory* ProducerIPCClientImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ProducerIPCClientImpl::page_size_kb() const {
-  return page_size_kb_;
+size_t ProducerIPCClientImpl::shared_buffer_page_size_kb() const {
+  return shared_buffer_page_size_kb_;
 }
 
 }  // namespace perfetto

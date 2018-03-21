@@ -112,7 +112,9 @@ message GetAsyncCommandResponse {
 
   message StopDataSource { optional uint64 instance_id = 1; }
 
-  message OnTracingStart { optional uint64 page_size_kb = 1; }
+  // This message also transports the file descriptor for the shared memory
+  // buffer.
+  message OnTracingStart { optional uint64 shared_buffer_page_size_kb = 1; }
 
   message OnTracingStop {}
 

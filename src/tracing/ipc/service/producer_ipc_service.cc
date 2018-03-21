@@ -270,13 +270,14 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
         "Producer has not yet initialized the connection");
     return;
   }
+  PERFETTO_CHECK(service_endpoint->shared_memory());
   const int shm_fd =
       static_cast<PosixSharedMemory*>(service_endpoint->shared_memory())->fd();
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd.set_fd(shm_fd);
-  cmd->mutable_on_tracing_start()->set_page_size_kb(
-      service_endpoint->page_size_kb());
+  cmd->mutable_on_tracing_start()->set_shared_buffer_page_size_kb(
+      service_endpoint->shared_buffer_page_size_kb());
   async_producer_commands.Resolve(std::move(cmd));
 }
 
