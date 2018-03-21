@@ -3147,6 +3147,7 @@ cc_test {
     "src/traced/probes/filesystem/prefix_finder.cc",
     "src/traced/probes/filesystem/prefix_finder_unittest.cc",
     "src/traced/probes/filesystem/range_tree.cc",
+    "src/traced/probes/filesystem/range_tree_unittest.cc",
     "src/traced/probes/probes_producer.cc",
     "src/traced/probes/process_stats_data_source.cc",
     "src/traced/probes/process_stats_data_source_unittest.cc",
