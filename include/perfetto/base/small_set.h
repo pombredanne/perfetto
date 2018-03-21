@@ -56,6 +56,7 @@ class SmallSet {
   std::array<DataType, Size> arr_;
   size_t filled_ = 0;
 };
+
 }  // namespace perfetto
 
 #endif  // INCLUDE_PERFETTO_BASE_SMALL_SET_H_
