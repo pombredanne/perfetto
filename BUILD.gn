@@ -60,6 +60,7 @@ executable("perfetto_unittests") {
     "gn:gtest_main",
     "src/base:unittests",
     "src/ipc:unittests",
+    "src/perfetto_cmd:unittests",
     "src/protozero:unittests",
     "src/traced/probes/filesystem:unittests",
     "src/tracing:unittests",
@@ -84,6 +85,7 @@ if (!build_with_chromium && (is_linux || is_android)) {
       "src/ftrace_reader:ftrace_reader_benchmarks",
       "src/tracing:tracing_benchmarks",
       "test:benchmark_main",
+      "test:end_to_end_benchmarks",
     ]
   }
 
@@ -160,6 +162,15 @@ if (!build_with_chromium && (is_linux || is_android)) {
         "utils",
       ]
     }
+  }
+
+  # This target exports perfetto trace protos in the Android build system,
+  # allowing both host and device targets to implement custom parsers based on
+  # our protos.
+  static_library("perfetto_trace_protos") {
+    deps = [
+      "protos/perfetto/trace:lite",
+    ]
   }
 } else {
   component("libperfetto") {
