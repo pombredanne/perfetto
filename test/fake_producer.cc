@@ -21,7 +21,6 @@
 
 #include "gtest/gtest.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/utils.h"
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
@@ -64,7 +63,6 @@ void FakeProducer::CreateDataSourceInstance(
       static_cast<BufferID>(source_config.target_buffer()));
   rnd_engine_ = std::minstd_rand0(source_config.for_testing().seed());
   message_count_ = source_config.for_testing().message_count();
-  message_size_ = source_config.for_testing().message_size();
   task_runner_->PostTask(on_create_data_source_instance_);
 }
 
@@ -77,18 +75,13 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
 void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
-
-    size_t payload_size = message_size_ - sizeof(uint32_t);
-    PERFETTO_CHECK(payload_size >= sizeof(char));
-
-    std::unique_ptr<char, base::FreeDeleter> payload(
-        static_cast<char*>(malloc(payload_size)));
-    memset(payload.get(), '.', payload_size);
-    payload.get()[payload_size - 1] = 0;
+    char payload[1024];
+    memset(payload, '.', sizeof(payload));
+    payload[sizeof(payload) - 1] = 0;
     for (size_t i = 0; i < message_count_; i++) {
       auto handle = trace_writer_->NewTracePacket();
       handle->set_for_testing()->set_seq_value(rnd_engine_());
-      handle->set_for_testing()->set_str(payload.get(), payload_size);
+      handle->set_for_testing()->set_str(payload, sizeof(payload));
     }
     trace_writer_->Flush(callback);
   });
