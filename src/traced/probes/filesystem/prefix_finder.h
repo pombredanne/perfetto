@@ -23,13 +23,26 @@
 #include <utility>
 #include <vector>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 
-// This needs to have paths supplied in DFS order.
+// PrefixFinder allows to find prefixes for filenames that ensure that
+// they can be found again within a provided limit of steps when searching
+// within that prefix in the same order.
+//
+// For instance, let the limit be 4 and the filesystem be.
+// /a/1
+// /a/2
+// /a/3
+// /b/4
+// /b/5
+//
+// The prefix for /a/1, /a/2 and /a/3/ is /, the one for /b/4 and /b/5 is /b/.
 class PrefixFinder {
  public:
   // Opaque placeholder for a prefix that can be turned into a string
-  // using .ToString.
+  // using ToString.
   // Can not be constructed outside of PrefixFinder.
   class Node {
    public:
@@ -49,14 +62,23 @@ class PrefixFinder {
   };
 
   PrefixFinder(size_t limit);
+  // This *HAS* to be called in DFS order.
+  // This must not be called again after a GetPrefix call.
   void AddPath(std::string path);
+  // Return identifier for prefix. Ownership remains with the PrefixFinder.
   Node* GetPrefix(std::string path);
+  void Finalize();
 
  private:
+  void Finalize(size_t i);
+  void InsertPrefix(size_t len);
   const size_t limit_;
   // (path element, count) tuples for last path seen.
-  std::vector<std::pair<std::string, size_t>> state_;
+  std::vector<std::pair<std::string, size_t>> state_{{"", 0}};
   Node root_{"", nullptr};
+#if PERFETTO_DCHECK_IS_ON()
+  bool finalized_ = false;
+#endif
 };
 
 }  // namespace perfetto

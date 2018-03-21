@@ -27,25 +27,44 @@ std::string PrefixFinder::Node::ToString() {
 
 PrefixFinder::PrefixFinder(size_t limit) : limit_(limit) {}
 
+void PrefixFinder::InsertPrefix(size_t len) {
+  Node* cur = &root_;
+  for (auto it = state_.cbegin() + 1;
+       it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
+    std::unique_ptr<Node>& next = cur->children_[it->first];
+    if (!next)
+      next.reset(new Node(it->first, cur));
+    cur = next.get();
+  }
+}
+
+void PrefixFinder::Finalize(size_t i) {
+  for (size_t j = i; j < state_.size(); ++j) {
+    if (j != 0 && state_[j - 1].second > limit_ && state_[j].second <= limit_) {
+      InsertPrefix(i);
+      break;
+    }
+  }
+}
+
+void PrefixFinder::Finalize() {
+  Finalize(1);
+#if PERFETTO_DCHECK_IS_ON()
+  finalized_ = true;
+#endif
+}
 void PrefixFinder::AddPath(std::string path) {
+  auto puth = path;
   perfetto::base::StringSplitter s(std::move(path), '/');
-  for (size_t i = 0; s.Next(); ++i) {
+  state_[0].second++;
+  for (size_t i = 1; s.Next(); ++i) {
     char* token = s.cur_token();
     if (i < state_.size()) {
       std::pair<std::string, size_t>& elem = state_[i];
       if (elem.first == token) {
         elem.second++;
       } else {
-        if (i == 0 || state_[i - 1].second > limit_) {
-          Node* cur = &root_;
-          for (auto it = state_.cbegin();
-               it != state_.cbegin() + static_cast<ssize_t>(i + 1); it++) {
-            std::unique_ptr<Node>& next = cur->children_[it->first];
-            if (!next)
-              next.reset(new Node(it->first, cur));
-            cur = next.get();
-          }
-        }
+        Finalize(i);
         elem.first = token;
         elem.second = 1;
         state_.resize(i + 1);
@@ -57,6 +76,9 @@ void PrefixFinder::AddPath(std::string path) {
 }
 
 PrefixFinder::Node* PrefixFinder::GetPrefix(std::string path) {
+#if PERFETTO_DCHECK_IS_ON()
+  PERFETTO_DCHECK(finalized_);
+#endif
   perfetto::base::StringSplitter s(std::move(path), '/');
   Node* cur = &root_;
   for (size_t i = 0; s.Next(); ++i) {

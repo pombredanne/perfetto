@@ -45,5 +45,6 @@ source_set("unittests") {
   sources = [
     "fs_mount_unittest.cc",
     "lru_inode_cache_unittest.cc",
+    "prefix_finder_unittest.cc",
   ]
 }
