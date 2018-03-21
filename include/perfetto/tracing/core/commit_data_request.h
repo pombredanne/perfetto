@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/export.h"
+
 // Forward declarations for protobuf types.
 namespace perfetto {
 namespace protos {
@@ -45,7 +47,7 @@ class CommitDataRequest_ChunkToPatch_Patch;
 
 namespace perfetto {
 
-class CommitDataRequest {
+class PERFETTO_EXPORT CommitDataRequest {
  public:
   class ChunksToMove {
    public:

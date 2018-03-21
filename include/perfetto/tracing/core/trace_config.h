@@ -33,6 +33,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/export.h"
 #include "perfetto/tracing/core/data_source_config.h"
 
 // Forward declarations for protobuf types.
@@ -50,7 +51,7 @@ class TestConfig;
 
 namespace perfetto {
 
-class TraceConfig {
+class PERFETTO_EXPORT TraceConfig {
  public:
   class BufferConfig {
    public:
