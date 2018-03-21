@@ -40,9 +40,11 @@ namespace {
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
-const char* kFtraceSourceName = "com.google.perfetto.ftrace";
-const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
-const char* kInodeMapSourceName = "com.google.perfetto.inode_file_map";
+constexpr const char* kFtraceSourceName = "com.google.perfetto.ftrace";
+constexpr const char* kProcessStatsSourceName =
+    "com.google.perfetto.process_stats";
+constexpr const char* kInodeMapSourceName =
+    "com.google.perfetto.inode_file_map";
 
 }  // namespace.
 

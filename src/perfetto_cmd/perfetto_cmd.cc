@@ -60,8 +60,8 @@ namespace {
 
 // Temporary directory for DropBox traces. Note that this is automatically
 // created by the system by setting setprop persist.traced.enable=1.
-const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
-const char kDefaultDropBoxTag[] = "perfetto";
+constexpr const char kTempDropBoxTraceDir[] = "/data/misc/perfetto-traces";
+constexpr const char kDefaultDropBoxTag[] = "perfetto";
 
 std::string GetDirName(const std::string& path) {
   size_t sep = path.find_last_of('/');
