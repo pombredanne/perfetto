@@ -373,7 +373,12 @@ void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
 }
 
 void FtraceMetadata::AddInode(Inode inode_number) {
+  static int32_t cached_pid = 0;
+  if (!cached_pid)
+    cached_pid = getpid();
+
   PERFETTO_DCHECK(!pids.empty());
+  PERFETTO_DCHECK(cached_pid == getpid());
   // Ignore own scanning activity.
   if (pids.empty() || pids.back() != getpid()) {
     inode_and_device.push_back(
