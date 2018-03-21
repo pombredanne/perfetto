@@ -375,7 +375,7 @@ void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
 void FtraceMetadata::AddInode(Inode inode_number) {
   PERFETTO_DCHECK(!pids.empty());
   // Ignore own scanning activity.
-  if (!pids.empty() && pids.back() != getpid()) {
+  if (pids.empty() || pids.back() != getpid()) {
     inode_and_device.push_back(
         std::make_pair(inode_number, last_seen_device_id));
   }
