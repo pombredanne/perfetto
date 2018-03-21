@@ -64,12 +64,17 @@ class InodeFileDataSource {
 
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
+  // If the provided inode number and block device id are found in the
+  // block_device_entry map, adds entry to the InodeFileMap proto and returns
+  // true.
   bool AddInodeEntryFromMap(
       InodeFileMap* inode_file_map,
       BlockDeviceID block_device_id,
       Inode inode_number,
       const std::map<Inode, InodeMapValue>& block_device_entry);
 
+  // If the provided inode number and block device id are found in the LRU inode
+  // cache, adds entry to the InodeFileMap proto and returns true.
   bool AddInodeEntryFromLRU(InodeFileMap* inode_file_map,
                             BlockDeviceID block_device_id,
                             Inode inode_number);
