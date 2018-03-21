@@ -44,7 +44,7 @@ constexpr size_t kSetSize = 3;
 //
 // will be stored as
 // [1, 4) {a, b, c}
-// [5, inf) {d}
+// [4, inf) {d}
 //
 // This comes from the observation that close-by inode numbers tend to be
 // in the same directory. We are storing multiple values to be able to
