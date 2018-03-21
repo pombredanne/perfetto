@@ -18,6 +18,7 @@
 #define SRC_TRACED_PROBES_FILESYSTEM_PREFIX_FINDER_H_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
