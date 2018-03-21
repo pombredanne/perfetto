@@ -102,8 +102,6 @@ void CreateDeviceToInodeMap(
             paths = currVal->paths();
           paths.emplace(path);
           InodeMapValue value(type, paths);
-          // value.SetType(type);
-          // value.SetPaths(paths);
           cache->Insert(key, value);
         }
 
@@ -194,9 +192,10 @@ void InodeFileDataSource::OnInodes(
     if (system_entry != system_partition_files_->end())
       block_device_in_system = true;
 
-    int unresolved_count = 0;
-    int cache_found_count = 0;
-    PERFETTO_DLOG("Found %u total inodes", inode_numbers.size());
+    uint64_t unresolved_count = 0;
+    uint64_t cache_found_count = 0;
+    PERFETTO_DLOG("Found %lu total inodes",
+                  static_cast<uint64_t>(inode_numbers.size()));
     for (const auto& inode_number : inode_numbers) {
       bool inode_in_system = false;
       if (block_device_in_system) {
@@ -216,11 +215,12 @@ void InodeFileDataSource::OnInodes(
         }
       }
     }
-    PERFETTO_DLOG("%u inodes found in cache", cache_found_count);
-    PERFETTO_DLOG("%u inodes for full file scan", unresolved_count);
-    // Full scan for any unresolved inodes in the /data partition
-    // Currently not enabled since we are not filtering our own scanning
-    if (!data_partition_inodes.empty() && data_partition_inodes.size() > 0) {
+    PERFETTO_DLOG("%lu inodes found in cache", cache_found_count);
+    PERFETTO_DLOG("%lu inodes for full file scan", unresolved_count);
+    // Full scan for unresolved inodes in the /data partition
+    // Currently only enabled if we've seen over 10 unresolved inodes since we
+    // are not filtering our own scanning
+    if (!data_partition_inodes.empty() && data_partition_inodes.size() > 10) {
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>
           data_partition_files;
       // TODO(azappone): Make root directory a mount point
