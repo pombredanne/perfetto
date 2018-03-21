@@ -19,6 +19,7 @@
 #include "perfetto/base/string_splitter.h"
 
 namespace perfetto {
+
 std::string PrefixFinder::Node::ToString() {
   if (parent_ != nullptr)
     return parent_->ToString() + "/" + name_;
@@ -98,4 +99,5 @@ PrefixFinder::Node* PrefixFinder::GetPrefix(std::string path) {
   }
   return cur;
 }
+
 }  // namespace perfetto

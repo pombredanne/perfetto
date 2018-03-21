@@ -31,6 +31,7 @@ namespace perfetto {
 namespace {
 
 constexpr size_t kSetSize = 3;
+
 }  // namespace
 
 // Keep key value associations in ranges. Keeps kSetSize=3 possible values

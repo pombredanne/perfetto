@@ -41,4 +41,5 @@ void RangeTree::Insert(Inode inode, RangeTree::DataType value) {
     map_.emplace(inode, std::move(n));
   }
 }
+
 }  // namespace perfetto
