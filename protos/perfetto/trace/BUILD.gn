@@ -42,7 +42,6 @@ protozero_library("zero") {
 proto_library("lite") {
   generate_python = false
   deps = [
-    "../ipc",
     "chrome:lite",
     "filesystem:lite",
     "ftrace:lite",
