@@ -27,13 +27,27 @@
 #ifndef SRC_TRACED_PROBES_FILESYSTEM_RANGE_TREE_H_
 #define SRC_TRACED_PROBES_FILESYSTEM_RANGE_TREE_H_
 
-// RANGES ARE [x, y), left-inclusive and right-exlusive.
 namespace perfetto {
 namespace {
 
 constexpr size_t kSetSize = 3;
 }  // namespace
 
+// Keep key value associations in ranges. Keeps kSetSize=3 possible values
+// for every key, where one is the correct one.
+// For instance,
+// 1 -> a
+// 2 -> b
+// 3 -> c
+// 4 -> d
+//
+// will be stored as
+// [1, 4) {a, b, c}
+// [5, inf) {d}
+//
+// This comes from the observation that close-by inode numbers tend to be
+// in the same directory. We are storing multiple values to be able to
+// aggregate to larger ranges and reduce memory usage.
 class RangeTree {
  public:
   using DataType = PrefixFinder::Node*;

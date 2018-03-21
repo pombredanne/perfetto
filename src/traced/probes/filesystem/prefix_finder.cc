@@ -38,7 +38,7 @@ void PrefixFinder::InsertPrefix(size_t len) {
   }
 }
 
-void PrefixFinder::Finalize(size_t i) {
+void PrefixFinder::Flush(size_t i) {
   for (size_t j = i; j < state_.size(); ++j) {
     if (j != 0 && state_[j - 1].second > limit_ && state_[j].second <= limit_) {
       InsertPrefix(i);
@@ -48,8 +48,9 @@ void PrefixFinder::Finalize(size_t i) {
 }
 
 void PrefixFinder::Finalize() {
-  Finalize(1);
+  Flush(1);
 #if PERFETTO_DCHECK_IS_ON()
+  PERFETTO_DCHECK(!finalized_);
   finalized_ = true;
 #endif
 }
@@ -64,7 +65,7 @@ void PrefixFinder::AddPath(std::string path) {
       if (elem.first == token) {
         elem.second++;
       } else {
-        Finalize(i);
+        Flush(i);
         elem.first = token;
         elem.second = 1;
         state_.resize(i + 1);

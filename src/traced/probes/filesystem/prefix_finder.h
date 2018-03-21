@@ -51,6 +51,8 @@ class PrefixFinder {
     Node(const Node& that) = delete;
     Node& operator=(const Node&) = delete;
 
+    // Return string representation of prefix, e.g. /foo/bar.
+    // Does not enclude a trailing /.
     std::string ToString();
 
    private:
@@ -62,15 +64,20 @@ class PrefixFinder {
   };
 
   PrefixFinder(size_t limit);
+
   // This *HAS* to be called in DFS order.
-  // This must not be called again after a GetPrefix call.
+  // Must not be called after Finalize.
   void AddPath(std::string path);
+
   // Return identifier for prefix. Ownership remains with the PrefixFinder.
+  // Must not be before after Finalize.
   Node* GetPrefix(std::string path);
+
+  // Call this after the last AddPath and before the first GetPrefix.
   void Finalize();
 
  private:
-  void Finalize(size_t i);
+  void Flush(size_t i);
   void InsertPrefix(size_t len);
   const size_t limit_;
   // (path element, count) tuples for last path seen.

@@ -21,6 +21,8 @@
 
 namespace perfetto {
 
+// Set that can store up to Size items of DataType.
+// Lookup is O(Size), so it is only usable for very small sets.
 template <typename DataType, size_t Size>
 class SmallSet {
  public:
