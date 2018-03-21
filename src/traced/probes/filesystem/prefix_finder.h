@@ -66,14 +66,14 @@ class PrefixFinder {
   PrefixFinder(size_t limit);
 
   // Add path to prefix mapping.
-  // This *HAS* to be called in DFS order.
-  // Must not be called after Finalize.
+  // Must be called in DFS order.
   // Must be called before GetPrefix(path) for the same path.
+  // Must not be called after Finalize.
   void AddPath(std::string path);
 
   // Return identifier for prefix. Ownership remains with the PrefixFinder.
-  // Must not be before after Finalize.
   // Must be called after AddPath(path) for the same path.
+  // Must not be before after Finalize.
   Node* GetPrefix(std::string path);
 
   // Call this after the last AddPath and before the first GetPrefix.
