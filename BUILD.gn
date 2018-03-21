@@ -160,6 +160,12 @@ if (!build_with_chromium && (is_linux || is_android)) {
       ]
     }
   }
+
+  static_library("perfetto_trace_protos") {
+    deps = [
+      "protos/perfetto/trace:lite",
+    ]
+  }
 } else {
   group("lib") {
     public_configs = [ "gn:public_config" ]

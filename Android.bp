@@ -3048,6 +3048,47 @@ cc_library_static {
   ],
 }
 
+// GN target: //:perfetto_trace_protos
+cc_library_static {
+  name: "perfetto_trace_protos",
+  srcs: [
+    ":perfetto_protos_perfetto_trace_chrome_lite_gen",
+    ":perfetto_protos_perfetto_trace_filesystem_lite_gen",
+    ":perfetto_protos_perfetto_trace_ftrace_lite_gen",
+    ":perfetto_protos_perfetto_trace_lite_gen",
+    ":perfetto_protos_perfetto_trace_ps_lite_gen",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  host_supported: true,
+  export_include_dirs: [
+    "include",
+  ],
+  generated_headers: [
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_ps_lite_gen_headers",
+  ],
+  export_generated_headers: [
+    "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_filesystem_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_ftrace_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_lite_gen_headers",
+    "perfetto_protos_perfetto_trace_ps_lite_gen_headers",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+  ],
+}
+
 // GN target: //:perfetto_unittests
 cc_test {
   name: "perfetto_unittests",
