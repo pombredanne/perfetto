@@ -157,7 +157,7 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  static constexpr uint32_t kEventCount = 10 + 1;
+  static constexpr uint32_t kEventCount = 10;
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
@@ -183,7 +183,8 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
     total += packets.size();
 
     if (!has_more) {
-      ASSERT_EQ(total, kEventCount);
+      // One extra packet for the clock snapshot.
+      ASSERT_EQ(total, kEventCount + 1);
       finish();
     }
   };
