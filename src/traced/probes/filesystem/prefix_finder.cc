@@ -39,6 +39,7 @@ void PrefixFinder::InsertPrefix(size_t len) {
 }
 
 void PrefixFinder::Flush(size_t i) {
+  PERFETTO_DCHECK(i > 0);
   for (size_t j = i; j < state_.size(); ++j) {
     if (j != 0 && state_[j - 1].second > limit_ && state_[j].second <= limit_) {
       InsertPrefix(i);
@@ -57,6 +58,9 @@ void PrefixFinder::Finalize() {
 void PrefixFinder::AddPath(std::string path) {
   auto puth = path;
   perfetto::base::StringSplitter s(std::move(path), '/');
+  // An artificial element for the root directory.
+  // This simplifies the logic below because we can always assume
+  // there is a parent element.
   state_[0].second++;
   for (size_t i = 1; s.Next(); ++i) {
     char* token = s.cur_token();
@@ -65,6 +69,8 @@ void PrefixFinder::AddPath(std::string path) {
       if (elem.first == token) {
         elem.second++;
       } else {
+        // Check if we need to write a prefix for any element
+        // in the previous state.
         Flush(i);
         elem.first = token;
         elem.second = 1;
