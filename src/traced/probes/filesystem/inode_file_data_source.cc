@@ -47,8 +47,6 @@ void ScanFilesDFS(
     if (dir == nullptr)
       continue;
     while ((entry = readdir(dir)) != nullptr) {
-      if (entry->d_type == DT_LNK)
-        continue;
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
@@ -56,10 +54,6 @@ void ScanFilesDFS(
 
       struct stat buf;
       if (lstat(filepath.c_str(), &buf) != 0)
-        continue;
-      // This might happen on filesystems that do not return
-      // information in entry->d_type.
-      if (S_ISLNK(buf.st_mode))
         continue;
 
       // This might happen on filesystems that do not return
