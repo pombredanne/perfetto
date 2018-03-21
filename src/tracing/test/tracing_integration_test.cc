@@ -200,7 +200,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
                 sprintf(buf, "evt_%zu", num_pack_rx++);
                 EXPECT_EQ(std::string(buf), packet->for_testing().str());
               } else if (packet->has_clock_snapshot()) {
-                EXPECT_EQ(2, packet->clock_snapshot().clocks_size());
+                EXPECT_GE(packet->clock_snapshot().clocks_size(), 8);
                 saw_clock_snapshot = true;
               }
             }

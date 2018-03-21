@@ -25,7 +25,13 @@ message ClockSnapshot {
     enum Type {
       UNKNOWN = 0;
       REALTIME = 1;
-      MONOTONIC = 2;
+      REALTIME_COARSE = 2;
+      MONOTONIC = 3;
+      MONOTONIC_COARSE = 4;
+      MONOTONIC_RAW = 5;
+      BOOTTIME = 6;
+      PROCESS_CPUTIME = 7;
+      THREAD_CPUTIME = 8;
     }
     optional Type type = 1;
     optional uint64 timestamp = 2;

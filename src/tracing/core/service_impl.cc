@@ -679,22 +679,39 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
+      {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
       {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
       {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
-      // TODO(skyostil): Add all the Linux-specific clocks.
+      {CLOCK_MONOTONIC_RAW,
+       protos::ClockSnapshot::Clock::MONOTONIC_RAW,
+       {0, 0}},
+      {CLOCK_PROCESS_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+       {0, 0}},
+      {CLOCK_THREAD_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+       {0, 0}},
+      {CLOCK_REALTIME_COARSE,
+       protos::ClockSnapshot::Clock::REALTIME_COARSE,
+       {0, 0}},
+      {CLOCK_MONOTONIC_COARSE,
+       protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+       {0, 0}},
   };
   protos::TracePacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
   // First snapshot all the clocks as atomically as we can.
-  for (auto& clock : clocks)
-    clock_gettime(clock.id, &clock.ts);
+  for (auto& clock : clocks) {
+    if (clock_gettime(clock.id, &clock.ts) == -1)
+      PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
+  }
   for (auto& clock : clocks) {
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
-    c->set_timestamp(clock.ts.tv_sec * 1000000000L + clock.ts.tv_nsec);
+    c->set_timestamp(base::FromPosixTimespec(clock.ts).count());
   }
   Slice slice = Slice::Allocate(packet.ByteSize());
-  PERFETTO_CHECK(packet.SerializeToArray(slice.own_data(), packet.ByteSize()));
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
 }

@@ -56,6 +56,10 @@ inline struct timespec ToPosixTimespec(TimeMillis time) {
   return ts;
 }
 
+inline TimeNanos FromPosixTimespec(const struct timespec& ts) {
+  return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+}
+
 }  // namespace base
 }  // namespace perfetto
 
