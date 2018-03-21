@@ -29,6 +29,7 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/filesystem/fs_mount.h"
+#include "src/traced/probes/filesystem/lru_inode_cache.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 
@@ -37,23 +38,10 @@ namespace perfetto {
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 
-class InodeMapValue {
- public:
-  protos::pbzero::InodeFileMap_Entry_Type type() const { return entry_type_; }
-  std::set<std::string> paths() const { return paths_; }
-  void SetType(protos::pbzero::InodeFileMap_Entry_Type entry_type) {
-    entry_type_ = entry_type;
-  }
-  void SetPaths(std::set<std::string> paths) { paths_ = paths; }
-  void AddPath(std::string path) { paths_.emplace(path); }
-
- private:
-  protos::pbzero::InodeFileMap_Entry_Type entry_type_;
-  std::set<std::string> paths_;
-};
-
 void ScanFilesDFS(
     const std::string& root_directory,
+    const std::map<BlockDeviceID, std::set<Inode>>& inodes,
+    LRUInodeCache* cache,
     const std::function<void(BlockDeviceID block_device_id,
                              Inode inode_number,
                              const std::string& path,
@@ -61,6 +49,8 @@ void ScanFilesDFS(
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
+    const std::map<BlockDeviceID, std::set<Inode>>& inodes,
+    LRUInodeCache* cache,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
 
 class InodeFileDataSource {
@@ -68,6 +58,7 @@ class InodeFileDataSource {
   InodeFileDataSource(TracingSessionID,
                       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
                           system_partition_files,
+                      LRUInodeCache* cache,
                       std::unique_ptr<TraceWriter> writer);
 
   TracingSessionID session_id() const { return session_id_; }
@@ -75,17 +66,21 @@ class InodeFileDataSource {
 
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
-  bool AddInodeFileMapEntry(
+  bool AddInodeEntryFromMap(
       InodeFileMap* inode_file_map,
       BlockDeviceID block_device_id,
-      Inode inode,
-      const std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>&
-          block_device_map);
+      Inode inode_number,
+      const std::map<Inode, InodeMapValue>& block_device_entry);
+
+  bool AddInodeEntryFromLRU(InodeFileMap* inode_file_map,
+                            BlockDeviceID block_device_id,
+                            Inode inode_number);
 
  private:
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
       system_partition_files_;
+  LRUInodeCache* cache_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
   base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.

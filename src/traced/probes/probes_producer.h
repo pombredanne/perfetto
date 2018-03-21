@@ -140,6 +140,7 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
       file_map_sources_;
+  LRUInodeCache cache_{100};
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>> system_inodes_;
 };
 
