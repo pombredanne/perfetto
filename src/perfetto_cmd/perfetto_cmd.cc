@@ -39,7 +39,6 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
-#include "perfetto/config/statsd_metadata.pb.h"
 #include "perfetto/config/trace_config.pb.h"
 #include "perfetto/trace/trace.pb.h"
 
@@ -149,8 +148,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   int option_index = 0;
   std::string trace_config_raw;
   bool background = false;
-  perfetto::protos::StatsdMetadata statsd_metadata;
-  bool has_statsd_metadata = false;
+  perfetto::protos::TraceConfig::StatsdMetadata statsd_metadata;
   for (;;) {
     int option =
         getopt_long(argc, argv, "c:o:bd::", long_options, &option_index);
@@ -205,19 +203,16 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
     if (option == OPT_ALERT_ID) {
       statsd_metadata.set_triggering_alert_id(atoll(optarg));
-      has_statsd_metadata = true;
       continue;
     }
 
     if (option == OPT_CONFIG_ID) {
       statsd_metadata.set_triggering_config_id(atoll(optarg));
-      has_statsd_metadata = true;
       continue;
     }
 
     if (option == OPT_CONFIG_UID) {
       statsd_metadata.set_triggering_config_uid(atol(optarg));
-      has_statsd_metadata = true;
       continue;
     }
 
@@ -247,8 +242,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_ELOG("Could not parse TraceConfig proto from stdin");
     return 1;
   }
-  if (has_statsd_metadata)
-    *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
+  *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
   trace_config_.reset(new TraceConfig());
   trace_config_->FromProto(trace_config_proto);
   trace_config_raw.clear();

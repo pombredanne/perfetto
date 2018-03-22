@@ -747,7 +747,6 @@ void ServiceImpl::MaybeEmitTraceConfig(TracingSession* tracing_session,
     return;
   tracing_session->did_emit_config = true;
   protos::TracePacket packet;
-  protos::TraceConfig config;
   tracing_session->config.ToProto(packet.mutable_trace_config());
   packet.set_trusted_uid(getuid());
   Slice slice = Slice::Allocate(packet.ByteSize());

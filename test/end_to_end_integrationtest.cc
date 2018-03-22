@@ -96,8 +96,9 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
                                     bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
-      ASSERT_TRUE(packet->has_ftrace_events() || packet->has_clock_snapshot());
-      if (packet->has_clock_snapshot())
+      ASSERT_TRUE(packet->has_ftrace_events() || packet->has_clock_snapshot() ||
+                  packet->has_trace_config());
+      if (packet->has_clock_snapshot() || packet->has_trace_config())
         continue;
       for (int ev = 0; ev < packet->ftrace_events().event_size(); ev++) {
         ASSERT_TRUE(packet->ftrace_events().event(ev).has_sched_switch());
@@ -173,7 +174,7 @@ TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
 
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
-      if (packet->has_clock_snapshot())
+      if (packet->has_clock_snapshot() || packet->has_trace_config())
         continue;
       ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,

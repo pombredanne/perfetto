@@ -25,7 +25,6 @@ proto_library("config") {
     "data_source_config.proto",
     "data_source_descriptor.proto",
     "ftrace/ftrace_config.proto",
-    "statsd_metadata.proto",
     "test_config.proto",
     "trace_config.proto",
   ]
@@ -39,7 +38,6 @@ protozero_library("config_zero") {
     "data_source_config.proto",
     "data_source_descriptor.proto",
     "ftrace/ftrace_config.proto",
-    "statsd_metadata.proto",
     "test_config.proto",
     "trace_config.proto",
   ]
