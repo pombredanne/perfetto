@@ -37,11 +37,6 @@ PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
   // This will be nicer with C++14 transparent comparators.
   // Then we will be able to look up by just the name using a sutiable
   // comparator.
-  //
-  // Until then, use a dummy unique_ptr<Node> that we set the name on for
-  // lookup.
-  //
-  // Prevent exit time destructor from being run by using *new.
   Node search_node(name, nullptr);
   auto it = children_.find(search_node);
   if (it == children_.end())
