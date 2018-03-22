@@ -17,7 +17,8 @@
 #ifndef SRC_TRACED_PROBES_FILESYSTEM_PREFIX_FINDER_H_
 #define SRC_TRACED_PROBES_FILESYSTEM_PREFIX_FINDER_H_
 
-#include <map>
+#include <memory>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -51,26 +52,46 @@ class PrefixFinder {
     Node(const Node& that) = delete;
     Node& operator=(const Node&) = delete;
 
+    // Return string representation of prefix, e.g. /foo/bar.
+    // Does not enclude a trailing /.
     std::string ToString();
 
    private:
+    class CompareNames {
+     public:
+      bool operator()(const std::unique_ptr<Node>& one,
+                      const std::unique_ptr<Node>& other) const {
+        return one->name_ < other->name_;
+      }
+    };
     Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
 
+    void AddChild(std::unique_ptr<Node>);
+    Node* MaybeChild(const std::string& name);
+
     std::string name_;
-    std::map<std::string, std::unique_ptr<Node>> children_;
+    std::set<std::unique_ptr<Node>, CompareNames> children_;
     Node* parent_;
   };
 
   PrefixFinder(size_t limit);
-  // This *HAS* to be called in DFS order.
-  // This must not be called again after a GetPrefix call.
+
+  // Add path to prefix mapping.
+  // Must be called in DFS order.
+  // Must be called before GetPrefix(path) for the same path.
+  // Must not be called after Finalize.
   void AddPath(std::string path);
+
   // Return identifier for prefix. Ownership remains with the PrefixFinder.
+  // Must be called after AddPath(path) for the same path.
+  // Must not be before after Finalize.
   Node* GetPrefix(std::string path);
+
+  // Call this after the last AddPath and before the first GetPrefix.
   void Finalize();
 
  private:
-  void Finalize(size_t i);
+  void Flush(size_t i);
   void InsertPrefix(size_t len);
   const size_t limit_;
   // (path element, count) tuples for last path seen.

@@ -19,10 +19,31 @@
 #include "perfetto/base/string_splitter.h"
 
 namespace perfetto {
+
 std::string PrefixFinder::Node::ToString() {
   if (parent_ != nullptr)
     return parent_->ToString() + "/" + name_;
   return name_;
+}
+
+void PrefixFinder::Node::AddChild(std::unique_ptr<Node> node) {
+  children_.emplace(std::move(node));
+}
+
+PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
+  // This will be nicer with C++14 transparent comparators.
+  // Then we will be able to look up by just the name using a sutiable
+  // comparator.
+  //
+  // Until then, use a dummy unique_ptr<Node> that we set the name on for
+  // lookup.
+  static std::unique_ptr<Node>& search_node =
+      *new std::unique_ptr<Node>(new Node("", nullptr));
+  search_node->name_ = name;
+  auto it = children_.find(search_node);
+  if (it == children_.end())
+    return nullptr;
+  return it->get();
 }
 
 PrefixFinder::PrefixFinder(size_t limit) : limit_(limit) {}
@@ -31,14 +52,17 @@ void PrefixFinder::InsertPrefix(size_t len) {
   Node* cur = &root_;
   for (auto it = state_.cbegin() + 1;
        it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
-    std::unique_ptr<Node>& next = cur->children_[it->first];
-    if (!next)
-      next.reset(new Node(it->first, cur));
-    cur = next.get();
+    Node* next = cur->MaybeChild(it->first);
+    if (!next) {
+      next = new Node(it->first, cur);
+      cur->AddChild(std::unique_ptr<Node>(next));
+    }
+    cur = next;
   }
 }
 
-void PrefixFinder::Finalize(size_t i) {
+void PrefixFinder::Flush(size_t i) {
+  PERFETTO_DCHECK(i > 0);
   for (size_t j = i; j < state_.size(); ++j) {
     if (j != 0 && state_[j - 1].second > limit_ && state_[j].second <= limit_) {
       InsertPrefix(i);
@@ -48,14 +72,18 @@ void PrefixFinder::Finalize(size_t i) {
 }
 
 void PrefixFinder::Finalize() {
-  Finalize(1);
+  Flush(1);
 #if PERFETTO_DCHECK_IS_ON()
+  PERFETTO_DCHECK(!finalized_);
   finalized_ = true;
 #endif
 }
 void PrefixFinder::AddPath(std::string path) {
   auto puth = path;
   perfetto::base::StringSplitter s(std::move(path), '/');
+  // An artificial element for the root directory.
+  // This simplifies the logic below because we can always assume
+  // there is a parent element.
   state_[0].second++;
   for (size_t i = 1; s.Next(); ++i) {
     char* token = s.cur_token();
@@ -64,7 +92,9 @@ void PrefixFinder::AddPath(std::string path) {
       if (elem.first == token) {
         elem.second++;
       } else {
-        Finalize(i);
+        // Check if we need to write a prefix for any element
+        // in the previous state.
+        Flush(i);
         elem.first = token;
         elem.second = 1;
         state_.resize(i + 1);
@@ -83,12 +113,13 @@ PrefixFinder::Node* PrefixFinder::GetPrefix(std::string path) {
   Node* cur = &root_;
   for (size_t i = 0; s.Next(); ++i) {
     char* token = s.cur_token();
-    auto it = cur->children_.find(token);
-    if (it == cur->children_.end())
+    Node* next = cur->MaybeChild(token);
+    if (next == nullptr)
       break;
-    cur = it->second.get();
+    cur = next;
     PERFETTO_DCHECK(cur->name_ == token);
   }
   return cur;
 }
+
 }  // namespace perfetto
