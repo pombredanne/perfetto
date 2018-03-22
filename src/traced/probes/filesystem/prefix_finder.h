@@ -55,7 +55,7 @@ class PrefixFinder {
 
     // Return string representation of prefix, e.g. /foo/bar.
     // Does not enclude a trailing /.
-    std::string ToString();
+    std::string ToString() const;
 
    private:
     class CompareNames {
@@ -75,8 +75,8 @@ class PrefixFinder {
     Node* MaybeChild(const std::string& name);
 
     const std::string name_;
+    const Node* parent_;
     std::set<Node, CompareNames> children_;
-    Node* parent_;
   };
 
   PrefixFinder(size_t limit);

@@ -20,7 +20,7 @@
 
 namespace perfetto {
 
-std::string PrefixFinder::Node::ToString() {
+std::string PrefixFinder::Node::ToString() const {
   if (parent_ != nullptr)
     return parent_->ToString() + "/" + name_;
   return name_;
@@ -57,9 +57,8 @@ void PrefixFinder::InsertPrefix(size_t len) {
   for (auto it = state_.cbegin() + 1;
        it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
     Node* next = cur->MaybeChild(it->first);
-    if (!next) {
+    if (!next)
       next = cur->AddChild(it->first);
-    }
     cur = next;
   }
 }
