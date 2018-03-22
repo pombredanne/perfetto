@@ -31,10 +31,6 @@
 
 namespace perfetto {
 
-namespace {
-using ScopedDir = base::ScopedResource<DIR*, closedir, nullptr>;
-}
-
 void ScanFilesDFS(
     const std::string& root_directory,
     const std::function<bool(BlockDeviceID block_device_id,
@@ -47,9 +43,9 @@ void ScanFilesDFS(
     struct dirent* entry;
     std::string directory = queue.back();
     queue.pop_back();
-    ScopedDir dir(opendir(directory.c_str()));
+    base::ScopedDir dir(opendir(directory.c_str()));
     directory += "/";
-    if (dir.get() == nullptr)
+    if (dir)
       continue;
     while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
@@ -80,9 +76,8 @@ void ScanFilesDFS(
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
 
-      if (!fn(block_device_id, inode_number, filepath, type)) {
+      if (!fn(block_device_id, inode_number, filepath, type))
         return;
-      }
     }
   }
 }
@@ -90,17 +85,17 @@ void ScanFilesDFS(
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {
-  ScanFilesDFS(root_directory,
-               [&block_device_map](
-                   BlockDeviceID block_device_id, Inode inode_number,
-                   const std::string& path,
-                   protos::pbzero::InodeFileMap_Entry_Type type) -> bool {
-                 std::map<Inode, InodeMapValue>& inode_map =
-                     (*block_device_map)[block_device_id];
-                 inode_map[inode_number].SetType(type);
-                 inode_map[inode_number].AddPath(path);
-                 return true;
-               });
+  ScanFilesDFS(
+      root_directory,
+      [&block_device_map](BlockDeviceID block_device_id, Inode inode_number,
+                          const std::string& path,
+                          protos::pbzero::InodeFileMap_Entry_Type type) {
+        std::map<Inode, InodeMapValue>& inode_map =
+            (*block_device_map)[block_device_id];
+        inode_map[inode_number].SetType(type);
+        inode_map[inode_number].AddPath(path);
+        return true;
+      });
 }
 
 InodeFileDataSource::InodeFileDataSource(
