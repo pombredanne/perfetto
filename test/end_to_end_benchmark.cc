@@ -181,7 +181,7 @@ static void BenchmarkConsumer(benchmark::State& state) {
   FakeProducer* producer = producer_delegate_cached->producer();
 
   // Setup the TraceConfig for the consumer.
-  static constexpr uint32_t kBufferSizeBytes = 4 * 1024 * 1024;
+  static constexpr uint32_t kBufferSizeBytes = 1024 * 1024;
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(kBufferSizeBytes / 1024);
 
@@ -233,13 +233,10 @@ static void BenchmarkConsumer(benchmark::State& state) {
   uint64_t consumer_start_ns = base::GetThreadCPUTimeNs().count();
   uint64_t iterations = 0;
   for (auto _ : state) {
-    state.PauseTiming();
-
     // Called every time there is a mini-batch produced.
     auto cname = "produced.and.committed." + std::to_string(iterations++);
     auto on_minibatch = [&state, &consumer, &on_readback_complete, cname] {
       on_readback_complete = [&state] { state.PauseTiming(); };
-      state.ResumeTiming();
       consumer.ReadTraceData();
     };
     producer->ProduceEventBatch(
@@ -249,7 +246,6 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
     auto readback_cname = "readback.complete." + std::to_string(iterations);
     on_readback_complete = task_runner.CreateCheckpoint(readback_cname);
-    state.ResumeTiming();
     consumer.ReadTraceData();
     task_runner.RunUntilCheckpoint(readback_cname);
   }
@@ -296,7 +292,7 @@ BENCHMARK(BM_EndToEnd_Consumer_Saturate)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Ranges({{8, 1024 * 256}, {0, 0}});
+    ->Ranges({{8, 64 * 1024}, {0, 0}});
 
 static void BM_EndToEnd_Consumer_ConstantRate(benchmark::State& state) {
   BenchmarkConsumer(state);
@@ -306,6 +302,6 @@ BENCHMARK(BM_EndToEnd_Consumer_ConstantRate)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Ranges({{8, 1024 * 256}, {8, 128}});
+    ->Ranges({{8, 8 * 1024}, {32, 128}});
 
 }  // namespace perfetto
