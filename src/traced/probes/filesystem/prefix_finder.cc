@@ -37,6 +37,8 @@ PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
   //
   // Until then, use a dummy unique_ptr<Node> that we set the name on for
   // lookup.
+  //
+  // Prevent exit time destructor from being run by using *new.
   static std::unique_ptr<Node>& search_node =
       *new std::unique_ptr<Node>(new Node("", nullptr));
   search_node->name_ = name;
