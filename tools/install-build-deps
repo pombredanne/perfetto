@@ -126,7 +126,7 @@ BUILD_DEPS_HOST = [
 
   # Benchmarking tool.
   ('buildtools/benchmark.zip',
-   'https://github.com/google/benchmark/archive/v1.3s.0.zip',
+   'https://github.com/google/benchmark/archive/v1.3.0.zip',
    'f387e0df37d54bfd5be239e8d0d3ea2e2c3e34f4',
    'all'
   ),
