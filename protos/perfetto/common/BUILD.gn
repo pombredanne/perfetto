@@ -1,4 +1,4 @@
-# Copyright (C) 2017 The Android Open Source Project
+# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +13,15 @@
 # limitations under the License.
 
 import("../../../gn/perfetto.gni")
-import("../../../gn/ipc_library.gni")
+import("../../../gn/proto_library.gni")
 
-# IPC service definitions.
-ipc_library("ipc") {
-  deps = [
-    "../common",
-    "../config",
-  ]
+# Proto messages that are required by the IPC service definitions but have also
+# a C++ counterpart in tracing/core (i.e. are used also for the non-IPC cases).
+proto_library("common") {
+  generate_python = false
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
   sources = [
-    "consumer_port.proto",
-    "producer_port.proto",
+    "commit_data_request.proto",
   ]
 }
