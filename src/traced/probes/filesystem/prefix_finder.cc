@@ -64,9 +64,9 @@ void PrefixFinder::InsertPrefix(size_t len) {
 }
 
 void PrefixFinder::Flush(size_t i) {
-  PERFETTO_DCHECK(i > 0);
+  PERFETTO_CHECK(i > 0);
   for (size_t j = i; j < state_.size(); ++j) {
-    if (j != 0 && state_[j - 1].second > limit_ && state_[j].second <= limit_) {
+    if (state_[j - 1].second > limit_ && state_[j].second <= limit_) {
       InsertPrefix(i);
       break;
     }
