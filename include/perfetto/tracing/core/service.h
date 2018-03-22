@@ -97,7 +97,6 @@ class Service {
     // DataSourceConfig.target_buffer().
     virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
         BufferID target_buffer) = 0;
-
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.
