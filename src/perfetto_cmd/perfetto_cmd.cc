@@ -308,6 +308,7 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
 bool PerfettoCmd::OpenOutputFile() {
   base::ScopedFile fd;
   if (!dropbox_tag_.empty()) {
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
     // If we are tracing to DropBox, there's no need to make a
     // filesystem-visible temporary file.
     // TODO(skyostil): Fall back to base::TempFile for older devices.
@@ -317,6 +318,9 @@ bool PerfettoCmd::OpenOutputFile() {
                     kTempDropBoxTraceDir);
       return false;
     }
+#else
+    PERFETTO_CHECK(false);
+#endif
   } else {
     // Otherwise create a temporary file in the directory where the final trace
     // is going to be.
