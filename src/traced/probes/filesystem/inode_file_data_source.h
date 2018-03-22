@@ -71,11 +71,11 @@ class InodeFileDataSource {
 
   // Full filesystem scan to search in /data partition and add inodes to
   // InodeFileMap proto if found. Fills in cache with resolved inodes.
-  void ResolveInodesFromDataPartition(const std::string& root_directory,
-                                      BlockDeviceID block_device_id,
-                                      std::set<Inode>* inode_numbers,
-                                      LRUInodeCache* cache,
-                                      InodeFileMap* inode_file_map);
+  void AddInodesFromDataPartition(const std::string& root_directory,
+                                  BlockDeviceID block_device_id,
+                                  std::set<Inode>* inode_numbers,
+                                  LRUInodeCache* cache,
+                                  InodeFileMap* inode_file_map);
 
   // Search in /system partition and add inodes to InodeFileMap proto if found
   void AddInodesFromSystem(BlockDeviceID block_device_id,

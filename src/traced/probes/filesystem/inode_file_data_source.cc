@@ -120,7 +120,7 @@ InodeFileDataSource::InodeFileDataSource(
       weak_factory_(this) {}
 
 // Currently only enabled if we've seen over 1 unresolved inode
-void InodeFileDataSource::ResolveInodesFromDataPartition(
+void InodeFileDataSource::AddInodesFromDataPartition(
     const std::string& root_directory,
     BlockDeviceID provided_block_device_id,
     std::set<Inode>* inode_numbers,
@@ -225,23 +225,23 @@ void InodeFileDataSource::OnInodes(
     auto trace_packet = writer_->NewTracePacket();
     auto inode_file_map = trace_packet->set_inode_file_map();
 
-    // Add block device id
+    // Add block device id to InodeFileMap
     inode_file_map->set_block_device_id(block_device_id);
 
-    // Add mount points
+    // Add mount points to InodeFileMap
     auto range = mount_points_.equal_range(block_device_id);
     for (std::multimap<BlockDeviceID, std::string>::iterator it = range.first;
          it != range.second; ++it)
       inode_file_map->add_mount_points(it->second.c_str());
 
-    // Add entries for inodes in system
+    // Add entries to InodeFileMap as inodes are found and resolved to their
+    // paths/type
     AddInodesFromSystem(block_device_id, &inode_numbers, inode_file_map);
     AddInodesFromLRUCache(block_device_id, &inode_numbers, inode_file_map);
-
     // TODO(azappone): Make root directory a mount point
     std::string root_directory = "/data";
-    ResolveInodesFromDataPartition(root_directory, block_device_id,
-                                   &inode_numbers, cache_, inode_file_map);
+    AddInodesFromDataPartition(root_directory, block_device_id, &inode_numbers,
+                               cache_, inode_file_map);
     trace_packet->Finalize();
   }
 }
