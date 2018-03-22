@@ -40,9 +40,9 @@ namespace {
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
-const char* kFtraceSourceName = "com.google.perfetto.ftrace";
-const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
-const char* kInodeMapSourceName = "com.google.perfetto.inode_file_map";
+constexpr char kFtraceSourceName[] = "com.google.perfetto.ftrace";
+constexpr char kProcessStatsSourceName[] = "com.google.perfetto.process_stats";
+constexpr char kInodeMapSourceName[] = "com.google.perfetto.inode_file_map";
 
 }  // namespace.
 
@@ -219,6 +219,9 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   watchdogs_.erase(id);
 }
 
+void ProbesProducer::OnTracingStart() {}
+void ProbesProducer::OnTracingStop() {}
+
 void ProbesProducer::ConnectWithRetries(const char* socket_name,
                                         base::TaskRunner* task_runner) {
   PERFETTO_DCHECK(state_ == kNotStarted);
@@ -233,11 +236,8 @@ void ProbesProducer::ConnectWithRetries(const char* socket_name,
 void ProbesProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
-  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
-}
-
-std::string ProbesProducer::GetProducerName() {
-  return "com.google.perfetto.probes_producer";
+  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_,
+                                         "com.google.perfetto.traced_probes");
 }
 
 void ProbesProducer::IncreaseConnectionBackoff() {
@@ -272,8 +272,8 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
 
-  if (file_source_ && !metadata.inodes.empty()) {
-    auto inodes = metadata.inodes;
+  if (file_source_ && !metadata.inode_and_device.empty()) {
+    auto inodes = metadata.inode_and_device;
     auto weak_file_source = file_source_;
     task_runner_->PostTask([weak_file_source, inodes] {
       if (weak_file_source)

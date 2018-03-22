@@ -19,7 +19,7 @@ option optimize_for = LITE_RUNTIME;
 
 import "perfetto/config/data_source_config.proto";
 import "perfetto/config/data_source_descriptor.proto";
-import "perfetto/ipc/commit_data_request.proto";
+import "perfetto/common/commit_data_request.proto";
 
 package perfetto.protos;
 
@@ -112,7 +112,9 @@ message GetAsyncCommandResponse {
 
   message StopDataSource { optional uint64 instance_id = 1; }
 
-  message OnTracingStart { optional uint64 page_size_kb = 1; }
+  // This message also transports the file descriptor for the shared memory
+  // buffer.
+  message OnTracingStart { optional uint64 shared_buffer_page_size_kb = 1; }
 
   message OnTracingStop {}
 

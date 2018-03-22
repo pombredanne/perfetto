@@ -40,18 +40,21 @@ namespace perfetto {
 std::unique_ptr<Service::ProducerEndpoint> ProducerIPCClient::Connect(
     const char* service_sock_name,
     Producer* producer,
-    base::TaskRunner* task_runner) {
-  return std::unique_ptr<Service::ProducerEndpoint>(
-      new ProducerIPCClientImpl(service_sock_name, producer, task_runner));
+    base::TaskRunner* task_runner,
+    const std::string& producer_name) {
+  return std::unique_ptr<Service::ProducerEndpoint>(new ProducerIPCClientImpl(
+      service_sock_name, producer, task_runner, producer_name));
 }
 
 ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
                                              Producer* producer,
-                                             base::TaskRunner* task_runner)
+                                             base::TaskRunner* task_runner,
+                                             const std::string& producer_name)
     : producer_(producer),
       task_runner_(task_runner),
       ipc_channel_(ipc::Client::CreateInstance(service_sock_name, task_runner)),
-      producer_port_(this /* event_listener */) {
+      producer_port_(this /* event_listener */),
+      name_(producer_name) {
   ipc_channel_->BindService(producer_port_.GetWeakPtr());
   PERFETTO_DCHECK_THREAD(thread_checker_);
 }
@@ -72,7 +75,7 @@ void ProducerIPCClientImpl::OnConnect() {
         OnConnectionInitialized(resp.success());
       });
   protos::InitializeConnectionRequest req;
-  req.set_producer_name(producer_->GetProducerName());
+  req.set_producer_name(name_);
   producer_port_.InitializeConnection(req, std::move(on_init));
 
   // Create the back channel to receive commands from the Service.
@@ -127,9 +130,11 @@ void ProducerIPCClientImpl::OnServiceRequest(
 
     // TODO(primiano): handle mmap failure in case of OOM.
     shared_memory_ = PosixSharedMemory::AttachToFd(std::move(shmem_fd));
-    page_size_kb_ = cmd.on_tracing_start().page_size_kb();
+    shared_buffer_page_size_kb_ =
+        cmd.on_tracing_start().shared_buffer_page_size_kb();
     shared_memory_arbiter_ = SharedMemoryArbiter::CreateInstance(
-        shared_memory_.get(), page_size_kb_ * 1024, this, task_runner_);
+        shared_memory_.get(), shared_buffer_page_size_kb_ * 1024, this,
+        task_runner_);
     producer_->OnTracingStart();
     return;
   }
@@ -224,8 +229,8 @@ SharedMemory* ProducerIPCClientImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ProducerIPCClientImpl::page_size_kb() const {
-  return page_size_kb_;
+size_t ProducerIPCClientImpl::shared_buffer_page_size_kb() const {
+  return shared_buffer_page_size_kb_;
 }
 
 }  // namespace perfetto

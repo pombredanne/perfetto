@@ -83,7 +83,7 @@ class Service {
 
     // Size of shared memory buffer pages. It's always a multiple of 4K.
     // See shared_memory_abi.h
-    virtual size_t page_size_kb() const = 0;
+    virtual size_t shared_buffer_page_size_kb() const = 0;
 
     // Creates a trace writer, which allows to create events, handling the
     // underying shared memory buffer and signalling to the Service. This method
@@ -97,6 +97,7 @@ class Service {
     // DataSourceConfig.target_buffer().
     virtual std::unique_ptr<TraceWriter> CreateTraceWriter(
         BufferID target_buffer) = 0;
+
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.
@@ -141,6 +142,7 @@ class Service {
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
       Producer*,
       uid_t uid,
+      const std::string& name = std::string(),
       size_t shared_memory_size_hint_bytes = 0) = 0;
 
   // Coonects a Consumer instance and obtains a ConsumerEndpoint, which is

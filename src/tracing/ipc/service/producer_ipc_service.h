@@ -74,8 +74,6 @@ class ProducerIPCService : public protos::ProducerPort {
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
     void OnTracingStart() override;
     void OnTracingStop() override;
-    std::string GetProducerName() override;
-    void SetProducerName(std::string name);
 
     // RegisterDataSource requests that haven't been replied yet.
     std::map<std::string, DeferredRegisterDataSourceResponse>
@@ -90,9 +88,6 @@ class ProducerIPCService : public protos::ProducerPort {
     // to send asynchronous commands to the remote Producer (e.g. start/stop a
     // data source).
     DeferredGetAsyncCommandResponse async_producer_commands;
-
-   private:
-    std::string producer_name_;
   };
 
   ProducerIPCService(const ProducerIPCService&) = delete;

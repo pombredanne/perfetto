@@ -78,14 +78,10 @@ class Producer {
 
   // Called by the Service after OnConnect but before the first DataSource is
   // created. Can be used for any setup required before tracing begins.
-  virtual void OnTracingStart() {}
+  virtual void OnTracingStart() = 0;
 
   // Called by the Service after the final DataSource is torn down.
-  virtual void OnTracingStop() {}
-
-  // The producer name that is passed to the service. Used to set specific
-  // config for a producer.
-  virtual std::string GetProducerName() = 0;
+  virtual void OnTracingStop() = 0;
 };
 
 }  // namespace perfetto

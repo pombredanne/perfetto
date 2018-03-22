@@ -414,7 +414,7 @@ class SharedMemoryABI {
   size_t size() const { return size_; }
   size_t page_size() const { return page_size_; }
   size_t num_pages() const { return num_pages_; }
-  bool is_valid() { return size_ && page_size_ && num_pages_; }
+  bool is_valid() { return num_pages() > 0; }
 
   uint8_t* page_start(size_t page_idx) {
     PERFETTO_DCHECK(page_idx < num_pages_);
@@ -533,10 +533,10 @@ class SharedMemoryABI {
                         const ChunkHeader*);
   size_t ReleaseChunk(Chunk chunk, ChunkState);
 
-  uint8_t* start_;
-  size_t size_;
-  size_t page_size_;
-  size_t num_pages_;
+  uint8_t* start_ = 0;
+  size_t size_ = 0;
+  size_t page_size_ = 0;
+  size_t num_pages_ = 0;
   std::array<uint16_t, kNumPageLayouts> chunk_sizes_;
 };
 

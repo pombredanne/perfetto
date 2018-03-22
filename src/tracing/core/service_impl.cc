@@ -34,6 +34,7 @@
 #include "src/tracing/core/packet_stream_validator.h"
 #include "src/tracing/core/trace_buffer.h"
 
+#include "perfetto/trace/clock_snapshot.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
 
@@ -52,6 +53,7 @@ namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
 constexpr int kMaxBuffersPerConsumer = 128;
+constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 
 constexpr uint64_t kMillisPerHour = 3600000;
 
@@ -84,6 +86,7 @@ ServiceImpl::~ServiceImpl() {
 std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
     Producer* producer,
     uid_t uid,
+    const std::string& producer_name,
     size_t shared_memory_size_hint_bytes) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
@@ -105,6 +108,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   shared_memory_size_hint_bytes_ = shared_memory_size_hint_bytes;
+  endpoint->name_ = producer_name;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
   return std::move(endpoint);
@@ -334,6 +338,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   }
   std::vector<TracePacket> packets;
   size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
+  MaybeSnapshotClocks(tracing_session, &packets);
 
   // This is a rough threshold to determine how to split packets within each
   // IPC. This is not an upper bound, we just stop accumulating packets and send
@@ -537,16 +542,16 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    producer->page_size_kb_ = (tracing_session->GetDesiredPageSizeKb(
-                                   producer->producer_->GetProducerName()) == 0)
-                                  ? base::kPageSize / 1024  // default
-                                  : tracing_session->GetDesiredPageSizeKb(
-                                        producer->producer_->GetProducerName());
+    size_t desired_page_size =
+        producer->GetDesiredPageSizeKb(tracing_session->config);
+    producer->shared_buffer_page_size_kb_ =
+        (desired_page_size == 0) ? base::kPageSize / 1024  // default
+                                 : desired_page_size;
 
-    size_t shm_size = std::min(tracing_session->GetDesiredShmSizeKb(
-                                   producer->producer_->GetProducerName()) *
-                                   1024,
-                               kMaxShmSize);
+    size_t desired_shm_size =
+        producer->GetDesiredShmSizeKb(tracing_session->config);
+    size_t shm_size = std::min(desired_shm_size * 1024, kMaxShmSize);
+
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
@@ -689,6 +694,54 @@ void ServiceImpl::UpdateMemoryGuardrail() {
   uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
   base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
 #endif
+}
+
+void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
+                                      std::vector<TracePacket>* packets) {
+  base::TimeMillis now = base::GetWallTimeMs();
+  if (now < tracing_session->last_clock_snapshot + kClockSnapshotInterval)
+    return;
+  tracing_session->last_clock_snapshot = now;
+  struct {
+    clockid_t id;
+    protos::ClockSnapshot::Clock::Type type;
+    struct timespec ts;
+  } clocks[] = {
+      {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+      {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+      {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+      {CLOCK_MONOTONIC_RAW,
+       protos::ClockSnapshot::Clock::MONOTONIC_RAW,
+       {0, 0}},
+      {CLOCK_PROCESS_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+       {0, 0}},
+      {CLOCK_THREAD_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+       {0, 0}},
+      {CLOCK_REALTIME_COARSE,
+       protos::ClockSnapshot::Clock::REALTIME_COARSE,
+       {0, 0}},
+      {CLOCK_MONOTONIC_COARSE,
+       protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+       {0, 0}},
+  };
+  protos::TracePacket packet;
+  protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
+  // First snapshot all the clocks as atomically as we can.
+  for (auto& clock : clocks) {
+    if (clock_gettime(clock.id, &clock.ts) == -1)
+      PERFETTO_DLOG("clock_gettime failed for clock %d", clock.id);
+  }
+  for (auto& clock : clocks) {
+    protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
+    c->set_type(clock.type);
+    c->set_timestamp(base::FromPosixTimespec(clock.ts).count());
+  }
+  Slice slice = Slice::Allocate(packet.ByteSize());
+  PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
+  packets->emplace_back();
+  packets->back().AddSlice(std::move(slice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -849,7 +902,26 @@ void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
   PERFETTO_DCHECK(!shared_memory_ && !shmem_abi_.is_valid());
   shared_memory_ = std::move(shared_memory);
   shmem_abi_.Initialize(reinterpret_cast<uint8_t*>(shared_memory_->start()),
-                        shared_memory_->size(), page_size_kb() * 1024);
+                        shared_memory_->size(),
+                        shared_buffer_page_size_kb() * 1024);
+}
+
+size_t ServiceImpl::ProducerEndpointImpl::GetDesiredShmSizeKb(
+    const TraceConfig& config) {
+  for (auto& producer_config : config.producers()) {
+    if (name_ == producer_config.producer_name())
+      return producer_config.shm_size_kb();
+  }
+  return 0;
+}
+
+size_t ServiceImpl::ProducerEndpointImpl::GetDesiredPageSizeKb(
+    const TraceConfig& config) {
+  for (auto& producer_config : config.producers()) {
+    if (name_ == producer_config.producer_name())
+      return producer_config.page_size_kb();
+  }
+  return 0;
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
@@ -857,8 +929,8 @@ SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {
   return shared_memory_.get();
 }
 
-size_t ServiceImpl::ProducerEndpointImpl::page_size_kb() const {
-  return page_size_kb_;
+size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
+  return shared_buffer_page_size_kb_;
 }
 
 std::unique_ptr<TraceWriter>
@@ -877,23 +949,5 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 
 ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
     : config(new_config) {}
-
-size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb(
-    std::string producer_name) {
-  for (auto& producer_config : config.producers()) {
-    if (producer_name == producer_config.producer_name())
-      return producer_config.shm_size_kb();
-  }
-  return 0;
-}
-
-size_t ServiceImpl::TracingSession::GetDesiredPageSizeKb(
-    std::string producer_name) {
-  for (auto& producer_config : config.producers()) {
-    if (producer_name == producer_config.producer_name())
-      return producer_config.page_size_kb();
-  }
-  return 0;
-}
 
 }  // namespace perfetto
