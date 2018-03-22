@@ -45,7 +45,7 @@ void ScanFilesDFS(
     queue.pop_back();
     base::ScopedDir dir(opendir(directory.c_str()));
     directory += "/";
-    if (dir)
+    if (!dir)
       continue;
     while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
