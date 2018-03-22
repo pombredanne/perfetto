@@ -29,6 +29,7 @@ std::string PrefixFinder::Node::ToString() {
 PrefixFinder::Node* PrefixFinder::Node::AddChild(std::string name) {
   auto p = children_.emplace(std::move(name), this);
   PERFETTO_DCHECK(p.second);
+  // This is fine as long as the comparator only uses const members of Node.
   return const_cast<Node*>(&(*p.first));
 }
 
@@ -45,6 +46,7 @@ PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
   auto it = children_.find(search_node);
   if (it == children_.end())
     return nullptr;
+  // This is fine as long as the comparator only uses const members of Node.
   return const_cast<Node*>(&(*it));
 }
 
