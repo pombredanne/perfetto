@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +17,12 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-message FakeFtraceEvent {
-  optional uint32 common_field = 1;
-  oneof event { FakeAllFieldsFtraceEvent all_fields = 42; }
-}
+package perfetto;
 
-message FakeAllFieldsFtraceEvent {
-  optional uint32 field_uint32 = 1;
-  optional int32 field_pid = 2;
-  optional uint64 field_dev_32 = 3;
-  optional uint64 field_inode_32 = 4;
-  optional uint64 field_dev_64 = 5;
-  optional uint64 field_inode_64 = 6;
-  optional string field_char_16 = 500;
-  optional string field_char = 501;
+message PerfettoCmdState {
+  // These are fixed size so that the file is always a constant length.
+  optional fixed64 first_trace_timestamp = 1;
+  optional fixed64 last_trace_timestamp = 2;
+  // Total of bytes uploaded since first_trace_timestamp.
+  optional fixed64 total_bytes_uploaded = 3;
 }
