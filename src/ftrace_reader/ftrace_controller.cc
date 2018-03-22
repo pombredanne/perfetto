@@ -403,6 +403,7 @@ void FtraceMetadata::Clear() {
   pids.clear();
   overwrite_count = 0;
   last_seen_device_id = 0;
+  last_seen_common_pid = 0;
 }
 
 }  // namespace perfetto
