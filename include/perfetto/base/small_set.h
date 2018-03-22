@@ -25,6 +25,8 @@ namespace perfetto {
 // Lookup is O(Size), so it is only usable for very small sets.
 template <typename DataType, size_t Size>
 class SmallSet {
+  static_assert(Size < 16, "Do not use SmallSet for many items");
+
  public:
   // Name for consistency with STL.
   using const_iterator = typename std::array<DataType, Size>::const_iterator;
@@ -32,15 +34,13 @@ class SmallSet {
     if (Contains(n))
       return true;
     if (filled_ < Size) {
-      arr_[filled_++] = n;
+      arr_[filled_++] = std::move(n);
       return true;
     }
     return false;
   }
 
-  bool Contains(DataType n) const {
-    if (!filled_)
-      return false;
+  bool Contains(const DataType& n) const {
     for (size_t i = 0; i < filled_; ++i) {
       if (arr_[i] == n)
         return true;
