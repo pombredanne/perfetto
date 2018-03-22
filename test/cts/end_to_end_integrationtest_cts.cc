@@ -69,7 +69,7 @@ class PerfettoCtsTest : public ::testing::Test {
       total += packets.size();
 
       if (!has_more) {
-        ASSERT_EQ(total, kEventCount);
+        ASSERT_EQ(total, kEventCount + 1);
         finish();
       }
     };
@@ -87,9 +87,9 @@ class PerfettoCtsTest : public ::testing::Test {
     // and the consumer tries to retrieve it. For now wait a bit until the
     // service is done, but we should add explicit flushing to avoid this.
     task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
-                                5000);
+                                1000);
 
-    task_runner.RunUntilCheckpoint("no.more.packets", 10000);
+    task_runner.RunUntilCheckpoint("no.more.packets");
   }
 };
 
