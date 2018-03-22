@@ -23,7 +23,14 @@
 #include <tuple>
 
 namespace perfetto {
-namespace base {
+
+bool operator==(const perfetto::InodeMapValue& lhs,
+                const perfetto::InodeMapValue& rhs);
+bool operator==(const perfetto::InodeMapValue& lhs,
+                const perfetto::InodeMapValue& rhs) {
+  return lhs.type() == rhs.type() && lhs.paths() == rhs.paths();
+}
+
 namespace {
 
 using ::testing::Eq;
@@ -44,16 +51,12 @@ TEST(LRUInodeCacheTest, Basic) {
 
   LRUInodeCache cache(2);
   cache.Insert(key1, val1);
-  EXPECT_THAT(cache.Get(key1)->paths(), Eq(val1.paths()));
-  EXPECT_THAT(cache.Get(key1)->type(), Eq(val1.type()));
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
   cache.Insert(key2, val2);
-  EXPECT_THAT(cache.Get(key1)->paths(), Eq(val1.paths()));
-  EXPECT_THAT(cache.Get(key1)->type(), Eq(val1.type()));
-  EXPECT_THAT(cache.Get(key2)->paths(), Eq(val2.paths()));
-  EXPECT_THAT(cache.Get(key2)->type(), Eq(val2.type()));
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
   cache.Insert(key1, val2);
-  EXPECT_THAT(cache.Get(key1)->paths(), Eq(val2.paths()));
-  EXPECT_THAT(cache.Get(key1)->type(), Eq(val2.type()));
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val2)));
 }
 
 TEST(LRUInodeCacheTest, Overflow) {
@@ -70,19 +73,14 @@ TEST(LRUInodeCacheTest, Overflow) {
   LRUInodeCache cache(2);
   cache.Insert(key1, val1);
   cache.Insert(key2, val2);
-  EXPECT_THAT(cache.Get(key1)->paths(), Eq(val1.paths()));
-  EXPECT_THAT(cache.Get(key1)->type(), Eq(val1.type()));
-  EXPECT_THAT(cache.Get(key2)->paths(), Eq(val2.paths()));
-  EXPECT_THAT(cache.Get(key2)->type(), Eq(val2.type()));
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
   cache.Insert(key3, val3);
   // key1 is the LRU and should be evicted.
   EXPECT_THAT(cache.Get(key1), IsNull());
-  EXPECT_THAT(cache.Get(key2)->paths(), Eq(val2.paths()));
-  EXPECT_THAT(cache.Get(key2)->type(), Eq(val2.type()));
-  EXPECT_THAT(cache.Get(key3)->paths(), Eq(val3.paths()));
-  EXPECT_THAT(cache.Get(key3)->type(), Eq(val3.type()));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
+  EXPECT_THAT(cache.Get(key3), Pointee(Eq(val3)));
 }
 
 }  // namespace
-}  // namespace base
 }  // namespace perfetto

@@ -45,11 +45,15 @@ void ScanFilesDFS(
                              const std::string& path,
                              protos::pbzero::InodeFileMap_Entry_Type type)>&);
 
-void CreateDeviceToInodeMap(
+// Creates block_device_map for /system partition
+void CreateSystemDeviceToInodeMap(
     const std::string& root_directory,
-    const std::map<BlockDeviceID, std::set<Inode>>& unresolved_inodes,
-    LRUInodeCache* cache,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map);
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+        system_block_device_map);
+
+void FillInodeEntry(InodeFileMap* inode_file_map,
+                    Inode inode_number,
+                    const InodeMapValue& inode_map_value);
 
 class InodeFileDataSource {
  public:
@@ -62,22 +66,26 @@ class InodeFileDataSource {
   TracingSessionID session_id() const { return session_id_; }
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
 
+  // Called when Inodes are seen in the FtraceEventBundle
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
-  // If the provided inode number and block device id are found in the
-  // block_device_entry map, adds entry to the InodeFileMap proto and returns
-  // true.
-  bool AddInodeEntryFromMap(
-      InodeFileMap* inode_file_map,
-      BlockDeviceID block_device_id,
-      Inode inode_number,
-      const std::map<Inode, InodeMapValue>& block_device_entry);
+  // Full filesystem scan to search in /data partition and add inodes to
+  // InodeFileMap proto if found. Fills in cache with resolved inodes.
+  void ResolveInodesFromDataPartition(const std::string& root_directory,
+                                      BlockDeviceID block_device_id,
+                                      std::set<Inode>* inode_numbers,
+                                      LRUInodeCache* cache,
+                                      InodeFileMap* inode_file_map);
 
-  // If the provided inode number and block device id are found in the LRU inode
-  // cache, adds entry to the InodeFileMap proto and returns true.
-  bool AddInodeEntryFromLRU(InodeFileMap* inode_file_map,
-                            BlockDeviceID block_device_id,
-                            Inode inode_number);
+  // Search in /system partition and add inodes to InodeFileMap proto if found
+  void AddInodesFromSystem(BlockDeviceID block_device_id,
+                           std::set<Inode>* inode_numbers,
+                           InodeFileMap* inode_file_map);
+
+  // Search in LRUInodeCache and add inodes to InodeFileMap if found
+  void AddInodesFromLRUCache(BlockDeviceID block_device_id,
+                             std::set<Inode>* inode_numbers,
+                             InodeFileMap* inode_file_map);
 
  private:
   const TracingSessionID session_id_;
