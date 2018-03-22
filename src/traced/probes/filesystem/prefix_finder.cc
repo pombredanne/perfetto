@@ -26,13 +26,25 @@ std::string PrefixFinder::Node::ToString() {
   return name_;
 }
 
+std::unique_ptr<PrefixFinder::Node>& PrefixFinder::Node::Child(
+    const std::string& name) {
+  return children_[name];
+}
+
+PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
+  auto it = children_.find(name);
+  if (it == children_.end())
+    return nullptr;
+  return it->second.get();
+}
+
 PrefixFinder::PrefixFinder(size_t limit) : limit_(limit) {}
 
 void PrefixFinder::InsertPrefix(size_t len) {
   Node* cur = &root_;
   for (auto it = state_.cbegin() + 1;
        it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
-    std::unique_ptr<Node>& next = cur->children_[it->first];
+    std::unique_ptr<Node>& next = cur->Child(it->first);
     if (!next)
       next.reset(new Node(it->first, cur));
     cur = next.get();
@@ -91,10 +103,10 @@ PrefixFinder::Node* PrefixFinder::GetPrefix(std::string path) {
   Node* cur = &root_;
   for (size_t i = 0; s.Next(); ++i) {
     char* token = s.cur_token();
-    auto it = cur->children_.find(token);
-    if (it == cur->children_.end())
+    Node* next = cur->MaybeChild(token);
+    if (next == nullptr)
       break;
-    cur = it->second.get();
+    cur = next;
     PERFETTO_DCHECK(cur->name_ == token);
   }
   return cur;

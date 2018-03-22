@@ -59,6 +59,9 @@ class PrefixFinder {
    private:
     Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
 
+    std::unique_ptr<Node>& Child(const std::string& name);
+    Node* MaybeChild(const std::string& name);
+
     std::string name_;
     std::map<std::string, std::unique_ptr<Node>> children_;
     Node* parent_;
