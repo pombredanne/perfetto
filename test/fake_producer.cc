@@ -77,8 +77,9 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
 }
 
 // Note: this will called on a different thread.
-void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
-  task_runner_->PostTask([this, callback] {
+void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
+                                     std::function<void()> complete_callback) {
+  task_runner_->PostTask([this, minibatch_callback, complete_callback] {
     PERFETTO_CHECK(trace_writer_);
 
     size_t payload_size = message_size_ - sizeof(uint32_t);
@@ -113,9 +114,9 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
           usleep((1000 - time_taken.count()) * 1000);
         }
       }
+      trace_writer_->Flush(messages_to_emit > 0 ? minibatch_callback
+                                                : complete_callback);
     } while (messages_to_emit > 0);
-
-    trace_writer_->Flush(callback);
   });
 }
 

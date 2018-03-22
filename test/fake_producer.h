@@ -39,9 +39,8 @@ class FakeProducer : public Producer {
                base::TaskRunner* task_runner,
                std::function<void()> on_create_data_source_instance);
 
-  // Produces a batch of events (as configured in the DataSourceConfig) and
-  // posts a callback when the service acknowledges the commit.
-  void ProduceEventBatch(std::function<void()> callback);
+  void ProduceEventBatch(std::function<void()> minibatch_callback,
+                         std::function<void()> complete_callback);
 
   // Producer implementation.
   void OnConnect() override;

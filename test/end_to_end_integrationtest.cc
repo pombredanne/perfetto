@@ -212,7 +212,7 @@ TEST(PerfettoTest, TestFakeProducer) {
     task_runner.PostTask(on_produced_and_committed);
   };
   FakeProducer* producer = producer_delegate_cached->producer();
-  producer->ProduceEventBatch(posted_on_produced_and_committed);
+  producer->ProduceEventBatch([] {}, posted_on_produced_and_committed);
   task_runner.RunUntilCheckpoint("produced.and.committed");
 
   consumer.ReadTraceData();
