@@ -146,7 +146,8 @@ def Main():
   binary = env + './%s' % args.test_name
   cmd += binary
   if args.cmd_args:
-    cmd += ' ' + ' '.join(args.cmd_args.replace(args.test_name, binary))
+    actual_args = [arg.replace(args.test_name, binary) for arg in args.cmd_args]
+    cmd += ' ' + ' '.join(actual_args)
   cmd += ';echo -e "\\nTEST_RET_CODE=$?"'
   print cmd
   test_output = subprocess.check_output([ADB_PATH, 'shell', cmd])
