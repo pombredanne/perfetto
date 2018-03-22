@@ -31,6 +31,7 @@ void PrefixFinder::Node::AddChild(std::unique_ptr<Node> node) {
 }
 
 PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
+  // This will be nicer with C++14 transparent comparators.
   static std::unique_ptr<Node>& search_node =
       *new std::unique_ptr<Node>(new Node("", nullptr));
   search_node->name_ = name;
