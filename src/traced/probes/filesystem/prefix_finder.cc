@@ -26,16 +26,18 @@ std::string PrefixFinder::Node::ToString() {
   return name_;
 }
 
-std::unique_ptr<PrefixFinder::Node>& PrefixFinder::Node::Child(
-    const std::string& name) {
-  return children_[name];
+void PrefixFinder::Node::AddChild(std::unique_ptr<Node> node) {
+  children_.emplace(std::move(node));
 }
 
 PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
-  auto it = children_.find(name);
+  static std::unique_ptr<Node>& search_node =
+      *new std::unique_ptr<Node>(new Node("", nullptr));
+  search_node->name_ = name;
+  auto it = children_.find(search_node);
   if (it == children_.end())
     return nullptr;
-  return it->second.get();
+  return it->get();
 }
 
 PrefixFinder::PrefixFinder(size_t limit) : limit_(limit) {}
@@ -44,10 +46,12 @@ void PrefixFinder::InsertPrefix(size_t len) {
   Node* cur = &root_;
   for (auto it = state_.cbegin() + 1;
        it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
-    std::unique_ptr<Node>& next = cur->Child(it->first);
-    if (!next)
-      next.reset(new Node(it->first, cur));
-    cur = next.get();
+    Node* next = cur->MaybeChild(it->first);
+    if (!next) {
+      next = new Node(it->first, cur);
+      cur->AddChild(std::unique_ptr<Node>(next));
+    }
+    cur = next;
   }
 }
 

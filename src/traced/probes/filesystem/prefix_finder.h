@@ -17,8 +17,8 @@
 #ifndef SRC_TRACED_PROBES_FILESYSTEM_PREFIX_FINDER_H_
 #define SRC_TRACED_PROBES_FILESYSTEM_PREFIX_FINDER_H_
 
-#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -57,13 +57,20 @@ class PrefixFinder {
     std::string ToString();
 
    private:
+    class CompareNames {
+     public:
+      bool operator()(const std::unique_ptr<Node>& one,
+                      const std::unique_ptr<Node>& other) const {
+        return one->name_ < other->name_;
+      }
+    };
     Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
 
-    std::unique_ptr<Node>& Child(const std::string& name);
+    void AddChild(std::unique_ptr<Node>);
     Node* MaybeChild(const std::string& name);
 
     std::string name_;
-    std::map<std::string, std::unique_ptr<Node>> children_;
+    std::set<std::unique_ptr<Node>, CompareNames> children_;
     Node* parent_;
   };
 
