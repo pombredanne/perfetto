@@ -704,17 +704,25 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     struct timespec ts;
   } clocks[] = {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME},
+    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
 #else
-    {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME},
-    {CLOCK_REALTIME_COARSE, protos::ClockSnapshot::Clock::REALTIME_COARSE},
-    {CLOCK_MONOTONIC_COARSE, protos::ClockSnapshot::Clock::MONOTONIC_COARSE},
+    {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+    {CLOCK_REALTIME_COARSE,
+     protos::ClockSnapshot::Clock::REALTIME_COARSE,
+     {0, 0}},
+    {CLOCK_MONOTONIC_COARSE,
+     protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+     {0, 0}},
 #endif
-    {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME},
-    {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC},
-    {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW},
-    {CLOCK_PROCESS_CPUTIME_ID, protos::ClockSnapshot::Clock::PROCESS_CPUTIME},
-    {CLOCK_THREAD_CPUTIME_ID, protos::ClockSnapshot::Clock::THREAD_CPUTIME},
+    {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+    {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+    {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW, {0, 0}},
+    {CLOCK_PROCESS_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+     {0, 0}},
+    {CLOCK_THREAD_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+     {0, 0}},
   };
   protos::TracePacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
