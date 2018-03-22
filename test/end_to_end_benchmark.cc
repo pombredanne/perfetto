@@ -29,6 +29,8 @@
 
 namespace perfetto {
 
+namespace {
+
 // If we're building on Android and starting the daemons ourselves,
 // create the sockets in a world-writable location.
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
@@ -40,7 +42,7 @@ namespace perfetto {
 #define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
 #endif
 
-static void BM_EndToEnd(benchmark::State& state) {
+static void BenchmarkCommon(benchmark::State& state) {
   base::TestTaskRunner task_runner;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
@@ -56,9 +58,12 @@ static void BM_EndToEnd(benchmark::State& state) {
   };
   std::unique_ptr<FakeProducerDelegate> producer_delegate(
       new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
-                               posted_on_producer_enabled));
+                               std::move(posted_on_producer_enabled)));
   FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
   producer_thread.Start(std::move(producer_delegate));
+
+  // Once conneced, we can retrieve the inner producer.
+  FakeProducer* producer = producer_delegate_cached->producer();
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
@@ -71,13 +76,19 @@ static void BM_EndToEnd(benchmark::State& state) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  uint32_t message_count = state.range(0);
-  uint32_t message_size = state.range(1);
+  size_t message_count = state.range(0);
+  size_t message_bytes = state.range(1);
+  size_t mb_per_s = state.range(2);
+
+  size_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
+  size_t time_for_messages_ms =
+      5000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(message_count);
-  ds_config->mutable_for_testing()->set_message_size(message_size);
+  ds_config->mutable_for_testing()->set_message_size(message_bytes);
+  ds_config->mutable_for_testing()->set_max_messages_per_second(messages_per_s);
 
   bool is_first_packet = true;
   auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
@@ -118,7 +129,8 @@ static void BM_EndToEnd(benchmark::State& state) {
   task_runner.RunUntilCheckpoint("producer.enabled");
 
   uint64_t wall_start_ns = base::GetWallTimeNs().count();
-  uint64_t thread_start_ns = service_thread.GetThreadCPUTimeNs();
+  uint64_t service_start_ns = service_thread.GetThreadCPUTimeNs();
+  uint64_t producer_start_ns = producer_thread.GetThreadCPUTimeNs();
   uint64_t iterations = 0;
   for (auto _ : state) {
     auto cname = "produced.and.committed." + std::to_string(iterations++);
@@ -127,29 +139,45 @@ static void BM_EndToEnd(benchmark::State& state) {
                                              &on_produced_and_committed] {
       task_runner.PostTask(on_produced_and_committed);
     };
-    FakeProducer* producer = producer_delegate_cached->producer();
     producer->ProduceEventBatch(posted_on_produced_and_committed);
-    task_runner.RunUntilCheckpoint(cname);
+    task_runner.RunUntilCheckpoint(cname, time_for_messages_ms);
   }
-  uint64_t thread_ns = service_thread.GetThreadCPUTimeNs() - thread_start_ns;
+  uint64_t service_ns = service_thread.GetThreadCPUTimeNs() - service_start_ns;
+  uint64_t producer_ns =
+      producer_thread.GetThreadCPUTimeNs() - producer_start_ns;
   uint64_t wall_ns = base::GetWallTimeNs().count() - wall_start_ns;
 
-  state.counters["Ser CPU"] = benchmark::Counter(100.0 * thread_ns / wall_ns);
+  state.counters["Pro CPU"] = benchmark::Counter(100.0 * producer_ns / wall_ns);
+  state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
   state.counters["Ser ns/m"] =
-      benchmark::Counter(1.0 * thread_ns / message_count);
+      benchmark::Counter(1.0 * service_start_ns / message_count);
 
   // Read back the buffer just to check correctness.
   consumer.ReadTraceData();
   task_runner.RunUntilCheckpoint("readback.complete");
-  state.SetBytesProcessed(int64_t(state.iterations()) * message_size *
-                          message_count);
+  state.SetBytesProcessed(iterations * message_bytes * message_count);
 
   consumer.Disconnect();
 }
+}
 
-BENCHMARK(BM_EndToEnd)
+static void BM_EndToEnd_Fastest(benchmark::State& state) {
+  BenchmarkCommon(state);
+}
+
+BENCHMARK(BM_EndToEnd_Fastest)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Ranges({{16, 1024 * 1024}, {8, 2048}});
+    ->Ranges({{16, 1024 * 1024}, {8, 2048}, {0, 0}});
+
+static void BM_EndToEnd_ConstantRate(benchmark::State& state) {
+  BenchmarkCommon(state);
 }
+
+BENCHMARK(BM_EndToEnd_ConstantRate)
+    ->Unit(benchmark::kMicrosecond)
+    ->UseRealTime()
+    ->RangeMultiplier(2)
+    ->Ranges({{128 * 1024, 256 * 1024}, {128, 256}, {8, 128}});
+}  // namespace perfetto
