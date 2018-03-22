@@ -24,7 +24,7 @@ const std::set<std::string> RangeTree::Get(Inode inode) {
   auto lower = map_.upper_bound(inode);
   if (lower != map_.begin())
     lower--;
-  for (const auto x : lower->second)
+  for (const DataType& x : lower->second)
     ret.emplace(x->ToString());
   return ret;
 }
@@ -36,9 +36,7 @@ void RangeTree::Insert(Inode inode, RangeTree::DataType value) {
   }
 
   if (map_.empty() || !lower->second.Add(value)) {
-    SmallSet<PrefixFinder::Node*, kSetSize> n;
-    n.Add(value);
-    map_.emplace(inode, std::move(n));
+    map_[inode].Add(value);
   }
 }
 

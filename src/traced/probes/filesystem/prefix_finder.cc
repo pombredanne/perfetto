@@ -63,13 +63,14 @@ void PrefixFinder::Flush(size_t i) {
 
 void PrefixFinder::Finalize() {
   Flush(1);
+  state_.resize(1);
 #if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!finalized_);
   finalized_ = true;
 #endif
 }
+
 void PrefixFinder::AddPath(std::string path) {
-  auto puth = path;
   perfetto::base::StringSplitter s(std::move(path), '/');
   // An artificial element for the root directory.
   // This simplifies the logic below because we can always assume
