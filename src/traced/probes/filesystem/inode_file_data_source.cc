@@ -23,6 +23,7 @@
 #include <queue>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
@@ -30,9 +31,13 @@
 
 namespace perfetto {
 
+namespace {
+using ScopedDir = base::ScopedResource<DIR*, closedir, nullptr>;
+}
+
 void ScanFilesDFS(
     const std::string& root_directory,
-    const std::function<void(BlockDeviceID block_device_id,
+    const std::function<bool(BlockDeviceID block_device_id,
                              Inode inode_number,
                              const std::string& path,
                              protos::pbzero::InodeFileMap_Entry_Type type)>&
@@ -42,11 +47,11 @@ void ScanFilesDFS(
     struct dirent* entry;
     std::string directory = queue.back();
     queue.pop_back();
-    DIR* dir = opendir(directory.c_str());
+    ScopedDir dir(opendir(directory.c_str()));
     directory += "/";
-    if (dir == nullptr)
+    if (dir.get() == nullptr)
       continue;
-    while ((entry = readdir(dir)) != nullptr) {
+    while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
@@ -75,25 +80,27 @@ void ScanFilesDFS(
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
 
-      fn(block_device_id, inode_number, filepath, type);
+      if (!fn(block_device_id, inode_number, filepath, type)) {
+        return;
+      }
     }
-    closedir(dir);
   }
 }
 
 void CreateDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* block_device_map) {
-  ScanFilesDFS(
-      root_directory,
-      [&block_device_map](BlockDeviceID block_device_id, Inode inode_number,
-                          const std::string& path,
-                          protos::pbzero::InodeFileMap_Entry_Type type) {
-        std::map<Inode, InodeMapValue>& inode_map =
-            (*block_device_map)[block_device_id];
-        inode_map[inode_number].SetType(type);
-        inode_map[inode_number].AddPath(path);
-      });
+  ScanFilesDFS(root_directory,
+               [&block_device_map](
+                   BlockDeviceID block_device_id, Inode inode_number,
+                   const std::string& path,
+                   protos::pbzero::InodeFileMap_Entry_Type type) -> bool {
+                 std::map<Inode, InodeMapValue>& inode_map =
+                     (*block_device_map)[block_device_id];
+                 inode_map[inode_number].SetType(type);
+                 inode_map[inode_number].AddPath(path);
+                 return true;
+               });
 }
 
 InodeFileDataSource::InodeFileDataSource(
