@@ -50,7 +50,7 @@ source_set("unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace/ftrace:lite",
-    "../base:test_support",
+    "../../src/base:test_support",
   ]
   sources = [
     "cpu_reader_unittest.cc",
