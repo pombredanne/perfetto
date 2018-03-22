@@ -152,7 +152,7 @@ script:
       for TEST_TARGET in $TEST_TARGETS; do
         tools/run_android_test out/dist "$TEST_TARGET"
       done
-      tools/run_android_test out/dist perfetto_benchmarks --benchmark_filter="(\$(/data/local/tmp/perfetto_benchmarks  --benchmark_list_tests | sed \"/BM_EndToEnd\/.....*\//d\" | xargs | tr \" \" \"|\"))"
+      tools/run_android_test out/dist "perfetto_benchmarks" --benchmark_filter=\"(\$(./perfetto_benchmarks  --benchmark_list_tests | sed \"/BM_EndToEnd\/.....*\//d\" | xargs | tr \" \" \"|\"))\"
     fi
 
 after_script:

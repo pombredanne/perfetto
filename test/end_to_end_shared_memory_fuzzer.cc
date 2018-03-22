@@ -128,11 +128,9 @@ int FuzzSharedMemory(const uint8_t* data, size_t size);
 int FuzzSharedMemory(const uint8_t* data, size_t size) {
   base::TestTaskRunner task_runner;
 
-#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
   TaskRunnerThread service_thread("perfetto.svc");
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
       new ServiceDelegate(kProducerSocket, kConsumerSocket)));
-#endif
 
   auto on_produced_and_committed =
       task_runner.CreateCheckpoint("produced.and.committed");
