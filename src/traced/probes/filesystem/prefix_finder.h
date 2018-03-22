@@ -48,6 +48,7 @@ class PrefixFinder {
   class Node {
    public:
     friend class PrefixFinder;
+    Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
 
     Node(const Node& that) = delete;
     Node& operator=(const Node&) = delete;
@@ -59,18 +60,24 @@ class PrefixFinder {
    private:
     class CompareNames {
      public:
-      bool operator()(const std::unique_ptr<Node>& one,
-                      const std::unique_ptr<Node>& other) const {
-        return one->name_ < other->name_;
+      bool operator()(const Node& one, const Node& other) const {
+        return one.name_ < other.name_;
       }
     };
-    Node(std::string name, Node* parent) : name_(name), parent_(parent) {}
 
-    void AddChild(std::unique_ptr<Node>);
+    // Add a new child to this node.
+    // DO NOT CHANGE ANYTHING REFERENCED IN CompareNames ABOVE IN THE
+    // VALUE RETURNED.
+    Node* AddChild(std::string name);
+
+    // Get existing child for this node. Return nullptr if it
+    // does not exist.
+    // DO NOT CHANGE ANYTHING REFERENCED IN CompareNames ABOVE IN THE
+    // VALUE RETURNED.
     Node* MaybeChild(const std::string& name);
 
     std::string name_;
-    std::set<std::unique_ptr<Node>, CompareNames> children_;
+    std::set<Node, CompareNames> children_;
     Node* parent_;
   };
 

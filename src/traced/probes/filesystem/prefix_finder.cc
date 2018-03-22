@@ -26,8 +26,10 @@ std::string PrefixFinder::Node::ToString() {
   return name_;
 }
 
-void PrefixFinder::Node::AddChild(std::unique_ptr<Node> node) {
-  children_.emplace(std::move(node));
+PrefixFinder::Node* PrefixFinder::Node::AddChild(std::string name) {
+  auto p = children_.emplace(std::move(name), this);
+  PERFETTO_DCHECK(p.second);
+  return const_cast<Node*>(&(*p.first));
 }
 
 PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
@@ -39,13 +41,12 @@ PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
   // lookup.
   //
   // Prevent exit time destructor from being run by using *new.
-  static std::unique_ptr<Node>& search_node =
-      *new std::unique_ptr<Node>(new Node("", nullptr));
-  search_node->name_ = name;
+  static Node& search_node = *new Node("", nullptr);
+  search_node.name_ = name;
   auto it = children_.find(search_node);
   if (it == children_.end())
     return nullptr;
-  return it->get();
+  return const_cast<Node*>(&(*it));
 }
 
 PrefixFinder::PrefixFinder(size_t limit) : limit_(limit) {}
@@ -56,8 +57,7 @@ void PrefixFinder::InsertPrefix(size_t len) {
        it != state_.cbegin() + static_cast<ssize_t>(len + 1); it++) {
     Node* next = cur->MaybeChild(it->first);
     if (!next) {
-      next = new Node(it->first, cur);
-      cur->AddChild(std::unique_ptr<Node>(next));
+      next = cur->AddChild(it->first);
     }
     cur = next;
   }
