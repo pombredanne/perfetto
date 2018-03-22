@@ -60,23 +60,21 @@ class PrefixFinder {
    private:
     class CompareNames {
      public:
+      // ONLY USE CONST MEMBERS IN THIS AS WE ARE USING MUTABLE POINTERS
+      // TO SET ELEMENTS.
       bool operator()(const Node& one, const Node& other) const {
         return one.name_ < other.name_;
       }
     };
 
     // Add a new child to this node.
-    // DO NOT CHANGE ANYTHING REFERENCED IN CompareNames ABOVE IN THE
-    // VALUE RETURNED.
     Node* AddChild(std::string name);
 
     // Get existing child for this node. Return nullptr if it
     // does not exist.
-    // DO NOT CHANGE ANYTHING REFERENCED IN CompareNames ABOVE IN THE
-    // VALUE RETURNED.
     Node* MaybeChild(const std::string& name);
 
-    std::string name_;
+    const std::string name_;
     std::set<Node, CompareNames> children_;
     Node* parent_;
   };

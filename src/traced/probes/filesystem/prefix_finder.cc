@@ -41,8 +41,7 @@ PrefixFinder::Node* PrefixFinder::Node::MaybeChild(const std::string& name) {
   // lookup.
   //
   // Prevent exit time destructor from being run by using *new.
-  static Node& search_node = *new Node("", nullptr);
-  search_node.name_ = name;
+  Node search_node(name, nullptr);
   auto it = children_.find(search_node);
   if (it == children_.end())
     return nullptr;
