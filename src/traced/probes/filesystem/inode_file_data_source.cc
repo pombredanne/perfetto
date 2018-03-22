@@ -81,26 +81,24 @@ void ScanFilesDFS(
   }
 }
 
-void CreateSystemDeviceToInodeMap(
+void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-        system_block_device_map) {
-  ScanFilesDFS(
-      root_directory,
-      [&system_block_device_map](BlockDeviceID block_device_id,
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map) {
+  ScanFilesDFS(root_directory,
+               [static_file_map](BlockDeviceID block_device_id,
                                  Inode inode_number, const std::string& path,
                                  protos::pbzero::InodeFileMap_Entry_Type type) {
-        std::map<Inode, InodeMapValue>& inode_map =
-            (*system_block_device_map)[block_device_id];
-        inode_map[inode_number].SetType(type);
-        inode_map[inode_number].AddPath(path);
-      });
+                 std::map<Inode, InodeMapValue>& inode_map =
+                     (*static_file_map)[block_device_id];
+                 inode_map[inode_number].SetType(type);
+                 inode_map[inode_number].AddPath(path);
+               });
 }
 
-void FillInodeEntry(InodeFileMap* inode_file_map,
+void FillInodeEntry(InodeFileMap* destination,
                     Inode inode_number,
                     const InodeMapValue& inode_map_value) {
-  auto* entry = inode_file_map->add_entries();
+  auto* entry = destination->add_entries();
   entry->set_inode_number(inode_number);
   entry->set_type(inode_map_value.type());
   for (const auto& path : inode_map_value.paths())
@@ -109,29 +107,26 @@ void FillInodeEntry(InodeFileMap* inode_file_map,
 
 InodeFileDataSource::InodeFileDataSource(
     TracingSessionID id,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-        system_partition_files,
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map,
     LRUInodeCache* cache,
     std::unique_ptr<TraceWriter> writer)
     : session_id_(id),
-      system_partition_files_(system_partition_files),
+      static_file_map_(static_file_map),
       cache_(cache),
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
-// Currently only enabled if we've seen over 1 unresolved inode
-void InodeFileDataSource::AddInodesFromDataPartition(
+void InodeFileDataSource::AddInodesFromFilesystemScan(
     const std::string& root_directory,
     BlockDeviceID provided_block_device_id,
     std::set<Inode>* inode_numbers,
     LRUInodeCache* cache,
-    InodeFileMap* inode_file_map) {
-  // If there's not many inodes to resolve, do not scan full file system
-  if (inode_numbers->empty() || inode_numbers->size() < 1)
+    InodeFileMap* destination) {
+  if (inode_numbers->empty())
     return;
   ScanFilesDFS(
       root_directory,
-      [provided_block_device_id, &inode_numbers, cache, inode_file_map](
+      [provided_block_device_id, inode_numbers, cache, destination](
           BlockDeviceID block_device_id, Inode inode_number,
           const std::string& path,
           protos::pbzero::InodeFileMap_Entry_Type type) {
@@ -147,45 +142,46 @@ void InodeFileDataSource::AddInodesFromDataPartition(
         paths.emplace(path);
         InodeMapValue value(type, paths);
         cache->Insert(key, value);
-        FillInodeEntry(inode_file_map, inode_number, value);
+        FillInodeEntry(destination, inode_number, value);
         inode_numbers->erase(inode_number);
       });
 
   // Could not be found, just add the inode number
   PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
   for (const auto& unresolved_inode : *inode_numbers) {
-    auto* entry = inode_file_map->add_entries();
+    auto* entry = destination->add_entries();
     entry->set_inode_number(unresolved_inode);
   }
 }
 
-void InodeFileDataSource::AddInodesFromSystem(BlockDeviceID block_device_id,
-                                              std::set<Inode>* inode_numbers,
-                                              InodeFileMap* inode_file_map) {
-  // Check if block device id exists in /system map
-  auto system_entry = system_partition_files_->find(block_device_id);
-  if (system_entry == system_partition_files_->end())
+void InodeFileDataSource::AddInodesFromStaticMap(BlockDeviceID block_device_id,
+                                                 std::set<Inode>* inode_numbers,
+                                                 InodeFileMap* destination) {
+  // Check if block device id exists in static file map
+  auto static_map_entry = static_file_map_->find(block_device_id);
+  if (static_map_entry == static_file_map_->end())
     return;
 
   uint64_t system_found_count = 0;
   for (auto it = inode_numbers->begin(); it != inode_numbers->end();) {
     Inode inode_number = *it;
-    // Check if inode number exists in /system map for given block device id
-    auto inode_map = system_entry->second.find(inode_number);
-    if (inode_map == system_entry->second.end()) {
+    // Check if inode number exists in static file map for given block device id
+    auto inode_it = static_map_entry->second.find(inode_number);
+    if (inode_it == static_map_entry->second.end()) {
       ++it;
       continue;
     }
     system_found_count++;
     it = inode_numbers->erase(it);
-    FillInodeEntry(inode_file_map, inode_number, inode_map->second);
+    FillInodeEntry(destination, inode_number, inode_it->second);
   }
-  PERFETTO_DLOG("%" PRIu64 "inodes found in /system", system_found_count);
+  PERFETTO_DLOG("%" PRIu64 "inodes found in static file map",
+                system_found_count);
 }
 
 void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
                                                 std::set<Inode>* inode_numbers,
-                                                InodeFileMap* inode_file_map) {
+                                                InodeFileMap* destination) {
   uint64_t cache_found_count = 0;
   for (auto it = inode_numbers->begin(); it != inode_numbers->end();) {
     Inode inode_number = *it;
@@ -196,7 +192,7 @@ void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
     }
     cache_found_count++;
     it = inode_numbers->erase(it);
-    FillInodeEntry(inode_file_map, inode_number, *value);
+    FillInodeEntry(destination, inode_number, *value);
   }
   PERFETTO_DLOG("%" PRIu64 "inodes found in cache", cache_found_count);
 }
@@ -236,12 +232,12 @@ void InodeFileDataSource::OnInodes(
 
     // Add entries to InodeFileMap as inodes are found and resolved to their
     // paths/type
-    AddInodesFromSystem(block_device_id, &inode_numbers, inode_file_map);
+    AddInodesFromStaticMap(block_device_id, &inode_numbers, inode_file_map);
     AddInodesFromLRUCache(block_device_id, &inode_numbers, inode_file_map);
     // TODO(azappone): Make root directory a mount point
     std::string root_directory = "/data";
-    AddInodesFromDataPartition(root_directory, block_device_id, &inode_numbers,
-                               cache_, inode_file_map);
+    AddInodesFromFilesystemScan(root_directory, block_device_id, &inode_numbers,
+                                cache_, inode_file_map);
     trace_packet->Finalize();
   }
 }

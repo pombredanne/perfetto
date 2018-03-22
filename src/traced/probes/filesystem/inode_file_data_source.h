@@ -46,22 +46,21 @@ void ScanFilesDFS(
                              protos::pbzero::InodeFileMap_Entry_Type type)>&);
 
 // Creates block_device_map for /system partition
-void CreateSystemDeviceToInodeMap(
+void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-        system_block_device_map);
+    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map);
 
-void FillInodeEntry(InodeFileMap* inode_file_map,
+void FillInodeEntry(InodeFileMap* destination,
                     Inode inode_number,
                     const InodeMapValue& inode_map_value);
 
 class InodeFileDataSource {
  public:
-  InodeFileDataSource(TracingSessionID,
-                      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-                          system_partition_files,
-                      LRUInodeCache* cache,
-                      std::unique_ptr<TraceWriter> writer);
+  InodeFileDataSource(
+      TracingSessionID,
+      std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map,
+      LRUInodeCache* cache,
+      std::unique_ptr<TraceWriter> writer);
 
   TracingSessionID session_id() const { return session_id_; }
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
@@ -69,28 +68,28 @@ class InodeFileDataSource {
   // Called when Inodes are seen in the FtraceEventBundle
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
-  // Full filesystem scan to search in /data partition and add inodes to
-  // InodeFileMap proto if found. Fills in cache with resolved inodes.
-  void AddInodesFromDataPartition(const std::string& root_directory,
-                                  BlockDeviceID block_device_id,
-                                  std::set<Inode>* inode_numbers,
-                                  LRUInodeCache* cache,
-                                  InodeFileMap* inode_file_map);
+  // Filesystem scan starting from root directory to search for provided inode
+  // numbers. Adds all inode numbers to the InodeFileMap proto. Fills in cache
+  // for all inode numbers that get resolved from the scan.
+  void AddInodesFromFilesystemScan(const std::string& root_directory,
+                                   BlockDeviceID block_device_id,
+                                   std::set<Inode>* inode_numbers,
+                                   LRUInodeCache* cache,
+                                   InodeFileMap* destination);
 
   // Search in /system partition and add inodes to InodeFileMap proto if found
-  void AddInodesFromSystem(BlockDeviceID block_device_id,
-                           std::set<Inode>* inode_numbers,
-                           InodeFileMap* inode_file_map);
+  void AddInodesFromStaticMap(BlockDeviceID block_device_id,
+                              std::set<Inode>* inode_numbers,
+                              InodeFileMap* destination);
 
   // Search in LRUInodeCache and add inodes to InodeFileMap if found
   void AddInodesFromLRUCache(BlockDeviceID block_device_id,
                              std::set<Inode>* inode_numbers,
-                             InodeFileMap* inode_file_map);
+                             InodeFileMap* destination);
 
  private:
   const TracingSessionID session_id_;
-  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
-      system_partition_files_;
+  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map_;
   LRUInodeCache* cache_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;

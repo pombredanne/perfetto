@@ -41,45 +41,43 @@ const std::pair<BlockDeviceID, Inode> key1{0, 0};
 const std::pair<BlockDeviceID, Inode> key2{0, 1};
 const std::pair<BlockDeviceID, Inode> key3{0, 2};
 
-TEST(LRUInodeCacheTest, Basic) {
-  InodeMapValue val1 =
-      InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY,
-                    std::set<std::string>{"Value 1"});
-  InodeMapValue val2 =
-      InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN,
-                    std::set<std::string>{"Value 2"});
+InodeMapValue val1() {
+  return InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY,
+                       std::set<std::string>{"Value 1"});
+}
 
+InodeMapValue val2() {
+  return InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN,
+                       std::set<std::string>{"Value 2"});
+}
+
+InodeMapValue val3() {
+  return InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN,
+                       std::set<std::string>{"Value 2"});
+}
+
+TEST(LRUInodeCacheTest, Basic) {
   LRUInodeCache cache(2);
-  cache.Insert(key1, val1);
-  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
-  cache.Insert(key2, val2);
-  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
-  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
-  cache.Insert(key1, val2);
-  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val2)));
+  cache.Insert(key1, val1());
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1())));
+  cache.Insert(key2, val2());
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1())));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2())));
+  cache.Insert(key1, val2());
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val2())));
 }
 
 TEST(LRUInodeCacheTest, Overflow) {
-  InodeMapValue val1 =
-      InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY,
-                    std::set<std::string>{"Value 1"});
-  InodeMapValue val2 =
-      InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN,
-                    std::set<std::string>{"Value 2"});
-  InodeMapValue val3 =
-      InodeMapValue(protos::pbzero::InodeFileMap_Entry_Type_FILE,
-                    std::set<std::string>{"Value 3"});
-
   LRUInodeCache cache(2);
-  cache.Insert(key1, val1);
-  cache.Insert(key2, val2);
-  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1)));
-  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
-  cache.Insert(key3, val3);
+  cache.Insert(key1, val1());
+  cache.Insert(key2, val2());
+  EXPECT_THAT(cache.Get(key1), Pointee(Eq(val1())));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2())));
+  cache.Insert(key3, val3());
   // key1 is the LRU and should be evicted.
   EXPECT_THAT(cache.Get(key1), IsNull());
-  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2)));
-  EXPECT_THAT(cache.Get(key3), Pointee(Eq(val3)));
+  EXPECT_THAT(cache.Get(key2), Pointee(Eq(val2())));
+  EXPECT_THAT(cache.Get(key3), Pointee(Eq(val3())));
 }
 
 }  // namespace
