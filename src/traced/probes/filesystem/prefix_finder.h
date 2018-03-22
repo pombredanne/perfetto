@@ -91,6 +91,8 @@ class PrefixFinder {
   void Finalize();
 
  private:
+  // We're about to remove the suffix of state from i onwards,
+  // if necessary add a prefix for anything in that suffix.
   void Flush(size_t i);
   void InsertPrefix(size_t len);
   const size_t limit_;

@@ -57,7 +57,7 @@ class RangeTree {
   void Insert(Inode inode, DataType value);
 
  private:
-  std::map<Inode, SmallSet<PrefixFinder::Node*, kSetSize>> map_;
+  std::map<Inode, SmallSet<DataType, kSetSize>> map_;
 };
 
 }  // namespace perfetto
