@@ -369,11 +369,14 @@ FtraceMetadata::FtraceMetadata() {
 }
 
 void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
+  // TODO(b/76199183): Renable.
+  // PERFETTO_DCHECK(device_id != 0);
   last_seen_device_id = device_id;
 }
 
 void FtraceMetadata::AddInode(Inode inode_number) {
-  PERFETTO_DCHECK(last_seen_device_id != 0);
+  // TODO(b/76199183): Renable.
+  // PERFETTO_DCHECK(last_seen_device_id != 0);
   static int32_t cached_pid = 0;
   if (!cached_pid)
     cached_pid = getpid();
@@ -385,9 +388,10 @@ void FtraceMetadata::AddInode(Inode inode_number) {
     inode_and_device.push_back(
         std::make_pair(inode_number, last_seen_device_id));
   }
-#if PERFETTO_DCHECK_IS_ON()
-  last_seen_device_id = 0;
-#endif
+  // TODO(b/76199183): Renable.
+  // #if PERFETTO_DCHECK_IS_ON()
+  //   last_seen_device_id = 0;
+  // #endif
 }
 
 void FtraceMetadata::AddCommonPid(int32_t pid) {
