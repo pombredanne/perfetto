@@ -214,7 +214,6 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // though, because this assumes that each tracing session creates at most one
   // data source instance in each Producer, and each data source has only one
   // TraceWriter.
-  // TODO(taylori): Handle multiple producers/producer_configs.
   // auto first_producer_config = cfg.producers()[0];
   // if (tracing_sessions_.size() >=
   //     (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
