@@ -150,7 +150,7 @@ static void BenchmarkCommon(benchmark::State& state) {
   state.counters["Pro CPU"] = benchmark::Counter(100.0 * producer_ns / wall_ns);
   state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
   state.counters["Ser ns/m"] =
-      benchmark::Counter(1.0 * service_start_ns / message_count);
+      benchmark::Counter(1.0 * service_ns / message_count);
 
   // Read back the buffer just to check correctness.
   consumer.ReadTraceData();
