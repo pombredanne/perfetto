@@ -400,13 +400,17 @@ void FtraceMetadata::AddPid(int32_t pid) {
   pids.push_back(pid);
 }
 
+void FtraceMetadata::FinishEvent() {
+  last_seen_device_id = 0;
+  seen_device_id = false;
+  last_seen_common_pid = 0;
+}
+
 void FtraceMetadata::Clear() {
   inode_and_device.clear();
   pids.clear();
   overwrite_count = 0;
-  last_seen_device_id = 0;
-  seen_device_id = false;
-  last_seen_common_pid = 0;
+  FinishEvent();
 }
 
 }  // namespace perfetto

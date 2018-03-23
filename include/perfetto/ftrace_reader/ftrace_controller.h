@@ -59,6 +59,7 @@ struct FtraceMetadata {
   void AddPid(int32_t);
   void AddCommonPid(int32_t);
   void Clear();
+  void FinishEvent();
 };
 
 namespace protos {
