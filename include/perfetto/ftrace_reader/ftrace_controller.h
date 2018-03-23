@@ -47,6 +47,7 @@ struct FtraceMetadata {
 
   size_t overwrite_count;
   BlockDeviceID last_seen_device_id;
+  int32_t last_seen_common_pid;
 
   // A vector not a set to keep the writer_fast.
   std::vector<std::pair<Inode, BlockDeviceID>> inode_and_device;
@@ -55,6 +56,7 @@ struct FtraceMetadata {
   void AddDevice(BlockDeviceID);
   void AddInode(Inode);
   void AddPid(int32_t);
+  void AddCommonPid(int32_t);
   void Clear();
 };
 
@@ -64,8 +66,8 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
-const size_t kMaxSinks = 32;
-const size_t kMaxCpus = 64;
+constexpr size_t kMaxSinks = 32;
+constexpr size_t kMaxCpus = 64;
 
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
