@@ -15,10 +15,19 @@
 declare_args() {
   is_debug = true
   is_clang = true
+
+  # Only to be used for quick debugging to allow commenting out code etc.
+  disable_warnings = false
 }
 
 declare_args() {
   ar = "ar"
+
+  # Useful for prod builds that have symbols so stacktraces can be
+  # investiated.
+  # Especially useful for fuzzing, where we *do not* want to hit DCHECK
+  # but still be able to investigate crashes.
+  is_debug_symbols = !is_debug
 }
 
 # Platform detection
@@ -55,8 +64,15 @@ default_configs = [
   "//gn/standalone/sanitizers:sanitizers_cflags",
 ]
 
-if (!is_debug) {
+if (!is_debug_symbols) {
   default_configs -= [ "//gn/standalone:debug_symbols" ]
+}
+
+if (disable_warnings) {
+  default_configs -= [ "//gn/standalone:extra_warnings" ]
+}
+
+if (!is_debug) {
   default_configs += [ "//gn/standalone:release" ]
 }
 
