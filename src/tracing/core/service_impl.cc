@@ -21,6 +21,7 @@
 
 #include <algorithm>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
@@ -103,12 +104,11 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
   const ProducerID id = GetNextProducerID();
   PERFETTO_DLOG("Producer %" PRIu16 " connected", id);
 
-  std::unique_ptr<ProducerEndpointImpl> endpoint(
-      new ProducerEndpointImpl(id, uid, this, task_runner_, producer));
+  std::unique_ptr<ProducerEndpointImpl> endpoint(new ProducerEndpointImpl(
+      id, uid, this, task_runner_, producer, producer_name));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
   shared_memory_size_hint_bytes_ = shared_memory_size_hint_bytes;
-  endpoint->name_ = producer_name;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
   return std::move(endpoint);
@@ -548,9 +548,9 @@ void ServiceImpl::CreateDataSourceInstance(
         (desired_page_size == 0) ? base::kPageSize / 1024  // default
                                  : desired_page_size;
 
-    size_t desired_shm_size =
+    size_t desired_shm_size_kb =
         producer->GetDesiredShmSizeKb(tracing_session->config);
-    size_t shm_size = std::min(desired_shm_size * 1024, kMaxShmSize);
+    size_t shm_size = std::min(desired_shm_size_kb * 1024, kMaxShmSize);
 
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
@@ -707,24 +707,26 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
-      {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
-      {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
-      {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
-      {CLOCK_MONOTONIC_RAW,
-       protos::ClockSnapshot::Clock::MONOTONIC_RAW,
-       {0, 0}},
-      {CLOCK_PROCESS_CPUTIME_ID,
-       protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
-       {0, 0}},
-      {CLOCK_THREAD_CPUTIME_ID,
-       protos::ClockSnapshot::Clock::THREAD_CPUTIME,
-       {0, 0}},
-      {CLOCK_REALTIME_COARSE,
-       protos::ClockSnapshot::Clock::REALTIME_COARSE,
-       {0, 0}},
-      {CLOCK_MONOTONIC_COARSE,
-       protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
-       {0, 0}},
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+#else
+    {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+    {CLOCK_REALTIME_COARSE,
+     protos::ClockSnapshot::Clock::REALTIME_COARSE,
+     {0, 0}},
+    {CLOCK_MONOTONIC_COARSE,
+     protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+     {0, 0}},
+#endif
+    {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+    {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+    {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW, {0, 0}},
+    {CLOCK_PROCESS_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+     {0, 0}},
+    {CLOCK_THREAD_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+     {0, 0}},
   };
   protos::TracePacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
@@ -806,12 +808,14 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
     uid_t uid,
     ServiceImpl* service,
     base::TaskRunner* task_runner,
-    Producer* producer)
+    Producer* producer,
+    const std::string& producer_name)
     : id_(id),
       uid_(uid),
       service_(service),
       task_runner_(task_runner),
-      producer_(producer) {
+      producer_(producer),
+      name_(producer_name) {
   // TODO(primiano): make the page-size for the SHM dynamic and find a way to
   // communicate that to the Producer (add a field to the
   // InitializeConnectionResponse IPC).

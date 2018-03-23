@@ -58,7 +58,8 @@ class ServiceImpl : public Service {
                          uid_t uid,
                          ServiceImpl*,
                          base::TaskRunner*,
-                         Producer*);
+                         Producer*,
+                         const std::string& producer_name = std::string());
     ~ProducerEndpointImpl() override;
 
     // Service::ProducerEndpoint implementation.
