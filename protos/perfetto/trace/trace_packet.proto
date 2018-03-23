@@ -30,7 +30,7 @@ package perfetto.protos;
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 8.
+// Next id: 7.
 message TracePacket {
   oneof data {
     FtraceEventBundle ftrace_events = 1;
@@ -38,7 +38,10 @@ message TracePacket {
     InodeFileMap inode_file_map = 4;
     ChromeEventBundle chrome_events = 5;
     ClockSnapshot clock_snapshot = 6;
-    TraceConfig trace_config = 7;
+
+    // IDs up to 32 are reserved for events that are quite frequent because they
+    // take only one byte to encode their preamble.
+    TraceConfig trace_config = 33;
 
     // This field is only used for testing.
     TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.
