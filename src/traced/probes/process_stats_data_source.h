@@ -18,6 +18,7 @@
 #define SRC_TRACED_PROBES_PROCESS_STATS_DATA_SOURCE_H_
 
 #include <memory>
+#include <set>
 #include <vector>
 
 #include "perfetto/base/weak_ptr.h"
@@ -37,11 +38,14 @@ class ProcessStatsDataSource {
   void OnPids(const std::vector<int32_t>& pids);
 
  private:
+  static void WriteProcess(int32_t pid, TraceWriter* writer);
+
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
 
   const TracingSessionID session_id_;
   std::unique_ptr<TraceWriter> writer_;
+  std::set<int32_t> seen_pids_;
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.
 };
 
