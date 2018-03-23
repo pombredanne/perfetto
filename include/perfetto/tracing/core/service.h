@@ -141,7 +141,7 @@ class Service {
   virtual std::unique_ptr<ProducerEndpoint> ConnectProducer(
       Producer*,
       uid_t uid,
-      const std::string& name = std::string(),
+      const std::string& name,
       size_t shared_memory_size_hint_bytes = 0) = 0;
 
   // Coonects a Consumer instance and obtains a ConsumerEndpoint, which is
