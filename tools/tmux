@@ -27,7 +27,11 @@ function is_android {
 }
 
 function reset_tracing {
-  adb shell 'echo 0 > /d/tracing/tracing_on'
+  if is_android $OUT; then
+    adb shell 'echo 0 > /d/tracing/tracing_on'
+  else
+    sudo bash -c 'echo 0 > /sys/kernel/debug/tracing/tracing_on'
+  fi
 }
 
 function adb_supports_push_sync {
@@ -160,7 +164,9 @@ tmux select-pane -t 2
 
 tmux -2 attach-session -t demo
 
-TRACE=$HOME/Downloads/trace.json
-echo -e "\n\x1b[32mPulling trace into $TRACE\x1b[0m"
+TRACE=$HOME/Downloads/trace
 pull trace /tmp/trace.protobuf
-$OUT/trace_to_text systrace < /tmp/trace.protobuf > $TRACE
+echo -e "\n\x1b[32mPulling trace into $TRACE.pbtext\x1b[0m"
+$OUT/trace_to_text text < /tmp/trace.protobuf > $TRACE.pbtext
+echo -e "\n\x1b[32mPulling trace into $TRACE.json\x1b[0m"
+$OUT/trace_to_text systrace < /tmp/trace.protobuf > $TRACE.json
