@@ -21,7 +21,6 @@
 
 #include <algorithm>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
@@ -703,26 +702,24 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
-#else
-    {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
-    {CLOCK_REALTIME_COARSE,
-     protos::ClockSnapshot::Clock::REALTIME_COARSE,
-     {0, 0}},
-    {CLOCK_MONOTONIC_COARSE,
-     protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
-     {0, 0}},
-#endif
-    {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
-    {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
-    {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW, {0, 0}},
-    {CLOCK_PROCESS_CPUTIME_ID,
-     protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
-     {0, 0}},
-    {CLOCK_THREAD_CPUTIME_ID,
-     protos::ClockSnapshot::Clock::THREAD_CPUTIME,
-     {0, 0}},
+      {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+      {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+      {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+      {CLOCK_MONOTONIC_RAW,
+       protos::ClockSnapshot::Clock::MONOTONIC_RAW,
+       {0, 0}},
+      {CLOCK_PROCESS_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+       {0, 0}},
+      {CLOCK_THREAD_CPUTIME_ID,
+       protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+       {0, 0}},
+      {CLOCK_REALTIME_COARSE,
+       protos::ClockSnapshot::Clock::REALTIME_COARSE,
+       {0, 0}},
+      {CLOCK_MONOTONIC_COARSE,
+       protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+       {0, 0}},
   };
   protos::TracePacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();

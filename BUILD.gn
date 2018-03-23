@@ -85,7 +85,6 @@ if (!build_with_chromium && (is_linux || is_android)) {
       "src/ftrace_reader:ftrace_reader_benchmarks",
       "src/tracing:tracing_benchmarks",
       "test:benchmark_main",
-      "test:end_to_end_benchmarks",
     ]
   }
 
@@ -172,7 +171,9 @@ if (!build_with_chromium && (is_linux || is_android)) {
       "protos/perfetto/trace:lite",
     ]
   }
-} else {
+}
+
+if (build_with_chromium) {
   component("libperfetto") {
     public_configs = [ "gn:public_config" ]
     deps = [
@@ -184,4 +185,4 @@ if (!build_with_chromium && (is_linux || is_android)) {
       "include/perfetto/tracing/core",
     ]
   }
-}  # !build_with_chromium
+}

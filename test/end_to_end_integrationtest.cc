@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <gtest/gtest.h>
 #include <unistd.h>
 #include <chrono>
 #include <condition_variable>
@@ -21,8 +22,6 @@
 #include <random>
 #include <thread>
 
-#include "gtest/gtest.h"
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
@@ -67,18 +66,19 @@ class PerfettoTest : public ::testing::Test {
 
 // TODO(b/73453011): reenable this on more platforms (including standalone
 // Android).
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
 #define MAYBE_TestFtraceProducer TestFtraceProducer
 #else
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
 TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
   base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
   // Setip the TraceConfig for the consumer.
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(1024);
-  trace_config.set_duration_ms(3000);
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(10000);
 
   // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
@@ -92,9 +92,8 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  auto function = [&total, &on_readback_complete](
-                      std::vector<TracePacket> packets, bool has_more) {
+  auto function = [&total, &finish](std::vector<TracePacket> packets,
+                                    bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
       ASSERT_TRUE(packet->has_ftrace_events() || packet->has_clock_snapshot());
@@ -108,41 +107,47 @@ TEST_F(PerfettoTest, MAYBE_TestFtraceProducer) {
 
     if (!has_more) {
       ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
-      on_readback_complete();
+      finish();
     }
   };
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-  TaskRunnerThread service_thread("perfetto.svc");
+  TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
       new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
 
-  TaskRunnerThread producer_thread("perfetto.prd");
+  TaskRunnerThread producer_thread;
   producer_thread.Start(std::unique_ptr<ProbesProducerDelegate>(
       new ProbesProducerDelegate(TEST_PRODUCER_SOCK_NAME)));
 #endif
 
   // Finally, make the consumer connect to the service.
-  auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
-  FakeConsumer consumer(trace_config, std::move(on_connect),
-                        std::move(function), &task_runner);
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
 
-  task_runner.RunUntilCheckpoint("consumer.connected");
-  consumer.EnableTracing();
+  // TODO(skyostil): There's a race here before the service processes our data
+  // and the consumer tries to retrieve it. For now wait a bit until the service
+  // is done, but we should add explicit flushing to avoid this.
+  task_runner.PostDelayedTask([&consumer]() { consumer.ReadTraceData(); },
+                              13000);
 
-  // Traced probes should flush data as it produces it.
-  task_runner.PostDelayedTask([&consumer] { consumer.ReadTraceData(); }, 3000);
-
-  task_runner.RunUntilCheckpoint("readback.complete", 10000);
+  task_runner.RunUntilCheckpoint("no.more.packets", 20000);
 }
 
-TEST_F(PerfettoTest, TestFakeProducer) {
+// TODO(b/73453011): reenable this on more platforms (including standalone
+// Android).
+#if defined(PERFETTO_BUILD_WITH_ANDROID)
+#define MAYBE_TestFakeProducer TestFakeProducer
+#else
+#define MAYBE_TestFakeProducer DISABLED_TestFakeProducer
+#endif
+TEST_F(PerfettoTest, MAYBE_TestFakeProducer) {
   base::TestTaskRunner task_runner;
+  auto finish = task_runner.CreateCheckpoint("no.more.packets");
 
   // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(1024);
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
   trace_config.set_duration_ms(200);
 
   // Create the buffer for ftrace.
@@ -163,9 +168,8 @@ TEST_F(PerfettoTest, TestFakeProducer) {
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  auto function = [&total, &on_readback_complete, &random](
-                      std::vector<TracePacket> packets, bool has_more) {
+  auto function = [&total, &finish, &random](std::vector<TracePacket> packets,
+                                             bool has_more) {
 
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
@@ -181,51 +185,32 @@ TEST_F(PerfettoTest, TestFakeProducer) {
     if (!has_more) {
       // One extra packet for the clock snapshot.
       ASSERT_EQ(total, kEventCount + 1);
-      on_readback_complete();
+      finish();
     }
   };
 
 #if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-  TaskRunnerThread service_thread("perfetto.svc");
+  TaskRunnerThread service_thread;
   service_thread.Start(std::unique_ptr<ServiceDelegate>(
       new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
 #endif
 
-  auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
-  auto posted_on_producer_enabled = [&task_runner, &on_producer_enabled] {
-    task_runner.PostTask(on_producer_enabled);
-  };
-  TaskRunnerThread producer_thread("perfetto.prd");
-  std::unique_ptr<FakeProducerDelegate> producer_delegate(
-      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
-                               posted_on_producer_enabled));
-  FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
-  producer_thread.Start(std::move(producer_delegate));
+  auto data_produced = task_runner.CreateCheckpoint("data.produced");
+  TaskRunnerThread producer_thread;
+  producer_thread.Start(
+      std::unique_ptr<FakeProducerDelegate>(new FakeProducerDelegate(
+          TEST_PRODUCER_SOCK_NAME, [&task_runner, &data_produced] {
+            task_runner.PostTask(data_produced);
+          })));
 
   // Finally, make the consumer connect to the service.
-  auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
-  FakeConsumer consumer(trace_config, std::move(on_connect),
-                        std::move(function), &task_runner);
+  FakeConsumer consumer(trace_config, std::move(function), &task_runner);
   consumer.Connect(TEST_CONSUMER_SOCK_NAME);
-  task_runner.RunUntilCheckpoint("consumer.connected");
 
-  consumer.EnableTracing();
-  task_runner.RunUntilCheckpoint("producer.enabled");
-
-  auto on_produced_and_committed =
-      task_runner.CreateCheckpoint("produced.and.committed");
-  auto posted_on_produced_and_committed = [&task_runner,
-                                           &on_produced_and_committed] {
-    task_runner.PostTask(on_produced_and_committed);
-  };
-  FakeProducer* producer = producer_delegate_cached->producer();
-  producer->ProduceEventBatch(posted_on_produced_and_committed);
-  task_runner.RunUntilCheckpoint("produced.and.committed");
-
+  task_runner.RunUntilCheckpoint("data.produced");
   consumer.ReadTraceData();
-  task_runner.RunUntilCheckpoint("readback.complete");
 
-  consumer.Disconnect();
+  task_runner.RunUntilCheckpoint("no.more.packets");
 }
 
 }  // namespace perfetto
