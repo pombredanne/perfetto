@@ -138,12 +138,14 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
           return true;
         std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
         auto cur_val = cache->Get(key);
-        if (cur_val != nullptr)
+        if (cur_val != nullptr) {
           cur_val->AddPath(path);
-        else
-          cur_val = new InodeMapValue(type, {path});
-        cache->Insert(key, *cur_val);
-        FillInodeEntry(destination, inode_number, *cur_val);
+          FillInodeEntry(destination, inode_number, *cur_val);
+        } else {
+          InodeMapValue new_val(InodeMapValue(type, {path}));
+          cache->Insert(key, new_val);
+          FillInodeEntry(destination, inode_number, new_val);
+        }
         inode_numbers->erase(inode_number);
         if (inode_numbers->empty())
           return false;
