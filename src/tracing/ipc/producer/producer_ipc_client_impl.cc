@@ -40,16 +40,16 @@ namespace perfetto {
 std::unique_ptr<Service::ProducerEndpoint> ProducerIPCClient::Connect(
     const char* service_sock_name,
     Producer* producer,
-    base::TaskRunner* task_runner,
-    const std::string& producer_name) {
+    const std::string& producer_name,
+    base::TaskRunner* task_runner) {
   return std::unique_ptr<Service::ProducerEndpoint>(new ProducerIPCClientImpl(
-      service_sock_name, producer, task_runner, producer_name));
+      service_sock_name, producer, producer_name, task_runner));
 }
 
 ProducerIPCClientImpl::ProducerIPCClientImpl(const char* service_sock_name,
                                              Producer* producer,
-                                             base::TaskRunner* task_runner,
-                                             const std::string& producer_name)
+                                             const std::string& producer_name,
+                                             base::TaskRunner* task_runner)
     : producer_(producer),
       task_runner_(task_runner),
       ipc_channel_(ipc::Client::CreateInstance(service_sock_name, task_runner)),

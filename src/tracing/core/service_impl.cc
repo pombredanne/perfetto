@@ -282,7 +282,12 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
     for (auto it = range.first; it != range.second; it++)
-      CreateDataSourceInstance(cfg_data_source, it->second, &ts);
+      for (auto& producer_config : cfg.producers()) {
+        if (GetProducer(it->second.producer_id)->name_ ==
+            producer_config.producer_name())
+          CreateDataSourceInstance(cfg_data_source, producer_config, it->second,
+                                   &ts);
+      }
   }
 
   // Trigger delayed task if the trace is time limited.
@@ -460,11 +465,16 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
 
   for (auto& iter : tracing_sessions_) {
     TracingSession& tracing_session = iter.second;
+    TraceConfig::ProducerConfig producer_config;
+    for (auto& config : tracing_session.config.producers()) {
+      if (producer->name_ == config.producer_name())
+        producer_config = config;
+    }
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
       if (cfg_data_source.config().name() == desc.name())
-        CreateDataSourceInstance(cfg_data_source, reg_ds->second,
-                                 &tracing_session);
+        CreateDataSourceInstance(cfg_data_source, producer_config,
+                                 reg_ds->second, &tracing_session);
     }
   }
 }
@@ -503,6 +513,7 @@ void ServiceImpl::UnregisterDataSource(ProducerID producer_id,
 
 void ServiceImpl::CreateDataSourceInstance(
     const TraceConfig::DataSource& cfg_data_source,
+    const TraceConfig::ProducerConfig& producer_config,
     const RegisteredDataSource& data_source,
     TracingSession* tracing_session) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
@@ -544,16 +555,13 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    size_t desired_page_size_kb =
-        producer->GetDesiredPageSizeKb(tracing_session->config);
-    producer->shared_buffer_page_size_kb_ =
-        std::min((desired_page_size_kb == 0) ? kDefaultShmPageSizeKb
-                                             : desired_page_size_kb,
-                 kMaxShmPageSizeKb);
+    producer->shared_buffer_page_size_kb_ = std::min(
+        (producer_config.page_size_kb() == 0) ? kDefaultShmPageSizeKb
+                                              : producer_config.page_size_kb(),
+        kMaxShmPageSizeKb);
 
-    size_t desired_shm_size_kb =
-        producer->GetDesiredShmSizeKb(tracing_session->config);
-    size_t shm_size = std::min(desired_shm_size_kb * 1024, kMaxShmSize);
+    size_t shm_size =
+        std::min(producer_config.shm_size_kb() * 1024, kMaxShmSize);
 
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
@@ -911,24 +919,6 @@ void ServiceImpl::ProducerEndpointImpl::SetSharedMemory(
   shmem_abi_.Initialize(reinterpret_cast<uint8_t*>(shared_memory_->start()),
                         shared_memory_->size(),
                         shared_buffer_page_size_kb() * 1024);
-}
-
-size_t ServiceImpl::ProducerEndpointImpl::GetDesiredShmSizeKb(
-    const TraceConfig& config) {
-  for (auto& producer_config : config.producers()) {
-    if (name_ == producer_config.producer_name())
-      return producer_config.shm_size_kb();
-  }
-  return 0;
-}
-
-size_t ServiceImpl::ProducerEndpointImpl::GetDesiredPageSizeKb(
-    const TraceConfig& config) {
-  for (auto& producer_config : config.producers()) {
-    if (name_ == producer_config.producer_name())
-      return producer_config.page_size_kb();
-  }
-  return 0;
 }
 
 SharedMemory* ServiceImpl::ProducerEndpointImpl::shared_memory() const {

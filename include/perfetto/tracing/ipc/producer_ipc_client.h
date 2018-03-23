@@ -44,8 +44,8 @@ class ProducerIPCClient {
   static std::unique_ptr<Service::ProducerEndpoint> Connect(
       const char* service_sock_name,
       Producer*,
-      base::TaskRunner*,
-      const std::string& producer_name = std::string());
+      const std::string& producer_name,
+      base::TaskRunner*);
 
  protected:
   ProducerIPCClient() = delete;

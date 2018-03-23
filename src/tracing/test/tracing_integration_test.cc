@@ -102,6 +102,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   MockProducer producer;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
       ProducerIPCClient::Connect(kProducerSockName, &producer,
+                                 "com.google.perfetto.mock_producer",
                                  task_runner_.get());
   auto on_producer_connect =
       task_runner_->CreateCheckpoint("on_producer_connect");

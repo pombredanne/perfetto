@@ -59,7 +59,7 @@ class ServiceImpl : public Service {
                          ServiceImpl*,
                          base::TaskRunner*,
                          Producer*,
-                         const std::string& producer_name = std::string());
+                         const std::string& producer_name);
     ~ProducerEndpointImpl() override;
 
     // Service::ProducerEndpoint implementation.
@@ -68,12 +68,6 @@ class ServiceImpl : public Service {
     void UnregisterDataSource(DataSourceID) override;
     void CommitData(const CommitDataRequest&, CommitDataCallback) override;
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
-
-    // Retrieves the page size from the trace config.
-    size_t GetDesiredPageSizeKb(const TraceConfig& config);
-
-    // Retrieves the SHM size from the trace config.
-    size_t GetDesiredShmSizeKb(const TraceConfig& config);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     SharedMemory* shared_memory() const override;
@@ -213,6 +207,7 @@ class ServiceImpl : public Service {
   ServiceImpl& operator=(const ServiceImpl&) = delete;
 
   void CreateDataSourceInstance(const TraceConfig::DataSource&,
+                                const TraceConfig::ProducerConfig&,
                                 const RegisteredDataSource&,
                                 TracingSession*);
 

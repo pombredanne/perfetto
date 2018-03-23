@@ -53,8 +53,8 @@ class ProducerIPCClientImpl : public Service::ProducerEndpoint,
  public:
   ProducerIPCClientImpl(const char* service_sock_name,
                         Producer*,
-                        base::TaskRunner*,
-                        const std::string& producer_name);
+                        const std::string& producer_name,
+                        base::TaskRunner*);
   ~ProducerIPCClientImpl() override;
 
   // Service::ProducerEndpoint implementation.
