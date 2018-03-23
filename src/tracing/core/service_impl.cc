@@ -281,13 +281,16 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   for (const TraceConfig::DataSource& cfg_data_source : cfg.data_sources()) {
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
-    for (auto it = range.first; it != range.second; it++)
-      for (auto& producer_config : cfg.producers()) {
+    for (auto it = range.first; it != range.second; it++) {
+      TraceConfig::ProducerConfig producer_config;
+      for (auto& config : cfg.producers()) {
         if (GetProducer(it->second.producer_id)->name_ ==
-            producer_config.producer_name())
-          CreateDataSourceInstance(cfg_data_source, producer_config, it->second,
-                                   &ts);
+            config.producer_name())
+          producer_config = config;
       }
+      CreateDataSourceInstance(cfg_data_source, producer_config, it->second,
+                               &ts);
+    }
   }
 
   // Trigger delayed task if the trace is time limited.
