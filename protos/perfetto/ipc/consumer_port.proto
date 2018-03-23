@@ -104,7 +104,10 @@ message ReadBuffersIntoFileRequest {
   // write them into the passed file descriptor. A period == 0 means that the
   // service will perform only a one-shot read. When set, the period will be
   // capped at a minimum of 100 ms.
-  optional int32 write_period_ms = 1;
+  optional uint32 write_period_ms = 1;
+
+  // Stop the periodic writing after having written the given amount of bytes.
+  optional uint64 max_file_size_bytes = 2;
 }
 
 message ReadBuffersIntoFileResponse {}

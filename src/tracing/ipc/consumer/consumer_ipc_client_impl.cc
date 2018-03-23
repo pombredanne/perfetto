@@ -120,7 +120,8 @@ void ConsumerIPCClientImpl::ReadBuffers() {
 }
 
 void ConsumerIPCClientImpl::ReadBuffersIntoFile(base::ScopedFile fd,
-                                                uint32_t period_ms) {
+                                                uint32_t period_ms,
+                                                size_t max_file_size_bytes) {
   if (!connected_) {
     PERFETTO_DLOG(
         "Cannot ReadBuffersIntoFile(), not connected to tracing service");
@@ -135,6 +136,7 @@ void ConsumerIPCClientImpl::ReadBuffersIntoFile(base::ScopedFile fd,
       });
   protos::ReadBuffersIntoFileRequest req;
   req.set_write_period_ms(period_ms);
+  req.set_max_file_size_bytes(max_file_size_bytes);
   consumer_port_.ReadBuffersIntoFile(req, std::move(async_response), *fd);
   // |fd| at this point will go out of scope and close the fd. But the IPC layer
   // has duped it just above and passed to the service.

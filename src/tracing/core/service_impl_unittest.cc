@@ -47,6 +47,8 @@ class MockProducer : public Producer {
   MOCK_METHOD2(CreateDataSourceInstance,
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
+  MOCK_METHOD0(OnTracingStart, void());
+  MOCK_METHOD0(OnTracingStop, void());
 };
 
 class MockConsumer : public Consumer {
@@ -135,6 +137,7 @@ TEST_F(ServiceImplTest, RegisterAndUnregister) {
 
   ASSERT_EQ(0u, svc->num_producers());
 }
+
 TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   MockProducer mock_producer;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
@@ -210,10 +213,12 @@ TEST_F(ServiceImplTest, LockdownMode) {
   consumer_endpoint->EnableTracing(trace_config);
   task_runner.RunUntilIdle();
 
+  EXPECT_CALL(mock_producer_sameuid, OnDisconnect());
   EXPECT_CALL(mock_producer, OnConnect());
   producer_endpoint_sameuid =
       svc->ConnectProducer(&mock_producer, geteuid() + 1);
 
+  EXPECT_CALL(mock_producer, OnDisconnect());
   task_runner.RunUntilIdle();
 }
 

@@ -35,6 +35,7 @@
 
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace.pb.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -75,6 +76,8 @@ class MockProducer : public Producer {
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
   MOCK_METHOD0(uid, uid_t());
+  MOCK_METHOD0(OnTracingStart, void());
+  MOCK_METHOD0(OnTracingStop, void());
 };
 
 class MockConsumer : public Consumer {
@@ -144,6 +147,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   BufferID global_buf_id = 0;
   auto on_create_ds_instance =
       task_runner_->CreateCheckpoint("on_create_ds_instance");
+  EXPECT_CALL(producer, OnTracingStart());
   EXPECT_CALL(producer, CreateDataSourceInstance(_, _))
       .WillOnce(
           Invoke([on_create_ds_instance, &ds_iid, &global_buf_id](
@@ -180,19 +184,29 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   // Read the log buffer.
   consumer_endpoint->ReadBuffers();
   size_t num_pack_rx = 0;
+  bool saw_clock_snapshot = false;
   auto all_packets_rx = task_runner_->CreateCheckpoint("all_packets_rx");
   EXPECT_CALL(consumer, OnTracePackets(_, _))
       .WillRepeatedly(
-          Invoke([&num_pack_rx, all_packets_rx](
+          Invoke([&num_pack_rx, all_packets_rx, &saw_clock_snapshot](
                      std::vector<TracePacket>* packets, bool has_more) {
-            // TODO(primiano): check contents, requires both pblite and pzero.
-            num_pack_rx += packets->size();
+            for (auto& packet : *packets) {
+              ASSERT_TRUE(packet.Decode());
+              if (packet->has_for_testing()) {
+                char buf[8];
+                sprintf(buf, "evt_%zu", num_pack_rx++);
+                EXPECT_EQ(std::string(buf), packet->for_testing().str());
+              } else if (packet->has_clock_snapshot()) {
+                EXPECT_GE(packet->clock_snapshot().clocks_size(), 6);
+                saw_clock_snapshot = true;
+              }
+            }
             if (!has_more)
               all_packets_rx();
           }));
   task_runner_->RunUntilCheckpoint("all_packets_rx");
   ASSERT_EQ(kNumPackets, num_pack_rx);
-
+  EXPECT_TRUE(saw_clock_snapshot);
   // Now write some other data.
   for (size_t i = 0; i < kNumPackets; i++) {
     char buf[16];

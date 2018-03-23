@@ -61,7 +61,9 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
   void EnableTracing(const TraceConfig&) override;
   void DisableTracing() override;
   void ReadBuffers() override;
-  void ReadBuffersIntoFile(base::ScopedFile, uint32_t period_ms) override;
+  void ReadBuffersIntoFile(base::ScopedFile,
+                           uint32_t period_ms,
+                           size_t max_file_size_bytes) override;
   void FreeBuffers() override;
 
   // ipc::ServiceProxy::EventListener implementation.

@@ -90,8 +90,8 @@ void ConsumerIPCService::ReadBuffersIntoFile(
     PERFETTO_DCHECK(false);
     return;
   }
-  remote_consumer->service_endpoint->ReadBuffersIntoFile(std::move(fd),
-                                                         req.write_period_ms());
+  remote_consumer->service_endpoint->ReadBuffersIntoFile(
+      std::move(fd), req.write_period_ms(), req.max_file_size_bytes());
   resp.Resolve(ipc::AsyncResult<protos::ReadBuffersIntoFileResponse>::Create());
 }
 
