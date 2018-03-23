@@ -386,10 +386,6 @@ void FtraceMetadata::AddInode(Inode inode_number) {
     inode_and_device.push_back(
         std::make_pair(inode_number, last_seen_device_id));
   }
-#if PERFETTO_DCHECK_IS_ON()
-  last_seen_device_id = 0;
-  seen_device_id = false;
-#endif
 }
 
 void FtraceMetadata::AddCommonPid(int32_t pid) {
@@ -409,6 +405,7 @@ void FtraceMetadata::Clear() {
   pids.clear();
   overwrite_count = 0;
   last_seen_device_id = 0;
+  seen_device_id = false;
   last_seen_common_pid = 0;
 }
 
