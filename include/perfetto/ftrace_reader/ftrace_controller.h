@@ -47,7 +47,9 @@ struct FtraceMetadata {
 
   size_t overwrite_count;
   BlockDeviceID last_seen_device_id = 0;
+#if PERFETTO_DCHECK_IS_ON()
   bool seen_device_id = false;
+#endif
   int32_t last_seen_common_pid = 0;
 
   // A vector not a set to keep the writer_fast.
