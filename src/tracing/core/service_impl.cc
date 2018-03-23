@@ -21,6 +21,7 @@
 
 #include <algorithm>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
@@ -52,6 +53,9 @@ using protozero::proto_utils::WriteVarInt;
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
+// TODO(primiano): How come we can't set this higher?
+constexpr size_t kMaxShmPageSizeKb = 16ul;
+constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 
@@ -542,9 +546,10 @@ void ServiceImpl::CreateDataSourceInstance(
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
     producer->shared_buffer_page_size_kb_ =
-        (tracing_session->GetDesiredPageSizeKb() == 0)
-            ? base::kPageSize / 1024  // default
-            : tracing_session->GetDesiredPageSizeKb();
+        std::min((tracing_session->GetDesiredPageSizeKb() == 0)
+                     ? kDefaultShmPageSizeKb
+                     : tracing_session->GetDesiredPageSizeKb(),
+                 kMaxShmPageSizeKb);
     size_t shm_size =
         std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
@@ -702,24 +707,26 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
-      {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
-      {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
-      {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
-      {CLOCK_MONOTONIC_RAW,
-       protos::ClockSnapshot::Clock::MONOTONIC_RAW,
-       {0, 0}},
-      {CLOCK_PROCESS_CPUTIME_ID,
-       protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
-       {0, 0}},
-      {CLOCK_THREAD_CPUTIME_ID,
-       protos::ClockSnapshot::Clock::THREAD_CPUTIME,
-       {0, 0}},
-      {CLOCK_REALTIME_COARSE,
-       protos::ClockSnapshot::Clock::REALTIME_COARSE,
-       {0, 0}},
-      {CLOCK_MONOTONIC_COARSE,
-       protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
-       {0, 0}},
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+#else
+    {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+    {CLOCK_REALTIME_COARSE,
+     protos::ClockSnapshot::Clock::REALTIME_COARSE,
+     {0, 0}},
+    {CLOCK_MONOTONIC_COARSE,
+     protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
+     {0, 0}},
+#endif
+    {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
+    {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
+    {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW, {0, 0}},
+    {CLOCK_PROCESS_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::PROCESS_CPUTIME,
+     {0, 0}},
+    {CLOCK_THREAD_CPUTIME_ID,
+     protos::ClockSnapshot::Clock::THREAD_CPUTIME,
+     {0, 0}},
   };
   protos::TracePacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
