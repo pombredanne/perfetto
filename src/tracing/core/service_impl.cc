@@ -53,6 +53,9 @@ using protozero::proto_utils::WriteVarInt;
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
+// TODO(primiano): How come we can't set this higher?
+constexpr size_t kMaxShmPageSizeKb = 16ul;
+constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 
@@ -541,11 +544,12 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    size_t desired_page_size =
+    size_t desired_page_size_kb =
         producer->GetDesiredPageSizeKb(tracing_session->config);
     producer->shared_buffer_page_size_kb_ =
-        (desired_page_size == 0) ? base::kPageSize / 1024  // default
-                                 : desired_page_size;
+        std::min((desired_page_size_kb == 0) ? kDefaultShmPageSizeKb  // default
+                                             : desired_page_size_kb,
+                 kMaxShmPageSizeKb);
 
     size_t desired_shm_size_kb =
         producer->GetDesiredShmSizeKb(tracing_session->config);
