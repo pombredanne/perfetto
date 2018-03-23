@@ -70,7 +70,7 @@ class PerfettoCtsTest : public ::testing::Test {
       total += packets.size();
 
       if (!has_more) {
-        ASSERT_EQ(total, kEventCount + 1);
+        ASSERT_EQ(total, kEventCount + 2);
         finish();
       }
     };
