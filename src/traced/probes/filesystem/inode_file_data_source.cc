@@ -31,6 +31,8 @@
 
 namespace perfetto {
 
+static uint64_t scanned_files = 0;
+
 void ScanFilesDFS(
     const std::string& root_directory,
     const std::function<bool(BlockDeviceID block_device_id,
@@ -48,6 +50,7 @@ void ScanFilesDFS(
     if (!dir)
       continue;
     while ((entry = readdir(dir.get())) != nullptr) {
+      ++scanned_files;
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
