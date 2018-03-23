@@ -547,7 +547,7 @@ void ServiceImpl::CreateDataSourceInstance(
     size_t desired_page_size_kb =
         producer->GetDesiredPageSizeKb(tracing_session->config);
     producer->shared_buffer_page_size_kb_ =
-        std::min((desired_page_size_kb == 0) ? kDefaultShmPageSizeKb  // default
+        std::min((desired_page_size_kb == 0) ? kDefaultShmPageSizeKb
                                              : desired_page_size_kb,
                  kMaxShmPageSizeKb);
 
