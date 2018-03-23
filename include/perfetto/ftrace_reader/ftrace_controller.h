@@ -46,8 +46,9 @@ struct FtraceMetadata {
   FtraceMetadata();
 
   size_t overwrite_count;
-  BlockDeviceID last_seen_device_id;
-  int32_t last_seen_common_pid;
+  BlockDeviceID last_seen_device_id = 0;
+  bool seen_device_id = false;
+  int32_t last_seen_common_pid = 0;
 
   // A vector not a set to keep the writer_fast.
   std::vector<std::pair<Inode, BlockDeviceID>> inode_and_device;

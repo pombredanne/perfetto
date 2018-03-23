@@ -370,10 +370,11 @@ FtraceMetadata::FtraceMetadata() {
 
 void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
+  seen_device_id = true;
 }
 
 void FtraceMetadata::AddInode(Inode inode_number) {
-  PERFETTO_DCHECK(last_seen_device_id != 0);
+  PERFETTO_DCHECK(seen_device_id);
   static int32_t cached_pid = 0;
   if (!cached_pid)
     cached_pid = getpid();
@@ -387,6 +388,7 @@ void FtraceMetadata::AddInode(Inode inode_number) {
   }
 #if PERFETTO_DCHECK_IS_ON()
   last_seen_device_id = 0;
+  seen_device_id = false;
 #endif
 }
 
