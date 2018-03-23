@@ -236,6 +236,11 @@ void PerfettoCmd::OnDisconnect() {
   task_runner_.Quit();
 }
 
+void PerfettoCmd::OnTracingStop() {
+  PERFETTO_LOG("OnTracingStop()");
+  // TODO here.
+}
+
 void PerfettoCmd::OnStopTraceTimer() {
   PERFETTO_LOG("Timer expired, disabling tracing and collecting results");
   consumer_endpoint_->DisableTracing();

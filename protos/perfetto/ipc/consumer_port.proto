@@ -32,7 +32,8 @@ service ConsumerPort {
 
   // Enables tracing for one or more data sources. At least one buffer must have
   // been previously created.
-  rpc EnableTracing(EnableTracingRequest) returns (EnableTracingResponse) {}
+  rpc EnableTracing(EnableTracingRequest)
+      returns (stream EnableTracingResponse) {}
 
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
@@ -61,7 +62,9 @@ message EnableTracingRequest {
   optional protos.TraceConfig trace_config = 1;
 }
 
-message EnableTracingResponse {}
+message EnableTracingResponse {
+  oneof state { bool stopped = 1; }
+}
 
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {

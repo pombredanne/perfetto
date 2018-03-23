@@ -38,7 +38,7 @@ function traced_probes_cmd {
   if is_android $OUT; then
     echo "$PREFIX $DIR/traced_probes"
   else
-    echo "sudo $PREFIX $DIR/traced_probes"
+    echo "$PREFIX $DIR/traced_probes"
   fi
 }
 

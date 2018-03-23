@@ -163,7 +163,7 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   consumers_.erase(consumer);
 }
 
-void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
+bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                                 const TraceConfig& cfg) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Enabling tracing for consumer %p",
@@ -178,8 +178,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     PERFETTO_DLOG(
         "A Consumer is trying to EnableTracing() but another tracing session "
         "is already active (forgot a call to FreeBuffers() ?)");
-    // TODO(primiano): make this a bool and return failure to the IPC layer.
-    return;
+    return false;
   }
 
   if (cfg.enable_extra_guardrails()) {
@@ -187,7 +186,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
                     " ms)",
                     cfg.duration_ms(), kMaxTracingDurationMillis);
-      return;
+      return false;
     }
     uint64_t buf_size_sum = 0;
     for (const auto& buf : cfg.buffers())
@@ -196,13 +195,13 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       PERFETTO_ELOG("Requested too large trace buffer (%" PRIu64
                     "kB  > %" PRIu64 " kB)",
                     buf_size_sum, kMaxTracingBufferSizeKb);
-      return;
+      return false;
     }
   }
 
   if (cfg.buffers_size() > kMaxBuffersPerConsumer) {
     PERFETTO_DLOG("Too many buffers configured (%d)", cfg.buffers_size());
-    return;  // TODO(primiano): signal failure to the caller.
+    return false;
   }
 
   // TODO(taylori): These assumptions are no longer true. Figure out a new
@@ -224,8 +223,9 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   //}
 
   const TracingSessionID tsid = ++last_tracing_session_id_;
-  TracingSession& ts =
-      tracing_sessions_.emplace(tsid, TracingSession(cfg)).first->second;
+  tracing_session =
+      &tracing_sessions_.emplace(tsid, TracingSession(consumer, cfg))
+           .first->second;
 
   // Initialize the log buffers.
   bool did_allocate_all_buffers = true;
@@ -235,7 +235,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // corresponding BufferID, which is a global ID namespace for the service and
   // all producers.
   size_t total_buf_size_kb = 0;
-  ts.buffers_index.reserve(cfg.buffers_size());
+  tracing_session->buffers_index.reserve(cfg.buffers_size());
   for (int i = 0; i < cfg.buffers_size(); i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
     BufferID global_id = buffer_ids_.Allocate();
@@ -243,7 +243,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       did_allocate_all_buffers = false;  // We ran out of IDs.
       break;
     }
-    ts.buffers_index.push_back(global_id);
+    tracing_session->buffers_index.push_back(global_id);
     const size_t buf_size_bytes = buffer_cfg.size_kb() * 1024u;
     total_buf_size_kb += buffer_cfg.size_kb();
     auto it_and_inserted =
@@ -264,12 +264,12 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // In any case, free all the previously allocated buffers and abort.
   // TODO(fmayer): add a test to cover this case, this is quite subtle.
   if (!did_allocate_all_buffers) {
-    for (BufferID global_id : ts.buffers_index) {
+    for (BufferID global_id : tracing_session->buffers_index) {
       buffer_ids_.Free(global_id);
       buffers_.erase(global_id);
     }
     tracing_sessions_.erase(tsid);
-    return;  // TODO(primiano): return failure condition?
+    return false;
   }
 
   consumer->tracing_session_id_ = tsid;
@@ -279,7 +279,7 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     // Scan all the registered data sources with a matching name.
     auto range = data_sources_.equal_range(cfg_data_source.config().name());
     for (auto it = range.first; it != range.second; it++)
-      CreateDataSourceInstance(cfg_data_source, it->second, &ts);
+      CreateDataSourceInstance(cfg_data_source, it->second, tracing_session);
   }
 
   // Trigger delayed task if the trace is time limited.
@@ -297,6 +297,9 @@ void ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
                cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
                total_buf_size_kb, tracing_sessions_.size());
+
+  tracing_session->tracing_enabled = true;
+  return true;
 }
 
 // DisableTracing just stops the data sources but doesn't free up any buffer.
@@ -322,6 +325,11 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
   }
   tracing_session->data_source_instances.clear();
 
+  if (tracing_session->tracing_enabled) {
+    tracing_session->tracing_enabled = false;
+    tracing_session->consumer->NotifyOnTracingStop();
+  }
+
   // Deliberately NOT removing the session from |tracing_session_|, it's still
   // needed to call ReadBuffers(). FreeBuffers() will erase() the session.
 }
@@ -339,7 +347,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
   // This can happen if the Consumer calls ReadBuffersIntoFile() with an empty
   // fd, to stop the reads.
-  if (write_into_file && !tracing_session->write_into_file_)
+  if (write_into_file && !tracing_session->write_into_file)
     return;
 
   std::vector<TracePacket> packets;
@@ -427,10 +435,10 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       }
       PERFETTO_DCHECK(i == num_iovecs);
     }
-    int fd = *tracing_session->write_into_file_;
+    int fd = *tracing_session->write_into_file;
 
     size_t total_wr_size = 0;
-    bool stop_writing_into_file = tracing_session->write_period_ms_ == 0;
+    bool stop_writing_into_file = tracing_session->write_period_ms == 0;
     for (size_t i = 0; i < num_iovecs; i += IOV_MAX) {
       size_t batch = std::min(num_iovecs - i, static_cast<size_t>(IOV_MAX));
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], batch));
@@ -441,12 +449,12 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       total_wr_size += wr_size;
     }
     PERFETTO_DCHECK(total_wr_size == packets_bytes);
-    tracing_session->bytes_written_into_file_ += total_wr_size;
-    stop_writing_into_file |= tracing_session->bytes_written_into_file_ >=
-                              tracing_session->max_file_size_bytes_;
+    tracing_session->bytes_written_into_file += total_wr_size;
+    stop_writing_into_file |= tracing_session->bytes_written_into_file >=
+                              tracing_session->max_file_size_bytes;
     if (stop_writing_into_file) {
-      tracing_session->write_into_file_.reset();
-      tracing_session->write_period_ms_ = 0;
+      tracing_session->write_into_file.reset();
+      tracing_session->write_period_ms = 0;
     } else {
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       task_runner_->PostDelayedTask(
@@ -454,7 +462,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
             if (weak_this)
               weak_this->ReadBuffers(tsid, true /*write_into_file*/, nullptr);
           },
-          tracing_session->write_period_ms_);
+          tracing_session->write_period_ms);
     }
     return;
   }  // if (write_into_file)
@@ -487,12 +495,12 @@ void ServiceImpl::ReadBuffersIntoFile(TracingSessionID tsid,
         "active");
     return;  // TODO(primiano): signal failure?
   }
-  tracing_session->write_into_file_ = std::move(fd);
-  tracing_session->write_period_ms_ = period_ms;
-  tracing_session->max_file_size_bytes_ = max_file_size_bytes;
-  tracing_session->bytes_written_into_file_ = 0;
+  tracing_session->write_into_file = std::move(fd);
+  tracing_session->write_period_ms = period_ms;
+  tracing_session->max_file_size_bytes = max_file_size_bytes;
+  tracing_session->bytes_written_into_file = 0;
   if (period_ms > 0 && period_ms < kMinWriteIntoFilePeriodMs)
-    tracing_session->write_period_ms_ = kMinWriteIntoFilePeriodMs;
+    tracing_session->write_period_ms = kMinWriteIntoFilePeriodMs;
 
   ReadBuffers(tsid, true /*read_into_file*/, nullptr);
 }
@@ -510,8 +518,8 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
 
   // If the client requested us to drain periodically the buffer into the passed
   // file, force a final read pass before destroying the buffers.
-  if (tracing_session->write_into_file_) {
-    tracing_session->write_period_ms_ = 0;
+  if (tracing_session->write_into_file) {
+    tracing_session->write_period_ms = 0;
     ReadBuffers(tsid, true, nullptr);
   }
 
@@ -841,19 +849,33 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
 // ServiceImpl::ConsumerEndpointImpl implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(ServiceImpl* service,
-                                                        base::TaskRunner*,
-                                                        Consumer* consumer)
-    : service_(service), consumer_(consumer), weak_ptr_factory_(this) {}
+ServiceImpl::ConsumerEndpointImpl::ConsumerEndpointImpl(
+    ServiceImpl* service,
+    base::TaskRunner* task_runner,
+    Consumer* consumer)
+    : task_runner_(task_runner),
+      service_(service),
+      consumer_(consumer),
+      weak_ptr_factory_(this) {}
 
 ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   service_->DisconnectConsumer(this);
   consumer_->OnDisconnect();
 }
 
+void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingStop() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto weak_this = GetWeakPtr();
+  task_runner_->PostTask([weak_this] {
+    if (weak_this)
+      weak_this->consumer_->OnTracingStop();
+  });
+}
+
 void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  service_->EnableTracing(this, cfg);
+  if (!service_->EnableTracing(this, cfg))
+    NotifyOnTracingStop();
 }
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
@@ -1036,8 +1058,9 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
 // ServiceImpl::TracingSession implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-ServiceImpl::TracingSession::TracingSession(const TraceConfig& new_config)
-    : config(new_config) {}
+ServiceImpl::TracingSession::TracingSession(ConsumerEndpointImpl* consumer_ptr,
+                                            const TraceConfig& new_config)
+    : consumer(consumer_ptr), config(new_config) {}
 
 size_t ServiceImpl::TracingSession::GetDesiredShmSizeKb() {
   if (config.producers_size() == 0)

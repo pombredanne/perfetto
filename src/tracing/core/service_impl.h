@@ -97,6 +97,7 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl(ServiceImpl*, base::TaskRunner*, Consumer*);
     ~ConsumerEndpointImpl() override;
 
+    void NotifyOnTracingStop();
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // Service::ConsumerEndpoint implementation.
@@ -113,6 +114,7 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl(const ConsumerEndpointImpl&) = delete;
     ConsumerEndpointImpl& operator=(const ConsumerEndpointImpl&) = delete;
 
+    base::TaskRunner* const task_runner_;
     ServiceImpl* const service_;
     Consumer* const consumer_;
     TracingSessionID tracing_session_id_ = 0;
@@ -146,7 +148,7 @@ class ServiceImpl : public Service {
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
-  void EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
+  bool EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
   void DisableTracing(TracingSessionID);
   void ReadBuffers(TracingSessionID,
                    bool write_into_file,
@@ -188,7 +190,7 @@ class ServiceImpl : public Service {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    explicit TracingSession(const TraceConfig&);
+    TracingSession(ConsumerEndpointImpl*, const TraceConfig&);
 
     size_t num_buffers() const { return buffers_index.size(); }
 
@@ -197,6 +199,9 @@ class ServiceImpl : public Service {
 
     // Retrieves the SHM size from the trace config.
     size_t GetDesiredShmSizeKb();
+
+    // The consumer that started the session.
+    ConsumerEndpointImpl* const consumer;
 
     // The original trace config provided by the Consumer when calling
     // EnableTracing().
@@ -214,13 +219,15 @@ class ServiceImpl : public Service {
     // When the last clock snapshot was emitted into the output stream.
     base::TimeMillis last_clock_snapshot = {};
 
+    bool tracing_enabled = false;
+
     // This is set when the Consumer calls ReadBuffersIntoFile(). In this case
     // this represents the file we should stream the trace packets into, rather
     // than returning it to the consumer via OnTraceData().
-    base::ScopedFile write_into_file_;
-    int write_period_ms_ = 0;
-    size_t max_file_size_bytes_ = 0;
-    size_t bytes_written_into_file_ = 0;
+    base::ScopedFile write_into_file;
+    int write_period_ms = 0;
+    size_t max_file_size_bytes = 0;
+    size_t bytes_written_into_file = 0;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;

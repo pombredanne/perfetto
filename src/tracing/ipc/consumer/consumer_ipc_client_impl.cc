@@ -75,10 +75,13 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config) {
   protos::EnableTracingRequest req;
   trace_config.ToProto(req.mutable_trace_config());
   ipc::Deferred<protos::EnableTracingResponse> async_response;
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
   async_response.Bind(
-      [](ipc::AsyncResult<protos::EnableTracingResponse> response) {
-        if (!response)
-          PERFETTO_DLOG("EnableTracing() failed");
+      [weak_this](ipc::AsyncResult<protos::EnableTracingResponse> response) {
+        if (!weak_this)
+          return;
+        if (!response || response->stopped())
+          weak_this->consumer_->OnTracingStop();
       });
   consumer_port_.EnableTracing(req, std::move(async_response));
 }
