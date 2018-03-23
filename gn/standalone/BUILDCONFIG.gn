@@ -27,7 +27,7 @@ declare_args() {
   # investiated.
   # Especially useful for fuzzing, where we *do not* want to hit DCHECK
   # but still be able to investigate crashes.
-  is_debug_symbols = !is_debug
+  is_debug_symbols = is_debug
 }
 
 # Platform detection
