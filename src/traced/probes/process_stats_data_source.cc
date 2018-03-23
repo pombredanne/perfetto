@@ -44,7 +44,7 @@ void ProcessStatsDataSource::WriteAllProcesses() {
   TraceWriter* writer = writer_.get();
 
   file_utils::ForEachPidInProcPath("/proc", [&processes, writer](int pid) {
-    // TODO(hjd): Move this out when we supposrt large trace packets.
+    // TODO(hjd): Move this out when we support large trace packets.
     auto trace_packet = writer->NewTracePacket();
     auto* process_tree = trace_packet->set_process_tree();
 
