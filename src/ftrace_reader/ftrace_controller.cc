@@ -370,11 +370,15 @@ FtraceMetadata::FtraceMetadata() {
 
 void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
+#if PERFETTO_DCHECK_IS_ON()
   seen_device_id = true;
+#endif
 }
 
 void FtraceMetadata::AddInode(Inode inode_number) {
+#if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(seen_device_id);
+#endif
   static int32_t cached_pid = 0;
   if (!cached_pid)
     cached_pid = getpid();
@@ -402,7 +406,9 @@ void FtraceMetadata::AddPid(int32_t pid) {
 
 void FtraceMetadata::FinishEvent() {
   last_seen_device_id = 0;
+#if PERFETTO_DCHECK_IS_ON()
   seen_device_id = false;
+#endif
   last_seen_common_pid = 0;
 }
 
