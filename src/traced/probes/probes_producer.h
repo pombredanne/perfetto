@@ -33,7 +33,7 @@
 
 namespace perfetto {
 
-const uint64_t kLRUInodeCacheSize = 100;
+const uint64_t kLRUInodeCacheSize = 1000;
 
 class ProbesProducer : public Producer {
  public:

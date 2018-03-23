@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +17,12 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-package perfetto.protos;
+package perfetto;
 
-// Event used by testing code.
-message TestEvent {
-  // Arbitary string used in tests.
-  optional string str = 1;
-
-  // The current value of the random number sequence used in tests.
-  optional uint32 seq_value = 2;
+message PerfettoCmdState {
+  // These are fixed size so that the file is always a constant length.
+  optional fixed64 first_trace_timestamp = 1;
+  optional fixed64 last_trace_timestamp = 2;
+  // Total of bytes uploaded since first_trace_timestamp.
+  optional fixed64 total_bytes_uploaded = 3;
 }

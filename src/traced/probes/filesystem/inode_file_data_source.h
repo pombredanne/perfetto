@@ -40,7 +40,7 @@ class TraceWriter;
 
 void ScanFilesDFS(
     const std::string& root_directory,
-    const std::function<void(BlockDeviceID block_device_id,
+    const std::function<bool(BlockDeviceID block_device_id,
                              Inode inode_number,
                              const std::string& path,
                              protos::pbzero::InodeFileMap_Entry_Type type)>&);

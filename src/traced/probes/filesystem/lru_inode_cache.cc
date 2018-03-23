@@ -18,7 +18,7 @@
 
 namespace perfetto {
 
-const InodeMapValue* LRUInodeCache::Get(const InodeKey& k) {
+InodeMapValue* LRUInodeCache::Get(const InodeKey& k) {
   const auto& map_it = map_.find(k);
   if (map_it == map_.end()) {
     return nullptr;
@@ -28,7 +28,7 @@ const InodeMapValue* LRUInodeCache::Get(const InodeKey& k) {
   // We can borrow both elements of the pair stored in the list because
   // insert does not need them.
   Insert(map_it, std::move(list_entry->first), std::move(list_entry->second));
-  return &list_.cbegin()->second;
+  return &list_.begin()->second;
 }
 
 void LRUInodeCache::Insert(InodeKey k, InodeMapValue v) {

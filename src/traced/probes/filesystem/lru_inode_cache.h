@@ -35,11 +35,11 @@ class LRUInodeCache {
 
   explicit LRUInodeCache(size_t capacity) : capacity_(capacity) {}
 
-  const InodeMapValue* Get(const InodeKey& k);
+  InodeMapValue* Get(const InodeKey& k);
   void Insert(InodeKey k, InodeMapValue v);
 
  private:
-  using ItemType = std::pair<const InodeKey, const InodeMapValue>;
+  using ItemType = std::pair<const InodeKey, InodeMapValue>;
   using ListIteratorType = std::list<ItemType>::iterator;
   using MapType = std::map<const InodeKey, ListIteratorType>;
 
