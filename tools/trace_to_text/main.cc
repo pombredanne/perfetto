@@ -2210,7 +2210,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
     if (!input->good())
       break;
     bytes_processed++;
-    PERFETTO_DCHECK(preamble == 0x0a);  // Field ID:1, type:length dlimited.
+    PERFETTO_DCHECK(preamble == 0x0a);  // Field ID:1, type:length delimited.
 
     // ... a varint stating its size ...
     uint32_t field_size = 0;

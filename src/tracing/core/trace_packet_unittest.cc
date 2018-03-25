@@ -95,32 +95,40 @@ TEST(TracePacketTest, Corrupted) {
   ASSERT_FALSE(tp.Decode());
 }
 
-// Tests that the GetPreamble() logic returns a valid preamble that allows to
-// encode a TracePacket as a field of the root trace.proto message.
-TEST(TracePacketTest, GetPreamble) {
-  protos::TracePacket tp_proto;
-  static const char kPayload[] = "long string 1234567890abcdefACBDEF";
-  tp_proto.mutable_for_testing()->set_str(kPayload);
-  std::string ser_buf = tp_proto.SerializeAsString();
-
-  TracePacket tp;
-  tp.AddSlice({ser_buf.data(), ser_buf.size()});
-
+// Tests that the GetProtoPreamble() logic returns a valid preamble that allows
+// to encode a TracePacket as a field of the root trace.proto message.
+TEST(TracePacketTest, GetProtoPreamble) {
   char* preamble;
   size_t preamble_size;
-  std::tie(preamble, preamble_size) = tp.GetPreamble();
-  ASSERT_GT(preamble_size, 0u);
-  ASSERT_LE(preamble_size, 8u);
 
-  char buf[128];
+  // Test empty packet.
+  TracePacket tp;
+  std::tie(preamble, preamble_size) = tp.GetProtoPreamble();
+  ASSERT_EQ(2u, preamble_size);
+  ASSERT_EQ(0, preamble[1]);
+
+  // Test packet with one slice.
+  protos::TracePacket tp_proto;
+  char payload[257];
+  for (size_t i = 0; i < sizeof(payload); i++)
+    payload[i] = 'a' + (i % 16);
+  payload[sizeof(payload) - 1] = '\0';
+  tp_proto.mutable_for_testing()->set_str(payload);
+  std::string ser_buf = tp_proto.SerializeAsString();
+  tp.AddSlice({ser_buf.data(), ser_buf.size()});
+
+  std::tie(preamble, preamble_size) = tp.GetProtoPreamble();
+  ASSERT_EQ(3u, preamble_size);
+
+  // Verify that the content is actually parsable using libprotobuf.
+  char buf[512];
   memcpy(buf, preamble, preamble_size);
   ASSERT_EQ(1u, tp.slices().size());
   memcpy(&buf[preamble_size], tp.slices()[0].start, tp.slices()[0].size);
-
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromArray(buf, preamble_size + tp.size()));
   ASSERT_EQ(1, trace.packet_size());
-  ASSERT_EQ(kPayload, trace.packet(0).for_testing().str());
+  ASSERT_EQ(payload, trace.packet(0).for_testing().str());
 }
 
 }  // namespace

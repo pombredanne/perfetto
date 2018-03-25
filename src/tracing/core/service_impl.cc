@@ -60,6 +60,7 @@ constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 constexpr int kMinWriteIntoFilePeriodMs = 100;
+constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
 
 constexpr uint64_t kMillisPerHour = 3600000;
 
@@ -166,6 +167,17 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
   if (consumer->tracing_session_id_)
     FreeBuffers(consumer->tracing_session_id_);  // Will also DisableTracing().
   consumers_.erase(consumer);
+
+// At this point no more pointers to |consumer| should be around.
+#if PERFETTO_DCHECK_IS_ON()
+  PERFETTO_DCHECK(
+      std::find_if(
+          tracing_sessions_.begin(), tracing_sessions_.end(),
+          [consumer](
+              const std::pair<const TracingSessionID, TracingSession>& kv) {
+            return kv.second.consumer != consumer;
+          }) == tracing_sessions_.end());
+#endif
 }
 
 bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
@@ -241,6 +253,8 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     }
     tracing_session->write_into_file = std::move(fd);
     uint32_t write_period_ms = cfg.file_write_period_ms();
+    if (write_period_ms == 0)
+      write_period_ms = kDefaultWriteIntoFilePeriodMs;
     if (write_period_ms < kMinWriteIntoFilePeriodMs)
       write_period_ms = kMinWriteIntoFilePeriodMs;
     tracing_session->write_period_ms = write_period_ms;
@@ -325,12 +339,11 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
         tracing_session->write_period_ms);
   }
 
+  tracing_session->tracing_enabled = true;
   PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
                cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
                total_buf_size_kb, tracing_sessions_.size());
-
-  tracing_session->tracing_enabled = true;
   return true;
 }
 
@@ -356,6 +369,13 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     producer->producer_->TearDownDataSourceInstance(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
+
+  // If the client requested us to periodically save the buffer into the passed
+  // file, force a pass.
+  if (tracing_session->write_into_file) {
+    tracing_session->write_period_ms = 0;
+    ReadBuffers(tsid, true, nullptr);
+  }
 
   if (tracing_session->tracing_enabled) {
     tracing_session->tracing_enabled = false;
@@ -468,13 +488,17 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     const size_t num_iovecs = total_slices + packets.size();
 
     std::unique_ptr<struct iovec[]> iovecs(new struct iovec[num_iovecs]);
-    {
+    {  // This block is here merely to limit the scope of |i|.
       size_t i = 0;
       for (TracePacket& packet : packets) {
-        std::tie(iovecs[i].iov_base, iovecs[i].iov_len) = packet.GetPreamble();
+        std::tie(iovecs[i].iov_base, iovecs[i].iov_len) =
+            packet.GetProtoPreamble();
         packets_bytes += iovecs[i].iov_len;
         i++;
         for (const Slice& slice : packet.slices()) {
+          // writev() doesn't change the passed pointer. However, struct iovec
+          // take a non-const ptr because it's the same struct used by readv().
+          // Hence the const_cast here.
           char* start = reinterpret_cast<char*>(const_cast<void*>(slice.start));
           iovecs[i++] = {start, slice.size};
         }
@@ -491,8 +515,8 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       size_t batch = std::min(num_iovecs - i, static_cast<size_t>(IOV_MAX));
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], batch));
       if (wr_size <= 0) {
-        stop_writing_into_file = true;
         PERFETTO_PLOG("writev() failed");
+        stop_writing_into_file = true;
       }
       total_wr_size += wr_size;
     }
@@ -546,13 +570,6 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
     return;  // TODO(primiano): signal failure?
   }
   DisableTracing(tsid);
-
-  // If the client requested us to drain periodically the buffer into the passed
-  // file, force a final read pass before destroying the buffers.
-  if (tracing_session->write_into_file) {
-    tracing_session->write_period_ms = 0;
-    ReadBuffers(tsid, true, nullptr);
-  }
 
   for (BufferID buffer_id : tracing_session->buffers_index) {
     buffer_ids_.Free(buffer_id);

@@ -59,8 +59,8 @@ class PerfettoCmd : public Consumer {
   int Main(int argc, char** argv);
   int PrintUsage(const char* argv0);
   void OnTimeout();
-  void PostDisableRequest();
-  void FinalizeFileAndExit();
+  void DisableTracingFromSignal();
+  void FinalizeTraceAndExit();
 
   // perfetto::Consumer implementation.
   void OnConnect() override;

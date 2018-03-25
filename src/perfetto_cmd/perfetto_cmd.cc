@@ -210,7 +210,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
 #endif
   sa.sa_handler = [](int) {
     PERFETTO_LOG("SIGINT received: disabling tracing");
-    g_consumer_cmd->PostDisableRequest();
+    g_consumer_cmd->DisableTracingFromSignal();
   };
   sa.sa_flags = SA_RESETHAND | SA_RESTART;
 #pragma GCC diagnostic pop
@@ -256,7 +256,7 @@ void PerfettoCmd::OnTimeout() {
   task_runner_.Quit();
 }
 
-void PerfettoCmd::PostDisableRequest() {
+void PerfettoCmd::DisableTracingFromSignal() {
   task_runner_.PostTask([this] { consumer_endpoint_->DisableTracing(); });
 }
 
@@ -276,26 +276,27 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   }
 
   if (!has_more)
-    FinalizeFileAndExit();  // Reached end of trace.
+    FinalizeTraceAndExit();  // Reached end of trace.
 }
 
 void PerfettoCmd::OnTracingStop() {
   if (trace_config_->write_into_file()) {
     // If write_into_file == true, at this point the passed file contains
     // already all the packets.
-    return FinalizeFileAndExit();
+    return FinalizeTraceAndExit();
   }
   // This will cause a bunch of OnTraceData callbacks. The last one will
   // save the file and exit.
   consumer_endpoint_->ReadBuffers();
 }
 
-void PerfettoCmd::FinalizeFileAndExit() {
+void PerfettoCmd::FinalizeTraceAndExit() {
   fflush(*trace_out_stream_);
   fseek(*trace_out_stream_, 0, SEEK_END);
   long bytes_written = ftell(*trace_out_stream_);
   if (dropbox_tag_.empty()) {
     trace_out_stream_.reset();
+    did_process_full_trace_ = true;
     PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
                   trace_out_path_.c_str());
   } else {
@@ -314,17 +315,17 @@ void PerfettoCmd::FinalizeFileAndExit() {
     android::binder::Status status =
         dropbox->addFile(android::String16(dropbox_tag_.c_str()),
                          read_only_fd.release(), 0 /* flags */);
-    if (!status.isOk()) {
+    if (status.isOk()) {
+      // TODO(hjd): Account for compression.
+      did_process_full_trace_ = true;
+      bytes_uploaded_to_dropbox_ = bytes_written;
+      PERFETTO_ILOG("Uploaded %ld bytes into DropBox with tag %s",
+                    bytes_written, dropbox_tag_.c_str());
+    } else {
       PERFETTO_ELOG("DropBox upload failed: %s", status.toString8().c_str());
-      return;
     }
-    // TODO(hjd): Account for compression.
-    bytes_uploaded_to_dropbox_ = bytes_written;
-    PERFETTO_ILOG("Uploaded %ld bytes into DropBox with tag %s", bytes_written,
-                  dropbox_tag_.c_str());
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   }
-  did_process_full_trace_ = true;
   task_runner_.Quit();
 }
 

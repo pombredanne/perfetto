@@ -43,14 +43,6 @@ function adb_supports_push_sync {
   adb --help | grep 'push.*\[--sync\]' 2>&1 >/dev/null
 }
 
-function traced_probes_cmd {
-  if is_android $OUT; then
-    echo "$PREFIX $DIR/traced_probes"
-  else
-    echo "$PREFIX $DIR/traced_probes"
-  fi
-}
-
 function push {
   if is_android $OUT; then
     local maybe_sync=''
@@ -159,7 +151,7 @@ tmux select-pane -t 1
 tmux send-keys "$PREFIX $DIR/traced" Enter
 
 tmux select-pane -t 0
-tmux send-keys "$(traced_probes_cmd)" Enter
+tmux send-keys "$PREFIX $DIR/traced_probes" Enter
 
 tmux select-pane -t 2
 tmux send-keys "$PREFIX $DIR/perfetto -c $CONFIG_DEVICE_PATH -o $DIR/trace"

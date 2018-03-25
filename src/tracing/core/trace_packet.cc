@@ -53,16 +53,19 @@ void TracePacket::AddSlice(const void* start, size_t size) {
   slices_.emplace_back(start, size);
 }
 
-std::tuple<char*, size_t> TracePacket::GetPreamble() {
+std::tuple<char*, size_t> TracePacket::GetProtoPreamble() {
   using protozero::proto_utils::MakeTagLengthDelimited;
   using protozero::proto_utils::WriteVarInt;
-  uint32_t tag = MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber);
-  PERFETTO_DCHECK(tag < 0x80);  // Should fit in one byte.
-  char* ptr = &preamble_[0];
-  *(ptr++) = static_cast<char>(tag);
-  ptr = reinterpret_cast<char*>(
-      WriteVarInt(size(), reinterpret_cast<uint8_t*>(ptr)));
-  size_t preamble_size = static_cast<size_t>(ptr - &preamble_[0]);
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(&preamble_[0]);
+
+  constexpr uint32_t kPacketFieldNumber = protos::Trace::kPacketFieldNumber;
+  constexpr uint8_t tag = MakeTagLengthDelimited(kPacketFieldNumber);
+  static_assert(tag < 0x80, "TracePacket tag should fit in one byte");
+  *(ptr++) = tag;
+
+  ptr = WriteVarInt(size(), ptr);
+  size_t preamble_size = reinterpret_cast<uintptr_t>(ptr) -
+                         reinterpret_cast<uintptr_t>(&preamble_[0]);
   PERFETTO_DCHECK(preamble_size <= sizeof(preamble_));
   return std::make_tuple(&preamble_[0], preamble_size);
 }
