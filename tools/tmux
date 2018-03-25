@@ -27,7 +27,16 @@ function is_android {
 }
 
 function reset_tracing {
-  adb shell 'echo 0 > /d/tracing/tracing_on'
+  if is_android $OUT; then
+    adb shell 'echo 0 > /d/tracing/tracing_on'
+  else
+    if [ ! -w /sys/kernel/debug ]; then
+      echo "debugfs not accessible, try sudo chown -R $USER /sys/kernel/debug"
+      sudo chown -R $USER /sys/kernel/debug
+    fi
+
+    echo 0 > /sys/kernel/debug/tracing/tracing_on
+  fi
 }
 
 function adb_supports_push_sync {

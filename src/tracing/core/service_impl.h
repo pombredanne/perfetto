@@ -44,6 +44,7 @@ class Consumer;
 class DataSourceConfig;
 class Producer;
 class SharedMemory;
+class SharedMemoryArbiterImpl;
 class TraceBuffez;
 class TraceConfig;
 class TracePacket;
@@ -88,6 +89,10 @@ class ServiceImpl : public Service {
     SharedMemoryABI shmem_abi_;
     size_t shared_memory_size_hint_bytes_ = 0;
     DataSourceID last_data_source_id_ = 0;
+
+    // This is used only in in-process configurations (mostly tests).
+    std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
+
     PERFETTO_THREAD_CHECKER(thread_checker_)
   };
 
@@ -101,12 +106,9 @@ class ServiceImpl : public Service {
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // Service::ConsumerEndpoint implementation.
-    void EnableTracing(const TraceConfig&) override;
+    void EnableTracing(const TraceConfig&, base::ScopedFile) override;
     void DisableTracing() override;
     void ReadBuffers() override;
-    void ReadBuffersIntoFile(base::ScopedFile,
-                             uint32_t period_ms,
-                             size_t max_file_size_bytes) override;
     void FreeBuffers() override;
 
    private:
@@ -148,15 +150,13 @@ class ServiceImpl : public Service {
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
-  bool EnableTracing(ConsumerEndpointImpl*, const TraceConfig&);
+  bool EnableTracing(ConsumerEndpointImpl*,
+                     const TraceConfig&,
+                     base::ScopedFile);
   void DisableTracing(TracingSessionID);
   void ReadBuffers(TracingSessionID,
                    bool write_into_file,
                    ConsumerEndpointImpl*);
-  void ReadBuffersIntoFile(TracingSessionID,
-                           base::ScopedFile,
-                           uint32_t period_ms,
-                           size_t max_file_size_bytes);
   void FreeBuffers(TracingSessionID);
 
   // Service implementation.
@@ -221,9 +221,10 @@ class ServiceImpl : public Service {
 
     bool tracing_enabled = false;
 
-    // This is set when the Consumer calls ReadBuffersIntoFile(). In this case
-    // this represents the file we should stream the trace packets into, rather
-    // than returning it to the consumer via OnTraceData().
+    // This is set when the Consumer calls sets |write_into_file| == true in the
+    // TraceConfig. In this case this represents the file we should stream the
+    // trace packets into, rather than returning it to the consumer via
+    // OnTraceData().
     base::ScopedFile write_into_file;
     int write_period_ms = 0;
     size_t max_file_size_bytes = 0;

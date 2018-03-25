@@ -48,23 +48,6 @@ using testing::_;
 constexpr char kProducerSockName[] = TEST_SOCK_NAME("tracing_test-producer");
 constexpr char kConsumerSockName[] = TEST_SOCK_NAME("tracing_test-consumer");
 
-class TracingIntegrationTest : public ::testing::Test {
- public:
-  void SetUp() override {
-    DESTROY_TEST_SOCK(kProducerSockName);
-    DESTROY_TEST_SOCK(kConsumerSockName);
-    task_runner_.reset(new base::TestTaskRunner());
-  }
-
-  void TearDown() override {
-    task_runner_.reset();
-    DESTROY_TEST_SOCK(kProducerSockName);
-    DESTROY_TEST_SOCK(kConsumerSockName);
-  }
-
-  std::unique_ptr<base::TestTaskRunner> task_runner_;
-};
-
 class MockProducer : public Producer {
  public:
   ~MockProducer() override {}
@@ -96,51 +79,91 @@ class MockConsumer : public Consumer {
   }
 };
 
+class TracingIntegrationTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    DESTROY_TEST_SOCK(kProducerSockName);
+    DESTROY_TEST_SOCK(kConsumerSockName);
+    task_runner_.reset(new base::TestTaskRunner());
+
+    // Create the service host.
+    svc_ = ServiceIPCHost::CreateInstance(task_runner_.get());
+    svc_->Start(kProducerSockName, kConsumerSockName);
+
+    // Create and connect a Producer.
+    producer_endpoint_ = ProducerIPCClient::Connect(
+        kProducerSockName, &producer_, task_runner_.get());
+    auto on_producer_connect =
+        task_runner_->CreateCheckpoint("on_producer_connect");
+    EXPECT_CALL(producer_, OnConnect()).WillOnce(Invoke(on_producer_connect));
+    task_runner_->RunUntilCheckpoint("on_producer_connect");
+
+    // Register a data source.
+    DataSourceDescriptor ds_desc;
+    ds_desc.set_name("perfetto.test");
+    auto on_data_source_registered =
+        task_runner_->CreateCheckpoint("on_data_source_registered");
+    producer_endpoint_->RegisterDataSource(
+        ds_desc, [on_data_source_registered](DataSourceID dsid) {
+          PERFETTO_DLOG("Registered data source with ID: %" PRIu64, dsid);
+          on_data_source_registered();
+        });
+    task_runner_->RunUntilCheckpoint("on_data_source_registered");
+
+    // Create and connect a Consumer.
+    consumer_endpoint_ = ConsumerIPCClient::Connect(
+        kConsumerSockName, &consumer_, task_runner_.get());
+    auto on_consumer_connect =
+        task_runner_->CreateCheckpoint("on_consumer_connect");
+    EXPECT_CALL(consumer_, OnConnect()).WillOnce(Invoke(on_consumer_connect));
+    task_runner_->RunUntilCheckpoint("on_consumer_connect");
+
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&producer_));
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&consumer_));
+  }
+
+  void TearDown() override {
+    // Destroy the service and check that both Producer and Consumer see an
+    // OnDisconnect() call.
+
+    auto on_producer_disconnect =
+        task_runner_->CreateCheckpoint("on_producer_disconnect");
+    EXPECT_CALL(producer_, OnDisconnect())
+        .WillOnce(Invoke(on_producer_disconnect));
+
+    auto on_consumer_disconnect =
+        task_runner_->CreateCheckpoint("on_consumer_disconnect");
+    EXPECT_CALL(consumer_, OnDisconnect())
+        .WillOnce(Invoke(on_consumer_disconnect));
+
+    svc_.reset();
+    task_runner_->RunUntilCheckpoint("on_producer_disconnect");
+    task_runner_->RunUntilCheckpoint("on_consumer_disconnect");
+
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&producer_));
+    ASSERT_TRUE(testing::Mock::VerifyAndClearExpectations(&consumer_));
+
+    task_runner_.reset();
+    DESTROY_TEST_SOCK(kProducerSockName);
+    DESTROY_TEST_SOCK(kConsumerSockName);
+  }
+
+  std::unique_ptr<base::TestTaskRunner> task_runner_;
+  std::unique_ptr<ServiceIPCHost> svc_;
+  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_;
+  MockProducer producer_;
+  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint_;
+  MockConsumer consumer_;
+};
+
 TEST_F(TracingIntegrationTest, WithIPCTransport) {
-  // Create the service host.
-  std::unique_ptr<ServiceIPCHost> svc =
-      ServiceIPCHost::CreateInstance(task_runner_.get());
-  svc->Start(kProducerSockName, kConsumerSockName);
-
-  // Create and connect a Producer.
-  MockProducer producer;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      ProducerIPCClient::Connect(kProducerSockName, &producer,
-                                 task_runner_.get());
-  auto on_producer_connect =
-      task_runner_->CreateCheckpoint("on_producer_connect");
-  EXPECT_CALL(producer, OnConnect()).WillOnce(Invoke(on_producer_connect));
-  task_runner_->RunUntilCheckpoint("on_producer_connect");
-
-  // Register a data source.
-  DataSourceDescriptor ds_desc;
-  ds_desc.set_name("perfetto.test");
-  auto on_data_source_registered =
-      task_runner_->CreateCheckpoint("on_data_source_registered");
-  producer_endpoint->RegisterDataSource(
-      ds_desc, [on_data_source_registered](DataSourceID dsid) {
-        PERFETTO_DLOG("Registered data source with ID: %" PRIu64, dsid);
-        on_data_source_registered();
-      });
-  task_runner_->RunUntilCheckpoint("on_data_source_registered");
-
-  // Create and connect a Consumer.
-  MockConsumer consumer;
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      ConsumerIPCClient::Connect(kConsumerSockName, &consumer,
-                                 task_runner_.get());
-  auto on_consumer_connect =
-      task_runner_->CreateCheckpoint("on_consumer_connect");
-  EXPECT_CALL(consumer, OnConnect()).WillOnce(Invoke(on_consumer_connect));
-  task_runner_->RunUntilCheckpoint("on_consumer_connect");
-
   // Start tracing.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("perfetto.test");
   ds_config->set_target_buffer(0);
-  consumer_endpoint->EnableTracing(trace_config);
+  consumer_endpoint_->EnableTracing(trace_config);
 
   // At this point, the Producer should be asked to turn its data source on.
   DataSourceInstanceID ds_iid = 0;
@@ -148,8 +171,8 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   BufferID global_buf_id = 0;
   auto on_create_ds_instance =
       task_runner_->CreateCheckpoint("on_create_ds_instance");
-  EXPECT_CALL(producer, OnTracingStart());
-  EXPECT_CALL(producer, CreateDataSourceInstance(_, _))
+  EXPECT_CALL(producer_, OnTracingStart());
+  EXPECT_CALL(producer_, CreateDataSourceInstance(_, _))
       .WillOnce(
           Invoke([on_create_ds_instance, &ds_iid, &global_buf_id](
                      DataSourceInstanceID id, const DataSourceConfig& cfg) {
@@ -167,7 +190,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   // Doing so should accumulate a bunch of chunks that will be notified by the
   // a future task in one batch.
   std::unique_ptr<TraceWriter> writer =
-      producer_endpoint->CreateTraceWriter(global_buf_id);
+      producer_endpoint_->CreateTraceWriter(global_buf_id);
   ASSERT_TRUE(writer);
 
   const size_t kNumPackets = 10;
@@ -183,11 +206,11 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   task_runner_->RunUntilCheckpoint("on_data_committed");
 
   // Read the log buffer.
-  consumer_endpoint->ReadBuffers();
+  consumer_endpoint_->ReadBuffers();
   size_t num_pack_rx = 0;
   bool saw_clock_snapshot = false;
   auto all_packets_rx = task_runner_->CreateCheckpoint("all_packets_rx");
-  EXPECT_CALL(consumer, OnTracePackets(_, _))
+  EXPECT_CALL(consumer_, OnTracePackets(_, _))
       .WillRepeatedly(
           Invoke([&num_pack_rx, all_packets_rx, &saw_clock_snapshot](
                      std::vector<TracePacket>* packets, bool has_more) {
@@ -208,36 +231,63 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   task_runner_->RunUntilCheckpoint("all_packets_rx");
   ASSERT_EQ(kNumPackets, num_pack_rx);
   EXPECT_TRUE(saw_clock_snapshot);
-  // Now write some other data.
+
+  // Disable tracing.
+  consumer_endpoint_->DisableTracing();
+
+  auto on_tracing_stop = task_runner_->CreateCheckpoint("on_tracing_stop");
+  EXPECT_CALL(producer_, TearDownDataSourceInstance(_));
+  EXPECT_CALL(consumer_, OnTracingStop()).WillOnce(Invoke(on_tracing_stop));
+  task_runner_->RunUntilCheckpoint("on_tracing_stop");
+}
+
+TEST_F(TracingIntegrationTest, WriteIntoFile) {
+  // Start tracing.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("perfetto.test");
+  ds_config->set_target_buffer(0);
+  trace_config.set_write_into_file(true);
+  base::TempFile tmp_file = base::TempFile::CreateUnlinked();
+  consumer_endpoint_->EnableTracing(trace_config,
+                                    base::ScopedFile(dup(tmp_file.fd())));
+
+  // At this point, the producer_ should be asked to turn its data source on.
+  BufferID global_buf_id = 0;
+  auto on_create_ds_instance =
+      task_runner_->CreateCheckpoint("on_create_ds_instance");
+  EXPECT_CALL(producer_, OnTracingStart());
+  EXPECT_CALL(producer_, CreateDataSourceInstance(_, _))
+      .WillOnce(Invoke([on_create_ds_instance, &global_buf_id](
+                           DataSourceInstanceID, const DataSourceConfig& cfg) {
+        global_buf_id = static_cast<BufferID>(cfg.target_buffer());
+        on_create_ds_instance();
+      }));
+  task_runner_->RunUntilCheckpoint("on_create_ds_instance");
+
+  std::unique_ptr<TraceWriter> writer =
+      producer_endpoint_->CreateTraceWriter(global_buf_id);
+  ASSERT_TRUE(writer);
+
+  const size_t kNumPackets = 10;
   for (size_t i = 0; i < kNumPackets; i++) {
     char buf[16];
-    sprintf(buf, "evt2_%zu", i);
+    sprintf(buf, "evt_%zu", i);
     writer->NewTracePacket()->set_for_testing()->set_str(buf, strlen(buf));
   }
+  auto on_data_committed = task_runner_->CreateCheckpoint("on_data_committed");
+  writer->Flush(on_data_committed);
+  task_runner_->RunUntilCheckpoint("on_data_committed");
 
-  // Allow the service to see the CommitData() before reading back.
-  auto on_data_committed2 =
-      task_runner_->CreateCheckpoint("on_data_committed2");
-  writer->Flush(on_data_committed2);
-  task_runner_->RunUntilCheckpoint("on_data_committed2");
+  // Will disable tracing and will force the buffers to be written into the
+  // file before destroying them.
+  consumer_endpoint_->FreeBuffers();
 
-  // And ask the service to write it into a file.
-  base::TempFile tmp_file = base::TempFile::CreateUnlinked();
-  consumer_endpoint->ReadBuffersIntoFile(base::ScopedFile(dup(tmp_file.fd())),
-                                         0);
-
-  // Doing a conventional ReadBuffers() should return no data, as all the buffer
-  // should have been drained into the |tmp_file|.
-  consumer_endpoint->ReadBuffers();
-  auto no_packets_rx = task_runner_->CreateCheckpoint("no_packets_rx");
-  EXPECT_CALL(consumer, OnTracePackets(_, false))
-      .WillOnce(
-          Invoke([no_packets_rx](std::vector<TracePacket>* packets, bool) {
-            ASSERT_EQ(0u, packets->size());
-            no_packets_rx();
-
-          }));
-  task_runner_->RunUntilCheckpoint("no_packets_rx");
+  auto on_tracing_stop = task_runner_->CreateCheckpoint("on_tracing_stop");
+  EXPECT_CALL(producer_, TearDownDataSourceInstance(_));
+  EXPECT_CALL(consumer_, OnTracingStop()).WillOnce(Invoke(on_tracing_stop));
+  task_runner_->RunUntilCheckpoint("on_tracing_stop");
 
   // Check that |tmp_file| contains a valid trace.proto message.
   ASSERT_EQ(0, lseek(tmp_file.fd(), 0, SEEK_SET));
@@ -246,38 +296,14 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   ASSERT_GT(rsize, 0);
   protos::Trace tmp_trace;
   ASSERT_TRUE(tmp_trace.ParseFromArray(tmp_buf, rsize));
-  ASSERT_EQ(kNumPackets, static_cast<size_t>(tmp_trace.packet_size()));
-  for (size_t i = 0; i < kNumPackets; i++) {
+  size_t num_test_packet = 0;
+  for (int i = 0; i < tmp_trace.packet_size(); i++) {
     const protos::TracePacket& packet = tmp_trace.packet(i);
-    ASSERT_EQ("evt2_" + std::to_string(i), packet.for_testing().str());
+    if (packet.has_for_testing()) {
+      ASSERT_EQ("evt_" + std::to_string(num_test_packet++),
+                packet.for_testing().str());
+    }
   }
-
-  // Disable tracing.
-  consumer_endpoint->DisableTracing();
-  auto on_teardown_ds_instance =
-      task_runner_->CreateCheckpoint("on_teardown_ds_instance");
-  EXPECT_CALL(producer, TearDownDataSourceInstance(ds_iid))
-      .WillOnce(InvokeWithoutArgs(on_teardown_ds_instance));
-  task_runner_->RunUntilCheckpoint("on_teardown_ds_instance");
-
-  // TODO(primiano): cover FreeBuffers.
-
-  // Destroy the service and check that both Producer and Consumer see an
-  // OnDisconnect() call.
-
-  auto on_producer_disconnect =
-      task_runner_->CreateCheckpoint("on_producer_disconnect");
-  EXPECT_CALL(producer, OnDisconnect())
-      .WillOnce(Invoke(on_producer_disconnect));
-
-  auto on_consumer_disconnect =
-      task_runner_->CreateCheckpoint("on_consumer_disconnect");
-  EXPECT_CALL(consumer, OnDisconnect())
-      .WillOnce(Invoke(on_consumer_disconnect));
-
-  svc.reset();
-  task_runner_->RunUntilCheckpoint("on_producer_disconnect");
-  task_runner_->RunUntilCheckpoint("on_consumer_disconnect");
 }
 
 // TODO(primiano): add tests to cover:

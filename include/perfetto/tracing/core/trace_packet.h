@@ -22,6 +22,7 @@
 #include <memory>
 #include <tuple>
 
+#include "perfetto/base/export.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/slice.h"
 
@@ -41,7 +42,7 @@ class TracePacket;  // From protos/trace_packet.pb.h.
 // If the packets are saved / streamed and not just consumed locally, consumers
 // should ensure to preserve the unknown fields in the proto. A consumer, in
 // fact, might have an older version .proto which is newer on the producer.
-class TracePacket {
+class PERFETTO_EXPORT TracePacket {
  public:
   using const_iterator = Slices::const_iterator;
 

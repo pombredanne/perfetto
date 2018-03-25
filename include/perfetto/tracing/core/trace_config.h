@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/export.h"
+
 #include "perfetto/tracing/core/data_source_config.h"
 
 // Forward declarations for protobuf types.
@@ -51,9 +53,9 @@ class TraceConfig_ProducerConfig;
 
 namespace perfetto {
 
-class TraceConfig {
+class PERFETTO_EXPORT TraceConfig {
  public:
-  class BufferConfig {
+  class PERFETTO_EXPORT BufferConfig {
    public:
     enum FillPolicy {
       UNSPECIFIED = 0,
@@ -85,7 +87,7 @@ class TraceConfig {
     std::string unknown_fields_;
   };
 
-  class DataSource {
+  class PERFETTO_EXPORT DataSource {
    public:
     DataSource();
     ~DataSource();
@@ -127,7 +129,7 @@ class TraceConfig {
     LOCKDOWN_SET = 2,
   };
 
-  class ProducerConfig {
+  class PERFETTO_EXPORT ProducerConfig {
    public:
     ProducerConfig();
     ~ProducerConfig();
@@ -206,6 +208,17 @@ class TraceConfig {
     return &producers_.back();
   }
 
+  bool write_into_file() const { return write_into_file_; }
+  void set_write_into_file(bool value) { write_into_file_ = value; }
+
+  uint32_t file_write_period_ms() const { return file_write_period_ms_; }
+  void set_file_write_period_ms(uint32_t value) {
+    file_write_period_ms_ = value;
+  }
+
+  uint64_t max_file_size_bytes() const { return max_file_size_bytes_; }
+  void set_max_file_size_bytes(uint64_t value) { max_file_size_bytes_ = value; }
+
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
@@ -213,6 +226,9 @@ class TraceConfig {
   bool enable_extra_guardrails_ = {};
   LockdownModeOperation lockdown_mode_ = {};
   std::vector<ProducerConfig> producers_;
+  bool write_into_file_ = {};
+  uint32_t file_write_period_ms_ = {};
+  uint64_t max_file_size_bytes_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

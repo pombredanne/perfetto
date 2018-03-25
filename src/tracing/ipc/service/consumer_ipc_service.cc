@@ -61,7 +61,10 @@ void ConsumerIPCService::EnableTracing(const protos::EnableTracingRequest& req,
   TraceConfig trace_config;
   trace_config.FromProto(req.trace_config());
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
-  remote_consumer->service_endpoint->EnableTracing(trace_config);
+  base::ScopedFile fd;
+  if (trace_config.write_into_file())
+    fd = ipc::Service::TakeReceivedFD();
+  remote_consumer->service_endpoint->EnableTracing(trace_config, std::move(fd));
   remote_consumer->enable_tracing_response = std::move(resp);
 }
 
@@ -79,21 +82,6 @@ void ConsumerIPCService::ReadBuffers(const protos::ReadBuffersRequest& req,
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
   remote_consumer->read_buffers_response = std::move(resp);
   remote_consumer->service_endpoint->ReadBuffers();
-}
-
-void ConsumerIPCService::ReadBuffersIntoFile(
-    const protos::ReadBuffersIntoFileRequest& req,
-    DeferredReadBuffersIntoFileResponse resp) {
-  RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
-  base::ScopedFile fd = ipc::Service::TakeReceivedFD();
-  if (!fd) {
-    PERFETTO_DLOG("No FD passed to ReadBuffersIntoFile()");
-    PERFETTO_DCHECK(false);
-    return;
-  }
-  remote_consumer->service_endpoint->ReadBuffersIntoFile(
-      std::move(fd), req.write_period_ms(), req.max_file_size_bytes());
-  resp.Resolve(ipc::AsyncResult<protos::ReadBuffersIntoFileResponse>::Create());
 }
 
 // Called by the IPC layer.

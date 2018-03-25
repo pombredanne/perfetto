@@ -58,12 +58,9 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
   // Service::ConsumerEndpoint implementation.
   // These methods are invoked by the actual Consumer(s) code by clients of the
   // tracing library, which know nothing about the IPC transport.
-  void EnableTracing(const TraceConfig&) override;
+  void EnableTracing(const TraceConfig&, base::ScopedFile) override;
   void DisableTracing() override;
   void ReadBuffers() override;
-  void ReadBuffersIntoFile(base::ScopedFile,
-                           uint32_t period_ms,
-                           size_t max_file_size_bytes) override;
   void FreeBuffers() override;
 
   // ipc::ServiceProxy::EventListener implementation.

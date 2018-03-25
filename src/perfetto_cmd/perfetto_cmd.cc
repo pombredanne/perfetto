@@ -18,6 +18,7 @@
 
 #include <fcntl.h>
 #include <getopt.h>
+#include <signal.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -58,12 +59,7 @@ namespace {
 
 constexpr char kDefaultDropBoxTag[] = "perfetto";
 
-std::string GetDirName(const std::string& path) {
-  size_t sep = path.find_last_of('/');
-  if (sep == std::string::npos)
-    return ".";
-  return path.substr(0, sep);
-}
+perfetto::PerfettoCmd* g_consumer_cmd;
 
 }  // namespace
 
@@ -206,6 +202,20 @@ int PerfettoCmd::Main(int argc, char** argv) {
   if (!limiter.ShouldTrace(args))
     return 1;
 
+  // Setup signal handler.
+  struct sigaction sa {};
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
+  sa.sa_handler = [](int) {
+    PERFETTO_LOG("SIGINT received: disabling tracing");
+    g_consumer_cmd->PostDisableRequest();
+  };
+  sa.sa_flags = SA_RESETHAND | SA_RESTART;
+#pragma GCC diagnostic pop
+  sigaction(SIGINT, &sa, nullptr);
+
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
   task_runner_.Run();
@@ -222,13 +232,18 @@ void PerfettoCmd::OnConnect() {
       trace_config_->duration_ms());
   PERFETTO_DCHECK(trace_config_);
   trace_config_->set_enable_extra_guardrails(!dropbox_tag_.empty());
-  consumer_endpoint_->EnableTracing(*trace_config_);
-  task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnStopTraceTimer, this),
-                               trace_config_->duration_ms());
+
+  base::ScopedFile optional_fd;
+  if (trace_config_->write_into_file())
+    optional_fd.reset(dup(fileno(*trace_out_stream_)));
+
+  consumer_endpoint_->EnableTracing(*trace_config_, std::move(optional_fd));
 
   // Failsafe mechanism to avoid waiting indefinitely if the service hangs.
-  task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnTimeout, this),
-                               trace_config_->duration_ms() * 2);
+  if (trace_config_->duration_ms()) {
+    task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnTimeout, this),
+                                 trace_config_->duration_ms() * 2);
+  }
 }
 
 void PerfettoCmd::OnDisconnect() {
@@ -236,20 +251,13 @@ void PerfettoCmd::OnDisconnect() {
   task_runner_.Quit();
 }
 
-void PerfettoCmd::OnTracingStop() {
-  PERFETTO_LOG("OnTracingStop()");
-  // TODO here.
-}
-
-void PerfettoCmd::OnStopTraceTimer() {
-  PERFETTO_LOG("Timer expired, disabling tracing and collecting results");
-  consumer_endpoint_->DisableTracing();
-  consumer_endpoint_->ReadBuffers();
-}
-
 void PerfettoCmd::OnTimeout() {
   PERFETTO_ELOG("Timed out while waiting for trace from the service, aborting");
   task_runner_.Quit();
+}
+
+void PerfettoCmd::PostDisableRequest() {
+  task_runner_.PostTask([this] { consumer_endpoint_->DisableTracing(); });
 }
 
 void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
@@ -266,19 +274,28 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
              trace_out_stream_.get());
     }
   }
-  if (has_more)
-    return;
 
-  // Reached end of trace.
-  task_runner_.Quit();
+  if (!has_more)
+    FinalizeFileAndExit();  // Reached end of trace.
+}
 
+void PerfettoCmd::OnTracingStop() {
+  if (trace_config_->write_into_file()) {
+    // If write_into_file == true, at this point the passed file contains
+    // already all the packets.
+    return FinalizeFileAndExit();
+  }
+  // This will cause a bunch of OnTraceData callbacks. The last one will
+  // save the file and exit.
+  consumer_endpoint_->ReadBuffers();
+}
+
+void PerfettoCmd::FinalizeFileAndExit() {
   fflush(*trace_out_stream_);
+  fseek(*trace_out_stream_, 0, SEEK_END);
   long bytes_written = ftell(*trace_out_stream_);
-
   if (dropbox_tag_.empty()) {
     trace_out_stream_.reset();
-    PERFETTO_CHECK(
-        rename(tmp_trace_out_path_.c_str(), trace_out_path_.c_str()) == 0);
     PERFETTO_ILOG("Wrote %ld bytes into %s", bytes_written,
                   trace_out_path_.c_str());
   } else {
@@ -308,6 +325,7 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   }
   did_process_full_trace_ = true;
+  task_runner_.Quit();
 }
 
 bool PerfettoCmd::OpenOutputFile() {
@@ -327,10 +345,7 @@ bool PerfettoCmd::OpenOutputFile() {
     PERFETTO_CHECK(false);
 #endif
   } else {
-    // Otherwise create a temporary file in the directory where the final trace
-    // is going to be.
-    tmp_trace_out_path_ = GetDirName(trace_out_path_) + "/perfetto-traceXXXXXX";
-    fd.reset(mkstemp(&tmp_trace_out_path_[0]));
+    fd.reset(open(trace_out_path_.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600));
   }
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
@@ -339,8 +354,8 @@ bool PerfettoCmd::OpenOutputFile() {
 
 int __attribute__((visibility("default")))
 PerfettoCmdMain(int argc, char** argv) {
-  perfetto::PerfettoCmd consumer_cmd;
-  return consumer_cmd.Main(argc, argv);
+  g_consumer_cmd = new perfetto::PerfettoCmd();
+  return g_consumer_cmd->Main(argc, argv);
 }
 
 }  // namespace perfetto

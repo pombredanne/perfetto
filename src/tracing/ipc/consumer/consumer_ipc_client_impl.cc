@@ -64,7 +64,8 @@ void ConsumerIPCClientImpl::OnDisconnect() {
   consumer_->OnDisconnect();
 }
 
-void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config) {
+void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
+                                          base::ScopedFile fd) {
   if (!connected_) {
     PERFETTO_DLOG("Cannot EnableTracing(), not connected to tracing service");
     return;
@@ -83,7 +84,10 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config) {
         if (!response || response->stopped())
           weak_this->consumer_->OnTracingStop();
       });
-  consumer_port_.EnableTracing(req, std::move(async_response));
+
+  // |fd| will be closed when this function returns, but it's fine because the
+  // IPC layer dup()'s it when sending the IPC.
+  consumer_port_.EnableTracing(req, std::move(async_response), *fd);
 }
 
 void ConsumerIPCClientImpl::DisableTracing() {
@@ -120,29 +124,6 @@ void ConsumerIPCClientImpl::ReadBuffers() {
       });
   consumer_port_.ReadBuffers(protos::ReadBuffersRequest(),
                              std::move(async_response));
-}
-
-void ConsumerIPCClientImpl::ReadBuffersIntoFile(base::ScopedFile fd,
-                                                uint32_t period_ms,
-                                                size_t max_file_size_bytes) {
-  if (!connected_) {
-    PERFETTO_DLOG(
-        "Cannot ReadBuffersIntoFile(), not connected to tracing service");
-    return;
-  }
-
-  ipc::Deferred<protos::ReadBuffersIntoFileResponse> async_response;
-  async_response.Bind(
-      [](ipc::AsyncResult<protos::ReadBuffersIntoFileResponse> response) {
-        if (!response)
-          PERFETTO_DLOG("ReadBuffersIntoFile() failed");
-      });
-  protos::ReadBuffersIntoFileRequest req;
-  req.set_write_period_ms(period_ms);
-  req.set_max_file_size_bytes(max_file_size_bytes);
-  consumer_port_.ReadBuffersIntoFile(req, std::move(async_response), *fd);
-  // |fd| at this point will go out of scope and close the fd. But the IPC layer
-  // has duped it just above and passed to the service.
 }
 
 void ConsumerIPCClientImpl::OnReadBuffersResponse(

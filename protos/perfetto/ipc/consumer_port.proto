@@ -32,8 +32,7 @@ service ConsumerPort {
 
   // Enables tracing for one or more data sources. At least one buffer must have
   // been previously created.
-  rpc EnableTracing(EnableTracingRequest)
-      returns (stream EnableTracingResponse) {}
+  rpc EnableTracing(EnableTracingRequest) returns (EnableTracingResponse) {}
 
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
@@ -44,11 +43,6 @@ service ConsumerPort {
   // carrying one or more TracePacket(s). An EOF flag is attached to the last
   // ReadBufferResponse through the |has_more| == false field.
   rpc ReadBuffers(ReadBuffersRequest) returns (stream ReadBuffersResponse) {}
-
-  // Like ReadBuffers() but instead of returning the stream of packets to the
-  // consumer, it writes them into the passed file descriptor.
-  rpc ReadBuffersIntoFile(ReadBuffersIntoFileRequest)
-      returns (stream ReadBuffersIntoFileResponse) {}
 
   // Destroys the buffers previously created. Note: all buffers are destroyed
   // implicitly if the Consumer disconnects.
@@ -100,20 +94,6 @@ message ReadBuffersResponse {
   // Perhaps we should just cap the size of a TracePacket to a lower size?
   repeated bytes trace_packets = 2;
 }
-
-// Arguments for rpc ReadBuffersIntoFile().
-message ReadBuffersIntoFileRequest {
-  // Determines how frequently the service will read the trace buffer(s) and
-  // write them into the passed file descriptor. A period == 0 means that the
-  // service will perform only a one-shot read. When set, the period will be
-  // capped at a minimum of 100 ms.
-  optional uint32 write_period_ms = 1;
-
-  // Stop the periodic writing after having written the given amount of bytes.
-  optional uint64 max_file_size_bytes = 2;
-}
-
-message ReadBuffersIntoFileResponse {}
 
 // Arguments for rpc FreeBuffers().
 message FreeBuffersRequest {

@@ -35,7 +35,9 @@
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/core/trace_writer.h"
 #include "src/tracing/core/packet_stream_validator.h"
+#include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/core/trace_buffer.h"
 
 #include "perfetto/trace/clock_snapshot.pb.h"
@@ -52,6 +54,9 @@ namespace perfetto {
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
+// TODO(primiano): How come we can't set this higher?
+constexpr size_t kMaxShmPageSizeKb = 16ul;
+constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 constexpr int kMinWriteIntoFilePeriodMs = 100;
@@ -164,7 +169,8 @@ void ServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
 }
 
 bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
-                                const TraceConfig& cfg) {
+                                const TraceConfig& cfg,
+                                base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("Enabling tracing for consumer %p",
                 reinterpret_cast<void*>(consumer));
@@ -226,6 +232,21 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   tracing_session =
       &tracing_sessions_.emplace(tsid, TracingSession(consumer, cfg))
            .first->second;
+
+  if (cfg.write_into_file()) {
+    if (!fd) {
+      PERFETTO_ELOG(
+          "The TraceConfig had write_into_file==true but no fd was passed");
+      return false;
+    }
+    tracing_session->write_into_file = std::move(fd);
+    uint32_t write_period_ms = cfg.file_write_period_ms();
+    if (write_period_ms < kMinWriteIntoFilePeriodMs)
+      write_period_ms = kMinWriteIntoFilePeriodMs;
+    tracing_session->write_period_ms = write_period_ms;
+    tracing_session->max_file_size_bytes = cfg.max_file_size_bytes();
+    tracing_session->bytes_written_into_file = 0;
+  }
 
   // Initialize the log buffers.
   bool did_allocate_all_buffers = true;
@@ -293,6 +314,17 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
         cfg.duration_ms());
   }
 
+  // Start the periodic drain tasks if we should to save the trace into a file.
+  if (cfg.write_into_file()) {
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_this, tsid] {
+          if (weak_this)
+            weak_this->ReadBuffers(tsid, true /*read_into_file*/, nullptr);
+        },
+        tracing_session->write_period_ms);
+  }
+
   PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
                " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
                cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
@@ -345,14 +377,28 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     return;  // TODO(primiano): signal failure?
   }
 
-  // This can happen if the Consumer calls ReadBuffersIntoFile() with an empty
-  // fd, to stop the reads.
+  // This can happen if the file is closed by a previous task because it reaches
+  // |max_file_size_bytes|.
   if (write_into_file && !tracing_session->write_into_file)
     return;
 
+  if (tracing_session->write_into_file && !write_into_file) {
+    // If the consumer enabled tracing and asked to save the contents into the
+    // passed file makes little sense to also try to read the buffers over IPC,
+    // as that would just steal data from the periodic draining task.
+    PERFETTO_DCHECK(false);
+    return;
+  }
+
   std::vector<TracePacket> packets;
-  size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
   MaybeSnapshotClocks(tracing_session, &packets);
+
+  size_t packets_bytes = 0;  // SUM(slice.size() for each slice in |packets|).
+  size_t total_slices = 0;   // SUM(#slices in |packets|).
+  for (const TracePacket& packet : packets) {
+    packets_bytes += packet.size();
+    total_slices += packet.slices().size();
+  }
 
   // This is a rough threshold to determine how to split packets within each
   // IPC. This is not an upper bound, we just stop accumulating packets and send
@@ -360,7 +406,6 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   // will be >= kApproxBytesPerRead).
   static constexpr size_t kApproxBytesPerRead = 4096;
   bool did_hit_threshold = false;
-  size_t total_slices = 0;
 
   // TODO(primiano): Extend the ReadBuffers API to allow reading only some
   // buffers, not all of them in one go.
@@ -413,8 +458,9 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     }  // for(packets...)
   }    // for(buffers...)
 
-  // If the caller asked us to write into a file via a ReadBuffersIntoFile()
-  // call, drain the packets read (if any) into the given file descriptor.
+  // If the caller asked us to write into a file by setting
+  // |write_into_file| == true in the trace config, drain the packets read
+  // (if any) into the given file descriptor.
   if (write_into_file) {
     // When writing into a file, the file should look like a root trace.proto
     // message. Each packet should be prepended with a proto preamble stating
@@ -439,22 +485,29 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
     size_t total_wr_size = 0;
     bool stop_writing_into_file = tracing_session->write_period_ms == 0;
+
+    // writev() can take at most IOV_MAX entries per call. Batch them.
     for (size_t i = 0; i < num_iovecs; i += IOV_MAX) {
       size_t batch = std::min(num_iovecs - i, static_cast<size_t>(IOV_MAX));
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], batch));
-      if (wr_size == -1 && (errno == ENOSPC || errno == EDQUOT))
+      if (wr_size <= 0) {
         stop_writing_into_file = true;
-      else if (wr_size <= 0)
         PERFETTO_PLOG("writev() failed");
+      }
       total_wr_size += wr_size;
     }
     PERFETTO_DCHECK(total_wr_size == packets_bytes);
     tracing_session->bytes_written_into_file += total_wr_size;
-    stop_writing_into_file |= tracing_session->bytes_written_into_file >=
-                              tracing_session->max_file_size_bytes;
+    if (tracing_session->max_file_size_bytes) {
+      stop_writing_into_file |= tracing_session->bytes_written_into_file >=
+                                tracing_session->max_file_size_bytes;
+    }
+    PERFETTO_DLOG("Draining into file, written: %zu, stop: %d", total_wr_size,
+                  stop_writing_into_file);
     if (stop_writing_into_file) {
       tracing_session->write_into_file.reset();
       tracing_session->write_period_ms = 0;
+      DisableTracing(tsid);
     } else {
       auto weak_this = weak_ptr_factory_.GetWeakPtr();
       task_runner_->PostDelayedTask(
@@ -481,28 +534,6 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
   // Keep this as tail call, just in case the consumer re-enters.
   consumer->consumer_->OnTraceData(std::move(packets), has_more);
-}
-
-void ServiceImpl::ReadBuffersIntoFile(TracingSessionID tsid,
-                                      base::ScopedFile fd,
-                                      uint32_t period_ms,
-                                      size_t max_file_size_bytes) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  TracingSession* tracing_session = GetTracingSession(tsid);
-  if (!tracing_session) {
-    PERFETTO_DLOG(
-        "Consumer invoked ReadBuffersIntoFile() but no tracing session is "
-        "active");
-    return;  // TODO(primiano): signal failure?
-  }
-  tracing_session->write_into_file = std::move(fd);
-  tracing_session->write_period_ms = period_ms;
-  tracing_session->max_file_size_bytes = max_file_size_bytes;
-  tracing_session->bytes_written_into_file = 0;
-  if (period_ms > 0 && period_ms < kMinWriteIntoFilePeriodMs)
-    tracing_session->write_period_ms = kMinWriteIntoFilePeriodMs;
-
-  ReadBuffers(tsid, true /*read_into_file*/, nullptr);
 }
 
 void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
@@ -646,9 +677,10 @@ void ServiceImpl::CreateDataSourceInstance(
   if (!producer->shared_memory()) {
     // TODO(taylori): Handle multiple producers/producer configs.
     producer->shared_buffer_page_size_kb_ =
-        (tracing_session->GetDesiredPageSizeKb() == 0)
-            ? base::kPageSize / 1024  // default
-            : tracing_session->GetDesiredPageSizeKb();
+        std::min((tracing_session->GetDesiredPageSizeKb() == 0)
+                     ? kDefaultShmPageSizeKb
+                     : tracing_session->GetDesiredPageSizeKb(),
+                 kMaxShmPageSizeKb);
     size_t shm_size =
         std::min(tracing_session->GetDesiredShmSizeKb() * 1024, kMaxShmSize);
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
@@ -872,9 +904,10 @@ void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingStop() {
   });
 }
 
-void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg) {
+void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg,
+                                                      base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (!service_->EnableTracing(this, cfg))
+  if (!service_->EnableTracing(this, cfg, std::move(fd)))
     NotifyOnTracingStop();
 }
 
@@ -893,20 +926,6 @@ void ServiceImpl::ConsumerEndpointImpl::ReadBuffers() {
     service_->ReadBuffers(tracing_session_id_, false /*write_into_file*/, this);
   } else {
     PERFETTO_LOG("Consumer called ReadBuffers() but tracing was not active");
-  }
-}
-
-void ServiceImpl::ConsumerEndpointImpl::ReadBuffersIntoFile(
-    base::ScopedFile fd,
-    uint32_t period_ms,
-    size_t max_file_size_bytes) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (tracing_session_id_) {
-    service_->ReadBuffersIntoFile(tracing_session_id_, std::move(fd), period_ms,
-                                  max_file_size_bytes);
-  } else {
-    PERFETTO_LOG(
-        "Consumer called ReadBuffersIntoFile() but tracing was not active");
   }
 }
 
@@ -1045,13 +1064,14 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
 }
 
 std::unique_ptr<TraceWriter>
-ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID) {
+ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  // TODO(primiano): not implemented yet.
-  // This code path is hit only in in-process configuration, where tracing
-  // Service and Producer are hosted in the same process. It's a use case we
-  // want to support, but not too interesting right now.
-  PERFETTO_CHECK(false);
+  if (!inproc_shmem_arbiter_) {
+    inproc_shmem_arbiter_.reset(new SharedMemoryArbiterImpl(
+        shared_memory_->start(), shared_memory_->size(),
+        shared_buffer_page_size_kb_ * 1024, this, task_runner_));
+  }
+  return inproc_shmem_arbiter_->CreateTraceWriter(buf_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

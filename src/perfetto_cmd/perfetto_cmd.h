@@ -58,8 +58,9 @@ class PerfettoCmd : public Consumer {
  public:
   int Main(int argc, char** argv);
   int PrintUsage(const char* argv0);
-  void OnStopTraceTimer();
   void OnTimeout();
+  void PostDisableRequest();
+  void FinalizeFileAndExit();
 
   // perfetto::Consumer implementation.
   void OnConnect() override;
@@ -75,9 +76,6 @@ class PerfettoCmd : public Consumer {
   std::unique_ptr<TraceConfig> trace_config_;
   base::ScopedFstream trace_out_stream_;
   std::string trace_out_path_;
-
-  // Only used if linkat(AT_FDCWD) isn't available.
-  std::string tmp_trace_out_path_;
 
   std::string dropbox_tag_;
   bool did_process_full_trace_ = false;

@@ -23,6 +23,7 @@
 #include <memory>
 #include <vector>
 
+#include "perfetto/base/export.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory.h"
@@ -53,7 +54,7 @@ class TraceWriter;
 //
 // Subclassed by:
 //   The service business logic in src/core/service_impl.cc.
-class Service {
+class PERFETTO_EXPORT Service {
  public:
   // The API for the Producer port of the Service.
   // Subclassed by:
@@ -110,19 +111,14 @@ class Service {
    public:
     virtual ~ConsumerEndpoint() = default;
 
-    virtual void EnableTracing(const TraceConfig&) = 0;
+    // Enables tracing with the given TraceConfig. The ScopedFile argument is
+    // used only when TraceConfig.write_into_file == true.
+    virtual void EnableTracing(const TraceConfig&,
+                               base::ScopedFile = base::ScopedFile()) = 0;
     virtual void DisableTracing() = 0;
 
     // Tracing data will be delivered invoking Consumer::OnTraceData().
     virtual void ReadBuffers() = 0;
-
-    // Like ReadBuffers() but, instead of handing the tracing data back to the
-    // caller, saves it into the passed file. If |period_ms| == 0, the service
-    // will perform just a one shot read. |period| is capped at a minimum of
-    // 100 ms when non-zero.
-    virtual void ReadBuffersIntoFile(base::ScopedFile,
-                                     uint32_t period_ms,
-                                     size_t max_file_size_bytes = 0) = 0;
 
     virtual void FreeBuffers() = 0;
   };  // class ConsumerEndpoint.
