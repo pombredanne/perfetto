@@ -319,7 +319,7 @@ bool PerfettoCmd::OpenOutputFile() {
       return false;
     }
 #else
-    PERFETTO_CHECK(false);
+    PERFETTO_FATAL("Tracing to Dropbox requires the Android build.");
 #endif
   } else {
     // Otherwise create a temporary file in the directory where the final trace
