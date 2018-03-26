@@ -19,6 +19,7 @@
 
 #include <map>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include "perfetto/base/task_runner.h"
@@ -145,7 +146,8 @@ class ProbesProducer : public Producer {
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
       file_map_sources_;
   LRUInodeCache cache_{kLRUInodeCacheSize};
-  std::map<BlockDeviceID, std::map<Inode, InodeMapValue>> system_inodes_;
+  std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>
+      system_inodes_;
 };
 
 }  // namespace perfetto

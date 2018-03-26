@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <queue>
+#include <unordered_map>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
@@ -84,7 +85,8 @@ void ScanFilesDFS(
 
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map) {
+    std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+        static_file_map) {
   ScanFilesDFS(root_directory,
                [static_file_map](BlockDeviceID block_device_id,
                                  Inode inode_number, const std::string& path,
@@ -109,7 +111,8 @@ void FillInodeEntry(InodeFileMap* destination,
 
 InodeFileDataSource::InodeFileDataSource(
     TracingSessionID id,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map,
+    std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+        static_file_map,
     LRUInodeCache* cache,
     std::unique_ptr<TraceWriter> writer)
     : session_id_(id),
