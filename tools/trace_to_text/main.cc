@@ -2202,7 +2202,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   // tokenize the repeated TracePacket messages and parse them individually
   // using libprotobuf.
   for (;;) {
-    fprintf(stderr, "%8zu KB processed\r", bytes_processed / 1024);
+    fprintf(stderr, "Processing trace: %8zu KB\r", bytes_processed / 1024);
     fflush(stderr);
     // A TracePacket consists in one byte stating its field if and type ...
     char preamble;
@@ -2793,8 +2793,17 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   *output << kTraceHeader;
   *output << kFtraceHeader;
 
-  for (auto it = sorted.begin(); it != sorted.end(); it++)
+  fprintf(stderr, "\n");
+  size_t total_events = sorted.size();
+  size_t written_events = 0;
+  for (auto it = sorted.begin(); it != sorted.end(); it++) {
     *output << it->second;
+    if (written_events++ % 100 == 0) {
+      fprintf(stderr, "Writing trace: %.2f %%\r",
+              written_events * 100.0 / total_events);
+      fflush(stderr);
+    }
+  }
 
   *output << kTraceFooter;
 
