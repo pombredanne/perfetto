@@ -20,6 +20,7 @@
 #include "perfetto/base/scoped_file.h"
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdint.h>
 #include <fstream>
@@ -165,7 +166,10 @@ void Watchdog::CheckMemory(uint64_t rss_bytes) {
   // remains under our threshold.
   if (memory_window_bytes_.Push(rss_bytes)) {
     if (memory_window_bytes_.Mean() > memory_limit_bytes_) {
-      PERFETTO_ELOG("Memory watchdog trigger.");
+      PERFETTO_ELOG(
+          "Memory watchdog trigger. Memory window of %f bytes is above the "
+          "%" PRIu32 " bytes limit.",
+          memory_window_bytes_.Mean(), memory_limit_bytes_);
       kill(getpid(), SIGABRT);
     }
   }
@@ -188,7 +192,10 @@ void Watchdog::CheckCpu(uint64_t cpu_time) {
     double percentage = static_cast<double>(difference_ticks) /
                         static_cast<double>(window_interval_ticks) * 100;
     if (percentage > cpu_limit_percentage_) {
-      PERFETTO_ELOG("CPU watchdog trigger.");
+      PERFETTO_ELOG(
+          "CPU watchdog trigger. CPU percentage %f is above the %" PRIu32
+          " percentage limit.",
+          percentage, cpu_limit_percentage_);
       kill(getpid(), SIGABRT);
     }
   }
