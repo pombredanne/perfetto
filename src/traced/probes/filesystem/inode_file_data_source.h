@@ -24,6 +24,7 @@
 #include <set>
 #include <string>
 
+#include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/data_source_types.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -57,10 +58,13 @@ void FillInodeEntry(InodeFileMap* destination,
 class InodeFileDataSource {
  public:
   InodeFileDataSource(
+      base::TaskRunner*,
       TracingSessionID,
       std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map,
       LRUInodeCache* cache,
       std::unique_ptr<TraceWriter> writer);
+
+  ~InodeFileDataSource();
 
   TracingSessionID session_id() const { return session_id_; }
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
@@ -88,11 +92,15 @@ class InodeFileDataSource {
                              InodeFileMap* destination);
 
  private:
+  void FindMissingInodes(BlockDeviceID);
+
+  base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map_;
   LRUInodeCache* cache_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
+  std::map<BlockDeviceID, std::set<Inode>> missing_inodes_;
   base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 
