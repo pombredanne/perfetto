@@ -92,7 +92,7 @@ class InodeFileDataSource {
                              InodeFileMap* destination);
 
  private:
-  void FindMissingInodes(BlockDeviceID);
+  void FindMissingInodes();
 
   base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
