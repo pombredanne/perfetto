@@ -55,10 +55,8 @@ void ProcessStatsDataSource::WriteAllProcesses() {
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   for (int32_t pid : pids) {
-    PERFETTO_LOG("a %d", pid);
     if (seen_pids_.count(pid))
       continue;
-    PERFETTO_LOG("b %d", pid);
     WriteProcess(pid, writer_.get());
     seen_pids_.insert(pid);
   }
