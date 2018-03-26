@@ -392,8 +392,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
-    PERFETTO_DLOG(
-        "Consumer invoked ReadBuffers() but no tracing session is active");
+    PERFETTO_DLOG("Cannot ReadBuffers(): no tracing session is active");
     return;  // TODO(primiano): signal failure?
   }
 
@@ -565,8 +564,7 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
   PERFETTO_DLOG("Freeing buffers for session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
-    PERFETTO_DLOG(
-        "Consumer invoked FreeBuffers() but no tracing session is active");
+    PERFETTO_DLOG("Cannot FreeBuffers(): no tracing session is active");
     return;  // TODO(primiano): signal failure?
   }
   DisableTracing(tsid);
