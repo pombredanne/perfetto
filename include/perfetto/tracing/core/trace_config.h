@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/export.h"
+
 #include "perfetto/tracing/core/data_source_config.h"
 
 // Forward declarations for protobuf types.
@@ -52,9 +54,9 @@ class TraceConfig_StatsdMetadata;
 
 namespace perfetto {
 
-class TraceConfig {
+class PERFETTO_EXPORT TraceConfig {
  public:
-  class BufferConfig {
+  class PERFETTO_EXPORT BufferConfig {
    public:
     enum OptimizeFor {
       DEFAULT = 0,
@@ -94,7 +96,7 @@ class TraceConfig {
     std::string unknown_fields_;
   };
 
-  class DataSource {
+  class PERFETTO_EXPORT DataSource {
    public:
     DataSource();
     ~DataSource();
@@ -136,7 +138,7 @@ class TraceConfig {
     LOCKDOWN_SET = 2,
   };
 
-  class ProducerConfig {
+  class PERFETTO_EXPORT ProducerConfig {
    public:
     ProducerConfig();
     ~ProducerConfig();
