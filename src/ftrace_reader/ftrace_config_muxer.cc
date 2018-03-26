@@ -90,8 +90,6 @@ FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
       return 0;
 
     // If we're about to turn tracing on use this opportunity do some setup:
-    if (RequiresAtrace(request))
-      EnableAtrace(request);
     SetupClock(request);
     SetupBufferSize(request);
   } else {
@@ -101,6 +99,9 @@ FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
   }
 
   std::set<std::string> events = GetFtraceEvents(request);
+
+  if (RequiresAtrace(request))
+    UpdateAtrace(request);
 
   for (auto& name : events) {
     const Event* event = table_->GetEventByName(name);
@@ -193,14 +194,13 @@ void FtraceConfigMuxer::SetupBufferSize(const FtraceConfig& request) {
   current_state_.cpu_buffer_size_pages = pages;
 }
 
-void FtraceConfigMuxer::EnableAtrace(const FtraceConfig& request) {
-  PERFETTO_DCHECK(!current_state_.atrace_on);
-
-  PERFETTO_DLOG("Start atrace...");
+void FtraceConfigMuxer::UpdateAtrace(const FtraceConfig& request) {
+  PERFETTO_DLOG("Update atrace config...");
 
   std::vector<std::string> args;
   args.push_back("atrace");  // argv0 for exec()
   args.push_back("--async_start");
+  args.push_back("--only_userspace");
   for (const auto& category : request.atrace_categories())
     args.push_back(category);
   if (!request.atrace_apps().empty()) {
@@ -220,7 +220,7 @@ void FtraceConfigMuxer::DisableAtrace() {
 
   PERFETTO_DLOG("Stop atrace...");
 
-  if (RunAtrace({"atrace", "--async_stop"}))
+  if (RunAtrace({"atrace", "--async_stop", "--only_userspace"}))
     current_state_.atrace_on = false;
 
   PERFETTO_DLOG("...done");
