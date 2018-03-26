@@ -49,7 +49,7 @@ void ScanFilesDFS(
 // Creates block_device_map for /system partition
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
-    std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+    std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
         static_file_map);
 
 void FillInodeEntry(InodeFileMap* destination,
@@ -60,7 +60,7 @@ class InodeFileDataSource {
  public:
   InodeFileDataSource(
       TracingSessionID,
-      std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+      std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
           static_file_map,
       LRUInodeCache* cache,
       std::unique_ptr<TraceWriter> writer);
@@ -92,7 +92,7 @@ class InodeFileDataSource {
 
  private:
   const TracingSessionID session_id_;
-  std::unordered_map<BlockDeviceID, std::map<Inode, InodeMapValue>>*
+  std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
       static_file_map_;
   LRUInodeCache* cache_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
