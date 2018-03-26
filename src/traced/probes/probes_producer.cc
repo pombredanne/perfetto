@@ -40,9 +40,9 @@ namespace {
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
-const char* kFtraceSourceName = "com.google.perfetto.ftrace";
-const char* kProcessStatsSourceName = "com.google.perfetto.process_stats";
-const char* kInodeMapSourceName = "com.google.perfetto.inode_file_map";
+constexpr char kFtraceSourceName[] = "com.google.perfetto.ftrace";
+constexpr char kProcessStatsSourceName[] = "com.google.perfetto.process_stats";
+constexpr char kInodeMapSourceName[] = "com.google.perfetto.inode_file_map";
 
 }  // namespace.
 
@@ -186,10 +186,10 @@ void ProbesProducer::CreateInodeFileDataSourceInstance(
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   if (system_inodes_.empty())
-    CreateDeviceToInodeMap("/system/", &system_inodes_);
+    CreateStaticDeviceToInodeMap("/system/", &system_inodes_);
   auto file_map_source =
       std::unique_ptr<InodeFileDataSource>(new InodeFileDataSource(
-          session_id, &system_inodes_, std::move(trace_writer)));
+          session_id, &system_inodes_, &cache_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
 }
@@ -218,6 +218,9 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   file_map_sources_.erase(id);
   watchdogs_.erase(id);
 }
+
+void ProbesProducer::OnTracingStart() {}
+void ProbesProducer::OnTracingStop() {}
 
 void ProbesProducer::ConnectWithRetries(const char* socket_name,
                                         base::TaskRunner* task_runner) {

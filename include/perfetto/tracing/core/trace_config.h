@@ -33,6 +33,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "perfetto/base/export.h"
+
 #include "perfetto/tracing/core/data_source_config.h"
 
 // Forward declarations for protobuf types.
@@ -45,14 +47,15 @@ class DataSourceConfig;
 class FtraceConfig;
 class ChromeConfig;
 class TestConfig;
+class TraceConfig_ProducerConfig;
 }  // namespace protos
 }  // namespace perfetto
 
 namespace perfetto {
 
-class TraceConfig {
+class PERFETTO_EXPORT TraceConfig {
  public:
-  class BufferConfig {
+  class PERFETTO_EXPORT BufferConfig {
    public:
     enum OptimizeFor {
       DEFAULT = 0,
@@ -92,7 +95,7 @@ class TraceConfig {
     std::string unknown_fields_;
   };
 
-  class DataSource {
+  class PERFETTO_EXPORT DataSource {
    public:
     DataSource();
     ~DataSource();
@@ -133,6 +136,39 @@ class TraceConfig {
     LOCKDOWN_CLEAR = 1,
     LOCKDOWN_SET = 2,
   };
+
+  class PERFETTO_EXPORT ProducerConfig {
+   public:
+    ProducerConfig();
+    ~ProducerConfig();
+    ProducerConfig(ProducerConfig&&) noexcept;
+    ProducerConfig& operator=(ProducerConfig&&);
+    ProducerConfig(const ProducerConfig&);
+    ProducerConfig& operator=(const ProducerConfig&);
+
+    // Conversion methods from/to the corresponding protobuf types.
+    void FromProto(const perfetto::protos::TraceConfig_ProducerConfig&);
+    void ToProto(perfetto::protos::TraceConfig_ProducerConfig*) const;
+
+    const std::string& producer_name() const { return producer_name_; }
+    void set_producer_name(const std::string& value) { producer_name_ = value; }
+
+    uint32_t shm_size_kb() const { return shm_size_kb_; }
+    void set_shm_size_kb(uint32_t value) { shm_size_kb_ = value; }
+
+    uint32_t page_size_kb() const { return page_size_kb_; }
+    void set_page_size_kb(uint32_t value) { page_size_kb_ = value; }
+
+   private:
+    std::string producer_name_ = {};
+    uint32_t shm_size_kb_ = {};
+    uint32_t page_size_kb_ = {};
+
+    // Allows to preserve unknown protobuf fields for compatibility
+    // with future versions of .proto files.
+    std::string unknown_fields_;
+  };
+
   TraceConfig();
   ~TraceConfig();
   TraceConfig(TraceConfig&&) noexcept;
@@ -173,12 +209,20 @@ class TraceConfig {
     lockdown_mode_ = value;
   }
 
+  int producers_size() const { return static_cast<int>(producers_.size()); }
+  const std::vector<ProducerConfig>& producers() const { return producers_; }
+  ProducerConfig* add_producers() {
+    producers_.emplace_back();
+    return &producers_.back();
+  }
+
  private:
   std::vector<BufferConfig> buffers_;
   std::vector<DataSource> data_sources_;
   uint32_t duration_ms_ = {};
   bool enable_extra_guardrails_ = {};
   LockdownModeOperation lockdown_mode_ = {};
+  std::vector<ProducerConfig> producers_;
 
   // Allows to preserve unknown protobuf fields for compatibility
   // with future versions of .proto files.

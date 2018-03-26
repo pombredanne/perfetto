@@ -31,10 +31,10 @@ namespace perfetto {
 namespace {
 
 // trace_clocks in preference order.
-const char* kClocks[] = {"boot", "global", "local"};
+constexpr const char* kClocks[] = {"boot", "global", "local"};
 
-const int kDefaultPerCpuBufferSizeKb = 512;   // 512kb
-const int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
+constexpr int kDefaultPerCpuBufferSizeKb = 512;   // 512kb
+constexpr int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
 
 std::vector<std::string> difference(const std::set<std::string>& a,
                                     const std::set<std::string>& b) {
@@ -65,7 +65,7 @@ std::set<std::string> GetFtraceEvents(const FtraceConfig& request,
     events.insert("print");
 
     // Ideally we should keep this code in sync with:
-    // android.googlesource.com/platform/frameworks/native/+/master/cmds/atrace/atrace.cpp
+    // platform/frameworks/native/cmds/atrace/atrace.cpp
     // It's not a disaster if they go out of sync, we can always add the ftrace
     // categories manually server side but this is user friendly and reduces the
     // size of the configs.
