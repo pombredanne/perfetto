@@ -192,10 +192,9 @@ void Watchdog::CheckCpu(uint64_t cpu_time) {
     double percentage = static_cast<double>(difference_ticks) /
                         static_cast<double>(window_interval_ticks) * 100;
     if (percentage > cpu_limit_percentage_) {
-      PERFETTO_ELOG(
-          "CPU watchdog trigger. CPU percentage %f is above the %" PRIu32
-          " percentage limit.",
-          percentage, cpu_limit_percentage_);
+      PERFETTO_ELOG("CPU watchdog trigger. %f%% CPU use is above the %" PRIu32
+                    "%% CPU limit.",
+                    percentage, cpu_limit_percentage_);
       kill(getpid(), SIGABRT);
     }
   }
