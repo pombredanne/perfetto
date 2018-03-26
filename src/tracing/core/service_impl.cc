@@ -558,13 +558,13 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    producer->shared_buffer_page_size_kb_ = std::min(
+    producer->shared_buffer_page_size_kb_ = std::min<size_t>(
         (producer_config.page_size_kb() == 0) ? kDefaultShmPageSizeKb
                                               : producer_config.page_size_kb(),
         kMaxShmPageSizeKb);
 
     size_t shm_size =
-        std::min(producer_config.shm_size_kb() * 1024ul, kMaxShmSize);
+        std::min<size_t>(producer_config.shm_size_kb() * 1024, kMaxShmSize);
 
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
