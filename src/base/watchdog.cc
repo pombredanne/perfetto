@@ -165,6 +165,7 @@ void Watchdog::CheckMemory(uint64_t rss_bytes) {
   // remains under our threshold.
   if (memory_window_bytes_.Push(rss_bytes)) {
     if (memory_window_bytes_.Mean() > memory_limit_bytes_) {
+      PERFETTO_ELOG("Memory watchdog trigger.");
       kill(getpid(), SIGABRT);
     }
   }
@@ -187,6 +188,7 @@ void Watchdog::CheckCpu(uint64_t cpu_time) {
     double percentage = static_cast<double>(difference_ticks) /
                         static_cast<double>(window_interval_ticks) * 100;
     if (percentage > cpu_limit_percentage_) {
+      PERFETTO_ELOG("CPU watchdog trigger.");
       kill(getpid(), SIGABRT);
     }
   }

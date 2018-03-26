@@ -153,7 +153,8 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
       });
 
   // Could not be found, just add the inode number
-  PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
+  if (inode_numbers->size() != 0)
+    PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
   for (const auto& unresolved_inode : *inode_numbers) {
     auto* entry = destination->add_entries();
     entry->set_inode_number(unresolved_inode);
