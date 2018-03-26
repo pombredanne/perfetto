@@ -201,6 +201,9 @@ class ServiceImpl : public Service {
 
     // When the last clock snapshot was emitted into the output stream.
     base::TimeMillis last_clock_snapshot = {};
+
+    // Whether we mirrored the trace config back to the trace output yet.
+    bool did_emit_config = false;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;
@@ -223,6 +226,7 @@ class ServiceImpl : public Service {
   void UpdateMemoryGuardrail();
 
   void MaybeSnapshotClocks(TracingSession*, std::vector<TracePacket>*);
+  void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
 
   TraceBuffez* GetBufferByID(BufferID);
 
