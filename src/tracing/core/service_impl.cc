@@ -564,7 +564,7 @@ void ServiceImpl::CreateDataSourceInstance(
         kMaxShmPageSizeKb);
 
     size_t shm_size =
-        std::min(producer_config.shm_size_kb() * 1024, kMaxShmSize);
+        std::min(producer_config.shm_size_kb() * 1024ul, kMaxShmSize);
 
     if (shm_size % base::kPageSize || shm_size < base::kPageSize)
       shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
