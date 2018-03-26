@@ -107,8 +107,8 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 
 #define PERFETTO_DLOG(fmt, ...) PERFETTO_XLOG(kLogDebug, fmt, ##__VA_ARGS__)
 
-#define PERFETTO_DPLOG(x) \
-  PERFETTO_DLOG("%s (errno: %d, %s)", (x), errno, strerror(errno))
+#define PERFETTO_DPLOG(x, ...) \
+  PERFETTO_DLOG(x " (errno: %d, %s)", ##__VA_ARGS__, errno, strerror(errno))
 
 #define PERFETTO_DCHECK(x)                      \
   do {                                          \
