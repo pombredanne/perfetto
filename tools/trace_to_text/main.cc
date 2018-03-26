@@ -17,6 +17,10 @@
 #include <inttypes.h>
 
 #include <stdio.h>
+#include <sys/ioctl.h>
+#include <stdio.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iostream>
@@ -27,6 +31,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <limits>
 
 #include <google/protobuf/compiler/importer.h>
 #include <google/protobuf/dynamic_message.h>
@@ -770,28 +775,6 @@ std::string FormatSyncPt(const SyncPtFtraceEvent& event) {
   sprintf(line, "sync_pt: name=%s value=%s\\n", event.timeline().c_str(),
           event.value().c_str());
   return std::string(line);
-}
-
-int TraceToText(std::istream* input, std::ostream* output) {
-  DiskSourceTree dst;
-  dst.MapPath("perfetto", "protos/perfetto");
-  MFE mfe;
-  Importer importer(&dst, &mfe);
-  const FileDescriptor* parsed_file =
-      importer.Import("perfetto/trace/trace.proto");
-
-  DynamicMessageFactory dmf;
-  const Descriptor* trace_descriptor = parsed_file->message_type(0);
-  const Message* msg_root = dmf.GetPrototype(trace_descriptor);
-  Message* msg = msg_root->New();
-
-  if (!msg->ParseFromIstream(input)) {
-    PERFETTO_ELOG("Could not parse input.");
-    return 1;
-  }
-  OstreamOutputStream zero_copy_output(output);
-  TextFormat::Print(*msg, &zero_copy_output);
-  return 0;
 }
 
 std::string FormatSoftirqRaise(const SoftirqRaiseFtraceEvent& event) {
@@ -2810,13 +2793,125 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   return 0;
 }
 
+int TraceToText(std::istream* input, std::ostream* output) {
+  DiskSourceTree dst;
+  dst.MapPath("perfetto", "protos/perfetto");
+  MFE mfe;
+  Importer importer(&dst, &mfe);
+  const FileDescriptor* parsed_file =
+      importer.Import("perfetto/trace/trace.proto");
+
+  DynamicMessageFactory dmf;
+  const Descriptor* trace_descriptor = parsed_file->message_type(0);
+  const Message* msg_root = dmf.GetPrototype(trace_descriptor);
+  Message* msg = msg_root->New();
+
+  if (!msg->ParseFromIstream(input)) {
+    PERFETTO_ELOG("Could not parse input.");
+    return 1;
+  }
+  OstreamOutputStream zero_copy_output(output);
+  TextFormat::Print(*msg, &zero_copy_output);
+  return 0;
+}
+
+int TraceToSummary(std::istream* input, std::ostream* output) {
+  uint64_t start = std::numeric_limits<uint64_t>::max();
+  uint64_t end = 0;
+  std::multiset<uint64_t> ftrace_timestamps;
+
+  size_t bytes_processed = 0;
+  // The trace stream can be very large. We cannot just pass it in one go to
+  // libprotobuf as that will refuse to parse messages > 64MB. However we know
+  // that a trace is merely a sequence of TracePackets. Here we just manually
+  // tokenize the repeated TracePacket messages and parse them individually
+  // using libprotobuf.
+  for (;;) {
+    fprintf(stderr, "Processing trace: %8zu KB\r", bytes_processed / 1024);
+    fflush(stderr);
+    // A TracePacket consists in one byte stating its field if and type ...
+    char preamble;
+    input->get(preamble);
+    if (!input->good())
+      break;
+    bytes_processed++;
+    PERFETTO_DCHECK(preamble == 0x0a);  // Field ID:1, type:length delimited.
+
+    // ... a varint stating its size ...
+    uint32_t field_size = 0;
+    uint32_t shift = 0;
+    for (;;) {
+      char c = 0;
+      input->get(c);
+      field_size |= static_cast<uint32_t>(c & 0x7f) << shift;
+      shift += 7;
+      bytes_processed++;
+      if (!(c & 0x80))
+        break;
+    }
+
+    // ... and the actual TracePacket itself.
+    std::unique_ptr<char[]> buf(new char[field_size]);
+    input->read(buf.get(), field_size);
+    bytes_processed += field_size;
+
+    protos::TracePacket packet;
+    PERFETTO_CHECK(packet.ParseFromArray(buf.get(), field_size));
+
+
+    if (!packet.has_ftrace_events())
+      continue;
+
+    const FtraceEventBundle& bundle = packet.ftrace_events();
+    
+    for (const FtraceEvent& event : bundle.event()) {
+      if (event.timestamp()) {
+        start = std::min<uint64_t>(start, event.timestamp());
+        end = std::max<uint64_t>(end, event.timestamp());
+        ftrace_timestamps.insert(event.timestamp());
+      }
+    }
+
+
+//    fprintf(stderr, "Event!\n");
+  }
+
+  char line[2048];
+  sprintf(line, "Duration: %" PRIu64 "ms\n", (end - start) / (1000 * 1000));
+  *output << std::string(line);
+
+  struct winsize win_size;
+  ioctl(STDOUT_FILENO, TIOCGWINSZ, &win_size);
+  size_t width = win_size.ws_col;
+
+  size_t bucket_count = width-strlen("ftrace ");
+  size_t bucket_size = (end - start) / bucket_count;
+  size_t max = 0;
+  std::vector<size_t> buckets(bucket_count);
+  for (size_t i=0; i<bucket_count; i++) {
+    auto low = ftrace_timestamps.lower_bound(i*bucket_size+start);
+    auto high = ftrace_timestamps.upper_bound((i+1)*bucket_size+start);
+    buckets[i] = std::distance(low, high);
+    max = std::max(max, buckets[i]);
+  }
+
+  std::vector<std::string> out = std::vector<std::string>({" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇"});
+  *output << "ftrace ";
+  for (size_t i=0; i<bucket_count; i++) {
+    sprintf(line, "%s", out[buckets[i] / (max / out.size())].c_str());
+    *output << std::string(line);
+  }
+  *output << "\n";
+  return 0;
+}
+
 }  // namespace
 }  // namespace perfetto
 
 namespace {
 
 int Usage(int argc, char** argv) {
-  printf("Usage: %s [systrace|text] < trace.proto > trace.txt\n", argv[0]);
+  printf("Usage: %s [systrace|text|summary] < trace.proto > trace.txt\n", argv[0]);
   return 1;
 }
 
@@ -2828,14 +2923,15 @@ int main(int argc, char** argv) {
 
   std::string format(argv[1]);
 
-  if (format != "systrace" && format != "text")
-    return Usage(argc, argv);
+  bool is_systrace = format == "systrace";
+  bool is_text = format == "text";
+  bool is_summary = format == "summary";
 
-  bool systrace = format == "systrace";
-
-  if (systrace) {
+  if (is_systrace)
     return perfetto::TraceToSystrace(&std::cin, &std::cout);
-  } else {
+  if (is_text)
     return perfetto::TraceToText(&std::cin, &std::cout);
-  }
+  if (is_summary)
+    return perfetto::TraceToSummary(&std::cin, &std::cout);
+  return Usage(argc, argv);
 }
