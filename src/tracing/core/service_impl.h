@@ -23,6 +23,7 @@
 #include <set>
 
 #include "gtest/gtest_prod.h"
+#include "perfetto/base/logging.h"
 #include "perfetto/base/page_allocator.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/weak_ptr.h"
@@ -154,9 +155,7 @@ class ServiceImpl : public Service {
                      const TraceConfig&,
                      base::ScopedFile);
   void DisableTracing(TracingSessionID);
-  void ReadBuffers(TracingSessionID,
-                   bool write_into_file,
-                   ConsumerEndpointImpl*);
+  void ReadBuffers(TracingSessionID, ConsumerEndpointImpl*);
   void FreeBuffers(TracingSessionID);
 
   // Service implementation.
@@ -200,6 +199,11 @@ class ServiceImpl : public Service {
     // Retrieves the SHM size from the trace config.
     size_t GetDesiredShmSizeKb();
 
+    int next_write_period_ms() const {
+      PERFETTO_DCHECK(write_period_ms);
+      return base::GetWallTimeMs().count() % write_period_ms;
+    }
+
     // The consumer that started the session.
     ConsumerEndpointImpl* const consumer;
 
@@ -218,6 +222,9 @@ class ServiceImpl : public Service {
 
     // When the last clock snapshot was emitted into the output stream.
     base::TimeMillis last_clock_snapshot = {};
+
+    // Whether we mirrored the trace config back to the trace output yet.
+    bool did_emit_config = false;
 
     bool tracing_enabled = false;
 
@@ -250,6 +257,7 @@ class ServiceImpl : public Service {
   void UpdateMemoryGuardrail();
 
   void MaybeSnapshotClocks(TracingSession*, std::vector<TracePacket>*);
+  void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
 
   TraceBuffez* GetBufferByID(BufferID);
 

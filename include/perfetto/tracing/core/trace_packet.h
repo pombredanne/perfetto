@@ -74,7 +74,8 @@ class PERFETTO_EXPORT TracePacket {
 
   // Generates a protobuf preamble suitable to represent this packet as a
   // repeated field within a root trace.proto message.
-  // Returns a pointer to a buffer containing the preamble and its size.
+  // Returns a pointer to a buffer, owned by this class, containing the preamble
+  // and its size.
   std::tuple<char*, size_t> GetProtoPreamble();
 
  private:

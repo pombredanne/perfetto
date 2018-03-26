@@ -2204,7 +2204,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
   for (;;) {
     fprintf(stderr, "Processing trace: %8zu KB\r", bytes_processed / 1024);
     fflush(stderr);
-    // A TracePacket consists in one byte stating its field if and type ...
+    // A TracePacket consists in one byte stating its field id and type ...
     char preamble;
     input->get(preamble);
     if (!input->good())
