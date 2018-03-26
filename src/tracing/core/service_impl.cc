@@ -420,7 +420,6 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
   // Add up size for packets added by the Maybe* calls above.
   for (const TracePacket& packet : packets) {
-    PERFETTO_LOG("  PB += %zu", packet.size());
     packets_bytes += packet.size();
     total_slices += packet.slices().size();
   }
