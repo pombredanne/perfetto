@@ -211,9 +211,6 @@ void InodeFileDataSource::OnInodes(
   if (mount_points_.empty()) {
     mount_points_ = ParseMounts();
   }
-  PERFETTO_DLOG("Mount points found:");
-  for (const auto& p : mount_points_)
-    PERFETTO_DLOG("%lu: %s", p.first, p.second.c_str());
   // Group inodes from FtraceMetadata by block device
   std::map<BlockDeviceID, std::set<Inode>> inode_file_maps;
   for (const auto& inodes_pair : inodes) {
