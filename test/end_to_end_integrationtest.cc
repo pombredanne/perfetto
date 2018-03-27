@@ -112,7 +112,7 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
     total += packets.size();
 
     if (!has_more) {
-      ASSERT_GE(total, static_cast<uint64_t>(sysconf(_SC_NPROCESSORS_CONF)));
+      ASSERT_GT(total, 0u);
       on_readback_complete();
     }
   };
@@ -183,9 +183,10 @@ TEST(PerfettoTest, TestFakeProducer) {
                               std::vector<TracePacket> packets, bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
+      ASSERT_TRUE(packet->has_for_testing() || packet->has_clock_snapshot() ||
+                  packet->has_trace_config());
       if (packet->has_clock_snapshot() || packet->has_trace_config())
         continue;
-      ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
       ASSERT_EQ(packet->for_testing().seq_value(), random());
