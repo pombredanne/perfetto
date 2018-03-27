@@ -57,10 +57,6 @@ using PlatformTaskRunner = base::UnixTaskRunner;
 class PerfettoCmd : public Consumer {
  public:
   int Main(int argc, char** argv);
-  int PrintUsage(const char* argv0);
-  void OnTimeout();
-  void DisableTracingFromSignal();
-  void FinalizeTraceAndExit();
 
   // perfetto::Consumer implementation.
   void OnConnect() override;
@@ -68,15 +64,22 @@ class PerfettoCmd : public Consumer {
   void OnTracingStop() override;
   void OnTraceData(std::vector<TracePacket>, bool has_more) override;
 
+  int ctrl_c_pipe_wr() const { return *ctrl_c_pipe_wr_; }
+
  private:
   bool OpenOutputFile();
+  void SetupCtrlCSignalHandler();
+  void FinalizeTraceAndExit();
+  int PrintUsage(const char* argv0);
+  void OnTimeout();
 
   PlatformTaskRunner task_runner_;
   std::unique_ptr<perfetto::Service::ConsumerEndpoint> consumer_endpoint_;
   std::unique_ptr<TraceConfig> trace_config_;
   base::ScopedFstream trace_out_stream_;
   std::string trace_out_path_;
-
+  base::ScopedFile ctrl_c_pipe_wr_;
+  base::ScopedFile ctrl_c_pipe_rd_;
   std::string dropbox_tag_;
   bool did_process_full_trace_ = false;
   size_t bytes_uploaded_to_dropbox_ = 0;

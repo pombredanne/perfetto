@@ -110,7 +110,7 @@ TEST(TracePacketTest, GetProtoPreamble) {
   // Test packet with one slice.
   protos::TracePacket tp_proto;
   char payload[257];
-  for (size_t i = 0; i < sizeof(payload); i++)
+  for (size_t i = 0; i < sizeof(payload) - 1; i++)
     payload[i] = 'a' + (i % 16);
   payload[sizeof(payload) - 1] = '\0';
   tp_proto.mutable_for_testing()->set_str(payload);

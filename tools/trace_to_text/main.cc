@@ -187,7 +187,7 @@ void ForEachPacketInTrace(
   for (;;) {
     fprintf(stderr, "Processing trace: %8zu KB\r", bytes_processed / 1024);
     fflush(stderr);
-    // A TracePacket consists in one byte stating its field if and type ...
+    // A TracePacket consists in one byte stating its field id and type ...
     char preamble;
     input->get(preamble);
     if (!input->good())
@@ -323,7 +323,9 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
       std::vector<std::string>({" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇"});
   *output << kFtraceTrackName;
   for (size_t i = 0; i < bucket_count; i++) {
-    sprintf(line, "%s", out[buckets[i] / (max / out.size())].c_str());
+    sprintf(
+        line, "%s",
+        out[std::min(buckets[i] / (max / out.size()), out.size() - 1)].c_str());
     *output << std::string(line);
   }
   *output << "\n";

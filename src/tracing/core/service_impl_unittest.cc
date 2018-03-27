@@ -412,7 +412,8 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   ds_config->set_target_buffer(0);
   trace_config.set_write_into_file(true);
   trace_config.set_file_write_period_ms(1);
-  trace_config.set_max_file_size_bytes(kNumPackets * strlen(kPayload));
+  const uint64_t kMaxFileSize = 512;
+  trace_config.set_max_file_size_bytes(kMaxFileSize);
   base::TempFile tmp_file = base::TempFile::Create();
   auto on_tracing_start = task_runner.CreateCheckpoint("on_tracing_start");
   BufferID buf_id = 0;
@@ -429,14 +430,22 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
 
   std::unique_ptr<TraceWriter> writer =
       producer_endpoint->CreateTraceWriter(buf_id);
+  // All these packets should fit within kMaxFileSize.
   for (int i = 0; i < kNumPackets; i++) {
     auto tp = writer->NewTracePacket();
     std::string payload(kPayload);
     payload.append(std::to_string(i));
     tp->set_for_testing()->set_str(payload.c_str(), payload.size());
-    tp->Finalize();
-    writer->Flush();
   }
+
+  // Finally add a packet that overflows kMaxFileSize. This should cause the
+  // implicit stop of the trace and should *not* be written in the trace.
+  {
+    auto tp = writer->NewTracePacket();
+    char big_payload[kMaxFileSize] = "BIG!";
+    tp->set_for_testing()->set_str(big_payload, sizeof(big_payload));
+  }
+  writer->Flush();
   writer.reset();
 
   auto on_tracing_stop = task_runner.CreateCheckpoint("on_tracing_stop");
@@ -462,12 +471,9 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
     const protos::TracePacket& tp = trace.packet(i);
     if (!tp.has_for_testing())
       continue;
-    ASSERT_EQ(tp.for_testing().str(),
-              kPayload + std::to_string(num_testing_packet++));
+    ASSERT_EQ(kPayload + std::to_string(num_testing_packet++),
+              tp.for_testing().str());
   }
-
-  Mock::VerifyAndClearExpectations(&mock_producer);
-  Mock::VerifyAndClearExpectations(&mock_consumer);
 }  // namespace perfetto
 
 }  // namespace perfetto

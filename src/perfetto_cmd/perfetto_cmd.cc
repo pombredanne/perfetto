@@ -79,12 +79,22 @@ Usage: %s
   --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
   --help           -h
+
+statsd-specific flags:
+  --alert-id           : ID of the alert that triggered this trace.
+  --config-id          : ID of the triggering config.
+  --config-uid         : UID of app which registered the config.
 )",
                 argv0, kDefaultDropBoxTag);
   return 1;
 }
 
 int PerfettoCmd::Main(int argc, char** argv) {
+  enum LongOption {
+    OPT_ALERT_ID = 1000,
+    OPT_CONFIG_ID,
+    OPT_CONFIG_UID,
+  };
   static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
       {"help", required_argument, 0, 'h'},
@@ -93,12 +103,16 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"background", no_argument, 0, 'b'},
       {"dropbox", optional_argument, 0, 'd'},
       {"no-guardrails", optional_argument, 0, 'n'},
+      {"alert-id", required_argument, 0, OPT_ALERT_ID},
+      {"config-id", required_argument, 0, OPT_CONFIG_ID},
+      {"config-uid", required_argument, 0, OPT_CONFIG_UID},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
   std::string trace_config_raw;
   bool background = false;
   bool ignore_guardrails = false;
+  perfetto::protos::TraceConfig::StatsdMetadata statsd_metadata;
   for (;;) {
     int option =
         getopt_long(argc, argv, "c:o:bd::n", long_options, &option_index);
@@ -156,6 +170,21 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
+    if (option == OPT_ALERT_ID) {
+      statsd_metadata.set_triggering_alert_id(atoll(optarg));
+      continue;
+    }
+
+    if (option == OPT_CONFIG_ID) {
+      statsd_metadata.set_triggering_config_id(atoll(optarg));
+      continue;
+    }
+
+    if (option == OPT_CONFIG_UID) {
+      statsd_metadata.set_triggering_config_uid(atol(optarg));
+      continue;
+    }
+
     return PrintUsage(argv[0]);
   }
 
@@ -182,6 +211,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_ELOG("Could not parse TraceConfig proto from stdin");
     return 1;
   }
+  *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
   trace_config_.reset(new TraceConfig());
   trace_config_->FromProto(trace_config_proto);
   trace_config_raw.clear();
@@ -202,22 +232,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
   if (!limiter.ShouldTrace(args))
     return 1;
 
-  // Setup signal handler.
-  struct sigaction sa {};
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
-#endif
-  sa.sa_handler = [](int) {
-    PERFETTO_LOG("SIGINT received: disabling tracing");
-    g_consumer_cmd->DisableTracingFromSignal();
-  };
-  sa.sa_flags = SA_RESETHAND | SA_RESTART;
-#pragma GCC diagnostic pop
-  sigaction(SIGINT, &sa, nullptr);
-
   consumer_endpoint_ = ConsumerIPCClient::Connect(PERFETTO_CONSUMER_SOCK_NAME,
                                                   this, &task_runner_);
+  SetupCtrlCSignalHandler();
   task_runner_.Run();
 
   return limiter.OnTraceDone(args, did_process_full_trace_,
@@ -254,10 +271,6 @@ void PerfettoCmd::OnDisconnect() {
 void PerfettoCmd::OnTimeout() {
   PERFETTO_ELOG("Timed out while waiting for trace from the service, aborting");
   task_runner_.Quit();
-}
-
-void PerfettoCmd::DisableTracingFromSignal() {
-  task_runner_.PostTask([this] { consumer_endpoint_->DisableTracing(); });
 }
 
 void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
@@ -343,7 +356,7 @@ bool PerfettoCmd::OpenOutputFile() {
       return false;
     }
 #else
-    PERFETTO_CHECK(false);
+    PERFETTO_FATAL("Tracing to Dropbox requires the Android build.");
 #endif
   } else {
     fd.reset(open(trace_out_path_.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600));
@@ -351,6 +364,35 @@ bool PerfettoCmd::OpenOutputFile() {
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
   return true;
+}
+
+void PerfettoCmd::SetupCtrlCSignalHandler() {
+  // Setup the pipe used to deliver the CTRL-C notification from signal handler.
+  int pipe_fds[2];
+  PERFETTO_CHECK(pipe(pipe_fds) == 0);
+  ctrl_c_pipe_rd_.reset(pipe_fds[0]);
+  ctrl_c_pipe_wr_.reset(pipe_fds[1]);
+
+  // Setup signal handler.
+  struct sigaction sa {};
+
+// Glibc headers for sa_sigaction trigger this.
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
+  sa.sa_handler = [](int) {
+    PERFETTO_LOG("SIGINT received: disabling tracing");
+    char one = '1';
+    PERFETTO_CHECK(PERFETTO_EINTR(write(g_consumer_cmd->ctrl_c_pipe_wr(), &one,
+                                        sizeof(one))) == 1);
+  };
+  sa.sa_flags = SA_RESETHAND | SA_RESTART;
+#pragma GCC diagnostic pop
+  sigaction(SIGINT, &sa, nullptr);
+
+  task_runner_.AddFileDescriptorWatch(
+      *ctrl_c_pipe_rd_, [this] { consumer_endpoint_->DisableTracing(); });
 }
 
 int __attribute__((visibility("default")))

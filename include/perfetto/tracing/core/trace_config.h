@@ -48,6 +48,7 @@ class FtraceConfig;
 class ChromeConfig;
 class TestConfig;
 class TraceConfig_ProducerConfig;
+class TraceConfig_StatsdMetadata;
 }  // namespace protos
 }  // namespace perfetto
 
@@ -161,6 +162,44 @@ class PERFETTO_EXPORT TraceConfig {
     std::string unknown_fields_;
   };
 
+  class PERFETTO_EXPORT StatsdMetadata {
+   public:
+    StatsdMetadata();
+    ~StatsdMetadata();
+    StatsdMetadata(StatsdMetadata&&) noexcept;
+    StatsdMetadata& operator=(StatsdMetadata&&);
+    StatsdMetadata(const StatsdMetadata&);
+    StatsdMetadata& operator=(const StatsdMetadata&);
+
+    // Conversion methods from/to the corresponding protobuf types.
+    void FromProto(const perfetto::protos::TraceConfig_StatsdMetadata&);
+    void ToProto(perfetto::protos::TraceConfig_StatsdMetadata*) const;
+
+    int64_t triggering_alert_id() const { return triggering_alert_id_; }
+    void set_triggering_alert_id(int64_t value) {
+      triggering_alert_id_ = value;
+    }
+
+    int32_t triggering_config_uid() const { return triggering_config_uid_; }
+    void set_triggering_config_uid(int32_t value) {
+      triggering_config_uid_ = value;
+    }
+
+    int64_t triggering_config_id() const { return triggering_config_id_; }
+    void set_triggering_config_id(int64_t value) {
+      triggering_config_id_ = value;
+    }
+
+   private:
+    int64_t triggering_alert_id_ = {};
+    int32_t triggering_config_uid_ = {};
+    int64_t triggering_config_id_ = {};
+
+    // Allows to preserve unknown protobuf fields for compatibility
+    // with future versions of .proto files.
+    std::string unknown_fields_;
+  };
+
   TraceConfig();
   ~TraceConfig();
   TraceConfig(TraceConfig&&) noexcept;
@@ -208,6 +247,9 @@ class PERFETTO_EXPORT TraceConfig {
     return &producers_.back();
   }
 
+  const StatsdMetadata& statsd_metadata() const { return statsd_metadata_; }
+  StatsdMetadata* mutable_statsd_metadata() { return &statsd_metadata_; }
+
   bool write_into_file() const { return write_into_file_; }
   void set_write_into_file(bool value) { write_into_file_ = value; }
 
@@ -226,6 +268,7 @@ class PERFETTO_EXPORT TraceConfig {
   bool enable_extra_guardrails_ = {};
   LockdownModeOperation lockdown_mode_ = {};
   std::vector<ProducerConfig> producers_;
+  StatsdMetadata statsd_metadata_ = {};
   bool write_into_file_ = {};
   uint32_t file_write_period_ms_ = {};
   uint64_t max_file_size_bytes_ = {};
