@@ -91,7 +91,7 @@ class ServiceImpl : public Service {
     SharedMemoryABI shmem_abi_;
     size_t shared_memory_size_hint_bytes_ = 0;
     DataSourceID last_data_source_id_ = 0;
-    std::string name_;
+    const std::string name_;
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;

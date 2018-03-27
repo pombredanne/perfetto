@@ -392,7 +392,7 @@ TEST_F(ServiceImplTest, ProducerIDWrapping) {
 TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   MockProducer mock_producer;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */);
+      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
   MockConsumer mock_consumer;
   std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
       svc->ConnectConsumer(&mock_consumer);

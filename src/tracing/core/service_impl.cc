@@ -313,8 +313,10 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       TraceConfig::ProducerConfig producer_config;
       for (auto& config : cfg.producers()) {
         if (GetProducer(it->second.producer_id)->name_ ==
-            config.producer_name())
+            config.producer_name()) {
           producer_config = config;
+          break;
+        }
       }
       CreateDataSourceInstance(cfg_data_source, producer_config, it->second,
                                tracing_session);
@@ -635,8 +637,10 @@ void ServiceImpl::RegisterDataSource(ProducerID producer_id,
     TracingSession& tracing_session = iter.second;
     TraceConfig::ProducerConfig producer_config;
     for (auto& config : tracing_session.config.producers()) {
-      if (producer->name_ == config.producer_name())
+      if (producer->name_ == config.producer_name()) {
         producer_config = config;
+        break;
+      }
     }
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
