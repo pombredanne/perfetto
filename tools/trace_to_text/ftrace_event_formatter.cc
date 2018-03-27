@@ -398,13 +398,19 @@ std::string FormatSchedBlockedReason(
 }
 
 std::string FormatPrint(const PrintFtraceEvent& print) {
-  char line[2048];
-  std::string msg = print.buf();
+  std::string line = "tracing_mark_write: ";
+  size_t dst = line.size();
+  line.resize(2048);
+  const std::string& msg = print.buf();
+
   // Remove any newlines in the message. It's not entirely clear what the right
   // behaviour is here. Maybe we should escape them instead?
-  msg.erase(std::remove(msg.begin(), msg.end(), '\n'), msg.end());
-  sprintf(line, "tracing_mark_write: %s\\n", msg.c_str());
-  return std::string(line);
+  for (size_t src = 0; src < msg.size() && dst < line.size(); src++) {
+    char c = msg[src];
+    if (c != '\n')
+      line[dst++] = c;
+  }
+  return line;
 }
 
 std::string FormatCpuFrequency(const CpuFrequencyFtraceEvent& event) {
