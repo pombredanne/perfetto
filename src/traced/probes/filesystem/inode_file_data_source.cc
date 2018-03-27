@@ -204,7 +204,8 @@ void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
     it = inode_numbers->erase(it);
     FillInodeEntry(destination, inode_number, *value);
   }
-  PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
+  if (cache_found_count > 0)
+    PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
 }
 
 void InodeFileDataSource::OnInodes(
