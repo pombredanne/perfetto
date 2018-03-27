@@ -396,9 +396,8 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet,
       // We ran out of chunks in the current {ProducerID, WriterID} sequence or
       // we just reached the index_.end().
 
-      if (PERFETTO_UNLIKELY(read_iter_.seq_end == index_.end())) {
+      if (PERFETTO_UNLIKELY(read_iter_.seq_end == index_.end()))
         return false;
-      }
 
       // We reached the end of sequence, move to the next one.
       // Note: ++read_iter_.seq_end might become index_.end(), but
@@ -441,6 +440,7 @@ bool TraceBuffez::ReadNextTracePacket(TracePacket* packet,
     // | Packet 2      |   | ... Packet 3  ... |  | Packet 4      |
     // | Packet 3  ... |   |                   |  | Packet 5 ...  |
     // +---------------+   +-------------------+  +---------------+
+
     PERFETTO_DCHECK(chunk_meta->num_fragments_read <=
                     chunk_meta->num_fragments);
     while (chunk_meta->num_fragments_read < chunk_meta->num_fragments) {

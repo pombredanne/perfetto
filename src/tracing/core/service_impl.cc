@@ -367,7 +367,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
   tracing_session->data_source_instances.clear();
 
   // If the client requested us to periodically save the buffer into the passed
-  // file, force a pass.
+  // file, force a write pass.
   if (tracing_session->write_into_file) {
     tracing_session->write_period_ms = 0;
     ReadBuffers(tsid, nullptr);
@@ -531,13 +531,13 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
     // writev() can take at most IOV_MAX entries per call. Batch them.
     constexpr size_t kIOVMax = IOV_MAX;
-
     for (size_t i = 0; i < num_iovecs; i += kIOVMax) {
       size_t iov_batch_size = std::min(num_iovecs - i, kIOVMax);
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], iov_batch_size));
       if (wr_size <= 0) {
         PERFETTO_PLOG("writev() failed");
         stop_writing_into_file = true;
+        break;
       }
       total_wr_size += wr_size;
     }
@@ -552,6 +552,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       DisableTracing(tsid);
       return;
     }
+
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {

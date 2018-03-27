@@ -201,7 +201,8 @@ class ServiceImpl : public Service {
 
     int next_write_period_ms() const {
       PERFETTO_DCHECK(write_period_ms);
-      return base::GetWallTimeMs().count() % write_period_ms;
+      // TODO(primiano): this will drift. Synchronize % period so it aligns.
+      return write_period_ms;
     }
 
     // The consumer that started the session.
