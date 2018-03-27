@@ -26,6 +26,7 @@
 #include "perfetto/ipc/service_proxy.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/service.h"
+#include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 
 #include "perfetto/ipc/consumer_port.ipc.h"
@@ -42,6 +43,7 @@ class Client;
 
 class Consumer;
 class TraceConfig;
+class TracePacket;
 
 // Exposes a Service endpoint to Consumer(s), proxying all requests through a
 // IPC channel to the remote Service. This class is the glue layer between the
@@ -83,6 +85,8 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
   protos::ConsumerPortProxy consumer_port_;
 
   bool connected_ = false;
+
+  TracePacket partial_packet_;
 
   base::WeakPtrFactory<ConsumerIPCClientImpl> weak_ptr_factory_;
 };

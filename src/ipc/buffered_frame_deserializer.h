@@ -81,7 +81,7 @@ class BufferedFrameDeserializer {
     size_t size;
   };
 
-  explicit BufferedFrameDeserializer(size_t max_capacity = 128 * 1024);
+  explicit BufferedFrameDeserializer(size_t max_capacity);
   ~BufferedFrameDeserializer();
 
   // This function doesn't really belong here as it does Serialization, unlike

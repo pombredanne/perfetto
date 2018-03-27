@@ -40,7 +40,7 @@ void FakeProducer::Connect(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   task_runner_ = task_runner;
   endpoint_ = ProducerIPCClient::Connect(
-      socket_name, this, "com.google.perfetto.fake_producer", task_runner);
+      socket_name, this, "android.perfetto.FakeProducer", task_runner);
   on_create_data_source_instance_ = std::move(on_create_data_source_instance);
 }
 

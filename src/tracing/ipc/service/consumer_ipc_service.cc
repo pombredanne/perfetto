@@ -120,16 +120,28 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
     return;
 
   auto result = ipc::AsyncResult<protos::ReadBuffersResponse>::Create();
-  result.set_has_more(has_more);
-  // TODO(primiano): Expose the slices to the Consumer rather than stitching
-  // them and wasting cpu time to hide this detail.
+
+  auto send_ipc = [this, &result](bool more) {
+    result.set_has_more(more);
+    read_buffers_response.Resolve(std::move(result));
+    result = ipc::AsyncResult<protos::ReadBuffersResponse>::Create();
+  };
+
+  size_t approx_reply_size = 0;
   for (const TracePacket& trace_packet : trace_packets) {
-    std::string* dst = result->add_trace_packets();
-    dst->reserve(trace_packet.size());
-    for (const Slice& slice : trace_packet.slices())
-      dst->append(reinterpret_cast<const char*>(slice.start), slice.size);
+    size_t num_slices_left_for_packet = trace_packet.slices().size();
+    for (const Slice& slice : trace_packet.slices()) {
+      auto* res_slice = result->add_slices();
+      res_slice->set_last_slice_for_packet(--num_slices_left_for_packet == 0);
+      res_slice->set_data(slice.start, slice.size);
+      approx_reply_size += slice.size + 16;
+      if (approx_reply_size > 64000) {  // TODO constant
+        send_ipc(/*has_more=*/true);
+        approx_reply_size = 0;
+      }
+    }
   }
-  read_buffers_response.Resolve(std::move(result));
+  send_ipc(has_more);
 }
 
 }  // namespace perfetto

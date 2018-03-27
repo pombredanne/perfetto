@@ -226,4 +226,74 @@ TEST(PerfettoTest, TestFakeProducer) {
   consumer.Disconnect();
 }
 
+TEST(PerfettoTest, VeryLargePackets) {
+  base::TestTaskRunner task_runner;
+
+#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
+  TaskRunnerThread service_thread("perfetto.svc");
+  service_thread.Start(std::unique_ptr<ServiceDelegate>(
+      new ServiceDelegate(TEST_PRODUCER_SOCK_NAME, TEST_CONSUMER_SOCK_NAME)));
+#endif
+
+  auto on_producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
+  auto posted_on_producer_enabled = [&task_runner, &on_producer_enabled] {
+    task_runner.PostTask(on_producer_enabled);
+  };
+  TaskRunnerThread producer_thread("perfetto.prd");
+  std::unique_ptr<FakeProducerDelegate> producer_delegate(
+      new FakeProducerDelegate(TEST_PRODUCER_SOCK_NAME,
+                               posted_on_producer_enabled));
+  FakeProducerDelegate* producer_delegate_cached = producer_delegate.get();
+  producer_thread.Start(std::move(producer_delegate));
+
+  // Setup the TraceConfig for the consumer.
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(4096 * 10);
+
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("android.perfetto.FakeProducer");
+  ds_config->set_target_buffer(0);
+  ds_config->mutable_for_testing()->set_message_count(1);
+  ds_config->mutable_for_testing()->set_message_size(1024 * 1024);
+
+  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
+  auto on_consumer_data = [&on_readback_complete](
+                              std::vector<TracePacket> packets, bool has_more) {
+    for (auto& packet : packets) {
+      ASSERT_TRUE(packet.Decode());
+      if (!packet->has_for_testing())
+        continue;
+      // ASSERT_EQ(packet->for_testing().seq_value(), random());
+      // TODO validation
+    }
+    if (!has_more)
+      on_readback_complete();
+  };
+
+  auto on_connect = task_runner.CreateCheckpoint("consumer.connected");
+  FakeConsumer consumer(trace_config, std::move(on_connect),
+                        std::move(on_consumer_data), &task_runner);
+
+  consumer.Connect(TEST_CONSUMER_SOCK_NAME);
+  task_runner.RunUntilCheckpoint("consumer.connected");
+
+  consumer.EnableTracing();
+  task_runner.RunUntilCheckpoint("producer.enabled");
+
+  auto on_produced_and_committed =
+      task_runner.CreateCheckpoint("produced.and.committed");
+  auto posted_on_produced_and_committed = [&task_runner,
+                                           &on_produced_and_committed] {
+    task_runner.PostTask(on_produced_and_committed);
+  };
+  FakeProducer* producer = producer_delegate_cached->producer();
+  producer->ProduceEventBatch(posted_on_produced_and_committed);
+  task_runner.RunUntilCheckpoint("produced.and.committed");
+
+  consumer.ReadTraceData();
+  task_runner.RunUntilCheckpoint("readback.complete");
+
+  consumer.Disconnect();
+}
+
 }  // namespace perfetto
