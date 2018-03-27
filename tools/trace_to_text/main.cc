@@ -229,9 +229,11 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
 
     const FtraceEventBundle& bundle = packet.ftrace_events();
     for (const FtraceEvent& event : bundle.event()) {
-      std::string line = FormatFtraceEvent(event);
-      sorted.emplace(event.timestamp(),
-                     FormatPrefix(event.timestamp(), bundle.cpu()) + line);
+      std::string line =
+          FormatFtraceEvent(event.timestamp(), bundle.cpu(), event);
+      if (line == "")
+        continue;
+      sorted.emplace(event.timestamp(), line);
     }
   });
 

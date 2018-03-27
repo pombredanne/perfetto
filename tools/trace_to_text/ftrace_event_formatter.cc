@@ -2030,9 +2030,7 @@ std::string FormatExt4ZeroRange(const Ext4ZeroRangeFtraceEvent& event) {
   return std::string(line);
 }
 
-}  // namespace
-
-std::string FormatFtraceEvent(const protos::FtraceEvent& event) {
+std::string FormatEventText(const protos::FtraceEvent& event) {
   if (event.has_binder_lock()) {
     const auto& inner = event.binder_lock();
     return FormatBinderLock(inner);
@@ -2578,6 +2576,36 @@ std::string FormatFtraceEvent(const protos::FtraceEvent& event) {
     return FormatTaskNewtask(inner);
   }
   return "";
+}
+
+uint64_t TimestampToSeconds(uint64_t timestamp) {
+  return timestamp / 1000000000ul;
+}
+
+uint64_t TimestampToMicroseconds(uint64_t timestamp) {
+  return (timestamp / 1000) % 1000000ul;
+}
+
+std::string FormatPrefix(uint64_t timestamp, uint64_t cpu) {
+  char line[2048];
+  uint64_t seconds = TimestampToSeconds(timestamp);
+  uint64_t useconds = TimestampToMicroseconds(timestamp);
+  sprintf(line,
+          "<idle>-0     (-----) [%03" PRIu64 "] d..3 %" PRIu64 ".%.6" PRIu64
+          ": ",
+          cpu, seconds, useconds);
+  return std::string(line);
+}
+
+}  // namespace
+
+std::string FormatFtraceEvent(uint64_t timestamp,
+                              size_t cpu,
+                              const protos::FtraceEvent& event) {
+  std::string line = FormatEventText(event);
+  if (line == "")
+    return "";
+  return FormatPrefix(timestamp, cpu) + line;
 }
 
 }  // namespace perfetto

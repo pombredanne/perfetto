@@ -25,7 +25,9 @@
 
 namespace perfetto {
 
-std::string FormatFtraceEvent(const protos::FtraceEvent&);
+std::string FormatFtraceEvent(uint64_t timestamp,
+                              size_t cpu,
+                              const protos::FtraceEvent&);
 
 }  // namespace perfetto
 
