@@ -43,6 +43,7 @@
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "tools/trace_to_text/ftrace_event_formatter.h"
+#include "tools/trace_to_text/ftrace_inode_handler.h"
 
 namespace perfetto {
 namespace {
@@ -283,26 +284,40 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
   uint64_t start = std::numeric_limits<uint64_t>::max();
   uint64_t end = 0;
   std::multiset<uint64_t> ftrace_timestamps;
+  std::set<uint64_t> inode_numbers;
+  uint64_t events_with_inodes = 0;
 
-  ForEachPacketInTrace(input, [&start, &end, &ftrace_timestamps](
-                                  const protos::TracePacket& packet) {
-    if (!packet.has_ftrace_events())
-      return;
+  ForEachPacketInTrace(
+      input, [&start, &end, &ftrace_timestamps, &inode_numbers,
+              &events_with_inodes](const protos::TracePacket& packet) {
+        if (!packet.has_ftrace_events())
+          return;
 
-    const FtraceEventBundle& bundle = packet.ftrace_events();
+        const FtraceEventBundle& bundle = packet.ftrace_events();
 
-    for (const FtraceEvent& event : bundle.event()) {
-      if (event.timestamp()) {
-        start = std::min<uint64_t>(start, event.timestamp());
-        end = std::max<uint64_t>(end, event.timestamp());
-        ftrace_timestamps.insert(event.timestamp());
-      }
-    }
-  });
+        uint64_t inode_number = 0;
+        for (const FtraceEvent& event : bundle.event()) {
+          if (ParseInode(event, &inode_number)) {
+            inode_numbers.insert(inode_number);
+            events_with_inodes++;
+          }
+          if (event.timestamp()) {
+            start = std::min<uint64_t>(start, event.timestamp());
+            end = std::max<uint64_t>(end, event.timestamp());
+            ftrace_timestamps.insert(event.timestamp());
+          }
+        }
+      });
 
   fprintf(stderr, "\n");
 
   char line[2048];
+  sprintf(line, "Unique inodes: %" PRIu64 "\n", inode_numbers.size());
+  *output << std::string(line);
+
+  sprintf(line, "Events with inodes: %" PRIu64 "\n", events_with_inodes);
+  *output << std::string(line);
+
   sprintf(line, "Duration: %" PRIu64 "ms\n", (end - start) / (1000 * 1000));
   *output << std::string(line);
 
