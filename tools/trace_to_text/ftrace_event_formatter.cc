@@ -405,11 +405,12 @@ std::string FormatPrint(const PrintFtraceEvent& print) {
 
   // Remove any newlines in the message. It's not entirely clear what the right
   // behaviour is here. Maybe we should escape them instead?
-  for (size_t src = 0; src < msg.size() && dst < line.size(); src++) {
+  for (size_t src = 0; src < msg.size() && dst < line.size() - 1; src++) {
     char c = msg[src];
     if (c != '\n')
       line[dst++] = c;
   }
+  line[dst] = '\n';
   return line;
 }
 
