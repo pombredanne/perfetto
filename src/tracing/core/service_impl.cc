@@ -218,24 +218,6 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
     return false;
   }
 
-  // TODO(taylori): These assumptions are no longer true. Figure out a new
-  // heuristic.
-  // TODO(primiano): This is a workaround to prevent that a producer gets stuck
-  // in a state where it stalls by design by having more TraceWriterImpl
-  // instances than free pages in the buffer. This is a very fragile heuristic
-  // though, because this assumes that each tracing session creates at most one
-  // data source instance in each Producer, and each data source has only one
-  // TraceWriter.
-  // TODO(taylori): Handle multiple producers/producer_configs.
-  // auto first_producer_config = cfg.producers()[0];
-  // if (tracing_sessions_.size() >=
-  //     (kDefaultShmSize / first_producer_config.page_size_kb() / 2)) {
-  //   PERFETTO_ELOG("Too many concurrent tracing sesions (%zu)",
-  //                 tracing_sessions_.size());
-  //   // TODO(primiano): make this a bool and return failure to the IPC layer.
-  //   return;
-  //}
-
   const TracingSessionID tsid = ++last_tracing_session_id_;
   tracing_session =
       &tracing_sessions_.emplace(tsid, TracingSession(consumer, cfg))
@@ -1009,9 +991,6 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       service_(service),
       task_runner_(task_runner),
       producer_(producer) {
-  // TODO(primiano): make the page-size for the SHM dynamic and find a way to
-  // communicate that to the Producer (add a field to the
-  // InitializeConnectionResponse IPC).
 }
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {

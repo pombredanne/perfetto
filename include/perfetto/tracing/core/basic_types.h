@@ -55,10 +55,6 @@ using BufferID = uint16_t;
 // Keep this in sync with SharedMemoryABI::PageHeader::target_buffer.
 static constexpr BufferID kMaxTraceBufferID = static_cast<BufferID>(-1);
 
-// TODO(primiano): temporary. The buffer page size should be configurable by
-// consumers.
-static constexpr size_t kBufferPageSize = 8192;
-
 }  // namespace perfetto
 
 #endif  // INCLUDE_PERFETTO_TRACING_CORE_BASIC_TYPES_H_

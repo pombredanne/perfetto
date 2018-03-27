@@ -68,8 +68,6 @@ class PERFETTO_EXPORT Service {
 
     // Called by the Producer to (un)register data sources. The Services returns
     // asynchronousy the ID for the data source.
-    // TODO(primiano): thinking twice there is no reason why the service choses
-    // ID rather than the Producer. Update in upcoming CLs.
     using RegisterDataSourceCallback = std::function<void(DataSourceID)>;
     virtual void RegisterDataSource(const DataSourceDescriptor&,
                                     RegisterDataSourceCallback) = 0;
