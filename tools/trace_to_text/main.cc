@@ -2816,7 +2816,7 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
 namespace {
 
 int Usage(int argc, char** argv) {
-  printf("Usage: %s [systrace|text] < trace.proto > trace.txt\n", argv[0]);
+  printf("Usage: %s [systrace|text]\n", argv[0]);
   return 1;
 }
 
