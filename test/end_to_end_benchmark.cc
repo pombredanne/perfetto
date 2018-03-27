@@ -101,10 +101,10 @@ static void BenchmarkProducer(benchmark::State& state) {
                                         bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
-      ASSERT_TRUE(packet->has_for_testing() || packet->has_clock_snapshot());
-      if (packet->has_clock_snapshot()) {
+      ASSERT_TRUE(packet->has_for_testing() || packet->has_clock_snapshot() ||
+                  packet->has_trace_config());
+      if (packet->has_clock_snapshot() || packet->has_trace_config())
         continue;
-      }
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
       if (is_first_packet) {
