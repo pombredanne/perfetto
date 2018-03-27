@@ -46,9 +46,7 @@ NullTraceWriter::TracePacketHandle NullTraceWriter::NewTracePacket() {
   // finalized the previous packet.
   PERFETTO_DCHECK(cur_packet_->is_finalized());
   cur_packet_->Reset(&stream_);
-  NullTraceWriter::TracePacketHandle handle(cur_packet_.get());
-
-  return handle;
+  return TraceWriter::TracePacketHandle(cur_packet_.get());
 }
 
 WriterID NullTraceWriter::writer_id() const {

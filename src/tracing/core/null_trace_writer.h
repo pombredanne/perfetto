@@ -23,14 +23,16 @@
 
 namespace perfetto {
 
+// A specialization of TraceWriter which no-ops all the writes routing them
+// into a fixed region of memory
 // See //include/perfetto/tracing/core/trace_writer.h for docs.
 class NullTraceWriter : public TraceWriter {
  public:
-  // TracePacketHandle is defined in trace_writer.h
   NullTraceWriter();
   ~NullTraceWriter() override;
 
   // TraceWriter implementation. See documentation in trace_writer.h.
+  // TracePacketHandle is defined in trace_writer.h
   TracePacketHandle NewTracePacket() override;
   void Flush(std::function<void()> callback = {}) override;
   WriterID writer_id() const override;

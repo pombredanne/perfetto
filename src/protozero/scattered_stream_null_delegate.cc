@@ -20,6 +20,9 @@ namespace protozero {
 
 // An implementation of ScatteredStreamWriter::Delegate which always returns
 // the same piece of memory.
+// This is used when we need to no-op the writers (e.g. during teardown or in
+// case of resource exhaustion), avoiding that the clients have to deal with
+// nullptr checks.
 ScatteredStreamWriterNullDelegate::ScatteredStreamWriterNullDelegate(
     size_t chunk_size)
     : chunk_size_(chunk_size),

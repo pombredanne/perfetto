@@ -34,7 +34,7 @@ TEST(NullTraceWriterTest, WriterIdIsZero) {
 
 TEST(NullTraceWriterTest, Writing) {
   NullTraceWriter writer;
-  for (size_t i = 0; i < base::kPageSize; i++) {
+  for (size_t i = 0; i < 3 * base::kPageSize; i++) {
     auto packet = writer.NewTracePacket();
     packet->set_for_testing()->set_str("Hello, world!");
   }
@@ -43,6 +43,9 @@ TEST(NullTraceWriterTest, Writing) {
 TEST(NullTraceWriterTest, FlushCallbackIsCalled) {
   NullTraceWriter writer;
   writer.Flush();
+  bool was_called = false;
+  writer.Flush([&was_called] { was_called = true; });
+  EXPECT_TRUE(was_called);
 }
 
 }  // namespace
