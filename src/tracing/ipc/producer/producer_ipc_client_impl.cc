@@ -109,7 +109,6 @@ void ProducerIPCClientImpl::OnServiceRequest(
     const protos::GetAsyncCommandResponse& cmd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kStartDataSource) {
-    // Keep this in sync with chages in data_source_config.proto.
     const auto& req = cmd.start_data_source();
     const DataSourceInstanceID dsid = req.new_instance_id();
     DataSourceConfig cfg;
