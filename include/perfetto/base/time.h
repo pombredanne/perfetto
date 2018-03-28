@@ -60,13 +60,13 @@ inline TimeNanos GetThreadCPUTimeNs() {
 #else  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
 inline TimeNanos GetWallTimeNs() {
-  static uint64_t monotonic_timebase_factor = 0;
-  if (monotonic_timebase_factor == 0) {
+  auto init_time_factor = []() -> uint64_t {
     mach_timebase_info_data_t timebase_info;
     mach_timebase_info(&timebase_info);
-    monotonic_timebase_factor = timebase_info.numer / timebase_info.denom;
+    return timebase_info.numer / timebase_info.denom;
   }
 
+  static uint64_t monotonic_timebase_factor = init_time_factor();
   return TimeNanos(mach_absolute_time() * monotonic_timebase_factor);
 }
 
