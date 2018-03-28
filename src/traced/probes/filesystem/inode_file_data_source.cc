@@ -127,10 +127,6 @@ InodeFileDataSource::InodeFileDataSource(
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
-InodeFileDataSource::~InodeFileDataSource() {
-  FindMissingInodes();
-}
-
 void InodeFileDataSource::AddInodesFromFilesystemScan(
     const std::string& root_directory,
     BlockDeviceID provided_block_device_id,
