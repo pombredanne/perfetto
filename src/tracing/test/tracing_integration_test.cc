@@ -219,9 +219,9 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
                   &saw_clock_snapshot, &saw_trace_config](
                      std::vector<TracePacket>* packets, bool has_more) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-            const int kExpectedNumberOfClocks = 6;
-#else
             const int kExpectedNumberOfClocks = 1;
+#else
+            const int kExpectedNumberOfClocks = 6;
 #endif
 
             for (auto& packet : *packets) {
