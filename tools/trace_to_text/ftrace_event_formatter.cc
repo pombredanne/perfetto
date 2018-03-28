@@ -17,6 +17,7 @@
 #include "tools/trace_to_text/ftrace_event_formatter.h"
 
 #include <inttypes.h>
+#include <algorithm>
 
 namespace perfetto {
 namespace {
