@@ -699,11 +699,10 @@ void ServiceImpl::CreateDataSourceInstance(
   }
   // TODO(primiano): Add tests for registration ordering
   // (data sources vs consumers).
-  if (!(std::any_of(cfg_data_source.producer_name_filter().begin(),
-                    cfg_data_source.producer_name_filter().end(),
-                    [&producer](const std::string& item) {
-                      return item == producer->name_;
-                    }))) {
+  if (std::find(cfg_data_source.producer_name_filter().begin(),
+                cfg_data_source.producer_name_filter().end(),
+                producer->name_) ==
+      cfg_data_source.producer_name_filter().end()) {
     PERFETTO_DLOG("Data source: %s is not enabled for producer: %s",
                   cfg_data_source.config().name().c_str(),
                   producer->name_.c_str());
