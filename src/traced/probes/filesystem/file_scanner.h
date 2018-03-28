@@ -55,6 +55,7 @@ class FileScanner {
   std::vector<std::string> queue_;
   base::ScopedDir current_directory_fd_;
   std::string current_directory_;
+  BlockDeviceID current_block_device_id_;
 };
 
 }  // namespace perfetto

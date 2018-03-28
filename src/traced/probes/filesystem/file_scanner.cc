@@ -26,8 +26,19 @@
 
 namespace perfetto {
 namespace {
-uint64_t kScanInterval = 10000;  // 30s
+uint64_t kScanInterval = 10000;  // 10s
 uint64_t kScanSteps = 5000;
+
+std::string JoinPaths(const std::string& one, const std::string& other) {
+  std::string result;
+  result.reserve(one.size() + other.size() + 1);
+  result += one;
+  if (!result.empty() && result[result.size() - 1] != '/') {
+    result += '/';
+  }
+  result += other;
+  return result;
+}
 }  // namespace
 
 FileScanner::FileScanner(
@@ -53,6 +64,16 @@ void FileScanner::NextDirectory() {
   std::string directory = queue_.back();
   queue_.pop_back();
   current_directory_fd_.reset(opendir(directory.c_str()));
+
+  struct stat buf;
+  if (fstat(dirfd(current_directory_fd_.get()), &buf) != 0)
+    return;
+
+  if (S_ISLNK(buf.st_mode)) {
+    current_directory_fd_.reset();
+    return;
+  }
+
   current_directory_ = std::move(directory);
 }
 
@@ -72,38 +93,24 @@ void FileScanner::Step() {
     return;
   }
 
-  if (entry->d_type == DT_LNK)
-    return;
-
   std::string filename = entry->d_name;
   if (filename == "." || filename == "..")
     return;
-  std::string filepath = current_directory_ + filename;
 
-  struct stat buf;
-  if (lstat(filepath.c_str(), &buf) != 0)
-    return;
-
-  // This might happen on filesystems that do not return
-  // information in entry->d_type.
-  if (S_ISLNK(buf.st_mode))
-    return;
-
-  Inode inode_number = entry->d_ino;
-  BlockDeviceID block_device_id = buf.st_dev;
+  std::string filepath = JoinPaths(current_directory_, filename);
 
   protos::pbzero::InodeFileMap_Entry_Type type =
       protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
   // Readdir and stat not guaranteed to have directory info for all systems
-  if (entry->d_type == DT_DIR || S_ISDIR(buf.st_mode)) {
+  if (entry->d_type == DT_DIR) {
     // Continue iterating through files if current entry is a directory
     queue_.emplace_back(filepath);
     type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
-  } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
+  } else if (entry->d_type == DT_REG) {
     type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
   }
 
-  if (!callback_(block_device_id, inode_number, filepath, type)) {
+  if (!callback_(current_block_device_id_, entry->d_ino, filepath, type)) {
     queue_.clear();
     current_directory_fd_.reset();
   }
