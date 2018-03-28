@@ -33,8 +33,11 @@ namespace perfetto {
 struct Slice {
   Slice() : start(nullptr), size(0) {}
   Slice(const void* st, size_t sz) : start(st), size(sz) {}
+
+  // Used to inherit ownership of a buffer from a protobuf via release_str().
   explicit Slice(std::unique_ptr<std::string> str)
       : start(&(*str)[0]), size(str->size()), moved_str_data_(std::move(str)) {}
+
   Slice(Slice&& other) noexcept = default;
 
   // Create a Slice which owns |size| bytes of memory.

@@ -81,9 +81,14 @@ message ReadBuffersResponse {
   // packets, or even just a portion of it (if it's too big to fit within one
   // IPC). The returned slices are ordered and contiguous: packets' slices are
   // not interleaved and slices are sent only once all slices for a packet are
-  // avilable (i.e. the consumer will never see any hole).
+  // avilable (i.e. the consumer will never see any gap).
   message Slice {
     optional bytes data = 1;
+
+    // When true, this is the last slice for the packet. A ReadBufferResponse
+    // might have no slices marked as |last_slice_for_packet|==true, in the case
+    // of a very large packet that gets chunked into several IPCs (in which case
+    // only the last IPC for the packet will have this flag set).
     optional bool last_slice_for_packet = 2;
   }
   repeated Slice slices = 2;
