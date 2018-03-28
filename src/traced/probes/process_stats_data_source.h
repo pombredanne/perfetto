@@ -38,13 +38,14 @@ class ProcessStatsDataSource {
   void OnPids(const std::vector<int32_t>& pids);
 
  private:
-  static void WriteProcess(int32_t pid, TraceWriter* writer);
+  static void WriteProcess(int32_t pid, protos::pbzero::TracePacket*);
 
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
 
   const TracingSessionID session_id_;
   std::unique_ptr<TraceWriter> writer_;
+  // TODO(b/76663469): Optimization: use a bitmap.
   std::set<int32_t> seen_pids_;
   base::WeakPtrFactory<ProcessStatsDataSource> weak_factory_;  // Keep last.
 };

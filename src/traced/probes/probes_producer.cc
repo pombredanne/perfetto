@@ -240,7 +240,8 @@ void ProbesProducer::ConnectWithRetries(const char* socket_name,
 void ProbesProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
-  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
+  endpoint_ = ProducerIPCClient::Connect(
+      socket_name_, this, "com.google.perfetto.traced_probes", task_runner_);
 }
 
 void ProbesProducer::IncreaseConnectionBackoff() {
@@ -276,7 +277,7 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
   trace_packet_->Finalize();
 
   if (ps_source_ && !metadata.pids.empty()) {
-    auto pids = metadata.pids;
+    const auto& pids = metadata.pids;
     auto weak_ps_source = ps_source_;
     task_runner_->PostTask([weak_ps_source, pids] {
       if (weak_ps_source)

@@ -20,7 +20,6 @@
 
 #include "perfetto/trace/ps/process_tree.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
-#include "perfetto/tracing/core/trace_packet.h"
 #include "src/process_stats/file_utils.h"
 #include "src/process_stats/procfs_utils.h"
 
@@ -39,33 +38,37 @@ base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
 }
 
 void ProcessStatsDataSource::WriteAllProcesses() {
-  TraceWriter* writer = writer_.get();
+  auto trace_packet = writer_->NewTracePacket();
+  auto* trace_packet_ptr = &*trace_packet;
   std::set<int32_t>* seen_pids = &seen_pids_;
 
-  file_utils::ForEachPidInProcPath("/proc", [writer, seen_pids](int pid) {
-    // ForEachPid will list all processes and threads. Here we want to
-    // iterate first only by processes (for which pid == thread group id)
-    if (procfs_utils::ReadTgid(pid) != pid)
-      return;
+  file_utils::ForEachPidInProcPath("/proc",
+                                   [trace_packet_ptr, seen_pids](int pid) {
+                                     // ForEachPid will list all processes and
+                                     // threads. Here we want to iterate first
+                                     // only by processes (for which pid ==
+                                     // thread group id)
+                                     if (procfs_utils::ReadTgid(pid) != pid)
+                                       return;
 
-    WriteProcess(pid, writer);
-    seen_pids->insert(pid);
-  });
+                                     WriteProcess(pid, trace_packet_ptr);
+                                     seen_pids->insert(pid);
+                                   });
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
+  auto trace_packet = writer_->NewTracePacket();
   for (int32_t pid : pids) {
-    if (seen_pids_.count(pid))
-      continue;
-    WriteProcess(pid, writer_.get());
-    seen_pids_.insert(pid);
+    auto it_and_inserted = seen_pids_.emplace(pid);
+    if (it_and_inserted.second)
+      WriteProcess(pid, &*trace_packet);
   }
 }
 
 // static
-void ProcessStatsDataSource::WriteProcess(int32_t pid, TraceWriter* writer) {
-  // TODO(hjd): Move this out when we support large trace packets.
-  auto trace_packet = writer->NewTracePacket();
+void ProcessStatsDataSource::WriteProcess(
+    int32_t pid,
+    protos::pbzero::TracePacket* trace_packet) {
   auto* process_tree = trace_packet->set_process_tree();
 
   std::unique_ptr<ProcessInfo> process = procfs_utils::ReadProcessInfo(pid);
