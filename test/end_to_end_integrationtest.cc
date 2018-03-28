@@ -269,7 +269,7 @@ TEST(PerfettoTest, VeryLargePackets) {
                               std::vector<TracePacket> packets, bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
-      if (!packet->has_for_testing())
+      if (packet->has_clock_snapshot() || packet->has_trace_config())
         continue;
       packets_seen++;
       ASSERT_EQ(packet->for_testing().seq_value(), rnd_engine());
