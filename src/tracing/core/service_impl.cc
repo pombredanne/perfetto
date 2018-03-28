@@ -697,8 +697,18 @@ void ServiceImpl::CreateDataSourceInstance(
     PERFETTO_DLOG("Lockdown mode: not enabling producer %hu", producer->id_);
     return;
   }
-  // TODO(primiano): match against |producer_name_filter| and add tests
-  // for registration ordering (data sources vs consumers).
+  // TODO(primiano): Add tests for registration ordering
+  // (data sources vs consumers).
+  if (!(std::any_of(cfg_data_source.producer_name_filter().begin(),
+                    cfg_data_source.producer_name_filter().end(),
+                    [&producer](const std::string& item) {
+                      return item == producer->name_;
+                    }))) {
+    PERFETTO_DLOG("Data source: %s is not enabled for producer: %s",
+                  cfg_data_source.config().name().c_str(),
+                  producer->name_.c_str());
+    return;
+  }
 
   // Create a copy of the DataSourceConfig specified in the trace config. This
   // will be passed to the producer after translating the |target_buffer| id.
