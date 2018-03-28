@@ -191,8 +191,8 @@ static void BM_EndToEnd_ConstantRate(benchmark::State& state) {
 }
 
 static void ConstantRateArgs(benchmark::internal::Benchmark* b) {
-  int min_speed = IsBenchmarkFunctionalOnly() ? 8 : 32;
-  int max_speed = IsBenchmarkFunctionalOnly() ? 128 : 64;
+  int min_speed = IsBenchmarkFunctionalOnly() ? 32 : 8;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 64 : 128;
   for (int speed = min_speed; speed <= max_speed; speed *= 2) {
     b->Args({128 * 1024, 128, speed});
     b->Args({256 * 1024, 128, speed});

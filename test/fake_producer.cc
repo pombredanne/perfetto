@@ -90,6 +90,8 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
     memset(payload.get(), '.', payload_size);
     payload.get()[payload_size - 1] = 0;
 
+    int64_t iterations = 0;
+    base::TimeMillis start = base::GetWallTimeMs();
     size_t messages_to_emit = message_count_;
     do {
       size_t messages_in_minibatch =
@@ -98,7 +100,6 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
               : std::min(max_messages_per_second_, messages_to_emit);
       PERFETTO_DCHECK(messages_to_emit >= messages_in_minibatch);
 
-      base::TimeMillis start = base::GetWallTimeMs();
       for (size_t i = 0; i < messages_in_minibatch; i++) {
         auto handle = trace_writer_->NewTracePacket();
         handle->set_for_testing()->set_seq_value(rnd_engine_());
@@ -110,8 +111,9 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
       // the speed limitation.
       if (max_messages_per_second_ > 0) {
         base::TimeMillis time_taken = base::GetWallTimeMs() - start;
-        if (time_taken.count() < 1000) {
-          usleep((1000 - time_taken.count()) * 1000);
+        int64_t expected_time_taken = ++iterations * 1000;
+        if (time_taken.count() < expected_time_taken) {
+          usleep((expected_time_taken - time_taken.count()) * 1000);
         }
       }
     } while (messages_to_emit > 0);
