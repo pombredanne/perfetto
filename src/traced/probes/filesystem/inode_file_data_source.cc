@@ -282,7 +282,8 @@ void InodeFileDataSource::FileScannerDone() {
   // Finalize the accumulated trace packets.
   current_block_device_id_ = 0;
   current_file_map_ = nullptr;
-  current_trace_packet_->Finalize();
+  if (has_current_trace_packet_)
+    current_trace_packet_->Finalize();
   has_current_trace_packet_ = false;
   if (!next_missing_inodes_.empty()) {
     auto weak_this = GetWeakPtr();
