@@ -17,19 +17,19 @@
 #ifndef SRC_TRACED_PROBES_FILESYSTEM_FILE_SCANNER_H_
 #define SRC_TRACED_PROBES_FILESYSTEM_FILE_SCANNER_H_
 
-#include "src/traced/probes/filesystem/inode_file_data_source.h"
-
 #include <string>
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/data_source_types.h"
 
 namespace perfetto {
 
 class FileScanner {
-  FileScanner(std::string root_directory,
+ public:
+  FileScanner(std::vector<std::string> root_directories,
               std::function<bool(BlockDeviceID block_device_id,
                                  Inode inode_number,
                                  const std::string& path,
@@ -58,10 +58,12 @@ class FileScanner {
   std::function<void()> done_callback_;
   const uint64_t scan_interval_ms_;
   const uint64_t scan_steps_;
+
   std::vector<std::string> queue_;
   base::ScopedDir current_directory_fd_;
   std::string current_directory_;
   BlockDeviceID current_block_device_id_;
+  base::WeakPtrFactory<FileScanner> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto
