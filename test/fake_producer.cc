@@ -41,7 +41,7 @@ void FakeProducer::Connect(
   PERFETTO_DCHECK_THREAD(thread_checker_);
   task_runner_ = task_runner;
   endpoint_ = ProducerIPCClient::Connect(
-      socket_name, this, "com.google.perfetto.fake_producer", task_runner);
+      socket_name, this, "android.perfetto.FakeProducer", task_runner);
   on_create_data_source_instance_ = std::move(on_create_data_source_instance);
 }
 
@@ -81,19 +81,16 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
 void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
-
-    size_t payload_size = message_size_ - sizeof(uint32_t);
-    PERFETTO_CHECK(payload_size >= sizeof(char));
-
+    PERFETTO_CHECK(message_size_ > 1);
     std::unique_ptr<char, base::FreeDeleter> payload(
-        static_cast<char*>(malloc(payload_size)));
-    memset(payload.get(), '.', payload_size);
-    payload.get()[payload_size - 1] = 0;
+        static_cast<char*>(malloc(message_size_)));
+    memset(payload.get(), '.', message_size_);
+    payload.get()[message_size_ - 1] = 0;
 
-    int64_t iterations = 0;
     base::TimeMillis start = base::GetWallTimeMs();
+    int64_t iterations = 0;
     size_t messages_to_emit = message_count_;
-    do {
+    while (messages_to_emit > 0) {
       size_t messages_in_minibatch =
           max_messages_per_second_ == 0
               ? messages_to_emit
@@ -103,7 +100,7 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
       for (size_t i = 0; i < messages_in_minibatch; i++) {
         auto handle = trace_writer_->NewTracePacket();
         handle->set_for_testing()->set_seq_value(rnd_engine_());
-        handle->set_for_testing()->set_str(payload.get(), payload_size);
+        handle->set_for_testing()->set_str(payload.get(), message_size_);
       }
       messages_to_emit -= messages_in_minibatch;
 
@@ -116,8 +113,7 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
           usleep((expected_time_taken - time_taken.count()) * 1000);
         }
       }
-    } while (messages_to_emit > 0);
-
+    }
     trace_writer_->Flush(callback);
   });
 }
