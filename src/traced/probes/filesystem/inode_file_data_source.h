@@ -93,7 +93,6 @@ class InodeFileDataSource {
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
 
-  std::unique_ptr<FileScanner> file_scanner_;
   base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
@@ -107,8 +106,8 @@ class InodeFileDataSource {
   TraceWriter::TracePacketHandle current_trace_packet_;
   InodeFileMap* current_file_map_;
   bool has_current_trace_packet_ = false;
-
   bool scan_running_ = false;
+  std::unique_ptr<FileScanner> file_scanner_;
   base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 

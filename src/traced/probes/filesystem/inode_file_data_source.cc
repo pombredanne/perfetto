@@ -204,6 +204,11 @@ void InodeFileDataSource::OnInodes(
     AddInodesFromLRUCache(block_device_id, &inode_numbers);
     // TODO(azappone): Make root directory a mount point
     if (!inode_numbers.empty()) {
+      // Try to piggy back the current scan.
+      auto it = missing_inodes_.find(block_device_id);
+      if (it != missing_inodes_.end()) {
+        it->second.insert(inode_numbers.cbegin(), inode_numbers.cend());
+      }
       next_missing_inodes_[block_device_id].insert(inode_numbers.cbegin(),
                                                    inode_numbers.cend());
       if (!scan_running_) {
@@ -301,6 +306,7 @@ void InodeFileDataSource::FileScannerDone() {
         kScanIntervalMs);
   } else {
     scan_running_ = false;
+    file_scanner_.reset();
   }
 }
 
