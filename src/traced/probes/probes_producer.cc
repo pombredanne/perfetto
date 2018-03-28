@@ -188,10 +188,10 @@ void ProbesProducer::CreateInodeFileDataSourceInstance(
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(source_config.target_buffer()));
   if (system_inodes_.empty())
-    CreateStaticDeviceToInodeMap("/system/", &system_inodes_);
-  auto file_map_source =
-      std::unique_ptr<InodeFileDataSource>(new InodeFileDataSource(
-          session_id, &system_inodes_, &cache_, std::move(trace_writer)));
+    CreateStaticDeviceToInodeMap("/system", &system_inodes_);
+  auto file_map_source = std::unique_ptr<InodeFileDataSource>(
+      new InodeFileDataSource(task_runner_, session_id, &system_inodes_,
+                              &cache_, std::move(trace_writer)));
   file_map_sources_.emplace(id, std::move(file_map_source));
   AddWatchdogsTimer(id, source_config);
 }
@@ -240,7 +240,8 @@ void ProbesProducer::ConnectWithRetries(const char* socket_name,
 void ProbesProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
-  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, task_runner_);
+  endpoint_ = ProducerIPCClient::Connect(
+      socket_name_, this, "com.google.perfetto.traced_probes", task_runner_);
 }
 
 void ProbesProducer::IncreaseConnectionBackoff() {

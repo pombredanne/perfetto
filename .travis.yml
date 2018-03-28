@@ -136,24 +136,11 @@ script:
     perfetto_integrationtests
     perfetto_unittests
     "
-    BENCHMARK_BLACKLIST="
-    BM_EndToEnd_Fastest/[0-9][0-9][0-9][0-9][0-9][0-9]*/1024/0/real_time
-    BM_EndToEnd_Fastest/[0-9]*/2048/0/real_time
-    "
-    BENCHMARK_BLACKLIST_REGEX=$(echo $BENCHMARK_BLACKLIST | tr " " "|")
-
-    LIST_BENCHMARKS_COMMAND="perfetto_benchmarks  --benchmark_list_tests"
-    BLACKLIST_REMOVE_COMMAND="sed -E \"\%$BENCHMARK_BLACKLIST_REGEX%d\""
-    CONVERT_TO_SPACES_COMMAND="xargs"
-    CONVERT_TO_REGEX_COMMAND="tr \" \" \"|\""
-
-    BENCHMARK_PIPELINE="$LIST_BENCHMARKS_COMMAND | $BLACKLIST_REMOVE_COMMAND | $CONVERT_TO_SPACES_COMMAND | $CONVERT_TO_REGEX_COMMAND"
-
     if [[ "$CFG" != android-* ]]; then
       for TEST_TARGET in $TEST_TARGETS; do
         "out/dist/$TEST_TARGET"
       done
-      out/dist/perfetto_benchmarks --benchmark_filter="$(eval "out/dist/$BENCHMARK_PIPELINE")"
+      BENCHMARK_FUNCTIONAL_TEST_ONLY=true out/dist/perfetto_benchmarks
       if [[ "$CFG" == *-libfuzzer ]]; then
         # Run a single iteration each to make sure they are not crashing.
         out/dist/end_to_end_shared_memory_fuzzer -runs=1
@@ -165,7 +152,7 @@ script:
       for TEST_TARGET in $TEST_TARGETS; do
         tools/run_android_test out/dist "$TEST_TARGET"
       done
-      tools/run_android_test out/dist "perfetto_benchmarks" "--benchmark_filter=\"\$(eval '$BENCHMARK_PIPELINE')\""
+      tools/run_android_test --env BENCHMARK_FUNCTIONAL_TEST_ONLY=true out/dist "perfetto_benchmarks"
     fi
 
 after_script:

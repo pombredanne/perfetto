@@ -40,7 +40,8 @@ void FakeProducer::Connect(
     std::function<void()> on_create_data_source_instance) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   task_runner_ = task_runner;
-  endpoint_ = ProducerIPCClient::Connect(socket_name, this, task_runner);
+  endpoint_ = ProducerIPCClient::Connect(
+      socket_name, this, "android.perfetto.FakeProducer", task_runner);
   on_create_data_source_instance_ = std::move(on_create_data_source_instance);
 }
 
@@ -81,28 +82,26 @@ void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
                                      std::function<void()> complete_callback) {
   task_runner_->PostTask([this, minibatch_callback, complete_callback] {
     PERFETTO_CHECK(trace_writer_);
-
-    size_t payload_size = message_size_ - sizeof(uint32_t);
-    PERFETTO_CHECK(payload_size >= sizeof(char));
-
+    PERFETTO_CHECK(message_size_ > 1);
     std::unique_ptr<char, base::FreeDeleter> payload(
-        static_cast<char*>(malloc(payload_size)));
-    memset(payload.get(), '.', payload_size);
-    payload.get()[payload_size - 1] = 0;
+        static_cast<char*>(malloc(message_size_)));
+    memset(payload.get(), '.', message_size_);
+    payload.get()[message_size_ - 1] = 0;
 
+    base::TimeMillis start = base::GetWallTimeMs();
+    int64_t iterations = 0;
     size_t messages_to_emit = message_count_;
-    do {
+    while (messages_to_emit > 0) {
       size_t messages_in_minibatch =
           max_messages_per_second_ == 0
               ? messages_to_emit
               : std::min(max_messages_per_second_, messages_to_emit);
       PERFETTO_DCHECK(messages_to_emit >= messages_in_minibatch);
 
-      base::TimeMillis start = base::GetWallTimeMs();
       for (size_t i = 0; i < messages_in_minibatch; i++) {
         auto handle = trace_writer_->NewTracePacket();
         handle->set_for_testing()->set_seq_value(rnd_engine_());
-        handle->set_for_testing()->set_str(payload.get(), payload_size);
+        handle->set_for_testing()->set_str(payload.get(), message_size_);
       }
       messages_to_emit -= messages_in_minibatch;
 
@@ -110,13 +109,14 @@ void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
       // the speed limitation.
       if (max_messages_per_second_ > 0) {
         base::TimeMillis time_taken = base::GetWallTimeMs() - start;
-        if (time_taken.count() < 1000) {
-          usleep((1000 - time_taken.count()) * 1000);
+        int64_t expected_time_taken = ++iterations * 1000;
+        if (time_taken.count() < expected_time_taken) {
+          usleep((expected_time_taken - time_taken.count()) * 1000);
         }
       }
       trace_writer_->Flush(messages_to_emit > 0 ? minibatch_callback
                                                 : complete_callback);
-    } while (messages_to_emit > 0);
+    }
   });
 }
 
