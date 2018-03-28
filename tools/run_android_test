@@ -139,7 +139,7 @@ def Main():
 
   # LLVM sanitizers require to sideload a libclangrtXX.so on the device.
   sanitizer_libs = os.path.join(args.out_dir, 'sanitizer_libs')
-  env = ' '.join(args.env) + ' '
+  env = ' '.join(args.env if args.env is not None else []) + ' '
   if os.path.exists(sanitizer_libs):
     AdbCall('push', sanitizer_libs, target_dir)
     env += 'LD_LIBRARY_PATH="%s/sanitizer_libs" ' % (target_dir)
