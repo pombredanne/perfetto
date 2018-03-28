@@ -81,7 +81,7 @@ message ReadBuffersResponse {
   // packets, or even just a portion of it (if it's too big to fit within one
   // IPC). The returned slices are ordered and contiguous: packets' slices are
   // not interleaved and slices are sent only once all slices for a packet are
-  // avilable (i.e. the consumer will never see any gap).
+  // available (i.e. the consumer will never see any gap).
   message Slice {
     optional bytes data = 1;
 

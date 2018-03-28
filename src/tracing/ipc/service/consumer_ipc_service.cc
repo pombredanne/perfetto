@@ -143,17 +143,21 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
     size_t num_slices_left_for_packet = trace_packet.slices().size();
     for (const Slice& slice : trace_packet.slices()) {
       // Check if this slice would cause the IPC to overflow its max size and,
-      // if that is the case, split the IPCs. The "16" below is an
-      // over-estimation of the preamble that prefixes each message (thre are 2x
-      // size fields in the proto + a bool + the size in the IPC header).
-      const size_t approx_slice_ipc_size = slice.size + 16;
-      if (approx_reply_size + approx_slice_ipc_size > ipc::kIPCBufferSize) {
+      // if that is the case, split the IPCs. The "16" and "64" below are
+      // over-estimations of, respectively:
+      // 16: the preamble that prefixes each slice (there are 2 x size fields
+      //     in the proto + the |last_slice_for_packet| bool).
+      // 64: the overhead of the IPC InvokeMethodReply + wire_protocol's frame.
+      // If these estimations are wrong, BufferedFrameDeserializer::Serialize()
+      // will hit a DCHECK anyways.
+      const size_t approx_slice_size = slice.size + 16;
+      if (approx_reply_size + approx_slice_size > ipc::kIPCBufferSize - 64) {
         // If we hit this CHECK we got a single slice that is > kIPCBufferSize.
         PERFETTO_CHECK(result->slices_size() > 0);
         send_ipc_reply(/*has_more=*/true);
         approx_reply_size = 0;
       }
-      approx_reply_size += approx_slice_ipc_size;
+      approx_reply_size += approx_slice_size;
 
       auto* res_slice = result->add_slices();
       res_slice->set_last_slice_for_packet(--num_slices_left_for_packet == 0);
