@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <queue>
+#include <unordered_map>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
@@ -47,49 +48,53 @@ void ScanFilesDFS(
     directory += "/";
     if (!dir)
       continue;
+
+    struct stat buf;
+    if (lstat(directory.c_str(), &buf) != 0) {
+      PERFETTO_DPLOG("lstat %s", directory.c_str());
+      continue;
+    }
+    if (S_ISLNK(buf.st_mode))
+      continue;
+
+    BlockDeviceID block_device_id = buf.st_dev;
+
     while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
       std::string filepath = directory + filename;
 
-      struct stat buf;
-      if (lstat(filepath.c_str(), &buf) != 0)
-        continue;
-
-      // This might happen on filesystems that do not return
-      // information in entry->d_type.
-      if (S_ISLNK(buf.st_mode))
-        continue;
-
       Inode inode_number = entry->d_ino;
-      BlockDeviceID block_device_id = buf.st_dev;
 
       protos::pbzero::InodeFileMap_Entry_Type type =
           protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
       // Readdir and stat not guaranteed to have directory info for all systems
-      if (entry->d_type == DT_DIR || S_ISDIR(buf.st_mode)) {
+      if (entry->d_type == DT_DIR) {
         // Continue iterating through files if current entry is a directory
         queue.push_back(filepath);
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
-      } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
+      } else if (entry->d_type == DT_REG) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
 
       if (!fn(block_device_id, inode_number, filepath, type))
         return;
     }
+    if (errno != 0)
+      PERFETTO_DPLOG("readdir %s", directory.c_str());
   }
 }
 
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map) {
+    std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
+        static_file_map) {
   ScanFilesDFS(root_directory,
                [static_file_map](BlockDeviceID block_device_id,
                                  Inode inode_number, const std::string& path,
                                  protos::pbzero::InodeFileMap_Entry_Type type) {
-                 std::map<Inode, InodeMapValue>& inode_map =
+                 std::unordered_map<Inode, InodeMapValue>& inode_map =
                      (*static_file_map)[block_device_id];
                  inode_map[inode_number].SetType(type);
                  inode_map[inode_number].AddPath(path);
@@ -109,7 +114,8 @@ void FillInodeEntry(InodeFileMap* destination,
 
 InodeFileDataSource::InodeFileDataSource(
     TracingSessionID id,
-    std::map<BlockDeviceID, std::map<Inode, InodeMapValue>>* static_file_map,
+    std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
+        static_file_map,
     LRUInodeCache* cache,
     std::unique_ptr<TraceWriter> writer)
     : session_id_(id),
@@ -153,7 +159,8 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
       });
 
   // Could not be found, just add the inode number
-  PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
+  if (inode_numbers->size() != 0)
+    PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
   for (const auto& unresolved_inode : *inode_numbers) {
     auto* entry = destination->add_entries();
     entry->set_inode_number(unresolved_inode);
@@ -200,7 +207,8 @@ void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
     it = inode_numbers->erase(it);
     FillInodeEntry(destination, inode_number, *value);
   }
-  PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
+  if (cache_found_count > 0)
+    PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
 }
 
 void InodeFileDataSource::OnInodes(
@@ -215,7 +223,8 @@ void InodeFileDataSource::OnInodes(
     BlockDeviceID block_device_id = inodes_pair.second;
     inode_file_maps[block_device_id].emplace(inode_number);
   }
-  PERFETTO_DLOG("Saw %zu block devices.", inode_file_maps.size());
+  if (inode_file_maps.size() > 1)
+    PERFETTO_DLOG("Saw %zu block devices.", inode_file_maps.size());
 
   // Write a TracePacket with an InodeFileMap proto for each block device id
   for (const auto& inode_file_map_data : inode_file_maps) {

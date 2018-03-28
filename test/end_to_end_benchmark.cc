@@ -42,6 +42,10 @@ namespace {
 #define TEST_CONSUMER_SOCK_NAME PERFETTO_CONSUMER_SOCK_NAME
 #endif
 
+static bool IsBenchmarkFunctionalOnly() {
+  return getenv("BENCHMARK_FUNCTIONAL_TEST_ONLY") != nullptr;
+}
+
 static void BenchmarkCommon(benchmark::State& state) {
   base::TestTaskRunner task_runner;
 
@@ -161,23 +165,44 @@ static void BenchmarkCommon(benchmark::State& state) {
 }
 }
 
-static void BM_EndToEnd_Fastest(benchmark::State& state) {
+static void BM_EndToEnd_SaturateCpu(benchmark::State& state) {
   BenchmarkCommon(state);
 }
 
-BENCHMARK(BM_EndToEnd_Fastest)
+static void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
+  int min_message_count = 16;
+  int max_message_count = IsBenchmarkFunctionalOnly() ? 1024 : 1024 * 1024;
+  int min_payload = 8;
+  int max_payload = IsBenchmarkFunctionalOnly() ? 256 : 2048;
+  for (int count = min_message_count; count <= max_message_count; count *= 2) {
+    for (int bytes = min_payload; bytes <= max_payload; bytes *= 2) {
+      b->Args({count, bytes, 0 /* speed */});
+    }
+  }
+}
+
+BENCHMARK(BM_EndToEnd_SaturateCpu)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
-    ->RangeMultiplier(2)
-    ->Ranges({{16, 1024 * 1024}, {8, 2048}, {0, 0}});
+    ->Apply(SaturateCpuArgs);
 
 static void BM_EndToEnd_ConstantRate(benchmark::State& state) {
   BenchmarkCommon(state);
 }
 
+static void ConstantRateArgs(benchmark::internal::Benchmark* b) {
+  int min_speed = IsBenchmarkFunctionalOnly() ? 8 : 32;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 128 : 64;
+  for (int speed = min_speed; speed <= max_speed; speed *= 2) {
+    b->Args({128 * 1024, 128, speed});
+    b->Args({256 * 1024, 128, speed});
+    b->Args({128 * 1024, 256, speed});
+    b->Args({256 * 1024, 256, speed});
+  }
+}
+
 BENCHMARK(BM_EndToEnd_ConstantRate)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
-    ->RangeMultiplier(2)
-    ->Ranges({{128 * 1024, 256 * 1024}, {128, 256}, {8, 128}});
+    ->Apply(ConstantRateArgs);
 }  // namespace perfetto
