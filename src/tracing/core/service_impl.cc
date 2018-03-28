@@ -895,7 +895,6 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
-    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
     {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
     {CLOCK_REALTIME_COARSE,
      protos::ClockSnapshot::Clock::REALTIME_COARSE,

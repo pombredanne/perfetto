@@ -21,11 +21,11 @@
 
 #include <chrono>
 
-#include "perfetto/base/logging.h"
-
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 #include <mach/mach_time.h>
 #endif
+
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace base {
