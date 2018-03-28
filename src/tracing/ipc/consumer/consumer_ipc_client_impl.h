@@ -43,7 +43,6 @@ class Client;
 
 class Consumer;
 class TraceConfig;
-class TracePacket;
 
 // Exposes a Service endpoint to Consumer(s), proxying all requests through a
 // IPC channel to the remote Service. This class is the glue layer between the

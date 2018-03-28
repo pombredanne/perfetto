@@ -35,8 +35,8 @@ using MethodID = uint64_t;
 using ClientID = uint64_t;
 using RequestID = uint64_t;
 
-// This determines the maximum size allowed for IPCs. Trying to send/receive
-// a message larger than this size will hit DCHECK(s) and auto-disconnects.
+// This determines the maximum size allowed for an IPC message. Trying to send
+// or receive a larger message will hit DCHECK(s) and auto-disconnect.
 constexpr size_t kIPCBufferSize = 128 * 1024;
 
 }  // namespace ipc
