@@ -26,8 +26,6 @@
 
 namespace perfetto {
 namespace {
-uint64_t kScanInterval = 10000;  // 10s
-uint64_t kScanSteps = 5000;
 
 std::string JoinPaths(const std::string& one, const std::string& other) {
   std::string result;
@@ -47,16 +45,20 @@ FileScanner::FileScanner(
                        Inode inode_number,
                        const std::string& path,
                        protos::pbzero::InodeFileMap_Entry_Type type)> callback,
-    std::function<void()> done_callback)
+    std::function<void()> done_callback,
+    uint64_t scan_interval,
+    uint64_t scan_steps)
     : callback_(std::move(callback)),
       done_callback_(done_callback),
+      scan_interval_ms_(scan_interval),
+      scan_steps_(scan_steps),
       queue_({std::move(root_directory)}) {}
 
 void FileScanner::Scan(base::TaskRunner* task_runner) {
-  Steps(kScanSteps);
+  Steps(scan_steps_);
   if (!done()) {
     task_runner->PostDelayedTask([this, task_runner] { Scan(task_runner); },
-                                 kScanInterval);
+                                 scan_interval_ms_);
   }
 }
 

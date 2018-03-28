@@ -37,7 +37,9 @@ class FileScanner {
                                  const std::string& path,
                                  protos::pbzero::InodeFileMap_Entry_Type type)>
                   callback,
-              std::function<void()> done_callback);
+              std::function<void()> done_callback,
+              uint64_t scan_interval,
+              uint64_t scan_steps);
   void Scan(base::TaskRunner* task_runner);
 
  private:
@@ -52,6 +54,8 @@ class FileScanner {
                      protos::pbzero::InodeFileMap_Entry_Type type)>
       callback_;
   std::function<void()> done_callback_;
+  const uint64_t scan_interval_ms_;
+  const uint64_t scan_steps_;
   std::vector<std::string> queue_;
   base::ScopedDir current_directory_fd_;
   std::string current_directory_;
