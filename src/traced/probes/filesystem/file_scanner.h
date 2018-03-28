@@ -19,14 +19,12 @@
 
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 
-#include "perfetto/base/scoped_file.h"
+#include <string>
+#include <vector>
 
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/traced/data_source_types.h"
-
-#include <string>
-#include <vector>
 
 namespace perfetto {
 
@@ -38,15 +36,19 @@ class FileScanner {
                                  protos::pbzero::InodeFileMap_Entry_Type type)>
                   callback,
               std::function<void()> done_callback,
-              uint64_t scan_interval,
+              uint64_t scan_interval_ms,
               uint64_t scan_steps);
+
+  FileScanner(const FileScanner&) = delete;
+  FileScanner& operator=(const FileScanner&) = delete;
+
   void Scan(base::TaskRunner* task_runner);
 
  private:
   void NextDirectory();
   void Step();
   void Steps(uint64_t n);
-  bool done();
+  bool Done();
 
   std::function<bool(BlockDeviceID block_device_id,
                      Inode inode_number,

@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "perfetto/base/scoped_file.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 
 namespace perfetto {
@@ -31,12 +30,12 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
   std::string result;
   result.reserve(one.size() + other.size() + 1);
   result += one;
-  if (!result.empty() && result[result.size() - 1] != '/') {
+  if (!result.empty() && result[result.size() - 1] != '/')
     result += '/';
-  }
   result += other;
   return result;
 }
+
 }  // namespace
 
 FileScanner::FileScanner(
@@ -46,37 +45,45 @@ FileScanner::FileScanner(
                        const std::string& path,
                        protos::pbzero::InodeFileMap_Entry_Type type)> callback,
     std::function<void()> done_callback,
-    uint64_t scan_interval,
+    uint64_t scan_interval_ms,
     uint64_t scan_steps)
     : callback_(std::move(callback)),
       done_callback_(done_callback),
-      scan_interval_ms_(scan_interval),
+      scan_interval_ms_(scan_interval_ms),
       scan_steps_(scan_steps),
       queue_({std::move(root_directory)}) {}
 
 void FileScanner::Scan(base::TaskRunner* task_runner) {
   Steps(scan_steps_);
-  if (!done()) {
+  if (!Done()) {
     task_runner->PostDelayedTask([this, task_runner] { Scan(task_runner); },
                                  scan_interval_ms_);
   }
 }
 
 void FileScanner::NextDirectory() {
-  std::string directory = queue_.back();
+  std::string directory = std::move(queue_.back());
   queue_.pop_back();
   current_directory_fd_.reset(opendir(directory.c_str()));
+  if (!current_directory_fd_) {
+    PERFETTO_DPLOG("opendir %s", directory.c_str());
+    return;
+  }
+  current_directory_ = std::move(directory);
 
   struct stat buf;
-  if (fstat(dirfd(current_directory_fd_.get()), &buf) != 0)
-    return;
-
-  if (S_ISLNK(buf.st_mode)) {
+  if (fstat(dirfd(current_directory_fd_.get()), &buf) != 0) {
+    PERFETTO_DPLOG("fstat %s", current_directory_.c_str());
     current_directory_fd_.reset();
+    current_directory_.clear();
     return;
   }
 
-  current_directory_ = std::move(directory);
+  if (S_ISLNK(buf.st_mode)) {
+    current_directory_fd_.reset();
+    current_directory_.clear();
+    return;
+  }
 }
 
 void FileScanner::Step() {
@@ -119,11 +126,11 @@ void FileScanner::Step() {
 }
 
 void FileScanner::Steps(uint64_t n) {
-  for (uint64_t i = 0; i < n && !done(); ++i)
+  for (uint64_t i = 0; i < n && !Done(); ++i)
     Step();
 }
 
-bool FileScanner::done() {
+bool FileScanner::Done() {
   return !current_directory_fd_ && queue_.empty();
 }
 }  // namespace perfetto
