@@ -67,8 +67,6 @@ class InodeFileDataSource {
       LRUInodeCache* cache,
       std::unique_ptr<TraceWriter> writer);
 
-  ~InodeFileDataSource();
-
   TracingSessionID session_id() const { return session_id_; }
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
 
