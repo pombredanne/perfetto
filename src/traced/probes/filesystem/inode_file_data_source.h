@@ -30,6 +30,7 @@
 #include "perfetto/traced/data_source_types.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "src/traced/probes/filesystem/file_scanner.h"
 #include "src/traced/probes/filesystem/fs_mount.h"
 #include "src/traced/probes/filesystem/lru_inode_cache.h"
 
@@ -73,15 +74,6 @@ class InodeFileDataSource {
   // Called when Inodes are seen in the FtraceEventBundle
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
-  // Filesystem scan starting from root directory to search for provided inode
-  // numbers. Adds all inode numbers to the InodeFileMap proto. Fills in cache
-  // for all inode numbers that get resolved from the scan.
-  void AddInodesFromFilesystemScan(const std::string& root_directory,
-                                   BlockDeviceID block_device_id,
-                                   std::set<Inode>* inode_numbers,
-                                   LRUInodeCache* cache,
-                                   InodeFileMap* destination);
-
   // Search in /system partition and add inodes to InodeFileMap proto if found
   void AddInodesFromStaticMap(BlockDeviceID block_device_id,
                               std::set<Inode>* inode_numbers,
@@ -94,7 +86,20 @@ class InodeFileDataSource {
 
  private:
   void FindMissingInodes();
+  bool FileScannerCallback(BlockDeviceID block_device_id,
+                           Inode inode_number,
+                           const std::string& path,
+                           protos::pbzero::InodeFileMap_Entry_Type type);
+  void FileScannerDone();
+  void AddRootsForBlockDevice(BlockDeviceID block_device_id,
+                              std::vector<std::string>* roots);
 
+  std::map<BlockDeviceID, protozero::MessageHandle<protos::pbzero::TracePacket>>
+      trace_packets_;
+  std::map<BlockDeviceID, protos::pbzero::InodeFileMap*> filemaps_;
+  bool scan_running_ = false;
+
+  std::unique_ptr<FileScanner> file_scanner_;
   base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*

@@ -39,7 +39,7 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
 }  // namespace
 
 FileScanner::FileScanner(
-    std::string root_directory,
+    std::vector<std::string> root_directories,
     std::function<bool(BlockDeviceID block_device_id,
                        Inode inode_number,
                        const std::string& path,
@@ -51,14 +51,21 @@ FileScanner::FileScanner(
       done_callback_(done_callback),
       scan_interval_ms_(scan_interval_ms),
       scan_steps_(scan_steps),
-      queue_({std::move(root_directory)}) {}
+      queue_(std::move(root_directories)),
+      weak_factory_(this) {}
 
 void FileScanner::Scan(base::TaskRunner* task_runner) {
   Steps(scan_steps_);
-  if (!Done()) {
-    task_runner->PostDelayedTask([this, task_runner] { Scan(task_runner); },
-                                 scan_interval_ms_);
-  }
+  if (Done())
+    return done_callback_();
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner->PostDelayedTask(
+      [weak_this, task_runner] {
+        if (!weak_this)
+          return;
+        weak_this->Scan(task_runner);
+      },
+      scan_interval_ms_);
 }
 
 void FileScanner::NextDirectory() {
@@ -134,4 +141,5 @@ void FileScanner::Steps(uint64_t n) {
 bool FileScanner::Done() {
   return !current_directory_fd_ && queue_.empty();
 }
+
 }  // namespace perfetto
