@@ -67,6 +67,7 @@ void FileScanner::NextDirectory() {
   current_directory_fd_.reset(opendir(directory.c_str()));
   if (!current_directory_fd_) {
     PERFETTO_DPLOG("opendir %s", directory.c_str());
+    current_directory_.clear();
     return;
   }
   current_directory_ = std::move(directory);
