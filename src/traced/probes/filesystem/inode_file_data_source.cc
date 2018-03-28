@@ -292,6 +292,7 @@ void InodeFileDataSource::FileScannerDone() {
   if (has_current_trace_packet_)
     current_trace_packet_->Finalize();
   has_current_trace_packet_ = false;
+  file_scanner_.reset();
   if (!next_missing_inodes_.empty()) {
     auto weak_this = GetWeakPtr();
     PERFETTO_DLOG("Starting another filesystem scan.");
@@ -306,7 +307,6 @@ void InodeFileDataSource::FileScannerDone() {
         kScanIntervalMs);
   } else {
     scan_running_ = false;
-    file_scanner_.reset();
   }
 }
 
