@@ -130,11 +130,10 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
     InodeFileMap* destination) {
   if (inode_numbers->empty())
     return;
-  std::set<Inode> resolved_inodes_set;
-  std::set<Inode>* resolved_inodes = &resolved_inodes_set;
+  size_t resolved_count = 0;
   ScanFilesDFS(
       root_directory,
-      [&resolved_inodes, provided_block_device_id, inode_numbers, cache,
+      [&resolved_count, provided_block_device_id, inode_numbers, cache,
        destination](BlockDeviceID block_device_id, Inode inode_number,
                     const std::string& path,
                     protos::pbzero::InodeFileMap_Entry_Type type) {
@@ -152,18 +151,19 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
           cache->Insert(key, new_val);
           FillInodeEntry(destination, inode_number, new_val);
         }
-        resolved_inodes->insert(inode_number);
-        if (resolved_inodes->size() == inode_numbers->size())
+        resolved_count++;
+        inode_numbers->erase(inode_number);
+        if (inode_numbers->empty())
           return false;
         return true;
       });
-  size_t resolved_count = resolved_inodes->size();
+
   if (resolved_count > 0)
     PERFETTO_DLOG("%zu inodes found in filesystem scan", resolved_count);
   // Some inodes were not resolved
-  if (resolved_count != inode_numbers->size())
+  if (inode_numbers->size() > 0)
     PERFETTO_DLOG("%zu inodes not found in filesystem scan",
-                  inode_numbers->size() - resolved_count);
+                  inode_numbers->size());
 }
 
 void InodeFileDataSource::AddInodesFromStaticMap(BlockDeviceID block_device_id,
@@ -222,7 +222,8 @@ void InodeFileDataSource::OnInodes(
     BlockDeviceID block_device_id = inodes_pair.second;
     inode_file_maps[block_device_id].emplace(inode_number);
   }
-  PERFETTO_DLOG("Saw %zu block devices.", inode_file_maps.size());
+  if (inode_file_maps.size() > 1)
+    PERFETTO_DLOG("Saw %zu block devices.", inode_file_maps.size());
 
   // Write a TracePacket with an InodeFileMap proto for each block device id
   for (const auto& inode_file_map_data : inode_file_maps) {
