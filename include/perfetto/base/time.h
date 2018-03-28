@@ -35,6 +35,7 @@ using TimeMillis = std::chrono::milliseconds;
 using TimeNanos = std::chrono::nanoseconds;
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+
 constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC;
 
 inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
@@ -51,7 +52,7 @@ inline TimeNanos GetThreadCPUTimeNs() {
   return GetTimeInternalNs(CLOCK_THREAD_CPUTIME_ID);
 }
 
-#else   // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#else  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
 inline TimeNanos GetWallTimeNs() {
   static uint64_t monotonic_timebase_factor = 0;
@@ -63,6 +64,7 @@ inline TimeNanos GetWallTimeNs() {
 
   return TimeNanos(mach_absolute_time() * monotonic_timebase_factor);
 }
+
 #endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
 inline TimeMillis GetWallTimeMs() {
