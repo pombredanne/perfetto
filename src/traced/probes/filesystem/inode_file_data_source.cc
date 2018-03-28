@@ -268,11 +268,13 @@ bool InodeFileDataSource::FileScannerCallback(
   auto cur_val = cache_->Get(key);
   if (cur_val != nullptr) {
     cur_val->AddPath(path);
-    FillInodeEntry(current_file_map_, inode_number, *cur_val);
+    FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+                   *cur_val);
   } else {
     InodeMapValue new_val(InodeMapValue(type, {path}));
     cache_->Insert(key, new_val);
-    FillInodeEntry(current_file_map_, inode_number, new_val);
+    FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+                   new_val);
   }
   PERFETTO_DLOG("Filled %s", path.c_str());
   return !missing_inodes_.empty();
