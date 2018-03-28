@@ -329,6 +329,7 @@ cc_test {
     "test/fake_consumer.cc",
     "test/fake_producer.cc",
     "test/task_runner_thread.cc",
+    "test/test_helper.cc",
   ],
   shared_libs: [
     "libandroid",
