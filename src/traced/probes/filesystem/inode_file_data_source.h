@@ -76,15 +76,14 @@ class InodeFileDataSource {
 
   // Search in /system partition and add inodes to InodeFileMap proto if found
   void AddInodesFromStaticMap(BlockDeviceID block_device_id,
-                              std::set<Inode>* inode_numbers,
-                              InodeFileMap* destination);
+                              std::set<Inode>* inode_numbers);
 
   // Search in LRUInodeCache and add inodes to InodeFileMap if found
   void AddInodesFromLRUCache(BlockDeviceID block_device_id,
-                             std::set<Inode>* inode_numbers,
-                             InodeFileMap* destination);
+                             std::set<Inode>* inode_numbers);
 
  private:
+  InodeFileMap* AddToCurrentTracePacket(BlockDeviceID block_device_id);
   void FindMissingInodes();
   bool FileScannerCallback(BlockDeviceID block_device_id,
                            Inode inode_number,
@@ -93,11 +92,6 @@ class InodeFileDataSource {
   void FileScannerDone();
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
-
-  std::map<BlockDeviceID, protozero::MessageHandle<protos::pbzero::TracePacket>>
-      trace_packets_;
-  std::map<BlockDeviceID, protos::pbzero::InodeFileMap*> filemaps_;
-  bool scan_running_ = false;
 
   std::unique_ptr<FileScanner> file_scanner_;
   base::TaskRunner* task_runner_;
@@ -108,6 +102,13 @@ class InodeFileDataSource {
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
   std::map<BlockDeviceID, std::set<Inode>> missing_inodes_;
+  std::map<BlockDeviceID, std::set<Inode>> next_missing_inodes_;
+  BlockDeviceID current_block_device_id_;
+  TraceWriter::TracePacketHandle current_trace_packet_;
+  InodeFileMap* current_file_map_;
+  bool has_current_trace_packet_ = false;
+
+  bool scan_running_ = false;
   base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 

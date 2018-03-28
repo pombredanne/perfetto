@@ -92,6 +92,7 @@ void FileScanner::NextDirectory() {
     current_directory_.clear();
     return;
   }
+  current_block_device_id_ = buf.st_dev;
 }
 
 void FileScanner::Step() {
