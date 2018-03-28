@@ -38,14 +38,6 @@ inline TimeNanos FromPosixTimespec(const struct timespec& ts) {
   return TimeNanos(ts.tv_sec * 1000000000LL + ts.tv_nsec);
 }
 
-inline struct timespec ToPosixTimespec(TimeMillis time) {
-  struct timespec ts {};
-  const long time_s = static_cast<long>(time.count() / 1000);
-  ts.tv_sec = time_s;
-  ts.tv_nsec = (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
-  return ts;
-}
-
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
 constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC;
@@ -85,6 +77,14 @@ inline TimeMillis GetWallTimeMs() {
 
 inline TimeSeconds GetWallTimeS() {
   return std::chrono::duration_cast<TimeSeconds>(GetWallTimeNs());
+}
+
+inline struct timespec ToPosixTimespec(TimeMillis time) {
+  struct timespec ts {};
+  const long time_s = static_cast<long>(time.count() / 1000);
+  ts.tv_sec = time_s;
+  ts.tv_nsec = (static_cast<long>(time.count()) - time_s * 1000L) * 1000000L;
+  return ts;
 }
 
 }  // namespace base
