@@ -78,18 +78,15 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
 void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
-
-    size_t payload_size = message_size_ - sizeof(uint32_t);
-    PERFETTO_CHECK(payload_size >= sizeof(char));
-
+    PERFETTO_CHECK(message_size_ > 1);
     std::unique_ptr<char, base::FreeDeleter> payload(
-        static_cast<char*>(malloc(payload_size)));
-    memset(payload.get(), '.', payload_size);
-    payload.get()[payload_size - 1] = 0;
+        static_cast<char*>(malloc(message_size_)));
+    memset(payload.get(), '.', message_size_);
+    payload.get()[message_size_ - 1] = 0;
     for (size_t i = 0; i < message_count_; i++) {
       auto handle = trace_writer_->NewTracePacket();
       handle->set_for_testing()->set_seq_value(rnd_engine_());
-      handle->set_for_testing()->set_str(payload.get(), payload_size);
+      handle->set_for_testing()->set_str(payload.get(), message_size_);
     }
     trace_writer_->Flush(callback);
   });

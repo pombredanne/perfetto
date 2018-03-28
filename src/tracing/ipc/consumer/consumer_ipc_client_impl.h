@@ -86,6 +86,11 @@ class ConsumerIPCClientImpl : public Service::ConsumerEndpoint,
 
   bool connected_ = false;
 
+  // When a packet is too big to fit into a ReadBuffersResponse IPC, the service
+  // will chunk it into several IPCs, each containing few slices of the packet
+  // (a packet's slice is always guaranteed to be << kIPCBufferSize). When
+  // chunking happens this field accumulates the slices received until the
+  // one with |last_slice_for_packet| == true is received.
   TracePacket partial_packet_;
 
   base::WeakPtrFactory<ConsumerIPCClientImpl> weak_ptr_factory_;

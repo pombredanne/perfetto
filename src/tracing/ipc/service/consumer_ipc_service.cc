@@ -21,8 +21,10 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/ipc/basic_types.h"
 #include "perfetto/ipc/host.h"
 #include "perfetto/tracing/core/service.h"
+#include "perfetto/tracing/core/shared_memory_abi.h"
 #include "perfetto/tracing/core/slice.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
@@ -121,7 +123,16 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
 
   auto result = ipc::AsyncResult<protos::ReadBuffersResponse>::Create();
 
-  auto send_ipc = [this, &result](bool more) {
+  // A TracePacket might be too big to fit into a single IPC message (max
+  // kIPCBufferSize). However a TracePacket is made of slices and each slice
+  // is way smaller than kIPCBufferSize (a slice size is effectively bounded by
+  // the max chunk size of the SharedMemoryABI). When sending a TracePacket,
+  // if its slices don't fit within one IPC, chunk them over several contiguous
+  // IPCs using the |last_slice_for_packet| for glueing on the other side.
+  static_assert(ipc::kIPCBufferSize >= SharedMemoryABI::kMaxPageSize * 2,
+                "kIPCBufferSize too small given the max possible slice size");
+
+  auto send_ipc_reply = [this, &result](bool more) {
     result.set_has_more(more);
     read_buffers_response.Resolve(std::move(result));
     result = ipc::AsyncResult<protos::ReadBuffersResponse>::Create();
@@ -131,17 +142,25 @@ void ConsumerIPCService::RemoteConsumer::OnTraceData(
   for (const TracePacket& trace_packet : trace_packets) {
     size_t num_slices_left_for_packet = trace_packet.slices().size();
     for (const Slice& slice : trace_packet.slices()) {
+      // Check if this slice would cause the IPC to overflow its max size and,
+      // if that is the case, split the IPCs. The "16" below is an
+      // over-estimation of the preamble that prefixes each message (thre are 2x
+      // size fields in the proto + a bool + the size in the IPC header).
+      const size_t approx_slice_ipc_size = slice.size + 16;
+      if (approx_reply_size + approx_slice_ipc_size > ipc::kIPCBufferSize) {
+        // If we hit this CHECK we got a single slice that is > kIPCBufferSize.
+        PERFETTO_CHECK(result->slices_size() > 0);
+        send_ipc_reply(/*has_more=*/true);
+        approx_reply_size = 0;
+      }
+      approx_reply_size += approx_slice_ipc_size;
+
       auto* res_slice = result->add_slices();
       res_slice->set_last_slice_for_packet(--num_slices_left_for_packet == 0);
       res_slice->set_data(slice.start, slice.size);
-      approx_reply_size += slice.size + 16;
-      if (approx_reply_size > 64000) {  // TODO constant
-        send_ipc(/*has_more=*/true);
-        approx_reply_size = 0;
-      }
     }
   }
-  send_ipc(has_more);
+  send_ipc_reply(has_more);
 }
 
 }  // namespace perfetto

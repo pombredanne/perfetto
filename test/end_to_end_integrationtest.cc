@@ -174,12 +174,12 @@ TEST(PerfettoTest, TestFakeProducer) {
   ds_config->mutable_for_testing()->set_message_size(kMessageSizeBytes);
 
   // Create the random generator with the same seed.
-  std::minstd_rand0 random(kRandomSeed);
+  std::minstd_rand0 rnd_engine(kRandomSeed);
 
   // Create the function to handle packets as they come in.
   uint64_t total = 0;
   auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  auto on_consumer_data = [&total, &on_readback_complete, &random](
+  auto on_consumer_data = [&total, &on_readback_complete, &rnd_engine](
                               std::vector<TracePacket> packets, bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
@@ -188,7 +188,7 @@ TEST(PerfettoTest, TestFakeProducer) {
       ASSERT_TRUE(packet->has_for_testing());
       ASSERT_EQ(protos::TracePacket::kTrustedUid,
                 packet->optional_trusted_uid_case());
-      ASSERT_EQ(packet->for_testing().seq_value(), random());
+      ASSERT_EQ(packet->for_testing().seq_value(), rnd_engine());
     }
     total += packets.size();
 
@@ -250,22 +250,34 @@ TEST(PerfettoTest, VeryLargePackets) {
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
 
+  static constexpr int kNumPackets = 5;
+  static constexpr uint32_t kRandomSeed = 42;
+  static constexpr uint32_t kMsgSize = 1024 * 1024 - 42;
+  std::minstd_rand0 rnd_engine(kRandomSeed);
+
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
-  ds_config->mutable_for_testing()->set_message_count(1);
-  ds_config->mutable_for_testing()->set_message_size(1024 * 1024);
+  ds_config->mutable_for_testing()->set_seed(kRandomSeed);
+  ds_config->mutable_for_testing()->set_message_count(kNumPackets);
+  ds_config->mutable_for_testing()->set_message_size(kMsgSize);
 
   auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  auto on_consumer_data = [&on_readback_complete](
+  int packets_seen = 0;
+  auto on_consumer_data = [&on_readback_complete, &rnd_engine, &packets_seen](
                               std::vector<TracePacket> packets, bool has_more) {
     for (auto& packet : packets) {
       ASSERT_TRUE(packet.Decode());
       if (!packet->has_for_testing())
         continue;
-      // ASSERT_EQ(packet->for_testing().seq_value(), random());
-      // TODO validation
+      packets_seen++;
+      ASSERT_EQ(packet->for_testing().seq_value(), rnd_engine());
+      size_t msg_size = packet->for_testing().str().size();
+      ASSERT_EQ(kMsgSize, msg_size);
+      for (size_t i = 0; i < msg_size; i++)
+        ASSERT_EQ(i < msg_size - 1 ? '.' : 0, packet->for_testing().str()[i]);
     }
+
     if (!has_more)
       on_readback_complete();
   };
@@ -292,6 +304,7 @@ TEST(PerfettoTest, VeryLargePackets) {
 
   consumer.ReadTraceData();
   task_runner.RunUntilCheckpoint("readback.complete");
+  ASSERT_EQ(kNumPackets, packets_seen);
 
   consumer.Disconnect();
 }

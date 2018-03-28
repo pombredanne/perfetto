@@ -132,15 +132,12 @@ void ConsumerIPCClientImpl::OnReadBuffersResponse(
     return;
   }
   std::vector<TracePacket> trace_packets;
-  std::string x;
   for (auto& resp_slice : *response->mutable_slices()) {
-    x.append(resp_slice.last_slice_for_packet() ? "|" : ".");
     partial_packet_.AddSlice(
         Slice(std::unique_ptr<std::string>(resp_slice.release_data())));
     if (resp_slice.last_slice_for_packet())
       trace_packets.emplace_back(std::move(partial_packet_));
   }
-  PERFETTO_DLOG("Invoke %d %s", response->slices().size(), x.c_str());
   if (!trace_packets.empty() || !response.has_more())
     consumer_->OnTraceData(std::move(trace_packets), response.has_more());
 }

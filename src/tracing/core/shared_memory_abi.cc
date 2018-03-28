@@ -51,6 +51,7 @@ std::array<uint16_t, SharedMemoryABI::kNumPageLayouts> InitChunkSizes(
 constexpr size_t SharedMemoryABI::kNumChunksForLayout[];
 constexpr const char* SharedMemoryABI::kChunkStateStr[];
 constexpr const size_t SharedMemoryABI::kInvalidPageIdx;
+constexpr const size_t SharedMemoryABI::kMaxPageSize;
 
 SharedMemoryABI::SharedMemoryABI() = default;
 
@@ -110,6 +111,7 @@ void SharedMemoryABI::Initialize(uint8_t* start,
   PERFETTO_CHECK(kMaxWriterID <= chunk_header.writer_id);
 
   PERFETTO_CHECK(page_size >= 4096);
+  PERFETTO_CHECK(page_size < kMaxPageSize);
   PERFETTO_CHECK(page_size % 4096 == 0);
   PERFETTO_CHECK(reinterpret_cast<uintptr_t>(start) % 4096 == 0);
   PERFETTO_CHECK(size % page_size == 0);
