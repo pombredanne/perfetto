@@ -48,41 +48,38 @@ void ScanFilesDFS(
     directory += "/";
     if (!dir)
       continue;
-
-    struct stat buf;
-    if (lstat(directory.c_str(), &buf) != 0) {
-      PERFETTO_DPLOG("lstat %s", directory.c_str());
-      continue;
-    }
-    if (S_ISLNK(buf.st_mode))
-      continue;
-
-    BlockDeviceID block_device_id = buf.st_dev;
-
     while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
       std::string filepath = directory + filename;
 
+      struct stat buf;
+      if (lstat(filepath.c_str(), &buf) != 0)
+        continue;
+
+      // This might happen on filesystems that do not return
+      // information in entry->d_type.
+      if (S_ISLNK(buf.st_mode))
+        continue;
+
       Inode inode_number = entry->d_ino;
+      BlockDeviceID block_device_id = buf.st_dev;
 
       protos::pbzero::InodeFileMap_Entry_Type type =
           protos::pbzero::InodeFileMap_Entry_Type_UNKNOWN;
       // Readdir and stat not guaranteed to have directory info for all systems
-      if (entry->d_type == DT_DIR) {
+      if (entry->d_type == DT_DIR || S_ISDIR(buf.st_mode)) {
         // Continue iterating through files if current entry is a directory
         queue.push_back(filepath);
         type = protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY;
-      } else if (entry->d_type == DT_REG) {
+      } else if (entry->d_type == DT_REG || S_ISREG(buf.st_mode)) {
         type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
       }
 
       if (!fn(block_device_id, inode_number, filepath, type))
         return;
     }
-    if (errno != 0)
-      PERFETTO_DPLOG("readdir %s", directory.c_str());
   }
 }
 
@@ -132,12 +129,14 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
     InodeFileMap* destination) {
   if (inode_numbers->empty())
     return;
+  std::set<Inode> resolved_inodes_set;
+  std::set<Inode>* resolved_inodes = &resolved_inodes_set;
   ScanFilesDFS(
       root_directory,
-      [provided_block_device_id, inode_numbers, cache, destination](
-          BlockDeviceID block_device_id, Inode inode_number,
-          const std::string& path,
-          protos::pbzero::InodeFileMap_Entry_Type type) {
+      [&resolved_inodes, provided_block_device_id, inode_numbers, cache,
+       destination](BlockDeviceID block_device_id, Inode inode_number,
+                    const std::string& path,
+                    protos::pbzero::InodeFileMap_Entry_Type type) {
         if (provided_block_device_id != block_device_id)
           return true;
         if (inode_numbers->find(inode_number) == inode_numbers->end())
@@ -152,19 +151,18 @@ void InodeFileDataSource::AddInodesFromFilesystemScan(
           cache->Insert(key, new_val);
           FillInodeEntry(destination, inode_number, new_val);
         }
-        inode_numbers->erase(inode_number);
-        if (inode_numbers->empty())
+        resolved_inodes->insert(inode_number);
+        if (resolved_inodes->size() == inode_numbers->size())
           return false;
         return true;
       });
-
-  // Could not be found, just add the inode number
-  if (inode_numbers->size() != 0)
-    PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
-  for (const auto& unresolved_inode : *inode_numbers) {
-    auto* entry = destination->add_entries();
-    entry->set_inode_number(unresolved_inode);
-  }
+  size_t resolved_count = resolved_inodes->size();
+  if (resolved_count > 0)
+    PERFETTO_DLOG("%zu inodes found in filesystem scan", resolved_count);
+  // Some inodes were not resolved
+  if (resolved_count != inode_numbers->size())
+    PERFETTO_DLOG("%zu inodes not found in filesystem scan",
+                  inode_numbers->size() - resolved_count);
 }
 
 void InodeFileDataSource::AddInodesFromStaticMap(BlockDeviceID block_device_id,
@@ -204,8 +202,8 @@ void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
       continue;
     }
     cache_found_count++;
-    it = inode_numbers->erase(it);
     FillInodeEntry(destination, inode_number, *value);
+    it = inode_numbers->erase(it);
   }
   if (cache_found_count > 0)
     PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
