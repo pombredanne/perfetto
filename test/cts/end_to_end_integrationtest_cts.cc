@@ -54,7 +54,7 @@ class PerfettoCtsTest : public ::testing::Test {
     helper.StartTracing(trace_config);
     helper.WaitForTracingDisabled();
 
-    helper.ReadData(on_consumer_data);
+    helper.ReadData();
     helper.WaitForReadData();
 
     std::minstd_rand0 rnd_engine(kRandomSeed);
