@@ -290,10 +290,10 @@ void PrintInodeStats(std::ostream* output,
                    std::inserter(intersect, intersect.begin()));
 
   sprintf(line, "Unresolved inodes: %" PRIu64 "\n",
-          ftrace_inodes.size() - intersect.size());
+          static_cast<uint64_t>(ftrace_inodes.size() - intersect.size()));
 
   sprintf(line, "Unexpected inodes from filesystem: %" PRIu64 "\n",
-          resolved_inodes.size() - intersect.size());
+          static_cast<uint64_t>(resolved_inodes.size() - intersect.size()));
   *output << std::string(line);
 
   *output << "\n";
