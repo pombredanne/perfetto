@@ -65,9 +65,8 @@ class ServiceImpl : public Service {
     ~ProducerEndpointImpl() override;
 
     // Service::ProducerEndpoint implementation.
-    void RegisterDataSource(const DataSourceDescriptor&,
-                            RegisterDataSourceCallback) override;
-    void UnregisterDataSource(DataSourceID) override;
+    void RegisterDataSource(const DataSourceDescriptor&) override;
+    void UnregisterDataSource(const std::string& name) override;
     void CommitData(const CommitDataRequest&, CommitDataCallback) override;
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
@@ -90,7 +89,6 @@ class ServiceImpl : public Service {
     size_t shared_buffer_page_size_kb_ = 0;
     SharedMemoryABI shmem_abi_;
     size_t shared_memory_size_hint_bytes_ = 0;
-    DataSourceID last_data_source_id_ = 0;
     const std::string name_;
 
     // This is used only in in-process configurations (mostly tests).
@@ -134,10 +132,8 @@ class ServiceImpl : public Service {
 
   // Called by ProducerEndpointImpl.
   void DisconnectProducer(ProducerID);
-  void RegisterDataSource(ProducerID,
-                          DataSourceID,
-                          const DataSourceDescriptor&);
-  void UnregisterDataSource(ProducerID, DataSourceID);
+  void RegisterDataSource(ProducerID, const DataSourceDescriptor&);
+  void UnregisterDataSource(ProducerID, const std::string& name);
   void CopyProducerPageIntoLogBuffer(ProducerID,
                                      uid_t,
                                      WriterID,
@@ -178,14 +174,13 @@ class ServiceImpl : public Service {
 
   struct RegisteredDataSource {
     ProducerID producer_id;
-    DataSourceID data_source_id;
     DataSourceDescriptor descriptor;
   };
 
   // Represents an active data source for a tracing session.
   struct DataSourceInstance {
     DataSourceInstanceID instance_id;
-    DataSourceID data_source_id;
+    std::string data_source_name;
   };
 
   // Holds the state of a tracing session. A tracing session is uniquely bound
@@ -195,10 +190,10 @@ class ServiceImpl : public Service {
 
     size_t num_buffers() const { return buffers_index.size(); }
 
-    int next_write_period_ms() const {
-      PERFETTO_DCHECK(write_period_ms);
-      // TODO(primiano): this will drift. Synchronize % period so it aligns.
-      return write_period_ms;
+    int delay_to_next_write_period_ms() const {
+      PERFETTO_DCHECK(write_period_ms > 0);
+      return write_period_ms -
+             (base::GetWallTimeMs().count() % write_period_ms);
     }
 
     // The consumer that started the session.
