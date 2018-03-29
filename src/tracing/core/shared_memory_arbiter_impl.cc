@@ -32,7 +32,7 @@ using Chunk = SharedMemoryABI::Chunk;
 
 // static
 SharedMemoryABI::PageLayout SharedMemoryArbiterImpl::default_page_layout =
-    SharedMemoryABI::PageLayout::kPageDiv7;
+    SharedMemoryABI::PageLayout::kPageDiv1;
 
 // static
 std::unique_ptr<SharedMemoryArbiter> SharedMemoryArbiter::CreateInstance(
@@ -64,7 +64,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
   int stall_count = 0;
   useconds_t stall_interval_us = 0;
   static const useconds_t kMaxStallIntervalUs = 100000;
-  static const int kLogAfterNStalls = 30;
+  static const int kLogAfterNStalls = 3;
 
   for (;;) {
     // TODO(primiano): Probably this lock is not really required and this code
