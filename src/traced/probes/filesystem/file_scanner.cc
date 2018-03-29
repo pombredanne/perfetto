@@ -38,17 +38,11 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
 
 }  // namespace
 
-FileScanner::FileScanner(
-    std::vector<std::string> root_directories,
-    std::function<bool(BlockDeviceID block_device_id,
-                       Inode inode_number,
-                       const std::string& path,
-                       protos::pbzero::InodeFileMap_Entry_Type type)> callback,
-    std::function<void()> done_callback,
-    uint64_t scan_interval_ms,
-    uint64_t scan_steps)
-    : callback_(std::move(callback)),
-      done_callback_(done_callback),
+FileScanner::FileScanner(std::vector<std::string> root_directories,
+                         Delegate* delegate,
+                         uint64_t scan_interval_ms,
+                         uint64_t scan_steps)
+    : delegate_(delegate),
       scan_interval_ms_(scan_interval_ms),
       scan_steps_(scan_steps),
       queue_(std::move(root_directories)),
@@ -57,7 +51,7 @@ FileScanner::FileScanner(
 void FileScanner::Scan(base::TaskRunner* task_runner) {
   Steps(scan_steps_);
   if (Done())
-    return done_callback_();
+    return delegate_->OnInodeScanDone();
   auto weak_this = weak_factory_.GetWeakPtr();
   task_runner->PostDelayedTask(
       [weak_this, task_runner] {
@@ -71,8 +65,8 @@ void FileScanner::Scan(base::TaskRunner* task_runner) {
 void FileScanner::NextDirectory() {
   std::string directory = std::move(queue_.back());
   queue_.pop_back();
-  current_directory_fd_.reset(opendir(directory.c_str()));
-  if (!current_directory_fd_) {
+  current_dir_handle_.reset(opendir(directory.c_str()));
+  if (!current_dir_handle_) {
     PERFETTO_DPLOG("opendir %s", directory.c_str());
     current_directory_.clear();
     return;
@@ -80,15 +74,15 @@ void FileScanner::NextDirectory() {
   current_directory_ = std::move(directory);
 
   struct stat buf;
-  if (fstat(dirfd(current_directory_fd_.get()), &buf) != 0) {
+  if (fstat(dirfd(current_dir_handle_.get()), &buf) != 0) {
     PERFETTO_DPLOG("fstat %s", current_directory_.c_str());
-    current_directory_fd_.reset();
+    current_dir_handle_.reset();
     current_directory_.clear();
     return;
   }
 
   if (S_ISLNK(buf.st_mode)) {
-    current_directory_fd_.reset();
+    current_dir_handle_.reset();
     current_directory_.clear();
     return;
   }
@@ -96,18 +90,18 @@ void FileScanner::NextDirectory() {
 }
 
 void FileScanner::Step() {
-  if (!current_directory_fd_) {
+  if (!current_dir_handle_) {
     if (queue_.empty())
       return;
     NextDirectory();
   }
 
-  if (!current_directory_fd_)
+  if (!current_dir_handle_)
     return;
 
-  struct dirent* entry = readdir(current_directory_fd_.get());
+  struct dirent* entry = readdir(current_dir_handle_.get());
   if (entry == nullptr) {
-    current_directory_fd_.reset();
+    current_dir_handle_.reset();
     return;
   }
 
@@ -128,9 +122,10 @@ void FileScanner::Step() {
     type = protos::pbzero::InodeFileMap_Entry_Type_FILE;
   }
 
-  if (!callback_(current_block_device_id_, entry->d_ino, filepath, type)) {
+  if (!delegate_->OnInodeFound(current_block_device_id_, entry->d_ino, filepath,
+                               type)) {
     queue_.clear();
-    current_directory_fd_.reset();
+    current_dir_handle_.reset();
   }
 }
 
@@ -140,7 +135,7 @@ void FileScanner::Steps(uint64_t n) {
 }
 
 bool FileScanner::Done() {
-  return !current_directory_fd_ && queue_.empty();
+  return !current_dir_handle_ && queue_.empty();
 }
 
 }  // namespace perfetto
