@@ -52,9 +52,9 @@ if (use_libfuzzer) {
     ]
     testonly = true
     deps = [
-      ":fake_consumer",
       ":task_runner_thread",
       ":task_runner_thread_delegates",
+      ":test_helper",
       "../gn:default_deps",
       "../src/base:test_support",
       "../src/protozero",
@@ -132,7 +132,6 @@ if (!build_with_chromium) {
   source_set("end_to_end_benchmarks") {
     testonly = true
     deps = [
-      ":fake_consumer",
       ":task_runner_thread",
       ":task_runner_thread_delegates",
       ":test_helper",
