@@ -70,7 +70,7 @@ class PerfettoCtsTest : public ::testing::Test {
         },
         1000);
     task_runner.RunUntilCheckpoint("readback.complete");
-    ASSERT_EQ(packets_seen, kNumPackets);
+    ASSERT_EQ(packets_seen, kEventCount);
   }
 };
 
