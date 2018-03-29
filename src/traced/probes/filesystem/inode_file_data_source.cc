@@ -34,7 +34,7 @@
 namespace perfetto {
 namespace {
 const int kScanIntervalMs = 10000;  // 10s
-uint64_t kScanSteps = 15000;
+uint64_t kScanBatchSize = 15000;
 }
 
 void ScanFilesDFS(
@@ -328,7 +328,7 @@ void InodeFileDataSource::FindMissingInodes() {
   PERFETTO_DCHECK(file_scanner_.get() == nullptr);
   auto weak_this = GetWeakPtr();
   file_scanner_ = std::unique_ptr<FileScanner>(
-      new FileScanner(std::move(roots), this, kScanIntervalMs, kScanSteps));
+      new FileScanner(std::move(roots), this, kScanIntervalMs, kScanBatchSize));
 
   file_scanner_->Scan(task_runner_);
 }
