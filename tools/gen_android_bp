@@ -43,6 +43,8 @@ default_targets = [
     '//:perfetto',
     '//:traced',
     '//:traced_probes',
+    '//:traced_probes',
+    '//:trace_to_text',
 ]
 
 # Defines a custom init_rc argument to be applied to the corresponding output
@@ -53,6 +55,7 @@ target_initrc = {
 
 target_host_supported = [
     '//:perfetto_trace_protos',
+    '//:trace_to_text',
 ]
 
 # Arguments for the GN output directory.
