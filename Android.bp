@@ -3439,7 +3439,7 @@ cc_test {
 }
 
 // GN target: //:trace_to_text
-cc_test {
+cc_binary_host {
   name: "trace_to_text",
   srcs: [
     ":perfetto_protos_perfetto_config_config_gen",
@@ -3457,7 +3457,6 @@ cc_test {
     "libprotobuf-cpp-full",
     "libprotobuf-cpp-lite",
   ],
-  host_supported: true,
   generated_headers: [
     "perfetto_protos_perfetto_config_config_gen_headers",
     "perfetto_protos_perfetto_trace_chrome_lite_gen_headers",

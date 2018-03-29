@@ -54,6 +54,9 @@ target_initrc = {
 
 target_host_supported = [
     '//:perfetto_trace_protos',
+]
+
+target_host_only = [
     '//:trace_to_text',
 ]
 
@@ -472,7 +475,7 @@ def create_modules_from_target(blueprint, desc, target_name):
     """
     target = desc[target_name]
     if target['type'] == 'executable':
-        if 'host' in target['toolchain']:
+        if 'host' in target['toolchain'] or target_name in target_host_only:
             module_type = 'cc_binary_host'
         elif target.get('testonly'):
             module_type = 'cc_test'
