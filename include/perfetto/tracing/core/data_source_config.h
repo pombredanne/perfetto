@@ -87,6 +87,9 @@ class PERFETTO_EXPORT DataSourceConfig {
   }
   InodeFileConfig* mutable_inode_file_config() { return &inode_file_config_; }
 
+  const std::string& legacy_config() const { return legacy_config_; }
+  void set_legacy_config(const std::string& value) { legacy_config_ = value; }
+
   const TestConfig& for_testing() const { return for_testing_; }
   TestConfig* mutable_for_testing() { return &for_testing_; }
 
@@ -97,6 +100,7 @@ class PERFETTO_EXPORT DataSourceConfig {
   FtraceConfig ftrace_config_ = {};
   ChromeConfig chrome_config_ = {};
   InodeFileConfig inode_file_config_ = {};
+  std::string legacy_config_ = {};
   TestConfig for_testing_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
