@@ -57,6 +57,7 @@ void FileScanner::Scan() {
     Step();
 }
 void FileScanner::Scan(base::TaskRunner* task_runner) {
+  PERFETTO_DCHECK(scan_interval_ms_ && scan_steps_);
   Steps(scan_steps_);
   if (Done())
     return delegate_->OnInodeScanDone();
