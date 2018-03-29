@@ -259,19 +259,16 @@ void InodeFileDataSource::OnInodes(
   }
 }
 
-void InodeFileDataSource::ResetTracePacket() {
-  if (has_current_trace_packet_)
-    current_trace_packet_->Finalize();
-  current_trace_packet_ = writer_->NewTracePacket();
-  current_file_map_ = current_trace_packet_->set_inode_file_map();
-  has_current_trace_packet_ = true;
-}
-
 InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
     BlockDeviceID block_device_id) {
   if (!has_current_trace_packet_ ||
       current_block_device_id_ != block_device_id) {
-    ResetTracePacket();
+    if (has_current_trace_packet_)
+      current_trace_packet_->Finalize();
+    current_trace_packet_ = writer_->NewTracePacket();
+    current_file_map_ = current_trace_packet_->set_inode_file_map();
+    has_current_trace_packet_ = true;
+
     // Add block device id to InodeFileMap
     current_file_map_->set_block_device_id(block_device_id);
     // Add mount points to InodeFileMap
@@ -315,13 +312,17 @@ bool InodeFileDataSource::OnInodeFound(
   return !missing_inodes_.empty();
 }
 
-void InodeFileDataSource::OnInodeScanDone() {
-  // Finalize the accumulated trace packets.
+void InodeFileDataSource::ResetTracePacket() {
   current_block_device_id_ = 0;
   current_file_map_ = nullptr;
   if (has_current_trace_packet_)
     current_trace_packet_->Finalize();
   has_current_trace_packet_ = false;
+}
+
+void InodeFileDataSource::OnInodeScanDone() {
+  // Finalize the accumulated trace packets.
+  ResetTracePacket();
   file_scanner_.reset();
   if (next_missing_inodes_.empty()) {
     scan_running_ = false;
