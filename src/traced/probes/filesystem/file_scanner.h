@@ -34,9 +34,9 @@ class FileScanner {
     virtual bool OnInodeFound(BlockDeviceID,
                               Inode,
                               const std::string&,
-                              protos::pbzero::InodeFileMap_Entry_Type);
-    virtual void OnInodeScanDone();
-    virtual ~Delegate();
+                              protos::pbzero::InodeFileMap_Entry_Type) = 0;
+    virtual void OnInodeScanDone() = 0;
+    virtual ~Delegate() {}
   };
 
   FileScanner(std::vector<std::string> root_directories,
