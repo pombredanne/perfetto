@@ -37,6 +37,7 @@
 
 #include "perfetto/tracing/core/chrome_config.h"
 #include "perfetto/tracing/core/ftrace_config.h"
+#include "perfetto/tracing/core/inode_file_config.h"
 #include "perfetto/tracing/core/process_stats_config.h"
 #include "perfetto/tracing/core/test_config.h"
 
@@ -46,6 +47,8 @@ namespace protos {
 class DataSourceConfig;
 class FtraceConfig;
 class ChromeConfig;
+class InodeFileConfig;
+class InodeFileConfig_MountPointMappingEntry;
 class ProcessStatsConfig;
 class TestConfig;
 }  // namespace protos
@@ -81,6 +84,11 @@ class PERFETTO_EXPORT DataSourceConfig {
   const ChromeConfig& chrome_config() const { return chrome_config_; }
   ChromeConfig* mutable_chrome_config() { return &chrome_config_; }
 
+  const InodeFileConfig& inode_file_config() const {
+    return inode_file_config_;
+  }
+  InodeFileConfig* mutable_inode_file_config() { return &inode_file_config_; }
+
   const ProcessStatsConfig& process_stats_config() const {
     return process_stats_config_;
   }
@@ -100,6 +108,7 @@ class PERFETTO_EXPORT DataSourceConfig {
   uint32_t trace_duration_ms_ = {};
   FtraceConfig ftrace_config_ = {};
   ChromeConfig chrome_config_ = {};
+  InodeFileConfig inode_file_config_ = {};
   ProcessStatsConfig process_stats_config_ = {};
   std::string legacy_config_ = {};
   TestConfig for_testing_ = {};

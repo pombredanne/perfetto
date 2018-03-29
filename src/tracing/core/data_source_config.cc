@@ -30,6 +30,7 @@
 #include "perfetto/config/chrome/chrome_config.pb.h"
 #include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/config/ftrace/ftrace_config.pb.h"
+#include "perfetto/config/inode_file/inode_file_config.pb.h"
 #include "perfetto/config/process_stats/process_stats_config.pb.h"
 #include "perfetto/config/test_config.pb.h"
 
@@ -60,6 +61,8 @@ void DataSourceConfig::FromProto(
   ftrace_config_.FromProto(proto.ftrace_config());
 
   chrome_config_.FromProto(proto.chrome_config());
+
+  inode_file_config_.FromProto(proto.inode_file_config());
 
   process_stats_config_.FromProto(proto.process_stats_config());
 
@@ -92,6 +95,8 @@ void DataSourceConfig::ToProto(
   ftrace_config_.ToProto(proto->mutable_ftrace_config());
 
   chrome_config_.ToProto(proto->mutable_chrome_config());
+
+  inode_file_config_.ToProto(proto->mutable_inode_file_config());
 
   process_stats_config_.ToProto(proto->mutable_process_stats_config());
 
