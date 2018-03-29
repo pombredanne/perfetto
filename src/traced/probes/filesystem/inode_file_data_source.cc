@@ -212,7 +212,7 @@ void InodeFileDataSource::OnInodes(
     AddInodesFromStaticMap(block_device_id, &inode_numbers);
     AddInodesFromLRUCache(block_device_id, &inode_numbers);
 
-    if (source_config_.inode_file().do_not_scan())
+    if (source_config_.inode_file_config().do_not_scan())
       inode_numbers.clear();
 
     if (!inode_numbers.empty()) {
@@ -345,16 +345,17 @@ void InodeFileDataSource::FindMissingInodes() {
 }
 
 uint64_t InodeFileDataSource::GetScanIntervalMs() {
-  return OrDefault(source_config_.inode_file().scan_interval_ms(),
+  return OrDefault(source_config_.inode_file_config().scan_interval_ms(),
                    kScanIntervalMs);
 }
 
 uint64_t InodeFileDataSource::GetScanDelayMs() {
-  return OrDefault(source_config_.inode_file().scan_delay_ms(), kScanDelayMs);
+  return OrDefault(source_config_.inode_file_config().scan_delay_ms(),
+                   kScanDelayMs);
 }
 
 uint64_t InodeFileDataSource::GetScanBatchSize() {
-  return OrDefault(source_config_.inode_file().scan_batch_size(),
+  return OrDefault(source_config_.inode_file_config().scan_batch_size(),
                    kScanBatchSize);
 }
 

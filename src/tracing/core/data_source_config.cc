@@ -61,7 +61,7 @@ void DataSourceConfig::FromProto(
 
   chrome_config_.FromProto(proto.chrome_config());
 
-  inode_file_.FromProto(proto.inode_file());
+  inode_file_config_.FromProto(proto.inode_file_config());
 
   for_testing_.FromProto(proto.for_testing());
   unknown_fields_ = proto.unknown_fields();
@@ -89,7 +89,7 @@ void DataSourceConfig::ToProto(
 
   chrome_config_.ToProto(proto->mutable_chrome_config());
 
-  inode_file_.ToProto(proto->mutable_inode_file());
+  inode_file_config_.ToProto(proto->mutable_inode_file_config());
 
   for_testing_.ToProto(proto->mutable_for_testing());
   *(proto->mutable_unknown_fields()) = unknown_fields_;

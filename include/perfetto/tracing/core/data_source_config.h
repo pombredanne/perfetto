@@ -81,8 +81,10 @@ class PERFETTO_EXPORT DataSourceConfig {
   const ChromeConfig& chrome_config() const { return chrome_config_; }
   ChromeConfig* mutable_chrome_config() { return &chrome_config_; }
 
-  const InodeFileConfig& inode_file() const { return inode_file_; }
-  InodeFileConfig* mutable_inode_file() { return &inode_file_; }
+  const InodeFileConfig& inode_file_config() const {
+    return inode_file_config_;
+  }
+  InodeFileConfig* mutable_inode_file_config() { return &inode_file_config_; }
 
   const TestConfig& for_testing() const { return for_testing_; }
   TestConfig* mutable_for_testing() { return &for_testing_; }
@@ -93,7 +95,7 @@ class PERFETTO_EXPORT DataSourceConfig {
   uint32_t trace_duration_ms_ = {};
   FtraceConfig ftrace_config_ = {};
   ChromeConfig chrome_config_ = {};
-  InodeFileConfig inode_file_ = {};
+  InodeFileConfig inode_file_config_ = {};
   TestConfig for_testing_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility
