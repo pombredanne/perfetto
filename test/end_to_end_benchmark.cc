@@ -32,11 +32,11 @@ namespace perfetto {
 
 namespace {
 
-static bool IsBenchmarkFunctionalOnly() {
+bool IsBenchmarkFunctionalOnly() {
   return getenv("BENCHMARK_FUNCTIONAL_TEST_ONLY") != nullptr;
 }
 
-static void BenchmarkCommon(benchmark::State& state) {
+void BenchmarkCommon(benchmark::State& state) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -112,13 +112,8 @@ static void BenchmarkCommon(benchmark::State& state) {
   task_runner.RunUntilCheckpoint("readback.complete");
   state.SetBytesProcessed(iterations * message_bytes * message_count);
 }
-}  // namespace
 
-static void BM_EndToEnd_SaturateCpu(benchmark::State& state) {
-  BenchmarkCommon(state);
-}
-
-static void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
+void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
   int min_message_count = 16;
   int max_message_count = IsBenchmarkFunctionalOnly() ? 1024 : 1024 * 1024;
   int min_payload = 8;
@@ -130,16 +125,7 @@ static void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
   }
 }
 
-BENCHMARK(BM_EndToEnd_SaturateCpu)
-    ->Unit(benchmark::kMicrosecond)
-    ->UseRealTime()
-    ->Apply(SaturateCpuArgs);
-
-static void BM_EndToEnd_ConstantRate(benchmark::State& state) {
-  BenchmarkCommon(state);
-}
-
-static void ConstantRateArgs(benchmark::internal::Benchmark* b) {
+void ConstantRateArgs(benchmark::internal::Benchmark* b) {
   int min_speed = IsBenchmarkFunctionalOnly() ? 32 : 8;
   int max_speed = IsBenchmarkFunctionalOnly() ? 64 : 128;
   for (int speed = min_speed; speed <= max_speed; speed *= 2) {
@@ -148,6 +134,20 @@ static void ConstantRateArgs(benchmark::internal::Benchmark* b) {
     b->Args({128 * 1024, 256, speed});
     b->Args({256 * 1024, 256, speed});
   }
+}
+}  // namespace
+
+static void BM_EndToEnd_SaturateCpu(benchmark::State& state) {
+  BenchmarkCommon(state);
+}
+
+BENCHMARK(BM_EndToEnd_SaturateCpu)
+    ->Unit(benchmark::kMicrosecond)
+    ->UseRealTime()
+    ->Apply(SaturateCpuArgs);
+
+static void BM_EndToEnd_ConstantRate(benchmark::State& state) {
+  BenchmarkCommon(state);
 }
 
 BENCHMARK(BM_EndToEnd_ConstantRate)
