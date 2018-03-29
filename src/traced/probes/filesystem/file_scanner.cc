@@ -30,7 +30,7 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
   std::string result;
   result.reserve(one.size() + other.size() + 1);
   result += one;
-  if (!result.empty() && result[result.size() - 1] != '/')
+  if (!result.empty() && result.back() != '/')
     result += '/';
   result += other;
   return result;
