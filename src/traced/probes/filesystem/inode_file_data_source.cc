@@ -269,13 +269,10 @@ bool InodeFileDataSource::OnInodeFound(
     Inode inode_number,
     const std::string& path,
     protos::pbzero::InodeFileMap_Entry_Type type) {
-  //  PERFETTO_DLOG("Saw %s %lu", path.c_str(), block_device_id);
   auto it = missing_inodes_.find(block_device_id);
   if (it == missing_inodes_.end())
     return true;
 
-  //  PERFETTO_DLOG("Missing %lu / %lu", missing_inodes_.size(),
-  //  it->second.size());
   size_t n = it->second.erase(inode_number);
   if (n == 0)
     return true;
