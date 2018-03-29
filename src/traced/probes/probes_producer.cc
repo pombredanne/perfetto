@@ -205,10 +205,10 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
       new ProcessStatsDataSource(session_id, std::move(trace_writer)));
   auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
   PERFETTO_DCHECK(it_and_inserted.second);
-  if (std::find(config.process_tree_config().flags().begin(),
-                config.process_tree_config().flags().end(),
-                ProcessTreeConfig::DISABLE_INITIAL_DUMP) !=
-      config.process_tree_config().flags().end()) {
+  if (std::find(config.process_stats_config().quirks().begin(),
+                config.process_stats_config().quirks().end(),
+                ProcessStatsConfig::DISABLE_INITIAL_DUMP) !=
+      config.process_stats_config().quirks().end()) {
     PERFETTO_DLOG("Initial process tree dump is disabled.");
     return;
   }
@@ -280,6 +280,15 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     FtraceBundleHandle,
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
+
+  if (ps_source_ && !metadata.pids.empty()) {
+    const auto& pids = metadata.pids;
+    auto weak_ps_source = ps_source_;
+    task_runner_->PostTask([weak_ps_source, pids] {
+      if (weak_ps_source)
+        weak_ps_source->OnPids(pids);
+    });
+  }
 
   if (file_source_ && !metadata.inode_and_device.empty()) {
     auto inodes = metadata.inode_and_device;

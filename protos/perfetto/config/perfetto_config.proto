@@ -22,23 +22,23 @@ message ChromeConfig {
 
 // End of protos/perfetto/config/chrome/chrome_config.proto
 
-// Begin of protos/perfetto/config/process_tree/process_tree_config.proto
+// Begin of protos/perfetto/config/process_stats/process_stats_config.proto
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
 // to reflect changes in the corresponding C++ headers.
 
-message ProcessTreeConfig {
-  enum Flags {
-    DEFAULT = 0;
+message ProcessStatsConfig {
+  enum Quirks {
+    QUIRKS_UNSPECIFIED = 0;
     DISABLE_INITIAL_DUMP = 1;
     // TODO(taylori) Not implemented.
     DISABLE_ON_DEMAND = 2;
   }
 
-  repeated Flags flags = 1;
+  repeated Quirks quirks = 1;
 }
 
-// End of protos/perfetto/config/process_tree/process_tree_config.proto
+// End of protos/perfetto/config/process_stats/process_stats_config.proto
 
 // Begin of protos/perfetto/config/data_source_config.proto
 
@@ -69,7 +69,7 @@ message DataSourceConfig {
 
   optional FtraceConfig ftrace_config = 100;
   optional ChromeConfig chrome_config = 101;
-  optional ProcessTreeConfig process_tree_config = 103;
+  optional ProcessStatsConfig process_stats_config = 103;
 
   // This field is only used for testing.
   optional TestConfig for_testing =
