@@ -413,7 +413,7 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   // TODO(hjd): Test truncated events.
   // If the end of the buffer is before the end of the event give up.
-  if (info.size > length) {
+  if (info.size >= length) {
     PERFETTO_DCHECK(false);
     return false;
   }
@@ -444,7 +444,7 @@ bool CpuReader::ParseField(const Field& field,
                            const uint8_t* end,
                            protozero::Message* message,
                            FtraceMetadata* metadata) {
-  PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size <= end);
+  PERFETTO_DCHECK(start + field.ftrace_offset + field.ftrace_size < end);
   const uint8_t* field_start = start + field.ftrace_offset;
   uint32_t field_id = field.proto_field_id;
 
