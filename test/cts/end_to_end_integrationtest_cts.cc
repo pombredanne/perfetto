@@ -57,6 +57,9 @@ class PerfettoCtsTest : public ::testing::Test {
     helper.ReadData();
     helper.WaitForReadData();
 
+    const auto& packets = helper.trace();
+    ASSERT_EQ(packets.size(), kNumPackets);
+
     std::minstd_rand0 rnd_engine(kRandomSeed);
     for (const auto& packet : packets) {
       ASSERT_TRUE(packet.has_for_testing());
