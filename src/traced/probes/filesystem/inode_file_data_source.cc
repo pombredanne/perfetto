@@ -33,7 +33,7 @@
 
 namespace perfetto {
 namespace {
-uint64_t kScanIntervalMs = 1000;  // 10s
+const int kScanIntervalMs = 10000;  // 10s
 uint64_t kScanSteps = 15000;
 }
 
