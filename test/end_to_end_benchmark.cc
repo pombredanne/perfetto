@@ -61,7 +61,7 @@ void BenchmarkCommon(benchmark::State& state) {
 
   size_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
   size_t time_for_messages_ms =
-      5000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
+      10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
@@ -125,13 +125,12 @@ void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
 }
 
 void ConstantRateArgs(benchmark::internal::Benchmark* b) {
-  int min_speed = IsBenchmarkFunctionalOnly() ? 32 : 8;
-  int max_speed = IsBenchmarkFunctionalOnly() ? 64 : 128;
+  int message_count = IsBenchmarkFunctionalOnly() ? 2 * 1024 : 128 * 1024;
+  int min_speed = IsBenchmarkFunctionalOnly() ? 64 : 8;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 128 : 128;
   for (int speed = min_speed; speed <= max_speed; speed *= 2) {
-    b->Args({128 * 1024, 128, speed});
-    b->Args({256 * 1024, 128, speed});
-    b->Args({128 * 1024, 256, speed});
-    b->Args({256 * 1024, 256, speed});
+    b->Args({message_count, 128, speed});
+    b->Args({message_count, 256, speed});
   }
 }
 }  // namespace
