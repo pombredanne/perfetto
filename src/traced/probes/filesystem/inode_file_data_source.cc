@@ -276,13 +276,12 @@ bool InodeFileDataSource::OnInodeFound(
   if (n == 0)
     return true;
 
-  if (it->second.empty()) {
+  if (it->second.empty())
     missing_inodes_.erase(it);
-  }
 
   std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
   auto cur_val = cache_->Get(key);
-  if (cur_val != nullptr) {
+  if (cur_val) {
     cur_val->AddPath(path);
     FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
                    *cur_val);
@@ -304,7 +303,9 @@ void InodeFileDataSource::OnInodeScanDone() {
     current_trace_packet_->Finalize();
   has_current_trace_packet_ = false;
   file_scanner_.reset();
-  if (!next_missing_inodes_.empty()) {
+  if (next_missing_inodes_.empty()) {
+    scan_running_ = false;
+  } else {
     auto weak_this = GetWeakPtr();
     PERFETTO_DLOG("Starting another filesystem scan.");
     task_runner_->PostDelayedTask(
@@ -316,8 +317,6 @@ void InodeFileDataSource::OnInodeScanDone() {
           weak_this->FindMissingInodes();
         },
         GetScanDelayMs());
-  } else {
-    scan_running_ = false;
   }
 }
 
@@ -325,17 +324,16 @@ void InodeFileDataSource::AddRootsForBlockDevice(
     BlockDeviceID block_device_id,
     std::vector<std::string>* roots) {
   auto p = mount_points_.equal_range(block_device_id);
-  for (auto it = p.first; it != p.second; ++it) {
+  for (auto it = p.first; it != p.second; ++it)
     roots->emplace_back(it->second);
-  }
 }
 
 void InodeFileDataSource::FindMissingInodes() {
   missing_inodes_ = std::move(next_missing_inodes_);
   std::vector<std::string> roots;
-  for (auto& p : missing_inodes_) {
+  for (auto& p : missing_inodes_)
     AddRootsForBlockDevice(p.first, &roots);
-  }
+
   PERFETTO_DCHECK(file_scanner_.get() == nullptr);
   auto weak_this = GetWeakPtr();
   file_scanner_ = std::unique_ptr<FileScanner>(new FileScanner(
