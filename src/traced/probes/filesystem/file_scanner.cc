@@ -50,7 +50,10 @@ FileScanner::FileScanner(std::vector<std::string> root_directories,
 
 FileScanner::FileScanner(std::vector<std::string> root_directories,
                          Delegate* delegate)
-    : FileScanner(std::move(root_directories), delegate, 0, 0) {}
+    : FileScanner(std::move(root_directories),
+                  delegate,
+                  0 /* scan_interval_ms */,
+                  0 /* scan_steps */) {}
 
 void FileScanner::Scan() {
   while (!Done())
