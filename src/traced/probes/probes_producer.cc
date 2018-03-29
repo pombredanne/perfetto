@@ -209,7 +209,7 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
                 config.process_tree_config().flags().end(),
                 ProcessTreeConfig::DISABLE_INITIAL_DUMP) !=
       config.process_tree_config().flags().end()) {
-    PERFETTO_LOG("No flag");
+    PERFETTO_DLOG("Initial process tree dump is disabled.");
     return;
   }
   it_and_inserted.first->second->WriteAllProcesses();

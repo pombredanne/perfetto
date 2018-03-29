@@ -31,6 +31,7 @@ message ProcessTreeConfig {
   enum Flags {
     DEFAULT = 0;
     DISABLE_INITIAL_DUMP = 1;
+    // TODO(taylori) Not implemented.
     DISABLE_ON_DEMAND = 2;
   }
 
