@@ -48,6 +48,14 @@ FileScanner::FileScanner(std::vector<std::string> root_directories,
       queue_(std::move(root_directories)),
       weak_factory_(this) {}
 
+FileScanner::FileScanner(std::vector<std::string> root_directories,
+                         Delegate* delegate)
+    : FileScanner(std::move(root_directories), delegate, 0, 0) {}
+
+void FileScanner::Scan() {
+  while (!Done())
+    Step();
+}
 void FileScanner::Scan(base::TaskRunner* task_runner) {
   Steps(scan_steps_);
   if (Done())

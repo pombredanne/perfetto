@@ -44,10 +44,13 @@ class FileScanner {
               uint64_t scan_interval_ms,
               uint64_t scan_steps);
 
+  FileScanner(std::vector<std::string> root_directories, Delegate* delegate);
+
   FileScanner(const FileScanner&) = delete;
   FileScanner& operator=(const FileScanner&) = delete;
 
   void Scan(base::TaskRunner* task_runner);
+  void Scan();
 
  private:
   void NextDirectory();
