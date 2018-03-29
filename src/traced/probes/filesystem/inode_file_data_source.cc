@@ -250,7 +250,7 @@ InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
   return current_file_map_;
 }
 
-bool InodeFileDataSource::FileScannerCallback(
+bool InodeFileDataSource::OnInodeFound(
     BlockDeviceID block_device_id,
     Inode inode_number,
     const std::string& path,
@@ -285,7 +285,7 @@ bool InodeFileDataSource::FileScannerCallback(
   return !missing_inodes_.empty();
 }
 
-void InodeFileDataSource::FileScannerDone() {
+void InodeFileDataSource::OnInodeScanDone() {
   // Finalize the accumulated trace packets.
   current_block_device_id_ = 0;
   current_file_map_ = nullptr;
@@ -327,22 +327,8 @@ void InodeFileDataSource::FindMissingInodes() {
   }
   PERFETTO_DCHECK(file_scanner_.get() == nullptr);
   auto weak_this = GetWeakPtr();
-  file_scanner_ = std::unique_ptr<FileScanner>(new FileScanner(
-      std::move(roots),
-      [weak_this](BlockDeviceID block_device_id, Inode inode_number,
-                  const std::string& path,
-                  protos::pbzero::InodeFileMap_Entry_Type type) {
-        if (!weak_this)
-          return false;  // No one cares about the results anymore.
-        return weak_this->FileScannerCallback(block_device_id, inode_number,
-                                              path, type);
-      },
-      [weak_this] {
-        if (!weak_this)
-          return;
-        weak_this->FileScannerDone();
-      },
-      kScanIntervalMs, kScanSteps));
+  file_scanner_ = std::unique_ptr<FileScanner>(
+      new FileScanner(std::move(roots), this, kScanIntervalMs, kScanSteps));
 
   file_scanner_->Scan(task_runner_);
 }

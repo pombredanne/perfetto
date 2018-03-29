@@ -29,13 +29,18 @@ namespace perfetto {
 
 class FileScanner {
  public:
+  class Delegate {
+   public:
+    virtual bool OnInodeFound(BlockDeviceID,
+                              Inode,
+                              const std::string&,
+                              protos::pbzero::InodeFileMap_Entry_Type) = 0;
+    virtual void OnInodeScanDone() = 0;
+    virtual ~Delegate() {}
+  };
+
   FileScanner(std::vector<std::string> root_directories,
-              std::function<bool(BlockDeviceID block_device_id,
-                                 Inode inode_number,
-                                 const std::string& path,
-                                 protos::pbzero::InodeFileMap_Entry_Type type)>
-                  callback,
-              std::function<void()> done_callback,
+              Delegate* delegate,
               uint64_t scan_interval_ms,
               uint64_t scan_steps);
 
@@ -50,17 +55,12 @@ class FileScanner {
   void Steps(uint64_t n);
   bool Done();
 
-  std::function<bool(BlockDeviceID block_device_id,
-                     Inode inode_number,
-                     const std::string& path,
-                     protos::pbzero::InodeFileMap_Entry_Type type)>
-      callback_;
-  std::function<void()> done_callback_;
+  Delegate* delegate_;
   const uint64_t scan_interval_ms_;
   const uint64_t scan_steps_;
 
   std::vector<std::string> queue_;
-  base::ScopedDir current_directory_fd_;
+  base::ScopedDir current_dir_handle_;
   std::string current_directory_;
   BlockDeviceID current_block_device_id_;
   base::WeakPtrFactory<FileScanner> weak_factory_;  // Keep last.

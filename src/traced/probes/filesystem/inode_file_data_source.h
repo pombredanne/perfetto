@@ -58,7 +58,7 @@ void FillInodeEntry(InodeFileMap* destination,
                     Inode inode_number,
                     const InodeMapValue& inode_map_value);
 
-class InodeFileDataSource {
+class InodeFileDataSource : public FileScanner::Delegate {
  public:
   InodeFileDataSource(
       base::TaskRunner*,
@@ -82,14 +82,16 @@ class InodeFileDataSource {
   void AddInodesFromLRUCache(BlockDeviceID block_device_id,
                              std::set<Inode>* inode_numbers);
 
+  virtual ~InodeFileDataSource() {}
+
  private:
   InodeFileMap* AddToCurrentTracePacket(BlockDeviceID block_device_id);
   void FindMissingInodes();
-  bool FileScannerCallback(BlockDeviceID block_device_id,
-                           Inode inode_number,
-                           const std::string& path,
-                           protos::pbzero::InodeFileMap_Entry_Type type);
-  void FileScannerDone();
+  bool OnInodeFound(BlockDeviceID block_device_id,
+                    Inode inode_number,
+                    const std::string& path,
+                    protos::pbzero::InodeFileMap_Entry_Type type);
+  void OnInodeScanDone();
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
 
