@@ -65,22 +65,6 @@ if (use_libfuzzer) {
   }
 }
 
-source_set("fake_consumer") {
-  testonly = true
-  deps = [
-    "../gn:default_deps",
-    "../gn:gtest_deps",
-    "../protos/perfetto/trace:lite",
-    "../protos/perfetto/trace:zero",
-    "../src/base:base",
-    "../src/base:test_support",
-  ]
-  sources = [
-    "fake_consumer.cc",
-    "fake_consumer.h",
-  ]
-}
-
 source_set("task_runner_thread") {
   testonly = true
   deps = [
@@ -112,7 +96,6 @@ source_set("task_runner_thread_delegates") {
 source_set("test_helper") {
   testonly = true
   deps = [
-    ":fake_consumer",
     ":task_runner_thread",
     ":task_runner_thread_delegates",
     "../gn:default_deps",
