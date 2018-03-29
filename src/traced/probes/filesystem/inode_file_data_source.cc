@@ -36,6 +36,7 @@ namespace {
 constexpr uint64_t kScanIntervalMs = 10000;  // 10s
 constexpr uint64_t kScanDelayMs = 10000;     // 10s
 constexpr uint64_t kScanBatchSize = 15000;
+constexpr uint64_t kFlushBeforeEndMs = 500;
 
 uint64_t OrDefault(uint64_t value, uint64_t def) {
   if (value != 0)
@@ -126,7 +127,22 @@ InodeFileDataSource::InodeFileDataSource(
       static_file_map_(static_file_map),
       cache_(cache),
       writer_(std::move(writer)),
-      weak_factory_(this) {}
+      weak_factory_(this) {
+  auto weak_this = GetWeakPtr();
+  // Flush TracePacket of current scan shortly before we expect the trace
+  // to end, to retain information from any scan that might be in
+  // progress.
+  task_runner_->PostDelayedTask(
+      [weak_this] {
+        if (!weak_this) {
+          PERFETTO_DLOG("Giving up flush.");
+          return;
+        }
+        PERFETTO_DLOG("Flushing.");
+        weak_this->ResetTracePacket();
+      },
+      source_config_.trace_duration_ms() - kFlushBeforeEndMs);
+}
 
 void InodeFileDataSource::AddInodesFromStaticMap(
     BlockDeviceID block_device_id,
@@ -243,16 +259,19 @@ void InodeFileDataSource::OnInodes(
   }
 }
 
+void InodeFileDataSource::ResetTracePacket() {
+  if (has_current_trace_packet_)
+    current_trace_packet_->Finalize();
+  current_trace_packet_ = writer_->NewTracePacket();
+  current_file_map_ = current_trace_packet_->set_inode_file_map();
+  has_current_trace_packet_ = true;
+}
+
 InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
     BlockDeviceID block_device_id) {
   if (!has_current_trace_packet_ ||
       current_block_device_id_ != block_device_id) {
-    if (has_current_trace_packet_)
-      current_trace_packet_->Finalize();
-    current_trace_packet_ = writer_->NewTracePacket();
-    current_file_map_ = current_trace_packet_->set_inode_file_map();
-    has_current_trace_packet_ = true;
-
+    ResetTracePacket();
     // Add block device id to InodeFileMap
     current_file_map_->set_block_device_id(block_device_id);
     // Add mount points to InodeFileMap
