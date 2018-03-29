@@ -60,6 +60,7 @@ void TestHelper::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
       continue;
     ASSERT_EQ(protos::TracePacket::kTrustedUid,
               packet->optional_trusted_uid_case());
+    trace_.push_back(std::move(*packet));
   }
 
   if (!has_more) {
