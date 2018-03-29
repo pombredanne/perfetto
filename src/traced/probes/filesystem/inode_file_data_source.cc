@@ -213,7 +213,7 @@ void InodeFileDataSource::OnInodes(
                                                    inode_numbers.cend());
       if (!scan_running_) {
         scan_running_ = true;
-        PERFETTO_DLOG("Posting to scan filesystem in %lu ms", kScanIntervalMs);
+        PERFETTO_DLOG("Posting to scan filesystem in %d ms", kScanIntervalMs);
         auto weak_this = GetWeakPtr();
         task_runner_->PostDelayedTask(
             [weak_this] {
