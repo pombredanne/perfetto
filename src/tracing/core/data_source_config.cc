@@ -30,6 +30,7 @@
 #include "perfetto/config/chrome/chrome_config.pb.h"
 #include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/config/ftrace/ftrace_config.pb.h"
+#include "perfetto/config/process_tree/process_tree_config.pb.h"
 #include "perfetto/config/test_config.pb.h"
 
 namespace perfetto {
@@ -60,6 +61,8 @@ void DataSourceConfig::FromProto(
 
   chrome_config_.FromProto(proto.chrome_config());
 
+  process_tree_config_.FromProto(proto.process_tree_config());
+
   for_testing_.FromProto(proto.for_testing());
   unknown_fields_ = proto.unknown_fields();
 }
@@ -85,6 +88,8 @@ void DataSourceConfig::ToProto(
   ftrace_config_.ToProto(proto->mutable_ftrace_config());
 
   chrome_config_.ToProto(proto->mutable_chrome_config());
+
+  process_tree_config_.ToProto(proto->mutable_process_tree_config());
 
   for_testing_.ToProto(proto->mutable_for_testing());
   *(proto->mutable_unknown_fields()) = unknown_fields_;

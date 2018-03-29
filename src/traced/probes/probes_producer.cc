@@ -205,6 +205,13 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
       new ProcessStatsDataSource(session_id, std::move(trace_writer)));
   auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
   PERFETTO_DCHECK(it_and_inserted.second);
+  if (std::find(config.process_tree_config().flags().begin(),
+                config.process_tree_config().flags().end(),
+                ProcessTreeConfig::DISABLE_INITIAL_DUMP) !=
+      config.process_tree_config().flags().end()) {
+    PERFETTO_LOG("No flag");
+    return;
+  }
   it_and_inserted.first->second->WriteAllProcesses();
 }
 
