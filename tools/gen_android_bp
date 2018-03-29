@@ -43,7 +43,6 @@ default_targets = [
     '//:perfetto',
     '//:traced',
     '//:traced_probes',
-    '//:traced_probes',
     '//:trace_to_text',
 ]
 
