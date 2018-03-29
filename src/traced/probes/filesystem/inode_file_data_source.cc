@@ -33,9 +33,11 @@
 namespace perfetto {
 
 namespace {
-const int kScanIntervalMs = 10000;  // 10s
+const int kScanIntervalMs = 9000;  // 9s
+uint64_t kScanBatchSize = 15000;
 }
 
+<<<<<<< HEAD
 void ScanFilesDFS(
     const std::string& root_directory,
     const std::function<bool(BlockDeviceID block_device_id,
@@ -52,6 +54,36 @@ void ScanFilesDFS(
     directory += "/";
     if (!dir)
       continue;
+=======
+std::string DbgFmt(const std::vector<std::string>& values) {
+  if (values.empty())
+    return "";
+
+  std::string result;
+  for (auto it = values.cbegin(); it != values.cend() - 1; ++it)
+    result += *it + ",";
+
+  result += values.back();
+  return result;
+}
+
+std::map<std::string, std::vector<std::string>> BuildMountpointMapping(
+    const DataSourceConfig& source_config) {
+  std::map<std::string, std::vector<std::string>> m;
+  for (const auto& map_entry :
+       source_config.inode_file_config().mount_point_mapping())
+    m.emplace(map_entry.mountpoint(), map_entry.scan_roots());
+
+  return m;
+}
+
+class StaticMapDelegate : public FileScanner::Delegate {
+ public:
+  StaticMapDelegate(
+      std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>* map)
+      : map_(map) {}
+  ~StaticMapDelegate() {}
+>>>>>>> d6878254... Allow to configure scan roots.
 
     struct stat buf;
     if (lstat(directory.c_str(), &buf) != 0) {
@@ -62,13 +94,11 @@ void ScanFilesDFS(
       continue;
 
     BlockDeviceID block_device_id = buf.st_dev;
-
     while ((entry = readdir(dir.get())) != nullptr) {
       std::string filename = entry->d_name;
       if (filename == "." || filename == "..")
         continue;
       std::string filepath = directory + filename;
-
       Inode inode_number = entry->d_ino;
 
       protos::pbzero::InodeFileMap_Entry_Type type =
@@ -88,7 +118,15 @@ void ScanFilesDFS(
     if (errno != 0)
       PERFETTO_DPLOG("readdir %s", directory.c_str());
   }
+<<<<<<< HEAD
 }
+=======
+  void OnInodeScanDone() {}
+  std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>* map_;
+};  // namespace perfetto
+
+}  // namespace perfetto
+>>>>>>> d6878254... Allow to configure scan roots.
 
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
@@ -123,84 +161,55 @@ InodeFileDataSource::InodeFileDataSource(
         static_file_map,
     LRUInodeCache* cache,
     std::unique_ptr<TraceWriter> writer)
+<<<<<<< HEAD
     : task_runner_(task_runner),
+=======
+    : source_config_(std::move(source_config)),
+      scan_mount_points_(
+          source_config_.inode_file_config().scan_mount_points().cbegin(),
+          source_config_.inode_file_config().scan_mount_points().cend()),
+      mount_point_mapping_(BuildMountpointMapping(source_config_)),
+      task_runner_(task_runner),
+>>>>>>> d6878254... Allow to configure scan roots.
       session_id_(id),
       static_file_map_(static_file_map),
       cache_(cache),
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
-void InodeFileDataSource::AddInodesFromFilesystemScan(
-    const std::string& root_directory,
-    BlockDeviceID provided_block_device_id,
-    std::set<Inode>* inode_numbers,
-    LRUInodeCache* cache,
-    InodeFileMap* destination) {
-  if (inode_numbers->empty())
-    return;
-  ScanFilesDFS(
-      root_directory,
-      [provided_block_device_id, inode_numbers, cache, destination](
-          BlockDeviceID block_device_id, Inode inode_number,
-          const std::string& path,
-          protos::pbzero::InodeFileMap_Entry_Type type) {
-        if (provided_block_device_id != block_device_id)
-          return true;
-        if (inode_numbers->find(inode_number) == inode_numbers->end())
-          return true;
-        std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
-        auto cur_val = cache->Get(key);
-        if (cur_val != nullptr) {
-          cur_val->AddPath(path);
-          FillInodeEntry(destination, inode_number, *cur_val);
-        } else {
-          InodeMapValue new_val(InodeMapValue(type, {path}));
-          cache->Insert(key, new_val);
-          FillInodeEntry(destination, inode_number, new_val);
-        }
-        inode_numbers->erase(inode_number);
-        if (inode_numbers->empty())
-          return false;
-        return true;
-      });
-
-  // Could not be found, just add the inode number
-  if (inode_numbers->size() != 0)
-    PERFETTO_DLOG("%zu inodes not found", inode_numbers->size());
-  for (const auto& unresolved_inode : *inode_numbers) {
-    auto* entry = destination->add_entries();
-    entry->set_inode_number(unresolved_inode);
+void InodeFileDataSource::AddInodesFromStaticMap(
+    BlockDeviceID block_device_id,
+    std::set<Inode>* inode_numbers) {
+  for (auto inode_number : *inode_numbers) {
+    auto* entry = AddToCurrentTracePacket(block_device_id)->add_entries();
+    entry->set_inode_number(inode_number);
   }
-}
-
-void InodeFileDataSource::AddInodesFromStaticMap(BlockDeviceID block_device_id,
-                                                 std::set<Inode>* inode_numbers,
-                                                 InodeFileMap* destination) {
   // Check if block device id exists in static file map
   auto static_map_entry = static_file_map_->find(block_device_id);
   if (static_map_entry == static_file_map_->end())
     return;
-
-  uint64_t system_found_count = 0;
-  for (auto it = inode_numbers->begin(); it != inode_numbers->end();) {
-    Inode inode_number = *it;
-    // Check if inode number exists in static file map for given block device id
-    auto inode_it = static_map_entry->second.find(inode_number);
-    if (inode_it == static_map_entry->second.end()) {
-      ++it;
-      continue;
-    }
-    system_found_count++;
-    it = inode_numbers->erase(it);
-    FillInodeEntry(destination, inode_number, inode_it->second);
-  }
-  PERFETTO_DLOG("%" PRIu64 " inodes found in static file map",
-                system_found_count);
+  //
+  // uint64_t system_found_count = 0;
+  // for (auto it = inode_numbers->begin(); it != inode_numbers->end();) {
+  //   Inode inode_number = *it;
+  //   // Check if inode number exists in static file map for given block device
+  //   id auto inode_it = static_map_entry->second.find(inode_number); if
+  //   (inode_it == static_map_entry->second.end()) {
+  //     ++it;
+  //     continue;
+  //   }
+  //   system_found_count++;
+  //   it = inode_numbers->erase(it);
+  //   FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+  //                  inode_it->second);
+  // }
+  // PERFETTO_DLOG("%" PRIu64 " inodes found in static file map",
+  //               system_found_count);
 }
 
-void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
-                                                std::set<Inode>* inode_numbers,
-                                                InodeFileMap* destination) {
+void InodeFileDataSource::AddInodesFromLRUCache(
+    BlockDeviceID block_device_id,
+    std::set<Inode>* inode_numbers) {
   uint64_t cache_found_count = 0;
   for (auto it = inode_numbers->begin(); it != inode_numbers->end();) {
     Inode inode_number = *it;
@@ -211,7 +220,8 @@ void InodeFileDataSource::AddInodesFromLRUCache(BlockDeviceID block_device_id,
     }
     cache_found_count++;
     it = inode_numbers->erase(it);
-    FillInodeEntry(destination, inode_number, *value);
+    FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+                   *value);
   }
   if (cache_found_count > 0)
     PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
@@ -238,67 +248,181 @@ void InodeFileDataSource::OnInodes(
     std::set<Inode>& inode_numbers = inode_file_map_data.second;
     PERFETTO_DLOG("Saw %zu unique inode numbers.", inode_numbers.size());
 
-    // New TracePacket for each InodeFileMap
-    auto trace_packet = writer_->NewTracePacket();
-    auto inode_file_map = trace_packet->set_inode_file_map();
+    // Add entries to InodeFileMap as inodes are found and resolved to their
+    // paths/type
+    AddInodesFromStaticMap(block_device_id, &inode_numbers);
+<<<<<<< HEAD
+    /*    AddInodesFromLRUCache(block_device_id, &inode_numbers);
+        // TODO(azappone): Make root directory a mount point
+    =======
+        AddInodesFromLRUCache(block_device_id, &inode_numbers);
+
+        if (source_config_.inode_file_config().do_not_scan())
+          inode_numbers.clear();
+
+        // If we defined mount points we want to scan in the config,
+        // skip inodes on other mount points.
+        if (!scan_mount_points_.empty()) {
+          bool process = true;
+          auto range = mount_points_.equal_range(block_device_id);
+          for (auto it = range.first; it != range.second; ++it) {
+            if (scan_mount_points_.count(it->second) == 0) {
+              process = false;
+              break;
+            }
+          }
+          if (!process)
+            continue;
+        }
+
+    >>>>>>> d6878254... Allow to configure scan roots.
+        if (!inode_numbers.empty()) {
+          // Try to piggy back the current scan.
+          auto it = missing_inodes_.find(block_device_id);
+          if (it != missing_inodes_.end()) {
+            it->second.insert(inode_numbers.cbegin(), inode_numbers.cend());
+          }
+          next_missing_inodes_[block_device_id].insert(inode_numbers.cbegin(),
+                                                       inode_numbers.cend());
+          if (!scan_running_) {
+            scan_running_ = true;
+            PERFETTO_DLOG("Posting to scan filesystem in %d ms",
+    kScanIntervalMs); auto weak_this = GetWeakPtr();
+            task_runner_->PostDelayedTask(
+                [weak_this] {
+                  if (!weak_this) {
+                    PERFETTO_DLOG("Giving up filesystem scan.");
+                    return;
+                  }
+                  weak_this.get()->FindMissingInodes();
+                },
+                kScanIntervalMs);
+          }
+        }*/
+  }
+}
+
+InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
+    BlockDeviceID block_device_id) {
+  if (!has_current_trace_packet_ ||
+      current_block_device_id_ != block_device_id) {
+    if (has_current_trace_packet_)
+      current_trace_packet_->Finalize();
+    current_trace_packet_ = writer_->NewTracePacket();
+    current_file_map_ = current_trace_packet_->set_inode_file_map();
+    has_current_trace_packet_ = true;
 
     // Add block device id to InodeFileMap
-    inode_file_map->set_block_device_id(block_device_id);
-
+    current_file_map_->set_block_device_id(block_device_id);
     // Add mount points to InodeFileMap
     auto range = mount_points_.equal_range(block_device_id);
     for (std::multimap<BlockDeviceID, std::string>::iterator it = range.first;
          it != range.second; ++it)
-      inode_file_map->add_mount_points(it->second.c_str());
+      current_file_map_->add_mount_points(it->second.c_str());
+  }
+  return current_file_map_;
+}
 
-    // Add entries to InodeFileMap as inodes are found and resolved to their
-    // paths/type
-    AddInodesFromStaticMap(block_device_id, &inode_numbers, inode_file_map);
-    AddInodesFromLRUCache(block_device_id, &inode_numbers, inode_file_map);
-    // TODO(azappone): Make root directory a mount point
-    if (!inode_numbers.empty()) {
-      bool first_scan = missing_inodes_.empty();
-      missing_inodes_[block_device_id].insert(inode_numbers.cbegin(),
-                                              inode_numbers.cend());
-      if (first_scan) {
-        PERFETTO_DLOG("Posting to scan filesystem in %d ms", kScanIntervalMs);
-        auto weak_this = GetWeakPtr();
-        task_runner_->PostDelayedTask(
-            [weak_this] {
-              if (!weak_this) {
-                PERFETTO_DLOG("Giving up filesystem scan.");
-                return;
-              }
-              weak_this.get()->FindMissingInodes();
-            },
-            kScanIntervalMs);
-      }
-    }
+bool InodeFileDataSource::OnInodeFound(
+    BlockDeviceID block_device_id,
+    Inode inode_number,
+    const std::string& path,
+    protos::pbzero::InodeFileMap_Entry_Type type) {
+  auto it = missing_inodes_.find(block_device_id);
+  if (it == missing_inodes_.end())
+    return true;
+
+  size_t n = it->second.erase(inode_number);
+  if (n == 0)
+    return true;
+
+  if (it->second.empty()) {
+    missing_inodes_.erase(it);
+  }
+
+  std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
+  auto cur_val = cache_->Get(key);
+  if (cur_val != nullptr) {
+    cur_val->AddPath(path);
+    FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+                   *cur_val);
+  } else {
+    InodeMapValue new_val(InodeMapValue(type, {path}));
+    cache_->Insert(key, new_val);
+    FillInodeEntry(AddToCurrentTracePacket(block_device_id), inode_number,
+                   new_val);
+  }
+  PERFETTO_DLOG("Filled %s", path.c_str());
+  return !missing_inodes_.empty();
+}
+
+void InodeFileDataSource::OnInodeScanDone() {
+  // Finalize the accumulated trace packets.
+  current_block_device_id_ = 0;
+  current_file_map_ = nullptr;
+  if (has_current_trace_packet_)
+    current_trace_packet_->Finalize();
+  has_current_trace_packet_ = false;
+  file_scanner_.reset();
+  if (!next_missing_inodes_.empty()) {
+    auto weak_this = GetWeakPtr();
+    PERFETTO_DLOG("Starting another filesystem scan.");
+    task_runner_->PostDelayedTask(
+        [weak_this] {
+          if (!weak_this) {
+            PERFETTO_DLOG("Giving up filesystem scan.");
+            return;
+          }
+          weak_this->FindMissingInodes();
+        },
+        kScanIntervalMs);
+  } else {
+    scan_running_ = false;
   }
 }
 
-void InodeFileDataSource::FindMissingInodes() {
-  for (auto& p : missing_inodes_) {
-    BlockDeviceID block_device_id = p.first;
-    std::set<Inode>& missing = p.second;
-
-    PERFETTO_DLOG("Scanning filesystem");
-    auto it = mount_points_.find(block_device_id);
-    if (it == mount_points_.end())
-      continue;
-
-    std::string root_directory = it->second;
-    // New TracePacket for each InodeFileMap
-    auto trace_packet = writer_->NewTracePacket();
-    auto inode_file_map = trace_packet->set_inode_file_map();
-    // Add block device id to InodeFileMap
-    inode_file_map->set_block_device_id(block_device_id);
-
-    AddInodesFromFilesystemScan(root_directory, block_device_id, &missing,
-                                cache_, inode_file_map);
-    PERFETTO_DLOG("Giving up on finding %lu inodes", missing.size());
+void InodeFileDataSource::AddRootsForBlockDevice(
+    BlockDeviceID block_device_id,
+    std::vector<std::string>* roots) {
+<<<<<<< HEAD
+  auto p = mount_points_.equal_range(block_device_id);
+  for (auto it = p.first; it != p.second; ++it) {
+=======
+  auto range = mount_points_.equal_range(block_device_id);
+  for (auto it = range.first; it != range.second; ++it) {
+    PERFETTO_DLOG("Trying to replace %s", it->second.c_str());
+    auto replace_it = mount_point_mapping_.find(it->second);
+    if (replace_it != mount_point_mapping_.end()) {
+      roots->insert(roots->end(), replace_it->second.cbegin(),
+                    replace_it->second.cend());
+      return;
+    }
   }
-  missing_inodes_.clear();
+
+  for (auto it = range.first; it != range.second; ++it)
+>>>>>>> d6878254... Allow to configure scan roots.
+    roots->emplace_back(it->second);
+  }
+}  // namespace perfetto
+
+void InodeFileDataSource::FindMissingInodes() {
+  missing_inodes_ = std::move(next_missing_inodes_);
+  std::vector<std::string> roots;
+  for (auto& p : missing_inodes_) {
+    AddRootsForBlockDevice(p.first, &roots);
+  }
+  PERFETTO_DCHECK(file_scanner_.get() == nullptr);
+  auto weak_this = GetWeakPtr();
+<<<<<<< HEAD
+  file_scanner_ = std::unique_ptr<FileScanner>(
+      new FileScanner(std::move(roots), this, kScanIntervalMs, kScanBatchSize));
+=======
+  PERFETTO_DLOG("Starting scan of %s", DbgFmt(roots).c_str());
+  file_scanner_ = std::unique_ptr<FileScanner>(new FileScanner(
+      std::move(roots), this, GetScanIntervalMs(), GetScanBatchSize()));
+>>>>>>> d6878254... Allow to configure scan roots.
+
+  file_scanner_->Scan(task_runner_);
 }
 
 base::WeakPtr<InodeFileDataSource> InodeFileDataSource::GetWeakPtr() const {

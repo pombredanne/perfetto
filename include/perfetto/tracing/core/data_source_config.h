@@ -45,6 +45,11 @@ namespace protos {
 class DataSourceConfig;
 class FtraceConfig;
 class ChromeConfig;
+<<<<<<< HEAD
+=======
+class InodeFileConfig;
+class InodeFileConfig_MountPointMappingEntry;
+>>>>>>> d6878254... Allow to configure scan roots.
 class TestConfig;
 }  // namespace protos
 }  // namespace perfetto

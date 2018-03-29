@@ -368,15 +368,22 @@ FtraceMetadata::FtraceMetadata() {
 
 void FtraceMetadata::AddDevice(BlockDeviceID device_id) {
   last_seen_device_id = device_id;
-#if PERFETTO_DCHECK_IS_ON()
   seen_device_id = true;
-#endif
+  // Add if we’ve already seen the inode number in this event
+  if (seen_inode) {
+    AddInode(last_seen_inode);
+    seen_device_id = false;
+  }
 }
 
 void FtraceMetadata::AddInode(Inode inode_number) {
-#if PERFETTO_DCHECK_IS_ON()
-  PERFETTO_DCHECK(seen_device_id);
-#endif
+  last_seen_inode = inode_number;
+  // Will be added later if a device id is seen
+  if (!seen_device_id) {
+    seen_inode = true;
+    return;
+  }
+
   static int32_t cached_pid = 0;
   if (!cached_pid)
     cached_pid = getpid();
@@ -404,9 +411,9 @@ void FtraceMetadata::AddPid(int32_t pid) {
 
 void FtraceMetadata::FinishEvent() {
   last_seen_device_id = 0;
-#if PERFETTO_DCHECK_IS_ON()
   seen_device_id = false;
-#endif
+  last_seen_inode = 0;
+  seen_inode = false;
   last_seen_common_pid = 0;
 }
 

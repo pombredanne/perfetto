@@ -266,10 +266,10 @@ TEST(TranslationTableTest, InferFtraceType) {
   ASSERT_TRUE(InferFtraceType("u32 foo", 4, false, &type));
   EXPECT_EQ(type, kFtraceUint32);
 
-  ASSERT_TRUE(InferFtraceType("i_ino foo", 4, false, &type));
+  ASSERT_TRUE(InferFtraceType("uint32 i_ino", 4, false, &type));
   ASSERT_EQ(type, kFtraceInode32);
 
-  ASSERT_TRUE(InferFtraceType("i_ino foo", 8, false, &type));
+  ASSERT_TRUE(InferFtraceType("unsigned long i_ino", 8, false, &type));
   ASSERT_EQ(type, kFtraceInode64);
 
   ASSERT_TRUE(InferFtraceType("ino_t foo", 4, false, &type));

@@ -189,8 +189,7 @@ bool InferFtraceType(const std::string& type_and_name,
     return true;
   }
 
-  if (StartsWith(type_and_name, "ino_t ") ||
-      StartsWith(type_and_name, "i_ino ")) {
+  if (StartsWith(type_and_name, "ino_t ") || Contains(type_and_name, "i_ino")) {
     if (size == 4) {
       *out = kFtraceInode32;
       return true;
