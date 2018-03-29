@@ -40,9 +40,9 @@ namespace {
 
 uint64_t kInitialConnectionBackoffMs = 100;
 uint64_t kMaxConnectionBackoffMs = 30 * 1000;
-constexpr char kFtraceSourceName[] = "com.google.perfetto.ftrace";
-constexpr char kProcessStatsSourceName[] = "com.google.perfetto.process_stats";
-constexpr char kInodeMapSourceName[] = "com.google.perfetto.inode_file_map";
+constexpr char kFtraceSourceName[] = "linux.ftrace";
+constexpr char kProcessStatsSourceName[] = "linux.process_stats";
+constexpr char kInodeMapSourceName[] = "linux.inode_file_map";
 
 }  // namespace.
 
@@ -239,7 +239,7 @@ void ProbesProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
   endpoint_ = ProducerIPCClient::Connect(
-      socket_name_, this, "com.google.perfetto.traced_probes", task_runner_);
+      socket_name_, this, "perfetto.traced_probes", task_runner_);
 }
 
 void ProbesProducer::IncreaseConnectionBackoff() {
@@ -273,6 +273,15 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     FtraceBundleHandle,
     const FtraceMetadata& metadata) {
   trace_packet_->Finalize();
+
+  if (ps_source_ && !metadata.pids.empty()) {
+    const auto& pids = metadata.pids;
+    auto weak_ps_source = ps_source_;
+    task_runner_->PostTask([weak_ps_source, pids] {
+      if (weak_ps_source)
+        weak_ps_source->OnPids(pids);
+    });
+  }
 
   if (file_source_ && !metadata.inode_and_device.empty()) {
     auto inodes = metadata.inode_and_device;
