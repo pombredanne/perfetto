@@ -71,8 +71,7 @@ class FakeProducer : public Producer {
   void OnConnect() override {
     DataSourceDescriptor descriptor;
     descriptor.set_name(name_);
-    endpoint_->RegisterDataSource(descriptor,
-                                  [this](DataSourceID id) { id_ = id; });
+    endpoint_->RegisterDataSource(descriptor);
   }
 
   void OnDisconnect() override {}
@@ -103,7 +102,6 @@ class FakeProducer : public Producer {
   const std::string name_;
   const uint8_t* data_;
   const size_t size_;
-  DataSourceID id_ = 0;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   std::function<void()> on_produced_and_committed_;
 };
@@ -139,17 +137,14 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
 
-  auto on_produced_and_committed =
-      task_runner.CreateCheckpoint("produced.and.committed");
-  auto posted_on_produced_and_committed = [&task_runner,
-                                           &on_produced_and_committed] {
-    task_runner.PostTask(on_produced_and_committed);
-  };
   TaskRunnerThread producer_thread("perfetto.prd");
   producer_thread.Start(std::unique_ptr<FakeProducerDelegate>(
-      new FakeProducerDelegate(data, size, posted_on_produced_and_committed)));
+      new FakeProducerDelegate(data, size,
+                               helper.WrapTask(task_runner.CreateCheckpoint(
+                                   "produced.and.committed")))));
 
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(8);
@@ -158,19 +153,11 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
 
-  auto producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
-  task_runner.PostTask(producer_enabled);
   helper.StartTracing(trace_config);
   task_runner.RunUntilCheckpoint("produced.and.committed");
 
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  auto on_consumer_data =
-      [&on_readback_complete](const TracePacket::DecodedTracePacket& packet) {
-        if (packet.for_testing().str() == "end")
-          on_readback_complete();
-      };
-  helper.ReadData(on_consumer_data, [] {});
-  task_runner.RunUntilCheckpoint("readback.complete");
+  helper.ReadData([](const TracePacket::DecodedTracePacket&) {});
+  helper.WaitForReadData();
 
   return 0;
 }

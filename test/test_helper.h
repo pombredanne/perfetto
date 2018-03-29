@@ -42,8 +42,12 @@ class TestHelper : public Consumer {
   void ConnectConsumer();
   void StartTracing(const TraceConfig& config);
   void ReadData(std::function<void(const TracePacket::DecodedTracePacket&)>
-                    packet_callback,
-                std::function<void()> on_finish_callback);
+                    packet_callback);
+
+  void WaitForConsumerConnect();
+  void WaitForProducerEnabled();
+  void WaitForTracingDisabled();
+  void WaitForReadData();
 
   std::function<void()> WrapTask(const std::function<void()>& function);
 
@@ -53,8 +57,10 @@ class TestHelper : public Consumer {
  private:
   base::TestTaskRunner* task_runner_ = nullptr;
 
+  std::function<void()> on_connect_callback_;
   std::function<void(const TracePacket::DecodedTracePacket&)> packet_callback_;
-  std::function<void()> continuation_callack_;
+  std::function<void()> on_packets_finished_callback_;
+  std::function<void()> on_stop_tracing_callback_;
 
   TaskRunnerThread service_thread_;
   TaskRunnerThread producer_thread_;

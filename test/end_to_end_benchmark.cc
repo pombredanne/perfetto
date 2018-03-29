@@ -43,17 +43,15 @@ void BenchmarkCommon(benchmark::State& state) {
 
   FakeProducer* producer = helper.ConnectFakeProducer();
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
-  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(512);
 
-  // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
 
-  // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
   size_t message_count = state.range(0);
   size_t message_bytes = state.range(1);
@@ -63,26 +61,13 @@ void BenchmarkCommon(benchmark::State& state) {
   size_t time_for_messages_ms =
       10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
-  // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(message_count);
   ds_config->mutable_for_testing()->set_message_size(message_bytes);
   ds_config->mutable_for_testing()->set_max_messages_per_second(messages_per_s);
 
   helper.StartTracing(trace_config);
-
-  bool is_first_packet = true;
-  std::minstd_rand0 rnd_engine(kRandomSeed);
-  auto on_consumer_data = [&is_first_packet, &rnd_engine](
-                              const TracePacket::DecodedTracePacket& packet) {
-    ASSERT_TRUE(packet.has_for_testing());
-    if (is_first_packet) {
-      rnd_engine = std::minstd_rand0(packet.for_testing().seq_value());
-      is_first_packet = false;
-    } else {
-      ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
-    }
-  };
+  helper.WaitForProducerEnabled();
 
   uint64_t wall_start_ns = base::GetWallTimeNs().count();
   uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
@@ -104,12 +89,23 @@ void BenchmarkCommon(benchmark::State& state) {
   state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
   state.counters["Ser ns/m"] =
       benchmark::Counter(1.0 * service_ns / message_count);
+  state.SetBytesProcessed(iterations * message_bytes * message_count);
 
   // Read back the buffer just to check correctness.
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  helper.ReadData(on_consumer_data, on_readback_complete);
-  task_runner.RunUntilCheckpoint("readback.complete");
-  state.SetBytesProcessed(iterations * message_bytes * message_count);
+  bool is_first_packet = true;
+  std::minstd_rand0 rnd_engine(kRandomSeed);
+  auto on_consumer_data = [&is_first_packet, &rnd_engine](
+                              const TracePacket::DecodedTracePacket& packet) {
+    ASSERT_TRUE(packet.has_for_testing());
+    if (is_first_packet) {
+      rnd_engine = std::minstd_rand0(packet.for_testing().seq_value());
+      is_first_packet = false;
+    } else {
+      ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
+    }
+  };
+  helper.ReadData(on_consumer_data);
+  helper.WaitForReadData();
 }
 
 void SaturateCpuArgs(benchmark::internal::Benchmark* b) {

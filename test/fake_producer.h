@@ -41,7 +41,7 @@ class FakeProducer : public Producer {
 
   // Produces a batch of events (as configured in the DataSourceConfig) and
   // posts a callback when the service acknowledges the commit.
-  void ProduceEventBatch(std::function<void()> callback);
+  void ProduceEventBatch(std::function<void()> callback = [] {});
 
   // Producer implementation.
   void OnConnect() override;

@@ -65,6 +65,7 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
 #endif
 
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(1024);
@@ -78,9 +79,8 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   *ftrace_config->add_ftrace_events() = "sched_switch";
   *ftrace_config->add_ftrace_events() = "bar";
 
-  auto producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
-  task_runner.PostDelayedTask(producer_enabled, 100);
   helper.StartTracing(trace_config);
+  helper.WaitForTracingDisabled();
 
   size_t packets_seen = 0;
   auto on_consumer_data =
@@ -90,13 +90,8 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
         }
         packets_seen++;
       };
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  task_runner.PostDelayedTask(
-      [&helper, &on_consumer_data, &on_readback_complete] {
-        helper.ReadData(on_consumer_data, on_readback_complete);
-      },
-      3000);
-  task_runner.RunUntilCheckpoint("readback.complete");
+  helper.ReadData(on_consumer_data);
+  helper.WaitForReadData();
   ASSERT_GT(packets_seen, 0u);
 }
 
@@ -105,9 +100,9 @@ TEST(PerfettoTest, TestFakeProducer) {
 
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
-
-  FakeProducer* producer = helper.ConnectFakeProducer();
+  helper.ConnectFakeProducer();
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(1024);
@@ -123,12 +118,10 @@ TEST(PerfettoTest, TestFakeProducer) {
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(kNumPackets);
   ds_config->mutable_for_testing()->set_message_size(kMsgSize);
+  ds_config->mutable_for_testing()->set_send_batch_on_register(true);
 
   helper.StartTracing(trace_config);
-
-  producer->ProduceEventBatch(
-      helper.WrapTask(task_runner.CreateCheckpoint("produced.and.committed")));
-  task_runner.RunUntilCheckpoint("produced.and.committed");
+  helper.WaitForTracingDisabled();
 
   size_t packets_seen = 0;
   std::minstd_rand0 rnd_engine(kRandomSeed);
@@ -138,9 +131,8 @@ TEST(PerfettoTest, TestFakeProducer) {
     ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
     packets_seen++;
   };
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  helper.ReadData(on_consumer_data, on_readback_complete);
-  task_runner.RunUntilCheckpoint("readback.complete");
+  helper.ReadData(on_consumer_data);
+  helper.WaitForReadData();
   ASSERT_EQ(packets_seen, kNumPackets);
 }
 
@@ -149,13 +141,13 @@ TEST(PerfettoTest, VeryLargePackets) {
 
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
-
-  FakeProducer* producer = helper.ConnectFakeProducer();
+  helper.ConnectFakeProducer();
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
-  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.set_duration_ms(500);
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
@@ -167,12 +159,10 @@ TEST(PerfettoTest, VeryLargePackets) {
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(kNumPackets);
   ds_config->mutable_for_testing()->set_message_size(kMsgSize);
+  ds_config->mutable_for_testing()->set_send_batch_on_register(true);
 
   helper.StartTracing(trace_config);
-
-  producer->ProduceEventBatch(
-      helper.WrapTask(task_runner.CreateCheckpoint("produced.and.committed")));
-  task_runner.RunUntilCheckpoint("produced.and.committed");
+  helper.WaitForTracingDisabled();
 
   size_t packets_seen = 0;
   std::minstd_rand0 rnd_engine(kRandomSeed);
@@ -186,9 +176,8 @@ TEST(PerfettoTest, VeryLargePackets) {
       ASSERT_EQ(i < msg_size - 1 ? '.' : 0, packet.for_testing().str()[i]);
     packets_seen++;
   };
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  helper.ReadData(on_consumer_data, on_readback_complete);
-  task_runner.RunUntilCheckpoint("readback.complete");
+  helper.ReadData(on_consumer_data);
+  helper.WaitForReadData();
   ASSERT_EQ(packets_seen, kNumPackets);
 }
 
