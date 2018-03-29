@@ -351,16 +351,15 @@ bool UnixSocket::Send(const void* msg,
   if (blocking_mode == BlockingMode::kBlocking)
     SetBlockingIO(false);
 
-  if (sz == static_cast<ssize_t>(len)) {
+  if (sz >= 0) {
+    // There should be no way a non-blocking socket returns < |len|.
+    // If the queueing fails, sendmsg() must return -1 + errno = EWOULDBLOCK.
+    PERFETTO_CHECK(static_cast<size_t>(sz) == len);
     last_error_ = 0;
     return true;
   }
 
-  // If sendmsg() succeds but the returned size is < |len| it means that the
-  // endpoint disconnected in the middle of the read, and we managed to send
-  // only a portion of the buffer. In this case we should just give up.
-
-  if (sz < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+  if (errno == EAGAIN || errno == EWOULDBLOCK) {
     // A genuine out-of-buffer. The client should retry or give up.
     // Man pages specify that EAGAIN and EWOULDBLOCK have the same semantic here
     // and clients should check for both.

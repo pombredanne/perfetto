@@ -25,7 +25,6 @@
 #include <sys/mman.h>
 
 #include "perfetto/base/page_allocator.h"
-#include "perfetto/ipc/basic_types.h"
 
 namespace perfetto {
 namespace ipc {
@@ -82,8 +81,7 @@ class BufferedFrameDeserializer {
     size_t size;
   };
 
-  // |max_capacity| is overridable only for tests.
-  explicit BufferedFrameDeserializer(size_t max_capacity = kIPCBufferSize);
+  explicit BufferedFrameDeserializer(size_t max_capacity = 128 * 1024);
   ~BufferedFrameDeserializer();
 
   // This function doesn't really belong here as it does Serialization, unlike

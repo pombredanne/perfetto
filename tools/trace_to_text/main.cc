@@ -22,7 +22,6 @@
 
 #include <algorithm>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <istream>
 #include <limits>
@@ -30,6 +29,7 @@
 #include <memory>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <utility>
 
 #include <google/protobuf/compiler/importer.h>
@@ -43,7 +43,6 @@
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "tools/trace_to_text/ftrace_event_formatter.h"
-#include "tools/trace_to_text/ftrace_inode_handler.h"
 
 namespace perfetto {
 namespace {
@@ -280,90 +279,16 @@ int TraceToText(std::istream* input, std::ostream* output) {
   return 0;
 }
 
-void PrintFtraceTrack(std::ostream* output,
-                      const uint64_t& start,
-                      const uint64_t& end,
-                      const std::multiset<uint64_t>& ftrace_timestamps) {
-  constexpr char kFtraceTrackName[] = "ftrace ";
-  size_t width = GetWidth();
-  size_t bucket_count = width - strlen(kFtraceTrackName);
-  size_t bucket_size = (end - start) / bucket_count;
-  size_t max = 0;
-  std::vector<size_t> buckets(bucket_count);
-  for (size_t i = 0; i < bucket_count; i++) {
-    auto low = ftrace_timestamps.lower_bound(i * bucket_size + start);
-    auto high = ftrace_timestamps.upper_bound((i + 1) * bucket_size + start);
-    buckets[i] = std::distance(low, high);
-    max = std::max(max, buckets[i]);
-  }
-
-  std::vector<std::string> out =
-      std::vector<std::string>({" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇"});
-  *output << "-------------------- " << kFtraceTrackName
-          << "--------------------\n";
-  char line[2048];
-  for (size_t i = 0; i < bucket_count; i++) {
-    sprintf(
-        line, "%s",
-        out[std::min(buckets[i] / (max / out.size()), out.size() - 1)].c_str());
-    *output << std::string(line);
-  }
-  *output << "\n\n";
-}
-
-void PrintInodeStats(std::ostream* output,
-                     const std::set<uint64_t>& inode_numbers,
-                     const uint64_t& events_with_inodes) {
-  *output << "--------------------Inode Stats-------------------\n";
-  char line[2048];
-  sprintf(line, "Unique inodes: %zu\n", inode_numbers.size());
-  *output << std::string(line);
-
-  sprintf(line, "Events with inodes: %" PRIu64 "\n", events_with_inodes);
-  *output << std::string(line);
-  *output << "\n";
-}
-
-void PrintProcessStats(std::ostream* output,
-                       const std::set<pid_t>& tids_in_tree,
-                       const std::set<pid_t>& tids_in_events) {
-  *output << "----------------Process Tree Stats----------------\n";
-
-  char tid[2048];
-  sprintf(tid, "Unique thread ids in process tree: %zu\n", tids_in_tree.size());
-  *output << std::string(tid);
-
-  char tid_event[2048];
-  sprintf(tid_event, "Unique thread ids in ftrace events: %zu\n",
-          tids_in_events.size());
-  *output << std::string(tid_event);
-
-  std::set<pid_t> intersect;
-  set_intersection(tids_in_tree.begin(), tids_in_tree.end(),
-                   tids_in_events.begin(), tids_in_events.end(),
-                   std::inserter(intersect, intersect.begin()));
-
-  char matching[2048];
-  sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n\n",
-          intersect.size(), tids_in_events.size(),
-          (intersect.size() * 100) / tids_in_events.size());
-  *output << std::string(matching);
-  *output << "\n";
-}
-
 int TraceToSummary(std::istream* input, std::ostream* output) {
   uint64_t start = std::numeric_limits<uint64_t>::max();
   uint64_t end = 0;
   std::multiset<uint64_t> ftrace_timestamps;
   std::set<pid_t> tids_in_tree;
   std::set<pid_t> tids_in_events;
-  std::set<uint64_t> inode_numbers;
-  uint64_t events_with_inodes = 0;
 
   ForEachPacketInTrace(
-      input,
-      [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
-       &inode_numbers, &events_with_inodes](const protos::TracePacket& packet) {
+      input, [&start, &end, &ftrace_timestamps, &tids_in_tree,
+              &tids_in_events](const protos::TracePacket& packet) {
 
         if (packet.has_process_tree()) {
           const ProcessTree& tree = packet.process_tree();
@@ -378,12 +303,8 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
           return;
 
         const FtraceEventBundle& bundle = packet.ftrace_events();
-        uint64_t inode_number = 0;
+
         for (const FtraceEvent& event : bundle.event()) {
-          if (ParseInode(event, &inode_number)) {
-            inode_numbers.insert(inode_number);
-            events_with_inodes++;
-          }
           if (event.pid()) {
             tids_in_events.insert(event.pid());
           }
@@ -401,9 +322,54 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
   sprintf(line, "Duration: %" PRIu64 "ms\n", (end - start) / (1000 * 1000));
   *output << std::string(line);
 
-  PrintFtraceTrack(output, start, end, ftrace_timestamps);
-  PrintProcessStats(output, tids_in_tree, tids_in_events);
-  PrintInodeStats(output, inode_numbers, events_with_inodes);
+  constexpr char kFtraceTrackName[] = "ftrace ";
+  size_t width = GetWidth();
+  size_t bucket_count = width - strlen(kFtraceTrackName);
+  size_t bucket_size = (end - start) / bucket_count;
+  size_t max = 0;
+  std::vector<size_t> buckets(bucket_count);
+  for (size_t i = 0; i < bucket_count; i++) {
+    auto low = ftrace_timestamps.lower_bound(i * bucket_size + start);
+    auto high = ftrace_timestamps.upper_bound((i + 1) * bucket_size + start);
+    buckets[i] = std::distance(low, high);
+    max = std::max(max, buckets[i]);
+  }
+
+  std::vector<std::string> out =
+      std::vector<std::string>({" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇"});
+  *output << kFtraceTrackName;
+  for (size_t i = 0; i < bucket_count; i++) {
+    sprintf(
+        line, "%s",
+        out[std::min(buckets[i] / (max / out.size()), out.size() - 1)].c_str());
+    *output << std::string(line);
+  }
+  *output << "\n\n";
+
+  *output << "----------------Process Tree Stats----------------\n";
+
+  char tid[2048];
+  sprintf(tid, "Unique thread ids in process tree: %" PRIu64 "\n",
+          tids_in_tree.size());
+  *output << std::string(tid);
+
+  char tid_event[2048];
+  sprintf(tid_event, "Unique thread ids in ftrace events: %" PRIu64 "\n",
+          tids_in_events.size());
+  *output << std::string(tid_event);
+
+  std::set<pid_t> intersect;
+  set_intersection(tids_in_tree.begin(), tids_in_tree.end(),
+                   tids_in_events.begin(), tids_in_events.end(),
+                   std::inserter(intersect, intersect.begin()));
+
+  char matching[2048];
+  sprintf(matching,
+          "Thread ids with process info: %" PRIu64 "/%" PRIu64 " -> %" PRIu64
+          "%%\n\n",
+          intersect.size(), tids_in_events.size(),
+          (intersect.size() * 100) / tids_in_events.size());
+  *output << std::string(matching);
 
   return 0;
 }

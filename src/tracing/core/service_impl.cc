@@ -53,6 +53,7 @@ namespace perfetto {
 namespace {
 constexpr size_t kDefaultShmSize = 256 * 1024ul;
 constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
+constexpr size_t kMaxShmPageSizeKb = 16ul;
 constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
@@ -433,18 +434,11 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     total_slices += packet.slices().size();
   }
 
-  // This is a rough threshold to determine how much to read from the buffer in
-  // each task. This is to avoid executing a single huge sending task for too
-  // long and risk to hit the watchdog. This is *not* an upper bound: we just
-  // stop accumulating new packets and PostTask *after* we cross this threshold.
-  // This constant essentially balances the PostTask and IPC overhead vs the
-  // responsiveness of the service. An extremely small value will cause one IPC
-  // and one PostTask for each slice but will keep the service extremely
-  // responsive. An extremely large value will batch the send for the full
-  // buffer in one large task, will hit the blocking send() once the socket
-  // buffers are full and hang the service for a bit (until the consumer
-  // catches up).
-  static constexpr size_t kApproxBytesPerTask = 32768;
+  // This is a rough threshold to determine how to split packets within each
+  // IPC. This is not an upper bound, we just stop accumulating packets and send
+  // an IPC out every time we cross this threshold (i.e. all IPCs % last one
+  // will be >= kApproxBytesPerRead).
+  static constexpr size_t kApproxBytesPerRead = 4096;
   bool did_hit_threshold = false;
 
   // TODO(primiano): Extend the ReadBuffers API to allow reading only some
@@ -492,7 +486,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       // Append the packet (inclusive of the trusted uid) to |packets|.
       packets_bytes += packet.size();
       total_slices += packet.slices().size();
-      did_hit_threshold = packets_bytes >= kApproxBytesPerTask &&
+      did_hit_threshold = packets_bytes >= kApproxBytesPerRead &&
                           !tracing_session->write_into_file;
       packets.emplace_back(std::move(packet));
     }  // for(packets...)
@@ -710,7 +704,7 @@ void ServiceImpl::CreateDataSourceInstance(
                   cfg_data_source.producer_name_filter().end(),
                   producer->name_) ==
         cfg_data_source.producer_name_filter().end()) {
-      PERFETTO_DLOG("Data source: %s is not enabled for producer: %s",
+      PERFETTO_DLOG("Data source: %s is filtered out for producer: %s",
                     cfg_data_source.config().name().c_str(),
                     producer->name_.c_str());
       return;
@@ -747,7 +741,7 @@ void ServiceImpl::CreateDataSourceInstance(
     producer->shared_buffer_page_size_kb_ = std::min<size_t>(
         (producer_config.page_size_kb() == 0) ? kDefaultShmPageSizeKb
                                               : producer_config.page_size_kb(),
-        SharedMemoryABI::kMaxPageSize);
+        kMaxShmPageSizeKb);
 
     size_t shm_size =
         std::min<size_t>(producer_config.shm_size_kb() * 1024, kMaxShmSize);
@@ -902,16 +896,14 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
   if (now < tracing_session->last_clock_snapshot + kClockSnapshotInterval)
     return;
   tracing_session->last_clock_snapshot = now;
-
-  protos::TracePacket packet;
-  protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
-
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   struct {
     clockid_t id;
     protos::ClockSnapshot::Clock::Type type;
     struct timespec ts;
   } clocks[] = {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+    {CLOCK_UPTIME_RAW, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
+#else
     {CLOCK_BOOTTIME, protos::ClockSnapshot::Clock::BOOTTIME, {0, 0}},
     {CLOCK_REALTIME_COARSE,
      protos::ClockSnapshot::Clock::REALTIME_COARSE,
@@ -919,6 +911,7 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     {CLOCK_MONOTONIC_COARSE,
      protos::ClockSnapshot::Clock::MONOTONIC_COARSE,
      {0, 0}},
+#endif
     {CLOCK_REALTIME, protos::ClockSnapshot::Clock::REALTIME, {0, 0}},
     {CLOCK_MONOTONIC, protos::ClockSnapshot::Clock::MONOTONIC, {0, 0}},
     {CLOCK_MONOTONIC_RAW, protos::ClockSnapshot::Clock::MONOTONIC_RAW, {0, 0}},
@@ -929,6 +922,8 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
      protos::ClockSnapshot::Clock::THREAD_CPUTIME,
      {0, 0}},
   };
+  protos::TracePacket packet;
+  protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
   // First snapshot all the clocks as atomically as we can.
   for (auto& clock : clocks) {
     if (clock_gettime(clock.id, &clock.ts) == -1)
@@ -939,12 +934,6 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
     c->set_type(clock.type);
     c->set_timestamp(base::FromPosixTimespec(clock.ts).count());
   }
-#else   // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-  protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
-  c->set_type(protos::ClockSnapshot::Clock::MONOTONIC);
-  c->set_timestamp(base::GetWallTimeNs().count());
-#endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-
   packet.set_trusted_uid(getuid());
   Slice slice = Slice::Allocate(packet.ByteSize());
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));

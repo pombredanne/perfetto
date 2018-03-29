@@ -25,7 +25,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/data_source_types.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -60,7 +59,6 @@ void FillInodeEntry(InodeFileMap* destination,
 class InodeFileDataSource {
  public:
   InodeFileDataSource(
-      base::TaskRunner*,
       TracingSessionID,
       std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
           static_file_map,
@@ -93,16 +91,12 @@ class InodeFileDataSource {
                              InodeFileMap* destination);
 
  private:
-  void FindMissingInodes();
-
-  base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
       static_file_map_;
   LRUInodeCache* cache_;
   std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
-  std::map<BlockDeviceID, std::set<Inode>> missing_inodes_;
   base::WeakPtrFactory<InodeFileDataSource> weak_factory_;  // Keep last.
 };
 
