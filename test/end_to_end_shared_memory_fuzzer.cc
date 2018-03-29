@@ -64,8 +64,7 @@ class FakeProducer : public Producer {
   void OnConnect() override {
     DataSourceDescriptor descriptor;
     descriptor.set_name(name_);
-    endpoint_->RegisterDataSource(descriptor,
-                                  [this](DataSourceID id) { id_ = id; });
+    endpoint_->RegisterDataSource(descriptor);
   }
 
   void OnDisconnect() override {}
