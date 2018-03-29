@@ -54,17 +54,14 @@ class PerfettoCtsTest : public ::testing::Test {
     helper.StartTracing(trace_config);
     helper.WaitForTracingDisabled();
 
-    size_t packets_seen = 0;
-    std::minstd_rand0 rnd_engine(kRandomSeed);
-    auto on_consumer_data = [&packets_seen, &rnd_engine](
-                                const TracePacket::DecodedTracePacket& packet) {
-      ASSERT_TRUE(packet.has_for_testing());
-      ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
-      packets_seen++;
-    };
     helper.ReadData(on_consumer_data);
     helper.WaitForReadData();
-    ASSERT_EQ(packets_seen, kNumPackets);
+
+    std::minstd_rand0 rnd_engine(kRandomSeed);
+    for (const auto& packet : packets) {
+      ASSERT_TRUE(packet.has_for_testing());
+      ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
+    }
   }
 };
 

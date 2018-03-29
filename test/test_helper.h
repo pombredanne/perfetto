@@ -41,8 +41,7 @@ class TestHelper : public Consumer {
   FakeProducer* ConnectFakeProducer();
   void ConnectConsumer();
   void StartTracing(const TraceConfig& config);
-  void ReadData(std::function<void(const TracePacket::DecodedTracePacket&)>
-                    packet_callback);
+  void ReadData();
 
   void WaitForConsumerConnect();
   void WaitForProducerEnabled();
@@ -53,14 +52,16 @@ class TestHelper : public Consumer {
 
   TaskRunnerThread* service_thread() { return &service_thread_; }
   TaskRunnerThread* producer_thread() { return &producer_thread_; }
+  const std::vector<TracePacket::DecodedTracePacket>& trace() { return trace_; }
 
  private:
   base::TestTaskRunner* task_runner_ = nullptr;
 
   std::function<void()> on_connect_callback_;
-  std::function<void(const TracePacket::DecodedTracePacket&)> packet_callback_;
   std::function<void()> on_packets_finished_callback_;
   std::function<void()> on_stop_tracing_callback_;
+
+  std::vector<TracePacket::DecodedTracePacket> trace_;
 
   TaskRunnerThread service_thread_;
   TaskRunnerThread producer_thread_;

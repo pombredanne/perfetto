@@ -60,11 +60,9 @@ void TestHelper::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
       continue;
     ASSERT_EQ(protos::TracePacket::kTrustedUid,
               packet->optional_trusted_uid_case());
-    packet_callback_(*packet);
   }
 
   if (!has_more) {
-    packet_callback_ = {};
     std::move(on_packets_finished_callback_)();
   }
 }
@@ -97,10 +95,7 @@ void TestHelper::StartTracing(const TraceConfig& config) {
   endpoint_->EnableTracing(config);
 }
 
-void TestHelper::ReadData(
-    std::function<void(const TracePacket::DecodedTracePacket&)>
-        packet_callback) {
-  packet_callback_ = packet_callback;
+void TestHelper::ReadData() {
   on_packets_finished_callback_ =
       task_runner_->CreateCheckpoint("readback.complete");
   endpoint_->ReadBuffers();

@@ -156,7 +156,7 @@ int FuzzSharedMemory(const uint8_t* data, size_t size) {
   helper.StartTracing(trace_config);
   task_runner.RunUntilCheckpoint("produced.and.committed");
 
-  helper.ReadData([](const TracePacket::DecodedTracePacket&) {});
+  helper.ReadData();
   helper.WaitForReadData();
 
   return 0;

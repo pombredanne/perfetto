@@ -82,17 +82,17 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   helper.StartTracing(trace_config);
   helper.WaitForTracingDisabled();
 
-  size_t packets_seen = 0;
-  auto on_consumer_data =
-      [&packets_seen](const TracePacket::DecodedTracePacket& packet) {
-        for (int ev = 0; ev < packet.ftrace_events().event_size(); ev++) {
-          ASSERT_TRUE(packet.ftrace_events().event(ev).has_sched_switch());
-        }
-        packets_seen++;
-      };
-  helper.ReadData(on_consumer_data);
+  helper.ReadData();
   helper.WaitForReadData();
-  ASSERT_GT(packets_seen, 0u);
+
+  const auto& packets = helper.trace();
+  ASSERT_GT(packets.size(), 0u);
+
+  for (const auto& packet : packets) {
+    for (int ev = 0; ev < packet.ftrace_events().event_size(); ev++) {
+      ASSERT_TRUE(packet.ftrace_events().event(ev).has_sched_switch());
+    }
+  }
 }
 
 TEST(PerfettoTest, TestFakeProducer) {
@@ -123,17 +123,17 @@ TEST(PerfettoTest, TestFakeProducer) {
   helper.StartTracing(trace_config);
   helper.WaitForTracingDisabled();
 
-  size_t packets_seen = 0;
+  helper.ReadData();
+  helper.WaitForReadData();
+
+  const auto& packets = helper.trace();
+  ASSERT_EQ(packets.size(), kNumPackets);
+
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  auto on_consumer_data = [&packets_seen, &rnd_engine](
-                              const TracePacket::DecodedTracePacket& packet) {
+  for (const auto& packet : packets) {
     ASSERT_TRUE(packet.has_for_testing());
     ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
-    packets_seen++;
-  };
-  helper.ReadData(on_consumer_data);
-  helper.WaitForReadData();
-  ASSERT_EQ(packets_seen, kNumPackets);
+  }
 }
 
 TEST(PerfettoTest, VeryLargePackets) {
@@ -164,21 +164,20 @@ TEST(PerfettoTest, VeryLargePackets) {
   helper.StartTracing(trace_config);
   helper.WaitForTracingDisabled();
 
-  size_t packets_seen = 0;
+  helper.ReadData();
+  helper.WaitForReadData();
+
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  auto on_consumer_data = [&packets_seen, &rnd_engine](
-                              const TracePacket::DecodedTracePacket& packet) {
+  const auto& packets = helper.trace();
+  ASSERT_EQ(packets.size(), kNumPackets);
+  for (const auto& packet : packets) {
     ASSERT_TRUE(packet.has_for_testing());
     ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
     size_t msg_size = packet.for_testing().str().size();
     ASSERT_EQ(kMsgSize, msg_size);
     for (size_t i = 0; i < msg_size; i++)
       ASSERT_EQ(i < msg_size - 1 ? '.' : 0, packet.for_testing().str()[i]);
-    packets_seen++;
-  };
-  helper.ReadData(on_consumer_data);
-  helper.WaitForReadData();
-  ASSERT_EQ(packets_seen, kNumPackets);
+  }
 }
 
 }  // namespace perfetto

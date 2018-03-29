@@ -92,10 +92,12 @@ void BenchmarkCommon(benchmark::State& state) {
   state.SetBytesProcessed(iterations * message_bytes * message_count);
 
   // Read back the buffer just to check correctness.
+  helper.ReadData();
+  helper.WaitForReadData();
+
   bool is_first_packet = true;
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  auto on_consumer_data = [&is_first_packet, &rnd_engine](
-                              const TracePacket::DecodedTracePacket& packet) {
+  for (const auto& packet : helper.trace()) {
     ASSERT_TRUE(packet.has_for_testing());
     if (is_first_packet) {
       rnd_engine = std::minstd_rand0(packet.for_testing().seq_value());
@@ -103,9 +105,7 @@ void BenchmarkCommon(benchmark::State& state) {
     } else {
       ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
     }
-  };
-  helper.ReadData(on_consumer_data);
-  helper.WaitForReadData();
+  }
 }
 
 void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
