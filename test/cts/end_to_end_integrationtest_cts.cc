@@ -22,7 +22,8 @@
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
-#include "test/fake_consumer.h"
+#include "src/base/test/test_task_runner.h"
+#include "test/test_helper.h"
 
 namespace perfetto {
 
