@@ -51,6 +51,7 @@ message DataSourceConfig {
 
   optional FtraceConfig ftrace_config = 100;
   optional ChromeConfig chrome_config = 101;
+  optional InodeFileConfig inode_file = 102;
 
   // This field is only used for testing.
   optional TestConfig for_testing =
