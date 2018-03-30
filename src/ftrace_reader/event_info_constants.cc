@@ -85,4 +85,20 @@ bool SetTranslationStrategy(FtraceFieldType ftrace,
   return true;
 }
 
+Event* AddEvent(std::vector<Event>* events,
+                const char* name,
+                const char* group,
+                uint32_t field_id) {
+  events->emplace_back();
+  Event* event = &events->back();
+  event->name = name;
+  event->group = group;
+  event->proto_field_id = field_id;
+  return event;
+}
+
+void AddField(Event* event, const char* name, size_t id, ProtoFieldType type) {
+  event->fields.push_back(MakeField(name, id, type));
+}
+
 }  // namespace perfetto

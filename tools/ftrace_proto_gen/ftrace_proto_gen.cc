@@ -194,14 +194,17 @@ std::string SingleEventInfo(perfetto::FtraceEvent format,
                             const std::string& group,
                             const std::string& proto_field_id) {
   std::string s = "";
-  s += "    event->name = \"" + format.name + "\";\n";
-  s += "    event->group = \"" + group + "\";\n";
-  s += "    event->proto_field_id = " + proto_field_id + ";\n";
+  s += "    Event* event = AddEvent(&events, ";
+  s += "\"" + format.name + "\", ";
+  s += "\"" + group + "\", ";
+  s += proto_field_id;
+  s += ");\n";
 
   for (const auto& field : proto.fields) {
-    s += "    event->fields.push_back(MakeField(\"" + field.name + "\", " +
-         std::to_string(field.number) + ", kProto" + ToCamelCase(field.type) +
-         "));\n";
+    s += "    AddField(event, ";
+    s += "\"" + field.name + "\", ";
+    s += std::to_string(field.number) + ", ";
+    s += "kProto" + ToCamelCase(field.type) + ");\n";
   }
   return s;
 }
@@ -230,8 +233,6 @@ std::vector<Event> GetStaticEventInfo() {
   for (const auto& event : events_info) {
     s += "\n";
     s += "  {\n";
-    s += "    events.emplace_back(Event{});\n";
-    s += "    Event* event = &events.back();\n";
     s += event;
     s += "  }\n";
   }

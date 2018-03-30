@@ -232,6 +232,13 @@ bool SetTranslationStrategy(FtraceFieldType ftrace,
 
 Field MakeField(const char* name, size_t id, ProtoFieldType type);
 
+Event* AddEvent(std::vector<Event>* events,
+                const char* name,
+                const char* group,
+                uint32_t field_id);
+
+void AddField(Event* event, const char* name, size_t id, ProtoFieldType type);
+
 }  // namespace perfetto
 
 #endif  // SRC_FTRACE_READER_EVENT_INFO_CONSTANTS_H_
