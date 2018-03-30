@@ -16,15 +16,17 @@ import("../../../src/protozero/protozero_library.gni")
 import("../../../gn/perfetto.gni")
 import("../../../gn/proto_library.gni")
 
+# Common protos used by both the ":minimal_lite" target (for the service) and
+# the generic ":lite" target
+proto_sources_minimal = [
+  "clock_snapshot.proto",
+  "trusted_packet.proto",
+]
+
 proto_sources = [
   "test_event.proto",
   "trace_packet.proto",
   "trace.proto",
-]
-
-proto_sources_service = [
-  "clock_snapshot.proto",
-  "trusted_packet.proto",
 ]
 
 # Protozero generated stubs, for writers.
@@ -36,7 +38,7 @@ protozero_library("zero") {
     "ftrace:zero",
     "ps:zero",
   ]
-  sources = proto_sources + proto_sources_service
+  sources = proto_sources_minimal + proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
   generator_plugin_options = "wrapper_namespace=pbzero"
@@ -53,11 +55,7 @@ proto_library("lite") {
     "ftrace:lite",
     "ps:lite",
   ]
-  sources = [
-    "test_event.proto",
-    "trace.proto",
-    "trace_packet.proto",
-  ]
+  sources = proto_sources
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
 }
@@ -68,7 +66,7 @@ proto_library("minimal_lite") {
   deps = [
     "../config:config",
   ]
-  sources = proto_sources_service
+  sources = proto_sources_minimal
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
 }

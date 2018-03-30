@@ -27,13 +27,21 @@
 namespace perfetto {
 namespace {
 
-static_assert(protos::TracePacket::kTrustedUidFieldNumber ==
-                  protos::TrustedPacket::kTrustedUidFieldNumber,
-              "trusted uid field id mismatch");
-
 static_assert(TracePacket::kPacketFieldNumber ==
                   protos::Trace::kPacketFieldNumber,
-              "kPacketFieldNumber mismatch");
+              "packet field id mismatch");
+
+static_assert(protos::TracePacket::kTrustedUidFieldNumber ==
+                  protos::TrustedPacket::kTrustedUidFieldNumber,
+              "trusted_uid field id mismatch");
+
+static_assert(protos::TracePacket::kTraceConfigFieldNumber ==
+                  protos::TrustedPacket::kTraceConfigFieldNumber,
+              "trace_config field id mismatch");
+
+static_assert(protos::TracePacket::kClockSnapshotFieldNumber ==
+                  protos::TrustedPacket::kClockSnapshotFieldNumber,
+              "clock_snapshot field id mismatch");
 
 TEST(TracePacketTest, Simple) {
   protos::TracePacket proto;
