@@ -17,10 +17,13 @@ import("../../../gn/perfetto.gni")
 import("../../../gn/proto_library.gni")
 
 proto_sources = [
-  "clock_snapshot.proto",
   "test_event.proto",
   "trace_packet.proto",
   "trace.proto",
+]
+
+proto_sources_service = [
+  "clock_snapshot.proto",
   "trusted_packet.proto",
 ]
 
@@ -33,7 +36,7 @@ protozero_library("zero") {
     "ftrace:zero",
     "ps:zero",
   ]
-  sources = proto_sources
+  sources = proto_sources + proto_sources_service
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
   generator_plugin_options = "wrapper_namespace=pbzero"
@@ -43,13 +46,29 @@ protozero_library("zero") {
 proto_library("lite") {
   generate_python = false
   deps = [
+    ":minimal_lite",
     "../config:config",
     "chrome:lite",
     "filesystem:lite",
     "ftrace:lite",
     "ps:lite",
   ]
-  sources = proto_sources
+  sources = [
+    "test_event.proto",
+    "trace.proto",
+    "trace_packet.proto",
+  ]
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
+}
+
+# Used by the traced service for packet sanitization.
+proto_library("minimal_lite") {
+  generate_python = false
+  deps = [
+    "../config:config",
+  ]
+  sources = proto_sources_service
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
 }
