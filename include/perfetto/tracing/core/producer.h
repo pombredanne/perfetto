@@ -78,11 +78,7 @@ class Producer {
 
   // Called by the Service after OnConnect but before the first DataSource is
   // created. Can be used for any setup required before tracing begins.
-  virtual void OnTracingStart() = 0;
-
-  // Called by the Service after the final DataSource is torn down.
-  virtual void OnTracingStop() = 0;
-
+  virtual void SetupSharedMemory() = 0;
   // Called by the sevice to request the Producer to commit the data of the
   // given data sources and return their chunks into the shared memory buffer.
   // The Producer is expected to invoke NotifyFlushComplete(FlushRequestID) on

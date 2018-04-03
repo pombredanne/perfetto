@@ -72,8 +72,7 @@ class ProducerIPCService : public protos::ProducerPort {
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&) override;
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
-    void OnTracingStart() override;
-    void OnTracingStop() override;
+    void SetupSharedMemory() override;
     void Flush(FlushRequestID,
                const DataSourceInstanceID* data_source_ids,
                size_t num_data_sources) override;

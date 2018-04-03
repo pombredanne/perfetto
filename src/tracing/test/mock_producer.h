@@ -45,8 +45,7 @@ class MockProducer : public Producer {
   void Connect(Service* svc, const std::string& producer_name, uid_t uid = 42);
   void RegisterDataSource(const std::string& name);
   void UnregisterDataSource(const std::string& name);
-  void WaitForTracingEnabled();
-  void WaitForTracingDisabled();
+  void WaitForShmemInitialization();
   void WaitForDataSourceStart(const std::string& name);
   void WaitForDataSourceStop(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(
@@ -61,8 +60,7 @@ class MockProducer : public Producer {
   MOCK_METHOD2(CreateDataSourceInstance,
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
-  MOCK_METHOD0(OnTracingStart, void());
-  MOCK_METHOD0(OnTracingStop, void());
+  MOCK_METHOD0(SetupSharedMemory, void());
   MOCK_METHOD3(Flush,
                void(FlushRequestID, const DataSourceInstanceID*, size_t));
 

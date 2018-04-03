@@ -51,7 +51,7 @@ class MockConsumer : public Consumer {
   // Consumer implementation.
   MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
-  MOCK_METHOD0(OnTracingStop, void());
+  MOCK_METHOD0(OnTracingDisabled, void());
   MOCK_METHOD2(OnTraceData,
                void(std::vector<TracePacket>* /*packets*/, bool /*has_more*/));
 

@@ -63,8 +63,8 @@ std::tuple<char*, size_t> TracePacket::GetProtoPreamble() {
   return std::make_tuple(&preamble_[0], preamble_size);
 }
 
-std::unique_ptr<::google::protobuf::io::ZeroCopyInputStream>
-TracePacket::CreateSlicedInputStream() {
+std::unique_ptr<TracePacket::ZeroCopyInputStream>
+TracePacket::CreateSlicedInputStream() const {
   return std::unique_ptr<ZeroCopyInputStream>(
       new SlicedProtobufInputStream(&slices_));
 }

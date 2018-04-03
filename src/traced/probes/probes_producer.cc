@@ -249,8 +249,7 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   watchdogs_.erase(id);
 }
 
-void ProbesProducer::OnTracingStart() {}
-void ProbesProducer::OnTracingStop() {}
+void ProbesProducer::SetupSharedMemory() {}
 
 void ProbesProducer::Flush(FlushRequestID flush_request_id,
                            const DataSourceInstanceID* data_source_ids,

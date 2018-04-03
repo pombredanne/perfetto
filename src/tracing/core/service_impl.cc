@@ -366,17 +366,11 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     return;
   }
 
-  // Note: OnTracingStart() is different for the producer and the consumer. From
-  // a producer's viewpoint, tracing is stopped when all its data sources are
-  // torn down for *all* the active tracing sessions. From a consumer's
-  // viewpoint, tracing is stopped when all the data sources for *the session*
-  // are torn down.
-
   for (const auto& data_source_inst : tracing_session->data_source_instances) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
-    producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
+    producer->TearDownDataSource(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
 
@@ -389,7 +383,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
 
   if (tracing_session->tracing_enabled) {
     tracing_session->tracing_enabled = false;
-    tracing_session->consumer->NotifyOnTracingStop();
+    tracing_session->consumer->NotifyOnTracingDisabled();
   }
 
   // Deliberately NOT removing the session from |tracing_session_|, it's still
@@ -767,7 +761,7 @@ void ServiceImpl::UnregisterDataSource(ProducerID producer_id,
     for (auto it = ds_instances.begin(); it != ds_instances.end();) {
       if (it->first == producer_id && it->second.data_source_name == name) {
         DataSourceInstanceID ds_inst_id = it->second.instance_id;
-        producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
+        producer->TearDownDataSource(ds_inst_id);
         it = ds_instances.erase(it);
       } else {
         ++it;
@@ -843,8 +837,6 @@ void ServiceImpl::CreateDataSourceInstance(
   tracing_session->data_source_instances.emplace(
       producer->id_,
       DataSourceInstance{inst_id, data_source.descriptor.name()});
-  auto it_and_inserted = producer->data_source_instances_.insert(inst_id);
-  PERFETTO_DCHECK(it_and_inserted.second);
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
@@ -867,7 +859,7 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->OnTracingStart();
+    producer->SetupSharedMemory();
     UpdateMemoryGuardrail();
   }
   producer->CreateDataSourceInstance(inst_id, ds_config);
@@ -1090,12 +1082,12 @@ ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   consumer_->OnDisconnect();
 }
 
-void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingStop() {
+void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingDisabled() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->consumer_->OnTracingStop();
+      weak_this->consumer_->OnTracingDisabled();
   });
 }
 
@@ -1103,7 +1095,7 @@ void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg,
                                                       base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
-    NotifyOnTracingStop();
+    NotifyOnTracingDisabled();
 }
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
@@ -1267,25 +1259,16 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
   return shared_buffer_page_size_kb_;
 }
 
-void ServiceImpl::ProducerEndpointImpl::TearDownDataSourceAndMaybeStopTracing(
+void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
     DataSourceInstanceID ds_inst_id) {
-  size_t num_erased = data_source_instances_.erase(ds_inst_id);
-  // If all data sources for the producer have been disabled, tell the producer
-  // that tracing is stopped for it. This does NOT mean that the tracing session
-  // has ended, as there might be other data sources still enabled in other
-  // producers.
-  bool should_stop = num_erased && data_source_instances_.empty();
+  // TODO(primiano): When we'll support tearing down the SMB, at this point we
+  // should send the Producer an OnTracingDisabled if all its data sources
+  // have been disabled (see b/77532839 and aosp/655179 PS1).
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
+  task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
       weak_this->producer_->TearDownDataSourceInstance(ds_inst_id);
   });
-  if (should_stop) {
-    task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
-      if (weak_this)
-        weak_this->producer_->OnTracingStop();
-    });
-  }
 }
 
 SharedMemoryArbiterImpl*
@@ -1305,11 +1288,11 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-void ServiceImpl::ProducerEndpointImpl::OnTracingStart() {
+void ServiceImpl::ProducerEndpointImpl::SetupSharedMemory() {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->producer_->OnTracingStart();
+      weak_this->producer_->SetupSharedMemory();
   });
 }
 

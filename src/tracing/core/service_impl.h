@@ -71,12 +71,12 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
-    void OnTracingStart();
+    void SetupSharedMemory();
     void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&);
     void NotifyFlushComplete(FlushRequestID) override;
-    void TearDownDataSourceAndMaybeStopTracing(DataSourceInstanceID);
+    void TearDownDataSource(DataSourceInstanceID);
     SharedMemory* shared_memory() const override;
     size_t shared_buffer_page_size_kb() const override;
 
@@ -97,13 +97,11 @@ class ServiceImpl : public Service {
     SharedMemoryABI shmem_abi_;
     size_t shared_memory_size_hint_bytes_ = 0;
     const std::string name_;
-    std::set<DataSourceInstanceID> data_source_instances_;
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
-
-    base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;
     PERFETTO_THREAD_CHECKER(thread_checker_)
+    base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
 
   // The implementation behind the service endpoint exposed to each consumer.
@@ -112,7 +110,7 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl(ServiceImpl*, base::TaskRunner*, Consumer*);
     ~ConsumerEndpointImpl() override;
 
-    void NotifyOnTracingStop();
+    void NotifyOnTracingDisabled();
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // Service::ConsumerEndpoint implementation.
@@ -131,10 +129,8 @@ class ServiceImpl : public Service {
     ServiceImpl* const service_;
     Consumer* const consumer_;
     TracingSessionID tracing_session_id_ = 0;
-
     PERFETTO_THREAD_CHECKER(thread_checker_)
-
-    base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
+    base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
 
   explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,
