@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_WATCHDOG_H_
-#define INCLUDE_PERFETTO_BASE_WATCHDOG_H_
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
 
-#include "perfetto/base/build_config.h"
+package perfetto.protos;
 
-#if (PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||    \
-     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)) && \
-    !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
-#include "perfetto/base/watchdog_posix.h"
-#else
-#include "perfetto/base/watchdog_noop.h"
-#endif
+// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
+// to reflect changes in the corresponding C++ headers.
 
-#endif  // INCLUDE_PERFETTO_BASE_WATCHDOG_H_
+message ProcessStatsConfig {
+  enum Quirks {
+    QUIRKS_UNSPECIFIED = 0;
+    DISABLE_INITIAL_DUMP = 1;
+    // TODO(taylori) Not implemented.
+    DISABLE_ON_DEMAND = 2;
+  }
+
+  repeated Quirks quirks = 1;
+}

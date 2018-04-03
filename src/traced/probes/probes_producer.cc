@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 #include <sys/stat.h>
+
+#include <algorithm>
 #include <queue>
 #include <string>
 
@@ -78,13 +80,31 @@ void ProbesProducer::OnConnect() {
 
 void ProbesProducer::OnDisconnect() {
   PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
-  state_ = kNotConnected;
   PERFETTO_LOG("Disconnected from tracing service");
-  IncreaseConnectionBackoff();
+  if (state_ == kConnected)
+    return task_runner_->PostTask([this] { this->Restart(); });
 
-  // TODO(hjd): Erase all sinks and add e2e test for this.
+  state_ = kNotConnected;
+  IncreaseConnectionBackoff();
   task_runner_->PostDelayedTask([this] { this->Connect(); },
                                 connection_backoff_ms_);
+}
+
+void ProbesProducer::Restart() {
+  // We lost the connection with the tracing service. At this point we need
+  // to reset all the data sources. Trying to handle that manually is going to
+  // be error prone. What we do here is simply desroying the instance and
+  // recreating it again.
+  // TODO(hjd): Add e2e test for this.
+
+  base::TaskRunner* task_runner = task_runner_;
+  const char* socket_name = socket_name_;
+
+  // Invoke destructor and then the constructor again.
+  this->~ProbesProducer();
+  new (this) ProbesProducer();
+
+  ConnectWithRetries(socket_name, task_runner);
 }
 
 void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID instance_id,
@@ -206,6 +226,13 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
       new ProcessStatsDataSource(session_id, std::move(trace_writer)));
   auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
   PERFETTO_DCHECK(it_and_inserted.second);
+  if (std::find(config.process_stats_config().quirks().begin(),
+                config.process_stats_config().quirks().end(),
+                ProcessStatsConfig::DISABLE_INITIAL_DUMP) !=
+      config.process_stats_config().quirks().end()) {
+    PERFETTO_DLOG("Initial process tree dump is disabled.");
+    return;
+  }
   it_and_inserted.first->second->WriteAllProcesses();
 }
 
