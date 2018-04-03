@@ -73,7 +73,6 @@ class ProducerIPCService : public protos::ProducerPort {
                                   const DataSourceConfig&) override;
     void TearDownDataSourceInstance(DataSourceInstanceID) override;
     void OnTracingStart() override;
-    void OnTracingStop() override;
 
     // The interface obtained from the core service business logic through
     // Service::ConnectProducer(this). This allows to invoke methods for a

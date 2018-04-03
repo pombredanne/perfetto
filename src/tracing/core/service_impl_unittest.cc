@@ -123,7 +123,7 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  producer->WaitForTracingDisabled();
+  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 }
 
@@ -156,7 +156,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
   consumer->DisableTracing();
   consumer->FreeBuffers();
   producer->WaitForDataSourceStop("data_source");
-  producer->WaitForTracingDisabled();
+  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 
   trace_config.set_lockdown_mode(
@@ -172,7 +172,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  producer->WaitForTracingDisabled();
+  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 }
 
@@ -197,7 +197,7 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   // teardown.
   consumer.reset();
   producer->WaitForDataSourceStop("data_source");
-  producer->WaitForTracingDisabled();
+  // producer->WaitForTracingDisabled();
 }
 
 TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
@@ -302,7 +302,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  producer->WaitForTracingDisabled();
+  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 
   // Verify the contents of the file.

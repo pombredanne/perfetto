@@ -46,7 +46,6 @@ class MockProducer : public Producer {
   void RegisterDataSource(const std::string& name);
   void UnregisterDataSource(const std::string& name);
   void WaitForTracingEnabled();
-  void WaitForTracingDisabled();
   void WaitForDataSourceStart(const std::string& name);
   void WaitForDataSourceStop(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(
@@ -61,7 +60,6 @@ class MockProducer : public Producer {
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
   MOCK_METHOD0(OnTracingStart, void());
-  MOCK_METHOD0(OnTracingStop, void());
 
  private:
   base::TestTaskRunner* const task_runner_;

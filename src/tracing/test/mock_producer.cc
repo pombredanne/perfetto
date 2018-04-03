@@ -72,15 +72,6 @@ void MockProducer::WaitForTracingEnabled() {
   task_runner_->RunUntilCheckpoint(checkpoint_name);
 }
 
-void MockProducer::WaitForTracingDisabled() {
-  static int i = 0;
-  auto checkpoint_name =
-      "on_tracing_disabled_" + producer_name_ + "_" + std::to_string(i++);
-  auto on_tracing_disabled = task_runner_->CreateCheckpoint(checkpoint_name);
-  EXPECT_CALL(*this, OnTracingStop()).WillOnce(Invoke(on_tracing_disabled));
-  task_runner_->RunUntilCheckpoint(checkpoint_name);
-}
-
 void MockProducer::WaitForDataSourceStart(const std::string& name) {
   static int i = 0;
   auto checkpoint_name = "on_ds_start_" + name + "_" + std::to_string(i++);

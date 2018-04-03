@@ -50,7 +50,6 @@ class FakeProducer : public Producer {
                                 const DataSourceConfig& source_config) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
   void OnTracingStart() override;
-  void OnTracingStop() override;
 
  private:
   void Shutdown();

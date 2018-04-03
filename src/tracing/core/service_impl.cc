@@ -375,7 +375,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
-    producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
+    producer->TearDownDataSource(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
 
@@ -670,7 +670,7 @@ void ServiceImpl::UnregisterDataSource(ProducerID producer_id,
     for (auto it = ds_instances.begin(); it != ds_instances.end();) {
       if (it->first == producer_id && it->second.data_source_name == name) {
         DataSourceInstanceID ds_inst_id = it->second.instance_id;
-        producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
+        producer->TearDownDataSource(ds_inst_id);
         it = ds_instances.erase(it);
       } else {
         ++it;
@@ -746,8 +746,6 @@ void ServiceImpl::CreateDataSourceInstance(
   tracing_session->data_source_instances.emplace(
       producer->id_,
       DataSourceInstance{inst_id, data_source.descriptor.name()});
-  auto it_and_inserted = producer->data_source_instances_.insert(inst_id);
-  PERFETTO_DCHECK(it_and_inserted.second);
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
@@ -1156,25 +1154,16 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
   return shared_buffer_page_size_kb_;
 }
 
-void ServiceImpl::ProducerEndpointImpl::TearDownDataSourceAndMaybeStopTracing(
+void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
     DataSourceInstanceID ds_inst_id) {
-  size_t num_erased = data_source_instances_.erase(ds_inst_id);
-  // If all data sources for the producer have been disabled, tell the producer
-  // that tracing is stopped for it. This does NOT mean that the tracing session
-  // has ended, as there might be other data sources still enabled in other
-  // producers.
-  bool should_stop = num_erased && data_source_instances_.empty();
+  // TODO(primiano): When we'll support tearing down the SMB, at this point we
+  // should send the Producer an OnTracingStop if all its data sources
+  // have been disabled (see aosp/655179 PS1).
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
-  task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
+  task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
       weak_this->producer_->TearDownDataSourceInstance(ds_inst_id);
   });
-  if (should_stop) {
-    task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
-      if (weak_this)
-        weak_this->producer_->OnTracingStop();
-    });
-  }
 }
 
 SharedMemoryArbiterImpl*

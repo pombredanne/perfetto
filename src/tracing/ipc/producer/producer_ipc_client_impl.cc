@@ -138,11 +138,6 @@ void ProducerIPCClientImpl::OnServiceRequest(
     return;
   }
 
-  if (cmd.cmd_case() == protos::GetAsyncCommandResponse::kOnTracingStop) {
-    // TODO (taylori) Tear down the shm.
-    return;
-  }
-
   PERFETTO_DLOG("Unknown async request %d received from tracing service",
                 cmd.cmd_case());
 }

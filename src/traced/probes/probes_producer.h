@@ -48,7 +48,6 @@ class ProbesProducer : public Producer {
                                 const DataSourceConfig&) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
   void OnTracingStart() override;
-  void OnTracingStop() override;
 
   // Our Impl
   void ConnectWithRetries(const char* socket_name,

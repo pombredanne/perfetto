@@ -250,7 +250,6 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
 }
 
 void ProbesProducer::OnTracingStart() {}
-void ProbesProducer::OnTracingStop() {}
 
 void ProbesProducer::ConnectWithRetries(const char* socket_name,
                                         base::TaskRunner* task_runner) {

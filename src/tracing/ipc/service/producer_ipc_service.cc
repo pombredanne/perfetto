@@ -241,8 +241,4 @@ void ProducerIPCService::RemoteProducer::OnTracingStart() {
   async_producer_commands.Resolve(std::move(cmd));
 }
 
-void ProducerIPCService::RemoteProducer::OnTracingStop() {
-  // TODO(taylori): Implement.
-}
-
 }  // namespace perfetto
