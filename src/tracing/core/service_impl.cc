@@ -361,16 +361,21 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
   if (!tracing_session) {
     // Can happen if the consumer calls this before EnableTracing() or after
     // FreeBuffers().
-    PERFETTO_DLOG("Couldn't find tracing session %" PRIu64, tsid);
+    PERFETTO_DLOG("DisableTracing() failed, invalid session ID %" PRIu64, tsid);
     return;
   }
+
+  // Note: OnTracingStart() is different for the producer and the consumer. From
+  // a producer's viewpoint, tracing is stopped when all its data sources are
+  // torn down for *all* the active tracing sessions. From a consumer's
+  // viewpoint, tracing is stopped when all the data sources for *the session*
+  // are torn down.
 
   for (const auto& data_source_inst : tracing_session->data_source_instances) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
-    PERFETTO_DCHECK(producer);
-    producer->producer_->TearDownDataSourceInstance(ds_inst_id);
+    producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
 
@@ -598,7 +603,7 @@ void ServiceImpl::FreeBuffers(TracingSessionID tsid) {
   PERFETTO_DLOG("Freeing buffers for session %" PRIu64, tsid);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session) {
-    PERFETTO_DLOG("Cannot FreeBuffers(): no tracing session is active");
+    PERFETTO_DLOG("FreeBuffers() failed, invalid session ID %" PRIu64, tsid);
     return;  // TODO(primiano): signal failure?
   }
   DisableTracing(tsid);
@@ -660,17 +665,18 @@ void ServiceImpl::UnregisterDataSource(ProducerID producer_id,
   PERFETTO_CHECK(producer_id);
   ProducerEndpointImpl* producer = GetProducer(producer_id);
   PERFETTO_DCHECK(producer);
-  for (auto& session : tracing_sessions_) {
-    auto it = session.second.data_source_instances.begin();
-    while (it != session.second.data_source_instances.end()) {
+  for (auto& kv : tracing_sessions_) {
+    auto& ds_instances = kv.second.data_source_instances;
+    for (auto it = ds_instances.begin(); it != ds_instances.end();) {
       if (it->first == producer_id && it->second.data_source_name == name) {
-        producer->producer_->TearDownDataSourceInstance(it->second.instance_id);
-        it = session.second.data_source_instances.erase(it);
+        DataSourceInstanceID ds_inst_id = it->second.instance_id;
+        producer->TearDownDataSourceAndMaybeStopTracing(ds_inst_id);
+        it = ds_instances.erase(it);
       } else {
         ++it;
       }
-    }
-  }
+    }  // for (data_source_instances)
+  }    // for (tracing_session)
 
   for (auto it = data_sources_.begin(); it != data_sources_.end(); ++it) {
     if (it->second.producer_id == producer_id &&
@@ -740,6 +746,8 @@ void ServiceImpl::CreateDataSourceInstance(
   tracing_session->data_source_instances.emplace(
       producer->id_,
       DataSourceInstance{inst_id, data_source.descriptor.name()});
+  auto it_and_inserted = producer->data_source_instances_.insert(inst_id);
+  PERFETTO_DCHECK(it_and_inserted.second);
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
@@ -762,10 +770,10 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->producer_->OnTracingStart();
+    producer->OnTracingStart();
     UpdateMemoryGuardrail();
   }
-  producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
+  producer->CreateDataSourceInstance(inst_id, ds_config);
 }
 
 // Note: all the fields % *_trusted ones are untrusted, as in, the Producer
@@ -1003,30 +1011,30 @@ void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg,
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (tracing_session_id_) {
-    service_->DisableTracing(tracing_session_id_);
-  } else {
+  if (!tracing_session_id_) {
     PERFETTO_LOG("Consumer called DisableTracing() but tracing was not active");
+    return;
   }
+  service_->DisableTracing(tracing_session_id_);
 }
 
 void ServiceImpl::ConsumerEndpointImpl::ReadBuffers() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (tracing_session_id_) {
-    service_->ReadBuffers(tracing_session_id_, this);
-  } else {
+  if (!tracing_session_id_) {
     PERFETTO_LOG("Consumer called ReadBuffers() but tracing was not active");
+    return;
   }
+  service_->ReadBuffers(tracing_session_id_, this);
 }
 
 void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (tracing_session_id_) {
-    service_->FreeBuffers(tracing_session_id_);
-    tracing_session_id_ = 0;
-  } else {
+  if (!tracing_session_id_) {
     PERFETTO_LOG("Consumer called FreeBuffers() but tracing was not active");
+    return;
   }
+  service_->FreeBuffers(tracing_session_id_);
+  tracing_session_id_ = 0;
 }
 
 base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>
@@ -1051,11 +1059,8 @@ ServiceImpl::ProducerEndpointImpl::ProducerEndpointImpl(
       service_(service),
       task_runner_(task_runner),
       producer_(producer),
-      name_(producer_name) {
-  // TODO(primiano): make the page-size for the SHM dynamic and find a way to
-  // communicate that to the Producer (add a field to the
-  // InitializeConnectionResponse IPC).
-}
+      name_(producer_name),
+      weak_ptr_factory_(this) {}
 
 ServiceImpl::ProducerEndpointImpl::~ProducerEndpointImpl() {
   service_->DisconnectProducer(id_);
@@ -1151,15 +1156,59 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
   return shared_buffer_page_size_kb_;
 }
 
-std::unique_ptr<TraceWriter>
-ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
+void ServiceImpl::ProducerEndpointImpl::TearDownDataSourceAndMaybeStopTracing(
+    DataSourceInstanceID ds_inst_id) {
+  size_t num_erased = data_source_instances_.erase(ds_inst_id);
+  // If all data sources for the producer have been disabled, tell the producer
+  // that tracing is stopped for it. This does NOT mean that the tracing session
+  // has ended, as there might be other data sources still enabled in other
+  // producers.
+  bool should_stop = num_erased && data_source_instances_.empty();
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
+    if (weak_this)
+      weak_this->producer_->TearDownDataSourceInstance(ds_inst_id);
+  });
+  if (should_stop) {
+    task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
+      if (weak_this)
+        weak_this->producer_->OnTracingStop();
+    });
+  }
+}
+
+SharedMemoryArbiterImpl*
+ServiceImpl::ProducerEndpointImpl::GetOrCreateShmemArbiter() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!inproc_shmem_arbiter_) {
     inproc_shmem_arbiter_.reset(new SharedMemoryArbiterImpl(
         shared_memory_->start(), shared_memory_->size(),
         shared_buffer_page_size_kb_ * 1024, this, task_runner_));
   }
-  return inproc_shmem_arbiter_->CreateTraceWriter(buf_id);
+  return inproc_shmem_arbiter_.get();
+}
+
+std::unique_ptr<TraceWriter>
+ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
+}
+
+void ServiceImpl::ProducerEndpointImpl::OnTracingStart() {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this] {
+    if (weak_this)
+      weak_this->producer_->OnTracingStart();
+  });
+}
+void ServiceImpl::ProducerEndpointImpl::CreateDataSourceInstance(
+    DataSourceInstanceID ds_id,
+    const DataSourceConfig& config) {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, ds_id, config] {
+    if (weak_this)
+      weak_this->producer_->CreateDataSourceInstance(ds_id, std::move(config));
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////
