@@ -450,7 +450,13 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint8ToUint32:
+      PERFETTO_CHECK(sizeof(uint8_t) <= field.ftrace_size);
+      ReadIntoVarInt<uint8_t>(field_start, field_id, message);
+      return true;
     case kUint16ToUint32:
+      PERFETTO_CHECK(sizeof(uint16_t) <= field.ftrace_size);
+      ReadIntoVarInt<uint16_t>(field_start, field_id, message);
+      return true;
     case kUint32ToUint32:
     case kUint32ToUint64:
       PERFETTO_CHECK(sizeof(uint32_t) <= field.ftrace_size);
@@ -461,7 +467,13 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
     case kInt8ToInt32:
+      PERFETTO_CHECK(sizeof(int8_t) <= field.ftrace_size);
+      ReadIntoVarInt<int8_t>(field_start, field_id, message);
+      return true;
     case kInt16ToInt32:
+      PERFETTO_CHECK(sizeof(int16_t) <= field.ftrace_size);
+      ReadIntoVarInt<int16_t>(field_start, field_id, message);
+      return true;
     case kInt32ToInt32:
     case kInt32ToInt64:
       PERFETTO_CHECK(sizeof(int32_t) <= field.ftrace_size);
