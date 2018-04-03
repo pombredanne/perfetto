@@ -382,7 +382,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
 
   if (tracing_session->tracing_enabled) {
     tracing_session->tracing_enabled = false;
-    tracing_session->consumer->NotifyOnTracingStop();
+    tracing_session->consumer->NotifyOnTracingDisabled();
   }
 
   // Deliberately NOT removing the session from |tracing_session_|, it's still
@@ -985,12 +985,12 @@ ServiceImpl::ConsumerEndpointImpl::~ConsumerEndpointImpl() {
   consumer_->OnDisconnect();
 }
 
-void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingStop() {
+void ServiceImpl::ConsumerEndpointImpl::NotifyOnTracingDisabled() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->consumer_->OnTracingStop();
+      weak_this->consumer_->OnTracingDisabled();
   });
 }
 
@@ -998,7 +998,7 @@ void ServiceImpl::ConsumerEndpointImpl::EnableTracing(const TraceConfig& cfg,
                                                       base::ScopedFile fd) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!service_->EnableTracing(this, cfg, std::move(fd)))
-    NotifyOnTracingStop();
+    NotifyOnTracingDisabled();
 }
 
 void ServiceImpl::ConsumerEndpointImpl::DisableTracing() {
@@ -1151,8 +1151,8 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
 void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
     DataSourceInstanceID ds_inst_id) {
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
-  // should send the Producer an OnTracingStop if all its data sources
-  // have been disabled (see aosp/655179 PS1).
+  // should send the Producer an OnTracingDisabled if all its data sources
+  // have been disabled (see b/77532839 and aosp/655179 PS1).
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)

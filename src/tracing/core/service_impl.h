@@ -98,8 +98,8 @@ class ServiceImpl : public Service {
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
-    base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;
     PERFETTO_THREAD_CHECKER(thread_checker_)
+    base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
 
   // The implementation behind the service endpoint exposed to each consumer.
@@ -108,7 +108,7 @@ class ServiceImpl : public Service {
     ConsumerEndpointImpl(ServiceImpl*, base::TaskRunner*, Consumer*);
     ~ConsumerEndpointImpl() override;
 
-    void NotifyOnTracingStop();
+    void NotifyOnTracingDisabled();
     base::WeakPtr<ConsumerEndpointImpl> GetWeakPtr();
 
     // Service::ConsumerEndpoint implementation.
@@ -126,10 +126,8 @@ class ServiceImpl : public Service {
     ServiceImpl* const service_;
     Consumer* const consumer_;
     TracingSessionID tracing_session_id_ = 0;
-
     PERFETTO_THREAD_CHECKER(thread_checker_)
-
-    base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;
+    base::WeakPtrFactory<ConsumerEndpointImpl> weak_ptr_factory_;  // Keep last.
   };
 
   explicit ServiceImpl(std::unique_ptr<SharedMemory::Factory>,

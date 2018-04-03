@@ -63,7 +63,7 @@ void MockProducer::UnregisterDataSource(const std::string& name) {
   service_endpoint_->UnregisterDataSource(name);
 }
 
-void MockProducer::WaitForShmemInitialized() {
+void MockProducer::WaitForShmemInitialization() {
   static int i = 0;
   auto checkpoint_name =
       "on_shmem_initialized_" + producer_name_ + "_" + std::to_string(i++);

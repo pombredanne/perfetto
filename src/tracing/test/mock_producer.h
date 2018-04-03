@@ -45,7 +45,7 @@ class MockProducer : public Producer {
   void Connect(Service* svc, const std::string& producer_name, uid_t uid = 42);
   void RegisterDataSource(const std::string& name);
   void UnregisterDataSource(const std::string& name);
-  void WaitForShmemInitialized();
+  void WaitForShmemInitialization();
   void WaitForDataSourceStart(const std::string& name);
   void WaitForDataSourceStop(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(

@@ -118,7 +118,7 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 
   consumer->DisableTracing();
@@ -142,7 +142,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
@@ -184,7 +184,7 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting the consumer while tracing should trigger data source
@@ -207,7 +207,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting and reconnecting a producer with a matching data source.
@@ -216,7 +216,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer_2");
   producer->RegisterDataSource("data_source");
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 }
 
@@ -267,7 +267,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
-  producer->WaitForShmemInitialized();
+  producer->WaitForShmemInitialization();
   producer->WaitForDataSourceStart("data_source");
 
   static const char kPayload[] = "1234567890abcdef-";
