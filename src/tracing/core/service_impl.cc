@@ -365,12 +365,6 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     return;
   }
 
-  // Note: OnTracingStart() is different for the producer and the consumer. From
-  // a producer's viewpoint, tracing is stopped when all its data sources are
-  // torn down for *all* the active tracing sessions. From a consumer's
-  // viewpoint, tracing is stopped when all the data sources for *the session*
-  // are torn down.
-
   for (const auto& data_source_inst : tracing_session->data_source_instances) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
@@ -768,7 +762,7 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->OnTracingStart();
+    producer->SetupSharedMemory();
     UpdateMemoryGuardrail();
   }
   producer->CreateDataSourceInstance(inst_id, ds_config);
@@ -1183,13 +1177,14 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-void ServiceImpl::ProducerEndpointImpl::OnTracingStart() {
+void ServiceImpl::ProducerEndpointImpl::SetupSharedMemory() {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->producer_->OnTracingStart();
+      weak_this->producer_->SetupSharedMemory();
   });
 }
+
 void ServiceImpl::ProducerEndpointImpl::CreateDataSourceInstance(
     DataSourceInstanceID ds_id,
     const DataSourceConfig& config) {

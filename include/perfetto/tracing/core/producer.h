@@ -78,7 +78,7 @@ class Producer {
 
   // Called by the Service after OnConnect but before the first DataSource is
   // created. Can be used for any setup required before tracing begins.
-  virtual void OnTracingStart() = 0;
+  virtual void SetupSharedMemory() = 0;
 };
 
 }  // namespace perfetto

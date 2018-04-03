@@ -118,12 +118,11 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 }
 
@@ -143,7 +142,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
@@ -156,15 +155,11 @@ TEST_F(ServiceImplTest, LockdownMode) {
   consumer->DisableTracing();
   consumer->FreeBuffers();
   producer->WaitForDataSourceStop("data_source");
-  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_CLEAR);
   consumer->EnableTracing(trace_config);
-  // TODO(primiano): this depends on the not-yet-implemented OnTracingStop()
-  // with SHM teardown for the producer.
-  // producer->WaitForTracingEnabled();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid2 = CreateMockProducer();
@@ -172,7 +167,6 @@ TEST_F(ServiceImplTest, LockdownMode) {
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 }
 
@@ -190,14 +184,13 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting the consumer while tracing should trigger data source
   // teardown.
   consumer.reset();
   producer->WaitForDataSourceStop("data_source");
-  // producer->WaitForTracingDisabled();
 }
 
 TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
@@ -214,7 +207,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting and reconnecting a producer with a matching data source.
@@ -223,7 +216,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer_2");
   producer->RegisterDataSource("data_source");
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 }
 
@@ -274,7 +267,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
-  producer->WaitForTracingEnabled();
+  producer->WaitForShmemInitialized();
   producer->WaitForDataSourceStart("data_source");
 
   static const char kPayload[] = "1234567890abcdef-";
@@ -302,7 +295,6 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
-  // producer->WaitForTracingDisabled();
   consumer->WaitForTracingDisabled();
 
   // Verify the contents of the file.

@@ -60,7 +60,7 @@ class MockProducer : public Producer {
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
   MOCK_METHOD0(uid, uid_t());
-  MOCK_METHOD0(OnTracingStart, void());
+  MOCK_METHOD0(SetupSharedMemory, void());
 };
 
 class MockConsumer : public Consumer {
@@ -165,7 +165,7 @@ TEST_F(TracingIntegrationTest, WithIPCTransport) {
   BufferID global_buf_id = 0;
   auto on_create_ds_instance =
       task_runner_->CreateCheckpoint("on_create_ds_instance");
-  EXPECT_CALL(producer_, OnTracingStart());
+  EXPECT_CALL(producer_, SetupSharedMemory());
   EXPECT_CALL(producer_, CreateDataSourceInstance(_, _))
       .WillOnce(
           Invoke([on_create_ds_instance, &ds_iid, &global_buf_id](
@@ -279,7 +279,7 @@ TEST_F(TracingIntegrationTest, WriteIntoFile) {
   BufferID global_buf_id = 0;
   auto on_create_ds_instance =
       task_runner_->CreateCheckpoint("on_create_ds_instance");
-  EXPECT_CALL(producer_, OnTracingStart());
+  EXPECT_CALL(producer_, SetupSharedMemory());
   EXPECT_CALL(producer_, CreateDataSourceInstance(_, _))
       .WillOnce(Invoke([on_create_ds_instance, &global_buf_id](
                            DataSourceInstanceID, const DataSourceConfig& cfg) {

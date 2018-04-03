@@ -63,12 +63,12 @@ void MockProducer::UnregisterDataSource(const std::string& name) {
   service_endpoint_->UnregisterDataSource(name);
 }
 
-void MockProducer::WaitForTracingEnabled() {
+void MockProducer::WaitForShmemInitialized() {
   static int i = 0;
   auto checkpoint_name =
-      "on_tracing_enabled_" + producer_name_ + "_" + std::to_string(i++);
+      "on_shmem_initialized_" + producer_name_ + "_" + std::to_string(i++);
   auto on_tracing_enabled = task_runner_->CreateCheckpoint(checkpoint_name);
-  EXPECT_CALL(*this, OnTracingStart()).WillOnce(Invoke(on_tracing_enabled));
+  EXPECT_CALL(*this, SetupSharedMemory()).WillOnce(Invoke(on_tracing_enabled));
   task_runner_->RunUntilCheckpoint(checkpoint_name);
 }
 
