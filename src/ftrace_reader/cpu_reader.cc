@@ -459,37 +459,29 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint8ToUint32:
-      PERFETTO_DCHECK(sizeof(uint8_t) <= field.ftrace_size);
       ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kUint16ToUint32:
-      PERFETTO_DCHECK(sizeof(uint16_t) <= field.ftrace_size);
       ReadIntoVarInt<uint16_t>(field_start, field_id, message);
       return true;
     case kUint32ToUint32:
     case kUint32ToUint64:
-      PERFETTO_DCHECK(sizeof(uint32_t) <= field.ftrace_size);
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kUint64ToUint64:
-      PERFETTO_DCHECK(sizeof(uint64_t) <= field.ftrace_size);
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
     case kInt8ToInt32:
-      PERFETTO_DCHECK(sizeof(int8_t) <= field.ftrace_size);
       ReadIntoVarInt<int8_t>(field_start, field_id, message);
       return true;
     case kInt16ToInt32:
-      PERFETTO_DCHECK(sizeof(int16_t) <= field.ftrace_size);
       ReadIntoVarInt<int16_t>(field_start, field_id, message);
       return true;
     case kInt32ToInt32:
     case kInt32ToInt64:
-      PERFETTO_DCHECK(sizeof(int32_t) <= field.ftrace_size);
       ReadIntoVarInt<int32_t>(field_start, field_id, message);
       return true;
     case kInt64ToInt64:
-      PERFETTO_DCHECK(sizeof(int64_t) <= field.ftrace_size);
       ReadIntoVarInt<int64_t>(field_start, field_id, message);
       return true;
     case kFixedCStringToString:
@@ -503,31 +495,24 @@ bool CpuReader::ParseField(const Field& field,
       // TODO(hjd): Figure out how to read these.
       return true;
     case kBoolToUint32:
-      PERFETTO_DCHECK(sizeof(uint32_t) <= field.ftrace_size);
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
-      PERFETTO_DCHECK(sizeof(uint32_t) <= field.ftrace_size);
       ReadInode<uint32_t>(field_start, field_id, message, metadata);
       return true;
     case kInode64ToUint64:
-      PERFETTO_DCHECK(sizeof(uint64_t) <= field.ftrace_size);
       ReadInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
     case kPid32ToInt32:
-      PERFETTO_DCHECK(sizeof(int32_t) <= field.ftrace_size);
       ReadPid(field_start, field_id, message, metadata);
       return true;
     case kCommonPid32ToInt32:
-      PERFETTO_DCHECK(sizeof(int32_t) <= field.ftrace_size);
       ReadCommonPid(field_start, field_id, message, metadata);
       return true;
     case kDevId32ToUint64:
-      PERFETTO_DCHECK(sizeof(uint64_t) <= field.ftrace_size);
       ReadDevId<uint32_t>(field_start, field_id, message, metadata);
       return true;
     case kDevId64ToUint64:
-      PERFETTO_DCHECK(sizeof(uint64_t) <= field.ftrace_size);
       ReadDevId<uint64_t>(field_start, field_id, message, metadata);
       return true;
   }
