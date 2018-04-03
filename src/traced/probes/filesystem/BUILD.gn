@@ -45,6 +45,7 @@ source_set("unittests") {
     "../../../../gn:gtest_deps",
   ]
   sources = [
+    "file_scanner_unittest.cc",
     "fs_mount_unittest.cc",
     "lru_inode_cache_unittest.cc",
     "prefix_finder_unittest.cc",
