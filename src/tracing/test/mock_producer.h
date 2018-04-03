@@ -42,7 +42,10 @@ class MockProducer : public Producer {
   explicit MockProducer(base::TestTaskRunner*);
   ~MockProducer() override;
 
-  void Connect(Service* svc, const std::string& producer_name, uid_t uid = 42);
+  void Connect(Service* svc,
+               const std::string& producer_name,
+               uid_t uid = 42,
+               size_t shared_memory_size_hint_bytes = 0);
   void RegisterDataSource(const std::string& name);
   void UnregisterDataSource(const std::string& name);
   void WaitForShmemInitialization();
@@ -50,6 +53,9 @@ class MockProducer : public Producer {
   void WaitForDataSourceStop(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(
       const std::string& data_source_name);
+
+  // If |writer_to_flush| != nullptr does NOT reply to the flush request.
+  // If |writer_to_flush| == nullptr does NOT reply to the flush request.
   void WaitForFlush(TraceWriter* writer_to_flush);
 
   Service::ProducerEndpoint* endpoint() { return service_endpoint_.get(); }

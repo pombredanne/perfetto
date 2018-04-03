@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/temp_file.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -41,6 +42,7 @@
 
 using ::testing::_;
 using ::testing::Contains;
+using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
@@ -50,6 +52,10 @@ using ::testing::Property;
 using ::testing::StrictMock;
 
 namespace perfetto {
+
+namespace {
+constexpr size_t kDefaultShmSizeKb = ServiceImpl::kDefaultShmSize / 1024;
+}  // namespace
 
 class ServiceImplTest : public testing::Test {
  public:
@@ -71,6 +77,19 @@ class ServiceImplTest : public testing::Test {
         new StrictMock<MockConsumer>(&task_runner));
   }
 
+  ProducerID* last_producer_id() { return &svc->last_producer_id_; }
+
+  uid_t GetProducerUid(ProducerID producer_id) {
+    return svc->GetProducer(producer_id)->uid_;
+  }
+
+  size_t GetNumPendingFlushes() {
+    ServiceImpl::TracingSession* tracing_session =
+        svc->GetTracingSession(svc->last_tracing_session_id_);
+    EXPECT_NE(nullptr, tracing_session);
+    return tracing_session->pending_flushes.size();
+  }
+
   base::TestTaskRunner task_runner;
   std::unique_ptr<ServiceImpl> svc;
 };
@@ -85,8 +104,8 @@ TEST_F(ServiceImplTest, RegisterAndUnregister) {
   ASSERT_EQ(2u, svc->num_producers());
   ASSERT_EQ(mock_producer_1->endpoint(), svc->GetProducer(1));
   ASSERT_EQ(mock_producer_2->endpoint(), svc->GetProducer(2));
-  ASSERT_EQ(123u, svc->GetProducer(1)->uid_);
-  ASSERT_EQ(456u, svc->GetProducer(2)->uid_);
+  ASSERT_EQ(123u, GetProducerUid(1));
+  ASSERT_EQ(456u, GetProducerUid(2));
 
   mock_producer_1->RegisterDataSource("foo");
   mock_producer_2->RegisterDataSource("bar");
@@ -228,7 +247,7 @@ TEST_F(ServiceImplTest, ProducerIDWrapping) {
                                       this](const std::string& name) {
     producers.emplace_back(CreateMockProducer());
     producers.back()->Connect(svc.get(), "mock_producer_" + name);
-    return svc->last_producer_id_;
+    return *last_producer_id();
   };
 
   // Connect producers 1-4.
@@ -239,7 +258,7 @@ TEST_F(ServiceImplTest, ProducerIDWrapping) {
   producers[1].reset();
   producers[3].reset();
 
-  svc->last_producer_id_ = kMaxProducerID - 1;
+  *last_producer_id() = kMaxProducerID - 1;
   ASSERT_EQ(kMaxProducerID, connect_producer_and_get_id("maxid"));
   ASSERT_EQ(1u, connect_producer_and_get_id("1_again"));
   ASSERT_EQ(3u, connect_producer_and_get_id("3_again"));
@@ -313,6 +332,104 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   }
 }
 
+TEST_F(ServiceImplTest, ProducerShmSizeHintRespected) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  static constexpr size_t kReqSizes[] = {
+      4096,              //  OK.
+      8192,              //  OK.
+      32768,             //  OK.
+      16,                //  Too small.
+      4097,              //  Not a multiple of page size.
+      4096 * 1000000ULL  //  Too big, will be truncated.
+  };
+  static constexpr size_t kExpectedSizesKb[] = {
+      4, 8, 32, kDefaultShmSizeKb, kDefaultShmSizeKb, kDefaultShmSizeKb};
+
+  static constexpr size_t kNumProducers = base::ArraySize(kReqSizes);
+  std::unique_ptr<MockProducer> producer[kNumProducers];
+  for (size_t i = 0; i < kNumProducers; i++) {
+    auto name = "mock_producer_" + std::to_string(i);
+    producer[i] = CreateMockProducer();
+    producer[i]->Connect(svc.get(), name, geteuid(), kReqSizes[i]);
+    producer[i]->RegisterDataSource("data_source");
+  }
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("data_source");
+
+  consumer->EnableTracing(trace_config);
+  size_t actual_shm_sizes_kb[kNumProducers]{};
+  for (size_t i = 0; i < kNumProducers; i++) {
+    producer[i]->WaitForShmemInitialization();
+    producer[i]->WaitForDataSourceStart("data_source");
+    actual_shm_sizes_kb[i] =
+        producer[i]->endpoint()->shared_memory()->size() / 1024;
+  }
+  ASSERT_THAT(actual_shm_sizes_kb, ElementsAreArray(kExpectedSizesKb));
+}
+
+// Test the logic that allows the trace config to set the shm total size and
+// page size from the trace config. Also check that, if the producer specifies
+// a lower hint for the shm size, we respect it.
+TEST_F(ServiceImplTest, ProducerShmSizeAndPageOverriddenByTraceConfig) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+  const size_t kConfigPageSizesKb[] = {16, 16, 4, 0, 16, 8, 3, 4096};
+  const size_t kExpectedPageSizesKb[] = {16, 16, 4, 4, 16, 8, 4, 64};
+
+  const size_t kConfigSizesKb[] = {32, 32, 20, 20, 20, 0, 0, 32};
+  const size_t kHintSizesKb[] = {16, 128, 8, 265, 32, 0, 24, 16};
+  const size_t kExpectedSizesKb[] = {
+      16,                 //  Respect hint (16 KB) which is < config (32 KB).
+      32,                 // Cap at config (32 KB) size.
+      8,                  // Respect hint (8 KB) which is < config (20 KB).
+      20,                 // Hint is invalid (265 KB), use lower config (20 KB).
+      kDefaultShmSizeKb,  // Config (20 KB) not a multiple of page size (16 KB).
+      kDefaultShmSizeKb,  // Both config and hint are zero.
+      24,                 // Config is 0, use hint (64 KB).
+      kDefaultShmSizeKb   // Neither config (32 KB) nor hint (16 KB) are
+                          // multiples of the page size (64 KB).
+  };
+
+  const size_t kNumProducers = base::ArraySize(kHintSizesKb);
+  std::unique_ptr<MockProducer> producer[kNumProducers];
+  for (size_t i = 0; i < kNumProducers; i++) {
+    auto name = "mock_producer_" + std::to_string(i);
+    producer[i] = CreateMockProducer();
+    producer[i]->Connect(svc.get(), name, geteuid(), kHintSizesKb[i] * 1024);
+    producer[i]->RegisterDataSource("data_source");
+  }
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("data_source");
+  for (size_t i = 0; i < kNumProducers; i++) {
+    auto* producer_config = trace_config.add_producers();
+    producer_config->set_producer_name("mock_producer_" + std::to_string(i));
+    producer_config->set_shm_size_kb(kConfigSizesKb[i]);
+    producer_config->set_page_size_kb(kConfigPageSizesKb[i]);
+  }
+
+  consumer->EnableTracing(trace_config);
+  size_t actual_shm_sizes_kb[kNumProducers]{};
+  size_t actual_page_sizes_kb[kNumProducers]{};
+  for (size_t i = 0; i < kNumProducers; i++) {
+    producer[i]->WaitForShmemInitialization();
+    producer[i]->WaitForDataSourceStart("data_source");
+    actual_shm_sizes_kb[i] =
+        producer[i]->endpoint()->shared_memory()->size() / 1024;
+    actual_page_sizes_kb[i] =
+        producer[i]->endpoint()->shared_buffer_page_size_kb();
+  }
+  ASSERT_THAT(actual_page_sizes_kb, ElementsAreArray(kExpectedPageSizesKb));
+  ASSERT_THAT(actual_shm_sizes_kb, ElementsAreArray(kExpectedSizesKb));
+}
+
 TEST_F(ServiceImplTest, ExplicitFlush) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
@@ -337,9 +454,9 @@ TEST_F(ServiceImplTest, ExplicitFlush) {
     tp->set_for_testing()->set_str("payload");
   }
 
-  consumer->Flush();
+  auto flush_request = consumer->Flush();
   producer->WaitForFlush(writer.get());
-  ASSERT_TRUE(consumer->WaitForFlush());
+  ASSERT_TRUE(flush_request.WaitForReply());
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
@@ -380,6 +497,69 @@ TEST_F(ServiceImplTest, ImplicitFlushOnTimedTraces) {
   producer->WaitForDataSourceStop("data_source");
   consumer->WaitForTracingDisabled();
 
+  EXPECT_THAT(
+      consumer->ReadBuffers(),
+      Contains(Property(&protos::TracePacket::for_testing,
+                        Property(&protos::TestEvent::str, Eq("payload")))));
+}
+
+// Tests the monotonic semantic of flush request IDs, i.e., once a producer
+// acks flush request N, all flush requests <= N are considered successful and
+// acked to the consumer.
+TEST_F(ServiceImplTest, BatchFlushes) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  std::unique_ptr<MockProducer> producer = CreateMockProducer();
+  producer->Connect(svc.get(), "mock_producer");
+  producer->RegisterDataSource("data_source");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("data_source");
+
+  consumer->EnableTracing(trace_config);
+  producer->WaitForShmemInitialization();
+  producer->WaitForDataSourceStart("data_source");
+
+  std::unique_ptr<TraceWriter> writer =
+      producer->CreateTraceWriter("data_source");
+  {
+    auto tp = writer->NewTracePacket();
+    tp->set_for_testing()->set_str("payload");
+  }
+
+  auto flush_req_1 = consumer->Flush();
+  auto flush_req_2 = consumer->Flush();
+  auto flush_req_3 = consumer->Flush();
+
+  // We'll deliberately let the 4th flush request timeout. Use a lower timeout
+  // to keep test time short.
+  auto flush_req_4 = consumer->Flush(/*timeout=*/10);
+  ASSERT_EQ(4u, GetNumPendingFlushes());
+
+  // Make the producer reply only to the 3rd flush request.
+  testing::InSequence seq;
+  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 1.
+  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 2.
+  producer->WaitForFlush(writer.get());  // Will reply only to flush id == 3.
+  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 4.
+
+  // Even if the producer explicily replied only to flush ID == 3, all the
+  // previous flushed < 3 should be implicitly acked.
+  ASSERT_TRUE(flush_req_1.WaitForReply());
+  ASSERT_TRUE(flush_req_2.WaitForReply());
+  ASSERT_TRUE(flush_req_3.WaitForReply());
+
+  // At this point flush id == 4 should still be pending and should fail because
+  // of reaching its timeout.
+  ASSERT_EQ(1u, GetNumPendingFlushes());
+  ASSERT_FALSE(flush_req_4.WaitForReply());
+
+  consumer->DisableTracing();
+  producer->WaitForDataSourceStop("data_source");
+  consumer->WaitForTracingDisabled();
   EXPECT_THAT(
       consumer->ReadBuffers(),
       Contains(Property(&protos::TracePacket::for_testing,

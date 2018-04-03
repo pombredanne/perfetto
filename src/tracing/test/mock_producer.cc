@@ -44,9 +44,11 @@ MockProducer::~MockProducer() {
 
 void MockProducer::Connect(Service* svc,
                            const std::string& producer_name,
-                           uid_t uid) {
+                           uid_t uid,
+                           size_t shared_memory_size_hint_bytes) {
   producer_name_ = producer_name;
-  service_endpoint_ = svc->ConnectProducer(this, uid, producer_name);
+  service_endpoint_ = svc->ConnectProducer(this, uid, producer_name,
+                                           shared_memory_size_hint_bytes);
   auto checkpoint_name = "on_producer_connect_" + producer_name;
   auto on_connect = task_runner_->CreateCheckpoint(checkpoint_name);
   EXPECT_CALL(*this, OnConnect()).WillOnce(Invoke(on_connect));
@@ -109,13 +111,15 @@ std::unique_ptr<TraceWriter> MockProducer::CreateTraceWriter(
 }
 
 void MockProducer::WaitForFlush(TraceWriter* writer_to_flush) {
-  EXPECT_CALL(*this, Flush(_, _, _))
-      .WillOnce(
-          Invoke([this, writer_to_flush](FlushRequestID flush_req_id,
-                                         const DataSourceInstanceID*, size_t) {
-            writer_to_flush->Flush();
-            service_endpoint_->NotifyFlushComplete(flush_req_id);
-          }));
+  auto& expected_call = EXPECT_CALL(*this, Flush(_, _, _));
+  if (!writer_to_flush)
+    return;
+  expected_call.WillOnce(
+      Invoke([this, writer_to_flush](FlushRequestID flush_req_id,
+                                     const DataSourceInstanceID*, size_t) {
+        writer_to_flush->Flush();
+        service_endpoint_->NotifyFlushComplete(flush_req_id);
+      }));
 }
 
 }  // namespace perfetto

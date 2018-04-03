@@ -128,6 +128,6 @@ message GetAsyncCommandResponse {
     StartDataSource start_data_source = 1;
     StopDataSource stop_data_source = 2;
     SetupSharedMemory setup_shared_memory = 3;
-    Flush flush = 5;
+    Flush flush = 4;
   }
 }

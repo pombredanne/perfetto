@@ -50,9 +50,7 @@
 namespace perfetto {
 
 namespace {
-constexpr size_t kDefaultShmSize = 256 * 1024ul;
-constexpr size_t kMaxShmSize = 4096 * 1024 * 512ul;
-constexpr size_t kDefaultShmPageSizeKb = base::kPageSize / 1024ul;
+constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 constexpr int kMinWriteIntoFilePeriodMs = 100;
@@ -65,6 +63,10 @@ constexpr uint64_t kMillisPerHour = 3600000;
 constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
 constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
 }  // namespace
+
+// These constants instad are defined in the header because are used by tests.
+constexpr size_t ServiceImpl::kDefaultShmSize;
+constexpr size_t ServiceImpl::kMaxShmSize;
 
 // static
 std::unique_ptr<Service> Service::CreateInstance(
@@ -111,7 +113,7 @@ std::unique_ptr<Service::ProducerEndpoint> ServiceImpl::ConnectProducer(
       id, uid, this, task_runner_, producer, producer_name));
   auto it_and_inserted = producers_.emplace(id, endpoint.get());
   PERFETTO_DCHECK(it_and_inserted.second);
-  shared_memory_size_hint_bytes_ = shared_memory_size_hint_bytes;
+  endpoint->shmem_size_hint_bytes_ = shared_memory_size_hint_bytes;
   task_runner_->PostTask(std::bind(&Producer::OnConnect, endpoint->producer_));
 
   return std::move(endpoint);
@@ -400,7 +402,7 @@ void ServiceImpl::Flush(TracingSessionID tsid,
     return;
   }
 
-  if (tracing_session->pending_flushes.size() > 10000) {
+  if (tracing_session->pending_flushes.size() > 1000) {
     PERFETTO_ELOG("Too many flushes (%zu) pending for the tracing session",
                   tracing_session->pending_flushes.size());
     callback(false);
@@ -840,18 +842,20 @@ void ServiceImpl::CreateDataSourceInstance(
   PERFETTO_DLOG("Starting data source %s with target buffer %" PRIu16,
                 ds_config.name().c_str(), global_id);
   if (!producer->shared_memory()) {
-    producer->shared_buffer_page_size_kb_ = std::min<size_t>(
-        (producer_config.page_size_kb() == 0) ? kDefaultShmPageSizeKb
-                                              : producer_config.page_size_kb(),
-        SharedMemoryABI::kMaxPageSize);
+    // Determine the SMB page size. Must be an integer multiple of 4k.
+    size_t page_size = std::min<size_t>(producer_config.page_size_kb() * 1024,
+                                        SharedMemoryABI::kMaxPageSize);
+    if (page_size < base::kPageSize || page_size % base::kPageSize != 0)
+      page_size = kDefaultShmPageSize;
+    producer->shared_buffer_page_size_kb_ = page_size / 1024;
 
-    size_t shm_size =
-        std::min<size_t>(producer_config.shm_size_kb() * 1024, kMaxShmSize);
-
-    if (shm_size % base::kPageSize || shm_size < base::kPageSize)
-      shm_size = std::min(shared_memory_size_hint_bytes_, kMaxShmSize);
-    if (shm_size % base::kPageSize || shm_size < base::kPageSize ||
-        shm_size == 0)
+    // Determine the SMB size. Must be an integer multiple of the SMB page size.
+    size_t shm_size = producer_config.shm_size_kb() * 1024;
+    if (shm_size == 0)
+      shm_size = kDefaultShmSize;
+    shm_size = std::min<size_t>(shm_size, producer->shmem_size_hint_bytes_);
+    shm_size = std::min<size_t>(shm_size, kMaxShmSize);
+    if (shm_size < page_size || shm_size % page_size)
       shm_size = kDefaultShmSize;
 
     // TODO(primiano): right now Create() will suicide in case of OOM if the
