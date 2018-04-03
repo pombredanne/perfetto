@@ -82,6 +82,14 @@ class Producer {
 
   // Called by the Service after the final DataSource is torn down.
   virtual void OnTracingStop() = 0;
+
+  // Called by the sevice to request the Producer to commit the data of the
+  // given data sources and return their chunks into the shared memory buffer.
+  // The Producer is expected to invoke NotifyFlushComplete(FlushRequestID) on
+  // the Service after the data has been committed.
+  virtual void Flush(FlushRequestID,
+                     const DataSourceInstanceID* data_source_ids,
+                     size_t num_data_sources) = 0;
 };
 
 }  // namespace perfetto

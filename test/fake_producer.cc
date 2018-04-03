@@ -122,4 +122,13 @@ void FakeProducer::OnTracingStart() {}
 
 void FakeProducer::OnTracingStop() {}
 
+void FakeProducer::Flush(FlushRequestID flush_request_id,
+                         const DataSourceInstanceID* data_source_ids,
+                         size_t num_data_sources) {
+  PERFETTO_DCHECK(num_data_sources > 0);
+  if (trace_writer_)
+    trace_writer_->Flush();
+  endpoint_->NotifyFlushComplete(flush_request_id);
+}
+
 }  // namespace perfetto

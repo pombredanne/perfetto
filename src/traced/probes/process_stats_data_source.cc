@@ -65,6 +65,11 @@ void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   }
 }
 
+void ProcessStatsDataSource::Flush() {
+  if (writer_)
+    writer_->Flush();
+}
+
 // static
 void ProcessStatsDataSource::WriteProcess(
     int32_t pid,

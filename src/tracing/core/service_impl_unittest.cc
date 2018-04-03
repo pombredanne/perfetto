@@ -34,13 +34,18 @@
 
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace.pb.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 using ::testing::_;
+using ::testing::Contains;
+using ::testing::Eq;
 using ::testing::InSequence;
 using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
 using ::testing::Mock;
+using ::testing::Property;
 
 namespace {
 
@@ -56,6 +61,8 @@ class MockProducer : public Producer {
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
   MOCK_METHOD0(OnTracingStart, void());
   MOCK_METHOD0(OnTracingStop, void());
+  MOCK_METHOD3(Flush,
+               void(FlushRequestID, const DataSourceInstanceID*, size_t));
 };
 
 class MockConsumer : public Consumer {
@@ -66,8 +73,14 @@ class MockConsumer : public Consumer {
   MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
   MOCK_METHOD0(OnTracingStop, void());
+  MOCK_METHOD2(OnTraceData,
+               void(std::vector<TracePacket>* /*packets*/, bool /*has_more*/));
 
-  void OnTraceData(std::vector<TracePacket> packets, bool has_more) override {}
+  // gtest doesn't support move-only types. This wrapper is here jut to pass
+  // a pointer to the vector (rather than the vector itself) to the mock method.
+  void OnTraceData(std::vector<TracePacket> packets, bool has_more) override {
+    OnTraceData(&packets, has_more);
+  }
 };
 
 }  // namespace
@@ -82,8 +95,133 @@ class ServiceImplTest : public testing::Test {
             .release()));
   }
 
+  void TearDown() override {
+    if (mock_consumer_) {
+      EXPECT_CALL(*mock_consumer_, OnDisconnect());
+      consumer_endpoint_.reset();
+      mock_consumer_.reset();
+    }
+
+    if (mock_producer_) {
+      EXPECT_CALL(*mock_producer_, OnDisconnect());
+      producer_endpoint_.reset();
+      mock_producer_.reset();
+    }
+  }
+
+  void CreateAndConnectMockProducer(const std::string& name, uid_t uid = 42) {
+    if (producer_endpoint_) {
+      EXPECT_CALL(*mock_producer_, OnDisconnect());
+      producer_endpoint_.reset();
+      mock_producer_.reset();
+    }
+    mock_producer_.reset(new MockProducer());
+    producer_endpoint_ = svc->ConnectProducer(mock_producer_.get(), uid, name);
+    std::string checkpoint_name = "on_producer_connect_" + name;
+    auto on_connect = task_runner.CreateCheckpoint(checkpoint_name);
+    EXPECT_CALL(*mock_producer_, OnConnect()).WillOnce(Invoke(on_connect));
+    task_runner.RunUntilCheckpoint(checkpoint_name);
+  }
+
+  void CreateAndConnectMockConsumer() {
+    mock_consumer_.reset(new MockConsumer());
+    consumer_endpoint_ = svc->ConnectConsumer(mock_consumer_.get());
+    auto on_connect = task_runner.CreateCheckpoint("on_consumer_connect");
+    EXPECT_CALL(*mock_consumer_, OnConnect()).WillOnce(Invoke(on_connect));
+    task_runner.RunUntilCheckpoint("on_consumer_connect");
+  }
+
+  void RegisterProducerDataSource(const std::string& name) {
+    DataSourceDescriptor ds_desc;
+    ds_desc.set_name(name);
+    producer_endpoint_->RegisterDataSource(ds_desc);
+    task_runner.RunUntilIdle();
+  }
+
+  void EnableTracingAndWait(
+      const TraceConfig& trace_config,
+      base::ScopedFile write_into_file = base::ScopedFile()) {
+    static int i = 0;
+    std::string checkpoint_name = "on_start_ds_" + std::to_string(i++);
+    auto on_start_ds = task_runner.CreateCheckpoint(checkpoint_name);
+    EXPECT_CALL(*mock_producer_, OnTracingStart());
+    EXPECT_CALL(*mock_producer_, CreateDataSourceInstance(_, _))
+        .WillOnce(Invoke([on_start_ds, this](DataSourceInstanceID,
+                                             const DataSourceConfig& cfg) {
+          producer_buf_id_ = static_cast<BufferID>(cfg.target_buffer());
+          on_start_ds();
+        }));
+    consumer_endpoint_->EnableTracing(trace_config, std::move(write_into_file));
+    task_runner.RunUntilCheckpoint(checkpoint_name);
+    task_runner.RunUntilIdle();  // For EnableTracing() reply to the consumer.
+  }
+
+  bool FlushAndWait(int timeout_ms = 10000) {
+    static int i = 0;
+    std::string checkpoint_name = "on_flush_" + std::to_string(i++);
+    auto on_flush = task_runner.CreateCheckpoint(checkpoint_name);
+    bool flush_res = false;
+    consumer_endpoint_->Flush(timeout_ms, [on_flush, &flush_res](bool success) {
+      flush_res = success;
+      on_flush();
+    });
+    task_runner.RunUntilCheckpoint(checkpoint_name);
+    return flush_res;
+  }
+
+  void BeginWaitTracingDisabled() {
+    auto prod_stop = task_runner.CreateCheckpoint("on_producer_stop");
+    EXPECT_CALL(*mock_producer_, TearDownDataSourceInstance(_));
+    EXPECT_CALL(*mock_producer_, OnTracingStop()).WillOnce(Invoke(prod_stop));
+    auto cons_stop = task_runner.CreateCheckpoint("on_consumer_stop");
+    EXPECT_CALL(*mock_consumer_, OnTracingStop()).WillOnce(Invoke(cons_stop));
+  }
+
+  void EndWaitTracingDisabled() {
+    task_runner.RunUntilCheckpoint("on_producer_stop");
+    task_runner.RunUntilCheckpoint("on_consumer_stop");
+  }
+
+  void WaitTracingDisabled() {
+    BeginWaitTracingDisabled();
+    EndWaitTracingDisabled();
+  }
+
+  void DisableTracingAndWait() {
+    BeginWaitTracingDisabled();
+    consumer_endpoint_->DisableTracing();
+    EndWaitTracingDisabled();
+  }
+
+  std::vector<protos::TracePacket> ReadBuffers() {
+    std::vector<protos::TracePacket> decoded_packets;
+    static int i = 0;
+    std::string checkpoint_name = "on_read_buffers_" + std::to_string(i++);
+    auto on_read_buffers = task_runner.CreateCheckpoint(checkpoint_name);
+    EXPECT_CALL(*mock_consumer_, OnTraceData(_, _))
+        .WillRepeatedly(
+            Invoke([&decoded_packets, on_read_buffers](
+                       std::vector<TracePacket>* packets, bool has_more) {
+              for (TracePacket& packet : *packets) {
+                decoded_packets.emplace_back();
+                protos::TracePacket* decoded_packet = &decoded_packets.back();
+                packet.Decode(decoded_packet);
+              }
+              if (!has_more)
+                on_read_buffers();
+            }));
+    consumer_endpoint_->ReadBuffers();
+    task_runner.RunUntilCheckpoint(checkpoint_name);
+    return decoded_packets;
+  }
+
   base::TestTaskRunner task_runner;
   std::unique_ptr<ServiceImpl> svc;
+  std::unique_ptr<MockProducer> mock_producer_;
+  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_;
+  std::unique_ptr<MockConsumer> mock_consumer_;
+  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint_;
+  BufferID producer_buf_id_ = 0;
 };
 
 TEST_F(ServiceImplTest, RegisterAndUnregister) {
@@ -140,183 +278,106 @@ TEST_F(ServiceImplTest, RegisterAndUnregister) {
 }
 
 TEST_F(ServiceImplTest, EnableAndDisableTracing) {
-  MockProducer mock_producer;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
-  MockConsumer mock_consumer;
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      svc->ConnectConsumer(&mock_consumer);
-
-  InSequence seq;
-  EXPECT_CALL(mock_producer, OnConnect());
-  EXPECT_CALL(mock_consumer, OnConnect());
-  task_runner.RunUntilIdle();
-
-  DataSourceDescriptor ds_desc;
-  ds_desc.set_name("foo");
-  producer_endpoint->RegisterDataSource(ds_desc);
-
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
+  CreateAndConnectMockProducer("mock_producer");
+  CreateAndConnectMockConsumer();
+  RegisterProducerDataSource("foo");
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.add_buffers()->set_size_kb(128);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("foo");
   ds_config->set_target_buffer(0);
-  consumer_endpoint->EnableTracing(trace_config);
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_producer, OnDisconnect());
-  EXPECT_CALL(mock_consumer, OnDisconnect());
-  consumer_endpoint->DisableTracing();
-  producer_endpoint.reset();
-  consumer_endpoint.reset();
-  task_runner.RunUntilIdle();
-  Mock::VerifyAndClearExpectations(&mock_producer);
-  Mock::VerifyAndClearExpectations(&mock_consumer);
+  EnableTracingAndWait(trace_config);
+  DisableTracingAndWait();
 }
 
 TEST_F(ServiceImplTest, LockdownMode) {
-  MockConsumer mock_consumer;
-  EXPECT_CALL(mock_consumer, OnConnect());
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      svc->ConnectConsumer(&mock_consumer);
+  CreateAndConnectMockConsumer();
+  CreateAndConnectMockProducer("mock_producer_sameuid", geteuid());
+  RegisterProducerDataSource("foo");
 
   TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("foo");
+  ds_config->set_target_buffer(0);
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
-  consumer_endpoint->EnableTracing(trace_config);
-  task_runner.RunUntilIdle();
+  EnableTracingAndWait(trace_config);
 
-  InSequence seq;
-
-  MockProducer mock_producer;
+  MockProducer mock_producer_otheruid;
   std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, geteuid() + 1 /* uid */,
-                           "mock_producer");
+      svc->ConnectProducer(&mock_producer_otheruid, geteuid() + 1,
+                           "mock_producer_otheruid");
+  EXPECT_CALL(mock_producer_otheruid, OnConnect()).Times(0);
+  task_runner.RunUntilIdle();
+  Mock::VerifyAndClearExpectations(&mock_producer_otheruid);
 
-  MockProducer mock_producer_sameuid;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_sameuid =
-      svc->ConnectProducer(&mock_producer_sameuid, geteuid() /* uid */,
-                           "mock_producer_sameuid");
-
-  EXPECT_CALL(mock_producer, OnConnect()).Times(0);
-  EXPECT_CALL(mock_producer_sameuid, OnConnect());
+  DisableTracingAndWait();
+  consumer_endpoint_->FreeBuffers();
   task_runner.RunUntilIdle();
 
-  Mock::VerifyAndClearExpectations(&mock_producer);
-
-  consumer_endpoint->DisableTracing();
-  task_runner.RunUntilIdle();
+  CreateAndConnectMockProducer("mock_producer_sameuid_2", geteuid());
+  RegisterProducerDataSource("foo");
 
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_CLEAR);
-  consumer_endpoint->EnableTracing(trace_config);
+  EnableTracingAndWait(trace_config);
+
+  MockProducer mock_producer_otheruid_2;
+  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint_2 =
+      svc->ConnectProducer(&mock_producer_otheruid_2, geteuid() + 1,
+                           "mock_producer_otheruid_2");
+  EXPECT_CALL(mock_producer_otheruid_2, OnConnect()).Times(1);
   task_runner.RunUntilIdle();
 
-  EXPECT_CALL(mock_producer_sameuid, OnDisconnect());
-  EXPECT_CALL(mock_producer, OnConnect());
-  producer_endpoint_sameuid =
-      svc->ConnectProducer(&mock_producer, geteuid() + 1, "mock_producer");
-
-  EXPECT_CALL(mock_producer, OnDisconnect());
-  task_runner.RunUntilIdle();
+  EXPECT_CALL(mock_producer_otheruid_2, OnDisconnect());
+  producer_endpoint.reset();
+  producer_endpoint_2.reset();
 }
 
 TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
-  MockProducer mock_producer;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
-  MockConsumer mock_consumer;
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      svc->ConnectConsumer(&mock_consumer);
-
-  InSequence seq;
-  EXPECT_CALL(mock_producer, OnConnect());
-  EXPECT_CALL(mock_consumer, OnConnect());
-  task_runner.RunUntilIdle();
-
-  DataSourceDescriptor ds_desc;
-  ds_desc.set_name("foo");
-  producer_endpoint->RegisterDataSource(ds_desc);
-  task_runner.RunUntilIdle();
+  CreateAndConnectMockProducer("mock_producer");
+  CreateAndConnectMockConsumer();
+  RegisterProducerDataSource("foo");
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("foo");
+  ds_config->set_target_buffer(0);
+  EnableTracingAndWait(trace_config);
 
   // Disconnecting the consumer while tracing should trigger data source
   // teardown.
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(4096 * 10);
-  auto* ds_config = trace_config.add_data_sources()->mutable_config();
-  ds_config->set_name("foo");
-  ds_config->set_target_buffer(0);
-  consumer_endpoint->EnableTracing(trace_config);
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_consumer, OnDisconnect());
-  consumer_endpoint.reset();
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_producer, OnDisconnect());
-  producer_endpoint.reset();
-  Mock::VerifyAndClearExpectations(&mock_producer);
-  Mock::VerifyAndClearExpectations(&mock_consumer);
+  auto on_cons_disconnect = task_runner.CreateCheckpoint("on_cons_disconnect");
+  EXPECT_CALL(*mock_consumer_, OnDisconnect())
+      .WillOnce(Invoke(on_cons_disconnect));
+  auto on_prod_teardown = task_runner.CreateCheckpoint("on_prod_teardown");
+  EXPECT_CALL(*mock_producer_, TearDownDataSourceInstance(_))
+      .WillOnce(InvokeWithoutArgs(on_prod_teardown));
+  EXPECT_CALL(*mock_producer_, OnTracingStop());
+  consumer_endpoint_.reset();
+  mock_consumer_.reset();
+  task_runner.RunUntilCheckpoint("on_cons_disconnect");
+  task_runner.RunUntilCheckpoint("on_prod_teardown");
 }
 
 TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
-  MockProducer mock_producer;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
-  MockConsumer mock_consumer;
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      svc->ConnectConsumer(&mock_consumer);
-
-  InSequence seq;
-  EXPECT_CALL(mock_producer, OnConnect());
-  EXPECT_CALL(mock_consumer, OnConnect());
-  task_runner.RunUntilIdle();
-
-  DataSourceDescriptor ds_desc;
-  ds_desc.set_name("foo");
-  producer_endpoint->RegisterDataSource(ds_desc);
-  task_runner.RunUntilIdle();
-
-  // Disconnecting the producer while tracing should trigger data source
-  // teardown.
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  EXPECT_CALL(mock_producer, OnDisconnect());
+  CreateAndConnectMockConsumer();
+  CreateAndConnectMockProducer("mock_producer");
+  RegisterProducerDataSource("foo");
   TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(4096 * 10);
+  trace_config.add_buffers()->set_size_kb(128);
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("foo");
   ds_config->set_target_buffer(0);
-  consumer_endpoint->EnableTracing(trace_config);
-  producer_endpoint.reset();
-  task_runner.RunUntilIdle();
+  EnableTracingAndWait(trace_config);
 
-  // Reconnecting a producer with a matching data source should see that data
-  // source getting enabled.
-  EXPECT_CALL(mock_producer, OnConnect());
-  producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
-  task_runner.RunUntilIdle();
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _));
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  producer_endpoint->RegisterDataSource(ds_desc);
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_consumer, OnDisconnect());
-  consumer_endpoint->DisableTracing();
-  consumer_endpoint.reset();
-  task_runner.RunUntilIdle();
-
-  EXPECT_CALL(mock_producer, OnDisconnect());
-  producer_endpoint.reset();
-  Mock::VerifyAndClearExpectations(&mock_producer);
-  Mock::VerifyAndClearExpectations(&mock_consumer);
+  // Disconnecting and reconnecting a producer with a matching data source.
+  // The Producer should see that data source getting enabled again.
+  CreateAndConnectMockProducer("mock_producer_2");
+  EXPECT_CALL(*mock_producer_, OnTracingStart());
+  EXPECT_CALL(*mock_producer_, CreateDataSourceInstance(_, _));
+  RegisterProducerDataSource("foo");
 }
 
 TEST_F(ServiceImplTest, ProducerIDWrapping) {
@@ -383,21 +444,9 @@ TEST_F(ServiceImplTest, ProducerIDWrapping) {
 }
 
 TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
-  MockProducer mock_producer;
-  std::unique_ptr<Service::ProducerEndpoint> producer_endpoint =
-      svc->ConnectProducer(&mock_producer, 123u /* uid */, "mock_producer");
-  MockConsumer mock_consumer;
-  std::unique_ptr<Service::ConsumerEndpoint> consumer_endpoint =
-      svc->ConnectConsumer(&mock_consumer);
-
-  EXPECT_CALL(mock_producer, OnConnect());
-  EXPECT_CALL(mock_consumer, OnConnect());
-  task_runner.RunUntilIdle();
-
-  DataSourceDescriptor ds_desc;
-  ds_desc.set_name("datasource");
-  producer_endpoint->RegisterDataSource(ds_desc);
-  task_runner.RunUntilIdle();
+  CreateAndConnectMockProducer("mock_producer");
+  CreateAndConnectMockConsumer();
+  RegisterProducerDataSource("datasource");
 
   static const char kPayload[] = "1234567890abcdef-";
   static const int kNumPackets = 10;
@@ -411,21 +460,10 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   const uint64_t kMaxFileSize = 512;
   trace_config.set_max_file_size_bytes(kMaxFileSize);
   base::TempFile tmp_file = base::TempFile::Create();
-  auto on_tracing_start = task_runner.CreateCheckpoint("on_tracing_start");
-  BufferID buf_id = 0;
-  EXPECT_CALL(mock_producer, OnTracingStart());
-  EXPECT_CALL(mock_producer, CreateDataSourceInstance(_, _))
-      .WillOnce(Invoke([on_tracing_start, &buf_id](
-                           DataSourceInstanceID, const DataSourceConfig& cfg) {
-        buf_id = static_cast<BufferID>(cfg.target_buffer());
-        on_tracing_start();
-      }));
-  consumer_endpoint->EnableTracing(trace_config,
-                                   base::ScopedFile(dup(tmp_file.fd())));
-  task_runner.RunUntilCheckpoint("on_tracing_start");
+  EnableTracingAndWait(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
   std::unique_ptr<TraceWriter> writer =
-      producer_endpoint->CreateTraceWriter(buf_id);
+      producer_endpoint_->CreateTraceWriter(producer_buf_id_);
   // All these packets should fit within kMaxFileSize.
   for (int i = 0; i < kNumPackets; i++) {
     auto tp = writer->NewTracePacket();
@@ -444,17 +482,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   writer->Flush();
   writer.reset();
 
-  auto on_tracing_stop = task_runner.CreateCheckpoint("on_tracing_stop");
-  EXPECT_CALL(mock_producer, TearDownDataSourceInstance(_));
-  EXPECT_CALL(mock_consumer, OnTracingStop()).WillOnce(Invoke(on_tracing_stop));
-  task_runner.RunUntilCheckpoint("on_tracing_stop");
-
-  EXPECT_CALL(mock_consumer, OnDisconnect());
-  EXPECT_CALL(mock_producer, OnDisconnect());
-  consumer_endpoint->DisableTracing();
-  consumer_endpoint.reset();
-  producer_endpoint.reset();
-  task_runner.RunUntilIdle();
+  DisableTracingAndWait();
 
   // Verify the contents of the file.
   std::string trace_raw;
@@ -470,6 +498,75 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
     ASSERT_EQ(kPayload + std::to_string(num_testing_packet++),
               tp.for_testing().str());
   }
-}  // namespace perfetto
+}
+
+TEST_F(ServiceImplTest, ExplicitFlush) {
+  CreateAndConnectMockProducer("mock_producer");
+  CreateAndConnectMockConsumer();
+  RegisterProducerDataSource("foo");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("foo");
+  ds_config->set_target_buffer(0);
+  EnableTracingAndWait(trace_config);
+
+  std::unique_ptr<TraceWriter> writer =
+      producer_endpoint_->CreateTraceWriter(producer_buf_id_);
+  {
+    auto tp = writer->NewTracePacket();
+    tp->set_for_testing()->set_str("payload");
+  }
+
+  EXPECT_CALL(*mock_producer_, Flush(_, _, 1))
+      .WillOnce(Invoke([&writer, this](FlushRequestID flush_req_id,
+                                       const DataSourceInstanceID*, size_t) {
+        writer->Flush();
+        producer_endpoint_->NotifyFlushComplete(flush_req_id);
+      }));
+  ASSERT_TRUE(FlushAndWait());
+
+  DisableTracingAndWait();
+  EXPECT_THAT(
+      ReadBuffers(),
+      Contains(Property(&protos::TracePacket::for_testing,
+                        Property(&protos::TestEvent::str, Eq("payload")))));
+}
+
+TEST_F(ServiceImplTest, ImplicitFlushOnTimedTraces) {
+  CreateAndConnectMockProducer("mock_producer");
+  CreateAndConnectMockConsumer();
+  RegisterProducerDataSource("foo");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  auto* ds_config = trace_config.add_data_sources()->mutable_config();
+  ds_config->set_name("foo");
+  ds_config->set_target_buffer(0);
+  trace_config.set_duration_ms(1);
+  EnableTracingAndWait(trace_config);
+
+  std::unique_ptr<TraceWriter> writer =
+      producer_endpoint_->CreateTraceWriter(producer_buf_id_);
+  {
+    auto tp = writer->NewTracePacket();
+    tp->set_for_testing()->set_str("payload");
+  }
+
+  EXPECT_CALL(*mock_producer_, Flush(_, _, 1))
+      .WillOnce(Invoke([&writer, this](FlushRequestID flush_req_id,
+                                       const DataSourceInstanceID*, size_t) {
+        writer->Flush();
+        producer_endpoint_->NotifyFlushComplete(flush_req_id);
+      }));
+
+  WaitTracingDisabled();
+
+  EXPECT_THAT(
+      ReadBuffers(),
+      Contains(Property(&protos::TracePacket::for_testing,
+                        Property(&protos::TestEvent::str, Eq("payload")))));
+}
 
 }  // namespace perfetto

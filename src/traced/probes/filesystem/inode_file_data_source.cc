@@ -174,6 +174,14 @@ void InodeFileDataSource::AddInodesFromLRUCache(
     PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
 }
 
+void InodeFileDataSource::Flush() {
+  // TODO(primiano): Check the current logic. It's quite weird that we leave
+  // packets unfinished.
+  if (writer_ &&
+      (!current_trace_packet_ || current_trace_packet_->is_finalized()))
+    writer_->Flush();
+}
+
 void InodeFileDataSource::OnInodes(
     const std::vector<std::pair<Inode, BlockDeviceID>>& inodes) {
   if (mount_points_.empty()) {

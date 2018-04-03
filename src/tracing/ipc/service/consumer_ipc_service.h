@@ -17,6 +17,7 @@
 #ifndef SRC_TRACING_IPC_SERVICE_CONSUMER_IPC_SERVICE_H_
 #define SRC_TRACING_IPC_SERVICE_CONSUMER_IPC_SERVICE_H_
 
+#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -52,6 +53,7 @@ class ConsumerIPCService : public protos::ConsumerPort {
                    DeferredReadBuffersResponse) override;
   void FreeBuffers(const protos::FreeBuffersRequest&,
                    DeferredFreeBuffersResponse) override;
+  void Flush(const protos::FlushRequest&, DeferredFlushResponse) override;
   void OnClientDisconnected() override;
 
  private:
@@ -96,6 +98,8 @@ class ConsumerIPCService : public protos::ConsumerPort {
   // Maps IPC clients to ConsumerEndpoint instances registered on the
   // |core_service_| business logic.
   std::map<ipc::ClientID, std::unique_ptr<RemoteConsumer>> consumers_;
+
+  std::list<DeferredFlushResponse> pending_flush_responses_;
 
   base::WeakPtrFactory<ConsumerIPCService> weak_ptr_factory_;
 };

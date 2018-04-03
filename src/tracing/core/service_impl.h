@@ -71,6 +71,8 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
+    void NotifyFlushComplete(FlushRequestID) override;
+    void TearDownDataSourceAndMaybeStopTracing(DataSourceInstanceID);
     SharedMemory* shared_memory() const override;
     size_t shared_buffer_page_size_kb() const override;
 
@@ -79,6 +81,7 @@ class ServiceImpl : public Service {
     FRIEND_TEST(ServiceImplTest, RegisterAndUnregister);
     ProducerEndpointImpl(const ProducerEndpointImpl&) = delete;
     ProducerEndpointImpl& operator=(const ProducerEndpointImpl&) = delete;
+    SharedMemoryArbiterImpl* GetOrCreateShmemArbiter();
 
     ProducerID const id_;
     const uid_t uid_;
@@ -90,9 +93,12 @@ class ServiceImpl : public Service {
     SharedMemoryABI shmem_abi_;
     size_t shared_memory_size_hint_bytes_ = 0;
     const std::string name_;
+    std::set<DataSourceInstanceID> data_source_instances_;
 
     // This is used only in in-process configurations (mostly tests).
     std::unique_ptr<SharedMemoryArbiterImpl> inproc_shmem_arbiter_;
+
+    base::WeakPtrFactory<ProducerEndpointImpl> weak_ptr_factory_;
     PERFETTO_THREAD_CHECKER(thread_checker_)
   };
 
@@ -110,6 +116,7 @@ class ServiceImpl : public Service {
     void DisableTracing() override;
     void ReadBuffers() override;
     void FreeBuffers() override;
+    void Flush(int timeout_ms, FlushCallback) override;
 
    private:
     friend class ServiceImpl;
@@ -145,6 +152,7 @@ class ServiceImpl : public Service {
                                      size_t size);
   void ApplyChunkPatches(ProducerID,
                          const std::vector<CommitDataRequest::ChunkToPatch>&);
+  void NotifyFlushDoneForProducer(ProducerID, FlushRequestID);
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
@@ -152,6 +160,10 @@ class ServiceImpl : public Service {
                      const TraceConfig&,
                      base::ScopedFile);
   void DisableTracing(TracingSessionID);
+  void Flush(TracingSessionID tsid,
+             int timeout_ms,
+             ConsumerEndpoint::FlushCallback);
+  void FlushAndDisableTracing(TracingSessionID);
   void ReadBuffers(TracingSessionID, ConsumerEndpointImpl*);
   void FreeBuffers(TracingSessionID);
 
@@ -183,6 +195,12 @@ class ServiceImpl : public Service {
     std::string data_source_name;
   };
 
+  struct PendingFlush {
+    std::set<ProducerID> producers;
+    ConsumerEndpoint::FlushCallback callback;
+    explicit PendingFlush(decltype(callback) cb) : callback(std::move(cb)) {}
+  };
+
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
@@ -206,6 +224,9 @@ class ServiceImpl : public Service {
     // List of data source instances that have been enabled on the various
     // producers for this tracing session.
     std::multimap<ProducerID, DataSourceInstance> data_source_instances;
+
+    // List of data sources for which we are awiting a Flush(request_id) ack.
+    std::map<FlushRequestID, PendingFlush> pending_flushes;
 
     // Maps a per-trace-session buffer index into the corresponding global
     // BufferID (shared namespace amongst all consumers). This vector has as
@@ -251,7 +272,7 @@ class ServiceImpl : public Service {
 
   void MaybeSnapshotClocks(TracingSession*, std::vector<TracePacket>*);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
-
+  void OnFlushTimeout(TracingSessionID, FlushRequestID);
   TraceBuffer* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;
@@ -260,6 +281,7 @@ class ServiceImpl : public Service {
   DataSourceInstanceID last_data_source_instance_id_ = 0;
   TracingSessionID last_tracing_session_id_ = 0;
   size_t shared_memory_size_hint_bytes_ = 0;
+  FlushRequestID last_flush_request_id_ = 0;
 
   // Buffer IDs are global across all consumers (because a Producer can produce
   // data for more than one trace session, hence more than one consumer).

@@ -62,6 +62,8 @@ class MockProducer : public Producer {
   MOCK_METHOD0(uid, uid_t());
   MOCK_METHOD0(OnTracingStart, void());
   MOCK_METHOD0(OnTracingStop, void());
+  MOCK_METHOD3(Flush,
+               void(FlushRequestID, const DataSourceInstanceID*, size_t));
 };
 
 class MockConsumer : public Consumer {
