@@ -366,7 +366,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
     return;
   }
 
-  // Note: OnTracingStop() is different for the producer and the consumer. From
+  // Note: OnTracingStart() is different for the producer and the consumer. From
   // a producer's viewpoint, tracing is stopped when all its data sources are
   // torn down for *all* the active tracing sessions. From a consumer's
   // viewpoint, tracing is stopped when all the data sources for *the session*
@@ -435,8 +435,7 @@ void ServiceImpl::Flush(TracingSessionID tsid,
   for (const auto& kv : flush_map) {
     ProducerEndpointImpl* producer = kv.first;
     const std::vector<DataSourceInstanceID>& data_sources = kv.second;
-    producer->producer_->Flush(flush_request_id, data_sources.data(),
-                               data_sources.size());
+    producer->Flush(flush_request_id, data_sources);
     pending_flush.producers.insert(producer->id_);
   }
 
@@ -868,10 +867,10 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->producer_->OnTracingStart();
+    producer->OnTracingStart();
     UpdateMemoryGuardrail();
   }
-  producer->producer_->CreateDataSourceInstance(inst_id, ds_config);
+  producer->CreateDataSourceInstance(inst_id, ds_config);
 }
 
 // Note: all the fields % *_trusted ones are untrusted, as in, the Producer
@@ -1278,12 +1277,15 @@ void ServiceImpl::ProducerEndpointImpl::TearDownDataSourceAndMaybeStopTracing(
   bool should_stop = num_erased && data_source_instances_.empty();
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
-    if (!weak_this)
-      return;
-    weak_this->producer_->TearDownDataSourceInstance(ds_inst_id);
-    if (should_stop)
-      weak_this->producer_->OnTracingStop();
+    if (weak_this)
+      weak_this->producer_->TearDownDataSourceInstance(ds_inst_id);
   });
+  if (should_stop) {
+    task_runner_->PostTask([weak_this, ds_inst_id, should_stop] {
+      if (weak_this)
+        weak_this->producer_->OnTracingStop();
+    });
+  }
 }
 
 SharedMemoryArbiterImpl*
@@ -1301,6 +1303,35 @@ std::unique_ptr<TraceWriter>
 ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
+}
+
+void ServiceImpl::ProducerEndpointImpl::OnTracingStart() {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this] {
+    if (weak_this)
+      weak_this->producer_->OnTracingStart();
+  });
+}
+
+void ServiceImpl::ProducerEndpointImpl::Flush(
+    FlushRequestID flush_request_id,
+    const std::vector<DataSourceInstanceID>& data_sources) {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, flush_request_id, data_sources] {
+    if (weak_this)
+      weak_this->producer_->Flush(flush_request_id, data_sources.data(),
+                                  data_sources.size());
+  });
+}
+
+void ServiceImpl::ProducerEndpointImpl::CreateDataSourceInstance(
+    DataSourceInstanceID ds_id,
+    const DataSourceConfig& config) {
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, ds_id, config] {
+    if (weak_this)
+      weak_this->producer_->CreateDataSourceInstance(ds_id, std::move(config));
+  });
 }
 
 void ServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(FlushRequestID id) {

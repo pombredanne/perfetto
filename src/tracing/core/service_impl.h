@@ -71,6 +71,10 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
+    void OnTracingStart();
+    void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
+    void CreateDataSourceInstance(DataSourceInstanceID,
+                                  const DataSourceConfig&);
     void NotifyFlushComplete(FlushRequestID) override;
     void TearDownDataSourceAndMaybeStopTracing(DataSourceInstanceID);
     SharedMemory* shared_memory() const override;
