@@ -19,17 +19,19 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include <sys/stat.h>
+#include <memory>
 #include <string>
-#include <tuple>
 
+#include "perfetto/base/logging.h"
 #include "src/base/test/test_task_runner.h"
 
 namespace perfetto {
 namespace {
 
 using ::testing::Eq;
-using ::testing::IsNull;
-using ::testing::Pointee;
+using ::testing::Contains;
+using ::testing::UnorderedElementsAre;
 
 class TestDelegate : public FileScanner::Delegate {
  public:
@@ -58,6 +60,40 @@ class TestDelegate : public FileScanner::Delegate {
       callback_;
   std::function<void()> done_callback_;
 };
+
+struct FileEntry {
+  FileEntry(BlockDeviceID block_device_id,
+            Inode inode,
+            std::string path,
+            protos::pbzero::InodeFileMap_Entry_Type type)
+      : block_device_id_(block_device_id),
+        inode_(inode),
+        path_(std::move(path)),
+        type_(type) {}
+
+  bool operator==(const FileEntry& other) const {
+    return block_device_id_ == other.block_device_id_ &&
+           inode_ == other.inode_ && path_ == other.path_ &&
+           type_ == other.type_;
+  }
+
+  BlockDeviceID block_device_id_;
+  Inode inode_;
+  std::string path_;
+  protos::pbzero::InodeFileMap_Entry_Type type_;
+};
+
+struct stat CheckStat(const std::string& path) {
+  struct stat buf;
+  PERFETTO_CHECK(lstat(path.c_str(), &buf) != -1);
+  return buf;
+}
+
+FileEntry StatFileEntry(const std::string& path,
+                        protos::pbzero::InodeFileMap_Entry_Type type) {
+  struct stat buf = CheckStat(path);
+  return FileEntry(buf.st_dev, buf.st_ino, path, type);
+}
 
 TEST(TestFileScanner, TestSynchronousStop) {
   uint64_t seen = 0;
@@ -96,6 +132,63 @@ TEST(TestFileScanner, TestAsynchronousStop) {
   task_runner.RunUntilCheckpoint("done");
 
   EXPECT_EQ(seen, 1u);
+}
+
+TEST(TestFileScanner, TestSynchronousFindFiles) {
+  std::vector<FileEntry> file_entries;
+  TestDelegate delegate(
+      [&file_entries](BlockDeviceID block_device_id, Inode inode,
+                      const std::string& path,
+                      protos::pbzero::InodeFileMap_Entry_Type type) {
+        file_entries.emplace_back(block_device_id, inode, path, type);
+        return true;
+      },
+      [] {});
+
+  FileScanner fs({"src/traced/probes/filesystem/testdata"}, &delegate);
+  fs.Scan();
+
+  EXPECT_THAT(
+      file_entries,
+      UnorderedElementsAre(
+          Eq(StatFileEntry("src/traced/probes/filesystem/testdata/dir1/file1",
+                           protos::pbzero::InodeFileMap_Entry_Type_FILE)),
+          Eq(StatFileEntry("src/traced/probes/filesystem/testdata/file2",
+                           protos::pbzero::InodeFileMap_Entry_Type_FILE)),
+
+          Eq(StatFileEntry(
+              "src/traced/probes/filesystem/testdata/dir1",
+              protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY))));
+}
+
+TEST(TestFileScanner, TestAsynchronousFindFiles) {
+  base::TestTaskRunner task_runner;
+  std::vector<FileEntry> file_entries;
+  TestDelegate delegate(
+      [&file_entries](BlockDeviceID block_device_id, Inode inode,
+                      const std::string& path,
+                      protos::pbzero::InodeFileMap_Entry_Type type) {
+        file_entries.emplace_back(block_device_id, inode, path, type);
+        return true;
+      },
+      task_runner.CreateCheckpoint("done"));
+
+  FileScanner fs({"src/traced/probes/filesystem/testdata"}, &delegate, 1, 1);
+  fs.Scan(&task_runner);
+
+  task_runner.RunUntilCheckpoint("done");
+
+  EXPECT_THAT(
+      file_entries,
+      UnorderedElementsAre(
+          Eq(StatFileEntry("src/traced/probes/filesystem/testdata/dir1/file1",
+                           protos::pbzero::InodeFileMap_Entry_Type_FILE)),
+          Eq(StatFileEntry("src/traced/probes/filesystem/testdata/file2",
+                           protos::pbzero::InodeFileMap_Entry_Type_FILE)),
+
+          Eq(StatFileEntry(
+              "src/traced/probes/filesystem/testdata/dir1",
+              protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY))));
 }
 
 }  // namespace
