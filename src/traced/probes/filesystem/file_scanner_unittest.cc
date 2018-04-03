@@ -155,7 +155,6 @@ TEST(TestFileScanner, TestSynchronousFindFiles) {
                            protos::pbzero::InodeFileMap_Entry_Type_FILE)),
           Eq(StatFileEntry("src/traced/probes/filesystem/testdata/file2",
                            protos::pbzero::InodeFileMap_Entry_Type_FILE)),
-
           Eq(StatFileEntry(
               "src/traced/probes/filesystem/testdata/dir1",
               protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY))));
@@ -185,7 +184,6 @@ TEST(TestFileScanner, TestAsynchronousFindFiles) {
                            protos::pbzero::InodeFileMap_Entry_Type_FILE)),
           Eq(StatFileEntry("src/traced/probes/filesystem/testdata/file2",
                            protos::pbzero::InodeFileMap_Entry_Type_FILE)),
-
           Eq(StatFileEntry(
               "src/traced/probes/filesystem/testdata/dir1",
               protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY))));
