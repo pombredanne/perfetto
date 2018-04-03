@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "perfetto/base/task_runner.h"
+#include "perfetto/base/watchdog.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -60,7 +61,7 @@ class ProbesProducer : public Producer {
                                             const DataSourceConfig& config);
   void CreateInodeFileDataSourceInstance(TracingSessionID session_id,
                                          DataSourceInstanceID id,
-                                         const DataSourceConfig& config);
+                                         DataSourceConfig config);
 
   void OnMetadata(const FtraceMetadata& metadata);
 
@@ -126,13 +127,14 @@ class ProbesProducer : public Producer {
   ProbesProducer& operator=(const ProbesProducer&) = delete;
 
   void Connect();
+  void Restart();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
   void AddWatchdogsTimer(DataSourceInstanceID id,
                          const DataSourceConfig& source_config);
 
   State state_ = kNotStarted;
-  base::TaskRunner* task_runner_;
+  base::TaskRunner* task_runner_ = nullptr;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   bool ftrace_creation_failed_ = false;
