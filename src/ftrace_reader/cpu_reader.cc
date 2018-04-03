@@ -386,7 +386,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
         const uint8_t* next = ptr + event_size;
 
         if (next > end)
-          break;
+          return 0;
 
         uint16_t ftrace_event_id;
         if (!ReadAndAdvance<uint16_t>(&ptr, end, &ftrace_event_id))
