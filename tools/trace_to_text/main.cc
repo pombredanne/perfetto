@@ -343,9 +343,10 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
   std::set<uint64_t> resolved_scan_inodes;
 
   ForEachPacketInTrace(
-      input, [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
-              &ftrace_inodes, &ftrace_inode_count, &resolved_map_inodes,
-              &resolved_scan_inodes](const protos::TracePacket& packet) {
+      input,
+      [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
+       &ftrace_inodes, &ftrace_inode_count, &resolved_map_inodes,
+       &resolved_scan_inodes, &output](const protos::TracePacket& packet) {
 
         if (packet.has_process_tree()) {
           const ProcessTree& tree = packet.process_tree();
@@ -385,7 +386,15 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
           if (event.timestamp()) {
             start = std::min<uint64_t>(start, event.timestamp());
             end = std::max<uint64_t>(end, event.timestamp());
+
+            if (!event.has_cpu_frequency())
+              continue;
+
             ftrace_timestamps.insert(event.timestamp());
+            char line[2048];
+            sprintf(line, "%llu,bundle_cpu%u,freq_cpu%u\n", event.timestamp(),
+                    bundle.cpu(), event.cpu_frequency().cpu_id());
+            *output << std::string(line);
           }
         }
       });
