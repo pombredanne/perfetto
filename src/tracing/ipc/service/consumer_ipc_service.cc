@@ -100,17 +100,24 @@ void ConsumerIPCService::Flush(const protos::FlushRequest& req,
                                             std::move(resp));
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   auto callback = [weak_this, it](bool success) {
-    if (!weak_this)
+    if (weak_this)
       return;
-    DeferredFlushResponse response(std::move(*it));
-    weak_this->pending_flush_responses_.erase(it);
-    if (success)
-      response.Resolve(ipc::AsyncResult<protos::FlushResponse>::Create());
-    else
-      response.Reject();
+    weak_this->OnFlushCallback(success, std::move(it));
   };
   GetConsumerForCurrentRequest()->service_endpoint->Flush(req.timeout_ms(),
                                                           std::move(callback));
+}
+
+// Called by the service in response to a service_endpoint->Flush() request.
+void ConsumerIPCService::OnFlushCallback(
+    bool success,
+    PendingFlushResponses::iterator pending_response_it) {
+  DeferredFlushResponse response(std::move(*pending_response_it));
+  pending_flush_responses_.erase(pending_response_it);
+  if (success)
+    response.Resolve(ipc::AsyncResult<protos::FlushResponse>::Create());
+  else
+    response.Reject();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

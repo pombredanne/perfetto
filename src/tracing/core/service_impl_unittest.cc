@@ -536,15 +536,15 @@ TEST_F(ServiceImplTest, BatchFlushes) {
 
   // We'll deliberately let the 4th flush request timeout. Use a lower timeout
   // to keep test time short.
-  auto flush_req_4 = consumer->Flush(/*timeout=*/10);
+  auto flush_req_4 = consumer->Flush(/*timeout_ms=*/10);
   ASSERT_EQ(4u, GetNumPendingFlushes());
 
   // Make the producer reply only to the 3rd flush request.
   testing::InSequence seq;
-  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 1.
-  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 2.
+  producer->WaitForFlush(nullptr);       // Will NOT reply to flush id == 1.
+  producer->WaitForFlush(nullptr);       // Will NOT reply to flush id == 2.
   producer->WaitForFlush(writer.get());  // Will reply only to flush id == 3.
-  producer->WaitForFlush(nullptr);  // Will NOT reply only to flush id == 4.
+  producer->WaitForFlush(nullptr);       // Will NOT reply to flush id == 4.
 
   // Even if the producer explicily replied only to flush ID == 3, all the
   // previous flushed < 3 should be implicitly acked.

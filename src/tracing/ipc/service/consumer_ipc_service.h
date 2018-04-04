@@ -86,6 +86,9 @@ class ConsumerIPCService : public protos::ConsumerPort {
     DeferredEnableTracingResponse enable_tracing_response;
   };
 
+  // This has to be a container that doesn't invalidate iterators.
+  using PendingFlushResponses = std::list<DeferredFlushResponse>;
+
   ConsumerIPCService(const ConsumerIPCService&) = delete;
   ConsumerIPCService& operator=(const ConsumerIPCService&) = delete;
 
@@ -93,15 +96,17 @@ class ConsumerIPCService : public protos::ConsumerPort {
   // the current IPC request.
   RemoteConsumer* GetConsumerForCurrentRequest();
 
+  void OnFlushCallback(bool success, PendingFlushResponses::iterator);
+
   Service* const core_service_;
 
   // Maps IPC clients to ConsumerEndpoint instances registered on the
   // |core_service_| business logic.
   std::map<ipc::ClientID, std::unique_ptr<RemoteConsumer>> consumers_;
 
-  std::list<DeferredFlushResponse> pending_flush_responses_;
+  PendingFlushResponses pending_flush_responses_;
 
-  base::WeakPtrFactory<ConsumerIPCService> weak_ptr_factory_;
+  base::WeakPtrFactory<ConsumerIPCService> weak_ptr_factory_;  // Keep last.
 };
 
 }  // namespace perfetto
