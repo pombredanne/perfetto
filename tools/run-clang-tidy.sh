@@ -35,7 +35,7 @@ if [[ ! -z "${affected_files// }" ]]; then
   ninja -t compdb cc cxx obj objcxx > compile_commands.json;
   # We need to build in order to generate proto headers.
   ninja;
-  echo $affected_files | xargs -P100 ~/buildclang/build/bin/clang-tidy \
+  echo $affected_files | xargs -P100 clang-tidy \
     '-header-filter=^'"$(realpath ../../)"'/(?!buildtools).*' -p=. -fix;
 else
   echo "No .cc files affected."
