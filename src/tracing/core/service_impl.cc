@@ -1151,8 +1151,8 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
 void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
     DataSourceInstanceID ds_inst_id) {
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
-  // should send the Producer an OnTracingDisabled if all its data sources
-  // have been disabled (see b/77532839 and aosp/655179 PS1).
+  // should send the Producer a TearDownTracing if all its data sources have
+  // been disabled (see b/77532839 and aosp/655179 PS1).
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
