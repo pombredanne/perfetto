@@ -63,7 +63,7 @@ constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
 constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
 }  // namespace
 
-// These constants instad are defined in the header because are used by tests.
+// These constants instead are defined in the header because are used by tests.
 constexpr size_t ServiceImpl::kDefaultShmSize;
 constexpr size_t ServiceImpl::kMaxShmSize;
 
@@ -753,10 +753,13 @@ void ServiceImpl::CreateDataSourceInstance(
     producer->shared_buffer_page_size_kb_ = page_size / 1024;
 
     // Determine the SMB size. Must be an integer multiple of the SMB page size.
+    // The decisional tree is as follows:
+    // 1. Give priority to what defined in the trace config.
+    // 2. If unset give priority to the hint passed by the producer.
+    // 3. Keep within bounds and ensure it's a multiple of the page size.
     size_t shm_size = producer_config.shm_size_kb() * 1024;
     if (shm_size == 0)
-      shm_size = kDefaultShmSize;
-    shm_size = std::min<size_t>(shm_size, producer->shmem_size_hint_bytes_);
+      shm_size = producer->shmem_size_hint_bytes_;
     shm_size = std::min<size_t>(shm_size, kMaxShmSize);
     if (shm_size < page_size || shm_size % page_size)
       shm_size = kDefaultShmSize;
