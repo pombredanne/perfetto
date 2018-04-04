@@ -97,8 +97,7 @@ class FakeProducer : public Producer {
   }
 
   void TearDownDataSourceInstance(DataSourceInstanceID) override {}
-  void OnTracingStart() override {}
-  void OnTracingStop() override {}
+  void OnTracingSetup() override {}
 
  private:
   const std::string name_;
