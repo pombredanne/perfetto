@@ -762,7 +762,7 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->SetupSharedMemory();
+    producer->OnTracingSetup();
     UpdateMemoryGuardrail();
   }
   producer->CreateDataSourceInstance(inst_id, ds_config);
@@ -1177,11 +1177,11 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-void ServiceImpl::ProducerEndpointImpl::SetupSharedMemory() {
+void ServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->producer_->SetupSharedMemory();
+      weak_this->producer_->OnTracingSetup();
   });
 }
 
