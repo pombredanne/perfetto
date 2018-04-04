@@ -314,6 +314,10 @@ ProbesProducer::SinkDelegate::SinkDelegate(TracingSessionID id,
 ProbesProducer::SinkDelegate::~SinkDelegate() = default;
 
 void ProbesProducer::SinkDelegate::Flush() {
+  // TODO(primiano): this still doesn't flush data from the kernel ftrace
+  // buffers (see b/73886018). We should do that and delay the
+  // NotifyFlushComplete() until the ftrace data has been drained from the
+  // kernel ftrace buffer and written in the SMB.
   if (writer_ && (!trace_packet_ || trace_packet_->is_finalized()))
     writer_->Flush();
 }

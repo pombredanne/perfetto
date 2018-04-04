@@ -290,11 +290,7 @@ class ServiceImpl : public Service {
   IdAllocator<BufferID> buffer_ids_;
 
   std::multimap<std::string /*name*/, RegisteredDataSource> data_sources_;
-
-  // TODO(primiano): There doesn't seem to be any good reason why |producers_|
-  // is a map indexed by ID and not just a set<ProducerEndpointImpl*>.
   std::map<ProducerID, ProducerEndpointImpl*> producers_;
-
   std::set<ConsumerEndpointImpl*> consumers_;
   std::map<TracingSessionID, TracingSession> tracing_sessions_;
   std::map<BufferID, std::unique_ptr<TraceBuffer>> buffers_;
