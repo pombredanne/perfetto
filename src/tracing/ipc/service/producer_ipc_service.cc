@@ -223,7 +223,7 @@ void ProducerIPCService::RemoteProducer::TearDownDataSourceInstance(
   async_producer_commands.Resolve(std::move(cmd));
 }
 
-void ProducerIPCService::RemoteProducer::OnTracingEnabled() {
+void ProducerIPCService::RemoteProducer::SetupSharedMemory() {
   if (!async_producer_commands.IsBound()) {
     PERFETTO_DLOG(
         "The Service tried to allocate the shared memory but the remote "
@@ -236,7 +236,7 @@ void ProducerIPCService::RemoteProducer::OnTracingEnabled() {
   auto cmd = ipc::AsyncResult<protos::GetAsyncCommandResponse>::Create();
   cmd.set_has_more(true);
   cmd.set_fd(shm_fd);
-  cmd->mutable_on_tracing_enabled()->set_shared_buffer_page_size_kb(
+  cmd->mutable_setup_shared_memory()->set_shared_buffer_page_size_kb(
       service_endpoint->shared_buffer_page_size_kb());
   async_producer_commands.Resolve(std::move(cmd));
 }
