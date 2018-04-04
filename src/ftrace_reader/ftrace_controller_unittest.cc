@@ -413,8 +413,7 @@ TEST(FtraceControllerTest, TaskScheduling) {
   sink.reset();
 }
 
-// TODO(b/73452932): Fix and reenable this test.
-TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
+TEST(FtraceControllerTest, DrainPeriodRespected) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
 
