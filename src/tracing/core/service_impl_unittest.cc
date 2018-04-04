@@ -130,7 +130,7 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   consumer->DisableTracing();
@@ -154,7 +154,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
@@ -196,7 +196,7 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting the consumer while tracing should trigger data source
@@ -219,7 +219,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting and reconnecting a producer with a matching data source.
@@ -228,7 +228,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer_2");
   producer->RegisterDataSource("data_source");
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 }
 
@@ -279,7 +279,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   static const char kPayload[] = "1234567890abcdef-";
@@ -357,7 +357,7 @@ TEST_F(ServiceImplTest, ProducerShmSizeHintRespected) {
   consumer->EnableTracing(trace_config);
   size_t actual_shm_sizes_kb[kNumProducers]{};
   for (size_t i = 0; i < kNumProducers; i++) {
-    producer[i]->WaitForShmemInitialization();
+    producer[i]->WaitForTracingSetup();
     producer[i]->WaitForDataSourceStart("data_source");
     actual_shm_sizes_kb[i] =
         producer[i]->endpoint()->shared_memory()->size() / 1024;
@@ -412,7 +412,7 @@ TEST_F(ServiceImplTest, ProducerShmSizeAndPageOverriddenByTraceConfig) {
   size_t actual_shm_sizes_kb[kNumProducers]{};
   size_t actual_page_sizes_kb[kNumProducers]{};
   for (size_t i = 0; i < kNumProducers; i++) {
-    producer[i]->WaitForShmemInitialization();
+    producer[i]->WaitForTracingSetup();
     producer[i]->WaitForDataSourceStart("data_source");
     actual_shm_sizes_kb[i] =
         producer[i]->endpoint()->shared_memory()->size() / 1024;

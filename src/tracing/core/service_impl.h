@@ -74,7 +74,7 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
-    void SetupSharedMemory();
+    void OnTracingSetup();
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&);
     void TearDownDataSource(DataSourceInstanceID);
