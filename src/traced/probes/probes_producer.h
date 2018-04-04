@@ -76,6 +76,7 @@ class ProbesProducer : public Producer {
     ~SinkDelegate() override;
 
     TracingSessionID session_id() const { return session_id_; }
+
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
     void OnBundleComplete(size_t cpu,
