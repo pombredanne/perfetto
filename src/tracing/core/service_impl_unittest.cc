@@ -384,7 +384,7 @@ TEST_F(ServiceImplTest, ProducerShmSizeAndPageOverriddenByTraceConfig) {
   const size_t kConfigSizesKb[] = {32, 32, 20, 20, 20, 0, 0, 32};
   const size_t kHintSizesKb[] = {16, 128, 8, 265, 32, 0, 24, 16};
   const size_t kExpectedSizesKb[] = {
-      16,                 //  Respect hint (16 KB) which is < config (32 KB).
+      16,                 // Respect hint (16 KB) which is < config (32 KB).
       32,                 // Cap at config (32 KB) size.
       8,                  // Respect hint (8 KB) which is < config (20 KB).
       20,                 // Hint is invalid (265 KB), use lower config (20 KB).
