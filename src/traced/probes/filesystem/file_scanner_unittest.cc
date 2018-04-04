@@ -95,7 +95,7 @@ FileEntry StatFileEntry(const std::string& path,
   return FileEntry(buf.st_dev, buf.st_ino, path, type);
 }
 
-TEST(TestFileScanner, TestSynchronousStop) {
+TEST(FileScannerTest, TestSynchronousStop) {
   uint64_t seen = 0;
   bool done = false;
   TestDelegate delegate(
@@ -114,7 +114,7 @@ TEST(TestFileScanner, TestSynchronousStop) {
   EXPECT_TRUE(done);
 }
 
-TEST(TestFileScanner, TestAsynchronousStop) {
+TEST(FileScannerTest, TestAsynchronousStop) {
   uint64_t seen = 0;
   base::TestTaskRunner task_runner;
   TestDelegate delegate(
@@ -134,7 +134,7 @@ TEST(TestFileScanner, TestAsynchronousStop) {
   EXPECT_EQ(seen, 1u);
 }
 
-TEST(TestFileScanner, TestSynchronousFindFiles) {
+TEST(FileScannerTest, TestSynchronousFindFiles) {
   std::vector<FileEntry> file_entries;
   TestDelegate delegate(
       [&file_entries](BlockDeviceID block_device_id, Inode inode,
@@ -160,7 +160,7 @@ TEST(TestFileScanner, TestSynchronousFindFiles) {
               protos::pbzero::InodeFileMap_Entry_Type_DIRECTORY))));
 }
 
-TEST(TestFileScanner, TestAsynchronousFindFiles) {
+TEST(FileScannerTest, TestAsynchronousFindFiles) {
   base::TestTaskRunner task_runner;
   std::vector<FileEntry> file_entries;
   TestDelegate delegate(
