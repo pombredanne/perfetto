@@ -68,13 +68,13 @@ void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   protos::pbzero::ProcessTree* process_tree = nullptr;
   for (int32_t pid : pids) {
     auto it_and_inserted = seen_pids_.emplace(pid);
-    if (it_and_inserted.second) {
-      if (!process_tree) {
-        trace_packet = writer_->NewTracePacket();
-        process_tree = trace_packet->set_process_tree();
-      }
-      WriteProcess(pid, process_tree);
+    if (!it_and_inserted.second)
+      continue;
+    if (!process_tree) {
+      trace_packet = writer_->NewTracePacket();
+      process_tree = trace_packet->set_process_tree();
     }
+    WriteProcess(pid, process_tree);
   }
 }
 
