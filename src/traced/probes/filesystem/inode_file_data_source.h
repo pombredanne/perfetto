@@ -64,6 +64,7 @@ class InodeFileDataSource : public FileScanner::Delegate {
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
 
   // Called when Inodes are seen in the FtraceEventBundle
+  // TODO(fmayer): Change  to std::pair<BlockDeviceID, Inode>.
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
   // Search in /system partition and add inodes to InodeFileMap proto if found
