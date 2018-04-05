@@ -376,17 +376,17 @@ void InodeFileDataSource::FindMissingInodes() {
   file_scanner_->Scan(task_runner_);
 }
 
-uint64_t InodeFileDataSource::GetScanIntervalMs() {
+uint64_t InodeFileDataSource::GetScanIntervalMs() const {
   return OrDefault(source_config_.inode_file_config().scan_interval_ms(),
                    kScanIntervalMs);
 }
 
-uint64_t InodeFileDataSource::GetScanDelayMs() {
+uint64_t InodeFileDataSource::GetScanDelayMs() const {
   return OrDefault(source_config_.inode_file_config().scan_delay_ms(),
                    kScanDelayMs);
 }
 
-uint64_t InodeFileDataSource::GetScanBatchSize() {
+uint64_t InodeFileDataSource::GetScanBatchSize() const {
   return OrDefault(source_config_.inode_file_config().scan_batch_size(),
                    kScanBatchSize);
 }
