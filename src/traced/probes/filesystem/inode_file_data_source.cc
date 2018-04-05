@@ -128,20 +128,22 @@ InodeFileDataSource::InodeFileDataSource(
       cache_(cache),
       writer_(std::move(writer)),
       weak_factory_(this) {
-  auto weak_this = GetWeakPtr();
-  // Flush TracePacket of current scan shortly before we expect the trace
-  // to end, to retain information from any scan that might be in
-  // progress.
-  task_runner_->PostDelayedTask(
-      [weak_this] {
-        if (!weak_this) {
-          PERFETTO_DLOG("Giving up flush.");
-          return;
-        }
-        PERFETTO_DLOG("Flushing.");
-        weak_this->ResetTracePacket();
-      },
-      source_config_.trace_duration_ms() - kFlushBeforeEndMs);
+  if (kFlushBeforeEndMs < source_config_.trace_duration_ms()) {
+    auto weak_this = GetWeakPtr();
+    // Flush TracePacket of current scan shortly before we expect the trace
+    // to end, to retain information from any scan that might be in
+    // progress.
+    task_runner_->PostDelayedTask(
+        [weak_this] {
+          if (!weak_this) {
+            PERFETTO_DLOG("Giving up flush.");
+            return;
+          }
+          PERFETTO_DLOG("Flushing.");
+          weak_this->ResetTracePacket();
+        },
+        source_config_.trace_duration_ms() - kFlushBeforeEndMs);
+  }
 }
 
 void InodeFileDataSource::AddInodesFromStaticMap(

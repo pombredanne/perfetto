@@ -138,5 +138,6 @@ TEST_F(InodeFileDataSourceTest, TestCache) {
 
   data_source->OnInodes({{buf.st_ino, buf.st_dev}});
 }
+
 }  // namespace
 }  // namespace perfetto
