@@ -42,22 +42,12 @@ namespace perfetto {
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 
-void ScanFilesDFS(
-    const std::string& root_directory,
-    const std::function<bool(BlockDeviceID block_device_id,
-                             Inode inode_number,
-                             const std::string& path,
-                             protos::pbzero::InodeFileMap_Entry_Type type)>&);
-
 // Creates block_device_map for /system partition
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
         static_file_map);
 
-void FillInodeEntry(InodeFileMap* destination,
-                    Inode inode_number,
-                    const InodeMapValue& inode_map_value);
 
 class InodeFileDataSource : public FileScanner::Delegate {
  public:
@@ -86,6 +76,13 @@ class InodeFileDataSource : public FileScanner::Delegate {
 
   virtual ~InodeFileDataSource() {}
 
+  virtual void FillInodeEntry(InodeFileMap* destination,
+                              Inode inode_number,
+                              const InodeMapValue& inode_map_value);
+
+ protected:
+  std::multimap<BlockDeviceID, std::string> mount_points_;
+
  private:
   InodeFileMap* AddToCurrentTracePacket(BlockDeviceID block_device_id);
   void ResetTracePacket();
@@ -111,7 +108,6 @@ class InodeFileDataSource : public FileScanner::Delegate {
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
       static_file_map_;
   LRUInodeCache* cache_;
-  std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
   std::map<BlockDeviceID, std::set<Inode>> missing_inodes_;
   std::map<BlockDeviceID, std::set<Inode>> next_missing_inodes_;
