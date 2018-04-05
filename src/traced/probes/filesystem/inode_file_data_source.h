@@ -88,11 +88,14 @@ class InodeFileDataSource : public FileScanner::Delegate {
   InodeFileMap* AddToCurrentTracePacket(BlockDeviceID block_device_id);
   void ResetTracePacket();
   void FindMissingInodes();
+
+  // Callbacks for dynamic filesystem scan.
   bool OnInodeFound(BlockDeviceID block_device_id,
                     Inode inode_number,
                     const std::string& path,
                     protos::pbzero::InodeFileMap_Entry_Type type);
   void OnInodeScanDone();
+
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
 
