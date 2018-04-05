@@ -26,8 +26,12 @@ namespace perfetto {
 
 ProcessStatsDataSource::ProcessStatsDataSource(
     TracingSessionID id,
-    std::unique_ptr<TraceWriter> writer)
-    : session_id_(id), writer_(std::move(writer)), weak_factory_(this) {}
+    std::unique_ptr<TraceWriter> writer,
+    const DataSourceConfig& config)
+    : session_id_(id),
+      writer_(std::move(writer)),
+      config_(config),
+      weak_factory_(this) {}
 
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 
@@ -52,15 +56,25 @@ void ProcessStatsDataSource::WriteAllProcesses() {
     WriteProcess(pid, process_tree);
     seen_pids->insert(pid);
   });
+
+  trace_packet->Finalize();
+
+  // TODO(hjd): Remove this once the service flushes the producers on teardown.
+  writer_->Flush();
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
-  auto trace_packet = writer_->NewTracePacket();
-  auto* process_tree = trace_packet->set_process_tree();
+  TraceWriter::TracePacketHandle trace_packet{};
+  protos::pbzero::ProcessTree* process_tree = nullptr;
   for (int32_t pid : pids) {
     auto it_and_inserted = seen_pids_.emplace(pid);
-    if (it_and_inserted.second)
+    if (it_and_inserted.second) {
+      if (!process_tree) {
+        trace_packet = writer_->NewTracePacket();
+        process_tree = trace_packet->set_process_tree();
+      }
       WriteProcess(pid, process_tree);
+    }
   }
 }
 
