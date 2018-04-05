@@ -250,6 +250,11 @@ void PrintFtraceTrack(std::ostream* output,
   *output << "-------------------- " << kFtraceTrackName
           << "--------------------\n";
   char line[2048];
+  if (max == 0) {
+    sprintf(line, "%s", "There are 0 ftrace events in this trace.\n\n");
+    *output << std::string(line);
+    return;
+  }
   for (size_t i = 0; i < bucket_count; i++) {
     sprintf(
         line, "%s",
@@ -324,9 +329,14 @@ void PrintProcessStats(std::ostream* output,
                    std::inserter(intersect, intersect.begin()));
 
   char matching[2048];
-  sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n\n",
-          intersect.size(), tids_in_events.size(),
-          (intersect.size() * 100) / tids_in_events.size());
+  if (!tids_in_events.size()) {
+    sprintf(matching, "Thread ids with process info: %zu/%zu -> 0 %%\n\n",
+            intersect.size(), tids_in_events.size());
+  } else {
+    sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n\n",
+            intersect.size(), tids_in_events.size(),
+            (intersect.size() * 100) / tids_in_events.size());
+  }
   *output << std::string(matching);
   *output << "\n";
 }
