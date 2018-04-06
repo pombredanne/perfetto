@@ -22,21 +22,21 @@ import sys
 import argparse
 
 class Node(object):
-  def __init__(self, name, label):
+  def __init__(self, name, label=None):
     self.name = name
     self.label = label
     self.marked = False
     self.children = {}
 
-  def Find(self, children):
-    if not children:
+  def Find(self, components):
+    if not components:
       return self
 
-    child = children[0]
+    child = components[0]
     if child in self.children:
-      return self.children[child].Find(children[1:])
+      return self.children[child].Find(components[1:])
 
-    n = Node(child, None)
+    n = Node(child)
     self.children[child] = n
     return n
 
@@ -61,7 +61,7 @@ class Node(object):
 
 
 def BuildTree(stream=sys.stdin):
-  root = Node("", None)
+  root = Node("")
 
   for line in stream:
     line = line.strip()
