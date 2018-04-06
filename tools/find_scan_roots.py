@@ -75,7 +75,6 @@ def BuildTree(stream=sys.stdin):
     components = path[1:].split('/')
 
     n = root.Find(components)
-    # assert(n.label is None)
     n.label = sanitized_label
   return root
 
