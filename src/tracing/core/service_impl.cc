@@ -419,20 +419,19 @@ void ServiceImpl::Flush(TracingSessionID tsid,
   // Send a flush request to each producer involved in the tracing session. In
   // order to issue a flush request we have to build a map of all data source
   // instance ids enabled for each producer.
-  std::map<ProducerEndpointImpl*, std::vector<DataSourceInstanceID>> flush_map;
+  std::map<ProducerID, std::vector<DataSourceInstanceID>> flush_map;
   for (const auto& data_source_inst : tracing_session->data_source_instances) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
-    ProducerEndpointImpl* producer = GetProducer(producer_id);
-    PERFETTO_DCHECK(producer);
-    flush_map[producer].push_back(ds_inst_id);
+    flush_map[producer_id].push_back(ds_inst_id);
   }
 
   for (const auto& kv : flush_map) {
-    ProducerEndpointImpl* producer = kv.first;
+    ProducerID producer_id = kv.first;
+    ProducerEndpointImpl* producer = GetProducer(producer_id);
     const std::vector<DataSourceInstanceID>& data_sources = kv.second;
     producer->Flush(flush_request_id, data_sources);
-    pending_flush.producers.insert(producer->id_);
+    pending_flush.producers.insert(producer_id);
   }
 
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
@@ -455,7 +454,7 @@ void ServiceImpl::NotifyFlushDoneForProducer(ProducerID producer_id,
       pending_flush.producers.erase(producer_id);
       if (pending_flush.producers.empty()) {
         task_runner_->PostTask(
-            std::bind(std::move(pending_flush.callback), true));
+            std::bind(std::move(pending_flush.callback), /*success=*/true));
         it = pending_flushes.erase(it);
       } else {
         it++;
@@ -1271,6 +1270,7 @@ void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
   // should send the Producer a TearDownTracing if all its data sources have
   // been disabled (see b/77532839 and aosp/655179 PS1).
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
@@ -1306,6 +1306,7 @@ void ServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
 void ServiceImpl::ProducerEndpointImpl::Flush(
     FlushRequestID flush_request_id,
     const std::vector<DataSourceInstanceID>& data_sources) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, flush_request_id, data_sources] {
     if (weak_this) {
@@ -1318,6 +1319,7 @@ void ServiceImpl::ProducerEndpointImpl::Flush(
 void ServiceImpl::ProducerEndpointImpl::CreateDataSourceInstance(
     DataSourceInstanceID ds_id,
     const DataSourceConfig& config) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_id, config] {
     if (weak_this)
