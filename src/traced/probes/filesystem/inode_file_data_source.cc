@@ -98,9 +98,9 @@ void CreateStaticDeviceToInodeMap(
   scanner.Scan();
 }
 
-void FillInodeEntry(InodeFileMap* destination,
-                    Inode inode_number,
-                    const InodeMapValue& inode_map_value) {
+void InodeFileDataSource::FillInodeEntry(InodeFileMap* destination,
+                                         Inode inode_number,
+                                         const InodeMapValue& inode_map_value) {
   auto* entry = destination->add_entries();
   entry->set_inode_number(inode_number);
   entry->set_type(inode_map_value.type());
@@ -363,17 +363,17 @@ void InodeFileDataSource::FindMissingInodes() {
   file_scanner_->Scan(task_runner_);
 }
 
-uint64_t InodeFileDataSource::GetScanIntervalMs() {
+uint64_t InodeFileDataSource::GetScanIntervalMs() const {
   return OrDefault(source_config_.inode_file_config().scan_interval_ms(),
                    kScanIntervalMs);
 }
 
-uint64_t InodeFileDataSource::GetScanDelayMs() {
+uint64_t InodeFileDataSource::GetScanDelayMs() const {
   return OrDefault(source_config_.inode_file_config().scan_delay_ms(),
                    kScanDelayMs);
 }
 
-uint64_t InodeFileDataSource::GetScanBatchSize() {
+uint64_t InodeFileDataSource::GetScanBatchSize() const {
   return OrDefault(source_config_.inode_file_config().scan_batch_size(),
                    kScanBatchSize);
 }

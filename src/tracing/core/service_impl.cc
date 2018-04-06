@@ -64,7 +64,7 @@ constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
 constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
 }  // namespace
 
-// These constants instad are defined in the header because are used by tests.
+// These constants instead are defined in the header because are used by tests.
 constexpr size_t ServiceImpl::kDefaultShmSize;
 constexpr size_t ServiceImpl::kMaxShmSize;
 
@@ -850,10 +850,13 @@ void ServiceImpl::CreateDataSourceInstance(
     producer->shared_buffer_page_size_kb_ = page_size / 1024;
 
     // Determine the SMB size. Must be an integer multiple of the SMB page size.
+    // The decisional tree is as follows:
+    // 1. Give priority to what defined in the trace config.
+    // 2. If unset give priority to the hint passed by the producer.
+    // 3. Keep within bounds and ensure it's a multiple of the page size.
     size_t shm_size = producer_config.shm_size_kb() * 1024;
     if (shm_size == 0)
-      shm_size = kDefaultShmSize;
-    shm_size = std::min<size_t>(shm_size, producer->shmem_size_hint_bytes_);
+      shm_size = producer->shmem_size_hint_bytes_;
     shm_size = std::min<size_t>(shm_size, kMaxShmSize);
     if (shm_size < page_size || shm_size % page_size)
       shm_size = kDefaultShmSize;
@@ -863,7 +866,7 @@ void ServiceImpl::CreateDataSourceInstance(
     // client to go away.
     auto shared_memory = shm_factory_->CreateSharedMemory(shm_size);
     producer->SetSharedMemory(std::move(shared_memory));
-    producer->SetupSharedMemory();
+    producer->OnTracingSetup();
     UpdateMemoryGuardrail();
   }
   producer->CreateDataSourceInstance(inst_id, ds_config);
@@ -1266,8 +1269,8 @@ size_t ServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb() const {
 void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
     DataSourceInstanceID ds_inst_id) {
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
-  // should send the Producer an OnTracingDisabled if all its data sources
-  // have been disabled (see b/77532839 and aosp/655179 PS1).
+  // should send the Producer a TearDownTracing if all its data sources have
+  // been disabled (see b/77532839 and aosp/655179 PS1).
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
@@ -1292,11 +1295,11 @@ ServiceImpl::ProducerEndpointImpl::CreateTraceWriter(BufferID buf_id) {
   return GetOrCreateShmemArbiter()->CreateTraceWriter(buf_id);
 }
 
-void ServiceImpl::ProducerEndpointImpl::SetupSharedMemory() {
+void ServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
-      weak_this->producer_->SetupSharedMemory();
+      weak_this->producer_->OnTracingSetup();
   });
 }
 
@@ -1305,9 +1308,10 @@ void ServiceImpl::ProducerEndpointImpl::Flush(
     const std::vector<DataSourceInstanceID>& data_sources) {
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, flush_request_id, data_sources] {
-    if (weak_this)
+    if (weak_this) {
       weak_this->producer_->Flush(flush_request_id, data_sources.data(),
                                   data_sources.size());
+    }
   });
 }
 

@@ -111,10 +111,10 @@ message GetAsyncCommandResponse {
 
   // This message also transports the file descriptor for the shared memory
   // buffer.
-  message SetupSharedMemory { optional uint64 shared_buffer_page_size_kb = 1; }
+  message SetupTracing { optional uint64 shared_buffer_page_size_kb = 1; }
 
   message Flush {
-    // The instance id  (i.e. StartDataSource.new_instance_id) of the data
+    // The instance id (i.e. StartDataSource.new_instance_id) of the data
     // sources to flush.
     repeated uint64 data_source_ids = 1;
 
@@ -127,8 +127,8 @@ message GetAsyncCommandResponse {
   oneof cmd {
     StartDataSource start_data_source = 1;
     StopDataSource stop_data_source = 2;
-    SetupSharedMemory setup_shared_memory = 3;
-    // 4 was on_tracing_stop (aka tear_down_shared_memory), never implemented.
+    SetupTracing setup_tracing = 3;
+    // id == 4 was teardown_tracing, never implemented.
     Flush flush = 5;
   }
 }

@@ -118,7 +118,7 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   });
 }
 
-void FakeProducer::SetupSharedMemory() {}
+void FakeProducer::OnTracingSetup() {}
 
 void FakeProducer::Flush(FlushRequestID flush_request_id,
                          const DataSourceInstanceID* data_source_ids,

@@ -55,6 +55,7 @@ namespace perfetto {
 
 namespace {
 constexpr size_t kDefaultShmSizeKb = ServiceImpl::kDefaultShmSize / 1024;
+constexpr size_t kMaxShmSizeKb = ServiceImpl::kMaxShmSize / 1024;
 }  // namespace
 
 class ServiceImplTest : public testing::Test {
@@ -137,7 +138,7 @@ TEST_F(ServiceImplTest, EnableAndDisableTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   consumer->DisableTracing();
@@ -161,7 +162,7 @@ TEST_F(ServiceImplTest, LockdownMode) {
       TraceConfig::LockdownModeOperation::LOCKDOWN_SET);
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
@@ -203,7 +204,7 @@ TEST_F(ServiceImplTest, DisconnectConsumerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting the consumer while tracing should trigger data source
@@ -226,7 +227,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   ds_config->set_name("data_source");
   consumer->EnableTracing(trace_config);
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting and reconnecting a producer with a matching data source.
@@ -235,7 +236,7 @@ TEST_F(ServiceImplTest, ReconnectProducerWhileTracing) {
   producer = CreateMockProducer();
   producer->Connect(svc.get(), "mock_producer_2");
   producer->RegisterDataSource("data_source");
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 }
 
@@ -286,7 +287,7 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   static const char kPayload[] = "1234567890abcdef-";
@@ -332,67 +333,27 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   }
 }
 
-TEST_F(ServiceImplTest, ProducerShmSizeHintRespected) {
-  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
-  consumer->Connect(svc.get());
-
-  static constexpr size_t kReqSizes[] = {
-      4096,              //  OK.
-      8192,              //  OK.
-      32768,             //  OK.
-      16,                //  Too small.
-      4097,              //  Not a multiple of page size.
-      4096 * 1000000ULL  //  Too big, will be truncated.
-  };
-  static constexpr size_t kExpectedSizesKb[] = {
-      4, 8, 32, kDefaultShmSizeKb, kDefaultShmSizeKb, kDefaultShmSizeKb};
-
-  static constexpr size_t kNumProducers = base::ArraySize(kReqSizes);
-  std::unique_ptr<MockProducer> producer[kNumProducers];
-  for (size_t i = 0; i < kNumProducers; i++) {
-    auto name = "mock_producer_" + std::to_string(i);
-    producer[i] = CreateMockProducer();
-    producer[i]->Connect(svc.get(), name, geteuid(), kReqSizes[i]);
-    producer[i]->RegisterDataSource("data_source");
-  }
-
-  TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(128);
-  auto* ds_config = trace_config.add_data_sources()->mutable_config();
-  ds_config->set_name("data_source");
-
-  consumer->EnableTracing(trace_config);
-  size_t actual_shm_sizes_kb[kNumProducers]{};
-  for (size_t i = 0; i < kNumProducers; i++) {
-    producer[i]->WaitForShmemInitialization();
-    producer[i]->WaitForDataSourceStart("data_source");
-    actual_shm_sizes_kb[i] =
-        producer[i]->endpoint()->shared_memory()->size() / 1024;
-  }
-  ASSERT_THAT(actual_shm_sizes_kb, ElementsAreArray(kExpectedSizesKb));
-}
-
 // Test the logic that allows the trace config to set the shm total size and
-// page size from the trace config. Also check that, if the producer specifies
-// a lower hint for the shm size, we respect it.
-TEST_F(ServiceImplTest, ProducerShmSizeAndPageOverriddenByTraceConfig) {
+// page size from the trace config. Also check that, if the config doesn't
+// specify a value we fall back on the hint provided by the producer.
+TEST_F(ServiceImplTest, ProducerShmAndPageSizeOverriddenByTraceConfig) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
-  const size_t kConfigPageSizesKb[] = {16, 16, 4, 0, 16, 8, 3, 4096};
-  const size_t kExpectedPageSizesKb[] = {16, 16, 4, 4, 16, 8, 4, 64};
+  const size_t kConfigPageSizesKb[] = /****/ {16, 16, 4, 0, 16, 8, 3, 4096, 4};
+  const size_t kExpectedPageSizesKb[] = /**/ {16, 16, 4, 4, 16, 8, 4, 64, 4};
 
-  const size_t kConfigSizesKb[] = {32, 32, 20, 20, 20, 0, 0, 32};
-  const size_t kHintSizesKb[] = {16, 128, 8, 265, 32, 0, 24, 16};
+  const size_t kConfigSizesKb[] = /**/ {0, 16, 0, 20, 32, 7, 0, 96, 4096000};
+  const size_t kHintSizesKb[] = /****/ {0, 0, 16, 32, 16, 0, 7, 96, 4096000};
   const size_t kExpectedSizesKb[] = {
-      16,                 // Respect hint (16 KB) which is < config (32 KB).
-      32,                 // Cap at config (32 KB) size.
-      8,                  // Respect hint (8 KB) which is < config (20 KB).
-      20,                 // Hint is invalid (265 KB), use lower config (20 KB).
-      kDefaultShmSizeKb,  // Config (20 KB) not a multiple of page size (16 KB).
-      kDefaultShmSizeKb,  // Both config and hint are zero.
-      24,                 // Config is 0, use hint (64 KB).
-      kDefaultShmSizeKb   // Neither config (32 KB) nor hint (16 KB) are
-                          // multiples of the page size (64 KB).
+      kDefaultShmSizeKb,  // Both hint and config are 0, use default.
+      16,                 // Hint is 0, use config.
+      16,                 // Config is 0, use hint.
+      20,                 // Hint is takes precedence over the config.
+      32,                 // Ditto, even if config is higher than hint.
+      kDefaultShmSizeKb,  // Config is invalid and hint is 0, use default.
+      kDefaultShmSizeKb,  // Config is 0 and hint is invalid, use default.
+      kDefaultShmSizeKb,  // 96 KB isn't a multiple of the page size (64 KB).
+      kMaxShmSizeKb       // Too big, cap at kMaxShmSize.
   };
 
   const size_t kNumProducers = base::ArraySize(kHintSizesKb);
@@ -419,7 +380,7 @@ TEST_F(ServiceImplTest, ProducerShmSizeAndPageOverriddenByTraceConfig) {
   size_t actual_shm_sizes_kb[kNumProducers]{};
   size_t actual_page_sizes_kb[kNumProducers]{};
   for (size_t i = 0; i < kNumProducers; i++) {
-    producer[i]->WaitForShmemInitialization();
+    producer[i]->WaitForTracingSetup();
     producer[i]->WaitForDataSourceStart("data_source");
     actual_shm_sizes_kb[i] =
         producer[i]->endpoint()->shared_memory()->size() / 1024;
@@ -444,7 +405,7 @@ TEST_F(ServiceImplTest, ExplicitFlush) {
   ds_config->set_name("data_source");
 
   consumer->EnableTracing(trace_config);
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -482,7 +443,7 @@ TEST_F(ServiceImplTest, ImplicitFlushOnTimedTraces) {
   trace_config.set_duration_ms(1);
 
   consumer->EnableTracing(trace_config);
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -520,7 +481,7 @@ TEST_F(ServiceImplTest, BatchFlushes) {
   ds_config->set_name("data_source");
 
   consumer->EnableTracing(trace_config);
-  producer->WaitForShmemInitialization();
+  producer->WaitForTracingSetup();
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =

@@ -47,7 +47,7 @@ class ProbesProducer : public Producer {
   void CreateDataSourceInstance(DataSourceInstanceID,
                                 const DataSourceConfig&) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
-  void SetupSharedMemory() override;
+  void OnTracingSetup() override;
   void Flush(FlushRequestID,
              const DataSourceInstanceID* data_source_ids,
              size_t num_data_sources) override;

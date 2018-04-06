@@ -114,10 +114,11 @@ void ConsumerIPCService::OnFlushCallback(
     PendingFlushResponses::iterator pending_response_it) {
   DeferredFlushResponse response(std::move(*pending_response_it));
   pending_flush_responses_.erase(pending_response_it);
-  if (success)
+  if (success) {
     response.Resolve(ipc::AsyncResult<protos::FlushResponse>::Create());
-  else
+  } else {
     response.Reject();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

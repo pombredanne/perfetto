@@ -118,7 +118,7 @@ class PERFETTO_EXPORT Service {
     virtual void DisableTracing() = 0;
 
     // Requests all data sources to flush their data immediately and invokes the
-    // passed callback once either of them have acked the flush (in which case
+    // passed callback once all of them have acked the flush (in which case
     // the callback argument |success| will be true) or |timeout_ms| are elapsed
     // (in which case |success| will be false).
     using FlushCallback = std::function<void(bool /*success*/)>;

@@ -48,7 +48,7 @@ class MockProducer : public Producer {
                size_t shared_memory_size_hint_bytes = 0);
   void RegisterDataSource(const std::string& name);
   void UnregisterDataSource(const std::string& name);
-  void WaitForShmemInitialization();
+  void WaitForTracingSetup();
   void WaitForDataSourceStart(const std::string& name);
   void WaitForDataSourceStop(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(
@@ -66,7 +66,7 @@ class MockProducer : public Producer {
   MOCK_METHOD2(CreateDataSourceInstance,
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(TearDownDataSourceInstance, void(DataSourceInstanceID));
-  MOCK_METHOD0(SetupSharedMemory, void());
+  MOCK_METHOD0(OnTracingSetup, void());
   MOCK_METHOD3(Flush,
                void(FlushRequestID, const DataSourceInstanceID*, size_t));
 

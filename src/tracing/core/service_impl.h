@@ -74,7 +74,7 @@ class ServiceImpl : public Service {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
 
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
-    void SetupSharedMemory();
+    void OnTracingSetup();
     void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
     void CreateDataSourceInstance(DataSourceInstanceID,
                                   const DataSourceConfig&);
@@ -228,7 +228,8 @@ class ServiceImpl : public Service {
     // producers for this tracing session.
     std::multimap<ProducerID, DataSourceInstance> data_source_instances;
 
-    // List of data sources for which we are awiting a Flush(request_id) ack.
+    // For each Flush(N) request, keeps track of the set of producers for which
+    // we are still awaiting a NotifyFlushComplete(N) ack.
     std::map<FlushRequestID, PendingFlush> pending_flushes;
 
     // Maps a per-trace-session buffer index into the corresponding global
