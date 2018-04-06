@@ -413,7 +413,7 @@ void ServiceImpl::Flush(TracingSessionID tsid,
   PendingFlush& pending_flush =
       tracing_session->pending_flushes
           .emplace_hint(tracing_session->pending_flushes.end(),
-                        flush_request_id, std::move(callback))
+                        flush_request_id, PendingFlush(std::move(callback)))
           ->second;
 
   // Send a flush request to each producer involved in the tracing session. In
