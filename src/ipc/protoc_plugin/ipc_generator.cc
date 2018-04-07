@@ -21,12 +21,14 @@
 #include <set>
 #include <string>
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/compiler/cpp/cpp_options.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/io/printer.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/stubs/strutil.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {
@@ -226,7 +228,7 @@ IPCGenerator::IPCGenerator() = default;
 IPCGenerator::~IPCGenerator() = default;
 
 bool IPCGenerator::Generate(const FileDescriptor* file,
-                            const std::string& options,
+                            const std::string&,
                             GeneratorContext* context,
                             std::string* error) const {
   if (file->options().cc_generic_services()) {

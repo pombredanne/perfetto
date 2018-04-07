@@ -17,9 +17,12 @@
 #include "perfetto/ipc/deferred.h"
 
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/test/deferred_unittest_messages.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {
@@ -105,7 +108,7 @@ TEST(DeferredTest, BindTwiceDoesNotHoldBindState) {
 
   // Re-binding the callback should release the bind state, without invoking the
   // old callback.
-  deferred.Bind([](AsyncResult<TestMessage> msg) {});
+  deferred.Bind([](AsyncResult<TestMessage>) {});
   ASSERT_EQ(1, num_callbacks.use_count());
   ASSERT_EQ(0, *num_callbacks);
 

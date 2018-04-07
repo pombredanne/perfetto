@@ -17,8 +17,12 @@
 #ifndef SRC_PERFETTO_CMD_RATE_LIMITER_H_
 #define SRC_PERFETTO_CMD_RATE_LIMITER_H_
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/time.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

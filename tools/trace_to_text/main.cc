@@ -32,18 +32,22 @@
 #include <sstream>
 #include <utility>
 
-#include <google/protobuf/compiler/importer.h>
-#include <google/protobuf/dynamic_message.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/util/field_comparator.h>
-#include <google/protobuf/util/message_differencer.h>
-
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/trace/trace.pb.h"
-#include "perfetto/trace/trace_packet.pb.h"
 #include "tools/trace_to_text/ftrace_event_formatter.h"
 #include "tools/trace_to_text/ftrace_inode_handler.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "google/protobuf/compiler/importer.h"
+#include "google/protobuf/dynamic_message.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/text_format.h"
+#include "google/protobuf/util/field_comparator.h"
+#include "google/protobuf/util/message_differencer.h"
+
+#include "perfetto/trace/trace.pb.h"
+#include "perfetto/trace/trace_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {
@@ -158,8 +162,8 @@ void ForEachPacketInTrace(
     bytes_processed += field_size;
 
     protos::TracePacket packet;
-    PERFETTO_CHECK(packet.ParseFromArray(buf.get(), field_size));
-
+    auto res = packet.ParseFromArray(buf.get(), static_cast<int>(field_size));
+    PERFETTO_CHECK(res);
     f(packet);
   }
 }
@@ -241,7 +245,7 @@ void PrintFtraceTrack(std::ostream* output,
   for (size_t i = 0; i < bucket_count; i++) {
     auto low = ftrace_timestamps.lower_bound(i * bucket_size + start);
     auto high = ftrace_timestamps.upper_bound((i + 1) * bucket_size + start);
-    buckets[i] = std::distance(low, high);
+    buckets[i] = static_cast<size_t>(std::distance(low, high));
     max = std::max(max, buckets[i]);
   }
 
@@ -380,7 +384,7 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
             ftrace_inode_count++;
           }
           if (event.pid()) {
-            tids_in_events.insert(event.pid());
+            tids_in_events.insert(static_cast<int>(event.pid()));
           }
           if (event.timestamp()) {
             start = std::min<uint64_t>(start, event.timestamp());
@@ -409,9 +413,9 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
 
 namespace {
 
-int Usage(int argc, char** argv) {
+int Usage(const char* argv0) {
   printf("Usage: %s [systrace|json|text|summary] < trace.proto > trace.txt\n",
-         argv[0]);
+         argv0);
   return 1;
 }
 
@@ -419,7 +423,7 @@ int Usage(int argc, char** argv) {
 
 int main(int argc, char** argv) {
   if (argc != 2)
-    return Usage(argc, argv);
+    return Usage(argv[0]);
 
   std::string format(argv[1]);
 
@@ -433,5 +437,5 @@ int main(int argc, char** argv) {
     return perfetto::TraceToText(&std::cin, &std::cout);
   if (format == "summary")
     return perfetto::TraceToSummary(&std::cin, &std::cout);
-  return Usage(argc, argv);
+  return Usage(argv[0]);
 }

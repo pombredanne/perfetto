@@ -20,16 +20,19 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/wire_protocol.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {
 namespace {
 
-constexpr size_t kHeaderSize = sizeof(uint32_t);
+constexpr uint32_t kHeaderSize = sizeof(uint32_t);
 
 // Generates a parsable Frame of exactly |size| bytes (including header).
 std::vector<char> GetSimpleFrame(size_t size) {
@@ -44,10 +47,10 @@ std::vector<char> GetSimpleFrame(size_t size) {
   Frame frame;
   std::vector<char> padding;
   char padding_char = '0';
-  const size_t payload_size = size - kHeaderSize;
-  for (size_t size_left = payload_size; size_left > 0;) {
+  const uint32_t payload_size = static_cast<uint32_t>(size - kHeaderSize);
+  for (uint32_t size_left = payload_size; size_left > 0;) {
     PERFETTO_CHECK(size_left >= 2);  // We cannot produce frames < 2 bytes.
-    size_t padding_size;
+    uint32_t padding_size;
     if (size_left <= 127) {
       padding_size = size_left - 2;
       size_left = 0;
@@ -56,7 +59,7 @@ std::vector<char> GetSimpleFrame(size_t size) {
       size_left -= padding_size + 2;
     }
     padding.resize(padding_size);
-    for (size_t i = 0; i < padding_size; i++) {
+    for (uint32_t i = 0; i < padding_size; i++) {
       padding_char = padding_char == 'z' ? '0' : padding_char + 1;
       padding[i] = padding_char;
     }

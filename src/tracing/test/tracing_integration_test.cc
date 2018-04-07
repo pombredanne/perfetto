@@ -19,6 +19,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
@@ -33,11 +34,14 @@
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
 
-#include "perfetto/config/trace_config.pb.h"
 #include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "perfetto/config/trace_config.pb.h"
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {
@@ -323,7 +327,7 @@ TEST_F(TracingIntegrationTest, WriteIntoFile) {
   ssize_t rsize = read(tmp_file.fd(), tmp_buf, sizeof(tmp_buf));
   ASSERT_GT(rsize, 0);
   protos::Trace tmp_trace;
-  ASSERT_TRUE(tmp_trace.ParseFromArray(tmp_buf, rsize));
+  ASSERT_TRUE(tmp_trace.ParseFromArray(tmp_buf, static_cast<int>(rsize)));
   size_t num_test_packet = 0;
   for (int i = 0; i < tmp_trace.packet_size(); i++) {
     const protos::TracePacket& packet = tmp_trace.packet(i);

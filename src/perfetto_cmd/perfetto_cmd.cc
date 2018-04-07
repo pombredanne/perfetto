@@ -39,18 +39,19 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
-
-#include "perfetto/config/trace_config.pb.h"
-
 #include "src/tracing/ipc/default_socket.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "perfetto/config/trace_config.pb.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #include <android/os/DropBoxManager.h>
 #include <utils/Looper.h>
 #include <utils/StrongPointer.h>
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 // TODO(primiano): add the ability to pass the file descriptor directly to the
 // traced service instead of receiving a copy of the slices and writing them
@@ -98,15 +99,15 @@ int PerfettoCmd::Main(int argc, char** argv) {
   };
   static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
-      {"help", required_argument, 0, 'h'},
-      {"config", required_argument, 0, 'c'},
-      {"out", required_argument, 0, 'o'},
-      {"background", no_argument, 0, 'b'},
-      {"dropbox", optional_argument, 0, 'd'},
-      {"no-guardrails", optional_argument, 0, 'n'},
-      {"alert-id", required_argument, 0, OPT_ALERT_ID},
-      {"config-id", required_argument, 0, OPT_CONFIG_ID},
-      {"config-uid", required_argument, 0, OPT_CONFIG_UID},
+      {"help", required_argument, nullptr, 'h'},
+      {"config", required_argument, nullptr, 'c'},
+      {"out", required_argument, nullptr, 'o'},
+      {"background", no_argument, nullptr, 'b'},
+      {"dropbox", optional_argument, nullptr, 'd'},
+      {"no-guardrails", optional_argument, nullptr, 'n'},
+      {"alert-id", required_argument, nullptr, OPT_ALERT_ID},
+      {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
+      {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
@@ -182,7 +183,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == OPT_CONFIG_UID) {
-      statsd_metadata.set_triggering_config_uid(atol(optarg));
+      statsd_metadata.set_triggering_config_uid(atoi(optarg));
       continue;
     }
 
@@ -259,8 +260,9 @@ void PerfettoCmd::OnConnect() {
 
   // Failsafe mechanism to avoid waiting indefinitely if the service hangs.
   if (trace_config_->duration_ms()) {
-    task_runner_.PostDelayedTask(std::bind(&PerfettoCmd::OnTimeout, this),
-                                 trace_config_->duration_ms() + 10000);
+    task_runner_.PostDelayedTask(
+        std::bind(&PerfettoCmd::OnTimeout, this),
+        static_cast<int>(trace_config_->duration_ms() + 10000));
   }
 }
 
@@ -283,8 +285,8 @@ void PerfettoCmd::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
     static constexpr uint32_t kPacketFieldNumber = 1;
     pos = WriteVarInt(MakeTagLengthDelimited(kPacketFieldNumber), pos);
     pos = WriteVarInt(static_cast<uint32_t>(packet.size()), pos);
-    fwrite(reinterpret_cast<const char*>(preamble), pos - preamble, 1,
-           trace_out_stream_.get());
+    fwrite(reinterpret_cast<const char*>(preamble),
+           static_cast<size_t>(pos - preamble), 1, trace_out_stream_.get());
     for (const Slice& slice : packet.slices()) {
       fwrite(reinterpret_cast<const char*>(slice.start), slice.size, 1,
              trace_out_stream_.get());
@@ -390,7 +392,7 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
     PERFETTO_CHECK(PERFETTO_EINTR(write(g_consumer_cmd->ctrl_c_pipe_wr(), &one,
                                         sizeof(one))) == 1);
   };
-  sa.sa_flags = SA_RESETHAND | SA_RESTART;
+  sa.sa_flags = static_cast<decltype(sa.sa_flags)>(SA_RESETHAND | SA_RESTART);
 #pragma GCC diagnostic pop
   sigaction(SIGINT, &sa, nullptr);
 

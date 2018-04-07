@@ -14,20 +14,23 @@
  * limitations under the License.
  */
 
-#include <google/protobuf/compiler/importer.h>
-#include <google/protobuf/dynamic_message.h>
-#include <google/protobuf/io/printer.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <google/protobuf/stubs/strutil.h>
-#include <google/protobuf/util/field_comparator.h>
-#include <google/protobuf/util/message_differencer.h>
-
 #include <stdio.h>
 
 #include <fstream>
 #include <iostream>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "google/protobuf/compiler/importer.h"
+#include "google/protobuf/dynamic_message.h"
+#include "google/protobuf/io/printer.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "google/protobuf/stubs/strutil.h"
+#include "google/protobuf/util/field_comparator.h"
+#include "google/protobuf/util/message_differencer.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using namespace google::protobuf;
 using namespace google::protobuf::compiler;
@@ -232,6 +235,7 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
 
   cpp_printer.Print(kHeader, "f", __FILE__, "p", src_proto);
   PERFETTO_CHECK(dst_header.find("include/") == 0);
+  cpp_printer.Print("#include \"perfetto/base/build_config.h\"\n");
   cpp_printer.Print("#include \"$f$\"\n", "f",
                     dst_header.substr(strlen("include/")));
 
@@ -242,11 +246,13 @@ void ProtoToCpp::Convert(const std::string& src_proto) {
   }
   header_printer.Print("\n");
 
-  cpp_printer.Print("\n#include \"$f$\"\n", "f", GetProtoHeader(proto_file));
+  cpp_printer.Print("\nPERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()\n");
+  cpp_printer.Print("#include \"$f$\"\n", "f", GetProtoHeader(proto_file));
   for (int i = 0; i < proto_file->dependency_count(); i++) {
     const FileDescriptor* dep = proto_file->dependency(i);
     cpp_printer.Print("#include \"$f$\"\n", "f", GetProtoHeader(dep));
   }
+  cpp_printer.Print("PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()\n");
 
   // Generate forward declarations in the header for proto types.
   header_printer.Print("// Forward declarations for protobuf types.\n");

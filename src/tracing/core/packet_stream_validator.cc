@@ -19,9 +19,13 @@
 #include <inttypes.h>
 #include <stddef.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_utils.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trusted_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 
@@ -33,7 +37,7 @@ bool PacketStreamValidator::Validate(const Slices& slices) {
     size += slice.size;
 
   protos::TrustedPacket packet;
-  if (!packet.ParseFromBoundedZeroCopyStream(&stream, size))
+  if (!packet.ParseFromBoundedZeroCopyStream(&stream, static_cast<int>(size)))
     return false;
 
   // Only the service is allowed to fill in the trusted uid.

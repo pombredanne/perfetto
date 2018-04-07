@@ -16,13 +16,16 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/ipc/client.h"
 #include "perfetto/ipc/host.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/test/greeter_service.ipc.h"
 #include "src/ipc/test/greeter_service.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace ipc_test {
 namespace {

@@ -100,7 +100,7 @@ _Unwind_Reason_Code TraceStackFrame(_Unwind_Context* context, void* arg) {
 }
 
 // Note: use only async-safe functions inside this.
-void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
+void SignalHandler(int sig_num, siginfo_t* info, void* /*ucontext*/) {
   // Restore the old handlers.
   for (size_t i = 0; i < sizeof(g_signals) / sizeof(g_signals[0]); i++)
     sigaction(g_signals[i].sig_num, &g_signals[i].old_handler, nullptr);
@@ -137,7 +137,7 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  auto bt_error = [](void* data, const char* msg, int errnum) { Print(msg); };
+  auto bt_error = [](void*, const char* msg, int) { Print(msg); };
   struct backtrace_state* bt_state =
       backtrace_create_state(nullptr, 0, bt_error, nullptr);
 #endif
@@ -151,8 +151,9 @@ void SignalHandler(int sig_num, siginfo_t* info, void* ucontext) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-    auto symbolize_callback = [](void* data, uintptr_t pc, const char* filename,
-                                 int lineno, const char* function) -> int {
+    auto symbolize_callback = [](void* data, uintptr_t /*pc*/,
+                                 const char* filename, int lineno,
+                                 const char* function) -> int {
       SymbolInfo* psym = reinterpret_cast<SymbolInfo*>(data);
       if (function)
         strncpy(psym->sym_name, function, sizeof(psym->sym_name));

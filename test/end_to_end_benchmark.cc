@@ -56,12 +56,12 @@ void BenchmarkCommon(benchmark::State& state) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  size_t message_count = state.range(0);
-  size_t message_bytes = state.range(1);
-  size_t mb_per_s = state.range(2);
+  uint32_t message_count = state.range(0);
+  uint32_t message_bytes = state.range(1);
+  uint32_t mb_per_s = state.range(2);
 
-  size_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
-  size_t time_for_messages_ms =
+  uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
+  uint32_t time_for_messages_ms =
       10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
   // Setup the test to use a random number generator.

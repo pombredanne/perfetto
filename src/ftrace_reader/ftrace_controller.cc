@@ -143,7 +143,7 @@ FtraceController::~FtraceController() {
 }
 
 uint64_t FtraceController::NowMs() const {
-  return base::GetWallTimeMs().count();
+  return static_cast<uint64_t>(base::GetWallTimeMs().count());
 }
 
 // static

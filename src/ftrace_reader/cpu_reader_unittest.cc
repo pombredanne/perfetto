@@ -20,21 +20,23 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "proto_translation_table.h"
-#include "src/ftrace_reader/event_info.h"
-
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
+#include "proto_translation_table.h"
+#include "src/ftrace_reader/event_info.h"
+#include "src/ftrace_reader/test/cpu_reader_support.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
-#include "perfetto/trace/ftrace/ftrace_event.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "src/ftrace_reader/test/cpu_reader_support.h"
-#include "src/ftrace_reader/test/test_messages.pb.h"
 #include "src/ftrace_reader/test/test_messages.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "perfetto/trace/ftrace/ftrace_event.pb.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
+#include "src/ftrace_reader/test/test_messages.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::Each;
 using testing::ElementsAre;
@@ -327,7 +329,7 @@ TEST(ReadAndAdvanceTest, Underruns) {
 //               sh-28712 [000] ...1 608934.535199: tracing_mark_write: Hello, world!
 // clang-format on
 
-ExamplePage g_single_print{
+static ExamplePage g_single_print{
     "synthetic",
     R"(
     00000000: ba12 6a33 c628 0200 2c00 0000 0000 0000  ..j3.(..,.......
@@ -354,7 +356,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
   EXPECT_EQ(metadata.overwrite_count, 0ul);
-  ASSERT_EQ(bundle->event().size(), 1);
+  ASSERT_EQ(1, bundle->event().size());
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712ul);
   EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 608934, 535199));
@@ -377,7 +379,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
 //             echo-6908  ( 6908) [000] ...1 282762.884492: tracing_mark_write:
 // clang-format on
 
-ExamplePage g_really_long_event{
+static ExamplePage g_really_long_event{
     "synthetic",
     R"(
       00000000: 6be0 48dd 2b01 0100 e403 0000 0000 0000  k.H.+...........
@@ -474,7 +476,7 @@ TEST(CpuReaderTest, ReallyLongEvent) {
 
 // This event is as the event for ParseSinglePrint above except the string
 // is extended to overflow the page size written in the header.
-ExamplePage g_single_print_malformed{
+static ExamplePage g_single_print_malformed{
     "synthetic",
     R"(
     00000000: ba12 6a33 c628 0200 2c00 0000 0000 0000  ................
@@ -546,7 +548,7 @@ TEST(CpuReaderTest, FilterByEvent) {
 //               sh-30693 [000] ...1 615495.632679: tracing_mark_write: Goodbye, world!
 // clang-format on
 
-ExamplePage g_three_prints{
+static ExamplePage g_three_prints{
     "synthetic",
     R"(
     00000000: a3ab 1569 bc2f 0200 9400 0000 0000 0000  ...i./..........
@@ -623,7 +625,7 @@ TEST(CpuReaderTest, ParseThreePrint) {
 //            sleep-3733  [000] d..3 1045157.726697: sched_switch: prev_comm=sleep prev_pid=3733 prev_prio=120 prev_state=x ==> next_comm=kworker/u16:3 next_pid=3681 next_prio=120
 // clang-format on
 
-ExamplePage g_six_sched_switch{
+static ExamplePage g_six_sched_switch{
     "synthetic",
     R"(
     00000000: 2b16 c3be 90b6 0300 a001 0000 0000 0000  +...............
@@ -832,20 +834,20 @@ TEST(CpuReaderTest, ParseAllFields) {
   // to generate the below examples
   const uint32_t kKernelBlockDeviceId = 271581216;
 
-  const uint64_t kUserspaceBlockDeviceId =
-      CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
+  const BlockDeviceID kUserspaceBlockDeviceId =
+      CpuReader::TranslateBlockDeviceIDToUserspace<BlockDeviceID>(
           kKernelBlockDeviceId);
   const uint64_t k64BitKernelBlockDeviceId = 4442450946;
-  const uint64_t k64BitUserspaceBlockDeviceId =
+  const BlockDeviceID k64BitUserspaceBlockDeviceId =
       CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
           k64BitKernelBlockDeviceId);
 
-  writer.Write<int32_t>(1001);  // Common field.
-  writer.Write<int32_t>(9999);  // Common pid
-  writer.Write<int32_t>(1003);  // Uint32 field
-  writer.Write<int32_t>(97);    // Pid
-  writer.Write<int32_t>(kKernelBlockDeviceId);  // Dev id
-  writer.Write<int32_t>(98);    // Inode 32
+  writer.Write<int32_t>(1001);                       // Common field.
+  writer.Write<int32_t>(9999);                       // Common pid
+  writer.Write<int32_t>(1003);                       // Uint32 field
+  writer.Write<int32_t>(97);                         // Pid
+  writer.Write<int32_t>(kKernelBlockDeviceId);       // Dev id
+  writer.Write<int32_t>(98);                         // Inode 32
   writer.Write<int64_t>(k64BitKernelBlockDeviceId);  // Dev id 64
   writer.Write<int64_t>(99u);                        // Inode 64
   writer.WriteFixedString(16, "Hello");
@@ -866,7 +868,8 @@ TEST(CpuReaderTest, ParseAllFields) {
   EXPECT_EQ(event->event_case(), FakeFtraceEvent::kAllFields);
   EXPECT_EQ(event->all_fields().field_uint32(), 1003u);
   EXPECT_EQ(event->all_fields().field_pid(), 97);
-  EXPECT_EQ(event->all_fields().field_dev_32(), kUserspaceBlockDeviceId);
+  EXPECT_EQ(event->all_fields().field_dev_32(),
+            static_cast<uint32_t>(kUserspaceBlockDeviceId));
   EXPECT_EQ(event->all_fields().field_inode_32(), 98u);
 // TODO(primiano): for some reason this fails on mac.
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
@@ -885,16 +888,17 @@ TEST(CpuReaderTest, ParseAllFields) {
 
 TEST(CpuReaderTest, TranslateBlockDeviceIDToUserspace) {
   const uint32_t kKernelBlockDeviceId = 271581216;
-  const uint64_t kUserspaceBlockDeviceId = 66336;
+  const BlockDeviceID kUserspaceBlockDeviceId = 66336;
   const uint64_t k64BitKernelBlockDeviceId = 4442450946;
-  const uint64_t k64BitUserspaceBlockDeviceId = 17594983681026;
+  const BlockDeviceID k64BitUserspaceBlockDeviceId =
+      static_cast<BlockDeviceID>(17594983681026);
 
-  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
-                  kKernelBlockDeviceId),
-              kUserspaceBlockDeviceId);
-  EXPECT_THAT(CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
-                  k64BitKernelBlockDeviceId),
-              k64BitUserspaceBlockDeviceId);
+  EXPECT_EQ(kUserspaceBlockDeviceId,
+            CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
+                kKernelBlockDeviceId));
+  EXPECT_EQ(k64BitUserspaceBlockDeviceId,
+            CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
+                k64BitKernelBlockDeviceId));
 }
 
 // clang-format off
@@ -1045,7 +1049,7 @@ TEST(CpuReaderTest, TranslateBlockDeviceIDToUserspace) {
 //   d.process.acor-27885 [000] ...1 175018.227852: ext4_writepages_result: dev 259,32 ino 3278183 ret 0 pages_written 0 pages_skipped 0 sync_mode 1 writeback_index 2
 // clang-format on
 
-ExamplePage g_full_page_sched_switch{
+static ExamplePage g_full_page_sched_switch{
     "synthetic",
     R"(
 00000000: 31f2 7622 1a00 0000 b40f 0000 0000 0000  1.v"............
@@ -1474,7 +1478,7 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
 //   d.process.acor-27885 [000] ...1 175018.227852: ext4_writepages_result: dev 259,32 ino 3278183 ret 0 pages_written 0 pages_skipped 0 sync_mode 1 writeback_index 2
 // clang-format on
 
-ExamplePage g_full_page_ext4{
+static ExamplePage g_full_page_ext4{
     "synthetic",
     R"(
 00000000: 50fe 5852 279f 0000 c80f 00c0 ffff ffff  P.XR'...........

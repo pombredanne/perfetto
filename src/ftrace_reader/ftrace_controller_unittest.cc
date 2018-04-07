@@ -65,7 +65,7 @@ class MockTaskRunner : public base::TaskRunner {
     task_ = std::move(task);
   }
 
-  void OnPostDelayedTask(std::function<void()> task, int _delay) {
+  void OnPostDelayedTask(std::function<void()> task, int /*delay*/) {
     std::unique_lock<std::mutex> lock(lock_);
     EXPECT_FALSE(task_);
     task_ = std::move(task);
@@ -156,17 +156,17 @@ class MockFtraceProcfs : public FtraceProcfs {
         .Times(AnyNumber());
   }
 
-  bool WriteTracingOn(const std::string& path, const std::string& value) {
+  bool WriteTracingOn(const std::string& /*path*/, const std::string& value) {
     PERFETTO_CHECK(value == "1" || value == "0");
     tracing_on_ = value == "1";
     return true;
   }
 
-  char ReadTracingOn(const std::string& path) {
+  char ReadTracingOn(const std::string& /*path*/) {
     return tracing_on_ ? '1' : '0';
   }
 
-  base::ScopedFile OpenPipeForCpu(size_t cpu) override {
+  base::ScopedFile OpenPipeForCpu(size_t /*cpu*/) override {
     return base::ScopedFile(open("/dev/null", O_RDONLY));
   }
 

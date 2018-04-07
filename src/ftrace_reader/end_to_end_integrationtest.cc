@@ -18,7 +18,6 @@
 #include <sstream>
 
 #include "gmock/gmock.h"
-#include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 
 #include "perfetto/base/build_config.h"
@@ -29,10 +28,14 @@
 #include "src/ftrace_reader/ftrace_procfs.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "google/protobuf/text_format.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
+#include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::HasSubstr;
 using testing::Not;
@@ -78,8 +81,8 @@ class EndToEndIntegrationTest : public ::testing::Test,
   }
 
   virtual void OnBundleComplete(size_t cpu,
-                                FtraceBundleHandle bundle,
-                                const FtraceMetadata& metadata) {
+                                FtraceBundleHandle,
+                                const FtraceMetadata&) {
     PERFETTO_CHECK(currently_writing_);
     currently_writing_ = false;
     EXPECT_NE(cpu_being_written_, 9999ul);

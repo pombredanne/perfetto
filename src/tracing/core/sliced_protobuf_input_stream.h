@@ -17,11 +17,14 @@
 #ifndef SRC_TRACING_CORE_SLICED_PROTOBUF_INPUT_STREAM_H_
 #define SRC_TRACING_CORE_SLICED_PROTOBUF_INPUT_STREAM_H_
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/tracing/core/slice.h"
 
 #include <stdint.h>
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/io/zero_copy_stream.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

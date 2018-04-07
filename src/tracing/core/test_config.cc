@@ -26,8 +26,11 @@
  */
 
 #include "perfetto/tracing/core/test_config.h"
+#include "perfetto/base/build_config.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/config/test_config.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

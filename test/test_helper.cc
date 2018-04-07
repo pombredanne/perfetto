@@ -17,14 +17,17 @@
 #include "test/test_helper.h"
 
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "src/tracing/ipc/default_socket.h"
 #include "test/task_runner_thread_delegates.h"
 
-#include "src/tracing/ipc/default_socket.h"
-
-#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "perfetto/trace/trace_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

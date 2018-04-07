@@ -48,7 +48,6 @@ void CreateStaticDeviceToInodeMap(
     std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
         static_file_map);
 
-
 class InodeFileDataSource : public FileScanner::Delegate {
  public:
   InodeFileDataSource(
@@ -101,9 +100,9 @@ class InodeFileDataSource : public FileScanner::Delegate {
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
 
-  uint64_t GetScanIntervalMs() const;
-  uint64_t GetScanDelayMs() const;
-  uint64_t GetScanBatchSize() const;
+  int GetScanIntervalMs() const;
+  int GetScanDelayMs() const;
+  int GetScanBatchSize() const;
 
   const DataSourceConfig source_config_;
   std::set<std::string> scan_mount_points_;

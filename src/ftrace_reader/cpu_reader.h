@@ -103,7 +103,7 @@ class CpuReader {
   // Returns the raw value not the varint.
   template <typename T>
   static T ReadIntoVarInt(const uint8_t* start,
-                          size_t field_id,
+                          uint32_t field_id,
                           protozero::Message* out) {
     T t;
     memcpy(&t, reinterpret_cast<const void*>(start), sizeof(T));
@@ -113,7 +113,7 @@ class CpuReader {
 
   template <typename T>
   static void ReadInode(const uint8_t* start,
-                        size_t field_id,
+                        uint32_t field_id,
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
     T t = ReadIntoVarInt<T>(start, field_id, out);
@@ -122,7 +122,7 @@ class CpuReader {
 
   template <typename T>
   static void ReadDevId(const uint8_t* start,
-                        size_t field_id,
+                        uint32_t field_id,
                         protozero::Message* out,
                         FtraceMetadata* metadata) {
     T t;
@@ -133,7 +133,7 @@ class CpuReader {
   }
 
   static void ReadPid(const uint8_t* start,
-                      size_t field_id,
+                      uint32_t field_id,
                       protozero::Message* out,
                       FtraceMetadata* metadata) {
     int32_t pid = ReadIntoVarInt<int32_t>(start, field_id, out);
@@ -141,7 +141,7 @@ class CpuReader {
   }
 
   static void ReadCommonPid(const uint8_t* start,
-                            size_t field_id,
+                            uint32_t field_id,
                             protozero::Message* out,
                             FtraceMetadata* metadata) {
     int32_t pid = ReadIntoVarInt<int32_t>(start, field_id, out);

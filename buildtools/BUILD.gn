@@ -93,22 +93,22 @@ config("protobuf_gen_config") {
   include_dirs = [ "protobuf/src" ]
   cflags = [
     "-Wno-deprecated",
-    "-Wno-disabled-macro-expansion",
-    "-Wno-int-to-void-pointer-cast",
-    "-Wno-missing-variable-declarations",
-    "-Wno-old-style-cast",
-    "-Wno-shorten-64-to-32",
-    "-Wno-sign-conversion",
-    "-Wno-undef",
-    "-Wno-zero-as-null-pointer-constant",
+    #   "-Wno-disabled-macro-expansion",
+    #   "-Wno-int-to-void-pointer-cast",
+    #   "-Wno-missing-variable-declarations",
+    #   "-Wno-old-style-cast",
+    #   "-Wno-shorten-64-to-32",
+    #   "-Wno-sign-conversion",
+    #   "-Wno-undef",
+    #   "-Wno-zero-as-null-pointer-constant",
   ]
 
-  if (!is_clang) {
-    cflags += [
-      "-Wno-sign-compare",
-      "-Wno-maybe-uninitialized",
-    ]
-  }
+  # if (!is_clang) {
+  #   cflags += [
+  #     "-Wno-sign-compare",
+  #     "-Wno-maybe-uninitialized",
+  #   ]
+  # }
 }
 
 # Configuration used to build libprotobuf_* and the protoc compiler.
@@ -119,18 +119,25 @@ config("protobuf_config") {
   visibility = [ ":*" ]
   defines = [ "HAVE_PTHREAD=1" ]
   cflags = [
-    "-Wno-ignored-qualifiers",
-    "-Wno-missing-noreturn",
-    "-Wno-undef",
-    "-Wno-unused-parameter",
-    "-Wno-unused",
+    #   "-Wno-deprecated",
+    #   "-Wno-disabled-macro-expansion",
+    #   "-Wno-int-to-void-pointer-cast",
+    #   "-Wno-missing-variable-declarations",
+    #   "-Wno-old-style-cast",
+    #   "-Wno-shorten-64-to-32",
+    #   "-Wno-sign-conversion",
+    #   "-Wno-undef",
+    "-Wno-zero-as-null-pointer-constant",
   ]
   if (is_clang) {
     cflags += [
       "-Wno-enum-compare-switch",
-      "-Wno-global-constructors",
-      "-Wno-shift-sign-overflow",
-      "-Wno-used-but-marked-unused",
+
+      #     "-Wno-global-constructors",
+      #     "-Wno-maybe-uninitialized",
+      #     "-Wno-shift-sign-overflow",
+      #     "-Wno-sign-compare",
+      #     "-Wno-used-but-marked-unused",
       "-Wno-user-defined-warnings",
     ]
   } else {

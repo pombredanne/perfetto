@@ -98,7 +98,8 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
 
       for (size_t i = 0; i < messages_in_minibatch; i++) {
         auto handle = trace_writer_->NewTracePacket();
-        handle->set_for_testing()->set_seq_value(rnd_engine_());
+        handle->set_for_testing()->set_seq_value(
+            static_cast<uint32_t>(rnd_engine_()));
         handle->set_for_testing()->set_str(payload.get(), message_size_);
       }
       messages_to_emit -= messages_in_minibatch;
@@ -109,7 +110,8 @@ void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
         int64_t expected_time_taken = ++iterations * 1000;
         base::TimeMillis time_taken = base::GetWallTimeMs() - start;
         while (time_taken.count() < expected_time_taken) {
-          usleep((expected_time_taken - time_taken.count()) * 1000);
+          usleep(static_cast<useconds_t>(
+              (expected_time_taken - time_taken.count()) * 1000));
           time_taken = base::GetWallTimeMs() - start;
         }
       }

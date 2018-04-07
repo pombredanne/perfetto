@@ -26,8 +26,11 @@
  */
 
 #include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/base/build_config.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/config/data_source_descriptor.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

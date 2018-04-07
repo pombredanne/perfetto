@@ -20,6 +20,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/utils.h"
@@ -36,9 +37,12 @@
 #include "src/tracing/test/test_shared_memory.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using ::testing::_;
 using ::testing::Contains;
@@ -339,12 +343,12 @@ TEST_F(ServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
 TEST_F(ServiceImplTest, ProducerShmAndPageSizeOverriddenByTraceConfig) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
-  const size_t kConfigPageSizesKb[] = /****/ {16, 16, 4, 0, 16, 8, 3, 4096, 4};
-  const size_t kExpectedPageSizesKb[] = /**/ {16, 16, 4, 4, 16, 8, 4, 64, 4};
+  const uint32_t kConfigPageSizesKb[] = /****/ {16, 16, 4, 0, 16, 8, 3, 512, 4};
+  const uint32_t kExpectedPageSizesKb[] = /**/ {16, 16, 4, 4, 16, 8, 4, 64, 4};
 
-  const size_t kConfigSizesKb[] = /**/ {0, 16, 0, 20, 32, 7, 0, 96, 4096000};
-  const size_t kHintSizesKb[] = /****/ {0, 0, 16, 32, 16, 0, 7, 96, 4096000};
-  const size_t kExpectedSizesKb[] = {
+  const uint32_t kConfigSizesKb[] = /**/ {0, 16, 0, 20, 32, 7, 0, 96, 4096000};
+  const uint32_t kHintSizesKb[] = /****/ {0, 0, 16, 32, 16, 0, 7, 96, 4096000};
+  const uint32_t kExpectedSizesKb[] = {
       kDefaultShmSizeKb,  // Both hint and config are 0, use default.
       16,                 // Hint is 0, use config.
       16,                 // Config is 0, use hint.

@@ -26,13 +26,16 @@
  */
 
 #include "perfetto/tracing/core/data_source_config.h"
+#include "perfetto/base/build_config.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/config/chrome/chrome_config.pb.h"
 #include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/config/ftrace/ftrace_config.pb.h"
 #include "perfetto/config/inode_file/inode_file_config.pb.h"
 #include "perfetto/config/process_stats/process_stats_config.pb.h"
 #include "perfetto/config/test_config.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

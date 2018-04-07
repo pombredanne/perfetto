@@ -23,6 +23,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ipc/service_descriptor.h"
@@ -32,7 +33,9 @@
 #include "src/ipc/test/test_socket.h"
 #include "src/ipc/unix_socket.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/test/client_unittest_messages.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {
@@ -160,11 +163,11 @@ class FakeHost : public UnixSocket::EventListener {
         Frame reply;
         reply.set_request_id(req.request_id());
         for (const auto& svc : services) {
-          if (static_cast<int32_t>(svc.second->id) !=
+          if (static_cast<uint64_t>(svc.second->id) !=
               req.msg_invoke_method().service_id())
             continue;
           for (const auto& method : svc.second->methods) {
-            if (static_cast<int32_t>(method.second->id) !=
+            if (static_cast<uint64_t>(method.second->id) !=
                 req.msg_invoke_method().method_id())
               continue;
             method.second->OnInvoke(req.msg_invoke_method(),
@@ -355,7 +358,7 @@ TEST_F(ClientImplTest, ReceiveFileDescriptor) {
 
   EXPECT_CALL(*host_method, OnInvoke(_, _))
       .WillOnce(Invoke(
-          [](const Frame::InvokeMethod& req, Frame::InvokeMethodReply* reply) {
+          [](const Frame::InvokeMethod&, Frame::InvokeMethodReply* reply) {
             RequestProto req_args;
             reply->set_reply_proto(ReplyProto().SerializeAsString());
             reply->set_success(true);
@@ -397,7 +400,7 @@ TEST_F(ClientImplTest, SendFileDescriptor) {
   base::ignore_result(write(tx_file.fd(), kFileContent, sizeof(kFileContent)));
   EXPECT_CALL(*host_method, OnInvoke(_, _))
       .WillOnce(Invoke(
-          [](const Frame::InvokeMethod& req, Frame::InvokeMethodReply* reply) {
+          [](const Frame::InvokeMethod&, Frame::InvokeMethodReply* reply) {
             RequestProto req_args;
             reply->set_reply_proto(ReplyProto().SerializeAsString());
             reply->set_success(true);

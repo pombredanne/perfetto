@@ -265,7 +265,7 @@ void UnixSocket::ReadPeerCredentials() {
   socklen_t len = sizeof(user_cred);
   int res = getsockopt(*fd_, 0, LOCAL_PEERCRED, &user_cred, &len);
   PERFETTO_CHECK(res == 0 && user_cred.cr_version == XUCRED_VERSION);
-  peer_uid_ = user_cred.cr_uid;
+  peer_uid_ = static_cast<uid_t>(user_cred.cr_uid);
 #endif
 }
 

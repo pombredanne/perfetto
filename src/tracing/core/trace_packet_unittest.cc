@@ -19,10 +19,13 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {
@@ -132,7 +135,8 @@ TEST(TracePacketTest, GetProtoPreamble) {
   ASSERT_EQ(1u, tp.slices().size());
   memcpy(&buf[preamble_size], tp.slices()[0].start, tp.slices()[0].size);
   protos::Trace trace;
-  ASSERT_TRUE(trace.ParseFromArray(buf, preamble_size + tp.size()));
+  ASSERT_TRUE(
+      trace.ParseFromArray(buf, static_cast<int>(preamble_size + tp.size())));
   ASSERT_EQ(1, trace.packet_size());
   ASSERT_EQ(payload, trace.packet(0).for_testing().str());
 }

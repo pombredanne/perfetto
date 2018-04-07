@@ -21,6 +21,7 @@
 
 #include <vector>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/thread_checker.h"
 #include "perfetto/ipc/service_proxy.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -28,7 +29,9 @@
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/ipc/producer_port.ipc.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

@@ -19,8 +19,11 @@
 #include <string>
 
 #include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trace_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {

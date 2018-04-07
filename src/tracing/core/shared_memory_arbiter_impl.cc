@@ -72,8 +72,8 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
     // SharedMemoryABI. But let's not be too adventurous for the moment.
     {
       std::lock_guard<std::mutex> scoped_lock(lock_);
-      const size_t initial_page_idx = page_idx_;
-      for (size_t i = 0; i < shmem_abi_.num_pages(); i++) {
+      const uint32_t initial_page_idx = page_idx_;
+      for (uint32_t i = 0; i < shmem_abi_.num_pages(); i++) {
         page_idx_ = (initial_page_idx + i) % shmem_abi_.num_pages();
         bool is_new_page = false;
 

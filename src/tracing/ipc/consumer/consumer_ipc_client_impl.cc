@@ -163,7 +163,7 @@ void ConsumerIPCClientImpl::Flush(int timeout_ms, FlushCallback callback) {
   }
 
   protos::FlushRequest req;
-  req.set_timeout_ms(timeout_ms);
+  req.set_timeout_ms(static_cast<uint32_t>(timeout_ms));
   ipc::Deferred<protos::FlushResponse> async_response;
   async_response.Bind(
       [callback](ipc::AsyncResult<protos::FlushResponse> response) {

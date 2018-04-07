@@ -26,18 +26,19 @@ message Frame {
   // Host -> Client.
   message BindServiceReply {
     message MethodInfo {
-      optional int32 id = 1;
+      optional uint64 id = 1;
       optional string name = 2;
     }
     optional bool success = 1;
-    optional int32 service_id = 2;
+    optional uint64 service_id = 2;
     repeated MethodInfo methods = 3;
   }
 
   // Client -> Host.
   message InvokeMethod {
-    optional int32 service_id = 1;  // As returned by BindServiceReply.id.
-    optional int32 method_id = 2;  // As returned by BindServiceReply.method.id.
+    optional uint64 service_id = 1;  // As returned by BindServiceReply.id.
+    optional uint64 method_id =
+        2;  // As returned by BindServiceReply.method.id.
     optional bytes args_proto = 3;  // Proto-encoded request argument.
 
     // When true the client specifies that a reply is not needed. The use case

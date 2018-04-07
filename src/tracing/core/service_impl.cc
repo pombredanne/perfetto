@@ -39,8 +39,10 @@
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/core/trace_buffer.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/clock_snapshot.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 // General note: this class must assume that Producers are malicious and will
 // try to crash / exploit this class. We can trust pointers because they come
@@ -249,7 +251,7 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       return false;
     }
     tracing_session->write_into_file = std::move(fd);
-    uint32_t write_period_ms = cfg.file_write_period_ms();
+    int write_period_ms = static_cast<int>(cfg.file_write_period_ms());
     if (write_period_ms == 0)
       write_period_ms = kDefaultWriteIntoFilePeriodMs;
     if (write_period_ms < kMinWriteIntoFilePeriodMs)
@@ -267,8 +269,9 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // corresponding BufferID, which is a global ID namespace for the service and
   // all producers.
   size_t total_buf_size_kb = 0;
-  tracing_session->buffers_index.reserve(cfg.buffers_size());
-  for (int i = 0; i < cfg.buffers_size(); i++) {
+  const size_t num_buffers = static_cast<size_t>(cfg.buffers_size());
+  tracing_session->buffers_index.reserve(num_buffers);
+  for (size_t i = 0; i < num_buffers; i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
     BufferID global_id = buffer_ids_.Allocate();
     if (!global_id) {
@@ -325,14 +328,15 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   // Trigger delayed task if the trace is time limited.
-  if (cfg.duration_ms()) {
+  const int trace_duration_ms = static_cast<int>(cfg.duration_ms());
+  if (trace_duration_ms > 0) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
           if (weak_this)
             weak_this->FlushAndDisableTracing(tsid);
         },
-        cfg.duration_ms());
+        trace_duration_ms);
   }
 
   // Start the periodic drain tasks if we should to save the trace into a file.
@@ -347,10 +351,11 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   tracing_session->tracing_enabled = true;
-  PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
-               " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
-               cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
-               total_buf_size_kb, tracing_sessions_.size());
+  PERFETTO_LOG(
+      "Enabled tracing, #sources:%zu, duration:%d ms, #buffers:%d, total "
+      "buffer size:%zu KB, total sessions:%zu",
+      cfg.data_sources().size(), trace_duration_ms, cfg.buffers_size(),
+      total_buf_size_kb, tracing_sessions_.size());
   return true;
 }
 
@@ -557,7 +562,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      uid_t producer_uid = -1;
+      uid_t producer_uid = static_cast<uid_t>(-1);
       if (!tbuf.ReadNextTracePacket(&packet, &producer_uid))
         break;
       PERFETTO_DCHECK(producer_uid != static_cast<uid_t>(-1));
@@ -576,7 +581,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       // the producer can't give us a partial packet (e.g., a truncated
       // string) which only becomes valid when the UID is appended here.
       protos::TrustedPacket trusted_packet;
-      trusted_packet.set_trusted_uid(producer_uid);
+      trusted_packet.set_trusted_uid(static_cast<int32_t>(producer_uid));
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -644,14 +649,14 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     // writev() can take at most IOV_MAX entries per call. Batch them.
     constexpr size_t kIOVMax = IOV_MAX;
     for (size_t i = 0; i < num_iovecs; i += kIOVMax) {
-      size_t iov_batch_size = std::min(num_iovecs - i, kIOVMax);
+      int iov_batch_size = static_cast<int>(std::min(num_iovecs - i, kIOVMax));
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], iov_batch_size));
       if (wr_size <= 0) {
         PERFETTO_PLOG("writev() failed");
         stop_writing_into_file = true;
         break;
       }
-      total_wr_size += wr_size;
+      total_wr_size += static_cast<size_t>(wr_size);
     }
 
     tracing_session->bytes_written_into_file += total_wr_size;
@@ -978,7 +983,7 @@ TraceBuffer* ServiceImpl::GetBufferByID(BufferID buffer_id) {
 void ServiceImpl::UpdateMemoryGuardrail() {
 #if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-  uint64_t total_buffer_bytes = 0;
+  size_t total_buffer_bytes = 0;
 
   // Sum up all the shared memory buffers.
   for (const auto& id_to_producer : producers_) {
@@ -993,7 +998,8 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Set the guard rail to 32MB + the sum of all the buffers over a 30 second
   // interval.
-  uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
+  uint32_t guardrail =
+      32 * 1024 * 1024 + static_cast<uint32_t>(total_buffer_bytes);
   base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
 #endif
 }
@@ -1041,16 +1047,17 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
   for (auto& clock : clocks) {
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
-    c->set_timestamp(base::FromPosixTimespec(clock.ts).count());
+    c->set_timestamp(
+        static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
   }
 #else   // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
   c->set_type(protos::ClockSnapshot::Clock::MONOTONIC);
-  c->set_timestamp(base::GetWallTimeNs().count());
+  c->set_timestamp(static_cast<uint64_t>(base::GetWallTimeNs().count()));
 #endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
-  packet.set_trusted_uid(getuid());
-  Slice slice = Slice::Allocate(packet.ByteSize());
+  packet.set_trusted_uid(static_cast<int32_t>(getuid()));
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
@@ -1063,8 +1070,8 @@ void ServiceImpl::MaybeEmitTraceConfig(TracingSession* tracing_session,
   tracing_session->did_emit_config = true;
   protos::TrustedPacket packet;
   tracing_session->config.ToProto(packet.mutable_trace_config());
-  packet.set_trusted_uid(getuid());
-  Slice slice = Slice::Allocate(packet.ByteSize());
+  packet.set_trusted_uid(static_cast<int32_t>(getuid()));
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));

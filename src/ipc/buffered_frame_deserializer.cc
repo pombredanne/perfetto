@@ -22,11 +22,14 @@
 #include <type_traits>
 #include <utility>
 
-#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "src/ipc/wire_protocol.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {

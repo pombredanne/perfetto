@@ -82,7 +82,8 @@ std::unique_ptr<PosixSharedMemory> PosixSharedMemory::MapFD(base::ScopedFile fd,
                                                             size_t size) {
   PERFETTO_DCHECK(fd);
   PERFETTO_DCHECK(size > 0);
-  void* start = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  void* start =
+      mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   PERFETTO_CHECK(start != MAP_FAILED);
   return std::unique_ptr<PosixSharedMemory>(
       new PosixSharedMemory(start, size, std::move(fd)));

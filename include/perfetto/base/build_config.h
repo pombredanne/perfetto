@@ -58,4 +58,11 @@
 #define PERFETTO_BUILDFLAG_DEFINE_PERFETTO_START_DAEMONS() 0
 #endif
 
+#define PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN() \
+  _Pragma("GCC diagnostic push")                       \
+      _Pragma("GCC diagnostic ignored \"-Weverything\"")
+
+#define PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END() \
+  _Pragma("GCC diagnostic pop")
+
 #endif  // INCLUDE_PERFETTO_BASE_BUILD_CONFIG_H_

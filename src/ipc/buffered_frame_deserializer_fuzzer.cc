@@ -17,9 +17,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 #include "src/ipc/buffered_frame_deserializer.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/wire_protocol.pb.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
 
