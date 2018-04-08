@@ -14,8 +14,10 @@
 
 import("//gn/standalone/libc++/libc++.gni")
 
-config("test_warnings_suppression") {
+# Used to suppress warnings coming from googletest macros expansions.
+config("test_warning_suppressions") {
   cflags = [
+    "-Wno-unknown-warning-option",
     "-Wno-global-constructors",
     "-Wno-covered-switch-default",
     "-Wno-used-but-marked-unused",
@@ -35,6 +37,9 @@ config("test_warnings_suppression") {
 # production code.
 config("googletest_prod_config") {
   cflags = [
+    # Using -isystem instead of include_dirs (-I), so we don't need to suppress
+    # warnings coming from libprotobuf headers. Doing so would mask warnings in
+    # our own code.
     "-isystem",
     rebase_path("googletest/googletest/include", root_build_dir),
   ]
@@ -44,12 +49,15 @@ config("googletest_prod_config") {
 config("googletest_config") {
   defines = [ "GTEST_LANG_CXX11=1" ]
   cflags = [
+    # Using -isystem instead of include_dirs (-I), so we don't need to suppress
+    # warnings coming from libprotobuf headers. Doing so would mask warnings in
+    # our own code.
     "-isystem",
     rebase_path("googletest/googletest/include", root_build_dir),
     "-isystem",
     rebase_path("googletest/googlemock/include", root_build_dir),
   ]
-  configs = [ ":test_warnings_suppression" ]
+  configs = [ ":test_warning_suppressions" ]
 }
 
 source_set("gtest") {
@@ -95,9 +103,15 @@ config("protobuf_gen_config") {
     "GOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ]
   cflags = [
+    # Using -isystem instead of include_dirs (-I), so we don't need to suppress
+    # warnings coming from libprotobuf headers. Doing so would mask warnings in
+    # our own code.
     "-isystem",
     rebase_path("protobuf/src", root_build_dir),
+    "-Wno-unknown-warning-option",
     "-Wno-deprecated",
+    "-Wno-undef",
+    "-Wno-zero-as-null-pointer-constant",
   ]
 }
 
@@ -109,6 +123,7 @@ config("protobuf_config") {
   defines = [ "HAVE_PTHREAD=1" ]
   if (is_clang) {
     cflags = [
+      "-Wno-unknown-warning-option",
       "-Wno-enum-compare-switch",
       "-Wno-user-defined-warnings",
     ]
@@ -463,7 +478,7 @@ if (use_custom_libcxx) {
 
 config("benchmark_config") {
   include_dirs = [ "benchmark/include" ]
-  configs = [ ":test_warnings_suppression" ]
+  configs = [ ":test_warning_suppressions" ]
 }
 
 source_set("benchmark") {

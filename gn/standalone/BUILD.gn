@@ -67,16 +67,12 @@ config("default") {
     "-Werror",
   ]
 
-  # Color compiler output, see https://github.com/ninja-build/ninja/wiki/FAQ
   if (is_clang) {
     cflags += [
+      # Color compiler output, see https://github.com/ninja-build/ninja/wiki/FAQ
       "-fcolor-diagnostics",
-      "-Wno-deprecated",
-      "-Wno-unknown-warning-option",
       "-fdiagnostics-show-template-tree",
     ]
-  } else {
-    # cflags += [ "-Wno-unknown-warning" ]
   }
 
   if (current_cpu == "arm") {
