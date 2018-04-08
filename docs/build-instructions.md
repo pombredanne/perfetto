@@ -10,30 +10,30 @@ suggested way to work on Perfetto.
 
 Get the code
 ------------
-**Standalone checkout**:
+**Standalone checkout**:  
 ```
 $ git clone https://android.googlesource.com/platform/external/perfetto/
 ```
 
-**Android tree**:
+**Android tree**:  
 Perfetto lives in `external/perfetto` in the AOSP tree.
 
 
 Prerequisites
 -------------
-**Standalone checkout**:
+**Standalone checkout**:  
 All dependent libraries are self-hosted and pulled through:
 ```
 $ tools/install-build-deps [--no-android]
 ```
 
-**Android tree**:
+**Android tree**:  
 See https://source.android.com/setup
 
 
 Building
 --------
-**Standalone checkout**:
+**Standalone checkout**:  
 If you are a chromium developer and have depot_tools installed you can avoid
 the `tools/` prefix below and just use gn/ninja from depot_tools.
 
@@ -51,7 +51,7 @@ is_debug = true / false
 $ tools/ninja -C out/android
 ```
 
-**Android tree**:
+**Android tree**:  
 `$ mmma external/perfetto`
 or
 `$ m perfetto traced traced_probes`
@@ -88,7 +88,8 @@ Supported platforms
 
 
 
-# Build configurations
+Build configurations
+--------------------
 The following [GN args][gn-quickstart] are supported:
 
 `target_os = "android" | "linux" | "mac"`:  

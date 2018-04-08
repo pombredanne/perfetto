@@ -70,8 +70,8 @@ The only dependencies of Perfetto's tracing libraries are C++11 and [Protobuf li
 
 **Extensibility**  
 Perfetto allows third parties to defined their own protobufs for:
-* [(input) Configuration](https://android.googlesource.com/platform/external/perfetto/+/master/protos/perfetto/config/data_source_config.proto#52)
-* [(output) Trace packets](https://android.googlesource.com/platform/external/perfetto/+/master/protos/perfetto/trace/trace_packet.proto#36)
+* [(input) Configuration](/protos/perfetto/config/data_source_config.proto#52)
+* [(output) Trace packets](/protos/perfetto/trace/trace_packet.proto#36)
 
 Allowing apps to define their own strongly-typed input and output schema.
 See [docs/trace-format.md](docs/trace-format.md) for more details.
@@ -84,12 +84,14 @@ Docs
 * [Running tests](docs/testing.md)
 * [Running on Android](docs/running-perfetto.md)
 * [Key concepts and architecture](docs/architecture.md)
-* [Life of a trace packet](docs/life-of-a-trace-packet.md)
+* [Life of a tracing session](life-of-a-tracing-session.md)
 * [Performance benchmarks](docs/benchmarks.md)
+* [Trace config](docs/trace-config.md)
 * [Trace format](docs/trace-format.md)
 * [Multi-layer tracing](docs/multi-layer-tracing.md)
 * [Security-model](docs/security-model.md)
 * [API surface](docs/api.md)
+* [Embedding Perfetto in your own project](docs/embedder-guide.md)
 
 [ftrace]: https://www.kernel.org/doc/Documentation/trace/ftrace.txt
 [systrace]: https://developer.android.com/studio/command-line/systrace.html

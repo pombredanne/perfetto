@@ -15,8 +15,8 @@ integration (Linux only).
 Benchmarks tracking the performance of: (i) trace writing, (ii) trace readback
 and (iii) ftrace raw pipe -> protobuf translation.
 
-Running tests on the Linux / MacOS
-----------------------------------
+Running tests on Linux / MacOS
+------------------------------
 ```
 $ tools/ninja -C out/default perfetto_{unittests,integrationtests,benchmarks}
 $ out/default/perfetto_unittests --gtest_help
@@ -30,7 +30,7 @@ sudo chown  -R $USER /sys/kernel/debug/tracing
 
 Running tests on Android
 ------------------------
-1A) Connect a device through `adb`
+1A) Connect a device through `adb`  
 1B) Start the build-in emulator (supported on Linux and MacOS):  
 ```
 $ tools/install-build-deps
@@ -46,17 +46,17 @@ $ tools/run_android_test out/default perfetto_unittests
 Continuous testing
 ------------------
 Perfetto is tested in a variety of locations:
-**Travis CI**: https://perfetto-ci.appspot.com/
+**Travis CI**: https://perfetto-ci.appspot.com/  
 Builds and runs perfetto_{unittests,integrationtests,benchmarks} from then standalone checkout. Benchmarks are ran in a reduced form for smoke testing.
 
-**Android CI** (see go/apct and go/apct-guide):
+**Android CI** (see go/apct and go/apct-guide):  
 runs only `perfetto_integrationtests`
 
-**Android presubmits (TreeHugger)**:
+**Android presubmits (TreeHugger)**:  
 Runs before submission of every AOSP CL of `external/perfetto`.
 
 
-**Android CTS** (Android test suite used run to ensure API compatibility): Rolling runs internally.
+**Android CTS** (Android test suite used run to ensure API compatibility):   Rolling runs internally.
 
 Note that Travis uses the standalone build system and the others build as
 part of the Android tree.
@@ -75,17 +75,16 @@ Integration tests ensure that subsystems (importantly ftrace and the IPC layer)
 and Perfetto as a whole is working correctly end-to-end.
 
 There are two configurations in which integration tests can be run:
-**1. Production mode** (Android-only)
+**1. Production mode** (Android-only)  
 This mode assumes that both the tracing service (`traced`) and the OS probes
 service (`traced_probes`) are already running. In this mode the test enables
 only the consumer endpoint and tests the interaction with the production
 services. This is the way our Android CTS and APCT tests work.
 
-**2. Standalone mode**:
+**2. Standalone mode**:  
 Starting up the daemons in the test itself and then testing against them.
 This is how standalone builds are tested. This is the only supported way to
 run integration tests on Linux and MacOS.
-
 
 Android CTS tests
 -----------------
@@ -95,6 +94,19 @@ platform API.
 These tests include a subset of the integration tests above as well as adding
 more complex tests which ensure interaction between platform (e.g. Android apps
 etc.) and Perfetto is not broken.
+
+The relevant targets are `CtsPerfettoProducerApp` and `CtsPerfettoTestCases`. Once these are built, the following commands should be run:
+```
+adb push $ANDROID_HOST_OUT/cts/android-cts/testcases/CtsPerfettoTestCases64 /data/local/tmp/
+adb install -r $ANDROID_HOST_OUT/cts/android-cts/testcases/CtsPerfettoProducerApp.apk
+```
+
+Next, the app named `android.perfetto.producer` should be run on the device.
+
+Finally, the following command should be run:
+```
+adb shell /data/local/tmp/CtsPerfettoTestCases64
+```
 
 Chromium waterfall
 ------------------
