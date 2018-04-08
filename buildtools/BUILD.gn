@@ -14,6 +14,20 @@
 
 import("//gn/standalone/libc++/libc++.gni")
 
+config("test_warnings_suppression") {
+  cflags = [
+    "-Wno-global-constructors",
+    "-Wno-covered-switch-default",
+    "-Wno-used-but-marked-unused",
+    "-Wno-covered-switch-default",
+    "-Wno-global-constructors",
+    "-Wno-used-but-marked-unused",
+    "-Wno-inconsistent-missing-override",
+    "-Wno-unused-member-function",
+    "-Wno-zero-as-null-pointer-constant",
+  ]
+}
+
 # Mimimal config to be used in production (i.e. non-test) targets. This is
 # really just to allowing include "gtest/gtest_prod.h" for the FRIEND_TEST macro
 # and avoid to pull in warning suppressions that are not really necessary for
@@ -31,20 +45,7 @@ config("googletest_config") {
     "googletest/googletest/include",
     "googletest/googlemock/include",
   ]
-  cflags = [
-    "-Wno-covered-switch-default",
-    "-Wno-deprecated",
-    "-Wno-global-constructors",
-    "-Wno-inconsistent-missing-override",
-    "-Wno-missing-noreturn",
-    "-Wno-overloaded-virtual",
-    "-Wno-shift-sign-overflow",
-    "-Wno-sign-conversion",
-    "-Wno-undef",
-    "-Wno-unused-member-function",
-    "-Wno-used-but-marked-unused",
-    "-Wno-zero-as-null-pointer-constant",
-  ]
+  configs = [ ":test_warnings_suppression" ]
 }
 
 source_set("gtest") {
@@ -91,17 +92,7 @@ config("protobuf_gen_config") {
     "GOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
   ]
   include_dirs = [ "protobuf/src" ]
-  cflags = [
-    "-Wno-deprecated",
-    #   "-Wno-disabled-macro-expansion",
-    #   "-Wno-int-to-void-pointer-cast",
-    #   "-Wno-missing-variable-declarations",
-    #   "-Wno-old-style-cast",
-    #   "-Wno-shorten-64-to-32",
-    #   "-Wno-sign-conversion",
-    #   "-Wno-undef",
-    #   "-Wno-zero-as-null-pointer-constant",
-  ]
+  cflags = [ "-Wno-deprecated" ]
 
   # if (!is_clang) {
   #   cflags += [
@@ -118,26 +109,10 @@ config("protobuf_config") {
 
   visibility = [ ":*" ]
   defines = [ "HAVE_PTHREAD=1" ]
-  cflags = [
-    #   "-Wno-deprecated",
-    #   "-Wno-disabled-macro-expansion",
-    #   "-Wno-int-to-void-pointer-cast",
-    #   "-Wno-missing-variable-declarations",
-    #   "-Wno-old-style-cast",
-    #   "-Wno-shorten-64-to-32",
-    #   "-Wno-sign-conversion",
-    #   "-Wno-undef",
-    "-Wno-zero-as-null-pointer-constant",
-  ]
+  cflags = [ "-Wno-zero-as-null-pointer-constant" ]
   if (is_clang) {
     cflags += [
       "-Wno-enum-compare-switch",
-
-      #     "-Wno-global-constructors",
-      #     "-Wno-maybe-uninitialized",
-      #     "-Wno-shift-sign-overflow",
-      #     "-Wno-sign-compare",
-      #     "-Wno-used-but-marked-unused",
       "-Wno-user-defined-warnings",
     ]
   } else {
@@ -346,7 +321,7 @@ if (current_toolchain == host_toolchain) {
   executable("protoc") {
     deps = [
       ":protoc_lib",
-      "../gn:default_deps",
+      "//gn:default_deps",
     ]
     sources = [
       "protobuf/src/google/protobuf/compiler/main.cc",
@@ -494,11 +469,7 @@ if (use_custom_libcxx) {
 config("benchmark_config") {
   visibility = [ ":*" ]
   include_dirs = [ "benchmark/include" ]
-  cflags = [
-    "-Wno-global-constructors",
-    "-Wno-covered-switch-default",
-    "-Wno-used-but-marked-unused",
-  ]
+  configs = [ ":test_warnings_suppression" ]
 }
 
 source_set("benchmark") {

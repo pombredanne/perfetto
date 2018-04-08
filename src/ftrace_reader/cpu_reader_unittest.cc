@@ -18,8 +18,6 @@
 
 #include <sys/stat.h>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
@@ -33,6 +31,8 @@
 #include "src/ftrace_reader/test/test_messages.pbzero.h"
 
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/trace/ftrace/ftrace_event.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "src/ftrace_reader/test/test_messages.pb.h"
@@ -123,13 +123,6 @@ class BinaryWriter {
     PERFETTO_CHECK(ptr_ < ptr_ + size_);
   }
 
-  void WriteString(const char* s) {
-    char c;
-    while ((c = *s++)) {
-      Write<char>(c);
-    }
-  }
-
   void WriteFixedString(size_t n, const char* s) {
     size_t length = strlen(s);
     PERFETTO_CHECK(length < n);
@@ -149,7 +142,7 @@ class BinaryWriter {
     return buffer;
   }
 
-  size_t written() { return ptr_ - page_.get(); }
+  size_t written() { return static_cast<size_t>(ptr_ - page_.get()); }
 
  private:
   size_t size_;

@@ -16,8 +16,12 @@
 
 #include "src/traced/probes/filesystem/lru_inode_cache.h"
 
+#include "perfetto/base/build_config.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 #include <string>
 #include <tuple>

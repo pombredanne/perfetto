@@ -21,14 +21,17 @@
 #include <list>
 #include <thread>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/utils.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {

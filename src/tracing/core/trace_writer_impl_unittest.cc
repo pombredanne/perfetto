@@ -16,7 +16,10 @@
 
 #include "src/tracing/core/trace_writer_impl.h"
 
+#include "perfetto/base/build_config.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/base/utils.h"
 #include "perfetto/tracing/core/commit_data_request.h"
 #include "perfetto/tracing/core/service.h"

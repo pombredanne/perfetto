@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gtest/gtest.h>
+#include "perfetto/base/build_config.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include <random>
 
 #include "benchmark/benchmark.h"
@@ -56,13 +59,14 @@ void BenchmarkCommon(benchmark::State& state) {
 
   // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  uint32_t message_count = state.range(0);
-  uint32_t message_bytes = state.range(1);
-  uint32_t mb_per_s = state.range(2);
+  uint32_t message_count = static_cast<uint32_t>(state.range(0));
+  uint32_t message_bytes = static_cast<uint32_t>(state.range(1));
+  uint32_t mb_per_s = static_cast<uint32_t>(state.range(2));
 
   uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
-  uint32_t time_for_messages_ms =
-      10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
+  int time_for_messages_ms = static_cast<int>(
+      10000 +
+      (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s));
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
@@ -85,7 +89,7 @@ void BenchmarkCommon(benchmark::State& state) {
     }
   };
 
-  uint64_t wall_start_ns = base::GetWallTimeNs().count();
+  uint64_t wall_start_ns = static_cast<uint64_t>(base::GetWallTimeNs().count());
   uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
   uint64_t producer_start_ns = helper.producer_thread()->GetThreadCPUTimeNs();
   uint64_t iterations = 0;
@@ -99,7 +103,8 @@ void BenchmarkCommon(benchmark::State& state) {
       helper.service_thread()->GetThreadCPUTimeNs() - service_start_ns;
   uint64_t producer_ns =
       helper.producer_thread()->GetThreadCPUTimeNs() - producer_start_ns;
-  uint64_t wall_ns = base::GetWallTimeNs().count() - wall_start_ns;
+  uint64_t wall_ns =
+      static_cast<uint64_t>(base::GetWallTimeNs().count()) - wall_start_ns;
 
   state.counters["Pro CPU"] = benchmark::Counter(100.0 * producer_ns / wall_ns);
   state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);

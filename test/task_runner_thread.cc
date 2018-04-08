@@ -69,7 +69,7 @@ uint64_t TaskRunnerThread::GetThreadCPUTimeNs() {
 
   runner_->PostTask([this, &thread_time_ns, &cv] {
     std::unique_lock<std::mutex> inner_lock(mutex_);
-    thread_time_ns = base::GetThreadCPUTimeNs().count();
+    thread_time_ns = static_cast<uint64_t>(base::GetThreadCPUTimeNs().count());
     cv.notify_one();
   });
 

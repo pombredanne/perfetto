@@ -16,7 +16,10 @@
 
 #include "perfetto/protozero/message_handle.h"
 
+#include "perfetto/base/build_config.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/protozero/message.h"
 
 namespace protozero {

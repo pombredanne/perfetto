@@ -18,8 +18,6 @@
 
 #include <memory>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/temp_file.h"
@@ -32,6 +30,8 @@
 #include "src/ipc/unix_socket.h"
 
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "src/ipc/test/client_unittest_messages.pb.h"
 #include "src/ipc/wire_protocol.pb.h"
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
@@ -51,7 +51,7 @@ constexpr char kSockName[] = TEST_SOCK_NAME("host_impl_unittest.sock");
 
 class FakeService : public Service {
  public:
-  MOCK_METHOD0(Destroyed, void());
+  // MOCK_METHOD0(Destroyed, void());
   MOCK_METHOD2(OnFakeMethod1, void(const RequestProto&, DeferredBase*));
 
   static void Invoker(Service* service,

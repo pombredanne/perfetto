@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "proto_translation_table.h"
@@ -27,8 +28,10 @@
 #include "src/ftrace_reader/ftrace_config_muxer.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
 
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::_;
 using testing::AnyNumber;
@@ -430,8 +433,9 @@ TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
   const int kCycles = 50;
-  EXPECT_CALL(*controller->runner(),
-              PostDelayedTask(_, controller->drain_period_ms()))
+  EXPECT_CALL(
+      *controller->runner(),
+      PostDelayedTask(_, static_cast<int>(controller->drain_period_ms())))
       .Times(kCycles);
   EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(kCycles);
   EXPECT_CALL(*controller->runner(), PostTask(_)).Times(kCycles);

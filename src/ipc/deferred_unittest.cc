@@ -16,7 +16,10 @@
 
 #include "perfetto/ipc/deferred.h"
 
+#include "perfetto/base/build_config.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 

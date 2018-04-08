@@ -158,9 +158,8 @@ class CpuReader {
     // Convert to user space id using
     // https://github.com/torvalds/linux/blob/v4.12/include/linux/kdev_t.h#L10
     // TODO(azappone): see if this is the same on all platforms
-    unsigned int maj = static_cast<unsigned int>((kernel_dev) >> 20);
-    unsigned int min =
-        static_cast<unsigned int>((kernel_dev) & ((1U << 20) - 1));
+    unsigned int maj = static_cast<unsigned int>(kernel_dev) >> 20;
+    unsigned int min = static_cast<unsigned int>(kernel_dev) & ((1U << 20) - 1);
     return static_cast<BlockDeviceID>(  // From makedev()
         (((maj)&0xfffff000ULL) << 32) | (((maj)&0xfffULL) << 8) |
         (((min)&0xffffff00ULL) << 12) | (((min)&0xffULL)));

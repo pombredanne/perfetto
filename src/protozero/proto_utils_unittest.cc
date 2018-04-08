@@ -18,7 +18,10 @@
 
 #include <limits>
 
+#include "perfetto/base/build_config.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
@@ -159,7 +162,7 @@ TEST(ProtoUtilsTest, VarIntDecoding) {
 TEST(ProtoUtilsTest, VarIntDecodingOutOfBounds) {
   uint8_t buf[] = {0xff, 0xff, 0xff, 0xff};
   for (size_t i = 0; i < 5; i++) {
-    uint64_t value = -1;
+    uint64_t value = static_cast<uint64_t>(-1);
     const uint8_t* res = ParseVarInt(buf, buf + i, &value);
     EXPECT_EQ(&buf[0] + i, res);
     EXPECT_EQ(0u, value);

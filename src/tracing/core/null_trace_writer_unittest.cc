@@ -16,13 +16,17 @@
 
 #include "src/tracing/core/null_trace_writer.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/tracing/core/trace_writer.h"
 
 #include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {

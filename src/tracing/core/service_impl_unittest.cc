@@ -18,8 +18,6 @@
 
 #include <string.h>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/temp_file.h"
@@ -40,6 +38,8 @@
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()

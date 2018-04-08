@@ -28,6 +28,12 @@
 
 #include "perfetto/base/build_config.h"
 
+// Some glibc headers hit this when using signals.
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdisabled-macro-expansion"
+#endif
+
 #if defined(NDEBUG)
 #error This translation unit should not be used in release builds
 #endif
@@ -241,3 +247,5 @@ void EnableStacktraceOnCrashForDebug() {
 }
 
 }  // namespace
+
+#pragma GCC diagnostic pop

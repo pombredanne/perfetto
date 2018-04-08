@@ -18,12 +18,15 @@
 
 #include <memory>
 
+#include "perfetto/base/build_config.h"
+#include "proto_translation_table.h"
+#include "src/ftrace_reader/atrace_wrapper.h"
+#include "src/ftrace_reader/ftrace_procfs.h"
+
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "atrace_wrapper.h"
-#include "ftrace_procfs.h"
-#include "proto_translation_table.h"
+PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::_;
 using testing::AnyNumber;

@@ -17,9 +17,6 @@
 #include <fstream>
 #include <sstream>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/utils.h"
@@ -32,7 +29,9 @@
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pbzero.h"
 
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
+#include "gmock/gmock.h"
 #include "google/protobuf/text_format.h"
+#include "gtest/gtest.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/test_bundle_wrapper.pb.h"
 PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()

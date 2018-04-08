@@ -65,10 +65,6 @@ if (is_debug && !build_with_chromium && !build_with_android) {
     sources = [
       "debug_crash_stack_trace.cc",
     ]
-    cflags = [
-      "-Wno-deprecated-dynamic-exception-spec",
-      "-Wno-disabled-macro-expansion",
-    ]
     deps = [
       "../../gn:default_deps",
     ]
