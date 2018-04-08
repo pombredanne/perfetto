@@ -127,6 +127,8 @@ InodeFileDataSource::InodeFileDataSource(
       writer_(std::move(writer)),
       weak_factory_(this) {}
 
+InodeFileDataSource::~InodeFileDataSource() = default;
+
 void InodeFileDataSource::AddInodesFromStaticMap(
     BlockDeviceID block_device_id,
     std::set<Inode>* inode_numbers) {

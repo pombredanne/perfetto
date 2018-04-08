@@ -16,12 +16,8 @@
 
 #include "perfetto/ipc/deferred.h"
 
-#include "perfetto/base/build_config.h"
-#include "perfetto/base/logging.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/message_lite.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace ipc {

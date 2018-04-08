@@ -111,4 +111,6 @@ void TaskRunnerThread::Run(std::unique_ptr<ThreadDelegate> delegate) {
   }
 }
 
+ThreadDelegate::~ThreadDelegate() = default;
+
 }  // namespace perfetto

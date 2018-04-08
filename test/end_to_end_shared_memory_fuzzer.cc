@@ -18,7 +18,6 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
@@ -37,11 +36,8 @@
 #include "test/task_runner_thread_delegates.h"
 #include "test/test_helper.h"
 
-#include "perfetto/trace/trace_packet.pbzero.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trace_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 namespace shm_fuzz {

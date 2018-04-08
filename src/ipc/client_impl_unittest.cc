@@ -21,7 +21,8 @@
 
 #include <string>
 
-#include "perfetto/base/build_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ipc/service_descriptor.h"
@@ -31,11 +32,7 @@
 #include "src/ipc/test/test_socket.h"
 #include "src/ipc/unix_socket.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "src/ipc/test/client_unittest_messages.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {

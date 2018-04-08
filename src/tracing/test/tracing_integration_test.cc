@@ -17,7 +17,8 @@
 #include <inttypes.h>
 #include <unistd.h>
 
-#include "perfetto/base/build_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/data_source_config.h"
@@ -32,16 +33,11 @@
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
 
-#include "perfetto/trace/test_event.pbzero.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/config/trace_config.pb.h"
+#include "perfetto/trace/test_event.pbzero.h"
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 namespace {

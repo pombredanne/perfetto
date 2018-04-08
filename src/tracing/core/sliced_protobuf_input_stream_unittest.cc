@@ -16,10 +16,7 @@
 
 #include "src/tracing/core/sliced_protobuf_input_stream.h"
 
-#include "perfetto/base/build_config.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/base/utils.h"
 
 namespace perfetto {

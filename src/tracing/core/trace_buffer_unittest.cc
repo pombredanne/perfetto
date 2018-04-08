@@ -21,7 +21,6 @@
 #include <sstream>
 #include <vector>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/protozero/proto_utils.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/shared_memory_abi.h"
@@ -29,10 +28,8 @@
 #include "src/tracing/core/trace_buffer.h"
 #include "src/tracing/test/fake_packet.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

@@ -26,12 +26,9 @@
  */
 
 #include "perfetto/tracing/core/trace_config.h"
-#include "perfetto/base/build_config.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/config/data_source_config.pb.h"
 #include "perfetto/config/trace_config.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

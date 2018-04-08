@@ -19,15 +19,11 @@
 #include <sstream>
 #include <string>
 
-#include "perfetto/base/build_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::HasSubstr;
 using testing::Not;

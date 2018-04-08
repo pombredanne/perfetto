@@ -18,12 +18,8 @@
 
 #include <vector>
 
-#include "perfetto/base/build_config.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace base {

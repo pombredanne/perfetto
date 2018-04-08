@@ -14,23 +14,18 @@
  * limitations under the License.
  */
 
-#include "perfetto/protozero/message_handle.h"
+#include "perfetto/ipc/client.h"
+#include "perfetto/ipc/host.h"
+#include "perfetto/ipc/service.h"
+#include "perfetto/ipc/service_proxy.h"
 
-#include "gtest/gtest.h"
-#include "perfetto/protozero/message.h"
+namespace perfetto {
+namespace ipc {
 
-namespace protozero {
+Client::~Client() = default;
+Host::~Host() = default;
+Service::~Service() = default;
+ServiceProxy::EventListener::~EventListener() = default;
 
-namespace {
-
-TEST(MessageHandleTest, MoveHandleSharedMessageDoesntFinalize) {
-  Message message;
-  message.Reset(nullptr);
-
-  MessageHandle<Message> handle_1(&message);
-  handle_1 = MessageHandle<Message>(&message);
-  ASSERT_FALSE(handle_1->is_finalized());
-}
-
-}  // namespace
-}  // namespace protozero
+}  // namespace ipc
+}  // namespace perfetto

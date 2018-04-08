@@ -90,7 +90,11 @@ template("proto_library") {
   source_set_name = target_name
 
   config(config_name) {
-    include_dirs = [ cc_out_dir ]
+    cflags = [
+      "-isystem",
+      rebase_path(cc_out_dir),
+    ]
+    # include_dirs = [ cc_out_dir ]
   }
 
   # The XXX_gen action that generates the .pb.{cc,h} files.

@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/build_config.h"
-#include "src/ipc/protoc_plugin/ipc_generator.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/compiler/plugin.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "src/ipc/protoc_plugin/ipc_generator.h"
 
 int main(int argc, char* argv[]) {
   ::perfetto::ipc::IPCGenerator generator;

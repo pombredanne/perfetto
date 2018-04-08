@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/build_config.h"
-#include "src/protozero/protoc_plugin/protozero_generator.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/compiler/plugin.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "src/protozero/protoc_plugin/protozero_generator.h"
 
 int main(int argc, char* argv[]) {
   ::protozero::ProtoZeroGenerator generator;

@@ -76,7 +76,7 @@ class InodeFileDataSource : public FileScanner::Delegate {
 
   void Flush();
 
-  virtual ~InodeFileDataSource() {}
+  virtual ~InodeFileDataSource();
 
   virtual void FillInodeEntry(InodeFileMap* destination,
                               Inode inode_number,

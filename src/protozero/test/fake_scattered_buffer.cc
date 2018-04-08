@@ -19,10 +19,7 @@
 #include <sstream>
 #include <utility>
 
-#include "perfetto/base/build_config.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace protozero {
 

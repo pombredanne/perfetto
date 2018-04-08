@@ -17,16 +17,13 @@
 #ifndef SRC_IPC_CLIENT_IMPL_H_
 #define SRC_IPC_CLIENT_IMPL_H_
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/ipc/client.h"
 #include "src/ipc/buffered_frame_deserializer.h"
 #include "src/ipc/unix_socket.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/wire_protocol.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 #include <list>
 #include <map>

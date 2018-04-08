@@ -36,7 +36,7 @@ class FileScanner {
                               const std::string&,
                               protos::pbzero::InodeFileMap_Entry_Type) = 0;
     virtual void OnInodeScanDone() = 0;
-    virtual ~Delegate() {}
+    virtual ~Delegate();
   };
 
   FileScanner(std::vector<std::string> root_directories,

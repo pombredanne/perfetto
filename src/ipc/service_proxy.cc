@@ -18,15 +18,11 @@
 
 #include <utility>
 
-#include "perfetto/base/build_config.h"
+#include "google/protobuf/message_lite.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ipc/service_descriptor.h"
 #include "src/ipc/client_impl.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "google/protobuf/message_lite.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace ipc {

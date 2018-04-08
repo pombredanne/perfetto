@@ -20,12 +20,9 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/vm_test_utils.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 #include <sys/resource.h>

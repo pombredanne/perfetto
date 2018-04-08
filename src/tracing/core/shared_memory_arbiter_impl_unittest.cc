@@ -16,7 +16,8 @@
 
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 
-#include "perfetto/base/build_config.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/commit_data_request.h"
@@ -25,11 +26,6 @@
 #include "src/base/test/test_task_runner.h"
 #include "src/tracing/core/patch_list.h"
 #include "src/tracing/test/aligned_buffer_test.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {

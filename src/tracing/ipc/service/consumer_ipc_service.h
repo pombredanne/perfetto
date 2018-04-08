@@ -22,15 +22,12 @@
 #include <memory>
 #include <string>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/ipc/basic_types.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/service.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/ipc/consumer_port.ipc.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,12 @@
  * limitations under the License.
  */
 
-#include "perfetto/protozero/message_handle.h"
+#include "perfetto/base/task_runner.h"
 
-#include "gtest/gtest.h"
-#include "perfetto/protozero/message.h"
+namespace perfetto {
+namespace base {
 
-namespace protozero {
+TaskRunner::~TaskRunner() = default;
 
-namespace {
-
-TEST(MessageHandleTest, MoveHandleSharedMessageDoesntFinalize) {
-  Message message;
-  message.Reset(nullptr);
-
-  MessageHandle<Message> handle_1(&message);
-  handle_1 = MessageHandle<Message>(&message);
-  ASSERT_FALSE(handle_1->is_finalized());
-}
-
-}  // namespace
-}  // namespace protozero
+}  // namespace base
+}  // namespace perfetto

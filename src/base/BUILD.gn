@@ -29,6 +29,7 @@ source_set("base") {
     "temp_file.cc",
     "thread_checker.cc",
     "unix_task_runner.cc",
+    "virtual_destructors.cc",
   ]
   if (!build_with_chromium && (is_linux || is_android)) {
     sources += [ "watchdog_posix.cc" ]

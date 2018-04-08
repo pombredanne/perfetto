@@ -16,16 +16,13 @@
 
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "src/base/test/test_task_runner.h"
 #include "src/traced/probes/filesystem/lru_inode_cache.h"
 #include "src/tracing/core/null_trace_writer.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 namespace {

@@ -16,12 +16,9 @@
 
 #include "perfetto/base/unix_task_runner.h"
 
+#include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/scoped_file.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) && \
     !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)

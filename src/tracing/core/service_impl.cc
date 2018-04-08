@@ -39,10 +39,8 @@
 #include "src/tracing/core/shared_memory_arbiter_impl.h"
 #include "src/tracing/core/trace_buffer.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/clock_snapshot.pb.h"
 #include "perfetto/trace/trusted_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 // General note: this class must assume that Producers are malicious and will
 // try to crash / exploit this class. We can trust pointers because they come

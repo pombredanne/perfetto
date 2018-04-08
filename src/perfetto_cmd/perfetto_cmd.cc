@@ -39,19 +39,18 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+
+#include "perfetto/config/trace_config.pb.h"
+
 #include "src/tracing/ipc/default_socket.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "google/protobuf/io/zero_copy_stream_impl_lite.h"
-#include "perfetto/config/trace_config.pb.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
 #include <android/os/DropBoxManager.h>
 #include <utils/Looper.h>
 #include <utils/StrongPointer.h>
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 // TODO(primiano): add the ability to pass the file descriptor directly to the
 // traced service instead of receiving a copy of the slices and writing them

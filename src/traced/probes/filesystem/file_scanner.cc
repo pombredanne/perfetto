@@ -151,4 +151,6 @@ bool FileScanner::Done() {
   return !current_dir_handle_ && queue_.empty();
 }
 
+FileScanner::Delegate::~Delegate() = default;
+
 }  // namespace perfetto

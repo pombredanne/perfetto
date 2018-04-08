@@ -18,25 +18,23 @@
 
 #include <sys/stat.h>
 
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "proto_translation_table.h"
+#include "src/ftrace_reader/event_info.h"
+
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
-#include "proto_translation_table.h"
-#include "src/ftrace_reader/event_info.h"
-#include "src/ftrace_reader/test/cpu_reader_support.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
-#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "src/ftrace_reader/test/test_messages.pbzero.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "perfetto/trace/ftrace/ftrace_event.pb.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "src/ftrace_reader/test/cpu_reader_support.h"
 #include "src/ftrace_reader/test/test_messages.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "src/ftrace_reader/test/test_messages.pbzero.h"
 
 using testing::Each;
 using testing::ElementsAre;

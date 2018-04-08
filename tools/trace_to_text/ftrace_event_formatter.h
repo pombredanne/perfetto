@@ -17,14 +17,11 @@
 #ifndef TOOLS_TRACE_TO_TEXT_FTRACE_EVENT_FORMATTER_H_
 #define TOOLS_TRACE_TO_TEXT_FTRACE_EVENT_FORMATTER_H_
 
-#include "perfetto/base/build_config.h"
 #include "tools/trace_to_text/ftrace_event_formatter.h"
 
 #include <string>
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "perfetto/trace/trace_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

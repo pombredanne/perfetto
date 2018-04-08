@@ -32,22 +32,18 @@
 #include <sstream>
 #include <utility>
 
-#include "perfetto/base/build_config.h"
+#include <google/protobuf/compiler/importer.h>
+#include <google/protobuf/dynamic_message.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/util/field_comparator.h>
+#include <google/protobuf/util/message_differencer.h>
+
 #include "perfetto/base/logging.h"
-#include "tools/trace_to_text/ftrace_event_formatter.h"
-#include "tools/trace_to_text/ftrace_inode_handler.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "google/protobuf/compiler/importer.h"
-#include "google/protobuf/dynamic_message.h"
-#include "google/protobuf/io/zero_copy_stream_impl.h"
-#include "google/protobuf/text_format.h"
-#include "google/protobuf/util/field_comparator.h"
-#include "google/protobuf/util/message_differencer.h"
-
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include "tools/trace_to_text/ftrace_event_formatter.h"
+#include "tools/trace_to_text/ftrace_inode_handler.h"
 
 namespace perfetto {
 namespace {

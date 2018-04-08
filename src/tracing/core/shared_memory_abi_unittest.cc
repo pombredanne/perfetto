@@ -16,10 +16,7 @@
 
 #include "perfetto/tracing/core/shared_memory_abi.h"
 
-#include "perfetto/base/build_config.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 #include "perfetto/tracing/core/basic_types.h"
 #include "src/tracing/test/aligned_buffer_test.h"
 

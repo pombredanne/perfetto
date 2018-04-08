@@ -30,7 +30,6 @@ config("extra_warnings") {
       "-Wno-gnu-zero-variadic-macro-arguments",
       "-Wno-padded",
       "-Wno-reserved-id-macro",
-      "-Wno-weak-vtables",
     ]
   }
 }
@@ -77,7 +76,7 @@ config("default") {
       "-fdiagnostics-show-template-tree",
     ]
   } else {
-    cflags += [ "-Wno-unknown-warning" ]
+    # cflags += [ "-Wno-unknown-warning" ]
   }
 
   if (current_cpu == "arm") {

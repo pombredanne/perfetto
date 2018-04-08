@@ -42,7 +42,7 @@ constexpr int64_t kWatchdogMillis = 30000;  // 30s
 // All methods of this interface can be called from any thread.
 class TaskRunner {
  public:
-  virtual ~TaskRunner() = default;
+  virtual ~TaskRunner();
 
   // Schedule a task for immediate execution. Immediate tasks are always
   // executed in the order they are posted. Can be called from any thread.

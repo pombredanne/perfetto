@@ -30,13 +30,12 @@
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "rate_limiter.h"
 
+#include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
+
 #if defined(PERFETTO_OS_ANDROID)
 #include "perfetto/base/android_task_runner.h"
 #endif  // defined(PERFETTO_OS_ANDROID)
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

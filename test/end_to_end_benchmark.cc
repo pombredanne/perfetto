@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "perfetto/base/build_config.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
+#include <gtest/gtest.h>
 #include <random>
 
 #include "benchmark/benchmark.h"

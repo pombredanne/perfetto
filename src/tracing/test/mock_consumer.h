@@ -19,15 +19,12 @@
 
 #include <memory>
 
-#include "perfetto/base/build_config.h"
+#include "gmock/gmock.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/service.h"
 #include "perfetto/tracing/core/trace_packet.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "gmock/gmock.h"
 #include "perfetto/trace/trace_packet.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

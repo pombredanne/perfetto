@@ -97,7 +97,7 @@ class FtraceSink {
     virtual void OnBundleComplete(size_t,
                                   protozero::MessageHandle<FtraceEventBundle>,
                                   const FtraceMetadata&) = 0;
-    virtual ~Delegate() = default;
+    virtual ~Delegate();
   };
 
   FtraceSink(base::WeakPtr<FtraceController>,

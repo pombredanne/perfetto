@@ -14,17 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef TOOLS_TRACE_TO_TEXT_FTRACE_INODE_HANDLER_H_
-#define TOOLS_TRACE_TO_TEXT_FTRACE_INODE_HANDLER_H_
-
-#include "tools/trace_to_text/ftrace_inode_handler.h"
-
-#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/tracing/core/consumer.h"
+#include "perfetto/tracing/core/producer.h"
+#include "perfetto/tracing/core/service.h"
+#include "perfetto/tracing/core/shared_memory.h"
+#include "perfetto/tracing/core/shared_memory_arbiter.h"
 
 namespace perfetto {
 
-bool ParseInode(const protos::FtraceEvent&, uint64_t* inode);
+Consumer::~Consumer() = default;
+Producer::~Producer() = default;
+Service::~Service() = default;
+Service::ConsumerEndpoint::~ConsumerEndpoint() = default;
+Service::ProducerEndpoint::~ProducerEndpoint() = default;
+SharedMemory::~SharedMemory() = default;
+SharedMemory::Factory::~Factory() = default;
+SharedMemoryArbiter::~SharedMemoryArbiter() = default;
 
 }  // namespace perfetto
-
-#endif  // TOOLS_TRACE_TO_TEXT_FTRACE_INODE_HANDLER_H_

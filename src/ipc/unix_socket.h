@@ -180,7 +180,7 @@ class UnixSocket {
   // and the socket goes into the kDisconnected state, it retains the uid of
   // the last peer.
   uid_t peer_uid() const {
-    PERFETTO_DCHECK(!is_listening() && peer_uid_ >= 0);
+    PERFETTO_DCHECK(!is_listening() && peer_uid_ != static_cast<uid_t>(-1));
     return peer_uid_;
   }
 

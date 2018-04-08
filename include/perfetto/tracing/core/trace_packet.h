@@ -22,14 +22,10 @@
 #include <memory>
 #include <tuple>
 
-#include "perfetto/base/build_config.h"
+#include "google/protobuf/io/zero_copy_stream.h"
 #include "perfetto/base/export.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/slice.h"
-
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
-#include "google/protobuf/io/zero_copy_stream.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 namespace perfetto {
 

@@ -21,15 +21,12 @@
 #include <algorithm>
 #include <utility>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ipc/service.h"
 #include "perfetto/ipc/service_descriptor.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "src/ipc/wire_protocol.pb.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 // TODO(primiano): put limits on #connections/uid and req. queue (b/69093705).
 

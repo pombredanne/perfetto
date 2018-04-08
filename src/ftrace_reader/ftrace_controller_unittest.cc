@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "proto_translation_table.h"
@@ -28,10 +27,8 @@
 #include "src/ftrace_reader/ftrace_config_muxer.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
 
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_BEGIN()
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-PERFETTO_COMPILER_WARNINGS_SUPPRESSION_END()
 
 using testing::_;
 using testing::AnyNumber;

@@ -416,4 +416,6 @@ void FtraceMetadata::Clear() {
   FinishEvent();
 }
 
+FtraceSink::Delegate::~Delegate() = default;
+
 }  // namespace perfetto
