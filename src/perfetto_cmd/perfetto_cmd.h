@@ -28,7 +28,7 @@
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/ipc/consumer_ipc_client.h"
-#include "rate_limiter.h"
+#include "src/perfetto_cmd/rate_limiter.h"
 
 #include "src/perfetto_cmd/perfetto_cmd_state.pb.h"
 

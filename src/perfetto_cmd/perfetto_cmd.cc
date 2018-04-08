@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "perfetto_cmd.h"
+#include "src/perfetto_cmd/perfetto_cmd.h"
 
 #include <fcntl.h>
 #include <getopt.h>

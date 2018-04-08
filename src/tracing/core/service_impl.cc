@@ -560,10 +560,10 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      uid_t producer_uid = static_cast<uid_t>(-1);
+      uid_t producer_uid = kInvalidUid;
       if (!tbuf.ReadNextTracePacket(&packet, &producer_uid))
         break;
-      PERFETTO_DCHECK(producer_uid != static_cast<uid_t>(-1));
+      PERFETTO_DCHECK(producer_uid != kInvalidUid);
       PERFETTO_DCHECK(packet.size() > 0);
       if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
@@ -601,9 +601,9 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   // |write_into_file| == true in the trace config, drain the packets read
   // (if any) into the given file descriptor.
   if (tracing_session->write_into_file) {
-    const size_t max_size = tracing_session->max_file_size_bytes
-                                ? tracing_session->max_file_size_bytes
-                                : std::numeric_limits<size_t>::max();
+    const uint64_t max_size = tracing_session->max_file_size_bytes
+                                  ? tracing_session->max_file_size_bytes
+                                  : std::numeric_limits<size_t>::max();
 
     // When writing into a file, the file should look like a root trace.proto
     // message. Each packet should be prepended with a proto preamble stating
@@ -614,7 +614,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     bool stop_writing_into_file = tracing_session->write_period_ms == 0;
     std::unique_ptr<struct iovec[]> iovecs(new struct iovec[max_iovecs]);
     size_t num_iovecs_at_last_packet = 0;
-    size_t bytes_about_to_be_written = 0;
+    uint64_t bytes_about_to_be_written = 0;
     for (TracePacket& packet : packets) {
       std::tie(iovecs[num_iovecs].iov_base, iovecs[num_iovecs].iov_len) =
           packet.GetProtoPreamble();
@@ -642,7 +642,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     PERFETTO_DCHECK(num_iovecs <= max_iovecs);
     int fd = *tracing_session->write_into_file;
 
-    size_t total_wr_size = 0;
+    uint64_t total_wr_size = 0;
 
     // writev() can take at most IOV_MAX entries per call. Batch them.
     constexpr size_t kIOVMax = IOV_MAX;
@@ -659,8 +659,8 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
 
     tracing_session->bytes_written_into_file += total_wr_size;
 
-    PERFETTO_DLOG("Draining into file, written: %zu, stop: %d", total_wr_size,
-                  stop_writing_into_file);
+    PERFETTO_DLOG("Draining into file, written: %" PRIu64 " KB, stop: %d",
+                  (total_wr_size + 1023) / 1024, stop_writing_into_file);
     if (stop_writing_into_file) {
       tracing_session->write_into_file.reset();
       tracing_session->write_period_ms = 0;

@@ -389,7 +389,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
   TRACE_BUFFER_DLOG("ReadNextTracePacket()");
 
   // Just in case we forget to initialize it below.
-  *producer_uid = static_cast<uid_t>(-1);
+  *producer_uid = kInvalidUid;
 
 #if PERFETTO_DCHECK_IS_ON()
   PERFETTO_DCHECK(!changed_since_last_read_);

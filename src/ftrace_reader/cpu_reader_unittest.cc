@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "cpu_reader.h"
+#include "src/ftrace_reader/cpu_reader.h"
 
 #include <sys/stat.h>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "proto_translation_table.h"
 #include "src/ftrace_reader/event_info.h"
+#include "src/ftrace_reader/proto_translation_table.h"
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"

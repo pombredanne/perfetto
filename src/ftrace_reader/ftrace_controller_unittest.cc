@@ -22,10 +22,10 @@
 
 #include "perfetto/ftrace_reader/ftrace_config.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "proto_translation_table.h"
 #include "src/ftrace_reader/cpu_reader.h"
 #include "src/ftrace_reader/ftrace_config_muxer.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
+#include "src/ftrace_reader/proto_translation_table.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

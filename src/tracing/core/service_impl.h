@@ -251,8 +251,8 @@ class ServiceImpl : public Service {
     // OnTraceData().
     base::ScopedFile write_into_file;
     int write_period_ms = 0;
-    size_t max_file_size_bytes = 0;
-    size_t bytes_written_into_file = 0;
+    uint64_t max_file_size_bytes = 0;
+    uint64_t bytes_written_into_file = 0;
   };
 
   ServiceImpl(const ServiceImpl&) = delete;

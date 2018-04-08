@@ -89,7 +89,7 @@ void BenchmarkCommon(benchmark::State& state) {
   uint64_t wall_start_ns = static_cast<uint64_t>(base::GetWallTimeNs().count());
   uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
   uint64_t producer_start_ns = helper.producer_thread()->GetThreadCPUTimeNs();
-  uint64_t iterations = 0;
+  uint32_t iterations = 0;
   for (auto _ : state) {
     auto cname = "produced.and.committed." + std::to_string(iterations++);
     auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);

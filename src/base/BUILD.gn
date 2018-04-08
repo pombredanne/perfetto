@@ -72,6 +72,7 @@ if (is_debug && !build_with_chromium && !build_with_android) {
     if (is_linux || is_android) {
       deps += [ "../../buildtools:libbacktrace" ]
     }
+    cflags = [ "-Wno-deprecated" ]
   }
 }
 

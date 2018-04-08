@@ -154,7 +154,7 @@ void ForEachPacketInTrace(
 
     // ... and the actual TracePacket itself.
     std::unique_ptr<char[]> buf(new char[field_size]);
-    input->read(buf.get(), field_size);
+    input->read(buf.get(), static_cast<std::streamsize>(field_size));
     bytes_processed += field_size;
 
     protos::TracePacket packet;
@@ -235,7 +235,7 @@ void PrintFtraceTrack(std::ostream* output,
   constexpr char kFtraceTrackName[] = "ftrace ";
   size_t width = GetWidth();
   size_t bucket_count = width - strlen(kFtraceTrackName);
-  size_t bucket_size = (end - start) / bucket_count;
+  size_t bucket_size = static_cast<size_t>(end - start) / bucket_count;
   size_t max = 0;
   std::vector<size_t> buckets(bucket_count);
   for (size_t i = 0; i < bucket_count; i++) {

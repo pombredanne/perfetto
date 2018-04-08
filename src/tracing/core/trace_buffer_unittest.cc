@@ -165,7 +165,7 @@ TEST_F(TraceBufferTest, ReadWrite_Simple) {
 TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
   for (int8_t num_writers = 1; num_writers <= 10; num_writers++) {
     ResetBuffer(4096);
-    for (int8_t i = 1; i <= num_writers; i++) {
+    for (char i = 1; i <= num_writers; i++) {
       ASSERT_EQ(32u, CreateChunk(ProducerID(i), WriterID(i), ChunkID(i))
                          .AddPacket(32 - 16, i)
                          .CopyIntoTraceBuffer());
@@ -173,7 +173,7 @@ TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
 
     // The expected read sequence now is: c3, c4, c5.
     trace_buffer()->BeginRead();
-    for (int8_t i = 1; i <= num_writers; i++)
+    for (char i = 1; i <= num_writers; i++)
       ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32 - 16, i)));
     ASSERT_THAT(ReadPacket(), IsEmpty());
   }  // for(num_writers)
@@ -399,7 +399,7 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
   ResetBuffer(4096);
 
   // [c0: 512][c1: 512][c2: 512][c3: 512][c4: 512][c5: 512][c6: 512][c7: 512]
-  for (int8_t i = 0; i < 8; i++) {
+  for (char i = 0; i < 8; i++) {
     ASSERT_EQ(512u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(i))
                         .AddPacket(512 - 16, 'a' + i)
                         .CopyIntoTraceBuffer());
@@ -626,7 +626,7 @@ TEST_F(TraceBufferTest, Fragments_PreserveUID) {
       .SetUID(11)
       .CopyIntoTraceBuffer();
   trace_buffer()->BeginRead();
-  uid_t uid = static_cast<uid_t>(-1);
+  uid_t uid = kInvalidUid;
   ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'a')));
   ASSERT_EQ(11u, uid);
 
