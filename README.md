@@ -12,7 +12,7 @@ Linux/Android platforms and user-space apps. It consists of:
   I/O tracing, heap profiling (coming soon), perf sampling (coming soon).
 - Web-based UI for inspection and analysis of traces (coming soon)
 
-![Perfetto Stack](docs/perfetto-stack.svg)
+![Perfetto Stack](docs/images/perfetto-stack.png)
 
 Goals
 -----
@@ -71,7 +71,7 @@ See [docs/trace-format.md](docs/trace-format.md) for more details.
 
 Docs
 ----
-#### [Contributing](#Contributing)
+#### [Contributing](docs/contributing.md)
 #### [Build instructions](docs/build-instructions.md)
 #### [Running tests](docs/testing.md)
 #### [Running on Android](docs/running-perfetto.md)

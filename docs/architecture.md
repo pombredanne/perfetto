@@ -16,4 +16,4 @@ Trace buffers
 
 IPC signalling
 
-![Perfetto Stack](perfetto-stack.svg)
+![Perfetto Stack](images/perfetto-stack.png)
