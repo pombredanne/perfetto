@@ -25,6 +25,8 @@
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 
+#include "perfetto/trace/trace_packet.pb.h"
+
 namespace perfetto {
 
 class TestHelper : public Consumer {
@@ -34,7 +36,7 @@ class TestHelper : public Consumer {
   // Consumer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
-  void OnTracingStop() override;
+  void OnTracingDisabled() override;
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
   void StartServiceIfRequired();
@@ -61,7 +63,7 @@ class TestHelper : public Consumer {
   std::function<void()> on_packets_finished_callback_;
   std::function<void()> on_stop_tracing_callback_;
 
-  std::vector<TracePacket::DecodedTracePacket> trace_;
+  std::vector<protos::TracePacket> trace_;
 
   TaskRunnerThread service_thread_;
   TaskRunnerThread producer_thread_;

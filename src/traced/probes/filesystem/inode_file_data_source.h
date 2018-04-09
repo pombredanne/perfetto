@@ -29,6 +29,7 @@
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/data_source_types.h"
 #include "perfetto/tracing/core/basic_types.h"
+#include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/filesystem/file_scanner.h"
 #include "src/traced/probes/filesystem/fs_mount.h"
@@ -41,26 +42,17 @@ namespace perfetto {
 using InodeFileMap = protos::pbzero::InodeFileMap;
 class TraceWriter;
 
-void ScanFilesDFS(
-    const std::string& root_directory,
-    const std::function<bool(BlockDeviceID block_device_id,
-                             Inode inode_number,
-                             const std::string& path,
-                             protos::pbzero::InodeFileMap_Entry_Type type)>&);
-
 // Creates block_device_map for /system partition
 void CreateStaticDeviceToInodeMap(
     const std::string& root_directory,
     std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
         static_file_map);
 
-void FillInodeEntry(InodeFileMap* destination,
-                    Inode inode_number,
-                    const InodeMapValue& inode_map_value);
 
 class InodeFileDataSource : public FileScanner::Delegate {
  public:
   InodeFileDataSource(
+      DataSourceConfig,
       base::TaskRunner*,
       TracingSessionID,
       std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
@@ -72,6 +64,7 @@ class InodeFileDataSource : public FileScanner::Delegate {
   base::WeakPtr<InodeFileDataSource> GetWeakPtr() const;
 
   // Called when Inodes are seen in the FtraceEventBundle
+  // TODO(fmayer): Change  to std::pair<BlockDeviceID, Inode>.
   void OnInodes(const std::vector<std::pair<Inode, BlockDeviceID>>& inodes);
 
   // Search in /system partition and add inodes to InodeFileMap proto if found
@@ -82,25 +75,45 @@ class InodeFileDataSource : public FileScanner::Delegate {
   void AddInodesFromLRUCache(BlockDeviceID block_device_id,
                              std::set<Inode>* inode_numbers);
 
+  void Flush();
+
   virtual ~InodeFileDataSource() {}
+
+  virtual void FillInodeEntry(InodeFileMap* destination,
+                              Inode inode_number,
+                              const InodeMapValue& inode_map_value);
+
+ protected:
+  std::multimap<BlockDeviceID, std::string> mount_points_;
 
  private:
   InodeFileMap* AddToCurrentTracePacket(BlockDeviceID block_device_id);
+  void ResetTracePacket();
   void FindMissingInodes();
+
+  // Callbacks for dynamic filesystem scan.
   bool OnInodeFound(BlockDeviceID block_device_id,
                     Inode inode_number,
                     const std::string& path,
                     protos::pbzero::InodeFileMap_Entry_Type type);
   void OnInodeScanDone();
+
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
+
+  uint64_t GetScanIntervalMs() const;
+  uint64_t GetScanDelayMs() const;
+  uint64_t GetScanBatchSize() const;
+
+  const DataSourceConfig source_config_;
+  std::set<std::string> scan_mount_points_;
+  std::map<std::string, std::vector<std::string>> mount_point_mapping_;
 
   base::TaskRunner* task_runner_;
   const TracingSessionID session_id_;
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>*
       static_file_map_;
   LRUInodeCache* cache_;
-  std::multimap<BlockDeviceID, std::string> mount_points_;
   std::unique_ptr<TraceWriter> writer_;
   std::map<BlockDeviceID, std::set<Inode>> missing_inodes_;
   std::map<BlockDeviceID, std::set<Inode>> next_missing_inodes_;

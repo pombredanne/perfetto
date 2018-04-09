@@ -294,10 +294,10 @@ void PrintInodeStats(std::ostream* output,
                    ftrace_inodes.begin(), ftrace_inodes.end(),
                    std::inserter(intersect, intersect.begin()));
 
-  sprintf(line, "Unresolved inodes: %" PRIu64 "\n",
+  sprintf(line, "Unresolved inodes: %zu\n",
           ftrace_inodes.size() - intersect.size());
 
-  sprintf(line, "Unexpected inodes from filesystem: %" PRIu64 "\n",
+  sprintf(line, "Unexpected inodes from filesystem: %zu\n",
           resolved_inodes.size() - intersect.size());
   *output << std::string(line);
 
@@ -350,6 +350,7 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
         if (packet.has_process_tree()) {
           const ProcessTree& tree = packet.process_tree();
           for (Process process : tree.processes()) {
+            tids_in_tree.insert(process.pid());
             for (ProcessTree::Thread thread : process.threads()) {
               tids_in_tree.insert(thread.tid());
             }

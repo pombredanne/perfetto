@@ -25,6 +25,8 @@
 #include "src/base/test/test_task_runner.h"
 #include "test/test_helper.h"
 
+#include "perfetto/trace/trace_packet.pb.h"
+
 namespace perfetto {
 
 class PerfettoCtsTest : public ::testing::Test {
