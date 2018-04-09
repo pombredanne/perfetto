@@ -54,9 +54,18 @@ $ adb shell perfetto --config :test --out /data/misc/perfetto-traces/trace
 
 For more advanced configurations see the [Trace Config](#trace-config) section.
 
-Note: If the output file is not under `/data/misc/perfetto-traces`, tracing will
+*** aside
+If the output file is not under `/data/misc/perfetto-traces`, tracing will
 fail due to SELinux.
+***
 
+*** aside
+For security reasons the trace file is written with 0600 (rw-------) permissions
+and owned by shell. On rooted (`userbuild`) devices it is possible to just
+`adb pull` the file after `adb root`. On `user` devices instead, in order to get
+the trace out of the device, do the following:
+`adb shell cat /data/misc/perfetto-traces/trace > ~/trace`
+***
 
 Trace config
 ------------

@@ -10,7 +10,7 @@ Platform-agnostic unit-tests.
 
 `perfetto_integrationtests`:  
 End-to-end tests, involving the protobuf-based IPC transport and ftrace
-integration (Linux only).
+integration (Linux/Android only).
 
 `perfetto_benchmarks`:  
 Benchmarks tracking the performance of: (i) trace writing, (ii) trace readback

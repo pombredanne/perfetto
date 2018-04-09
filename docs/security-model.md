@@ -7,7 +7,7 @@
 
 ![Security overview](images/security-overview.png)
 
-**TL;DR**
+**TL;DR**  
 The tracing service has two endpoints (in Chromium: Mojo services, on Android:
 UNIX sockets): one for producer(s) and one for consumer(s).
 The former is typically public, the latter is restricted only to trusted
@@ -20,7 +20,7 @@ exploit the tracing service. We do so at the
 level of security and testing is applied regardless of the embedder and the IPC
 transport.
 
-**Tracing service**
+**Tracing service**  
 - The tracing service has to validate all inputs.
 - In the worst case a bug in the tracing service allowing remote code execution,
   the tracing service should have no meaningful capabilities to exploit.
@@ -54,7 +54,7 @@ untrusted-and-unprivileged and trusted-and-more-privileged entities).
 The tracing service guarantees that the `TracePacket` fields defined also in
 [trusted_packet.proto](/protos/perfetto/trace/trusted_packet.proto) cannot be
 spoofed by the Producer(s). Packets that try to define those fields are rejected
-(% the clock snapshots).  
+(modulo the clock snapshots).  
 See [PacketStreamValidator](/src/tracing/core/packet_stream_validator.cc) and
 [its unit test](/src/tracing/core/packet_stream_validator_unittest.cc) for more
 details.  

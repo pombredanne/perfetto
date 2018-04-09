@@ -9,7 +9,7 @@ A Perfetto trace is guaranteed to be a a linear sequence of `TracePacket(s)`
 (see [trace_packet.proto](/protos/perfetto/trace/trace_packet.proto)).
 
 As a key part of the Perfetto design, the tracing service is agnostic of the
-content of TracePacket, % the few fields defined in
+content of TracePacket, modulo the few fields defined in
 [trusted_packet.proto](/protos/perfetto/trace/trusted_packet.proto) that are
 produced by the service itself.
 

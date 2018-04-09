@@ -90,6 +90,11 @@ Supported platforms
 
 Build configurations
 --------------------
+*** aside
+`tools/build_all_configs.py` can be used to generate out/XXX folders for most of
+the supported configurations.
+***
+
 The following [GN args][gn-quickstart] are supported:
 
 `target_os = "android" | "linux" | "mac"`:  

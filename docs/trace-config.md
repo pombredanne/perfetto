@@ -75,7 +75,7 @@ $protoc --encode=perfetto.protos.TraceConfig \
         > /tmp/config.pb
 
 cat /tmp/config.pb | adb shell perfetto -c - -o /data/misc/perfetto-traces/trace.pb
-adb pull /data/misc/perfetto-traces/trace.pb /tmp/
+adb shell cat /data/misc/perfetto-traces/trace.pb > /tmp/trace.pb
 out/android/trace_to_text json < /tmp/trace.pb > /tmp/trace.json
 
 # The file can now be viewed in chrome://tracing

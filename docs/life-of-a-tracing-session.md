@@ -3,9 +3,9 @@
 This document explains how producer, service and consumer interact end-to-end
 during a tracing session, with references to code and IPC requests / responses.
 
-1.  One ore more producers connect to the tracing service and sets up their IPC
+1.  One or more producers connect to the tracing service and sets up their IPC
     channels.
-2.  Each producer advertises one ore more data sources through the
+2.  Each producer advertises one or more data sources through the
     [`RegisterDataSource`](/protos/perfetto/ipc/producer_port.proto#34) IPC.
     Nothing more happens on the Producer until this point. Nothing traces by
     default.

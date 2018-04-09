@@ -102,9 +102,13 @@ directly into its shared memory buffer, using a special library called
 Each chunk:
 - Is owned exclusively by one Producer thread (or shared through a mutex).
 - Contains a linear sequence of [`TracePacket(s)`](trace-format.md), or
-  fragments of that.
+  fragments of that. A `TracePacket` can span across several chunks, the
+  fragmentation is not exposed to the consumers (consumers always see whole
+  packets as if they were never fragmented).
 - Can be owned and written by exactly one `TraceWriter`.
-- Is part of a reliable and ordered sequence through i
+- Is part of a reliable and ordered sequence, identified by the `WriterID`:
+  packets in a sequence are guaranteed to be read back in order, without gaps
+  and without repetitions (see [trace-format.md](trace-format.md) for more).
 
 See the comments in
 [shared_memory_abi.h](/include/perfetto/tracing/core/shared_memory_abi.h)
