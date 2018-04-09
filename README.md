@@ -21,7 +21,7 @@ A UI for inspection and analysis of traces (coming soon).
 A python / C++ (TBD) library for trace-based metrics (coming soon).
 
 
-![Perfetto Stack](docs/images/perfetto-stack.png)
+![Perfetto Stack](https://storage.googleapis.com/perfetto/markdown_img/perfetto-stack.png)
 
 Goals
 -----

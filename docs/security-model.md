@@ -5,7 +5,7 @@
 <!-- TODO(primiano): expand security model doc. -->
 ***
 
-![Security overview](images/security-overview.png)
+![Security overview](https://storage.googleapis.com/perfetto/markdown_img/security-overview.png)
 
 **TL;DR**  
 The tracing service has two endpoints (in Chromium: Mojo services, on Android:

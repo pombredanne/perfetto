@@ -2,7 +2,7 @@
 
 Producer <> Service <> Consumer model
 -------------------------------------
-![Perfetto Stack](images/producer-service-consumer.png)
+![Perfetto Stack](https://storage.googleapis.com/perfetto/markdown_img/producer-service-consumer.png)
 
 **Service**  
 The tracing service is a long-lived entity (a system daemon on Linux/Android,

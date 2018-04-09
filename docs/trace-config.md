@@ -5,7 +5,7 @@
 <!-- TODO(primiano): write trace config doc. -->
 ***
 
-![Trace Config](images/trace-config.png)
+![Trace Config](https://storage.googleapis.com/perfetto/markdown_img/trace-config.png)
 
 The [`TraceConfig`](/protos/perfetto/config/trace_config.proto) is an extensible
 protobuf message, sent by the consumer to the service, that defines:
