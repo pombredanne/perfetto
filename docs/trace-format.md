@@ -14,6 +14,7 @@ Each data source can extend the trace with their app-specific protobuf schema.
 *** aside
 TODO(primiano): we should reserve an extension range and figure out / comment a
 hash to assign sub-message IDs, even without checking them into
+trace_packet.proto.
 ***
 
 

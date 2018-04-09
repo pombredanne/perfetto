@@ -18,7 +18,7 @@ zero-syscall (on fast-paths) writing of protobufs over shared memory.
 A UI for inspection and analysis of traces (coming soon).
 
 **Batch processing of traces**  
-A C++ library for trace-based metrics (coming soon).
+A python / C++ (TBD) library for trace-based metrics (coming soon).
 
 
 ![Perfetto Stack](docs/images/perfetto-stack.png)
