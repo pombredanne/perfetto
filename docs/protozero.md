@@ -1,6 +1,11 @@
 ProtoZero
 ---------
 
+*** note
+**This doc is WIP**, stay tuned.
+<!-- TODO(primiano): write protozero doc. -->
+***
+
 ProtoZero is an almost* zero-copy zero-malloc append-only protobuf library.
 It's designed to be fast and efficient at the cost of a reduced API
 surface for generated stubs. The main limitations consist of:
@@ -14,6 +19,6 @@ surface for generated stubs. The main limitations consist of:
 contiguous buffer (e.g., to request a new buffer to continue the write).
 ***
 
-TODO(primiano): expand the documentation here.
-
-See also: [Design doc](https://goo.gl/EKvEfa]).
+Other resources
+---------------
+* [Design doc](https://goo.gl/EKvEfa])

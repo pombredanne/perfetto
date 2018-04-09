@@ -112,4 +112,6 @@ for more details about the binary format of this buffer.
 
 Other resources
 ---------------
-[Life of a tracing session](life-of-a-tracing-session.md)
+* [Life of a tracing session](life-of-a-tracing-session.md)
+* [Trace config](trace-config.md)
+* [Trace format](trace-format.md)

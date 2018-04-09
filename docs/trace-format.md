@@ -1,6 +1,9 @@
 # Perfetto trace format
 
-TODO(primiano): describe trace packets.
+*** note
+**This doc is WIP**, stay tuned.
+<!-- TODO(primiano): write trace format doc. -->
+***
 
 A Perfetto trace is guaranteed to be a a linear sequence of `TracePacket(s)`
 (see [trace_packet.proto](/protos/perfetto/trace/trace_packet.proto)).

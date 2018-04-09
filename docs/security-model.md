@@ -1,8 +1,11 @@
 # Perfetto security model
 
-![Security overview](images/security-overview.png)
+*** note
+**This doc is WIP**, stay tuned.
+<!-- TODO(primiano): expand security model doc. -->
+***
 
-TODO(primiano): expand security model doc, backport from security review docs.
+![Security overview](images/security-overview.png)
 
 **TL;DR**
 The tracing service has two endpoints (in Chromium: Mojo services, on Android:
@@ -30,8 +33,7 @@ transport.
   - On Android it runs as nobody:nobody and is allowed to do very little
     see [traced.te](https://android.googlesource.com/platform/system/sepolicy/+/master/private/traced.te).
   - In Chromium it should run as a utility process.
-  - TODO(primiano): we could use BPF syscall sandboxing both in Chromium and
-    Android.
+  - TODO: we could use BPF syscall sandboxing both in Chromium and Android.
     [Proof of concept](https://android-review.googlesource.com/c/platform/external/perfetto/+/576563)
 
 **Consumers**  

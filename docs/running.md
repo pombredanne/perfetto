@@ -61,56 +61,8 @@ fail due to SELinux.
 Trace config
 ------------
 `--config :test` uses a hard-coded test trace config. It is possible to pass
-an arbitrary trace config by doing the following:
-```
-cat > /tmp/config.txpb <<EOF
-# This is a text-encoded protobuf for /protos/perfetto/config/trace_config.proto
-duration_ms: 10000
-
-# For long traces set the following variables. It will periodically drain the
-# trace buffers into the output file, allowing to save a trace larger than the
-# buffer size.
-write_into_file: true
-file_write_period_ms: 5000
-
-buffers {
-  size_kb: 10240
-}
-
-data_sources {
-  config {
-    name: "linux.ftrace"
-    target_buffer: 0
-    ftrace_config {
-      buffer_size_kb: 40 # Kernel ftrace buffer size.
-      ftrace_events: "sched_switch"
-      ftrace_events: "print"
-    }
-  }
-}
-
-data_sources {
-  config {
-    name: "linux.process_stats"
-    target_buffer: 0
-  }
-}
-EOF
-
-protoc=$(pwd)/out/android/gcc_like_host/protoc
-
-$protoc --encode=perfetto.protos.TraceConfig \
-        -I$(pwd)/external/perfetto/protos \
-        $(pwd)/external/perfetto/protos/perfetto/config/perfetto_config.proto \
-        < /tmp/config.txpb \
-        > /tmp/config.pb
-
-cat /tmp/config.pb | adb shell perfetto -c - -o /data/misc/perfetto-traces/trace.pb
-adb pull /data/misc/perfetto-traces/trace.pb /tmp/
-out/android/trace_to_text json < /tmp/trace.pb > /tmp/trace.json
-
-# The file can now be viewed in chrome://tracing
-```
+an arbitrary trace config. See instructions in the
+[trace config](trace-config.md) page.
 
 
 [dropbox]: https://developer.android.com/reference/android/os/DropBoxManager.html

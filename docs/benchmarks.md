@@ -1,7 +1,10 @@
 # Perfetto benchmarks
 
-TODO(primiano): summarize results of `perfetto_benchmarks` (repro steps or
-didn't happen)
+
+*** note
+**This doc is WIP**, stay tuned.
+<!-- TODO(primiano): Summarize results of perfetto_benchmarks  -->
+***
 
 This doc should show the charts of `perfetto_benchmarks`, showing cpu usage and
 tracing bandwidth for both writing (producer->service) and reading

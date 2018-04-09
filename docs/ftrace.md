@@ -1,8 +1,9 @@
 # Perfetto <-> Ftrace interoperability
 
-TODO(primiano): write ftrace doc
-
-Code lives in [/src/ftrace_reader](/src/ftrace_reader/).
+*** note
+**This doc is WIP**, stay tuned.
+<!-- TODO(primiano): write ftrace doc. -->
+***
 
 This doc should:
 - Describe the ftrace trace_pipe_raw -> protobuf translation.
@@ -12,6 +13,8 @@ This doc should:
   `tools/udate_protos.py`)
 - Describe how session multiplexing works.
 - Describe the page-by-page scheduling algorithm that uses vmsplice()
+
+Code lives in [/src/ftrace_reader](/src/ftrace_reader/).
 
 From https://android-review.googlesource.com/c/platform/external/perfetto/+/603793/
 ```
