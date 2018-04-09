@@ -4,6 +4,7 @@ The testing strategy for Perfetto is rather complex due to the wide variety
 of build configurations and embedding targets.
 
 Common test targets (all platforms / checkouts):
+
 `perfetto_unittests`:  
 Platform-agnostic unit-tests.
 
@@ -46,6 +47,7 @@ $ tools/run_android_test out/default perfetto_unittests
 Continuous testing
 ------------------
 Perfetto is tested in a variety of locations:
+
 **Travis CI**: https://perfetto-ci.appspot.com/  
 Builds and runs perfetto_{unittests,integrationtests,benchmarks} from then standalone checkout. Benchmarks are ran in a reduced form for smoke testing.
 
@@ -75,6 +77,7 @@ Integration tests ensure that subsystems (importantly ftrace and the IPC layer)
 and Perfetto as a whole is working correctly end-to-end.
 
 There are two configurations in which integration tests can be run:
+
 **1. Production mode** (Android-only)  
 This mode assumes that both the tracing service (`traced`) and the OS probes
 service (`traced_probes`) are already running. In this mode the test enables

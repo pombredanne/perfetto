@@ -1,9 +1,10 @@
 # Perfetto - Performance instrumentation and tracing
 
 Perfetto is an open-source project for performance instrumentation and tracing
-of Linux/Android/Chrome platforms and user-space apps. It consists of:
+of Linux/Android/Chrome platforms and user-space apps.  
+It consists of:
 
-**A portable, high efficiency, user-space tracing library**
+**A portable, high efficiency, user-space tracing library**  
 designed for tracing of multi-process systems, based on zero-alloc zero-copy
 zero-syscall (on fast-paths) writing of protobufs over shared memory.
 
@@ -13,11 +14,11 @@ zero-syscall (on fast-paths) writing of protobufs over shared memory.
 * I/O tracing
 * Many new probes coming soon: heap profiling, perf sampling, syscall tracing.
 
-**Web-based frontend**
+**Web-based frontend**  
 A UI for inspection and analysis of traces (coming soon).
 
-**Batch processing of traces**
-A C++ framework for trace-based metrics (coming soon).
+**Batch processing of traces**  
+A C++ library for trace-based metrics (coming soon).
 
 
 ![Perfetto Stack](docs/images/perfetto-stack.png)
@@ -82,7 +83,7 @@ Docs
 * [Contributing](docs/contributing.md)
 * [Build instructions](docs/build-instructions.md)
 * [Running tests](docs/testing.md)
-* [Running on Android](docs/running-perfetto.md)
+* [Running Perfetto](docs/running.md)
 * [Key concepts and architecture](docs/architecture.md)
 * [Life of a tracing session](life-of-a-tracing-session.md)
 * [Ftrace interop](docs/ftrace.md)

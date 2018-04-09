@@ -3,8 +3,23 @@
 TODO(primiano): summarize results of `perfetto_benchmarks` (repro steps or
 didn't happen)
 
+This doc should show the charts of `perfetto_benchmarks`, showing cpu usage and
+tracing bandwidth for both writing (producer->service) and reading
+(service->file / service->consumer).
+
+In two modes:
+- Measure peak tracing bandwidth saturating the cpu: the producer(s) write as
+  much data as they can, reaching 100% cpu usage.
+- Measure CPU overhead vs constant bandwidth: the producer(s) writes data at a
+  pre-defined rate.
+
+Tweaking the various parameters, such as:
+- Number of writers
+- Size of the shared memory buffer
+- Size of each TracePacket.
+
 **TL;DR:**  
-Peak producer-to-service tracing bandwidth (using 64 KB chunk sizes):
+Peak producer-to-service tracing bandwidth:
 * Linux desktop: ~1.3 GB/s
 * Android Pixel: ~1 GB/s
 

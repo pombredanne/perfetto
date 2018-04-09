@@ -13,7 +13,7 @@ This doc should:
 - Describe how session multiplexing works.
 - Describe the page-by-page scheduling algorithm that uses vmsplice()
 
-From https://android-review.googlesource.com/c/platform/external/perfetto/+/603793/:
+From https://android-review.googlesource.com/c/platform/external/perfetto/+/603793/
 ```
 
   main thread                           [drain] [unblock]
