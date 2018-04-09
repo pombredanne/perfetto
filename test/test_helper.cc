@@ -63,7 +63,7 @@ void TestHelper::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
     if (packet.has_clock_snapshot() || packet.has_trace_config())
       continue;
     ASSERT_EQ(protos::TracePacket::kTrustedUid,
-              packet->optional_trusted_uid_case());
+              packet.optional_trusted_uid_case());
     trace_.push_back(std::move(packet));
   }
 

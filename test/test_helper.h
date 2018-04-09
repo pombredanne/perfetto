@@ -54,7 +54,7 @@ class TestHelper : public Consumer {
 
   TaskRunnerThread* service_thread() { return &service_thread_; }
   TaskRunnerThread* producer_thread() { return &producer_thread_; }
-  const std::vector<TracePacket::DecodedTracePacket>& trace() { return trace_; }
+  const std::vector<protos::TracePacket>& trace() { return trace_; }
 
  private:
   base::TestTaskRunner* task_runner_ = nullptr;
