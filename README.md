@@ -85,7 +85,7 @@ Docs
 * [Running tests](docs/testing.md)
 * [Running Perfetto](docs/running.md)
 * [Key concepts and architecture](docs/architecture.md)
-* [Life of a tracing session](life-of-a-tracing-session.md)
+* [Life of a tracing session](docs/life-of-a-tracing-session.md)
 * [Ftrace interop](docs/ftrace.md)
 * [Performance benchmarks](docs/benchmarks.md)
 * [Trace config](docs/trace-config.md)
