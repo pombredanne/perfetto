@@ -85,12 +85,12 @@ Docs
 * [Running on Android](docs/running-perfetto.md)
 * [Key concepts and architecture](docs/architecture.md)
 * [Life of a tracing session](life-of-a-tracing-session.md)
+* [Ftrace interop](docs/ftrace.md)
 * [Performance benchmarks](docs/benchmarks.md)
 * [Trace config](docs/trace-config.md)
 * [Trace format](docs/trace-format.md)
 * [Multi-layer tracing](docs/multi-layer-tracing.md)
-* [Security-model](docs/security-model.md)
-* [API surface](docs/api.md)
+* [Security model](docs/security-model.md)
 * [Embedding Perfetto in your own project](docs/embedder-guide.md)
 
 [ftrace]: https://www.kernel.org/doc/Documentation/trace/ftrace.txt
