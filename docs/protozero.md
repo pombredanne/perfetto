@@ -14,10 +14,14 @@ surface for generated stubs. The main limitations consist of:
 - Mandatory ordering when writing of nested messages: once a nested message is
   started it must be completed before adding any fields to its parent.
 
-***
-* Allocations and library calls will happen only when crossing the boundary of a
+*** aside
+Allocations and library calls will happen only when crossing the boundary of a
 contiguous buffer (e.g., to request a new buffer to continue the write).
+Assuming a chunk size (a trace *chunk* is what becomes a *contiguous buffer*
+within ProtoZero) of 4KB, and an average event size of 32 bytes, only 7 out of
+1000 events will hit malloc / ipc / library calls.
 ***
+
 
 Other resources
 ---------------
