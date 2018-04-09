@@ -93,6 +93,8 @@ Docs
 * [Multi-layer tracing](docs/multi-layer-tracing.md)
 * [Security model](docs/security-model.md)
 * [Embedding Perfetto in your own project](docs/embedder-guide.md)
+* [ProtoZero internals](docs/protozero.md)
+* [IPC internals](docs/ipc.md)
 
 [ftrace]: https://www.kernel.org/doc/Documentation/trace/ftrace.txt
 [systrace]: https://developer.android.com/studio/command-line/systrace.html

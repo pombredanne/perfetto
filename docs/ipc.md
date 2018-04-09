@@ -6,8 +6,9 @@
 ***
 
 **TL;DR**  
-We needed an IPC for Android and Linux which was small, simple, controllable, predictable, C++11 friendly and debuggable.
-If you don't like it you don't have to use it, you can wrap your own IPC
+We needed an IPC for Android and Linux which was small, simple, controllable,
+predictable, C++11 friendly and debuggable.
+Our IPC transport is not mandatory outside of Android, you can wrap your own IPC
 transport (e.g., Perfetto uses Mojo in chromium) or just short circuit the
 Perfetto `{Service,Producer,Consumer}` interfaces for IPC-less full in-process
 use.
@@ -35,7 +36,7 @@ Key features:
   - The wire protocol is based on protobuf.
   - [Fuzzed](/src/ipc/buffered_frame_deserializer_fuzzer.cc)
 - Offers direct control of socket buffers and overrun/stalling policy.
-- ABI stable (until we accidentally break it).
+- ABI stable.
 
 Realistically will never support:
   - Multithreading / thread pools.
