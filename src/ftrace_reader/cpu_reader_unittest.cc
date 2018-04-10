@@ -882,14 +882,14 @@ TEST(CpuReaderTest, TranslateBlockDeviceIDToUserspace) {
   const BlockDeviceID kUserspaceBlockDeviceId = 66336;
   const uint64_t k64BitKernelBlockDeviceId = 4442450946;
   const BlockDeviceID k64BitUserspaceBlockDeviceId =
-      static_cast<BlockDeviceID>(17594983681026);
+      static_cast<BlockDeviceID>(17594983681026ULL);
 
-  EXPECT_EQ(kUserspaceBlockDeviceId,
-            CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
-                kKernelBlockDeviceId));
-  EXPECT_EQ(k64BitUserspaceBlockDeviceId,
-            CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
-                k64BitKernelBlockDeviceId));
+  EXPECT_EQ(CpuReader::TranslateBlockDeviceIDToUserspace<uint32_t>(
+                kKernelBlockDeviceId),
+            kUserspaceBlockDeviceId);
+  EXPECT_EQ(CpuReader::TranslateBlockDeviceIDToUserspace<uint64_t>(
+                k64BitKernelBlockDeviceId),
+            k64BitUserspaceBlockDeviceId);
 }
 
 // clang-format off
