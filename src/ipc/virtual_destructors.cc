@@ -19,6 +19,11 @@
 #include "perfetto/ipc/service.h"
 #include "perfetto/ipc/service_proxy.h"
 
+// This translation unit contains the definitions for the destructor of pure
+// virtual interfaces for the current build target. The alternative would be
+// introducing a one-liner .cc file for each pure virtual interface, which is
+// overkill. This is for compliance with -Wweak-vtables.
+
 namespace perfetto {
 namespace ipc {
 

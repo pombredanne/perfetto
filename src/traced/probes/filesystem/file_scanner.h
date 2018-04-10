@@ -41,8 +41,8 @@ class FileScanner {
 
   FileScanner(std::vector<std::string> root_directories,
               Delegate* delegate,
-              int scan_interval_ms,
-              int scan_steps);
+              uint32_t scan_interval_ms,
+              uint32_t scan_steps);
 
   // Ctor when only the blocking version of Scan is used.
   FileScanner(std::vector<std::string> root_directories, Delegate* delegate);
@@ -56,12 +56,12 @@ class FileScanner {
  private:
   void NextDirectory();
   void Step();
-  void Steps(int n);
+  void Steps(uint32_t n);
   bool Done();
 
   Delegate* delegate_;
-  const int scan_interval_ms_;
-  const int scan_steps_;
+  const uint32_t scan_interval_ms_;
+  const uint32_t scan_steps_;
 
   std::vector<std::string> queue_;
   base::ScopedDir current_dir_handle_;

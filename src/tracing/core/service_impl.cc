@@ -249,7 +249,7 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
       return false;
     }
     tracing_session->write_into_file = std::move(fd);
-    int write_period_ms = static_cast<int>(cfg.file_write_period_ms());
+    uint32_t write_period_ms = cfg.file_write_period_ms();
     if (write_period_ms == 0)
       write_period_ms = kDefaultWriteIntoFilePeriodMs;
     if (write_period_ms < kMinWriteIntoFilePeriodMs)
@@ -326,7 +326,7 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   // Trigger delayed task if the trace is time limited.
-  const int trace_duration_ms = static_cast<int>(cfg.duration_ms());
+  const uint32_t trace_duration_ms = cfg.duration_ms();
   if (trace_duration_ms > 0) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
@@ -396,7 +396,7 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
 }
 
 void ServiceImpl::Flush(TracingSessionID tsid,
-                        int timeout_ms,
+                        uint32_t timeout_ms,
                         ConsumerEndpoint::FlushCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
@@ -1137,7 +1137,7 @@ void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
   tracing_session_id_ = 0;
 }
 
-void ServiceImpl::ConsumerEndpointImpl::Flush(int timeout_ms,
+void ServiceImpl::ConsumerEndpointImpl::Flush(uint32_t timeout_ms,
                                               FlushCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!tracing_session_id_) {

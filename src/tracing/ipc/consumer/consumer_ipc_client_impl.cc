@@ -156,7 +156,7 @@ void ConsumerIPCClientImpl::FreeBuffers() {
   consumer_port_.FreeBuffers(req, std::move(async_response));
 }
 
-void ConsumerIPCClientImpl::Flush(int timeout_ms, FlushCallback callback) {
+void ConsumerIPCClientImpl::Flush(uint32_t timeout_ms, FlushCallback callback) {
   if (!connected_) {
     PERFETTO_DLOG("Cannot Flush(), not connected to tracing service");
     return callback(/*success=*/false);

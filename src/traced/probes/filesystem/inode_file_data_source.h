@@ -100,9 +100,9 @@ class InodeFileDataSource : public FileScanner::Delegate {
   void AddRootsForBlockDevice(BlockDeviceID block_device_id,
                               std::vector<std::string>* roots);
 
-  int GetScanIntervalMs() const;
-  int GetScanDelayMs() const;
-  int GetScanBatchSize() const;
+  uint32_t GetScanIntervalMs() const;
+  uint32_t GetScanDelayMs() const;
+  uint32_t GetScanBatchSize() const;
 
   const DataSourceConfig source_config_;
   std::set<std::string> scan_mount_points_;

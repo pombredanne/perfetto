@@ -40,8 +40,8 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
 
 FileScanner::FileScanner(std::vector<std::string> root_directories,
                          Delegate* delegate,
-                         int scan_interval_ms,
-                         int scan_steps)
+                         uint32_t scan_interval_ms,
+                         uint32_t scan_steps)
     : delegate_(delegate),
       scan_interval_ms_(scan_interval_ms),
       scan_steps_(scan_steps),
@@ -142,8 +142,8 @@ void FileScanner::Step() {
   }
 }
 
-void FileScanner::Steps(int n) {
-  for (int i = 0; i < n && !Done(); ++i)
+void FileScanner::Steps(uint32_t n) {
+  for (uint32_t i = 0; i < n && !Done(); ++i)
     Step();
 }
 

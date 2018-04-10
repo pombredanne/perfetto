@@ -20,6 +20,11 @@
 #include "perfetto/tracing/core/shared_memory.h"
 #include "perfetto/tracing/core/shared_memory_arbiter.h"
 
+// This translation unit contains the definitions for the destructor of pure
+// virtual interfaces for the current build target. The alternative would be
+// introducing a one-liner .cc file for each pure virtual interface, which is
+// overkill. This is for compliance with -Wweak-vtables.
+
 namespace perfetto {
 
 Consumer::~Consumer() = default;

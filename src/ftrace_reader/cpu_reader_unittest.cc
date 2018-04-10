@@ -347,7 +347,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
   EXPECT_EQ(metadata.overwrite_count, 0ul);
-  ASSERT_EQ(1, bundle->event().size());
+  ASSERT_EQ(bundle->event().size(), 1);
   const protos::FtraceEvent& event = bundle->event().Get(0);
   EXPECT_EQ(event.pid(), 28712ul);
   EXPECT_TRUE(WithinOneMicrosecond(event.timestamp(), 608934, 535199));

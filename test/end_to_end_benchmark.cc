@@ -61,9 +61,8 @@ void BenchmarkCommon(benchmark::State& state) {
   uint32_t mb_per_s = static_cast<uint32_t>(state.range(2));
 
   uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
-  int time_for_messages_ms = static_cast<int>(
-      10000 +
-      (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s));
+  uint32_t time_for_messages_ms =
+      10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
   // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);

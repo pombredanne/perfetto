@@ -79,7 +79,7 @@ class MockTaskRunner : public base::TaskRunner {
   }
 
   MOCK_METHOD1(PostTask, void(std::function<void()>));
-  MOCK_METHOD2(PostDelayedTask, void(std::function<void()>, int delay_ms));
+  MOCK_METHOD2(PostDelayedTask, void(std::function<void()>, uint32_t delay_ms));
   MOCK_METHOD2(AddFileDescriptorWatch, void(int fd, std::function<void()>));
   MOCK_METHOD1(RemoveFileDescriptorWatch, void(int fd));
 
@@ -430,9 +430,8 @@ TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   std::unique_ptr<FtraceSink> sink = controller->CreateSink(config, &delegate);
 
   const int kCycles = 50;
-  EXPECT_CALL(
-      *controller->runner(),
-      PostDelayedTask(_, static_cast<int>(controller->drain_period_ms())))
+  EXPECT_CALL(*controller->runner(),
+              PostDelayedTask(_, controller->drain_period_ms()))
       .Times(kCycles);
   EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(kCycles);
   EXPECT_CALL(*controller->runner(), PostTask(_)).Times(kCycles);

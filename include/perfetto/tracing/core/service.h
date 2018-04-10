@@ -122,7 +122,7 @@ class PERFETTO_EXPORT Service {
     // the callback argument |success| will be true) or |timeout_ms| are elapsed
     // (in which case |success| will be false).
     using FlushCallback = std::function<void(bool /*success*/)>;
-    virtual void Flush(int timeout_ms, FlushCallback) = 0;
+    virtual void Flush(uint32_t timeout_ms, FlushCallback) = 0;
 
     // Tracing data will be delivered invoking Consumer::OnTraceData().
     virtual void ReadBuffers() = 0;

@@ -33,13 +33,12 @@
 
 namespace perfetto {
 namespace {
-constexpr int kScanIntervalMs = 10000;  // 10s
-constexpr int kScanDelayMs = 10000;     // 10s
-constexpr int kScanBatchSize = 15000;
+constexpr uint32_t kScanIntervalMs = 10000;  // 10s
+constexpr uint32_t kScanDelayMs = 10000;     // 10s
+constexpr uint32_t kScanBatchSize = 15000;
 
-int OrDefault(uint64_t value, int def) {
-  int int_value = static_cast<int>(value);
-  return int_value ? int_value : def;
+uint32_t OrDefault(uint32_t value, uint32_t def) {
+  return value ? value : def;
 }
 
 std::string DbgFmt(const std::vector<std::string>& values) {
@@ -365,17 +364,17 @@ void InodeFileDataSource::FindMissingInodes() {
   file_scanner_->Scan(task_runner_);
 }
 
-int InodeFileDataSource::GetScanIntervalMs() const {
+uint32_t InodeFileDataSource::GetScanIntervalMs() const {
   return OrDefault(source_config_.inode_file_config().scan_interval_ms(),
                    kScanIntervalMs);
 }
 
-int InodeFileDataSource::GetScanDelayMs() const {
+uint32_t InodeFileDataSource::GetScanDelayMs() const {
   return OrDefault(source_config_.inode_file_config().scan_delay_ms(),
                    kScanDelayMs);
 }
 
-int InodeFileDataSource::GetScanBatchSize() const {
+uint32_t InodeFileDataSource::GetScanBatchSize() const {
   return OrDefault(source_config_.inode_file_config().scan_batch_size(),
                    kScanBatchSize);
 }
