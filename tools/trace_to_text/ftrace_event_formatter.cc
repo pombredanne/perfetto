@@ -29,6 +29,7 @@
 
 // Not worth doing casts for printfs in this translation unit.
 #pragma GCC diagnostic ignored "-Wformat"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 
 namespace perfetto {
 namespace {
