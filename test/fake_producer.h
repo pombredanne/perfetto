@@ -50,6 +50,7 @@ class FakeProducer : public Producer {
                                 const DataSourceConfig& source_config) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
   void OnTracingSetup() override;
+  void Flush(FlushRequestID, const DataSourceInstanceID*, size_t) override;
 
  private:
   void Shutdown();
@@ -58,9 +59,9 @@ class FakeProducer : public Producer {
   base::TaskRunner* task_runner_ = nullptr;
   std::string name_;
   std::minstd_rand0 rnd_engine_;
-  size_t message_size_ = 0;
-  size_t message_count_ = 0;
-  size_t max_messages_per_second_ = 0;
+  uint32_t message_size_ = 0;
+  uint32_t message_count_ = 0;
+  uint32_t max_messages_per_second_ = 0;
   std::function<void()> on_create_data_source_instance_;
   std::unique_ptr<Service::ProducerEndpoint> endpoint_;
   std::unique_ptr<TraceWriter> trace_writer_;

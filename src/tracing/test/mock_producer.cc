@@ -18,6 +18,7 @@
 
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/tracing/core/trace_writer.h"
 #include "src/base/test/test_task_runner.h"
 
 using ::testing::_;
@@ -108,6 +109,18 @@ std::unique_ptr<TraceWriter> MockProducer::CreateTraceWriter(
   PERFETTO_DCHECK(data_source_instances_.count(data_source_name));
   BufferID buf_id = data_source_instances_[data_source_name].target_buffer;
   return service_endpoint_->CreateTraceWriter(buf_id);
+}
+
+void MockProducer::WaitForFlush(TraceWriter* writer_to_flush) {
+  auto& expected_call = EXPECT_CALL(*this, Flush(_, _, _));
+  if (!writer_to_flush)
+    return;
+  expected_call.WillOnce(
+      Invoke([this, writer_to_flush](FlushRequestID flush_req_id,
+                                     const DataSourceInstanceID*, size_t) {
+        writer_to_flush->Flush();
+        service_endpoint_->NotifyFlushComplete(flush_req_id);
+      }));
 }
 
 }  // namespace perfetto

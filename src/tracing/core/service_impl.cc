@@ -55,6 +55,7 @@ constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kClockSnapshotInterval(10 * 1000);
 constexpr int kMinWriteIntoFilePeriodMs = 100;
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
+constexpr int kFlushTimeoutMs = 1000;
 
 constexpr uint64_t kMillisPerHour = 3600000;
 
@@ -266,8 +267,9 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // corresponding BufferID, which is a global ID namespace for the service and
   // all producers.
   size_t total_buf_size_kb = 0;
-  tracing_session->buffers_index.reserve(cfg.buffers_size());
-  for (int i = 0; i < cfg.buffers_size(); i++) {
+  const size_t num_buffers = static_cast<size_t>(cfg.buffers_size());
+  tracing_session->buffers_index.reserve(num_buffers);
+  for (size_t i = 0; i < num_buffers; i++) {
     const TraceConfig::BufferConfig& buffer_cfg = cfg.buffers()[i];
     BufferID global_id = buffer_ids_.Allocate();
     if (!global_id) {
@@ -324,14 +326,15 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   // Trigger delayed task if the trace is time limited.
-  if (cfg.duration_ms()) {
+  const uint32_t trace_duration_ms = cfg.duration_ms();
+  if (trace_duration_ms > 0) {
     auto weak_this = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostDelayedTask(
         [weak_this, tsid] {
           if (weak_this)
-            weak_this->DisableTracing(tsid);
+            weak_this->FlushAndDisableTracing(tsid);
         },
-        cfg.duration_ms());
+        trace_duration_ms);
   }
 
   // Start the periodic drain tasks if we should to save the trace into a file.
@@ -346,10 +349,11 @@ bool ServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   tracing_session->tracing_enabled = true;
-  PERFETTO_LOG("Enabled tracing, #sources:%zu, duration:%" PRIu32
-               " ms, #buffers:%d, total buffer size:%zu KB, total sessions:%zu",
-               cfg.data_sources().size(), cfg.duration_ms(), cfg.buffers_size(),
-               total_buf_size_kb, tracing_sessions_.size());
+  PERFETTO_LOG(
+      "Enabled tracing, #sources:%zu, duration:%d ms, #buffers:%d, total "
+      "buffer size:%zu KB, total sessions:%zu",
+      cfg.data_sources().size(), trace_duration_ms, cfg.buffers_size(),
+      total_buf_size_kb, tracing_sessions_.size());
   return true;
 }
 
@@ -389,6 +393,101 @@ void ServiceImpl::DisableTracing(TracingSessionID tsid) {
 
   // Deliberately NOT removing the session from |tracing_session_|, it's still
   // needed to call ReadBuffers(). FreeBuffers() will erase() the session.
+}
+
+void ServiceImpl::Flush(TracingSessionID tsid,
+                        uint32_t timeout_ms,
+                        ConsumerEndpoint::FlushCallback callback) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session) {
+    PERFETTO_DLOG("Flush() failed, invalid session ID %" PRIu64, tsid);
+    return;
+  }
+
+  if (tracing_session->pending_flushes.size() > 1000) {
+    PERFETTO_ELOG("Too many flushes (%zu) pending for the tracing session",
+                  tracing_session->pending_flushes.size());
+    callback(false);
+    return;
+  }
+
+  FlushRequestID flush_request_id = ++last_flush_request_id_;
+  PendingFlush& pending_flush =
+      tracing_session->pending_flushes
+          .emplace_hint(tracing_session->pending_flushes.end(),
+                        flush_request_id, PendingFlush(std::move(callback)))
+          ->second;
+
+  // Send a flush request to each producer involved in the tracing session. In
+  // order to issue a flush request we have to build a map of all data source
+  // instance ids enabled for each producer.
+  std::map<ProducerID, std::vector<DataSourceInstanceID>> flush_map;
+  for (const auto& data_source_inst : tracing_session->data_source_instances) {
+    const ProducerID producer_id = data_source_inst.first;
+    const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
+    flush_map[producer_id].push_back(ds_inst_id);
+  }
+
+  for (const auto& kv : flush_map) {
+    ProducerID producer_id = kv.first;
+    ProducerEndpointImpl* producer = GetProducer(producer_id);
+    const std::vector<DataSourceInstanceID>& data_sources = kv.second;
+    producer->Flush(flush_request_id, data_sources);
+    pending_flush.producers.insert(producer_id);
+  }
+
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_this, tsid, flush_request_id] {
+        if (weak_this)
+          weak_this->OnFlushTimeout(tsid, flush_request_id);
+      },
+      timeout_ms);
+}
+
+void ServiceImpl::NotifyFlushDoneForProducer(ProducerID producer_id,
+                                             FlushRequestID flush_request_id) {
+  for (auto& kv : tracing_sessions_) {
+    // Remove all pending flushes <= |flush_request_id| for |producer_id|.
+    auto& pending_flushes = kv.second.pending_flushes;
+    auto end_it = pending_flushes.upper_bound(flush_request_id);
+    for (auto it = pending_flushes.begin(); it != end_it;) {
+      PendingFlush& pending_flush = it->second;
+      pending_flush.producers.erase(producer_id);
+      if (pending_flush.producers.empty()) {
+        task_runner_->PostTask(
+            std::bind(std::move(pending_flush.callback), /*success=*/true));
+        it = pending_flushes.erase(it);
+      } else {
+        it++;
+      }
+    }  // for (pending_flushes)
+  }    // for (tracing_session)
+}
+
+void ServiceImpl::OnFlushTimeout(TracingSessionID tsid,
+                                 FlushRequestID flush_request_id) {
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session)
+    return;
+  auto it = tracing_session->pending_flushes.find(flush_request_id);
+  if (it == tracing_session->pending_flushes.end())
+    return;  // Nominal case: flush was completed and acked on time.
+  auto callback = std::move(it->second.callback);
+  tracing_session->pending_flushes.erase(it);
+  callback(/*success=*/false);
+}
+
+void ServiceImpl::FlushAndDisableTracing(TracingSessionID tsid) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  Flush(tsid, kFlushTimeoutMs, [weak_this, tsid](bool success) {
+    PERFETTO_DLOG("Flush done (success: %d), disabling trace session %" PRIu64,
+                  success, tsid);
+    if (weak_this)
+      weak_this->DisableTracing(tsid);
+  });
 }
 
 // Note: when this is called to write into a file passed when starting tracing
@@ -461,10 +560,10 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     tbuf.BeginRead();
     while (!did_hit_threshold) {
       TracePacket packet;
-      uid_t producer_uid = -1;
+      uid_t producer_uid = kInvalidUid;
       if (!tbuf.ReadNextTracePacket(&packet, &producer_uid))
         break;
-      PERFETTO_DCHECK(producer_uid != static_cast<uid_t>(-1));
+      PERFETTO_DCHECK(producer_uid != kInvalidUid);
       PERFETTO_DCHECK(packet.size() > 0);
       if (!PacketStreamValidator::Validate(packet.slices())) {
         PERFETTO_DLOG("Dropping invalid packet");
@@ -480,7 +579,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
       // the producer can't give us a partial packet (e.g., a truncated
       // string) which only becomes valid when the UID is appended here.
       protos::TrustedPacket trusted_packet;
-      trusted_packet.set_trusted_uid(producer_uid);
+      trusted_packet.set_trusted_uid(static_cast<int32_t>(producer_uid));
       static constexpr size_t kTrustedBufSize = 16;
       Slice slice = Slice::Allocate(kTrustedBufSize);
       PERFETTO_CHECK(
@@ -502,9 +601,9 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
   // |write_into_file| == true in the trace config, drain the packets read
   // (if any) into the given file descriptor.
   if (tracing_session->write_into_file) {
-    const size_t max_size = tracing_session->max_file_size_bytes
-                                ? tracing_session->max_file_size_bytes
-                                : std::numeric_limits<size_t>::max();
+    const uint64_t max_size = tracing_session->max_file_size_bytes
+                                  ? tracing_session->max_file_size_bytes
+                                  : std::numeric_limits<size_t>::max();
 
     // When writing into a file, the file should look like a root trace.proto
     // message. Each packet should be prepended with a proto preamble stating
@@ -515,7 +614,7 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     bool stop_writing_into_file = tracing_session->write_period_ms == 0;
     std::unique_ptr<struct iovec[]> iovecs(new struct iovec[max_iovecs]);
     size_t num_iovecs_at_last_packet = 0;
-    size_t bytes_about_to_be_written = 0;
+    uint64_t bytes_about_to_be_written = 0;
     for (TracePacket& packet : packets) {
       std::tie(iovecs[num_iovecs].iov_base, iovecs[num_iovecs].iov_len) =
           packet.GetProtoPreamble();
@@ -543,25 +642,25 @@ void ServiceImpl::ReadBuffers(TracingSessionID tsid,
     PERFETTO_DCHECK(num_iovecs <= max_iovecs);
     int fd = *tracing_session->write_into_file;
 
-    size_t total_wr_size = 0;
+    uint64_t total_wr_size = 0;
 
     // writev() can take at most IOV_MAX entries per call. Batch them.
     constexpr size_t kIOVMax = IOV_MAX;
     for (size_t i = 0; i < num_iovecs; i += kIOVMax) {
-      size_t iov_batch_size = std::min(num_iovecs - i, kIOVMax);
+      int iov_batch_size = static_cast<int>(std::min(num_iovecs - i, kIOVMax));
       ssize_t wr_size = PERFETTO_EINTR(writev(fd, &iovecs[i], iov_batch_size));
       if (wr_size <= 0) {
         PERFETTO_PLOG("writev() failed");
         stop_writing_into_file = true;
         break;
       }
-      total_wr_size += wr_size;
+      total_wr_size += static_cast<size_t>(wr_size);
     }
 
     tracing_session->bytes_written_into_file += total_wr_size;
 
-    PERFETTO_DLOG("Draining into file, written: %zu, stop: %d", total_wr_size,
-                  stop_writing_into_file);
+    PERFETTO_DLOG("Draining into file, written: %" PRIu64 " KB, stop: %d",
+                  (total_wr_size + 1023) / 1024, stop_writing_into_file);
     if (stop_writing_into_file) {
       tracing_session->write_into_file.reset();
       tracing_session->write_period_ms = 0;
@@ -945,16 +1044,17 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
   for (auto& clock : clocks) {
     protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
     c->set_type(clock.type);
-    c->set_timestamp(base::FromPosixTimespec(clock.ts).count());
+    c->set_timestamp(
+        static_cast<uint64_t>(base::FromPosixTimespec(clock.ts).count()));
   }
 #else   // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   protos::ClockSnapshot::Clock* c = clock_snapshot->add_clocks();
   c->set_type(protos::ClockSnapshot::Clock::MONOTONIC);
-  c->set_timestamp(base::GetWallTimeNs().count());
+  c->set_timestamp(static_cast<uint64_t>(base::GetWallTimeNs().count()));
 #endif  // !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 
-  packet.set_trusted_uid(getuid());
-  Slice slice = Slice::Allocate(packet.ByteSize());
+  packet.set_trusted_uid(static_cast<int32_t>(getuid()));
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
@@ -967,8 +1067,8 @@ void ServiceImpl::MaybeEmitTraceConfig(TracingSession* tracing_session,
   tracing_session->did_emit_config = true;
   protos::TrustedPacket packet;
   tracing_session->config.ToProto(packet.mutable_trace_config());
-  packet.set_trusted_uid(getuid());
-  Slice slice = Slice::Allocate(packet.ByteSize());
+  packet.set_trusted_uid(static_cast<int32_t>(getuid()));
+  Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));
   PERFETTO_CHECK(packet.SerializeWithCachedSizesToArray(slice.own_data()));
   packets->emplace_back();
   packets->back().AddSlice(std::move(slice));
@@ -1034,6 +1134,16 @@ void ServiceImpl::ConsumerEndpointImpl::FreeBuffers() {
   }
   service_->FreeBuffers(tracing_session_id_);
   tracing_session_id_ = 0;
+}
+
+void ServiceImpl::ConsumerEndpointImpl::Flush(uint32_t timeout_ms,
+                                              FlushCallback callback) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  if (!tracing_session_id_) {
+    PERFETTO_LOG("Consumer called Flush() but tracing was not active");
+    return;
+  }
+  service_->Flush(tracing_session_id_, timeout_ms, callback);
 }
 
 base::WeakPtr<ServiceImpl::ConsumerEndpointImpl>
@@ -1130,6 +1240,10 @@ void ServiceImpl::ProducerEndpointImpl::CommitData(
 
   service_->ApplyChunkPatches(id_, req_untrusted.chunks_to_patch());
 
+  if (req_untrusted.flush_request_id()) {
+    service_->NotifyFlushDoneForProducer(id_, req_untrusted.flush_request_id());
+  }
+
   // Keep this invocation last. ProducerIPCService::CommitData() relies on this
   // callback being invoked within the same callstack and not posted. If this
   // changes, the code there needs to be changed accordingly.
@@ -1160,6 +1274,7 @@ void ServiceImpl::ProducerEndpointImpl::TearDownDataSource(
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
   // should send the Producer a TearDownTracing if all its data sources have
   // been disabled (see b/77532839 and aosp/655179 PS1).
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_inst_id] {
     if (weak_this)
@@ -1192,14 +1307,33 @@ void ServiceImpl::ProducerEndpointImpl::OnTracingSetup() {
   });
 }
 
+void ServiceImpl::ProducerEndpointImpl::Flush(
+    FlushRequestID flush_request_id,
+    const std::vector<DataSourceInstanceID>& data_sources) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, flush_request_id, data_sources] {
+    if (weak_this) {
+      weak_this->producer_->Flush(flush_request_id, data_sources.data(),
+                                  data_sources.size());
+    }
+  });
+}
+
 void ServiceImpl::ProducerEndpointImpl::CreateDataSourceInstance(
     DataSourceInstanceID ds_id,
     const DataSourceConfig& config) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this, ds_id, config] {
     if (weak_this)
       weak_this->producer_->CreateDataSourceInstance(ds_id, std::move(config));
   });
+}
+
+void ServiceImpl::ProducerEndpointImpl::NotifyFlushComplete(FlushRequestID id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  return GetOrCreateShmemArbiter()->NotifyFlushComplete(id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
