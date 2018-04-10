@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 import os
 import re
 import subprocess
@@ -77,10 +78,12 @@ def merge_protos(proto_paths, output_path):
     merged_content += content
     merged_content += '\n// End of %s\n' % proto
 
- 
-  definitions = re.finditer('^ *(?:message|enum) ([A-Z][A-Za-z0-9].*) {', merged_content, re.MULTILINE)
+  definitions_re = r'^ *(?:message|enum) ([A-Z][A-Za-z0-9].*) {'
+  definitions = re.finditer(definitions_re, merged_content, re.MULTILINE)
   types = set((match.group(1) for match in definitions))
-  uses = re.finditer('^( +)(?:repeated)?\s?([A-Z][A-Za-z0-9].*)\s+[a-z][A-Za-z0-9_]+\s*=\s*(\d+);', merged_content, re.MULTILINE)
+
+  uses_re = r'^( +)(?:repeated)?\s?([A-Z]\w+.*)\s+[a-z]\w+\s*=\s*(\d+);'
+  uses = re.finditer(uses_re, merged_content, re.MULTILINE)
   substitutions = []
   for use in uses:
     everything = use.group(0)
@@ -89,12 +92,13 @@ def merge_protos(proto_paths, output_path):
     field_number = use.group(3)
     if used_type not in types:
       # replacement = '{}reserved {};'.format(indentation, field_number)
-      replacement = '{}// removed field with id {}'.format(indentation, field_number)
+      replacement = '{}// removed field with id {}'.format(
+          indentation, field_number)
       substitutions.append((everything, replacement))
 
   for before, after in substitutions:
     merged_content = merged_content.replace(before, after)
-    
+
   out_path = os.path.join(root_dir, output_path)
 
   prev_content = None
@@ -108,15 +112,15 @@ def merge_protos(proto_paths, output_path):
   if '--check-only' in sys.argv:
     return False
 
-  print 'Updating %s' % output_path  
+  print('Updating {}'.format(output_path))
   with open(out_path, 'wb') as fout:
     fout.write(merged_content)
   return True
-  
+
 def main():
   config_result = merge_protos(CONFIG_PROTOS, MERGED_CONFIG_PROTO)
   trace_result = merge_protos(TRACE_PROTOS, MERGED_TRACE_PROTO)
   return 0 if config_result and trace_result else 1
- 
+
 if __name__ == '__main__':
   sys.exit(main())

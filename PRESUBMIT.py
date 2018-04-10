@@ -89,7 +89,7 @@ def CheckMergedTraceConfigProto(input_api, output_api):
     if subprocess.call([tool, '--check-only']):
         return [
             output_api.PresubmitError(
-                'perfetto_config.proto is out of date. Please run ' +
-                tool + ' to update it.')
+                'perfetto_config.proto or perfetto_trace.proto is out of ' +
+                'date. Please run ' + tool + ' to update it.')
         ]
     return []
