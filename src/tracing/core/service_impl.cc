@@ -981,7 +981,7 @@ TraceBuffer* ServiceImpl::GetBufferByID(BufferID buffer_id) {
 void ServiceImpl::UpdateMemoryGuardrail() {
 #if !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD) && \
     !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-  size_t total_buffer_bytes = 0;
+  uint64_t total_buffer_bytes = 0;
 
   // Sum up all the shared memory buffers.
   for (const auto& id_to_producer : producers_) {
@@ -996,8 +996,7 @@ void ServiceImpl::UpdateMemoryGuardrail() {
 
   // Set the guard rail to 32MB + the sum of all the buffers over a 30 second
   // interval.
-  uint32_t guardrail =
-      32 * 1024 * 1024 + static_cast<uint32_t>(total_buffer_bytes);
+  uint64_t guardrail = 32 * 1024 * 1024 + total_buffer_bytes;
   base::Watchdog::GetInstance()->SetMemoryLimit(guardrail, 30 * 1000);
 #endif
 }
