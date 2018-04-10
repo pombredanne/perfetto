@@ -160,12 +160,10 @@ class FakeHost : public UnixSocket::EventListener {
         Frame reply;
         reply.set_request_id(req.request_id());
         for (const auto& svc : services) {
-          if (static_cast<uint64_t>(svc.second->id) !=
-              req.msg_invoke_method().service_id())
+          if (svc.second->id != req.msg_invoke_method().service_id())
             continue;
           for (const auto& method : svc.second->methods) {
-            if (static_cast<uint64_t>(method.second->id) !=
-                req.msg_invoke_method().method_id())
+            if (method.second->id != req.msg_invoke_method().method_id())
               continue;
             method.second->OnInvoke(req.msg_invoke_method(),
                                     reply.mutable_msg_invoke_method_reply());

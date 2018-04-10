@@ -31,8 +31,8 @@ namespace perfetto {
 namespace ipc {
 
 using ProtoMessage = ::google::protobuf::MessageLite;
-using ServiceID = uint64_t;
-using MethodID = uint64_t;
+using ServiceID = uint32_t;
+using MethodID = uint32_t;
 using ClientID = uint64_t;
 using RequestID = uint64_t;
 
