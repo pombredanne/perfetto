@@ -39,6 +39,7 @@ TRACE_PROTOS = (
   'protos/perfetto/trace/ftrace/cpu_idle.proto',
   'protos/perfetto/trace/ftrace/cpu_frequency.proto',
   'protos/perfetto/trace/ftrace/sched_switch.proto',
+  'protos/perfetto/trace/ps/process_tree.proto',
 )
 
 MERGED_TRACE_PROTO = 'protos/perfetto/trace/perfetto_trace.proto'
