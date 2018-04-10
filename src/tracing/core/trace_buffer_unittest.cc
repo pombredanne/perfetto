@@ -163,9 +163,9 @@ TEST_F(TraceBufferTest, ReadWrite_Simple) {
 }
 
 TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
-  for (uint8_t num_writers = 1; num_writers <= 10; num_writers++) {
+  for (int8_t num_writers = 1; num_writers <= 10; num_writers++) {
     ResetBuffer(4096);
-    for (uint8_t i = 1; i <= num_writers; i++) {
+    for (char i = 1; i <= num_writers; i++) {
       ASSERT_EQ(32u, CreateChunk(ProducerID(i), WriterID(i), ChunkID(i))
                          .AddPacket(32 - 16, i)
                          .CopyIntoTraceBuffer());
@@ -173,7 +173,7 @@ TEST_F(TraceBufferTest, ReadWrite_OneChunkPerWriter) {
 
     // The expected read sequence now is: c3, c4, c5.
     trace_buffer()->BeginRead();
-    for (uint8_t i = 1; i <= num_writers; i++)
+    for (char i = 1; i <= num_writers; i++)
       ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32 - 16, i)));
     ASSERT_THAT(ReadPacket(), IsEmpty());
   }  // for(num_writers)
@@ -297,7 +297,7 @@ TEST_F(TraceBufferTest, ReadWrite_MinimalPadding) {
 }
 
 TEST_F(TraceBufferTest, ReadWrite_RandomChunksNoWrapping) {
-  for (int seed = 1; seed <= 32; seed++) {
+  for (unsigned int seed = 1; seed <= 32; seed++) {
     std::minstd_rand0 rnd_engine(seed);
     ResetBuffer(4096 * (1 + rnd_engine() % 32));
     std::uniform_int_distribution<size_t> size_dist(18, 4096);
@@ -399,7 +399,7 @@ TEST_F(TraceBufferTest, ReadWrite_PaddingAtEndUpdatesIndexMisaligned) {
   ResetBuffer(4096);
 
   // [c0: 512][c1: 512][c2: 512][c3: 512][c4: 512][c5: 512][c6: 512][c7: 512]
-  for (uint8_t i = 0; i < 8; i++) {
+  for (char i = 0; i < 8; i++) {
     ASSERT_EQ(512u, CreateChunk(ProducerID(1), WriterID(1), ChunkID(i))
                         .AddPacket(512 - 16, 'a' + i)
                         .CopyIntoTraceBuffer());
@@ -596,7 +596,7 @@ TEST_F(TraceBufferTest, Fragments_LongPacketWithWrappingID) {
   ResetBuffer(4096);
   std::vector<FakePacketFragment> expected_fragments;
 
-  for (ChunkID chunk_id = -2; chunk_id <= 2; chunk_id++) {
+  for (ChunkID chunk_id = static_cast<ChunkID>(-2); chunk_id <= 2; chunk_id++) {
     char prefix = static_cast<char>('c' + chunk_id);
     expected_fragments.emplace_back(10 + chunk_id, prefix);
     CreateChunk(ProducerID(1), WriterID(1), chunk_id)
@@ -626,7 +626,7 @@ TEST_F(TraceBufferTest, Fragments_PreserveUID) {
       .SetUID(11)
       .CopyIntoTraceBuffer();
   trace_buffer()->BeginRead();
-  uid_t uid = -1;
+  uid_t uid = kInvalidUid;
   ASSERT_THAT(ReadPacket(&uid), ElementsAre(FakePacketFragment(10, 'a')));
   ASSERT_EQ(11u, uid);
 
@@ -827,6 +827,27 @@ TEST_F(TraceBufferTest, Malicious_RepeatedChunkID) {
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
+TEST_F(TraceBufferTest, Malicious_DeclareMorePacketsBeyondBoundaries) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(64, 'a')
+      .IncrementNumPackets()
+      .IncrementNumPackets()
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(1), WriterID(2), ChunkID(0))
+      .IncrementNumPackets()
+      .CopyIntoTraceBuffer();
+  CreateChunk(ProducerID(1), WriterID(3), ChunkID(0))
+      .AddPacket(32, 'b')
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(64, 'a')));
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(32, 'b')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
 TEST_F(TraceBufferTest, Malicious_ZeroVarintHeader) {
   ResetBuffer(4096);
   SuppressSanityDchecksForTesting();
@@ -841,6 +862,22 @@ TEST_F(TraceBufferTest, Malicious_ZeroVarintHeader) {
       .CopyIntoTraceBuffer();
   trace_buffer()->BeginRead();
   ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(4, 'c')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
+}
+
+// Forge a chunk where the first packet is valid but the second packet has a
+// varint header that continues beyond the end of the chunk (and also beyond the
+// end of the buffer).
+TEST_F(TraceBufferTest, Malicious_OverflowingVarintHeader) {
+  ResetBuffer(4096);
+  SuppressSanityDchecksForTesting();
+  CreateChunk(ProducerID(1), WriterID(1), ChunkID(0))
+      .AddPacket(4079, 'a')  // 4079 := 4096 - sizeof(ChunkRecord) - 1
+      .AddPacket({0x82})  // 0x8*: that the varint continues on the next byte.
+      .CopyIntoTraceBuffer();
+  trace_buffer()->BeginRead();
+  ASSERT_THAT(ReadPacket(), ElementsAre(FakePacketFragment(4079, 'a')));
+  ASSERT_THAT(ReadPacket(), IsEmpty());
   ASSERT_THAT(ReadPacket(), IsEmpty());
 }
 
@@ -1034,7 +1071,9 @@ TEST_F(TraceBufferTest, Iterator_ManyStreamsOrdered) {
 
 TEST_F(TraceBufferTest, Iterator_ManyStreamsWrapping) {
   ResetBuffer(64 * 1024);
-  auto Neg = [](int x) { return kMaxChunkID + x; };
+  auto Neg = [](int x) -> ChunkID {
+    return kMaxChunkID + static_cast<ChunkID>(x);
+  };
   AppendChunks({
       {ProducerID(1), WriterID(1), ChunkID(Neg(-4))},
       {ProducerID(1), WriterID(1), ChunkID(Neg(-3))},

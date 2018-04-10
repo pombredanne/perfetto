@@ -71,15 +71,14 @@ void ConsumerIPCService::EnableTracing(const protos::EnableTracingRequest& req,
 }
 
 // Called by the IPC layer.
-void ConsumerIPCService::DisableTracing(
-    const protos::DisableTracingRequest& req,
-    DeferredDisableTracingResponse resp) {
+void ConsumerIPCService::DisableTracing(const protos::DisableTracingRequest&,
+                                        DeferredDisableTracingResponse resp) {
   GetConsumerForCurrentRequest()->service_endpoint->DisableTracing();
   resp.Resolve(ipc::AsyncResult<protos::DisableTracingResponse>::Create());
 }
 
 // Called by the IPC layer.
-void ConsumerIPCService::ReadBuffers(const protos::ReadBuffersRequest& req,
+void ConsumerIPCService::ReadBuffers(const protos::ReadBuffersRequest&,
                                      DeferredReadBuffersResponse resp) {
   RemoteConsumer* remote_consumer = GetConsumerForCurrentRequest();
   remote_consumer->read_buffers_response = std::move(resp);
@@ -87,10 +86,37 @@ void ConsumerIPCService::ReadBuffers(const protos::ReadBuffersRequest& req,
 }
 
 // Called by the IPC layer.
-void ConsumerIPCService::FreeBuffers(const protos::FreeBuffersRequest& req,
+void ConsumerIPCService::FreeBuffers(const protos::FreeBuffersRequest&,
                                      DeferredFreeBuffersResponse resp) {
   GetConsumerForCurrentRequest()->service_endpoint->FreeBuffers();
   resp.Resolve(ipc::AsyncResult<protos::FreeBuffersResponse>::Create());
+}
+
+// Called by the IPC layer.
+void ConsumerIPCService::Flush(const protos::FlushRequest& req,
+                               DeferredFlushResponse resp) {
+  auto it = pending_flush_responses_.insert(pending_flush_responses_.end(),
+                                            std::move(resp));
+  auto weak_this = weak_ptr_factory_.GetWeakPtr();
+  auto callback = [weak_this, it](bool success) {
+    if (weak_this)
+      weak_this->OnFlushCallback(success, std::move(it));
+  };
+  GetConsumerForCurrentRequest()->service_endpoint->Flush(req.timeout_ms(),
+                                                          std::move(callback));
+}
+
+// Called by the service in response to a service_endpoint->Flush() request.
+void ConsumerIPCService::OnFlushCallback(
+    bool success,
+    PendingFlushResponses::iterator pending_response_it) {
+  DeferredFlushResponse response(std::move(*pending_response_it));
+  pending_flush_responses_.erase(pending_response_it);
+  if (success) {
+    response.Resolve(ipc::AsyncResult<protos::FlushResponse>::Create());
+  } else {
+    response.Reject();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

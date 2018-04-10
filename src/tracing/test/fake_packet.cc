@@ -77,7 +77,7 @@ FakePacketFragment::FakePacketFragment(const void* payload,
   PERFETTO_CHECK(payload_size <= 4096 - 2);
   payload_.assign(reinterpret_cast<const char*>(payload), payload_size);
   uint8_t* end = WriteVarInt(payload_.size(), &header_[0]);
-  header_size_ = end - &header_[0];
+  header_size_ = static_cast<size_t>(end - &header_[0]);
 }
 
 void FakePacketFragment::CopyInto(std::vector<uint8_t>* data) const {
@@ -122,6 +122,11 @@ FakeChunk& FakeChunk::AddPacket(size_t size, char seed, uint8_t packet_flag) {
 
 FakeChunk& FakeChunk::AddPacket(std::initializer_list<uint8_t> raw) {
   data.insert(data.end(), raw.begin(), raw.end());
+  num_packets++;
+  return *this;
+}
+
+FakeChunk& FakeChunk::IncrementNumPackets() {
   num_packets++;
   return *this;
 }
