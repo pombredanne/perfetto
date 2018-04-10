@@ -56,6 +56,7 @@ HEADER = """# Copyright (C) 2018 The Android Open Source Project
 
 
 def command(*args):
+  print(args)
   subprocess.check_call(args, stdout=sys.stdout, stderr=sys.stderr)
 
 def main():
