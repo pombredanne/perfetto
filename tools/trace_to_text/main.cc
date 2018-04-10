@@ -470,8 +470,9 @@ int TraceToSummary(std::istream* input,
 namespace {
 
 int Usage(int argc, char** argv) {
-  printf("Usage: %s [systrace|json|text|summary] < trace.proto > trace.txt\n",
-         argv[0]);
+  printf(
+      "Usage: %s [systrace|json|text|summary|raw] < trace.proto > trace.txt\n",
+      argv[0]);
   return 1;
 }
 
@@ -492,8 +493,11 @@ int main(int argc, char** argv) {
   if (format == "text")
     return perfetto::TraceToText(&std::cin, &std::cout);
   if (format == "summary")
-    return perfetto::TraceToSummary(
-        &std::cin, &std::cout,
-        /* compact_output */ !isatty(fileno(stdout)));
+    return perfetto::TraceToSummary(&std::cin, &std::cout,
+                                    /* compact_output */ true);
+  if (format == "raw")
+    return perfetto::TraceToSummary(&std::cin, &std::cout,
+                                    /* compact_output */ true);
+
   return Usage(argc, argv);
 }
