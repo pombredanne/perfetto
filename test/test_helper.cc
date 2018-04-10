@@ -45,16 +45,14 @@ TestHelper::TestHelper(base::TestTaskRunner* task_runner)
       producer_thread_("perfetto.prd") {}
 
 void TestHelper::OnConnect() {
-  std::move(on_connect_callback_)();
+  std::move(continuation_callack_)();
 }
 
 void TestHelper::OnDisconnect() {
   FAIL() << "Consumer unexpectedly disconnected from the service";
 }
 
-void TestHelper::OnTracingDisabled() {
-  std::move(on_stop_tracing_callback_)();
-}
+void TestHelper::OnTracingDisabled() {}
 
 void TestHelper::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
   for (auto& encoded_packet : packets) {
@@ -64,11 +62,12 @@ void TestHelper::OnTraceData(std::vector<TracePacket> packets, bool has_more) {
       continue;
     ASSERT_EQ(protos::TracePacket::kTrustedUid,
               packet.optional_trusted_uid_case());
-    trace_.push_back(std::move(packet));
+    packet_callback_(packet);
   }
 
   if (!has_more) {
-    std::move(on_packets_finished_callback_)();
+    packet_callback_ = {};
+    std::move(continuation_callack_)();
   }
 }
 
@@ -90,36 +89,23 @@ FakeProducer* TestHelper::ConnectFakeProducer() {
 }
 
 void TestHelper::ConnectConsumer() {
-  on_connect_callback_ = task_runner_->CreateCheckpoint("consumer.connected");
+  continuation_callack_ = task_runner_->CreateCheckpoint("consumer.connected");
   endpoint_ =
       ConsumerIPCClient::Connect(TEST_CONSUMER_SOCK_NAME, this, task_runner_);
-}
-
-void TestHelper::StartTracing(const TraceConfig& config) {
-  on_stop_tracing_callback_ = task_runner_->CreateCheckpoint("stop.tracing");
-  endpoint_->EnableTracing(config);
-}
-
-void TestHelper::ReadData() {
-  on_packets_finished_callback_ =
-      task_runner_->CreateCheckpoint("readback.complete");
-  endpoint_->ReadBuffers();
-}
-
-void TestHelper::WaitForConsumerConnect() {
   task_runner_->RunUntilCheckpoint("consumer.connected");
 }
 
-void TestHelper::WaitForProducerEnabled() {
+void TestHelper::StartTracing(const TraceConfig& config) {
+  endpoint_->EnableTracing(config);
   task_runner_->RunUntilCheckpoint("producer.enabled");
 }
 
-void TestHelper::WaitForTracingDisabled() {
-  task_runner_->RunUntilCheckpoint("stop.tracing");
-}
-
-void TestHelper::WaitForReadData() {
-  task_runner_->RunUntilCheckpoint("readback.complete");
+void TestHelper::ReadData(
+    std::function<void(const protos::TracePacket&)> packet_callback,
+    std::function<void()> on_finish_callback) {
+  packet_callback_ = packet_callback;
+  continuation_callack_ = on_finish_callback;
+  endpoint_->ReadBuffers();
 }
 
 std::function<void()> TestHelper::WrapTask(

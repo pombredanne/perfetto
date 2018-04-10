@@ -67,7 +67,6 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
 #endif
 
   helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(1024);
@@ -81,20 +80,25 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   *ftrace_config->add_ftrace_events() = "sched_switch";
   *ftrace_config->add_ftrace_events() = "bar";
 
+  auto producer_enabled = task_runner.CreateCheckpoint("producer.enabled");
+  task_runner.PostDelayedTask(producer_enabled, 100);
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled();
 
-  helper.ReadData();
-  helper.WaitForReadData();
-
-  const auto& packets = helper.trace();
-  ASSERT_GT(packets.size(), 0u);
-
-  for (const auto& packet : packets) {
+  size_t packets_seen = 0;
+  auto on_consumer_data = [&packets_seen](const protos::TracePacket& packet) {
     for (int ev = 0; ev < packet.ftrace_events().event_size(); ev++) {
       ASSERT_TRUE(packet.ftrace_events().event(ev).has_sched_switch());
     }
-  }
+    packets_seen++;
+  };
+  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
+  task_runner.PostDelayedTask(
+      [&helper, &on_consumer_data, &on_readback_complete] {
+        helper.ReadData(on_consumer_data, on_readback_complete);
+      },
+      3000);
+  task_runner.RunUntilCheckpoint("readback.complete");
+  ASSERT_GT(packets_seen, 0u);
 }
 
 TEST(PerfettoTest, TestFakeProducer) {
@@ -102,9 +106,9 @@ TEST(PerfettoTest, TestFakeProducer) {
 
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
-  helper.ConnectFakeProducer();
+
+  FakeProducer* producer = helper.ConnectFakeProducer();
   helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(1024);
@@ -120,22 +124,25 @@ TEST(PerfettoTest, TestFakeProducer) {
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(kNumPackets);
   ds_config->mutable_for_testing()->set_message_size(kMsgSize);
-  ds_config->mutable_for_testing()->set_send_batch_on_register(true);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled();
 
-  helper.ReadData();
-  helper.WaitForReadData();
+  producer->ProduceEventBatch(
+      helper.WrapTask(task_runner.CreateCheckpoint("produced.and.committed")));
+  task_runner.RunUntilCheckpoint("produced.and.committed");
 
-  const auto& packets = helper.trace();
-  ASSERT_EQ(packets.size(), kNumPackets);
-
+  size_t packets_seen = 0;
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  for (const auto& packet : packets) {
+  auto on_consumer_data = [&packets_seen,
+                           &rnd_engine](const protos::TracePacket& packet) {
     ASSERT_TRUE(packet.has_for_testing());
     ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
-  }
+    packets_seen++;
+  };
+  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
+  helper.ReadData(on_consumer_data, on_readback_complete);
+  task_runner.RunUntilCheckpoint("readback.complete");
+  ASSERT_EQ(packets_seen, kNumPackets);
 }
 
 TEST(PerfettoTest, VeryLargePackets) {
@@ -143,13 +150,13 @@ TEST(PerfettoTest, VeryLargePackets) {
 
   TestHelper helper(&task_runner);
   helper.StartServiceIfRequired();
-  helper.ConnectFakeProducer();
-  helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
 
+  FakeProducer* producer = helper.ConnectFakeProducer();
+  helper.ConnectConsumer();
+
+  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(4096 * 10);
-  trace_config.set_duration_ms(500);
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
@@ -161,26 +168,29 @@ TEST(PerfettoTest, VeryLargePackets) {
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(kNumPackets);
   ds_config->mutable_for_testing()->set_message_size(kMsgSize);
-  ds_config->mutable_for_testing()->set_send_batch_on_register(true);
 
   helper.StartTracing(trace_config);
-  helper.WaitForTracingDisabled();
 
-  helper.ReadData();
-  helper.WaitForReadData();
+  producer->ProduceEventBatch(
+      helper.WrapTask(task_runner.CreateCheckpoint("produced.and.committed")));
+  task_runner.RunUntilCheckpoint("produced.and.committed");
 
-  const auto& packets = helper.trace();
-  ASSERT_EQ(packets.size(), kNumPackets);
-
+  size_t packets_seen = 0;
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  for (const auto& packet : packets) {
+  auto on_consumer_data = [&packets_seen,
+                           &rnd_engine](const protos::TracePacket& packet) {
     ASSERT_TRUE(packet.has_for_testing());
     ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
     size_t msg_size = packet.for_testing().str().size();
     ASSERT_EQ(kMsgSize, msg_size);
     for (size_t i = 0; i < msg_size; i++)
       ASSERT_EQ(i < msg_size - 1 ? '.' : 0, packet.for_testing().str()[i]);
-  }
+    packets_seen++;
+  };
+  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
+  helper.ReadData(on_consumer_data, on_readback_complete);
+  task_runner.RunUntilCheckpoint("readback.complete");
+  ASSERT_EQ(packets_seen, kNumPackets);
 }
 
 }  // namespace perfetto

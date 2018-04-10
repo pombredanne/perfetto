@@ -68,11 +68,7 @@ void FakeProducer::CreateDataSourceInstance(
   message_size_ = source_config.for_testing().message_size();
   max_messages_per_second_ =
       source_config.for_testing().max_messages_per_second();
-  if (source_config.for_testing().send_batch_on_register()) {
-    ProduceEventBatch(on_create_data_source_instance_);
-  } else {
-    task_runner_->PostTask(on_create_data_source_instance_);
-  }
+  task_runner_->PostTask(on_create_data_source_instance_);
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
@@ -80,7 +76,7 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
   trace_writer_.reset();
 }
 
-// Note: this can be called on a different thread.
+// Note: this will called on a different thread.
 void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
   task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
