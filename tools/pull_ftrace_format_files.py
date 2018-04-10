@@ -88,7 +88,7 @@ def ensure_single_device(serial):
 def pull_format_files(serial, output_directory):
   # Pulling each file individually is 100x slower so we pipe all together then
   # split them on the host.
-  cmd = "/data/busybox-armv5l find /sys/kernel/debug/tracing/ " \
+  cmd = "find /sys/kernel/debug/tracing/ " \
       "-name available_events -o " \
       "-name format -o " \
       "-name header_event -o " \
@@ -112,7 +112,7 @@ def pull_format_files(serial, output_directory):
 def get_output_directory(prefix=None, serial=None):
   build_id = adb('shell', 'getprop', 'ro.build.id', serial=serial).strip()
   product = adb('shell', 'getprop', 'ro.build.product', serial=serial).strip()
-  kernel = '3.10.40' # adb('shell', 'uname', '-r', serial=serial).split('-')[0].strip()
+  kernel = adb('shell', 'uname', '-r', serial=serial).split('-')[0].strip()
   parts = ['android', product, build_id, kernel]
   if prefix:
     parts = [prefix] + parts
