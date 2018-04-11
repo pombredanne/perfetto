@@ -15,6 +15,11 @@
  */
 
 #include "src/traced/probes/process_stats_data_source.h"
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
+
+#include "src/process_stats/process_info.h"
+#include "src/tracing/core/trace_writer_for_testing.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -22,7 +27,54 @@
 namespace perfetto {
 namespace {
 
-// TODO(hjd): Add tests.
+class TestProcessStatsDataSource : public ProcessStatsDataSource {
+ public:
+  TestProcessStatsDataSource(TracingSessionID id,
+                             std::unique_ptr<TraceWriter> writer,
+                             const DataSourceConfig& config)
+      : ProcessStatsDataSource(id, std::move(writer), config) {}
+
+  MOCK_METHOD1(ReadProcessInfo, std::unique_ptr<ProcessInfo>(int pid));
+};
+
+class ProcessStatsDataSourceTest : public ::testing::Test {
+ protected:
+  ProcessStatsDataSourceTest() {}
+
+  TraceWriterForTesting* writer_raw_;
+
+  std::unique_ptr<TestProcessStatsDataSource> GetProcessStatsDataSource(
+      const DataSourceConfig& cfg) {
+    std::unique_ptr<TraceWriterForTesting> writer =
+        std::unique_ptr<TraceWriterForTesting>(new TraceWriterForTesting());
+    writer_raw_ = writer.get();
+    return std::unique_ptr<TestProcessStatsDataSource>(
+        new TestProcessStatsDataSource(0, std::move(writer), cfg));
+  }
+
+  static std::unique_ptr<ProcessInfo> getProcessInfo(int pid) {
+    ProcessInfo* process = new ProcessInfo();
+    process->pid = pid;
+    process->cmdline.push_back("test_process");
+    process->in_kernel = true;
+    process->ppid = 0;
+    return std::unique_ptr<ProcessInfo>(process);
+  }
+};
+
+TEST_F(ProcessStatsDataSourceTest, TestWriteOnDemand) {
+  DataSourceConfig config;
+  auto data_source = GetProcessStatsDataSource(config);
+  EXPECT_CALL(*data_source, ReadProcessInfo(0))
+      .WillRepeatedly(::testing::Invoke(getProcessInfo));
+  std::vector<int32_t> pids(1, 0);
+  data_source->OnPids(pids);
+  std::unique_ptr<protos::TracePacket> packet =
+      writer_raw_->ParseProto<protos::TracePacket>();
+  ASSERT_TRUE(packet->has_process_tree());
+  auto processes = packet->process_tree().processes();
+  ASSERT_EQ(packet->process_tree().processes_size(), 1);
+}
 
 }  // namespace
 }  // namespace perfetto

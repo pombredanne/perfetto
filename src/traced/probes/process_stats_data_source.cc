@@ -77,6 +77,11 @@ void ProcessStatsDataSource::Flush() {
   writer_->Flush();
 }
 
+// To be overidden for testing.
+std::unique_ptr<ProcessInfo> ProcessStatsDataSource::ReadProcessInfo(int pid) {
+  return procfs_utils::ReadProcessInfo(pid);
+}
+
 // static
 void ProcessStatsDataSource::WriteProcess(int32_t pid,
                                           protos::pbzero::ProcessTree* tree) {

@@ -26,6 +26,7 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "src/process_stats/process_info.h"
 
 namespace perfetto {
 
@@ -41,6 +42,7 @@ class ProcessStatsDataSource {
 
   base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
   void WriteAllProcesses();
+  std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
   void OnPids(const std::vector<int32_t>& pids);
   void Flush();
 
