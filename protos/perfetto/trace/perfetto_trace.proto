@@ -129,9 +129,9 @@ message FtraceEvent {
     BinderTransactionFtraceEvent binder_transaction = 50;
     BinderTransactionReceivedFtraceEvent binder_transaction_received = 51;
     // removed field with id 52
-    // removed field with id 53
-    // removed field with id 54
-    // removed field with id 55
+    BinderLockFtraceEvent binder_lock = 53;
+    BinderLockedFtraceEvent binder_locked = 54;
+    BinderUnlockFtraceEvent binder_unlock = 55;
     // removed field with id 56
     // removed field with id 57
     // removed field with id 58
@@ -311,17 +311,17 @@ message FtraceEvent {
     // removed field with id 243
     // removed field with id 244
     // removed field with id 245
-    // removed field with id 246
+    F2fsGetDataBlockFtraceEvent f2fs_get_data_block = 246;
     // removed field with id 247
-    // removed field with id 248
+    F2fsIgetFtraceEvent f2fs_iget = 248;
     // removed field with id 249
     // removed field with id 250
     // removed field with id 251
     // removed field with id 252
     // removed field with id 253
     // removed field with id 254
-    // removed field with id 255
-    // removed field with id 256
+    F2fsSyncFileEnterFtraceEvent f2fs_sync_file_enter = 255;
+    F2fsSyncFileExitFtraceEvent f2fs_sync_file_exit = 256;
     // removed field with id 257
     // removed field with id 258
     // removed field with id 259
@@ -336,9 +336,9 @@ message FtraceEvent {
     // removed field with id 268
     // removed field with id 269
     // removed field with id 270
-    // removed field with id 271
+    F2fsWriteBeginFtraceEvent f2fs_write_begin = 271;
     // removed field with id 272
-    // removed field with id 273
+    F2fsWriteEndFtraceEvent f2fs_write_end = 273;
   }
 }
 
@@ -379,6 +379,22 @@ message ProcessTree {
 
 // End of protos/perfetto/trace/ps/process_tree.proto
 
+// Begin of protos/perfetto/trace/ftrace/binder_locked.proto
+
+message BinderLockedFtraceEvent {
+  optional string tag = 1;
+}
+
+// End of protos/perfetto/trace/ftrace/binder_locked.proto
+
+// Begin of protos/perfetto/trace/ftrace/binder_lock.proto
+
+message BinderLockFtraceEvent {
+  optional string tag = 1;
+}
+
+// End of protos/perfetto/trace/ftrace/binder_lock.proto
+
 // Begin of protos/perfetto/trace/ftrace/binder_transaction.proto
 
 message BinderTransactionFtraceEvent {
@@ -400,6 +416,14 @@ message BinderTransactionReceivedFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/binder_transaction_received.proto
+
+// Begin of protos/perfetto/trace/ftrace/binder_unlock.proto
+
+message BinderUnlockFtraceEvent {
+  optional string tag = 1;
+}
+
+// End of protos/perfetto/trace/ftrace/binder_unlock.proto
 
 // Begin of protos/perfetto/trace/ftrace/block_rq_complete.proto
 
@@ -699,6 +723,85 @@ message Ext4SyncFileExitFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/ext4_sync_file_exit.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_get_data_block.proto
+
+message F2fsGetDataBlockFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional uint64 iblock = 3;
+  optional uint64 bh_start = 4;
+  optional uint64 bh_size = 5;
+  optional int32 ret = 6;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_get_data_block.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_iget.proto
+
+message F2fsIgetFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional uint64 pino = 3;
+  optional uint32 mode = 4;
+  optional int64 size = 5;
+  optional uint32 nlink = 6;
+  optional uint64 blocks = 7;
+  optional uint32 advise = 8;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_iget.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_sync_file_enter.proto
+
+message F2fsSyncFileEnterFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional uint64 pino = 3;
+  optional uint32 mode = 4;
+  optional int64 size = 5;
+  optional uint32 nlink = 6;
+  optional uint64 blocks = 7;
+  optional uint32 advise = 8;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_sync_file_enter.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_sync_file_exit.proto
+
+message F2fsSyncFileExitFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional uint32 need_cp = 3;
+  optional int32 datasync = 4;
+  optional int32 ret = 5;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_sync_file_exit.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_write_begin.proto
+
+message F2fsWriteBeginFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional int64 pos = 3;
+  optional uint32 len = 4;
+  optional uint32 flags = 5;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_write_begin.proto
+
+// Begin of protos/perfetto/trace/ftrace/f2fs_write_end.proto
+
+message F2fsWriteEndFtraceEvent {
+  optional uint64 dev = 1;
+  optional uint64 ino = 2;
+  optional int64 pos = 3;
+  optional uint32 len = 4;
+  optional uint32 copied = 5;
+}
+
+// End of protos/perfetto/trace/ftrace/f2fs_write_end.proto
 
 // Begin of protos/perfetto/trace/ftrace/lowmemory_kill.proto
 

@@ -1,7 +1,10 @@
 #!/bin/bash
 
 for f in $(cat $1 | grep u:object_r:debugfs_tracing:s0 | grep tracing/events | awk '{ print $3 }' | xargs -n1 basename);do
-  for x in $(find src/ftrace_reader/test/data/android_walleye_OPM5.171019.017.A1_4.4.88/events -wholename '*/'"$f"'/format' -or -wholename '*/'"$f"'/*/format'); do
+  if [ -f "protos/perfetto/trace/ftrace/$f.proto" ]; then
+    echo "'protos/perfetto/trace/ftrace/$f.proto',";
+  else
+  for x in $(find src/ftrace_reader/test/data/*/events -wholename '*/'"$f"'/format' -or -wholename '*/'"$f"'/*/format'); do
     event=$(echo $x | awk -F / '{print $(NF - 1)}')
   n="protos/perfetto/trace/ftrace/$event.proto";
   if [ -f $n ]; then
@@ -10,4 +13,5 @@ for f in $(cat $1 | grep u:object_r:debugfs_tracing:s0 | grep tracing/events | a
       echo "# MISSING $event"
       fi
     done
+  fi
   done | sort
