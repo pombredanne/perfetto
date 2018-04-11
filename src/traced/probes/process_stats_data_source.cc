@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-#include "process_stats_data_source.h"
+#include "src/traced/probes/process_stats_data_source.h"
 
 #include <utility>
 
-#include "perfetto/trace/ps/process_tree.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "src/process_stats/file_utils.h"
 #include "src/process_stats/procfs_utils.h"
@@ -27,8 +26,12 @@ namespace perfetto {
 
 ProcessStatsDataSource::ProcessStatsDataSource(
     TracingSessionID id,
-    std::unique_ptr<TraceWriter> writer)
-    : session_id_(id), writer_(std::move(writer)), weak_factory_(this) {}
+    std::unique_ptr<TraceWriter> writer,
+    const DataSourceConfig& config)
+    : session_id_(id),
+      writer_(std::move(writer)),
+      config_(config),
+      weak_factory_(this) {}
 
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 
@@ -39,11 +42,11 @@ base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
 
 void ProcessStatsDataSource::WriteAllProcesses() {
   auto trace_packet = writer_->NewTracePacket();
-  auto* trace_packet_ptr = &*trace_packet;
+  auto* process_tree = trace_packet->set_process_tree();
   std::set<int32_t>* seen_pids = &seen_pids_;
 
   file_utils::ForEachPidInProcPath("/proc",
-                                   [trace_packet_ptr, seen_pids](int pid) {
+                                   [this, process_tree, seen_pids](int pid) {
                                      // ForEachPid will list all processes and
                                      // threads. Here we want to iterate first
                                      // only by processes (for which pid ==
@@ -51,29 +54,40 @@ void ProcessStatsDataSource::WriteAllProcesses() {
                                      if (procfs_utils::ReadTgid(pid) != pid)
                                        return;
 
-                                     WriteProcess(pid, trace_packet_ptr);
+                                     WriteProcess(pid, process_tree);
                                      seen_pids->insert(pid);
                                    });
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
-  auto trace_packet = writer_->NewTracePacket();
+  TraceWriter::TracePacketHandle trace_packet{};
+  protos::pbzero::ProcessTree* process_tree = nullptr;
   for (int32_t pid : pids) {
     auto it_and_inserted = seen_pids_.emplace(pid);
-    if (it_and_inserted.second)
-      WriteProcess(pid, &*trace_packet);
+    if (!it_and_inserted.second)
+      continue;
+    if (!process_tree) {
+      trace_packet = writer_->NewTracePacket();
+      process_tree = trace_packet->set_process_tree();
+    }
+    WriteProcess(pid, process_tree);
   }
 }
 
-// static
-void ProcessStatsDataSource::WriteProcess(
-    int32_t pid,
-    protos::pbzero::TracePacket* trace_packet) {
-  auto* process_tree = trace_packet->set_process_tree();
+void ProcessStatsDataSource::Flush() {
+  writer_->Flush();
+}
 
-  std::unique_ptr<ProcessInfo> process = procfs_utils::ReadProcessInfo(pid);
+// To be overidden for testing.
+std::unique_ptr<ProcessInfo> ProcessStatsDataSource::ReadProcessInfo(int pid) {
+  return procfs_utils::ReadProcessInfo(pid);
+}
+
+void ProcessStatsDataSource::WriteProcess(int32_t pid,
+                                          protos::pbzero::ProcessTree* tree) {
+  std::unique_ptr<ProcessInfo> process = ReadProcessInfo(pid);
   procfs_utils::ReadProcessThreads(process.get());
-  auto* process_writer = process_tree->add_processes();
+  auto* process_writer = tree->add_processes();
   process_writer->set_pid(process->pid);
   process_writer->set_ppid(process->ppid);
   for (const auto& field : process->cmdline)
