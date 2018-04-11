@@ -80,10 +80,10 @@ def CheckIncludeGuards(input_api, output_api):
 
 
 def CheckMergedTraceConfigProto(input_api, output_api):
-    tool = 'tools/gen_merged_trace_config'
+    tool = 'tools/gen_merged_protos'
     build_file_filter = lambda x: input_api.FilterSourceFile(
           x,
-          white_list=('protos/perfetto/config/.*[.]proto$', tool))
+          white_list=('protos/perfetto/.*[.]proto$', tool))
     if not input_api.AffectedSourceFiles(build_file_filter):
         return []
     if subprocess.call([tool, '--check-only']):
