@@ -42,15 +42,17 @@ class ProcessStatsDataSource {
 
   base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
   void WriteAllProcesses();
-  virtual std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
   void OnPids(const std::vector<int32_t>& pids);
   void Flush();
 
- private:
-  void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
+  // Virtual for testing.
+  virtual std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
 
+ private:
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
+
+  void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
 
   const TracingSessionID session_id_;
   std::unique_ptr<TraceWriter> writer_;

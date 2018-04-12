@@ -59,7 +59,7 @@ class ProcessStatsDataSourceTest : public ::testing::Test {
     process->pid = pid;
     process->in_kernel = true;  // So that it doesn't try to read threads.
     process->ppid = 0;
-    process->cmdline.push_back(std::string("test_process"));
+    process->cmdline.push_back("test_process");
     return std::unique_ptr<ProcessInfo>(process);
   }
 };
