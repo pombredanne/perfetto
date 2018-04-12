@@ -29,12 +29,11 @@ source_set("test_support") {
     ":ftrace_reader",
     "../../gn:default_deps",
     "../protozero",
+    "../protozero:test_support",
   ]
   sources = [
     "test/cpu_reader_support.cc",
     "test/cpu_reader_support.h",
-    "test/scattered_stream_delegate_for_testing.cc",
-    "test/scattered_stream_delegate_for_testing.h",
   ]
 }
 
