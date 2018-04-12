@@ -49,8 +49,7 @@ void FakeProducer::OnConnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   DataSourceDescriptor descriptor;
   descriptor.set_name(name_);
-  endpoint_->RegisterDataSource(descriptor,
-                                [this](DataSourceID id) { id_ = id; });
+  endpoint_->RegisterDataSource(descriptor);
 }
 
 void FakeProducer::OnDisconnect() {
@@ -69,7 +68,11 @@ void FakeProducer::CreateDataSourceInstance(
   message_size_ = source_config.for_testing().message_size();
   max_messages_per_second_ =
       source_config.for_testing().max_messages_per_second();
-  task_runner_->PostTask(on_create_data_source_instance_);
+  if (source_config.for_testing().send_batch_on_register()) {
+    ProduceEventBatch(on_create_data_source_instance_);
+  } else {
+    task_runner_->PostTask(on_create_data_source_instance_);
+  }
 }
 
 void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
@@ -77,10 +80,9 @@ void FakeProducer::TearDownDataSourceInstance(DataSourceInstanceID) {
   trace_writer_.reset();
 }
 
-// Note: this will called on a different thread.
-void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
-                                     std::function<void()> complete_callback) {
-  task_runner_->PostTask([this, minibatch_callback, complete_callback] {
+// Note: this can be called on a different thread.
+void FakeProducer::ProduceEventBatch(std::function<void()> callback) {
+  task_runner_->PostTask([this, callback] {
     PERFETTO_CHECK(trace_writer_);
     PERFETTO_CHECK(message_size_ > 1);
     std::unique_ptr<char, base::FreeDeleter> payload(
@@ -90,17 +92,18 @@ void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
 
     base::TimeMillis start = base::GetWallTimeMs();
     int64_t iterations = 0;
-    size_t messages_to_emit = message_count_;
+    uint32_t messages_to_emit = message_count_;
     while (messages_to_emit > 0) {
-      size_t messages_in_minibatch =
+      uint32_t messages_in_minibatch =
           max_messages_per_second_ == 0
               ? messages_to_emit
               : std::min(max_messages_per_second_, messages_to_emit);
       PERFETTO_DCHECK(messages_to_emit >= messages_in_minibatch);
 
-      for (size_t i = 0; i < messages_in_minibatch; i++) {
+      for (uint32_t i = 0; i < messages_in_minibatch; i++) {
         auto handle = trace_writer_->NewTracePacket();
-        handle->set_for_testing()->set_seq_value(rnd_engine_());
+        handle->set_for_testing()->set_seq_value(
+            static_cast<uint32_t>(rnd_engine_()));
         handle->set_for_testing()->set_str(payload.get(), message_size_);
       }
       messages_to_emit -= messages_in_minibatch;
@@ -108,20 +111,28 @@ void FakeProducer::ProduceEventBatch(std::function<void()> minibatch_callback,
       // Pause until the second boundary to make sure that we are adhering to
       // the speed limitation.
       if (max_messages_per_second_ > 0) {
-        base::TimeMillis time_taken = base::GetWallTimeMs() - start;
         int64_t expected_time_taken = ++iterations * 1000;
-        if (time_taken.count() < expected_time_taken) {
-          usleep((expected_time_taken - time_taken.count()) * 1000);
+        base::TimeMillis time_taken = base::GetWallTimeMs() - start;
+        while (time_taken.count() < expected_time_taken) {
+          usleep(static_cast<useconds_t>(
+              (expected_time_taken - time_taken.count()) * 1000));
+          time_taken = base::GetWallTimeMs() - start;
         }
       }
-      trace_writer_->Flush(messages_to_emit > 0 ? minibatch_callback
-                                                : complete_callback);
+      trace_writer_->Flush(messages_to_emit > 0 ? [] {} : callback);
     }
   });
 }
 
-void FakeProducer::OnTracingStart() {}
+void FakeProducer::OnTracingSetup() {}
 
-void FakeProducer::OnTracingStop() {}
+void FakeProducer::Flush(FlushRequestID flush_request_id,
+                         const DataSourceInstanceID*,
+                         size_t num_data_sources) {
+  PERFETTO_DCHECK(num_data_sources > 0);
+  if (trace_writer_)
+    trace_writer_->Flush();
+  endpoint_->NotifyFlushComplete(flush_request_id);
+}
 
 }  // namespace perfetto

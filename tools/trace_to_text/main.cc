@@ -71,8 +71,6 @@ const char kFtraceHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
-constexpr const char* inodeFileTypeArray[] = {"UNKNOWN", "FILE", "DIRECTORY"};
-
 using google::protobuf::Descriptor;
 using google::protobuf::DynamicMessageFactory;
 using google::protobuf::FileDescriptor;
@@ -121,61 +119,6 @@ class MFE : public MultiFileErrorCollector {
   }
 };
 
-uint64_t TimestampToSeconds(uint64_t timestamp) {
-  return timestamp / 1000000000ul;
-}
-
-uint64_t TimestampToMicroseconds(uint64_t timestamp) {
-  return (timestamp / 1000) % 1000000ul;
-}
-
-std::string FormatPrefix(uint64_t timestamp, uint64_t cpu) {
-  char line[2048];
-  uint64_t seconds = TimestampToSeconds(timestamp);
-  uint64_t useconds = TimestampToMicroseconds(timestamp);
-  sprintf(line,
-          "<idle>-0     (-----) [%03" PRIu64 "] d..3 %" PRIu64 ".%.6" PRIu64
-          ": ",
-          cpu, seconds, useconds);
-  return std::string(line);
-}
-
-// TODO(taylori): Confirm correct format for this.
-// Calling this breaks loading into chrome://tracing
-std::string FormatProcess(const Process& process) {
-  char line[2048];
-  sprintf(line, "process: pid=%d ppid=%d cmdline=", process.pid(),
-          process.ppid());
-  std::string output = std::string(line);
-  for (auto field : process.cmdline()) {
-    char cmd[2048];
-    sprintf(cmd, "%s ", field.c_str());
-    output += std::string(cmd);
-  }
-  output += "\\n";
-  for (auto thread : process.threads()) {
-    char thread_line[2048];
-    sprintf(thread_line, "thread: tid=%d name=%s\\n", thread.tid(),
-            thread.name().c_str());
-    output += thread_line;
-  }
-  return output;
-}
-
-// Calling this breaks loading into chrome://tracing
-std::string FormatInodeFileMap(const Entry& entry) {
-  char line[2048];
-  sprintf(line, "inode_file_map: ino=%llu type=%s path=", entry.inode_number(),
-          inodeFileTypeArray[entry.type()]);
-  std::string output = std::string(line);
-  for (auto field : entry.paths()) {
-    char path[2048];
-    sprintf(path, "%s", field.c_str());
-    output += std::string(path);
-  }
-  return output;
-}
-
 void ForEachPacketInTrace(
     std::istream* input,
     const std::function<void(const protos::TracePacket&)>& f) {
@@ -211,17 +154,19 @@ void ForEachPacketInTrace(
 
     // ... and the actual TracePacket itself.
     std::unique_ptr<char[]> buf(new char[field_size]);
-    input->read(buf.get(), field_size);
+    input->read(buf.get(), static_cast<std::streamsize>(field_size));
     bytes_processed += field_size;
 
     protos::TracePacket packet;
-    PERFETTO_CHECK(packet.ParseFromArray(buf.get(), field_size));
-
+    auto res = packet.ParseFromArray(buf.get(), static_cast<int>(field_size));
+    PERFETTO_CHECK(res);
     f(packet);
   }
 }
 
-int TraceToSystrace(std::istream* input, std::ostream* output) {
+int TraceToSystrace(std::istream* input,
+                    std::ostream* output,
+                    bool wrap_in_json) {
   std::multimap<uint64_t, std::string> sorted;
 
   ForEachPacketInTrace(input, [&sorted](const protos::TracePacket& packet) {
@@ -238,22 +183,25 @@ int TraceToSystrace(std::istream* input, std::ostream* output) {
     }
   });
 
-  *output << kTraceHeader;
-  *output << kFtraceHeader;
+  if (wrap_in_json) {
+    *output << kTraceHeader;
+    *output << kFtraceHeader;
+  }
 
   fprintf(stderr, "\n");
   size_t total_events = sorted.size();
   size_t written_events = 0;
   for (auto it = sorted.begin(); it != sorted.end(); it++) {
-    *output << it->second;
-    if (written_events++ % 100 == 0) {
+    *output << it->second << (wrap_in_json ? "\\n" : "\n");
+    if (written_events++ % 100 == 0 && !isatty(STDOUT_FILENO)) {
       fprintf(stderr, "Writing trace: %.2f %%\r",
               written_events * 100.0 / total_events);
       fflush(stderr);
     }
   }
 
-  *output << kTraceFooter;
+  if (wrap_in_json)
+    *output << kTraceFooter;
 
   return 0;
 }
@@ -287,13 +235,13 @@ void PrintFtraceTrack(std::ostream* output,
   constexpr char kFtraceTrackName[] = "ftrace ";
   size_t width = GetWidth();
   size_t bucket_count = width - strlen(kFtraceTrackName);
-  size_t bucket_size = (end - start) / bucket_count;
+  size_t bucket_size = static_cast<size_t>(end - start) / bucket_count;
   size_t max = 0;
   std::vector<size_t> buckets(bucket_count);
   for (size_t i = 0; i < bucket_count; i++) {
     auto low = ftrace_timestamps.lower_bound(i * bucket_size + start);
     auto high = ftrace_timestamps.upper_bound((i + 1) * bucket_size + start);
-    buckets[i] = std::distance(low, high);
+    buckets[i] = static_cast<size_t>(std::distance(low, high));
     max = std::max(max, buckets[i]);
   }
 
@@ -312,31 +260,107 @@ void PrintFtraceTrack(std::ostream* output,
 }
 
 void PrintInodeStats(std::ostream* output,
-                     const std::set<uint64_t>& inode_numbers,
-                     const uint64_t& events_with_inodes) {
-  *output << "--------------------Inode Stats-------------------\n";
+                     const std::set<uint64_t>& ftrace_inodes,
+                     const uint64_t& ftrace_inode_count,
+                     const std::set<uint64_t>& resolved_map_inodes,
+                     const std::set<uint64_t>& resolved_scan_inodes,
+                     bool compact_output) {
+  if (!compact_output)
+    *output << "--------------------Inode Stats-------------------\n";
+
   char line[2048];
-  sprintf(line, "Unique inodes: %" PRIu64 "\n", inode_numbers.size());
+  if (compact_output) {
+    sprintf(line, "events_inodes,%" PRIu64 "\n", ftrace_inode_count);
+  } else {
+    sprintf(line, "Events with inodes: %" PRIu64 "\n", ftrace_inode_count);
+  }
   *output << std::string(line);
 
-  sprintf(line, "Events with inodes: %" PRIu64 "\n", events_with_inodes);
+  if (compact_output) {
+    sprintf(line, "events_unique_inodes,%zu\n", ftrace_inodes.size());
+  } else {
+    sprintf(line, "Unique inodes from events: %zu\n", ftrace_inodes.size());
+  }
   *output << std::string(line);
-  *output << "\n";
+
+  if (compact_output) {
+    sprintf(line, "resolved_inodes_static,%zu\n", resolved_map_inodes.size());
+  } else {
+    sprintf(line, "Resolved inodes from static map: %zu\n",
+            resolved_map_inodes.size());
+  }
+  *output << std::string(line);
+
+  if (compact_output) {
+    sprintf(line, "resolved_inodes_scan_cache,%zu\n",
+            resolved_scan_inodes.size());
+  } else {
+    sprintf(line, "Resolved inodes from scan and cache: %zu\n",
+            resolved_scan_inodes.size());
+  }
+  *output << std::string(line);
+
+  std::set<uint64_t> resolved_inodes;
+  set_union(resolved_map_inodes.begin(), resolved_map_inodes.end(),
+            resolved_scan_inodes.begin(), resolved_scan_inodes.end(),
+            std::inserter(resolved_inodes, resolved_inodes.begin()));
+
+  if (compact_output) {
+    sprintf(line, "total_resolved_inodes,%zu\n", resolved_inodes.size());
+  } else {
+    sprintf(line, "Total resolved inodes: %zu\n", resolved_inodes.size());
+  }
+  *output << std::string(line);
+
+  std::set<uint64_t> intersect;
+  set_intersection(resolved_inodes.begin(), resolved_inodes.end(),
+                   ftrace_inodes.begin(), ftrace_inodes.end(),
+                   std::inserter(intersect, intersect.begin()));
+
+  size_t unresolved_inodes = ftrace_inodes.size() - intersect.size();
+  if (compact_output) {
+    sprintf(line, "unresolved_inodes,%zu\n", unresolved_inodes);
+  } else {
+    sprintf(line, "Unresolved inodes: %zu\n", unresolved_inodes);
+  }
+  *output << std::string(line);
+
+  size_t unexpected_inodes = resolved_inodes.size() - intersect.size();
+  if (compact_output) {
+    sprintf(line, "unexpected_inodes_fs,%zu\n", unexpected_inodes);
+  } else {
+    sprintf(line, "Unexpected inodes from filesystem: %zu\n",
+            unexpected_inodes);
+  }
+  *output << std::string(line);
+
+  if (!compact_output)
+    *output << "\n";
 }
 
 void PrintProcessStats(std::ostream* output,
                        const std::set<pid_t>& tids_in_tree,
-                       const std::set<pid_t>& tids_in_events) {
-  *output << "----------------Process Tree Stats----------------\n";
+                       const std::set<pid_t>& tids_in_events,
+                       bool compact_output) {
+  if (!compact_output)
+    *output << "----------------Process Tree Stats----------------\n";
 
   char tid[2048];
-  sprintf(tid, "Unique thread ids in process tree: %" PRIu64 "\n",
-          tids_in_tree.size());
+  if (compact_output) {
+    sprintf(tid, "unique_thread_process,%zu\n", tids_in_tree.size());
+  } else {
+    sprintf(tid, "Unique thread ids in process tree: %zu\n",
+            tids_in_tree.size());
+  }
   *output << std::string(tid);
 
   char tid_event[2048];
-  sprintf(tid_event, "Unique thread ids in ftrace events: %" PRIu64 "\n",
-          tids_in_events.size());
+  if (compact_output) {
+    sprintf(tid_event, "unique_thread_ftrace,%zu\n", tids_in_events.size());
+  } else {
+    sprintf(tid_event, "Unique thread ids in ftrace events: %zu\n",
+            tids_in_events.size());
+  }
   *output << std::string(tid_event);
 
   std::set<pid_t> intersect;
@@ -345,36 +369,60 @@ void PrintProcessStats(std::ostream* output,
                    std::inserter(intersect, intersect.begin()));
 
   char matching[2048];
-  sprintf(matching,
-          "Thread ids with process info: %" PRIu64 "/%" PRIu64 " -> %" PRIu64
-          "%%\n\n",
-          intersect.size(), tids_in_events.size(),
-          (intersect.size() * 100) / tids_in_events.size());
+  size_t thread_id_process_info =
+      (intersect.size() * 100) / tids_in_events.size();
+  if (compact_output) {
+    sprintf(matching,
+            "tids_with_pinfo,%zu\ntids,%zu\ntids_with_pinfo_percentage,%zu\n",
+            intersect.size(), tids_in_events.size(), thread_id_process_info);
+  } else {
+    sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n\n",
+            intersect.size(), tids_in_events.size(), thread_id_process_info);
+  }
   *output << std::string(matching);
-  *output << "\n";
+
+  if (!compact_output)
+    *output << "\n";
 }
 
-int TraceToSummary(std::istream* input, std::ostream* output) {
+int TraceToSummary(std::istream* input,
+                   std::ostream* output,
+                   bool compact_output) {
   uint64_t start = std::numeric_limits<uint64_t>::max();
   uint64_t end = 0;
   std::multiset<uint64_t> ftrace_timestamps;
   std::set<pid_t> tids_in_tree;
   std::set<pid_t> tids_in_events;
-  std::set<uint64_t> inode_numbers;
-  uint64_t events_with_inodes = 0;
+  std::set<uint64_t> ftrace_inodes;
+  uint64_t ftrace_inode_count = 0;
+  std::set<uint64_t> resolved_map_inodes;
+  std::set<uint64_t> resolved_scan_inodes;
 
   ForEachPacketInTrace(
-      input,
-      [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
-       &inode_numbers, &events_with_inodes](const protos::TracePacket& packet) {
+      input, [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
+              &ftrace_inodes, &ftrace_inode_count, &resolved_map_inodes,
+              &resolved_scan_inodes](const protos::TracePacket& packet) {
 
         if (packet.has_process_tree()) {
           const ProcessTree& tree = packet.process_tree();
           for (Process process : tree.processes()) {
+            tids_in_tree.insert(process.pid());
             for (ProcessTree::Thread thread : process.threads()) {
               tids_in_tree.insert(thread.tid());
             }
           }
+        }
+
+        if (packet.has_inode_file_map()) {
+          const InodeFileMap& inode_file_map = packet.inode_file_map();
+          const auto& mount_points = inode_file_map.mount_points();
+          bool from_scan = std::find(mount_points.begin(), mount_points.end(),
+                                     "/data") != mount_points.end();
+          for (const auto& entry : inode_file_map.entries())
+            if (from_scan)
+              resolved_scan_inodes.insert(entry.inode_number());
+            else
+              resolved_map_inodes.insert(entry.inode_number());
         }
 
         if (!packet.has_ftrace_events())
@@ -384,11 +432,11 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
         uint64_t inode_number = 0;
         for (const FtraceEvent& event : bundle.event()) {
           if (ParseInode(event, &inode_number)) {
-            inode_numbers.insert(inode_number);
-            events_with_inodes++;
+            ftrace_inodes.insert(inode_number);
+            ftrace_inode_count++;
           }
           if (event.pid()) {
-            tids_in_events.insert(event.pid());
+            tids_in_events.insert(static_cast<int>(event.pid()));
           }
           if (event.timestamp()) {
             start = std::min<uint64_t>(start, event.timestamp());
@@ -401,12 +449,19 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
   fprintf(stderr, "\n");
 
   char line[2048];
-  sprintf(line, "Duration: %" PRIu64 "ms\n", (end - start) / (1000 * 1000));
+  uint64_t duration = (end - start) / (1000 * 1000);
+  if (compact_output) {
+    sprintf(line, "duration,%" PRIu64 "\n", duration);
+  } else {
+    sprintf(line, "Duration: %" PRIu64 "ms\n", duration);
+  }
   *output << std::string(line);
 
-  PrintFtraceTrack(output, start, end, ftrace_timestamps);
-  PrintProcessStats(output, tids_in_tree, tids_in_events);
-  PrintInodeStats(output, inode_numbers, events_with_inodes);
+  if (!compact_output)
+    PrintFtraceTrack(output, start, end, ftrace_timestamps);
+  PrintProcessStats(output, tids_in_tree, tids_in_events, compact_output);
+  PrintInodeStats(output, ftrace_inodes, ftrace_inode_count,
+                  resolved_map_inodes, resolved_scan_inodes, compact_output);
 
   return 0;
 }
@@ -416,9 +471,11 @@ int TraceToSummary(std::istream* input, std::ostream* output) {
 
 namespace {
 
-int Usage(int argc, char** argv) {
-  printf("Usage: %s [systrace|text|summary] < trace.proto > trace.txt\n",
-         argv[0]);
+int Usage(const char* argv0) {
+  printf(
+      "Usage: %s [systrace|json|text|summary|short_summary] < trace.proto > "
+      "trace.txt\n",
+      argv0);
   return 1;
 }
 
@@ -426,19 +483,24 @@ int Usage(int argc, char** argv) {
 
 int main(int argc, char** argv) {
   if (argc != 2)
-    return Usage(argc, argv);
+    return Usage(argv[0]);
 
   std::string format(argv[1]);
 
-  bool is_systrace = format == "systrace";
-  bool is_text = format == "text";
-  bool is_summary = format == "summary";
-
-  if (is_systrace)
-    return perfetto::TraceToSystrace(&std::cin, &std::cout);
-  if (is_text)
+  if (format == "json")
+    return perfetto::TraceToSystrace(&std::cin, &std::cout,
+                                     /*wrap_in_json=*/true);
+  if (format == "systrace")
+    return perfetto::TraceToSystrace(&std::cin, &std::cout,
+                                     /*wrap_in_json=*/false);
+  if (format == "text")
     return perfetto::TraceToText(&std::cin, &std::cout);
-  if (is_summary)
-    return perfetto::TraceToSummary(&std::cin, &std::cout);
-  return Usage(argc, argv);
+  if (format == "summary")
+    return perfetto::TraceToSummary(&std::cin, &std::cout,
+                                    /* compact_output */ true);
+  if (format == "short_summary")
+    return perfetto::TraceToSummary(&std::cin, &std::cout,
+                                    /* compact_output */ true);
+
+  return Usage(argv[0]);
 }

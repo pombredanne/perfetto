@@ -17,26 +17,26 @@
 
 #include "benchmark/benchmark.h"
 #include "perfetto/base/time.h"
-#include "perfetto/trace/trace_packet.pb.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "src/base/test/test_task_runner.h"
-#include "test/fake_consumer.h"
 #include "test/task_runner_thread.h"
 #include "test/task_runner_thread_delegates.h"
 #include "test/test_helper.h"
+
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 
 namespace {
 
-static bool IsBenchmarkFunctionalOnly() {
+bool IsBenchmarkFunctionalOnly() {
   return getenv("BENCHMARK_FUNCTIONAL_TEST_ONLY") != nullptr;
 }
 
-static void BenchmarkProducer(benchmark::State& state) {
+void BenchmarkProducer(benchmark::State& state) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -44,38 +44,62 @@ static void BenchmarkProducer(benchmark::State& state) {
 
   FakeProducer* producer = helper.ConnectFakeProducer();
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
-  // Setup the TraceConfig for the consumer.
   TraceConfig trace_config;
   trace_config.add_buffers()->set_size_kb(512);
 
-  // Create the buffer for ftrace.
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
   ds_config->set_target_buffer(0);
 
-  // The parameters for the producer.
   static constexpr uint32_t kRandomSeed = 42;
-  size_t message_count = state.range(0);
-  size_t message_bytes = state.range(1);
-  size_t mb_per_s = state.range(2);
+  uint32_t message_count = static_cast<uint32_t>(state.range(0));
+  uint32_t message_bytes = static_cast<uint32_t>(state.range(1));
+  uint32_t mb_per_s = static_cast<uint32_t>(state.range(2));
 
-  size_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
-  size_t time_for_messages_ms =
-      5000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
+  uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
+  uint32_t time_for_messages_ms =
+      10000 + (messages_per_s == 0 ? 0 : message_count * 1000 / messages_per_s);
 
-  // Setup the test to use a random number generator.
   ds_config->mutable_for_testing()->set_seed(kRandomSeed);
   ds_config->mutable_for_testing()->set_message_count(message_count);
   ds_config->mutable_for_testing()->set_message_size(message_bytes);
   ds_config->mutable_for_testing()->set_max_messages_per_second(messages_per_s);
 
   helper.StartTracing(trace_config);
+  helper.WaitForProducerEnabled();
+
+  uint64_t wall_start_ns = static_cast<uint64_t>(base::GetWallTimeNs().count());
+  uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
+  uint64_t producer_start_ns = helper.producer_thread()->GetThreadCPUTimeNs();
+  uint32_t iterations = 0;
+  for (auto _ : state) {
+    auto cname = "produced.and.committed." + std::to_string(iterations++);
+    auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
+    producer->ProduceEventBatch(helper.WrapTask(on_produced_and_committed));
+    task_runner.RunUntilCheckpoint(cname, time_for_messages_ms);
+  }
+  uint64_t service_ns =
+      helper.service_thread()->GetThreadCPUTimeNs() - service_start_ns;
+  uint64_t producer_ns =
+      helper.producer_thread()->GetThreadCPUTimeNs() - producer_start_ns;
+  uint64_t wall_ns =
+      static_cast<uint64_t>(base::GetWallTimeNs().count()) - wall_start_ns;
+
+  state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
+  state.counters["Ser ns/m"] =
+      benchmark::Counter(1.0 * service_ns / message_count);
+  state.counters["Pro CPU"] = benchmark::Counter(100.0 * producer_ns / wall_ns);
+  state.SetBytesProcessed(iterations * message_bytes * message_count);
+
+  // Read back the buffer just to check correctness.
+  helper.ReadData();
+  helper.WaitForReadData();
 
   bool is_first_packet = true;
   std::minstd_rand0 rnd_engine(kRandomSeed);
-  auto on_consumer_data = [&is_first_packet, &rnd_engine](
-                              const TracePacket::DecodedTracePacket& packet) {
+  for (const auto& packet : helper.trace()) {
     ASSERT_TRUE(packet.has_for_testing());
     if (is_first_packet) {
       rnd_engine = std::minstd_rand0(packet.for_testing().seq_value());
@@ -83,35 +107,7 @@ static void BenchmarkProducer(benchmark::State& state) {
     } else {
       ASSERT_EQ(packet.for_testing().seq_value(), rnd_engine());
     }
-  };
-
-  uint64_t wall_start_ns = base::GetWallTimeNs().count();
-  uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
-  uint64_t producer_start_ns = helper.producer_thread()->GetThreadCPUTimeNs();
-  uint64_t iterations = 0;
-  for (auto _ : state) {
-    auto cname = "produced.and.committed." + std::to_string(iterations++);
-    auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
-    producer->ProduceEventBatch([] {},
-                                helper.WrapTask(on_produced_and_committed));
-    task_runner.RunUntilCheckpoint(cname, time_for_messages_ms);
   }
-  uint64_t service_ns =
-      helper.service_thread()->GetThreadCPUTimeNs() - service_start_ns;
-  uint64_t producer_ns =
-      helper.producer_thread()->GetThreadCPUTimeNs() - producer_start_ns;
-  uint64_t wall_ns = base::GetWallTimeNs().count() - wall_start_ns;
-
-  state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
-  state.counters["Ser ns/m"] =
-      benchmark::Counter(1.0 * service_ns / message_count);
-  state.counters["Pro CPU"] = benchmark::Counter(100.0 * producer_ns / wall_ns);
-
-  // Read back the buffer just to check correctness.
-  auto on_readback_complete = task_runner.CreateCheckpoint("readback.complete");
-  helper.ReadData(on_consumer_data, on_readback_complete);
-  task_runner.RunUntilCheckpoint("readback.complete");
-  state.SetBytesProcessed(iterations * message_bytes * message_count);
 }
 
 static void BenchmarkConsumer(benchmark::State& state) {
@@ -122,6 +118,7 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
   FakeProducer* producer = helper.ConnectFakeProducer();
   helper.ConnectConsumer();
+  helper.WaitForConsumerConnect();
 
   TraceConfig trace_config;
 
@@ -129,11 +126,11 @@ static void BenchmarkConsumer(benchmark::State& state) {
   trace_config.add_buffers()->set_size_kb(kBufferSizeBytes / 1024);
 
   static constexpr uint32_t kRandomSeed = 42;
-  size_t message_bytes = state.range(0);
-  size_t mb_per_s = state.range(1);
+  uint32_t message_bytes = static_cast<uint32_t>(state.range(0));
+  uint32_t mb_per_s = static_cast<uint32_t>(state.range(1));
 
-  size_t message_count = kBufferSizeBytes / message_bytes;
-  size_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
+  uint32_t message_count = kBufferSizeBytes / message_bytes;
+  uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
@@ -144,32 +141,34 @@ static void BenchmarkConsumer(benchmark::State& state) {
   ds_config->mutable_for_testing()->set_max_messages_per_second(messages_per_s);
 
   helper.StartTracing(trace_config);
+  helper.WaitForProducerEnabled();
 
-  uint64_t wall_start_ns = base::GetWallTimeNs().count();
-  uint64_t service_start_ns = helper.service_thread()->GetThreadCPUTimeNs();
-  uint64_t consumer_start_ns = base::GetThreadCPUTimeNs().count();
+  uint64_t wall_start_ns = static_cast<uint64_t>(base::GetWallTimeNs().count());
+  uint64_t service_start_ns =
+      static_cast<uint64_t>(helper.service_thread()->GetThreadCPUTimeNs());
+  uint64_t consumer_start_ns =
+      static_cast<uint64_t>(base::GetThreadCPUTimeNs().count());
   uint64_t iterations = 0;
-  auto on_readback_complete = std::function<void()>();
+  uint32_t counter = 0;
   for (auto _ : state) {
-    // Called every time there is a mini-batch produced.
-    auto cname = "produced.and.committed." + std::to_string(iterations++);
-    auto on_minibatch = [&helper, cname] {
-      helper.ReadData([](const TracePacket::DecodedTracePacket&) {}, [] {});
-    };
-    producer->ProduceEventBatch(
-        helper.WrapTask(on_minibatch),
-        helper.WrapTask(task_runner.CreateCheckpoint(cname)));
-    task_runner.RunUntilCheckpoint(cname);
+    bool emitted_all = false;
+    auto finish_fn = [&emitted_all] { emitted_all = true; };
+    producer->ProduceEventBatch(helper.WrapTask(finish_fn));
 
-    auto readback_cname = "readback.complete." + std::to_string(iterations);
-    on_readback_complete = task_runner.CreateCheckpoint(readback_cname);
-    helper.ReadData([](const TracePacket::DecodedTracePacket&) {}, [] {});
-    task_runner.RunUntilCheckpoint(readback_cname);
+    do {
+      helper.ReadData(counter);
+      helper.WaitForReadData(counter++);
+    } while (!emitted_all);
+    iterations++;
   }
   uint64_t service_ns =
-      helper.service_thread()->GetThreadCPUTimeNs() - service_start_ns;
-  uint64_t consumer_ns = base::GetThreadCPUTimeNs().count() - consumer_start_ns;
-  uint64_t wall_ns = base::GetWallTimeNs().count() - wall_start_ns;
+      static_cast<uint64_t>(helper.service_thread()->GetThreadCPUTimeNs()) -
+      service_start_ns;
+  uint64_t consumer_ns =
+      static_cast<uint64_t>(base::GetThreadCPUTimeNs().count()) -
+      consumer_start_ns;
+  uint64_t wall_ns =
+      static_cast<uint64_t>(base::GetWallTimeNs().count()) - wall_start_ns;
 
   state.counters["Ser CPU"] = benchmark::Counter(100.0 * service_ns / wall_ns);
   state.counters["Ser ns/m"] =
@@ -178,13 +177,8 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
   state.SetBytesProcessed(iterations * message_bytes * message_count);
 }
-}  // namespace
 
-static void BM_EndToEnd_Producer_SaturateCpu(benchmark::State& state) {
-  BenchmarkProducer(state);
-}
-
-static void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
+void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
   int min_message_count = 16;
   int max_message_count = IsBenchmarkFunctionalOnly() ? 1024 : 1024 * 1024;
   int min_payload = 8;
@@ -196,6 +190,21 @@ static void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
   }
 }
 
+void ConstantRateArgs(benchmark::internal::Benchmark* b) {
+  int message_count = IsBenchmarkFunctionalOnly() ? 2 * 1024 : 128 * 1024;
+  int min_speed = IsBenchmarkFunctionalOnly() ? 64 : 8;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 128 : 128;
+  for (int speed = min_speed; speed <= max_speed; speed *= 2) {
+    b->Args({message_count, 128, speed});
+    b->Args({message_count, 256, speed});
+  }
+}
+}  // namespace
+
+static void BM_EndToEnd_Producer_SaturateCpu(benchmark::State& state) {
+  BenchmarkProducer(state);
+}
+
 BENCHMARK(BM_EndToEnd_Producer_SaturateCpu)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
@@ -203,17 +212,6 @@ BENCHMARK(BM_EndToEnd_Producer_SaturateCpu)
 
 static void BM_EndToEnd_Producer_ConstantRate(benchmark::State& state) {
   BenchmarkProducer(state);
-}
-
-static void ConstantRateArgs(benchmark::internal::Benchmark* b) {
-  int min_speed = IsBenchmarkFunctionalOnly() ? 32 : 8;
-  int max_speed = IsBenchmarkFunctionalOnly() ? 64 : 128;
-  for (int speed = min_speed; speed <= max_speed; speed *= 2) {
-    b->Args({128 * 1024, 128, speed});
-    b->Args({256 * 1024, 128, speed});
-    b->Args({128 * 1024, 256, speed});
-    b->Args({256 * 1024, 256, speed});
-  }
 }
 
 BENCHMARK(BM_EndToEnd_Producer_ConstantRate)

@@ -70,8 +70,6 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
     return;
   }
 
-  // Serialize the |trace_config| into a EnableTracingRequest protobuf.
-  // Keep this in sync with changes in consumer_port.proto.
   protos::EnableTracingRequest req;
   trace_config.ToProto(req.mutable_trace_config());
   ipc::Deferred<protos::EnableTracingResponse> async_response;
@@ -80,8 +78,8 @@ void ConsumerIPCClientImpl::EnableTracing(const TraceConfig& trace_config,
       [weak_this](ipc::AsyncResult<protos::EnableTracingResponse> response) {
         if (!weak_this)
           return;
-        if (!response || response->stopped())
-          weak_this->consumer_->OnTracingStop();
+        if (!response || response->disabled())
+          weak_this->consumer_->OnTracingDisabled();
       });
 
   // |fd| will be closed when this function returns, but it's fine because the
@@ -156,6 +154,22 @@ void ConsumerIPCClientImpl::FreeBuffers() {
           PERFETTO_DLOG("FreeBuffers() failed");
       });
   consumer_port_.FreeBuffers(req, std::move(async_response));
+}
+
+void ConsumerIPCClientImpl::Flush(uint32_t timeout_ms, FlushCallback callback) {
+  if (!connected_) {
+    PERFETTO_DLOG("Cannot Flush(), not connected to tracing service");
+    return callback(/*success=*/false);
+  }
+
+  protos::FlushRequest req;
+  req.set_timeout_ms(static_cast<uint32_t>(timeout_ms));
+  ipc::Deferred<protos::FlushResponse> async_response;
+  async_response.Bind(
+      [callback](ipc::AsyncResult<protos::FlushResponse> response) {
+        callback(!!response);
+      });
+  consumer_port_.Flush(req, std::move(async_response));
 }
 
 }  // namespace perfetto

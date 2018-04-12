@@ -27,7 +27,7 @@ class TracePacket;
 
 class Consumer {
  public:
-  virtual ~Consumer() = default;
+  virtual ~Consumer();
 
   // Called by Service (or more typically by the transport layer, on behalf of
   // the remote Service), once the Consumer <> Service connection has been
@@ -46,7 +46,7 @@ class Consumer {
   // - The TraceConfig's |duration_ms| has been reached.
   // - The TraceConfig's |max_file_size_bytes| has been reached.
   // - An error occurred while trying to enable tracing.
-  virtual void OnTracingStop() = 0;
+  virtual void OnTracingDisabled() = 0;
 
   // Called back by the Service (or transport layer) after invoking
   // Service::ConsumerEndpoint::ReadBuffers(). This function can be called more

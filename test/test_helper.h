@@ -17,11 +17,15 @@
 #ifndef TEST_TEST_HELPER_H_
 #define TEST_TEST_HELPER_H_
 
+#include "perfetto/tracing/core/consumer.h"
 #include "perfetto/tracing/core/trace_config.h"
+#include "perfetto/tracing/core/trace_packet.h"
+#include "perfetto/tracing/ipc/consumer_ipc_client.h"
 #include "src/base/test/test_task_runner.h"
-#include "test/fake_consumer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
+
+#include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
 
@@ -32,27 +36,34 @@ class TestHelper : public Consumer {
   // Consumer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
-  void OnTracingStop() override;
+  void OnTracingDisabled() override;
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
   void StartServiceIfRequired();
   FakeProducer* ConnectFakeProducer();
   void ConnectConsumer();
   void StartTracing(const TraceConfig& config);
-  void ReadData(std::function<void(const TracePacket::DecodedTracePacket&)>
-                    packet_callback,
-                std::function<void()> on_finish_callback);
+  void ReadData(uint32_t read_count = 0);
+
+  void WaitForConsumerConnect();
+  void WaitForProducerEnabled();
+  void WaitForTracingDisabled();
+  void WaitForReadData(uint32_t read_count = 0);
 
   std::function<void()> WrapTask(const std::function<void()>& function);
 
   TaskRunnerThread* service_thread() { return &service_thread_; }
   TaskRunnerThread* producer_thread() { return &producer_thread_; }
+  const std::vector<protos::TracePacket>& trace() { return trace_; }
 
  private:
   base::TestTaskRunner* task_runner_ = nullptr;
 
-  std::function<void(const TracePacket::DecodedTracePacket&)> packet_callback_;
-  std::function<void()> continuation_callack_;
+  std::function<void()> on_connect_callback_;
+  std::function<void()> on_packets_finished_callback_;
+  std::function<void()> on_stop_tracing_callback_;
+
+  std::vector<protos::TracePacket> trace_;
 
   TaskRunnerThread service_thread_;
   TaskRunnerThread producer_thread_;
