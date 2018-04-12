@@ -17,6 +17,7 @@
 #define SRC_TRACING_CORE_TRACE_WRITER_FOR_TESTING_H_
 
 #include "perfetto/protozero/message_handle.h"
+#include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
 
@@ -36,16 +37,7 @@ class TraceWriterForTesting : public TraceWriter {
   TracePacketHandle NewTracePacket() override;
   void Flush(std::function<void()> callback = {}) override;
 
-  template <class ProtoT>
-  std::unique_ptr<ProtoT> ParseProto() {
-    auto bundle = std::unique_ptr<ProtoT>(new ProtoT());
-    size_t msg_size =
-        delegate_.chunks().size() * chunk_size_ - stream_.bytes_available();
-    std::unique_ptr<uint8_t[]> buffer = delegate_.StitchChunks(msg_size);
-    if (!bundle->ParseFromArray(buffer.get(), static_cast<int>(msg_size)))
-      return nullptr;
-    return bundle;
-  }
+  std::unique_ptr<protos::TracePacket> ParseProto();
 
   WriterID writer_id() const override;
 
@@ -55,7 +47,7 @@ class TraceWriterForTesting : public TraceWriter {
 
   ScatteredStreamDelegateForTesting delegate_;
   protozero::ScatteredStreamWriter stream_;
-  size_t chunk_size_ = base::kPageSize;
+
   // The packet returned via NewTracePacket(). Its owned by this class,
   // TracePacketHandle has just a pointer to it.
   std::unique_ptr<protos::pbzero::TracePacket> cur_packet_;

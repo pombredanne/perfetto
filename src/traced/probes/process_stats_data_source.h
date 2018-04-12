@@ -35,19 +35,19 @@ class ProcessStatsDataSource {
   ProcessStatsDataSource(TracingSessionID,
                          std::unique_ptr<TraceWriter> writer,
                          const DataSourceConfig&);
-  ~ProcessStatsDataSource();
+  virtual ~ProcessStatsDataSource();
 
   TracingSessionID session_id() const { return session_id_; }
   const DataSourceConfig& config() const { return config_; }
 
   base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
   void WriteAllProcesses();
-  std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
+  virtual std::unique_ptr<ProcessInfo> ReadProcessInfo(int pid);
   void OnPids(const std::vector<int32_t>& pids);
   void Flush();
 
  private:
-  static void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
+  void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
 
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;

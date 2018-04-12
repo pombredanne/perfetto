@@ -24,6 +24,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::testing::Invoke;
+
 namespace perfetto {
 namespace {
 
@@ -45,19 +47,19 @@ class ProcessStatsDataSourceTest : public ::testing::Test {
 
   std::unique_ptr<TestProcessStatsDataSource> GetProcessStatsDataSource(
       const DataSourceConfig& cfg) {
-    std::unique_ptr<TraceWriterForTesting> writer =
+    auto writer =
         std::unique_ptr<TraceWriterForTesting>(new TraceWriterForTesting());
     writer_raw_ = writer.get();
     return std::unique_ptr<TestProcessStatsDataSource>(
         new TestProcessStatsDataSource(0, std::move(writer), cfg));
   }
 
-  static std::unique_ptr<ProcessInfo> getProcessInfo(int pid) {
+  static std::unique_ptr<ProcessInfo> GetProcessInfo(int pid) {
     ProcessInfo* process = new ProcessInfo();
     process->pid = pid;
-    process->cmdline.push_back("test_process");
-    process->in_kernel = true;
+    process->in_kernel = true;  // So that it doesn't try to read threads.
     process->ppid = 0;
+    process->cmdline.push_back(std::string("test_process"));
     return std::unique_ptr<ProcessInfo>(process);
   }
 };
@@ -65,15 +67,16 @@ class ProcessStatsDataSourceTest : public ::testing::Test {
 TEST_F(ProcessStatsDataSourceTest, TestWriteOnDemand) {
   DataSourceConfig config;
   auto data_source = GetProcessStatsDataSource(config);
-  EXPECT_CALL(*data_source, ReadProcessInfo(0))
-      .WillRepeatedly(::testing::Invoke(getProcessInfo));
-  std::vector<int32_t> pids(1, 0);
-  data_source->OnPids(pids);
-  std::unique_ptr<protos::TracePacket> packet =
-      writer_raw_->ParseProto<protos::TracePacket>();
+  EXPECT_CALL(*data_source, ReadProcessInfo(42))
+      .WillRepeatedly(Invoke(GetProcessInfo));
+  data_source->OnPids({42});
+  std::unique_ptr<protos::TracePacket> packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet->has_process_tree());
-  auto processes = packet->process_tree().processes();
   ASSERT_EQ(packet->process_tree().processes_size(), 1);
+  auto first_process = packet->process_tree().processes(0);
+  ASSERT_EQ(first_process.pid(), 42);
+  ASSERT_EQ(first_process.ppid(), 0);
+  ASSERT_EQ(first_process.cmdline(0), std::string("test_process"));
 }
 
 }  // namespace
