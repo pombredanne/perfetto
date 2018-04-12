@@ -40,8 +40,8 @@ std::string JoinPaths(const std::string& one, const std::string& other) {
 
 FileScanner::FileScanner(std::vector<std::string> root_directories,
                          Delegate* delegate,
-                         uint64_t scan_interval_ms,
-                         uint64_t scan_steps)
+                         uint32_t scan_interval_ms,
+                         uint32_t scan_steps)
     : delegate_(delegate),
       scan_interval_ms_(scan_interval_ms),
       scan_steps_(scan_steps),
@@ -58,6 +58,7 @@ FileScanner::FileScanner(std::vector<std::string> root_directories,
 void FileScanner::Scan() {
   while (!Done())
     Step();
+  delegate_->OnInodeScanDone();
 }
 void FileScanner::Scan(base::TaskRunner* task_runner) {
   PERFETTO_DCHECK(scan_interval_ms_ && scan_steps_);
@@ -141,13 +142,15 @@ void FileScanner::Step() {
   }
 }
 
-void FileScanner::Steps(uint64_t n) {
-  for (uint64_t i = 0; i < n && !Done(); ++i)
+void FileScanner::Steps(uint32_t n) {
+  for (uint32_t i = 0; i < n && !Done(); ++i)
     Step();
 }
 
 bool FileScanner::Done() {
   return !current_dir_handle_ && queue_.empty();
 }
+
+FileScanner::Delegate::~Delegate() = default;
 
 }  // namespace perfetto

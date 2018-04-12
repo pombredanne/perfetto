@@ -25,6 +25,8 @@
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 
+#include "perfetto/trace/trace_packet.pb.h"
+
 namespace perfetto {
 
 class TestHelper : public Consumer {
@@ -34,27 +36,34 @@ class TestHelper : public Consumer {
   // Consumer implementation.
   void OnConnect() override;
   void OnDisconnect() override;
-  void OnTracingStop() override;
+  void OnTracingDisabled() override;
   void OnTraceData(std::vector<TracePacket> packets, bool has_more) override;
 
   void StartServiceIfRequired();
   FakeProducer* ConnectFakeProducer();
   void ConnectConsumer();
   void StartTracing(const TraceConfig& config);
-  void ReadData(std::function<void(const TracePacket::DecodedTracePacket&)>
-                    packet_callback,
-                std::function<void()> on_finish_callback);
+  void ReadData();
+
+  void WaitForConsumerConnect();
+  void WaitForProducerEnabled();
+  void WaitForTracingDisabled();
+  void WaitForReadData();
 
   std::function<void()> WrapTask(const std::function<void()>& function);
 
   TaskRunnerThread* service_thread() { return &service_thread_; }
   TaskRunnerThread* producer_thread() { return &producer_thread_; }
+  const std::vector<protos::TracePacket>& trace() { return trace_; }
 
  private:
   base::TestTaskRunner* task_runner_ = nullptr;
 
-  std::function<void(const TracePacket::DecodedTracePacket&)> packet_callback_;
-  std::function<void()> continuation_callack_;
+  std::function<void()> on_connect_callback_;
+  std::function<void()> on_packets_finished_callback_;
+  std::function<void()> on_stop_tracing_callback_;
+
+  std::vector<protos::TracePacket> trace_;
 
   TaskRunnerThread service_thread_;
   TaskRunnerThread producer_thread_;

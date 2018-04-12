@@ -33,14 +33,12 @@
 
 namespace perfetto {
 namespace {
-constexpr uint64_t kScanIntervalMs = 10000;  // 10s
-constexpr uint64_t kScanDelayMs = 10000;     // 10s
-constexpr uint64_t kScanBatchSize = 15000;
+constexpr uint32_t kScanIntervalMs = 10000;  // 10s
+constexpr uint32_t kScanDelayMs = 10000;     // 10s
+constexpr uint32_t kScanBatchSize = 15000;
 
-uint64_t OrDefault(uint64_t value, uint64_t def) {
-  if (value != 0)
-    return value;
-  return def;
+uint32_t OrDefault(uint32_t value, uint32_t def) {
+  return value ? value : def;
 }
 
 std::string DbgFmt(const std::vector<std::string>& values) {
@@ -98,9 +96,9 @@ void CreateStaticDeviceToInodeMap(
   scanner.Scan();
 }
 
-void FillInodeEntry(InodeFileMap* destination,
-                    Inode inode_number,
-                    const InodeMapValue& inode_map_value) {
+void InodeFileDataSource::FillInodeEntry(InodeFileMap* destination,
+                                         Inode inode_number,
+                                         const InodeMapValue& inode_map_value) {
   auto* entry = destination->add_entries();
   entry->set_inode_number(inode_number);
   entry->set_type(inode_map_value.type());
@@ -127,6 +125,8 @@ InodeFileDataSource::InodeFileDataSource(
       cache_(cache),
       writer_(std::move(writer)),
       weak_factory_(this) {}
+
+InodeFileDataSource::~InodeFileDataSource() = default;
 
 void InodeFileDataSource::AddInodesFromStaticMap(
     BlockDeviceID block_device_id,
@@ -172,6 +172,11 @@ void InodeFileDataSource::AddInodesFromLRUCache(
   }
   if (cache_found_count > 0)
     PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
+}
+
+void InodeFileDataSource::Flush() {
+  ResetTracePacket();
+  writer_->Flush();
 }
 
 void InodeFileDataSource::OnInodes(
@@ -245,6 +250,7 @@ void InodeFileDataSource::OnInodes(
 
 InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
     BlockDeviceID block_device_id) {
+  seen_block_devices_.emplace(block_device_id);
   if (!has_current_trace_packet_ ||
       current_block_device_id_ != block_device_id) {
     if (has_current_trace_packet_)
@@ -254,7 +260,8 @@ InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
     has_current_trace_packet_ = true;
 
     // Add block device id to InodeFileMap
-    current_file_map_->set_block_device_id(block_device_id);
+    current_file_map_->set_block_device_id(
+        static_cast<uint64_t>(block_device_id));
     // Add mount points to InodeFileMap
     auto range = mount_points_.equal_range(block_device_id);
     for (std::multimap<BlockDeviceID, std::string>::iterator it = range.first;
@@ -262,6 +269,15 @@ InodeFileMap* InodeFileDataSource::AddToCurrentTracePacket(
       current_file_map_->add_mount_points(it->second.c_str());
   }
   return current_file_map_;
+}
+
+void InodeFileDataSource::RemoveFromNextMissingInodes(
+    BlockDeviceID block_device_id,
+    Inode inode_number) {
+  auto it = next_missing_inodes_.find(block_device_id);
+  if (it == next_missing_inodes_.end())
+    return;
+  it->second.erase(inode_number);
 }
 
 bool InodeFileDataSource::OnInodeFound(
@@ -280,6 +296,8 @@ bool InodeFileDataSource::OnInodeFound(
   if (it->second.empty())
     missing_inodes_.erase(it);
 
+  RemoveFromNextMissingInodes(block_device_id, inode_number);
+
   std::pair<BlockDeviceID, Inode> key{block_device_id, inode_number};
   auto cur_val = cache_->Get(key);
   if (cur_val) {
@@ -296,14 +314,26 @@ bool InodeFileDataSource::OnInodeFound(
   return !missing_inodes_.empty();
 }
 
-void InodeFileDataSource::OnInodeScanDone() {
-  // Finalize the accumulated trace packets.
+void InodeFileDataSource::ResetTracePacket() {
   current_block_device_id_ = 0;
   current_file_map_ = nullptr;
   if (has_current_trace_packet_)
     current_trace_packet_->Finalize();
   has_current_trace_packet_ = false;
+}
+
+void InodeFileDataSource::OnInodeScanDone() {
+  // Finalize the accumulated trace packets.
+  ResetTracePacket();
   file_scanner_.reset();
+  if (!missing_inodes_.empty()) {
+    // At least write mount point mapping for inodes that are not found.
+    for (const auto& p : missing_inodes_) {
+      if (seen_block_devices_.count(p.first) == 0)
+        AddToCurrentTracePacket(p.first);
+    }
+  }
+
   if (next_missing_inodes_.empty()) {
     scan_running_ = false;
   } else {
@@ -354,17 +384,17 @@ void InodeFileDataSource::FindMissingInodes() {
   file_scanner_->Scan(task_runner_);
 }
 
-uint64_t InodeFileDataSource::GetScanIntervalMs() {
+uint32_t InodeFileDataSource::GetScanIntervalMs() const {
   return OrDefault(source_config_.inode_file_config().scan_interval_ms(),
                    kScanIntervalMs);
 }
 
-uint64_t InodeFileDataSource::GetScanDelayMs() {
+uint32_t InodeFileDataSource::GetScanDelayMs() const {
   return OrDefault(source_config_.inode_file_config().scan_delay_ms(),
                    kScanDelayMs);
 }
 
-uint64_t InodeFileDataSource::GetScanBatchSize() {
+uint32_t InodeFileDataSource::GetScanBatchSize() const {
   return OrDefault(source_config_.inode_file_config().scan_batch_size(),
                    kScanBatchSize);
 }

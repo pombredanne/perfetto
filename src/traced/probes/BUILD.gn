@@ -19,6 +19,7 @@ source_set("probes") {
   deps = [
     ":probes_src",
     "../../../gn:default_deps",
+    "../../tracing:ipc",
   ]
   sources = [
     "probes.cc",
@@ -50,6 +51,8 @@ source_set("unittests") {
     ":probes_src",
     "../../../gn:default_deps",
     "../../../gn:gtest_deps",
+    "../../process_stats:process_stats",
+    "../../tracing:unittests",
   ]
   sources = [
     "process_stats_data_source_unittest.cc",
