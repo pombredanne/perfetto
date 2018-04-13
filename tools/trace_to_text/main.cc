@@ -495,10 +495,9 @@ int main(int argc, char** argv) {
                                      /*wrap_in_json=*/false);
   if (format == "text")
     return perfetto::TraceToText(&std::cin, &std::cout);
-
   if (format == "summary")
     return perfetto::TraceToSummary(&std::cin, &std::cout,
-                                    /* compact_output */ false);
+                                    /* compact_output */ true);
   if (format == "short_summary")
     return perfetto::TraceToSummary(&std::cin, &std::cout,
                                     /* compact_output */ true);
