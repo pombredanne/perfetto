@@ -122,15 +122,18 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
   TraceConfig trace_config;
 
-  static constexpr uint32_t kBufferSizeBytes = 1024 * 1024;
+  static constexpr uint32_t kBufferSizeBytes = 16 * 1024 * 1024;
   trace_config.add_buffers()->set_size_kb(kBufferSizeBytes / 1024);
 
   static constexpr uint32_t kRandomSeed = 42;
   uint32_t message_bytes = static_cast<uint32_t>(state.range(0));
   uint32_t mb_per_s = static_cast<uint32_t>(state.range(1));
+  bool is_saturated_producer = mb_per_s == 0;
 
   uint32_t message_count = kBufferSizeBytes / message_bytes;
   uint32_t messages_per_s = mb_per_s * 1024 * 1024 / message_bytes;
+  uint32_t number_of_batches =
+      is_saturated_producer ? 0 : std::max(1u, message_count / messages_per_s);
 
   auto* ds_config = trace_config.add_data_sources()->mutable_config();
   ds_config->set_name("android.perfetto.FakeProducer");
@@ -148,22 +151,46 @@ static void BenchmarkConsumer(benchmark::State& state) {
       static_cast<uint64_t>(helper.service_thread()->GetThreadCPUTimeNs());
   uint64_t consumer_start_ns =
       static_cast<uint64_t>(base::GetThreadCPUTimeNs().count());
+  uint64_t read_time_taken_ns = 0;
+
   uint64_t iterations = 0;
   uint32_t counter = 0;
   for (auto _ : state) {
-    bool emitted_all = false;
-    auto finish_fn = [&emitted_all] { emitted_all = true; };
-    producer->ProduceEventBatch(helper.WrapTask(finish_fn));
+    auto cname = "produced.and.committed." + std::to_string(iterations++);
+    auto on_produced_and_committed = task_runner.CreateCheckpoint(cname);
+    producer->ProduceEventBatch(helper.WrapTask(on_produced_and_committed));
 
-    do {
+    if (is_saturated_producer) {
+      // If the producer is running in saturated mode, wait until it flushes
+      // data.
+      task_runner.RunUntilCheckpoint(cname);
+
+      // Then time how long it takes to read back the data.
+      int64_t start = base::GetWallTimeNs().count();
       helper.ReadData(counter);
       helper.WaitForReadData(counter++);
-    } while (!emitted_all);
-    iterations++;
+      read_time_taken_ns +=
+          static_cast<uint64_t>(base::GetWallTimeNs().count() - start);
+    } else {
+      // If the producer is not running in saturated mode, every second the
+      // producer will send a batch of data over. Wait for a second before
+      // performing readback; do this for each batch the producer sends.
+      for (uint32_t i = 0; i < number_of_batches; i++) {
+        auto batch_cname = "batch.checkpoint." + std::to_string(counter);
+        auto batch_checkpoint = task_runner.CreateCheckpoint(batch_cname);
+        task_runner.PostDelayedTask(batch_checkpoint, 1000);
+        task_runner.RunUntilCheckpoint(batch_cname);
+
+        int64_t start = base::GetWallTimeNs().count();
+        helper.ReadData(counter);
+        helper.WaitForReadData(counter++);
+        read_time_taken_ns +=
+            static_cast<uint64_t>(base::GetWallTimeNs().count() - start);
+      }
+    }
   }
   uint64_t service_ns =
-      static_cast<uint64_t>(helper.service_thread()->GetThreadCPUTimeNs()) -
-      service_start_ns;
+      helper.service_thread()->GetThreadCPUTimeNs() - service_start_ns;
   uint64_t consumer_ns =
       static_cast<uint64_t>(base::GetThreadCPUTimeNs().count()) -
       consumer_start_ns;
@@ -174,8 +201,9 @@ static void BenchmarkConsumer(benchmark::State& state) {
   state.counters["Ser ns/m"] =
       benchmark::Counter(1.0 * service_ns / message_count);
   state.counters["Con CPU"] = benchmark::Counter(100.0 * consumer_ns / wall_ns);
-
-  state.SetBytesProcessed(iterations * message_bytes * message_count);
+  state.counters["Con Speed"] =
+      benchmark::Counter(iterations * 1000.0 * 1000 * 1000 * kBufferSizeBytes /
+                         read_time_taken_ns);
 }
 
 void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
@@ -234,9 +262,9 @@ static void BM_EndToEnd_Consumer_ConstantRate(benchmark::State& state) {
 }
 
 BENCHMARK(BM_EndToEnd_Consumer_ConstantRate)
-    ->Unit(benchmark::kMicrosecond)
+    ->Unit(benchmark::kMillisecond)
     ->UseRealTime()
     ->RangeMultiplier(2)
-    ->Ranges({{8, 8 * 1024}, {32, 128}});
+    ->Ranges({{2, 8 * 1024}, {8, 16}});
 
 }  // namespace perfetto
