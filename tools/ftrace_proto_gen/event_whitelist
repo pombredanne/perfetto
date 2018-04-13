@@ -1,3 +1,4 @@
+# Keep this in the same order as the fields in the FtraceEvent proto.
 ftrace/print
 sched/sched_switch
 cpufreq_interactive/cpufreq_interactive_already
