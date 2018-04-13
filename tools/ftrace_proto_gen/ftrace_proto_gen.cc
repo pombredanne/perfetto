@@ -54,6 +54,23 @@ bool Contains(const std::string& haystack, const std::string& needle) {
 
 }  // namespace
 
+std::vector<std::string> GetFileLines(const std::string& filename) {
+  std::string line;
+  std::vector<std::string> lines;
+
+  std::ifstream fin(filename, std::ios::in);
+  if (!fin) {
+    fprintf(stderr, "Failed to open whitelist %s\n", filename.c_str());
+    return lines;
+  }
+  while (std::getline(fin, line)) {
+    if (!StartsWith(line, "#") && line != "deleted") {
+      lines.emplace_back(line);
+    }
+  }
+  return lines;
+}
+
 std::string InferProtoType(const FtraceEvent::Field& field) {
   // Fixed length strings: "char foo[16]"
   if (std::regex_match(field.type_and_name, std::regex(R"(char \w+\[\d+\])")))
@@ -92,15 +109,6 @@ std::string InferProtoType(const FtraceEvent::Field& field) {
   if (field.size <= 8 && !field.is_signed)
     return "uint64";
   return "";
-}
-
-void PrintFtraceEventProtoAdditions(const std::set<std::string>& events) {
-  printf(
-      "\nNumber appropriately and add output to "
-      "protos/perfetto/trace/ftrace/ftrace_event.proto\n");
-  for (auto event : events) {
-    printf("%sFtraceEvent %s = ;\n", ToCamelCase(event).c_str(), event.c_str());
-  }
 }
 
 void PrintEventFormatterMain(const std::set<std::string>& events) {
@@ -171,17 +179,13 @@ bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
   return true;
 }
 
-std::set<std::string> GetWhitelistedEvents(const std::string& whitelist_path) {
-  std::string line;
-  std::set<std::string> whitelist;
+void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist) {}
 
-  std::ifstream fin(whitelist_path, std::ios::in);
-  if (!fin) {
-    fprintf(stderr, "Failed to open whitelist %s\n", whitelist_path.c_str());
-    return whitelist;
-  }
-  while (std::getline(fin, line)) {
-    if (!StartsWith(line, "#")) {
+std::set<std::string> GetWhitelistedEvents(
+    const std::vector<std::string>& raw_whitelist) {
+  std::set<std::string> whitelist;
+  for (const std::string& line : raw_whitelist) {
+    if (!StartsWith(line, "#") && line != "deleted") {
       whitelist.insert(line);
     }
   }
