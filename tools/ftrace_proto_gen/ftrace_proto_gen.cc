@@ -25,10 +25,6 @@ namespace perfetto {
 
 namespace {
 
-void UnionFtraceEvent(FtraceEvent* dst, const FtraceEvent& src) {
-  PERFETTO_CHECK(dst->name == src.name);
-}
-
 std::string ToCamelCase(const std::string& s) {
   std::string result;
   result.reserve(s.size());
