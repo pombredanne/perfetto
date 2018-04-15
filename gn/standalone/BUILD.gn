@@ -25,6 +25,7 @@ config("extra_warnings") {
       "-Weverything",
       "-Wno-c++98-compat-pedantic",
       "-Wno-c++98-compat",
+      "-Wno-disabled-macro-expansion",
       "-Wno-gnu-include-next",
       "-Wno-gnu-statement-expression",
       "-Wno-gnu-zero-variadic-macro-arguments",
@@ -62,7 +63,8 @@ config("default") {
     "-fstack-protector",
     "-fPIC",
     "-g",
-    "-Wa,--noexecstack",
+
+    # "-Wa,--noexecstack",
     "-Wformat",
     "-Werror",
   ]

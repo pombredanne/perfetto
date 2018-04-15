@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Perfetto UI</title>
+    <style>
+      body {
+        font-family: arial;
+        margin: 0;
+        padding: none;
+      }
+      #output {
+        font-family: monospace;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+
+    <input type="file" id="file-picker">
+    <textarea id="output" rows="40"></textarea>
+
+    <script type='text/javascript'>
+
+      var Module = {
+        preRun: [],
+        postRun: [],
+        print: (function() {
+          var element = document.getElementById('output');
+          if (element) element.value = ''; // clear browser cache
+          return function(text) {
+            if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+            // console.log(text);
+            if (element) {
+              element.value += text + "\n";
+              element.scrollTop = element.scrollHeight; // focus on bottom
+            }
+          };
+        })(),
+        printErr: function(text) {
+          if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+          console.error(text);
+        },
+      };
+
+      // var mem = new WebAssembly.Memory({ initial: 1 });
+      var readerContext = {
+        file: undefined,
+        reader: undefined
+      };
+
+      var tStart = 0;
+      var bytesRead = 0;
+
+      var FetchTrace = function(offset, length) {
+        console.log('FetchTrace(' + offset + ', ' + length  + ')');
+        readerContext.reader.readAsArrayBuffer(readerContext.file.slice(offset, offset + length));
+      };
+
+      var onFileRead = function(evt) {
+        var data = evt.target.result;
+        var srcMem = new Uint8Array(data);
+        bytesRead += srcMem.length;
+        var elapsed = (performance.now() - tStart) / 1000;
+        console.log('Read ' + srcMem.length + '  ' + ~~(bytesRead / elapsed / 1024) + ' KB/s');
+        Module.ccall('PerfettoOnTraceFetched', null, ['array','number'], [srcMem, srcMem.length]);
+      };
+
+      var openTrace = function(file) {
+        tStart = performance.now();
+        readerContext.file = file;
+        readerContext.reader = new FileReader();
+        readerContext.reader.addEventListener('load', onFileRead);
+        Module.ccall('PerfettoLoadTrace', null, null, null);
+
+        // readerContext.reader.readAsArrayBuffer(file.slice(0, readerContext.CHUNK_SIZE));
+      };
+
+      document.getElementById('file-picker').addEventListener('change', (e) => {
+        openTrace(e.target.files[0]);
+      });
+    </script>
+    <script async type="text/javascript" src="analysis_js.js"></script>
+  </body>
+</html>

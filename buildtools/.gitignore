@@ -4,6 +4,7 @@ benchmark/
 clang/
 clang_format/
 emulator/
+emscripten/
 googletest/
 libbacktrace/
 libcxx/

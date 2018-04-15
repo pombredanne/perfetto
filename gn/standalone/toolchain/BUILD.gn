@@ -166,3 +166,12 @@ gcc_like_toolchain("gcc_like_host") {
   cc = host_cc
   cxx = host_cxx
 }
+
+gcc_like_toolchain("wasm") {
+  emscripten_dir = rebase_path("//buildtools/emscripten", root_build_dir)
+  cpu = host_cpu
+  os = host_os
+  ar = "$emscripten_dir/emar"
+  cc = "$emscripten_dir/emcc"
+  cxx = "$emscripten_dir/em++"
+}
