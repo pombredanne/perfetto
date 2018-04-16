@@ -23,7 +23,6 @@ FetchTraceFunction g_fetch_trace;
 TraceStatusUpdateFunction g_trace_status_update;
 }  // namespace.
 
-
 // Exports (functions exported to JS)
 extern "C" void EMSCRIPTEN_KEEPALIVE Initialize(FetchTraceFunction,
                                                 TraceStatusUpdateFunction);

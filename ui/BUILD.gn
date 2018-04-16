@@ -14,11 +14,10 @@
 
 import("../gn/wasm.gni")
 
-
 group("ui") {
   deps = [
-   "../src/analysis:analysis",
-    ":copy_ui"
+    ":copy_ui",
+    "../src/analysis:analysis",
   ]
 }
 

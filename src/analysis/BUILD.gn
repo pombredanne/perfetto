@@ -17,9 +17,11 @@ import("../../gn/perfetto.gni")
 import("../../gn/wasm.gni")
 
 wasm("analysis") {
-  sources = ["test.cc"]
+  sources = [
+    "test.cc",
+  ]
   generate_js = true
   deps = [
-    "../../protos/perfetto/trace:lite($wasm_toolchain)"
+    "../../protos/perfetto/trace:lite($wasm_toolchain)",
   ]
 }
