@@ -27,7 +27,7 @@
 #include "perfetto/ftrace_reader/ftrace_controller.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
-#include "src/ftrace_reader/test/scattered_stream_delegate_for_testing.h"
+#include "src/protozero/scattered_stream_delegate_for_testing.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
@@ -78,8 +78,8 @@ class EndToEndIntegrationTest : public ::testing::Test,
   }
 
   virtual void OnBundleComplete(size_t cpu,
-                                FtraceBundleHandle bundle,
-                                const FtraceMetadata& metadata) {
+                                FtraceBundleHandle,
+                                const FtraceMetadata&) {
     PERFETTO_CHECK(currently_writing_);
     currently_writing_ = false;
     EXPECT_NE(cpu_being_written_, 9999ul);

@@ -47,8 +47,10 @@ class ProbesProducer : public Producer {
   void CreateDataSourceInstance(DataSourceInstanceID,
                                 const DataSourceConfig&) override;
   void TearDownDataSourceInstance(DataSourceInstanceID) override;
-  void OnTracingStart() override;
-  void OnTracingStop() override;
+  void OnTracingSetup() override;
+  void Flush(FlushRequestID,
+             const DataSourceInstanceID* data_source_ids,
+             size_t num_data_sources) override;
 
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
@@ -77,6 +79,8 @@ class ProbesProducer : public Producer {
     ~SinkDelegate() override;
 
     TracingSessionID session_id() const { return session_id_; }
+
+    void Flush();
 
     // FtraceDelegateImpl
     FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
@@ -112,6 +116,7 @@ class ProbesProducer : public Producer {
     // Keep this after the TraceWriter because TracePackets must not outlive
     // their originating writer.
     TraceWriter::TracePacketHandle trace_packet_;
+
     // Keep this last.
     base::WeakPtrFactory<SinkDelegate> weak_factory_;
   };
@@ -138,7 +143,7 @@ class ProbesProducer : public Producer {
   std::unique_ptr<Service::ProducerEndpoint> endpoint_ = nullptr;
   std::unique_ptr<FtraceController> ftrace_ = nullptr;
   bool ftrace_creation_failed_ = false;
-  uint64_t connection_backoff_ms_ = 0;
+  uint32_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
   std::set<DataSourceInstanceID> failed_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<ProcessStatsDataSource>>
