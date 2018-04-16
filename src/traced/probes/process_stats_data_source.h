@@ -52,10 +52,11 @@ class ProcessStatsDataSource {
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
 
-  void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
+  void WriteProcess(int32_t pid, TraceWriter::TracePacketHandle*);
 
   const TracingSessionID session_id_;
   std::unique_ptr<TraceWriter> writer_;
+  protos::pbzero::ProcessTree* process_tree_;
   const DataSourceConfig config_;
   // TODO(b/76663469): Optimization: use a bitmap.
   std::set<int32_t> seen_pids_;

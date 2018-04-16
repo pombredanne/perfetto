@@ -36,6 +36,10 @@ bool IsNumeric(const char* str);
 void ForEachPidInProcPath(const char* proc_path,
                           const std::function<void(int)>& predicate);
 
+// Gets the name of the first directory in the path. Used to find the main
+// thread which is the first directory inside proc/|pid|/task.
+int GetFirstNumericDirectoryInPath(const char* path);
+
 // Reads the contents of |path| fully into |buf| up to |length| chars.
 // |buf| is guaranteed to be null terminated.
 ssize_t ReadFile(const char* path, char* buf, size_t length);

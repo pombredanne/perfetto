@@ -250,6 +250,11 @@ void PrintFtraceTrack(std::ostream* output,
   *output << "-------------------- " << kFtraceTrackName
           << "--------------------\n";
   char line[2048];
+  if (max == 0) {
+    sprintf(line, "%s", "There are 0 ftrace events in this trace.\n\n");
+    *output << std::string(line);
+    return;
+  }
   for (size_t i = 0; i < bucket_count; i++) {
     sprintf(
         line, "%s",

@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "perfetto/base/logging.h"
+
 namespace file_utils {
 bool IsNumeric(const char* str) {
   if (!str[0])
@@ -33,6 +35,21 @@ void ForEachPidInProcPath(const char* proc_path,
       continue;
     predicate(atoi(child_dir->d_name));
   }
+}
+
+int GetFirstNumericDirectoryInPath(const char* path) {
+  DIR* root_dir = opendir(path);
+  if (!root_dir)
+    return -1;
+  ScopedDir autoclose(root_dir);
+  struct dirent* child_dir;
+  // First two entries are always . and .. so it must be read 3 times.
+  child_dir = readdir(root_dir);
+  child_dir = readdir(root_dir);
+  child_dir = readdir(root_dir);
+  if (!IsNumeric(child_dir->d_name))
+    return -1;
+  return atoi(child_dir->d_name);
 }
 
 ssize_t ReadFile(const char* path, char* buf, size_t length) {

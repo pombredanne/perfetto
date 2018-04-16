@@ -41,36 +41,32 @@ base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
 }
 
 void ProcessStatsDataSource::WriteAllProcesses() {
-  auto trace_packet = writer_->NewTracePacket();
-  auto* process_tree = trace_packet->set_process_tree();
+  TraceWriter::TracePacketHandle trace_packet{};
   std::set<int32_t>* seen_pids = &seen_pids_;
 
-  file_utils::ForEachPidInProcPath("/proc",
-                                   [this, process_tree, seen_pids](int pid) {
-                                     // ForEachPid will list all processes and
-                                     // threads. Here we want to iterate first
-                                     // only by processes (for which pid ==
-                                     // thread group id)
-                                     if (procfs_utils::ReadTgid(pid) != pid)
-                                       return;
+  file_utils::ForEachPidInProcPath(
+      "/proc", [this, &trace_packet, seen_pids](int pid) {
+        // ForEachPid will list all processes and
+        // threads. Here we want to iterate first
+        // only by processes (for which pid ==
+        // thread group id)
+        char path[64];
+        sprintf(path, "/proc/%d/task", pid);
+        if (file_utils::GetFirstNumericDirectoryInPath(path) != pid)
+          return;
 
-                                     WriteProcess(pid, process_tree);
-                                     seen_pids->insert(pid);
-                                   });
+        WriteProcess(pid, &trace_packet);
+        seen_pids->insert(pid);
+      });
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   TraceWriter::TracePacketHandle trace_packet{};
-  protos::pbzero::ProcessTree* process_tree = nullptr;
   for (int32_t pid : pids) {
     auto it_and_inserted = seen_pids_.emplace(pid);
     if (!it_and_inserted.second)
       continue;
-    if (!process_tree) {
-      trace_packet = writer_->NewTracePacket();
-      process_tree = trace_packet->set_process_tree();
-    }
-    WriteProcess(pid, process_tree);
+    WriteProcess(pid, &trace_packet);
   }
 }
 
@@ -83,17 +79,46 @@ std::unique_ptr<ProcessInfo> ProcessStatsDataSource::ReadProcessInfo(int pid) {
   return procfs_utils::ReadProcessInfo(pid);
 }
 
-void ProcessStatsDataSource::WriteProcess(int32_t pid,
-                                          protos::pbzero::ProcessTree* tree) {
+void ProcessStatsDataSource::WriteProcess(
+    int32_t pid,
+    TraceWriter::TracePacketHandle* handle) {
+  // Check if this the main thread. We only want to read process info for
+  // the main thread. Child thread info will be containined in it.
+  char path[64];
+  sprintf(path, "/proc/%d/task", pid);
+  // A pid is the main thread if it is the first directory in /proc/*pid*/task
+  int main_thread = file_utils::GetFirstNumericDirectoryInPath(path);
+  if (main_thread == -1) {  // pid no longer exists.
+    seen_pids_.erase(pid);  // So if it is seen again, can try to grab info.
+    return;
+  }
+
+  if (pid != main_thread) {
+    // Current pid is not the main thread.
+    auto it_and_inserted = seen_pids_.emplace(main_thread);
+    if (it_and_inserted.second) {
+      WriteProcess(main_thread, handle);
+    }
+    return;
+  }
+
+  // At this point we definitely have the main thread pid.
   std::unique_ptr<ProcessInfo> process = ReadProcessInfo(pid);
+
+  if (!*handle) {
+    *handle = writer_->NewTracePacket();
+    process_tree_ = (*handle)->set_process_tree();
+  }
+
   procfs_utils::ReadProcessThreads(process.get());
-  auto* process_writer = tree->add_processes();
+  auto* process_writer = process_tree_->add_processes();
   process_writer->set_pid(process->pid);
   process_writer->set_ppid(process->ppid);
   for (const auto& field : process->cmdline)
     process_writer->add_cmdline(field.c_str());
   for (auto& thread : process->threads) {
     auto* thread_writer = process_writer->add_threads();
+    seen_pids_.emplace(thread.second.tid);
     thread_writer->set_tid(thread.second.tid);
     thread_writer->set_name(thread.second.name);
   }

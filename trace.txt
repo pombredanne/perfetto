@@ -1,0 +1,19 @@
+Duration: 8631ms
+-------------------- ftrace --------------------
+▃▂▂▃▂▂▁▃▂▂▁▂▃▂▁▂▁▃▂▂▁▁▂▁▁▁▁▁▁▁▁▁▂▂▂▂▃▄▃▃▁▁▁▂▁▁▃▃▃▁▁▂▁▂▂▁▁▁▁▂▁▁▁▁▁▇▇▁▂▁▁  
+
+----------------Process Tree Stats----------------
+Unique thread ids in process tree: 4452
+Unique thread ids in ftrace events: 947
+Thread ids with process info: 927/947 -> 97 %
+
+
+--------------------Inode Stats-------------------
+Events with inodes: 13956
+Unique inodes from events: 1103
+Resolved inodes from static map: 0
+Resolved inodes from scan and cache: 0
+Total resolved inodes: 0
+Unresolved inodes: 1103
+Unexpected inodes from filesystem: 0
+
