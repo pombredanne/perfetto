@@ -200,7 +200,7 @@ void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist) {
   fout << "option optimize_for = LITE_RUNTIME;\n\n";
   for (const std::string& event : raw_whitelist) {
     std::string last_elem = GetLastPathElement(event);
-    if (event == "reserved")
+    if (event == "removed")
       continue;
 
     fout << R"(import "perfetto/trace/ftrace/)" << last_elem << R"(.proto";)"
@@ -224,8 +224,8 @@ void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist) {
   int i = 3;
   for (const std::string& event : raw_whitelist) {
     std::string last_elem = GetLastPathElement(event);
-    if (event == "reserved") {
-      fout << "    // reserved " << i << ";\n";
+    if (event == "removed") {
+      fout << "    // removed field with id " << i << ";\n";
       ++i;
       continue;
     }
