@@ -123,6 +123,7 @@ block/block_plug
 block/block_rq_abort
 block/block_rq_complete
 block/block_rq_insert
+reserved
 block/block_rq_remap
 block/block_rq_requeue
 block/block_sleeprq
@@ -215,6 +216,16 @@ ext4/ext4_truncate_exit
 ext4/ext4_unlink_enter
 ext4/ext4_unlink_exit
 ext4/ext4_write_begin
+reserved
+reserved
+reserved
+reserved
+reserved
+reserved
+reserved
+reserved
+reserved
+reserved
 ext4/ext4_write_end
 ext4/ext4_writepage
 ext4/ext4_writepages

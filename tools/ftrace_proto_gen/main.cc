@@ -62,6 +62,7 @@ int main(int argc, const char** argv) {
   }
 
   if (!new_events.empty()) {
+    perfetto::GenerateFtraceEventProto(whitelist);
     perfetto::PrintEventFormatterMain(new_events);
     perfetto::PrintEventFormatterUsingStatements(new_events);
     perfetto::PrintEventFormatterFunctions(new_events);
