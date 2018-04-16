@@ -19,7 +19,6 @@ import("../../gn/wasm.gni")
 wasm("analysis") {
   sources = ["test.cc"]
   generate_js = true
-  js_library = "../../ui/lib.js"  # TODO should become an input dep
   deps = [
     "../../protos/perfetto/trace:lite($wasm_toolchain)"
   ]

@@ -58,6 +58,7 @@
     <textarea id="output" rows="20"></textarea>
 
     <script type='text/javascript'>
+      var initialized = false;
       var statusEl = document.getElementById('status');
       var rangeEl = document.getElementById('range-picker');
       var outputEl = document.getElementById('output');
@@ -117,11 +118,19 @@
         var data = evt.target.result;
         var srcMem = new Uint8Array(data);
         ioBuf.set(srcMem);
-        // Module.ccall('PerfettoOnTraceFetched', null, ['array','number'], [srcMem, srcMem.length]);
-        Module.ccall('PerfettoOnTraceFetched', null, ['number'], [srcMem.length]);
+        // Module.ccall('OnTraceFetched', null, ['array','number'], [srcMem, srcMem.length]);
+        Module.ccall('OnTraceFetched', null, ['number'], [srcMem.length]);
       };
 
       var openTrace = function(file) {
+        if (!initialized) {
+          Module.ccall('Initialize', null, ['number', 'number'], [
+            Module.addFunction(FetchTrace),
+            Module.addFunction(TraceStatusUpdate),
+          ]);
+          initialized = true;
+        }
+
         ioBufSize = Module.ccall('GetIOBufSize', 'number', null, null);
         var ioBufAddr = Module.ccall('GetIOBuf', 'number', null, null);
         ioBuf = new Uint8Array(Module.HEAPU8.buffer, ioBufAddr, ioBufSize);
@@ -130,7 +139,7 @@
         readerContext.file = file;
         readerContext.reader = new FileReader();
         readerContext.reader.addEventListener('load', onFileRead);
-        Module.ccall('PerfettoLoadTrace', null, null, null);
+        Module.ccall('LoadTrace', null, null, null);
 
         // readerContext.reader.readAsArrayBuffer(file.slice(0, readerContext.CHUNK_SIZE));
       };

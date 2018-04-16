@@ -12,18 +12,23 @@
 using namespace perfetto;
 
 namespace {
-constexpr uint32_t kIOBufSize = 1 * 1024 * 1024;
+constexpr uint32_t kIOBufSize = 1024 * 1024;
+
+using FetchTraceFunction = uint32_t (*)(uint32_t /*offset*/, uint32_t /*len*/);
+using TraceStatusUpdateFunction = void (*)(uint32_t /*bytes_loaded*/,
+                                           bool /*complete*/,
+                                           float /*duration_ms*/);
+
+FetchTraceFunction g_fetch_trace;
+TraceStatusUpdateFunction g_trace_status_update;
 }  // namespace.
 
-// Imports (functions defined in JS)
-extern "C" uint32_t FetchTrace(uint32_t offset, uint32_t length);
-extern "C" void TraceStatusUpdate(uint32_t bytes_loaded,
-                                  bool complete,
-                                  float duration_ms);
 
 // Exports (functions exported to JS)
-extern "C" void EMSCRIPTEN_KEEPALIVE PerfettoLoadTrace();
-extern "C" void EMSCRIPTEN_KEEPALIVE PerfettoOnTraceFetched(uint32_t size);
+extern "C" void EMSCRIPTEN_KEEPALIVE Initialize(FetchTraceFunction,
+                                                TraceStatusUpdateFunction);
+extern "C" void EMSCRIPTEN_KEEPALIVE LoadTrace();
+extern "C" void EMSCRIPTEN_KEEPALIVE OnTraceFetched(uint32_t size);
 extern "C" uint32_t EMSCRIPTEN_KEEPALIVE LookupFtracePacket(float timestamp_ms);
 extern "C" void EMSCRIPTEN_KEEPALIVE PrintPacketsAt(float timestamp_ms);
 extern "C" char* EMSCRIPTEN_KEEPALIVE GetIOBuf();
@@ -73,7 +78,7 @@ void TraceStorage::MaybeScheduleNextFetch() {
     return;
   const auto& job = pending_fetches_.front();
   fetch_scheduled_ = true;
-  FetchTrace(static_cast<uint32_t>(job.offset), job.size);
+  g_fetch_trace(static_cast<uint32_t>(job.offset), job.size);
 }
 
 void TraceStorage::OnChunkFetched(const char* data, uint32_t size) {
@@ -235,7 +240,7 @@ void TraceLoader::OnChunkFetched(const char* data, uint32_t size) {
   // printf("Fetched %u @ %u\n", size, cur_offset_);
 
   bool complete = size == 0;
-  TraceStatusUpdate(cur_offset_, complete, ftrace_index_.duration());
+  g_trace_status_update(cur_offset_, complete, ftrace_index_.duration());
   if (complete)
     return;
 
@@ -259,11 +264,11 @@ void TraceLoader::OnChunkFetched(const char* data, uint32_t size) {
 // Functions exported to JS
 // -----------------------------------------------------------------------------
 
-extern "C" void PerfettoLoadTrace() {
+extern "C" void LoadTrace() {
   TraceLoader::GetInstance()->IndexFullTrace();
 }
 
-extern "C" void PerfettoOnTraceFetched(uint32_t size) {
+extern "C" void OnTraceFetched(uint32_t size) {
   TraceStorage::GetInstance()->OnChunkFetched(GetIOBuf(), size);
 }
 
@@ -310,37 +315,14 @@ extern "C" uint32_t GetIOBufSize() {
   return kIOBufSize;
 }
 
+extern "C" void Initialize(FetchTraceFunction fetch_trace,
+                           TraceStatusUpdateFunction trace_status_update) {
+  g_fetch_trace = fetch_trace;
+  g_trace_status_update = trace_status_update;
+  printf("Perfetto C++ library initialized\n");
+}
+
 int main() {
   printf("WASM runtime ready\n");
   return 0;
 }
-
-// extern "C" void PerfettoProcessTrace(const char* mem, int size) {
-//   printf("Parsing trace in C++ (mem: %p, size: %d)\n",
-//          reinterpret_cast<const void*>(mem), size);
-//
-//   char* alloced = static_cast<char*>(malloc(1024));
-//   strcpy(alloced, "uninitialized");
-//
-//   protos::Trace trace;
-//   bool parsed = trace.ParseFromArray(mem, size);
-//   printf("Parsed: %d, packets: %d\n", parsed, trace.packet_size());
-//
-//   std::map<std::string, int> instances;
-//   for (int i = 0; i < trace.packet_size(); i++) {
-//     const protos::TracePacket& packet = trace.packet(i);
-//     if (!packet.has_ftrace_events())
-//       continue;
-//     const protos::FtraceEventBundle& bundle = packet.ftrace_events();
-//     for (const protos::FtraceEvent& event : bundle.event()) {
-//       if (!event.has_sched_switch())
-//         continue;
-//       const auto& ss = event.sched_switch();
-//       instances[ss.prev_comm()]++;
-//       instances[ss.next_comm()]++;
-//     }
-//   }
-//   for (const auto& kv : instances)
-//     printf("  %-18s: %d instances\n", kv.first.c_str(), kv.second);
-//   printf("\nPROCESSING DONE\n");
-// }
