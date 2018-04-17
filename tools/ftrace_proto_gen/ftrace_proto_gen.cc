@@ -74,9 +74,8 @@ std::vector<std::string> GetFileLines(const std::string& filename) {
     return lines;
   }
   while (std::getline(fin, line)) {
-    if (!StartsWith(line, "#") && line != "removed") {
+    if (!StartsWith(line, "#"))
       lines.emplace_back(line);
-    }
   }
   return lines;
 }
