@@ -206,7 +206,7 @@ static void BenchmarkConsumer(benchmark::State& state) {
                          read_time_taken_ns);
 }
 
-void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
+void SaturateCpuProducerArgs(benchmark::internal::Benchmark* b) {
   int min_message_count = 16;
   int max_message_count = IsBenchmarkFunctionalOnly() ? 1024 : 1024 * 1024;
   int min_payload = 8;
@@ -218,7 +218,7 @@ void SaturateCpuArgs(benchmark::internal::Benchmark* b) {
   }
 }
 
-void ConstantRateArgs(benchmark::internal::Benchmark* b) {
+void ConstantRateProducerArgs(benchmark::internal::Benchmark* b) {
   int message_count = IsBenchmarkFunctionalOnly() ? 2 * 1024 : 128 * 1024;
   int min_speed = IsBenchmarkFunctionalOnly() ? 64 : 8;
   int max_speed = IsBenchmarkFunctionalOnly() ? 128 : 128;
@@ -227,6 +227,24 @@ void ConstantRateArgs(benchmark::internal::Benchmark* b) {
     b->Args({message_count, 256, speed});
   }
 }
+
+void SaturateCpuConsumerArgs(benchmark::internal::Benchmark* b) {
+  int min_payload = 8;
+  int max_payload = IsBenchmarkFunctionalOnly() ? 32 : 64 * 1024;
+  for (int bytes = min_payload; bytes <= max_payload; bytes *= 2) {
+    b->Args({bytes, 0 /* speed */});
+  }
+}
+
+void ConstantRateConsumerArgs(benchmark::internal::Benchmark* b) {
+  int min_speed = 8;
+  int max_speed = 16;
+  for (int speed = min_speed; speed <= max_speed; speed *= 2) {
+    b->Args({2, speed});
+    b->Args({4, speed});
+  }
+}
+
 }  // namespace
 
 static void BM_EndToEnd_Producer_SaturateCpu(benchmark::State& state) {
@@ -236,7 +254,7 @@ static void BM_EndToEnd_Producer_SaturateCpu(benchmark::State& state) {
 BENCHMARK(BM_EndToEnd_Producer_SaturateCpu)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
-    ->Apply(SaturateCpuArgs);
+    ->Apply(SaturateCpuProducerArgs);
 
 static void BM_EndToEnd_Producer_ConstantRate(benchmark::State& state) {
   BenchmarkProducer(state);
@@ -245,7 +263,7 @@ static void BM_EndToEnd_Producer_ConstantRate(benchmark::State& state) {
 BENCHMARK(BM_EndToEnd_Producer_ConstantRate)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
-    ->Apply(ConstantRateArgs);
+    ->Apply(ConstantRateProducerArgs);
 
 static void BM_EndToEnd_Consumer_Saturate(benchmark::State& state) {
   BenchmarkConsumer(state);
@@ -254,8 +272,7 @@ static void BM_EndToEnd_Consumer_Saturate(benchmark::State& state) {
 BENCHMARK(BM_EndToEnd_Consumer_Saturate)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
-    ->RangeMultiplier(2)
-    ->Ranges({{8, 64 * 1024}, {0, 0}});
+    ->Apply(SaturateCpuConsumerArgs);
 
 static void BM_EndToEnd_Consumer_ConstantRate(benchmark::State& state) {
   BenchmarkConsumer(state);
@@ -264,7 +281,6 @@ static void BM_EndToEnd_Consumer_ConstantRate(benchmark::State& state) {
 BENCHMARK(BM_EndToEnd_Consumer_ConstantRate)
     ->Unit(benchmark::kMillisecond)
     ->UseRealTime()
-    ->RangeMultiplier(2)
-    ->Ranges({{2, 8 * 1024}, {8, 16}});
+    ->Apply(ConstantRateConsumerArgs);
 
 }  // namespace perfetto
