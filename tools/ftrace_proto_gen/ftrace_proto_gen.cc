@@ -74,7 +74,7 @@ std::vector<std::string> GetFileLines(const std::string& filename) {
     return lines;
   }
   while (std::getline(fin, line)) {
-    if (!StartsWith(line, "#") && line != "deleted") {
+    if (!StartsWith(line, "#") && line != "removed") {
       lines.emplace_back(line);
     }
   }
@@ -242,7 +242,7 @@ std::set<std::string> GetWhitelistedEvents(
     const std::vector<std::string>& raw_whitelist) {
   std::set<std::string> whitelist;
   for (const std::string& line : raw_whitelist) {
-    if (!StartsWith(line, "#") && line != "deleted") {
+    if (!StartsWith(line, "#") && line != "removed") {
       whitelist.insert(line);
     }
   }
