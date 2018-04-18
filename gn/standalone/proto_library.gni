@@ -38,6 +38,11 @@ template("proto_library") {
     generate_cc = invoker.generate_cc
   }
 
+  generate_descriptor = false
+  if (defined(invoker.generate_descriptor)) {
+    generate_descriptor = invoker.generate_descriptor
+  }
+
   if (defined(invoker.generator_plugin_label)) {
     plugin_host_label = invoker.generator_plugin_label + "($host_toolchain)"
     plugin_path = get_label_info(plugin_host_label, "root_out_dir") + "/" +
@@ -113,6 +118,12 @@ template("proto_library") {
       args += [
         "--cpp_out",
         rel_cc_out_dir,
+      ]
+    }
+    if (generate_descriptor) {
+      args += [
+        "--descriptor_set_out",
+        rel_cc_out_dir + "/${target_name}_descriptor.pb",
       ]
     }
 
