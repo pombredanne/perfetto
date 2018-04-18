@@ -12,5 +12,4 @@ message BlockRqCompleteFtraceEvent {
   optional uint32 nr_sector = 3;
   optional int32 errors = 4;
   optional string rwbs = 5;
-  optional string cmd = 6;
 }

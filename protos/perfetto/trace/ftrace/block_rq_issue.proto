@@ -13,5 +13,4 @@ message BlockRqIssueFtraceEvent {
   optional uint32 bytes = 4;
   optional string rwbs = 5;
   optional string comm = 6;
-  optional string cmd = 7;
 }

@@ -147,7 +147,7 @@ message FtraceEvent {
     CgroupMkdirFtraceEvent cgroup_mkdir = 68;
     CgroupRemountFtraceEvent cgroup_remount = 69;
     CgroupRmdirFtraceEvent cgroup_rmdir = 70;
-    CgroupTransferTasksFtraceEvent cgroup_transfer_tasks = 71;
+    // removed field with id 71
     CgroupDestroyRootFtraceEvent cgroup_destroy_root = 72;
     CgroupReleaseFtraceEvent cgroup_release = 73;
     CgroupRenameFtraceEvent cgroup_rename = 74;
@@ -382,7 +382,6 @@ message ProcessTree {
 // Begin of protos/perfetto/trace/ftrace/binder_locked.proto
 
 message BinderLockedFtraceEvent {
-  optional string tag = 1;
 }
 
 // End of protos/perfetto/trace/ftrace/binder_locked.proto
@@ -390,7 +389,6 @@ message BinderLockedFtraceEvent {
 // Begin of protos/perfetto/trace/ftrace/binder_lock.proto
 
 message BinderLockFtraceEvent {
-  optional string tag = 1;
 }
 
 // End of protos/perfetto/trace/ftrace/binder_lock.proto
@@ -420,7 +418,6 @@ message BinderTransactionReceivedFtraceEvent {
 // Begin of protos/perfetto/trace/ftrace/binder_unlock.proto
 
 message BinderUnlockFtraceEvent {
-  optional string tag = 1;
 }
 
 // End of protos/perfetto/trace/ftrace/binder_unlock.proto
@@ -433,7 +430,6 @@ message BlockRqCompleteFtraceEvent {
   optional uint32 nr_sector = 3;
   optional int32 errors = 4;
   optional string rwbs = 5;
-  optional string cmd = 6;
 }
 
 // End of protos/perfetto/trace/ftrace/block_rq_complete.proto
@@ -447,7 +443,6 @@ message BlockRqIssueFtraceEvent {
   optional uint32 bytes = 4;
   optional string rwbs = 5;
   optional string comm = 6;
-  optional string cmd = 7;
 }
 
 // End of protos/perfetto/trace/ftrace/block_rq_issue.proto
@@ -458,7 +453,6 @@ message CgroupAttachTaskFtraceEvent {
   optional int32 dst_root = 1;
   optional int32 dst_id = 2;
   optional int32 pid = 3;
-  optional string comm = 4;
   optional string cname = 5;
 }
 
@@ -469,7 +463,6 @@ message CgroupAttachTaskFtraceEvent {
 message CgroupDestroyRootFtraceEvent {
   optional int32 root = 1;
   optional uint32 ss_mask = 2;
-  optional string name = 3;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_destroy_root.proto
@@ -499,7 +492,6 @@ message CgroupReleaseFtraceEvent {
 message CgroupRemountFtraceEvent {
   optional int32 root = 1;
   optional uint32 ss_mask = 2;
-  optional string name = 3;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_remount.proto
@@ -529,27 +521,13 @@ message CgroupRmdirFtraceEvent {
 message CgroupSetupRootFtraceEvent {
   optional int32 root = 1;
   optional uint32 ss_mask = 2;
-  optional string name = 3;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_setup_root.proto
 
-// Begin of protos/perfetto/trace/ftrace/cgroup_transfer_tasks.proto
-
-message CgroupTransferTasksFtraceEvent {
-  optional int32 dst_root = 1;
-  optional int32 dst_id = 2;
-  optional int32 pid = 3;
-  optional string comm = 4;
-  optional string cname = 5;
-}
-
-// End of protos/perfetto/trace/ftrace/cgroup_transfer_tasks.proto
-
 // Begin of protos/perfetto/trace/ftrace/clock_set_rate.proto
 
 message ClockSetRateFtraceEvent {
-  optional string name = 1;
   optional uint64 state = 2;
   optional uint64 cpu_id = 3;
 }
@@ -571,7 +549,6 @@ message CpufreqInteractiveAlreadyFtraceEvent {
 // Begin of protos/perfetto/trace/ftrace/cpufreq_interactive_boost.proto
 
 message CpufreqInteractiveBoostFtraceEvent {
-  optional string s = 1;
 }
 
 // End of protos/perfetto/trace/ftrace/cpufreq_interactive_boost.proto
@@ -613,7 +590,6 @@ message CpufreqInteractiveTargetFtraceEvent {
 // Begin of protos/perfetto/trace/ftrace/cpufreq_interactive_unboost.proto
 
 message CpufreqInteractiveUnboostFtraceEvent {
-  optional string s = 1;
 }
 
 // End of protos/perfetto/trace/ftrace/cpufreq_interactive_unboost.proto

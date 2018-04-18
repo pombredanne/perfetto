@@ -10,6 +10,5 @@ message CgroupAttachTaskFtraceEvent {
   optional int32 dst_root = 1;
   optional int32 dst_id = 2;
   optional int32 pid = 3;
-  optional string comm = 4;
   optional string cname = 5;
 }

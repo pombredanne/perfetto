@@ -9,5 +9,4 @@ package perfetto.protos;
 message CgroupSetupRootFtraceEvent {
   optional int32 root = 1;
   optional uint32 ss_mask = 2;
-  optional string name = 3;
 }

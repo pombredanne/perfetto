@@ -58,7 +58,6 @@ TRACE_PROTOS = (
   'protos/perfetto/trace/ftrace/cgroup_rename.proto',
   'protos/perfetto/trace/ftrace/cgroup_rmdir.proto',
   'protos/perfetto/trace/ftrace/cgroup_setup_root.proto',
-  'protos/perfetto/trace/ftrace/cgroup_transfer_tasks.proto',
   'protos/perfetto/trace/ftrace/clock_set_rate.proto',
   'protos/perfetto/trace/ftrace/cpufreq_interactive_already.proto',
   'protos/perfetto/trace/ftrace/cpufreq_interactive_boost.proto',

@@ -7,5 +7,4 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message BinderLockFtraceEvent {
-  optional string tag = 1;
 }
