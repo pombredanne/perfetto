@@ -230,15 +230,15 @@ void ConstantRateProducerArgs(benchmark::internal::Benchmark* b) {
 
 void SaturateCpuConsumerArgs(benchmark::internal::Benchmark* b) {
   int min_payload = 8;
-  int max_payload = IsBenchmarkFunctionalOnly() ? 32 : 64 * 1024;
+  int max_payload = IsBenchmarkFunctionalOnly() ? 16 : 64 * 1024;
   for (int bytes = min_payload; bytes <= max_payload; bytes *= 2) {
     b->Args({bytes, 0 /* speed */});
   }
 }
 
 void ConstantRateConsumerArgs(benchmark::internal::Benchmark* b) {
-  int min_speed = 8;
-  int max_speed = 16;
+  int min_speed = IsBenchmarkFunctionalOnly() ? 128 : 8;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 256 : 16;
   for (int speed = min_speed; speed <= max_speed; speed *= 2) {
     b->Args({2, speed});
     b->Args({4, speed});
@@ -265,11 +265,11 @@ BENCHMARK(BM_EndToEnd_Producer_ConstantRate)
     ->UseRealTime()
     ->Apply(ConstantRateProducerArgs);
 
-static void BM_EndToEnd_Consumer_Saturate(benchmark::State& state) {
+static void BM_EndToEnd_Consumer_SaturateCpu(benchmark::State& state) {
   BenchmarkConsumer(state);
 }
 
-BENCHMARK(BM_EndToEnd_Consumer_Saturate)
+BENCHMARK(BM_EndToEnd_Consumer_SaturateCpu)
     ->Unit(benchmark::kMicrosecond)
     ->UseRealTime()
     ->Apply(SaturateCpuConsumerArgs);
