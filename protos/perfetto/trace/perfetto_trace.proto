@@ -572,6 +572,7 @@ message CgroupSetupRootFtraceEvent {
 // Begin of protos/perfetto/trace/ftrace/clock_set_rate.proto
 
 message ClockSetRateFtraceEvent {
+  optional string name = 1;
   optional uint64 state = 2;
   optional uint64 cpu_id = 3;
 }
