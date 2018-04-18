@@ -122,7 +122,7 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
   TraceConfig trace_config;
 
-  static constexpr uint32_t kBufferSizeBytes = 16 * 1024 * 1024;
+  static constexpr uint32_t kBufferSizeBytes = 2 * 1024 * 1024;
   trace_config.add_buffers()->set_size_kb(kBufferSizeBytes / 1024);
 
   static constexpr uint32_t kRandomSeed = 42;
@@ -237,8 +237,8 @@ void SaturateCpuConsumerArgs(benchmark::internal::Benchmark* b) {
 }
 
 void ConstantRateConsumerArgs(benchmark::internal::Benchmark* b) {
-  int min_speed = IsBenchmarkFunctionalOnly() ? 128 : 8;
-  int max_speed = IsBenchmarkFunctionalOnly() ? 256 : 16;
+  int min_speed = IsBenchmarkFunctionalOnly() ? 128 : 1;
+  int max_speed = IsBenchmarkFunctionalOnly() ? 256 : 2;
   for (int speed = min_speed; speed <= max_speed; speed *= 2) {
     b->Args({2, speed});
     b->Args({4, speed});
