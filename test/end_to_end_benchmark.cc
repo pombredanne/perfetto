@@ -122,7 +122,8 @@ static void BenchmarkConsumer(benchmark::State& state) {
 
   TraceConfig trace_config;
 
-  static constexpr uint32_t kBufferSizeBytes = 2 * 1024 * 1024;
+  static constexpr uint32_t kBufferSizeBytes =
+      IsBenchmarkFunctionalOnly() ? 512 * 1024 : 2 * 1024 * 1024;
   trace_config.add_buffers()->set_size_kb(kBufferSizeBytes / 1024);
 
   static constexpr uint32_t kRandomSeed = 42;
