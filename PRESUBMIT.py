@@ -93,3 +93,30 @@ def CheckMergedTraceConfigProto(input_api, output_api):
                 'date. Please run ' + tool + ' to update it.')
         ]
     return []
+
+def CheckWhitelist(input_api, output_api):
+  file_filter = lambda x: input_api.FilterSourceFile(
+          x,
+          white_list=('tools/ftrace_proto_gen/event_whitelist$', tool))
+  if not input_api.AffectedSourceFiles(file_filter):
+    return []
+
+  old_whitelist_data = subprocess.check_call(
+      'git', 'show',
+      '@{upstream}:tools/ftrace_proto_gen/event_whitelist')
+  old_whitelist_lines = [x for x in old_whitelist_data.split('\n')
+                         if x != '#']
+  with open("tools/ftrace_proto_gen/event_whitelist") as new_whitelist_fd:
+    i = 0
+    for line in new_whitelist_fd:
+      line = line.strip('\n')
+      if line == '#':
+        continue
+      if line != "removed" and old_whitelist_lines[i] != line:
+        return [
+          output_api.PresubmitError(
+              'event_whitelist only has two supported changes: '
+              'adding a new line, and replacing a line with removed')
+        ]
+      i += 1
+  return []
