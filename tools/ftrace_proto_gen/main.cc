@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
     const google::protobuf::Descriptor* d =
         descriptor_pool.FindMessageTypeByName("perfetto.protos." + proto_name);
     if (d)
-      proto = perfetto::Proto(event, *d);
+      proto = perfetto::Proto(name, *d);
     else
       PERFETTO_LOG("Did not find %s", proto_name.c_str());
     for (int i = optind; i < argc; ++i) {
