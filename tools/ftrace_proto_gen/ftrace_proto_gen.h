@@ -27,6 +27,20 @@
 
 namespace perfetto {
 
+class FtraceEventName {
+ public:
+  explicit FtraceEventName(const std::string& full_name);
+
+  bool valid() const;
+  const std::string& name() const;
+  const std::string& group() const;
+
+ private:
+  bool valid_;
+  std::string name_;
+  std::string group_;
+};
+
 struct ProtoType {
   enum Type { INVALID, NUMERIC, STRING };
   Type type;
@@ -73,10 +87,9 @@ void PrintInodeHandlerMain(const std::string& event_name,
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out);
 ProtoType InferProtoType(const FtraceEvent::Field& field);
 
-std::vector<std::string> GetFileLines(const std::string& filename);
-std::set<std::string> GetWhitelistedEvents(
-    const std::vector<std::string>& raw_whitelist);
-void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist);
+std::vector<FtraceEventName> ReadWhitelist(const std::string& filename);
+void GenerateFtraceEventProto(
+    const std::vector<FtraceEventName>& raw_whitelist);
 std::string SingleEventInfo(perfetto::Proto proto,
                             const std::string& group,
                             const uint32_t proto_field_id);

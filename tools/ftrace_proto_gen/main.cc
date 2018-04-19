@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+// Run like this:
+// out/linux_clang_debug/ftrace_proto_gen \
+//   --whitelist_path ./tools/ftrace_proto_gen/event_whitelist \
+//   --output_dir protos/perfetto/trace/ftrace/ \
+//   --proto_descriptor
+//   out/linux_clang_release/gen/protos/trace/ftrace.descriptor \
+//   --update_build_files \
+//   src/ftrace_reader/test/data/*/events/
+
 #include <getopt.h>
 #include <sys/stat.h>
 #include <fstream>
@@ -75,7 +84,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  std::vector<std::string> whitelist = perfetto::GetFileLines(whitelist_path);
+  std::vector<perfetto::FtraceEventName> whitelist =
+      perfetto::ReadWhitelist(whitelist_path);
   std::vector<std::string> events_info;
 
   google::protobuf::DescriptorPool descriptor_pool;
@@ -106,14 +116,13 @@ int main(int argc, char** argv) {
 
   std::set<std::string> new_events;
   for (const auto& event : whitelist) {
-    if (event == "removed")
+    if (!event.valid())
       continue;
-    std::string file_name =
-        event.substr(event.find('/') + 1, std::string::npos);
     struct stat buf;
-    if (stat(("protos/perfetto/trace/ftrace/" + file_name + ".proto").c_str(),
-             &buf) == -1) {
-      new_events.insert(file_name);
+    if (stat(
+            ("protos/perfetto/trace/ftrace/" + event.name() + ".proto").c_str(),
+            &buf) == -1) {
+      new_events.insert(event.name());
     }
   }
 
@@ -129,27 +138,26 @@ int main(int argc, char** argv) {
   uint32_t proto_field_id = 2;
   for (auto event : whitelist) {
     ++proto_field_id;
-    if (event == "removed") {
+    if (!event.valid())
       continue;
-    }
-    std::string name = event.substr(event.find('/') + 1, std::string::npos);
-    std::string proto_file_name = name + ".proto";
+    std::string proto_file_name = event.name() + ".proto";
     std::string output_path = output_dir + std::string("/") + proto_file_name;
-    std::string group = event.substr(0, event.find('/'));
 
-    std::string proto_name = perfetto::ToCamelCase(name) + "FtraceEvent";
+    std::string proto_name =
+        perfetto::ToCamelCase(event.name()) + "FtraceEvent";
     perfetto::Proto proto;
     proto.name = proto_name;
-    proto.event_name = name;
+    proto.event_name = event.name();
     const google::protobuf::Descriptor* d =
         descriptor_pool.FindMessageTypeByName("perfetto.protos." + proto_name);
     if (d)
-      proto = perfetto::Proto(name, *d);
+      proto = perfetto::Proto(event.name(), *d);
     else
       PERFETTO_LOG("Did not find %s", proto_name.c_str());
     for (int i = optind; i < argc; ++i) {
       std::string input_dir = argv[i];
-      std::string input_path = input_dir + event + std::string("/format");
+      std::string input_path = input_dir + event.group() + "/" + event.name() +
+                               std::string("/format");
 
       std::string contents;
       if (!perfetto::base::ReadFile(input_path, &contents)) {
@@ -176,7 +184,7 @@ int main(int argc, char** argv) {
       PrintInodeHandlerMain(proto.name, proto);
 
     events_info.push_back(
-        perfetto::SingleEventInfo(proto, group, proto_field_id));
+        perfetto::SingleEventInfo(proto, event.group(), proto_field_id));
 
     std::ofstream fout(output_path.c_str(), std::ios::out);
     if (!fout) {
@@ -211,10 +219,10 @@ int main(int argc, char** argv) {
 
 ftrace_proto_names = [
 )";
-    for (const std::string& event : whitelist) {
-      if (event == "removed")
+    for (const perfetto::FtraceEventName& event : whitelist) {
+      if (!event.valid())
         continue;
-      f << "  \"" << event << ".proto\",\n";
+      f << "  \"" << event.name() << ".proto\",\n";
     }
     f << "]\n";
   }
