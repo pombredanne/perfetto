@@ -38,7 +38,7 @@ template("proto_library") {
     generate_cc = invoker.generate_cc
   }
 
-  generate_descriptor = false
+  generate_descriptor = ""
   if (defined(invoker.generate_descriptor)) {
     generate_descriptor = invoker.generate_descriptor
   }
@@ -71,6 +71,10 @@ template("proto_library") {
 
   protos = rebase_path(proto_sources, proto_in_dir)
   protogens = []
+
+  if (generate_descriptor != "") {
+    protogens += [ "$root_gen_dir/" + generate_descriptor ]
+  }
 
   foreach(proto, protos) {
     proto_dir = get_path_info(proto, "dir")
@@ -120,10 +124,10 @@ template("proto_library") {
         rel_cc_out_dir,
       ]
     }
-    if (generate_descriptor) {
+    if (generate_descriptor != "") {
       args += [
         "--descriptor_set_out",
-        rel_cc_out_dir + "/${target_name}_descriptor.pb",
+        rebase_path("$root_gen_dir/" + generate_descriptor, root_build_dir),
       ]
     }
 
