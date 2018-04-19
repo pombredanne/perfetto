@@ -30,6 +30,7 @@ def CheckChange(input, output):
     results += CheckIncludeGuards(input, output)
     results += CheckAndroidBlueprint(input, output)
     results += CheckMergedTraceConfigProto(input, output)
+    results += CheckWhitelist(input, output)
     return results
 
 
@@ -97,13 +98,13 @@ def CheckMergedTraceConfigProto(input_api, output_api):
 def CheckWhitelist(input_api, output_api):
   file_filter = lambda x: input_api.FilterSourceFile(
           x,
-          white_list=('tools/ftrace_proto_gen/event_whitelist$', tool))
+          white_list=('tools/ftrace_proto_gen/event_whitelist$'))
   if not input_api.AffectedSourceFiles(file_filter):
     return []
 
-  old_whitelist_data = subprocess.check_call(
-      'git', 'show',
-      '@{upstream}:tools/ftrace_proto_gen/event_whitelist')
+  old_whitelist_data = subprocess.check_output(
+      ['git', 'show',
+       '@{upstream}:tools/ftrace_proto_gen/event_whitelist'])
   old_whitelist_lines = [x for x in old_whitelist_data.split('\n')
                          if x != '#']
   with open("tools/ftrace_proto_gen/event_whitelist") as new_whitelist_fd:
