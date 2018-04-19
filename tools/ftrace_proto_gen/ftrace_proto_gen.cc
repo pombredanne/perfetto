@@ -91,6 +91,7 @@ std::string ProtoType::ToString() const {
       return s;
     }
   }
+  PERFETTO_CHECK(false);  // for GCC.
 }
 
 // static

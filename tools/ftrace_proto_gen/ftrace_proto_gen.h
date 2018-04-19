@@ -17,7 +17,6 @@
 #ifndef TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 #define TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 
-#include <map>
 #include <set>
 #include <string>
 #include <vector>
