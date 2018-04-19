@@ -17,7 +17,6 @@
 #ifndef TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 #define TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 
-#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -47,13 +46,9 @@ struct Proto {
     uint32_t number;
   };
   std::string name;
-  std::map<std::string, Field> fields;
+  std::vector<Field> fields;
 
   std::string ToString();
-  void MergeFrom(const Proto& other);
-  void AddField(Proto::Field field);
-
-  uint32_t max_id = 0;
 };
 
 ProtoType GetCommon(ProtoType one, ProtoType other);

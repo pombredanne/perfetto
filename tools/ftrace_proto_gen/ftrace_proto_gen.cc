@@ -19,7 +19,6 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
 
-#include <algorithm>
 #include <fstream>
 #include <regex>
 
@@ -111,9 +110,7 @@ ProtoType ProtoType::Numeric(uint16_t size, bool is_signed) {
 }
 
 ProtoType GetCommon(ProtoType one, ProtoType other) {
-  // If RHS is STRING but LHS isn't, we need to be it as a NUMERIC because
-  // we can't safely convert a NUMERIC into a string.
-  if (one.type == ProtoType::STRING)
+  if (one.type == ProtoType::STRING || other.type == ProtoType::STRING)
     return ProtoType::String();
 
   if (one.is_signed || other.is_signed) {
@@ -195,8 +192,7 @@ void PrintEventFormatterMain(const std::set<std::string>& events) {
 // Add output to ParseInode in ftrace_inode_handler
 void PrintInodeHandlerMain(const std::string& event_name,
                            const perfetto::Proto& proto) {
-  for (const auto& p : proto.fields) {
-    const Proto::Field& field = p.second;
+  for (const auto& field : proto.fields) {
     if (Contains(field.name, "ino") && !Contains(field.name, "minor"))
       printf(
           "else if (event.has_%s() && event.%s().%s()) {\n*inode = "
@@ -228,6 +224,7 @@ void PrintEventFormatterFunctions(const std::set<std::string>& events) {
 
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
   proto_out->name = ToCamelCase(format.name) + "FtraceEvent";
+  proto_out->fields.reserve(format.fields.size());
   std::set<std::string> seen;
   // TODO(hjd): We should be cleverer about id assignment.
   uint32_t i = 1;
@@ -241,8 +238,8 @@ bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
     // Check we managed to infer a type.
     if (type.type == ProtoType::INVALID)
       continue;
-    Proto::Field protofield{std::move(type), name, i};
-    proto_out->AddField(std::move(protofield));
+    proto_out->fields.emplace_back(
+        Proto::Field{std::move(type), std::move(name), i});
     i++;
   }
 
@@ -319,8 +316,7 @@ std::string SingleEventInfo(perfetto::FtraceEvent format,
   s += "    event->group = \"" + group + "\";\n";
   s += "    event->proto_field_id = " + proto_field_id + ";\n";
 
-  for (const auto& p : proto.fields) {
-    const Proto::Field& field = p.second;
+  for (const auto& field : proto.fields) {
     s += "    event->fields.push_back(MakeField(\"" + field.name + "\", " +
          std::to_string(field.number) + ", kProto" +
          ToCamelCase(field.type.ToString()) + "));\n";
@@ -382,33 +378,12 @@ package perfetto.protos;
 )";
 
   s += "message " + name + " {\n";
-  for (const auto& p : fields) {
-    const Proto::Field& field = p.second;
+  for (const Proto::Field& field : fields) {
     s += "  optional " + field.type.ToString() + " " + field.name + " = " +
          std::to_string(field.number) + ";\n";
   }
   s += "}\n";
   return s;
-}
-
-void Proto::MergeFrom(const Proto& other) {
-  // Always keep number from the left hand side.
-  PERFETTO_CHECK(name == other.name);
-  for (const auto& p : other.fields) {
-    auto it = fields.find(p.first);
-    if (it == fields.end()) {
-      Proto::Field field = p.second;
-      field.number = ++max_id;
-      AddField(std::move(field));
-    } else {
-      it->second.type = GetCommon(it->second.type, p.second.type);
-    }
-  }
-}
-
-void Proto::AddField(Proto::Field other) {
-  max_id = std::max(max_id, other.number);
-  fields.emplace(other.name, std::move(other));
 }
 
 }  // namespace perfetto
