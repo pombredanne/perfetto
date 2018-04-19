@@ -47,6 +47,7 @@ struct Proto {
     uint32_t number;
   };
   std::string name;
+  std::string event_name;
   std::map<std::string, Field> fields;
 
   std::string ToString();
@@ -71,8 +72,7 @@ std::vector<std::string> GetFileLines(const std::string& filename);
 std::set<std::string> GetWhitelistedEvents(
     const std::vector<std::string>& raw_whitelist);
 void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist);
-std::string SingleEventInfo(perfetto::FtraceEvent format,
-                            perfetto::Proto proto,
+std::string SingleEventInfo(perfetto::Proto proto,
                             const std::string& group,
                             const std::string& proto_field_id);
 void GenerateEventInfo(const std::vector<std::string>& events_info);

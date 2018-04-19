@@ -228,6 +228,7 @@ void PrintEventFormatterFunctions(const std::set<std::string>& events) {
 
 bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
   proto_out->name = ToCamelCase(format.name) + "FtraceEvent";
+  proto_out->event_name = format.name;
   std::set<std::string> seen;
   // TODO(hjd): We should be cleverer about id assignment.
   uint32_t i = 1;
@@ -310,12 +311,11 @@ std::set<std::string> GetWhitelistedEvents(
 }
 
 // Generates section of event_info.cc for a single event.
-std::string SingleEventInfo(perfetto::FtraceEvent format,
-                            perfetto::Proto proto,
+std::string SingleEventInfo(perfetto::Proto proto,
                             const std::string& group,
                             const std::string& proto_field_id) {
   std::string s = "";
-  s += "    event->name = \"" + format.name + "\";\n";
+  s += "    event->name = \"" + proto.event_name + "\";\n";
   s += "    event->group = \"" + group + "\";\n";
   s += "    event->proto_field_id = " + proto_field_id + ";\n";
 
