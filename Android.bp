@@ -3701,6 +3701,7 @@ cc_test {
   shared_libs: [
     "libandroid",
     "liblog",
+    "libprotobuf-cpp-full",
     "libprotobuf-cpp-lite",
   ],
   static_libs: [
