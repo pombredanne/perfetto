@@ -17,6 +17,7 @@
 #ifndef TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 #define TOOLS_FTRACE_PROTO_GEN_FTRACE_PROTO_GEN_H_
 
+#include <google/protobuf/descriptor.h>
 #include <map>
 #include <set>
 #include <string>
@@ -38,9 +39,12 @@ struct ProtoType {
   static ProtoType Invalid();
   static ProtoType String();
   static ProtoType Numeric(uint16_t size, bool is_signed);
+  static ProtoType FromDescriptor(google::protobuf::FieldDescriptor::Type type);
 };
 
 struct Proto {
+  Proto() = default;
+  Proto(std::string evt_name, const google::protobuf::Descriptor& desc);
   struct Field {
     ProtoType type;
     std::string name;
@@ -53,10 +57,11 @@ struct Proto {
   std::string ToString();
   void MergeFrom(const Proto& other);
   void AddField(Proto::Field field);
-
+  std::vector<const Field*> SortedFields();
   uint32_t max_id = 0;
 };
 
+std::string ToCamelCase(const std::string& s);
 ProtoType GetCommon(ProtoType one, ProtoType other);
 void PrintFtraceEventProtoAdditions(const std::set<std::string>& events);
 void PrintEventFormatterMain(const std::set<std::string>& events);
@@ -74,7 +79,7 @@ std::set<std::string> GetWhitelistedEvents(
 void GenerateFtraceEventProto(const std::vector<std::string>& raw_whitelist);
 std::string SingleEventInfo(perfetto::Proto proto,
                             const std::string& group,
-                            const std::string& proto_field_id);
+                            const uint32_t proto_field_id);
 void GenerateEventInfo(const std::vector<std::string>& events_info);
 
 }  // namespace perfetto

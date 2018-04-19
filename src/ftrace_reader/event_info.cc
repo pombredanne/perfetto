@@ -12,226 +12,489 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_lock";
-    event->group = "binder";
-    event->proto_field_id = 53;
-    event->fields.push_back(MakeField("tag", 1, kProtoString));
+    event->name = "ftrace/print";
+    event->group = "ftrace";
+    event->proto_field_id = 3;
+    event->fields.push_back(MakeField("ip", 1, kProtoUint64));
+    event->fields.push_back(MakeField("buf", 2, kProtoString));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_locked";
-    event->group = "binder";
-    event->proto_field_id = 54;
-    event->fields.push_back(MakeField("tag", 1, kProtoString));
+    event->name = "sched/sched_switch";
+    event->group = "sched";
+    event->proto_field_id = 4;
+    event->fields.push_back(MakeField("prev_comm", 1, kProtoString));
+    event->fields.push_back(MakeField("prev_pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prev_prio", 3, kProtoInt32));
+    event->fields.push_back(MakeField("prev_state", 4, kProtoInt64));
+    event->fields.push_back(MakeField("next_comm", 5, kProtoString));
+    event->fields.push_back(MakeField("next_pid", 6, kProtoInt32));
+    event->fields.push_back(MakeField("next_prio", 7, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_set_priority";
-    event->group = "binder";
-    event->proto_field_id = 52;
-    event->fields.push_back(MakeField("proc", 1, kProtoInt32));
-    event->fields.push_back(MakeField("thread", 2, kProtoInt32));
-    event->fields.push_back(MakeField("old_prio", 3, kProtoUint32));
-    event->fields.push_back(MakeField("new_prio", 4, kProtoUint32));
-    event->fields.push_back(MakeField("desired_prio", 5, kProtoUint32));
+    event->name = "cpufreq_interactive/cpufreq_interactive_already";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 5;
+    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
+    event->fields.push_back(MakeField("load", 2, kProtoUint64));
+    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
+    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
+    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_transaction";
-    event->group = "binder";
-    event->proto_field_id = 50;
-    event->fields.push_back(MakeField("debug_id", 1, kProtoInt32));
-    event->fields.push_back(MakeField("target_node", 2, kProtoInt32));
-    event->fields.push_back(MakeField("to_proc", 3, kProtoInt32));
-    event->fields.push_back(MakeField("to_thread", 4, kProtoInt32));
-    event->fields.push_back(MakeField("reply", 5, kProtoInt32));
-    event->fields.push_back(MakeField("code", 6, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 7, kProtoUint32));
+    event->name = "cpufreq_interactive/cpufreq_interactive_boost";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 6;
+    event->fields.push_back(MakeField("s", 1, kProtoString));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_transaction_received";
-    event->group = "binder";
-    event->proto_field_id = 51;
-    event->fields.push_back(MakeField("debug_id", 1, kProtoInt32));
+    event->name = "cpufreq_interactive/cpufreq_interactive_notyet";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 7;
+    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
+    event->fields.push_back(MakeField("load", 2, kProtoUint64));
+    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
+    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
+    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "binder_unlock";
-    event->group = "binder";
-    event->proto_field_id = 55;
-    event->fields.push_back(MakeField("tag", 1, kProtoString));
+    event->name = "cpufreq_interactive/cpufreq_interactive_setspeed";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 8;
+    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint32));
+    event->fields.push_back(MakeField("targfreq", 2, kProtoUint64));
+    event->fields.push_back(MakeField("actualfreq", 3, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_backmerge";
-    event->group = "block";
-    event->proto_field_id = 115;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
-    event->fields.push_back(MakeField("comm", 5, kProtoString));
+    event->name = "cpufreq_interactive/cpufreq_interactive_target";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 9;
+    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
+    event->fields.push_back(MakeField("load", 2, kProtoUint64));
+    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
+    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
+    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_bounce";
-    event->group = "block";
-    event->proto_field_id = 116;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
-    event->fields.push_back(MakeField("comm", 5, kProtoString));
+    event->name = "cpufreq_interactive/cpufreq_interactive_unboost";
+    event->group = "cpufreq_interactive";
+    event->proto_field_id = 10;
+    event->fields.push_back(MakeField("s", 1, kProtoString));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_complete";
-    event->group = "block";
-    event->proto_field_id = 117;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("error", 4, kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
+    event->name = "power/cpu_frequency";
+    event->group = "power";
+    event->proto_field_id = 11;
+    event->fields.push_back(MakeField("state", 1, kProtoUint32));
+    event->fields.push_back(MakeField("cpu_id", 2, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_frontmerge";
-    event->group = "block";
-    event->proto_field_id = 118;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
-    event->fields.push_back(MakeField("comm", 5, kProtoString));
+    event->name = "power/cpu_frequency_limits";
+    event->group = "power";
+    event->proto_field_id = 12;
+    event->fields.push_back(MakeField("min_freq", 1, kProtoUint32));
+    event->fields.push_back(MakeField("max_freq", 2, kProtoUint32));
+    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_queue";
-    event->group = "block";
-    event->proto_field_id = 119;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
-    event->fields.push_back(MakeField("comm", 5, kProtoString));
+    event->name = "power/cpu_idle";
+    event->group = "power";
+    event->proto_field_id = 13;
+    event->fields.push_back(MakeField("state", 1, kProtoUint32));
+    event->fields.push_back(MakeField("cpu_id", 2, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_bio_remap";
-    event->group = "block";
-    event->proto_field_id = 120;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("old_dev", 4, kProtoUint64));
-    event->fields.push_back(MakeField("old_sector", 5, kProtoUint64));
-    event->fields.push_back(MakeField("rwbs", 6, kProtoString));
+    event->name = "power/clock_enable";
+    event->group = "power";
+    event->proto_field_id = 14;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("state", 2, kProtoUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_dirty_buffer";
-    event->group = "block";
-    event->proto_field_id = 121;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("size", 3, kProtoUint64));
+    event->name = "power/clock_disable";
+    event->group = "power";
+    event->proto_field_id = 15;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("state", 2, kProtoUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_getrq";
-    event->group = "block";
-    event->proto_field_id = 122;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
-    event->fields.push_back(MakeField("comm", 5, kProtoString));
+    event->name = "power/clock_set_rate";
+    event->group = "power";
+    event->proto_field_id = 16;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("state", 2, kProtoUint64));
+    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_plug";
-    event->group = "block";
-    event->proto_field_id = 123;
+    event->name = "sched/sched_wakeup";
+    event->group = "sched";
+    event->proto_field_id = 17;
     event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
+    event->fields.push_back(MakeField("success", 4, kProtoInt32));
+    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_abort";
-    event->group = "block";
-    event->proto_field_id = 124;
+    event->name = "sched/sched_blocked_reason";
+    event->group = "sched";
+    event->proto_field_id = 18;
+    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("caller", 2, kProtoUint64));
+    event->fields.push_back(MakeField("io_wait", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sched/sched_cpu_hotplug";
+    event->group = "sched";
+    event->proto_field_id = 19;
+    event->fields.push_back(MakeField("affected_cpu", 1, kProtoInt32));
+    event->fields.push_back(MakeField("error", 2, kProtoInt32));
+    event->fields.push_back(MakeField("status", 3, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sched/sched_waking";
+    event->group = "sched";
+    event->proto_field_id = 20;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
+    event->fields.push_back(MakeField("success", 4, kProtoInt32));
+    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "ipi/ipi_entry";
+    event->group = "ipi";
+    event->proto_field_id = 21;
+    event->fields.push_back(MakeField("reason", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "ipi/ipi_exit";
+    event->group = "ipi";
+    event->proto_field_id = 22;
+    event->fields.push_back(MakeField("reason", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "ipi/ipi_raise";
+    event->group = "ipi";
+    event->proto_field_id = 23;
+    event->fields.push_back(MakeField("target_cpus", 1, kProtoUint32));
+    event->fields.push_back(MakeField("reason", 2, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "irq/softirq_entry";
+    event->group = "irq";
+    event->proto_field_id = 24;
+    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "irq/softirq_exit";
+    event->group = "irq";
+    event->proto_field_id = 25;
+    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "irq/softirq_raise";
+    event->group = "irq";
+    event->proto_field_id = 26;
+    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/i2c_read";
+    event->group = "i2c";
+    event->proto_field_id = 27;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
+    event->fields.push_back(MakeField("len", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/i2c_write";
+    event->group = "i2c";
+    event->proto_field_id = 28;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
+    event->fields.push_back(MakeField("len", 5, kProtoUint32));
+    event->fields.push_back(MakeField("buf", 6, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/i2c_result";
+    event->group = "i2c";
+    event->proto_field_id = 29;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("nr_msgs", 2, kProtoUint32));
+    event->fields.push_back(MakeField("ret", 3, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/i2c_reply";
+    event->group = "i2c";
+    event->proto_field_id = 30;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
+    event->fields.push_back(MakeField("len", 5, kProtoUint32));
+    event->fields.push_back(MakeField("buf", 6, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/smbus_read";
+    event->group = "i2c";
+    event->proto_field_id = 31;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("flags", 2, kProtoUint32));
+    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
+    event->fields.push_back(MakeField("command", 4, kProtoUint32));
+    event->fields.push_back(MakeField("protocol", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/smbus_write";
+    event->group = "i2c";
+    event->proto_field_id = 32;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
+    event->fields.push_back(MakeField("command", 4, kProtoUint32));
+    event->fields.push_back(MakeField("len", 5, kProtoUint32));
+    event->fields.push_back(MakeField("protocol", 6, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/smbus_result";
+    event->group = "i2c";
+    event->proto_field_id = 33;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
+    event->fields.push_back(MakeField("read_write", 4, kProtoUint32));
+    event->fields.push_back(MakeField("command", 5, kProtoUint32));
+    event->fields.push_back(MakeField("res", 6, kProtoInt32));
+    event->fields.push_back(MakeField("protocol", 7, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "i2c/smbus_reply";
+    event->group = "i2c";
+    event->proto_field_id = 34;
+    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
+    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
+    event->fields.push_back(MakeField("command", 4, kProtoUint32));
+    event->fields.push_back(MakeField("len", 5, kProtoUint32));
+    event->fields.push_back(MakeField("protocol", 6, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "lowmemorykiller/lowmemory_kill";
+    event->group = "lowmemorykiller";
+    event->proto_field_id = 35;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("pagecache_size", 3, kProtoInt64));
+    event->fields.push_back(MakeField("pagecache_limit", 4, kProtoInt64));
+    event->fields.push_back(MakeField("free", 5, kProtoInt64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "irq/irq_handler_entry";
+    event->group = "irq";
+    event->proto_field_id = 36;
+    event->fields.push_back(MakeField("irq", 1, kProtoInt32));
+    event->fields.push_back(MakeField("name", 2, kProtoString));
+    event->fields.push_back(MakeField("handler", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "irq/irq_handler_exit";
+    event->group = "irq";
+    event->proto_field_id = 37;
+    event->fields.push_back(MakeField("irq", 1, kProtoInt32));
+    event->fields.push_back(MakeField("ret", 2, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sync/sync_pt";
+    event->group = "sync";
+    event->proto_field_id = 38;
+    event->fields.push_back(MakeField("timeline", 1, kProtoString));
+    event->fields.push_back(MakeField("value", 2, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sync/sync_timeline";
+    event->group = "sync";
+    event->proto_field_id = 39;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("value", 2, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sync/sync_wait";
+    event->group = "sync";
+    event->proto_field_id = 40;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("status", 2, kProtoInt32));
+    event->fields.push_back(MakeField("begin", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "ext4/ext4_da_write_begin";
+    event->group = "ext4";
+    event->proto_field_id = 41;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("errors", 4, kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
-    event->fields.push_back(MakeField("cmd", 6, kProtoString));
+    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("pos", 3, kProtoInt64));
+    event->fields.push_back(MakeField("len", 4, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_complete";
-    event->group = "block";
-    event->proto_field_id = 125;
+    event->name = "ext4/ext4_da_write_end";
+    event->group = "ext4";
+    event->proto_field_id = 42;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("errors", 4, kProtoInt32));
-    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
-    event->fields.push_back(MakeField("cmd", 6, kProtoString));
+    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("pos", 3, kProtoInt64));
+    event->fields.push_back(MakeField("len", 4, kProtoUint32));
+    event->fields.push_back(MakeField("copied", 5, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_insert";
-    event->group = "block";
-    event->proto_field_id = 126;
+    event->name = "ext4/ext4_sync_file_enter";
+    event->group = "ext4";
+    event->proto_field_id = 43;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
-    event->fields.push_back(MakeField("bytes", 4, kProtoUint32));
-    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
-    event->fields.push_back(MakeField("comm", 6, kProtoString));
-    event->fields.push_back(MakeField("cmd", 7, kProtoString));
+    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("parent", 3, kProtoUint64));
+    event->fields.push_back(MakeField("datasync", 4, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_issue";
+    event->name = "ext4/ext4_sync_file_exit";
+    event->group = "ext4";
+    event->proto_field_id = 44;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("ret", 3, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_rq_issue";
     event->group = "block";
     event->proto_field_id = 45;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -246,7 +509,967 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_remap";
+    event->name = "vmscan/mm_vmscan_direct_reclaim_begin";
+    event->group = "vmscan";
+    event->proto_field_id = 46;
+    event->fields.push_back(MakeField("order", 1, kProtoInt32));
+    event->fields.push_back(MakeField("may_writepage", 2, kProtoInt32));
+    event->fields.push_back(MakeField("gfp_flags", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "vmscan/mm_vmscan_direct_reclaim_end";
+    event->group = "vmscan";
+    event->proto_field_id = 47;
+    event->fields.push_back(MakeField("nr_reclaimed", 1, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "vmscan/mm_vmscan_kswapd_wake";
+    event->group = "vmscan";
+    event->proto_field_id = 48;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("order", 2, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "vmscan/mm_vmscan_kswapd_sleep";
+    event->group = "vmscan";
+    event->proto_field_id = 49;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_transaction";
+    event->group = "binder";
+    event->proto_field_id = 50;
+    event->fields.push_back(MakeField("debug_id", 1, kProtoInt32));
+    event->fields.push_back(MakeField("target_node", 2, kProtoInt32));
+    event->fields.push_back(MakeField("to_proc", 3, kProtoInt32));
+    event->fields.push_back(MakeField("to_thread", 4, kProtoInt32));
+    event->fields.push_back(MakeField("reply", 5, kProtoInt32));
+    event->fields.push_back(MakeField("code", 6, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 7, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_transaction_received";
+    event->group = "binder";
+    event->proto_field_id = 51;
+    event->fields.push_back(MakeField("debug_id", 1, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_set_priority";
+    event->group = "binder";
+    event->proto_field_id = 52;
+    event->fields.push_back(MakeField("proc", 1, kProtoInt32));
+    event->fields.push_back(MakeField("thread", 2, kProtoInt32));
+    event->fields.push_back(MakeField("old_prio", 3, kProtoUint32));
+    event->fields.push_back(MakeField("new_prio", 4, kProtoUint32));
+    event->fields.push_back(MakeField("desired_prio", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_lock";
+    event->group = "binder";
+    event->proto_field_id = 53;
+    event->fields.push_back(MakeField("tag", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_locked";
+    event->group = "binder";
+    event->proto_field_id = 54;
+    event->fields.push_back(MakeField("tag", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "binder/binder_unlock";
+    event->group = "binder";
+    event->proto_field_id = 55;
+    event->fields.push_back(MakeField("tag", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "workqueue/workqueue_activate_work";
+    event->group = "workqueue";
+    event->proto_field_id = 56;
+    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "workqueue/workqueue_execute_end";
+    event->group = "workqueue";
+    event->proto_field_id = 57;
+    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "workqueue/workqueue_execute_start";
+    event->group = "workqueue";
+    event->proto_field_id = 58;
+    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+    event->fields.push_back(MakeField("function", 2, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "workqueue/workqueue_queue_work";
+    event->group = "workqueue";
+    event->proto_field_id = 59;
+    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+    event->fields.push_back(MakeField("function", 2, kProtoUint64));
+    event->fields.push_back(MakeField("workqueue", 3, kProtoUint64));
+    event->fields.push_back(MakeField("req_cpu", 4, kProtoUint32));
+    event->fields.push_back(MakeField("cpu", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_disable";
+    event->group = "regulator";
+    event->proto_field_id = 60;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_disable_complete";
+    event->group = "regulator";
+    event->proto_field_id = 61;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_enable";
+    event->group = "regulator";
+    event->proto_field_id = 62;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_enable_complete";
+    event->group = "regulator";
+    event->proto_field_id = 63;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_enable_delay";
+    event->group = "regulator";
+    event->proto_field_id = 64;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_set_voltage";
+    event->group = "regulator";
+    event->proto_field_id = 65;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("min", 2, kProtoInt32));
+    event->fields.push_back(MakeField("max", 3, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "regulator/regulator_set_voltage_complete";
+    event->group = "regulator";
+    event->proto_field_id = 66;
+    event->fields.push_back(MakeField("name", 1, kProtoString));
+    event->fields.push_back(MakeField("val", 2, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_attach_task";
+    event->group = "cgroup";
+    event->proto_field_id = 67;
+    event->fields.push_back(MakeField("dst_root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("dst_id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("pid", 3, kProtoInt32));
+    event->fields.push_back(MakeField("comm", 4, kProtoString));
+    event->fields.push_back(MakeField("cname", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_mkdir";
+    event->group = "cgroup";
+    event->proto_field_id = 68;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("cname", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_remount";
+    event->group = "cgroup";
+    event->proto_field_id = 69;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
+    event->fields.push_back(MakeField("name", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_rmdir";
+    event->group = "cgroup";
+    event->proto_field_id = 70;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("cname", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_transfer_tasks";
+    event->group = "cgroup";
+    event->proto_field_id = 71;
+    event->fields.push_back(MakeField("dst_root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("dst_id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("pid", 3, kProtoInt32));
+    event->fields.push_back(MakeField("comm", 4, kProtoString));
+    event->fields.push_back(MakeField("cname", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_destroy_root";
+    event->group = "cgroup";
+    event->proto_field_id = 72;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
+    event->fields.push_back(MakeField("name", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_release";
+    event->group = "cgroup";
+    event->proto_field_id = 73;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("cname", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_rename";
+    event->group = "cgroup";
+    event->proto_field_id = 74;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("id", 2, kProtoInt32));
+    event->fields.push_back(MakeField("cname", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "cgroup/cgroup_setup_root";
+    event->group = "cgroup";
+    event->proto_field_id = 75;
+    event->fields.push_back(MakeField("root", 1, kProtoInt32));
+    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
+    event->fields.push_back(MakeField("name", 3, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_cmd_kickoff";
+    event->group = "mdss";
+    event->proto_field_id = 76;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("kickoff_cnt", 2, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_commit";
+    event->group = "mdss";
+    event->proto_field_id = 77;
+    event->fields.push_back(MakeField("num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("clk_rate", 3, kProtoUint32));
+    event->fields.push_back(MakeField("bandwidth", 4, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_set_ot";
+    event->group = "mdss";
+    event->proto_field_id = 78;
+    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
+    event->fields.push_back(MakeField("xin_id", 2, kProtoUint32));
+    event->fields.push_back(MakeField("rd_lim", 3, kProtoUint32));
+    event->fields.push_back(MakeField("is_vbif_rt", 4, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_sspp_change";
+    event->group = "mdss";
+    event->proto_field_id = 79;
+    event->fields.push_back(MakeField("num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("mixer", 3, kProtoUint32));
+    event->fields.push_back(MakeField("stage", 4, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
+    event->fields.push_back(MakeField("format", 6, kProtoUint32));
+    event->fields.push_back(MakeField("img_w", 7, kProtoUint32));
+    event->fields.push_back(MakeField("img_h", 8, kProtoUint32));
+    event->fields.push_back(MakeField("src_x", 9, kProtoUint32));
+    event->fields.push_back(MakeField("src_y", 10, kProtoUint32));
+    event->fields.push_back(MakeField("src_w", 11, kProtoUint32));
+    event->fields.push_back(MakeField("src_h", 12, kProtoUint32));
+    event->fields.push_back(MakeField("dst_x", 13, kProtoUint32));
+    event->fields.push_back(MakeField("dst_y", 14, kProtoUint32));
+    event->fields.push_back(MakeField("dst_w", 15, kProtoUint32));
+    event->fields.push_back(MakeField("dst_h", 16, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/tracing_mark_write";
+    event->group = "mdss";
+    event->proto_field_id = 80;
+    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("trace_name", 2, kProtoString));
+    event->fields.push_back(MakeField("trace_begin", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_cmd_pingpong_done";
+    event->group = "mdss";
+    event->proto_field_id = 81;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("intf_num", 2, kProtoUint32));
+    event->fields.push_back(MakeField("pp_num", 3, kProtoUint32));
+    event->fields.push_back(MakeField("koff_cnt", 4, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_compare_bw";
+    event->group = "mdss";
+    event->proto_field_id = 82;
+    event->fields.push_back(MakeField("new_ab", 1, kProtoUint64));
+    event->fields.push_back(MakeField("new_ib", 2, kProtoUint64));
+    event->fields.push_back(MakeField("new_wb", 3, kProtoUint64));
+    event->fields.push_back(MakeField("old_ab", 4, kProtoUint64));
+    event->fields.push_back(MakeField("old_ib", 5, kProtoUint64));
+    event->fields.push_back(MakeField("old_wb", 6, kProtoUint64));
+    event->fields.push_back(MakeField("params_changed", 7, kProtoUint32));
+    event->fields.push_back(MakeField("update_bw", 8, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_set_panic_luts";
+    event->group = "mdss";
+    event->proto_field_id = 83;
+    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
+    event->fields.push_back(MakeField("fmt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("mode", 3, kProtoUint32));
+    event->fields.push_back(MakeField("panic_lut", 4, kProtoUint32));
+    event->fields.push_back(MakeField("robust_lut", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_sspp_set";
+    event->group = "mdss";
+    event->proto_field_id = 84;
+    event->fields.push_back(MakeField("num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("mixer", 3, kProtoUint32));
+    event->fields.push_back(MakeField("stage", 4, kProtoUint32));
+    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
+    event->fields.push_back(MakeField("format", 6, kProtoUint32));
+    event->fields.push_back(MakeField("img_w", 7, kProtoUint32));
+    event->fields.push_back(MakeField("img_h", 8, kProtoUint32));
+    event->fields.push_back(MakeField("src_x", 9, kProtoUint32));
+    event->fields.push_back(MakeField("src_y", 10, kProtoUint32));
+    event->fields.push_back(MakeField("src_w", 11, kProtoUint32));
+    event->fields.push_back(MakeField("src_h", 12, kProtoUint32));
+    event->fields.push_back(MakeField("dst_x", 13, kProtoUint32));
+    event->fields.push_back(MakeField("dst_y", 14, kProtoUint32));
+    event->fields.push_back(MakeField("dst_w", 15, kProtoUint32));
+    event->fields.push_back(MakeField("dst_h", 16, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_cmd_readptr_done";
+    event->group = "mdss";
+    event->proto_field_id = 85;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("koff_cnt", 2, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_misr_crc";
+    event->group = "mdss";
+    event->proto_field_id = 86;
+    event->fields.push_back(MakeField("block_id", 1, kProtoUint32));
+    event->fields.push_back(MakeField("vsync_cnt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("crc", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_set_qos_luts";
+    event->group = "mdss";
+    event->proto_field_id = 87;
+    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
+    event->fields.push_back(MakeField("fmt", 2, kProtoUint32));
+    event->fields.push_back(MakeField("intf", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rot", 4, kProtoUint32));
+    event->fields.push_back(MakeField("fl", 5, kProtoUint32));
+    event->fields.push_back(MakeField("lut", 6, kProtoUint32));
+    event->fields.push_back(MakeField("linear", 7, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_trace_counter";
+    event->group = "mdss";
+    event->proto_field_id = 88;
+    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("counter_name", 2, kProtoString));
+    event->fields.push_back(MakeField("value", 3, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_cmd_release_bw";
+    event->group = "mdss";
+    event->proto_field_id = 89;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_mixer_update";
+    event->group = "mdss";
+    event->proto_field_id = 90;
+    event->fields.push_back(MakeField("mixer_num", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_set_wm_levels";
+    event->group = "mdss";
+    event->proto_field_id = 91;
+    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
+    event->fields.push_back(MakeField("use_space", 2, kProtoUint32));
+    event->fields.push_back(MakeField("priority_bytes", 3, kProtoUint32));
+    event->fields.push_back(MakeField("wm0", 4, kProtoUint32));
+    event->fields.push_back(MakeField("wm1", 5, kProtoUint32));
+    event->fields.push_back(MakeField("wm2", 6, kProtoUint32));
+    event->fields.push_back(MakeField("mb_cnt", 7, kProtoUint32));
+    event->fields.push_back(MakeField("mb_size", 8, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_video_underrun_done";
+    event->group = "mdss";
+    event->proto_field_id = 92;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("underrun_cnt", 2, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_cmd_wait_pingpong";
+    event->group = "mdss";
+    event->proto_field_id = 93;
+    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
+    event->fields.push_back(MakeField("kickoff_cnt", 2, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_prefill_calc";
+    event->group = "mdss";
+    event->proto_field_id = 94;
+    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
+    event->fields.push_back(MakeField("latency_buf", 2, kProtoUint32));
+    event->fields.push_back(MakeField("ot", 3, kProtoUint32));
+    event->fields.push_back(MakeField("y_buf", 4, kProtoUint32));
+    event->fields.push_back(MakeField("y_scaler", 5, kProtoUint32));
+    event->fields.push_back(MakeField("pp_lines", 6, kProtoUint32));
+    event->fields.push_back(MakeField("pp_bytes", 7, kProtoUint32));
+    event->fields.push_back(MakeField("post_sc", 8, kProtoUint32));
+    event->fields.push_back(MakeField("fbc_bytes", 9, kProtoUint32));
+    event->fields.push_back(MakeField("prefill_bytes", 10, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/mdp_perf_update_bus";
+    event->group = "mdss";
+    event->proto_field_id = 95;
+    event->fields.push_back(MakeField("client", 1, kProtoInt32));
+    event->fields.push_back(MakeField("ab_quota", 2, kProtoUint64));
+    event->fields.push_back(MakeField("ib_quota", 3, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "mdss/rotator_bw_ao_as_context";
+    event->group = "mdss";
+    event->proto_field_id = 96;
+    event->fields.push_back(MakeField("state", 1, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "filemap/mm_filemap_add_to_page_cache";
+    event->group = "filemap";
+    event->proto_field_id = 97;
+    event->fields.push_back(MakeField("pfn", 1, kProtoUint64));
+    event->fields.push_back(MakeField("i_ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("index", 3, kProtoUint64));
+    event->fields.push_back(MakeField("s_dev", 4, kProtoUint64));
+    event->fields.push_back(MakeField("page", 5, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "filemap/mm_filemap_delete_from_page_cache";
+    event->group = "filemap";
+    event->proto_field_id = 98;
+    event->fields.push_back(MakeField("pfn", 1, kProtoUint64));
+    event->fields.push_back(MakeField("i_ino", 2, kProtoUint64));
+    event->fields.push_back(MakeField("index", 3, kProtoUint64));
+    event->fields.push_back(MakeField("s_dev", 4, kProtoUint64));
+    event->fields.push_back(MakeField("page", 5, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_begin";
+    event->group = "compaction";
+    event->proto_field_id = 99;
+    event->fields.push_back(MakeField("zone_start", 1, kProtoUint64));
+    event->fields.push_back(MakeField("migrate_pfn", 2, kProtoUint64));
+    event->fields.push_back(MakeField("free_pfn", 3, kProtoUint64));
+    event->fields.push_back(MakeField("zone_end", 4, kProtoUint64));
+    event->fields.push_back(MakeField("sync", 5, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_defer_compaction";
+    event->group = "compaction";
+    event->proto_field_id = 100;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
+    event->fields.push_back(MakeField("order", 3, kProtoInt32));
+    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
+    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
+    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_deferred";
+    event->group = "compaction";
+    event->proto_field_id = 101;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
+    event->fields.push_back(MakeField("order", 3, kProtoInt32));
+    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
+    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
+    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_defer_reset";
+    event->group = "compaction";
+    event->proto_field_id = 102;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
+    event->fields.push_back(MakeField("order", 3, kProtoInt32));
+    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
+    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
+    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_end";
+    event->group = "compaction";
+    event->proto_field_id = 103;
+    event->fields.push_back(MakeField("zone_start", 1, kProtoUint64));
+    event->fields.push_back(MakeField("migrate_pfn", 2, kProtoUint64));
+    event->fields.push_back(MakeField("free_pfn", 3, kProtoUint64));
+    event->fields.push_back(MakeField("zone_end", 4, kProtoUint64));
+    event->fields.push_back(MakeField("sync", 5, kProtoUint32));
+    event->fields.push_back(MakeField("status", 6, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_finished";
+    event->group = "compaction";
+    event->proto_field_id = 104;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
+    event->fields.push_back(MakeField("order", 3, kProtoInt32));
+    event->fields.push_back(MakeField("ret", 4, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_isolate_freepages";
+    event->group = "compaction";
+    event->proto_field_id = 105;
+    event->fields.push_back(MakeField("start_pfn", 1, kProtoUint64));
+    event->fields.push_back(MakeField("end_pfn", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_scanned", 3, kProtoUint64));
+    event->fields.push_back(MakeField("nr_taken", 4, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_isolate_migratepages";
+    event->group = "compaction";
+    event->proto_field_id = 106;
+    event->fields.push_back(MakeField("start_pfn", 1, kProtoUint64));
+    event->fields.push_back(MakeField("end_pfn", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_scanned", 3, kProtoUint64));
+    event->fields.push_back(MakeField("nr_taken", 4, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_kcompactd_sleep";
+    event->group = "compaction";
+    event->proto_field_id = 107;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_kcompactd_wake";
+    event->group = "compaction";
+    event->proto_field_id = 108;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("order", 2, kProtoInt32));
+    event->fields.push_back(MakeField("classzone_idx", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_migratepages";
+    event->group = "compaction";
+    event->proto_field_id = 109;
+    event->fields.push_back(MakeField("nr_migrated", 1, kProtoUint64));
+    event->fields.push_back(MakeField("nr_failed", 2, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_suitable";
+    event->group = "compaction";
+    event->proto_field_id = 110;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
+    event->fields.push_back(MakeField("order", 3, kProtoInt32));
+    event->fields.push_back(MakeField("ret", 4, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_try_to_compact_pages";
+    event->group = "compaction";
+    event->proto_field_id = 111;
+    event->fields.push_back(MakeField("order", 1, kProtoInt32));
+    event->fields.push_back(MakeField("gfp_mask", 2, kProtoUint32));
+    event->fields.push_back(MakeField("mode", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "compaction/mm_compaction_wakeup_kcompactd";
+    event->group = "compaction";
+    event->proto_field_id = 112;
+    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->fields.push_back(MakeField("order", 2, kProtoInt32));
+    event->fields.push_back(MakeField("classzone_idx", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "power/suspend_resume";
+    event->group = "power";
+    event->proto_field_id = 113;
+    event->fields.push_back(MakeField("action", 1, kProtoString));
+    event->fields.push_back(MakeField("val", 2, kProtoInt32));
+    event->fields.push_back(MakeField("start", 3, kProtoUint32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "sched/sched_wakeup_new";
+    event->group = "sched";
+    event->proto_field_id = 114;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
+    event->fields.push_back(MakeField("success", 4, kProtoInt32));
+    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_backmerge";
+    event->group = "block";
+    event->proto_field_id = 115;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
+    event->fields.push_back(MakeField("comm", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_bounce";
+    event->group = "block";
+    event->proto_field_id = 116;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
+    event->fields.push_back(MakeField("comm", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_complete";
+    event->group = "block";
+    event->proto_field_id = 117;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("error", 4, kProtoInt32));
+    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_frontmerge";
+    event->group = "block";
+    event->proto_field_id = 118;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
+    event->fields.push_back(MakeField("comm", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_queue";
+    event->group = "block";
+    event->proto_field_id = 119;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
+    event->fields.push_back(MakeField("comm", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_bio_remap";
+    event->group = "block";
+    event->proto_field_id = 120;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("old_dev", 4, kProtoUint64));
+    event->fields.push_back(MakeField("old_sector", 5, kProtoUint64));
+    event->fields.push_back(MakeField("rwbs", 6, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_dirty_buffer";
+    event->group = "block";
+    event->proto_field_id = 121;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("size", 3, kProtoUint64));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_getrq";
+    event->group = "block";
+    event->proto_field_id = 122;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 4, kProtoString));
+    event->fields.push_back(MakeField("comm", 5, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_plug";
+    event->group = "block";
+    event->proto_field_id = 123;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_rq_abort";
+    event->group = "block";
+    event->proto_field_id = 124;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("errors", 4, kProtoInt32));
+    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
+    event->fields.push_back(MakeField("cmd", 6, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_rq_complete";
+    event->group = "block";
+    event->proto_field_id = 125;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("errors", 4, kProtoInt32));
+    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
+    event->fields.push_back(MakeField("cmd", 6, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_rq_insert";
+    event->group = "block";
+    event->proto_field_id = 126;
+    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
+    event->fields.push_back(MakeField("sector", 2, kProtoUint64));
+    event->fields.push_back(MakeField("nr_sector", 3, kProtoUint32));
+    event->fields.push_back(MakeField("bytes", 4, kProtoUint32));
+    event->fields.push_back(MakeField("rwbs", 5, kProtoString));
+    event->fields.push_back(MakeField("comm", 6, kProtoString));
+    event->fields.push_back(MakeField("cmd", 7, kProtoString));
+  }
+
+  {
+    events.emplace_back(Event{});
+    Event* event = &events.back();
+    event->name = "block/block_rq_remap";
     event->group = "block";
     event->proto_field_id = 128;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -261,7 +1484,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_rq_requeue";
+    event->name = "block/block_rq_requeue";
     event->group = "block";
     event->proto_field_id = 129;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -275,7 +1498,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_sleeprq";
+    event->name = "block/block_sleeprq";
     event->group = "block";
     event->proto_field_id = 130;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -288,7 +1511,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_split";
+    event->name = "block/block_split";
     event->group = "block";
     event->proto_field_id = 131;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -301,7 +1524,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_touch_buffer";
+    event->name = "block/block_touch_buffer";
     event->group = "block";
     event->proto_field_id = 132;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -312,7 +1535,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "block_unplug";
+    event->name = "block/block_unplug";
     event->group = "block";
     event->proto_field_id = 133;
     event->fields.push_back(MakeField("nr_rq", 1, kProtoInt32));
@@ -322,347 +1545,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "cgroup_attach_task";
-    event->group = "cgroup";
-    event->proto_field_id = 67;
-    event->fields.push_back(MakeField("dst_root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("dst_id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("pid", 3, kProtoInt32));
-    event->fields.push_back(MakeField("comm", 4, kProtoString));
-    event->fields.push_back(MakeField("cname", 5, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_destroy_root";
-    event->group = "cgroup";
-    event->proto_field_id = 72;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_mkdir";
-    event->group = "cgroup";
-    event->proto_field_id = 68;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("cname", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_release";
-    event->group = "cgroup";
-    event->proto_field_id = 73;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("cname", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_remount";
-    event->group = "cgroup";
-    event->proto_field_id = 69;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_rename";
-    event->group = "cgroup";
-    event->proto_field_id = 74;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("cname", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_rmdir";
-    event->group = "cgroup";
-    event->proto_field_id = 70;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("cname", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_setup_root";
-    event->group = "cgroup";
-    event->proto_field_id = 75;
-    event->fields.push_back(MakeField("root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("ss_mask", 2, kProtoUint32));
-    event->fields.push_back(MakeField("name", 3, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cgroup_transfer_tasks";
-    event->group = "cgroup";
-    event->proto_field_id = 71;
-    event->fields.push_back(MakeField("dst_root", 1, kProtoInt32));
-    event->fields.push_back(MakeField("dst_id", 2, kProtoInt32));
-    event->fields.push_back(MakeField("pid", 3, kProtoInt32));
-    event->fields.push_back(MakeField("comm", 4, kProtoString));
-    event->fields.push_back(MakeField("cname", 5, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_begin";
-    event->group = "compaction";
-    event->proto_field_id = 99;
-    event->fields.push_back(MakeField("zone_start", 1, kProtoUint64));
-    event->fields.push_back(MakeField("migrate_pfn", 2, kProtoUint64));
-    event->fields.push_back(MakeField("free_pfn", 3, kProtoUint64));
-    event->fields.push_back(MakeField("zone_end", 4, kProtoUint64));
-    event->fields.push_back(MakeField("sync", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_defer_compaction";
-    event->group = "compaction";
-    event->proto_field_id = 100;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, kProtoInt32));
-    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
-    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
-    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_defer_reset";
-    event->group = "compaction";
-    event->proto_field_id = 102;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, kProtoInt32));
-    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
-    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
-    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_deferred";
-    event->group = "compaction";
-    event->proto_field_id = 101;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, kProtoInt32));
-    event->fields.push_back(MakeField("considered", 4, kProtoUint32));
-    event->fields.push_back(MakeField("defer_shift", 5, kProtoUint32));
-    event->fields.push_back(MakeField("order_failed", 6, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_end";
-    event->group = "compaction";
-    event->proto_field_id = 103;
-    event->fields.push_back(MakeField("zone_start", 1, kProtoUint64));
-    event->fields.push_back(MakeField("migrate_pfn", 2, kProtoUint64));
-    event->fields.push_back(MakeField("free_pfn", 3, kProtoUint64));
-    event->fields.push_back(MakeField("zone_end", 4, kProtoUint64));
-    event->fields.push_back(MakeField("sync", 5, kProtoUint32));
-    event->fields.push_back(MakeField("status", 6, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_finished";
-    event->group = "compaction";
-    event->proto_field_id = 104;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, kProtoInt32));
-    event->fields.push_back(MakeField("ret", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_isolate_freepages";
-    event->group = "compaction";
-    event->proto_field_id = 105;
-    event->fields.push_back(MakeField("start_pfn", 1, kProtoUint64));
-    event->fields.push_back(MakeField("end_pfn", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_scanned", 3, kProtoUint64));
-    event->fields.push_back(MakeField("nr_taken", 4, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_isolate_migratepages";
-    event->group = "compaction";
-    event->proto_field_id = 106;
-    event->fields.push_back(MakeField("start_pfn", 1, kProtoUint64));
-    event->fields.push_back(MakeField("end_pfn", 2, kProtoUint64));
-    event->fields.push_back(MakeField("nr_scanned", 3, kProtoUint64));
-    event->fields.push_back(MakeField("nr_taken", 4, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_kcompactd_sleep";
-    event->group = "compaction";
-    event->proto_field_id = 107;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_kcompactd_wake";
-    event->group = "compaction";
-    event->proto_field_id = 108;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, kProtoInt32));
-    event->fields.push_back(MakeField("classzone_idx", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_migratepages";
-    event->group = "compaction";
-    event->proto_field_id = 109;
-    event->fields.push_back(MakeField("nr_migrated", 1, kProtoUint64));
-    event->fields.push_back(MakeField("nr_failed", 2, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_suitable";
-    event->group = "compaction";
-    event->proto_field_id = 110;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("idx", 2, kProtoUint32));
-    event->fields.push_back(MakeField("order", 3, kProtoInt32));
-    event->fields.push_back(MakeField("ret", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_try_to_compact_pages";
-    event->group = "compaction";
-    event->proto_field_id = 111;
-    event->fields.push_back(MakeField("order", 1, kProtoInt32));
-    event->fields.push_back(MakeField("gfp_mask", 2, kProtoUint32));
-    event->fields.push_back(MakeField("mode", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_compaction_wakeup_kcompactd";
-    event->group = "compaction";
-    event->proto_field_id = 112;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, kProtoInt32));
-    event->fields.push_back(MakeField("classzone_idx", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_already";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 5;
-    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
-    event->fields.push_back(MakeField("load", 2, kProtoUint64));
-    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
-    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
-    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_boost";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 6;
-    event->fields.push_back(MakeField("s", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_notyet";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 7;
-    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
-    event->fields.push_back(MakeField("load", 2, kProtoUint64));
-    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
-    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
-    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_setspeed";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 8;
-    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint32));
-    event->fields.push_back(MakeField("targfreq", 2, kProtoUint64));
-    event->fields.push_back(MakeField("actualfreq", 3, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_target";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 9;
-    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
-    event->fields.push_back(MakeField("load", 2, kProtoUint64));
-    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
-    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
-    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_unboost";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 10;
-    event->fields.push_back(MakeField("s", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ext4_alloc_da_blocks";
+    event->name = "ext4/ext4_alloc_da_blocks";
     event->group = "ext4";
     event->proto_field_id = 134;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -674,7 +1557,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_allocate_blocks";
+    event->name = "ext4/ext4_allocate_blocks";
     event->group = "ext4";
     event->proto_field_id = 135;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -693,7 +1576,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_allocate_inode";
+    event->name = "ext4/ext4_allocate_inode";
     event->group = "ext4";
     event->proto_field_id = 136;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -705,7 +1588,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_begin_ordered_truncate";
+    event->name = "ext4/ext4_begin_ordered_truncate";
     event->group = "ext4";
     event->proto_field_id = 137;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -716,7 +1599,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_collapse_range";
+    event->name = "ext4/ext4_collapse_range";
     event->group = "ext4";
     event->proto_field_id = 138;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -728,7 +1611,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_da_release_space";
+    event->name = "ext4/ext4_da_release_space";
     event->group = "ext4";
     event->proto_field_id = 139;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -744,7 +1627,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_da_reserve_space";
+    event->name = "ext4/ext4_da_reserve_space";
     event->group = "ext4";
     event->proto_field_id = 140;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -753,12 +1636,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("reserved_data_blocks", 4, kProtoInt32));
     event->fields.push_back(MakeField("reserved_meta_blocks", 5, kProtoInt32));
     event->fields.push_back(MakeField("mode", 6, kProtoUint32));
+    event->fields.push_back(MakeField("md_needed", 7, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_da_update_reserve_space";
+    event->name = "ext4/ext4_da_update_reserve_space";
     event->group = "ext4";
     event->proto_field_id = 141;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -775,33 +1659,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_da_write_begin";
-    event->group = "ext4";
-    event->proto_field_id = 41;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ext4_da_write_end";
-    event->group = "ext4";
-    event->proto_field_id = 42;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("pos", 3, kProtoInt64));
-    event->fields.push_back(MakeField("len", 4, kProtoUint32));
-    event->fields.push_back(MakeField("copied", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ext4_da_write_pages";
+    event->name = "ext4/ext4_da_write_pages";
     event->group = "ext4";
     event->proto_field_id = 142;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -809,12 +1667,17 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("first_page", 3, kProtoUint64));
     event->fields.push_back(MakeField("nr_to_write", 4, kProtoInt64));
     event->fields.push_back(MakeField("sync_mode", 5, kProtoInt32));
+    event->fields.push_back(MakeField("b_blocknr", 6, kProtoUint64));
+    event->fields.push_back(MakeField("b_size", 7, kProtoUint32));
+    event->fields.push_back(MakeField("b_state", 8, kProtoUint32));
+    event->fields.push_back(MakeField("io_done", 9, kProtoInt32));
+    event->fields.push_back(MakeField("pages_written", 10, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_da_write_pages_extent";
+    event->name = "ext4/ext4_da_write_pages_extent";
     event->group = "ext4";
     event->proto_field_id = 143;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -827,7 +1690,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_direct_IO_enter";
+    event->name = "ext4/ext4_direct_IO_enter";
     event->group = "ext4";
     event->proto_field_id = 144;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -840,7 +1703,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_direct_IO_exit";
+    event->name = "ext4/ext4_direct_IO_exit";
     event->group = "ext4";
     event->proto_field_id = 145;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -854,7 +1717,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_discard_blocks";
+    event->name = "ext4/ext4_discard_blocks";
     event->group = "ext4";
     event->proto_field_id = 146;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -865,7 +1728,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_discard_preallocations";
+    event->name = "ext4/ext4_discard_preallocations";
     event->group = "ext4";
     event->proto_field_id = 147;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -875,7 +1738,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_drop_inode";
+    event->name = "ext4/ext4_drop_inode";
     event->group = "ext4";
     event->proto_field_id = 148;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -886,7 +1749,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_cache_extent";
+    event->name = "ext4/ext4_es_cache_extent";
     event->group = "ext4";
     event->proto_field_id = 149;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -900,7 +1763,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_find_delayed_extent_range_enter";
+    event->name = "ext4/ext4_es_find_delayed_extent_range_enter";
     event->group = "ext4";
     event->proto_field_id = 150;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -911,7 +1774,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_find_delayed_extent_range_exit";
+    event->name = "ext4/ext4_es_find_delayed_extent_range_exit";
     event->group = "ext4";
     event->proto_field_id = 151;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -919,13 +1782,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoUint32));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_insert_extent";
+    event->name = "ext4/ext4_es_insert_extent";
     event->group = "ext4";
     event->proto_field_id = 152;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -933,13 +1796,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoUint32));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_lookup_extent_enter";
+    event->name = "ext4/ext4_es_lookup_extent_enter";
     event->group = "ext4";
     event->proto_field_id = 153;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -950,7 +1813,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_lookup_extent_exit";
+    event->name = "ext4/ext4_es_lookup_extent_exit";
     event->group = "ext4";
     event->proto_field_id = 154;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -958,14 +1821,14 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoUint32));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
     event->fields.push_back(MakeField("found", 7, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_remove_extent";
+    event->name = "ext4/ext4_es_remove_extent";
     event->group = "ext4";
     event->proto_field_id = 155;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -977,7 +1840,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_shrink";
+    event->name = "ext4/ext4_es_shrink";
     event->group = "ext4";
     event->proto_field_id = 156;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -990,7 +1853,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_shrink_count";
+    event->name = "ext4/ext4_es_shrink_count";
     event->group = "ext4";
     event->proto_field_id = 157;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1001,7 +1864,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_shrink_scan_enter";
+    event->name = "ext4/ext4_es_shrink_scan_enter";
     event->group = "ext4";
     event->proto_field_id = 158;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1012,7 +1875,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_es_shrink_scan_exit";
+    event->name = "ext4/ext4_es_shrink_scan_exit";
     event->group = "ext4";
     event->proto_field_id = 159;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1023,7 +1886,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_evict_inode";
+    event->name = "ext4/ext4_evict_inode";
     event->group = "ext4";
     event->proto_field_id = 160;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1034,7 +1897,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_convert_to_initialized_enter";
+    event->name = "ext4/ext4_ext_convert_to_initialized_enter";
     event->group = "ext4";
     event->proto_field_id = 161;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1049,7 +1912,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_convert_to_initialized_fastpath";
+    event->name = "ext4/ext4_ext_convert_to_initialized_fastpath";
     event->group = "ext4";
     event->proto_field_id = 162;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1067,7 +1930,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_handle_unwritten_extents";
+    event->name = "ext4/ext4_ext_handle_unwritten_extents";
     event->group = "ext4";
     event->proto_field_id = 163;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1083,7 +1946,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_in_cache";
+    event->name = "ext4/ext4_ext_in_cache";
     event->group = "ext4";
     event->proto_field_id = 164;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1095,7 +1958,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_load_extent";
+    event->name = "ext4/ext4_ext_load_extent";
     event->group = "ext4";
     event->proto_field_id = 165;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1107,7 +1970,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_map_blocks_enter";
+    event->name = "ext4/ext4_ext_map_blocks_enter";
     event->group = "ext4";
     event->proto_field_id = 166;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1120,7 +1983,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_map_blocks_exit";
+    event->name = "ext4/ext4_ext_map_blocks_exit";
     event->group = "ext4";
     event->proto_field_id = 167;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1136,7 +1999,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_put_in_cache";
+    event->name = "ext4/ext4_ext_put_in_cache";
     event->group = "ext4";
     event->proto_field_id = 168;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1149,7 +2012,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_remove_space";
+    event->name = "ext4/ext4_ext_remove_space";
     event->group = "ext4";
     event->proto_field_id = 169;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1162,7 +2025,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_remove_space_done";
+    event->name = "ext4/ext4_ext_remove_space_done";
     event->group = "ext4";
     event->proto_field_id = 170;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1177,7 +2040,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_rm_idx";
+    event->name = "ext4/ext4_ext_rm_idx";
     event->group = "ext4";
     event->proto_field_id = 171;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1188,7 +2051,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_rm_leaf";
+    event->name = "ext4/ext4_ext_rm_leaf";
     event->group = "ext4";
     event->proto_field_id = 172;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1203,7 +2066,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ext_show_extent";
+    event->name = "ext4/ext4_ext_show_extent";
     event->group = "ext4";
     event->proto_field_id = 173;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1216,7 +2079,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_fallocate_enter";
+    event->name = "ext4/ext4_fallocate_enter";
     event->group = "ext4";
     event->proto_field_id = 174;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1224,12 +2087,13 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("offset", 3, kProtoInt64));
     event->fields.push_back(MakeField("len", 4, kProtoInt64));
     event->fields.push_back(MakeField("mode", 5, kProtoInt32));
+    event->fields.push_back(MakeField("pos", 6, kProtoInt64));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_fallocate_exit";
+    event->name = "ext4/ext4_fallocate_exit";
     event->group = "ext4";
     event->proto_field_id = 175;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1242,7 +2106,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_find_delalloc_range";
+    event->name = "ext4/ext4_find_delalloc_range";
     event->group = "ext4";
     event->proto_field_id = 176;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1257,7 +2121,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_forget";
+    event->name = "ext4/ext4_forget";
     event->group = "ext4";
     event->proto_field_id = 177;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1270,7 +2134,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_free_blocks";
+    event->name = "ext4/ext4_free_blocks";
     event->group = "ext4";
     event->proto_field_id = 178;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1284,7 +2148,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_free_inode";
+    event->name = "ext4/ext4_free_inode";
     event->group = "ext4";
     event->proto_field_id = 179;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1298,7 +2162,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_get_implied_cluster_alloc_exit";
+    event->name = "ext4/ext4_get_implied_cluster_alloc_exit";
     event->group = "ext4";
     event->proto_field_id = 180;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1312,7 +2176,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_get_reserved_cluster_alloc";
+    event->name = "ext4/ext4_get_reserved_cluster_alloc";
     event->group = "ext4";
     event->proto_field_id = 181;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1324,7 +2188,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ind_map_blocks_enter";
+    event->name = "ext4/ext4_ind_map_blocks_enter";
     event->group = "ext4";
     event->proto_field_id = 182;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1337,7 +2201,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_ind_map_blocks_exit";
+    event->name = "ext4/ext4_ind_map_blocks_exit";
     event->group = "ext4";
     event->proto_field_id = 183;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1353,7 +2217,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_insert_range";
+    event->name = "ext4/ext4_insert_range";
     event->group = "ext4";
     event->proto_field_id = 184;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1365,32 +2229,33 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_invalidatepage";
+    event->name = "ext4/ext4_invalidatepage";
     event->group = "ext4";
     event->proto_field_id = 185;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
     event->fields.push_back(MakeField("ino", 2, kProtoUint64));
     event->fields.push_back(MakeField("index", 3, kProtoUint64));
-    event->fields.push_back(MakeField("offset", 4, kProtoUint32));
+    event->fields.push_back(MakeField("offset", 4, kProtoUint64));
     event->fields.push_back(MakeField("length", 5, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_journal_start";
+    event->name = "ext4/ext4_journal_start";
     event->group = "ext4";
     event->proto_field_id = 186;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
     event->fields.push_back(MakeField("ip", 2, kProtoUint64));
     event->fields.push_back(MakeField("blocks", 3, kProtoInt32));
     event->fields.push_back(MakeField("rsv_blocks", 4, kProtoInt32));
+    event->fields.push_back(MakeField("nblocks", 5, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_journal_start_reserved";
+    event->name = "ext4/ext4_journal_start_reserved";
     event->group = "ext4";
     event->proto_field_id = 187;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1401,20 +2266,20 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_journalled_invalidatepage";
+    event->name = "ext4/ext4_journalled_invalidatepage";
     event->group = "ext4";
     event->proto_field_id = 188;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
     event->fields.push_back(MakeField("ino", 2, kProtoUint64));
     event->fields.push_back(MakeField("index", 3, kProtoUint64));
-    event->fields.push_back(MakeField("offset", 4, kProtoUint32));
+    event->fields.push_back(MakeField("offset", 4, kProtoUint64));
     event->fields.push_back(MakeField("length", 5, kProtoUint32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_journalled_write_end";
+    event->name = "ext4/ext4_journalled_write_end";
     event->group = "ext4";
     event->proto_field_id = 189;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1427,7 +2292,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_load_inode";
+    event->name = "ext4/ext4_load_inode";
     event->group = "ext4";
     event->proto_field_id = 190;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1437,7 +2302,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_load_inode_bitmap";
+    event->name = "ext4/ext4_load_inode_bitmap";
     event->group = "ext4";
     event->proto_field_id = 191;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1447,7 +2312,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mark_inode_dirty";
+    event->name = "ext4/ext4_mark_inode_dirty";
     event->group = "ext4";
     event->proto_field_id = 192;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1458,7 +2323,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_bitmap_load";
+    event->name = "ext4/ext4_mb_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 193;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1468,7 +2333,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_buddy_bitmap_load";
+    event->name = "ext4/ext4_mb_buddy_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 194;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1478,7 +2343,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_discard_preallocations";
+    event->name = "ext4/ext4_mb_discard_preallocations";
     event->group = "ext4";
     event->proto_field_id = 195;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1488,7 +2353,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_new_group_pa";
+    event->name = "ext4/ext4_mb_new_group_pa";
     event->group = "ext4";
     event->proto_field_id = 196;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1501,7 +2366,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_new_inode_pa";
+    event->name = "ext4/ext4_mb_new_inode_pa";
     event->group = "ext4";
     event->proto_field_id = 197;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1514,7 +2379,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_release_group_pa";
+    event->name = "ext4/ext4_mb_release_group_pa";
     event->group = "ext4";
     event->proto_field_id = 198;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1525,7 +2390,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mb_release_inode_pa";
+    event->name = "ext4/ext4_mb_release_inode_pa";
     event->group = "ext4";
     event->proto_field_id = 199;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1537,7 +2402,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mballoc_alloc";
+    event->name = "ext4/ext4_mballoc_alloc";
     event->group = "ext4";
     event->proto_field_id = 200;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1565,7 +2430,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mballoc_discard";
+    event->name = "ext4/ext4_mballoc_discard";
     event->group = "ext4";
     event->proto_field_id = 201;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1578,7 +2443,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mballoc_free";
+    event->name = "ext4/ext4_mballoc_free";
     event->group = "ext4";
     event->proto_field_id = 202;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1591,7 +2456,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_mballoc_prealloc";
+    event->name = "ext4/ext4_mballoc_prealloc";
     event->group = "ext4";
     event->proto_field_id = 203;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1609,7 +2474,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_other_inode_update_time";
+    event->name = "ext4/ext4_other_inode_update_time";
     event->group = "ext4";
     event->proto_field_id = 204;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1623,7 +2488,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_punch_hole";
+    event->name = "ext4/ext4_punch_hole";
     event->group = "ext4";
     event->proto_field_id = 205;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1636,7 +2501,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_read_block_bitmap_load";
+    event->name = "ext4/ext4_read_block_bitmap_load";
     event->group = "ext4";
     event->proto_field_id = 206;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1646,7 +2511,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_readpage";
+    event->name = "ext4/ext4_readpage";
     event->group = "ext4";
     event->proto_field_id = 207;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1657,7 +2522,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_releasepage";
+    event->name = "ext4/ext4_releasepage";
     event->group = "ext4";
     event->proto_field_id = 208;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1668,7 +2533,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_remove_blocks";
+    event->name = "ext4/ext4_remove_blocks";
     event->group = "ext4";
     event->proto_field_id = 209;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1684,7 +2549,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_request_blocks";
+    event->name = "ext4/ext4_request_blocks";
     event->group = "ext4";
     event->proto_field_id = 210;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1702,7 +2567,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_request_inode";
+    event->name = "ext4/ext4_request_inode";
     event->group = "ext4";
     event->proto_field_id = 211;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1713,30 +2578,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_sync_file_enter";
-    event->group = "ext4";
-    event->proto_field_id = 43;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("parent", 3, kProtoUint64));
-    event->fields.push_back(MakeField("datasync", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ext4_sync_file_exit";
-    event->group = "ext4";
-    event->proto_field_id = 44;
-    event->fields.push_back(MakeField("dev", 1, kProtoUint64));
-    event->fields.push_back(MakeField("ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("ret", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ext4_sync_fs";
+    event->name = "ext4/ext4_sync_fs";
     event->group = "ext4";
     event->proto_field_id = 212;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1746,7 +2588,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_trim_all_free";
+    event->name = "ext4/ext4_trim_all_free";
     event->group = "ext4";
     event->proto_field_id = 213;
     event->fields.push_back(MakeField("dev_major", 1, kProtoInt32));
@@ -1759,7 +2601,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_trim_extent";
+    event->name = "ext4/ext4_trim_extent";
     event->group = "ext4";
     event->proto_field_id = 214;
     event->fields.push_back(MakeField("dev_major", 1, kProtoInt32));
@@ -1772,7 +2614,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_truncate_enter";
+    event->name = "ext4/ext4_truncate_enter";
     event->group = "ext4";
     event->proto_field_id = 215;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1783,7 +2625,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_truncate_exit";
+    event->name = "ext4/ext4_truncate_exit";
     event->group = "ext4";
     event->proto_field_id = 216;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1794,7 +2636,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_unlink_enter";
+    event->name = "ext4/ext4_unlink_enter";
     event->group = "ext4";
     event->proto_field_id = 217;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1806,7 +2648,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_unlink_exit";
+    event->name = "ext4/ext4_unlink_exit";
     event->group = "ext4";
     event->proto_field_id = 218;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1817,7 +2659,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_write_begin";
+    event->name = "ext4/ext4_write_begin";
     event->group = "ext4";
     event->proto_field_id = 219;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1830,7 +2672,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_write_end";
+    event->name = "ext4/ext4_write_end";
     event->group = "ext4";
     event->proto_field_id = 230;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1843,7 +2685,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_writepage";
+    event->name = "ext4/ext4_writepage";
     event->group = "ext4";
     event->proto_field_id = 231;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1854,7 +2696,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_writepages";
+    event->name = "ext4/ext4_writepages";
     event->group = "ext4";
     event->proto_field_id = 232;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1872,7 +2714,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_writepages_result";
+    event->name = "ext4/ext4_writepages_result";
     event->group = "ext4";
     event->proto_field_id = 233;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1887,7 +2729,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "ext4_zero_range";
+    event->name = "ext4/ext4_zero_range";
     event->group = "ext4";
     event->proto_field_id = 234;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -1900,825 +2742,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "mm_filemap_add_to_page_cache";
-    event->group = "filemap";
-    event->proto_field_id = 97;
-    event->fields.push_back(MakeField("pfn", 1, kProtoUint64));
-    event->fields.push_back(MakeField("i_ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("index", 3, kProtoUint64));
-    event->fields.push_back(MakeField("s_dev", 4, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mm_filemap_delete_from_page_cache";
-    event->group = "filemap";
-    event->proto_field_id = 98;
-    event->fields.push_back(MakeField("pfn", 1, kProtoUint64));
-    event->fields.push_back(MakeField("i_ino", 2, kProtoUint64));
-    event->fields.push_back(MakeField("index", 3, kProtoUint64));
-    event->fields.push_back(MakeField("s_dev", 4, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "print";
-    event->group = "ftrace";
-    event->proto_field_id = 3;
-    event->fields.push_back(MakeField("ip", 1, kProtoUint64));
-    event->fields.push_back(MakeField("buf", 2, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "i2c_read";
-    event->group = "i2c";
-    event->proto_field_id = 27;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "i2c_reply";
-    event->group = "i2c";
-    event->proto_field_id = 30;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, kProtoUint32));
-    event->fields.push_back(MakeField("buf", 6, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "i2c_result";
-    event->group = "i2c";
-    event->proto_field_id = 29;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("nr_msgs", 2, kProtoUint32));
-    event->fields.push_back(MakeField("ret", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "i2c_write";
-    event->group = "i2c";
-    event->proto_field_id = 28;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("msg_nr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 4, kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, kProtoUint32));
-    event->fields.push_back(MakeField("buf", 6, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "smbus_read";
-    event->group = "i2c";
-    event->proto_field_id = 31;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("flags", 2, kProtoUint32));
-    event->fields.push_back(MakeField("addr", 3, kProtoUint32));
-    event->fields.push_back(MakeField("command", 4, kProtoUint32));
-    event->fields.push_back(MakeField("protocol", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "smbus_reply";
-    event->group = "i2c";
-    event->proto_field_id = 34;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
-    event->fields.push_back(MakeField("command", 4, kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, kProtoUint32));
-    event->fields.push_back(MakeField("protocol", 6, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "smbus_result";
-    event->group = "i2c";
-    event->proto_field_id = 33;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
-    event->fields.push_back(MakeField("read_write", 4, kProtoUint32));
-    event->fields.push_back(MakeField("command", 5, kProtoUint32));
-    event->fields.push_back(MakeField("res", 6, kProtoInt32));
-    event->fields.push_back(MakeField("protocol", 7, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "smbus_write";
-    event->group = "i2c";
-    event->proto_field_id = 32;
-    event->fields.push_back(MakeField("adapter_nr", 1, kProtoInt32));
-    event->fields.push_back(MakeField("addr", 2, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 3, kProtoUint32));
-    event->fields.push_back(MakeField("command", 4, kProtoUint32));
-    event->fields.push_back(MakeField("len", 5, kProtoUint32));
-    event->fields.push_back(MakeField("protocol", 6, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ipi_entry";
-    event->group = "ipi";
-    event->proto_field_id = 21;
-    event->fields.push_back(MakeField("reason", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ipi_exit";
-    event->group = "ipi";
-    event->proto_field_id = 22;
-    event->fields.push_back(MakeField("reason", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "ipi_raise";
-    event->group = "ipi";
-    event->proto_field_id = 23;
-    event->fields.push_back(MakeField("target_cpus", 1, kProtoUint32));
-    event->fields.push_back(MakeField("reason", 2, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "irq_handler_entry";
-    event->group = "irq";
-    event->proto_field_id = 36;
-    event->fields.push_back(MakeField("irq", 1, kProtoInt32));
-    event->fields.push_back(MakeField("name", 2, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "irq_handler_exit";
-    event->group = "irq";
-    event->proto_field_id = 37;
-    event->fields.push_back(MakeField("irq", 1, kProtoInt32));
-    event->fields.push_back(MakeField("ret", 2, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "softirq_entry";
-    event->group = "irq";
-    event->proto_field_id = 24;
-    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "softirq_exit";
-    event->group = "irq";
-    event->proto_field_id = 25;
-    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "softirq_raise";
-    event->group = "irq";
-    event->proto_field_id = 26;
-    event->fields.push_back(MakeField("vec", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "lowmemory_kill";
-    event->group = "lowmemorykiller";
-    event->proto_field_id = 35;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("pagecache_size", 3, kProtoInt64));
-    event->fields.push_back(MakeField("pagecache_limit", 4, kProtoInt64));
-    event->fields.push_back(MakeField("free", 5, kProtoInt64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_cmd_kickoff";
-    event->group = "mdss";
-    event->proto_field_id = 76;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("kickoff_cnt", 2, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_cmd_pingpong_done";
-    event->group = "mdss";
-    event->proto_field_id = 81;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("intf_num", 2, kProtoUint32));
-    event->fields.push_back(MakeField("pp_num", 3, kProtoUint32));
-    event->fields.push_back(MakeField("koff_cnt", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_cmd_readptr_done";
-    event->group = "mdss";
-    event->proto_field_id = 85;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("koff_cnt", 2, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_cmd_release_bw";
-    event->group = "mdss";
-    event->proto_field_id = 89;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_cmd_wait_pingpong";
-    event->group = "mdss";
-    event->proto_field_id = 93;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("kickoff_cnt", 2, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_commit";
-    event->group = "mdss";
-    event->proto_field_id = 77;
-    event->fields.push_back(MakeField("num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("clk_rate", 3, kProtoUint32));
-    event->fields.push_back(MakeField("bandwidth", 4, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_compare_bw";
-    event->group = "mdss";
-    event->proto_field_id = 82;
-    event->fields.push_back(MakeField("new_ab", 1, kProtoUint64));
-    event->fields.push_back(MakeField("new_ib", 2, kProtoUint64));
-    event->fields.push_back(MakeField("new_wb", 3, kProtoUint64));
-    event->fields.push_back(MakeField("old_ab", 4, kProtoUint64));
-    event->fields.push_back(MakeField("old_ib", 5, kProtoUint64));
-    event->fields.push_back(MakeField("old_wb", 6, kProtoUint64));
-    event->fields.push_back(MakeField("params_changed", 7, kProtoUint32));
-    event->fields.push_back(MakeField("update_bw", 8, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_misr_crc";
-    event->group = "mdss";
-    event->proto_field_id = 86;
-    event->fields.push_back(MakeField("block_id", 1, kProtoUint32));
-    event->fields.push_back(MakeField("vsync_cnt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("crc", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_mixer_update";
-    event->group = "mdss";
-    event->proto_field_id = 90;
-    event->fields.push_back(MakeField("mixer_num", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_prefill_calc";
-    event->group = "mdss";
-    event->proto_field_id = 94;
-    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
-    event->fields.push_back(MakeField("latency_buf", 2, kProtoUint32));
-    event->fields.push_back(MakeField("ot", 3, kProtoUint32));
-    event->fields.push_back(MakeField("y_buf", 4, kProtoUint32));
-    event->fields.push_back(MakeField("y_scaler", 5, kProtoUint32));
-    event->fields.push_back(MakeField("pp_lines", 6, kProtoUint32));
-    event->fields.push_back(MakeField("pp_bytes", 7, kProtoUint32));
-    event->fields.push_back(MakeField("post_sc", 8, kProtoUint32));
-    event->fields.push_back(MakeField("fbc_bytes", 9, kProtoUint32));
-    event->fields.push_back(MakeField("prefill_bytes", 10, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_set_ot";
-    event->group = "mdss";
-    event->proto_field_id = 78;
-    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
-    event->fields.push_back(MakeField("xin_id", 2, kProtoUint32));
-    event->fields.push_back(MakeField("rd_lim", 3, kProtoUint32));
-    event->fields.push_back(MakeField("is_vbif_rt", 4, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_set_panic_luts";
-    event->group = "mdss";
-    event->proto_field_id = 83;
-    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
-    event->fields.push_back(MakeField("fmt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("mode", 3, kProtoUint32));
-    event->fields.push_back(MakeField("panic_lut", 4, kProtoUint32));
-    event->fields.push_back(MakeField("robust_lut", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_set_qos_luts";
-    event->group = "mdss";
-    event->proto_field_id = 87;
-    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
-    event->fields.push_back(MakeField("fmt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("intf", 3, kProtoUint32));
-    event->fields.push_back(MakeField("rot", 4, kProtoUint32));
-    event->fields.push_back(MakeField("fl", 5, kProtoUint32));
-    event->fields.push_back(MakeField("lut", 6, kProtoUint32));
-    event->fields.push_back(MakeField("linear", 7, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_set_wm_levels";
-    event->group = "mdss";
-    event->proto_field_id = 91;
-    event->fields.push_back(MakeField("pnum", 1, kProtoUint32));
-    event->fields.push_back(MakeField("use_space", 2, kProtoUint32));
-    event->fields.push_back(MakeField("priority_bytes", 3, kProtoUint32));
-    event->fields.push_back(MakeField("wm0", 4, kProtoUint32));
-    event->fields.push_back(MakeField("wm1", 5, kProtoUint32));
-    event->fields.push_back(MakeField("wm2", 6, kProtoUint32));
-    event->fields.push_back(MakeField("mb_cnt", 7, kProtoUint32));
-    event->fields.push_back(MakeField("mb_size", 8, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_perf_update_bus";
-    event->group = "mdss";
-    event->proto_field_id = 95;
-    event->fields.push_back(MakeField("client", 1, kProtoInt32));
-    event->fields.push_back(MakeField("ab_quota", 2, kProtoUint64));
-    event->fields.push_back(MakeField("ib_quota", 3, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_sspp_change";
-    event->group = "mdss";
-    event->proto_field_id = 79;
-    event->fields.push_back(MakeField("num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("mixer", 3, kProtoUint32));
-    event->fields.push_back(MakeField("stage", 4, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
-    event->fields.push_back(MakeField("format", 6, kProtoUint32));
-    event->fields.push_back(MakeField("img_w", 7, kProtoUint32));
-    event->fields.push_back(MakeField("img_h", 8, kProtoUint32));
-    event->fields.push_back(MakeField("src_x", 9, kProtoUint32));
-    event->fields.push_back(MakeField("src_y", 10, kProtoUint32));
-    event->fields.push_back(MakeField("src_w", 11, kProtoUint32));
-    event->fields.push_back(MakeField("src_h", 12, kProtoUint32));
-    event->fields.push_back(MakeField("dst_x", 13, kProtoUint32));
-    event->fields.push_back(MakeField("dst_y", 14, kProtoUint32));
-    event->fields.push_back(MakeField("dst_w", 15, kProtoUint32));
-    event->fields.push_back(MakeField("dst_h", 16, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_sspp_set";
-    event->group = "mdss";
-    event->proto_field_id = 84;
-    event->fields.push_back(MakeField("num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("play_cnt", 2, kProtoUint32));
-    event->fields.push_back(MakeField("mixer", 3, kProtoUint32));
-    event->fields.push_back(MakeField("stage", 4, kProtoUint32));
-    event->fields.push_back(MakeField("flags", 5, kProtoUint32));
-    event->fields.push_back(MakeField("format", 6, kProtoUint32));
-    event->fields.push_back(MakeField("img_w", 7, kProtoUint32));
-    event->fields.push_back(MakeField("img_h", 8, kProtoUint32));
-    event->fields.push_back(MakeField("src_x", 9, kProtoUint32));
-    event->fields.push_back(MakeField("src_y", 10, kProtoUint32));
-    event->fields.push_back(MakeField("src_w", 11, kProtoUint32));
-    event->fields.push_back(MakeField("src_h", 12, kProtoUint32));
-    event->fields.push_back(MakeField("dst_x", 13, kProtoUint32));
-    event->fields.push_back(MakeField("dst_y", 14, kProtoUint32));
-    event->fields.push_back(MakeField("dst_w", 15, kProtoUint32));
-    event->fields.push_back(MakeField("dst_h", 16, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_trace_counter";
-    event->group = "mdss";
-    event->proto_field_id = 88;
-    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("counter_name", 2, kProtoString));
-    event->fields.push_back(MakeField("value", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "mdp_video_underrun_done";
-    event->group = "mdss";
-    event->proto_field_id = 92;
-    event->fields.push_back(MakeField("ctl_num", 1, kProtoUint32));
-    event->fields.push_back(MakeField("underrun_cnt", 2, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "rotator_bw_ao_as_context";
-    event->group = "mdss";
-    event->proto_field_id = 96;
-    event->fields.push_back(MakeField("state", 1, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "tracing_mark_write";
-    event->group = "mdss";
-    event->proto_field_id = 80;
-    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("trace_name", 2, kProtoString));
-    event->fields.push_back(MakeField("trace_begin", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "clock_disable";
-    event->group = "power";
-    event->proto_field_id = 15;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("state", 2, kProtoUint64));
-    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "clock_enable";
-    event->group = "power";
-    event->proto_field_id = 14;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("state", 2, kProtoUint64));
-    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "clock_set_rate";
-    event->group = "power";
-    event->proto_field_id = 16;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("state", 2, kProtoUint64));
-    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpu_frequency";
-    event->group = "power";
-    event->proto_field_id = 11;
-    event->fields.push_back(MakeField("state", 1, kProtoUint32));
-    event->fields.push_back(MakeField("cpu_id", 2, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpu_frequency_limits";
-    event->group = "power";
-    event->proto_field_id = 12;
-    event->fields.push_back(MakeField("min_freq", 1, kProtoUint32));
-    event->fields.push_back(MakeField("max_freq", 2, kProtoUint32));
-    event->fields.push_back(MakeField("cpu_id", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpu_idle";
-    event->group = "power";
-    event->proto_field_id = 13;
-    event->fields.push_back(MakeField("state", 1, kProtoUint32));
-    event->fields.push_back(MakeField("cpu_id", 2, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "suspend_resume";
-    event->group = "power";
-    event->proto_field_id = 113;
-    event->fields.push_back(MakeField("action", 1, kProtoString));
-    event->fields.push_back(MakeField("val", 2, kProtoInt32));
-    event->fields.push_back(MakeField("start", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_disable";
-    event->group = "regulator";
-    event->proto_field_id = 60;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_disable_complete";
-    event->group = "regulator";
-    event->proto_field_id = 61;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_enable";
-    event->group = "regulator";
-    event->proto_field_id = 62;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_enable_complete";
-    event->group = "regulator";
-    event->proto_field_id = 63;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_enable_delay";
-    event->group = "regulator";
-    event->proto_field_id = 64;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_set_voltage";
-    event->group = "regulator";
-    event->proto_field_id = 65;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("min", 2, kProtoInt32));
-    event->fields.push_back(MakeField("max", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "regulator_set_voltage_complete";
-    event->group = "regulator";
-    event->proto_field_id = 66;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("val", 2, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_blocked_reason";
-    event->group = "sched";
-    event->proto_field_id = 18;
-    event->fields.push_back(MakeField("pid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("caller", 2, kProtoUint64));
-    event->fields.push_back(MakeField("io_wait", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_cpu_hotplug";
-    event->group = "sched";
-    event->proto_field_id = 19;
-    event->fields.push_back(MakeField("affected_cpu", 1, kProtoInt32));
-    event->fields.push_back(MakeField("error", 2, kProtoInt32));
-    event->fields.push_back(MakeField("status", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_exec";
-    event->group = "sched";
-    event->proto_field_id = 237;
-    event->fields.push_back(MakeField("filename", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("old_pid", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_exit";
-    event->group = "sched";
-    event->proto_field_id = 238;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("tgid", 3, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_fork";
-    event->group = "sched";
-    event->proto_field_id = 239;
-    event->fields.push_back(MakeField("parent_comm", 1, kProtoString));
-    event->fields.push_back(MakeField("parent_pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("child_comm", 3, kProtoString));
-    event->fields.push_back(MakeField("child_pid", 4, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_free";
-    event->group = "sched";
-    event->proto_field_id = 240;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_hang";
-    event->group = "sched";
-    event->proto_field_id = 241;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_process_wait";
-    event->group = "sched";
-    event->proto_field_id = 242;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_switch";
-    event->group = "sched";
-    event->proto_field_id = 4;
-    event->fields.push_back(MakeField("prev_comm", 1, kProtoString));
-    event->fields.push_back(MakeField("prev_pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prev_prio", 3, kProtoInt32));
-    event->fields.push_back(MakeField("prev_state", 4, kProtoInt64));
-    event->fields.push_back(MakeField("next_comm", 5, kProtoString));
-    event->fields.push_back(MakeField("next_pid", 6, kProtoInt32));
-    event->fields.push_back(MakeField("next_prio", 7, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_wakeup";
-    event->group = "sched";
-    event->proto_field_id = 17;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
-    event->fields.push_back(MakeField("success", 4, kProtoInt32));
-    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_wakeup_new";
-    event->group = "sched";
-    event->proto_field_id = 114;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
-    event->fields.push_back(MakeField("success", 4, kProtoInt32));
-    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sched_waking";
-    event->group = "sched";
-    event->proto_field_id = 20;
-    event->fields.push_back(MakeField("comm", 1, kProtoString));
-    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
-    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
-    event->fields.push_back(MakeField("success", 4, kProtoInt32));
-    event->fields.push_back(MakeField("target_cpu", 5, kProtoInt32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sync_pt";
-    event->group = "sync";
-    event->proto_field_id = 38;
-    event->fields.push_back(MakeField("timeline", 1, kProtoString));
-    event->fields.push_back(MakeField("value", 2, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sync_timeline";
-    event->group = "sync";
-    event->proto_field_id = 39;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("value", 2, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "sync_wait";
-    event->group = "sync";
-    event->proto_field_id = 40;
-    event->fields.push_back(MakeField("name", 1, kProtoString));
-    event->fields.push_back(MakeField("status", 2, kProtoInt32));
-    event->fields.push_back(MakeField("begin", 3, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "task_newtask";
+    event->name = "task/task_newtask";
     event->group = "task";
     event->proto_field_id = 235;
     event->fields.push_back(MakeField("pid", 1, kProtoInt32));
@@ -2730,7 +2754,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "task_rename";
+    event->name = "task/task_rename";
     event->group = "task";
     event->proto_field_id = 236;
     event->fields.push_back(MakeField("pid", 1, kProtoInt32));
@@ -2742,87 +2766,74 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "mm_vmscan_direct_reclaim_begin";
-    event->group = "vmscan";
-    event->proto_field_id = 46;
-    event->fields.push_back(MakeField("order", 1, kProtoInt32));
-    event->fields.push_back(MakeField("may_writepage", 2, kProtoInt32));
-    event->fields.push_back(MakeField("gfp_flags", 3, kProtoUint32));
+    event->name = "sched/sched_process_exec";
+    event->group = "sched";
+    event->proto_field_id = 237;
+    event->fields.push_back(MakeField("filename", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("old_pid", 3, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "mm_vmscan_direct_reclaim_end";
-    event->group = "vmscan";
-    event->proto_field_id = 47;
-    event->fields.push_back(MakeField("nr_reclaimed", 1, kProtoUint64));
+    event->name = "sched/sched_process_exit";
+    event->group = "sched";
+    event->proto_field_id = 238;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("tgid", 3, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 4, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "mm_vmscan_kswapd_sleep";
-    event->group = "vmscan";
-    event->proto_field_id = 49;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
+    event->name = "sched/sched_process_fork";
+    event->group = "sched";
+    event->proto_field_id = 239;
+    event->fields.push_back(MakeField("parent_comm", 1, kProtoString));
+    event->fields.push_back(MakeField("parent_pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("child_comm", 3, kProtoString));
+    event->fields.push_back(MakeField("child_pid", 4, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "mm_vmscan_kswapd_wake";
-    event->group = "vmscan";
-    event->proto_field_id = 48;
-    event->fields.push_back(MakeField("nid", 1, kProtoInt32));
-    event->fields.push_back(MakeField("order", 2, kProtoInt32));
+    event->name = "sched/sched_process_free";
+    event->group = "sched";
+    event->proto_field_id = 240;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "workqueue_activate_work";
-    event->group = "workqueue";
-    event->proto_field_id = 56;
-    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+    event->name = "sched/sched_process_hang";
+    event->group = "sched";
+    event->proto_field_id = 241;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "workqueue_execute_end";
-    event->group = "workqueue";
-    event->proto_field_id = 57;
-    event->fields.push_back(MakeField("work", 1, kProtoUint64));
+    event->name = "sched/sched_process_wait";
+    event->group = "sched";
+    event->proto_field_id = 242;
+    event->fields.push_back(MakeField("comm", 1, kProtoString));
+    event->fields.push_back(MakeField("pid", 2, kProtoInt32));
+    event->fields.push_back(MakeField("prio", 3, kProtoInt32));
   }
 
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "workqueue_execute_start";
-    event->group = "workqueue";
-    event->proto_field_id = 58;
-    event->fields.push_back(MakeField("work", 1, kProtoUint64));
-    event->fields.push_back(MakeField("function", 2, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "workqueue_queue_work";
-    event->group = "workqueue";
-    event->proto_field_id = 59;
-    event->fields.push_back(MakeField("work", 1, kProtoUint64));
-    event->fields.push_back(MakeField("function", 2, kProtoUint64));
-    event->fields.push_back(MakeField("workqueue", 3, kProtoUint64));
-    event->fields.push_back(MakeField("req_cpu", 4, kProtoUint32));
-    event->fields.push_back(MakeField("cpu", 5, kProtoUint32));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "f2fs_do_submit_bio";
+    event->name = "f2fs/f2fs_do_submit_bio";
     event->group = "f2fs";
     event->proto_field_id = 243;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2835,7 +2846,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_evict_inode";
+    event->name = "f2fs/f2fs_evict_inode";
     event->group = "f2fs";
     event->proto_field_id = 244;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2851,7 +2862,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_fallocate";
+    event->name = "f2fs/f2fs_fallocate";
     event->group = "f2fs";
     event->proto_field_id = 245;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2867,7 +2878,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_get_data_block";
+    event->name = "f2fs/f2fs_get_data_block";
     event->group = "f2fs";
     event->proto_field_id = 246;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2881,7 +2892,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_get_victim";
+    event->name = "f2fs/f2fs_get_victim";
     event->group = "f2fs";
     event->proto_field_id = 247;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2899,7 +2910,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_iget";
+    event->name = "f2fs/f2fs_iget";
     event->group = "f2fs";
     event->proto_field_id = 248;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2915,7 +2926,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_iget_exit";
+    event->name = "f2fs/f2fs_iget_exit";
     event->group = "f2fs";
     event->proto_field_id = 249;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2926,7 +2937,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_new_inode";
+    event->name = "f2fs/f2fs_new_inode";
     event->group = "f2fs";
     event->proto_field_id = 250;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2937,7 +2948,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_readpage";
+    event->name = "f2fs/f2fs_readpage";
     event->group = "f2fs";
     event->proto_field_id = 251;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2950,7 +2961,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_reserve_new_block";
+    event->name = "f2fs/f2fs_reserve_new_block";
     event->group = "f2fs";
     event->proto_field_id = 252;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2961,7 +2972,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_set_page_dirty";
+    event->name = "f2fs/f2fs_set_page_dirty";
     event->group = "f2fs";
     event->proto_field_id = 253;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2975,7 +2986,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_submit_write_page";
+    event->name = "f2fs/f2fs_submit_write_page";
     event->group = "f2fs";
     event->proto_field_id = 254;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -2988,7 +2999,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_sync_file_enter";
+    event->name = "f2fs/f2fs_sync_file_enter";
     event->group = "f2fs";
     event->proto_field_id = 255;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3004,7 +3015,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_sync_file_exit";
+    event->name = "f2fs/f2fs_sync_file_exit";
     event->group = "f2fs";
     event->proto_field_id = 256;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3017,7 +3028,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_sync_fs";
+    event->name = "f2fs/f2fs_sync_fs";
     event->group = "f2fs";
     event->proto_field_id = 257;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3028,7 +3039,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate";
+    event->name = "f2fs/f2fs_truncate";
     event->group = "f2fs";
     event->proto_field_id = 258;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3044,7 +3055,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_blocks_enter";
+    event->name = "f2fs/f2fs_truncate_blocks_enter";
     event->group = "f2fs";
     event->proto_field_id = 259;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3057,7 +3068,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_blocks_exit";
+    event->name = "f2fs/f2fs_truncate_blocks_exit";
     event->group = "f2fs";
     event->proto_field_id = 260;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3068,7 +3079,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_data_blocks_range";
+    event->name = "f2fs/f2fs_truncate_data_blocks_range";
     event->group = "f2fs";
     event->proto_field_id = 261;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3081,7 +3092,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_inode_blocks_enter";
+    event->name = "f2fs/f2fs_truncate_inode_blocks_enter";
     event->group = "f2fs";
     event->proto_field_id = 262;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3094,7 +3105,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_inode_blocks_exit";
+    event->name = "f2fs/f2fs_truncate_inode_blocks_exit";
     event->group = "f2fs";
     event->proto_field_id = 263;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3105,7 +3116,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_node";
+    event->name = "f2fs/f2fs_truncate_node";
     event->group = "f2fs";
     event->proto_field_id = 264;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3117,7 +3128,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_nodes_enter";
+    event->name = "f2fs/f2fs_truncate_nodes_enter";
     event->group = "f2fs";
     event->proto_field_id = 265;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3129,7 +3140,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_nodes_exit";
+    event->name = "f2fs/f2fs_truncate_nodes_exit";
     event->group = "f2fs";
     event->proto_field_id = 266;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3140,7 +3151,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_truncate_partial_nodes";
+    event->name = "f2fs/f2fs_truncate_partial_nodes";
     event->group = "f2fs";
     event->proto_field_id = 267;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3153,7 +3164,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_unlink_enter";
+    event->name = "f2fs/f2fs_unlink_enter";
     event->group = "f2fs";
     event->proto_field_id = 268;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3166,7 +3177,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_unlink_exit";
+    event->name = "f2fs/f2fs_unlink_exit";
     event->group = "f2fs";
     event->proto_field_id = 269;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3177,7 +3188,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_vm_page_mkwrite";
+    event->name = "f2fs/f2fs_vm_page_mkwrite";
     event->group = "f2fs";
     event->proto_field_id = 270;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3191,7 +3202,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_write_begin";
+    event->name = "f2fs/f2fs_write_begin";
     event->group = "f2fs";
     event->proto_field_id = 271;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3204,7 +3215,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_write_checkpoint";
+    event->name = "f2fs/f2fs_write_checkpoint";
     event->group = "f2fs";
     event->proto_field_id = 272;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
@@ -3215,7 +3226,7 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "f2fs_write_end";
+    event->name = "f2fs/f2fs_write_end";
     event->group = "f2fs";
     event->proto_field_id = 273;
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
