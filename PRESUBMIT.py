@@ -95,6 +95,7 @@ def CheckMergedTraceConfigProto(input_api, output_api):
         ]
     return []
 
+
 def CheckWhitelist(input_api, output_api):
   file_filter = lambda x: input_api.FilterSourceFile(
           x,
@@ -121,7 +122,7 @@ def CheckWhitelist(input_api, output_api):
         return [
           output_api.PresubmitError(
               'event_whitelist only has two supported changes: '
-              'adding a new line, and replacing a line with removed '
+              'appending a new line, and replacing a line with removed.'
           )
         ]
       i += 1
