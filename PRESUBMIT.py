@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import subprocess
 
+import git_cl
 
 def CheckChange(input, output):
     # There apparently is no way to wrap strings in blueprints, so ignore long
@@ -30,6 +32,7 @@ def CheckChange(input, output):
     results += CheckIncludeGuards(input, output)
     results += CheckAndroidBlueprint(input, output)
     results += CheckMergedTraceConfigProto(input, output)
+    results += CheckWhitelist(input, output)
     return results
 
 
@@ -93,3 +96,33 @@ def CheckMergedTraceConfigProto(input_api, output_api):
                 'date. Please run ' + tool + ' to update it.')
         ]
     return []
+
+
+def CheckWhitelist(input_api, output_api):
+  file_filter = lambda x: input_api.FilterSourceFile(
+          x,
+          white_list=('tools/ftrace_proto_gen/event_whitelist$'))
+  if not input_api.AffectedSourceFiles(file_filter):
+    return []
+
+  cl = git_cl.Changelist()
+  upstream = cl.GetUpstreamBranch()
+
+  old_whitelist_data = subprocess.check_output(
+      ['git', 'show',
+       '{}:tools/ftrace_proto_gen/event_whitelist'.format(upstream)])
+  old_whitelist_lines = [x for x in old_whitelist_data.split('\n')
+                         if x and x != '#']
+  with open("tools/ftrace_proto_gen/event_whitelist") as new_whitelist_fd:
+    new_whitelist_lines = [x.strip() for x in new_whitelist_fd
+                           if x.strip() != '#']
+
+  if any(new_line != 'removed' and new_line != old_line for old_line, new_line
+         in itertools.izip(old_whitelist_lines, new_whitelist_lines)):
+    return [
+      output_api.PresubmitError(
+          'event_whitelist only has two supported changes: '
+          'appending a new line, and replacing a line with removed.'
+      )
+    ]
+  return []
