@@ -122,16 +122,8 @@ int main(int argc, char** argv) {
 
   {
     std::unique_ptr<std::ostream> out =
-        ostream_factory("protos/perfetto/trace/ftrace/ftrace_event.proto");
+        ostream_factory(output_dir + "/ftrace_event.proto");
     perfetto::GenerateFtraceEventProto(whitelist, out.get());
-  }
-
-  std::string ftrace;
-  if (!perfetto::base::ReadFile(
-          "protos/perfetto/trace/ftrace/ftrace_event.proto", &ftrace)) {
-    fprintf(stderr, "Failed to open %s\n",
-            "protos/perfetto/trace/ftrace/ftrace_event.proto");
-    return 1;
   }
 
   std::set<std::string> new_events;
@@ -213,12 +205,14 @@ int main(int argc, char** argv) {
     }
 
     *fout << proto.ToString();
+    PERFETTO_CHECK(!fout->fail());
   }
 
   {
     std::unique_ptr<std::ostream> out =
         ostream_factory("src/ftrace_reader/event_info.cc");
     perfetto::GenerateEventInfo(events_info, out.get());
+    PERFETTO_CHECK(!out->fail());
   }
 
   if (update_build_files) {

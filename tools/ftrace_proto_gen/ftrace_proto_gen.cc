@@ -45,7 +45,7 @@ VerifyStream::VerifyStream(std::string filename)
 
 VerifyStream::~VerifyStream() {
   if (expected_ != str()) {
-    PERFETTO_FATAL("%s is out of date. Please run tools/ftrace_proto_gen.",
+    PERFETTO_FATAL("%s is out of date. Please run tools/run_ftrace_proto_gen.",
                    filename_.c_str());
   }
 }
