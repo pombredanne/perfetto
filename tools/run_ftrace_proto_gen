@@ -2,10 +2,6 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 BUILDDIR="$DIR/ftrace_proto_gen_build"
-if [[ -f "$BUILDDIR" ]]; then
-  echo "$DIR/ftrace_proto_gen_build exists. Not continuing"
-  exit 1;
-fi
 
 "$DIR/gn" gen "$BUILDDIR" --args="is_clang=true is_debug=false"
 "$DIR/ninja" -C "$BUILDDIR" ftrace_proto_gen
@@ -20,3 +16,5 @@ cd "$DIR/.."
   --update_build_files \
   "$@" \
   "$DIR"/../src/ftrace_reader/test/data/*/events/
+
+rm -rf "$BUILDDIR"
