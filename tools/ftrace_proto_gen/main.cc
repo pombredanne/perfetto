@@ -39,12 +39,23 @@
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "tools/ftrace_proto_gen/ftrace_proto_gen.h"
 
+std::unique_ptr<std::ostream> MakeOFStream(const std::string& filename);
+std::unique_ptr<std::ostream> MakeOFStream(const std::string& filename) {
+  return std::unique_ptr<std::ostream>(new std::ofstream(filename));
+}
+
+std::unique_ptr<std::ostream> MakeVerifyStream(const std::string& filename);
+std::unique_ptr<std::ostream> MakeVerifyStream(const std::string& filename) {
+  return std::unique_ptr<std::ostream>(new perfetto::VerifyStream(filename));
+}
+
 int main(int argc, char** argv) {
   static struct option long_options[] = {
       {"whitelist_path", required_argument, nullptr, 'w'},
       {"output_dir", required_argument, nullptr, 'o'},
       {"proto_descriptor", required_argument, nullptr, 'd'},
       {"update_build_files", no_argument, nullptr, 'b'},
+      {"check_only", no_argument, nullptr, 'c'},
   };
 
   int option_index;
@@ -54,6 +65,9 @@ int main(int argc, char** argv) {
   std::string output_dir;
   std::string proto_descriptor;
   bool update_build_files = false;
+
+  std::unique_ptr<std::ostream> (*ostream_factory)(const std::string&) =
+      &MakeOFStream;
 
   while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
@@ -69,6 +83,8 @@ int main(int argc, char** argv) {
       case 'b':
         update_build_files = true;
         break;
+      case 'c':
+        ostream_factory = &MakeVerifyStream;
     }
   }
 
@@ -104,7 +120,11 @@ int main(int argc, char** argv) {
     }
   }
 
-  perfetto::GenerateFtraceEventProto(whitelist);
+  {
+    std::unique_ptr<std::ostream> out =
+        ostream_factory("protos/perfetto/trace/ftrace/ftrace_event.proto");
+    perfetto::GenerateFtraceEventProto(whitelist, out.get());
+  }
 
   std::string ftrace;
   if (!perfetto::base::ReadFile(
@@ -186,22 +206,26 @@ int main(int argc, char** argv) {
     events_info.push_back(
         perfetto::SingleEventInfo(proto, event.group(), proto_field_id));
 
-    std::ofstream fout(output_path.c_str(), std::ios::out);
+    std::unique_ptr<std::ostream> fout = ostream_factory(output_path);
     if (!fout) {
       fprintf(stderr, "Failed to open %s\n", output_path.c_str());
       return 1;
     }
 
-    fout << proto.ToString();
-    fout.close();
+    *fout << proto.ToString();
   }
 
-  perfetto::GenerateEventInfo(events_info);
+  {
+    std::unique_ptr<std::ostream> out =
+        ostream_factory("src/ftrace_reader/event_info.cc");
+    perfetto::GenerateEventInfo(events_info, out.get());
+  }
 
   if (update_build_files) {
-    std::ofstream f(output_dir + "/all_protos.gni");
+    std::unique_ptr<std::ostream> f =
+        ostream_factory(output_dir + "/all_protos.gni");
 
-    f << R"(# Copyright (C) 2018 The Android Open Source Project
+    *f << R"(# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -225,10 +249,9 @@ ftrace_proto_names = [
     for (const perfetto::FtraceEventName& event : whitelist) {
       if (!event.valid())
         continue;
-      f << "  \"" << event.name() << ".proto\",\n";
+      *f << "  \"" << event.name() << ".proto\",\n";
     }
-    f << "]\n";
-    f.close();
-    PERFETTO_CHECK(!f.fail());
+    *f << "]\n";
+    PERFETTO_CHECK(!f->fail());
   }
 }
