@@ -14,8 +14,8 @@
 
 import itertools
 import subprocess
-import git_cl
 
+import git_cl
 
 def CheckChange(input, output):
     # There apparently is no way to wrap strings in blueprints, so ignore long
