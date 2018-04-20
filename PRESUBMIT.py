@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import subprocess
+import git_cl
 
 
 def CheckChange(input, output):
@@ -103,7 +104,8 @@ def CheckWhitelist(input_api, output_api):
   if not input_api.AffectedSourceFiles(file_filter):
     return []
 
-  upstream = subprocess.check_output(['git', 'cl', 'upstream']).strip()
+  cl = git_cl.Changelist()
+  upstream = cl.GetUpstreamBranch()
 
   old_whitelist_data = subprocess.check_output(
       ['git', 'show',
