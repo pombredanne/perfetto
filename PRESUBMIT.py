@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import subprocess
 import git_cl
 
@@ -113,19 +114,15 @@ def CheckWhitelist(input_api, output_api):
   old_whitelist_lines = [x for x in old_whitelist_data.split('\n')
                          if x and x != '#']
   with open("tools/ftrace_proto_gen/event_whitelist") as new_whitelist_fd:
-    i = 0
-    for line in new_whitelist_fd:
-      line = line.strip('\n')
-      if line == '#':
-        continue
-      if (i < len(old_whitelist_lines) and
-          line != "removed" and
-          old_whitelist_lines[i] != line):
-        return [
-          output_api.PresubmitError(
-              'event_whitelist only has two supported changes: '
-              'appending a new line, and replacing a line with removed.'
-          )
-        ]
-      i += 1
+    new_whitelist_lines = [x.strip() for x in new_whitelist_fd
+                           if x.strip() != '#']
+
+  if any(new_line != 'removed' and new_line != old_line for old_line, new_line
+         in itertools.izip(old_whitelist_lines, new_whitelist_lines)):
+    return [
+      output_api.PresubmitError(
+          'event_whitelist only has two supported changes: '
+          'appending a new line, and replacing a line with removed.'
+      )
+    ]
   return []
