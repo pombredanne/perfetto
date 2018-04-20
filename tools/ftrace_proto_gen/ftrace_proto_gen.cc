@@ -16,11 +16,11 @@
 
 #include "tools/ftrace_proto_gen/ftrace_proto_gen.h"
 
-#include "perfetto/base/logging.h"
-#include "perfetto/base/string_splitter.h"
-
 #include <fstream>
 #include <regex>
+
+#include "perfetto/base/logging.h"
+#include "perfetto/base/string_splitter.h"
 
 namespace perfetto {
 
@@ -69,7 +69,6 @@ ProtoType ProtoType::GetSigned() const {
     return *this;
 
   if (size == 64) {
-    PERFETTO_ELOG("Casting uint64 to int64. Possible loss of precision.");
     return Numeric(64, true);
   }
 
@@ -106,6 +105,7 @@ ProtoType ProtoType::Invalid() {
 
 // static
 ProtoType ProtoType::Numeric(uint16_t size, bool is_signed) {
+  PERFETTO_CHECK(size == 32 || size == 64);
   return {NUMERIC, size, is_signed};
 }
 
@@ -162,18 +162,14 @@ ProtoType InferProtoType(const FtraceEvent::Field& field) {
   if (StartsWith(field.type_and_name, "ino_t ") ||
       StartsWith(field.type_and_name, "i_ino ") ||
       StartsWith(field.type_and_name, "dev_t ")) {
-    return ProtoType::Numeric(64, false);
+    return ProtoType::Numeric(64, /* is_signed= */ false);
   }
 
   // Ints of various sizes:
-  if (field.size <= 4 && field.is_signed)
-    return ProtoType::Numeric(32, true);
-  if (field.size <= 4 && !field.is_signed)
-    return ProtoType::Numeric(32, false);
-  if (field.size <= 8 && field.is_signed)
-    return ProtoType::Numeric(64, true);
-  if (field.size <= 8 && !field.is_signed)
-    return ProtoType::Numeric(64, false);
+  if (field.size <= 4)
+    return ProtoType::Numeric(32, field.is_signed);
+  if (field.size <= 8)
+    return ProtoType::Numeric(64, field.is_signed);
   return ProtoType::Invalid();
 }
 
