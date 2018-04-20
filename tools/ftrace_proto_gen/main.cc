@@ -14,15 +14,6 @@
  * limitations under the License.
  */
 
-// Run like this:
-// out/linux_clang_debug/ftrace_proto_gen \
-//   --whitelist_path ./tools/ftrace_proto_gen/event_whitelist \
-//   --output_dir protos/perfetto/trace/ftrace/ \
-//   --proto_descriptor
-//   out/linux_clang_release/gen/protos/trace/ftrace.descriptor \
-//   --update_build_files \
-//   src/ftrace_reader/test/data/*/events/
-
 #include <getopt.h>
 #include <sys/stat.h>
 #include <fstream>
