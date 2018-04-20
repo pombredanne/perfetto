@@ -166,9 +166,9 @@ ProtoType InferProtoType(const FtraceEvent::Field& field) {
   }
 
   // Ints of various sizes:
-  if (field.size <= 4 && field.is_signed)
+  if (field.size <= 4)
     return ProtoType::Numeric(32, field.is_signed);
-  if (field.size <= 8 && field.is_signed)
+  if (field.size <= 8)
     return ProtoType::Numeric(64, field.is_signed);
   return ProtoType::Invalid();
 }
