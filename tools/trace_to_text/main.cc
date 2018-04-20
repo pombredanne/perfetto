@@ -418,8 +418,9 @@ int TraceToSummary(std::istream* input,
   std::set<uint64_t> resolved_scan_inodes;
 
   ForEachPacketInTrace(
-      input, [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
-              &ftrace_inodes, &ftrace_inode_count, &resolved_map_inodes,
+      input, [&start, &end, &ftrace_overwrites, &ftrace_timestamps,
+              &tids_in_tree, &tids_in_events, &ftrace_inodes,
+              &ftrace_inode_count, &resolved_map_inodes,
               &resolved_scan_inodes](const protos::TracePacket& packet) {
 
         if (packet.has_process_tree()) {
