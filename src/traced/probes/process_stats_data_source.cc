@@ -63,6 +63,9 @@ void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   TraceWriter::TracePacketHandle trace_packet{};
   protos::pbzero::ProcessTree* process_tree = nullptr;
   for (int32_t pid : pids) {
+    if (procfs_utils::ReadTgid(pid) != pid)
+      return;
+
     auto it_and_inserted = seen_pids_.emplace(pid);
     if (!it_and_inserted.second)
       continue;
