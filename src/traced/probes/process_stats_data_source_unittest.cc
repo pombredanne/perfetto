@@ -15,15 +15,14 @@
  */
 
 #include "src/traced/probes/process_stats_data_source.h"
-#include "perfetto/trace/trace_packet.pb.h"
-#include "perfetto/trace/trace_packet.pbzero.h"
-
-#include "src/process_stats/process_info.h"
-#include "src/tracing/core/trace_writer_for_testing.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/trace/trace_packet.pb.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
+#include "src/tracing/core/trace_writer_for_testing.h"
 
+using ::procfs_utils::ProcessInfo;
+using ::testing::_;
 using ::testing::Invoke;
 
 namespace perfetto {
@@ -36,7 +35,7 @@ class TestProcessStatsDataSource : public ProcessStatsDataSource {
                              const DataSourceConfig& config)
       : ProcessStatsDataSource(id, std::move(writer), config) {}
 
-  MOCK_METHOD1(ReadProcessInfo, std::unique_ptr<ProcessInfo>(int pid));
+  MOCK_METHOD2(ReadProcessInfo, bool(int pid, ProcessInfo*));
 };
 
 class ProcessStatsDataSourceTest : public ::testing::Test {
@@ -53,22 +52,18 @@ class ProcessStatsDataSourceTest : public ::testing::Test {
     return std::unique_ptr<TestProcessStatsDataSource>(
         new TestProcessStatsDataSource(0, std::move(writer), cfg));
   }
-
-  static std::unique_ptr<ProcessInfo> GetProcessInfo(int pid) {
-    ProcessInfo* process = new ProcessInfo();
-    process->pid = pid;
-    process->in_kernel = true;  // So that it doesn't try to read threads.
-    process->ppid = 0;
-    process->cmdline.push_back("test_process");
-    return std::unique_ptr<ProcessInfo>(process);
-  }
 };
 
-TEST_F(ProcessStatsDataSourceTest, TestWriteOnDemand) {
-  DataSourceConfig config;
-  auto data_source = GetProcessStatsDataSource(config);
-  EXPECT_CALL(*data_source, ReadProcessInfo(42))
-      .WillRepeatedly(Invoke(GetProcessInfo));
+TEST_F(ProcessStatsDataSourceTest, WriteOnDemand) {
+  auto data_source = GetProcessStatsDataSource(DataSourceConfig());
+  EXPECT_CALL(*data_source, ReadProcessInfo(42, _))
+      .WillRepeatedly(Invoke([](int pid, ProcessInfo* process) {
+        process->pid = pid;
+        process->in_kernel = true;  // So that it doesn't try to read threads.
+        process->ppid = 0;
+        process->cmdline.push_back("test_process");
+        return true;
+      }));
   data_source->OnPids({42});
   std::unique_ptr<protos::TracePacket> packet = writer_raw_->ParseProto();
   ASSERT_TRUE(packet->has_process_tree());
@@ -77,6 +72,42 @@ TEST_F(ProcessStatsDataSourceTest, TestWriteOnDemand) {
   ASSERT_EQ(first_process.pid(), 42);
   ASSERT_EQ(first_process.ppid(), 0);
   ASSERT_EQ(first_process.cmdline(0), std::string("test_process"));
+}
+
+TEST_F(ProcessStatsDataSourceTest, DontRescanCachedPIDsAndTIDs) {
+  auto data_source = GetProcessStatsDataSource(DataSourceConfig());
+  auto mock_info = [](int pid, ProcessInfo* process) {
+    process->pid = pid;
+    process->in_kernel = false;
+    process->ppid = 0;
+    process->cmdline.push_back("test_process");
+    for (int tid = pid; tid < pid + 3; tid++) {
+      auto* thread_info = &process->threads[tid];
+      thread_info->tid = tid;
+      strcpy(thread_info->name, "test_thread");
+    }
+    return true;
+  };
+
+  EXPECT_CALL(*data_source, ReadProcessInfo(10, _)).WillOnce(Invoke(mock_info));
+  EXPECT_CALL(*data_source, ReadProcessInfo(20, _)).WillOnce(Invoke(mock_info));
+  EXPECT_CALL(*data_source, ReadProcessInfo(30, _)).WillOnce(Invoke(mock_info));
+  data_source->OnPids({10, 11, 12, 20, 21, 22, 10, 20, 11, 21});
+  data_source->OnPids({30});
+  data_source->OnPids({10, 30, 10, 31, 32});
+
+  std::unique_ptr<protos::TracePacket> packet = writer_raw_->ParseProto();
+  ASSERT_TRUE(packet->has_process_tree());
+  const auto& proceses = packet->process_tree().processes();
+  ASSERT_EQ(proceses.size(), 3);
+  for (int pid_idx = 0; pid_idx < 3; pid_idx++) {
+    int pid = (pid_idx + 1) * 10;
+    ASSERT_EQ(proceses.Get(pid_idx).pid(), pid);
+    for (int tid_idx = 0; tid_idx < 3; tid_idx++) {
+      int tid = pid + tid_idx;
+      ASSERT_EQ(proceses.Get(pid_idx).threads().Get(tid_idx).tid(), tid);
+    }
+  }
 }
 
 }  // namespace

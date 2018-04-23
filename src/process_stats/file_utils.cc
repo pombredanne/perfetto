@@ -1,6 +1,18 @@
-// Copyright 2017 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #include "src/process_stats/file_utils.h"
 
@@ -86,24 +98,6 @@ bool ReadProcFileTrimmed(int pid,
   char proc_path[128];
   snprintf(proc_path, sizeof(proc_path), "/proc/%d/%s", pid, proc_file);
   return ReadFileTrimmed(proc_path, buf, length);
-}
-
-LineReader::LineReader(char* buf, size_t size) : ptr_(buf), end_(buf + size) {}
-
-LineReader::~LineReader() {}
-
-const char* LineReader::NextLine() {
-  if (ptr_ >= end_)
-    return nullptr;
-  const char* cur = ptr_;
-  char* next = strchr(ptr_, '\n');
-  if (next) {
-    *next = '\0';
-    ptr_ = next + 1;
-  } else {
-    ptr_ = end_;
-  }
-  return cur;
 }
 
 }  // namespace file_utils

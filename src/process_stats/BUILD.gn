@@ -22,7 +22,6 @@ source_set("process_stats") {
   sources = [
     "file_utils.cc",
     "file_utils.h",
-    "process_info.h",
     "procfs_utils.cc",
     "procfs_utils.h",
   ]
