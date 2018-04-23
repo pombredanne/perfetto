@@ -25,13 +25,13 @@
 namespace procfs_utils {
 
 struct ThreadInfo {
-  int tid = -1;
+  int tid = 0;
   char name[16] = {};
 };
 
 struct ProcessInfo {
-  int pid = -1;
-  int ppid = -1;
+  int pid = 0;
+  int ppid = 0;
   bool in_kernel = false;
   bool is_app = false;
   char exe[256] = {};

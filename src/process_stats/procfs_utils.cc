@@ -58,7 +58,7 @@ inline int ReadStatusLine(const char* buf, const char* status_string) {
   const char* line = strstr(buf, status_string);
   if (!line) {
     PERFETTO_DCHECK(false);
-    return -1;
+    return 0;
   }
   return atoi(line + strlen(status_string));
 }
@@ -72,7 +72,7 @@ bool ReadProcessInfo(int pid, ProcessInfo* process, bool stop_recursion) {
     return false;
 
   int tgid = ReadStatusLine(proc_status, "\nTgid:");
-  if (tgid == -1)
+  if (tgid <= 0)
     return false;
 
   if (tgid != pid) {
