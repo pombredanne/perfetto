@@ -26,7 +26,7 @@ message ProcessStatsConfig {
   enum Quirks {
     QUIRKS_UNSPECIFIED = 0;
     DEPRECATED_DISABLE_INITIAL_DUMP = 1;  // Deprecated.
-    DISABLE_ON_DEMAND = 2;
+    DEPRECATED_DISABLE_ON_DEMAND = 2;     // Deprecated.
   }
 
   repeated Quirks quirks = 1;

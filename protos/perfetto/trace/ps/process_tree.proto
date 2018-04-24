@@ -24,8 +24,7 @@ message ProcessTree {
     // The thread id (as per gettid())
     optional int32 tid = 1;
 
-    // Thread group id (i.e. the PID of the parent process == TID of the main
-    // thread).
+    // Thread group id (i.e. the PID of the process, == TID of the main thread)
     optional int32 tgid = 3;
 
     // The name of the thread.
@@ -45,8 +44,8 @@ message ProcessTree {
     // and it will contain /proc/pid/comm.
     repeated string cmdline = 3;
 
-    // No longer used as of Apr 2018, when the separated |threads| field was
-    // introduced.
+    // No longer used as of Apr 2018, when the distinct |threads| field was
+    // introduced in ProcessTree.
     repeated Thread threads_deprecated = 4 [deprecated = true];
   }
 
