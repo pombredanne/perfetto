@@ -26,7 +26,6 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/trace_writer.h"
-#include "src/process_stats/procfs_utils.h"
 
 namespace perfetto {
 
@@ -41,18 +40,25 @@ class ProcessStatsDataSource {
   const DataSourceConfig& config() const { return config_; }
 
   base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
-  void WriteAllProcesses();
   void OnPids(const std::vector<int32_t>& pids);
   void Flush();
 
   // Virtual for testing.
-  virtual bool ReadProcessInfo(int pid, procfs_utils::ProcessInfo*);
+  virtual std::string ReadProcPidFile(int32_t pid, const std::string& file);
 
  private:
   ProcessStatsDataSource(const ProcessStatsDataSource&) = delete;
   ProcessStatsDataSource& operator=(const ProcessStatsDataSource&) = delete;
 
-  void WriteProcess(int32_t pid, protos::pbzero::ProcessTree*);
+  void WriteProcess(int32_t pid,
+                    const std::string& proc_status,
+                    protos::pbzero::ProcessTree*);
+  void WriteThread(int32_t tid,
+                   int32_t tgid,
+                   const std::string& proc_status,
+                   protos::pbzero::ProcessTree*);
+  void WriteProcessOrThread(int32_t pid, protos::pbzero::ProcessTree*);
+  std::string ReadProcStatusEntry(const std::string& buf, const char* key);
 
   const TracingSessionID session_id_;
   std::unique_ptr<TraceWriter> writer_;

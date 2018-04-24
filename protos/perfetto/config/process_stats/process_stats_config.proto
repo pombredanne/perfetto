@@ -25,7 +25,7 @@ package perfetto.protos;
 message ProcessStatsConfig {
   enum Quirks {
     QUIRKS_UNSPECIFIED = 0;
-    DISABLE_INITIAL_DUMP = 1;
+    DEPRECATED_DISABLE_INITIAL_DUMP = 1;  // Deprecated.
     DISABLE_ON_DEMAND = 2;
   }
 

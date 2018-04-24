@@ -16,12 +16,31 @@
 
 #include "src/traced/probes/process_stats_data_source.h"
 
+#include <stdlib.h>
+
 #include <utility>
 
+#include "perfetto/base/file_utils.h"
+#include "perfetto/base/string_splitter.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
-#include "src/process_stats/file_utils.h"
 
 namespace perfetto {
+
+// TODO(primiano): the code in this file assumes that PIDs are never recycled
+// and that processes/threads never change names. None of them is always true.
+
+// The notion of PID in the Linux kernel is a bit confusing.
+// What Linux calls:
+//  PID: is really the thread id (for the main thread, PID == TID).
+//  TGID (thread group ID): is the Unix Process ID.
+// So, in this file, |pid| might refer to either a process id or a thread id.
+namespace {
+
+inline int ToInt(const std::string& str) {
+  return atoi(str.c_str());
+}
+
+}  // namespace
 
 ProcessStatsDataSource::ProcessStatsDataSource(
     TracingSessionID id,
@@ -39,21 +58,9 @@ base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
   return weak_factory_.GetWeakPtr();
 }
 
-void ProcessStatsDataSource::WriteAllProcesses() {
-  auto trace_packet = writer_->NewTracePacket();
-  auto* process_tree = trace_packet->set_process_tree();
-
-  file_utils::ForEachPidInProcPath("/proc", [this, process_tree](int pid) {
-    WriteProcess(pid, process_tree);
-  });
-}
-
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
   TraceWriter::TracePacketHandle trace_packet{};
   protos::pbzero::ProcessTree* process_tree = nullptr;
-
-  // Note that the notion of a PID for the Linux kernel corresponds to what most
-  // humans typically refer to as TID (Thread ID).
 
   for (int32_t pid : pids) {
     if (seen_pids_.count(pid))
@@ -62,7 +69,7 @@ void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
       trace_packet = writer_->NewTracePacket();
       process_tree = trace_packet->set_process_tree();
     }
-    WriteProcess(pid, process_tree);
+    WriteProcessOrThread(pid, process_tree);
   }
 }
 
@@ -70,35 +77,75 @@ void ProcessStatsDataSource::Flush() {
   writer_->Flush();
 }
 
-// To be overidden for testing.
-bool ProcessStatsDataSource::ReadProcessInfo(
-    int pid,
-    procfs_utils::ProcessInfo* process) {
-  return procfs_utils::ReadProcessInfo(pid, process);
+void ProcessStatsDataSource::WriteProcessOrThread(
+    int32_t pid,
+    protos::pbzero::ProcessTree* tree) {
+  std::string proc_status = ReadProcPidFile(pid, "status");
+  if (proc_status.empty())
+    return;
+  int tgid = ToInt(ReadProcStatusEntry(proc_status, "Tgid:"));
+  if (tgid <= 0)
+    return;
+  if (!seen_pids_.count(tgid))
+    WriteProcess(tgid, proc_status, tree);
+  if (pid != tgid)
+    WriteThread(pid, tgid, proc_status, tree);
 }
 
 void ProcessStatsDataSource::WriteProcess(int32_t pid,
+                                          const std::string& proc_status,
                                           protos::pbzero::ProcessTree* tree) {
-  procfs_utils::ProcessInfo process;
-  if (!ReadProcessInfo(pid, &process))
-    return;
-  // Note: process.pid might not match |pid|, if pid was a thread id.
-  auto* process_writer = tree->add_processes();
-  process_writer->set_pid(process.pid);
-  process_writer->set_ppid(process.ppid);
-  seen_pids_.emplace(process.pid);
+  PERFETTO_DCHECK(ToInt(ReadProcStatusEntry(proc_status, "Tgid:")) == pid);
+  auto* proc = tree->add_processes();
+  proc->set_pid(pid);
+  proc->set_ppid(ToInt(ReadProcStatusEntry(proc_status, "PPid:")));
 
-  for (const auto& field : process.cmdline)
-    process_writer->add_cmdline(field.c_str());
-
-  for (auto& thread : process.threads) {
-    auto* thread_writer = process_writer->add_threads();
-    thread_writer->set_tid(thread.second.tid);
-    thread_writer->set_name(thread.second.name);
-    seen_pids_.emplace(thread.second.tid);
+  // It's not enough to just null terminate this since cmdline uses null as
+  // the argument seperator:
+  std::string cmdline = ReadProcPidFile(pid, "cmdline");
+  if (!cmdline.empty()) {
+    using base::StringSplitter;
+    for (StringSplitter ss(&cmdline[0], cmdline.size(), '\0'); ss.Next();)
+      proc->add_cmdline(ss.cur_token());
+  } else {
+    // Nothing in cmdline so use the thread "Name:" instead (== comm).
+    proc->add_cmdline(ReadProcStatusEntry(proc_status, "Name:").c_str());
   }
+  seen_pids_.emplace(pid);
+}
 
-  PERFETTO_DCHECK(seen_pids_.count(pid) == 1);
+void ProcessStatsDataSource::WriteThread(int32_t tid,
+                                         int32_t tgid,
+                                         const std::string& proc_status,
+                                         protos::pbzero::ProcessTree* tree) {
+  auto* thread = tree->add_threads();
+  thread->set_tid(tid);
+  thread->set_tgid(tgid);
+  thread->set_name(ReadProcStatusEntry(proc_status, "Name:").c_str());
+  seen_pids_.emplace(tid);
+}
+
+std::string ProcessStatsDataSource::ReadProcPidFile(int32_t pid,
+                                                    const std::string& file) {
+  std::string contents;
+  contents.reserve(4096);
+  if (!base::ReadFile("/proc/" + std::to_string(pid) + "/" + file, &contents))
+    return "";
+  return contents;
+}
+
+std::string ProcessStatsDataSource::ReadProcStatusEntry(const std::string& buf,
+                                                        const char* key) {
+  auto begin = buf.find(key);
+  if (begin == std::string::npos)
+    return "";
+  begin = buf.find_first_not_of(' ', begin + strlen(key));
+  if (begin == std::string::npos)
+    return "";
+  auto end = buf.find('\n', begin);
+  if (end == std::string::npos || end <= begin)
+    return "";
+  return buf.substr(begin, end - begin);
 }
 
 }  // namespace perfetto
