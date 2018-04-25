@@ -58,7 +58,7 @@ class ProcessStatsDataSourceTest : public ::testing::Test {
 TEST_F(ProcessStatsDataSourceTest, WriteOnceProcess) {
   auto data_source = GetProcessStatsDataSource(DataSourceConfig());
   EXPECT_CALL(*data_source, ReadProcPidFile(42, "status"))
-      .WillOnce(Return("Name: foo\nTgid:  42\nPid:   42\nPPid:  17\n"));
+      .WillOnce(Return("Name: foo\nTgid:\t42\nPid:   42\nPPid:  17\n"));
   EXPECT_CALL(*data_source, ReadProcPidFile(42, "cmdline"))
       .WillOnce(Return(std::string("foo\0bar\0baz\0", 12)));
 
@@ -78,7 +78,7 @@ TEST_F(ProcessStatsDataSourceTest, DontRescanCachedPIDsAndTIDs) {
     EXPECT_CALL(*data_source, ReadProcPidFile(p, "status"))
         .WillOnce(Invoke([](int32_t pid, const std::string&) {
           int32_t tgid = (pid / 10) * 10;
-          return "Name: thread_" + std::to_string(pid) +
+          return "Name: \tthread_" + std::to_string(pid) +
                  "\nTgid:  " + std::to_string(tgid) +
                  "\nPid:   " + std::to_string(pid) + "\nPPid:  1\n";
         }));

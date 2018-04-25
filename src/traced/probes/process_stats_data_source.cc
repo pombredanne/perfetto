@@ -141,7 +141,7 @@ std::string ProcessStatsDataSource::ReadProcStatusEntry(const std::string& buf,
   auto begin = buf.find(key);
   if (begin == std::string::npos)
     return "";
-  begin = buf.find_first_not_of(' ', begin + strlen(key));
+  begin = buf.find_first_not_of(" \t", begin + strlen(key));
   if (begin == std::string::npos)
     return "";
   auto end = buf.find('\n', begin);
