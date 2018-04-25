@@ -44,12 +44,18 @@ message ProcessTree {
     // and it will contain /proc/pid/comm.
     repeated string cmdline = 3;
 
-    // No longer used as of Apr 2018, when the distinct |threads| field was
+    // No longer used as of Apr 2018, when the dedicated |threads| field was
     // introduced in ProcessTree.
     repeated Thread threads_deprecated = 4 [deprecated = true];
   }
 
-  // List of all processes and threads in the client.
+  // List of processes and threads in the client. These lists are incremental
+  // and not exhaustive. A process and its threads might show up separately in
+  // different ProcessTree messages. A thread might event not show up at all, if
+  // no sched_switch activity was detected, for instance:
+  // #0 { processes: [{pid: 10, ...}], threads: [{pid: 11, tgid: 10}] }
+  // #1 { threads: [{pid: 12, tgid: 10}] }
+  // #2 { processes: [{pid: 20, ...}], threads: [{pid: 13, tgid: 10}] }
   repeated Process processes = 1;
   repeated Thread threads = 2;
 }

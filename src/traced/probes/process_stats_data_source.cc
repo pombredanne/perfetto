@@ -24,16 +24,18 @@
 #include "perfetto/base/string_splitter.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
-namespace perfetto {
-
 // TODO(primiano): the code in this file assumes that PIDs are never recycled
-// and that processes/threads never change names. None of them is always true.
+// and that processes/threads never change names. Neither is always true.
 
 // The notion of PID in the Linux kernel is a bit confusing.
-// What Linux calls:
-//  PID: is really the thread id (for the main thread, PID == TID).
-//  TGID (thread group ID): is the Unix Process ID.
+// - PID: is really the thread id (for the main thread: PID == TID).
+// - TGID (thread group ID): is the Unix Process ID (the actual PID).
+// - PID == TGID for the main thread: the TID of the main thread is also the PID
+//   of the process.
 // So, in this file, |pid| might refer to either a process id or a thread id.
+
+namespace perfetto {
+
 namespace {
 
 inline int ToInt(const std::string& str) {
@@ -88,8 +90,10 @@ void ProcessStatsDataSource::WriteProcessOrThread(
     return;
   if (!seen_pids_.count(tgid))
     WriteProcess(tgid, proc_status, tree);
-  if (pid != tgid)
+  if (pid != tgid) {
+    PERFETTO_DCHECK(!seen_pids_.count(pid));
     WriteThread(pid, tgid, proc_status, tree);
+  }
 }
 
 void ProcessStatsDataSource::WriteProcess(int32_t pid,
@@ -100,15 +104,13 @@ void ProcessStatsDataSource::WriteProcess(int32_t pid,
   proc->set_pid(pid);
   proc->set_ppid(ToInt(ReadProcStatusEntry(proc_status, "PPid:")));
 
-  // It's not enough to just null terminate this since cmdline uses null as
-  // the argument seperator:
   std::string cmdline = ReadProcPidFile(pid, "cmdline");
   if (!cmdline.empty()) {
     using base::StringSplitter;
     for (StringSplitter ss(&cmdline[0], cmdline.size(), '\0'); ss.Next();)
       proc->add_cmdline(ss.cur_token());
   } else {
-    // Nothing in cmdline so use the thread "Name:" instead (== comm).
+    // Nothing in cmdline so use the thread name instead (which is == "comm").
     proc->add_cmdline(ReadProcStatusEntry(proc_status, "Name:").c_str());
   }
   seen_pids_.emplace(pid);
