@@ -33,12 +33,14 @@
 #include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "src/ftrace_reader/cpu_reader.h"
+#include "src/ftrace_reader/cpu_stats_parser.h"
 #include "src/ftrace_reader/event_info.h"
 #include "src/ftrace_reader/ftrace_config_muxer.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
 #include "src/ftrace_reader/proto_translation_table.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_stats.pbzero.h"
 
 namespace perfetto {
 namespace {
@@ -339,6 +341,11 @@ void FtraceController::Unregister(FtraceSink* sink) {
   StopIfNeeded();
 }
 
+void FtraceController::DumpFtraceStats(
+    protozero::MessageHandle<protos::pbzero::FtraceStats> stats) {
+  DumpAllCpuStats(ftrace_procfs_.get(), &*stats);
+}
+
 FtraceSink::FtraceSink(base::WeakPtr<FtraceController> controller_weak,
                        FtraceConfigId id,
                        FtraceConfig config,
@@ -357,6 +364,11 @@ FtraceSink::~FtraceSink() {
 
 const std::set<std::string>& FtraceSink::enabled_events() {
   return filter_->enabled_names();
+}
+
+void FtraceSink::DumpFtraceStats(protozero::MessageHandle<FtraceStats> stats) {
+  if (controller_weak_)
+    controller_weak_->DumpFtraceStats(std::move(stats));
 }
 
 FtraceMetadata::FtraceMetadata() {

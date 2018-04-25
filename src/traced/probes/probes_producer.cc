@@ -35,6 +35,7 @@
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/ftrace_stats.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -318,8 +319,11 @@ void ProbesProducer::SinkDelegate::Flush() {
   // buffers (see b/73886018). We should do that and delay the
   // NotifyFlushComplete() until the ftrace data has been drained from the
   // kernel ftrace buffer and written in the SMB.
-  if (writer_ && (!trace_packet_ || trace_packet_->is_finalized()))
+  if (writer_ && (!trace_packet_ || trace_packet_->is_finalized())) {
+    sink_->DumpFtraceStats(
+        FtraceStatsHandle(writer_->NewTracePacket()->set_ftrace_stats()));
     writer_->Flush();
+  }
 }
 
 ProbesProducer::FtraceBundleHandle

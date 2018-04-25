@@ -67,6 +67,7 @@ struct FtraceMetadata {
 namespace protos {
 namespace pbzero {
 class FtraceEventBundle;
+class FtraceStats;
 }  // namespace pbzero
 }  // namespace protos
 
@@ -90,6 +91,7 @@ class ProtoTranslationTable;
 class FtraceSink {
  public:
   using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
+  using FtraceStats = protos::pbzero::FtraceStats;
   class Delegate {
    public:
     virtual protozero::MessageHandle<FtraceEventBundle> GetBundleForCpu(
@@ -106,6 +108,8 @@ class FtraceSink {
              std::unique_ptr<EventFilter>,
              Delegate*);
   ~FtraceSink();
+
+  void DumpFtraceStats(protozero::MessageHandle<FtraceStats>);
 
   const FtraceConfig& config() const { return config_; }
 
@@ -155,6 +159,9 @@ class FtraceController {
                    std::unique_ptr<ProtoTranslationTable>,
                    std::unique_ptr<FtraceConfigMuxer>,
                    base::TaskRunner*);
+
+  // Write
+  void DumpFtraceStats(protozero::MessageHandle<protos::pbzero::FtraceStats>);
 
   // Called to read data from the staging pipe for the given |cpu| and parse it
   // into the sinks. Protected and virtual for testing.
