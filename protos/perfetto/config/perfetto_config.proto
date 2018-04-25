@@ -64,8 +64,8 @@ message InodeFileConfig {
 message ProcessStatsConfig {
   enum Quirks {
     QUIRKS_UNSPECIFIED = 0;
-    DEPRECATED_DISABLE_INITIAL_DUMP = 1 [deprecated = true];
-    DEPRECATED_DISABLE_ON_DEMAND = 2 [deprecated = true];
+    DISABLE_INITIAL_DUMP = 1;
+    DISABLE_ON_DEMAND = 2;
   }
 
   repeated Quirks quirks = 1;

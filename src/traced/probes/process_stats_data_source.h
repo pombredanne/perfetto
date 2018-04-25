@@ -40,6 +40,7 @@ class ProcessStatsDataSource {
   const DataSourceConfig& config() const { return config_; }
 
   base::WeakPtr<ProcessStatsDataSource> GetWeakPtr() const;
+  void WriteAllProcesses();
   void OnPids(const std::vector<int32_t>& pids);
   void Flush();
 

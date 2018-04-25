@@ -21,6 +21,7 @@
 #include <utility>
 
 #include "perfetto/base/file_utils.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/string_splitter.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
@@ -37,6 +38,24 @@
 namespace perfetto {
 
 namespace {
+
+bool IsNumeric(const char* str) {
+  if (!str || !*str)
+    return false;
+  for (const char* c = str; *c; c++) {
+    if (!isdigit(*c))
+      return false;
+  }
+  return true;
+}
+
+int32_t ReadNextNumericDir(DIR* dirp) {
+  while (struct dirent* dir_ent = readdir(dirp)) {
+    if (dir_ent->d_type == DT_DIR && IsNumeric(dir_ent->d_name))
+      return atoi(dir_ent->d_name);
+  }
+  return 0;
+}
 
 inline int ToInt(const std::string& str) {
   return atoi(str.c_str());
@@ -58,6 +77,26 @@ ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
     const {
   return weak_factory_.GetWeakPtr();
+}
+
+void ProcessStatsDataSource::WriteAllProcesses() {
+  base::ScopedDir proc_dir(opendir("/proc"));
+  if (!proc_dir) {
+    PERFETTO_PLOG("Failed to opendir(/proc)");
+    return;
+  }
+  TraceWriter::TracePacketHandle trace_packet = writer_->NewTracePacket();
+  auto* process_tree = trace_packet->set_process_tree();
+  while (int32_t pid = ReadNextNumericDir(*proc_dir)) {
+    WriteProcessOrThread(pid, process_tree);
+    char task_path[255];
+    sprintf(task_path, "/proc/%d/task", pid);
+    base::ScopedDir task_dir(opendir(task_path));
+    if (!task_dir)
+      continue;
+    while (int32_t tid = ReadNextNumericDir(*task_dir))
+      WriteProcessOrThread(tid, process_tree);
+  }
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {

@@ -226,6 +226,14 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
       new ProcessStatsDataSource(session_id, std::move(trace_writer), config));
   auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
   PERFETTO_DCHECK(it_and_inserted.second);
+  const auto& quirks =
+      it_and_inserted.first->second->config().process_stats_config().quirks();
+  if (std::find(quirks.begin(), quirks.end(),
+                ProcessStatsConfig::DISABLE_INITIAL_DUMP) != quirks.end()) {
+    PERFETTO_DLOG("Initial process tree dump is disabled.");
+    return;
+  }
+  it_and_inserted.first->second->WriteAllProcesses();
 }
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
@@ -335,6 +343,11 @@ void ProbesProducer::SinkDelegate::OnBundleComplete(
     });
   }
   if (ps_source_ && !metadata.pids.empty()) {
+    const auto& quirks = ps_source_->config().process_stats_config().quirks();
+    if (std::find(quirks.begin(), quirks.end(),
+                  ProcessStatsConfig::DISABLE_ON_DEMAND) != quirks.end()) {
+      return;
+    }
     const auto& pids = metadata.pids;
     auto weak_ps_source = ps_source_;
     task_runner_->PostTask([weak_ps_source, pids] {
