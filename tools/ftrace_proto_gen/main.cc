@@ -146,6 +146,8 @@ int main(int argc, char** argv) {
         "tools/ftrace_proto_gen/ftrace_inode_handler.cc\n");
   }
 
+  // The first id used for events in FtraceEvent proto is 3.
+  // Because we increment before the loop, this is 2.
   uint32_t proto_field_id = 2;
   for (auto event : whitelist) {
     ++proto_field_id;
