@@ -21,9 +21,7 @@ def CheckChange(input, output):
     # There apparently is no way to wrap strings in blueprints, so ignore long
     # lines in them.
     long_line_sources = lambda x: input.FilterSourceFile(
-            x, white_list=".*", black_list=
-            ['Android[.]bp', 'protos/perfetto/trace/ftrace/ftrace_event.proto',
-             'protos/perfetto/trace/ftrace/.*[.]proto'])
+            x, white_list=".*", black_list=['Android[.]bp'])
     results = []
     results += input.canned_checks.CheckDoNotSubmit(input, output)
     results += input.canned_checks.CheckChangeHasNoTabs(input, output)
