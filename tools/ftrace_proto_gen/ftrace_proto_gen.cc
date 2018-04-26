@@ -148,8 +148,8 @@ ProtoType ProtoType::FromDescriptor(
 }
 
 ProtoType GetCommon(ProtoType one, ProtoType other) {
-  // If RHS is STRING but LHS isn't, we need to be it as a NUMERIC because
-  // we can't safely convert a NUMERIC into a string.
+  // Always need to prefer the LHS as it is the one already present
+  // in the proto.
   if (one.type == ProtoType::STRING)
     return ProtoType::String();
 
