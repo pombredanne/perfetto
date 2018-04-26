@@ -259,6 +259,46 @@ void PrintFtraceTrack(std::ostream* output,
   *output << "\n\n";
 }
 
+void PrintFtraceStats(std::ostream* output,
+                      uint64_t overwrite_count,
+                      std::map<FtraceEvent::EventCase, uint64_t> event_counts,
+                      bool compact_output) {
+  if (!compact_output)
+    *output << "--------------------Ftrace Stats-------------------\n";
+
+  char line[2048];
+  if (compact_output) {
+    sprintf(line, "ftrace_overwrite_count,%" PRIu64 "\n", overwrite_count);
+  } else {
+    sprintf(line, "Events overwritten: %" PRIu64 "\n", overwrite_count);
+  }
+  *output << std::string(line);
+
+  DiskSourceTree dst;
+  dst.MapPath("perfetto", "protos/perfetto");
+  MFE mfe;
+  Importer importer(&dst, &mfe);
+  const FileDescriptor* parsed_file =
+      importer.Import("perfetto/trace/ftrace/ftrace_event.proto");
+
+  DynamicMessageFactory dmf;
+  const Descriptor* ftrace_descriptor = parsed_file->message_type(0);
+  for (const auto& event_to_count : event_counts) {
+    const std::string& event_name =
+        ftrace_descriptor->FindFieldByNumber(event_to_count.first)->name();
+    uint64_t count = event_to_count.second;
+    if (compact_output) {
+      sprintf(line, "%s,%" PRIu64 "\n", event_name.c_str(), count);
+    } else {
+      sprintf(line, "%s count: %" PRIu64 "\n", event_name.c_str(), count);
+    }
+    *output << std::string(line);
+  }
+
+  if (!compact_output)
+    *output << "\n";
+}
+
 void PrintInodeStats(std::ostream* output,
                      const std::set<uint64_t>& ftrace_inodes,
                      const uint64_t& ftrace_inode_count,
@@ -376,7 +416,7 @@ void PrintProcessStats(std::ostream* output,
             "tids_with_pinfo,%zu\ntids,%zu\ntids_with_pinfo_percentage,%zu\n",
             intersect.size(), tids_in_events.size(), thread_id_process_info);
   } else {
-    sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n\n",
+    sprintf(matching, "Thread ids with process info: %zu/%zu -> %zu %%\n",
             intersect.size(), tids_in_events.size(), thread_id_process_info);
   }
   *output << std::string(matching);
@@ -390,6 +430,8 @@ int TraceToSummary(std::istream* input,
                    bool compact_output) {
   uint64_t start = std::numeric_limits<uint64_t>::max();
   uint64_t end = 0;
+  uint64_t ftrace_overwrites = 0;
+  std::map<FtraceEvent::EventCase, uint64_t> ftrace_event_counts;
   std::multiset<uint64_t> ftrace_timestamps;
   std::set<pid_t> tids_in_tree;
   std::set<pid_t> tids_in_events;
@@ -399,18 +441,19 @@ int TraceToSummary(std::istream* input,
   std::set<uint64_t> resolved_scan_inodes;
 
   ForEachPacketInTrace(
-      input, [&start, &end, &ftrace_timestamps, &tids_in_tree, &tids_in_events,
+      input, [&start, &end, &ftrace_overwrites, &ftrace_event_counts,
+              &ftrace_timestamps, &tids_in_tree, &tids_in_events,
               &ftrace_inodes, &ftrace_inode_count, &resolved_map_inodes,
               &resolved_scan_inodes](const protos::TracePacket& packet) {
-
         if (packet.has_process_tree()) {
           const ProcessTree& tree = packet.process_tree();
           for (Process process : tree.processes()) {
             tids_in_tree.insert(process.pid());
-            for (ProcessTree::Thread thread : process.threads()) {
+            for (ProcessTree::Thread thread : process.threads_deprecated())
               tids_in_tree.insert(thread.tid());
-            }
           }
+          for (ProcessTree::Thread thread : tree.threads())
+            tids_in_tree.insert(thread.tid());
         }
 
         if (packet.has_inode_file_map()) {
@@ -429,8 +472,12 @@ int TraceToSummary(std::istream* input,
           return;
 
         const FtraceEventBundle& bundle = packet.ftrace_events();
+        ftrace_overwrites += bundle.overwrite_count();
+
         uint64_t inode_number = 0;
         for (const FtraceEvent& event : bundle.event()) {
+          ftrace_event_counts[event.event_case()] += 1;
+
           if (ParseInode(event, &inode_number)) {
             ftrace_inodes.insert(inode_number);
             ftrace_inode_count++;
@@ -459,6 +506,8 @@ int TraceToSummary(std::istream* input,
 
   if (!compact_output)
     PrintFtraceTrack(output, start, end, ftrace_timestamps);
+  PrintFtraceStats(output, ftrace_overwrites, ftrace_event_counts,
+                   compact_output);
   PrintProcessStats(output, tids_in_tree, tids_in_events, compact_output);
   PrintInodeStats(output, ftrace_inodes, ftrace_inode_count,
                   resolved_map_inodes, resolved_scan_inodes, compact_output);
