@@ -34,7 +34,7 @@ namespace {
 constexpr const char* kClocks[] = {"boot", "global", "local"};
 
 constexpr int kDefaultPerCpuBufferSizeKb = 512;   // 512kb
-constexpr int kMaxPerCpuBufferSizeKb = 2 * 1024;  // 2mb
+constexpr int kMaxPerCpuBufferSizeKb = 64 * 1024;  // 64mb
 
 std::vector<std::string> difference(const std::set<std::string>& a,
                                     const std::set<std::string>& b) {
