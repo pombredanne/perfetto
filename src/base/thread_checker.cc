@@ -20,7 +20,7 @@ namespace perfetto {
 namespace base {
 
 namespace {
-constexpr pthread_t kDetached = 0;
+constexpr PerfettoThreadHandle kDetached = 0;
 }  // namespace
 
 ThreadChecker::ThreadChecker() {

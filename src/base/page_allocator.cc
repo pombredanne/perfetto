@@ -16,7 +16,7 @@
 
 #include "perfetto/base/page_allocator.h"
 
-#include <sys/mman.h>
+//#include <sys/mman.h>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
@@ -32,6 +32,10 @@ constexpr size_t kGuardSize = kPageSize;
 PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
   PERFETTO_DCHECK(size % kPageSize == 0);
   size_t outer_size = size + kGuardSize * 2;
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  char* usable_region = nullptr;
+  (void)outer_size;
+#else
   void* ptr = mmap(nullptr, outer_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
   if (ptr == MAP_FAILED && unchecked)
@@ -41,6 +45,7 @@ PageAllocator::UniquePtr AllocateInternal(size_t size, bool unchecked) {
   int res = mprotect(ptr, kGuardSize, PROT_NONE);
   res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
   PERFETTO_CHECK(res == 0);
+#endif
   return PageAllocator::UniquePtr(usable_region, PageAllocator::Deleter(size));
 }
 
@@ -55,8 +60,13 @@ void PageAllocator::Deleter::operator()(void* ptr) const {
   PERFETTO_CHECK(size_);
   char* start = reinterpret_cast<char*>(ptr) - kGuardSize;
   const size_t outer_size = size_ + kGuardSize * 2;
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  (void)start;
+  (void)outer_size;
+#else
   int res = munmap(start, outer_size);
   PERFETTO_CHECK(res == 0);
+#endif
 }
 
 // static

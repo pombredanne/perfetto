@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>  // For strerror.
-#include <unistd.h>
+//#include <unistd.h>
 
 #if defined(NDEBUG)
 #define PERFETTO_DCHECK_IS_ON() 0
