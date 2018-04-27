@@ -486,7 +486,6 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoString(string_start, string_start + len, field_id, message);
       return true;
     }
-
     case kBoolToUint32:
       ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
