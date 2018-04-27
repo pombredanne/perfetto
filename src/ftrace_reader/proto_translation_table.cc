@@ -169,6 +169,11 @@ bool InferFtraceType(const std::string& type_and_name,
 
   // String pointers: "__data_loc char[] foo" (as in
   // 'cpufreq_interactive_boost').
+  if (Contains(type_and_name, "__data_loc char[] ")) {
+    *out = kFtraceDataLoc;
+    return true;
+  }
+
   if (Contains(type_and_name, "char[] ")) {
     *out = kFtraceStringPtr;
     return true;
