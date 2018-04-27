@@ -17,18 +17,16 @@
 #ifndef SRC_FTRACE_READER_CPU_STATS_PARSER_H_
 #define SRC_FTRACE_READER_CPU_STATS_PARSER_H_
 
-#include <stddef.h>
-
 #include <string>
-
-#include "perfetto/trace/ftrace/ftrace_stats.pbzero.h"
-#include "src/ftrace_reader/ftrace_procfs.h"
 
 namespace perfetto {
 
-bool DumpCpuStats(std::string text,
-                  protos::pbzero::FtraceStats::FtraceCpuStats* stats);
-bool DumpAllCpuStats(FtraceProcfs* ftrace, protos::pbzero::FtraceStats* stats);
+class FtraceProcfs;
+struct FtraceStats;
+struct FtraceCpuStats;
+
+bool DumpCpuStats(std::string text, FtraceCpuStats*);
+bool DumpAllCpuStats(FtraceProcfs*, FtraceStats*);
 
 }  // namespace perfetto
 

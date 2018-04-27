@@ -31,6 +31,7 @@ TEST(StringUtilsTest, StartsWith) {
   EXPECT_TRUE(StartsWith("abc", "abc"));
   EXPECT_FALSE(StartsWith("abc", "abcd"));
   EXPECT_FALSE(StartsWith("aa", "ab"));
+  EXPECT_FALSE(StartsWith("", "ab"));
 }
 
 }  // namespace

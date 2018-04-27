@@ -19,19 +19,24 @@ option optimize_for = LITE_RUNTIME;
 
 package perfetto.protos;
 
-message FtraceStats {
-  message FtraceCpuStats {
-    optional uint32 cpu = 1;
-    optional uint32 overwrite_count = 2;
-    optional uint32 entries = 3;
-    optional uint32 overrun = 4;
-    optional uint32 commit_overrun = 5;
-    optional uint32 bytes_read = 6;
-    optional double oldest_event_ts = 7;
-    optional double now_ts = 8;
-    optional uint32 dropped_events = 9;
-    optional uint32 read_events = 10;
-  }
+message FtraceCpuStats {
+  optional uint64 cpu = 1;
+  optional uint64 entries = 2;
+  optional uint64 overrun = 3;
+  optional uint64 commit_overrun = 4;
+  optional uint64 bytes_read = 5;
+  optional double oldest_event_ts = 6;
+  optional double now_ts = 7;
+  optional uint64 dropped_events = 8;
+  optional uint64 read_events = 9;
+}
 
-  repeated FtraceCpuStats cpu_stats = 1;
+message FtraceStats {
+  enum Phase {
+    UNUSED = 0;
+    START_OF_TRACE = 1;
+    END_OF_TRACE = 2;
+  }
+  optional Phase phase = 1;
+  repeated FtraceCpuStats cpu_stats = 2;
 }
