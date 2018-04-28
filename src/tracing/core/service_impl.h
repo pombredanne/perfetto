@@ -274,7 +274,7 @@ class ServiceImpl : public Service {
   // shared memory and trace buffers.
   void UpdateMemoryGuardrail();
 
-  void MaybeSnapshotClocks(TracingSession*, std::vector<TracePacket>*);
+  void MaybeSnapshotClocksAndStats(TracingSession*, std::vector<TracePacket>*);
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   TraceBuffer* GetBufferByID(BufferID);
