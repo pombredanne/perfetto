@@ -493,7 +493,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       if (action == kReadOnePacket) {
         // The easy peasy case B.
         if (PERFETTO_LIKELY(ReadNextPacketInChunk(chunk_meta, packet))) {
-          stats_.packets_read++;
           *producer_uid = trusted_uid;
           return true;
         }
@@ -510,7 +509,6 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
         stats_.readaehads_succeeded++;
-        stats_.packets_read++;
         *producer_uid = trusted_uid;
         return true;
       }
@@ -668,10 +666,8 @@ bool TraceBuffer::ReadNextPacketInChunk(ChunkMeta* chunk_meta,
     return false;
   }
 
-  if (PERFETTO_LIKELY(packet)) {
+  if (PERFETTO_LIKELY(packet))
     packet->AddSlice(packet_data, static_cast<size_t>(packet_size));
-    stats_.bytes_read += packet_size;
-  }
 
   return true;
 }

@@ -434,9 +434,7 @@ void PrintTraceStats(std::ostream* output,
   size_t buf_num = 0;
   for (const auto& buf : stats.buffer_stats()) {
     *output << "Buffer " << buf_num++ << "\n"
-            << "  bytes_read: " << buf.bytes_read() << "\n"
             << "  bytes_written: " << buf.bytes_written() << "\n"
-            << "  packets_read: " << buf.packets_read() << "\n"
             << "  chunks_written: " << buf.chunks_written() << "\n"
             << "  chunks_overwritten: " << buf.chunks_overwritten() << "\n"
             << "  write_wrap_count: " << buf.write_wrap_count() << "\n"
@@ -446,12 +444,12 @@ void PrintTraceStats(std::ostream* output,
             << "  readaehads_failed: " << buf.readaehads_failed() << "\n"
             << "  abi_violations: " << buf.abi_violations() << "\n";
   }
-  *output << "producers_connected: " << stats.num_producers_connected() << "\n"
-          << "producers_seen: " << stats.num_producers_seen() << "\n"
-          << "data_sources_reg: " << stats.num_data_sources_registered() << "\n"
-          << "data_sources_seen: " << stats.num_data_sources_seen() << "\n"
-          << "tracing_sessions: " << stats.num_tracing_sessions() << "\n"
-          << "total_buffers: " << stats.num_total_buffers() << "\n";
+  *output << "producers_connected: " << stats.producers_connected() << "\n"
+          << "producers_seen: " << stats.producers_seen() << "\n"
+          << "data_sources_reg: " << stats.data_sources_registered() << "\n"
+          << "data_sources_seen: " << stats.data_sources_seen() << "\n"
+          << "tracing_sessions: " << stats.tracing_sessions() << "\n"
+          << "total_buffers: " << stats.total_buffers() << "\n";
 }
 
 int TraceToSummary(std::istream* input,
@@ -538,7 +536,6 @@ int TraceToSummary(std::istream* input,
   }
   *output << std::string(line);
 
-  PrintTraceStats(output, last_stats, compact_output);
   if (!compact_output)
     PrintFtraceTrack(output, start, end, ftrace_timestamps);
   PrintFtraceStats(output, ftrace_overwrites, ftrace_event_counts,
@@ -546,6 +543,7 @@ int TraceToSummary(std::istream* input,
   PrintProcessStats(output, tids_in_tree, tids_in_events, compact_output);
   PrintInodeStats(output, ftrace_inodes, ftrace_inode_count,
                   resolved_map_inodes, resolved_scan_inodes, compact_output);
+  PrintTraceStats(output, last_stats, compact_output);
 
   return 0;
 }

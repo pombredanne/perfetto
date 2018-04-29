@@ -131,9 +131,7 @@ class TraceBuffer {
   // Maintain these fields consistent with trace_stats.proto. See comments in
   // the .proto for the semantic of these fields.
   struct Stats {
-    uint64_t bytes_read = 0;
     uint64_t bytes_written = 0;
-    uint64_t packets_read = 0;
     uint64_t chunks_written = 0;
     uint64_t chunks_overwritten = 0;
     uint64_t write_wrap_count = 0;
