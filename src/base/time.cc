@@ -28,14 +28,18 @@ TimeNanos GetWallTimeNs() {
   ::QueryPerformanceFrequency(&freq);
   LARGE_INTEGER counter;
   ::QueryPerformanceCounter(&counter);
-  return TimeNanos(static_cast<uint64_t>(1e9 * counter.QuadPart) / freq.QuadPart);
+  double elapsed_nanoseconds = (1e9 * counter.QuadPart) / freq.QuadPart;
+  return TimeNanos(static_cast<uint64_t>(elapsed_nanoseconds));
 }
 
 TimeNanos GetThreadCPUTimeNs() {
   FILETIME dummy, kernel_ftime, user_ftime;
-  ::GetThreadTimes(GetCurrentThread(), &dummy, &dummy, &kernel_ftime, &user_ftime);
-  uint64_t kernel_time = kernel_ftime.dwHighDateTime * 0x100000000 + kernel_ftime.dwLowDateTime;
-  uint64_t user_time = user_ftime.dwHighDateTime * 0x100000000 + user_ftime.dwLowDateTime;
+  ::GetThreadTimes(GetCurrentThread(), &dummy, &dummy, &kernel_ftime,
+                   &user_ftime);
+  uint64_t kernel_time = kernel_ftime.dwHighDateTime * 0x100000000 +
+                         kernel_ftime.dwLowDateTime;
+  uint64_t user_time = user_ftime.dwHighDateTime * 0x100000000 +
+                       user_ftime.dwLowDateTime;
 
   return TimeNanos((kernel_time + user_time) * 100);
 }
