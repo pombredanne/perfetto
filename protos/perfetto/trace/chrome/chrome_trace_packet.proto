@@ -36,7 +36,8 @@ package perfetto.protos;
 // Note that the field ids here must be kept in sync with TracePacket.
 // This protobuf is here to avoid bloating the Chrome binary with symbols
 // for all possible trace protos.
-message MinimalChromePacket {
+// TODO(b/78898755): Try using weak bindings instead of a separate proto.
+message ChromeTracePacket {
   ChromeEventBundle chrome_events = 5;
 
   // The original trace config.
