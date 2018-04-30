@@ -17,6 +17,8 @@
 #ifndef INCLUDE_PERFETTO_BASE_UTILS_H_
 #define INCLUDE_PERFETTO_BASE_UTILS_H_
 
+#include "perfetto/base/build_config.h"
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -32,6 +34,15 @@
 
 #define PERFETTO_LIKELY(_x) __builtin_expect(!!(_x), 1)
 #define PERFETTO_UNLIKELY(_x) __builtin_expect(!!(_x), 0)
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+// ssize_t is not a C/C++ standard type. Maybe we should use ptrdiff_t instead?
+#if defined(_WIN64)
+typedef __int64 ssize_t;
+#else
+typedef long ssize_t;
+#endif
+#endif
 
 namespace perfetto {
 namespace base {
