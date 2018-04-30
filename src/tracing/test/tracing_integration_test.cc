@@ -96,7 +96,7 @@ void CheckTraceStats(const protos::TracePacket& packet) {
   EXPECT_EQ(0, buf_stats.chunks_overwritten());
   EXPECT_EQ(0, buf_stats.write_wrap_count());
   EXPECT_EQ(0, buf_stats.patches_failed());
-  EXPECT_EQ(0, buf_stats.readaehads_failed());
+  EXPECT_EQ(0, buf_stats.readaheads_failed());
   EXPECT_EQ(0, buf_stats.abi_violations());
 }
 

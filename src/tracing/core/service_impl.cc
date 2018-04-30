@@ -1099,8 +1099,8 @@ void ServiceImpl::MaybeSnapshotStats(TracingSession* tracing_session,
     buf_stats_proto->set_write_wrap_count(buf_stats.write_wrap_count);
     buf_stats_proto->set_patches_succeeded(buf_stats.patches_succeeded);
     buf_stats_proto->set_patches_failed(buf_stats.patches_failed);
-    buf_stats_proto->set_readaehads_succeeded(buf_stats.readaehads_succeeded);
-    buf_stats_proto->set_readaehads_failed(buf_stats.readaehads_failed);
+    buf_stats_proto->set_readaheads_succeeded(buf_stats.readaheads_succeeded);
+    buf_stats_proto->set_readaheads_failed(buf_stats.readaheads_failed);
     buf_stats_proto->set_abi_violations(buf_stats.abi_violations);
   }  // for (buf in session).
   Slice slice = Slice::Allocate(static_cast<size_t>(packet.ByteSize()));

@@ -43,14 +43,14 @@ message TraceStats {
 
     // Num. readaheads (for large multi-chunk packet reads) that ended up in a
     // successful packet read.
-    optional uint64 readaehads_succeeded = 7;
+    optional uint64 readaheads_succeeded = 7;
 
     // Num. readaheads aborted because of missing chunks in the sequence stream.
     // Note that a small number > 0 is totally expected: occasionally, when
     // issuing a read, the very last packet in a sequence might be incomplete
     // (because the producer is still writing it while we read). The read will
     // stop at that point, for that sequence, increasing this counter.
-    optional uint64 readaehads_failed = 8;
+    optional uint64 readaheads_failed = 8;
 
     // Num. of violations of the SharedMemoryABI found while writing or reading
     // the buffer. This is an indication of either a bug in the producer(s) or

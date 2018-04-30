@@ -440,8 +440,8 @@ void PrintTraceStats(std::ostream* output,
             << "  write_wrap_count: " << buf.write_wrap_count() << "\n"
             << "  patches_succeeded: " << buf.patches_succeeded() << "\n"
             << "  patches_failed: " << buf.patches_failed() << "\n"
-            << "  readaehads_succeeded: " << buf.readaehads_succeeded() << "\n"
-            << "  readaehads_failed: " << buf.readaehads_failed() << "\n"
+            << "  readaheads_succeeded: " << buf.readaheads_succeeded() << "\n"
+            << "  readaheads_failed: " << buf.readaheads_failed() << "\n"
             << "  abi_violations: " << buf.abi_violations() << "\n";
   }
   *output << "producers_connected: " << stats.producers_connected() << "\n"

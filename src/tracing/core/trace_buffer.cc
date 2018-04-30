@@ -508,7 +508,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       PERFETTO_DCHECK(action == kTryReadAhead);
       ReadAheadResult ra_res = ReadAhead(packet);
       if (ra_res == ReadAheadResult::kSucceededReturnSlices) {
-        stats_.readaehads_succeeded++;
+        stats_.readaheads_succeeded++;
         *producer_uid = trusted_uid;
         return true;
       }
@@ -516,7 +516,7 @@ bool TraceBuffer::ReadNextTracePacket(TracePacket* packet,
       if (ra_res == ReadAheadResult::kFailedMoveToNextSequence) {
         // readahead didn't find a contigous packet sequence. We'll try again
         // on the next ReadPacket() call.
-        stats_.readaehads_failed++;
+        stats_.readaheads_failed++;
 
         // TODO(primiano): optimization: this MoveToEnd() is the reason why
         // MoveNext() (that is called in the outer for(;;MoveNext)) needs to
