@@ -89,7 +89,7 @@ class TaskRunner {
        {TimeMillis(50), 0},
        {TimeMillis(100), 0},
        {TimeMillis(1000), 0},
-       {std::numeric_limits<TimeMillis>::max(), 0}}};
+       {TimeMillis(std::numeric_limits<TimeMillis::rep>::max()), 0}}};
 #endif
 };
 
