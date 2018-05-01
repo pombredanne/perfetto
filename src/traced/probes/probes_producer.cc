@@ -248,6 +248,9 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   process_stats_sources_.erase(id);
   file_map_sources_.erase(id);
   watchdogs_.erase(id);
+#if PERFETTO_DCHECK_IS_ON()
+  task_runner_->PrintDebugInfo();
+#endif
 }
 
 void ProbesProducer::OnTracingSetup() {}

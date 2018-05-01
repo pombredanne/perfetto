@@ -27,6 +27,7 @@ source_set("base") {
     "page_allocator.cc",
     "string_splitter.cc",
     "string_utils.cc",
+    "task_runner.cc",
     "temp_file.cc",
     "thread_checker.cc",
     "unix_task_runner.cc",
