@@ -18,8 +18,10 @@
 #define INCLUDE_PERFETTO_BASE_TASK_RUNNER_H_
 
 #include <functional>
+#include <vector>
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/base/watchdog.h"
 
@@ -66,12 +68,29 @@ class TaskRunner {
   // thread.
   virtual void RemoveFileDescriptorWatch(int fd) = 0;
 
+  void PrintDebugInfo();
+
  protected:
   static void RunTask(const std::function<void()>& task) {
     Watchdog::Timer handle =
         base::Watchdog::GetInstance()->CreateFatalTimer(kWatchdogMillis);
     task();
   }
+
+#if PERFETTO_DCHECK_IS_ON()
+  void AddToHistogram(TimeMillis value);
+#endif
+
+ private:
+#if PERFETTO_DCHECK_IS_ON()
+  std::vector<std::pair<TimeMillis, uint32_t>> delay_histogram_ms_{
+      {{TimeMillis(5), 0},
+       {TimeMillis(10), 0},
+       {TimeMillis(50), 0},
+       {TimeMillis(100), 0},
+       {TimeMillis(1000), 0},
+       {std::numeric_limits<TimeMillis>::max(), 0}}};
+#endif
 };
 
 }  // namespace base

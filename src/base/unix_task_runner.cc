@@ -129,6 +129,9 @@ void UnixTaskRunner::RunImmediateAndDelayedTask() {
     if (!delayed_tasks_.empty()) {
       auto it = delayed_tasks_.begin();
       if (now >= it->first) {
+#if PERFETTO_DCHECK_IS_ON()
+        AddToHistogram(GetWallTimeMs() - TimeMillis(it->first));
+#endif
         delayed_task = std::move(it->second);
         delayed_tasks_.erase(it);
       }
