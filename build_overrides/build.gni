@@ -17,10 +17,5 @@
 # When false, instead, the build files can assume this is a Perfetto standalone
 # build.
 build_with_chromium = false
-
-# Building with Windows is currently only supported in the Chromium tree so
-# always set this to false.
-is_win = false
-
 # Do not declare other variables here, use perfetto.gni instead.
 # This file will *not* be picked up in the Chrome tree.

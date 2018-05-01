@@ -30,6 +30,7 @@ source_set("base") {
     "time.cc",
     "virtual_destructors.cc",
   ]
+  # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     sources += [
       "page_allocator.cc",
@@ -105,6 +106,7 @@ source_set("unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
+  # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     deps += [ ":test_support" ]
   }
@@ -114,6 +116,7 @@ source_set("unittests") {
   sources = [
     "time_unittest.cc",
   ]
+  # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     sources += [
       "page_allocator_unittest.cc",

@@ -30,9 +30,9 @@ namespace perfetto {
 namespace base {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-typedef unsigned long PerfettoThreadHandle;
+using ThreadID = unsigned long;
 #else
-typedef pthread_t PerfettoThreadHandle;
+using ThreadiD = pthread_t;
 #endif
 
 class ThreadChecker {
@@ -45,7 +45,7 @@ class ThreadChecker {
   void DetachFromThread();
 
  private:
-  mutable std::atomic<PerfettoThreadHandle> thread_id_;
+  mutable std::atomic<ThreadID> thread_id_;
 };
 
 #if PERFETTO_DCHECK_IS_ON()

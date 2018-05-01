@@ -58,6 +58,7 @@ executable("perfetto_unittests") {
     "gn:gtest_main",
     "src/base:unittests",
   ]
+  # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     deps += [
       "src/protozero:unittests",

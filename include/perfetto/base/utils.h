@@ -36,11 +36,11 @@
 #define PERFETTO_UNLIKELY(_x) __builtin_expect(!!(_x), 0)
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-// ssize_t is not a C/C++ standard type. Maybe we should use ptrdiff_t instead?
+// TODO(brucedawson) - create a ::perfetto::base::IOSize to replace this.
 #if defined(_WIN64)
-typedef __int64 ssize_t;
+using ssize_t = __int64;
 #else
-typedef long ssize_t;
+using ssize_t = long;
 #endif
 #endif
 

@@ -24,9 +24,9 @@ namespace perfetto {
 namespace base {
 
 namespace {
-constexpr PerfettoThreadHandle kDetached = 0;
+constexpr ThreadID kDetached = 0;
 
-PerfettoThreadHandle CurrentThreadId() {
+ThreadID CurrentThreadId() {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   return ::GetCurrentThreadId();
 #else

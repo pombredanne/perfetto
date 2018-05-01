@@ -58,8 +58,8 @@ TEST(TimeTest, GetTime) {
   for (;;) {
     auto cur_time = GetWallTimeNs();
     auto elapsed = cur_time - start_time;
-    // Spin for about 500 ms.
-    if (elapsed > TimeNanos(500 * ns_in_ms))
+    // Spin for a little while.
+    if (elapsed > TimeNanos(20 * ns_in_ms))
       break;
   }
 
@@ -68,7 +68,7 @@ TEST(TimeTest, GetTime) {
   // Check that we're not burning much more CPU time than the length of time
   // that we spun in the loop. We may burn much less, depending on what else is
   // happening on the test machine.
-  EXPECT_LE(elapsed_cputime.count(), 550 * ns_in_ms);
+  EXPECT_LE(elapsed_cputime.count(), 50 * ns_in_ms);
 }
 
 }  // namespace

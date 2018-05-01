@@ -24,7 +24,7 @@
 #include <sys/types.h>
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-typedef unsigned int uid_t;
+using uid_t = unsigned int;
 #endif
 
 namespace perfetto {
