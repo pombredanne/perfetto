@@ -83,7 +83,7 @@ class TaskRunner {
 
  private:
 #if PERFETTO_DCHECK_IS_ON()
-  std::vector<std::pair<TimeMillis, uint32_t>> delay_histogram_ms_{
+  std::vector<std::pair<TimeMillis, uint64_t>> delay_histogram_ms_{
       {{TimeMillis(5), 0},
        {TimeMillis(10), 0},
        {TimeMillis(50), 0},
