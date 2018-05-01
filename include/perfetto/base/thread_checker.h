@@ -32,7 +32,7 @@ namespace base {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 using ThreadID = unsigned long;
 #else
-using ThreadiD = pthread_t;
+using ThreadID = pthread_t;
 #endif
 
 class ThreadChecker {
