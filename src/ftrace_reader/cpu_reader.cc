@@ -65,7 +65,7 @@ bool ReadDataLoc(const uint8_t* field_start,
 
   if (string_start + len > end) {
     PERFETTO_ELOG("%s: out of bounds __data_loc", field.ftrace_name);
-    return true;
+    return false;
   }
   ReadIntoString(string_start, string_start + len, field.proto_field_id,
                  message);
