@@ -55,7 +55,7 @@ void MetaTrace(std::vector<std::pair<std::string, std::string>> trace) {
     data += p.second;
     data += ", ";
   }
-  data += "\"ts\": " + std::to_string(GetWallTimeNs().count() / 1000) +
+  data += "\"ts\": " + std::to_string(GetWallTimeNs().count() / 1000.) +
           ", \"cat\": \"PERF\"},\n";
   write(fd, data.c_str(), data.size());
 }
