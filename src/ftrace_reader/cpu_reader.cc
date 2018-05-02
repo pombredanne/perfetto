@@ -26,6 +26,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/metatrace.h"
 #include "perfetto/base/utils.h"
 #include "src/ftrace_reader/proto_translation_table.h"
 
@@ -204,8 +205,14 @@ void CpuReader::RunWorkerThread(
     // First do a blocking splice which sleeps until there is at least one
     // page of data available and enough space to write it into the staging
     // pipe.
+    PERFETTO_METATRACE(PERFETTO_METATRACE_ELEMENT("name", "splice_blocking"),
+                       PERFETTO_METATRACE_ELEMENT("pid", cpu),
+                       PERFETTO_METATRACE_ELEMENT("ph", "B"));
     ssize_t splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                                 base::kPageSize, SPLICE_F_MOVE);
+    PERFETTO_METATRACE(PERFETTO_METATRACE_ELEMENT("name", "splice_blocking"),
+                       PERFETTO_METATRACE_ELEMENT("pid", cpu),
+                       PERFETTO_METATRACE_ELEMENT("ph", "E"));
     if (splice_res < 0) {
       // The kernel ftrace code has its own splice() implementation that can
       // occasionally fail with transient errors not reported in man 2 splice.
@@ -223,17 +230,35 @@ void CpuReader::RunWorkerThread(
     // pages from the trace pipe into the staging pipe as long as there is
     // data in the former and space in the latter.
     while (true) {
+      PERFETTO_METATRACE(
+          PERFETTO_METATRACE_ELEMENT("name", "splice_nonblocking"),
+          PERFETTO_METATRACE_ELEMENT("pid", cpu),
+          PERFETTO_METATRACE_ELEMENT("ph", "B"));
+
       splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                           base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
+
+      PERFETTO_METATRACE(
+          PERFETTO_METATRACE_ELEMENT("name", "splice_nonblocking"),
+          PERFETTO_METATRACE_ELEMENT("pid", cpu),
+          PERFETTO_METATRACE_ELEMENT("ph", "E"));
       if (splice_res < 0) {
         if (errno != EAGAIN && errno != ENOMEM && errno != EBUSY)
           PERFETTO_PLOG("splice");
         break;
       }
     }
-
+    PERFETTO_METATRACE(
+        PERFETTO_METATRACE_ELEMENT("name", "splice_waitcallback"),
+        PERFETTO_METATRACE_ELEMENT("pid", cpu),
+        PERFETTO_METATRACE_ELEMENT("ph", "B"));
     // This callback will block until we are allowed to read more data.
     on_data_available();
+
+    PERFETTO_METATRACE(
+        PERFETTO_METATRACE_ELEMENT("name", "splice_waitcallback"),
+        PERFETTO_METATRACE_ELEMENT("pid", cpu),
+        PERFETTO_METATRACE_ELEMENT("ph", "E"));
   }
 #else
   base::ignore_result(cpu);
