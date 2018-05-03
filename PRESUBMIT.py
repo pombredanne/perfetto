@@ -98,6 +98,7 @@ def CheckMergedTraceConfigProto(input_api, output_api):
     return []
 
 
+# Prevent removing or changing lines in event_whitelist.
 def CheckWhitelist(input_api, output_api):
   file_filter = lambda x: input_api.FilterSourceFile(
           x,
