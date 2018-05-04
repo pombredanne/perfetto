@@ -332,7 +332,9 @@ TEST(TranslationTableTest, Getters) {
     events.push_back(event);
   }
 
-  ProtoTranslationTable table(events, std::move(common_fields));
+  ProtoTranslationTable table(
+      events, std::move(common_fields),
+      ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
   EXPECT_EQ(table.largest_id(), 100ul);
   EXPECT_EQ(table.EventNameToFtraceId("foo"), 1ul);
   EXPECT_EQ(table.EventNameToFtraceId("baz"), 100ul);
