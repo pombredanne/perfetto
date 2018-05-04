@@ -38,6 +38,7 @@ class MockFtraceProcfs : public FtraceProcfs {
  public:
   MockFtraceProcfs() : FtraceProcfs("/root/") {}
 
+  MOCK_CONST_METHOD0(ReadPageHeaderFormat, std::string());
   MOCK_CONST_METHOD2(ReadEventFormat,
                      std::string(const std::string& group,
                                  const std::string& name));
@@ -150,6 +151,12 @@ TEST(TranslationTableTest, Create) {
   std::vector<Field> common_fields;
   std::vector<Event> events;
 
+  ON_CALL(ftrace, ReadPageHeaderFormat())
+      .WillByDefault(Return(
+          R"(	field: u64 timestamp;	offset:0;	size:8;	signed:0;
+	field: local_t commit;	offset:8;	size:8;	signed:1;
+	field: int overwrite;	offset:8;	size:1;	signed:1;
+	field: char data;	offset:16;	size:4080;	signed:0;)"));
   ON_CALL(ftrace, ReadEventFormat(_, _)).WillByDefault(Return(""));
   ON_CALL(ftrace, ReadEventFormat("group", "foo"))
       .WillByDefault(Return(R"(name: foo

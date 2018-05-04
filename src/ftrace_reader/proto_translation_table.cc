@@ -268,6 +268,15 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
   bool common_fields_processed = false;
   uint16_t common_fields_end = 0;
 
+  std::vector<FtraceEvent::Field> page_header_ftrace_event_fields;
+  std::vector<Field> page_header_fields;
+  std::string page_header = ftrace_procfs->ReadPageHeaderFormat();
+  PERFETTO_CHECK(!page_header.empty());
+  PERFETTO_CHECK(ParseFtraceEventBody(std::move(page_header), nullptr,
+                                      &page_header_ftrace_event_fields));
+  PERFETTO_LOG("PAGE SIZE %d", MergeFields(page_header_ftrace_event_fields,
+                                           &page_header_fields, "PAGE HEADER"));
+
   for (Event& event : events) {
     PERFETTO_DCHECK(event.name);
     PERFETTO_DCHECK(event.group);
