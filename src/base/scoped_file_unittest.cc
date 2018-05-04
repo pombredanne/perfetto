@@ -15,9 +15,22 @@
  */
 
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/build_config.h"
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <corecrt_io.h>
+const char* const null_filename = "NUL";
+const char* const zero_filename = "NUL";
+#else
 #include <fcntl.h>
 #include <unistd.h>
+// Double closing of file handles on Windows leads to invocation of the invalid
+// parameter handler or asserts and therefore it cannot be tested, but it can
+// be tested on other platforms.
+#define TEST_INVALID_CLOSE
+const char* const null_filename = "/dev/null";
+const char* const zero_filename = "/dev/zero";
+#endif
 
 #include "gtest/gtest.h"
 
@@ -25,7 +38,8 @@ namespace perfetto {
 namespace base {
 namespace {
 
-TEST(ScopedDirTest, CloseOutOfScope) {
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  TEST(ScopedDirTest, CloseOutOfScope) {
   DIR* dir_handle = opendir(".");
   ASSERT_NE(nullptr, dir_handle);
   int dir_handle_fd = dirfd(dir_handle);
@@ -37,9 +51,10 @@ TEST(ScopedDirTest, CloseOutOfScope) {
   }
   ASSERT_NE(0, close(dir_handle_fd));  // Should fail when closing twice.
 }
+#endif
 
 TEST(ScopedFileTest, CloseOutOfScope) {
-  int raw_fd = open("/dev/null", O_RDONLY);
+  int raw_fd = open(null_filename, O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -47,11 +62,13 @@ TEST(ScopedFileTest, CloseOutOfScope) {
     ASSERT_EQ(raw_fd, *scoped_file);
     ASSERT_TRUE(scoped_file);
   }
+#ifdef TEST_INVALID_CLOSE
   ASSERT_NE(0, close(raw_fd));  // Should fail when closing twice.
+#endif
 }
 
 TEST(ScopedFstreamTest, CloseOutOfScope) {
-  FILE* raw_stream = fopen("/dev/null", "r");
+  FILE* raw_stream = fopen(null_filename, "r");
   ASSERT_NE(nullptr, raw_stream);
   {
     ScopedFstream scoped_stream(raw_stream);
@@ -63,8 +80,8 @@ TEST(ScopedFstreamTest, CloseOutOfScope) {
 }
 
 TEST(ScopedFileTest, Reset) {
-  int raw_fd1 = open("/dev/null", O_RDONLY);
-  int raw_fd2 = open("/dev/zero", O_RDONLY);
+  int raw_fd1 = open(null_filename, O_RDONLY);
+  int raw_fd2 = open(zero_filename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -72,16 +89,20 @@ TEST(ScopedFileTest, Reset) {
     ASSERT_EQ(raw_fd1, scoped_file.get());
     scoped_file.reset(raw_fd2);
     ASSERT_EQ(raw_fd2, scoped_file.get());
+#ifdef TEST_INVALID_CLOSE
     ASSERT_NE(0, close(raw_fd1));  // Should fail when closing twice.
+#endif
     scoped_file.reset();
+#ifdef TEST_INVALID_CLOSE
     ASSERT_NE(0, close(raw_fd2));
-    scoped_file.reset(open("/dev/null", O_RDONLY));
+#endif
+    scoped_file.reset(open(null_filename, O_RDONLY));
     ASSERT_GE(scoped_file.get(), 0);
   }
 }
 
 TEST(ScopedFileTest, Release) {
-  int raw_fd = open("/dev/null", O_RDONLY);
+  int raw_fd = open(null_filename, O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -92,8 +113,8 @@ TEST(ScopedFileTest, Release) {
 }
 
 TEST(ScopedFileTest, MoveCtor) {
-  int raw_fd1 = open("/dev/null", O_RDONLY);
-  int raw_fd2 = open("/dev/zero", O_RDONLY);
+  int raw_fd1 = open(null_filename, O_RDONLY);
+  int raw_fd2 = open(zero_filename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -107,13 +128,15 @@ TEST(ScopedFileTest, MoveCtor) {
     scoped_file1.reset(raw_fd2);
     ASSERT_EQ(raw_fd2, scoped_file1.get());
   }
+#ifdef TEST_INVALID_CLOSE
   ASSERT_NE(0, close(raw_fd1));  // Should fail when closing twice.
   ASSERT_NE(0, close(raw_fd2));
+#endif
 }
 
 TEST(ScopedFileTest, MoveAssignment) {
-  int raw_fd1 = open("/dev/null", O_RDONLY);
-  int raw_fd2 = open("/dev/zero", O_RDONLY);
+  int raw_fd1 = open(null_filename, O_RDONLY);
+  int raw_fd2 = open(zero_filename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -123,20 +146,25 @@ TEST(ScopedFileTest, MoveAssignment) {
     ASSERT_EQ(-1, scoped_file1.get());
     ASSERT_FALSE(scoped_file1);
     ASSERT_EQ(raw_fd1, scoped_file2.get());
+#ifdef TEST_INVALID_CLOSE
     ASSERT_NE(0, close(raw_fd2));
+#endif
 
     scoped_file1 = std::move(scoped_file2);
     ASSERT_EQ(raw_fd1, scoped_file1.get());
     ASSERT_EQ(-1, scoped_file2.get());
   }
+#ifdef TEST_INVALID_CLOSE
   ASSERT_NE(0, close(raw_fd1));
+#endif
 }
 
 // File descriptors are capabilities and hence can be security critical. A
 // failed close() suggests the memory ownership of the file is wrong and we
 // might have leaked a capability.
+#ifdef TEST_INVALID_CLOSE
 TEST(ScopedFileTest, CloseFailureIsFatal) {
-  int raw_fd = open("/dev/null", O_RDONLY);
+  int raw_fd = open(null_filename, O_RDONLY);
   ASSERT_DEATH(
       {
         ScopedFile scoped_file(raw_fd);
@@ -144,6 +172,7 @@ TEST(ScopedFileTest, CloseFailureIsFatal) {
       },
       "");
 }
+#endif
 
 }  // namespace
 }  // namespace base
