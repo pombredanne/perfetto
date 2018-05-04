@@ -274,8 +274,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
   PERFETTO_CHECK(!page_header.empty());
   PERFETTO_CHECK(ParseFtraceEventBody(std::move(page_header), nullptr,
                                       &page_header_ftrace_event_fields));
-  PERFETTO_LOG("PAGE SIZE %d", MergeFields(page_header_ftrace_event_fields,
-                                           &page_header_fields, "PAGE HEADER"));
+  PERFETTO_DCHECK(page_header_ftrace_event_fields.size() == 4);
 
   for (Event& event : events) {
     PERFETTO_DCHECK(event.name);
