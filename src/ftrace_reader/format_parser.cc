@@ -21,10 +21,12 @@
 #include <iosfwd>
 #include <iostream>
 #include <memory>
+#include <regex>
+#include <string>
 #include <vector>
 
+#include "perfetto/base/string_splitter.h"
 #include "perfetto/base/utils.h"
-#include "perfetto/ftrace_reader/ftrace_to_proto.h"
 
 namespace perfetto {
 namespace {
@@ -35,27 +37,62 @@ namespace {
 
 const char* kCommonFieldPrefix = "common_";
 
-bool IsCommonFieldName(std::string name) {
+bool IsCommonFieldName(const std::string& name) {
   return name.compare(0, strlen(kCommonFieldPrefix), kCommonFieldPrefix) == 0;
+}
+
+bool IsCIdentifier(const std::string& s) {
+  for (const char c : s) {
+    if (!(std::isalnum(c) || c == '_'))
+      return false;
+  }
+  return !s.empty() && !std::isdigit(s[0]);
 }
 
 }  // namespace
 
-bool ParseFtraceEvent(const std::string& input, FtraceEvent* output) {
-  std::unique_ptr<char[], base::FreeDeleter> input_copy(strdup(input.c_str()));
-  char* s = input_copy.get();
+// For example:
+// "int foo" -> "foo"
+// "u8 foo[(int)sizeof(struct blah)]" -> "foo"
+// "char[] foo[16]" -> "foo"
+// "something_went_wrong" -> ""
+// "" -> ""
+std::string GetNameFromTypeAndName(const std::string& type_and_name) {
+  size_t right = type_and_name.size();
+  if (right == 0)
+    return "";
 
+  if (type_and_name[type_and_name.size() - 1] == ']') {
+    right = type_and_name.rfind('[');
+    if (right == std::string::npos)
+      return "";
+  }
+
+  size_t left = type_and_name.rfind(' ', right);
+  if (left == std::string::npos)
+    return "";
+  left++;
+
+  std::string result = type_and_name.substr(left, right - left);
+  if (!IsCIdentifier(result))
+    return "";
+
+  return result;
+}
+
+bool ParseFtraceEvent(const std::string& input, FtraceEvent* output) {
   char buffer[MAX_FIELD_LENGTH + 1];
 
   bool has_id = false;
   bool has_name = false;
 
-  int id = 0;
+  uint32_t id = 0;
   std::string name;
   std::vector<FtraceEvent::Field> common_fields;
   std::vector<FtraceEvent::Field> fields;
 
-  for (char* line = strtok(s, "\n"); line; line = strtok(nullptr, "\n")) {
+  for (base::StringSplitter ss(input, '\n'); ss.Next();) {
+    const char* line = ss.cur_token();
     if (!has_id && sscanf(line, "ID: %d", &id) == 1) {
       has_id = true;
       continue;
@@ -102,7 +139,7 @@ bool ParseFtraceEvent(const std::string& input, FtraceEvent* output) {
     return false;
   }
 
-  if (!has_id || !has_name || fields.size() == 0) {
+  if (!has_id || !has_name || fields.empty()) {
     if (output)
       fprintf(stderr, "Could not parse format file: %s.\n",
               !has_id ? "no ID found"

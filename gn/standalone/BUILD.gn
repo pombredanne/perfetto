@@ -17,8 +17,8 @@ import("//gn/standalone/sanitizers/sanitizers.gni")
 
 config("extra_warnings") {
   cflags = [
+    "-Wall",
     "-Wextra",
-    "-Wno-unused-parameter",
   ]
   if (is_clang) {
     cflags += [
@@ -30,17 +30,16 @@ config("extra_warnings") {
       "-Wno-gnu-zero-variadic-macro-arguments",
       "-Wno-padded",
       "-Wno-reserved-id-macro",
-      "-Wno-weak-vtables",
     ]
   }
 }
 
 config("no_exceptions") {
-  cflags = [ "-fno-exceptions" ]
+  cflags_cc = [ "-fno-exceptions" ]
 }
 
 config("no_rtti") {
-  cflags = [ "-fno-rtti" ]
+  cflags_cc = [ "-fno-rtti" ]
 }
 
 config("visibility_hidden") {
@@ -62,20 +61,18 @@ config("default") {
     "-fstrict-aliasing",
     "-fstack-protector",
     "-fPIC",
+    "-g",
     "-Wa,--noexecstack",
     "-Wformat",
-    "-Wall",
     "-Werror",
   ]
 
-  # Color compiler output, see https://github.com/ninja-build/ninja/wiki/FAQ
   if (is_clang) {
     cflags += [
+      # Color compiler output, see https://github.com/ninja-build/ninja/wiki/FAQ
       "-fcolor-diagnostics",
-      "-Wno-unknown-warning-option",
+      "-fdiagnostics-show-template-tree",
     ]
-  } else {
-    cflags += [ "-Wno-unknown-warning" ]
   }
 
   if (current_cpu == "arm") {
@@ -105,6 +102,10 @@ config("default") {
 
   if (is_android) {
     libs += [ "log" ]
+  }
+
+  if (is_debug) {
+    libs += [ "dl" ]
   }
 
   if (is_android) {
@@ -150,13 +151,9 @@ config("default") {
 }
 
 config("debug_symbols") {
-  cflags = [
-    "-g",
-    "-O0",
-  ]
+  cflags = [ "-O0" ]
   if (is_android || is_linux) {
     cflags += [ "-funwind-tables" ]
-    ldflags = [ "-rdynamic" ]
   }
 }
 

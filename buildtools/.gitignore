@@ -1,9 +1,12 @@
 android_sdk/
+aosp-*/
 benchmark/
 clang/
 clang_format/
-emulator_images/
+emscripten/
+emulator/
 googletest/
+libbacktrace/
 libcxx/
 libcxxabi/
 libunwind/

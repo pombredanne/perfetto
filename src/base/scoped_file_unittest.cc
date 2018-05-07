@@ -25,7 +25,7 @@ namespace perfetto {
 namespace base {
 namespace {
 
-TEST(ScopedDir, CloseOutOfScope) {
+TEST(ScopedDirTest, CloseOutOfScope) {
   DIR* dir_handle = opendir(".");
   ASSERT_NE(nullptr, dir_handle);
   int dir_handle_fd = dirfd(dir_handle);
@@ -38,7 +38,7 @@ TEST(ScopedDir, CloseOutOfScope) {
   ASSERT_NE(0, close(dir_handle_fd));  // Should fail when closing twice.
 }
 
-TEST(ScopedFile, CloseOutOfScope) {
+TEST(ScopedFileTest, CloseOutOfScope) {
   int raw_fd = open("/dev/null", O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
@@ -50,7 +50,19 @@ TEST(ScopedFile, CloseOutOfScope) {
   ASSERT_NE(0, close(raw_fd));  // Should fail when closing twice.
 }
 
-TEST(ScopedFile, Reset) {
+TEST(ScopedFstreamTest, CloseOutOfScope) {
+  FILE* raw_stream = fopen("/dev/null", "r");
+  ASSERT_NE(nullptr, raw_stream);
+  {
+    ScopedFstream scoped_stream(raw_stream);
+    ASSERT_EQ(raw_stream, scoped_stream.get());
+    ASSERT_EQ(raw_stream, *scoped_stream);
+    ASSERT_TRUE(scoped_stream);
+  }
+  // We don't have a direct way to see that the file was closed.
+}
+
+TEST(ScopedFileTest, Reset) {
   int raw_fd1 = open("/dev/null", O_RDONLY);
   int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
@@ -68,7 +80,18 @@ TEST(ScopedFile, Reset) {
   }
 }
 
-TEST(ScopedFile, MoveCtor) {
+TEST(ScopedFileTest, Release) {
+  int raw_fd = open("/dev/null", O_RDONLY);
+  ASSERT_GE(raw_fd, 0);
+  {
+    ScopedFile scoped_file(raw_fd);
+    ASSERT_EQ(raw_fd, scoped_file.release());
+    ASSERT_FALSE(scoped_file);
+  }
+  ASSERT_EQ(0, close(raw_fd));
+}
+
+TEST(ScopedFileTest, MoveCtor) {
   int raw_fd1 = open("/dev/null", O_RDONLY);
   int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
@@ -88,7 +111,7 @@ TEST(ScopedFile, MoveCtor) {
   ASSERT_NE(0, close(raw_fd2));
 }
 
-TEST(ScopedFile, MoveAssignment) {
+TEST(ScopedFileTest, MoveAssignment) {
   int raw_fd1 = open("/dev/null", O_RDONLY);
   int raw_fd2 = open("/dev/zero", O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
@@ -112,7 +135,7 @@ TEST(ScopedFile, MoveAssignment) {
 // File descriptors are capabilities and hence can be security critical. A
 // failed close() suggests the memory ownership of the file is wrong and we
 // might have leaked a capability.
-TEST(ScopedFile, CloseFailureIsFatal) {
+TEST(ScopedFileTest, CloseFailureIsFatal) {
   int raw_fd = open("/dev/null", O_RDONLY);
   ASSERT_DEATH(
       {

@@ -17,8 +17,19 @@
 #ifndef INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_
 #define INCLUDE_PERFETTO_BASE_SCOPED_FILE_H_
 
+#include "perfetto/base/build_config.h"
+
+#include <fcntl.h>
+#include <stdio.h>
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <io.h>
+#else
 #include <dirent.h>
 #include <unistd.h>
+#endif
+
+#include <string>
 
 #include "perfetto/base/logging.h"
 
@@ -49,6 +60,11 @@ class ScopedResource {
     }
     t_ = r;
   }
+  T release() {
+    T t = t_;
+    t_ = InvalidValue;
+    return t;
+  }
   ~ScopedResource() { reset(InvalidValue); }
 
  private:
@@ -58,8 +74,24 @@ class ScopedResource {
   T t_;
 };
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+using ScopedFile = ScopedResource<int, _close, -1>;
+inline static ScopedFile OpenFile(const std::string& path, int flags) {
+  ScopedFile fd(open(path.c_str(), flags));
+  return fd;
+}
+#else
 using ScopedFile = ScopedResource<int, close, -1>;
+// Always open a ScopedFile with O-CLOEXEC so we can safely fork and exec.
+inline static ScopedFile OpenFile(const std::string& path, int flags) {
+  ScopedFile fd(open(path.c_str(), flags | O_CLOEXEC));
+  return fd;
+}
+
 using ScopedDir = ScopedResource<DIR*, closedir, nullptr>;
+#endif
+
+using ScopedFstream = ScopedResource<FILE*, fclose, nullptr>;
 
 }  // namespace base
 }  // namespace perfetto

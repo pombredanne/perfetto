@@ -38,11 +38,20 @@ class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
 
+bool InferFtraceType(const std::string& type_and_name,
+                     size_t size,
+                     bool is_signed,
+                     FtraceFieldType* out);
+
 class ProtoTranslationTable {
  public:
+  // This method mutates the |events| and |common_fields| vectors to
+  // fill some of the fields and to delete unused events/fields
+  // before std:move'ing them into the ProtoTranslationTable.
   static std::unique_ptr<ProtoTranslationTable> Create(
       const FtraceProcfs* ftrace_procfs,
-      std::vector<Event> events);
+      std::vector<Event> events,
+      std::vector<Field> common_fields);
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,
@@ -56,6 +65,13 @@ class ProtoTranslationTable {
     if (!name_to_event_.count(name))
       return nullptr;
     return name_to_event_.at(name);
+  }
+
+  const std::vector<const Event*>* GetEventsByGroup(
+      const std::string& group) const {
+    if (!group_to_events_.count(group))
+      return nullptr;
+    return &group_to_events_.at(group);
   }
 
   const Event* GetEventById(size_t id) const {
@@ -81,6 +97,7 @@ class ProtoTranslationTable {
   const std::vector<Event> events_;
   size_t largest_id_;
   std::map<std::string, const Event*> name_to_event_;
+  std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
 };
 
