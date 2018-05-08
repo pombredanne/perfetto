@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//gn/standalone/android.gni")
+import("//gn/standalone/wasm.gni")
 import("//gn/standalone/sanitizers/sanitizers.gni")
 
 config("extra_warnings") {
@@ -62,10 +63,13 @@ config("default") {
     "-fstack-protector",
     "-fPIC",
     "-g",
-    "-Wa,--noexecstack",
     "-Wformat",
     "-Werror",
   ]
+
+  if (!is_wasm) {
+    cflags += [ "-Wa,--noexecstack" ]
+  }
 
   if (is_clang) {
     cflags += [
