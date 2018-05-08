@@ -27,6 +27,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 namespace {
@@ -40,7 +41,7 @@ void SetBlocking(int fd, bool is_blocking) {
 __attribute__((__noreturn__)) void ReadLoop(int fd) {
   char buf[4096];
   while (true) {
-    read(fd, &buf, sizeof(buf));
+    base::ignore_result(read(fd, &buf, sizeof(buf)));
   }
 }
 
