@@ -79,7 +79,7 @@ inline static ScopedFile OpenFile(const std::string& path, int flags) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   ScopedFile fd(open(path.c_str(), flags));
 #else
-  // Always open a ScopedFile with O-CLOEXEC so we can safely fork and exec.
+  // Always open a ScopedFile with O_CLOEXEC so we can safely fork and exec.
   ScopedFile fd(open(path.c_str(), flags | O_CLOEXEC));
 #endif
   return fd;

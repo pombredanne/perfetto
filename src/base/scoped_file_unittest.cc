@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2017 The Android Open Source Project
  *
@@ -19,8 +20,8 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <corecrt_io.h>
-const char* const null_filename = "NUL";
-const char* const zero_filename = "NUL";
+const char kNullFilename = "NUL";
+const char* const kZeroFilename = "NUL";
 #else
 #include <fcntl.h>
 #include <unistd.h>
@@ -28,8 +29,8 @@ const char* const zero_filename = "NUL";
 // parameter handler or asserts and therefore it cannot be tested, but it can
 // be tested on other platforms.
 #define TEST_INVALID_CLOSE
-const char* const null_filename = "/dev/null";
-const char* const zero_filename = "/dev/zero";
+const char* const kNullFilename = "/dev/null";
+const char* const kZeroFilename = "/dev/zero";
 #endif
 
 #include "gtest/gtest.h"
@@ -54,7 +55,7 @@ namespace {
 #endif
 
 TEST(ScopedFileTest, CloseOutOfScope) {
-  int raw_fd = open(null_filename, O_RDONLY);
+  int raw_fd = open(kNullFilename, O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -68,7 +69,7 @@ TEST(ScopedFileTest, CloseOutOfScope) {
 }
 
 TEST(ScopedFstreamTest, CloseOutOfScope) {
-  FILE* raw_stream = fopen(null_filename, "r");
+  FILE* raw_stream = fopen(kNullFilename, "r");
   ASSERT_NE(nullptr, raw_stream);
   {
     ScopedFstream scoped_stream(raw_stream);
@@ -80,8 +81,8 @@ TEST(ScopedFstreamTest, CloseOutOfScope) {
 }
 
 TEST(ScopedFileTest, Reset) {
-  int raw_fd1 = open(null_filename, O_RDONLY);
-  int raw_fd2 = open(zero_filename, O_RDONLY);
+  int raw_fd1 = open(kNullFilename, O_RDONLY);
+  int raw_fd2 = open(kZeroFilename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -96,13 +97,13 @@ TEST(ScopedFileTest, Reset) {
 #ifdef TEST_INVALID_CLOSE
     ASSERT_NE(0, close(raw_fd2));
 #endif
-    scoped_file.reset(open(null_filename, O_RDONLY));
+    scoped_file.reset(open(kNullFilename, O_RDONLY));
     ASSERT_GE(scoped_file.get(), 0);
   }
 }
 
 TEST(ScopedFileTest, Release) {
-  int raw_fd = open(null_filename, O_RDONLY);
+  int raw_fd = open(kNullFilename, O_RDONLY);
   ASSERT_GE(raw_fd, 0);
   {
     ScopedFile scoped_file(raw_fd);
@@ -113,8 +114,8 @@ TEST(ScopedFileTest, Release) {
 }
 
 TEST(ScopedFileTest, MoveCtor) {
-  int raw_fd1 = open(null_filename, O_RDONLY);
-  int raw_fd2 = open(zero_filename, O_RDONLY);
+  int raw_fd1 = open(kNullFilename, O_RDONLY);
+  int raw_fd2 = open(kZeroFilename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -135,8 +136,8 @@ TEST(ScopedFileTest, MoveCtor) {
 }
 
 TEST(ScopedFileTest, MoveAssignment) {
-  int raw_fd1 = open(null_filename, O_RDONLY);
-  int raw_fd2 = open(zero_filename, O_RDONLY);
+  int raw_fd1 = open(kNullFilename, O_RDONLY);
+  int raw_fd2 = open(kZeroFilename, O_RDONLY);
   ASSERT_GE(raw_fd1, 0);
   ASSERT_GE(raw_fd2, 0);
   {
@@ -164,7 +165,7 @@ TEST(ScopedFileTest, MoveAssignment) {
 // might have leaked a capability.
 #ifdef TEST_INVALID_CLOSE
 TEST(ScopedFileTest, CloseFailureIsFatal) {
-  int raw_fd = open(null_filename, O_RDONLY);
+  int raw_fd = open(kNullFilename, O_RDONLY);
   ASSERT_DEATH(
       {
         ScopedFile scoped_file(raw_fd);
