@@ -20,8 +20,6 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <corecrt_io.h>
-const char kNullFilename = "NUL";
-const char* const kZeroFilename = "NUL";
 #else
 #include <fcntl.h>
 #include <unistd.h>
@@ -29,8 +27,6 @@ const char* const kZeroFilename = "NUL";
 // parameter handler or asserts and therefore it cannot be tested, but it can
 // be tested on other platforms.
 #define TEST_INVALID_CLOSE
-const char* const kNullFilename = "/dev/null";
-const char* const kZeroFilename = "/dev/zero";
 #endif
 
 #include "gtest/gtest.h"
@@ -38,6 +34,14 @@ const char* const kZeroFilename = "/dev/zero";
 namespace perfetto {
 namespace base {
 namespace {
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+const char kNullFilename[] = "NUL";
+const char kZeroFilename[] = "NUL";
+#else
+const char kNullFilename[] = "/dev/null";
+const char kZeroFilename[] = "/dev/zero";
+#endif
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   TEST(ScopedDirTest, CloseOutOfScope) {
