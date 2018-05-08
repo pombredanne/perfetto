@@ -310,7 +310,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &page_header.timestamp))
     return 0;
 
-  // Temporary workaroud to make this work on ARM32 devices.
+  // Temporary workaroud to make this work on ARM32 and ARM64 devices.
   if (sizeof(void*) == 8) {
     uint64_t overwrite_and_size;
     if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &overwrite_and_size))
