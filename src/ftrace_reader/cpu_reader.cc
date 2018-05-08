@@ -285,7 +285,7 @@ uint8_t* CpuReader::GetBuffer() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!buffer_)
     buffer_ = base::PageAllocator::Allocate(base::kPageSize);
-  return buffer_.get();
+  return reinterpret_cast<uint8_t*>(buffer_.get());
 }
 
 // The structure of a raw trace buffer page is as follows:
