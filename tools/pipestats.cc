@@ -37,7 +37,7 @@ void SetBlocking(int fd, bool is_blocking) {
   PERFETTO_CHECK(fcntl(fd, F_SETFL, flags) == 0);
 }
 
-[[noreturn]] void ReadLoop(int fd) {
+__attribute__((__noreturn__)) void ReadLoop(int fd) {
   char buf[4096];
   while (true) {
     read(fd, &buf, sizeof(buf));
