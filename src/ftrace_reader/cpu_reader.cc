@@ -325,7 +325,6 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
 
     page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
     page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
-
   } else {
     PERFETTO_CHECK(false);
   }
