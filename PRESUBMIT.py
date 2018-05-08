@@ -101,7 +101,7 @@ def CheckMergedTraceConfigProto(input_api, output_api):
 # Prevent removing or changing lines in event_whitelist.
 def CheckWhitelist(input_api, output_api):
   for f in input_api.AffectedFiles():
-    if f.LocalPath != 'tools/ftrace_proto_gen/event_whitelist':
+    if f.LocalPath() != 'tools/ftrace_proto_gen/event_whitelist':
       continue
     if any(new_line != 'removed' and new_line != old_line for old_line, new_line
            in itertools.izip(f.OldContents(), f.NewContents())):
