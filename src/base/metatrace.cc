@@ -58,7 +58,7 @@ void MetaTrace::WriteEvent(std::string type) {
   }
   data += "\"ts\": " + std::to_string(GetWallTimeNs().count() / 1000.) +
           ", \"cat\": \"PERF\", \"ph\": \"" + type + "\"},\n";
-  write(fd, data.c_str(), data.size());
+  ignore_result(write(fd, data.c_str(), data.size()));
 }
 
 }  // namespace base
