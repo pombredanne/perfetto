@@ -47,7 +47,8 @@ void MetaTrace::WriteEvent(std::string type) {
   if (fd == -1)
     return;
 
-  std::string data;
+  std::string data = "{";
+  data.reserve(128);
   for (size_t i = 0; i < trace_.size(); ++i) {
     const std::pair<std::string, std::string>& p = trace_[i];
     data += p.first;

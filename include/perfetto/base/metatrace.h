@@ -48,13 +48,15 @@ class MetaTrace {
 
   template <typename T, typename... Ts>
   void AddElements(std::string name, T arg, Ts... args) {
-    trace_.emplace_back(std::move(name), FormatJSON(arg));
+    trace_.emplace_back(FormatJSON(std::move(name)),
+                        FormatJSON(std::move(arg)));
     AddElements(args...);
   }
 
   template <typename T>
   void AddElements(std::string name, T arg) {
-    trace_.emplace_back(std::move(name), FormatJSON(arg));
+    trace_.emplace_back(FormatJSON(std::move(name)),
+                        FormatJSON(std::move(arg)));
   }
 
   ~MetaTrace() { WriteEvent("E"); }
@@ -65,7 +67,7 @@ class MetaTrace {
   std::vector<std::pair<std::string, std::string>> trace_;
 };
 
-#if PERFETTO_DCHECK_IS_ON()
+#if PERFETTO_DCHECK_IS_ON() && !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
 #define PERFETTO_METATRACE(...) ::perfetto::base::MetaTrace(__VA_ARGS__)
 #else
 #define PERFETTO_METATRACE(...) ::perfetto::base::ignore_result(__VA_ARGS__)
