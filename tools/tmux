@@ -179,7 +179,7 @@ reset_tracing
 TRACE=$HOME/Downloads/trace
 pull trace /tmp/trace.protobuf
 pull mtrace /tmp/mtrace.json
-# Add [ to beginning of file and replace traililng , with ] to turn into valid
+# Add [ to beginning of file and replace trailing , with ] to turn into valid
 # JSON array.
 sed -i '$ s/.$/]/' /tmp/mtrace.json
 sed -i '1s/^/[/' /tmp/mtrace.json
