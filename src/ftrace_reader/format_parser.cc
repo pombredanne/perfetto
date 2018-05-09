@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_splitter.h"
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
@@ -47,6 +48,43 @@ bool IsCIdentifier(const std::string& s) {
       return false;
   }
   return !s.empty() && !std::isdigit(s[0]);
+}
+
+bool ParseFtraceEventBody(base::StringSplitter* ss,
+                          std::vector<FtraceEvent::Field>* common_fields,
+                          std::vector<FtraceEvent::Field>* fields) {
+  PERFETTO_DCHECK(common_fields || fields);
+  char buffer[MAX_FIELD_LENGTH + 1];
+  while (ss->Next()) {
+    const char* line = ss->cur_token();
+    uint16_t offset = 0;
+    uint16_t size = 0;
+    int is_signed = 0;
+    if (sscanf(line,
+               "\tfield:%" STRINGIFY(MAX_FIELD_LENGTH) "[^;];\toffset: "
+                                                       "%hu;\tsize: "
+                                                       "%hu;\tsigned: %d;",
+               buffer, &offset, &size, &is_signed) == 4) {
+      std::string type_and_name(buffer);
+
+      FtraceEvent::Field field{type_and_name, offset, size, is_signed == 1};
+
+      if (IsCommonFieldName(GetNameFromTypeAndName(type_and_name))) {
+        if (common_fields)
+          common_fields->push_back(field);
+      } else if (fields)
+        fields->push_back(field);
+      continue;
+    }
+
+    if (strncmp(line, "print fmt:", 10) == 0) {
+      break;
+    }
+
+    PERFETTO_ELOG("Cannot parse line: \"%s\"\n", line);
+    return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -78,46 +116,6 @@ std::string GetNameFromTypeAndName(const std::string& type_and_name) {
     return "";
 
   return result;
-}
-
-bool ParseFtraceEventBody(base::StringSplitter* ss,
-                          std::vector<FtraceEvent::Field>* common_fields,
-                          std::vector<FtraceEvent::Field>* fields) {
-  PERFETTO_DCHECK(common_fields || fields);
-  char buffer[MAX_FIELD_LENGTH + 1];
-  while (ss->Next()) {
-    const char* line = ss->cur_token();
-    uint16_t offset = 0;
-    uint16_t size = 0;
-    int is_signed = 0;
-    if (sscanf(line,
-               "\tfield:%" STRINGIFY(MAX_FIELD_LENGTH) "[^;];\toffset: "
-                                                       "%hu;\tsize: "
-                                                       "%hu;\tsigned: %d;",
-               buffer, &offset, &size, &is_signed) == 4) {
-      std::string type_and_name(buffer);
-
-      FtraceEvent::Field field{type_and_name, offset, size, is_signed == 1};
-
-      if (IsCommonFieldName(GetNameFromTypeAndName(type_and_name))) {
-        if (common_fields)
-          common_fields->push_back(field);
-      } else {
-        if (fields)
-          fields->push_back(field);
-      }
-
-      continue;
-    }
-
-    if (strncmp(line, "print fmt:", 10) == 0) {
-      break;
-    }
-
-    fprintf(stderr, "Cannot parse line: \"%s\"\n", line);
-    return false;
-  }
-  return true;
 }
 
 bool ParseFtraceEventBody(std::string input,

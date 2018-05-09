@@ -22,6 +22,7 @@
 #include "src/ftrace_reader/ftrace_procfs.h"
 
 using testing::_;
+using testing::Values;
 using testing::ValuesIn;
 using testing::TestWithParam;
 using testing::Return;
@@ -57,6 +58,8 @@ class AllTranslationTableTest : public TestWithParam<const char*> {
 
   std::unique_ptr<ProtoTranslationTable> table_;
 };
+
+class TranslationTableCreationTest : public TestWithParam<uint16_t> {};
 
 const char* kDevices[] = {
     "android_seed_N2F62_3.10.49", "android_hammerhead_MRA59G_3.4.0",
@@ -146,7 +149,7 @@ TEST(TranslationTableTest, Seed) {
   }
 }
 
-TEST(TranslationTableTest, Create) {
+TEST_P(TranslationTableCreationTest, Create) {
   MockFtraceProcfs ftrace;
   std::vector<Field> common_fields;
   std::vector<Event> events;
@@ -154,7 +157,8 @@ TEST(TranslationTableTest, Create) {
   ON_CALL(ftrace, ReadPageHeaderFormat())
       .WillByDefault(Return(
           R"(	field: u64 timestamp;	offset:0;	size:8;	signed:0;
-	field: local_t commit;	offset:8;	size:8;	signed:1;
+	field: local_t commit;	offset:8;	size:)" +
+          std::to_string(GetParam()) + R"(;	signed:1;
 	field: int overwrite;	offset:8;	size:1;	signed:1;
 	field: char data;	offset:16;	size:4080;	signed:0;)"));
   ON_CALL(ftrace, ReadEventFormat(_, _)).WillByDefault(Return(""));
@@ -235,6 +239,9 @@ print fmt: "some format")"));
   EXPECT_EQ(table->EventNameToFtraceId("bar"), 0ul);
   EXPECT_FALSE(table->GetEventById(43ul));
   ASSERT_TRUE(table->GetEventById(42ul));
+  EXPECT_EQ(table->ftrace_page_header_spec().timestamp.size, 8);
+  EXPECT_EQ(table->ftrace_page_header_spec().size.size, GetParam());
+  EXPECT_EQ(table->ftrace_page_header_spec().overwrite.size, 1);
   auto event = table->GetEventById(42);
   EXPECT_EQ(event->ftrace_event_id, 42ul);
   EXPECT_EQ(event->proto_field_id, 21ul);
@@ -251,6 +258,8 @@ print fmt: "some format")"));
   EXPECT_EQ(field_e.proto_field_id, 504ul);
   EXPECT_EQ(field_e.strategy, kUint32ToUint64);
 }
+
+INSTANTIATE_TEST_CASE_P(BySize, TranslationTableCreationTest, Values(4, 8));
 
 TEST(TranslationTableTest, InferFtraceType) {
   FtraceFieldType type;
