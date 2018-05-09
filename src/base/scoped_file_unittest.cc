@@ -44,7 +44,7 @@ const char kZeroFilename[] = "/dev/zero";
 #endif
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-TEST(ScopedDirTest, CloseOutOfScope) {
+  TEST(ScopedDirTest, CloseOutOfScope) {
   DIR* dir_handle = opendir(".");
   ASSERT_NE(nullptr, dir_handle);
   int dir_handle_fd = dirfd(dir_handle);
