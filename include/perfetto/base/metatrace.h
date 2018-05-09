@@ -47,16 +47,14 @@ class MetaTrace {
   }
 
   template <typename T, typename... Ts>
-  void AddElements(std::string name, T arg, Ts... args) {
-    trace_.emplace_back(FormatJSON(std::move(name)),
-                        FormatJSON(std::move(arg)));
+  void AddElements(const char* name, T arg, Ts... args) {
+    trace_.emplace_back(FormatJSON(name), FormatJSON(std::move(arg)));
     AddElements(args...);
   }
 
   template <typename T>
-  void AddElements(std::string name, T arg) {
-    trace_.emplace_back(FormatJSON(std::move(name)),
-                        FormatJSON(std::move(arg)));
+  void AddElements(const char* name, T arg) {
+    trace_.emplace_back(FormatJSON(name), FormatJSON(std::move(arg)));
   }
 
   ~MetaTrace() { WriteEvent("E"); }
