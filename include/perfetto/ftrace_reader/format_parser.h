@@ -26,8 +26,6 @@
 #include <tuple>
 #include <vector>
 
-#include "perfetto/base/string_splitter.h"
-
 namespace perfetto {
 
 struct FtraceEvent {
@@ -56,9 +54,6 @@ std::string GetNameFromTypeAndName(const std::string& type_and_name);
 ::std::ostream& operator<<(::std::ostream& os, const FtraceEvent::Field&);
 void PrintTo(const FtraceEvent::Field& args, ::std::ostream* os);
 
-bool ParseFtraceEventBody(base::StringSplitter* ss,
-                          std::vector<FtraceEvent::Field>* common_fields,
-                          std::vector<FtraceEvent::Field>* fields);
 bool ParseFtraceEventBody(std::string input,
                           std::vector<FtraceEvent::Field>* common_fields,
                           std::vector<FtraceEvent::Field>* fields);
