@@ -24,13 +24,13 @@
 namespace perfetto {
 namespace base {
 
-namespace {
-int MaybeOpen(const char* fn) {
-  if (fn == nullptr)
+int MaybeOpenTraceFile() {
+  static const char* tracing_path = getenv("PERFETTO_METATRACE_FILE");
+  if (tracing_path == nullptr)
     return -1;
-  return open(fn, O_WRONLY | O_CREAT | O_TRUNC);
+  static int fd = open(tracing_path, O_WRONLY | O_CREAT | O_TRUNC);
+  return fd;
 }
-}  // namespace
 
 template <>
 std::string FormatJSON<std::string>(std::string value) {
@@ -42,21 +42,21 @@ std::string FormatJSON<const char*>(const char* value) {
   return std::string("\"") + value + "\"";
 }
 
-void MetaTrace(std::vector<std::pair<std::string, std::string>> trace) {
-  static const char* tracing_path = getenv("PERFETTO_METATRACE_FILE");
-  static int fd = MaybeOpen(tracing_path);
+void MetaTrace::WriteEvent(std::string type) {
+  int fd = MaybeOpenTraceFile();
   if (fd == -1)
     return;
-  std::string data = "{ ";
-  for (decltype(trace)::size_type i = 0; i < trace.size(); ++i) {
-    const std::pair<std::string, std::string>& p = trace[i];
+
+  std::string data;
+  for (size_t i = 0; i < trace_.size(); ++i) {
+    const std::pair<std::string, std::string>& p = trace_[i];
     data += p.first;
     data += ": ";
     data += p.second;
     data += ", ";
   }
   data += "\"ts\": " + std::to_string(GetWallTimeNs().count() / 1000.) +
-          ", \"cat\": \"PERF\"},\n";
+          ", \"cat\": \"PERF\", \"ph\": \"" + type + "\"},\n";
   write(fd, data.c_str(), data.size());
 }
 

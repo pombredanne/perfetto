@@ -36,17 +36,40 @@ std::string FormatJSON<std::string>(std::string value);
 template <>
 std::string FormatJSON<const char*>(const char* value);
 
-#define PERFETTO_METATRACE_ELEMENT(key, value)      \
-  std::make_pair(::perfetto::base::FormatJSON(key), \
-                 ::perfetto::base::FormatJSON(value))
+int MaybeOpenTraceFile();
+
+class MetaTrace {
+ public:
+  template <typename... Ts>
+  MetaTrace(Ts... args) {
+    AddElements(args...);
+    WriteEvent("B");
+  }
+
+  template <typename T, typename... Ts>
+  void AddElements(std::string name, T arg, Ts... args) {
+    trace_.emplace_back(name, FormatJSON(arg));
+    AddElements(args...);
+  }
+
+  template <typename T>
+  void AddElements(std::string name, T arg) {
+    trace_.emplace_back(name, FormatJSON(arg));
+  }
+
+  ~MetaTrace() { WriteEvent("E"); }
+
+ private:
+  void WriteEvent(std::string type);
+
+  std::vector<std::pair<std::string, std::string>> trace_;
+};
 
 #if PERFETTO_DCHECK_IS_ON()
-#define PERFETTO_METATRACE(...) ::perfetto::base::MetaTrace({__VA_ARGS__})
+#define PERFETTO_METATRACE(...) ::perfetto::base::MetaTrace(__VA_ARGS__)
 #else
 #define PERFETTO_METATRACE(...) ::perfetto::base::ignore_result(__VA_ARGS__)
 #endif
-
-void MetaTrace(const std::vector<std::pair<std::string, std::string>> trace);
 
 }  // namespace base
 }  // namespace perfetto
