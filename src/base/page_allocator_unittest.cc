@@ -50,6 +50,10 @@ TEST(PageAllocatorTest, Basic) {
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(ptr.get()) + i));
 
+    // Testing that this works correctly is difficult, but this at least tests
+    // that it doesn't crash.
+    PageAllocator::AdviseDontNeed(ptr_raw, kSize);
+
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
   }
 

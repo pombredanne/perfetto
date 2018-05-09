@@ -93,10 +93,31 @@ PageAllocator::UniquePtr PageAllocator::AllocateMayFail(size_t size) {
 // static
 void PageAllocator::AdviseDontNeed(void* p, size_t size) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  // Note that MEM_RESET may have more CPU cost than is justified for the
-  // possible memory savings.
-  // https://blogs.msdn.microsoft.com/oldnewthing/20170113-00/?p=95185
-  //VirtualAlloc(p, size, MEM_RESET);
+  // Note that discarding pages may have more CPU cost than is justified for
+  // the possible memory savings.
+
+  // On Windows, discarded pages are not returned to the system immediately and
+  // not guaranteed to be zeroed when returned to the application.
+  using DiscardVirtualMemoryFunction = decltype(&::DiscardVirtualMemory);
+  static DiscardVirtualMemoryFunction discard_virtual_memory =
+      reinterpret_cast<DiscardVirtualMemoryFunction>(-1);
+  if (discard_virtual_memory ==
+      reinterpret_cast<DiscardVirtualMemoryFunction>(-1))
+    discard_virtual_memory =
+        reinterpret_cast<DiscardVirtualMemoryFunction>(GetProcAddress(
+            GetModuleHandle(L"Kernel32.dll"), "DiscardVirtualMemory"));
+  // Use DiscardVirtualMemory when available because it releases faster than
+  // MEM_RESET.
+  DWORD ret = 1;
+  if (discard_virtual_memory) {
+    ret = discard_virtual_memory(p, size);
+  }
+  // DiscardVirtualMemory is buggy in Win10 SP0, so fall back to MEM_RESET on
+  // failure.
+  if (ret) {
+    void* ptr = VirtualAlloc(p, size, MEM_RESET, PAGE_READWRITE);
+    PERFETTO_DCHECK(ptr);
+  }
 #else
   // http://man7.org/linux/man-pages/man2/madvise.2.html
   int res = madvise(p, size, MADV_DONTNEED);
