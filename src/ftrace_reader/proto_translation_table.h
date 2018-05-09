@@ -47,9 +47,9 @@ bool InferFtraceType(const std::string& type_and_name,
 class ProtoTranslationTable {
  public:
   struct FtracePageHeaderSpec {
-    FtraceEvent::Field timestamp;
-    FtraceEvent::Field overwrite;
-    FtraceEvent::Field size;
+    FtraceEvent::Field timestamp{};
+    FtraceEvent::Field overwrite{};
+    FtraceEvent::Field size{};
   };
 
   static FtracePageHeaderSpec DefaultPageHeaderSpecForTesting();
@@ -112,7 +112,7 @@ class ProtoTranslationTable {
   std::map<std::string, const Event*> name_to_event_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
-  FtracePageHeaderSpec ftrace_page_header_spec_;
+  FtracePageHeaderSpec ftrace_page_header_spec_{};
 };
 
 }  // namespace perfetto
