@@ -187,4 +187,3 @@ echo -e "\n\x1b[32mPulling trace into $TRACE.pbtext\x1b[0m"
 $OUT/trace_to_text text < /tmp/trace.protobuf > $TRACE.pbtext
 echo -e "\n\x1b[32mPulling trace into $TRACE.json\x1b[0m"
 $OUT/trace_to_text systrace < /tmp/trace.protobuf > $TRACE.json
-
