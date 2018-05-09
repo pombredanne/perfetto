@@ -20,6 +20,7 @@
 
 #include <algorithm>
 
+#include "perfetto/base/string_utils.h"
 #include "perfetto/ftrace_reader/format_parser.h"
 #include "src/ftrace_reader/event_info.h"
 #include "src/ftrace_reader/ftrace_procfs.h"
@@ -124,10 +125,6 @@ uint16_t MergeFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
   return fields_end;
 }
 
-bool StartsWith(const std::string& str, const std::string& prefix) {
-  return str.compare(0, prefix.length(), prefix) == 0;
-}
-
 bool Contains(const std::string& haystack, const std::string& needle) {
   return haystack.find(needle) != std::string::npos;
 }
@@ -169,6 +166,17 @@ bool InferFtraceType(const std::string& type_and_name,
 
   // String pointers: "__data_loc char[] foo" (as in
   // 'cpufreq_interactive_boost').
+  // TODO(fmayer): Handle u32[], u8[], __u8[] as well.
+  if (Contains(type_and_name, "__data_loc char[] ")) {
+    if (size != 4) {
+      PERFETTO_ELOG("__data_loc with incorrect size: %s (%zd)",
+                    type_and_name.c_str(), size);
+      return false;
+    }
+    *out = kFtraceDataLoc;
+    return true;
+  }
+
   if (Contains(type_and_name, "char[] ")) {
     *out = kFtraceStringPtr;
     return true;
@@ -179,18 +187,18 @@ bool InferFtraceType(const std::string& type_and_name,
   }
 
   // Variable length strings: "char foo" + size: 0 (as in 'print').
-  if (StartsWith(type_and_name, "char ") && size == 0) {
+  if (base::StartsWith(type_and_name, "char ") && size == 0) {
     *out = kFtraceCString;
     return true;
   }
 
-  if (StartsWith(type_and_name, "bool ")) {
+  if (base::StartsWith(type_and_name, "bool ")) {
     *out = kFtraceBool;
     return true;
   }
 
-  if (StartsWith(type_and_name, "ino_t ") ||
-      StartsWith(type_and_name, "i_ino ")) {
+  if (base::StartsWith(type_and_name, "ino_t ") ||
+      base::StartsWith(type_and_name, "i_ino ")) {
     if (size == 4) {
       *out = kFtraceInode32;
       return true;
@@ -200,7 +208,7 @@ bool InferFtraceType(const std::string& type_and_name,
     }
   }
 
-  if (StartsWith(type_and_name, "dev_t ")) {
+  if (base::StartsWith(type_and_name, "dev_t ")) {
     if (size == 4) {
       *out = kFtraceDevId32;
       return true;
@@ -211,7 +219,7 @@ bool InferFtraceType(const std::string& type_and_name,
   }
 
   // Pids (as in 'sched_switch').
-  if (StartsWith(type_and_name, "pid_t ") && size == 4) {
+  if (base::StartsWith(type_and_name, "pid_t ") && size == 4) {
     *out = kFtracePid32;
     return true;
   }

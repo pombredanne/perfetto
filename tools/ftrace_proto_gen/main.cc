@@ -116,7 +116,6 @@ int main(int argc, char** argv) {
         ostream_factory(output_dir + "/ftrace_event.proto");
     perfetto::GenerateFtraceEventProto(whitelist, out.get());
   }
-  }
 
   std::set<std::string> new_events;
   for (const auto& event : whitelist) {
@@ -232,6 +231,7 @@ int main(int argc, char** argv) {
 ftrace_proto_names = [
   "ftrace_event.proto",
   "ftrace_event_bundle.proto",
+  "ftrace_stats.proto",
   "test_bundle_wrapper.proto",
 )";
     for (const perfetto::FtraceEventName& event : whitelist) {
