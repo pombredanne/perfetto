@@ -17,14 +17,20 @@
 #include "perfetto/base/page_allocator.h"
 
 #include <stdint.h>
+
+#include "perfetto/base/build_config.h"
+
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/mman.h>
 #include <sys/types.h>
+#endif
 
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/vm_test_utils.h"
 
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/resource.h>
 #endif
 
@@ -62,8 +68,9 @@ TEST(PageAllocatorTest, GuardRegions) {
 // Disable this on:
 // MacOS: because it doesn't seem to have an equivalent rlimit to bound mmap().
 // Sanitizers: they seem to try to shadow mmaped memory and fail due to OOMs.
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && !defined(ADDRESS_SANITIZER) && \
-    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&                 \
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) &&                             \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) && !defined(ADDRESS_SANITIZER) && \
+    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&              \
     !defined(MEMORY_SANITIZER)
 // Glibc headers hit this on RLIMIT_ macros.
 #pragma GCC diagnostic push

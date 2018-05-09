@@ -45,6 +45,11 @@ class PageAllocator {
   // Like the above, but returns a nullptr if the mmap() fails (e.g., if out
   // of virtual address space).
   static UniquePtr AllocateMayFail(size_t size);
+
+  // Hint to the OS that the memory range is not needed and can be discarded.
+  // The memory remains accessible and its contents may be retained, or they
+  // may be zeroed. This function may be a NOP.
+  static void AdviseDontNeed(void* p, size_t size);
 };
 
 }  // namespace base

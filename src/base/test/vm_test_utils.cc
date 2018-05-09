@@ -16,12 +16,19 @@
 
 #include "src/base/test/vm_test_utils.h"
 
+#include "perfetto/base/build_config.h"
+
 #include <memory>
 
 #include <errno.h>
 #include <string.h>
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <Windows.h>
+#else
 #include <sys/mman.h>
 #include <sys/stat.h>
+#endif
 
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
@@ -31,6 +38,19 @@ namespace base {
 namespace vm_test_utils {
 
 bool IsMapped(void* start, size_t size) {
+  EXPECT_EQ(0u, size % 4096);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  MEMORY_BASIC_INFORMATION memory_info = {};
+  size_t res = VirtualQuery(start, &memory_info, size);
+  EXPECT_EQ(res, sizeof(memory_info));
+  EXPECT_EQ(memory_info.BaseAddress, start);
+  if (!memory_info.AllocationBase)
+    return false;
+  // If RegionSize is smaller than size that means the range has varying
+  // attributes, so a true/false answer is impossible.
+  EXPECT_GE(memory_info.RegionSize, size);
+  return memory_info.State == MEM_COMMIT;
+#else
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   using PageState = char;
   static constexpr PageState kIncoreMask = MINCORE_INCORE;
@@ -38,7 +58,6 @@ bool IsMapped(void* start, size_t size) {
   using PageState = unsigned char;
   static constexpr PageState kIncoreMask = 1;
 #endif
-  EXPECT_EQ(0u, size % 4096);
   const size_t num_pages = size / 4096;
   std::unique_ptr<PageState[]> page_states(new PageState[num_pages]);
   memset(page_states.get(), 0, num_pages * sizeof(PageState));
@@ -53,6 +72,7 @@ bool IsMapped(void* start, size_t size) {
       return false;
   }
   return true;
+#endif
 }
 
 }  // namespace vm_test_utils
