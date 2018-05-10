@@ -96,7 +96,7 @@ template("wasm_lib") {
       ldflags = target_ldflags
       output_extension = "html"
     }
-  }
+  }  # if(generate_html)
 
   if (generate_js) {
     js_target_name = "${target_name}_js"

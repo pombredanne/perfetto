@@ -25,6 +25,7 @@ source_set("base") {
   ]
   sources = [
     "file_utils.cc",
+    "metatrace.cc",
     "string_splitter.cc",
     "string_utils.cc",
     "thread_checker.cc",
@@ -117,21 +118,21 @@ source_set("unittests") {
     deps += [ ":android_task_runner" ]
   }
   sources = [
+    "scoped_file_unittest.cc",
+    "string_splitter_unittest.cc",
+    "string_utils_unittest.cc",
     "time_unittest.cc",
+    "weak_ptr_unittest.cc",
   ]
 
   # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     sources += [
       "page_allocator_unittest.cc",
-      "scoped_file_unittest.cc",
-      "string_splitter_unittest.cc",
-      "string_utils_unittest.cc",
       "task_runner_unittest.cc",
       "temp_file_unittest.cc",
       "thread_checker_unittest.cc",
       "utils_unittest.cc",
-      "weak_ptr_unittest.cc",
     ]
   }
   if (!build_with_chromium && (is_linux || is_android)) {
