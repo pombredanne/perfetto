@@ -1,0 +1,71 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+
+package perfetto.protos;
+
+message Query {
+  repeated uint32 group_by_field_id = 1;
+
+  message AggregatedField {
+    optional uint32 field_id = 1;
+    enum Operator { SUM = 1; }
+    optional Operator op = 2;
+  }
+  repeated AggregatedField aggregated_field = 2;
+
+  message Filter {
+    optional uint32 field_id = 1;
+    enum Operator {
+      EQ = 1;
+      NE = 2;
+      GT = 3;
+      GE = 4;
+      LT = 5;
+      LE = 6;
+      STRING_STARTSWITH = 7;
+      STRING_REGEX = 8;
+    }
+    optional Operator op = 2;
+
+    oneof value {
+      int32 int_value = 3;
+      uint32 uint_value = 4;
+      double double_value = 5;
+      string string_value = 6;
+    }
+  }
+  repeated Filter filter = 3;
+
+  message SortCriteria {
+    optional uint32 field_id = 1;
+    enum Order {
+      UNSPECIFIED = 0;
+      ASC = 1;
+      DESC = 2;
+    }
+    optional Order order = 2;
+  }
+  repeated SortCriteria sort_criteria = 4;
+
+  message Limit {
+    optional uint32 start = 1;
+    optional uint32 size = 2;
+  }
+  optional Limit limit = 5;
+}

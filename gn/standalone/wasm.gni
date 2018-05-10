@@ -47,9 +47,10 @@ template("wasm_lib") {
   }
 
   target_ldflags = [
-    "-O3",
     "-s",
     "WASM=1",
+    "-s",
+    "BUILD_AS_WORKER=1",
     "-s",
     "NO_FILESYSTEM=1",
     "-s",
@@ -61,8 +62,13 @@ template("wasm_lib") {
     "-s",
     "BINARYEN_METHOD='native-wasm'",
     "-s",
+    "EXPORT_FUNCTION_TABLES=1",
+    "-s",
     "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'addFunction']",
   ]
+  if (!is_debug) {
+    target_ldflags += [ "-O3" ]
+  }
 
   if (defined(invoker.js_library)) {
     target_ldflags += [

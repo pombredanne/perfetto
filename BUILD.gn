@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("gn/perfetto.gni")
+import("gn/wasm.gni")
 
 declare_args() {
   # Only for local development. When true the binaries (perfetto, traced, ...)
@@ -37,13 +38,17 @@ group("all") {
       ":traced_probes",
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
+      "src/trace_processor",
       "test/configs",
       "tools:protoc_helper",
       "tools/ftrace_proto_gen:ftrace_proto_gen",
       "tools/proto_to_cpp",
     ]
     if (!build_with_android) {
-      deps += [ "tools/trace_to_text" ]
+      deps += [
+        "src/trace_processor:wasm($wasm_toolchain)",
+        "tools/trace_to_text",
+      ]
     }
     if (is_linux || is_android) {
       deps += [ "tools/skippy" ]
@@ -58,6 +63,7 @@ executable("perfetto_unittests") {
     "gn:gtest_main",
     "src/base:unittests",
   ]
+
   # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     deps += [
