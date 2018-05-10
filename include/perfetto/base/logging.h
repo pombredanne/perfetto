@@ -69,8 +69,8 @@ enum LogLev { kLogDebug = 0, kLogInfo, kLogImportant, kLogError };
 constexpr const char* kLogFmt[] = {"", "", "",
                                    ""};
 
-#define PERFETTO_XLOG_STDERR(level, fmt, ...)                         \
-  fprintf(stderr, "%-24.24s " fmt "\n",       \
+#define PERFETTO_XLOG_STDERR(level, fmt, ...)                              \
+  fprintf(stderr, "%-24.24s " fmt "\n",                                    \
           ::perfetto::base::Basename(__FILE__ "(" PERFETTO_LOG_LINE "):"), \
           ##__VA_ARGS__)
 #else

@@ -90,7 +90,7 @@ bool IsMapped(void* start, size_t size) {
       ++pages_found;
   }
 
-  if (pages_found * 4096 == size)
+  if (pages_found * kPageSize == size)
     return true;
   return false;
 #else
