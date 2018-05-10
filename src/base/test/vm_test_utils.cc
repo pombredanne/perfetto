@@ -17,6 +17,7 @@
 #include "src/base/test/vm_test_utils.h"
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/utils.h"
 
 #include <memory>
 
@@ -39,10 +40,10 @@ namespace base {
 namespace vm_test_utils {
 
 bool IsMapped(void* start, size_t size) {
-  EXPECT_EQ(0u, size % 4096);
+  EXPECT_EQ(0u, size % kPageSize);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   int retries = 5;
-  int number_of_entries = 4096;  // Just a guess.
+  int number_of_entries = 4000;  // Just a guess.
   PSAPI_WORKING_SET_INFORMATION* ws_info = nullptr;
 
   std::vector<char> buffer;
@@ -82,11 +83,11 @@ bool IsMapped(void* start, size_t size) {
   // Now scan the working-set information looking for the addresses.
   unsigned pages_found = 0;
   for (unsigned i = 0; i < ws_info->NumberOfEntries; ++i) {
-    void* address = reinterpret_cast<void*>(ws_info->WorkingSetInfo[i].VirtualPage * 4096);
-    if (address >= start &&
-      address < end) {
+    void* address =
+        reinterpret_cast<void*>(ws_info->WorkingSetInfo[i].VirtualPage *
+        kPageSize);
+    if (address >= start && address < end)
       ++pages_found;
-    }
   }
 
   if (pages_found * 4096 == size)
@@ -100,7 +101,7 @@ bool IsMapped(void* start, size_t size) {
   using PageState = unsigned char;
   static constexpr PageState kIncoreMask = 1;
 #endif
-  const size_t num_pages = size / 4096;
+  const size_t num_pages = size / kPageSize;
   std::unique_ptr<PageState[]> page_states(new PageState[num_pages]);
   memset(page_states.get(), 0, num_pages * sizeof(PageState));
   int res = mincore(start, size, page_states.get());

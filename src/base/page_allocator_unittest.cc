@@ -18,13 +18,6 @@
 
 #include <stdint.h>
 
-#include "perfetto/base/build_config.h"
-
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-#include <sys/mman.h>
-#include <sys/types.h>
-#endif
-
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/vm_test_utils.h"
