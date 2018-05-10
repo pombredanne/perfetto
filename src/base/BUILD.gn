@@ -24,6 +24,7 @@ source_set("base") {
   ]
   sources = [
     "file_utils.cc",
+    "metatrace.cc",
     "page_allocator.cc",
     "string_splitter.cc",
     "string_utils.cc",
@@ -31,6 +32,7 @@ source_set("base") {
     "time.cc",
     "virtual_destructors.cc",
   ]
+
   # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     sources += [
@@ -112,6 +114,7 @@ source_set("unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
+
   if (is_android && !build_with_chromium) {
     deps += [ ":android_task_runner" ]
   }
@@ -123,6 +126,7 @@ source_set("unittests") {
     "time_unittest.cc",
     "weak_ptr_unittest.cc",
   ]
+
   # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
     sources += [
