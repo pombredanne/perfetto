@@ -48,8 +48,9 @@ class PageAllocator {
 
   // Hint to the OS that the memory range is not needed and can be discarded.
   // The memory remains accessible and its contents may be retained, or they
-  // may be zeroed. This function may be a NOP.
-  static void AdviseDontNeed(void* p, size_t size);
+  // may be zeroed. This function may be a NOP on some platforms. Returns true
+  // if implemented.
+  static bool AdviseDontNeed(void* p, size_t size);
 };
 
 }  // namespace base

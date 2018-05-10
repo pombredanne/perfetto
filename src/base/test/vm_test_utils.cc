@@ -25,6 +25,7 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <Windows.h>
+#include <Psapi.h>
 #else
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -40,16 +41,57 @@ namespace vm_test_utils {
 bool IsMapped(void* start, size_t size) {
   EXPECT_EQ(0u, size % 4096);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  MEMORY_BASIC_INFORMATION memory_info = {};
-  size_t res = VirtualQuery(start, &memory_info, size);
-  EXPECT_EQ(res, sizeof(memory_info));
-  EXPECT_EQ(memory_info.BaseAddress, start);
-  if (!memory_info.AllocationBase)
-    return false;
-  // If RegionSize is smaller than size that means the range has varying
-  // attributes, so a true/false answer is impossible.
-  EXPECT_GE(memory_info.RegionSize, size);
-  return memory_info.State == MEM_COMMIT;
+  int retries = 5;
+  int number_of_entries = 4096;  // Just a guess.
+  PSAPI_WORKING_SET_INFORMATION* ws_info = nullptr;
+
+  std::vector<char> buffer;
+  for (;;) {
+    size_t buffer_size =
+      sizeof(PSAPI_WORKING_SET_INFORMATION) +
+      (number_of_entries * sizeof(PSAPI_WORKING_SET_BLOCK));
+
+    buffer.resize(buffer_size);
+    ws_info = reinterpret_cast<PSAPI_WORKING_SET_INFORMATION*>(&buffer[0]);
+
+    // On success, |buffer_| is populated with info about the working set of
+    // |process|. On ERROR_BAD_LENGTH failure, increase the size of the
+    // buffer and try again.
+    if (QueryWorkingSet(GetCurrentProcess(), &buffer[0], buffer_size))
+      break;  // Success
+
+    if (GetLastError() != ERROR_BAD_LENGTH) {
+      EXPECT_EQ(true, false);
+      return false;
+    }
+
+    number_of_entries = ws_info->NumberOfEntries;
+
+    // Maybe some entries are being added right now. Increase the buffer to
+    // take that into account. Increasing by 10% should generally be enough.
+    number_of_entries *= 1.1;
+
+    if (--retries == 0) {
+      // If we're looping, eventually fail.
+      EXPECT_EQ(true, false);
+      return false;
+    }
+  }
+
+  void* end = reinterpret_cast<char*>(start) + size;
+  // Now scan the working-set information looking for the addresses.
+  unsigned pages_found = 0;
+  for (unsigned i = 0; i < ws_info->NumberOfEntries; ++i) {
+    void* address = reinterpret_cast<void*>(ws_info->WorkingSetInfo[i].VirtualPage * 4096);
+    if (address >= start &&
+      address < end) {
+      ++pages_found;
+    }
+  }
+
+  if (pages_found * 4096 == size)
+    return true;
+  return false;
 #else
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
   using PageState = char;

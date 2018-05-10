@@ -91,7 +91,7 @@ PageAllocator::UniquePtr PageAllocator::AllocateMayFail(size_t size) {
 }
 
 // static
-void PageAllocator::AdviseDontNeed(void* p, size_t size) {
+bool PageAllocator::AdviseDontNeed(void* p, size_t size) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   // Note that discarding pages may have more CPU cost than is justified for
   // the possible memory savings.
@@ -118,10 +118,12 @@ void PageAllocator::AdviseDontNeed(void* p, size_t size) {
     void* ptr = VirtualAlloc(p, size, MEM_RESET, PAGE_READWRITE);
     PERFETTO_DCHECK(ptr);
   }
+  return true;
 #else
   // http://man7.org/linux/man-pages/man2/madvise.2.html
   int res = madvise(p, size, MADV_DONTNEED);
   PERFETTO_DCHECK(res == 0);
+  return true;
 #endif
 }
 
