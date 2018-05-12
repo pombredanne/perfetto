@@ -1,0 +1,184 @@
+# Copyright (C) 2018 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import("../gn/perfetto.gni")
+
+ui_dist_dir = "$root_build_dir/ui"
+nodejs_root = rebase_path("../buildtools/nodejs", root_build_dir)
+npm = nodejs_root + "/bin/npm"  # Node package manager.
+tsc = "node_modules/.bin/tsc"  # TypeScript compiler.
+
+# Creates a symlink from out/xxx/ui/node_modules -> ../../../ui/node_modules.
+action("node_modules_symlink") {
+  src = "node_modules"
+  dst = "$ui_dist_dir/node_modules"
+  script = "../gn/standalone/build_tool_wrapper.py"
+  args = [
+    "/bin/ln",
+    "-fhs",
+    rebase_path(src, ui_dist_dir),
+    rebase_path(dst, root_build_dir)
+  ]
+  inputs = [ src ]
+  outputs = [ dst ]
+}
+
+# Runs npm install.
+action("node_modules") {
+  script = "../gn/standalone/build_tool_wrapper.py"
+  stamp_file = "$ui_dist_dir/.$target_name.stamp"
+  args = [
+    "--chdir",
+    rebase_path(".", root_build_dir),
+    "--stamp",
+    rebase_path(stamp_file, root_build_dir),
+    npm,
+    "install",
+    "--no-save"
+  ]
+  inputs = [  "package.json", "package-lock.json" ]
+  outputs = [ stamp_file ]
+  deps = [ ":node_modules_symlink" ]
+}
+
+# Creates a symlink from //ui/dist -> ../../out/xxx/ui. Used only for
+# autocompletion in IDEs. The problem this is solving is that in tsconfig.json
+# we can't possibly know the path to ../../out/xxx for outDir. Instead, we set
+# outDir to "./dist" and create a symlink on the first build.
+action("dist_symlink") {
+  script = "../gn/standalone/build_tool_wrapper.py"
+  stamp_file = "$ui_dist_dir/.$target_name.stamp"
+  args = [
+    "--stamp",
+    rebase_path(stamp_file, root_build_dir),
+    "/bin/ln",
+    "-fhs",
+    rebase_path(ui_dist_dir, "."),
+    rebase_path("dist", root_build_dir)
+  ]
+  inputs = []
+  outputs = [ stamp_file ]
+}
+
+
+protos = [
+  "query",
+  "sched",
+]
+all_proto_deps = []
+foreach(proto, protos) {
+  action("pb2js_$proto") {
+    script = "../gn/standalone/build_tool_wrapper.py"
+    input = "../protos/perfetto/processed_trace/$proto.proto"
+    output = "$ui_dist_dir/lib/$proto.js"
+    args = [
+      rebase_path("node_modules/.bin/pbjs", root_build_dir),
+      "-t",
+      "static-module",
+      "-w",
+      "commonjs",
+      "-p",
+      rebase_path("../protos", root_build_dir),
+      "-o",
+      rebase_path(output, root_build_dir),
+      rebase_path(input, root_build_dir),
+    ]
+    inputs = [ input ]
+    outputs = [ output ]
+  }
+
+  all_proto_deps += [ ":pb2ts_$proto" ]
+  action("pb2ts_$proto") {
+    script = "../gn/standalone/build_tool_wrapper.py"
+    deps = [ ":pb2js_$proto" ]
+    input = "$ui_dist_dir/lib/$proto.js"
+    output = "$ui_dist_dir/lib/$proto.d.ts"
+    args = [
+      rebase_path("node_modules/.bin/pbts", root_build_dir),
+      "-p",
+      rebase_path("../protos", root_build_dir),
+      "-o",
+      rebase_path(output, root_build_dir),
+      rebase_path(input, root_build_dir),
+    ]
+    inputs = [ input ]
+    outputs = [ output ]
+  }
+}  # foreach proto
+
+# Builds all .ts sources in the repo that are reachable from |sources|.
+action("transpile_all_ts") {
+  deps = [
+    ":node_modules",
+    ":dist_symlink",
+  ]
+  deps += all_proto_deps
+  sources = [ "main.ts" ]
+  outputs = [ "$ui_dist_dir/main.js" ]
+  inputs = sources + [ "tsconfig.json" ]
+
+  script = "../gn/standalone/build_tool_wrapper.py"
+  tsc_cmd = [
+      rebase_path(tsc, root_build_dir),
+      "--project",
+      rebase_path(".", root_build_dir)
+  ]
+
+  # Get all recursive input dependencies from the TypeScript compiler.
+  # The returned list will consist of absolute paths.
+  # all_ts_inputs = exec_script(
+  #     "../gn/standalone/build_tool_wrapper.py",
+  #     tsc_cmd + ["--listFiles", "--noEmit"],
+  #     "list lines")
+  # foreach(tsfile, all_ts_inputs) {
+  #   # inputs += [ rebase_path(tsfile, ".") ]   # TODO put back
+  # }
+
+  args = tsc_cmd + [
+    # "--rootDir",
+    # rebase_path(".", root_build_dir),
+    "--outDir",
+    rebase_path(ui_dist_dir, root_build_dir),
+  ]
+}
+
+copy("index") {
+  sources = [ "index.html" ]
+  outputs = [ "$ui_dist_dir/index.html" ]
+}
+
+# Bundle together all js sources into a bundle.js file, that will ultimately be
+# included by the .html files.
+action("bundle") {
+  deps = [
+    ":node_modules",
+    ":transpile_all_ts",
+    ":index",
+  ]
+  script = "../gn/standalone/build_tool_wrapper.py"
+  input =  "$ui_dist_dir/main.js"
+  output =  "$ui_dist_dir/bundle.js"
+  args = [
+    rebase_path("node_modules/.bin/browserify", root_build_dir),
+    rebase_path(input, root_build_dir),
+    "-o",
+    rebase_path(output, root_build_dir),
+  ]
+  inputs = [ input ]
+  outputs = [ output ]
+}
+
+group("ui") {
+  deps = [ ":node_modules", ":bundle" ]
+}

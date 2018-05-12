@@ -56,6 +56,12 @@ group("all") {
   }
 }
 
+if (build_standalone) {
+  group("ui") {
+    deps = [ "ui" ]
+  }
+}
+
 executable("perfetto_unittests") {
   testonly = true
   deps = [

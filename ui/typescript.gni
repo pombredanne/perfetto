@@ -1,0 +1,63 @@
+# Copyright (C) 2018 The Android Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# UNUSED STUFF, KILL THIS FILE.
+
+# ui_dist_dir = "$root_build_dir/ui"
+#
+# nodejs_root = rebase_path("//buildtools/nodejs", root_build_dir)
+# npm = nodejs_root + "/bin/npm"  # Node package manager.
+# tsc = "node_modules/.bin/tsc"  # TypeScript compiler.
+#
+# template("ts_library") {
+#   action(target_name) {
+#     ts_sources = []
+#     rebased_ts_sources = []
+#     transpiled_outputs = []
+#     foreach(source, invoker.sources) {
+#       ts_sources += [ "$source.ts" ]
+#       rebased_ts_sources += [ rebase_path("$source.ts", root_build_dir) ]
+#       transpiled_outputs += [ "$ui_dist_dir/" + rebase_path(source, ".") + ".js" ]
+#     }
+#     print(transpiled_outputs)
+#
+#     script = "//gn/standalone/build_tool_wrapper.py"
+#     # stamp_file = "$target_out_dir/ts_library_$target_name.stamp"
+#     args = [
+#       # "--stamp",
+#       # rebase_path(stamp_file, root_build_dir),
+#
+#       rebase_path(tsc, root_build_dir),
+#       # "--project",
+#       # rebase_path(".", root_build_dir),
+#       "-m",
+#       "commonjs",
+#       "-t",
+#       "ES2015",
+#       "--sourceMap",
+#       "--rootDir",
+#       rebase_path(".", root_build_dir),
+#       "--outDir",
+#       rebase_path(ui_dist_dir, root_build_dir),
+#     ] + rebased_ts_sources
+#
+#     inputs = ts_sources
+#     outputs = transpiled_outputs
+#
+#     if (defined(invoker.deps)) {
+#       deps = invoker.deps
+#     }
+#   }
+# }

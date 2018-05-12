@@ -17,7 +17,14 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
+import "perfetto/processed_trace/query.proto";
+
 package perfetto.protos;
+
+service sched {
+  rpc GetSchedEvents(Query) returns (stream SchedEvent) {}
+  rpc GetQuantizedSched(Query) returns (stream QuantizedSchedActivity) {}
+}
 
 message SchedEvent {
   optional int32 pid = 1;
@@ -40,10 +47,3 @@ message QuantizedSchedActivity {
   optional double duration = 2;
   repeated SchedEvent events = 3;
 }
-
-/*
-service SchedTable {
-  rpc GetSchedEvents(Query) returns (stream SchedInterval) {}
-  rpc ListProcesses(...) returns (...) {}
-}
-*/
