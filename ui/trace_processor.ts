@@ -20,7 +20,7 @@ import * as protobuf from "protobufjs";
 import * as protos_ns from './gen/protos';
 import protos = protos_ns.perfetto.protos;
 
-import './worker'  // Only for the WASMRequst/WASMReply declarations.
+import './worker'  // Only for the MsgMainToWorker/MsgWorkerToMain declarations.
 
 // This class is a shim intended to be used on the main thread. It routes method
 // calls to the worker (where the WASM module lives) and handles all the async
@@ -52,7 +52,7 @@ export default class TraceProcessor {
         return new Promise<Uint8Array>((resolve, reject) => {
             const reqId = ++this.lastReqId;
             this.pendingRequests[reqId] = { resolve: resolve, reject: reject };
-            this.worker.postMessage(<WASMRequest>{
+            this.worker.postMessage(<MsgMainToWorker>{
                 wasmCall: {
                     reqId: reqId,
                     svcName: svcName,
@@ -66,7 +66,7 @@ export default class TraceProcessor {
     }
 
     onWorkerMessage(msg: MessageEvent) {
-        const msgData = <WASMReply>msg.data;
+        const msgData = <MsgWorkerToMain>msg.data;
         if (msgData.wasmReply) {
             const reply = msgData.wasmReply;
             if (!(reply.reqId in this.pendingRequests)) {
@@ -80,21 +80,21 @@ export default class TraceProcessor {
             } else {
                 pendingReq.reject(new Error(reply.error));
             }
-        } else if (msgData.readData) {
-            const readData = msgData.readData;
+        } else if (msgData.traceDataReq) {
+            const traceDataReq = msgData.traceDataReq;
             var fr = new FileReader();
             fr.addEventListener('load', () => {
                 var buf: ArrayBuffer = fr.result;
-                this.worker.postMessage(<WASMRequest>{
-                  readData: {
-                    offset: readData.offset,
+                this.worker.postMessage(<MsgMainToWorker>{
+                  traceDataResp: {
+                    offset: traceDataReq.offset,
                     data: buf
                   }
                 }, [buf] /* transfer list */);
 
             });
             fr.readAsArrayBuffer(this.traceFile.slice(
-                readData.offset, readData.offset + readData.len));
+                traceDataReq.offset, traceDataReq.offset + traceDataReq.len));
         } else if (msgData.consoleOutput) {
           var line = document.createElement('div');
           const t = ((Date.now() - this.firstConsoleMsgTime) / 1000).toFixed(3);

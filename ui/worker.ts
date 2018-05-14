@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-// The message being send from the main thread to the worker, asking to invoke
-// a WASM function.
-
+// Messages sent from the main JS thread to the worker.
+class MsgMainToWorker {
+    wasmCall?: MethodCall;
+    traceDataResp?: ReadDataResponse;
+}
 class MethodCall {
     reqId: number = 0;
     svcName: string = '';
@@ -28,12 +30,13 @@ class ReadDataResponse {
     offset: number = 0;
     data: ArrayBuffer = new ArrayBuffer(0);
 }
-class WASMRequest {
-    wasmCall?: MethodCall;
-    readData?: ReadDataResponse;
+
+// Messages sent from the worker back to the main JS thread.
+class MsgWorkerToMain {
+    wasmReply?: MethodReply;
+    traceDataReq?: ReadDataRequest;
+    consoleOutput?: string
 }
-
-
 class MethodReply {
     reqId: number = 0;
     success: boolean = false;
@@ -43,12 +46,6 @@ class MethodReply {
 class ReadDataRequest {
     offset: number = 0;
     len: number = 0;
-}
-
-class WASMReply {
-    wasmReply?: MethodReply;
-    readData?: ReadDataRequest;
-    consoleOutput?: string
 }
 
 class TraceProcessorWorker {
@@ -76,8 +73,8 @@ class TraceProcessorWorker {
     }
 
     readTraceData(offset: number, len: number) {
-        var reply: WASMReply = {
-            readData: {
+        var reply: MsgWorkerToMain = {
+            traceDataReq: {
                 offset: offset,
                 len: len,
             }
@@ -87,7 +84,7 @@ class TraceProcessorWorker {
 
     reply(reqId: number, success: boolean, heapPtr: number, size: number) {
         const data = Module.HEAPU8.slice(heapPtr, heapPtr + size);
-        var reply: WASMReply = {
+        var reply: MsgWorkerToMain = {
             wasmReply: {
                 reqId: reqId,
                 success: success,
@@ -103,15 +100,15 @@ class TraceProcessorWorker {
     }
 
     onMessage(msg: MessageEvent) {
-        const req = <WASMRequest>msg.data;
+        const req = <MsgMainToWorker>msg.data;
         if (req.wasmCall) {
             if (!this.wasmReady) {
                 this.queuedCalls.push(req.wasmCall);
                 return;
             }
             this.callWasmMethod(req.wasmCall);
-        } else if (req.readData) {
-            const data = req.readData;
+        } else if (req.traceDataResp) {
+            const data = req.traceDataResp;
             Module.ccall(
                 'ReadComplete',                           // C function name.
                 'void',                                   // Return type.
@@ -123,7 +120,7 @@ class TraceProcessorWorker {
 
     onStdout(msg: string) {
         console.log(msg);
-        var reply: WASMReply = {
+        var reply: MsgWorkerToMain = {
           consoleOutput: msg,
         };
         (<any>self).postMessage(reply);
@@ -146,7 +143,7 @@ class TraceProcessorWorker {
 
 // If we are in a worker context, initialize the worker and the WASM module.
 // This file is pulled also from the main thread, just for the sake of getting
-// the WASMRequest/WASMReply declarations.
+// the MsgMainToWorker/MsgWorkerToMain declarations.
 if ((<any>self).WorkerGlobalScope !== undefined) {
     var tpw = new TraceProcessorWorker();
 
