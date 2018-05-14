@@ -49,7 +49,7 @@ group("all") {
       deps += [ "tools/skippy" ]
     }
     if (is_linux) {
-      deps += [ "tools/pipestats" ]
+      deps += [ "tools:pipestats" ]
     }
   }
 }
