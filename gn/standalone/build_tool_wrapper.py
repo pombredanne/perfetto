@@ -28,8 +28,12 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--chdir', default=None)
   parser.add_argument('--stamp', default=None)
+  parser.add_argument('--noop', default=False, action='store_true')
   parser.add_argument('cmd', nargs=argparse.REMAINDER)
   args = parser.parse_args()
+
+  if args.noop:
+    return 0
 
   if args.chdir and not os.path.exists(args.chdir):
     print >> sys.stderr, 'Cannot chdir to %s from %s' % (workdir, os.getcwd())

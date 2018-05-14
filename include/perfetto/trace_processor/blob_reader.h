@@ -17,22 +17,25 @@
 #ifndef INCLUDE_PERFETTO_TRACE_PROCESSOR_BLOB_READER_H_
 #define INCLUDE_PERFETTO_TRACE_PROCESSOR_BLOB_READER_H_
 
+#include <functional>
+
 namespace perfetto {
 namespace trace_processor {
 
 class BlobReader {
  public:
-  class Delegate {
-   public:
-    virtual void OnRead(uint64_t offset,
-                        const uint8_t* data,
-                        size_t length) = 0;
-  };
-  virtual void Read(uint64_t offset, size_t max_size) = 0;
+  // class Delegate {
+  //  public:
+  //   virtual void OnRead(uint64_t offset,
+  //                       const uint8_t* data,
+  //                       size_t length) = 0;
+  // };
 
- private:
-  BlobReader(const BlobReader&) = delete;
-  BlobReader& operator=(const BlobReader&) = delete;
+  virtual ~BlobReader();
+
+  using ReadCallback =
+      std::function<void(uint32_t /*offset*/, const uint8_t* /*data*/, size_t)>;
+  virtual void Read(uint32_t offset, size_t max_size, ReadCallback) = 0;
 };
 
 }  // namespace trace_processor

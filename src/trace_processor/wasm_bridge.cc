@@ -20,14 +20,17 @@
 #include <map>
 #include <string>
 
-#include "perfetto/processed_trace/query.pb.h"
+#include "perfetto/trace_processor/query.pb.h"
+#include "perfetto/trace_processor/sched.pb.h"
+#include "perfetto/trace_processor/blob_reader.h"
 #include "perfetto/trace_processor/sched.h"
 #include "src/trace_processor/emscripten_task_runner.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-using TraceID = int;
+using TraceID = uint32_t;
+using RequestID = uint32_t;
 
 // Imported functions implemented by JS and injected via Initialize().
 
@@ -44,38 +47,101 @@ using TraceID = int;
 using ReadTraceFunction = uint32_t (*)(TraceID,
                                        uint32_t /*offset*/,
                                        uint32_t /*len*/);
+using ReplyFunction = void (*)(RequestID,
+                               bool success,
+                               const char* /*proto_reply_data*/,
+                               uint32_t /*len*/);
+
 namespace {
+
+// TODO(primiano): create a class to handle the module state, like civilization.
+#pragma GCC diagnostic ignored "-Wglobal-constructors"
+#pragma GCC diagnostic ignored "-Wexit-time-destructors"
 
 EmscriptenTaskRunner* g_task_runner;
 TraceID g_trace_id;
 ReadTraceFunction g_read_trace;
-std::unique_ptr<TraceProcessor> g_trace_processor;
+ReplyFunction g_reply;
+TraceProcessor* g_trace_processor;
+BlobReader::ReadCallback g_read_callback;
+
+class BlobReaderImpl : public BlobReader {
+ public:
+  explicit BlobReaderImpl(base::TaskRunner* task_runner)
+      : task_runner_(task_runner) {}
+  ~BlobReaderImpl() override = default;
+
+  void Read(uint32_t offset, size_t max_size, ReadCallback callback) override {
+    g_read_trace(g_trace_id, offset, max_size);
+    g_read_callback = callback;
+    (void)task_runner_;
+  }
+
+ private:
+  base::TaskRunner* const task_runner_;
+};
+
+BlobReaderImpl* blob_reader() {
+  static BlobReaderImpl* instance = new BlobReaderImpl(g_task_runner);
+  return instance;
+}
+
+Sched* sched() {
+  static Sched* instance = new Sched(g_task_runner, blob_reader());
+  return instance;
+}
 
 }  // namespace
 
-extern "C" {
-void EMSCRIPTEN_KEEPALIVE Initialize(TraceID, ReadTraceFunction);
-
 // Functions exported to JS.
-void EMSCRIPTEN_KEEPALIVE GetSlices(const char* query_data, int len);
 
-void GetSlices(const char* query_data, int len) {
-  protos::Query query;
-  bool parsed = query.ParseFromArray(query_data, len);
-  printf("GetSlices(%p, %d). Parsed = %d\n",
-         reinterpret_cast<const void*>(query_data), len, parsed);
-}
-
-void Initialize(TraceID trace_id, ReadTraceFunction read_trace_function) {
-  printf("In Initialize()\n");
+extern "C" {
+void EMSCRIPTEN_KEEPALIVE Initialize(TraceID, ReadTraceFunction, ReplyFunction);
+void Initialize(TraceID trace_id,
+                ReadTraceFunction read_trace_function,
+                ReplyFunction reply_function) {
+  printf("Initializing WASM bridge\n");
   g_trace_id = trace_id;
   g_task_runner = new EmscriptenTaskRunner();
   g_read_trace = read_trace_function;
-  g_trace_processor.reset(new TraceProcessor(nullptr, nullptr));
+  g_reply = reply_function;
+  PERFETTO_CHECK(!g_trace_processor);
+  g_trace_processor = new TraceProcessor(nullptr, nullptr);
 }
+
+void EMSCRIPTEN_KEEPALIVE ReadComplete(uint32_t, const uint8_t*, uint32_t);
+void ReadComplete(uint32_t offset, const uint8_t* data, uint32_t size) {
+  g_read_callback(offset, data, size);
 }
+
+// Here we have one function for each method of each RPC service defined in
+// trace_processor/*.proto.
+
+// TODO(primiano): autogenerate these.
+void EMSCRIPTEN_KEEPALIVE sched_getSchedEvents(RequestID, const uint8_t*, int);
+void sched_getSchedEvents(RequestID req_id,
+                          const uint8_t* query_data,
+                          int len) {
+  protos::Query query;
+  bool parsed = query.ParseFromArray(query_data, len);
+  if (!parsed) {
+    std::string err = "Failed to parse input request";
+    g_reply(req_id, false, err.data(), err.size());
+  }
+
+  // When the C++ class implementing the service replies, serialize the protobuf
+  // result and post it back to the worker script (|g_reply|).
+  auto callback = [req_id](const protos::SchedEvent& events) {
+    std::string encoded;
+    events.SerializeToString(&encoded);
+    g_reply(req_id, true, encoded.data(),
+            static_cast<uint32_t>(encoded.size()));
+  };
+
+  sched()->GetSchedEvents(query, callback);
+}
+
+}  // extern "C"
 
 }  // namespace trace_processor
-
-}  // namespace perfetto
 }  // namespace perfetto

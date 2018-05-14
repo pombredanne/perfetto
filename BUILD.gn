@@ -38,7 +38,6 @@ group("all") {
       ":traced_probes",
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
-      "src/trace_processor",
       "test/configs",
       "tools:protoc_helper",
       "tools/ftrace_proto_gen:ftrace_proto_gen",
@@ -46,7 +45,7 @@ group("all") {
     ]
     if (!build_with_android) {
       deps += [
-        "src/trace_processor:wasm($wasm_toolchain)",
+        "src/trace_processor",
         "tools/trace_to_text",
       ]
     }
@@ -58,7 +57,9 @@ group("all") {
 
 if (build_standalone) {
   group("ui") {
-    deps = [ "ui" ]
+    deps = [
+      "ui",
+    ]
   }
 }
 

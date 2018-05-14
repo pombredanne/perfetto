@@ -28,27 +28,32 @@ class TaskRunner;
 namespace protos {
 class Query;
 class SchedEvent;
+class QuantizedSchedActivity;
 }  // namespace protos
 
 namespace trace_processor {
 
 class BlobReader;
 
+// This implements the RPC methods defined in sched.proto.
 class Sched {
  public:
-  explicit Sched(base::TaskRunner*);
+  Sched(base::TaskRunner*, BlobReader*);
 
-  using GetSchedEventsCallback =
-      std::function<void(const protos::SchedEvent*, size_t)>;
+  using GetSchedEventsCallback = std::function<void(const protos::SchedEvent&)>;
   void GetSchedEvents(const protos::Query&, GetSchedEventsCallback);
 
-  void GetQuantizedSchedActivity(const protos::Query&);
+  using GetQuantizedSchedActivityCallback =
+      std::function<void(const protos::QuantizedSchedActivity&)>;
+  void GetQuantizedSchedActivity(const protos::Query&,
+                                 GetQuantizedSchedActivityCallback);
 
  private:
   Sched(const Sched&) = delete;
   Sched& operator=(const Sched&) = delete;
 
   base::TaskRunner* const task_runner_;
+  BlobReader* const reader_;
 };
 
 }  // namespace trace_processor

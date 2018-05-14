@@ -22,12 +22,13 @@
 namespace perfetto {
 namespace trace_processor {
 
-TraceProcessor::TraceProcessor(base::TaskRunner* task_runner, BlobReader*)
-    : task_runner_(task_runner) {}
+TraceProcessor::TraceProcessor(base::TaskRunner* task_runner,
+                               BlobReader* reader)
+    : task_runner_(task_runner), reader_(reader) {}
 
 Sched* TraceProcessor::sched() {
   if (!sched_)
-    sched_.reset(new Sched(task_runner_));
+    sched_.reset(new Sched(task_runner_, reader_));
   return sched_.get();
 }
 

@@ -1,6 +1,46 @@
 <!doctype html>
 <html lang="en-us">
+<head>
+  <title>Perfetto test</title>
+  <style type="text/css">
+    html {
+      font-family: Roboto, verdana, sans-serif;
+      padding: 20px;
+    }
+
+    input[type=file] {
+      background: gold;
+      padding: 10px;
+    }
+    #console {
+      border: 1px solid #333;
+      width: auto;
+      height: 200px;
+      background: #eee;
+      margin: 10px 0;
+    }
+
+    #console > div {
+      width: 100%;
+      white-space: pre;
+      overflow: hidden;
+      font-family: monospace;
+      font-size: 12px;
+      line-height: 1;
+      text-overflow: ellipsis;
+      padding: 2px;
+    }
+  </style>
+</head>
 <body>
-<script src="bundle.js" type="text/javascript"></script>
+  <div>
+  Load a large (>300 MB) file here. The actual file doesn't matter, at the
+  moment it doesn't try to parse it, just benchmark I/O operations.
+  </div>
+  <input type="file" id="traceFile">
+  <div id="console">
+  </div>
+  <script src="bundle.js" type="text/javascript"></script>
+
 </body>
 </html>

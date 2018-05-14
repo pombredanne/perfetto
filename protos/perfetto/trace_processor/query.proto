@@ -20,17 +20,17 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message Query {
-  repeated uint32 group_by_field_id = 1;
+  repeated string group_by_field = 1;
 
   message AggregatedField {
-    optional uint32 field_id = 1;
+    optional string field = 1;
     enum Operator { SUM = 1; }
     optional Operator op = 2;
   }
   repeated AggregatedField aggregated_field = 2;
 
   message Filter {
-    optional uint32 field_id = 1;
+    optional string field = 1;
     enum Operator {
       EQ = 1;
       NE = 2;
@@ -53,7 +53,7 @@ message Query {
   repeated Filter filter = 3;
 
   message SortCriteria {
-    optional uint32 field_id = 1;
+    optional string field = 1;
     enum Order {
       UNSPECIFIED = 0;
       ASC = 1;

@@ -16,27 +16,79 @@
 
 #include "perfetto/trace_processor/sched.h"
 
+#include <algorithm>
+#include <numeric>
+
+#include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
-#include "perfetto/processed_trace/query.pb.h"
-#include "perfetto/processed_trace/sched.pb.h"
+#include "perfetto/base/time.h"
+#include "perfetto/trace_processor/query.pb.h"
+#include "perfetto/trace_processor/sched.pb.h"
+#include "perfetto/trace_processor/blob_reader.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-Sched::Sched(base::TaskRunner* task_runner) : task_runner_(task_runner) {}
+namespace {
+
+constexpr uint32_t kNumBlocks = 1000;
+constexpr uint32_t kBlockSize = 128 * 1024;
+
+base::TimeMillis t_start{};
+base::TimeMillis t_last_req{};
+BlobReader* g_reader;
+
+void OnReadComplete(uint32_t off, const uint8_t*, size_t len) {
+  auto now = base::GetWallTimeMs();
+  static std::vector<int64_t>* lat = new std::vector<int64_t>;
+  lat->push_back((now - t_last_req).count());
+
+  static uint32_t bytes_read = 0;
+  static uint32_t blocks_read = 0;
+  PERFETTO_DCHECK(off == bytes_read);
+  bytes_read += len;
+  if (++blocks_read >= kNumBlocks) {
+    int64_t ms = (now - t_start).count();
+
+    PERFETTO_ILOG("ReadCompelte %u KB (%u blocks) in %lld ms. %.2f KB/s",
+                  bytes_read / 1024, blocks_read, ms,
+                  bytes_read * 1000.0 / ms / 1024);
+    PERFETTO_ILOG(
+        "Latency RTT (C++ -> JS -> C++) [ms.]: min: %lld, max: %lld, avg: "
+        "%.3lf",
+        *std::min_element(lat->begin(), lat->end()),
+        *std::max_element(lat->begin(), lat->end()),
+        std::accumulate(lat->begin(), lat->end(), 0) /
+            static_cast<double>(lat->size()));
+  } else {
+    t_last_req = base::GetWallTimeMs();
+    g_reader->Read(bytes_read, kBlockSize, OnReadComplete);
+  }
+}
+
+}  // namespace
+
+Sched::Sched(base::TaskRunner* task_runner, BlobReader* reader)
+    : task_runner_(task_runner), reader_(reader) {}
 
 void Sched::GetSchedEvents(const protos::Query&,
                            GetSchedEventsCallback callback) {
   // TODO(primiano): This function should access the underlying storage, execute
   // the right query and return the results back using the |callback|. Right now
-  // let's just cheat.
+  // let's just cheat for the sake of the prototype.
   task_runner_->PostTask([callback] {
     protos::SchedEvent evt;
-    callback(&evt, 1);
+    evt.set_process_name("com.foo.bar");
+    callback(evt);
   });
+
+  t_last_req = t_start = base::GetWallTimeMs();
+  g_reader = reader_;
+  reader_->Read(0, kBlockSize, OnReadComplete);
 }
 
-void Sched::GetQuantizedSchedActivity(const protos::Query&) {
+void Sched::GetQuantizedSchedActivity(const protos::Query&,
+                                      GetQuantizedSchedActivityCallback) {
   // TODO(primiano): same here.
 }
 

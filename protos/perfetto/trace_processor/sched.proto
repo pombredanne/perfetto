@@ -17,13 +17,13 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
-import "perfetto/processed_trace/query.proto";
+import "perfetto/trace_processor/query.proto";
 
 package perfetto.protos;
 
-service sched {
-  rpc GetSchedEvents(Query) returns (stream SchedEvent) {}
-  rpc GetQuantizedSched(Query) returns (stream QuantizedSchedActivity) {}
+service Sched {
+  rpc GetSchedEvents(Query) returns (SchedEvent) {}
+  rpc GetQuantizedSched(Query) returns (QuantizedSchedActivity) {}
 }
 
 message SchedEvent {

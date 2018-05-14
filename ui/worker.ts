@@ -1,0 +1,165 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// The message being send from the main thread to the worker, asking to invoke
+// a WASM function.
+
+class MethodCall {
+    reqId: number = 0;
+    svcName: string = '';
+    funcName: string = '';
+    inputLen: number = 0;
+    input: ArrayBuffer = new ArrayBuffer(0);
+}
+class ReadDataResponse {
+    offset: number = 0;
+    data: ArrayBuffer = new ArrayBuffer(0);
+}
+class WASMRequest {
+    wasmCall?: MethodCall;
+    readData?: ReadDataResponse;
+}
+
+
+class MethodReply {
+    reqId: number = 0;
+    success: boolean = false;
+    error?: string;
+    data: ArrayBuffer = new ArrayBuffer(0);
+}
+class ReadDataRequest {
+    offset: number = 0;
+    len: number = 0;
+}
+
+class WASMReply {
+    wasmReply?: MethodReply;
+    readData?: ReadDataRequest;
+    consoleOutput?: string
+}
+
+class TraceProcessorWorker {
+    constructor() { }
+
+    onRuntimeInitialized() {
+        console.log('WASM runtime ready');
+        console.assert(!this.wasmReady);
+        this.wasmReady = true;
+        const traceId = 1;
+        const readTraceFn = Module.addFunction(this.readTraceData.bind(this), 'viii');
+        const replyFn = Module.addFunction(this.reply.bind(this), 'viiii');
+
+        Module.ccall('Initialize',
+            'void',
+            ['number', 'number', 'number'],
+            [traceId, readTraceFn, replyFn]);
+
+        // Process queued requests now that the module is ready.
+        for (; ;) {
+            const req = this.queuedCalls.shift();
+            if (!req)
+                break;
+            this.callWasmMethod(req);
+        }
+    }
+
+    readTraceData(traceId: number, offset: number, len: number) {
+        (traceId);
+        var reply: WASMReply = {
+            readData: {
+                offset: offset,
+                len: len,
+            }
+        };
+        (<any>self).postMessage(reply);
+    }
+
+    reply(reqId: number, success: boolean, heapPtr: number, size: number) {
+        const data = Module.HEAPU8.slice(heapPtr, heapPtr + size);
+        var reply: WASMReply = {
+            wasmReply: {
+                reqId: reqId,
+                success: success,
+                error: success ? undefined : (new TextDecoder()).decode(data),
+                data: success ? data : undefined
+            }
+        };
+
+        // TypeScript doesn't know that |self| is a WorkerGlobalScope and not
+        // a Window. In WorkerGlobalScope, postMessage() takes only one
+        // argument, as opposite to Window.
+        (<any>self).postMessage(reply);
+    }
+
+    onMessage(msg: MessageEvent) {
+        const req = <WASMRequest>msg.data;
+        if (req.wasmCall) {
+            if (!this.wasmReady) {
+                this.queuedCalls.push(req.wasmCall);
+                return;
+            }
+            this.callWasmMethod(req.wasmCall);
+        } else if (req.readData) {
+            const data = req.readData;
+            Module.ccall(
+                'ReadComplete',                           // C function name.
+                'void',                                   // Return type.
+                ['number', 'array', 'number'],            // Input args.
+                [data.offset, new Uint8Array(data.data), data.data.byteLength]
+            );
+        }
+    }
+
+    onStdout(msg: string) {
+        console.log(msg);
+        var reply: WASMReply = {
+          consoleOutput: msg,
+        };
+        (<any>self).postMessage(reply);
+    }
+
+    callWasmMethod(req: MethodCall) {
+        console.assert(this.wasmReady);
+        var inputData = new Uint8Array(req.input, 0, req.inputLen);
+        Module.ccall(
+            req.svcName + '_' + req.funcName,         // C function name.
+            'void',                                   // Return type.
+            ['number', 'array', 'number'],            // Input args.
+            [req.reqId, inputData, inputData.length]  // Args.
+        );
+    }
+
+    wasmReady: boolean = false;
+    queuedCalls: Array<MethodCall> = [];
+}
+
+// If we are in a worker context, initialize the worker and the WASM module.
+// This file is pulled also from the main thread, just for the sake of getting
+// the WASMRequest/WASMReply declarations.
+if ((<any>self).WorkerGlobalScope !== undefined) {
+    var tpw = new TraceProcessorWorker();
+
+    // |Module| is a special var name introduced by the WASM compiler in the global
+    // scope to interact with the corresponding c++ module.
+    var Module: any = {
+        locateFile: (s: string) => '/wasm/' + s,
+        onRuntimeInitialized: tpw.onRuntimeInitialized.bind(tpw),
+        print: tpw.onStdout.bind(tpw),
+        printErr: tpw.onStdout.bind(tpw),
+    };
+    self.addEventListener('message', tpw.onMessage.bind(tpw));
+    importScripts('wasm/trace_processor.js');
+}

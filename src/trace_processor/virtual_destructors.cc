@@ -14,39 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_TRACE_PROCESSOR_TRACE_PROCESSOR_H_
-#define INCLUDE_PERFETTO_TRACE_PROCESSOR_TRACE_PROCESSOR_H_
-
-#include <memory>
+#include "perfetto/trace_processor/blob_reader.h"
 
 namespace perfetto {
-
-namespace base {
-class TaskRunner;
-}
-
 namespace trace_processor {
 
-class BlobReader;
-class Sched;
-
-class TraceProcessor {
- public:
-  TraceProcessor(base::TaskRunner*, BlobReader*);
-
-  // There is going to be one of these methods for each type of processed proto.
-  Sched* sched();
-
- private:
-  TraceProcessor(const TraceProcessor&) = delete;
-  TraceProcessor& operator=(const TraceProcessor&) = delete;
-
-  base::TaskRunner* const task_runner_;
-  BlobReader* const reader_;
-  std::unique_ptr<Sched> sched_;
-};
+BlobReader::~BlobReader() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto
-
-#endif  // INCLUDE_PERFETTO_TRACE_PROCESSOR_TRACE_PROCESSOR_H_

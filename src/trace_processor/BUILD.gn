@@ -18,10 +18,11 @@ import("../../gn/wasm.gni")
 # This target is built twice: once with the default toolchain as a native C++
 # library (for trace-based metrics / batch processing) and once as a WASM
 # library (for the UI) by virtue of being depended on by the :wasm target below.
-source_set("trace_processor") {
+source_set("lib") {
   sources = [
     "sched.cc",
     "trace_processor.cc",
+    "virtual_destructors.cc",
   ]
   if (is_wasm) {
     sources += [
@@ -31,25 +32,21 @@ source_set("trace_processor") {
   }
   deps = [
     "../../gn:default_deps",
-    "../../protos/perfetto/processed_trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
     "../../src/base",
   ]
 }
 
-if (is_wasm) {
-  wasm_lib("wasm") {
-    generate_js = true
-    generate_html = true
-    sources = [
-      "wasm_bridge.cc",
-    ]
+wasm_lib("trace_processor") {
+  sources = [
+    "wasm_bridge.cc",
+  ]
 
-    # All the deps below are implicitly xxx($wasm_toolchain) because of the
-    # outer "is_wasm" block.
-    deps = [
-      ":trace_processor",
-      "../../gn:default_deps",
-      "../../protos/perfetto/processed_trace:lite",
-    ]
-  }
+  # All the deps below are implicitly xxx($wasm_toolchain) because of the
+  # outer "is_wasm" block.
+  deps = [
+    ":lib",
+    "../../gn:default_deps",
+    "../../protos/perfetto/trace_processor:lite",
+  ]
 }
