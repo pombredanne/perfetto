@@ -14,6 +14,7 @@
 
 import("../gn/perfetto.gni")
 import("../gn/wasm.gni")
+import("../protos/perfetto/trace_processor/proto_files.gni")
 
 ui_dist_dir = "$root_build_dir/ui"
 nodejs_root = rebase_path("../buildtools/nodejs", root_build_dir)
@@ -65,15 +66,11 @@ action("bundle") {
 # | Protobuf: gen rules to create .js and .d.ts files from protos.             |
 # +----------------------------------------------------------------------------+
 proto_gen_dir = "$ui_dist_dir/gen"
-protos = [
-  "query",
-  "sched",
-]
 
 action("protos_to_js") {
   script = "../gn/standalone/build_tool_wrapper.py"
   inputs = []
-  foreach(proto, protos) {
+  foreach(proto, trace_processor_protos) {
     inputs += [ "../protos/perfetto/trace_processor/$proto.proto" ]
   }
   outputs = [

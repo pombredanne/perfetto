@@ -29,8 +29,9 @@ fileElement.addEventListener('change', () => {
     var query = new protos.Query();
     query.groupByField = ['cpu', 'process'];
 
-    tp.sched.getSchedEvents(query).then((x: protos.SchedEvent) => {
-        console.log('getSchedEvents reply: ', x.processName);
+    tp.sched.getSchedEvents(query).then((x: protos.SchedEvents) => {
+        console.log('getSchedEvents reply: ', x.events[0].processName,
+            x.events[1].processName);
     });
 
 });

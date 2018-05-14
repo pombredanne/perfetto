@@ -21,7 +21,6 @@ import("../../gn/wasm.gni")
 source_set("lib") {
   sources = [
     "sched.cc",
-    "trace_processor.cc",
     "virtual_destructors.cc",
   ]
   if (is_wasm) {

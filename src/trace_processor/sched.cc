@@ -22,9 +22,9 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/time.h"
+#include "perfetto/trace_processor/blob_reader.h"
 #include "perfetto/trace_processor/query.pb.h"
 #include "perfetto/trace_processor/sched.pb.h"
-#include "perfetto/trace_processor/blob_reader.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -77,9 +77,12 @@ void Sched::GetSchedEvents(const protos::Query&,
   // the right query and return the results back using the |callback|. Right now
   // let's just cheat for the sake of the prototype.
   task_runner_->PostTask([callback] {
-    protos::SchedEvent evt;
-    evt.set_process_name("com.foo.bar");
-    callback(evt);
+    protos::SchedEvents events;
+    protos::SchedEvent* evt = events.add_events();
+    evt->set_process_name("com.foo.bar");
+    evt = events.add_events();
+    evt->set_process_name("com.foo.baz");
+    callback(events);
   });
 
   t_last_req = t_start = base::GetWallTimeMs();

@@ -12,16 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("../../../gn/perfetto.gni")
-import("../../../gn/proto_library.gni")
-import("proto_files.gni")
-
-proto_library("lite") {
-  generate_python = false
-  sources = []
-  foreach(source, trace_processor_protos) {
-    sources += [ "$source.proto" ]
-  }
-  proto_in_dir = "$perfetto_root_path/protos"
-  proto_out_dir = "$perfetto_root_path/protos"
-}
+# This variable is used both by ./BUILD.gn (for the C++ proto codegen) and by
+# //ui/BUIlD.gn (for the TypeScript/JS proto codegen).
+trace_processor_protos = [
+  "query",
+  "raw_query",
+  "sched",
+]

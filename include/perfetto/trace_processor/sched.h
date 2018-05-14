@@ -27,7 +27,7 @@ class TaskRunner;
 
 namespace protos {
 class Query;
-class SchedEvent;
+class SchedEvents;
 class QuantizedSchedActivity;
 }  // namespace protos
 
@@ -40,7 +40,8 @@ class Sched {
  public:
   Sched(base::TaskRunner*, BlobReader*);
 
-  using GetSchedEventsCallback = std::function<void(const protos::SchedEvent&)>;
+  using GetSchedEventsCallback =
+      std::function<void(const protos::SchedEvents&)>;
   void GetSchedEvents(const protos::Query&, GetSchedEventsCallback);
 
   using GetQuantizedSchedActivityCallback =

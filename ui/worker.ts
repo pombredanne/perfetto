@@ -58,14 +58,13 @@ class TraceProcessorWorker {
         console.log('WASM runtime ready');
         console.assert(!this.wasmReady);
         this.wasmReady = true;
-        const traceId = 1;
-        const readTraceFn = Module.addFunction(this.readTraceData.bind(this), 'viii');
+        const readTraceFn = Module.addFunction(this.readTraceData.bind(this), 'vii');
         const replyFn = Module.addFunction(this.reply.bind(this), 'viiii');
 
         Module.ccall('Initialize',
             'void',
-            ['number', 'number', 'number'],
-            [traceId, readTraceFn, replyFn]);
+            ['number', 'number'],
+            [readTraceFn, replyFn]);
 
         // Process queued requests now that the module is ready.
         for (; ;) {
@@ -76,8 +75,7 @@ class TraceProcessorWorker {
         }
     }
 
-    readTraceData(traceId: number, offset: number, len: number) {
-        (traceId);
+    readTraceData(offset: number, len: number) {
         var reply: WASMReply = {
             readData: {
                 offset: offset,
