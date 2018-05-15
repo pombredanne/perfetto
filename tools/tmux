@@ -71,11 +71,11 @@ function pull {
   fi
 }
 
-background=false
+background=0
 
 while getopts b o; do
   case "$o" in
-    b) background=true;;
+    b) background=1;;
     *) echo "Invalid option $o"; exit;;
   esac
 done
@@ -132,7 +132,7 @@ fi
 
 POSTFIX=""
 
-if [[ background ]]; then
+if [[ background -eq 1 ]]; then
   PREFIX="$PREFIX nohup"
   POSTFIX=" 2>&1 > /dev/null &"
 fi
@@ -189,7 +189,7 @@ tmux send-keys "$PREFIX $DIR/perfetto -c $CONFIG_DEVICE_PATH -o $DIR/trace $POST
 tmux select-pane -t 2
 
 tmux -2 attach-session -t demo
-if [[ background ]]; then
+if [[ background -eq 1 ]]; then
   exit 0;
 fi
 
