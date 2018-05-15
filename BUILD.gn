@@ -55,7 +55,7 @@ group("default") {
 }
 
 if (build_standalone) {
-  group("uiz") {
+  group("ui") {
     deps = [
       "ui",
     ]
