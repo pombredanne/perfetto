@@ -58,6 +58,7 @@ if (use_libfuzzer && !build_with_chromium) {
       ":task_runner_thread_delegates",
       ":test_helper",
       "../gn:default_deps",
+      "../protos/perfetto/trace:lite",
       "../src/base:test_support",
       "../src/protozero",
       "../src/tracing",
