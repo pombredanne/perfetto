@@ -134,7 +134,7 @@ POSTFIX=""
 
 if [[ background -eq 1 ]]; then
   PREFIX="$PREFIX nohup"
-  POSTFIX=" &> > /dev/null &"
+  POSTFIX=" &> /dev/null &"
 fi
 
 if tmux has-session -t demo; then
