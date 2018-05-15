@@ -119,8 +119,8 @@ BUILD_DEPS_HOST = [
   # Keep the revision in sync with Chrome's CLANG_REVISION in
   # tools/clang/scripts/update.py.
   ('buildtools/clang.tgz',
-   'https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-321529-1.tgz',
-   '7ca04034ac7e4a956b0084a8bc604bacab94af26',
+   'https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-331747-1.tgz',
+   '973073ca36ae9194019705ec7677852a30c4b54e',
    'linux2'
   ),
 
