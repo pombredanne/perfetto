@@ -22,7 +22,7 @@ declare_args() {
 }
 assert(!monolithic_binaries || !build_with_android)
 
-group("all") {
+group("default") {
   testonly = true  # allow to build also test targets
   deps = [
     ":perfetto_unittests",
@@ -51,6 +51,14 @@ group("all") {
     if (is_linux) {
       deps += [ "tools:pipestats" ]
     }
+  }
+}
+
+if (build_standalone) {
+  group("uiz") {
+    deps = [
+      "ui",
+    ]
   }
 }
 
