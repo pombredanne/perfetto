@@ -28,6 +28,7 @@ def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--chdir', default=None)
   parser.add_argument('--stamp', default=None)
+  parser.add_argument('--path', default=None)
   parser.add_argument('--noop', default=False, action='store_true')
   parser.add_argument('cmd', nargs=argparse.REMAINDER)
   args = parser.parse_args()
@@ -39,18 +40,21 @@ def main():
     print >> sys.stderr, 'Cannot chdir to %s from %s' % (workdir, os.getcwd())
     return 1
 
-  if not os.path.exists(args.cmd[0]):
-    print >> sys.stderr, 'Cannot find ' + args.cmd[0]
-    return 1
+  exe = os.path.abspath(args.cmd[0]) if os.sep in args.cmd[0] else args.cmd[0]
+  env = os.environ.copy()
+  if args.path:
+    env['PATH'] = os.path.abspath(args.path) + ':' + env['PATH']
 
-  abscmd = os.path.abspath(args.cmd[0])
-  proc = subprocess.Popen([abscmd] + args.cmd[1:], cwd=args.chdir)
-  ret = proc.wait()
-  if ret == 0 and args.stamp:
-    with open(args.stamp, 'w'):
-      os.utime(args.stamp, None)
-
-  return ret
+  try:
+    proc = subprocess.Popen([exe] + args.cmd[1:], cwd=args.chdir, env=env)
+    ret = proc.wait()
+    if ret == 0 and args.stamp:
+      with open(args.stamp, 'w'):
+        os.utime(args.stamp, None)
+    return ret
+  except OSError as _:
+    print 'File not found: "%s" (PATH=%s)' % (args.cmd[0], env.get('PATH'))
+    return 127
 
 if __name__ == '__main__':
   sys.exit(main())

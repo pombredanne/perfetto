@@ -138,6 +138,7 @@ if (!build_with_chromium) {
     deps = [
       ":libtraced_shared",
       "gn:default_deps",
+      "include/perfetto/traced",
     ]
     sources = [
       "src/traced/service/main.cc",
@@ -150,6 +151,7 @@ if (!build_with_chromium) {
     deps = [
       ":libtraced_shared",
       "gn:default_deps",
+      "include/perfetto/traced",
     ]
     sources = [
       "src/traced/probes/main.cc",

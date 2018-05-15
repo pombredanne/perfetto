@@ -17,9 +17,31 @@ import("../gn/wasm.gni")
 import("../protos/perfetto/trace_processor/proto_files.gni")
 
 ui_dist_dir = "$root_build_dir/ui"
-nodejs_root = rebase_path("../buildtools/nodejs", root_build_dir)
-npm = nodejs_root + "/bin/npm"  # Node package manager.
-tsc = "node_modules/.bin/tsc"  # TypeScript compiler.
+nodejs_root = "../buildtools/nodejs"
+nodejs_bin = rebase_path("$nodejs_root/bin", root_build_dir)
+
+template("node_bin") {
+  action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "inputs",
+                             "outputs",
+                           ])
+    deps = [
+      ":node_modules",
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+    script = "../gn/standalone/build_tool_wrapper.py"
+    _node_cmd = invoker.node_cmd
+    args = [
+             "--path=$nodejs_bin",
+             "node",
+             rebase_path("node_modules/.bin/$_node_cmd", root_build_dir),
+           ] + invoker.args
+  }
+}
 
 # +----------------------------------------------------------------------------+
 # | The outer "ui" target to just ninja -C out/xxx ui                          |
@@ -38,27 +60,22 @@ group("ui") {
 
 # Bundle together all js sources into a bundle.js file, that will ultimately be
 # included by the .html files.
-action("bundle") {
+node_bin("bundle") {
   deps = [
-    ":node_modules",
     ":transpile_all_ts",
   ]
-  script = "../gn/standalone/build_tool_wrapper.py"
-  input = "$ui_dist_dir/main.js"
-  output = "$ui_dist_dir/bundle.js"
-  args = [
-    rebase_path("node_modules/.bin/browserify", root_build_dir),
-    rebase_path(input, root_build_dir),
-    "-d",
-
-    "-o",
-    rebase_path(output, root_build_dir),
-  ]
+  node_cmd = "browserify"
   inputs = [
-    input,
+    "$ui_dist_dir/main.js",
   ]
   outputs = [
-    output,
+    "$ui_dist_dir/bundle.js",
+  ]
+  args = [
+    rebase_path(inputs[0], root_build_dir),
+    "-d",
+    "-o",
+    rebase_path(outputs[0], root_build_dir),
   ]
 }
 
@@ -67,8 +84,7 @@ action("bundle") {
 # +----------------------------------------------------------------------------+
 proto_gen_dir = "$ui_dist_dir/gen"
 
-action("protos_to_js") {
-  script = "../gn/standalone/build_tool_wrapper.py"
+node_bin("protos_to_js") {
   inputs = []
   foreach(proto, trace_processor_protos) {
     inputs += [ "../protos/perfetto/trace_processor/$proto.proto" ]
@@ -76,8 +92,8 @@ action("protos_to_js") {
   outputs = [
     "$proto_gen_dir/protos.js",
   ]
+  node_cmd = "pbjs"
   args = [
-           rebase_path("node_modules/.bin/pbjs", root_build_dir),
            "-t",
            "static-module",
            "-w",
@@ -89,8 +105,7 @@ action("protos_to_js") {
          ] + rebase_path(inputs, root_build_dir)
 }
 
-action("protos_to_ts") {
-  script = "../gn/standalone/build_tool_wrapper.py"
+node_bin("protos_to_ts") {
   deps = [
     ":protos_to_js",
   ]
@@ -100,8 +115,8 @@ action("protos_to_ts") {
   outputs = [
     "$proto_gen_dir/protos.d.ts",
   ]
+  node_cmd = "pbts"
   args = [
-    rebase_path("node_modules/.bin/pbts", root_build_dir),
     "-p",
     rebase_path("../protos", root_build_dir),
     "-o",
@@ -115,21 +130,18 @@ action("protos_to_ts") {
 # +----------------------------------------------------------------------------+
 
 # Builds all .ts sources in the repo that are reachable from |sources|.
-action("transpile_all_ts") {
+node_bin("transpile_all_ts") {
   sources = [
     "main.ts",
   ]
   deps = [
     ":dist_symlink",
-    ":node_modules",
     ":protos_to_ts",
   ]
   inputs = sources + [ "tsconfig.json" ]
   outputs = [
     "$ui_dist_dir/main.js",
   ]
-
-  script = "../gn/standalone/build_tool_wrapper.py"
 
   # Find all *.ts files and pass them as input triggers. This does NOT affect
   # which files will get built. This defines only the set of files that, when
@@ -146,8 +158,8 @@ action("transpile_all_ts") {
                              [ "." ])
   inputs += all_ts_files
 
+  node_cmd = "tsc"
   args = [
-    rebase_path(tsc, root_build_dir),
     "--project",
     rebase_path(".", root_build_dir),
     "--outDir",
@@ -192,7 +204,7 @@ action("node_modules_symlink") {
   script = "../gn/standalone/build_tool_wrapper.py"
   args = [
     "/bin/ln",
-    "-fhs",
+    "-fns",
     rebase_path(src, ui_dist_dir),
     rebase_path(dst, root_build_dir),
   ]
@@ -213,7 +225,11 @@ action("node_modules") {
     rebase_path(".", root_build_dir),
     "--stamp",
     rebase_path(stamp_file, root_build_dir),
-    npm,
+  ]
+  args += [
+    "--path=$nodejs_bin",
+    "node",
+    rebase_path("$nodejs_root/bin/npm", "."),
     "install",
     "--no-save",
   ]
@@ -240,7 +256,7 @@ action("dist_symlink") {
     "--stamp",
     rebase_path(stamp_file, root_build_dir),
     "/bin/ln",
-    "-fhs",
+    "-fns",
     rebase_path(ui_dist_dir, "."),
     rebase_path("dist", root_build_dir),
   ]
