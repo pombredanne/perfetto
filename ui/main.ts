@@ -17,9 +17,9 @@
 console.log('Hello world!');
 
 function writeToUIConsole(line:string) {
-  var lineElement = document.createElement('div');
+  const lineElement = document.createElement('div');
   lineElement.innerText = line;
-  var container = document.getElementById('console');
+  const container = document.getElementById('console');
   if (!container)
     throw new Error('OMG');
   container.appendChild(lineElement);

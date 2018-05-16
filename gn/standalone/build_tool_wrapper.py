@@ -43,7 +43,7 @@ def main():
   exe = os.path.abspath(args.cmd[0]) if os.sep in args.cmd[0] else args.cmd[0]
   env = os.environ.copy()
   if args.path:
-    env['PATH'] = os.path.abspath(args.path) + ':' + env['PATH']
+    env['PATH'] = os.path.abspath(args.path) + os.pathsep + env['PATH']
 
   try:
     proc = subprocess.Popen([exe] + args.cmd[1:], cwd=args.chdir, env=env)
@@ -52,8 +52,9 @@ def main():
       with open(args.stamp, 'w'):
         os.utime(args.stamp, None)
     return ret
-  except OSError as _:
-    print 'Error running: "%s" (PATH=%s)' % (args.cmd[0], env.get('PATH'))
+  except OSError as e:
+    print 'Error running: "%s" (%s)' % (args.cmd[0], e.strerror)
+    print 'PATH=%s' % env.get('PATH')
     return 127
 
 if __name__ == '__main__':
