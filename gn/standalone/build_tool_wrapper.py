@@ -53,7 +53,7 @@ def main():
         os.utime(args.stamp, None)
     return ret
   except OSError as _:
-    print 'File not found: "%s" (PATH=%s)' % (args.cmd[0], env.get('PATH'))
+    print 'Error running: "%s" (PATH=%s)' % (args.cmd[0], env.get('PATH'))
     return 127
 
 if __name__ == '__main__':

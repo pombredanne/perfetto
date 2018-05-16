@@ -22,7 +22,7 @@ declare_args() {
 }
 assert(!monolithic_binaries || !build_with_android)
 
-group("default") {
+group("all") {
   testonly = true  # allow to build also test targets
   deps = [
     ":perfetto_unittests",
@@ -52,6 +52,16 @@ group("default") {
       deps += [ "tools:pipestats" ]
     }
   }
+}
+
+# TODO(primiano): temporary workaround to:
+# 1) Prevent that the UI gets build automatically when doing ninja -C out/xx .
+# 2) Avoid breaking the chrome build, that right now depends on "all".
+group("default") {
+  testonly = true  # allow to build also test targets
+  deps = [
+    ":all",
+  ]
 }
 
 if (build_standalone) {

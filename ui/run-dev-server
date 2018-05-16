@@ -16,7 +16,7 @@
 CUR_DIR="$(cd -P ${BASH_SOURCE[0]%/*}; pwd)"
 LITE_SERVER="$CUR_DIR/node_modules/.bin/lite-server"
 if [ ! -f "$LITE_SERVER" ]; then
-  echo "ERROR: cannot find lite-server. You need to run at once:"
+  echo "ERROR: cannot find lite-server. You need to run:"
   echo "  tools/install-build-deps"
   echo "  ninja -C out/xxx ui"
   exit 127
