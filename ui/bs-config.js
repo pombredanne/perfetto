@@ -11,7 +11,6 @@ module.exports = function(bs) {
   return {
     files: [
       {
-        // TODO: Update this file list. This is only an example.
         match: ["ui/**", "src/trace_processor/**", "protos/**"],
         fn: function(event, file) {
           console.log(`Change detected on ${file}`);
