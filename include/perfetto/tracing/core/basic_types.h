@@ -25,6 +25,9 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 using uid_t = unsigned int;
+using useconds_t = uint64_t;
+void usleep(useconds_t interval_us) {
+}
 #endif
 
 namespace perfetto {

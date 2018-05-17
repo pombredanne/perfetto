@@ -16,12 +16,33 @@
 
 #include "src/tracing/core/service_impl.h"
 
+#include "perfetto/base/build_config.h"
+
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <string.h>
+
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/uio.h>
 #include <unistd.h>
+#endif
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+struct iovec {
+  void  *iov_base;    /* Starting address */
+  size_t iov_len;     /* Number of bytes to transfer */
+};
+
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
+  return 0;
+}
+
+#define IOV_MAX 65536
+
+uid_t getuid() { return 0; }
+uid_t geteuid() { return 0; }
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
 #include <algorithm>
 
@@ -1009,7 +1030,7 @@ void ServiceImpl::MaybeSnapshotClocks(TracingSession* tracing_session,
   protos::TrustedPacket packet;
   protos::ClockSnapshot* clock_snapshot = packet.mutable_clock_snapshot();
 
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   struct {
     clockid_t id;
     protos::ClockSnapshot::Clock::Type type;
