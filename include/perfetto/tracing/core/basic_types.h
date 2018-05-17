@@ -25,12 +25,12 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 using uid_t = unsigned int;
-using useconds_t = uint64_t;
+using useconds_t = unsigned int;
 #endif
 
 namespace perfetto {
 
-void usleep(useconds_t interval_us);
+void SleepMicroseconds(useconds_t interval_us);
 
 // Unique within the scope of the tracing service.
 using TracingSessionID = uint64_t;

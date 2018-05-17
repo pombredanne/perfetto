@@ -34,7 +34,7 @@ inline void WaitBeforeNextAttempt(int attempt) {
   if (attempt < kRetryAttempts / 2) {
     std::this_thread::yield();
   } else {
-    usleep((useconds_t(attempt) / 10) * 1000);
+    SleepMicroseconds((useconds_t(attempt) / 10) * 1000);
   }
 }
 

@@ -28,7 +28,7 @@ namespace perfetto {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
-void usleep(useconds_t interval_us) {
+void SleepMicroseconds(useconds_t interval_us) {
   // The Windows Sleep function takes a millisecond count. Round up so that
   // short sleeps don't turn into a busy wait. Note that the sleep granularity
   // on Windows can dynamically vary from 1 ms to ~16 ms, so don't count on this
@@ -38,7 +38,7 @@ void usleep(useconds_t interval_us) {
 
 #else  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
-void usleep(useconds_t interval_us) {
+void SleepMicroseconds(useconds_t interval_us) {
   ::usleep(interval_us);
 }
 
