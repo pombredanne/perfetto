@@ -32,6 +32,7 @@ source_set("tracing") {
     "../protozero",
   ]
   sources = [
+    "core/basic_types.cc",
     "core/chrome_config.cc",
     "core/commit_data_request.cc",
     "core/data_source_config.cc",

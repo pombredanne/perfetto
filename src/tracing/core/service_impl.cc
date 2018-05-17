@@ -28,22 +28,6 @@
 #include <unistd.h>
 #endif
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-struct iovec {
-  void  *iov_base;    /* Starting address */
-  size_t iov_len;     /* Number of bytes to transfer */
-};
-
-ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
-  return 0;
-}
-
-#define IOV_MAX 65536
-
-uid_t getuid() { return 0; }
-uid_t geteuid() { return 0; }
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-
 #include <algorithm>
 
 #include "perfetto/base/build_config.h"
@@ -85,6 +69,33 @@ constexpr uint64_t kMillisPerHour = 3600000;
 // These apply only if enable_extra_guardrails is true.
 constexpr uint64_t kMaxTracingDurationMillis = 24 * kMillisPerHour;
 constexpr uint64_t kMaxTracingBufferSizeKb = 32 * 1024;
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+struct iovec {
+  void  *iov_base; // Address
+  size_t iov_len;  // Block size
+};
+
+// Simple implementation of writev. Note that this does not give the atomicity
+// guarantees of a real writev, but we don't depend on these (we aren't writing
+// to the same file from another thread).
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt) {
+  ssize_t total_size = 0;
+  for (int i = 0; i < iovcnt; ++i) {
+    ssize_t current_size = write(fd, iov[i].iov_base, iov[i].iov_len);
+    if (current_size != static_cast<ssize_t>(iov[i].iov_len))
+      return -1;
+    total_size += current_size;
+  }
+  return total_size;
+}
+
+#define IOV_MAX 1024  // Linux compatible limit.
+
+// uid checking is a NOP on Windows.
+uid_t getuid() { return 0; }
+uid_t geteuid() { return 0; }
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }  // namespace
 
 // These constants instead are defined in the header because are used by tests.
