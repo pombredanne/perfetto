@@ -92,7 +92,7 @@ message ProcessStatsConfig {
 
 // The configuration that is passed to each data source when starting tracing.
 message DataSourceConfig {
-  // Data source unique name, e.g., "linux.ftrace". This must match
+  // Data source unique name, e.g., "org.chromium.trace_events". This must match
   // the name passed by the data source when it registers (see
   // RegisterDataSource()).
   optional string name = 1;
@@ -191,7 +191,7 @@ message TestConfig {
 // It contains the general config for the logging buffer(s) and the configs for
 // all the data source being enabled.
 //
-// Next id: 11.
+// Next id: 8.
 message TraceConfig {
   message BufferConfig {
     optional uint32 size_kb = 1;
@@ -235,7 +235,7 @@ message TraceConfig {
   optional bool enable_extra_guardrails = 4;
 
   enum LockdownModeOperation {
-    LOCKDOWN_UNSET = 0;
+    LOCKDOWN_UNCHANGED = 0;
     LOCKDOWN_CLEAR = 1;
     LOCKDOWN_SET = 2;
   }
@@ -255,7 +255,7 @@ message TraceConfig {
     optional uint32 shm_size_kb = 2;
 
     // Specifies the preferred size of each page in the shared memory buffer.
-    // Must be an integer multiple of 4K.
+    // Must be an integer mutiple of 4K.
     optional uint32 page_size_kb = 3;
   }
 

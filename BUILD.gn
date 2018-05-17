@@ -48,27 +48,6 @@ group("all") {
     if (is_linux || is_android) {
       deps += [ "tools/skippy" ]
     }
-    if (is_linux) {
-      deps += [ "tools:pipestats" ]
-    }
-  }
-}
-
-# TODO(primiano): temporary workaround to:
-# 1) Prevent that the UI gets build automatically when doing ninja -C out/xx .
-# 2) Avoid breaking the chrome build, that right now depends on "all".
-group("default") {
-  testonly = true  # allow to build also test targets
-  deps = [
-    ":all",
-  ]
-}
-
-if (build_standalone) {
-  group("ui") {
-    deps = [
-      "ui",
-    ]
   }
 }
 
@@ -78,12 +57,13 @@ executable("perfetto_unittests") {
     "gn:default_deps",
     "gn:gtest_main",
     "src/base:unittests",
-    "src/protozero:unittests",
   ]
-
   # TODO(brucedawson): Enable these for Windows when possible.
   if (!is_win) {
-    deps += [ "src/tracing:unittests" ]
+    deps += [
+      "src/protozero:unittests",
+      "src/tracing:unittests",
+    ]
   }
   if (!build_with_chromium) {
     deps += [
@@ -144,7 +124,6 @@ if (!build_with_chromium) {
     deps = [
       ":libtraced_shared",
       "gn:default_deps",
-      "include/perfetto/traced",
     ]
     sources = [
       "src/traced/service/main.cc",
@@ -157,7 +136,6 @@ if (!build_with_chromium) {
     deps = [
       ":libtraced_shared",
       "gn:default_deps",
-      "include/perfetto/traced",
     ]
     sources = [
       "src/traced/probes/main.cc",

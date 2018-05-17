@@ -27,7 +27,6 @@
 
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/page_allocator.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/thread_checker.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
@@ -213,7 +212,7 @@ class CpuReader {
   base::ScopedFile trace_fd_;
   base::ScopedFile staging_read_fd_;
   base::ScopedFile staging_write_fd_;
-  base::PageAllocator::UniquePtr buffer_;
+  std::unique_ptr<uint8_t[]> buffer_;
   std::thread worker_thread_;
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };

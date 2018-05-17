@@ -17,13 +17,14 @@
 #include "perfetto/base/page_allocator.h"
 
 #include <stdint.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
 #include "src/base/test/vm_test_utils.h"
 
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && \
-    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 #include <sys/resource.h>
 #endif
 
@@ -44,16 +45,8 @@ TEST(PageAllocatorTest, Basic) {
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(ptr.get()) + i));
 
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
-
-    bool unmapped = PageAllocator::AdviseDontNeed(ptr_raw, kSize);
-
-    if (unmapped) {
-      // Make sure the pages were removed from the working set.
-      ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
-    }
   }
 
-  // Freed memory is necessarily not mapped in to the process.
   ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 }
 
@@ -69,9 +62,8 @@ TEST(PageAllocatorTest, GuardRegions) {
 // Disable this on:
 // MacOS: because it doesn't seem to have an equivalent rlimit to bound mmap().
 // Sanitizers: they seem to try to shadow mmaped memory and fail due to OOMs.
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) &&                             \
-    !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) && !defined(ADDRESS_SANITIZER) && \
-    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&              \
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX) && !defined(ADDRESS_SANITIZER) && \
+    !defined(LEAK_SANITIZER) && !defined(THREAD_SANITIZER) &&                 \
     !defined(MEMORY_SANITIZER)
 // Glibc headers hit this on RLIMIT_ macros.
 #pragma GCC diagnostic push

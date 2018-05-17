@@ -17,7 +17,6 @@ source_set("base") {
     "build_config.h",
     "file_utils.h",
     "logging.h",
-    "metatrace.h",
     "page_allocator.h",
     "scoped_file.h",
     "small_set.h",

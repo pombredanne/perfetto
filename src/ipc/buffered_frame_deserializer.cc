@@ -54,10 +54,12 @@ BufferedFrameDeserializer::BeginReceive() {
     PERFETTO_DCHECK(size_ == 0);
     buf_ = base::PageAllocator::Allocate(capacity_);
 
-    // Surely we are going to use at least the first page, but we may not need
-    // the rest for a bit.
-    base::PageAllocator::AdviseDontNeed(buf() + base::kPageSize,
-                                        capacity_ - base::kPageSize);
+    // Surely we are going to use at least the first page. There is very little
+    // point in madvising that as well and immedately after telling the kernel
+    // that we want it back (via recv()).
+    int res = madvise(buf() + base::kPageSize, capacity_ - base::kPageSize,
+                      MADV_DONTNEED);
+    PERFETTO_DCHECK(res == 0);
   }
 
   PERFETTO_CHECK(capacity_ > size_);
@@ -147,7 +149,8 @@ bool BufferedFrameDeserializer::EndReceive(size_t recv_size) {
         const size_t madvise_size = capacity_ - size_rounded_up;
         PERFETTO_CHECK(madvise_begin > buf() + size_);
         PERFETTO_CHECK(madvise_begin + madvise_size <= buf() + capacity_);
-        base::PageAllocator::AdviseDontNeed(madvise_begin, madvise_size);
+        int res = madvise(madvise_begin, madvise_size, MADV_DONTNEED);
+        PERFETTO_DCHECK(res == 0);
       }
     }
   }

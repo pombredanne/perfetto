@@ -247,7 +247,8 @@ void ClientImpl::OnInvokeMethodReply(QueuedRequest req,
     return;
   std::unique_ptr<ProtoMessage> decoded_reply;
   if (reply.success()) {
-    // If this becomes a hotspot, optimize by maintaining a dedicated hashtable.
+    // TODO(fmayer): this could be optimized, stop doing method name string
+    // lookups.
     for (const auto& method : service_proxy->GetDescriptor().methods) {
       if (req.method_name == method.name) {
         decoded_reply = method.reply_proto_decoder(reply.reply_proto());

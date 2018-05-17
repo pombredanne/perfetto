@@ -30,9 +30,7 @@ source_set("end_to_end_integrationtests") {
     ":test_helper",
     "../gn:default_deps",
     "../gn:gtest_deps",
-    "../include/perfetto/traced",
     "../protos/perfetto/trace:lite",
-    "../protos/perfetto/trace:zero",
     "../src/base:base",
     "../src/base:test_support",
   ]
@@ -58,7 +56,6 @@ if (use_libfuzzer && !build_with_chromium) {
       ":task_runner_thread_delegates",
       ":test_helper",
       "../gn:default_deps",
-      "../protos/perfetto/trace:lite",
       "../src/base:test_support",
       "../src/protozero",
       "../src/tracing",
@@ -72,7 +69,6 @@ source_set("task_runner_thread") {
   testonly = true
   deps = [
     "../gn:default_deps",
-    "../src/base",
     "../src/base:test_support",
   ]
   sources = [
@@ -106,9 +102,7 @@ source_set("test_helper") {
     ":task_runner_thread",
     ":task_runner_thread_delegates",
     "../gn:default_deps",
-    "../include/perfetto/traced",
     "../protos/perfetto/trace:lite",
-    "../protos/perfetto/trace:zero",
     "../src/base:test_support",
   ]
   sources = [
@@ -128,12 +122,11 @@ if (!build_with_chromium) {
       ":task_runner_thread_delegates",
       ":test_helper",
       "../../gn:default_deps",
-      "../buildtools:benchmark",
       "../gn:gtest_deps",
-      "../include/perfetto/traced",
       "../protos/perfetto/trace:lite",
       "../protos/perfetto/trace:zero",
       "../src/base:test_support",
+      "//buildtools:benchmark",
     ]
     sources = [
       "end_to_end_benchmark.cc",
@@ -150,7 +143,7 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "../../gn:default_deps",
-      "../buildtools:benchmark",
+      "//buildtools:benchmark",
     ]
     sources = [
       "benchmark_main.cc",

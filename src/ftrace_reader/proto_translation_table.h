@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/ftrace_reader/format_parser.h"
 #include "src/ftrace_reader/event_info.h"
 
 namespace perfetto {
@@ -46,14 +45,6 @@ bool InferFtraceType(const std::string& type_and_name,
 
 class ProtoTranslationTable {
  public:
-  struct FtracePageHeaderSpec {
-    FtraceEvent::Field timestamp{};
-    FtraceEvent::Field overwrite{};
-    FtraceEvent::Field size{};
-  };
-
-  static FtracePageHeaderSpec DefaultPageHeaderSpecForTesting();
-
   // This method mutates the |events| and |common_fields| vectors to
   // fill some of the fields and to delete unused events/fields
   // before std:move'ing them into the ProtoTranslationTable.
@@ -64,8 +55,7 @@ class ProtoTranslationTable {
   ~ProtoTranslationTable();
 
   ProtoTranslationTable(const std::vector<Event>& events,
-                        std::vector<Field> common_fields,
-                        FtracePageHeaderSpec ftrace_page_header_spec);
+                        std::vector<Field> common_fields);
 
   size_t largest_id() const { return largest_id_; }
 
@@ -99,9 +89,6 @@ class ProtoTranslationTable {
   }
 
   const std::vector<Event>& events() { return events_; }
-  const FtracePageHeaderSpec& ftrace_page_header_spec() const {
-    return ftrace_page_header_spec_;
-  }
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
@@ -112,7 +99,6 @@ class ProtoTranslationTable {
   std::map<std::string, const Event*> name_to_event_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
-  FtracePageHeaderSpec ftrace_page_header_spec_{};
 };
 
 }  // namespace perfetto
