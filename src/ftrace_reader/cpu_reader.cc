@@ -226,7 +226,6 @@ void CpuReader::RunWorkerThread(size_t cpu,
         usleep(100 * 1000);
         continue;
       }
-      PERFETTO_CHECK(getpid() != 0);
       PERFETTO_DCHECK(errno == EPIPE || errno == EINTR || errno == EBADF);
       break;  // ~CpuReader is waiting to join this thread.
     }

@@ -217,7 +217,7 @@ class CpuReader {
   base::ScopedFile staging_write_fd_;
   base::PageAllocator::UniquePtr buffer_;
   std::thread worker_thread_;
-  std::atomic<bool> exiting_;
+  std::atomic<bool> exiting_{true};
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
