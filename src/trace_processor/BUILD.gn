@@ -27,3 +27,39 @@ wasm_lib("trace_processor") {
     "../../protos/perfetto/trace_processor:lite",
   ]
 }
+
+source_set("trace_processor_lib") {
+  sources = [
+    "trace_processor.cc",
+    "trace_processor.h",
+  ]
+
+  deps = [
+    ":sqlite",
+    "../../gn:default_deps",
+  ]
+}
+
+source_set("sqlite") {
+  sources = [
+    "sqlite3.c",
+    "sqlite3.h",
+  ]
+  configs -= [ "//gn/standalone:extra_warnings" ]
+  deps = [
+    "../../gn:default_deps",
+  ]
+}
+
+source_set("unittests") {
+  testonly = true
+  deps = [
+    ":trace_processor_lib",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+    "../base:test_support",
+  ]
+  sources = [
+    "trace_processor_unittest.cc",
+  ]
+}
