@@ -57,6 +57,7 @@ TraceWriterImpl::~TraceWriterImpl() {
   if (cur_chunk_.is_valid()) {
     cur_packet_->Finalize();
 #if !defined(PERFETTO_BUILD_WITH_CHROMIUM)
+    // Disabled in Chromium builds due to https://crbug.com/844379
     Flush();
 #endif
   }
