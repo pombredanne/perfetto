@@ -21,12 +21,14 @@
 #include <string.h>
 
 #include <array>
+#include <atomic>
 #include <memory>
 #include <set>
 #include <thread>
 
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/page_allocator.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/thread_checker.h"
 #include "perfetto/ftrace_reader/ftrace_controller.h"
@@ -201,7 +203,8 @@ class CpuReader {
   static void RunWorkerThread(size_t cpu,
                               int trace_fd,
                               int staging_write_fd,
-                              const std::function<void()>& on_data_available);
+                              const std::function<void()>& on_data_available,
+                              std::atomic<bool>* exiting);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
@@ -212,8 +215,9 @@ class CpuReader {
   base::ScopedFile trace_fd_;
   base::ScopedFile staging_read_fd_;
   base::ScopedFile staging_write_fd_;
-  std::unique_ptr<uint8_t[]> buffer_;
+  base::PageAllocator::UniquePtr buffer_;
   std::thread worker_thread_;
+  std::atomic<bool> exiting_{false};
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 
