@@ -124,7 +124,7 @@ Chunk SharedMemoryArbiterImpl::GetNewChunk(
       // SMB.
       FlushPendingCommitDataRequests();
     }
-    perfetto::base::SleepMicroseconds(stall_interval_us);
+    base::SleepMicroseconds(stall_interval_us);
     stall_interval_us =
         std::min(kMaxStallIntervalUs, (stall_interval_us + 1) * 8);
   }

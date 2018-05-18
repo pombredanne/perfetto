@@ -35,7 +35,7 @@ inline void WaitBeforeNextAttempt(int attempt) {
   if (attempt < kRetryAttempts / 2) {
     std::this_thread::yield();
   } else {
-    perfetto::base::SleepMicroseconds((unsigned(attempt) / 10) * 1000);
+    base::SleepMicroseconds((unsigned(attempt) / 10) * 1000);
   }
 }
 
