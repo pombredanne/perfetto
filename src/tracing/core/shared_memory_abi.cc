@@ -16,6 +16,7 @@
 #include "perfetto/tracing/core/shared_memory_abi.h"
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/time.h"
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/mman.h>
@@ -34,7 +35,7 @@ inline void WaitBeforeNextAttempt(int attempt) {
   if (attempt < kRetryAttempts / 2) {
     std::this_thread::yield();
   } else {
-    SleepMicroseconds((useconds_t(attempt) / 10) * 1000);
+    perfetto::base::SleepMicroseconds((unsigned(attempt) / 10) * 1000);
   }
 }
 

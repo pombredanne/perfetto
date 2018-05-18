@@ -48,6 +48,8 @@ inline TimeNanos FromPosixTimespec(const struct timespec& ts) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
+void SleepMicroseconds(unsigned interval_us);
+
 TimeNanos GetWallTimeNs();
 TimeNanos GetThreadCPUTimeNs();
 
