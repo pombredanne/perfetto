@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   if (optind >= argc) {
     fprintf(stderr,
             "Usage: ./%s -w whitelist_dir -o output_dir -d proto_descriptor "
-            "input_dir...\n",
+            "[--check_only] input_dir...\n",
             argv[0]);
     return 1;
   }
