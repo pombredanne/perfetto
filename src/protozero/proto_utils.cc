@@ -108,5 +108,59 @@ const uint8_t* ParseField(const uint8_t* start,
   return pos;
 }
 
+const uint8_t* ParseField(const uint8_t* start,
+                          const uint8_t* end,
+                          FieldDescriptor* fd) {
+  // The first byte of a proto field is structured as follows:
+  // The least 3 significant bits determine the field type.
+  // The most 5 significant bits determine the field id. If MSB == 1, the
+  // field id continues on the next bytes following the VarInt encoding.
+  const uint8_t kFieldTypeNumBits = 3;
+  const uint8_t kFieldTypeMask = (1 << kFieldTypeNumBits) - 1;  // 0000 0111;
+
+  const uint8_t* pos = start;
+  PERFETTO_CHECK_PTR_LE(pos, end - 1);
+  fd->type = static_cast<FieldType>(*pos & kFieldTypeMask);
+
+  uint64_t raw_field_id;
+  pos = ParseVarInt(pos, end, &raw_field_id);
+  raw_field_id >>= kFieldTypeNumBits;
+
+  PERFETTO_DCHECK(raw_field_id <= std::numeric_limits<uint32_t>::max());
+  fd->id = static_cast<uint32_t>(raw_field_id);
+
+  switch (fd->type) {
+    case kFieldTypeFixed64: {
+      PERFETTO_CHECK_PTR_LE(pos + sizeof(uint64_t), end);
+      memcpy(&fd->int_value, pos, sizeof(uint64_t));
+      fd->int_value = BYTE_SWAP_TO_LE64(fd->int_value);
+      pos += sizeof(uint64_t);
+      break;
+    }
+    case kFieldTypeFixed32: {
+      PERFETTO_CHECK_PTR_LE(pos + sizeof(uint32_t), end);
+      uint32_t tmp;
+      memcpy(&tmp, pos, sizeof(uint32_t));
+      fd->int_value = BYTE_SWAP_TO_LE32(tmp);
+      pos += sizeof(uint32_t);
+      break;
+    }
+    case kFieldTypeVarInt: {
+      pos = ParseVarInt(pos, end, &fd->int_value);
+      break;
+    }
+    case kFieldTypeLengthDelimited: {
+      uint64_t nested_size = 0;
+      pos = ParseVarInt(pos, end, &nested_size);
+      fd->nested.size = static_cast<uint32_t>(nested_size);
+      fd->nested.offset = static_cast<uint32_t>(pos - start);
+      pos += nested_size;
+      PERFETTO_CHECK_PTR_LE(pos, end);
+      break;
+    }
+  }
+  return pos;
+}
+
 }  // namespace proto_utils
 }  // namespace protozero

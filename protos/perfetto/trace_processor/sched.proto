@@ -17,9 +17,47 @@
 syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 
+import "perfetto/trace_processor/query.proto";
+
 package perfetto.protos;
 
-message Sched {
-  // TODO(primiano): fill in next CLs.
-  optional string test = 1;
+// This is the interface that allows to make high-level queries on scheduling
+// events.
+
+service Sched {
+  rpc GetSchedEvents(Query) returns (SchedEvents) {}
+  rpc GetQuantizedSched(Query) returns (QuantizedSchedActivity) {}
+}
+
+message SchedEvents {
+  // TODO: might need to review this and make it columnar, something like:
+  // repeated int32 pids = 1
+  // repeated int32 tids = 2
+  // ...
+  repeated SchedEvent events = 1;
+}
+
+message SchedEvent {
+  optional int32 pid = 1;
+  optional int32 tid = 2;
+  optional string process_name = 3;
+  optional string thread_name = 4;
+  optional double timestamp = 5;
+  optional double duration = 6;
+  optional double cycles = 7;
+
+  enum SchedReason {
+    PREEMPTED = 1;
+    BLOCKED_ON_IO = 2;
+  };
+  optional SchedReason reason = 8;
+}
+
+message QuantizedSchedActivity {
+  message TimeSlice {
+    optional double timestamp = 1;
+    optional double duration = 2;
+    repeated SchedEvent events = 3;
+  }
+  repeated TimeSlice slices = 1;
 }

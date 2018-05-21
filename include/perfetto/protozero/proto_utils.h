@@ -125,6 +125,23 @@ const uint8_t* ParseField(const uint8_t* start,
                           FieldType* field_type,
                           uint64_t* field_intvalue);
 
+struct FieldDescriptor {
+  struct Nested {
+    uint32_t offset;
+    uint32_t size;
+  };
+  uint32_t id;
+  FieldType type;
+  union {
+    Nested nested;
+    uint64_t int_value;
+  };
+};
+
+const uint8_t* ParseField(const uint8_t* start,
+                          const uint8_t* end,
+                          FieldDescriptor*);
+
 }  // namespace proto_utils
 }  // namespace protozero
 

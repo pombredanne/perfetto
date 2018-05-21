@@ -18,20 +18,153 @@
 #include <map>
 #include <string>
 
-#include "perfetto/base/logging.h"
+#include "perfetto/trace_processor/blob_reader.h"
+#include "perfetto/trace_processor/query.pb.h"
+#include "perfetto/trace_processor/raw_query.h"
+#include "perfetto/trace_processor/sched.h"
+#include "src/trace_processor/emscripten_task_runner.h"
+
+#include "perfetto/trace_processor/raw_query.pb.h"
 #include "perfetto/trace_processor/sched.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
 
+using RequestID = uint32_t;
+
+// +---------------------------------------------------------------------------+
+// | Imported functions implemented by JS and injected via Initialize().       |
+// +---------------------------------------------------------------------------+
+
+// ReadTrace(): reads a portion of the trace file. Ca
+// Invoked by the C++ code in the trace processor to ask the embedder (e.g. the
+// JS code for the case of the UI) to get read a chunk of the trace file.
+// Args:
+//   offset: the start offset (in bytes) in the trace file to read.
+//   len: maximum size of the buffered returned.
+// Returns:
+//   The embedder is supposed to asynchronously call ReadComplete(), passing
+//   back the offset, together with the actual buffer.
+using ReadTraceFunction = uint32_t (*)(uint32_t /*offset*/,
+                                       uint32_t /*len*/,
+                                       uint8_t* /*dst*/);
+
+// Reply(): replies to a RPC method invocation (e.g., sched_getSchedEvents()).
+// Called asynchronously (i.e. in a separate task) by the C++ code inside the
+// trace processor to return data for a RPC method call.
+// The function is generic and thankfully we need just one for all methods
+// because the output is always a protobuf buffer.
+// Args:
+//  RequestID: the ID passed by the embedder when invoking the RPC method (e.g.,
+//             the first argument passed to sched_getSchedEvents()).
+using ReplyFunction = void (*)(RequestID,
+                               bool success,
+                               const char* /*proto_reply_data*/,
+                               uint32_t /*len*/);
+
+// +---------------------------------------------------------------------------+
+// | Boring boilerplate                                                        |
+// +---------------------------------------------------------------------------+
+namespace {
+
+// TODO(primiano): create a class to handle the module state, instad of relying
+// on globals and get rid of this hack.
+#pragma GCC diagnostic ignored "-Wglobal-constructors"
+#pragma GCC diagnostic ignored "-Wexit-time-destructors"
+
+EmscriptenTaskRunner* g_task_runner;
+ReadTraceFunction g_read_trace;
+ReplyFunction g_reply;
+
+// Implements the BlobReader interface passed to the trace processor C++
+// classes. It simply routes the requests to the embedder (e.g. JS/TS).
+class BlobReaderImpl : public BlobReader {
+ public:
+  ~BlobReaderImpl() override = default;
+
+  uint32_t Read(uint32_t offset, uint32_t len, uint8_t* dst) override {
+    return g_read_trace(offset, len, dst);
+  }
+};
+
+BlobReaderImpl* blob_reader() {
+  static BlobReaderImpl* instance = new BlobReaderImpl();
+  return instance;
+}
+
+Sched* sched() {
+  static Sched* instance = new Sched(g_task_runner, blob_reader());
+  return instance;
+}
+
+RawQuery* raw_query() {
+  static RawQuery* instance = new RawQuery(g_task_runner, blob_reader());
+  return instance;
+}
+
+}  // namespace
+
 // +---------------------------------------------------------------------------+
 // | Exported functions called by the JS/TS running in the worker.             |
 // +---------------------------------------------------------------------------+
 extern "C" {
-void EMSCRIPTEN_KEEPALIVE main();
-void main() {
-  protos::Sched sched;
-  PERFETTO_ILOG("Hello from TraceProcessor C++ code (%d)\n", sched.ByteSize());
+void EMSCRIPTEN_KEEPALIVE Initialize(ReadTraceFunction, ReplyFunction);
+void Initialize(ReadTraceFunction read_trace_function,
+                ReplyFunction reply_function) {
+  printf("Initializing WASM bridge\n");
+  g_task_runner = new EmscriptenTaskRunner();
+  g_read_trace = read_trace_function;
+  g_reply = reply_function;
+}
+
+// +---------------------------------------------------------------------------+
+// Here we should have one function for each method of each RPC service defined
+// in trace_processor/*.proto.
+// TODO(primiano): autogenerate these, their implementation is fully mechanical.
+// +---------------------------------------------------------------------------+
+
+void EMSCRIPTEN_KEEPALIVE raw_query_execute(RequestID, const uint8_t*, int);
+void raw_query_execute(RequestID req_id, const uint8_t* query_data, int len) {
+  protos::RawQueryArgs query;
+  bool parsed = query.ParseFromArray(query_data, len);
+  if (!parsed) {
+    std::string err = "Failed to parse input request";
+    g_reply(req_id, false, err.data(), err.size());
+  }
+
+  // When the C++ class implementing the service replies, serialize the protobuf
+  // result and post it back to the worker script (|g_reply|).
+  auto callback = [req_id](const protos::RawQueryResult& res) {
+    std::string encoded;
+    res.SerializeToString(&encoded);
+    g_reply(req_id, true, encoded.data(),
+            static_cast<uint32_t>(encoded.size()));
+  };
+
+  raw_query()->Execute(query, callback);
+}
+
+void EMSCRIPTEN_KEEPALIVE sched_getSchedEvents(RequestID, const uint8_t*, int);
+void sched_getSchedEvents(RequestID req_id,
+                          const uint8_t* query_data,
+                          int len) {
+  protos::Query query;
+  bool parsed = query.ParseFromArray(query_data, len);
+  if (!parsed) {
+    std::string err = "Failed to parse input request";
+    g_reply(req_id, false, err.data(), err.size());
+  }
+
+  // When the C++ class implementing the service replies, serialize the protobuf
+  // result and post it back to the worker script (|g_reply|).
+  auto callback = [req_id](const protos::SchedEvents& events) {
+    std::string encoded;
+    events.SerializeToString(&encoded);
+    g_reply(req_id, true, encoded.data(),
+            static_cast<uint32_t>(encoded.size()));
+  };
+
+  sched()->GetSchedEvents(query, callback);
 }
 
 }  // extern "C"

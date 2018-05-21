@@ -14,21 +14,31 @@
  * limitations under the License.
  */
 
-console.log('Hello world!');
+import TraceProcessor from "./trace_processor"
 
-function writeToUIConsole(line:string) {
-  const lineElement = document.createElement('div');
-  lineElement.innerText = line;
-  const container = document.getElementById('console');
-  if (!container)
-    throw new Error('OMG');
-  container.appendChild(lineElement);
-}
+import * as x from './gen/protos';
+import protos = x.perfetto.protos;
 
-// TODO(primiano): temporary for testing, just instantiates the WASM module on
-// the main thread.
-(<any>window).Module = {
-    locateFile: (s: string) => '/wasm/' + s,
-    print: writeToUIConsole,
-    printErr: writeToUIConsole,
-};
+var fileElement = document.getElementById('traceFile');
+var consoleElement = document.getElementById('console');
+var queryElement = document.getElementById('query');
+var tp : TraceProcessor;
+
+if (!fileElement || !consoleElement || !queryElement)
+    throw new Error('Cannot find DIV elements');
+
+queryElement.addEventListener('keyup', (e) => {
+  if (e.keyCode != 13 || !tp || !queryElement)
+    return;
+  const sql : string = (<any>queryElement).value;
+  let rawQuery = protos.RawQueryArgs.create();
+  rawQuery.sqlQuery = sql;
+  tp.raw_query.execute(rawQuery).then(() => {});
+});
+
+fileElement.addEventListener('change', () => {
+    tp = new TraceProcessor((<any> fileElement).files[0], <HTMLElement> consoleElement);
+    let rawQuery = protos.RawQueryArgs.create();
+    rawQuery.sqlQuery = 'select * from trace limit 1';  // kick the indexing.
+    tp.raw_query.execute(rawQuery).then(() => {});
+});

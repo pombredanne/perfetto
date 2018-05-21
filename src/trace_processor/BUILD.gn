@@ -15,6 +15,44 @@
 import("../../gn/perfetto.gni")
 import("../../gn/wasm.gni")
 
+# This target is built twice: once with the default toolchain as a native C++
+# library (for trace-based metrics / batch processing) and once as a WASM
+# library (for the UI) by virtue of being depended on by the :wasm target below.
+source_set("lib") {
+  sources = [
+    "db.cc",
+    "raw_query.cc",
+    "sched.cc",
+    "virtual_destructors.cc",
+  ]
+  if (is_wasm) {
+    sources += [
+      "emscripten_task_runner.cc",
+      "emscripten_task_runner.h",
+    ]
+  }
+  deps = [
+    "../../buildtools:sqlite",
+    "../../gn:default_deps",
+    "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
+    "../../src/base",
+    "../../src/protozero",
+  ]
+}
+
+executable("sqshell") {
+  testonly = true
+  deps = [
+    ":lib",
+    "../../gn:default_deps",
+    "../../include/perfetto/base",
+  ]
+  sources = [
+    "shell.cc",
+  ]
+}
+
 wasm_lib("trace_processor") {
   sources = [
     "wasm_bridge.cc",
@@ -23,6 +61,7 @@ wasm_lib("trace_processor") {
   # All the deps below are implicitly xxx($wasm_toolchain) because of the
   # outer "is_wasm" block.
   deps = [
+    ":lib",
     "../../gn:default_deps",
     "../../protos/perfetto/trace_processor:lite",
   ]

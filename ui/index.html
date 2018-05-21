@@ -5,14 +5,23 @@
   <style type="text/css">
     html {
       font-family: Roboto, verdana, sans-serif;
+      font-weight: 200;
       padding: 20px;
     }
+
+    input[type=file] {
+      background: gold;
+      padding: 5px 10px;
+      margin: 10px 0;
+    }
+
     #console {
       border: 1px solid #333;
       width: auto;
-      height: 200px;
+      height: 500px;
       background: #eee;
       margin: 10px 0;
+      overflow: scroll;
     }
 
     #console > div {
@@ -25,13 +34,36 @@
       text-overflow: ellipsis;
       padding: 2px;
     }
+
+    #query {
+      display: block;
+      width: 90%;
+    }
+
+    h1 {
+      font-family: Roboto, sans-serif;
+      font-weight: 100;
+      font-size: 20px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
+  <h1>
+    This is a demo of <a href="http://go/perfetto-trace-processing">Perfetto TraceProcessor</a> + SQLite Virtual Table using an in-memory columnar storage + WASM.
+  </h1>
+  <div>
+    Load a perfetto trace here (<a href="http://www/~primiano/perfetto/long_trace.pb.gz">download example trace here</a>):
+  <input type="file" id="traceFile">
+  </div>
+
+  <div>
+    Then type a SQL query here and press enter:
+  </div>
+  <input type="text" id="query" value="select * from trace limit 10">
   <div id="console">
-    WASM output goes here
   </div>
   <script src="bundle.js" type="text/javascript"></script>
-  <script src="wasm/trace_processor.js" type="text/javascript"></script>
+
 </body>
 </html>

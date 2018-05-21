@@ -51,6 +51,7 @@ group("all") {
     ]
     if (!build_with_android) {
       deps += [ "tools/trace_to_text" ]
+      deps += [ "src/trace_processor:sqshell" ]
     }
     if (is_linux || is_android) {
       deps += [ "tools/skippy" ]
