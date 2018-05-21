@@ -9,7 +9,7 @@ BUILDDIR="$DIR/../out/ftrace_proto_gen_build"
 # FIXME(fmayer): make ftrace_proto_gen independent of cwd.
 cd "$DIR/.."
 
-"$BUILDDIR/ftrace_proto_gen_build/ftrace_proto_gen" \
+"$BUILDDIR/ftrace_proto_gen" \
   --whitelist_path "$DIR/ftrace_proto_gen/event_whitelist" \
   --output_dir "$DIR/../protos/perfetto/trace/ftrace/" \
   --proto_descriptor "$BUILDDIR/gen/protos/perfetto/trace/ftrace.descriptor" \
