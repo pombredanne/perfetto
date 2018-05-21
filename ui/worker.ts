@@ -141,8 +141,12 @@ if ((<any>self).WorkerGlobalScope !== undefined) {
 
     // |Module| is a special var name introduced by the WASM compiler in the global
     // scope to interact with the corresponding c++ module.
+    var baseLoc = location.pathname.split('/');
+    baseLoc.pop();
+    baseLoc.push('wasm');
+    const wasmLoc = baseLoc.join('/');
     var Module: any = {
-        locateFile: (s: string) => '/wasm/' + s,
+        locateFile: (s: string) => wasmLoc + '/' + s,
         onRuntimeInitialized: tpw.onRuntimeInitialized.bind(tpw),
         print: tpw.onStdout.bind(tpw),
         printErr: tpw.onStdout.bind(tpw),
