@@ -60,6 +60,10 @@ target_host_only = [
     '//:trace_to_text',
 ]
 
+target_user_debug_flag = [
+    '//:perfetto'
+]
+
 # Arguments for the GN output directory.
 gn_args = 'target_os="android" target_cpu="arm" is_debug=false build_with_android=true'
 
@@ -176,6 +180,7 @@ class Module(object):
         self.defaults = []
         self.cflags = set()
         self.local_include_dirs = []
+        self.user_debug_flag = False
 
     def to_string(self, output):
         if self.comment:
@@ -196,11 +201,18 @@ class Module(object):
         self._output_field(output, 'defaults')
         self._output_field(output, 'cflags')
         self._output_field(output, 'local_include_dirs')
-        if any(name in library_not_in_pdk for name in self.shared_libs):
+
+        disable_pdk = any(name in library_not_in_pdk for name in self.shared_libs)
+        if self.user_debug_flag or disable_pdk:
             output.append('  product_variables: {')
-            output.append('    pdk: {')
-            output.append('      enabled: false,')
-            output.append('    },')
+            if disable_pdk:
+                output.append('    pdk: {')
+                output.append('      enabled: false,')
+                output.append('    },')
+            if self.user_debug_flag:
+                output.append('    debuggable: {')
+                output.append('      cflags: ["-DPERFETTO_BUILD_WITH_ANDROID_USERDEBUG"],')
+                output.append('    },')
             output.append('  },')
         output.append('}')
         output.append('')
@@ -502,6 +514,8 @@ def create_modules_from_target(blueprint, desc, target_name):
           module.init_rc = [target_initrc[target_name]]
         if target_name in target_host_supported:
           module.host_supported = True
+        if target_name in target_user_debug_flag:
+          module.user_debug_flag = True
 
         # Don't try to inject library/source dependencies into genrules because
         # they are not compiled in the traditional sense.

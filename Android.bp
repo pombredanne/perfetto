@@ -232,6 +232,9 @@ cc_binary {
     pdk: {
       enabled: false,
     },
+    debuggable: {
+      cflags: ["-DPERFETTO_BUILD_WITH_ANDROID_USERDEBUG"],
+    },
   },
 }
 
