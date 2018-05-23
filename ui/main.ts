@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import './overview-timeline';
+
 console.log('Hello world!');
 
 function writeToUIConsole(line:string) {
