@@ -46,42 +46,7 @@ std::string RunClangFmt(const std::string& input) {
   int output_pipes[2];
   PERFETTO_CHECK(pipe2(input_pipes, O_NONBLOCK) != -1);
   PERFETTO_CHECK(pipe2(output_pipes, O_NONBLOCK) != -1);
-  if ((pid = fork()) > 0) {
-    // Parent
-    size_t written = 0;
-    size_t bytes_read = 0;
-    close(input_pipes[0]);
-    close(output_pipes[1]);
-    while (true) {
-      if (written < input.size()) {
-        ssize_t w =
-            write(input_pipes[1], &(input[written]), input.size() - written);
-        if (w == -1) {
-          if (errno == EAGAIN || errno == EINTR)
-            continue;
-          PERFETTO_CHECK(false);
-        }
-        written += static_cast<size_t>(w);
-        if (written == input.size())
-          close(input_pipes[1]);
-      }
-      if (bytes_read + 4096 > output.size())
-        output.resize(output.size() + 4096);
-      ssize_t r = read(output_pipes[0], &(output[bytes_read]), 4096);
-      if (r == -1 && errno != EAGAIN && errno != EINTR)
-        PERFETTO_CHECK(false);
-      if (r > 0)
-        bytes_read += static_cast<size_t>(r);
-      else if (r == 0)
-        break;
-    }
-    output.resize(bytes_read);
-
-    int wstatus;
-    waitpid(pid, &wstatus, 0);
-    PERFETTO_CHECK(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0);
-    return output;
-  } else if (pid == 0) {
+  if ((pid = fork()) == 0) {
     // Child
     PERFETTO_CHECK(dup2(input_pipes[0], STDIN_FILENO) != -1);
     PERFETTO_CHECK(dup2(output_pipes[1], STDOUT_FILENO) != -1);
@@ -89,10 +54,45 @@ std::string RunClangFmt(const std::string& input) {
     close(output_pipes[0]);
     PERFETTO_CHECK(execl("buildtools/linux64/clang-format", "clang-format",
                          nullptr) != -1);
-  } else {
-    PERFETTO_CHECK(false);
   }
-  PERFETTO_CHECK(false);
+  PERFETTO_CHECK(pid > 0);
+  // Parent
+  size_t written = 0;
+  size_t bytes_read = 0;
+  close(input_pipes[0]);
+  close(output_pipes[1]);
+  while (true) {
+    if (written < input.size()) {
+      ssize_t w =
+          write(input_pipes[1], &(input[written]), input.size() - written);
+      if (w == -1) {
+        if (errno == EAGAIN || errno == EINTR)
+          continue;
+        PERFETTO_FATAL("write failed");
+      }
+      written += static_cast<size_t>(w);
+      if (written == input.size())
+        close(input_pipes[1]);
+    }
+    if (bytes_read + base::kPageSize > output.size())
+      output.resize(output.size() + base::kPageSize);
+    ssize_t r = read(output_pipes[0], &(output[bytes_read]), base::kPageSize);
+    if (r == -1) {
+      if (errno == EAGAIN || errno == EINTR)
+        continue;
+      PERFETTO_FATAL("read failed");
+    }
+    if (r > 0)
+      bytes_read += static_cast<size_t>(r);
+    else
+      break;
+  }
+  output.resize(bytes_read);
+
+  int wstatus;
+  waitpid(pid, &wstatus, 0);
+  PERFETTO_CHECK(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0);
+  return output;
 }
 
 bool EndsWith(const std::string& str, const std::string& pattern) {
