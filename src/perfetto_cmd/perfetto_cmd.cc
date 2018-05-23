@@ -228,7 +228,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   args.current_time = base::GetWallTimeS();
   args.ignore_guardrails = ignore_guardrails;
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_USERDEBUG_BUILD)
-  args.max_upload_bytes_guardrail =
+  args.max_upload_bytes_override =
       trace_config_->guardrail_overrides().max_upload_per_day_bytes();
 #endif
   if (!limiter.ShouldTrace(args))
