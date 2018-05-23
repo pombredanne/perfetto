@@ -241,3 +241,22 @@ if (use_libfuzzer) {
     ]
   }
 }
+
+executable("fifoserver") {
+  deps = [
+    "gn:default_deps",
+  ]
+  sources = [
+    "fifoserver.cc",
+  ]
+}
+
+executable("fifoclient") {
+  deps = [
+    "gn:default_deps",
+    "src/base",
+  ]
+  sources = [
+    "fifoclient.cc",
+  ]
+}
