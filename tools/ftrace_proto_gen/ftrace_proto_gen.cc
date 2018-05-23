@@ -35,6 +35,10 @@ bool StartsWith(const std::string& str, const std::string& prefix) {
   return str.compare(0, prefix.length(), prefix) == 0;
 }
 
+bool EndsWith(const std::string& str, const std::string& pattern) {
+  return str.rfind(pattern) == str.size() - pattern.size();
+}
+
 bool Contains(const std::string& haystack, const std::string& needle) {
   return haystack.find(needle) != std::string::npos;
 }
@@ -61,7 +65,10 @@ std::string RunClangFmt(const std::string& input) {
   size_t bytes_read = 0;
   close(input_pipes[0]);
   close(output_pipes[1]);
-  while (true) {
+  // This cannot be left uninitialized because there's as continue statement
+  // before the first assignment to this in the loop.
+  ssize_t r = -1;
+  do {
     if (written < input.size()) {
       ssize_t w =
           write(input_pipes[1], &(input[written]), input.size() - written);
@@ -74,9 +81,10 @@ std::string RunClangFmt(const std::string& input) {
       if (written == input.size())
         close(input_pipes[1]);
     }
+
     if (bytes_read + base::kPageSize > output.size())
       output.resize(output.size() + base::kPageSize);
-    ssize_t r = read(output_pipes[0], &(output[bytes_read]), base::kPageSize);
+    r = read(output_pipes[0], &(output[bytes_read]), base::kPageSize);
     if (r == -1) {
       if (errno == EAGAIN || errno == EINTR)
         continue;
@@ -84,19 +92,13 @@ std::string RunClangFmt(const std::string& input) {
     }
     if (r > 0)
       bytes_read += static_cast<size_t>(r);
-    else
-      break;
-  }
+  } while (r != 0);
   output.resize(bytes_read);
 
   int wstatus;
   waitpid(pid, &wstatus, 0);
   PERFETTO_CHECK(WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0);
   return output;
-}
-
-bool EndsWith(const std::string& str, const std::string& pattern) {
-  return str.rfind(pattern) == str.size() - pattern.size();
 }
 
 }  // namespace
