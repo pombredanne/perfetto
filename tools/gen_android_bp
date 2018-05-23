@@ -60,10 +60,6 @@ target_host_only = [
     '//:trace_to_text',
 ]
 
-target_user_debug_flag = [
-    '//:perfetto'
-]
-
 # Arguments for the GN output directory.
 gn_args = 'target_os="android" target_cpu="arm" is_debug=false build_with_android=true'
 
@@ -514,8 +510,6 @@ def create_modules_from_target(blueprint, desc, target_name):
           module.init_rc = [target_initrc[target_name]]
         if target_name in target_host_supported:
           module.host_supported = True
-        if target_name in target_user_debug_flag:
-          module.user_debug_flag = True
 
         # Don't try to inject library/source dependencies into genrules because
         # they are not compiled in the traditional sense.
@@ -576,6 +570,7 @@ def create_blueprint_for_targets(desc, targets):
         '-fvisibility=hidden',
         '-Oz',
     ]
+    defaults.user_debug_flag = True
 
     blueprint.add_module(defaults)
     for target in targets:

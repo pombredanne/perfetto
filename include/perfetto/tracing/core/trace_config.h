@@ -129,7 +129,7 @@ class PERFETTO_EXPORT TraceConfig {
   };
 
   enum LockdownModeOperation {
-    LOCKDOWN_UNSET = 0,
+    LOCKDOWN_UNCHANGED = 0,
     LOCKDOWN_CLEAR = 1,
     LOCKDOWN_SET = 2,
   };

@@ -73,7 +73,7 @@ message TraceConfig {
   optional bool enable_extra_guardrails = 4;
 
   enum LockdownModeOperation {
-    LOCKDOWN_UNSET = 0;
+    LOCKDOWN_UNCHANGED = 0;
     LOCKDOWN_CLEAR = 1;
     LOCKDOWN_SET = 2;
   }
@@ -127,8 +127,7 @@ message TraceConfig {
   optional uint64 max_file_size_bytes = 10;
 
   // Contains flags which override the default values of the guardrails inside
-  // Perfetto. These values should be set carefully as setting them incorrectly
-  // will prevent Perfetto from stopping misbehaviour of itself.
+  // Perfetto. These values are only affect userdebug builds.
   message GuardrailOverrides {
     // Override the default limit (in bytes) for uploading data to server within
     // a 24 hour period.
