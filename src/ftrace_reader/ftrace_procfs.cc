@@ -104,7 +104,6 @@ size_t FtraceProcfs::NumberOfCpus() const {
 }
 
 void FtraceProcfs::ClearTrace() {
-  std::string path = root_ + "trace";
   for (size_t cpu = 0; cpu < NumberOfCpus(); cpu++) {
     PERFETTO_CHECK(
         ClearFile(root_ + "per_cpu/cpu" + std::to_string(cpu) + "/trace"));
