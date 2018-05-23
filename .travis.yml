@@ -126,7 +126,7 @@ install:
   - |
     if [[ "$CFG" == android-* ]]; then
       tools/install-build-deps
-    else if [[ "$CFG" == ui-* ]]; then
+    elif [[ "$CFG" == ui-* ]]; then
       tools/install-build-deps --no-android --ui
     else
       tools/install-build-deps --no-android
