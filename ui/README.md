@@ -8,20 +8,12 @@ Run:
 $ git clone https://android.googlesource.com/platform/external/perfetto/
 $ cd perfetto
 $ tools/install-build-deps --no-android --ui
-$ tools/build_all_configs.py
+$ tools/gn gen out/debug --args='is_debug=true is_clang=true'
+$ tools/ninja -C out/debug ui
 ```
 
-Then on Linux:
-
-```
-$ tools/ninja -C out/linux_clang_debug ui
-```
-
-Or on MacOS:
-
-```
-$ ninja -C out/mac_debug ui
-```
+For more details on `gn` configs see
+[Build Instructions](../docs/build-instructions.md).
 
 Finally run:
 
@@ -30,5 +22,3 @@ $ ./ui/run-dev-server
 ```
 
 and navigate to `localhost:3000`.
-
-
