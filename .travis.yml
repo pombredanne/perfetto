@@ -102,6 +102,8 @@ matrix:
       compiler: clang
       addons:
         apt:
+          sources:
+            - ubuntu-toolchain-r-test
           packages:
             - libstdc++6
       env: CFG=ui-clang-x86_64-release GN_ARGS="is_debug=false is_clang=true"
