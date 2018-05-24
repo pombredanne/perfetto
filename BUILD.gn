@@ -231,7 +231,7 @@ if (build_with_chromium) {
   }
 }
 
-if (use_libfuzzer && !build_with_chromium) {
+if (use_libfuzzer) {
   group("fuzzers") {
     testonly = true
     deps = [

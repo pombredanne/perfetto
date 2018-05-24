@@ -11,6 +11,7 @@
   "author": "Perfetto Team",
   "license": "Apache-2.0",
   "dependencies": {
+    "eslint-config-google": "^0.9.1",
     "protobufjs": "^6.8.6"
   },
   "devDependencies": {
