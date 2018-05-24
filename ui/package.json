@@ -18,17 +18,20 @@
     "lite-server": "^2.3.0",
     "typescript": "^2.8.3",
     "@skatejs/ssr": "^0.19.3",
+    "@types/jest": "^22.2.3",
     "jest": "^23.0.0",
-    "jest-canvas-mock": "^1.0.2"
+    "jest-canvas-mock": "^1.0.2",
+    "ts-jest": "^22.4.6"
   },
   "jest": {
     "setupFiles": [
       "jest-canvas-mock"
     ],
     "testEnvironment": "@skatejs/ssr/jest",
-    "moduleFileExtensions": ["ts", "tsx", "js"],
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
+    "moduleFileExtensions": ["ts",  "tsx", "js", "jsx", "json", "node" ],
     "transform": {
-      "^.+\\.(ts|tsx)$": "<rootDir>/tests-preprocessor.js"
+      "^.+\\.tsx?$": "ts-jest"
     }
   }
 }
