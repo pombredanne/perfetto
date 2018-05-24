@@ -103,7 +103,7 @@ matrix:
       addons:
         apt:
           packages:
-            - libstdc++-6
+            - libstdc++6
       env: CFG=ui-clang-x86_64-release GN_ARGS="is_debug=false is_clang=true"
 
 # Cache the deps that get git-pulled to avoid hitting quota limits (b/68252114).
