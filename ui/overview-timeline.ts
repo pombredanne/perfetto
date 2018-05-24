@@ -1,15 +1,11 @@
-"use strict";
-
-class OverviewTimeline extends HTMLElement
-{
+class OverviewTimeline extends HTMLElement {
   private static SVG_NS = 'http://www.w3.org/2000/svg';
   private static DEFAULT_WIDTH = '100%';
   private static DEFAULT_HEIGHT = '200';
 
   private shadow = this.attachShadow({mode: 'open'});
 
-  constructor()
-  {
+  constructor() {
     super();
 
     const width : string = this.getAttribute('width') ||
