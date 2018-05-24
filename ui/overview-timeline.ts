@@ -33,6 +33,11 @@ class OverviewTimeline extends HTMLElement {
     this.shadow.appendChild(style);
     this.shadow.appendChild(svgEl);
   }
+
+  public test()
+  {
+
+  }
 }
 
 customElements.define('overview-timeline', OverviewTimeline);

@@ -5,7 +5,7 @@
   "repository": "https://android.googlesource.com/platform/external/perfetto",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "dev": "lite-server --baseDir=dist"
   },
   "author": "Perfetto Team",
@@ -16,6 +16,19 @@
   "devDependencies": {
     "browserify": "^16.2.2",
     "lite-server": "^2.3.0",
-    "typescript": "^2.8.3"
+    "typescript": "^2.8.3",
+    "@skatejs/ssr": "^0.19.3",
+    "jest": "^23.0.0",
+    "jest-canvas-mock": "^1.0.2"
+  },
+  "jest": {
+    "setupFiles": [
+      "jest-canvas-mock"
+    ],
+    "testEnvironment": "@skatejs/ssr/jest",
+    "moduleFileExtensions": ["ts", "tsx", "js"],
+    "transform": {
+      "^.+\\.(ts|tsx)$": "<rootDir>/tests-preprocessor.js"
+    }
   }
 }
