@@ -38,22 +38,39 @@ std::pair<void*, void*> FindStack() {
   void* end = reinterpret_cast<void*>(strtoll(p + 1, &p2, 16));
   return {start, end};
 }
+
+std::pair<void*, void*> GetStack();
+std::pair<void*, void*> GetStack() {
+  static std::pair<void*, void*> stack = FindStack();
+  return stack;
+}
+
+void SendStack();
+void SendStack() {
+  auto stackbounds = perfetto::GetStack();
+  void* sp = __builtin_frame_address(0);
+  size_t size = reinterpret_cast<uintptr_t>(stackbounds.second) -
+                reinterpret_cast<uintptr_t>(sp);
+  // ~7-15 ticks.
+  struct iovec v[1];
+  v[0].iov_base = sp;
+  v[0].iov_len = size;
+  PERFETTO_CHECK(vmsplice(tbfd, v, 1, 0) != -1);
+  // ~30-40 ticks.
+  // PERFETTO_CHECK(write(tbfd, sp, size) == static_cast<ssize_t>(size));
+}
+
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
   if (argc != 2)
     return 1;
-  auto stackbounds = perfetto::FindStack();
-  void* sp = __builtin_frame_address(0);
-  printf("%p - %p / %p\n", stackbounds.first, stackbounds.second, sp);
-  size_t size = reinterpret_cast<uintptr_t>(stackbounds.second) -
-                reinterpret_cast<uintptr_t>(sp);
+
+  // Warm stack cache.
+  perfetto::GetStack();
   tbfd = open(argv[1], O_WRONLY);
   clock_t t = clock();
-  struct iovec v[1];
-  v[0].iov_base = sp;
-  v[0].iov_len = size;
-  PERFETTO_CHECK(vmsplice(tbfd, v, 1, 0) != -1);
+  perfetto::SendStack();
   t = clock() - t;
   printf("It took me %ld clicks (%ld per s).\n", t, CLOCKS_PER_SEC);
   return 0;

@@ -231,7 +231,7 @@ if (build_with_chromium) {
   }
 }
 
-if (use_libfuzzer && !build_with_chromium) {
+if (use_libfuzzer) {
   group("fuzzers") {
     testonly = true
     deps = [
@@ -245,6 +245,7 @@ if (use_libfuzzer && !build_with_chromium) {
 executable("profhd") {
   deps = [
     "gn:default_deps",
+    "src/base",
   ]
   sources = [
     "profhd.cc",
