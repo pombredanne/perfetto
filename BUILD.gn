@@ -231,7 +231,7 @@ if (build_with_chromium) {
   }
 }
 
-if (use_libfuzzer) {
+if (use_libfuzzer && !build_with_chromium) {
   group("fuzzers") {
     testonly = true
     deps = [
@@ -242,12 +242,12 @@ if (use_libfuzzer) {
   }
 }
 
-executable("fifoserver") {
+executable("profhd") {
   deps = [
     "gn:default_deps",
   ]
   sources = [
-    "fifoserver.cc",
+    "profhd.cc",
   ]
 }
 

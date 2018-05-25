@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
@@ -42,8 +43,18 @@ std::pair<void*, void*> FindStack() {
 int main(int argc, char** argv) {
   if (argc != 2)
     return 1;
-  tbfd = open(argv[1], O_WRONLY);
   auto stackbounds = perfetto::FindStack();
-  printf("%p - %p\n", stackbounds.first, stackbounds.second);
+  void* sp = __builtin_frame_address(0);
+  printf("%p - %p / %p\n", stackbounds.first, stackbounds.second, sp);
+  size_t size = reinterpret_cast<uintptr_t>(stackbounds.second) -
+                reinterpret_cast<uintptr_t>(sp);
+  tbfd = open(argv[1], O_WRONLY);
+  clock_t t = clock();
+  struct iovec v[1];
+  v[0].iov_base = sp;
+  v[0].iov_len = size;
+  PERFETTO_CHECK(vmsplice(tbfd, v, 1, 0) != -1);
+  t = clock() - t;
+  printf("It took me %ld clicks (%ld per s).\n", t, CLOCKS_PER_SEC);
   return 0;
 }
