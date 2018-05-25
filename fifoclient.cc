@@ -62,6 +62,15 @@ void SendStack() {
 
 }  // namespace perfetto
 
+int rec(int n);
+int rec(int n) {
+  if (n == 0) {
+    perfetto::SendStack();
+    return 1;
+  }
+  return n + rec(n - 1);
+}
+
 int main(int argc, char** argv) {
   if (argc != 2)
     return 1;
@@ -70,7 +79,7 @@ int main(int argc, char** argv) {
   perfetto::GetStack();
   tbfd = open(argv[1], O_WRONLY);
   clock_t t = clock();
-  perfetto::SendStack();
+  rec(1000);
   t = clock() - t;
   printf("It took me %ld clicks (%ld per s).\n", t, CLOCKS_PER_SEC);
   return 0;
