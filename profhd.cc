@@ -29,19 +29,18 @@ int main(int argc, char** argv) {
     return 1;
   if (mkfifo(argv[1], 0666) == -1)
     return 1;
-  int fd = open(argv[1], O_RDONLY);
-  long rd = -1;
-  std::string output;
-  do {
-    char foo[2048];
-    rd = PERFETTO_EINTR(read(fd, &foo, sizeof(foo)));
-    PERFETTO_CHECK(rd != -1);
-    std::string newdata;
-    newdata.assign(foo, static_cast<size_t>(rd));
-    output += newdata;
-  } while (rd != 0);
-  printf("%lu\n", output.size());
-  std::ofstream s("stack");
-  s << output;
-  return 0;
+  while (true) {
+    int fd = open(argv[1], O_RDONLY);
+    long rd = -1;
+    std::string output;
+    do {
+      char foo[2048];
+      rd = PERFETTO_EINTR(read(fd, &foo, sizeof(foo)));
+      PERFETTO_CHECK(rd != -1);
+      std::string newdata;
+      newdata.assign(foo, static_cast<size_t>(rd));
+      output += newdata;
+    } while (rd != 0);
+    close(fd);
+  }
 }

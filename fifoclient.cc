@@ -49,15 +49,20 @@ void SendStack();
 void SendStack() {
   auto stackbounds = perfetto::GetStack();
   void* sp = __builtin_frame_address(0);
+  //  sp = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(sp) /
+  //  base::kPageSize) * base::kPageSize);
   size_t size = reinterpret_cast<uintptr_t>(stackbounds.second) -
                 reinterpret_cast<uintptr_t>(sp);
+#ifdef USE_SPLICE
   // ~7-15 ticks.
   struct iovec v[1];
   v[0].iov_base = sp;
   v[0].iov_len = size;
   PERFETTO_CHECK(vmsplice(tbfd, v, 1, 0) != -1);
+#else
   // ~30-40 ticks.
-  // PERFETTO_CHECK(write(tbfd, sp, size) == static_cast<ssize_t>(size));
+  PERFETTO_CHECK(write(tbfd, sp, size) == static_cast<ssize_t>(size));
+#endif
 }
 
 }  // namespace perfetto
@@ -72,15 +77,17 @@ int rec(int n) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2)
+  if (argc != 3)
     return 1;
+
+  int depth = atoi(argv[2]);
 
   // Warm stack cache.
   perfetto::GetStack();
   tbfd = open(argv[1], O_WRONLY);
   clock_t t = clock();
-  rec(1000);
+  rec(depth);
   t = clock() - t;
-  printf("It took me %ld clicks (%ld per s).\n", t, CLOCKS_PER_SEC);
+  printf("%s, %d, %ld\n", INSTANCE_NAME, depth, t);
   return 0;
 }
