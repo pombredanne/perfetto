@@ -3,7 +3,7 @@
   "exclude": [ "./node_modules/" ],
   "compilerOptions": {
     "target": "es6",
-    "module": "commonjs",
+    "module": "es6",
     "moduleResolution": "node",
     // Lints and checks.
     "allowJs": true,
