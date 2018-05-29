@@ -49,11 +49,21 @@ template("node_bin") {
     }
     script = "../gn/standalone/build_tool_wrapper.py"
     _node_cmd = invoker.node_cmd
-    args = [
-             "--path=$nodejs_bin",
-             "node",
-             rebase_path("node_modules/.bin/$_node_cmd", root_build_dir),
-           ] + invoker.args
+
+    args = []
+
+    if (defined(invoker.suppress_stdout) && invoker.suppress_stdout) {
+      args += [ "--suppress_stdout" ]
+    }
+    if (defined(invoker.suppress_stderr) && invoker.suppress_stderr) {
+      args += [ "--suppress_stderr" ]
+    }
+
+    args += [
+              "--path=$nodejs_bin",
+              "node",
+              rebase_path("node_modules/.bin/$_node_cmd", root_build_dir),
+            ] + invoker.args
   }
 }
 
@@ -67,16 +77,19 @@ node_bin("bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  node_cmd = "browserify"
+  node_cmd = "webpack"
   inputs = [
     "$ui_dist_dir/main.js",
   ]
   outputs = [
     "$ui_dist_dir/bundle.js",
   ]
+  suppress_stdout = true
   args = [
     rebase_path(inputs[0], root_build_dir),
     "-d",
+    "--mode",
+    "development",
     "-o",
     rebase_path(outputs[0], root_build_dir),
   ]
@@ -215,7 +228,7 @@ action("check_node_exists") {
 }
 
 # Creates a symlink from out/xxx/ui/node_modules -> ../../../ui/node_modules.
-# This allows to run browserify and other node tools from the out/xxx directory.
+# This allows to run webpack and other node tools from the out/xxx directory.
 action("node_modules_symlink") {
   deps = [
     ":check_node_exists",

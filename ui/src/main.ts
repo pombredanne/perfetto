@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import {html, render} from 'lit-html';
+
 console.log('Hello world!');
 
 function writeToUIConsole(line:string) {
@@ -32,3 +34,9 @@ function writeToUIConsole(line:string) {
     print: writeToUIConsole,
     printErr: writeToUIConsole,
 };
+
+const myTemplate = (msg: string) => html`<p>${msg}</p>`;
+const container = document.getElementById('app-container');
+if (container) {
+  render(myTemplate('Hello world from lit-html!'), container);
+}
