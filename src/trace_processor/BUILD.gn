@@ -28,6 +28,26 @@ wasm_lib("trace_processor") {
   ]
 }
 
+source_set("trace_loader") {
+  sources = [
+    "trace_loader.cc",
+    "trace_loader.h",
+  ]
+  deps = [
+    ":blob_reader",
+    "../../gn:default_deps",
+  ]
+}
+
+source_set("blob_reader") {
+  sources = [
+    "blob_reader.h",
+  ]
+  deps = [
+    "../../gn:default_deps",
+  ]
+}
+
 source_set("columnar_trace") {
   sources = [
     "columnar_trace.cc",
@@ -42,10 +62,12 @@ source_set("unittests") {
   testonly = true
   deps = [
     ":columnar_trace",
+    ":trace_loader",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
   sources = [
     "columnar_trace_unittest.cc",
+    "trace_loader_unittest.cc",
   ]
 }
