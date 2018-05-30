@@ -16,6 +16,8 @@
 
 #include "src/trace_processor/trace_loader.h"
 
+#include "perfetto/base/utils.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -33,6 +35,7 @@ void TraceLoader::LoadNextChunk() {
     return;
 
   // TODO(lalitm): actually parse the data read here.
+  base::ignore_result(trace_);
 
   offset_ += read;
 }
