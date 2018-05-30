@@ -1,6 +1,6 @@
 {
   "include": [ "src/" ],
-  "exclude": [ "./node_modules/" ],
+  "exclude": [ ],
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",

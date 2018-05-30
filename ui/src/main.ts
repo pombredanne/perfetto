@@ -16,6 +16,8 @@
 
 console.log('Hello world!');
 
+import {html, render} from 'lit-html/src/lit-html';
+
 function writeToUIConsole(line:string) {
   const lineElement = document.createElement('div');
   lineElement.innerText = line;
@@ -32,3 +34,11 @@ function writeToUIConsole(line:string) {
     print: writeToUIConsole,
     printErr: writeToUIConsole,
 };
+
+const myTemplate = (msg: string) => html`<p>${msg}</p>`;
+const container = document.getElementById('app-container');
+if (container) {
+  render(myTemplate('Hello world from lit-html!'), container);
+}
+
+
