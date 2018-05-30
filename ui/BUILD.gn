@@ -220,9 +220,9 @@ action("node_modules_symlink") {
   deps = [
     ":check_node_exists",
   ]
-  inputs = [
-    "node_modules",
-  ]
+
+  # On Linux npm touches node_modules/. We don't want this to cause a rebuild.
+  fake_inputs = [ "node_modules" ]
   outputs = [
     "$ui_dist_dir/node_modules",
   ]
@@ -230,7 +230,7 @@ action("node_modules_symlink") {
   args = [
     "/bin/ln",
     "-fns",
-    rebase_path(inputs[0], ui_dist_dir),
+    rebase_path(fake_inputs[0], ui_dist_dir),
     rebase_path(outputs[0], root_build_dir),
   ]
 }
