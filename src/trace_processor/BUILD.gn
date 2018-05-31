@@ -28,10 +28,10 @@ wasm_lib("trace_processor") {
   ]
 }
 
-source_set("columnar_trace") {
+source_set("lib") {
   sources = [
-    "columnar_trace.cc",
-    "columnar_trace.h",
+    "trace_storage.cc",
+    "trace_storage.h",
   ]
   deps = [
     "../../gn:default_deps",
@@ -41,11 +41,11 @@ source_set("columnar_trace") {
 source_set("unittests") {
   testonly = true
   deps = [
-    ":columnar_trace",
+    ":lib",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
   ]
   sources = [
-    "columnar_trace_unittest.cc",
+    "trace_storage_unittest.cc",
   ]
 }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/columnar_trace.h"
+#include "src/trace_processor/trace_storage.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -27,8 +27,8 @@ using ::testing::_;
 using ::testing::InSequence;
 using ::testing::Invoke;
 
-TEST(ColumnarTrace, AddSliceForCpu) {
-  ColumnarTrace trace;
+TEST(TraceStorage, AddSliceForCpu) {
+  TraceStorage trace;
   trace.AddSliceForCpu(2, 1000, 42, "test");
   ASSERT_EQ(trace.start_timestamps_for_cpu(2)[0], 1000);
 }
