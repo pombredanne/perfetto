@@ -54,6 +54,7 @@ source_set("unittests") {
   testonly = true
   deps = [
     ":protozero",
+    ":test_support",
     ":testing_messages_lite",
     ":testing_messages_zero",
     "../../gn:default_deps",

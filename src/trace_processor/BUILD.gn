@@ -38,6 +38,7 @@ source_set("lib") {
   ]
   deps = [
     "../../gn:default_deps",
+    "../base",
   ]
 }
 
