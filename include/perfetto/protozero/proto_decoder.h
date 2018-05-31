@@ -17,12 +17,10 @@
 #ifndef INCLUDE_PERFETTO_PROTOZERO_PROTO_DECODER_H_
 #define INCLUDE_PERFETTO_PROTOZERO_PROTO_DECODER_H_
 
-#include <cstdint>
+#include <stdint.h>
 #include <memory>
 
 #include "perfetto/protozero/proto_utils.h"
-#include "src/trace_processor/blob_reader.h"
-#include "src/trace_processor/columnar_trace.h"
 
 namespace protozero {
 
@@ -35,7 +33,7 @@ class ProtoDecoder {
   // because the full tag was unable to be read etc.).
   struct Field {
     struct LengthDelimited {
-      const uint8_t* buffer;
+      const uint8_t* data;
       uint64_t length;
     };
 
@@ -54,14 +52,14 @@ class ProtoDecoder {
   // the returned struct will have id 0 which is an invalid field id.
   Field ReadField();
 
-  // Returns true if |length_| == |offset_| and false otherwise.
+  // Returns true if |length_| == |current_position_| - |buffer| and false
+  // otherwise.
   bool IsEndOfBuffer();
 
  private:
   const uint8_t* const buffer_;
   const uint64_t length_;
-
-  uint64_t offset_ = 0;
+  const uint8_t* current_position_ = nullptr;
 };
 
 }  // namespace protozero

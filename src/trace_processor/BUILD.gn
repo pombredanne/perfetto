@@ -33,6 +33,8 @@ source_set("lib") {
     "blob_reader.h",
     "trace_parser.cc",
     "trace_parser.h",
+    "trace_storage.cc",
+    "trace_storage.h",
   ]
   deps = [
     "../../gn:default_deps",

@@ -16,7 +16,9 @@
 
 #include "perfetto/protozero/proto_decoder.h"
 
-#include <cstring>
+#include <string.h>
+
+#include "perfetto/base/logging.h"
 
 namespace protozero {
 
@@ -30,7 +32,7 @@ using namespace proto_utils;
 #endif
 
 ProtoDecoder::ProtoDecoder(const uint8_t* buffer, uint64_t length)
-    : buffer_(buffer), length_(length) {}
+    : buffer_(buffer), length_(length), current_position_(buffer) {}
 
 ProtoDecoder::Field ProtoDecoder::ReadField() {
   Field field{};
@@ -43,9 +45,11 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   const uint64_t kFieldTypeMask = (1 << kFieldTypeNumBits) - 1;  // 0000 0111;
 
   const uint8_t* end = buffer_ + length_;
-  const uint8_t* pos = buffer_ + offset_;
+  const uint8_t* pos = current_position_;
+  PERFETTO_DCHECK(pos >= buffer_);
+  PERFETTO_DCHECK(pos <= end);
 
-  uint64_t raw_field_id;
+  uint64_t raw_field_id = 0;
   pos = ParseVarInt(pos, end, &raw_field_id);
 
   field.id = static_cast<uint32_t>(raw_field_id >> kFieldTypeNumBits);
@@ -55,7 +59,7 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   }
   field.type = static_cast<FieldType>(raw_field_id & kFieldTypeMask);
 
-  uint64_t field_intvalue;
+  uint64_t field_intvalue = 0;
   switch (field.type) {
     case kFieldTypeFixed64: {
       if (pos + sizeof(uint64_t) > end) {
@@ -84,38 +88,52 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       if (*pos == 0) {
         pos++;
         field.int_value = 0;
-        break;
-      }
-      pos = ParseVarInt(pos, end, &field.int_value);
-      if (field.int_value == 0) {
-        field.id = 0;
-        return field;
+      } else {
+        pos = ParseVarInt(pos, end, &field.int_value);
+
+        // The parsed value equalling zero means ParseVarInt could not fully
+        // parse the number. This is because we are out of space in the buffer.
+        // Set the id to zero and return but don't update the offset so a future
+        // read can read this field.
+        if (field.int_value == 0) {
+          field.id = 0;
+          return field;
+        }
       }
       break;
     }
     case kFieldTypeLengthDelimited: {
+      // We need to explicity check for zero to ensure that ParseVarInt doesn't
+      // return zero because of running out of space in the buffer.
       if (*pos == 0) {
-        field.length_value.buffer = ++pos;
+        field.length_value.data = ++pos;
         field.length_value.length = 0;
-        break;
+      } else {
+        pos = ParseVarInt(pos, end, &field_intvalue);
+
+        // The parsed value equalling zero means ParseVarInt could not fully
+        // parse the number. This is because we are out of space in the buffer.
+        // Alternatively, we may not have space to fully read the length
+        // delimited field. Set the id to zero and return but don't update the
+        // offset so a future read can read this field.
+        if (field_intvalue == 0 || pos + field_intvalue > end) {
+          field.id = 0;
+          return field;
+        }
+        field.length_value.data = pos;
+        field.length_value.length = field_intvalue;
+        pos += field_intvalue;
       }
-      pos = ParseVarInt(pos, end, &field_intvalue);
-      if (field_intvalue == 0 || pos + field_intvalue > end) {
-        field.id = 0;
-        return field;
-      }
-      field.length_value.buffer = pos;
-      field.length_value.length = field_intvalue;
-      pos += field_intvalue;
       break;
     }
   }
-  offset_ = static_cast<uint64_t>(pos - buffer_);
+  current_position_ = pos;
   return field;
 }
 
 bool ProtoDecoder::IsEndOfBuffer() {
-  return length_ == offset_;
+  PERFETTO_DCHECK(current_position_ >= buffer_);
+  return length_ == static_cast<uint64_t>(current_position_ - buffer_);
 }
 
 }  // namespace protozero

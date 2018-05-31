@@ -51,7 +51,7 @@ TEST(ProtoDecoder, ReadString) {
   ASSERT_EQ(field.type, proto_utils::FieldType::kFieldTypeLengthDelimited);
   ASSERT_EQ(field.length_value.length, sizeof(kTestString) - 1);
   for (size_t i = 0; i < sizeof(kTestString) - 1; i++) {
-    ASSERT_EQ(field.length_value.buffer[i], kTestString[i]);
+    ASSERT_EQ(field.length_value.data[i], kTestString[i]);
   }
 }
 
