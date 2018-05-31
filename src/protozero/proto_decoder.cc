@@ -47,9 +47,10 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   const uint8_t* end = buffer_ + length_;
   const uint8_t* pos = current_position_;
   PERFETTO_DCHECK(pos >= buffer_);
+  PERFETTO_DCHECK(pos <= end);
 
   // If we've already hit the end, just return an invalid field.
-  if (pos >= end) {
+  if (pos == end) {
     field.id = 0;
     return field;
   }
