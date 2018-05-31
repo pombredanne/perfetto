@@ -14,34 +14,38 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_TRACE_LOADER_H_
-#define SRC_TRACE_PROCESSOR_TRACE_LOADER_H_
+#ifndef SRC_TRACE_PROCESSOR_TRACE_PARSER_H_
+#define SRC_TRACE_PROCESSOR_TRACE_PARSER_H_
 
-#include <cstdint>
+#include <stdint.h>
 #include <memory>
 
 #include "src/trace_processor/blob_reader.h"
-#include "src/trace_processor/columnar_trace.h"
+#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class TraceLoader {
+// Reads a trace in chunks from an abstract data source and parses it into a
+// form which is efficient to query.
+class TraceParser {
  public:
-  TraceLoader(BlobReader* reader, ColumnarTrace* trace, uint32_t chunk_size_b);
+  // |reader| is the abstract method of getting chunks of size |chunk_size_b|
+  // from a trace file with these chunks parsed into |trace|.
+  TraceParser(BlobReader* reader, TraceStorage* trace, uint32_t chunk_size_b);
 
   void LoadNextChunk();
 
  private:
   BlobReader* const reader_;
-  ColumnarTrace* const trace_;
+  TraceStorage* const trace_;
   const uint32_t chunk_size_b_;
 
-  uint32_t offset_ = 0;
+  uint64_t offset_ = 0;
   std::unique_ptr<uint8_t[]> buffer_;
 };
 
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_TRACE_LOADER_H_
+#endif  // SRC_TRACE_PROCESSOR_TRACE_PARSER_H_
