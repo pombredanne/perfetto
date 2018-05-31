@@ -14,8 +14,8 @@
     "protobufjs": "^6.8.6"
   },
   "devDependencies": {
+    "rollup": "^0.59.4",
     "@types/jest": "^22.2.3",
-    "browserify": "^16.2.2",
     "jest": "^23.1.0",
     "lite-server": "^2.3.0",
     "typescript": "^2.8.4"
