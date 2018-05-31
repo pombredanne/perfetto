@@ -17,7 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_BLOB_READER_H_
 #define SRC_TRACE_PROCESSOR_BLOB_READER_H_
 
-#include <cstdint>
+#include <stdint.h>
 
 namespace perfetto {
 namespace trace_processor {
@@ -28,7 +28,7 @@ class BlobReader {
   virtual ~BlobReader();
 
   // Reads |len| bytes at |offset| into |dst|.
-  virtual uint32_t Read(uint32_t offset, uint32_t len, uint8_t* dst) = 0;
+  virtual uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) = 0;
 };
 
 }  // namespace trace_processor

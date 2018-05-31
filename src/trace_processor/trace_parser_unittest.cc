@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open foo Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,31 +14,31 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_loader.h"
+#include "src/trace_processor/trace_parser.h"
 
-#include "perfetto/base/utils.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace perfetto {
 namespace trace_processor {
+namespace {
 
-TraceLoader::TraceLoader(BlobReader* reader,
-                         ColumnarTrace* trace,
-                         uint32_t chunk_size_b)
-    : reader_(reader), trace_(trace), chunk_size_b_(chunk_size_b) {}
+using ::testing::_;
+using ::testing::InSequence;
+using ::testing::Invoke;
 
-void TraceLoader::LoadNextChunk() {
-  if (!buffer_)
-    buffer_.reset(new uint8_t[chunk_size_b_]);
-
-  uint32_t read = reader_->Read(offset_, chunk_size_b_, buffer_.get());
-  if (read == 0)
-    return;
-
-  // TODO(lalitm): actually parse the data read here.
-  base::ignore_result(trace_);
-
-  offset_ += read;
+TEST(TraceParser, LoadSinglePacket) {
+  // TODO(lalitm): write this test.
 }
 
+TEST(TraceParser, LoadMultiplePacket) {
+  // TODO(lalitm): write this test.
+}
+
+TEST(TraceParser, RepeatedLoadSinglePacket) {
+  // TODO(lalitm): write this test.
+}
+
+}  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto

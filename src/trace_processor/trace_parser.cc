@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open foo Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,31 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/columnar_trace.h"
+#include "src/trace_processor/trace_parser.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 namespace trace_processor {
-namespace {
 
-using ::testing::_;
-using ::testing::InSequence;
-using ::testing::Invoke;
+TraceParser::TraceParser(BlobReader* reader,
+                         TraceStorage* trace,
+                         uint32_t chunk_size_b)
+    : reader_(reader), trace_(trace), chunk_size_b_(chunk_size_b) {}
 
-TEST(ColumnarTrace, AddSliceForCpu) {
-  ColumnarTrace trace;
-  trace.AddSliceForCpu(2, 1000, 42, "test");
-  ASSERT_EQ(trace.start_timestamps_for_cpu(2)[0], 1000);
+void TraceParser::LoadNextChunk() {
+  if (!buffer_)
+    buffer_.reset(new uint8_t[chunk_size_b_]);
+
+  uint32_t read = reader_->Read(offset_, chunk_size_b_, buffer_.get());
+  if (read == 0)
+    return;
+
+  // TODO(lalitm): actually parse the data read here.
+  base::ignore_result(trace_);
+
+  offset_ += read;
 }
 
-}  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto

@@ -14,15 +14,20 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/columnar_trace.h"
+#include "src/trace_processor/trace_storage.h"
+
+#include <string.h>
 
 namespace perfetto {
 namespace trace_processor {
 
-void ColumnarTrace::AddSliceForCpu(uint32_t cpu,
-                                   uint64_t start_timestamp,
-                                   uint64_t duration,
-                                   const char* thread_name) {
+void TraceStorage::AddSliceForCpu(uint32_t cpu,
+                                  uint64_t start_timestamp,
+                                  uint64_t duration,
+                                  const char* thread_name) {
+  if (cpu_events_.size() <= cpu)
+    cpu_events_.resize(cpu + 1);
+
   SlicesPerCpu* slices = &cpu_events_[cpu];
   slices->cpu_ = cpu;
   slices->start_timestamps.emplace_back(start_timestamp);
@@ -32,10 +37,14 @@ void ColumnarTrace::AddSliceForCpu(uint32_t cpu,
   for (size_t i = 0; i < strlen(thread_name); ++i) {
     hash = static_cast<uint32_t>(thread_name[i]) + (hash * 31);
   }
-  if (string_pool_.find(hash) == string_pool_.end()) {
-    string_pool_.emplace(hash, std::string(thread_name));
+  auto id_it = string_pool_.find(hash);
+  if (id_it == string_pool_.end()) {
+    strings_.emplace_back(thread_name);
+    string_pool_.emplace(hash, strings_.size() - 1);
+    slices->thread_names.emplace_back(strings_.size() - 1);
+  } else {
+    slices->thread_names.emplace_back(id_it->second);
   }
-  slices->thread_names.emplace_back(hash);
 }
 
 }  // namespace trace_processor
