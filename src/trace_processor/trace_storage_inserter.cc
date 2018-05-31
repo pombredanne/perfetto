@@ -24,11 +24,14 @@ namespace trace_processor {
 TraceStorageInserter::TraceStorageInserter(TraceStorage* trace)
     : trace_(trace) {}
 
+TraceStorageInserter::~TraceStorageInserter() {}
+
 void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
                                              uint64_t timestamp,
                                              uint32_t prev_pid,
                                              uint32_t prev_state,
-                                             std::string prev_comm,
+                                             const char* prev_comm,
+                                             size_t prev_comm_len,
                                              uint32_t next_pid) {
   if (last_sched_per_cpu_.size() <= cpu)
     last_sched_per_cpu_.resize(cpu + 1);
@@ -42,7 +45,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
   // slice.
   if (prev.valid) {
     trace_->AddSliceForCpu(cpu, prev.timestamp, timestamp - prev.timestamp,
-                           std::move(prev.prev_comm));
+                           prev.prev_comm_id);
   }
 
   // Update the map with the current event.
@@ -50,7 +53,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
   event->timestamp = timestamp;
   event->prev_pid = prev_pid;
   event->prev_state = prev_state;
-  event->prev_comm = std::move(prev_comm);
+  event->prev_comm_id = trace_->InternString(prev_comm, prev_comm_len);
   event->next_pid = next_pid;
   event->valid = true;
 }

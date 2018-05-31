@@ -29,7 +29,7 @@ using ::testing::Invoke;
 
 TEST(TraceStorage, AddSliceForCpu) {
   TraceStorage trace;
-  trace.AddSliceForCpu(2, 1000, 42, "test");
+  trace.AddSliceForCpu(2, 1000, 42, trace.InternString("test", 4));
   ASSERT_EQ((*trace.start_timestamps_for_cpu(2))[0], 1000);
 }
 

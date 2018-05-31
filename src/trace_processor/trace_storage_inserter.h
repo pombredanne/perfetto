@@ -27,14 +27,17 @@ namespace trace_processor {
 class TraceStorageInserter {
  public:
   TraceStorageInserter(TraceStorage* trace);
+  virtual ~TraceStorageInserter();
 
   // Converts a sched switch into a sched slice and inserts into the storage.
-  void InsertSchedSwitch(uint32_t cpu,
-                         uint64_t timestamp,
-                         uint32_t prev_pid,
-                         uint32_t prev_state,
-                         std::string prev_comm,
-                         uint32_t next_pid);
+  // Virtual for testing.
+  virtual void InsertSchedSwitch(uint32_t cpu,
+                                 uint64_t timestamp,
+                                 uint32_t prev_pid,
+                                 uint32_t prev_state,
+                                 const char* prev_comm,
+                                 size_t prev_comm_len,
+                                 uint32_t next_pid);
 
  private:
   struct SchedSwitchEvent {
@@ -42,7 +45,7 @@ class TraceStorageInserter {
     uint64_t timestamp = 0;
     uint32_t prev_pid = 0;
     uint32_t prev_state = 0;
-    std::string prev_comm;
+    TraceStorage::StringId prev_comm_id;
     uint32_t next_pid = 0;
     bool valid = false;
   };

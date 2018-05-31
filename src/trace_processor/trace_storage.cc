@@ -24,7 +24,7 @@ namespace trace_processor {
 void TraceStorage::AddSliceForCpu(uint32_t cpu,
                                   uint64_t start_timestamp,
                                   uint64_t duration,
-                                  std::string thread_name) {
+                                  StringId thread_name_id) {
   if (cpu_events_.size() <= cpu)
     cpu_events_.resize(cpu + 1);
 
@@ -32,19 +32,22 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
   slices->cpu_ = cpu;
   slices->start_timestamps.emplace_back(start_timestamp);
   slices->durations.emplace_back(duration);
+  slices->thread_names.emplace_back(thread_name_id);
+}
 
+TraceStorage::StringId TraceStorage::InternString(const char* data,
+                                                  size_t length) {
   uint32_t hash = 0;
-  for (size_t i = 0; i < thread_name.size(); ++i) {
-    hash = static_cast<uint32_t>(thread_name[i]) + (hash * 31);
+  for (size_t i = 0; i < length; ++i) {
+    hash = static_cast<uint32_t>(data[i]) + (hash * 31);
   }
   auto id_it = string_pool_.find(hash);
-  if (id_it == string_pool_.end()) {
-    strings_.emplace_back(std::move(thread_name));
-    string_pool_.emplace(hash, strings_.size() - 1);
-    slices->thread_names.emplace_back(strings_.size() - 1);
-  } else {
-    slices->thread_names.emplace_back(id_it->second);
+  if (id_it != string_pool_.end()) {
+    return id_it->second;
   }
+  strings_.emplace_back(data, length);
+  string_pool_.emplace(hash, strings_.size() - 1);
+  return strings_.size() - 1;
 }
 
 }  // namespace trace_processor

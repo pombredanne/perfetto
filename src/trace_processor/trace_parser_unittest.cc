@@ -26,9 +26,8 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-using ::testing::_;
-using ::testing::InSequence;
-using ::testing::Invoke;
+using ::testing::Eq;
+using ::testing::Pointwise;
 
 class FakeStringBlobReader : public BlobReader {
  public:
@@ -46,6 +45,20 @@ class FakeStringBlobReader : public BlobReader {
   std::string data_;
 };
 
+class MockTraceStorageInserter : public TraceStorageInserter {
+ public:
+  MockTraceStorageInserter() : TraceStorageInserter(nullptr) {}
+
+  MOCK_METHOD7(InsertSchedSwitch,
+               void(uint32_t cpu,
+                    uint64_t timestamp,
+                    uint32_t prev_pid,
+                    uint32_t prev_state,
+                    const char* prev_comm,
+                    size_t prev_comm_len,
+                    uint32_t next_pid));
+};
+
 TEST(TraceParser, LoadSinglePacket) {
   protos::Trace trace;
 
@@ -55,13 +68,21 @@ TEST(TraceParser, LoadSinglePacket) {
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
 
+  static const char kProcName[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
-  sched_switch->set_next_prio(100);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName);
+  sched_switch->set_next_pid(100);
+
+  MockTraceStorageInserter inserter;
+  EXPECT_CALL(inserter,
+              InsertSchedSwitch(10, 1000, 10, 32, Pointwise(Eq(), kProcName),
+                                sizeof(kProcName) - 1, 100))
+      .Times(1);
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceStorage storage;
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 

@@ -30,11 +30,16 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
+  typedef size_t StringId;
+
   // Adds a sched slice for a given cpu.
   void AddSliceForCpu(uint32_t cpu,
                       uint64_t start_timestamp,
                       uint64_t duration,
-                      std::string thread_name);
+                      StringId thread_name_id);
+
+  // Return an unqiue identifier for the contents of each string.
+  StringId InternString(const char* data, size_t length);
 
   // Reading methods.
   std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
@@ -47,7 +52,6 @@ class TraceStorage {
 
  private:
   // Each StringId is an offset into |strings_|.
-  typedef size_t StringId;
   typedef uint32_t StringHash;
 
   struct SlicesPerCpu {
