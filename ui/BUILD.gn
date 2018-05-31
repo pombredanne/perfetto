@@ -25,9 +25,9 @@ nodejs_bin = rebase_path("$nodejs_root/bin", root_build_dir)
 # +----------------------------------------------------------------------------+
 group("ui") {
   deps = [
-    ":copy_main_bundle",
-    ":copy_wasm",
-    ":index",
+    ":index_release",
+    ":main_bundle_release",
+    ":wasm_release",
   ]
 }
 
@@ -174,7 +174,7 @@ node_bin("transpile_all_ts") {
 # +----------------------------------------------------------------------------+
 # | Copy rules: create the final output directory.                             |
 # +----------------------------------------------------------------------------+
-copy("index") {
+copy("index_release") {
   sources = [
     "index.html",
   ]
@@ -183,7 +183,7 @@ copy("index") {
   ]
 }
 
-copy("copy_main_bundle") {
+copy("main_bundle_release") {
   deps = [
     ":main_bundle",
   ]
@@ -195,23 +195,7 @@ copy("copy_main_bundle") {
   ]
 }
 
-copy("copy_wasm") {
-  deps = [
-    ":wasm",
-  ]
-  sources = [
-    "$target_out_dir/wasm/trace_processor.js",
-    "$target_out_dir/wasm/trace_processor.wasm",
-  ]
-  outputs = [
-    "$ui_dir/wasm/{{source_file_part}}",
-  ]
-}
-
-# +----------------------------------------------------------------------------+
-# | Copy rules: copy assets into the dist directory.                           |
-# +----------------------------------------------------------------------------+
-copy("wasm") {
+copy("wasm_release") {
   deps = [
     "//src/trace_processor:trace_processor.js($wasm_toolchain)",
     "//src/trace_processor:trace_processor.wasm($wasm_toolchain)",
