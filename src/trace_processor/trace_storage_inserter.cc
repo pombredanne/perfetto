@@ -28,8 +28,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
                                              uint64_t timestamp,
                                              uint32_t prev_pid,
                                              uint32_t prev_state,
-                                             const char* prev_comm,
-                                             size_t prev_comm_length,
+                                             std::string prev_comm,
                                              uint32_t next_pid) {
   if (last_sched_per_cpu_.size() <= cpu)
     last_sched_per_cpu_.resize(cpu + 1);
@@ -51,7 +50,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
   event->timestamp = timestamp;
   event->prev_pid = prev_pid;
   event->prev_state = prev_state;
-  event->prev_comm = std::string(prev_comm, prev_comm_length);
+  event->prev_comm = std::move(prev_comm);
   event->next_pid = next_pid;
   event->valid = true;
 }

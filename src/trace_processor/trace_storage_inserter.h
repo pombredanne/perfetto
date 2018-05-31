@@ -33,8 +33,7 @@ class TraceStorageInserter {
                          uint64_t timestamp,
                          uint32_t prev_pid,
                          uint32_t prev_state,
-                         const char* prev_comm,
-                         size_t prev_comm_length,
+                         std::string prev_comm,
                          uint32_t next_pid);
 
  private:

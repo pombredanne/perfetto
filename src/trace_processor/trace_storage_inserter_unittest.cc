@@ -38,7 +38,7 @@ TEST(TraceStorageInserter, NoInteractionFirstSched) {
   static const char kTestString[] = "test";
   uint32_t next_pid = 4;
   inserter.InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
-                             sizeof(kTestString) - 1, next_pid);
+                             next_pid);
 
   ASSERT_EQ(storage.start_timestamps_for_cpu(cpu), nullptr);
 }
@@ -55,9 +55,9 @@ TEST(TraceStorageInserter, InsertSecondSched) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
   inserter.InsertSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
-                             sizeof(kCommProc1) - 1, pid_2);
+                             pid_2);
   inserter.InsertSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
-                             sizeof(kCommProc2) - 1, pid_1);
+                             pid_1);
 
   const auto& timestamps = *storage.start_timestamps_for_cpu(cpu);
   ASSERT_EQ(timestamps.size(), 1ul);
