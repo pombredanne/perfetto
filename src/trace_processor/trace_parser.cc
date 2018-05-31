@@ -157,6 +157,7 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
     }
   }
 
+  // TODO(lalitm): store these fields inside the TraceStorage class.
   perfetto::base::ignore_result(cpu);
   perfetto::base::ignore_result(timestamp);
   perfetto::base::ignore_result(trace_);
