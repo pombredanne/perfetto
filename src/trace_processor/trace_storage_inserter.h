@@ -33,7 +33,7 @@ class TraceStorageInserter {
                          uint64_t timestamp,
                          uint32_t prev_pid,
                          uint32_t prev_state,
-                         char* prev_comm,
+                         const char* prev_comm,
                          size_t prev_comm_length,
                          uint32_t next_pid);
 
@@ -48,7 +48,7 @@ class TraceStorageInserter {
     bool valid = false;
   };
 
-  std::vector<uint32_t, SchedSwitchEvent> last_sched_per_cpu_;
+  std::vector<SchedSwitchEvent> last_sched_per_cpu_;
   TraceStorage* const trace_;
 };
 

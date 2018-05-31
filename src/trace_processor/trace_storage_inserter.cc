@@ -28,7 +28,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
                                              uint64_t timestamp,
                                              uint32_t prev_pid,
                                              uint32_t prev_state,
-                                             char* prev_comm,
+                                             const char* prev_comm,
                                              size_t prev_comm_length,
                                              uint32_t next_pid) {
   if (last_sched_per_cpu_.size() <= cpu)
@@ -43,7 +43,7 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
   // slice.
   if (prev.valid) {
     trace_->AddSliceForCpu(cpu, prev.timestamp, timestamp - prev.timestamp,
-                           prev.prev_comm.c_str());
+                           std::move(prev.prev_comm));
   }
 
   // Update the map with the current event.

@@ -37,8 +37,12 @@ class TraceStorage {
                       std::string thread_name);
 
   // Reading methods.
-  const std::deque<uint64_t>& start_timestamps_for_cpu(uint32_t cpu) {
-    return cpu_events_[cpu].start_timestamps;
+  std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
+    if (cpu_events_.size() <= cpu ||
+        cpu_events_[cpu].cpu_ == std::numeric_limits<uint32_t>::max()) {
+      return nullptr;
+    }
+    return &cpu_events_[cpu].start_timestamps;
   }
 
  private:
@@ -47,7 +51,7 @@ class TraceStorage {
   typedef uint32_t StringHash;
 
   struct SlicesPerCpu {
-    uint32_t cpu_ = 0;
+    uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
 
     // Each vector below has the same number of entries (the number of slices
     // in the trace for the CPU).
