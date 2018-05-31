@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-import {html, render} from 'lit-html';
-
-console.log('Hello world!');
+console.log('Hello from the main thread!');
 
 function writeToUIConsole(line:string) {
   const lineElement = document.createElement('div');
@@ -35,11 +33,12 @@ function writeToUIConsole(line:string) {
     printErr: writeToUIConsole,
 };
 
-const myTemplate = (msg: string) => html`<p>${msg}</p>`;
-const container = document.getElementById('app-container');
-if (container) {
-  render(myTemplate('Hello world from lit-html!'), container);
+
+function main() {
+  const worker = new Worker("worker.js");
+  worker.onerror = e => {
+    console.error(e);
+  }
 }
 
-
-
+main();
