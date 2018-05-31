@@ -233,15 +233,18 @@ action("node_modules_symlink") {
     ":check_node_exists",
   ]
 
-  outputs = [
-    "$target_out_dir/node_modules",
-  ]
   script = "../gn/standalone/build_tool_wrapper.py"
+  stamp_file = "$target_out_dir/.$target_name.stamp"
   args = [
+    "--stamp",
+    rebase_path(stamp_file, root_build_dir),
     "/bin/ln",
     "-fns",
     rebase_path("node_modules", root_build_dir),
-    rebase_path(outputs[0], root_build_dir),
+    rebase_path("$target_out_dir/node_modules", root_build_dir),
+  ]
+  outputs = [
+    stamp_file,
   ]
 }
 
