@@ -76,8 +76,6 @@ node_bin("main_bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  suppress_stdout = true
-  suppress_stderr = true
   node_cmd = "rollup"
   inputs = [
     "$target_out_dir/main.js",
@@ -87,9 +85,12 @@ node_bin("main_bundle") {
   ]
   args = [
     rebase_path(inputs[0], root_build_dir),
-    "-d",
     "-o",
     rebase_path(outputs[0], root_build_dir),
+    "-f",
+    "iife",
+    "-m",
+    "--silent",
   ]
 }
 
@@ -97,7 +98,7 @@ node_bin("worker_bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  node_cmd = "browserify"
+  node_cmd = "rollup"
   inputs = [
     "$target_out_dir/worker.js",
   ]
@@ -106,11 +107,12 @@ node_bin("worker_bundle") {
   ]
   args = [
     rebase_path(inputs[0], root_build_dir),
-    "--o",
+    "-o",
     rebase_path(outputs[0], root_build_dir),
-    "--f",
+    "-f",
     "iife",
-    "--m",
+    "-m",
+    "--silent",
   ]
 }
 
