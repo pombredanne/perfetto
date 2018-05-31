@@ -51,7 +51,6 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
 
   // If we've already hit the end, just return an invalid field.
   if (pos == end) {
-    field.id = 0;
     return field;
   }
 
