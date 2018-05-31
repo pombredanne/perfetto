@@ -57,9 +57,8 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   uint64_t raw_field_id = 0;
   pos = ParseVarInt(pos, end, &raw_field_id);
 
-  field.id = static_cast<uint32_t>(raw_field_id >> kFieldTypeNumBits);
-  if (field.id == 0 || pos >= end) {
-    field.id = 0;
+  uint32_t field_id = static_cast<uint32_t>(raw_field_id >> kFieldTypeNumBits);
+  if (field_id == 0 || pos >= end) {
     return field;
   }
   field.type = static_cast<FieldType>(raw_field_id & kFieldTypeMask);
@@ -68,7 +67,6 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
   switch (field.type) {
     case kFieldTypeFixed64: {
       if (pos + sizeof(uint64_t) > end) {
-        field.id = 0;
         return field;
       }
       memcpy(&field_intvalue, pos, sizeof(uint64_t));
@@ -78,7 +76,6 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
     }
     case kFieldTypeFixed32: {
       if (pos + sizeof(uint32_t) > end) {
-        field.id = 0;
         return field;
       }
       uint32_t tmp;
@@ -101,7 +98,6 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
         // Set the id to zero and return but don't update the offset so a future
         // read can read this field.
         if (field.int_value == 0) {
-          field.id = 0;
           return field;
         }
       }
@@ -122,7 +118,6 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
         // delimited field. Set the id to zero and return but don't update the
         // offset so a future read can read this field.
         if (field_intvalue == 0 || pos + field_intvalue > end) {
-          field.id = 0;
           return field;
         }
         field.length_value.data = pos;
@@ -132,6 +127,9 @@ ProtoDecoder::Field ProtoDecoder::ReadField() {
       break;
     }
   }
+  // Set the field id to make the returned value valid and update the current
+  // position in the buffer.
+  field.id = field_id;
   current_position_ = pos;
   return field;
 }

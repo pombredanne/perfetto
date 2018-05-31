@@ -156,6 +156,11 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         break;
     }
   }
+
+  perfetto::base::ignore_result(cpu);
+  perfetto::base::ignore_result(timestamp);
+  perfetto::base::ignore_result(trace_);
+
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 

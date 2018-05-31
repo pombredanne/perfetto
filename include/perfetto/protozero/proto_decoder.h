@@ -37,7 +37,7 @@ class ProtoDecoder {
       uint64_t length;
     };
 
-    uint32_t id;
+    uint32_t id = 0;
     protozero::proto_utils::FieldType type;
     union {
       uint64_t int_value;
