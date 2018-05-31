@@ -35,7 +35,7 @@ function writeToUIConsole(line:string) {
 
 
 function main() {
-  const worker = new Worker("worker.js");
+  const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
   }
