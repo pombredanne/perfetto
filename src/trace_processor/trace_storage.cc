@@ -24,7 +24,7 @@ namespace trace_processor {
 void TraceStorage::AddSliceForCpu(uint32_t cpu,
                                   uint64_t start_timestamp,
                                   uint64_t duration,
-                                  const char* thread_name) {
+                                  std::string thread_name) {
   if (cpu_events_.size() <= cpu)
     cpu_events_.resize(cpu + 1);
 
@@ -34,12 +34,12 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
   slices->durations.emplace_back(duration);
 
   uint32_t hash = 0;
-  for (size_t i = 0; i < strlen(thread_name); ++i) {
+  for (size_t i = 0; i < thread_name.size(); ++i) {
     hash = static_cast<uint32_t>(thread_name[i]) + (hash * 31);
   }
   auto id_it = string_pool_.find(hash);
   if (id_it == string_pool_.end()) {
-    strings_.emplace_back(thread_name);
+    strings_.emplace_back(std::move(thread_name));
     string_pool_.emplace(hash, strings_.size() - 1);
     slices->thread_names.emplace_back(strings_.size() - 1);
   } else {

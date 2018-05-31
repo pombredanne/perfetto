@@ -34,7 +34,7 @@ class TraceStorage {
   void AddSliceForCpu(uint32_t cpu,
                       uint64_t start_timestamp,
                       uint64_t duration,
-                      const char* thread_name);
+                      std::string thread_name);
 
   // Reading methods.
   const std::deque<uint64_t>& start_timestamps_for_cpu(uint32_t cpu) {
