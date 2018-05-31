@@ -20,6 +20,7 @@ if [[ -n "$BASH_VERSION" && "${BASH_SOURCE:-$0}" == "$0" ]]; then
 fi
 
 readonly PROJECT_ROOT="$(cd -P ${BASH_SOURCE[0]%/*}/..; pwd)"
+readonly NODE_PATH="$PROJECT_ROOT/buildtools/nodejs/bin/node"
 
 case "$(uname -s | tr '[A-Z]' '[a-z]')" in
   darwin)
@@ -32,10 +33,24 @@ case "$(uname -s | tr '[A-Z]' '[a-z]')" in
     ;;
 esac
 
-BIN_PATH="$PROJECT_ROOT/buildtools/$OS/$CMD"
+case "$CMD" in
+  node)
+    ;&
+  npm)
+    BIN_PATH="$PROJECT_ROOT/buildtools/nodejs/bin/$CMD";;
+  *)
+    BIN_PATH="$PROJECT_ROOT/buildtools/$OS/$CMD";;
+esac
+
 if [ ! -x "$BIN_PATH" ]; then
   echo "Cannot find $BIN_PATH. Run tools/install-build-deps first."
   exit 1
 fi
 
-exec "$BIN_PATH" "$@"
+case "$CMD" in
+  npm)
+    exec "$NODE_PATH" "$BIN_PATH" "$@";;
+  *)
+    exec "$BIN_PATH" "$@";;
+esac
+
