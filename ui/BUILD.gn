@@ -79,11 +79,14 @@ node_bin("main_bundle") {
   node_cmd = "rollup"
   inputs = [
     "$target_out_dir/main.js",
+    "rollup.config.js",
   ]
   outputs = [
     "$target_out_dir/main_bundle.js",
   ]
   args = [
+    "-c",
+    rebase_path("rollup.config.js", root_build_dir),
     rebase_path(inputs[0], root_build_dir),
     "-o",
     rebase_path(outputs[0], root_build_dir),
@@ -101,11 +104,14 @@ node_bin("worker_bundle") {
   node_cmd = "rollup"
   inputs = [
     "$target_out_dir/worker.js",
+    "rollup.config.js",
   ]
   outputs = [
     "$target_out_dir/worker_bundle.js",
   ]
   args = [
+    "-c",
+    rebase_path("rollup.config.js", root_build_dir),
     rebase_path(inputs[0], root_build_dir),
     "-o",
     rebase_path(outputs[0], root_build_dir),

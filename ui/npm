@@ -13,5 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CMD="node"
-source "$(dirname "${BASH_SOURCE[0]}")/run-buildtools-binary.sh"
+readonly ROOT_DIR="$(dirname $(cd -P ${BASH_SOURCE[0]%/*}; pwd))"
+readonly NODE_DIR="$ROOT_DIR/buildtools/nodejs/bin"
+readonly WRAPPER="$ROOT_DIR/gn/standalone/build_tool_wrapper.py"
+
+exec python "$WRAPPER" --path $NODE_DIR npm "$@"
+
