@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_trace.h"
+#include "src/trace_processor/trace_storage.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
