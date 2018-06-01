@@ -150,7 +150,7 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
       case protos::SchedSwitchFtraceEvent::kNextCommFieldNumber:
         next_comm =
             std::string(reinterpret_cast<const char*>(fld.length_value.data),
-                        fld.length_value.length);
+                        static_cast<size_t>(fld.length_value.length));
         break;
       default:
         break;
