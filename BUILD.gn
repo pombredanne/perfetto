@@ -246,6 +246,7 @@ executable("profhd") {
   deps = [
     "gn:default_deps",
     "src/base",
+    "src/ipc",
   ]
   sources = [
     "profhd.cc",
@@ -272,6 +273,13 @@ template("fifoclient_template") {
 
 fifoclient_template("fifoclient_splice") {
   defines = [ "USE_SPLICE" ]
+}
+
+fifoclient_template("fifoclient_splice_pagealign") {
+  defines = [
+    "USE_SPLICE",
+    "PAGE_ALIGN",
+  ]
 }
 
 fifoclient_template("fifoclient_nosplice") {

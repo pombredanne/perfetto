@@ -15,6 +15,7 @@
  */
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -23,24 +24,63 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/unix_task_runner.h"
+#include "perfetto/base/weak_ptr.h"
+#include "src/ipc/unix_socket.h"
 
-int main(int argc, char** argv) {
+namespace perfetto {
+
+class PipeSender : public ipc::UnixSocket::EventListener {
+ public:
+  PipeSender(base::TaskRunner* task_runner)
+      : task_runner_(task_runner), weak_factory_(this) {}
+
+  void OnNewIncomingConnection(ipc::UnixSocket*,
+                               std::unique_ptr<ipc::UnixSocket>) override;
+
+ private:
+  base::TaskRunner* task_runner_;
+  base::WeakPtrFactory<PipeSender> weak_factory_;
+};
+
+void PipeSender::OnNewIncomingConnection(
+    ipc::UnixSocket*,
+    std::unique_ptr<ipc::UnixSocket> new_connection) {
+  PERFETTO_LOG("STUFF!");
+  int pipes[2];
+  PERFETTO_CHECK(pipe(pipes) != -1);
+  new_connection->Send("data", 4, pipes[1]);
+  int fd = pipes[0];
+  base::WeakPtr<PipeSender> weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->AddFileDescriptorWatch(fd, [fd, weak_this] {
+    if (!weak_this)
+      return;
+
+    char foo[4096];
+    long rd = PERFETTO_EINTR(read(fd, &foo, sizeof(foo)));
+    PERFETTO_CHECK(rd != -1);
+    printf("%lu\n", rd);
+    if (rd == 0)
+      weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
+  });
+}
+
+int ProfHDMain(int argc, char** argv);
+int ProfHDMain(int argc, char** argv) {
   if (argc != 2)
     return 1;
-  if (mkfifo(argv[1], 0666) == -1)
-    return 1;
-  while (true) {
-    int fd = open(argv[1], O_RDONLY);
-    long rd = -1;
-    std::string output;
-    do {
-      char foo[2048];
-      rd = PERFETTO_EINTR(read(fd, &foo, sizeof(foo)));
-      PERFETTO_CHECK(rd != -1);
-      std::string newdata;
-      newdata.assign(foo, static_cast<size_t>(rd));
-      output += newdata;
-    } while (rd != 0);
-    close(fd);
-  }
+
+  base::UnixTaskRunner task_runner;
+  PipeSender listener(&task_runner);
+
+  std::unique_ptr<ipc::UnixSocket> sock(
+      ipc::UnixSocket::Listen(argv[1], &listener, &task_runner));
+  task_runner.Run();
+  return 0;
+}
+
+}  // namespace perfetto
+
+int main(int argc, char** argv) {
+  return perfetto::ProfHDMain(argc, argv);
 }
