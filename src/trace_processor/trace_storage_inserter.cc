@@ -38,14 +38,11 @@ void TraceStorageInserter::InsertSchedSwitch(uint32_t cpu,
 
   SchedSwitchEvent* event = &last_sched_per_cpu_[cpu];
 
-  // We move this to prevent string copies from happening.
-  SchedSwitchEvent prev = std::move(*event);
-
   // If we had a valid previous event, then inform the storage about the
   // slice.
-  if (prev.valid) {
-    trace_->AddSliceForCpu(cpu, prev.timestamp, timestamp - prev.timestamp,
-                           prev.prev_comm_id);
+  if (event->valid) {
+    trace_->AddSliceForCpu(cpu, event->timestamp, timestamp - event->timestamp,
+                           event->prev_comm_id);
   }
 
   // Update the map with the current event.
