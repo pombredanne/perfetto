@@ -56,6 +56,9 @@ class ProtoDecoder {
   // otherwise.
   bool IsEndOfBuffer();
 
+  // Resets the current position to the start of the buffer.
+  void Reset();
+
  private:
   const uint8_t* const buffer_;
   const uint64_t length_;
