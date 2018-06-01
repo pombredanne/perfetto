@@ -30,31 +30,66 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
+  // Each StringId is an offset into |strings_|.
+  typedef size_t StringId;
+  // UniquePid is an offset into process_entries_.
+  typedef size_t UniquePid;
+
+  // Each time a process is seen in the trace.
+  struct ProcessEntry {
+    uint64_t time_start;
+    uint64_t time_end;
+    StringId process_name;
+  };
+
   // Adds a sched slice for a given cpu.
   void AddSliceForCpu(uint32_t cpu,
                       uint64_t start_timestamp,
                       uint64_t duration,
                       const char* thread_name);
 
+  // Adds a process entry for a given pid.
+  void AddProcessEntry(uint64_t pid,
+                       uint64_t time_start,
+                       const char* process_name);
+
+  // Finds the upids for a given pid. Returns a nullptr if none are found.
+  std::deque<UniquePid>* UpidsForPid(uint64_t pid);
+
   // Reading methods.
   const std::deque<uint64_t>& start_timestamps_for_cpu(uint32_t cpu) {
     return cpu_events_[cpu].start_timestamps;
   }
 
+  const ProcessEntry* process_for_upid(UniquePid upid) {
+    if (process_entries_.size() <= upid) {
+      return nullptr;
+    }
+    return &process_entries_[upid];
+  }
+
+  const std::string* string_for_string_id(StringId id) {
+    if (strings_.size() <= id) {
+      return nullptr;
+    }
+    return &strings_[id];
+  }
+
  private:
-  // Each StringId is an offset into |strings_|.
-  typedef size_t StringId;
   typedef uint32_t StringHash;
+  UniquePid current_upid_ = 0;
 
   struct SlicesPerCpu {
     uint32_t cpu_ = 0;
 
-    // Each vector below has the same number of entries (the number of slices
+    // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
     std::deque<uint64_t> start_timestamps;
     std::deque<uint64_t> durations;
     std::deque<StringId> thread_names;
   };
+
+  StringId InsertString(const char* string);
 
   // One entry for each CPU in the trace.
   std::vector<SlicesPerCpu> cpu_events_;
@@ -64,6 +99,13 @@ class TraceStorage {
 
   // One entry for each unique string in the trace.
   std::unordered_map<StringHash, StringId> string_pool_;
+
+  // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
+  // each time a process is seen in the trace.
+  std::unordered_map<uint64_t, std::deque<UniquePid>> pids_;
+
+  // One entry for each UniquePid.
+  std::deque<ProcessEntry> process_entries_;
 };
 
 }  // namespace trace_processor

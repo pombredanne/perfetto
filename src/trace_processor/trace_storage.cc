@@ -32,19 +32,56 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
   slices->cpu_ = cpu;
   slices->start_timestamps.emplace_back(start_timestamp);
   slices->durations.emplace_back(duration);
+  slices->thread_names.emplace_back(InsertString(thread_name));
+}
 
-  uint32_t hash = 0;
-  for (size_t i = 0; i < strlen(thread_name); ++i) {
-    hash = static_cast<uint32_t>(thread_name[i]) + (hash * 31);
+void TraceStorage::AddProcessEntry(uint64_t pid,
+                                   uint64_t time_start,
+                                   const char* process_name) {
+  // Store a new upid for that pid.
+  auto pids_it = pids_.find(pid);
+  if (pids_it == pids_.end()) {
+    std::deque<UniquePid> upids(1, current_upid_);
+    pids_.emplace(pid, upids);
+  } else {
+    // If pid has been seen before, set the end time of the previous entry
+    // to the start time of this entry.
+    UniquePid prev_upid = pids_it->second.back();
+    process_entries_[prev_upid].time_end = time_start;
+    pids_it->second.emplace_back(current_upid_);
   }
+  current_upid_++;
+
+  // Make a new process entry for that upid.
+  ProcessEntry new_process;
+  new_process.time_start = time_start;
+  new_process.process_name = InsertString(process_name);
+  process_entries_.emplace_back(new_process);
+}
+
+std::deque<TraceStorage::UniquePid>* TraceStorage::UpidsForPid(uint64_t pid) {
+  auto pid_it = pids_.find(pid);
+  if (pid_it != pids_.end()) {
+    return &pid_it->second;
+  }
+  return nullptr;
+}
+
+TraceStorage::StringId TraceStorage::InsertString(const char* string) {
+  uint32_t hash = 0;
+  for (size_t i = 0; i < strlen(string); ++i) {
+    hash = static_cast<uint32_t>(string[i]) + (hash * 31);
+  }
+  TraceStorage::StringId id;
   auto id_it = string_pool_.find(hash);
   if (id_it == string_pool_.end()) {
-    strings_.emplace_back(thread_name);
+    strings_.emplace_back(string);
     string_pool_.emplace(hash, strings_.size() - 1);
-    slices->thread_names.emplace_back(strings_.size() - 1);
+    id = strings_.size() - 1;
   } else {
-    slices->thread_names.emplace_back(id_it->second);
+    id = id_it->second;
   }
+  return id;
 }
 
 }  // namespace trace_processor
