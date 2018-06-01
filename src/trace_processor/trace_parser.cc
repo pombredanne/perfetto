@@ -43,9 +43,9 @@ uint64_t FindIntField(ProtoDecoder* decoder, uint32_t field_id) {
 }  // namespace
 
 TraceParser::TraceParser(BlobReader* reader,
-                         TraceStorage* trace,
+                         TraceStorageInserter* inserter,
                          uint32_t chunk_size_b)
-    : reader_(reader), trace_(trace), chunk_size_b_(chunk_size_b) {}
+    : reader_(reader), inserter_(inserter), chunk_size_b_(chunk_size_b) {}
 
 void TraceParser::ParseNextChunk() {
   if (!buffer_)
@@ -137,33 +137,31 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
   ProtoDecoder decoder(data, length);
 
   uint32_t prev_pid = 0;
+  uint32_t prev_state = 0;
+  const char* prev_comm = nullptr;
+  uint64_t prev_comm_len = 0;
   uint32_t next_pid = 0;
-  std::string next_comm;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::SchedSwitchFtraceEvent::kPrevPidFieldNumber:
         prev_pid = static_cast<uint32_t>(fld.int_value);
         break;
+      case protos::SchedSwitchFtraceEvent::kPrevStateFieldNumber:
+        prev_state = static_cast<uint32_t>(fld.int_value);
+        break;
+      case protos::SchedSwitchFtraceEvent::kPrevCommFieldNumber:
+        prev_comm = reinterpret_cast<const char*>(fld.length_value.data);
+        prev_comm_len = fld.length_value.length;
+        break;
       case protos::SchedSwitchFtraceEvent::kNextPidFieldNumber:
         next_pid = static_cast<uint32_t>(fld.int_value);
-        break;
-      case protos::SchedSwitchFtraceEvent::kNextCommFieldNumber:
-        next_comm =
-            std::string(reinterpret_cast<const char*>(fld.length_value.data),
-                        static_cast<size_t>(fld.length_value.length));
         break;
       default:
         break;
     }
   }
-
-  // TODO(lalitm): store these fields inside the TraceStorage class.
-  perfetto::base::ignore_result(cpu);
-  perfetto::base::ignore_result(timestamp);
-  perfetto::base::ignore_result(trace_);
-  perfetto::base::ignore_result(prev_pid);
-  perfetto::base::ignore_result(next_pid);
-  perfetto::base::ignore_result(next_comm);
+  inserter_->InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
+                               prev_comm_len, next_pid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
