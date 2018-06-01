@@ -36,7 +36,7 @@ class TraceStorageInserter {
                                  uint32_t prev_pid,
                                  uint32_t prev_state,
                                  const char* prev_comm,
-                                 size_t prev_comm_len,
+                                 uint64_t prev_comm_len,
                                  uint32_t next_pid);
 
  private:

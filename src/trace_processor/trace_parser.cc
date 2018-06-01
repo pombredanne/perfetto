@@ -139,7 +139,7 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
   uint32_t prev_pid = 0;
   uint32_t prev_state = 0;
   const char* prev_comm = nullptr;
-  size_t prev_comm_len = 0;
+  uint64_t prev_comm_len = 0;
   uint32_t next_pid = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
