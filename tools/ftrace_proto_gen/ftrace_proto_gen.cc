@@ -23,6 +23,7 @@
 #include <fstream>
 #include <regex>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
@@ -48,16 +49,28 @@ std::string RunClangFmt(const std::string& input) {
   pid_t pid;
   int input_pipes[2];
   int output_pipes[2];
-  PERFETTO_CHECK(pipe2(input_pipes, O_NONBLOCK) != -1);
-  PERFETTO_CHECK(pipe2(output_pipes, O_NONBLOCK) != -1);
+  PERFETTO_CHECK(pipe(input_pipes) == 0);
+  PERFETTO_CHECK(pipe(output_pipes) == 0);
+  for (int i = 0; i < 2; i++) {
+    PERFETTO_CHECK(fcntl(input_pipes[i], F_SETFL, O_NONBLOCK) == 0);
+    PERFETTO_CHECK(fcntl(output_pipes[i], F_SETFL, O_NONBLOCK) == 0);
+  }
+
   if ((pid = fork()) == 0) {
     // Child
     PERFETTO_CHECK(dup2(input_pipes[0], STDIN_FILENO) != -1);
     PERFETTO_CHECK(dup2(output_pipes[1], STDOUT_FILENO) != -1);
     close(input_pipes[1]);
     close(output_pipes[0]);
-    PERFETTO_CHECK(execl("buildtools/linux64/clang-format", "clang-format",
-                         nullptr) != -1);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX)
+    static const char kClangFormat[] = "buildtools/linux64/clang-format";
+#elif PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+    static const char kClangFormat[] = "buildtools/mac/clang-format";
+#else
+    static const char kClangFormat[] = "/platform-not-supported";
+#endif
+    execl(kClangFormat, "clang-format", nullptr);
+    PERFETTO_CHECK(false);  // execl() doesn't return when it succeeds.
   }
   PERFETTO_CHECK(pid > 0);
   // Parent
