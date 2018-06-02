@@ -216,7 +216,7 @@ UI_DEPS = [
   ),
   ('buildtools/emsdk/llvm.tgz',
    'https://storage.googleapis.com/perfetto/emscripten-llvm-e1.37.40-static-linux.tar.gz',
-   '7a99e105bba7bb9d00ea6afa9ebe4442cbb515c0',
+   '163b918ed54390a3e3ffb367442d20c94772aa86',
    'linux2'
   ),
 ]
