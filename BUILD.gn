@@ -113,7 +113,7 @@ if (!build_with_chromium) {
     testonly = true
     deps = [
       "gn:default_deps",
-      "src/traced/probes/ftrace:ftrace_reader_benchmarks",
+      "src/traced/probes/ftrace:benchmarks",
       "src/tracing:tracing_benchmarks",
       "test:benchmark_main",
       "test:end_to_end_benchmarks",
@@ -125,7 +125,7 @@ if (!build_with_chromium) {
     deps = [
       "gn:default_deps",
       "gn:gtest_main",
-      "src/traced/probes/ftrace:ftrace_reader_integrationtests",
+      "src/traced/probes/ftrace:integrationtests",
       "test:end_to_end_integrationtests",
     ]
     if (build_with_android) {

@@ -3380,9 +3380,9 @@ genrule {
   ],
 }
 
-// GN target: //src/traced/probes/ftrace:ftrace_reader_test_messages_lite_gen
+// GN target: //src/traced/probes/ftrace:test_messages_lite_gen
 genrule {
-  name: "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_lite_gen",
+  name: "perfetto_src_traced_probes_ftrace_test_messages_lite_gen",
   srcs: [
     "src/traced/probes/ftrace/test/test_messages.proto",
   ],
@@ -3395,9 +3395,9 @@ genrule {
   ],
 }
 
-// GN target: //src/traced/probes/ftrace:ftrace_reader_test_messages_lite_gen
+// GN target: //src/traced/probes/ftrace:test_messages_lite_gen
 genrule {
-  name: "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_lite_gen_headers",
+  name: "perfetto_src_traced_probes_ftrace_test_messages_lite_gen_headers",
   srcs: [
     "src/traced/probes/ftrace/test/test_messages.proto",
   ],
@@ -3413,9 +3413,9 @@ genrule {
   ],
 }
 
-// GN target: //src/traced/probes/ftrace:ftrace_reader_test_messages_zero_gen
+// GN target: //src/traced/probes/ftrace:test_messages_zero_gen
 genrule {
-  name: "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_zero_gen",
+  name: "perfetto_src_traced_probes_ftrace_test_messages_zero_gen",
   srcs: [
     "src/traced/probes/ftrace/test/test_messages.proto",
   ],
@@ -3429,9 +3429,9 @@ genrule {
   ],
 }
 
-// GN target: //src/traced/probes/ftrace:ftrace_reader_test_messages_zero_gen
+// GN target: //src/traced/probes/ftrace:test_messages_zero_gen
 genrule {
-  name: "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_zero_gen_headers",
+  name: "perfetto_src_traced_probes_ftrace_test_messages_zero_gen_headers",
   srcs: [
     "src/traced/probes/ftrace/test/test_messages.proto",
   ],
@@ -3635,8 +3635,8 @@ cc_test {
     ":perfetto_src_perfetto_cmd_protos_gen",
     ":perfetto_src_protozero_testing_messages_lite_gen",
     ":perfetto_src_protozero_testing_messages_zero_gen",
-    ":perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_lite_gen",
-    ":perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_zero_gen",
+    ":perfetto_src_traced_probes_ftrace_test_messages_lite_gen",
+    ":perfetto_src_traced_probes_ftrace_test_messages_zero_gen",
     "src/base/android_task_runner.cc",
     "src/base/file_utils.cc",
     "src/base/metatrace.cc",
@@ -3807,8 +3807,8 @@ cc_test {
     "perfetto_src_perfetto_cmd_protos_gen_headers",
     "perfetto_src_protozero_testing_messages_lite_gen_headers",
     "perfetto_src_protozero_testing_messages_zero_gen_headers",
-    "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_lite_gen_headers",
-    "perfetto_src_traced_probes_ftrace_ftrace_reader_test_messages_zero_gen_headers",
+    "perfetto_src_traced_probes_ftrace_test_messages_lite_gen_headers",
+    "perfetto_src_traced_probes_ftrace_test_messages_zero_gen_headers",
   ],
   defaults: [
     "perfetto_defaults",
