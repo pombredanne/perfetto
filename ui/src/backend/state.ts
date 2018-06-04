@@ -14,7 +14,23 @@
  * limitations under the License.
  */
 
-import { main } from './backend';
+interface State {
+  counter: number;
+  checked: boolean;
+  fragment: string;
+}
 
-main();
+
+function createZeroState(): State {
+  return {
+    counter: 0,
+    checked: false,
+    fragment: "/control",
+  };
+}
+
+export {
+  createZeroState,
+  State,
+};
 

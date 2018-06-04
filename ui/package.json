@@ -12,9 +12,12 @@
   "license": "Apache-2.0",
   "dependencies": {
     "protobufjs": "^6.8.6",
-    "sorcery": "^0.10.0"
+    "@types/mithril": "^1.1.12",
+    "mithril": "^1.1.6",
+    "protobufjs": "^6.8.6"
   },
   "devDependencies": {
+    "sorcery": "^0.10.0",
     "@types/jest": "^22.2.3",
     "jest": "^23.1.0",
     "lite-server": "^2.3.0",

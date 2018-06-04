@@ -26,6 +26,7 @@ nodejs_bin = rebase_path("$nodejs_root/bin", root_build_dir)
 group("ui") {
   deps = [
     ":index_release",
+    ":logo_release",
     ":main_bundle_release",
     ":wasm_release",
     ":worker_bundle_release",
@@ -132,6 +133,7 @@ node_bin("protos_to_js") {
   foreach(proto, trace_processor_protos) {
     inputs += [ "../protos/perfetto/trace_processor/$proto.proto" ]
   }
+  inputs += [ "../protos/perfetto/config/perfetto_config.proto" ]
   outputs = [
     "$proto_gen_dir/protos.js",
   ]
@@ -222,6 +224,15 @@ copy("index_release") {
   ]
   outputs = [
     "$ui_dir/index.html",
+  ]
+}
+
+copy("logo_release") {
+  sources = [
+    "logo.png",
+  ]
+  outputs = [
+    "$ui_dir/logo.png",
   ]
 }
 
