@@ -31,6 +31,8 @@ wasm_lib("trace_processor") {
 source_set("lib") {
   sources = [
     "blob_reader.h",
+    "sched_slice_table.cc",
+    "sched_slice_table.h",
     "trace_parser.cc",
     "trace_parser.h",
     "trace_storage.cc",
