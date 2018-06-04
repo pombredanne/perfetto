@@ -101,6 +101,8 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
                                     const char* /* idxStr */,
                                     int argc,
                                     sqlite3_value** argv) {
+  Reset();
+
   const auto& constraints =
       table_->indexed_constraints_[static_cast<size_t>(idxNum)];
   PERFETTO_CHECK(constraints.size() == static_cast<size_t>(argc));
@@ -111,6 +113,8 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
       constraint_implemented = timestamp_constraints_.Setup(cs, argv[i]);
     } else if (cs.iColumn == Column::kCpu) {
       constraint_implemented = cpu_constraints_.Setup(cs, argv[i]);
+    } else if (cs.iColumn == Column::kDuration) {
+      constraint_implemented = duration_constraints_.Setup(cs, argv[i]);
     }
 
     if (!constraint_implemented) {
@@ -120,18 +124,67 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
     }
   }
 
-  // TODO: setup the cursor to use the next item.
-  perfetto::base::ignore_result(storage_);
+  // First setup CPU filtering because the trace storage is indexed by CPU.
+  for (uint32_t cpu = 0; cpu < storage_->cpus(); cpu++) {
+    if (!cpu_constraints_.Matches(cpu))
+      continue;
+
+    const auto* slices = storage_->SlicesForCpu(cpu);
+    if (!slices)
+      continue;
+
+    PerCpuState state;
+    state.cpu = cpu;
+
+    // Start by setting index out of bounds if filtering below doesn't
+    // yield any results.
+    state.index = slices->slice_count();
+
+    // Filter on other constraints now.
+    for (size_t i = 0; i < slices->slice_count(); i++) {
+      if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
+          duration_constraints_.Matches(slices->durations()[i])) {
+        state.index = i;
+        break;
+      }
+    }
+
+    per_cpu_state_.emplace_back(std::move(state));
+  }
 
   table_->indexed_constraints_.clear();
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Next() {
+  for (uint32_t i = 0; i < per_cpu_state_.size(); i++) {
+    const auto& state = per_cpu_state_[i];
+    const auto* slices = storage_->SlicesForCpu(state.cpu);
+
+    // Store the position we should start filtering from before setting
+    // the index out of bounds in case the loop doesn't match anything.
+    size_t start_index = state.index + 1;
+    state.index = slices->slice_count();
+
+    for (size_t i = start_index; i < slices->slice_count(); i++) {
+      if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
+          duration_constraints_.Matches(slices->durations()[i])) {
+        state.index = i;
+        break;
+      }
+    }
+  }
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Eof() {
+  for (uint32_t i = 0; i < per_cpu_state_.size(); i++) {
+    const auto& state = per_cpu_state_[i];
+    const auto* slices = storage_->SlicesForCpu(state.cpu);
+    if (state.index < slices->slice_count()) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -142,6 +195,13 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* /* context */,
 
 int SchedSliceTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
   return SQLITE_ERROR;
+}
+
+void SchedSliceTable::Cursor::Reset() {
+  per_cpu_state_.clear();
+  timestamp_constraints_ = {};
+  cpu_constraints_ = {};
+  duration_constraints_ = {};
 }
 
 template <typename T>
@@ -169,6 +229,16 @@ bool SchedSliceTable::Cursor::NumericConstraints<T>::Setup(
     constraint_implemented = false;
   }
   return constraint_implemented;
+}
+
+template <typename T>
+bool SchedSliceTable::Cursor::NumericConstraints<T>::Matches(T value) {
+  if (value < min_value || (value == min_value && !min_equals)) {
+    return false;
+  } else if (value > max_value || (value == max_value && !max_equals)) {
+    return false;
+  }
+  return true;
 }
 
 }  // namespace trace_processor

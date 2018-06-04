@@ -29,10 +29,8 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
     cpu_events_.resize(cpu + 1);
 
   SlicesPerCpu* slices = &cpu_events_[cpu];
-  slices->cpu_ = cpu;
-  slices->start_timestamps.emplace_back(start_timestamp);
-  slices->durations.emplace_back(duration);
-  slices->thread_names.emplace_back(thread_name_id);
+  slices->Setup(cpu);
+  slices->AddSlice(start_timestamp, duration, thread_name_id);
 }
 
 TraceStorage::StringId TraceStorage::InternString(const char* data,
@@ -48,6 +46,19 @@ TraceStorage::StringId TraceStorage::InternString(const char* data,
   strings_.emplace_back(data, length);
   string_pool_.emplace(hash, strings_.size() - 1);
   return strings_.size() - 1;
+}
+
+void TraceStorage::SlicesPerCpu::Setup(uint32_t cpu) {
+  cpu_ = cpu;
+  valid_ = true;
+}
+
+void TraceStorage::SlicesPerCpu::AddSlice(uint64_t start_timestamp,
+                                          uint64_t duration,
+                                          StringId thread_name_id) {
+  start_timestamps_.emplace_back(start_timestamp);
+  durations_.emplace_back(duration);
+  thread_names_.emplace_back(thread_name_id);
 }
 
 }  // namespace trace_processor

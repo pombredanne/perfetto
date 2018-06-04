@@ -42,6 +42,7 @@ source_set("lib") {
     "virtual_destructors.cc",
   ]
   deps = [
+    "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../protos/perfetto/trace:lite",
     "../base",

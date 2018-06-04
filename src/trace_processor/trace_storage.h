@@ -22,6 +22,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -31,6 +33,42 @@ namespace trace_processor {
 class TraceStorage {
  public:
   typedef size_t StringId;
+  class SlicesPerCpu {
+   public:
+    void Setup(uint32_t cpu);
+    void AddSlice(uint64_t start_timestamp,
+                  uint64_t duration,
+                  StringId thread_name_id);
+
+    size_t slice_count() const {
+      PERFETTO_DCHECK(valid_);
+      return start_timestamps_.size();
+    }
+
+    const std::deque<uint64_t>& start_timestamps() const {
+      PERFETTO_DCHECK(valid_);
+      return start_timestamps_;
+    }
+
+    const std::deque<uint64_t>& durations() const {
+      PERFETTO_DCHECK(valid_);
+      return durations_;
+    }
+
+    bool is_valid() const { return valid_; }
+
+   private:
+    uint32_t cpu_ = 0;
+
+    // Each vector below has the same number of entries (the number of slices
+    // in the trace for the CPU).
+    std::deque<uint64_t> start_timestamps_;
+    std::deque<uint64_t> durations_;
+    std::deque<StringId> thread_names_;
+
+    // Set to true when an event is seen for this CPU.
+    bool valid_ = false;
+  };
 
   // Adds a sched slice for a given cpu.
   void AddSliceForCpu(uint32_t cpu,
@@ -42,27 +80,18 @@ class TraceStorage {
   StringId InternString(const char* data, size_t length);
 
   // Reading methods.
-  std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
-    if (cpu_events_.size() <= cpu ||
-        cpu_events_[cpu].cpu_ == std::numeric_limits<uint32_t>::max()) {
+  const SlicesPerCpu* SlicesForCpu(uint32_t cpu) const {
+    if (cpu >= cpu_events_.size() || !cpu_events_[cpu].is_valid()) {
       return nullptr;
     }
-    return &cpu_events_[cpu].start_timestamps;
+    return &cpu_events_[cpu];
   }
+
+  uint32_t cpus() const { return static_cast<uint32_t>(cpu_events_.size()); }
 
  private:
   // Each StringId is an offset into |strings_|.
   typedef uint32_t StringHash;
-
-  struct SlicesPerCpu {
-    uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
-
-    // Each vector below has the same number of entries (the number of slices
-    // in the trace for the CPU).
-    std::deque<uint64_t> start_timestamps;
-    std::deque<uint64_t> durations;
-    std::deque<StringId> thread_names;
-  };
 
   // One entry for each CPU in the trace.
   std::vector<SlicesPerCpu> cpu_events_;

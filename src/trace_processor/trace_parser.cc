@@ -151,11 +151,11 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         prev_pid = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kPrevStateFieldNumber:
-        prev_state = static_cast<uint32_t>(fld.int_value);
+        prev_state = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kPrevCommFieldNumber:
-        prev_comm = reinterpret_cast<const char*>(fld.length_value.data);
-        prev_comm_len = fld.length_value.length;
+        prev_comm = reinterpret_cast<const char*>(fld.length_limited.data);
+        prev_comm_len = fld.length_limited.length;
         break;
       case protos::SchedSwitchFtraceEvent::kNextPidFieldNumber:
         next_pid = fld.as_uint32();

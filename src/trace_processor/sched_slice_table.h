@@ -40,11 +40,14 @@ class SchedSliceTable {
     int Column(sqlite3_context* context, int N);
     int RowId(sqlite_int64* pRowid);
 
+    void Reset();
+
    private:
     template <class T>
     class NumericConstraints {
      public:
       bool Setup(const Constraint& cs, sqlite3_value* value);
+      bool Matches(T value);
 
      private:
       T min_value = std::numeric_limits<T>::min();
@@ -52,13 +55,23 @@ class SchedSliceTable {
       T max_value = std::numeric_limits<T>::max();
       bool max_equals = true;
     };
+
+    typedef struct {
+      uint32_t cpu = 0;
+      size_t index = 0;
+    } PerCpuState;
+
     sqlite3_vtab_cursor base_;  // Must be first.
 
     SchedSliceTable* const table_;
     const TraceStorage* const storage_;
 
+    // One entry for each cpu which is used in filtering.
+    std::vector<PerCpuState> per_cpu_state_;
+
     NumericConstraints<uint64_t> timestamp_constraints_;
-    NumericConstraints<uint64_t> cpu_constraints_;
+    NumericConstraints<uint32_t> cpu_constraints_;
+    NumericConstraints<uint64_t> duration_constraints_;
   };
 
   SchedSliceTable(const TraceStorage* storage);
@@ -70,7 +83,7 @@ class SchedSliceTable {
   Cursor* GetCursor(sqlite3_vtab_cursor* cursor);
 
  private:
-  enum Column { kTimestamp = 0, kCpu = 0 };
+  enum Column { kTimestamp = 0, kCpu = 1, kDuration = 2 };
 
   sqlite3_vtab base_;  // Must be first.
   const TraceStorage* const storage_;
