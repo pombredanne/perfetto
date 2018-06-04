@@ -39,7 +39,7 @@ class TraceStorage {
                       StringId thread_name_id);
 
   // Return an unqiue identifier for the contents of each string.
-  StringId InternString(const char* data, uint64_t length);
+  StringId InternString(const char* data, size_t length);
 
   // Reading methods.
   std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {

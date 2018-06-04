@@ -39,9 +39,10 @@ class FakeStringBlobReader : public BlobReader {
 
   uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
     PERFETTO_CHECK(offset <= data_.size());
-    uint32_t read = std::min(static_cast<uint32_t>(data_.size() - offset), len);
-    memcpy(dst, data_.c_str() + offset, read);
-    return read;
+    uint32_t rsize =
+        std::min(static_cast<uint32_t>(data_.size() - offset), len);
+    memcpy(dst, data_.c_str() + offset, rsize);
+    return rsize;
   }
 
  private:

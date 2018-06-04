@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <memory>
 
+#include "perfetto/base/logging.h"
 #include "perfetto/protozero/proto_utils.h"
 
 namespace protozero {
@@ -41,8 +42,14 @@ class ProtoDecoder {
     protozero::proto_utils::FieldType type;
     union {
       uint64_t int_value;
-      LengthDelimited length_value;
+      LengthDelimited length_limited;
     };
+
+    inline uint32_t as_uint32() const {
+      PERFETTO_DCHECK(type == proto_utils::FieldType::kFieldTypeVarInt ||
+                      type == proto_utils::FieldType::kFieldTypeFixed32);
+      return static_cast<uint32_t>(int_value);
+    }
   };
 
   // Creates a ProtoDecoder using the given |buffer| with size |length| bytes.

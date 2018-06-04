@@ -36,9 +36,9 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
 }
 
 TraceStorage::StringId TraceStorage::InternString(const char* data,
-                                                  uint64_t length) {
+                                                  size_t length) {
   uint32_t hash = 0;
-  for (uint64_t i = 0; i < length; ++i) {
+  for (size_t i = 0; i < length; ++i) {
     hash = static_cast<uint32_t>(data[i]) + (hash * 31);
   }
   auto id_it = string_pool_.find(hash);

@@ -40,13 +40,13 @@ class TraceParser {
   void ParseNextChunk();
 
  private:
-  void ParsePacket(const uint8_t* data, uint64_t length);
-  void ParseFtraceEventBundle(const uint8_t* data, uint64_t length);
-  void ParseFtraceEvent(uint32_t cpu, const uint8_t* data, uint64_t length);
+  void ParsePacket(const uint8_t* data, uint32_t length);
+  void ParseFtraceEventBundle(const uint8_t* data, uint32_t length);
+  void ParseFtraceEvent(uint32_t cpu, const uint8_t* data, uint32_t length);
   void ParseSchedSwitch(uint32_t cpu,
                         uint64_t timestamp,
                         const uint8_t* data,
-                        uint64_t length);
+                        uint32_t length);
 
   BlobReader* const reader_;
 
