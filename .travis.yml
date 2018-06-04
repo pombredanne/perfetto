@@ -104,7 +104,7 @@ matrix:
         apt:
           packages:
             - libtinfo5
-      env: CFG=ui-clang-x86_64-release GN_ARGS="is_debug=false is_clang=true"
+      env: CFG=ui-clang-x86_64-release GN_ARGS="is_debug=false is_clang=true" LD_DEBUG_OUTPUT=/dev/null
 
 # Cache the deps that get git-pulled to avoid hitting quota limits (b/68252114).
 # Do not cache NDK/SDK and things that come from .zip files rather than git.
