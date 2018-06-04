@@ -29,21 +29,21 @@ using ::testing::Invoke;
 
 TEST(TraceStorageTest, AddSliceForCpu) {
   TraceStorage trace;
-  trace.AddSliceForCpu(2, 1000, 42, "test");
-  ASSERT_EQ(trace.start_timestamps_for_cpu(2)[0], 1000);
+  trace.AddSliceForCpu(2, 1000, 42, trace.InternString("test", 4));
+  ASSERT_EQ((*trace.start_timestamps_for_cpu(2))[0], 1000);
 }
 
 TEST(TraceStorageTest, AddProcessEntry) {
   TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, "test");
+  trace.AddProcessEntry(1, 1000, 1);
   ASSERT_EQ(trace.UpidsForPid(1)->front(), 0);
   ASSERT_EQ(trace.process_for_upid(0)->time_start, 1000);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
   TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, "test");
-  trace.AddProcessEntry(1, 2000, "test");
+  trace.AddProcessEntry(1, 1000, 1);
+  trace.AddProcessEntry(1, 2000, 1);
   ASSERT_EQ((*trace.UpidsForPid(1))[0], 0);
   ASSERT_EQ((*trace.UpidsForPid(1))[1], 1);
   ASSERT_EQ(trace.process_for_upid(0)->time_end, 2000);
@@ -54,8 +54,8 @@ TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
   TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, "test");
-  trace.AddProcessEntry(3, 2000, "test");
+  trace.AddProcessEntry(1, 1000, 1);
+  trace.AddProcessEntry(3, 2000, 1);
   ASSERT_EQ((*trace.UpidsForPid(1))[0], 0);
   ASSERT_EQ((*trace.UpidsForPid(3))[0], 1);
   ASSERT_EQ(trace.process_for_upid(1)->time_start, 2000);
@@ -68,8 +68,8 @@ TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, "test");
-  TraceStorage::StringId id = trace.process_for_upid(0)->process_name;
+  TraceStorage::StringId id = trace.InternString("test", 4);
+  trace.AddProcessEntry(1, 1000, id);
   ASSERT_EQ((*trace.string_for_string_id(id)), "test");
 }
 

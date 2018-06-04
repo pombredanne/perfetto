@@ -18,25 +18,198 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/logging.h"
+#include "perfetto/trace/trace.pb.h"
+#include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
 namespace {
 
+using ::testing::Args;
+using ::testing::ElementsAreArray;
+using ::testing::Eq;
+using ::testing::Pointwise;
 using ::testing::_;
-using ::testing::InSequence;
-using ::testing::Invoke;
 
-TEST(TraceParser, LoadSinglePacket) {
-  // TODO(lalitm): write this test.
+class FakeStringBlobReader : public BlobReader {
+ public:
+  FakeStringBlobReader(const std::string& data) : data_(data) {}
+  ~FakeStringBlobReader() override {}
+
+  uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
+    PERFETTO_CHECK(offset <= data_.size());
+    uint32_t read = std::min(static_cast<uint32_t>(data_.size() - offset), len);
+    memcpy(dst, data_.c_str() + offset, read);
+    return read;
+  }
+
+ private:
+  std::string data_;
+};
+
+class MockTraceStorageInserter : public TraceStorageInserter {
+ public:
+  MockTraceStorageInserter() : TraceStorageInserter(nullptr) {}
+
+  MOCK_METHOD7(InsertSchedSwitch,
+               void(uint32_t cpu,
+                    uint64_t timestamp,
+                    uint32_t prev_pid,
+                    uint32_t prev_state,
+                    const char* prev_comm,
+                    size_t prev_comm_len,
+                    uint32_t next_pid));
+};
+
+TEST(TraceParser, LoadSingleEvent) {
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+
+  static const char kProcName[] = "proc1";
+  auto* sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName);
+  sched_switch->set_next_pid(100);
+
+  MockTraceStorageInserter inserter;
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
+
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &inserter, 1024);
+  parser.ParseNextChunk();
 }
 
-TEST(TraceParser, LoadMultiplePacket) {
-  // TODO(lalitm): write this test.
+TEST(TraceParser, LoadMultipleEvents) {
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+
+  static const char kProcName1[] = "proc1";
+  auto* sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(100);
+
+  event = bundle->add_event();
+  event->set_timestamp(1001);
+
+  static const char kProcName2[] = "proc2";
+  sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_pid(10);
+
+  MockTraceStorageInserter inserter;
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &inserter, 1024);
+  parser.ParseNextChunk();
+}
+
+TEST(TraceParser, LoadMultiplePackets) {
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+
+  static const char kProcName1[] = "proc1";
+  auto* sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(100);
+
+  bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  event = bundle->add_event();
+  event->set_timestamp(1001);
+
+  static const char kProcName2[] = "proc2";
+  sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_pid(10);
+
+  MockTraceStorageInserter inserter;
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &inserter, 1024);
+  parser.ParseNextChunk();
 }
 
 TEST(TraceParser, RepeatedLoadSinglePacket) {
-  // TODO(lalitm): write this test.
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+
+  static const char kProcName1[] = "proc1";
+  auto* sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(100);
+
+  // Make the chunk size the size of the first packet.
+  uint32_t chunk_size = static_cast<uint32_t>(trace.ByteSize());
+
+  bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(10);
+
+  event = bundle->add_event();
+  event->set_timestamp(1001);
+
+  static const char kProcName2[] = "proc2";
+  sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_pid(10);
+
+  MockTraceStorageInserter inserter;
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &inserter, chunk_size);
+  parser.ParseNextChunk();
+
+  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+
+  parser.ParseNextChunk();
 }
 
 }  // namespace

@@ -32,10 +32,10 @@ class TraceStorage {
  public:
   // Each StringId is an offset into |strings_|.
   typedef size_t StringId;
-  // UniquePid is an offset into process_entries_.
+  // UniquePid is an offset into |process_entries_|.
   typedef size_t UniquePid;
 
-  // Each time a process is seen in the trace.
+  // Information about a unique process seen in a trace.
   struct ProcessEntry {
     uint64_t time_start;
     uint64_t time_end;
@@ -46,19 +46,26 @@ class TraceStorage {
   void AddSliceForCpu(uint32_t cpu,
                       uint64_t start_timestamp,
                       uint64_t duration,
-                      const char* thread_name);
+                      StringId thread_name_id);
+
+  // Return an unqiue identifier for the contents of each string.
+  StringId InternString(const char* data, uint64_t length);
 
   // Adds a process entry for a given pid.
   void AddProcessEntry(uint64_t pid,
                        uint64_t time_start,
-                       const char* process_name);
+                       StringId process_name_id);
 
   // Finds the upids for a given pid. Returns a nullptr if none are found.
   std::deque<UniquePid>* UpidsForPid(uint64_t pid);
 
   // Reading methods.
-  const std::deque<uint64_t>& start_timestamps_for_cpu(uint32_t cpu) {
-    return cpu_events_[cpu].start_timestamps;
+  std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
+    if (cpu_events_.size() <= cpu ||
+        cpu_events_[cpu].cpu_ == std::numeric_limits<uint32_t>::max()) {
+      return nullptr;
+    }
+    return &cpu_events_[cpu].start_timestamps;
   }
 
   const ProcessEntry* process_for_upid(UniquePid upid) {
@@ -80,7 +87,7 @@ class TraceStorage {
   UniquePid current_upid_ = 0;
 
   struct SlicesPerCpu {
-    uint32_t cpu_ = 0;
+    uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
 
     // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
@@ -88,8 +95,6 @@ class TraceStorage {
     std::deque<uint64_t> durations;
     std::deque<StringId> thread_names;
   };
-
-  StringId InsertString(const char* string);
 
   // One entry for each CPU in the trace.
   std::vector<SlicesPerCpu> cpu_events_;
