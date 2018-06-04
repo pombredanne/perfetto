@@ -163,6 +163,8 @@ script:
         out/dist/end_to_end_shared_memory_fuzzer -runs=1
         out/dist/buffered_frame_deserializer_fuzzer -runs=1
       fi
+    elif  [[ "$CFG" != ui-* ]]; then
+      true
     else
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
       tools/run_android_emulator --pid /tmp/emulator.pid -v &
