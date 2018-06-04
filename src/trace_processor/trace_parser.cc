@@ -30,15 +30,16 @@ using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
 
 namespace {
-uint64_t FindIntField(ProtoDecoder* decoder, uint32_t field_id) {
-  uint64_t value = std::numeric_limits<uint64_t>::max();
+bool FindIntField(ProtoDecoder* decoder,
+                  uint32_t field_id,
+                  uint64_t* field_value) {
   for (auto f = decoder->ReadField(); f.id != 0; f = decoder->ReadField()) {
     if (f.id == field_id) {
-      value = f.int_value;
-      break;
+      *field_value = f.int_value;
+      return true;
     }
   }
-  return value;
+  return false;
 }
 }  // namespace
 
@@ -61,18 +62,21 @@ void TraceParser::ParseNextChunk() {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
       continue;
     }
-    ParsePacket(fld.length_value.data, fld.length_value.length);
+    ParsePacket(fld.length_limited.data,
+                static_cast<uint32_t>(fld.length_limited.length));
   }
 
   offset_ += read;
 }
 
-void TraceParser::ParsePacket(const uint8_t* data, uint64_t length) {
+void TraceParser::ParsePacket(const uint8_t* data, uint32_t length) {
   ProtoDecoder decoder(data, length);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kFtraceEventsFieldNumber:
-        ParseFtraceEventBundle(fld.length_value.data, fld.length_value.length);
+        ParseFtraceEventBundle(
+            fld.length_limited.data,
+            static_cast<uint32_t>(fld.length_limited.length));
         break;
       default:
         break;
@@ -81,11 +85,11 @@ void TraceParser::ParsePacket(const uint8_t* data, uint64_t length) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void TraceParser::ParseFtraceEventBundle(const uint8_t* data, uint64_t length) {
+void TraceParser::ParseFtraceEventBundle(const uint8_t* data, uint32_t length) {
   ProtoDecoder decoder(data, length);
-  uint64_t cpu =
-      FindIntField(&decoder, protos::FtraceEventBundle::kCpuFieldNumber);
-  if (cpu == std::numeric_limits<uint64_t>::max()) {
+  uint64_t cpu = 0;
+  if (!FindIntField(&decoder, protos::FtraceEventBundle::kCpuFieldNumber,
+                    &cpu)) {
     PERFETTO_ELOG("CPU field not found in FtraceEventBundle");
     return;
   }
@@ -94,8 +98,8 @@ void TraceParser::ParseFtraceEventBundle(const uint8_t* data, uint64_t length) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEventBundle::kEventFieldNumber:
-        ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.length_value.data,
-                         fld.length_value.length);
+        ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.length_limited.data,
+                         static_cast<uint32_t>(fld.length_limited.length));
         break;
       default:
         break;
@@ -106,11 +110,11 @@ void TraceParser::ParseFtraceEventBundle(const uint8_t* data, uint64_t length) {
 
 void TraceParser::ParseFtraceEvent(uint32_t cpu,
                                    const uint8_t* data,
-                                   uint64_t length) {
+                                   uint32_t length) {
   ProtoDecoder decoder(data, length);
-  uint64_t timestamp =
-      FindIntField(&decoder, protos::FtraceEvent::kTimestampFieldNumber);
-  if (timestamp == std::numeric_limits<uint64_t>::max()) {
+  uint64_t timestamp = 0;
+  if (!FindIntField(&decoder, protos::FtraceEvent::kTimestampFieldNumber,
+                    &timestamp)) {
     PERFETTO_ELOG("Timestamp field not found in FtraceEvent");
     return;
   }
@@ -120,8 +124,8 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber:
         PERFETTO_DCHECK(timestamp > 0);
-        ParseSchedSwitch(cpu, timestamp, fld.length_value.data,
-                         fld.length_value.length);
+        ParseSchedSwitch(cpu, timestamp, fld.length_limited.data,
+                         static_cast<uint32_t>(fld.length_limited.length));
         break;
       default:
         break;
@@ -133,7 +137,7 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
 void TraceParser::ParseSchedSwitch(uint32_t cpu,
                                    uint64_t timestamp,
                                    const uint8_t* data,
-                                   uint64_t length) {
+                                   uint32_t length) {
   ProtoDecoder decoder(data, length);
 
   uint32_t prev_pid = 0;
@@ -142,15 +146,15 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::SchedSwitchFtraceEvent::kPrevPidFieldNumber:
-        prev_pid = static_cast<uint32_t>(fld.int_value);
+        prev_pid = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kNextPidFieldNumber:
-        next_pid = static_cast<uint32_t>(fld.int_value);
+        next_pid = fld.as_uint32();
         break;
       case protos::SchedSwitchFtraceEvent::kNextCommFieldNumber:
         next_comm =
-            std::string(reinterpret_cast<const char*>(fld.length_value.data),
-                        static_cast<size_t>(fld.length_value.length));
+            std::string(reinterpret_cast<const char*>(fld.length_limited.data),
+                        static_cast<size_t>(fld.length_limited.length));
         break;
       default:
         break;
@@ -158,12 +162,12 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
   }
 
   // TODO(lalitm): store these fields inside the TraceStorage class.
-  perfetto::base::ignore_result(cpu);
-  perfetto::base::ignore_result(timestamp);
-  perfetto::base::ignore_result(trace_);
-  perfetto::base::ignore_result(prev_pid);
-  perfetto::base::ignore_result(next_pid);
-  perfetto::base::ignore_result(next_comm);
+  base::ignore_result(cpu);
+  base::ignore_result(timestamp);
+  base::ignore_result(trace_);
+  base::ignore_result(prev_pid);
+  base::ignore_result(next_pid);
+  base::ignore_result(next_comm);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
