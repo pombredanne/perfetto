@@ -149,47 +149,67 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
       }
     }
 
-    per_cpu_state_.emplace_back(std::move(state));
+    // Don't bother adding filter state if the index is out of bounds.
+    if (state.index < slices->slice_count())
+      per_cpu_state_.emplace_back(std::move(state));
   }
+
+  // Set the cpu index to be the first item to look at.
+  UpdateStateIndex();
 
   table_->indexed_constraints_.clear();
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Next() {
-  for (uint32_t i = 0; i < per_cpu_state_.size(); i++) {
-    const auto& state = per_cpu_state_[i];
-    const auto* slices = storage_->SlicesForCpu(state.cpu);
+  auto* state = &per_cpu_state_[cur_state_index_];
+  const auto* slices = storage_->SlicesForCpu(state->cpu);
 
-    // Store the position we should start filtering from before setting
-    // the index out of bounds in case the loop doesn't match anything.
-    size_t start_index = state.index + 1;
-    state.index = slices->slice_count();
+  // Store the position we should start filtering from before setting
+  // the index out of bounds in case the loop doesn't match anything.
+  size_t start_index = state->index + 1;
+  state->index = slices->slice_count();
 
-    for (size_t i = start_index; i < slices->slice_count(); i++) {
-      if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
-          duration_constraints_.Matches(slices->durations()[i])) {
-        state.index = i;
-        break;
-      }
+  for (size_t i = start_index; i < slices->slice_count(); i++) {
+    if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
+        duration_constraints_.Matches(slices->durations()[i])) {
+      state->index = i;
+      break;
     }
   }
+
+  UpdateStateIndex();
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Eof() {
-  for (uint32_t i = 0; i < per_cpu_state_.size(); i++) {
-    const auto& state = per_cpu_state_[i];
-    const auto* slices = storage_->SlicesForCpu(state.cpu);
-    if (state.index < slices->slice_count()) {
-      return false;
-    }
-  }
-  return true;
+  return cur_state_index_ >= per_cpu_state_.size();
 }
 
-int SchedSliceTable::Cursor::Column(sqlite3_context* /* context */,
-                                    int /* N */) {
+int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
+  if (cur_state_index_ >= per_cpu_state_.size()) {
+    return SQLITE_ERROR;
+  }
+  const auto& state = per_cpu_state_[cur_state_index_];
+  const auto* slices = storage_->SlicesForCpu(state.cpu);
+  switch (N) {
+    case Column::kTimestamp: {
+      auto timestamp =
+          static_cast<sqlite3_int64>(slices->start_timestamps()[state.index]);
+      sqlite3_result_int64(context, timestamp);
+      break;
+    }
+    case Column::kCpu: {
+      sqlite3_result_int(context, static_cast<int>(state.cpu));
+      break;
+    }
+    case Column::kDuration: {
+      auto duration =
+          static_cast<sqlite3_int64>(slices->durations()[state.index]);
+      sqlite3_result_int64(context, duration);
+      break;
+    }
+  }
   return SQLITE_OK;
 }
 
@@ -202,6 +222,27 @@ void SchedSliceTable::Cursor::Reset() {
   timestamp_constraints_ = {};
   cpu_constraints_ = {};
   duration_constraints_ = {};
+}
+
+void SchedSliceTable::Cursor::UpdateStateIndex() {
+  int32_t next_state_index = -1;
+  uint64_t min_timestamp = std::numeric_limits<uint64_t>::max();
+  for (uint32_t i = 0; i < per_cpu_state_.size(); i++) {
+    const auto& state = per_cpu_state_[i];
+    const auto* slices = storage_->SlicesForCpu(state.cpu);
+    if (state.index >= slices->slice_count())
+      continue;
+
+    // TODO(lalitm): handle sorting by things other than timestamp.
+    uint64_t cur_timestamp = slices->start_timestamps()[state.index];
+    if (cur_timestamp < min_timestamp) {
+      min_timestamp = cur_timestamp;
+      next_state_index = -1;
+    }
+  }
+  cur_state_index_ = next_state_index == -1
+                         ? per_cpu_state_.size()
+                         : static_cast<size_t>(next_state_index);
 }
 
 template <typename T>

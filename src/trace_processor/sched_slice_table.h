@@ -40,8 +40,6 @@ class SchedSliceTable {
     int Column(sqlite3_context* context, int N);
     int RowId(sqlite_int64* pRowid);
 
-    void Reset();
-
    private:
     template <class T>
     class NumericConstraints {
@@ -61,6 +59,9 @@ class SchedSliceTable {
       size_t index = 0;
     } PerCpuState;
 
+    void Reset();
+    void UpdateStateIndex();
+
     sqlite3_vtab_cursor base_;  // Must be first.
 
     SchedSliceTable* const table_;
@@ -68,6 +69,7 @@ class SchedSliceTable {
 
     // One entry for each cpu which is used in filtering.
     std::vector<PerCpuState> per_cpu_state_;
+    size_t cur_state_index_ = 0;
 
     NumericConstraints<uint64_t> timestamp_constraints_;
     NumericConstraints<uint32_t> cpu_constraints_;
