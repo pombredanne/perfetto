@@ -66,6 +66,11 @@ class ProtoDecoder {
   // Resets the current position to the start of the buffer.
   void Reset();
 
+  // Return's offset inside the buffer.
+  uint64_t offset() const {
+    return static_cast<uint64_t>(current_position_ - buffer_);
+  }
+
  private:
   const uint8_t* const buffer_;
   const uint64_t length_;

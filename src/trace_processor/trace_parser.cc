@@ -66,7 +66,7 @@ void TraceParser::ParseNextChunk() {
                 static_cast<uint32_t>(fld.length_limited.length));
   }
 
-  offset_ += read;
+  offset_ += decoder.offset();
 }
 
 void TraceParser::ParsePacket(const uint8_t* data, uint32_t length) {
