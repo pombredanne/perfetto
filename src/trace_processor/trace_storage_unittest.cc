@@ -27,10 +27,39 @@ using ::testing::_;
 using ::testing::InSequence;
 using ::testing::Invoke;
 
-TEST(TraceStorage, AddSliceForCpu) {
-  TraceStorage trace;
-  trace.AddSliceForCpu(2, 1000, 42, trace.InternString("test", 4));
-  ASSERT_EQ((*trace.start_timestamps_for_cpu(2))[0], 1000);
+TEST(TraceStorageTest, NoInteractionFirstSched) {
+  TraceStorage storage;
+
+  uint32_t cpu = 3;
+  uint64_t timestamp = 100;
+  uint32_t prev_pid = 2;
+  uint32_t prev_state = 32;
+  static const char kTestString[] = "test";
+  uint32_t next_pid = 4;
+  storage.InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
+                            sizeof(kTestString) - 1, next_pid);
+
+  ASSERT_EQ(storage.start_timestamps_for_cpu(cpu), nullptr);
+}
+
+TEST(TraceStorageTest, InsertSecondSched) {
+  TraceStorage storage;
+
+  uint32_t cpu = 3;
+  uint64_t timestamp = 100;
+  uint32_t pid_1 = 2;
+  uint32_t prev_state = 32;
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  uint32_t pid_2 = 4;
+  storage.InsertSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+                            sizeof(kCommProc1) - 1, pid_2);
+  storage.InsertSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+                            sizeof(kCommProc2) - 1, pid_1);
+
+  const auto& timestamps = *storage.start_timestamps_for_cpu(cpu);
+  ASSERT_EQ(timestamps.size(), 1ul);
+  ASSERT_EQ(timestamps[0], timestamp);
 }
 
 }  // namespace

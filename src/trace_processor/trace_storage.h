@@ -30,16 +30,17 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
-  typedef size_t StringId;
+  virtual ~TraceStorage();
 
   // Adds a sched slice for a given cpu.
-  void AddSliceForCpu(uint32_t cpu,
-                      uint64_t start_timestamp,
-                      uint64_t duration,
-                      StringId thread_name_id);
-
-  // Return an unqiue identifier for the contents of each string.
-  StringId InternString(const char* data, size_t length);
+  // Virtual for testing.
+  virtual void InsertSchedSwitch(uint32_t cpu,
+                                 uint64_t timestamp,
+                                 uint32_t prev_pid,
+                                 uint32_t prev_state,
+                                 const char* prev_comm,
+                                 uint64_t prev_comm_len,
+                                 uint32_t next_pid);
 
   // Reading methods.
   std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
@@ -52,7 +53,8 @@ class TraceStorage {
 
  private:
   // Each StringId is an offset into |strings_|.
-  typedef uint32_t StringHash;
+  using StringId = size_t;
+  using StringHash = uint32_t;
 
   struct SlicesPerCpu {
     uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
@@ -63,6 +65,27 @@ class TraceStorage {
     std::deque<uint64_t> durations;
     std::deque<StringId> thread_names;
   };
+
+  struct SchedSwitchEvent {
+    uint64_t cpu = 0;
+    uint64_t timestamp = 0;
+    uint32_t prev_pid = 0;
+    uint32_t prev_state = 0;
+    StringId prev_comm_id;
+    uint32_t next_pid = 0;
+    bool valid = false;
+  };
+
+  void AddSliceForCpu(uint32_t cpu,
+                      uint64_t start_timestamp,
+                      uint64_t duration,
+                      StringId thread_name_id);
+
+  // Return an unqiue identifier for the contents of each string.
+  StringId InternString(const char* data, uint64_t length);
+
+  // One entry for each CPU in the trace.
+  std::vector<SchedSwitchEvent> last_sched_per_cpu_;
 
   // One entry for each CPU in the trace.
   std::vector<SlicesPerCpu> cpu_events_;

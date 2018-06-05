@@ -44,9 +44,9 @@ bool FindIntField(ProtoDecoder* decoder,
 }  // namespace
 
 TraceParser::TraceParser(BlobReader* reader,
-                         TraceStorageInserter* inserter,
+                         TraceStorage* storage,
                          uint32_t chunk_size_b)
-    : reader_(reader), inserter_(inserter), chunk_size_b_(chunk_size_b) {}
+    : reader_(reader), storage_(storage), chunk_size_b_(chunk_size_b) {}
 
 void TraceParser::ParseNextChunk() {
   if (!buffer_)
@@ -143,7 +143,7 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
   uint32_t prev_pid = 0;
   uint32_t prev_state = 0;
   const char* prev_comm = nullptr;
-  size_t prev_comm_len = 0;
+  uint64_t prev_comm_len = 0;
   uint32_t next_pid = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
@@ -154,8 +154,8 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         prev_state = static_cast<uint32_t>(fld.int_value);
         break;
       case protos::SchedSwitchFtraceEvent::kPrevCommFieldNumber:
-        prev_comm = reinterpret_cast<const char*>(fld.length_value.data);
-        prev_comm_len = fld.length_value.length;
+        prev_comm = reinterpret_cast<const char*>(fld.length_limited.data);
+        prev_comm_len = fld.length_limited.length;
         break;
       case protos::SchedSwitchFtraceEvent::kNextPidFieldNumber:
         next_pid = fld.as_uint32();
@@ -164,8 +164,8 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         break;
     }
   }
-  inserter_->InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
-                               prev_comm_len, next_pid);
+  storage_->InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
+                              prev_comm_len, next_pid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }

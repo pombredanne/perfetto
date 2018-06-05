@@ -21,6 +21,37 @@
 namespace perfetto {
 namespace trace_processor {
 
+TraceStorage::~TraceStorage() {}
+
+void TraceStorage::InsertSchedSwitch(uint32_t cpu,
+                                     uint64_t timestamp,
+                                     uint32_t prev_pid,
+                                     uint32_t prev_state,
+                                     const char* prev_comm,
+                                     size_t prev_comm_len,
+                                     uint32_t next_pid) {
+  if (last_sched_per_cpu_.size() <= cpu)
+    last_sched_per_cpu_.resize(cpu + 1);
+
+  SchedSwitchEvent* event = &last_sched_per_cpu_[cpu];
+
+  // If we had a valid previous event, then inform the storage about the
+  // slice.
+  if (event->valid) {
+    AddSliceForCpu(cpu, event->timestamp, timestamp - event->timestamp,
+                   event->prev_comm_id);
+  }
+
+  // Update the map with the current event.
+  event->cpu = cpu;
+  event->timestamp = timestamp;
+  event->prev_pid = prev_pid;
+  event->prev_state = prev_state;
+  event->prev_comm_id = InternString(prev_comm, prev_comm_len);
+  event->next_pid = next_pid;
+  event->valid = true;
+}
+
 void TraceStorage::AddSliceForCpu(uint32_t cpu,
                                   uint64_t start_timestamp,
                                   uint64_t duration,
@@ -36,9 +67,9 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
 }
 
 TraceStorage::StringId TraceStorage::InternString(const char* data,
-                                                  size_t length) {
+                                                  uint64_t length) {
   uint32_t hash = 0;
-  for (size_t i = 0; i < length; ++i) {
+  for (uint64_t i = 0; i < length; ++i) {
     hash = static_cast<uint32_t>(data[i]) + (hash * 31);
   }
   auto id_it = string_pool_.find(hash);
