@@ -82,7 +82,8 @@ class SchedSliceTable {
 
   int Open(sqlite3_vtab_cursor** ppCursor);
   int Close(sqlite3_vtab_cursor* cursor);
-  Cursor* GetCursor(sqlite3_vtab_cursor* cursor);
+
+  static Cursor* GetCursor(sqlite3_vtab_cursor* cursor);
 
  private:
   enum Column { kTimestamp = 0, kCpu = 1, kDuration = 2 };
