@@ -51,6 +51,7 @@ source_set("lib") {
 source_set("unittests") {
   testonly = true
   sources = [
+    "sched_slice_table_unittest.cc",
     "trace_parser_unittest.cc",
     "trace_storage_unittest.cc",
   ]
