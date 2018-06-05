@@ -66,9 +66,9 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
   slices->thread_names.emplace_back(thread_name_id);
 }
 
-void TraceStorage::InsertProcessEntry(uint64_t pid,
-                                      uint64_t time_start,
-                                      const char* process_name) {
+void TraceStorage::AddProcessEntry(uint64_t pid,
+                                   uint64_t time_start,
+                                   const char* process_name) {
   // Store a new upid for that pid.
   auto pids_it = pids_.find(pid);
   if (pids_it == pids_.end()) {

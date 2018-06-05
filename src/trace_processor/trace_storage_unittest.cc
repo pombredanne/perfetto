@@ -64,15 +64,15 @@ TEST(TraceStorageTest, InsertSecondSched) {
 
 TEST(TraceStorageTest, AddProcessEntry) {
   TraceStorage storage;
-  storage.InsertProcessEntry(1, 1000, "test");
+  storage.AddProcessEntry(1, 1000, "test");
   ASSERT_EQ(storage.UpidsForPid(1)->front(), 0);
   ASSERT_EQ(storage.process_for_upid(0)->time_start, 1000);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
   TraceStorage storage;
-  storage.InsertProcessEntry(1, 1000, "test");
-  storage.InsertProcessEntry(1, 2000, "test");
+  storage.AddProcessEntry(1, 1000, "test");
+  storage.AddProcessEntry(1, 2000, "test");
   ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
   ASSERT_EQ((*storage.UpidsForPid(1))[1], 1);
   ASSERT_EQ(storage.process_for_upid(0)->time_end, 2000);
@@ -83,8 +83,8 @@ TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
   TraceStorage storage;
-  storage.InsertProcessEntry(1, 1000, "test");
-  storage.InsertProcessEntry(3, 2000, "test");
+  storage.AddProcessEntry(1, 1000, "test");
+  storage.AddProcessEntry(3, 2000, "test");
   ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
   ASSERT_EQ((*storage.UpidsForPid(3))[0], 1);
   ASSERT_EQ(storage.process_for_upid(1)->time_start, 2000);
@@ -97,7 +97,7 @@ TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
-  storage.InsertProcessEntry(1, 1000, "test");
+  storage.AddProcessEntry(1, 1000, "test");
   ASSERT_EQ((*storage.string_for_string_id(
                 storage.process_for_upid(0)->process_name)),
             "test");

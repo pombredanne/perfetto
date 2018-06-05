@@ -34,7 +34,7 @@ class TraceStorage {
   // Each StringId is an offset into |strings_|.
   using StringId = size_t;
   // UniquePid is an offset into |process_entries_|.
-  typedef size_t UniquePid;
+  using UniquePid = size_t;
 
   // Information about a unique process seen in a trace.
   struct ProcessEntry {
@@ -54,9 +54,9 @@ class TraceStorage {
                                  uint32_t next_pid);
 
   // Adds a process entry for a given pid.
-  void InsertProcessEntry(uint64_t pid,
-                          uint64_t time_start,
-                          const char* process_name);
+  void AddProcessEntry(uint64_t pid,
+                       uint64_t time_start,
+                       const char* process_name);
 
   // Finds the upids for a given pid. Returns a nullptr if none are found.
   std::deque<UniquePid>* UpidsForPid(uint64_t pid);
@@ -85,8 +85,6 @@ class TraceStorage {
   }
 
  private:
-  // Each StringId is an offset into |strings_|.
-  // using StringId = size_t;
   using StringHash = uint32_t;
   UniquePid current_upid_ = 0;
 
