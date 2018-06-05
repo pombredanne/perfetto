@@ -17,10 +17,13 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
+#include <array>
 #include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -30,71 +33,110 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
+  constexpr static size_t kMaxCpus = 128;
+  using StringId = size_t;
+
+  class SlicesPerCpu {
+   public:
+    void Setup(uint32_t cpu);
+    void AddSlice(uint64_t start_timestamp,
+                  uint64_t duration,
+                  StringId thread_name_id);
+
+    size_t slice_count() const {
+      PERFETTO_DCHECK(valid_);
+      return start_ns_.size();
+    }
+
+    const std::deque<uint64_t>& start_ns() const {
+      PERFETTO_DCHECK(valid_);
+      return start_ns_;
+    }
+
+    const std::deque<uint64_t>& durations() const {
+      PERFETTO_DCHECK(valid_);
+      return durations_;
+    }
+
+    bool is_valid() const { return valid_; }
+
+   private:
+    uint32_t cpu_ = 0;
+
+    // Each vector below has the same number of entries (the number of slices
+    // in the trace for the CPU).
+    std::deque<uint64_t> start_ns_;
+    std::deque<uint64_t> durations_;
+    std::deque<StringId> thread_names_;
+
+    // Set to true when an event is seen for this CPU.
+    bool valid_ = false;
+  };
+
+  struct Counters {
+    uint64_t mismatched_sched_switch_tids_ = 0;
+  };
+
   virtual ~TraceStorage();
 
   // Adds a sched slice for a given cpu.
   // Virtual for testing.
-  virtual void InsertSchedSwitch(uint32_t cpu,
-                                 uint64_t timestamp,
-                                 uint32_t prev_pid,
-                                 uint32_t prev_state,
-                                 const char* prev_comm,
-                                 uint64_t prev_comm_len,
-                                 uint32_t next_pid);
+  virtual void PushSchedSwitch(uint32_t cpu,
+                               uint64_t timestamp,
+                               uint32_t prev_pid,
+                               uint32_t prev_state,
+                               const char* prev_comm,
+                               size_t prev_comm_len,
+                               uint32_t next_pid);
 
   // Reading methods.
-  std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
-    if (cpu_events_.size() <= cpu ||
-        cpu_events_[cpu].cpu_ == std::numeric_limits<uint32_t>::max()) {
+  const SlicesPerCpu* SlicesForCpu(uint32_t cpu) const {
+    if (cpu >= kMaxCpus || !cpu_events_[cpu].is_valid()) {
       return nullptr;
     }
-    return &cpu_events_[cpu].start_timestamps;
+    return &cpu_events_[cpu];
   }
+
+  uint32_t cpus() const { return static_cast<uint32_t>(cpu_events_.size()); }
 
  private:
   // Each StringId is an offset into |strings_|.
-  using StringId = size_t;
   using StringHash = uint32_t;
-
-  struct SlicesPerCpu {
-    uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
-
-    // Each vector below has the same number of entries (the number of slices
-    // in the trace for the CPU).
-    std::deque<uint64_t> start_timestamps;
-    std::deque<uint64_t> durations;
-    std::deque<StringId> thread_names;
-  };
 
   struct SchedSwitchEvent {
     uint64_t cpu = 0;
     uint64_t timestamp = 0;
     uint32_t prev_pid = 0;
     uint32_t prev_state = 0;
-    StringId prev_comm_id;
+    StringId prev_thread_id = 0;
     uint32_t next_pid = 0;
-    bool valid = false;
+
+    bool valid() const { return timestamp != 0; }
   };
 
   void AddSliceForCpu(uint32_t cpu,
-                      uint64_t start_timestamp,
-                      uint64_t duration,
+                      uint64_t start_ns,
+                      uint64_t duration_ns,
                       StringId thread_name_id);
 
   // Return an unqiue identifier for the contents of each string.
-  StringId InternString(const char* data, uint64_t length);
+  // The string is copied internally and can be destroyed after this called.
+  StringId InternString(const char* data, size_t length);
+
+  // Metadata counters for events being added.
+  Counters counters_;
 
   // One entry for each CPU in the trace.
-  std::vector<SchedSwitchEvent> last_sched_per_cpu_;
+  std::array<SchedSwitchEvent, kMaxCpus> last_sched_per_cpu_;
 
   // One entry for each CPU in the trace.
-  std::vector<SlicesPerCpu> cpu_events_;
+  std::array<SlicesPerCpu, kMaxCpus> cpu_events_;
 
   // One entry for each unique string in the trace.
-  std::deque<std::string> strings_;
+  std::deque<std::string> string_pool_;
 
   // One entry for each unique string in the trace.
-  std::unordered_map<StringHash, StringId> string_pool_;
+  std::unordered_map<StringHash, StringId> string_index_;
 };
 
 }  // namespace trace_processor

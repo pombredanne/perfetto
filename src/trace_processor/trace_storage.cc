@@ -23,62 +23,73 @@ namespace trace_processor {
 
 TraceStorage::~TraceStorage() {}
 
-void TraceStorage::InsertSchedSwitch(uint32_t cpu,
-                                     uint64_t timestamp,
-                                     uint32_t prev_pid,
-                                     uint32_t prev_state,
-                                     const char* prev_comm,
-                                     size_t prev_comm_len,
-                                     uint32_t next_pid) {
-  if (last_sched_per_cpu_.size() <= cpu)
-    last_sched_per_cpu_.resize(cpu + 1);
-
-  SchedSwitchEvent* event = &last_sched_per_cpu_[cpu];
+void TraceStorage::PushSchedSwitch(uint32_t cpu,
+                                   uint64_t timestamp,
+                                   uint32_t prev_pid,
+                                   uint32_t prev_state,
+                                   const char* prev_comm,
+                                   size_t prev_comm_len,
+                                   uint32_t next_pid) {
+  SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
 
   // If we had a valid previous event, then inform the storage about the
   // slice.
-  if (event->valid) {
-    AddSliceForCpu(cpu, event->timestamp, timestamp - event->timestamp,
-                   event->prev_comm_id);
+  if (prev->valid()) {
+    uint64_t duration = timestamp - prev->timestamp;
+    AddSliceForCpu(cpu, prev->timestamp, duration, prev->prev_thread_id);
+  }
+
+  // If the this events previous pid does not match the previous event's next
+  // pid, make a note of this.
+  if (prev_pid != prev->next_pid) {
+    counters_.mismatched_sched_switch_tids_++;
   }
 
   // Update the map with the current event.
-  event->cpu = cpu;
-  event->timestamp = timestamp;
-  event->prev_pid = prev_pid;
-  event->prev_state = prev_state;
-  event->prev_comm_id = InternString(prev_comm, prev_comm_len);
-  event->next_pid = next_pid;
-  event->valid = true;
+  prev->cpu = cpu;
+  prev->timestamp = timestamp;
+  prev->prev_pid = prev_pid;
+  prev->prev_state = prev_state;
+  prev->prev_thread_id = InternString(prev_comm, prev_comm_len);
+  prev->next_pid = next_pid;
 }
 
 void TraceStorage::AddSliceForCpu(uint32_t cpu,
-                                  uint64_t start_timestamp,
-                                  uint64_t duration,
+                                  uint64_t start_ns,
+                                  uint64_t duration_ns,
                                   StringId thread_name_id) {
-  if (cpu_events_.size() <= cpu)
-    cpu_events_.resize(cpu + 1);
-
   SlicesPerCpu* slices = &cpu_events_[cpu];
-  slices->cpu_ = cpu;
-  slices->start_timestamps.emplace_back(start_timestamp);
-  slices->durations.emplace_back(duration);
-  slices->thread_names.emplace_back(thread_name_id);
+  slices->Setup(cpu);
+  slices->AddSlice(start_ns, duration_ns, thread_name_id);
 }
 
 TraceStorage::StringId TraceStorage::InternString(const char* data,
-                                                  uint64_t length) {
+                                                  size_t length) {
   uint32_t hash = 0;
   for (uint64_t i = 0; i < length; ++i) {
     hash = static_cast<uint32_t>(data[i]) + (hash * 31);
   }
-  auto id_it = string_pool_.find(hash);
-  if (id_it != string_pool_.end()) {
+  auto id_it = string_index_.find(hash);
+  if (id_it != string_index_.end()) {
     return id_it->second;
   }
-  strings_.emplace_back(data, length);
-  string_pool_.emplace(hash, strings_.size() - 1);
-  return strings_.size() - 1;
+  string_pool_.emplace_back(data, length);
+  StringId string_id = string_pool_.size() - 1;
+  string_index_.emplace(hash, string_id);
+  return string_id;
+}
+
+void TraceStorage::SlicesPerCpu::Setup(uint32_t cpu) {
+  cpu_ = cpu;
+  valid_ = true;
+}
+
+void TraceStorage::SlicesPerCpu::AddSlice(uint64_t start_ns,
+                                          uint64_t duration_ns,
+                                          StringId thread_name_id) {
+  start_ns_.emplace_back(start_ns);
+  durations_.emplace_back(duration_ns);
+  thread_names_.emplace_back(thread_name_id);
 }
 
 }  // namespace trace_processor
