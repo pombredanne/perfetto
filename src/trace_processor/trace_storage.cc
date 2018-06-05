@@ -21,6 +21,37 @@
 namespace perfetto {
 namespace trace_processor {
 
+TraceStorage::~TraceStorage() {}
+
+void TraceStorage::InsertSchedSwitch(uint32_t cpu,
+                                     uint64_t timestamp,
+                                     uint32_t prev_pid,
+                                     uint32_t prev_state,
+                                     const char* prev_comm,
+                                     size_t prev_comm_len,
+                                     uint32_t next_pid) {
+  if (last_sched_per_cpu_.size() <= cpu)
+    last_sched_per_cpu_.resize(cpu + 1);
+
+  SchedSwitchEvent* event = &last_sched_per_cpu_[cpu];
+
+  // If we had a valid previous event, then inform the storage about the
+  // slice.
+  if (event->valid) {
+    AddSliceForCpu(cpu, event->timestamp, timestamp - event->timestamp,
+                   event->prev_comm_id);
+  }
+
+  // Update the map with the current event.
+  event->cpu = cpu;
+  event->timestamp = timestamp;
+  event->prev_pid = prev_pid;
+  event->prev_state = prev_state;
+  event->prev_comm_id = InternString(prev_comm, prev_comm_len);
+  event->next_pid = next_pid;
+  event->valid = true;
+}
+
 void TraceStorage::AddSliceForCpu(uint32_t cpu,
                                   uint64_t start_timestamp,
                                   uint64_t duration,
@@ -35,9 +66,9 @@ void TraceStorage::AddSliceForCpu(uint32_t cpu,
   slices->thread_names.emplace_back(thread_name_id);
 }
 
-void TraceStorage::AddProcessEntry(uint64_t pid,
-                                   uint64_t time_start,
-                                   StringId process_name_id) {
+void TraceStorage::InsertProcessEntry(uint64_t pid,
+                                      uint64_t time_start,
+                                      const char* process_name) {
   // Store a new upid for that pid.
   auto pids_it = pids_.find(pid);
   if (pids_it == pids_.end()) {
@@ -55,7 +86,7 @@ void TraceStorage::AddProcessEntry(uint64_t pid,
   // Make a new process entry for that upid.
   ProcessEntry new_process;
   new_process.time_start = time_start;
-  new_process.process_name = process_name_id;
+  new_process.process_name = InternString(process_name, strlen(process_name));
   process_entries_.emplace_back(new_process);
 }
 

@@ -22,7 +22,7 @@
 
 #include "perfetto/protozero/proto_decoder.h"
 #include "src/trace_processor/blob_reader.h"
-#include "src/trace_processor/trace_storage_inserter.h"
+#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -33,24 +33,22 @@ class TraceParser {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
-  TraceParser(BlobReader* reader,
-              TraceStorageInserter* inserter,
-              uint32_t chunk_size_b);
+  TraceParser(BlobReader* reader, TraceStorage* storage, uint32_t chunk_size_b);
 
   void ParseNextChunk();
 
  private:
-  void ParsePacket(const uint8_t* data, uint64_t length);
-  void ParseFtraceEventBundle(const uint8_t* data, uint64_t length);
-  void ParseFtraceEvent(uint32_t cpu, const uint8_t* data, uint64_t length);
+  void ParsePacket(const uint8_t* data, uint32_t length);
+  void ParseFtraceEventBundle(const uint8_t* data, uint32_t length);
+  void ParseFtraceEvent(uint32_t cpu, const uint8_t* data, uint32_t length);
   void ParseSchedSwitch(uint32_t cpu,
                         uint64_t timestamp,
                         const uint8_t* data,
-                        uint64_t length);
+                        uint32_t length);
 
   BlobReader* const reader_;
 
-  TraceStorageInserter* const inserter_;
+  TraceStorage* const storage_;
   const uint32_t chunk_size_b_;
 
   uint64_t offset_ = 0;

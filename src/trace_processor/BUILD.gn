@@ -35,8 +35,6 @@ source_set("lib") {
     "trace_parser.h",
     "trace_storage.cc",
     "trace_storage.h",
-    "trace_storage_inserter.cc",
-    "trace_storage_inserter.h",
     "virtual_destructors.cc",
   ]
   deps = [
@@ -51,7 +49,6 @@ source_set("unittests") {
   testonly = true
   sources = [
     "trace_parser_unittest.cc",
-    "trace_storage_inserter_unittest.cc",
     "trace_storage_unittest.cc",
   ]
   deps = [

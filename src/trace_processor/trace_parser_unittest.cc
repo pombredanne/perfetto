@@ -18,7 +18,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "perfetto/base/logging.h"
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 
@@ -39,18 +38,19 @@ class FakeStringBlobReader : public BlobReader {
 
   uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
     PERFETTO_CHECK(offset <= data_.size());
-    uint32_t read = std::min(static_cast<uint32_t>(data_.size() - offset), len);
-    memcpy(dst, data_.c_str() + offset, read);
-    return read;
+    uint32_t rsize =
+        std::min(static_cast<uint32_t>(data_.size() - offset), len);
+    memcpy(dst, data_.c_str() + offset, rsize);
+    return rsize;
   }
 
  private:
   std::string data_;
 };
 
-class MockTraceStorageInserter : public TraceStorageInserter {
+class MockTraceStorage : public TraceStorage {
  public:
-  MockTraceStorageInserter() : TraceStorageInserter(nullptr) {}
+  MockTraceStorage() : TraceStorage() {}
 
   MOCK_METHOD7(InsertSchedSwitch,
                void(uint32_t cpu,
@@ -78,12 +78,12 @@ TEST(TraceParser, LoadSingleEvent) {
   sched_switch->set_prev_comm(kProcName);
   sched_switch->set_next_pid(100);
 
-  MockTraceStorageInserter inserter;
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &inserter, 1024);
+  TraceParser parser(&reader, &storage, 1024);
   parser.ParseNextChunk();
 }
 
@@ -113,15 +113,15 @@ TEST(TraceParser, LoadMultipleEvents) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorageInserter inserter;
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &inserter, 1024);
+  TraceParser parser(&reader, &storage, 1024);
   parser.ParseNextChunk();
 }
 
@@ -154,15 +154,15 @@ TEST(TraceParser, LoadMultiplePackets) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorageInserter inserter;
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &inserter, 1024);
+  TraceParser parser(&reader, &storage, 1024);
   parser.ParseNextChunk();
 }
 
@@ -198,15 +198,15 @@ TEST(TraceParser, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorageInserter inserter;
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &inserter, chunk_size);
+  TraceParser parser(&reader, &storage, chunk_size);
   parser.ParseNextChunk();
 
-  EXPECT_CALL(inserter, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
+  EXPECT_CALL(storage, InsertSchedSwitch(10, 1001, 100, 32, _, _, 10))
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   parser.ParseNextChunk();

@@ -30,8 +30,9 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
+  virtual ~TraceStorage();
   // Each StringId is an offset into |strings_|.
-  typedef size_t StringId;
+  using StringId = size_t;
   // UniquePid is an offset into |process_entries_|.
   typedef size_t UniquePid;
 
@@ -43,18 +44,19 @@ class TraceStorage {
   };
 
   // Adds a sched slice for a given cpu.
-  void AddSliceForCpu(uint32_t cpu,
-                      uint64_t start_timestamp,
-                      uint64_t duration,
-                      StringId thread_name_id);
-
-  // Return an unqiue identifier for the contents of each string.
-  StringId InternString(const char* data, uint64_t length);
+  // Virtual for testing.
+  virtual void InsertSchedSwitch(uint32_t cpu,
+                                 uint64_t timestamp,
+                                 uint32_t prev_pid,
+                                 uint32_t prev_state,
+                                 const char* prev_comm,
+                                 uint64_t prev_comm_len,
+                                 uint32_t next_pid);
 
   // Adds a process entry for a given pid.
-  void AddProcessEntry(uint64_t pid,
-                       uint64_t time_start,
-                       StringId process_name_id);
+  void InsertProcessEntry(uint64_t pid,
+                          uint64_t time_start,
+                          const char* process_name);
 
   // Finds the upids for a given pid. Returns a nullptr if none are found.
   std::deque<UniquePid>* UpidsForPid(uint64_t pid);
@@ -83,7 +85,9 @@ class TraceStorage {
   }
 
  private:
-  typedef uint32_t StringHash;
+  // Each StringId is an offset into |strings_|.
+  // using StringId = size_t;
+  using StringHash = uint32_t;
   UniquePid current_upid_ = 0;
 
   struct SlicesPerCpu {
@@ -95,6 +99,27 @@ class TraceStorage {
     std::deque<uint64_t> durations;
     std::deque<StringId> thread_names;
   };
+
+  struct SchedSwitchEvent {
+    uint64_t cpu = 0;
+    uint64_t timestamp = 0;
+    uint32_t prev_pid = 0;
+    uint32_t prev_state = 0;
+    StringId prev_comm_id;
+    uint32_t next_pid = 0;
+    bool valid = false;
+  };
+
+  void AddSliceForCpu(uint32_t cpu,
+                      uint64_t start_timestamp,
+                      uint64_t duration,
+                      StringId thread_name_id);
+
+  // Return an unqiue identifier for the contents of each string.
+  StringId InternString(const char* data, uint64_t length);
+
+  // One entry for each CPU in the trace.
+  std::vector<SchedSwitchEvent> last_sched_per_cpu_;
 
   // One entry for each CPU in the trace.
   std::vector<SlicesPerCpu> cpu_events_;

@@ -27,50 +27,80 @@ using ::testing::_;
 using ::testing::InSequence;
 using ::testing::Invoke;
 
-TEST(TraceStorageTest, AddSliceForCpu) {
-  TraceStorage trace;
-  trace.AddSliceForCpu(2, 1000, 42, trace.InternString("test", 4));
-  ASSERT_EQ((*trace.start_timestamps_for_cpu(2))[0], 1000);
+TEST(TraceStorageTest, NoInteractionFirstSched) {
+  TraceStorage storage;
+
+  uint32_t cpu = 3;
+  uint64_t timestamp = 100;
+  uint32_t prev_pid = 2;
+  uint32_t prev_state = 32;
+  static const char kTestString[] = "test";
+  uint32_t next_pid = 4;
+  storage.InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
+                            sizeof(kTestString) - 1, next_pid);
+
+  ASSERT_EQ(storage.start_timestamps_for_cpu(cpu), nullptr);
+}
+
+TEST(TraceStorageTest, InsertSecondSched) {
+  TraceStorage storage;
+
+  uint32_t cpu = 3;
+  uint64_t timestamp = 100;
+  uint32_t pid_1 = 2;
+  uint32_t prev_state = 32;
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  uint32_t pid_2 = 4;
+  storage.InsertSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+                            sizeof(kCommProc1) - 1, pid_2);
+  storage.InsertSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+                            sizeof(kCommProc2) - 1, pid_1);
+
+  const auto& timestamps = *storage.start_timestamps_for_cpu(cpu);
+  ASSERT_EQ(timestamps.size(), 1ul);
+  ASSERT_EQ(timestamps[0], timestamp);
 }
 
 TEST(TraceStorageTest, AddProcessEntry) {
-  TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, 1);
-  ASSERT_EQ(trace.UpidsForPid(1)->front(), 0);
-  ASSERT_EQ(trace.process_for_upid(0)->time_start, 1000);
+  TraceStorage storage;
+  storage.InsertProcessEntry(1, 1000, "test");
+  ASSERT_EQ(storage.UpidsForPid(1)->front(), 0);
+  ASSERT_EQ(storage.process_for_upid(0)->time_start, 1000);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
-  TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, 1);
-  trace.AddProcessEntry(1, 2000, 1);
-  ASSERT_EQ((*trace.UpidsForPid(1))[0], 0);
-  ASSERT_EQ((*trace.UpidsForPid(1))[1], 1);
-  ASSERT_EQ(trace.process_for_upid(0)->time_end, 2000);
-  ASSERT_EQ(trace.process_for_upid(1)->time_start, 2000);
-  ASSERT_EQ(trace.process_for_upid(0)->process_name,
-            trace.process_for_upid(1)->process_name);
+  TraceStorage storage;
+  storage.InsertProcessEntry(1, 1000, "test");
+  storage.InsertProcessEntry(1, 2000, "test");
+  ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
+  ASSERT_EQ((*storage.UpidsForPid(1))[1], 1);
+  ASSERT_EQ(storage.process_for_upid(0)->time_end, 2000);
+  ASSERT_EQ(storage.process_for_upid(1)->time_start, 2000);
+  ASSERT_EQ(storage.process_for_upid(0)->process_name,
+            storage.process_for_upid(1)->process_name);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
-  TraceStorage trace;
-  trace.AddProcessEntry(1, 1000, 1);
-  trace.AddProcessEntry(3, 2000, 1);
-  ASSERT_EQ((*trace.UpidsForPid(1))[0], 0);
-  ASSERT_EQ((*trace.UpidsForPid(3))[0], 1);
-  ASSERT_EQ(trace.process_for_upid(1)->time_start, 2000);
+  TraceStorage storage;
+  storage.InsertProcessEntry(1, 1000, "test");
+  storage.InsertProcessEntry(3, 2000, "test");
+  ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
+  ASSERT_EQ((*storage.UpidsForPid(3))[0], 1);
+  ASSERT_EQ(storage.process_for_upid(1)->time_start, 2000);
 }
 
 TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
-  TraceStorage trace;
-  ASSERT_EQ(trace.UpidsForPid(1), nullptr);
+  TraceStorage storage;
+  ASSERT_EQ(storage.UpidsForPid(1), nullptr);
 }
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
-  TraceStorage trace;
-  TraceStorage::StringId id = trace.InternString("test", 4);
-  trace.AddProcessEntry(1, 1000, id);
-  ASSERT_EQ((*trace.string_for_string_id(id)), "test");
+  TraceStorage storage;
+  storage.InsertProcessEntry(1, 1000, "test");
+  ASSERT_EQ((*storage.string_for_string_id(
+                storage.process_for_upid(0)->process_name)),
+            "test");
 }
 
 }  // namespace
