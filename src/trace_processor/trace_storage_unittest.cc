@@ -36,8 +36,8 @@ TEST(TraceStorageTest, NoInteractionFirstSched) {
   uint32_t prev_state = 32;
   static const char kTestString[] = "test";
   uint32_t next_pid = 4;
-  storage.InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
-                            sizeof(kTestString) - 1, next_pid);
+  storage.PushSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
+                          sizeof(kTestString) - 1, next_pid);
 
   ASSERT_EQ(storage.SlicesForCpu(cpu), nullptr);
 }
@@ -52,12 +52,12 @@ TEST(TraceStorageTest, InsertSecondSched) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage.InsertSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
-                            sizeof(kCommProc1) - 1, pid_2);
-  storage.InsertSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
-                            sizeof(kCommProc2) - 1, pid_1);
+  storage.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+                          sizeof(kCommProc1) - 1, pid_2);
+  storage.PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+                          sizeof(kCommProc2) - 1, pid_1);
 
-  const auto& timestamps = storage.SlicesForCpu(cpu)->start_timestamps();
+  const auto& timestamps = storage.SlicesForCpu(cpu)->start_ns();
   ASSERT_EQ(timestamps.size(), 1ul);
   ASSERT_EQ(timestamps[0], timestamp);
 }

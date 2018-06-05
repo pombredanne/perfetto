@@ -109,12 +109,16 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
   for (size_t i = 0; i < constraints.size(); i++) {
     const auto& cs = constraints[i];
     bool constraint_implemented = false;
-    if (cs.iColumn == Column::kTimestamp) {
-      constraint_implemented = timestamp_constraints_.Setup(cs, argv[i]);
-    } else if (cs.iColumn == Column::kCpu) {
-      constraint_implemented = cpu_constraints_.Setup(cs, argv[i]);
-    } else if (cs.iColumn == Column::kDuration) {
-      constraint_implemented = duration_constraints_.Setup(cs, argv[i]);
+    switch (cs.iColumn) {
+      case Column::kTimestamp:
+        constraint_implemented = timestamp_constraints_.Setup(cs, argv[i]);
+        break;
+      case Column::kCpu:
+        constraint_implemented = cpu_constraints_.Setup(cs, argv[i]);
+        break;
+      case Column::kDuration:
+        constraint_implemented = duration_constraints_.Setup(cs, argv[i]);
+        break;
     }
 
     if (!constraint_implemented) {
@@ -125,7 +129,7 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
   }
 
   // First setup CPU filtering because the trace storage is indexed by CPU.
-  for (uint32_t cpu = 0; cpu < storage_->cpus(); cpu++) {
+  for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
     if (!cpu_constraints_.Matches(cpu))
       continue;
 
@@ -142,7 +146,7 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
 
     // Filter on other constraints now.
     for (size_t i = 0; i < slices->slice_count(); i++) {
-      if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
+      if (timestamp_constraints_.Matches(slices->start_ns()[i]) &&
           duration_constraints_.Matches(slices->durations()[i])) {
         state.index = i;
         break;
@@ -171,7 +175,7 @@ int SchedSliceTable::Cursor::Next() {
   state->index = slices->slice_count();
 
   for (size_t i = start_index; i < slices->slice_count(); i++) {
-    if (timestamp_constraints_.Matches(slices->start_timestamps()[i]) &&
+    if (timestamp_constraints_.Matches(slices->start_ns()[i]) &&
         duration_constraints_.Matches(slices->durations()[i])) {
       state->index = i;
       break;
@@ -195,7 +199,7 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
     case Column::kTimestamp: {
       auto timestamp =
-          static_cast<sqlite3_int64>(slices->start_timestamps()[state.index]);
+          static_cast<sqlite3_int64>(slices->start_ns()[state.index]);
       sqlite3_result_int64(context, timestamp);
       break;
     }
@@ -234,7 +238,7 @@ void SchedSliceTable::Cursor::UpdateStateIndex() {
       continue;
 
     // TODO(lalitm): handle sorting by things other than timestamp.
-    uint64_t cur_timestamp = slices->start_timestamps()[state.index];
+    uint64_t cur_timestamp = slices->start_ns()[state.index];
     if (cur_timestamp < min_timestamp) {
       min_timestamp = cur_timestamp;
       next_state_index = -1;
