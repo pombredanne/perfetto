@@ -97,8 +97,6 @@ class TraceStorage {
     return &cpu_events_[cpu];
   }
 
-  uint32_t cpus() const { return static_cast<uint32_t>(cpu_events_.size()); }
-
  private:
   // Each StringId is an offset into |strings_|.
   using StringHash = uint32_t;
