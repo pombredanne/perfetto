@@ -57,6 +57,9 @@
 #include <unwindstack/UserX86.h>
 #include <unwindstack/UserX86_64.h>
 
+// #define MAYBE_LOCK(l, mtx) do { } while(0)
+#define MAYBE_LOCK(l, mtx) std::lock_guard<std::mutex> l(mtx);
+
 namespace perfetto {
 
 std::string GetName(int fd) {
@@ -97,7 +100,7 @@ class StackMemory : public unwindstack::MemoryRemote {
 class Histogram {
  public:
   void AddSample(base::TimeMillis value) {
-    std::lock_guard<std::mutex> l(mtx_);
+    MAYBE_LOCK(l, mtx_);
     base::TimeMillis cur = base::TimeMillis(-1);
     for (auto& p : delay_histogram_ms_) {
       if (cur < value && value <= p.first) {
@@ -110,7 +113,7 @@ class Histogram {
   }
 
   void PrintDebugInfo() {
-    std::lock_guard<std::mutex> l(mtx_);
+    MAYBE_LOCK(l, mtx_);
     base::TimeMillis cur = base::TimeMillis(-1);
     for (auto& p : delay_histogram_ms_) {
       PERFETTO_LOG("(%" PRId64 ", %" PRId64 "]: %" PRIu64, int64_t(cur.count()),
@@ -145,9 +148,20 @@ Histogram parse_only_histogram;
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
 
+struct ProcessID {
+  uint64_t pid;
+  uint64_t init_ts;
+  bool operator<(const ProcessID& o) const {
+    return pid < o.pid || (pid == o.pid && init_ts < o.init_ts);
+  }
+  bool operator==(const ProcessID& o) const {
+    return pid == o.pid && init_ts == o.init_ts;
+  }
+};
+
 struct MetadataHeader {
   uint8_t type;
-  uint64_t pid;
+  ProcessID pid;
 };
 
 struct AllocMetadata {
@@ -227,7 +241,7 @@ class HeapDump {
     if (data.size() <= 2) {
       return;
     }
-    std::lock_guard<std::mutex> l(mutex_);
+    MAYBE_LOCK(l, mutex_);
 
     Frame* frame = &top_frame_;
     frame->size += metadata.size;
@@ -248,7 +262,7 @@ class HeapDump {
   }
 
   void FreeAddr(uint64_t addr) {
-    std::lock_guard<std::mutex> l(mutex_);
+    MAYBE_LOCK(l, mutex_);
     auto itr = addr_info_.find(addr);
     if (itr == addr_info_.end())
       return;
@@ -270,7 +284,7 @@ class HeapDump {
   }
 
   void Print(std::ostream& o) {
-    std::lock_guard<std::mutex> l(mutex_);
+    MAYBE_LOCK(l, mutex_);
     top_frame_.Print(o);
   }
 
@@ -282,7 +296,10 @@ class HeapDump {
       addr_info_;
 };
 
-std::map<uint64_t, HeapDump> heapdump_for_pid;
+std::map<ProcessID, HeapDump> heapdump_for_pid;
+std::mutex heapdump_for_pid_mtx;
+std::map<ProcessID, unwindstack::RemoteMaps> remotemap_for_pid;
+std::mutex remotemap_for_pid_mtx;
 
 void DoneAlloc(void* mem, size_t sz) {
   auto start = base::GetWallTimeMs();
@@ -295,15 +312,26 @@ void DoneAlloc(void* mem, size_t sz) {
     return;
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
-  unwindstack::RemoteMaps maps(metadata->header.pid);
-  auto parse_start = base::GetWallTimeMs();
-  if (!maps.Parse()) {
-    // PERFETTO_LOG("Parse %" PRIu64, metadata->header.pid);
-    return;
+  decltype(remotemap_for_pid)::iterator itr;
+  {
+    MAYBE_LOCK(l, remotemap_for_pid_mtx);
+    itr = remotemap_for_pid.find(metadata->header.pid);
+    if (itr == remotemap_for_pid.end()) {
+      itr = remotemap_for_pid
+                .emplace(metadata->header.pid, metadata->header.pid.pid)
+                .first;
+      auto parse_start = base::GetWallTimeMs();
+      if (!itr->second.Parse()) {
+        remotemap_for_pid.erase(itr);
+        return;
+      }
+      parse_only_histogram.AddSample(base::GetWallTimeMs() - parse_start);
+    }
   }
-  parse_only_histogram.AddSample(base::GetWallTimeMs() - parse_start);
-  std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->header.pid, metadata->sp, stack, sz - sizeof(AllocMetadata));
+  unwindstack::RemoteMaps& maps = itr->second;
+  std::shared_ptr<unwindstack::Memory> mems =
+      std::make_shared<StackMemory>(metadata->header.pid.pid, metadata->sp,
+                                    stack, sz - sizeof(AllocMetadata));
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
   auto unwind_start = base::GetWallTimeMs();
   unwinder.Unwind();
@@ -320,13 +348,20 @@ void DoneAlloc(void* mem, size_t sz) {
     histogram.AddSample(now - start);
     unwind_only_histogram.AddSample(now - unwind_start);
   }
-  heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
+  return;
+  HeapDump* hd;
+  {
+    MAYBE_LOCK(l, heapdump_for_pid_mtx);
+    hd = &heapdump_for_pid[metadata->header.pid];
+  }
+  hd->AddStack(unwinder.frames(), *metadata);
 }
 
 void DoneFree(void* mem, size_t sz) {
+  return;
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
-  for (size_t n = 3; n < sz / sizeof(*freed); n++) {
+  for (size_t n = 4; n < sz / sizeof(*freed); n++) {
     heapdump_for_pid[header->pid].FreeAddr(freed[n]);
   }
 }
@@ -558,6 +593,8 @@ void DumpHeaps() {
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
+  return;
+
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
@@ -565,7 +602,7 @@ void DumpHeaps() {
     if (!first)
       f << ",\n";
     first = false;
-    f << '"' << p.first << "\": [";
+    f << '"' << p.first.pid << "\": [";
     p.second.Print(f);
     f << "]";
   }
