@@ -231,7 +231,7 @@ if (build_with_chromium) {
   }
 }
 
-if (use_libfuzzer && !build_with_chromium) {
+if (use_libfuzzer) {
   group("fuzzers") {
     testonly = true
     deps = [
@@ -240,4 +240,16 @@ if (use_libfuzzer && !build_with_chromium) {
       "test:end_to_end_shared_memory_fuzzer",
     ]
   }
+}
+
+executable("profhd") {
+  deps = [
+    "gn:default_deps",
+    "src/base",
+    "src/ipc",
+  ]
+  sources = [
+    "profhd.cc",
+  ]
+  libs = [ "unwindstack" ]
 }
