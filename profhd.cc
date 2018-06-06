@@ -304,7 +304,6 @@ void PipeSender::OnNewIncomingConnection(
     }
 
     ssize_t rd = record_reader->Read(fd);
-    if (rd == -1) return;
     if (rd == 0) {
       PERFETTO_LOG("Pipe closed");
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
