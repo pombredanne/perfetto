@@ -44,6 +44,10 @@ class PipeSender : public ipc::UnixSocket::EventListener {
   void OnNewIncomingConnection(ipc::UnixSocket*,
                                std::unique_ptr<ipc::UnixSocket>) override;
   void OnDisconnect(ipc::UnixSocket* self) override;
+  void OnDataAvailable(ipc::UnixSocket* sock) override {
+    char buf[4096];
+    sock->Receive(&buf, sizeof(buf));
+  }
 
  private:
   base::TaskRunner* task_runner_;
@@ -76,10 +80,8 @@ void PipeSender::OnNewIncomingConnection(
     if (rd == -1)
       return;
     total_read += rd;
-    /*
-    if ((total_read / 100000) != ((total_read - rd) / 100000))
+    if ((total_read / 10000000) != ((total_read - rd) / 10000000))
       PERFETTO_LOG("perfhd: %lu\n", total_read);
-      */
     if (rd == 0) {
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
       close(outfd);
