@@ -210,8 +210,12 @@ void DoneFree(void* mem, size_t sz) {
   }
 }
 
+std::atomic<uint64_t> samples_recv(0);
+std::atomic<uint64_t> samples_handled(0);
+
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
+  samples_handled++;
   if (sz < sizeof(MetadataHeader)) return;
   void* mem = mmap(nullptr, sz, PROT_READ, MAP_PRIVATE, *fd, 0);
   if (mem == MAP_FAILED) {
@@ -243,11 +247,31 @@ struct WorkItem {
 folly::ProducerConsumerQueue<WorkItem> queue(10000);
 uint64_t queue_overrun = 0;
 
+class WorkQueue {
+ public:
+  bool Submit(WorkItem item) {
+    if (queue_.write(std::move(item))) {
+      task_runner_.PostTask([this] {
+        WorkItem w;
+        if (queue_.read(w)) Done(std::move(w.fd), w.record_size);
+      });
+      return true;
+    }
+    return false;
+  }
+
+  void Run() { task_runner_.Run(); }
+
+ private:
+  folly::ProducerConsumerQueue<WorkItem> queue_{5000};
+  base::UnixTaskRunner task_runner_;
+};
+
 class RecordReader {
  public:
   RecordReader() { Reset(); }
 
-  ssize_t Read(int fd, base::TaskRunner* unwind_task_runner) {
+  ssize_t Read(int fd, WorkQueue* wq) {
     if (read_idx_ < sizeof(record_size_)) {
       ssize_t rd = ReadRecordSize(fd);
       if (rd != -1) read_idx_ += rd;
@@ -257,15 +281,11 @@ class RecordReader {
     ssize_t rd = ReadRecord(fd);
     if (rd != -1) read_idx_ += rd;
     if (done()) {
-      // C++11 :(
-      if (outfd_ && queue.write(std::move(outfd_), record_size_)) {
-        unwind_task_runner->PostTask([] {
-          WorkItem w;
-          if (queue.read(w)) Done(std::move(w.fd), w.record_size);
-        });
-      } else if (queue_overrun++ % 10000 == 0) {
+      samples_recv++;
+      if (outfd_)
+        wq->Submit(WorkItem(std::move(outfd_), record_size_));
+      else if (queue_overrun++ % 10000 == 0)
         PERFETTO_LOG("Queue overrun %" PRIu64, queue_overrun);
-      }
       Reset();
     }
     return rd;
@@ -325,10 +345,10 @@ class RecordReader {
 
 class PipeSender : public ipc::UnixSocket::EventListener {
  public:
-  PipeSender(base::TaskRunner* task_runner,
-             base::TaskRunner* unwind_task_runner)
+  PipeSender(base::TaskRunner* task_runner, std::vector<WorkQueue>* work_queues)
       : task_runner_(task_runner),
-        unwind_task_runner_(unwind_task_runner),
+        work_queues_(work_queues),
+        num_wq_(work_queues_->size()),
         weak_factory_(this) {}
 
   void OnNewIncomingConnection(ipc::UnixSocket*,
@@ -341,9 +361,11 @@ class PipeSender : public ipc::UnixSocket::EventListener {
 
  private:
   base::TaskRunner* task_runner_;
-  base::TaskRunner* unwind_task_runner_;
-  base::WeakPtrFactory<PipeSender> weak_factory_;
+  std::vector<WorkQueue>* work_queues_;
+  uint64_t cur_wq_ = 0;
+  size_t num_wq_;
   std::map<ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket>> socks_;
+  base::WeakPtrFactory<PipeSender> weak_factory_;
 };
 
 void PipeSender::OnNewIncomingConnection(
@@ -373,7 +395,9 @@ void PipeSender::OnNewIncomingConnection(
       return;
     }
 
-    ssize_t rd = record_reader->Read(fd, weak_this->unwind_task_runner_);
+    ssize_t rd = record_reader->Read(
+        fd, &((*weak_this->work_queues_)[weak_this->cur_wq_++ %
+                                         weak_this->num_wq_]));
     if (rd == 0) {
       // PERFETTO_LOG("Pipe closed %s", GetName(fd).c_str());
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
@@ -388,12 +412,12 @@ void PipeSender::OnDisconnect(ipc::UnixSocket* self) { socks_.erase(self); }
 
 int dumppipes[2];
 
-void DumpHeapsHandler(int sig) {
-  PERFETTO_LOG("Dumping heap dumps.");
-  write(dumppipes[1], "w", 1);
-}
+void DumpHeapsHandler(int sig) { write(dumppipes[1], "w", 1); }
 
 void DumpHeaps() {
+  PERFETTO_LOG("Dumping heap dumps.");
+  PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64,
+               samples_recv.load(), samples_handled.load());
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
@@ -417,17 +441,24 @@ int ProfHDMain(int argc, char** argv) {
   pipe(dumppipes);
   signal(SIGUSR1, DumpHeapsHandler);
 
+  std::vector<WorkQueue> work_queues(
+      std::max(1u, std::thread::hardware_concurrency()));
+
   base::UnixTaskRunner read_task_runner;
   base::UnixTaskRunner unwind_task_runner;
   // Never block the read task_runner.
   unwind_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
-  PipeSender listener(&read_task_runner, &unwind_task_runner);
+  PipeSender listener(&read_task_runner, &work_queues);
 
   std::unique_ptr<ipc::UnixSocket> sock(
       ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner));
-  std::thread t([&unwind_task_runner] { unwind_task_runner.Run(); });
+
+  std::vector<std::thread> threads;
+  for (auto& wq : work_queues) threads.emplace_back([&wq] { wq.Run(); });
+
   read_task_runner.Run();
-  t.join();
+  for (auto& t : threads) t.join();
+
   return 0;
 }
 
