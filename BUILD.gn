@@ -253,35 +253,3 @@ executable("profhd") {
   ]
   libs = [ "unwindstack" ]
 }
-
-template("fifoclient_template") {
-  executable(target_name) {
-    deps = [
-      "gn:default_deps",
-      "src/base",
-    ]
-    sources = [
-      "fifoclient.cc",
-    ]
-    forward_variables_from(invoker, "*")
-    if (defined(defines)) {
-      defines += [ "INSTANCE_NAME=\"$target_name\"" ]
-    } else {
-      defines = [ "INSTANCE_NAME=\"$target_name\"" ]
-    }
-  }
-}
-
-fifoclient_template("fifoclient_splice") {
-  defines = [ "USE_SPLICE" ]
-}
-
-fifoclient_template("fifoclient_splice_pagealign") {
-  defines = [
-    "USE_SPLICE",
-    "PAGE_ALIGN",
-  ]
-}
-
-fifoclient_template("fifoclient_nosplice") {
-}
