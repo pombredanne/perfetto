@@ -159,6 +159,7 @@ class Histogram {
 };
 
 std::atomic<uint64_t> samples_recv(0);
+std::atomic<uint64_t> samples_too_late(0);
 std::atomic<uint64_t> samples_handled(0);
 std::atomic<uint64_t> samples_failed(0);
 
@@ -289,7 +290,8 @@ class HeapDump {
 
     Frame* frame = &top_frame_;
     frame->size -= metadata.size;
-    for (const unwindstack::FrameData frame_data : data) {
+    for (auto it = data.rbegin(); it != data.rend(); ++it) {
+      const unwindstack::FrameData& frame_data = *it;
       auto itr = frame->children.find(frame_data.function_name);
       if (itr == frame->children.end())
         break;
@@ -325,8 +327,11 @@ std::mutex metadata_for_pipe_mtx;
 
 void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   auto start = base::GetWallTimeUs();
-  if (sz < sizeof(AllocMetadata))
+  if (sz < sizeof(AllocMetadata)) {
+    PERFETTO_ELOG("size");
+    samples_failed++;
     return;
+  }
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
   if (alloc_metadata->last_timing)
     send_histogram.AddSample(base::TimeMicros(alloc_metadata->last_timing));
@@ -334,23 +339,24 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->regs);
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
+    samples_failed++;
     return;
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + alloc_metadata->sp_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       alloc_metadata->header.pid, alloc_metadata->sp, stack,
       sz - alloc_metadata->sp_offset);
-  unwindstack::Unwinder unwinder(100, &metadata->maps, regs, mems);
+  unwindstack::Unwinder unwinder(1000, &metadata->maps, regs, mems);
   auto unwind_start = base::GetWallTimeUs();
 
+  int error_code;
   for (int attempt = 0; attempt < 2; ++attempt) {
     unwinder.Unwind();
-    int error_code = unwinder.LastErrorCode();
+    error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
         metadata->maps = unwindstack::RemoteMaps(metadata->pid);
-        if (!metadata->maps.Parse())
-          break;
+        metadata->maps.Parse();
       } else {
         samples_failed++;
         if (error_code > 0 && error_code < errors.size())
@@ -367,12 +373,14 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
       break;
     }
   }
-  metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata);
+  if (error_code == 0) {
+    metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata);
+  }
 }
 
 void DoneFree(void* mem, size_t sz, Metadata* metadata) {
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
-  for (size_t n = 4; n < sz / sizeof(*freed); n++) {
+  for (size_t n = 3; n < sz / sizeof(*freed); n++) {
     frees_handled++;
     if (metadata->heap_dump.FreeAddr(freed[n]))
       frees_found++;
@@ -389,10 +397,18 @@ void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd) {
   {
     std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
     itr = metadata_for_pipe.find(pipe_fd);
-    if (itr == metadata_for_pipe.end())
-      itr = metadata_for_pipe.emplace(pipe_fd, header->pid).first;
+    if (itr == metadata_for_pipe.end()) {
+      metadata_for_pipe.emplace(pipe_fd, header->pid);
+    } else if (itr->second.pid != header->pid) {
+      metadata_for_pipe.erase(pipe_fd);
+      metadata_for_pipe.emplace(pipe_fd, header->pid);
+    }
   }
   Metadata& metadata = itr->second;
+  if (metadata.pid != header->pid) {
+    samples_too_late++;
+    return;
+  }
 
   switch (header->type) {
     case kAlloc:
@@ -459,6 +475,17 @@ class RecordReader {
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
+      {
+        auto itr = metadata_for_pipe.find(fd);
+        if (itr == metadata_for_pipe.end()) {
+          MetadataHeader* header =
+              reinterpret_cast<MetadataHeader*>(buf_.get());
+          std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+          //          PERFETTO_LOG("PID: %" PRIu64, header->pid);
+          metadata_for_pipe.emplace(fd, header->pid);
+        }
+      }
+
       if (!wq->Submit(WorkItem(std::move(buf_), record_size_, fd)))
         queue_overrun++;
       Reset();
@@ -537,15 +564,18 @@ class PipeSender : public ipc::UnixSocket::EventListener {
 void PipeSender::OnNewIncomingConnection(
     ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
+  //  PERFETTO_LOG("New connection");
   ipc::UnixSocket* p = new_connection.get();
   socks_.emplace(p, std::move(new_connection));
 }
 
 void PipeSender::OnDisconnect(ipc::UnixSocket* self) {
-  {
+  //  PERFETTO_LOG("Disconnected connection");
+  int fd = self->fd();
+  (*work_queues_)[fd % num_wq_].task_runner_.PostTask([fd] {
     std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-    metadata_for_pipe.erase(self->fd());
-  }
+    metadata_for_pipe.erase(fd);
+  });
   record_readers_.erase(self);
   socks_.erase(self);
 }
@@ -557,13 +587,20 @@ void InfoHandler(int sig) {
 }
 
 void Info() {
+  size_t pipe_metadata;
+  {
+    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+    pipe_metadata = metadata_for_pipe.size();
+  }
   PERFETTO_LOG("Dumping heap dumps.");
   PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
                ", samples overran %" PRIu64 ", samples failed %" PRIu64
-               ", frees handled %" PRIu64 ", frees found %" PRIu64,
+               ", frees handled %" PRIu64 ", frees found %" PRIu64
+               ", samples too late %" PRIu64 ", pipe metadata %" PRIu64,
                samples_recv.load(), samples_handled.load(),
                queue_overrun.load(), samples_failed.load(),
-               frees_handled.load(), frees_found.load());
+               frees_handled.load(), frees_found.load(),
+               samples_too_late.load(), pipe_metadata);
   for (int i = 1; i < errors.size(); ++i)
     PERFETTO_LOG("errors[%d] = %" PRIu64, i, errors[i].load());
 
