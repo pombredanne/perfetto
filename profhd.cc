@@ -362,16 +362,12 @@ void DoneFree(void* mem, size_t sz, Metadata* metadata) {
   }
 }
 
-void Done(base::ScopedFile fd, size_t sz, int pipe_fd);
-void Done(base::ScopedFile fd, size_t sz, int pipe_fd) {
+void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd);
+void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd) {
   samples_handled++;
   if (sz < sizeof(MetadataHeader))
     return;
-  void* mem = mmap(nullptr, sz, PROT_READ, MAP_PRIVATE, *fd, 0);
-  if (mem == MAP_FAILED) {
-    PERFETTO_PLOG("mmap %zd %d", sz, *fd);
-    return;
-  }
+  void* mem = buf.get();
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   decltype(metadata_for_pipe)::iterator itr;
   {
@@ -392,15 +388,14 @@ void Done(base::ScopedFile fd, size_t sz, int pipe_fd) {
     default:
       PERFETTO_ELOG("Invalid type %" PRIu8, header->type);
   }
-  munmap(mem, sz);
 }
 
 struct WorkItem {
  public:
   WorkItem() {}
-  WorkItem(base::ScopedFile f, size_t s, int pfd)
-      : fd(std::move(f)), record_size(s), pipe_fd(pfd) {}
-  base::ScopedFile fd;
+  WorkItem(std::unique_ptr<uint8_t[]> f, size_t s, int pfd)
+      : buf(std::move(f)), record_size(s), pipe_fd(pfd) {}
+  std::unique_ptr<uint8_t[]> buf;
   size_t record_size;
   int pipe_fd;
 };
@@ -414,7 +409,7 @@ class WorkQueue {
       task_runner_.PostTask([this] {
         WorkItem w;
         if (queue_.read(w))
-          Done(std::move(w.fd), w.record_size, w.pipe_fd);
+          Done(std::move(w.buf), w.record_size, w.pipe_fd);
       });
       return true;
     }
@@ -438,15 +433,18 @@ class RecordReader {
       ssize_t rd = ReadRecordSize(fd);
       if (rd != -1)
         read_idx_ += rd;
+      if (read_idx_ == sizeof(record_size_))
+        buf_.reset(new uint8_t[record_size_]);
       return rd;
     }
+
 
     ssize_t rd = ReadRecord(fd);
     if (rd != -1)
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
-      if (!outfd_ || !wq->Submit(WorkItem(std::move(outfd_), record_size_, fd)))
+      if (!wq->Submit(WorkItem(std::move(buf_), record_size_, fd)))
         queue_overrun++;
       Reset();
     }
@@ -455,9 +453,6 @@ class RecordReader {
 
  private:
   void Reset() {
-    outfd_.reset(static_cast<int>(syscall(__NR_memfd_create, "data", 0)));
-    if (*outfd_ == -1)
-      PERFETTO_PLOG("memfd_create");
     read_idx_ = 0;
     record_size_ = 1337;
   }
@@ -485,32 +480,18 @@ class RecordReader {
 
   ssize_t ReadRecord(int fd) {
     constexpr uint64_t chunk_size = 16u * 4096u;
-    char buf[chunk_size];
     uint64_t sz = std::min(chunk_size, record_size_ - read_idx());
+    ssize_t rd = read(fd, buf_.get() + read_idx(), sz);
 
-    ssize_t rd;
-    //     if (outfd_) {
-    /*
-          rd = PERFETTO_EINTR(splice(
-              fd, nullptr, *outfd_, nullptr, sz, SPLICE_F_NONBLOCK));
-    */
-    rd = read(fd, &buf, sz);
-    if (rd > 0)
-      PERFETTO_CHECK(write(*outfd_, &buf, rd) == rd);
-    /*    } else {
-          // Consume the data to not block the pipe.
-          rd = PERFETTO_EINTR(read(fd, buf, std::min(sizeof(buf), record_size_ -
-       read_idx())));
-        } */
     if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-      PERFETTO_FATAL("splice %d -> %d", fd, *outfd_);
+      PERFETTO_FATAL("read %d", fd);
     }
     return rd;
   }
 
-  base::ScopedFile outfd_;
   uint64_t read_idx_;
   uint64_t record_size_;
+  std::unique_ptr<uint8_t[]> buf_;
 };
 
 class PipeSender : public ipc::UnixSocket::EventListener {
@@ -541,13 +522,6 @@ void PipeSender::OnNewIncomingConnection(
     ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
   int pipes[2];
-  /*
-  if (pipe(pipes) == -1) {
-    PERFETTO_PLOG("pipe");
-    new_connection->Shutdown(false);
-    return;
-  }
-  */
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, pipes) == -1) {
     PERFETTO_PLOG("sockpair");
     new_connection->Shutdown(false);
