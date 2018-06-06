@@ -141,8 +141,7 @@ class HeapDump {
 
   void FreeAddr(uint64_t addr) {
     auto itr = addr_info_.find(addr);
-    if (itr == addr_info_.end())
-      return;
+    if (itr == addr_info_.end()) return;
     for (const std::string& fn : itr->second.second)
       heap_usage_per_function_[fn] -= itr->second.first;
   }
