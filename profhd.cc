@@ -64,8 +64,8 @@ class StackMemory : public unwindstack::MemoryRemote {
     int64_t offset = addr - sp_;
     if (offset >= 0 && offset < size_) {
       PERFETTO_CHECK(size < size_ - offset);
-      memcpy(dst, stack_ + offset, size);
-      return size;
+      memcpy(dst, stack_ + offset, std::min(size, size_));
+      return std::min(size, size_);
     }
     return unwindstack::MemoryRemote::Read(addr, dst, size);
   }
@@ -183,11 +183,14 @@ void DoneAlloc(void* mem, size_t sz) {
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
   unwinder.Unwind();
 
+  /*
+  if (unwinder.LastErrorCode() != 0)
+    PERFETTO_ELOG("Unwinder: %" PRIu8, unwinder.LastErrorCode());
+*/
   heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
 }
 
 void DoneFree(void* mem, size_t sz) {
-  PERFETTO_LOG("Freeing page.");
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 3; n < sz / sizeof(*freed); n++) {
