@@ -161,10 +161,15 @@ class Histogram {
 std::atomic<uint64_t> samples_recv(0);
 std::atomic<uint64_t> samples_handled(0);
 std::atomic<uint64_t> samples_failed(0);
+
+std::atomic<uint64_t> frees_handled(0);
+std::atomic<uint64_t> frees_found(0);
+
 std::array<std::atomic<uint64_t>, 7> errors;
 Histogram histogram;
 Histogram unwind_only_histogram;
 Histogram parse_only_histogram;
+Histogram send_histogram;
 
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
@@ -182,6 +187,7 @@ struct AllocMetadata {
   uint64_t sp;
   uint64_t sp_offset;
   uint64_t addr;
+  uint64_t last_timing;
 };
 
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
@@ -272,11 +278,11 @@ class HeapDump {
     addr_info_.emplace(metadata.addr, std::make_pair(data, metadata));
   }
 
-  void FreeAddr(uint64_t addr) {
+  bool FreeAddr(uint64_t addr) {
     MAYBE_LOCK(l, mutex_);
     auto itr = addr_info_.find(addr);
     if (itr == addr_info_.end())
-      return;
+      return false;
 
     const std::vector<unwindstack::FrameData>& data = itr->second.first;
     const AllocMetadata& metadata = itr->second.second;
@@ -291,7 +297,7 @@ class HeapDump {
       frame = &itr->second;
     }
 
-    addr_info_.erase(addr);
+    return addr_info_.erase(addr) == 1;
   }
 
   void Print(std::ostream& o) {
@@ -322,6 +328,8 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   if (sz < sizeof(AllocMetadata))
     return;
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
+  if (alloc_metadata->last_timing)
+    send_histogram.AddSample(base::TimeMicros(alloc_metadata->last_timing));
   unwindstack::Regs* regs =
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->regs);
   if (regs == nullptr) {
@@ -332,37 +340,47 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       alloc_metadata->header.pid, alloc_metadata->sp, stack,
       sz - alloc_metadata->sp_offset);
-  unwindstack::Unwinder unwinder(1000, &metadata->maps, regs, mems);
+  unwindstack::Unwinder unwinder(100, &metadata->maps, regs, mems);
   auto unwind_start = base::GetWallTimeUs();
-  unwinder.Unwind();
 
-  int error_code = unwinder.LastErrorCode();
-  if (error_code != 0) {
-    samples_failed++;
-    if (error_code > 0 && error_code < errors.size())
-      errors[error_code]++;
-    else
-      PERFETTO_ELOG("Unwinder: %" PRIu8, error_code);
-  } else {
-    base::TimeMicros now = base::GetWallTimeUs();
-    histogram.AddSample(now - start);
-    unwind_only_histogram.AddSample(now - unwind_start);
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    unwinder.Unwind();
+    int error_code = unwinder.LastErrorCode();
+    if (error_code != 0) {
+      if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
+        metadata->maps = unwindstack::RemoteMaps(metadata->pid);
+        if (!metadata->maps.Parse())
+          break;
+      } else {
+        samples_failed++;
+        if (error_code > 0 && error_code < errors.size())
+          errors[error_code]++;
+        else
+          PERFETTO_ELOG("Unwinder: %" PRIu8, error_code);
+        break;
+      }
+    } else {
+      base::TimeMicros now = base::GetWallTimeUs();
+      histogram.AddSample(now - start);
+      unwind_only_histogram.AddSample(now - unwind_start);
+      samples_handled++;
+      break;
+    }
   }
-  return;
   metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata);
 }
 
 void DoneFree(void* mem, size_t sz, Metadata* metadata) {
-  return;
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 4; n < sz / sizeof(*freed); n++) {
-    metadata->heap_dump.FreeAddr(freed[n]);
+    frees_handled++;
+    if (metadata->heap_dump.FreeAddr(freed[n]))
+      frees_found++;
   }
 }
 
 void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd);
 void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd) {
-  samples_handled++;
   if (sz < sizeof(MetadataHeader))
     return;
   void* mem = buf.get();
@@ -494,8 +512,7 @@ class RecordReader {
 class PipeSender : public ipc::UnixSocket::EventListener {
  public:
   PipeSender(std::vector<WorkQueue>* work_queues)
-      : work_queues_(work_queues),
-        num_wq_(work_queues_->size()) {}
+      : work_queues_(work_queues), num_wq_(work_queues_->size()) {}
 
   void OnNewIncomingConnection(ipc::UnixSocket*,
                                std::unique_ptr<ipc::UnixSocket>) override;
@@ -533,18 +550,20 @@ void PipeSender::OnDisconnect(ipc::UnixSocket* self) {
   socks_.erase(self);
 }
 
-int dumppipes[2];
+int infopipes[2];
 
-void DumpHeapsHandler(int sig) {
-  write(dumppipes[1], "w", 1);
+void InfoHandler(int sig) {
+  write(infopipes[1], "w", 1);
 }
 
-void DumpHeaps() {
+void Info() {
   PERFETTO_LOG("Dumping heap dumps.");
   PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
-               ", samples overran %" PRIu64 ", samples failed %" PRIu64,
+               ", samples overran %" PRIu64 ", samples failed %" PRIu64
+               ", frees handled %" PRIu64 ", frees found %" PRIu64,
                samples_recv.load(), samples_handled.load(),
-               queue_overrun.load(), samples_failed.load());
+               queue_overrun.load(), samples_failed.load(),
+               frees_handled.load(), frees_found.load());
   for (int i = 1; i < errors.size(); ++i)
     PERFETTO_LOG("errors[%d] = %" PRIu64, i, errors[i].load());
 
@@ -552,13 +571,15 @@ void DumpHeaps() {
   histogram.PrintDebugInfo();
   PERFETTO_LOG("Unwinding time:");
   unwind_only_histogram.PrintDebugInfo();
-  PERFETTO_LOG("Parsing time:");
-  parse_only_histogram.PrintDebugInfo();
+  // PERFETTO_LOG("Parsing time:");
+  // parse_only_histogram.PrintDebugInfo();
+  PERFETTO_LOG("Sending time:");
+  send_histogram.PrintDebugInfo();
   char buf[512];
-  read(dumppipes[0], &buf, sizeof(buf));
+  read(infopipes[0], &buf, sizeof(buf));
+}
 
-  return;
-
+void Dump() {
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
@@ -575,6 +596,11 @@ void DumpHeaps() {
   f << "\n}";
 }
 
+void DumpHandler(int sig) {
+  std::thread t(Dump);
+  t.detach();
+}
+
 int ProfHDMain(int argc, char** argv);
 int ProfHDMain(int argc, char** argv) {
   unwindstack::Elf::SetCachingEnabled(true);
@@ -583,8 +609,9 @@ int ProfHDMain(int argc, char** argv) {
 
   for (int i = 0; i < errors.size(); ++i)
     errors[i] = 0;
-  pipe(dumppipes);
-  signal(SIGUSR1, DumpHeapsHandler);
+  pipe(infopipes);
+  signal(SIGUSR1, InfoHandler);
+  signal(SIGUSR2, DumpHandler);
 
   std::vector<WorkQueue> work_queues(
       std::max(1u, std::thread::hardware_concurrency()));
@@ -592,7 +619,7 @@ int ProfHDMain(int argc, char** argv) {
   base::UnixTaskRunner read_task_runner;
   base::UnixTaskRunner sighandler_task_runner;
   // Never block the read task_runner.
-  sighandler_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
+  sighandler_task_runner.AddFileDescriptorWatch(infopipes[0], Info);
   PipeSender listener(&work_queues);
 
   std::unique_ptr<ipc::UnixSocket> sock(
