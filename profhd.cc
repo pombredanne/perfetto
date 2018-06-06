@@ -19,6 +19,7 @@
 #include <linux/memfd.h>
 #include <signal.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -36,6 +37,7 @@
 #include "folly/ProducerConsumerQueue.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "src/ipc/unix_socket.h"
@@ -61,6 +63,21 @@
 #define MAYBE_LOCK(l, mtx) std::lock_guard<std::mutex> l(mtx);
 
 namespace perfetto {
+
+std::string GetName(int fd) {
+  std::string path = "/proc/self/fd/";
+  path += std::to_string(fd);
+  char buf[512];
+  readlink(path.c_str(), buf, sizeof(buf));
+  return std::string(buf, sizeof(buf));
+}
+
+namespace base {
+using TimeMicros = std::chrono::microseconds;
+inline TimeMicros GetWallTimeUs() {
+  return std::chrono::duration_cast<TimeMicros>(GetWallTimeNs());
+}
+}  // namespace base
 
 class StackMemory : public unwindstack::MemoryRemote {
  public:
@@ -91,9 +108,11 @@ class StackMemory : public unwindstack::MemoryRemote {
 
 class Histogram {
  public:
-  void AddSample(base::TimeMillis value) {
+  void AddSample(base::TimeMicros value) {
     MAYBE_LOCK(l, mtx_);
-    base::TimeMillis cur = base::TimeMillis(-1);
+    total_time_ += value;
+    total_samples_++;
+    base::TimeMicros cur = base::TimeMicros(-1);
     for (auto& p : delay_histogram_ms_) {
       if (cur < value && value <= p.first) {
         p.second++;
@@ -106,26 +125,38 @@ class Histogram {
 
   void PrintDebugInfo() {
     MAYBE_LOCK(l, mtx_);
-    base::TimeMillis cur = base::TimeMillis(-1);
+    base::TimeMicros cur = base::TimeMicros(-1);
     for (auto& p : delay_histogram_ms_) {
       PERFETTO_LOG("(%" PRId64 ", %" PRId64 "]: %" PRIu64, int64_t(cur.count()),
                    int64_t(p.first.count()), p.second);
       cur = p.first;
     }
+    PERFETTO_LOG("profhd: average: %" PRIu64,
+                 uint64_t(total_time_.count()) / total_samples_);
   }
 
  private:
   std::mutex mtx_;
 
-  std::vector<std::pair<base::TimeMillis, uint64_t>> delay_histogram_ms_{
-      {{base::TimeMillis(1), 0},
-       {base::TimeMillis(5), 0},
-       {base::TimeMillis(10), 0},
-       {base::TimeMillis(50), 0},
-       {base::TimeMillis(100), 0},
-       {base::TimeMillis(500), 0},
-       {base::TimeMillis(1000), 0},
-       {base::TimeMillis(std::numeric_limits<base::TimeMillis::rep>::max()),
+  base::TimeMicros total_time_{0};
+  uint64_t total_samples_ = 0;
+  std::vector<std::pair<base::TimeMicros, uint64_t>> delay_histogram_ms_{
+      {{base::TimeMicros(1), 0},
+       {base::TimeMicros(5), 0},
+       {base::TimeMicros(10), 0},
+       {base::TimeMicros(20), 0},
+       {base::TimeMicros(50), 0},
+       {base::TimeMicros(100), 0},
+       {base::TimeMicros(200), 0},
+       {base::TimeMicros(500), 0},
+       {base::TimeMicros(1000), 0},
+       {base::TimeMicros(5000), 0},
+       {base::TimeMicros(10000), 0},
+       {base::TimeMicros(50000), 0},
+       {base::TimeMicros(100000), 0},
+       {base::TimeMicros(500000), 0},
+       {base::TimeMicros(1000000), 0},
+       {base::TimeMicros(std::numeric_limits<base::TimeMicros::rep>::max()),
         0}}};
 };
 
@@ -140,20 +171,9 @@ Histogram parse_only_histogram;
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
 
-struct ProcessID {
-  uint64_t pid;
-  uint64_t init_ts;
-  bool operator<(const ProcessID& o) const {
-    return pid < o.pid || (pid == o.pid && init_ts < o.init_ts);
-  }
-  bool operator==(const ProcessID& o) const {
-    return pid == o.pid && init_ts == o.init_ts;
-  }
-};
-
 struct MetadataHeader {
   uint8_t type;
-  ProcessID pid;
+  uint64_t pid;
 };
 
 struct AllocMetadata {
@@ -162,6 +182,7 @@ struct AllocMetadata {
   uint8_t regs[264];
   uint64_t size;
   uint64_t sp;
+  uint64_t sp_offset;
   uint64_t addr;
 };
 
@@ -299,7 +320,7 @@ std::map<int, Metadata> metadata_for_pipe;
 std::mutex metadata_for_pipe_mtx;
 
 void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
-  auto start = base::GetWallTimeMs();
+  auto start = base::GetWallTimeUs();
   if (sz < sizeof(AllocMetadata))
     return;
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
@@ -309,12 +330,12 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
     PERFETTO_ELOG("regs");
     return;
   }
-  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
+  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + alloc_metadata->sp_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      alloc_metadata->header.pid.pid, alloc_metadata->sp, stack,
-      sz - sizeof(AllocMetadata));
+      alloc_metadata->header.pid, alloc_metadata->sp, stack,
+      sz - alloc_metadata->sp_offset);
   unwindstack::Unwinder unwinder(1000, &metadata->maps, regs, mems);
-  auto unwind_start = base::GetWallTimeMs();
+  auto unwind_start = base::GetWallTimeUs();
   unwinder.Unwind();
 
   int error_code = unwinder.LastErrorCode();
@@ -325,7 +346,7 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
     else
       PERFETTO_ELOG("Unwinder: %" PRIu8, error_code);
   } else {
-    base::TimeMillis now = base::GetWallTimeMs();
+    base::TimeMicros now = base::GetWallTimeUs();
     histogram.AddSample(now - start);
     unwind_only_histogram.AddSample(now - unwind_start);
   }
@@ -357,7 +378,7 @@ void Done(base::ScopedFile fd, size_t sz, int pipe_fd) {
     std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
     itr = metadata_for_pipe.find(pipe_fd);
     if (itr == metadata_for_pipe.end())
-      itr = metadata_for_pipe.emplace(pipe_fd, header->pid.pid).first;
+      itr = metadata_for_pipe.emplace(pipe_fd, header->pid).first;
   }
   Metadata& metadata = itr->second;
 
@@ -463,21 +484,27 @@ class RecordReader {
   }
 
   ssize_t ReadRecord(int fd) {
-    static uint64_t chunk_size = 16u * 4096u;
+    constexpr uint64_t chunk_size = 16u * 4096u;
+    char buf[chunk_size];
+    uint64_t sz = std::min(chunk_size, record_size_ - read_idx());
 
     ssize_t rd;
-    if (outfd_) {
-      rd = PERFETTO_EINTR(splice(
-          fd, nullptr, *outfd_, nullptr,
-          std::min(chunk_size, record_size_ - read_idx()), SPLICE_F_NONBLOCK));
-    } else {
-      char buf[4096];
-      // Consume the data to not block the pipe.
-      rd = PERFETTO_EINTR(read(fd, buf, sizeof(buf)));
+    //     if (outfd_) {
+    /*
+          rd = PERFETTO_EINTR(splice(
+              fd, nullptr, *outfd_, nullptr, sz, SPLICE_F_NONBLOCK));
+    */
+    rd = read(fd, &buf, sz);
+    if (rd > 0)
+      PERFETTO_CHECK(write(*outfd_, &buf, rd) == rd);
+    /*    } else {
+          // Consume the data to not block the pipe.
+          rd = PERFETTO_EINTR(read(fd, buf, std::min(sizeof(buf), record_size_ -
+       read_idx())));
+        } */
+    if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+      PERFETTO_FATAL("splice %d -> %d", fd, *outfd_);
     }
-    if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
-      PERFETTO_PLOG("splice %d -> %d", fd, *outfd_);
-    PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
     return rd;
   }
 
@@ -514,11 +541,19 @@ void PipeSender::OnNewIncomingConnection(
     ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
   int pipes[2];
+  /*
   if (pipe(pipes) == -1) {
     PERFETTO_PLOG("pipe");
     new_connection->Shutdown(false);
     return;
   }
+  */
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, pipes) == -1) {
+    PERFETTO_PLOG("sockpair");
+    new_connection->Shutdown(false);
+    return;
+  }
+
   new_connection->Send("x", 1, pipes[1]);
   close(pipes[1]);
   ipc::UnixSocket* p = new_connection.get();
@@ -602,6 +637,7 @@ void DumpHeaps() {
 
 int ProfHDMain(int argc, char** argv);
 int ProfHDMain(int argc, char** argv) {
+  unwindstack::Elf::SetCachingEnabled(true);
   if (argc != 2)
     return 1;
 
