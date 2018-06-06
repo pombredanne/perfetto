@@ -251,7 +251,6 @@ struct WorkItem {
   size_t record_size;
 };
 
-folly::ProducerConsumerQueue<WorkItem> queue(10000);
 uint64_t queue_overrun = 0;
 
 class WorkQueue {
