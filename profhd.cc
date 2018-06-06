@@ -29,7 +29,10 @@
 #include <map>
 #include <set>
 #include <string>
+#include <thread>
 
+#include <unistd.h>
+#include "folly_queue.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/unix_task_runner.h"
@@ -54,6 +57,14 @@
 #include <unwindstack/UserX86_64.h>
 
 namespace perfetto {
+
+std::string GetName(int fd) {
+  std::string path = "/proc/self/fd/";
+  path += std::to_string(fd);
+  char buf[512];
+  readlink(path.c_str(), buf, sizeof(buf));
+  return std::string(buf, sizeof(buf));
+}
 
 class StackMemory : public unwindstack::MemoryRemote {
  public:
@@ -144,6 +155,7 @@ class HeapDump {
     if (itr == addr_info_.end()) return;
     for (const std::string& fn : itr->second.second)
       heap_usage_per_function_[fn] -= itr->second.first;
+    addr_info_.erase(itr);
   }
 
   void Print(std::ostream& o) const {
@@ -174,7 +186,7 @@ void DoneAlloc(void* mem, size_t sz) {
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
   unwindstack::RemoteMaps maps(metadata->header.pid);
   if (!maps.Parse()) {
-    PERFETTO_LOG("Parse %" PRIu64, metadata->header.pid);
+    // PERFETTO_LOG("Parse %" PRIu64, metadata->header.pid);
     return;
   }
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
@@ -190,6 +202,7 @@ void DoneAlloc(void* mem, size_t sz) {
 }
 
 void DoneFree(void* mem, size_t sz) {
+  return;
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 3; n < sz / sizeof(*freed); n++) {
@@ -219,11 +232,22 @@ void Done(base::ScopedFile fd, size_t sz) {
   munmap(mem, sz);
 }
 
+struct WorkItem {
+ public:
+  WorkItem() {}
+  WorkItem(base::ScopedFile f, size_t s) : fd(std::move(f)), record_size(s) {}
+  base::ScopedFile fd;
+  size_t record_size;
+};
+
+folly::ProducerConsumerQueue<WorkItem> queue(10000);
+uint64_t queue_overrun = 0;
+
 class RecordReader {
  public:
   RecordReader() { Reset(); }
 
-  ssize_t Read(int fd) {
+  ssize_t Read(int fd, base::TaskRunner* unwind_task_runner) {
     if (read_idx_ < sizeof(record_size_)) {
       ssize_t rd = ReadRecordSize(fd);
       if (rd != -1) read_idx_ += rd;
@@ -233,7 +257,15 @@ class RecordReader {
     ssize_t rd = ReadRecord(fd);
     if (rd != -1) read_idx_ += rd;
     if (done()) {
-      Done(std::move(outfd_), record_size_);
+      // C++11 :(
+      if (outfd_ && queue.write(std::move(outfd_), record_size_)) {
+        unwind_task_runner->PostTask([] {
+          WorkItem w;
+          if (queue.read(w)) Done(std::move(w.fd), w.record_size);
+        });
+      } else if (queue_overrun++ % 10000 == 0) {
+        PERFETTO_LOG("Queue overrun %" PRIu64, queue_overrun);
+      }
       Reset();
     }
     return rd;
@@ -242,6 +274,7 @@ class RecordReader {
  private:
   void Reset() {
     outfd_.reset(static_cast<int>(syscall(__NR_memfd_create, "data", 0)));
+    if (*outfd_ == -1) PERFETTO_PLOG("memfd_create");
     read_idx_ = 0;
     record_size_ = 1337;
   }
@@ -260,16 +293,27 @@ class RecordReader {
     ssize_t rd = PERFETTO_EINTR(
         read(fd, reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
              sizeof(record_size_) - read_idx_));
-    if (rd != -1 & rd != sizeof(record_size_)) PERFETTO_LOG("Incomplete read.");
+    if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+      PERFETTO_PLOG("read %d", fd);
     PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
     return rd;
   }
 
   ssize_t ReadRecord(int fd) {
     static uint64_t chunk_size = 16u * 4096u;
-    ssize_t rd = PERFETTO_EINTR(splice(
-        fd, nullptr, *outfd_, nullptr,
-        std::min(chunk_size, record_size_ - read_idx()), SPLICE_F_NONBLOCK));
+
+    ssize_t rd;
+    if (outfd_) {
+      rd = PERFETTO_EINTR(splice(
+          fd, nullptr, *outfd_, nullptr,
+          std::min(chunk_size, record_size_ - read_idx()), SPLICE_F_NONBLOCK));
+    } else {
+      char buf[4096];
+      // Consume the data to not block the pipe.
+      rd = PERFETTO_EINTR(read(fd, buf, sizeof(buf)));
+    }
+    if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+      PERFETTO_PLOG("splice %d -> %d", fd, *outfd_);
     PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
     return rd;
   }
@@ -281,8 +325,11 @@ class RecordReader {
 
 class PipeSender : public ipc::UnixSocket::EventListener {
  public:
-  PipeSender(base::TaskRunner* task_runner)
-      : task_runner_(task_runner), weak_factory_(this) {}
+  PipeSender(base::TaskRunner* task_runner,
+             base::TaskRunner* unwind_task_runner)
+      : task_runner_(task_runner),
+        unwind_task_runner_(unwind_task_runner),
+        weak_factory_(this) {}
 
   void OnNewIncomingConnection(ipc::UnixSocket*,
                                std::unique_ptr<ipc::UnixSocket>) override;
@@ -294,6 +341,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
 
  private:
   base::TaskRunner* task_runner_;
+  base::TaskRunner* unwind_task_runner_;
   base::WeakPtrFactory<PipeSender> weak_factory_;
   std::map<ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket>> socks_;
 };
@@ -301,8 +349,13 @@ class PipeSender : public ipc::UnixSocket::EventListener {
 void PipeSender::OnNewIncomingConnection(
     ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket> new_connection) {
   int pipes[2];
-  PERFETTO_CHECK(pipe(pipes) != -1);
+  if (pipe(pipes) == -1) {
+    PERFETTO_PLOG("pipe");
+    new_connection->Shutdown(false);
+    return;
+  }
   new_connection->Send("x", 1, pipes[1]);
+  close(pipes[1]);
   ipc::UnixSocket* p = new_connection.get();
   socks_.emplace(p, std::move(new_connection));
   int fd = pipes[0];
@@ -314,15 +367,15 @@ void PipeSender::OnNewIncomingConnection(
   RecordReader* record_reader = new RecordReader();
   task_runner_->AddFileDescriptorWatch(fd, [fd, weak_this, record_reader] {
     if (!weak_this) {
-      PERFETTO_LOG("Pipe closed");
+      // PERFETTO_LOG("Pipe closed");
       close(fd);
       delete record_reader;
       return;
     }
 
-    ssize_t rd = record_reader->Read(fd);
+    ssize_t rd = record_reader->Read(fd, weak_this->unwind_task_runner_);
     if (rd == 0) {
-      PERFETTO_LOG("Pipe closed");
+      // PERFETTO_LOG("Pipe closed %s", GetName(fd).c_str());
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
       close(fd);
       delete record_reader;
@@ -364,13 +417,17 @@ int ProfHDMain(int argc, char** argv) {
   pipe(dumppipes);
   signal(SIGUSR1, DumpHeapsHandler);
 
-  base::UnixTaskRunner task_runner;
-  task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
-  PipeSender listener(&task_runner);
+  base::UnixTaskRunner read_task_runner;
+  base::UnixTaskRunner unwind_task_runner;
+  // Never block the read task_runner.
+  unwind_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
+  PipeSender listener(&read_task_runner, &unwind_task_runner);
 
   std::unique_ptr<ipc::UnixSocket> sock(
-      ipc::UnixSocket::Listen(argv[1], &listener, &task_runner));
-  task_runner.Run();
+      ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner));
+  std::thread t([&unwind_task_runner] { unwind_task_runner.Run(); });
+  read_task_runner.Run();
+  t.join();
   return 0;
 }
 
