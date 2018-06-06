@@ -611,6 +611,8 @@ class PipeSender : public ipc::UnixSocket::EventListener {
     }
   }
 
+  base::ScopedFile mem_fd;
+
  private:
   std::vector<WorkQueue>* work_queues_;
   size_t num_wq_;

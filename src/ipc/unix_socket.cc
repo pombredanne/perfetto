@@ -307,10 +307,19 @@ void UnixSocket::OnEvent() {
 bool UnixSocket::Send(const std::string& msg) {
   return Send(msg.c_str(), msg.size() + 1);
 }
-
 bool UnixSocket::Send(const void* msg,
                       size_t len,
                       int send_fd,
+                      BlockingMode blocking_mode) {
+  std::vector<int> send_fds;
+  if (send_fd > -1)
+    send_fds.emplace_back(send_fd);
+  return Send(msg, len, send_fds, blocking_mode);
+}
+
+bool UnixSocket::Send(const void* msg,
+                      size_t len,
+                      std::vector<int> send_fds,
                       BlockingMode blocking_mode) {
   if (state_ != State::kConnected) {
     errno = last_error_ = ENOTCONN;
@@ -323,7 +332,7 @@ bool UnixSocket::Send(const void* msg,
   msg_hdr.msg_iovlen = 1;
   alignas(cmsghdr) char control_buf[256];
 
-  if (send_fd > -1) {
+  if (!send_fds.empty()) {
     const CBufLenType control_buf_len =
         static_cast<CBufLenType>(CMSG_SPACE(sizeof(int)));
     PERFETTO_CHECK(control_buf_len <= sizeof(control_buf));
@@ -331,11 +340,14 @@ bool UnixSocket::Send(const void* msg,
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen = control_buf_len;
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg_hdr);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(cmsg), &send_fd, sizeof(int));
-    msg_hdr.msg_controllen = cmsg->cmsg_len;
+    for (int send_fd : send_fds) {
+      cmsg->cmsg_level = SOL_SOCKET;
+      cmsg->cmsg_type = SCM_RIGHTS;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+      memcpy(CMSG_DATA(cmsg), &send_fd, sizeof(int));
+      msg_hdr.msg_controllen = cmsg->cmsg_len;
+      cmsg = CMSG_NXTHDR(&msg_hdr, cmsg);
+    }
   }
 
   if (blocking_mode == BlockingMode::kBlocking)
@@ -394,6 +406,19 @@ void UnixSocket::Shutdown(bool notify) {
 }
 
 size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
+  size_t r;
+  if (recv_fd) {
+    std::vector<base::ScopedFile> fd_vec;
+    r = ReceiveMany(msg, len, &fd_vec);
+    if (!fd_vec.empty())
+      *recv_fd = std::move(fd_vec.back());
+  } else {
+    r = ReceiveMany(msg, len, nullptr);
+  }
+  return r;
+}
+
+size_t UnixSocket::ReceiveMany(void* msg, size_t len, std::vector<base::ScopedFile>* fd_vec) {
   if (state_ != State::kConnected) {
     last_error_ = ENOTCONN;
     return 0;
@@ -405,7 +430,7 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   msg_hdr.msg_iovlen = 1;
   alignas(cmsghdr) char control_buf[256];
 
-  if (recv_fd) {
+  if (fd_vec) {
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen = static_cast<CBufLenType>(CMSG_SPACE(sizeof(int)));
     PERFETTO_CHECK(msg_hdr.msg_controllen <= sizeof(control_buf));
@@ -447,11 +472,7 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   }
 
   for (size_t i = 0; fds && i < fds_len; ++i) {
-    if (recv_fd && i == 0) {
-      recv_fd->reset(fds[i]);
-    } else {
-      close(fds[i]);
-    }
+    fd_vec->emplace_back(fds[i]);
   }
 
   last_error_ = 0;
