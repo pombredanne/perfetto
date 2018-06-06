@@ -438,7 +438,6 @@ class RecordReader {
       return rd;
     }
 
-
     ssize_t rd = ReadRecord(fd);
     if (rd != -1)
       read_idx_ += rd;
