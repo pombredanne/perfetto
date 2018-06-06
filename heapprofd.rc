@@ -13,8 +13,9 @@
 # limitations under the License.
 
 service heapprofd /system/bin/heapprofd
-    class core
+    class late_start
     disabled
     socket heapprofd stream 0666 root root
     user nobody
     group nobody
+    writepid /dev/cpuset/system-background/tasks

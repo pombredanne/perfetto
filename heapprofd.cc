@@ -744,8 +744,9 @@ void DumpHandler(int sig) {
 
 int ProfHDMain(int argc, char** argv);
 int ProfHDMain(int argc, char** argv) {
+  PERFETTO_LOG("Starting heapprofd.");
   unwindstack::Elf::SetCachingEnabled(true);
-  if (argc != 2)
+  if (argc != 2 && argc != 1)
     return 1;
 
   for (int i = 0; i < errors.size(); ++i)
@@ -763,8 +764,20 @@ int ProfHDMain(int argc, char** argv) {
   sighandler_task_runner.AddFileDescriptorWatch(infopipes[0], Info);
   PipeSender listener(&work_queues);
 
-  std::unique_ptr<ipc::UnixSocket> sock(
-      ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner));
+  std::unique_ptr<ipc::UnixSocket> sock;
+  if (argc == 2) {
+    sock  = ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
+  } else {
+    const char* sock_fd = getenv("ANDROID_SOCKET_heapprofd");
+    if (sock_fd == nullptr)
+      PERFETTO_FATAL("No argument given and no ANDROID_SOCKET_heapprof env.");
+    char* end;
+    int raw_fd = strtol(sock_fd, &end, 10);
+    if (*end != '\0')
+      PERFETTO_FATAL("Invalid ANDROID_SOCKET_heapprofd");
+    sock = ipc::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener, &read_task_runner);
+  }
+
 
   std::vector<std::thread> threads;
   for (auto& wq : work_queues)

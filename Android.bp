@@ -3832,6 +3832,11 @@ cc_test {
 // GN target: //:heapprofd
 cc_binary {
   name: "heapprofd",
+  product_variables: {
+    pdk: {
+      enabled: false,
+    },
+  },
   srcs: [
     ":perfetto_src_ipc_wire_protocol_gen",
     "heapprofd.cc",
