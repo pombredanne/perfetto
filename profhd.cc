@@ -94,7 +94,54 @@ class StackMemory : public unwindstack::MemoryRemote {
   size_t size_;
 };
 
+class Histogram {
+ public:
+  void AddSample(base::TimeMillis value) {
+    std::lock_guard<std::mutex> l(mtx_);
+    base::TimeMillis cur = base::TimeMillis(-1);
+    for (auto& p : delay_histogram_ms_) {
+      if (cur < value && value <= p.first) {
+        p.second++;
+        return;
+      }
+      cur = p.first;
+    }
+    PERFETTO_CHECK(false);
+  }
+
+  void PrintDebugInfo() {
+    std::lock_guard<std::mutex> l(mtx_);
+    base::TimeMillis cur = base::TimeMillis(-1);
+    for (auto& p : delay_histogram_ms_) {
+      PERFETTO_LOG("(%" PRId64 ", %" PRId64 "]: %" PRIu64, int64_t(cur.count()),
+                   int64_t(p.first.count()), p.second);
+      cur = p.first;
+    }
+  }
+
+ private:
+  std::mutex mtx_;
+
+  std::vector<std::pair<base::TimeMillis, uint64_t>> delay_histogram_ms_{
+      {{base::TimeMillis(1), 0},
+       {base::TimeMillis(5), 0},
+       {base::TimeMillis(10), 0},
+       {base::TimeMillis(50), 0},
+       {base::TimeMillis(100), 0},
+       {base::TimeMillis(500), 0},
+       {base::TimeMillis(1000), 0},
+       {base::TimeMillis(std::numeric_limits<base::TimeMillis::rep>::max()),
+        0}}};
+};
+
+std::atomic<uint64_t> samples_recv(0);
+std::atomic<uint64_t> samples_handled(0);
+std::atomic<uint64_t> samples_failed(0);
 std::array<std::atomic<uint64_t>, 7> errors;
+Histogram histogram;
+Histogram unwind_only_histogram;
+Histogram parse_only_histogram;
+
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
 
@@ -238,6 +285,7 @@ class HeapDump {
 std::map<uint64_t, HeapDump> heapdump_for_pid;
 
 void DoneAlloc(void* mem, size_t sz) {
+  auto start = base::GetWallTimeMs();
   if (sz < sizeof(AllocMetadata))
     return;
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(mem);
@@ -248,21 +296,29 @@ void DoneAlloc(void* mem, size_t sz) {
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
   unwindstack::RemoteMaps maps(metadata->header.pid);
+  auto parse_start = base::GetWallTimeMs();
   if (!maps.Parse()) {
     // PERFETTO_LOG("Parse %" PRIu64, metadata->header.pid);
     return;
   }
+  parse_only_histogram.AddSample(base::GetWallTimeMs() - parse_start);
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       metadata->header.pid, metadata->sp, stack, sz - sizeof(AllocMetadata));
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
+  auto unwind_start = base::GetWallTimeMs();
   unwinder.Unwind();
 
   int error_code = unwinder.LastErrorCode();
   if (error_code != 0) {
+    samples_failed++;
     if (error_code > 0 && error_code < errors.size())
       errors[error_code]++;
     else
       PERFETTO_ELOG("Unwinder: %" PRIu8, error_code);
+  } else {
+    base::TimeMillis now = base::GetWallTimeMs();
+    histogram.AddSample(now - start);
+    unwind_only_histogram.AddSample(now - unwind_start);
   }
   heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
 }
@@ -274,9 +330,6 @@ void DoneFree(void* mem, size_t sz) {
     heapdump_for_pid[header->pid].FreeAddr(freed[n]);
   }
 }
-
-std::atomic<uint64_t> samples_recv(0);
-std::atomic<uint64_t> samples_handled(0);
 
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
@@ -490,11 +543,18 @@ void DumpHeapsHandler(int sig) {
 void DumpHeaps() {
   PERFETTO_LOG("Dumping heap dumps.");
   PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
-               ", samples overran %" PRIu64,
+               ", samples overran %" PRIu64 ", samples failed %" PRIu64,
                samples_recv.load(), samples_handled.load(),
-               queue_overrun.load());
+               queue_overrun.load(), samples_failed.load());
   for (int i = 1; i < errors.size(); ++i)
     PERFETTO_LOG("errors[%d] = %" PRIu64, i, errors[i].load());
+
+  PERFETTO_LOG("Total time:");
+  histogram.PrintDebugInfo();
+  PERFETTO_LOG("Unwinding time:");
+  unwind_only_histogram.PrintDebugInfo();
+  PERFETTO_LOG("Parsing time:");
+  parse_only_histogram.PrintDebugInfo();
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
