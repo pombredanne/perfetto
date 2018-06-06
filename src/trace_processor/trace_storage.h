@@ -47,11 +47,17 @@ class TraceStorage {
       thread_names_.emplace_back(thread_name_id);
     }
 
-    size_t slice_count() const { return start_ns_.size(); }
+    size_t slice_count() const {
+      return start_ns_.size();
+    }
 
-    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
+    const std::deque<uint64_t>& start_ns() const {
+      return start_ns_;
+    }
 
-    const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<uint64_t>& durations() const {
+      return durations_;
+    }
 
    private:
     // Each vector below has the same number of entries (the number of slices
