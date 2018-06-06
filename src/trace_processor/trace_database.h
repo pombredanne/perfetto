@@ -19,8 +19,10 @@
 
 #include <memory>
 
+#include "perfetto/base/task_runner.h"
 #include "sqlite3.h"
 #include "src/trace_processor/sched_slice_table.h"
+#include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -28,12 +30,19 @@ namespace trace_processor {
 
 class TraceDatabase {
  public:
-  TraceDatabase();
+  TraceDatabase(BlobReader* reader, base::TaskRunner* task_runner);
   ~TraceDatabase();
 
  private:
+  void LoadTraceChunk();
+
   sqlite3* db_ = nullptr;
+
+  // Parser holds a pointer to storage so needs to be initialized after.
   TraceStorage storage_;
+  TraceParser parser_;
+
+  base::TaskRunner* const task_runner_;
 };
 
 }  // namespace trace_processor

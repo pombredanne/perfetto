@@ -18,21 +18,31 @@
 
 namespace perfetto {
 namespace trace_processor {
+namespace {
+constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
+}
 
-TraceDatabase::TraceDatabase() {
+TraceDatabase::TraceDatabase(BlobReader* reader, base::TaskRunner* task_runner)
+    : parser_(reader, &storage_, kTraceChunkSizeB), task_runner_(task_runner) {
   sqlite3_open(":memory:", &db_);
 
   // Setup the sched slice table.
   sqlite3_module module = SchedSliceTable::CreateModule();
   SchedSliceTable::Args* args = new SchedSliceTable::Args();
   args->storage = &storage_;
-  sqlite3_create_module_v2(db_, "sched_slice", &module, args, [](void* args) {
-    delete reinterpret_cast<SchedSliceTable::Args*>(args);
+  sqlite3_create_module_v2(db_, "sched_slice", &module, args, [](void* a) {
+    delete reinterpret_cast<SchedSliceTable::Args*>(a);
   });
+  LoadTraceChunk();
 }
 
 TraceDatabase::~TraceDatabase() {
   sqlite3_close(db_);
+}
+
+void TraceDatabase::LoadTraceChunk() {
+  parser_.ParseNextChunk();
+  task_runner_->PostTask(std::bind(&TraceDatabase::LoadTraceChunk, this));
 }
 
 }  // namespace trace_processor
