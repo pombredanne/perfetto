@@ -89,8 +89,8 @@ struct AllocMetadata {
   uint8_t regs[264];
   uint64_t pid;
   uint64_t size;
-  void* sp;
-  void* addr;
+  uint64_t sp;
+  uint64_t addr;
 };
 
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
