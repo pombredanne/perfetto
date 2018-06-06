@@ -184,6 +184,7 @@ std::atomic<uint64_t> frees_found(0);
 std::array<std::atomic<uint64_t>, 7> errors;
 Histogram histogram;
 Histogram unwind_only_histogram;
+Histogram gap_histogram;
 Histogram parse_only_histogram;
 Histogram send_histogram;
 Histogram alloc_histogram;
@@ -328,6 +329,8 @@ class HeapDump {
       frame = &itr->second;
     }
 
+    addr_info_.erase(itr);
+
     return n;
   }
 
@@ -348,15 +351,20 @@ struct Metadata {
   unwindstack::RemoteMaps maps;
   uint64_t pid;
   uint64_t num_allocs = 0;
+  base::TimeMicros last_alloc{0};
 };
 
 std::map<int, Metadata> metadata_for_pipe;
 std::mutex metadata_for_pipe_mtx;
 
 void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
-  stack_histogram.AddSample(base::TimeMicros(sz));
-  metadata->num_allocs++;
   auto start = base::GetWallTimeUs();
+  stack_histogram.AddSample(base::TimeMicros(sz));
+  if (metadata->last_alloc != base::TimeMicros(0))
+    gap_histogram.AddSample(start - metadata->last_alloc);
+
+  metadata->last_alloc = start;
+  metadata->num_allocs++;
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
     samples_failed++;
@@ -645,6 +653,10 @@ void Info() {
 
   f << "\"alloc_histogram\": ";
   alloc_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"gap_histogram\": ";
+  gap_histogram.PrintJSON(f);
   f << ",\n";
 
   f << "\"stack_histogram\": ";
