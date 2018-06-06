@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <map>
 #include <set>
@@ -93,6 +94,7 @@ class StackMemory : public unwindstack::MemoryRemote {
   size_t size_;
 };
 
+std::array<std::atomic<uint64_t>, 7> errors;
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
 
@@ -255,10 +257,13 @@ void DoneAlloc(void* mem, size_t sz) {
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
   unwinder.Unwind();
 
-  /*
-  if (unwinder.LastErrorCode() != 0)
-    PERFETTO_ELOG("Unwinder: %" PRIu8, unwinder.LastErrorCode());
-*/
+  int error_code = unwinder.LastErrorCode();
+  if (error_code != 0) {
+    if (error_code > 0 && error_code < errors.size())
+      errors[error_code]++;
+    else
+      PERFETTO_ELOG("Unwinder: %" PRIu8, error_code);
+  }
   heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
 }
 
@@ -488,6 +493,8 @@ void DumpHeaps() {
                ", samples overran %" PRIu64,
                samples_recv.load(), samples_handled.load(),
                queue_overrun.load());
+  for (int i = 1; i < errors.size(); ++i)
+    PERFETTO_LOG("errors[%d] = %" PRIu64, i, errors[i].load());
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
@@ -510,6 +517,8 @@ int ProfHDMain(int argc, char** argv) {
   if (argc != 2)
     return 1;
 
+  for (int i = 0; i < errors.size(); ++i)
+    errors[i] = 0;
   pipe(dumppipes);
   signal(SIGUSR1, DumpHeapsHandler);
 
