@@ -75,8 +75,6 @@ class StackMemory : public unwindstack::MemoryRemote {
   size_t size_;
 };
 
-static long total_read = 0;
-
 struct Metadata {
   unwindstack::ArchEnum arch;
   uint8_t regs[264];
@@ -112,16 +110,17 @@ static int total_frames = 0;
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
   void* mem = mmap(nullptr, sz, PROT_READ, MAP_PRIVATE, *fd, 0);
-  if (mem == MAP_FAILED) PERFETTO_PLOG("mmap %zd %d", sz, *fd);
+  if (mem == MAP_FAILED) {
+    PERFETTO_PLOG("mmap %zd %d", sz, *fd);
+    return;
+  }
   Metadata* metadata = reinterpret_cast<Metadata*>(mem);
   unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
-  PERFETTO_LOG("mmaped size: %" PRIu64 " pid: %" PRIu64 "sp: %p pc: %" PRIu64,
-               metadata->size, metadata->pid, metadata->sp, regs->pc());
-  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(Metadata);
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
     return;
   }
+  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(Metadata);
   unwindstack::RemoteMaps maps(metadata->pid);
   if (!maps.Parse()) {
     PERFETTO_LOG("Parse %" PRIu64, metadata->pid);
@@ -184,7 +183,6 @@ class RecordReader {
         read(fd, reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
              sizeof(record_size_) - read_idx_));
     PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
-    PERFETTO_LOG("Record size %zd %" PRIu64, rd, record_size_);
     return rd;
   }
 
@@ -193,7 +191,6 @@ class RecordReader {
     ssize_t rd = PERFETTO_EINTR(splice(
         fd, nullptr, *outfd_, nullptr,
         std::min(chunk_size, record_size_ - read_idx()), SPLICE_F_NONBLOCK));
-    PERFETTO_LOG("record %zd", rd);
     PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
     return rd;
   }
@@ -245,16 +242,13 @@ void PipeSender::OnNewIncomingConnection(
     }
 
     ssize_t rd = record_reader->Read(fd);
-    PERFETTO_LOG("Reading  %d %zd", fd, rd);
     if (rd == -1) return;
-    total_read += static_cast<size_t>(rd);
-    if ((total_read / 10000000) != ((total_read - rd) / 10000000))
-      PERFETTO_LOG("perfhd: %lu\n", total_read);
     if (rd == 0) {
       PERFETTO_LOG("Pipe closed");
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
       close(fd);
       delete record_reader;
+      return;
     }
   });
 }
