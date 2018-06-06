@@ -359,10 +359,12 @@ struct Metadata {
   uint64_t num_allocs = 0;
   base::TimeMicros last_alloc{0};
   base::TimeMicros last_unwind_timing;
+  std::atomic<int> pipes{0};
 };
 
-std::map<int, Metadata> metadata_for_pipe;
-std::mutex metadata_for_pipe_mtx;
+std::map<int, Metadata> metadata_for_pid;
+std::mutex metadata_for_pid_mtx;
+std::map<int, int> pipe_to_pid;
 
 void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   auto start = base::GetWallTimeUs();
@@ -450,22 +452,22 @@ void Done(std::unique_ptr<uint8_t[]> buf, size_t sz, int pipe_fd) {
     return;
   void* mem = buf.get();
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
-  decltype(metadata_for_pipe)::iterator itr;
+  decltype(metadata_for_pid)::iterator itr;
   {
-    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-    itr = metadata_for_pipe.find(pipe_fd);
-    if (itr == metadata_for_pipe.end()) {
-      metadata_for_pipe.emplace(pipe_fd, header->pid);
-    } else if (itr->second.pid != header->pid) {
-      metadata_for_pipe.erase(pipe_fd);
-      metadata_for_pipe.emplace(pipe_fd, header->pid);
+    std::lock_guard<std::mutex> l(metadata_for_pid_mtx);
+    itr = metadata_for_pid.find(header->pid);
+    if (itr == metadata_for_pid.end()) {
+      itr = metadata_for_pid.emplace(header->pid, header->pid).first;
     }
+
+    auto itr2 = pipe_to_pid.find(pipe_fd);
+    if (itr2 == pipe_to_pid.end()) {
+      itr->second.pipes++;
+      pipe_to_pid.emplace(pipe_fd, header->pid);
+    }
+
   }
   Metadata& metadata = itr->second;
-  if (metadata.pid != header->pid) {
-    samples_too_late++;
-    return;
-  }
 
   switch (header->type) {
     case kAlloc:
@@ -517,7 +519,7 @@ class RecordReader {
  public:
   RecordReader() { Reset(); }
 
-  ssize_t Read(int fd, WorkQueue* wq) {
+  ssize_t Read(int fd, std::vector<WorkQueue>* wqs) {
     if (read_idx_ < sizeof(record_size_)) {
       ssize_t rd = ReadRecordSize(fd);
       if (rd != -1)
@@ -532,18 +534,8 @@ class RecordReader {
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
-      {
-        auto itr = metadata_for_pipe.find(fd);
-        if (itr == metadata_for_pipe.end()) {
-          MetadataHeader* header =
-              reinterpret_cast<MetadataHeader*>(buf_.get());
-          std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-          //          PERFETTO_LOG("PID: %" PRIu64, header->pid);
-          metadata_for_pipe.emplace(fd, header->pid);
-        }
-      }
-
-      if (!wq->Submit(WorkItem(std::move(buf_), record_size_, fd)))
+      MetadataHeader* header = reinterpret_cast<MetadataHeader*>(buf_.get());
+      if (!(*wqs)[header->pid % wqs->size()].Submit(WorkItem(std::move(buf_), record_size_, fd)))
         samples_overran++;
       Reset();
     }
@@ -604,7 +596,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
   void OnDataAvailable(ipc::UnixSocket* sock) override {
     int fd = sock->fd();
     ssize_t rd =
-        record_readers_[sock].Read(fd, &((*work_queues_)[fd % num_wq_]));
+        record_readers_[sock].Read(fd, work_queues_);
     if (rd == 0) {
       char buf[1];
       sock->Receive(&buf, 1);
@@ -629,10 +621,18 @@ void PipeSender::OnNewIncomingConnection(
 void PipeSender::OnDisconnect(ipc::UnixSocket* self) {
   //  PERFETTO_LOG("Disconnected connection");
   int fd = self->fd();
-  (*work_queues_)[fd % num_wq_].task_runner_.PostTask([fd] {
-    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-    metadata_for_pipe.erase(fd);
-  });
+  std::lock_guard<std::mutex> l(metadata_for_pid_mtx);
+  auto itr = pipe_to_pid.find(fd);
+  if (itr != pipe_to_pid.end()) {
+    int pid = itr->second;
+    (*work_queues_)[pid % num_wq_].task_runner_.PostTask([pid] {
+      std::lock_guard<std::mutex> l(metadata_for_pid_mtx);
+      auto itr2 = metadata_for_pid.find(pid);
+      PERFETTO_CHECK(itr2 != metadata_for_pid.end());
+      if (--itr2->second.pipes == 0)
+        metadata_for_pid.erase(pid);
+    });
+  }
   record_readers_.erase(self);
   socks_.erase(self);
 }
@@ -647,8 +647,8 @@ void Info() {
   std::ofstream f("/data/local/heapinfo");
   size_t pipe_metadata;
   {
-    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-    pipe_metadata = metadata_for_pipe.size();
+    std::lock_guard<std::mutex> l(metadata_for_pid_mtx);
+    pipe_metadata = metadata_for_pid.size();
   }
 
   f << "{\n"
@@ -724,8 +724,8 @@ void Dump() {
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
-  std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-  for (auto& p : metadata_for_pipe) {
+  std::lock_guard<std::mutex> l(metadata_for_pid_mtx);
+  for (auto& p : metadata_for_pid) {
     auto& m = p.second;
     if (!first)
       f << ",\n";
@@ -754,8 +754,8 @@ int ProfHDMain(int argc, char** argv) {
   signal(SIGUSR1, InfoHandler);
   signal(SIGUSR2, DumpHandler);
 
-  std::vector<WorkQueue> work_queues(
-      std::max(1u, std::thread::hardware_concurrency()));
+  std::vector<WorkQueue> work_queues(1);
+//      std::max(1u, std::thread::hardware_concurrency()));
 
   base::UnixTaskRunner read_task_runner;
   base::UnixTaskRunner sighandler_task_runner;
