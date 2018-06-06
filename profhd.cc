@@ -32,7 +32,7 @@
 #include <thread>
 
 #include <unistd.h>
-#include "folly_queue.h"
+#include "folly/ProducerConsumerQueue.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/unix_task_runner.h"
@@ -132,6 +132,7 @@ class HeapDump {
     if (data.size() <= 2) {
       return;
     }
+    std::lock_guard<std::mutex> l(mutex_);
     std::set<std::string> fns;
     for (const unwindstack::FrameData& frame_data : data) {
       fns.emplace(frame_data.function_name);
@@ -151,10 +152,16 @@ class HeapDump {
   }
 
   void FreeAddr(uint64_t addr) {
+    std::lock_guard<std::mutex> l(mutex_);
     auto itr = addr_info_.find(addr);
     if (itr == addr_info_.end()) return;
-    for (const std::string& fn : itr->second.second)
-      heap_usage_per_function_[fn] -= itr->second.first;
+    for (const std::string& fn : itr->second.second) {
+      auto itr2 = heap_usage_per_function_.find(fn);
+      if (itr2 != heap_usage_per_function_.end()) {
+        itr2->second -= itr->second.first;
+        if (itr2->second == 0) heap_usage_per_function_.erase(itr2);
+      }
+    }
     addr_info_.erase(itr);
   }
 
@@ -169,6 +176,7 @@ class HeapDump {
   }
 
  private:
+  std::mutex mutex_;
   std::map<std::string, uint64_t> heap_usage_per_function_;
   std::map<uint64_t, std::pair<uint64_t, std::set<std::string>>> addr_info_;
 };
@@ -202,7 +210,6 @@ void DoneAlloc(void* mem, size_t sz) {
 }
 
 void DoneFree(void* mem, size_t sz) {
-  return;
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 3; n < sz / sizeof(*freed); n++) {
@@ -445,9 +452,9 @@ int ProfHDMain(int argc, char** argv) {
       std::max(1u, std::thread::hardware_concurrency()));
 
   base::UnixTaskRunner read_task_runner;
-  base::UnixTaskRunner unwind_task_runner;
+  base::UnixTaskRunner sighandler_task_runner;
   // Never block the read task_runner.
-  unwind_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
+  sighandler_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
   PipeSender listener(&read_task_runner, &work_queues);
 
   std::unique_ptr<ipc::UnixSocket> sock(
@@ -455,6 +462,8 @@ int ProfHDMain(int argc, char** argv) {
 
   std::vector<std::thread> threads;
   for (auto& wq : work_queues) threads.emplace_back([&wq] { wq.Run(); });
+  threads.emplace_back(
+      [&sighandler_task_runner] { sighandler_task_runner.Run(); });
 
   read_task_runner.Run();
   for (auto& t : threads) t.join();
