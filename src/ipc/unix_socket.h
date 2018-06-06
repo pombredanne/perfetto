@@ -159,7 +159,8 @@ class UnixSocket {
             BlockingMode blocking = BlockingMode::kNonBlocking);
   bool Send(const void* msg,
             size_t len,
-            std::vector<int> send_fds,
+            const int* send_fds,
+            size_t num_fds,
             BlockingMode blocking = BlockingMode::kNonBlocking);
   bool Send(const std::string& msg);
 
@@ -169,8 +170,7 @@ class UnixSocket {
   // If the ScopedFile pointer is not null and a FD is received, it moves the
   // received FD into that. If a FD is received but the ScopedFile pointer is
   // null, the FD will be automatically closed.
-  size_t Receive(void* msg, size_t len, base::ScopedFile* = nullptr);
-  size_t ReceiveMany(void* msg, size_t len, std::vector<base::ScopedFile>* fds);
+  size_t Receive(void* msg, size_t len, base::ScopedFile* = nullptr, size_t max_files = 0);
 
   // Only for tests. This is slower than Receive() as it requires a heap
   // allocation and a copy for the std::string. Guarantees that the returned
