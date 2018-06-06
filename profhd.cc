@@ -109,6 +109,7 @@ class Histogram {
   void AddSample(base::TimeMicros value) {
     MAYBE_LOCK(l, mtx_);
     samples_.emplace_back(value);
+    return;
     total_time_ += value;
     total_samples_++;
     base::TimeMicros cur = base::TimeMicros(-1);
@@ -189,6 +190,8 @@ Histogram parse_only_histogram;
 Histogram send_histogram;
 Histogram alloc_histogram;
 Histogram stack_histogram;
+Histogram unwind_diff_histogram;
+Histogram unwind_diff_factor_histogram;
 
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
@@ -352,6 +355,7 @@ struct Metadata {
   uint64_t pid;
   uint64_t num_allocs = 0;
   base::TimeMicros last_alloc{0};
+  base::TimeMicros last_unwind_timing;
 };
 
 std::map<int, Metadata> metadata_for_pipe;
@@ -373,6 +377,11 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
   if (alloc_metadata->last_timing)
     send_histogram.AddSample(base::TimeMicros(alloc_metadata->last_timing));
+  if (metadata->last_unwind_timing != base::TimeMicros(0) && alloc_metadata->last_timing) {
+    base::TimeMicros last_timing_us(alloc_metadata->last_timing);
+    unwind_diff_histogram.AddSample(last_timing_us - metadata->last_unwind_timing);
+  }
+
   unwindstack::Regs* regs =
       CreateFromRawData(alloc_metadata->arch, alloc_metadata->regs);
   if (regs == nullptr) {
@@ -404,9 +413,6 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
         break;
       }
     } else {
-      base::TimeMicros now = base::GetWallTimeUs();
-      histogram.AddSample(now - start);
-      unwind_only_histogram.AddSample(now - unwind_start);
       samples_handled++;
       break;
     }
@@ -414,6 +420,11 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   if (error_code == 0) {
     metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata, metadata->num_allocs);
   }
+  base::TimeMicros now = base::GetWallTimeUs();
+  base::TimeMicros unwind_time = now - unwind_start;
+  histogram.AddSample(now - start);
+  unwind_only_histogram.AddSample(unwind_time);
+  metadata->last_unwind_timing = unwind_time;
 }
 
 void DoneFree(void* mem, size_t sz, Metadata* metadata) {
@@ -653,6 +664,14 @@ void Info() {
 
   f << "\"alloc_histogram\": ";
   alloc_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"unwind_diff_histogram\": ";
+  unwind_diff_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"unwind_diff_factor_histogram\": ";
+  unwind_diff_factor_histogram.PrintJSON(f);
   f << ",\n";
 
   f << "\"gap_histogram\": ";
