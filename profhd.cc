@@ -81,13 +81,13 @@ constexpr uint8_t kFree = 2;
 
 struct MetadataHeader {
   uint8_t type;
+  uint64_t pid;
 };
 
 struct AllocMetadata {
   MetadataHeader header;
   unwindstack::ArchEnum arch;
   uint8_t regs[264];
-  uint64_t pid;
   uint64_t size;
   uint64_t sp;
   uint64_t addr;
@@ -139,6 +139,14 @@ class HeapDump {
                        std::make_pair(metadata.size, std::move(fns)));
   }
 
+  void FreeAddr(uint64_t addr) {
+    auto itr = addr_info_.find(addr);
+    if (itr == addr_info_.end())
+      return;
+    for (const std::string& fn : itr->second.second)
+      heap_usage_per_function_[fn] -= itr->second.first;
+  }
+
   void Print(std::ostream& o) const {
     bool first = true;
     for (const auto& p : heap_usage_per_function_) {
@@ -165,20 +173,27 @@ void DoneAlloc(void* mem, size_t sz) {
     return;
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
-  unwindstack::RemoteMaps maps(metadata->pid);
+  unwindstack::RemoteMaps maps(metadata->header.pid);
   if (!maps.Parse()) {
-    PERFETTO_LOG("Parse %" PRIu64, metadata->pid);
+    PERFETTO_LOG("Parse %" PRIu64, metadata->header.pid);
     return;
   }
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->pid, metadata->sp, stack, sz - sizeof(AllocMetadata));
+      metadata->header.pid, metadata->sp, stack, sz - sizeof(AllocMetadata));
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
   unwinder.Unwind();
 
-  heapdump_for_pid[metadata->pid].AddStack(unwinder.frames(), *metadata);
+  heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
 }
 
-void DoneFree(void* mem, size_t sz) {}
+void DoneFree(void* mem, size_t sz) {
+  PERFETTO_LOG("Freeing page.");
+  MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
+  uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
+  for (size_t n = 3; n < sz / sizeof(*freed); n++) {
+    heapdump_for_pid[header->pid].FreeAddr(freed[n]);
+  }
+}
 
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
