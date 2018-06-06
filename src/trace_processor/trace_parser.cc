@@ -62,7 +62,7 @@ bool TraceParser::ParseNextChunk() {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
       continue;
     }
-    ParsePacket(fld.length_limited.data, fld.length_limited.length);
+    ParsePacket(fld.data(), fld.size());
   }
 
   offset_ += decoder.offset();
@@ -74,11 +74,10 @@ void TraceParser::ParsePacket(const uint8_t* data, size_t length) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kFtraceEventsFieldNumber:
-        ParseFtraceEventBundle(fld.length_limited.data,
-                               fld.length_limited.length);
+        ParseFtraceEventBundle(fld.data(), fld.size());
         break;
       case protos::TracePacket::kProcessTreeFieldNumber:
-        ParseProcessTree(fld.length_limited.data, fld.length_limited.length);
+        ParseProcessTree(fld.data(), fld.size());
         break;
       default:
         break;
@@ -98,11 +97,11 @@ void TraceParser::ParseProcessTree(const uint8_t* data, size_t length) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
         PERFETTO_DCHECK(!parsed_thread_packet);
-        ParseProcess(fld.length_limited.data, fld.length_limited.length);
+        ParseProcess(fld.data(), fld.size());
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
         parsed_thread_packet = true;
-        ParseThread(fld.length_limited.data, fld.length_limited.length);
+        ParseThread(fld.data(), fld.size());
         break;
       default:
         break;
@@ -115,8 +114,6 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
   ProtoDecoder decoder(data, length);
   uint32_t tid = 0;
   uint32_t tgid = 0;
-  const char* thread_name = nullptr;
-  size_t thread_name_len = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessTree::Thread::kTidFieldNumber:
@@ -125,15 +122,11 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
       case protos::ProcessTree::Thread::kTgidFieldNumber:
         tgid = fld.as_uint32();
         break;
-      case protos::ProcessTree::Thread::kNameFieldNumber:
-        thread_name = fld.as_char_ptr();
-        thread_name_len = fld.size();
-        break;
       default:
         break;
     }
   }
-  // TODO(taylori): Store the thread.
+  storage_->MatchThreadToProcess(tid, tgid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -176,8 +169,7 @@ void TraceParser::ParseFtraceEventBundle(const uint8_t* data, size_t length) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEventBundle::kEventFieldNumber:
-        ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.length_limited.data,
-                         fld.length_limited.length);
+        ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.data(), fld.size());
         break;
       default:
         break;
@@ -202,8 +194,7 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber:
         PERFETTO_DCHECK(timestamp > 0);
-        ParseSchedSwitch(cpu, timestamp, fld.length_limited.data,
-                         fld.length_limited.length);
+        ParseSchedSwitch(cpu, timestamp, fld.data(), fld.size());
         break;
       default:
         break;

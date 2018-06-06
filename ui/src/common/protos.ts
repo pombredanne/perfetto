@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { TraceConfig } from './protos';
+import * as protos from '../gen/protos';
 
-test('round trip config proto', () => {
-  const input = TraceConfig.create({
-    durationMs: 42,
-  });
-  const output = TraceConfig.decode(TraceConfig.encode(input).finish());
-  expect(output.durationMs).toBe(42);
-});
+// Aliases protos to avoid the super nested namespaces.
+// See https://www.typescriptlang.org/docs/handbook/namespaces.html#aliases
+import TraceConfig = protos.perfetto.protos.TraceConfig;
+import TraceProcessor = protos.perfetto.protos.TraceProcessor;
+import IRawQueryArgs = protos.perfetto.protos.IRawQueryArgs;
+import RawQueryArgs = protos.perfetto.protos.RawQueryArgs;
+import RawQueryResult = protos.perfetto.protos.RawQueryResult;
 
+export {
+  TraceConfig,
+  TraceProcessor,
+  IRawQueryArgs,
+  RawQueryArgs,
+  RawQueryResult,
+};

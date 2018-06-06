@@ -131,6 +131,9 @@ if (!build_with_chromium) {
     if (build_with_android) {
       cflags = [ "-DPERFETTO_BUILD_WITH_ANDROID" ]
     }
+    if (build_standalone) {
+      deps += [ "src/trace_processor:integrationtests" ]
+    }
   }
 
   if (monolithic_binaries) {
@@ -214,6 +217,14 @@ if (!build_with_chromium) {
         "protos/perfetto/trace:lite",
       ]
     }
+  } else {
+    # The library which eases processing of Perfetto traces by exposing reading
+    # friendly APIs.
+    static_library("trace_processor") {
+      deps = [
+        "src/trace_processor:lib",
+      ]
+    }
   }
 }
 
@@ -227,6 +238,8 @@ if (build_with_chromium) {
     configs += [ "//build/config/compiler:no_chromium_code" ]
     public_deps = [
       "include/perfetto/tracing/core",
+      "protos/perfetto/trace:zero",
+      "protos/perfetto/trace/chrome:zero",
     ]
   }
 }

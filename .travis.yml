@@ -101,6 +101,12 @@ matrix:
       sudo: false
       compiler: clang
       env: CFG=ui-clang-x86_64-release GN_ARGS="is_debug=false is_clang=true"
+    - os: linux
+      dist: trusty
+      sudo: false
+      compiler: clang
+      env: CFG=ui-clang-x86_64-debug GN_ARGS="is_debug=true is_clang=true"
+
 
 # Cache the deps that get git-pulled to avoid hitting quota limits (b/68252114).
 # Do not cache NDK/SDK and things that come from .zip files rather than git.
@@ -150,7 +156,7 @@ script:
     perfetto_unittests
     "
     if [[ "$CFG" == ui-* ]]; then
-      ui/node ui/node_modules/jest/bin/jest.js --config=ui/package.json  --roots=../out/dist/obj/ui --ci
+      out/dist/ui_unittests --ci
     elif [[ "$CFG" == android-* ]]; then
       TARGET_ARCH=$(echo $CFG | cut -d- -f3)
       tools/run_android_emulator --pid /tmp/emulator.pid -v &

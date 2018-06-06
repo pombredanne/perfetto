@@ -14,5 +14,21 @@
  * limitations under the License.
  */
 
-console.log('Hello from the worker!');
+#ifndef SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#define SRC_TRACE_PROCESSOR_SCOPED_DB_H_
 
+#include <sqlite3.h>
+
+#include "perfetto/base/scoped_file.h"
+
+namespace perfetto {
+namespace trace_processor {
+
+using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
+using ScopedStmt =
+    base::ScopedResource<sqlite3_stmt*, sqlite3_finalize, nullptr>;
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_SCOPED_DB_H_
