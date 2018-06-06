@@ -330,11 +330,11 @@ bool UnixSocket::Send(const void* msg,
   iovec iov = {const_cast<void*>(msg), len};
   msg_hdr.msg_iov = &iov;
   msg_hdr.msg_iovlen = 1;
-  alignas(cmsghdr) char control_buf[256];
+  alignas(cmsghdr) char control_buf[256] = {};
 
   if (!send_fds.empty()) {
     const CBufLenType control_buf_len =
-        static_cast<CBufLenType>(CMSG_SPACE(sizeof(int)));
+        static_cast<CBufLenType>(send_fds.size() * CMSG_SPACE(sizeof(int)));
     PERFETTO_CHECK(control_buf_len <= sizeof(control_buf));
     memset(control_buf, 0, sizeof(control_buf));
     msg_hdr.msg_control = control_buf;
@@ -345,7 +345,6 @@ bool UnixSocket::Send(const void* msg,
       cmsg->cmsg_type = SCM_RIGHTS;
       cmsg->cmsg_len = CMSG_LEN(sizeof(int));
       memcpy(CMSG_DATA(cmsg), &send_fd, sizeof(int));
-      msg_hdr.msg_controllen = cmsg->cmsg_len;
       cmsg = CMSG_NXTHDR(&msg_hdr, cmsg);
     }
   }

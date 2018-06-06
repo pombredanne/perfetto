@@ -263,3 +263,25 @@ executable("heapprofd") {
   ]
   libs = [ "unwindstack" ]
 }
+
+executable("read_mem_serv") {
+  deps = [
+    "gn:default_deps",
+    "src/base",
+    "src/ipc",
+  ]
+  sources = [
+    "read_mem_serv.cc",
+  ]
+}
+
+executable("read_mem_client") {
+  deps = [
+    "gn:default_deps",
+    "src/base",
+    "src/ipc",
+  ]
+  sources = [
+    "read_mem_client.cc",
+  ]
+}

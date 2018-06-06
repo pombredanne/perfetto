@@ -602,6 +602,19 @@ class PipeSender : public ipc::UnixSocket::EventListener {
                                std::unique_ptr<ipc::UnixSocket>) override;
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnDataAvailable(ipc::UnixSocket* sock) override {
+    char buf[1];
+    sock->ReceiveMany(&buf, sizeof(buf), &mem_fds);
+    PERFETTO_LOG("Got %zd fds.", mem_fds.size());
+    if (mem_fds.size() == 2) {
+      base::ScopedFile mem_fd(std::move(mem_fds[0]));
+      base::ScopedFile maps_fd(std::move(mem_fds[1]));
+      char ptrbuf[256];
+      PERFETTO_CHECK(read(*maps_fd, ptrbuf, sizeof(ptrbuf)) == sizeof(ptrbuf));
+      int64_t ptr = strtoll(ptrbuf, nullptr, 16);
+      PERFETTO_CHECK(lseek(*mem_fd, ptr, SEEK_SET) != -1);
+      PERFETTO_LOG("Remote read %zd bytes", read(*mem_fd, ptrbuf, 1));
+    }
+    return;
     int fd = sock->fd();
     ssize_t rd =
         record_readers_[sock].Read(fd, &((*work_queues_)[fd % num_wq_]));
@@ -611,7 +624,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
     }
   }
 
-  base::ScopedFile mem_fd;
+  std::vector<base::ScopedFile> mem_fds;
 
  private:
   std::vector<WorkQueue>* work_queues_;
