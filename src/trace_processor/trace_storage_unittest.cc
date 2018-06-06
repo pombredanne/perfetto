@@ -50,6 +50,52 @@ TEST(TraceStorageTest, InsertSecondSched) {
   ASSERT_EQ(timestamps[0], timestamp);
 }
 
+TEST(TraceStorageTest, AddProcessEntry) {
+  TraceStorage storage;
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(storage.GetProcess(0)->start_ns, 1000);
+}
+
+TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
+  TraceStorage storage;
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  storage.AddProcessEntry(1, 2000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  ++pair_it.first;
+  ASSERT_EQ(pair_it.first->second, 1);
+  ASSERT_EQ(storage.GetProcess(0)->end_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(0)->process_name,
+            storage.GetProcess(1)->process_name);
+}
+
+TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
+  TraceStorage storage;
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  storage.AddProcessEntry(3, 2000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  auto second_pair_it = storage.UpidsForPid(3);
+  ASSERT_EQ(second_pair_it.first->second, 1);
+  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
+}
+
+TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
+  TraceStorage storage;
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first, pair_it.second);
+}
+
+TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
+  TraceStorage storage;
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  ASSERT_EQ(std::string(storage.GetString(storage.GetProcess(0)->process_name)),
+            "test");
+}
+
 }  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto

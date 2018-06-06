@@ -54,6 +54,37 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   prev->next_pid = next_pid;
 }
 
+void TraceStorage::AddProcessEntry(int32_t pid,
+                                   uint64_t start_ns,
+                                   const char* process_name,
+                                   size_t process_name_len) {
+  // Store a new upid for that pid. If pid has been seen before, set the end
+  // time of the previous entry to the start time of this entry.
+  auto pids_pair = pids_.equal_range(pid);
+  for (auto it = pids_pair.first; it != pids_pair.second; ++it) {
+    // Only the previous upid instance should have end_ns == 0
+    if (unique_processes_[it->second].end_ns == 0) {
+      unique_processes_[it->second].end_ns = start_ns;
+      break;
+    }
+  }
+  pids_.emplace(pid, current_upid_++);
+
+  // Make a new process entry for that upid.
+  ProcessEntry new_process;
+  new_process.start_ns = start_ns;
+  new_process.end_ns = 0;
+  new_process.process_name = InternString(process_name, process_name_len);
+  unique_processes_.emplace_back(new_process);
+}
+
+std::pair<
+    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator,
+    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator>
+TraceStorage::UpidsForPid(int32_t pid) {
+  return pids_.equal_range(pid);
+}
+
 TraceStorage::StringId TraceStorage::InternString(const char* data,
                                                   size_t length) {
   uint32_t hash = 0;
