@@ -495,9 +495,8 @@ class RecordReader {
 
 class PipeSender : public ipc::UnixSocket::EventListener {
  public:
-  PipeSender(base::TaskRunner* task_runner, std::vector<WorkQueue>* work_queues)
-      : task_runner_(task_runner),
-        work_queues_(work_queues),
+  PipeSender(std::vector<WorkQueue>* work_queues)
+      : work_queues_(work_queues),
         num_wq_(work_queues_->size()),
         weak_factory_(this) {}
 
@@ -505,64 +504,36 @@ class PipeSender : public ipc::UnixSocket::EventListener {
                                std::unique_ptr<ipc::UnixSocket>) override;
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnDataAvailable(ipc::UnixSocket* sock) override {
-    char buf[4096];
-    sock->Receive(&buf, sizeof(buf));
+    int fd = sock->fd();
+    ssize_t rd =
+        record_readers_[sock].Read(fd, &((*work_queues_)[fd % num_wq_]));
+    if (rd == 0) {
+      char buf[1];
+      sock->Receive(&buf, 1);
+    }
   }
 
  private:
-  base::TaskRunner* task_runner_;
   std::vector<WorkQueue>* work_queues_;
   size_t num_wq_;
   std::map<ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket>> socks_;
+  std::map<ipc::UnixSocket*, RecordReader> record_readers_;
   base::WeakPtrFactory<PipeSender> weak_factory_;
 };
 
 void PipeSender::OnNewIncomingConnection(
     ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
-  int pipes[2];
-  if (socketpair(AF_UNIX, SOCK_STREAM, 0, pipes) == -1) {
-    PERFETTO_PLOG("sockpair");
-    new_connection->Shutdown(false);
-    return;
-  }
-
-  new_connection->Send("x", 1, pipes[1]);
-  close(pipes[1]);
   ipc::UnixSocket* p = new_connection.get();
   socks_.emplace(p, std::move(new_connection));
-  int fd = pipes[0];
-  // We do not want to block the event loop in case of
-  // spurious wake-ups.
-  fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
-  base::WeakPtr<PipeSender> weak_this = weak_factory_.GetWeakPtr();
-  // Cannot move into lambda in C++11.
-  RecordReader* record_reader = new RecordReader();
-  task_runner_->AddFileDescriptorWatch(fd, [fd, weak_this, record_reader] {
-    if (!weak_this) {
-      PERFETTO_CHECK(false);
-    }
-
-    ssize_t rd = record_reader->Read(
-        fd, &((*weak_this->work_queues_)[fd % weak_this->num_wq_]));
-    if (rd == 0) {
-      weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
-      close(fd);
-      (*weak_this->work_queues_)[fd % weak_this->num_wq_].task_runner_.PostTask(
-          [fd] {
-            {
-              std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-              metadata_for_pipe.erase(fd);
-            }
-          });
-
-      delete record_reader;
-      return;
-    }
-  });
 }
 
 void PipeSender::OnDisconnect(ipc::UnixSocket* self) {
+  {
+    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+    metadata_for_pipe.erase(self->fd());
+  }
+  record_readers_.erase(self);
   socks_.erase(self);
 }
 
@@ -626,7 +597,7 @@ int ProfHDMain(int argc, char** argv) {
   base::UnixTaskRunner sighandler_task_runner;
   // Never block the read task_runner.
   sighandler_task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
-  PipeSender listener(&read_task_runner, &work_queues);
+  PipeSender listener(&work_queues);
 
   std::unique_ptr<ipc::UnixSocket> sock(
       ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner));
