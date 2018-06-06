@@ -1,6 +1,9 @@
 {
   "include": [ "src/" ],
-  "exclude": [ "./node_modules/" ],
+  "exclude": [
+    "./node_modules/",
+    "./src/gen/"
+  ],
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
@@ -9,7 +12,7 @@
     "allowJs": true,
     "checkJs": true,
     "declaration": false,                  // Generates corresponding '.d.ts' file.
-    "sourceMap": false,                    // Generates corresponding '.map' file.
+    "sourceMap": true,                     // Generates corresponding '.map' file.
     "outDir": "./dist",                    // Redirect output structure to the directory.
     "removeComments": false,               // Do not emit comments to output.
     "importHelpers": true,                 // Import emit helpers from 'tslib'.

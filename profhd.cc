@@ -74,11 +74,17 @@ class StackMemory : public unwindstack::MemoryRemote {
   size_t Read(uint64_t addr, void* dst, size_t size) override {
     int64_t offset = addr - sp_;
     if (offset >= 0 && offset < size_) {
-      PERFETTO_CHECK(size < size_ - offset);
+      if (size > size_ - offset)
+        return false;
       memcpy(dst, stack_ + offset, std::min(size, size_));
       return std::min(size, size_);
     }
     return unwindstack::MemoryRemote::Read(addr, dst, size);
+  }
+
+  void SetStack(uint8_t* stack, size_t size) {
+    stack_ = stack;
+    size_ = size;
   }
 
  private:
@@ -125,6 +131,46 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
   }
 }
 
+struct Frame {
+  Frame() {}
+  Frame(unwindstack::FrameData fd) : data(std::move(fd)) {}
+
+  unwindstack::FrameData data;
+  size_t size = 0;
+  std::map<std::string, Frame> children;
+
+  void Print(std::ostream& o) const {
+    o << "{";
+    bool prev = false;
+    if (!data.function_name.empty()) {
+      if (prev)
+        o << ",";
+      prev = true;
+      o << " \"name\": \"" << data.map_name << "`" << data.function_name
+        << "\"\n";
+    }
+    if (prev)
+      o << ",";
+    prev = true;
+    o << "  \"value\": " << size << "\n";
+    if (!children.empty()) {
+      if (prev)
+        o << ",";
+      prev = true;
+      o << "  \"children\": [";
+      bool first = true;
+      for (const auto& c : children) {
+        if (!first)
+          o << ",\n";
+        first = false;
+        c.second.Print(o);
+      }
+      o << "]\n";
+    }
+    o << "}";
+  }
+};
+
 class HeapDump {
  public:
   void AddStack(const std::vector<unwindstack::FrameData>& data,
@@ -133,58 +179,65 @@ class HeapDump {
       return;
     }
     std::lock_guard<std::mutex> l(mutex_);
-    std::set<std::string> fns;
-    for (const unwindstack::FrameData& frame_data : data) {
-      fns.emplace(frame_data.function_name);
-    }
 
-    for (std::string function : fns) {
-      auto itr = heap_usage_per_function_.find(function);
-      if (itr != heap_usage_per_function_.end()) {
-        itr->second += metadata.size;
-      } else {
-        heap_usage_per_function_.emplace(std::move(function), metadata.size);
+    Frame* frame = &top_frame_;
+    frame->size += metadata.size;
+    for (auto it = data.rbegin(); it != data.rend(); ++it) {
+      const unwindstack::FrameData& frame_data = *it;
+      auto itr = frame->children.find(frame_data.function_name);
+      if (itr == frame->children.end()) {
+        auto pair =
+            frame->children.emplace(frame_data.function_name, frame_data);
+        PERFETTO_CHECK(pair.second);
+        itr = pair.first;
       }
+      itr->second.size += metadata.size;
+      frame = &itr->second;
     }
 
-    addr_info_.emplace(metadata.addr,
-                       std::make_pair(metadata.size, std::move(fns)));
+    addr_info_.emplace(metadata.addr, std::make_pair(data, metadata));
   }
 
   void FreeAddr(uint64_t addr) {
     std::lock_guard<std::mutex> l(mutex_);
     auto itr = addr_info_.find(addr);
-    if (itr == addr_info_.end()) return;
-    for (const std::string& fn : itr->second.second) {
-      auto itr2 = heap_usage_per_function_.find(fn);
-      if (itr2 != heap_usage_per_function_.end()) {
-        itr2->second -= itr->second.first;
-        if (itr2->second == 0) heap_usage_per_function_.erase(itr2);
-      }
+    if (itr == addr_info_.end())
+      return;
+
+    const std::vector<unwindstack::FrameData>& data = itr->second.first;
+    const AllocMetadata& metadata = itr->second.second;
+
+    Frame* frame = &top_frame_;
+    frame->size -= metadata.size;
+    for (const unwindstack::FrameData frame_data : data) {
+      auto itr = frame->children.find(frame_data.function_name);
+      if (itr == frame->children.end())
+        break;
+      itr->second.size -= metadata.size;
+      frame = &itr->second;
     }
-    addr_info_.erase(itr);
+
+    addr_info_.erase(addr);
   }
 
-  void Print(std::ostream& o) const {
-    bool first = true;
-    for (const auto& p : heap_usage_per_function_) {
-      if (!first) o << ",\n";
-      first = false;
-      o << "{\"name\": \"" << p.first.c_str() << "\", bytes: " << p.second
-        << "}";
-    }
+  void Print(std::ostream& o) {
+    std::lock_guard<std::mutex> l(mutex_);
+    top_frame_.Print(o);
   }
 
  private:
   std::mutex mutex_;
-  std::map<std::string, uint64_t> heap_usage_per_function_;
-  std::map<uint64_t, std::pair<uint64_t, std::set<std::string>>> addr_info_;
+  Frame top_frame_;
+  std::map<uint64_t,
+           std::pair<std::vector<unwindstack::FrameData>, AllocMetadata>>
+      addr_info_;
 };
 
 std::map<uint64_t, HeapDump> heapdump_for_pid;
 
 void DoneAlloc(void* mem, size_t sz) {
-  if (sz < sizeof(AllocMetadata)) return;
+  if (sz < sizeof(AllocMetadata))
+    return;
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(mem);
   unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
   if (regs == nullptr) {
@@ -223,7 +276,8 @@ std::atomic<uint64_t> samples_handled(0);
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
   samples_handled++;
-  if (sz < sizeof(MetadataHeader)) return;
+  if (sz < sizeof(MetadataHeader))
+    return;
   void* mem = mmap(nullptr, sz, PROT_READ, MAP_PRIVATE, *fd, 0);
   if (mem == MAP_FAILED) {
     PERFETTO_PLOG("mmap %zd %d", sz, *fd);
@@ -259,7 +313,8 @@ class WorkQueue {
     if (queue_.write(std::move(item))) {
       task_runner_.PostTask([this] {
         WorkItem w;
-        if (queue_.read(w)) Done(std::move(w.fd), w.record_size);
+        if (queue_.read(w))
+          Done(std::move(w.fd), w.record_size);
       });
       return true;
     }
@@ -280,18 +335,20 @@ class RecordReader {
   ssize_t Read(int fd, WorkQueue* wq) {
     if (read_idx_ < sizeof(record_size_)) {
       ssize_t rd = ReadRecordSize(fd);
-      if (rd != -1) read_idx_ += rd;
+      if (rd != -1)
+        read_idx_ += rd;
       return rd;
     }
 
     ssize_t rd = ReadRecord(fd);
-    if (rd != -1) read_idx_ += rd;
+    if (rd != -1)
+      read_idx_ += rd;
     if (done()) {
       samples_recv++;
       if (outfd_)
         wq->Submit(WorkItem(std::move(outfd_), record_size_));
-      else if (queue_overrun++ % 10000 == 0)
-        PERFETTO_LOG("Queue overrun %" PRIu64, queue_overrun);
+      else
+        queue_overrun++;
       Reset();
     }
     return rd;
@@ -300,7 +357,8 @@ class RecordReader {
  private:
   void Reset() {
     outfd_.reset(static_cast<int>(syscall(__NR_memfd_create, "data", 0)));
-    if (*outfd_ == -1) PERFETTO_PLOG("memfd_create");
+    if (*outfd_ == -1)
+      PERFETTO_PLOG("memfd_create");
     read_idx_ = 0;
     record_size_ = 1337;
   }
@@ -311,7 +369,8 @@ class RecordReader {
   }
 
   size_t read_idx() {
-    if (read_idx_ < sizeof(record_size_)) return read_idx_;
+    if (read_idx_ < sizeof(record_size_))
+      return read_idx_;
     return read_idx_ - sizeof(record_size_);
   }
 
@@ -375,7 +434,8 @@ class PipeSender : public ipc::UnixSocket::EventListener {
 };
 
 void PipeSender::OnNewIncomingConnection(
-    ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket> new_connection) {
+    ipc::UnixSocket*,
+    std::unique_ptr<ipc::UnixSocket> new_connection) {
   int pipes[2];
   if (pipe(pipes) == -1) {
     PERFETTO_PLOG("pipe");
@@ -414,24 +474,30 @@ void PipeSender::OnNewIncomingConnection(
   });
 }
 
-void PipeSender::OnDisconnect(ipc::UnixSocket* self) { socks_.erase(self); }
+void PipeSender::OnDisconnect(ipc::UnixSocket* self) {
+  socks_.erase(self);
+}
 
 int dumppipes[2];
 
-void DumpHeapsHandler(int sig) { write(dumppipes[1], "w", 1); }
+void DumpHeapsHandler(int sig) {
+  write(dumppipes[1], "w", 1);
+}
 
 void DumpHeaps() {
   PERFETTO_LOG("Dumping heap dumps.");
-  PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64,
-               samples_recv.load(), samples_handled.load());
+  PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
+               ", samples overran %" PRIu64,
+               samples_recv.load(), samples_handled.load(), queue_overrun);
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
-  for (const auto& p : heapdump_for_pid) {
-    if (!first) f << ",\n";
+  for (auto& p : heapdump_for_pid) {
+    if (!first)
+      f << ",\n";
     first = false;
     f << '"' << p.first << "\": [";
     p.second.Print(f);
@@ -442,7 +508,8 @@ void DumpHeaps() {
 
 int ProfHDMain(int argc, char** argv);
 int ProfHDMain(int argc, char** argv) {
-  if (argc != 2) return 1;
+  if (argc != 2)
+    return 1;
 
   pipe(dumppipes);
   signal(SIGUSR1, DumpHeapsHandler);
@@ -460,16 +527,20 @@ int ProfHDMain(int argc, char** argv) {
       ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner));
 
   std::vector<std::thread> threads;
-  for (auto& wq : work_queues) threads.emplace_back([&wq] { wq.Run(); });
+  for (auto& wq : work_queues)
+    threads.emplace_back([&wq] { wq.Run(); });
   threads.emplace_back(
       [&sighandler_task_runner] { sighandler_task_runner.Run(); });
 
   read_task_runner.Run();
-  for (auto& t : threads) t.join();
+  for (auto& t : threads)
+    t.join();
 
   return 0;
 }
 
 }  // namespace perfetto
 
-int main(int argc, char** argv) { return perfetto::ProfHDMain(argc, argv); }
+int main(int argc, char** argv) {
+  return perfetto::ProfHDMain(argc, argv);
+}
