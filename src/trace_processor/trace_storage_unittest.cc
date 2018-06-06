@@ -27,21 +27,6 @@ using ::testing::_;
 using ::testing::InSequence;
 using ::testing::Invoke;
 
-TEST(TraceStorageTest, NoInteractionFirstSched) {
-  TraceStorage storage;
-
-  uint32_t cpu = 3;
-  uint64_t timestamp = 100;
-  uint32_t prev_pid = 2;
-  uint32_t prev_state = 32;
-  static const char kTestString[] = "test";
-  uint32_t next_pid = 4;
-  storage.InsertSchedSwitch(cpu, timestamp, prev_pid, prev_state, kTestString,
-                            sizeof(kTestString) - 1, next_pid);
-
-  ASSERT_EQ(storage.start_timestamps_for_cpu(cpu), nullptr);
-}
-
 TEST(TraceStorageTest, InsertSecondSched) {
   TraceStorage storage;
 
@@ -52,54 +37,62 @@ TEST(TraceStorageTest, InsertSecondSched) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage.InsertSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
-                            sizeof(kCommProc1) - 1, pid_2);
-  storage.InsertSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
-                            sizeof(kCommProc2) - 1, pid_1);
 
-  const auto& timestamps = *storage.start_timestamps_for_cpu(cpu);
+  const auto& timestamps = storage.SlicesForCpu(cpu).start_ns();
+  storage.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+                          sizeof(kCommProc1) - 1, pid_2);
+  ASSERT_EQ(timestamps.size(), 0);
+
+  storage.PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+                          sizeof(kCommProc2) - 1, pid_1);
+
   ASSERT_EQ(timestamps.size(), 1ul);
   ASSERT_EQ(timestamps[0], timestamp);
 }
 
 TEST(TraceStorageTest, AddProcessEntry) {
   TraceStorage storage;
-  storage.AddProcessEntry(1, 1000, "test");
-  ASSERT_EQ(storage.UpidsForPid(1)->front(), 0);
-  ASSERT_EQ(storage.process_for_upid(0)->time_start, 1000);
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(storage.GetProcess(0)->start_ns, 1000);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
   TraceStorage storage;
-  storage.AddProcessEntry(1, 1000, "test");
-  storage.AddProcessEntry(1, 2000, "test");
-  ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
-  ASSERT_EQ((*storage.UpidsForPid(1))[1], 1);
-  ASSERT_EQ(storage.process_for_upid(0)->time_end, 2000);
-  ASSERT_EQ(storage.process_for_upid(1)->time_start, 2000);
-  ASSERT_EQ(storage.process_for_upid(0)->process_name,
-            storage.process_for_upid(1)->process_name);
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  storage.AddProcessEntry(1, 2000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  ++pair_it.first;
+  ASSERT_EQ(pair_it.first->second, 1);
+  ASSERT_EQ(storage.GetProcess(0)->end_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(0)->process_name,
+            storage.GetProcess(1)->process_name);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
   TraceStorage storage;
-  storage.AddProcessEntry(1, 1000, "test");
-  storage.AddProcessEntry(3, 2000, "test");
-  ASSERT_EQ((*storage.UpidsForPid(1))[0], 0);
-  ASSERT_EQ((*storage.UpidsForPid(3))[0], 1);
-  ASSERT_EQ(storage.process_for_upid(1)->time_start, 2000);
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  storage.AddProcessEntry(3, 2000, "test", 4);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first->second, 0);
+  auto second_pair_it = storage.UpidsForPid(3);
+  ASSERT_EQ(second_pair_it.first->second, 1);
+  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
 }
 
 TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
   TraceStorage storage;
-  ASSERT_EQ(storage.UpidsForPid(1), nullptr);
+  auto pair_it = storage.UpidsForPid(1);
+  ASSERT_EQ(pair_it.first, pair_it.second);
 }
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
-  storage.AddProcessEntry(1, 1000, "test");
-  ASSERT_EQ((*storage.string_for_string_id(
-                storage.process_for_upid(0)->process_name)),
+  storage.AddProcessEntry(1, 1000, "test", 4);
+  ASSERT_EQ(std::string(storage.GetString(storage.GetProcess(0)->process_name)),
             "test");
 }
 

@@ -23,94 +23,85 @@ namespace trace_processor {
 
 TraceStorage::~TraceStorage() {}
 
-void TraceStorage::InsertSchedSwitch(uint32_t cpu,
-                                     uint64_t timestamp,
-                                     uint32_t prev_pid,
-                                     uint32_t prev_state,
-                                     const char* prev_comm,
-                                     size_t prev_comm_len,
-                                     uint32_t next_pid) {
-  if (last_sched_per_cpu_.size() <= cpu)
-    last_sched_per_cpu_.resize(cpu + 1);
-
-  SchedSwitchEvent* event = &last_sched_per_cpu_[cpu];
+void TraceStorage::PushSchedSwitch(uint32_t cpu,
+                                   uint64_t timestamp,
+                                   uint32_t prev_pid,
+                                   uint32_t prev_state,
+                                   const char* prev_comm,
+                                   size_t prev_comm_len,
+                                   uint32_t next_pid) {
+  SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
 
   // If we had a valid previous event, then inform the storage about the
   // slice.
-  if (event->valid) {
-    AddSliceForCpu(cpu, event->timestamp, timestamp - event->timestamp,
-                   event->prev_comm_id);
+  if (prev->valid()) {
+    uint64_t duration = timestamp - prev->timestamp;
+    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_thread_id);
+  }
+
+  // If the this events previous pid does not match the previous event's next
+  // pid, make a note of this.
+  if (prev_pid != prev->next_pid) {
+    stats_.mismatched_sched_switch_tids_++;
   }
 
   // Update the map with the current event.
-  event->cpu = cpu;
-  event->timestamp = timestamp;
-  event->prev_pid = prev_pid;
-  event->prev_state = prev_state;
-  event->prev_comm_id = InternString(prev_comm, prev_comm_len);
-  event->next_pid = next_pid;
-  event->valid = true;
+  prev->cpu = cpu;
+  prev->timestamp = timestamp;
+  prev->prev_pid = prev_pid;
+  prev->prev_state = prev_state;
+  prev->prev_thread_id = InternString(prev_comm, prev_comm_len);
+  prev->next_pid = next_pid;
 }
 
-void TraceStorage::AddSliceForCpu(uint32_t cpu,
-                                  uint64_t start_timestamp,
-                                  uint64_t duration,
-                                  StringId thread_name_id) {
-  if (cpu_events_.size() <= cpu)
-    cpu_events_.resize(cpu + 1);
-
-  SlicesPerCpu* slices = &cpu_events_[cpu];
-  slices->cpu_ = cpu;
-  slices->start_timestamps.emplace_back(start_timestamp);
-  slices->durations.emplace_back(duration);
-  slices->thread_names.emplace_back(thread_name_id);
-}
-
-void TraceStorage::AddProcessEntry(uint64_t pid,
-                                   uint64_t time_start,
-                                   const char* process_name) {
-  // Store a new upid for that pid.
-  auto pids_it = pids_.find(pid);
-  if (pids_it == pids_.end()) {
-    std::deque<UniquePid> upids(1, current_upid_);
-    pids_.emplace(pid, upids);
-  } else {
-    // If pid has been seen before, set the end time of the previous entry
-    // to the start time of this entry.
-    UniquePid prev_upid = pids_it->second.back();
-    process_entries_[prev_upid].time_end = time_start;
-    pids_it->second.emplace_back(current_upid_);
+void TraceStorage::AddProcessEntry(int32_t pid,
+                                   uint64_t start_ns,
+                                   const char* process_name,
+                                   size_t process_name_len) {
+  // Store a new upid for that pid. If pid has been seen before, set the end
+  // time of the previous entry to the start time of this entry.
+  auto pids_pair = pids_.equal_range(pid);
+  for (auto it = pids_pair.first; it != pids_pair.second; ++it) {
+    // Only the previous upid instance should have end_ns == 0
+    if (unique_processes_[it->second].end_ns == 0) {
+      unique_processes_[it->second].end_ns = start_ns;
+      break;
+    }
   }
-  current_upid_++;
+  pids_.emplace(pid, current_upid_++);
 
   // Make a new process entry for that upid.
   ProcessEntry new_process;
-  new_process.time_start = time_start;
-  new_process.process_name = InternString(process_name, strlen(process_name));
-  process_entries_.emplace_back(new_process);
+  new_process.start_ns = start_ns;
+  new_process.end_ns = 0;
+  new_process.process_name = InternString(process_name, process_name_len);
+  unique_processes_.emplace_back(new_process);
 }
 
-std::deque<TraceStorage::UniquePid>* TraceStorage::UpidsForPid(uint64_t pid) {
-  auto pid_it = pids_.find(pid);
-  if (pid_it != pids_.end()) {
-    return &pid_it->second;
-  }
-  return nullptr;
+std::pair<
+    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator,
+    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator>
+TraceStorage::UpidsForPid(int32_t pid) {
+  return pids_.equal_range(pid);
 }
 
 TraceStorage::StringId TraceStorage::InternString(const char* data,
-                                                  uint64_t length) {
+                                                  size_t length) {
   uint32_t hash = 0;
   for (uint64_t i = 0; i < length; ++i) {
     hash = static_cast<uint32_t>(data[i]) + (hash * 31);
   }
-  auto id_it = string_pool_.find(hash);
-  if (id_it != string_pool_.end()) {
+  auto id_it = string_index_.find(hash);
+  if (id_it != string_index_.end()) {
+    // TODO(lalitm): check if this DCHECK happens and if so, then change hash
+    // to 64bit.
+    PERFETTO_DCHECK(string_pool_[id_it->second] == std::string(data, length));
     return id_it->second;
   }
-  strings_.emplace_back(data, length);
-  string_pool_.emplace(hash, strings_.size() - 1);
-  return strings_.size() - 1;
+  string_pool_.emplace_back(data, length);
+  StringId string_id = string_pool_.size() - 1;
+  string_index_.emplace(hash, string_id);
+  return string_id;
 }
 
 }  // namespace trace_processor

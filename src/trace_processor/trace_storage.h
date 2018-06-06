@@ -17,10 +17,13 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 #define SRC_TRACE_PROCESSOR_TRACE_STORAGE_H_
 
+#include <array>
 #include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "perfetto/base/logging.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -30,110 +33,132 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
-  virtual ~TraceStorage();
-  // Each StringId is an offset into |strings_|.
+  constexpr static size_t kMaxCpus = 128;
+  // StringId is an offset into |string_pool_|.
   using StringId = size_t;
-  // UniquePid is an offset into |process_entries_|.
+
+  class SlicesPerCpu {
+   public:
+    inline void AddSlice(uint64_t start_ns,
+                         uint64_t duration_ns,
+                         StringId thread_name_id) {
+      start_ns_.emplace_back(start_ns);
+      durations_.emplace_back(duration_ns);
+      thread_names_.emplace_back(thread_name_id);
+    }
+
+    size_t slice_count() const { return start_ns_.size(); }
+
+    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
+
+    const std::deque<uint64_t>& durations() const { return durations_; }
+
+   private:
+    // Each vector below has the same number of entries (the number of slices
+    // in the trace for the CPU).
+    std::deque<uint64_t> start_ns_;
+    std::deque<uint64_t> durations_;
+    std::deque<StringId> thread_names_;
+  };
+
+  struct Stats {
+    uint64_t mismatched_sched_switch_tids_ = 0;
+  };
+
+  virtual ~TraceStorage();
+  // UniquePid is an offset into |unique_processes_|. This is necessary because
+  // Unix pids are reused and thus not guaranteed to be unique over a long
+  // period of time.
   using UniquePid = size_t;
 
   // Information about a unique process seen in a trace.
   struct ProcessEntry {
-    uint64_t time_start;
-    uint64_t time_end;
+    uint64_t start_ns;
+    uint64_t end_ns;
     StringId process_name;
   };
 
   // Adds a sched slice for a given cpu.
   // Virtual for testing.
-  virtual void InsertSchedSwitch(uint32_t cpu,
-                                 uint64_t timestamp,
-                                 uint32_t prev_pid,
-                                 uint32_t prev_state,
-                                 const char* prev_comm,
-                                 uint64_t prev_comm_len,
-                                 uint32_t next_pid);
+  virtual void PushSchedSwitch(uint32_t cpu,
+                               uint64_t timestamp,
+                               uint32_t prev_pid,
+                               uint32_t prev_state,
+                               const char* prev_comm,
+                               size_t prev_comm_len,
+                               uint32_t next_pid);
 
   // Adds a process entry for a given pid.
-  void AddProcessEntry(uint64_t pid,
-                       uint64_t time_start,
-                       const char* process_name);
+  void AddProcessEntry(int32_t pid,
+                       uint64_t start_ns,
+                       const char* process_name,
+                       size_t process_name_len);
 
-  // Finds the upids for a given pid. Returns a nullptr if none are found.
-  std::deque<UniquePid>* UpidsForPid(uint64_t pid);
+  // Returns the bounds of a range that includes all UniquePids that have the
+  // requested pid.
+  std::pair<std::unordered_multimap<int32_t, UniquePid>::const_iterator,
+            std::unordered_multimap<int32_t, UniquePid>::const_iterator>
+  UpidsForPid(int32_t pid);
 
   // Reading methods.
-  std::deque<uint64_t>* start_timestamps_for_cpu(uint32_t cpu) {
-    if (cpu_events_.size() <= cpu ||
-        cpu_events_[cpu].cpu_ == std::numeric_limits<uint32_t>::max()) {
-      return nullptr;
-    }
-    return &cpu_events_[cpu].start_timestamps;
+  const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
+    return cpu_events_[cpu];
   }
 
-  const ProcessEntry* process_for_upid(UniquePid upid) {
-    if (process_entries_.size() <= upid) {
+  const ProcessEntry* GetProcess(UniquePid upid) {
+    if (unique_processes_.size() <= upid) {
       return nullptr;
     }
-    return &process_entries_[upid];
+    return &unique_processes_[upid];
   }
 
-  const std::string* string_for_string_id(StringId id) {
-    if (strings_.size() <= id) {
+  const char* GetString(StringId id) {
+    if (string_pool_.size() <= id) {
       return nullptr;
     }
-    return &strings_[id];
+    return string_pool_[id].c_str();
   }
 
  private:
   using StringHash = uint32_t;
   UniquePid current_upid_ = 0;
 
-  struct SlicesPerCpu {
-    uint32_t cpu_ = std::numeric_limits<uint32_t>::max();
-
-    // Each deque below has the same number of entries (the number of slices
-    // in the trace for the CPU).
-    std::deque<uint64_t> start_timestamps;
-    std::deque<uint64_t> durations;
-    std::deque<StringId> thread_names;
-  };
-
   struct SchedSwitchEvent {
     uint64_t cpu = 0;
     uint64_t timestamp = 0;
     uint32_t prev_pid = 0;
     uint32_t prev_state = 0;
-    StringId prev_comm_id;
+    StringId prev_thread_id = 0;
     uint32_t next_pid = 0;
-    bool valid = false;
+
+    bool valid() const { return timestamp != 0; }
   };
 
-  void AddSliceForCpu(uint32_t cpu,
-                      uint64_t start_timestamp,
-                      uint64_t duration,
-                      StringId thread_name_id);
-
   // Return an unqiue identifier for the contents of each string.
-  StringId InternString(const char* data, uint64_t length);
+  // The string is copied internally and can be destroyed after this called.
+  StringId InternString(const char* data, size_t length);
+
+  // Metadata counters for events being added.
+  Stats stats_;
 
   // One entry for each CPU in the trace.
-  std::vector<SchedSwitchEvent> last_sched_per_cpu_;
+  std::array<SchedSwitchEvent, kMaxCpus> last_sched_per_cpu_;
 
   // One entry for each CPU in the trace.
-  std::vector<SlicesPerCpu> cpu_events_;
+  std::array<SlicesPerCpu, kMaxCpus> cpu_events_;
 
   // One entry for each unique string in the trace.
-  std::deque<std::string> strings_;
+  std::deque<std::string> string_pool_;
 
   // One entry for each unique string in the trace.
-  std::unordered_map<StringHash, StringId> string_pool_;
+  std::unordered_map<StringHash, StringId> string_index_;
 
   // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
   // each time a process is seen in the trace.
-  std::unordered_map<uint64_t, std::deque<UniquePid>> pids_;
+  std::unordered_multimap<int32_t, UniquePid> pids_;
 
-  // One entry for each UniquePid.
-  std::deque<ProcessEntry> process_entries_;
+  // One entry for each UniquePid, with UniquePid as the index.
+  std::deque<ProcessEntry> unique_processes_;
 };
 
 }  // namespace trace_processor
