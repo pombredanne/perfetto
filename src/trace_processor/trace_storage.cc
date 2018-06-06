@@ -36,13 +36,13 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   // slice.
   if (prev->valid()) {
     uint64_t duration = timestamp - prev->timestamp;
-    AddSliceForCpu(cpu, prev->timestamp, duration, prev->prev_thread_id);
+    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_thread_id);
   }
 
   // If the this events previous pid does not match the previous event's next
   // pid, make a note of this.
   if (prev_pid != prev->next_pid) {
-    counters_.mismatched_sched_switch_tids_++;
+    stats_.mismatched_sched_switch_tids_++;
   }
 
   // Update the map with the current event.
@@ -54,15 +54,6 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   prev->next_pid = next_pid;
 }
 
-void TraceStorage::AddSliceForCpu(uint32_t cpu,
-                                  uint64_t start_ns,
-                                  uint64_t duration_ns,
-                                  StringId thread_name_id) {
-  SlicesPerCpu* slices = &cpu_events_[cpu];
-  slices->Setup(cpu);
-  slices->AddSlice(start_ns, duration_ns, thread_name_id);
-}
-
 TraceStorage::StringId TraceStorage::InternString(const char* data,
                                                   size_t length) {
   uint32_t hash = 0;
@@ -71,25 +62,15 @@ TraceStorage::StringId TraceStorage::InternString(const char* data,
   }
   auto id_it = string_index_.find(hash);
   if (id_it != string_index_.end()) {
+    // TODO(lalitm): check if this DCHECK happens and if so, then change hash
+    // to 64bit.
+    PERFETTO_DCHECK(string_pool_[id_it->second] == std::string(data, length));
     return id_it->second;
   }
   string_pool_.emplace_back(data, length);
   StringId string_id = string_pool_.size() - 1;
   string_index_.emplace(hash, string_id);
   return string_id;
-}
-
-void TraceStorage::SlicesPerCpu::Setup(uint32_t cpu) {
-  cpu_ = cpu;
-  valid_ = true;
-}
-
-void TraceStorage::SlicesPerCpu::AddSlice(uint64_t start_ns,
-                                          uint64_t duration_ns,
-                                          StringId thread_name_id) {
-  start_ns_.emplace_back(start_ns);
-  durations_.emplace_back(duration_ns);
-  thread_names_.emplace_back(thread_name_id);
 }
 
 }  // namespace trace_processor

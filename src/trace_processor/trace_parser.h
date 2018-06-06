@@ -47,7 +47,6 @@ class TraceParser {
                         uint32_t length);
 
   BlobReader* const reader_;
-
   TraceStorage* const storage_;
   const uint32_t chunk_size_b_;
 

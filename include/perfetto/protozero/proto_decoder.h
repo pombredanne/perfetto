@@ -57,7 +57,7 @@ class ProtoDecoder {
       return reinterpret_cast<const char*>(length_limited.data);
     }
 
-    inline size_t as_size() const {
+    inline size_t size() const {
       PERFETTO_DCHECK(type ==
                       proto_utils::FieldType::kFieldTypeLengthDelimited);
       return static_cast<size_t>(length_limited.length);

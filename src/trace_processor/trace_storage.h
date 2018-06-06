@@ -38,10 +38,13 @@ class TraceStorage {
 
   class SlicesPerCpu {
    public:
-    void Setup(uint32_t cpu);
-    void AddSlice(uint64_t start_timestamp,
-                  uint64_t duration,
-                  StringId thread_name_id);
+    inline void AddSlice(uint64_t start_ns,
+                         uint64_t duration_ns,
+                         StringId thread_name_id) {
+      start_ns_.emplace_back(start_ns);
+      durations_.emplace_back(duration_ns);
+      thread_names_.emplace_back(thread_name_id);
+    }
 
     size_t slice_count() const {
       PERFETTO_DCHECK(valid_);
@@ -58,11 +61,7 @@ class TraceStorage {
       return durations_;
     }
 
-    bool is_valid() const { return valid_; }
-
    private:
-    uint32_t cpu_ = 0;
-
     // Each vector below has the same number of entries (the number of slices
     // in the trace for the CPU).
     std::deque<uint64_t> start_ns_;
@@ -73,7 +72,7 @@ class TraceStorage {
     bool valid_ = false;
   };
 
-  struct Counters {
+  struct Stats {
     uint64_t mismatched_sched_switch_tids_ = 0;
   };
 
@@ -90,11 +89,8 @@ class TraceStorage {
                                uint32_t next_pid);
 
   // Reading methods.
-  const SlicesPerCpu* SlicesForCpu(uint32_t cpu) const {
-    if (cpu >= kMaxCpus || !cpu_events_[cpu].is_valid()) {
-      return nullptr;
-    }
-    return &cpu_events_[cpu];
+  const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
+    return cpu_events_[cpu];
   }
 
  private:
@@ -112,17 +108,12 @@ class TraceStorage {
     bool valid() const { return timestamp != 0; }
   };
 
-  void AddSliceForCpu(uint32_t cpu,
-                      uint64_t start_ns,
-                      uint64_t duration_ns,
-                      StringId thread_name_id);
-
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
   StringId InternString(const char* data, size_t length);
 
   // Metadata counters for events being added.
-  Counters counters_;
+  Stats stats_;
 
   // One entry for each CPU in the trace.
   std::array<SchedSwitchEvent, kMaxCpus> last_sched_per_cpu_;
