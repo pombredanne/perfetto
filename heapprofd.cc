@@ -602,6 +602,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
                                std::unique_ptr<ipc::UnixSocket>) override;
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnDataAvailable(ipc::UnixSocket* sock) override {
+    /*
     char buf[1];
     sock->ReceiveMany(&buf, sizeof(buf), &mem_fds);
     PERFETTO_LOG("Got %zd fds.", mem_fds.size());
@@ -615,6 +616,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
       PERFETTO_LOG("Remote read %zd bytes", read(*mem_fd, ptrbuf, 1));
     }
     return;
+    */
     int fd = sock->fd();
     ssize_t rd =
         record_readers_[sock].Read(fd, &((*work_queues_)[fd % num_wq_]));
