@@ -108,6 +108,7 @@ class Histogram {
  public:
   void AddSample(base::TimeMicros value) {
     MAYBE_LOCK(l, mtx_);
+    samples_.emplace_back(value);
     total_time_ += value;
     total_samples_++;
     base::TimeMicros cur = base::TimeMicros(-1);
@@ -133,11 +134,25 @@ class Histogram {
                  uint64_t(total_time_.count()) / total_samples_);
   }
 
+  void PrintJSON(std::ostream& f) {
+    MAYBE_LOCK(l, mtx_);
+    f << "[";
+    auto last = samples_.cend();
+    last--;
+    for (auto itr = samples_.cbegin(); itr != samples_.cend(); ++itr) {
+      f << itr->count();
+      if (itr != last)
+        f << ",";
+    }
+    f << "]";
+  }
+
  private:
   std::mutex mtx_;
 
   base::TimeMicros total_time_{0};
   uint64_t total_samples_ = 0;
+  std::vector<base::TimeMicros> samples_;
   std::vector<std::pair<base::TimeMicros, uint64_t>> delay_histogram_ms_{
       {{base::TimeMicros(1), 0},
        {base::TimeMicros(5), 0},
@@ -171,6 +186,8 @@ Histogram histogram;
 Histogram unwind_only_histogram;
 Histogram parse_only_histogram;
 Histogram send_histogram;
+Histogram alloc_histogram;
+Histogram stack_histogram;
 
 constexpr uint8_t kAlloc = 1;
 constexpr uint8_t kFree = 2;
@@ -252,10 +269,19 @@ struct Frame {
   }
 };
 
+struct AddressMetadata {
+  AddressMetadata(std::vector<unwindstack::FrameData> frs, AllocMetadata am, uint64_t n) : frames(frs), alloc_metadata(am), n_alloc(n) {}
+
+  std::vector<unwindstack::FrameData> frames;
+  AllocMetadata alloc_metadata;
+  uint64_t n_alloc;
+};
+
 class HeapDump {
  public:
   void AddStack(const std::vector<unwindstack::FrameData>& data,
-                const AllocMetadata& metadata) {
+                const AllocMetadata& metadata,
+                uint64_t n) {
     if (data.size() <= 2) {
       return;
     }
@@ -276,17 +302,20 @@ class HeapDump {
       frame = &itr->second;
     }
 
-    addr_info_.emplace(metadata.addr, std::make_pair(data, metadata));
+    addr_info_.emplace(std::piecewise_construct,
+                       std::forward_as_tuple(metadata.addr),
+                       std::forward_as_tuple(data, metadata, n));
   }
 
-  bool FreeAddr(uint64_t addr) {
+  uint64_t FreeAddr(uint64_t addr) {
     MAYBE_LOCK(l, mutex_);
     auto itr = addr_info_.find(addr);
     if (itr == addr_info_.end())
-      return false;
+      return 0;
 
-    const std::vector<unwindstack::FrameData>& data = itr->second.first;
-    const AllocMetadata& metadata = itr->second.second;
+    const std::vector<unwindstack::FrameData>& data = itr->second.frames;
+    const AllocMetadata& metadata = itr->second.alloc_metadata;
+    const uint64_t n = itr->second.n_alloc;
 
     Frame* frame = &top_frame_;
     frame->size -= metadata.size;
@@ -299,7 +328,7 @@ class HeapDump {
       frame = &itr->second;
     }
 
-    return addr_info_.erase(addr) == 1;
+    return n;
   }
 
   void Print(std::ostream& o) {
@@ -310,9 +339,7 @@ class HeapDump {
  private:
   std::mutex mutex_;
   Frame top_frame_;
-  std::map<uint64_t,
-           std::pair<std::vector<unwindstack::FrameData>, AllocMetadata>>
-      addr_info_;
+  std::map<uint64_t, AddressMetadata> addr_info_;
 };
 
 struct Metadata {
@@ -320,12 +347,15 @@ struct Metadata {
   HeapDump heap_dump;
   unwindstack::RemoteMaps maps;
   uint64_t pid;
+  uint64_t num_allocs = 0;
 };
 
 std::map<int, Metadata> metadata_for_pipe;
 std::mutex metadata_for_pipe_mtx;
 
 void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
+  stack_histogram.AddSample(base::TimeMicros(sz));
+  metadata->num_allocs++;
   auto start = base::GetWallTimeUs();
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
@@ -374,7 +404,7 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
     }
   }
   if (error_code == 0) {
-    metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata);
+    metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata, metadata->num_allocs);
   }
 }
 
@@ -382,8 +412,10 @@ void DoneFree(void* mem, size_t sz, Metadata* metadata) {
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 3; n < sz / sizeof(*freed); n++) {
     frees_handled++;
-    if (metadata->heap_dump.FreeAddr(freed[n]))
+    if (uint64_t x = metadata->heap_dump.FreeAddr(freed[n])) {
       frees_found++;
+      alloc_histogram.AddSample(base::TimeMicros(x));
+    }
   }
 }
 
@@ -432,7 +464,7 @@ struct WorkItem {
   int pipe_fd;
 };
 
-std::atomic<uint64_t> queue_overrun(0);
+std::atomic<uint64_t> samples_overran(0);
 
 class WorkQueue {
  public:
@@ -487,7 +519,7 @@ class RecordReader {
       }
 
       if (!wq->Submit(WorkItem(std::move(buf_), record_size_, fd)))
-        queue_overrun++;
+        samples_overran++;
       Reset();
     }
     return rd;
@@ -587,18 +619,49 @@ void InfoHandler(int sig) {
 }
 
 void Info() {
+  std::ofstream f("/data/local/heapinfo");
   size_t pipe_metadata;
   {
     std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
     pipe_metadata = metadata_for_pipe.size();
   }
+
+  f << "{\n"
+    << "\"samples_recv\": " << samples_recv.load() << ",\n"
+    << "\"samples_handled\": " << samples_handled.load() << ",\n"
+    << "\"samples_overran\": " << samples_overran.load() << ",\n"
+    << "\"samples_failed\": " << samples_failed.load() << ",\n"
+    << "\"frees_handled\": " << frees_handled.load() << ",\n"
+    << "\"frees_found\": " << frees_found.load() << ",\n"
+    << "\"pipe_metadata\": " << pipe_metadata << ",\n";
+
+  f << "\"total_time_histogram\": ";
+  histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"unwind_only_histogram\": ";
+  unwind_only_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"alloc_histogram\": ";
+  alloc_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"stack_histogram\": ";
+  stack_histogram.PrintJSON(f);
+  f << ",\n";
+
+  f << "\"send_histogram\": ";
+  send_histogram.PrintJSON(f);
+  f << "\n}\n";
+
   PERFETTO_LOG("Dumping heap dumps.");
   PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
                ", samples overran %" PRIu64 ", samples failed %" PRIu64
                ", frees handled %" PRIu64 ", frees found %" PRIu64
                ", samples too late %" PRIu64 ", pipe metadata %" PRIu64,
                samples_recv.load(), samples_handled.load(),
-               queue_overrun.load(), samples_failed.load(),
+               samples_overran.load(), samples_failed.load(),
                frees_handled.load(), frees_found.load(),
                samples_too_late.load(), pipe_metadata);
   for (int i = 1; i < errors.size(); ++i)
@@ -608,6 +671,10 @@ void Info() {
   histogram.PrintDebugInfo();
   PERFETTO_LOG("Unwinding time:");
   unwind_only_histogram.PrintDebugInfo();
+  PERFETTO_LOG("Alloc:");
+  alloc_histogram.PrintDebugInfo();
+  PERFETTO_LOG("Stack size:");
+  stack_histogram.PrintDebugInfo();
   // PERFETTO_LOG("Parsing time:");
   // parse_only_histogram.PrintDebugInfo();
   PERFETTO_LOG("Sending time:");
