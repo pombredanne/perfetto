@@ -62,14 +62,6 @@
 
 namespace perfetto {
 
-std::string GetName(int fd) {
-  std::string path = "/proc/self/fd/";
-  path += std::to_string(fd);
-  char buf[512];
-  readlink(path.c_str(), buf, sizeof(buf));
-  return std::string(buf, sizeof(buf));
-}
-
 class StackMemory : public unwindstack::MemoryRemote {
  public:
   StackMemory(pid_t pid, uint64_t sp, uint8_t* stack, size_t size)
@@ -296,43 +288,32 @@ class HeapDump {
       addr_info_;
 };
 
-std::map<ProcessID, HeapDump> heapdump_for_pid;
-std::mutex heapdump_for_pid_mtx;
-std::map<ProcessID, unwindstack::RemoteMaps> remotemap_for_pid;
-std::mutex remotemap_for_pid_mtx;
+struct Metadata {
+  Metadata(uint64_t p) : maps(p), pid(p) { maps.Parse(); }
+  HeapDump heap_dump;
+  unwindstack::RemoteMaps maps;
+  uint64_t pid;
+};
 
-void DoneAlloc(void* mem, size_t sz) {
+std::map<int, Metadata> metadata_for_pipe;
+std::mutex metadata_for_pipe_mtx;
+
+void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   auto start = base::GetWallTimeMs();
   if (sz < sizeof(AllocMetadata))
     return;
-  AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(mem);
-  unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
+  AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
+  unwindstack::Regs* regs =
+      CreateFromRawData(alloc_metadata->arch, alloc_metadata->regs);
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
     return;
   }
   uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
-  decltype(remotemap_for_pid)::iterator itr;
-  {
-    MAYBE_LOCK(l, remotemap_for_pid_mtx);
-    itr = remotemap_for_pid.find(metadata->header.pid);
-    if (itr == remotemap_for_pid.end()) {
-      itr = remotemap_for_pid
-                .emplace(metadata->header.pid, metadata->header.pid.pid)
-                .first;
-      auto parse_start = base::GetWallTimeMs();
-      if (!itr->second.Parse()) {
-        remotemap_for_pid.erase(itr);
-        return;
-      }
-      parse_only_histogram.AddSample(base::GetWallTimeMs() - parse_start);
-    }
-  }
-  unwindstack::RemoteMaps& maps = itr->second;
-  std::shared_ptr<unwindstack::Memory> mems =
-      std::make_shared<StackMemory>(metadata->header.pid.pid, metadata->sp,
-                                    stack, sz - sizeof(AllocMetadata));
-  unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
+  std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
+      alloc_metadata->header.pid.pid, alloc_metadata->sp, stack,
+      sz - sizeof(AllocMetadata));
+  unwindstack::Unwinder unwinder(1000, &metadata->maps, regs, mems);
   auto unwind_start = base::GetWallTimeMs();
   unwinder.Unwind();
 
@@ -349,25 +330,19 @@ void DoneAlloc(void* mem, size_t sz) {
     unwind_only_histogram.AddSample(now - unwind_start);
   }
   return;
-  HeapDump* hd;
-  {
-    MAYBE_LOCK(l, heapdump_for_pid_mtx);
-    hd = &heapdump_for_pid[metadata->header.pid];
-  }
-  hd->AddStack(unwinder.frames(), *metadata);
+  metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata);
 }
 
-void DoneFree(void* mem, size_t sz) {
+void DoneFree(void* mem, size_t sz, Metadata* metadata) {
   return;
-  MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 4; n < sz / sizeof(*freed); n++) {
-    heapdump_for_pid[header->pid].FreeAddr(freed[n]);
+    metadata->heap_dump.FreeAddr(freed[n]);
   }
 }
 
-void Done(base::ScopedFile fd, size_t sz);
-void Done(base::ScopedFile fd, size_t sz) {
+void Done(base::ScopedFile fd, size_t sz, int pipe_fd);
+void Done(base::ScopedFile fd, size_t sz, int pipe_fd) {
   samples_handled++;
   if (sz < sizeof(MetadataHeader))
     return;
@@ -377,12 +352,21 @@ void Done(base::ScopedFile fd, size_t sz) {
     return;
   }
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
+  decltype(metadata_for_pipe)::iterator itr;
+  {
+    std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+    itr = metadata_for_pipe.find(pipe_fd);
+    if (itr == metadata_for_pipe.end())
+      itr = metadata_for_pipe.emplace(pipe_fd, header->pid.pid).first;
+  }
+  Metadata& metadata = itr->second;
+
   switch (header->type) {
     case kAlloc:
-      DoneAlloc(mem, sz);
+      DoneAlloc(mem, sz, &metadata);
       break;
     case kFree:
-      DoneFree(mem, sz);
+      DoneFree(mem, sz, &metadata);
       break;
     default:
       PERFETTO_ELOG("Invalid type %" PRIu8, header->type);
@@ -393,9 +377,11 @@ void Done(base::ScopedFile fd, size_t sz) {
 struct WorkItem {
  public:
   WorkItem() {}
-  WorkItem(base::ScopedFile f, size_t s) : fd(std::move(f)), record_size(s) {}
+  WorkItem(base::ScopedFile f, size_t s, int pfd)
+      : fd(std::move(f)), record_size(s), pipe_fd(pfd) {}
   base::ScopedFile fd;
   size_t record_size;
+  int pipe_fd;
 };
 
 std::atomic<uint64_t> queue_overrun(0);
@@ -407,7 +393,7 @@ class WorkQueue {
       task_runner_.PostTask([this] {
         WorkItem w;
         if (queue_.read(w))
-          Done(std::move(w.fd), w.record_size);
+          Done(std::move(w.fd), w.record_size, w.pipe_fd);
       });
       return true;
     }
@@ -416,9 +402,10 @@ class WorkQueue {
 
   void Run() { task_runner_.Run(); }
 
+  base::UnixTaskRunner task_runner_;
+
  private:
   folly::ProducerConsumerQueue<WorkItem> queue_{5000};
-  base::UnixTaskRunner task_runner_;
 };
 
 class RecordReader {
@@ -438,7 +425,7 @@ class RecordReader {
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
-      if (!outfd_ || !wq->Submit(WorkItem(std::move(outfd_), record_size_)))
+      if (!outfd_ || !wq->Submit(WorkItem(std::move(outfd_), record_size_, fd)))
         queue_overrun++;
       Reset();
     }
@@ -518,7 +505,6 @@ class PipeSender : public ipc::UnixSocket::EventListener {
  private:
   base::TaskRunner* task_runner_;
   std::vector<WorkQueue>* work_queues_;
-  uint64_t cur_wq_ = 0;
   size_t num_wq_;
   std::map<ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket>> socks_;
   base::WeakPtrFactory<PipeSender> weak_factory_;
@@ -546,19 +532,22 @@ void PipeSender::OnNewIncomingConnection(
   RecordReader* record_reader = new RecordReader();
   task_runner_->AddFileDescriptorWatch(fd, [fd, weak_this, record_reader] {
     if (!weak_this) {
-      // PERFETTO_LOG("Pipe closed");
-      close(fd);
-      delete record_reader;
-      return;
+      PERFETTO_CHECK(false);
     }
 
     ssize_t rd = record_reader->Read(
-        fd, &((*weak_this->work_queues_)[weak_this->cur_wq_++ %
-                                         weak_this->num_wq_]));
+        fd, &((*weak_this->work_queues_)[fd % weak_this->num_wq_]));
     if (rd == 0) {
-      // PERFETTO_LOG("Pipe closed %s", GetName(fd).c_str());
       weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
       close(fd);
+      (*weak_this->work_queues_)[fd % weak_this->num_wq_].task_runner_.PostTask(
+          [fd] {
+            {
+              std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+              metadata_for_pipe.erase(fd);
+            }
+          });
+
       delete record_reader;
       return;
     }
@@ -598,12 +587,14 @@ void DumpHeaps() {
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
-  for (auto& p : heapdump_for_pid) {
+  std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+  for (auto& p : metadata_for_pipe) {
+    auto& m = p.second;
     if (!first)
       f << ",\n";
     first = false;
-    f << '"' << p.first.pid << "\": [";
-    p.second.Print(f);
+    f << '"' << m.pid << "\": [";
+    m.heap_dump.Print(f);
     f << "]";
   }
   f << "\n}";
