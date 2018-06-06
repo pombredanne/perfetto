@@ -274,7 +274,10 @@ struct Frame {
 };
 
 struct AddressMetadata {
-  AddressMetadata(std::vector<unwindstack::FrameData> frs, AllocMetadata am, uint64_t n) : frames(frs), alloc_metadata(am), n_alloc(n) {}
+  AddressMetadata(std::vector<unwindstack::FrameData> frs,
+                  AllocMetadata am,
+                  uint64_t n)
+      : frames(frs), alloc_metadata(am), n_alloc(n) {}
 
   std::vector<unwindstack::FrameData> frames;
   AllocMetadata alloc_metadata;
@@ -377,9 +380,11 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
   if (alloc_metadata->last_timing)
     send_histogram.AddSample(base::TimeMicros(alloc_metadata->last_timing));
-  if (metadata->last_unwind_timing != base::TimeMicros(0) && alloc_metadata->last_timing) {
+  if (metadata->last_unwind_timing != base::TimeMicros(0) &&
+      alloc_metadata->last_timing) {
     base::TimeMicros last_timing_us(alloc_metadata->last_timing);
-    unwind_diff_histogram.AddSample(last_timing_us - metadata->last_unwind_timing);
+    unwind_diff_histogram.AddSample(last_timing_us -
+                                    metadata->last_unwind_timing);
   }
 
   unwindstack::Regs* regs =
@@ -418,7 +423,8 @@ void DoneAlloc(void* mem, size_t sz, Metadata* metadata) {
     }
   }
   if (error_code == 0) {
-    metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata, metadata->num_allocs);
+    metadata->heap_dump.AddStack(unwinder.frames(), *alloc_metadata,
+                                 metadata->num_allocs);
   }
   base::TimeMicros now = base::GetWallTimeUs();
   base::TimeMicros unwind_time = now - unwind_start;
