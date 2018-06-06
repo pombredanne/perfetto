@@ -106,11 +106,6 @@ int SchedSliceTable::Open(sqlite3_vtab_cursor** ppCursor) {
   return SQLITE_OK;
 }
 
-int SchedSliceTable::Close(sqlite3_vtab_cursor* cursor) {
-  delete AsCursor(cursor);
-  return SQLITE_OK;
-}
-
 // Called at least once but possibly many times before filtering things and is
 // the best time to keep track of constriants.
 int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {

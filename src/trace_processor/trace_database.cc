@@ -24,7 +24,11 @@ TraceDatabase::TraceDatabase() {
 
   // Setup the sched slice table.
   sqlite3_module module = SchedSliceTable::CreateModule();
-  sqlite3_create_module(db_, "sched_slice", &module, nullptr);
+  SchedSliceTable::Args* args = new SchedSliceTable::Args();
+  args->storage = &storage_;
+  sqlite3_create_module_v2(db_, "sched_slice", &module, args, [](void* args) {
+    delete reinterpret_cast<SchedSliceTable::Args*>(args);
+  });
 }
 
 TraceDatabase::~TraceDatabase() {
