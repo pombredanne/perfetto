@@ -515,9 +515,13 @@ class WorkQueue {
 
 class RecordReader {
  public:
-  RecordReader() { Reset(); }
+  RecordReader(
+      std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function)
+      : callback_function_(callback_function) {
+    Reset();
+  }
 
-  ssize_t Read(int fd, WorkQueue* wq) {
+  ssize_t Read(int fd) {
     if (read_idx_ < sizeof(record_size_)) {
       ssize_t rd = ReadRecordSize(fd);
       if (rd != -1)
@@ -532,19 +536,7 @@ class RecordReader {
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
-      {
-        auto itr = metadata_for_pipe.find(fd);
-        if (itr == metadata_for_pipe.end()) {
-          MetadataHeader* header =
-              reinterpret_cast<MetadataHeader*>(buf_.get());
-          std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
-          //          PERFETTO_LOG("PID: %" PRIu64, header->pid);
-          metadata_for_pipe.emplace(fd, header->pid);
-        }
-      }
-
-      if (!wq->Submit(WorkItem(std::move(buf_), record_size_, fd)))
-        samples_overran++;
+      callback_function_(record_size_, std::move(buf_));
       Reset();
     }
     return rd;
@@ -588,6 +580,7 @@ class RecordReader {
     return rd;
   }
 
+  std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function_;
   uint64_t read_idx_;
   uint64_t record_size_;
   std::unique_ptr<uint8_t[]> buf_;
@@ -618,8 +611,28 @@ class PipeSender : public ipc::UnixSocket::EventListener {
     return;
     */
     int fd = sock->fd();
-    ssize_t rd =
-        record_readers_[sock].Read(fd, &((*work_queues_)[fd % num_wq_]));
+    auto& wq = (*work_queues_)[fd % num_wq_];
+
+    auto itr = record_readers_.find(sock);
+    if (itr == record_readers_.end()) {
+      auto handle_sample_fn = [fd, &wq](size_t size,
+                                        std::unique_ptr<uint8_t[]> buf) {
+        auto itr = metadata_for_pipe.find(fd);
+        if (itr == metadata_for_pipe.end()) {
+          MetadataHeader* header = reinterpret_cast<MetadataHeader*>(buf.get());
+          std::lock_guard<std::mutex> l(metadata_for_pipe_mtx);
+          //          PERFETTO_LOG("PID: %" PRIu64, header->pid);
+          metadata_for_pipe.emplace(fd, header->pid);
+        }
+
+        if (!wq.Submit(WorkItem(std::move(buf), size, fd)))
+          samples_overran++;
+      };
+      itr = record_readers_.emplace(sock, handle_sample_fn).first;
+    }
+
+    RecordReader& record_reader = itr->second;
+    ssize_t rd = record_reader.Read(fd);
     if (rd == 0) {
       char buf[1];
       sock->Receive(&buf, 1);
@@ -783,7 +796,7 @@ int ProfHDMain(int argc, char** argv) {
 
   std::unique_ptr<ipc::UnixSocket> sock;
   if (argc == 2) {
-    sock  = ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
+    sock = ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
   } else {
     const char* sock_fd = getenv("ANDROID_SOCKET_heapprofd");
     if (sock_fd == nullptr)
@@ -792,9 +805,9 @@ int ProfHDMain(int argc, char** argv) {
     int raw_fd = strtol(sock_fd, &end, 10);
     if (*end != '\0')
       PERFETTO_FATAL("Invalid ANDROID_SOCKET_heapprofd");
-    sock = ipc::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener, &read_task_runner);
+    sock = ipc::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
+                                   &read_task_runner);
   }
-
 
   std::vector<std::thread> threads;
   for (auto& wq : work_queues)
