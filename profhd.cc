@@ -305,7 +305,7 @@ struct WorkItem {
   size_t record_size;
 };
 
-uint64_t queue_overrun = 0;
+std::atomic<uint64_t> queue_overrun(0);
 
 class WorkQueue {
  public:
@@ -345,9 +345,7 @@ class RecordReader {
       read_idx_ += rd;
     if (done()) {
       samples_recv++;
-      if (outfd_)
-        wq->Submit(WorkItem(std::move(outfd_), record_size_));
-      else
+      if (!outfd_ || !wq->Submit(WorkItem(std::move(outfd_), record_size_)))
         queue_overrun++;
       Reset();
     }
@@ -488,7 +486,8 @@ void DumpHeaps() {
   PERFETTO_LOG("Dumping heap dumps.");
   PERFETTO_LOG("Samples received: %" PRIu64 ", samples handled %" PRIu64
                ", samples overran %" PRIu64,
-               samples_recv.load(), samples_handled.load(), queue_overrun);
+               samples_recv.load(), samples_handled.load(),
+               queue_overrun.load());
   char buf[512];
   read(dumppipes[0], &buf, sizeof(buf));
 
