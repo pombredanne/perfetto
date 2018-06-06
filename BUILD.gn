@@ -255,14 +255,14 @@ if (use_libfuzzer) {
   }
 }
 
-executable("profhd") {
+executable("heapprofd") {
   deps = [
     "gn:default_deps",
     "src/base",
     "src/ipc",
   ]
   sources = [
-    "profhd.cc",
+    "heapprofd.cc",
   ]
   libs = [ "unwindstack" ]
 }

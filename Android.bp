@@ -3829,12 +3829,12 @@ cc_test {
   },
 }
 
-// GN target: //:profhd
+// GN target: //:heapprofd
 cc_binary {
-  name: "profhd",
+  name: "heapprofd",
   srcs: [
     ":perfetto_src_ipc_wire_protocol_gen",
-    "profhd.cc",
+    "heapprofd.cc",
     "src/base/file_utils.cc",
     "src/base/metatrace.cc",
     "src/base/page_allocator.cc",
@@ -3858,6 +3858,9 @@ cc_binary {
     "liblog",
     "libprotobuf-cpp-lite",
     "libunwindstack",
+  ],
+  init_rc: [
+    "heapprofd.rc",
   ],
   generated_headers: [
     "perfetto_src_ipc_wire_protocol_gen_headers",
