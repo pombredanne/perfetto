@@ -36,10 +36,8 @@
 #include <unistd.h>
 #include "folly/ProducerConsumerQueue.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
-#include "perfetto/base/weak_ptr.h"
 #include "src/ipc/unix_socket.h"
 
 #include <unwindstack/Elf.h>
@@ -497,8 +495,7 @@ class PipeSender : public ipc::UnixSocket::EventListener {
  public:
   PipeSender(std::vector<WorkQueue>* work_queues)
       : work_queues_(work_queues),
-        num_wq_(work_queues_->size()),
-        weak_factory_(this) {}
+        num_wq_(work_queues_->size()) {}
 
   void OnNewIncomingConnection(ipc::UnixSocket*,
                                std::unique_ptr<ipc::UnixSocket>) override;
@@ -518,7 +515,6 @@ class PipeSender : public ipc::UnixSocket::EventListener {
   size_t num_wq_;
   std::map<ipc::UnixSocket*, std::unique_ptr<ipc::UnixSocket>> socks_;
   std::map<ipc::UnixSocket*, RecordReader> record_readers_;
-  base::WeakPtrFactory<PipeSender> weak_factory_;
 };
 
 void PipeSender::OnNewIncomingConnection(
