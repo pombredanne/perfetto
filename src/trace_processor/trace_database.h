@@ -28,15 +28,12 @@ namespace trace_processor {
 
 class TraceDatabase {
  public:
-  TraceDatabase(TraceStorage* storage);
+  TraceDatabase();
   ~TraceDatabase();
 
  private:
-  static TraceDatabase* GetDatabase(sqlite3* db);
-  static SchedSliceTable* GetSchedSliceTable(sqlite3_vtab* vtab);
-
-  sqlite3* db_ = nullptr;  // must be first.
-  TraceStorage* storage_;
+  sqlite3* db_ = nullptr;
+  TraceStorage storage_;
 };
 
 }  // namespace trace_processor

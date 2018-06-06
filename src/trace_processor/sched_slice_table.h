@@ -29,6 +29,10 @@ class SchedSliceTable {
  public:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
+  struct Args {
+    TraceStorage* storage;
+  };
+
   class Cursor {
    public:
     Cursor(SchedSliceTable* table, const TraceStorage* storage);
@@ -79,6 +83,7 @@ class SchedSliceTable {
   };
 
   SchedSliceTable(const TraceStorage* storage);
+  static sqlite3_module CreateModule();
 
   int BestIndex(sqlite3_index_info* index_info);
 
