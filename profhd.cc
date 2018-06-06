@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <set>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -75,12 +76,21 @@ class StackMemory : public unwindstack::MemoryRemote {
   size_t size_;
 };
 
-struct Metadata {
+constexpr uint8_t kAlloc = 1;
+constexpr uint8_t kFree = 2;
+
+struct MetadataHeader {
+  uint8_t type;
+};
+
+struct AllocMetadata {
+  MetadataHeader header;
   unwindstack::ArchEnum arch;
   uint8_t regs[264];
   uint64_t pid;
   uint64_t size;
   void* sp;
+  void* addr;
 };
 
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
@@ -104,8 +114,62 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
   }
 }
 
-static int total_frames = 0;
-// static unsigned long total_records = 0;
+class HeapDump {
+ public:
+  void AddStack(const std::vector<unwindstack::FrameData>& data,
+                const AllocMetadata& metadata) {
+    if (data.size() <= 2) {
+      return;
+    }
+    std::set<std::string> fns;
+    for (const unwindstack::FrameData& frame_data : data) {
+      fns.emplace(frame_data.function_name);
+    }
+
+    for (std::string function : fns) {
+      auto itr = heap_usage_per_function_.find(function);
+      if (itr != heap_usage_per_function_.end()) {
+        itr->second += metadata.size;
+      } else {
+        heap_usage_per_function_.emplace(std::move(function), metadata.size);
+      }
+    }
+  }
+
+  void Print() {
+    for (const auto& p : heap_usage_per_function_)
+      PERFETTO_LOG("Heap Dump: %s %" PRIu64, p.first.c_str(), p.second);
+  }
+
+ private:
+  std::map<std::string, uint64_t> heap_usage_per_function_;
+};
+
+std::map<uint64_t, HeapDump> heapdump_for_pid;
+
+void DoneAlloc(void* mem, size_t sz) {
+  AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(mem);
+  unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
+  if (regs == nullptr) {
+    PERFETTO_ELOG("regs");
+    return;
+  }
+  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
+  unwindstack::RemoteMaps maps(metadata->pid);
+  if (!maps.Parse()) {
+    PERFETTO_LOG("Parse %" PRIu64, metadata->pid);
+    return;
+  }
+  std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
+      metadata->pid, reinterpret_cast<uint64_t>(metadata->sp), stack,
+      sz - sizeof(AllocMetadata));
+  unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
+  unwinder.Unwind();
+
+  heapdump_for_pid[metadata->pid].AddStack(unwinder.frames(), *metadata);
+}
+
+void DoneFree(void* mem, size_t sz) {}
 
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
@@ -114,30 +178,20 @@ void Done(base::ScopedFile fd, size_t sz) {
     PERFETTO_PLOG("mmap %zd %d", sz, *fd);
     return;
   }
-  Metadata* metadata = reinterpret_cast<Metadata*>(mem);
-  unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
-  if (regs == nullptr) {
-    PERFETTO_ELOG("regs");
-    return;
+  MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
+  switch (header->type) {
+    case kAlloc:
+      DoneAlloc(mem, sz);
+      break;
+    case kFree:
+      DoneFree(mem, sz);
+      break;
+    default:
+      PERFETTO_CHECK(false);
   }
-  uint8_t* stack = reinterpret_cast<uint8_t*>(mem) + sizeof(Metadata);
-  unwindstack::RemoteMaps maps(metadata->pid);
-  if (!maps.Parse()) {
-    PERFETTO_LOG("Parse %" PRIu64, metadata->pid);
-    return;
-  }
-  std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->pid, reinterpret_cast<uint64_t>(metadata->sp), stack,
-      sz - sizeof(Metadata));
-  unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
-  unwinder.Unwind();
-  total_frames += unwinder.NumFrames();
-  PERFETTO_LOG("Frames: %zu (%" PRIu8 ")", unwinder.NumFrames(),
-               unwinder.LastErrorCode());
-  for (const unwindstack::FrameData& frame : unwinder.frames())
-    PERFETTO_LOG("Frames: %s %" PRIu64 ": %s+%" PRIu64, frame.map_name.c_str(),
-                 frame.rel_pc, frame.function_name.c_str(),
-                 frame.function_offset);
+
+  //  PERFETTO_LOG("Heap Dump for %" PRIu64, metadata->pid);
+  //  heapdump_for_pid[metadata->pid].Print();
   munmap(mem, sz);
 }
 
