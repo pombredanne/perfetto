@@ -134,20 +134,30 @@ class HeapDump {
         heap_usage_per_function_.emplace(std::move(function), metadata.size);
       }
     }
+
+    addr_info_.emplace(metadata.addr,
+                       std::make_pair(metadata.size, std::move(fns)));
   }
 
-  void Print() {
-    for (const auto& p : heap_usage_per_function_)
-      PERFETTO_LOG("Heap Dump: %s %" PRIu64, p.first.c_str(), p.second);
+  void Print(std::ostream& o) const {
+    bool first = true;
+    for (const auto& p : heap_usage_per_function_) {
+      if (!first) o << ",\n";
+      first = false;
+      o << "{\"name\": \"" << p.first.c_str() << "\", bytes: " << p.second
+        << "}";
+    }
   }
 
  private:
   std::map<std::string, uint64_t> heap_usage_per_function_;
+  std::map<uint64_t, std::pair<uint64_t, std::set<std::string>>> addr_info_;
 };
 
 std::map<uint64_t, HeapDump> heapdump_for_pid;
 
 void DoneAlloc(void* mem, size_t sz) {
+  if (sz < sizeof(AllocMetadata)) return;
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(mem);
   unwindstack::Regs* regs = CreateFromRawData(metadata->arch, metadata->regs);
   if (regs == nullptr) {
@@ -161,8 +171,7 @@ void DoneAlloc(void* mem, size_t sz) {
     return;
   }
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->pid, reinterpret_cast<uint64_t>(metadata->sp), stack,
-      sz - sizeof(AllocMetadata));
+      metadata->pid, metadata->sp, stack, sz - sizeof(AllocMetadata));
   unwindstack::Unwinder unwinder(1000, &maps, regs, mems);
   unwinder.Unwind();
 
@@ -173,6 +182,7 @@ void DoneFree(void* mem, size_t sz) {}
 
 void Done(base::ScopedFile fd, size_t sz);
 void Done(base::ScopedFile fd, size_t sz) {
+  if (sz < sizeof(MetadataHeader)) return;
   void* mem = mmap(nullptr, sz, PROT_READ, MAP_PRIVATE, *fd, 0);
   if (mem == MAP_FAILED) {
     PERFETTO_PLOG("mmap %zd %d", sz, *fd);
@@ -187,11 +197,8 @@ void Done(base::ScopedFile fd, size_t sz) {
       DoneFree(mem, sz);
       break;
     default:
-      PERFETTO_CHECK(false);
+      PERFETTO_ELOG("Invalid type %" PRIu8, header->type);
   }
-
-  //  PERFETTO_LOG("Heap Dump for %" PRIu64, metadata->pid);
-  //  heapdump_for_pid[metadata->pid].Print();
   munmap(mem, sz);
 }
 
@@ -236,6 +243,7 @@ class RecordReader {
     ssize_t rd = PERFETTO_EINTR(
         read(fd, reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
              sizeof(record_size_) - read_idx_));
+    if (rd != -1 & rd != sizeof(record_size_)) PERFETTO_LOG("Incomplete read.");
     PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
     return rd;
   }
@@ -309,11 +317,39 @@ void PipeSender::OnNewIncomingConnection(
 
 void PipeSender::OnDisconnect(ipc::UnixSocket* self) { socks_.erase(self); }
 
+int dumppipes[2];
+
+void DumpHeapsHandler(int sig) {
+  PERFETTO_LOG("Dumping heap dumps.");
+  write(dumppipes[1], "w", 1);
+}
+
+void DumpHeaps() {
+  char buf[512];
+  read(dumppipes[0], &buf, sizeof(buf));
+
+  std::ofstream f("/data/local/heapd");
+  f << "{\n";
+  bool first = true;
+  for (const auto& p : heapdump_for_pid) {
+    if (!first) f << ",\n";
+    first = false;
+    f << '"' << p.first << "\": [";
+    p.second.Print(f);
+    f << "]";
+  }
+  f << "\n}";
+}
+
 int ProfHDMain(int argc, char** argv);
 int ProfHDMain(int argc, char** argv) {
   if (argc != 2) return 1;
 
+  pipe(dumppipes);
+  signal(SIGUSR1, DumpHeapsHandler);
+
   base::UnixTaskRunner task_runner;
+  task_runner.AddFileDescriptorWatch(dumppipes[0], DumpHeaps);
   PipeSender listener(&task_runner);
 
   std::unique_ptr<ipc::UnixSocket> sock(
