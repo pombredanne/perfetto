@@ -78,9 +78,8 @@ void TraceStorage::AddProcessEntry(uint32_t pid,
   unique_processes_.emplace_back(new_process);
 }
 
-std::pair<
-    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator,
-    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator>
+std::pair<TraceStorage::UniqueProcessIterator,
+          TraceStorage::UniqueProcessIterator>
 TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }

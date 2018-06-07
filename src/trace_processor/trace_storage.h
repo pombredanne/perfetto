@@ -76,6 +76,8 @@ class TraceStorage {
   // Unix pids are reused and thus not guaranteed to be unique over a long
   // period of time.
   using UniquePid = size_t;
+  using UniqueProcessIterator =
+      std::unordered_multimap<uint32_t, UniquePid>::const_iterator;
 
   // Information about a unique process seen in a trace.
   struct ProcessEntry {
@@ -102,28 +104,19 @@ class TraceStorage {
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
-  std::pair<std::unordered_multimap<uint32_t, UniquePid>::const_iterator,
-            std::unordered_multimap<uint32_t, UniquePid>::const_iterator>
-  UpidsForPid(uint32_t pid);
+  std::pair<UniqueProcessIterator, UniqueProcessIterator> UpidsForPid(
+      uint32_t pid);
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
     return cpu_events_[cpu];
   }
 
-  const ProcessEntry* GetProcess(UniquePid upid) {
-    if (unique_processes_.size() <= upid) {
-      return nullptr;
-    }
-    return &unique_processes_[upid];
+  const ProcessEntry& GetProcess(UniquePid upid) {
+    return unique_processes_[upid];
   }
 
-  const char* GetString(StringId id) {
-    if (string_pool_.size() <= id) {
-      return nullptr;
-    }
-    return string_pool_[id].c_str();
-  }
+  const std::string& GetString(StringId id) { return string_pool_[id]; }
 
  private:
   using StringHash = uint32_t;

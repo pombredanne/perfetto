@@ -55,7 +55,7 @@ TEST(TraceStorageTest, AddProcessEntry) {
   storage.AddProcessEntry(1, 1000, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
   ASSERT_EQ(pair_it.first->second, 0);
-  ASSERT_EQ(storage.GetProcess(0)->start_ns, 1000);
+  ASSERT_EQ(storage.GetProcess(0).start_ns, 1000);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
@@ -66,10 +66,10 @@ TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
   ASSERT_EQ(pair_it.first->second, 0);
   ++pair_it.first;
   ASSERT_EQ(pair_it.first->second, 1);
-  ASSERT_EQ(storage.GetProcess(0)->end_ns, 2000);
-  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
-  ASSERT_EQ(storage.GetProcess(0)->process_name,
-            storage.GetProcess(1)->process_name);
+  ASSERT_EQ(storage.GetProcess(0).end_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(1).start_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(0).process_name,
+            storage.GetProcess(1).process_name);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
@@ -80,7 +80,7 @@ TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
   ASSERT_EQ(pair_it.first->second, 0);
   auto second_pair_it = storage.UpidsForPid(3);
   ASSERT_EQ(second_pair_it.first->second, 1);
-  ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
+  ASSERT_EQ(storage.GetProcess(1).start_ns, 2000);
 }
 
 TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
@@ -92,8 +92,7 @@ TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
   storage.AddProcessEntry(1, 1000, "test", 4);
-  ASSERT_EQ(std::string(storage.GetString(storage.GetProcess(0)->process_name)),
-            "test");
+  ASSERT_EQ(storage.GetString(storage.GetProcess(0).process_name), "test");
 }
 
 }  // namespace
