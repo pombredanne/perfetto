@@ -36,7 +36,10 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   // slice.
   if (prev->valid()) {
     uint64_t duration = timestamp - prev->timestamp;
-    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_thread_id);
+    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_pid,
+                              prev->prev_thread_name_id);
+  } else {
+    cpu_events_[cpu].InitaliseSlices(this);
   }
 
   // If the this events previous pid does not match the previous event's next
@@ -50,11 +53,11 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   prev->timestamp = timestamp;
   prev->prev_pid = prev_pid;
   prev->prev_state = prev_state;
-  prev->prev_thread_id = InternString(prev_comm, prev_comm_len);
+  prev->prev_thread_name_id = InternString(prev_comm, prev_comm_len);
   prev->next_pid = next_pid;
 }
 
-void TraceStorage::AddProcessEntry(int32_t pid,
+void TraceStorage::AddProcessEntry(uint32_t pid,
                                    uint64_t start_ns,
                                    const char* process_name,
                                    size_t process_name_len) {
@@ -71,17 +74,17 @@ void TraceStorage::AddProcessEntry(int32_t pid,
   pids_.emplace(pid, current_upid_++);
 
   // Make a new process entry for that upid.
-  ProcessEntry new_process;
+  TaskInfo new_process;
   new_process.start_ns = start_ns;
   new_process.end_ns = 0;
-  new_process.process_name = InternString(process_name, process_name_len);
+  new_process.name = InternString(process_name, process_name_len);
   unique_processes_.emplace_back(new_process);
 }
 
 std::pair<
-    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator,
-    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator>
-TraceStorage::UpidsForPid(int32_t pid) {
+    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator,
+    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator>
+TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }
 

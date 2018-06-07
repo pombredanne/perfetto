@@ -48,6 +48,9 @@ TEST(TraceStorageTest, InsertSecondSched) {
 
   ASSERT_EQ(timestamps.size(), 1ul);
   ASSERT_EQ(timestamps[0], timestamp);
+  ASSERT_EQ(storage.GetThread(0)->start_ns, timestamp);
+  ASSERT_EQ(std::string(storage.GetString(storage.GetThread(0)->name)),
+            "process1");
 }
 
 TEST(TraceStorageTest, AddProcessEntry) {
@@ -68,8 +71,7 @@ TEST(TraceStorageTest, AddTwoProcessEntries_SamePid) {
   ASSERT_EQ(pair_it.first->second, 1);
   ASSERT_EQ(storage.GetProcess(0)->end_ns, 2000);
   ASSERT_EQ(storage.GetProcess(1)->start_ns, 2000);
-  ASSERT_EQ(storage.GetProcess(0)->process_name,
-            storage.GetProcess(1)->process_name);
+  ASSERT_EQ(storage.GetProcess(0)->name, storage.GetProcess(1)->name);
 }
 
 TEST(TraceStorageTest, AddTwoProcessEntries_DifferentPid) {
@@ -92,7 +94,7 @@ TEST(TraceStorageTest, UpidsForPid_NonExistantPid) {
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
   storage.AddProcessEntry(1, 1000, "test", 4);
-  ASSERT_EQ(std::string(storage.GetString(storage.GetProcess(0)->process_name)),
+  ASSERT_EQ(std::string(storage.GetString(storage.GetProcess(0)->name)),
             "test");
 }
 
