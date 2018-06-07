@@ -54,7 +54,7 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   prev->next_pid = next_pid;
 }
 
-void TraceStorage::AddProcessEntry(int32_t pid,
+void TraceStorage::AddProcessEntry(uint32_t pid,
                                    uint64_t start_ns,
                                    const char* process_name,
                                    size_t process_name_len) {
@@ -79,9 +79,9 @@ void TraceStorage::AddProcessEntry(int32_t pid,
 }
 
 std::pair<
-    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator,
-    std::unordered_multimap<int32_t, TraceStorage::UniquePid>::const_iterator>
-TraceStorage::UpidsForPid(int32_t pid) {
+    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator,
+    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator>
+TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }
 

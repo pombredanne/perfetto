@@ -95,16 +95,16 @@ class TraceStorage {
                                uint32_t next_pid);
 
   // Adds a process entry for a given pid.
-  void AddProcessEntry(int32_t pid,
+  void AddProcessEntry(uint32_t pid,
                        uint64_t start_ns,
                        const char* process_name,
                        size_t process_name_len);
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
-  std::pair<std::unordered_multimap<int32_t, UniquePid>::const_iterator,
-            std::unordered_multimap<int32_t, UniquePid>::const_iterator>
-  UpidsForPid(int32_t pid);
+  std::pair<std::unordered_multimap<uint32_t, UniquePid>::const_iterator,
+            std::unordered_multimap<uint32_t, UniquePid>::const_iterator>
+  UpidsForPid(uint32_t pid);
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
@@ -161,7 +161,7 @@ class TraceStorage {
 
   // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
   // each time a process is seen in the trace.
-  std::unordered_multimap<int32_t, UniquePid> pids_;
+  std::unordered_multimap<uint32_t, UniquePid> pids_;
 
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<ProcessEntry> unique_processes_;
