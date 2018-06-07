@@ -118,6 +118,10 @@ if (!build_with_chromium) {
       "test:benchmark_main",
       "test:end_to_end_benchmarks",
     ]
+
+    if (build_standalone) {
+      deps += [ "src/trace_processor:benchmarks" ]
+    }
   }
 
   executable("perfetto_integrationtests") {

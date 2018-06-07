@@ -65,3 +65,18 @@ source_set("unittests") {
     "../base",
   ]
 }
+
+if (!build_with_chromium) {
+  source_set("benchmarks") {
+    testonly = true
+    deps = [
+      ":lib",
+      "../../buildtools:benchmark",
+      "../../gn:default_deps",
+      "../../protos/perfetto/trace:lite",
+    ]
+    sources = [
+      "trace_database_benchmark.cc",
+    ]
+  }
+}
