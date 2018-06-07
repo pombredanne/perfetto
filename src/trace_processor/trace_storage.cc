@@ -64,7 +64,8 @@ TraceStorage::StringId TraceStorage::InternString(const char* data,
   if (id_it != string_index_.end()) {
     // TODO(lalitm): check if this DCHECK happens and if so, then change hash
     // to 64bit.
-    PERFETTO_DCHECK(strncmp(string_pool_[id_it->second].c_str(), data, length));
+    PERFETTO_DCHECK(
+        strncmp(string_pool_[id_it->second].c_str(), data, length) == 0);
     return id_it->second;
   }
   string_pool_.emplace_back(data, length);
