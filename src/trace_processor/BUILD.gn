@@ -74,6 +74,7 @@ if (!build_with_chromium) {
       "../../buildtools:benchmark",
       "../../gn:default_deps",
       "../../protos/perfetto/trace:lite",
+      "../base:test_support",
     ]
     sources = [
       "trace_database_benchmark.cc",
