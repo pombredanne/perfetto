@@ -299,15 +299,5 @@ bool SchedSliceTable::Cursor::NumericConstraints<T>::Initialize(
   return constraint_implemented;
 }
 
-template <typename T>
-bool SchedSliceTable::Cursor::NumericConstraints<T>::Matches(T value) {
-  if (value < min_value || (value == min_value && !min_equals)) {
-    return false;
-  } else if (value > max_value || (value == max_value && !max_equals)) {
-    return false;
-  }
-  return true;
-}
-
 }  // namespace trace_processor
 }  // namespace perfetto

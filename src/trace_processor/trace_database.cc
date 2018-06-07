@@ -22,29 +22,35 @@ namespace {
 constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
 }
 
-TraceDatabase::TraceDatabase(BlobReader* reader, base::TaskRunner* task_runner)
-    : parser_(reader, &storage_, kTraceChunkSizeB),
-      task_runner_(task_runner),
-      weak_factory_(this) {
+TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
+    : task_runner_(task_runner), weak_factory_(this) {
   sqlite3_open(":memory:", &db_);
 
   // Setup the sched slice table.
   sqlite3_module module = SchedSliceTable::CreateModule();
   sqlite3_create_module(db_, "sched_slice", &module,
                         static_cast<void*>(&storage_));
-  LoadTraceChunk();
 }
 
 TraceDatabase::~TraceDatabase() {
   sqlite3_close(db_);
 }
 
+void TraceDatabase::LoadTrace(BlobReader* reader) {
+  // Reset storage and start a new trace parsing task.
+  storage_ = {};
+  parser_.reset(new TraceParser(reader, &storage_, kTraceChunkSizeB));
+  LoadTraceChunk();
+}
+
 void TraceDatabase::LoadTraceChunk() {
-  parser_.ParseNextChunk();
+  parser_->ParseNextChunk();
+
   auto ptr = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([ptr] {
     if (!ptr)
       return;
+
     ptr->LoadTraceChunk();
   });
 }

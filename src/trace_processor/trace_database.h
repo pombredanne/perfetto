@@ -31,20 +31,20 @@ namespace trace_processor {
 
 class TraceDatabase {
  public:
-  TraceDatabase(BlobReader* reader, base::TaskRunner* task_runner);
+  TraceDatabase(base::TaskRunner* task_runner);
   ~TraceDatabase();
+
+  void LoadTrace(BlobReader* reader);
 
  private:
   void LoadTraceChunk();
 
   sqlite3* db_ = nullptr;
 
-  // Parser holds a pointer to storage so needs to be initialized after.
   TraceStorage storage_;
-  TraceParser parser_;
+  std::unique_ptr<TraceParser> parser_;
 
   base::TaskRunner* const task_runner_;
-
   base::WeakPtrFactory<TraceDatabase> weak_factory_;
 };
 
