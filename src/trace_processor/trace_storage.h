@@ -58,15 +58,14 @@ class TraceStorage {
         // There are utids stored for the current tid.
         // Iterate through them until one with the same thread name is
         // found.
-        auto it = pair_it.first;
-        while (!found && it != pair_it.second) {
+        for (auto it = pair_it.first; it != pair_it.second; ++it) {
           UniqueTid utid = it->second;
-          if (storage_->unique_threads_[utid].name == thread_name_id) {
+          if (storage_->unique_threads_[utid].name_id == thread_name_id) {
             // Found the matching entry - store utid in sched_switch table.
             storage_->tids_.emplace(tid, utid);
             found = true;
+            break;
           }
-          it++;
         }
       }
 
@@ -74,7 +73,7 @@ class TraceStorage {
         // No entries for the current tid and name exist.
         // Assign a new utid and store it.
         TaskInfo new_thread;
-        new_thread.name = thread_name_id;
+        new_thread.name_id = thread_name_id;
         new_thread.start_ns = start_ns;
         storage_->unique_threads_.emplace_back(new_thread);
         storage_->tids_.emplace(tid, storage_->current_utid_);
@@ -94,7 +93,7 @@ class TraceStorage {
       return durations_;
     }
 
-    void InitaliseSlices(TraceStorage* storage) { storage_ = storage; }
+    void InitalizeSlices(TraceStorage* storage) { storage_ = storage; }
 
    private:
     // Each vector below has the same number of entries (the number of slices
@@ -115,12 +114,14 @@ class TraceStorage {
   // Unix pids are reused and thus not guaranteed to be unique over a long
   // period of time.
   using UniquePid = size_t;
+  using UniqueProcessIterator =
+      std::unordered_multimap<uint32_t, UniquePid>::const_iterator;
 
   // Information about a unique process or thread seen in a trace.
   struct TaskInfo {
     uint64_t start_ns;
     uint64_t end_ns;
-    StringId name;
+    StringId name_id;
   };
 
   // Adds a sched slice for a given cpu.
@@ -141,35 +142,19 @@ class TraceStorage {
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
-  std::pair<std::unordered_multimap<uint32_t, UniquePid>::const_iterator,
-            std::unordered_multimap<uint32_t, UniquePid>::const_iterator>
-  UpidsForPid(uint32_t pid);
+  std::pair<UniqueProcessIterator, UniqueProcessIterator> UpidsForPid(
+      uint32_t pid);
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
     return cpu_events_[cpu];
   }
 
-  const TaskInfo* GetProcess(UniquePid upid) {
-    if (unique_processes_.size() <= upid) {
-      return nullptr;
-    }
-    return &unique_processes_[upid];
-  }
+  const TaskInfo& GetProcess(UniquePid upid) { return unique_processes_[upid]; }
 
-  const TaskInfo* GetThread(UniqueTid utid) {
-    if (unique_threads_.size() <= utid) {
-      return nullptr;
-    }
-    return &unique_threads_[utid];
-  }
+  const TaskInfo& GetThread(UniqueTid utid) { return unique_threads_[utid]; }
 
-  const char* GetString(StringId id) {
-    if (string_pool_.size() <= id) {
-      return nullptr;
-    }
-    return string_pool_[id].c_str();
-  }
+  const std::string& GetString(StringId id) { return string_pool_[id]; }
 
  private:
   using StringHash = uint32_t;

@@ -39,7 +39,7 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
     cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_pid,
                               prev->prev_thread_name_id);
   } else {
-    cpu_events_[cpu].InitaliseSlices(this);
+    cpu_events_[cpu].InitalizeSlices(this);
   }
 
   // If the this events previous pid does not match the previous event's next
@@ -77,13 +77,12 @@ void TraceStorage::AddProcessEntry(uint32_t pid,
   TaskInfo new_process;
   new_process.start_ns = start_ns;
   new_process.end_ns = 0;
-  new_process.name = InternString(process_name, process_name_len);
+  new_process.name_id = InternString(process_name, process_name_len);
   unique_processes_.emplace_back(new_process);
 }
 
-std::pair<
-    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator,
-    std::unordered_multimap<uint32_t, TraceStorage::UniquePid>::const_iterator>
+std::pair<TraceStorage::UniqueProcessIterator,
+          TraceStorage::UniqueProcessIterator>
 TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }
