@@ -17,10 +17,11 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_DATABASE_H_
 #define SRC_TRACE_PROCESSOR_TRACE_DATABASE_H_
 
+#include <sqlite3.h>
 #include <memory>
 
 #include "perfetto/base/task_runner.h"
-#include "sqlite3.h"
+#include "perfetto/base/weak_ptr.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_storage.h"
@@ -43,6 +44,8 @@ class TraceDatabase {
   TraceParser parser_;
 
   base::TaskRunner* const task_runner_;
+
+  base::WeakPtrFactory<TraceDatabase> weak_factory_;
 };
 
 }  // namespace trace_processor

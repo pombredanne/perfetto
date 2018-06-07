@@ -29,10 +29,6 @@ class SchedSliceTable {
  public:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
-  struct Args {
-    TraceStorage* storage;
-  };
-
   class Cursor {
    public:
     Cursor(SchedSliceTable* table, const TraceStorage* storage);

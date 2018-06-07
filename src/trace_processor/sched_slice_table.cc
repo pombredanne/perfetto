@@ -70,8 +70,8 @@ sqlite3_module SchedSliceTable::CreateModule() {
         "CREATE TABLE x(ts, cpu, dur, PRIMARY KEY(cpu, ts)) WITHOUT ROWID;");
     if (res != SQLITE_OK)
       return res;
-    Args* args = static_cast<Args*>(raw_args);
-    *tab = reinterpret_cast<sqlite3_vtab*>(new SchedSliceTable(args->storage));
+    TraceStorage* storage = static_cast<TraceStorage*>(raw_args);
+    *tab = reinterpret_cast<sqlite3_vtab*>(new SchedSliceTable(storage));
     return SQLITE_OK;
   };
   module.xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
