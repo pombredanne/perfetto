@@ -45,7 +45,14 @@ class SchedSliceTable {
     class NumericConstraints {
      public:
       bool Initialize(const Constraint& cs, sqlite3_value* value);
-      bool Matches(T value);
+      bool Matches(T value) {
+        if (value < min_value || (value == min_value && !min_equals)) {
+          return false;
+        } else if (value > max_value || (value == max_value && !max_equals)) {
+          return false;
+        }
+        return true;
+      }
 
      private:
       T min_value = std::numeric_limits<T>::min();
