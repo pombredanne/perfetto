@@ -34,10 +34,10 @@ class TraceDatabase {
   TraceDatabase(base::TaskRunner* task_runner);
   ~TraceDatabase();
 
-  void LoadTrace(BlobReader* reader);
+  void LoadTrace(BlobReader* reader, std::function<void()> callback);
 
  private:
-  void LoadTraceChunk();
+  void LoadTraceChunk(std::function<void()> callback);
 
   sqlite3* db_ = nullptr;
 

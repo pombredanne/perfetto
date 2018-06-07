@@ -27,7 +27,7 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
   sqlite3_open(":memory:", &db_);
 
   // Setup the sched slice table.
-  sqlite3_module module = SchedSliceTable::CreateModule();
+  static sqlite3_module module = SchedSliceTable::CreateModule();
   sqlite3_create_module(db_, "sched_slice", &module,
                         static_cast<void*>(&storage_));
 }
@@ -36,22 +36,27 @@ TraceDatabase::~TraceDatabase() {
   sqlite3_close(db_);
 }
 
-void TraceDatabase::LoadTrace(BlobReader* reader) {
+void TraceDatabase::LoadTrace(BlobReader* reader,
+                              std::function<void()> callback) {
   // Reset storage and start a new trace parsing task.
   storage_ = {};
   parser_.reset(new TraceParser(reader, &storage_, kTraceChunkSizeB));
-  LoadTraceChunk();
+  LoadTraceChunk(callback);
 }
 
-void TraceDatabase::LoadTraceChunk() {
-  parser_->ParseNextChunk();
+void TraceDatabase::LoadTraceChunk(std::function<void()> callback) {
+  bool has_more = parser_->ParseNextChunk();
+  if (!has_more) {
+    callback();
+    return;
+  }
 
   auto ptr = weak_factory_.GetWeakPtr();
-  task_runner_->PostTask([ptr] {
+  task_runner_->PostTask([ptr, callback] {
     if (!ptr)
       return;
 
-    ptr->LoadTraceChunk();
+    ptr->LoadTraceChunk(callback);
   });
 }
 
