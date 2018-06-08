@@ -61,12 +61,9 @@ void TraceStorage::AddProcessEntry(uint32_t pid,
   // Store a new upid for that pid. If pid has been seen before, set the end
   // time of the previous entry to the start time of this entry.
   auto pids_pair = pids_.equal_range(pid);
-  for (auto it = pids_pair.first; it != pids_pair.second; ++it) {
-    // Only the previous upid instance should have end_ns == 0
-    if (unique_processes_[it->second].end_ns == 0) {
-      unique_processes_[it->second].end_ns = start_ns;
-      break;
-    }
+  if (pids_pair.first != pids_pair.second) {
+    UniquePid last_upid = std::prev(pids_pair.second)->second;
+    unique_processes_[last_upid].end_ns = start_ns;
   }
   pids_.emplace(pid, current_upid_++);
 
