@@ -54,25 +54,27 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   prev->next_pid = next_pid;
 }
 
-void TraceStorage::AddProcessEntry(uint32_t pid,
-                                   uint64_t start_ns,
-                                   const char* process_name,
-                                   size_t process_name_len) {
-  // Store a new upid for that pid. If pid has been seen before, set the end
-  // time of the previous entry to the start time of this entry.
+void TraceStorage::PushProcess(uint32_t pid,
+                               const char* process_name,
+                               size_t process_name_len) {
+  bool exists = false;
   auto pids_pair = pids_.equal_range(pid);
   if (pids_pair.first != pids_pair.second) {
-    UniquePid last_upid = std::prev(pids_pair.second)->second;
-    unique_processes_[last_upid].end_ns = start_ns;
+    UniquePid prev_upid = std::prev(pids_pair.second)->second;
+    // If the previous process with the same pid also has the same name,
+    // then no action needs to be taken.
+    exists =
+        GetString(unique_processes_[prev_upid].process_name) == process_name;
   }
-  pids_.emplace(pid, current_upid_++);
 
-  // Make a new process entry for that upid.
-  ProcessEntry new_process;
-  new_process.start_ns = start_ns;
-  new_process.end_ns = 0;
-  new_process.process_name = InternString(process_name, process_name_len);
-  unique_processes_.emplace_back(new_process);
+  if (!exists) {
+    pids_.emplace(pid, current_upid_++);
+    ProcessEntry new_process;
+    new_process.start_ns = 0;
+    new_process.end_ns = 0;
+    new_process.process_name = InternString(process_name, process_name_len);
+    unique_processes_.emplace_back(new_process);
+  }
 }
 
 std::pair<TraceStorage::UniqueProcessIterator,
