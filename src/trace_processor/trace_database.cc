@@ -62,7 +62,6 @@ void TraceDatabase::ExecuteQuery(
     return;
   }
 
-  std::vector<int> proto_to_sqlite_column_index;
   for (int i = 0, size = sqlite3_column_count(stmt); i < size; i++) {
     const char* type = sqlite3_column_decltype(stmt, i);
 
@@ -81,25 +80,21 @@ void TraceDatabase::ExecuteQuery(
 
     // Add the empty column to the proto.
     proto.add_columns();
-
-    // Set the current proto column index to equal the real sqlite index.
-    proto_to_sqlite_column_index.push_back(i);
   }
 
   int row_count = 0;
   int result = sqlite3_step(stmt);
   while (result == SQLITE_ROW) {
     for (int i = 0; i < proto.columns_size(); i++) {
-      int column_index = proto_to_sqlite_column_index[static_cast<size_t>(i)];
       auto* column = proto.mutable_columns(i);
       switch (proto.column_descriptors(i).type()) {
         case protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_LONG:
           column->add_ulong_values(
-              static_cast<uint64_t>(sqlite3_column_int64(stmt, column_index)));
+              static_cast<uint64_t>(sqlite3_column_int64(stmt, i)));
           break;
         case protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_INT:
           column->add_uint_values(
-              static_cast<uint32_t>(sqlite3_column_double(stmt, column_index)));
+              static_cast<uint32_t>(sqlite3_column_double(stmt, i)));
           break;
         case protos::RawQueryResult_ColumnDesc_Type_INT:
         case protos::RawQueryResult_ColumnDesc_Type_LONG:
