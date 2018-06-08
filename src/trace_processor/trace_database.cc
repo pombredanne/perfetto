@@ -22,7 +22,9 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
-}
+static const char kUIntColumnName[] = "UNSIGNED INT";
+static const char kULongColumnName[] = "UNSIGNED BIG INT";
+}  // namespace
 
 TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
     : task_runner_(task_runner), weak_factory_(this) {
@@ -30,7 +32,7 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
 
   // Setup the sched slice table.
   static sqlite3_module module = SchedSliceTable::CreateModule();
-  sqlite3_create_module(db_, "sched_slice", &module,
+  sqlite3_create_module(db_, "sched_slices", &module,
                         static_cast<void*>(&storage_));
 }
 
@@ -49,51 +51,59 @@ void TraceDatabase::LoadTrace(BlobReader* reader,
 void TraceDatabase::ExecuteQuery(
     const protos::RawQueryArgs& args,
     std::function<void(protos::RawQueryResult)> callback) {
+  protos::RawQueryResult proto;
+
   const auto& sql = args.sql_query();
   sqlite3_stmt* stmt;
   int err = sqlite3_prepare_v2(db_, sql.c_str(), static_cast<int>(sql.size()),
                                &stmt, nullptr);
   if (err) {
-    callback(protos::RawQueryResult());
+    callback(std::move(proto));
     return;
   }
 
-  protos::RawQueryResult proto;
-  int column_count = sqlite3_column_count(stmt);
-  for (int i = 0; i < column_count; i++) {
+  std::vector<int> proto_to_sqlite_column_index;
+  for (int i = 0, size = sqlite3_column_count(stmt); i < size; i++) {
+    const char* type = sqlite3_column_decltype(stmt, i);
+
+    // Setup the descriptors.
     auto* descriptor = proto.add_column_descriptors();
     descriptor->set_name(sqlite3_column_name(stmt, i));
 
-    int type = sqlite3_column_type(stmt, i);
-    if (type == SQLITE_INTEGER) {
-      descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_INTEGER);
-    } else if (type == SQLITE_FLOAT) {
-      descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_FLOAT);
-    } else if (type == SQLITE_TEXT) {
-      descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_STRING);
+    if (strncmp(type, kUIntColumnName, sizeof(kUIntColumnName)) == 0) {
+      descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_INT);
+    } else if (strncmp(type, kULongColumnName, sizeof(kULongColumnName)) == 0) {
+      descriptor->set_type(
+          protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_LONG);
     } else {
       PERFETTO_FATAL("Unexpected column type found in SQL query");
     }
+
     // Add the empty column to the proto.
     proto.add_columns();
+
+    // Set the current proto column index to equal the real sqlite index.
+    proto_to_sqlite_column_index.push_back(i);
   }
 
   int row_count = 0;
   int result = sqlite3_step(stmt);
   while (result == SQLITE_ROW) {
-    for (int i = 0; i < column_count; i++) {
+    for (int i = 0; i < proto.columns_size(); i++) {
+      int column_index = proto_to_sqlite_column_index[static_cast<size_t>(i)];
+      auto* column = proto.mutable_columns(i);
       switch (proto.column_descriptors(i).type()) {
-        case protos::RawQueryResult_ColumnDesc_Type_INTEGER:
-          proto.mutable_columns(i)->add_long_values(
-              sqlite3_column_int64(stmt, i));
+        case protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_LONG:
+          column->add_ulong_values(
+              static_cast<uint64_t>(sqlite3_column_int64(stmt, column_index)));
           break;
-        case protos::RawQueryResult_ColumnDesc_Type_FLOAT:
-          proto.mutable_columns(i)->add_double_values(
-              sqlite3_column_double(stmt, i));
+        case protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_INT:
+          column->add_uint_values(
+              static_cast<uint32_t>(sqlite3_column_double(stmt, column_index)));
           break;
-        case protos::RawQueryResult_ColumnDesc_Type_STRING:
-          proto.mutable_columns(i)->add_string_values(
-              reinterpret_cast<const char*>(sqlite3_column_text(stmt, i)));
+        case protos::RawQueryResult_ColumnDesc_Type_INT:
+        case protos::RawQueryResult_ColumnDesc_Type_LONG:
+          PERFETTO_FATAL("Unexpected column type found in SQL query");
           break;
       }
     }

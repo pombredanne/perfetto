@@ -65,9 +65,13 @@ sqlite3_module SchedSliceTable::CreateModule() {
   memset(&module, 0, sizeof(module));
   module.xConnect = [](sqlite3* db, void* raw_args, int, const char* const*,
                        sqlite3_vtab** tab, char**) {
-    int res = sqlite3_declare_vtab(
-        db,
-        "CREATE TABLE x(ts, cpu, dur, PRIMARY KEY(cpu, ts)) WITHOUT ROWID;");
+    int res = sqlite3_declare_vtab(db,
+                                   "CREATE TABLE sched_slices("
+                                   "ts UNSIGNED BIG INT, "
+                                   "cpu UNSIGNED INT, "
+                                   "dur UNSIGNED BIG INT, "
+                                   "PRIMARY KEY(cpu, ts)"
+                                   ") WITHOUT ROWID;");
     if (res != SQLITE_OK)
       return res;
     TraceStorage* storage = static_cast<TraceStorage*>(raw_args);
@@ -121,15 +125,14 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   idx->orderByConsumed = !external_ordering_required;
 
   indexes_.emplace_back();
-  idx->idxNum = static_cast<int>(indexes_.size());
+  idx->idxNum = static_cast<int>(indexes_.size() - 1);
   std::vector<Constraint>* constraints = &indexes_.back();
   for (int i = 0; i < idx->nConstraint; i++) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
     constraints->emplace_back(cs);
-    idx->aConstraintUsage[i].argvIndex =
-        static_cast<int>(constraints->size() - 1);
+    idx->aConstraintUsage[i].argvIndex = static_cast<int>(constraints->size());
   }
   return SQLITE_OK;
 }
