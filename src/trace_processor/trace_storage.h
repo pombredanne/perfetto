@@ -54,18 +54,15 @@ class TraceStorage {
 
       auto pair_it = storage_->tids_.equal_range(tid);
       bool found = false;
-      if (pair_it.first != pair_it.second) {
-        // There are utids stored for the current tid.
-        // Iterate through them until one with the same thread name is
-        // found.
-        for (auto it = pair_it.first; it != pair_it.second; ++it) {
-          UniqueTid utid = it->second;
-          if (storage_->unique_threads_[utid].name_id == thread_name_id) {
-            // Found the matching entry - store utid in sched_switch table.
-            storage_->tids_.emplace(tid, utid);
-            found = true;
-            break;
-          }
+      // Iterate utids stored for the current tid until one with the same
+      // thread name is found.
+      for (auto it = pair_it.first; it != pair_it.second; ++it) {
+        UniqueTid utid = it->second;
+        if (storage_->unique_threads_[utid].name_id == thread_name_id) {
+          // Found the matching entry - store utid in sched_switch table.
+          utids_.emplace_back(utid);
+          found = true;
+          break;
         }
       }
 
@@ -77,6 +74,7 @@ class TraceStorage {
         new_thread.start_ns = start_ns;
         storage_->unique_threads_.emplace_back(new_thread);
         storage_->tids_.emplace(tid, storage_->current_utid_);
+        utids_.emplace_back(storage_->current_utid_);
         storage_->current_utid_++;
       }
     }
@@ -93,6 +91,8 @@ class TraceStorage {
       return durations_;
     }
 
+    const std::deque<UniqueTid>& utids() const { return utids_; }
+
     void InitalizeSlices(TraceStorage* storage) { storage_ = storage; }
 
    private:
@@ -100,7 +100,7 @@ class TraceStorage {
     // in the trace for the CPU).
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
-    std::deque<UniqueTid> tids_;
+    std::deque<UniqueTid> utids_;
 
     TraceStorage* storage_;
   };
