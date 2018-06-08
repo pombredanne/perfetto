@@ -19,6 +19,7 @@
 
 #include <array>
 #include <deque>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -115,7 +116,7 @@ class TraceStorage {
   // period of time.
   using UniquePid = size_t;
   using UniqueProcessIterator =
-      std::unordered_multimap<uint32_t, UniquePid>::const_iterator;
+      std::multimap<uint32_t, UniquePid>::const_iterator;
 
   // Information about a unique process or thread seen in a trace.
   struct TaskInfo {
@@ -193,14 +194,14 @@ class TraceStorage {
 
   // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
   // each time a process is seen in the trace.
-  std::unordered_multimap<uint32_t, UniquePid> pids_;
+  std::multimap<uint32_t, UniquePid> pids_;
 
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<TaskInfo> unique_processes_;
 
-  // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
-  // each time a process is seen in the trace.
-  std::unordered_multimap<uint32_t, UniqueTid> tids_;
+  // Each pid can have multiple UniquePid entries, a new UniqueTid is assigned
+  // each time a thread is seen in the trace.
+  std::multimap<uint32_t, UniqueTid> tids_;
 
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<TaskInfo> unique_threads_;
