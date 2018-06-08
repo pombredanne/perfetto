@@ -24,6 +24,14 @@ namespace {
 constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
 static const char kUIntColumnName[] = "UNSIGNED INT";
 static const char kULongColumnName[] = "UNSIGNED BIG INT";
+
+bool IsColumnUInt(const char* type) {
+  return strncmp(type, kUIntColumnName, sizeof(kUIntColumnName)) == 0;
+}
+
+bool IsColumnULong(const char* type) {
+  return strncmp(type, kULongColumnName, sizeof(kULongColumnName)) == 0;
+}
 }  // namespace
 
 TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
@@ -63,15 +71,14 @@ void TraceDatabase::ExecuteQuery(
   }
 
   for (int i = 0, size = sqlite3_column_count(stmt); i < size; i++) {
-    const char* type = sqlite3_column_decltype(stmt, i);
-
     // Setup the descriptors.
     auto* descriptor = proto.add_column_descriptors();
     descriptor->set_name(sqlite3_column_name(stmt, i));
 
-    if (strncmp(type, kUIntColumnName, sizeof(kUIntColumnName)) == 0) {
+    const char* type = sqlite3_column_decltype(stmt, i);
+    if (IsColumnUInt(type)) {
       descriptor->set_type(protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_INT);
-    } else if (strncmp(type, kULongColumnName, sizeof(kULongColumnName)) == 0) {
+    } else if (IsColumnULong(type)) {
       descriptor->set_type(
           protos::RawQueryResult_ColumnDesc_Type_UNSIGNED_LONG);
     } else {
