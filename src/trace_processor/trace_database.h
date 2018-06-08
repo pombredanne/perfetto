@@ -22,6 +22,7 @@
 
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
+#include "perfetto/trace_processor/raw_query.pb.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_storage.h"
@@ -35,6 +36,8 @@ class TraceDatabase {
   ~TraceDatabase();
 
   void LoadTrace(BlobReader* reader, std::function<void()> callback);
+  void ExecuteQuery(const protos::RawQueryArgs& args,
+                    std::function<void(protos::RawQueryResult)> result);
 
  private:
   void LoadTraceChunk(std::function<void()> callback);

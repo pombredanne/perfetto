@@ -45,6 +45,7 @@ source_set("lib") {
     "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../protozero",
   ]
