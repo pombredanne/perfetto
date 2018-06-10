@@ -15,6 +15,7 @@
  */
 
 console.log('Hello from the main thread!');
+import { Adb } from './adb/adb';
 
 function writeToUIConsole(line:string) {
   const lineElement = document.createElement('div');
@@ -33,12 +34,43 @@ function writeToUIConsole(line:string) {
     printErr: writeToUIConsole,
 };
 
+const g_adb = new Adb();
+(<any>window).dev = new Adb();
 
 function main() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
   }
+
+  const adbCmd = <HTMLInputElement> document.getElementById('adb_cmd');
+  const adbConnect = <HTMLButtonElement> document.getElementById('adb_connect');
+  const adbOut = <HTMLDivElement> document.getElementById('adb_output');
+  const adbPushFile = <HTMLInputElement> document.getElementById('adb_push_file');
+  const adbPushTarget = <HTMLInputElement> document.getElementById('adb_push_target');
+  adbConnect.addEventListener('click', () => {
+    g_adb.connect();
+    adbCmd.disabled = false;
+  });
+  const appendAdbLog = function(text:string) {
+    const row = document.createElement('div');
+    row.innerText = text;
+    adbOut.appendChild(row);
+    row.scrollIntoView();
+  } 
+  adbPushFile.addEventListener('change', () => {
+    g_adb.sendFile(adbPushTarget.value, (<FileList> adbPushFile.files)[0]);
+  });
+  adbCmd.addEventListener('keypress', (k) => {
+    if (k.keyCode != 13)
+      return;
+    appendAdbLog(adbCmd.value);
+    g_adb.openStream(adbCmd.value)
+    .then(stream => {
+      stream.onData = (str, _) => { appendAdbLog(str); }
+    });
+  });
+
 }
 
 main();
