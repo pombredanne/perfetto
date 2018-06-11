@@ -74,7 +74,8 @@ class SchedSliceTable {
       NumericConstraints<uint32_t> cpu_constraints;
     };
 
-    void Reset();
+    void FindNextSliceForCpu(uint32_t cpu, size_t start_index);
+
     void FindNextSliceAmongCpus();
 
     sqlite3_vtab_cursor base_;  // Must be first.
@@ -98,6 +99,8 @@ class SchedSliceTable {
   sqlite3_vtab base_;  // Must be first.
   const TraceStorage* const storage_;
 
+  // This vector contains one outer entry for each xBestIndex call and one
+  // inner entry for each constraint provided by that xBestIndex call.
   std::vector<std::vector<Constraint>> indexes_;
 };
 
