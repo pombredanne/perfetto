@@ -59,12 +59,12 @@ void TraceStorage::PushProcess(uint32_t pid,
                                size_t process_name_len) {
   bool exists = false;
   auto pids_pair = pids_.equal_range(pid);
+  auto proc_name_id = InternString(process_name, process_name_len);
   if (pids_pair.first != pids_pair.second) {
     UniquePid prev_upid = std::prev(pids_pair.second)->second;
     // If the previous process with the same pid also has the same name,
     // then no action needs to be taken.
-    exists =
-        GetString(unique_processes_[prev_upid].process_name) == process_name;
+    exists = unique_processes_[prev_upid].process_name_id == proc_name_id;
   }
 
   if (!exists) {
@@ -72,14 +72,12 @@ void TraceStorage::PushProcess(uint32_t pid,
     ProcessEntry new_process;
     new_process.start_ns = 0;
     new_process.end_ns = 0;
-    new_process.process_name = InternString(process_name, process_name_len);
+    new_process.process_name_id = InternString(process_name, process_name_len);
     unique_processes_.emplace_back(new_process);
   }
 }
 
-std::pair<TraceStorage::UniqueProcessIterator,
-          TraceStorage::UniqueProcessIterator>
-TraceStorage::UpidsForPid(uint32_t pid) {
+TraceStorage::UniqueProcessRange TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }
 

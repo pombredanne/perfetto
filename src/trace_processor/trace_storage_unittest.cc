@@ -54,7 +54,7 @@ TEST(TraceStorageTest, PushProcess) {
   TraceStorage storage;
   storage.PushProcess(1, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
 }
 
 TEST(TraceStorageTest, PushTwoProcessEntries_SamePidAndName) {
@@ -62,7 +62,7 @@ TEST(TraceStorageTest, PushTwoProcessEntries_SamePidAndName) {
   storage.PushProcess(1, "test", 4);
   storage.PushProcess(1, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
   ASSERT_EQ(++pair_it.first, pair_it.second);
 }
 
@@ -71,15 +71,15 @@ TEST(TraceStorageTest, PushTwoProcessEntries_DifferentPid) {
   storage.PushProcess(1, "test", 4);
   storage.PushProcess(3, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
   auto second_pair_it = storage.UpidsForPid(3);
-  ASSERT_EQ(second_pair_it.first->second, 1);
+  ASSERT_EQ(second_pair_it.first->second, 2);
 }
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
   storage.PushProcess(1, "test", 4);
-  ASSERT_EQ(storage.GetString(storage.GetProcess(0).process_name), "test");
+  ASSERT_EQ(storage.GetString(storage.GetProcess(1).process_name_id), "test");
 }
 
 }  // namespace
