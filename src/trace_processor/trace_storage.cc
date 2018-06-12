@@ -21,6 +21,12 @@
 namespace perfetto {
 namespace trace_processor {
 
+TraceStorage::TraceStorage() {
+  // Upid/utid 0 is reserved for invalid processes/threads.
+  unique_processes_.emplace_back();
+  unique_threads_.emplace_back();
+}
+
 TraceStorage::~TraceStorage() {}
 
 void TraceStorage::PushSchedSwitch(uint32_t cpu,
@@ -62,11 +68,12 @@ void TraceStorage::PushProcess(uint32_t pid,
                                size_t process_name_len) {
   bool exists = false;
   auto pids_pair = pids_.equal_range(pid);
+  auto proc_name_id = InternString(process_name, process_name_len);
   if (pids_pair.first != pids_pair.second) {
     UniquePid prev_upid = std::prev(pids_pair.second)->second;
     // If the previous process with the same pid also has the same name,
     // then no action needs to be taken.
-    exists = GetString(unique_processes_[prev_upid].name_id) == process_name;
+    exists = unique_processes_[prev_upid].name_id == proc_name_id;
   }
 
   if (!exists) {
@@ -74,14 +81,12 @@ void TraceStorage::PushProcess(uint32_t pid,
     TaskInfo new_process;
     new_process.start_ns = 0;
     new_process.end_ns = 0;
-    new_process.name_id = InternString(process_name, process_name_len);
-    unique_processes_.emplace_back(new_process);
+    new_process.name_id = proc_name_id;
+    unique_processes_.emplace_back(std::move(new_process));
   }
 }
 
-std::pair<TraceStorage::UniqueProcessIterator,
-          TraceStorage::UniqueProcessIterator>
-TraceStorage::UpidsForPid(uint32_t pid) {
+TraceStorage::UniqueProcessRange TraceStorage::UpidsForPid(uint32_t pid) {
   return pids_.equal_range(pid);
 }
 

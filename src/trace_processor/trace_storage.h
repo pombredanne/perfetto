@@ -34,13 +34,22 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
+  TraceStorage();
+
   constexpr static size_t kMaxCpus = 128;
   // StringId is an offset into |string_pool_|.
   using StringId = size_t;
-  // UniqueTid is an offset into |unique_threads_|. This is necessary because
-  // Unix tids are reused and thus not guaranteed to be unique over a long
+  // UniquePid is an offset into |unique_processes_|. This is necessary because
+  // Unix pids are reused and thus not guaranteed to be unique over a long
   // period of time.
-  using UniqueTid = size_t;
+  using UniquePid = uint32_t;
+  // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
+  // be reused.
+  using UniqueTid = uint32_t;
+  using UniqueProcessIterator =
+      std::multimap<uint32_t, UniquePid>::const_iterator;
+  using UniqueProcessRange =
+      std::pair<UniqueProcessIterator, UniqueProcessIterator>;
 
   class SlicesPerCpu {
    public:
@@ -54,43 +63,34 @@ class TraceStorage {
       PERFETTO_DCHECK(storage_ != nullptr);
 
       auto pair_it = storage_->tids_.equal_range(tid);
-      bool found = false;
-      // Iterate utids stored for the current tid until one with the same
-      // thread name is found.
-      for (auto it = pair_it.first; it != pair_it.second; ++it) {
-        UniqueTid utid = it->second;
-        if (storage_->unique_threads_[utid].name_id == thread_name_id) {
-          // Found the matching entry - store utid in sched_switch table.
-          utids_.emplace_back(utid);
-          found = true;
-          break;
+      bool exists = false;
+      // If the previous utid has the same name then we assume it's the same
+      // thread.
+      if (pair_it.first != pair_it.second) {
+        UniqueTid prev_utid = std::prev(pair_it.second)->second;
+        if (storage_->unique_threads_[prev_utid].name_id == thread_name_id) {
+          utids_.emplace_back(prev_utid);
+          exists = true;
         }
       }
 
-      if (!found) {
+      if (!exists) {
         // No entries for the current tid and name exist.
         // Assign a new utid and store it.
         TaskInfo new_thread;
         new_thread.name_id = thread_name_id;
         new_thread.start_ns = start_ns;
-        storage_->unique_threads_.emplace_back(new_thread);
+        storage_->unique_threads_.emplace_back(std::move(new_thread));
         storage_->tids_.emplace(tid, storage_->current_utid_);
-        utids_.emplace_back(storage_->current_utid_);
-        storage_->current_utid_++;
+        utids_.emplace_back(storage_->current_utid_++);
       }
     }
 
-    size_t slice_count() const {
-      return start_ns_.size();
-    }
+    size_t slice_count() const { return start_ns_.size(); }
 
-    const std::deque<uint64_t>& start_ns() const {
-      return start_ns_;
-    }
+    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
 
-    const std::deque<uint64_t>& durations() const {
-      return durations_;
-    }
+    const std::deque<uint64_t>& durations() const { return durations_; }
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
@@ -111,14 +111,8 @@ class TraceStorage {
   };
 
   virtual ~TraceStorage();
-  // UniquePid is an offset into |unique_processes_|. This is necessary because
-  // Unix pids are reused and thus not guaranteed to be unique over a long
-  // period of time.
-  using UniquePid = size_t;
-  using UniqueProcessIterator =
-      std::multimap<uint32_t, UniquePid>::const_iterator;
 
-  // Information about a unique process or thread seen in a trace.
+  // Information about a unique process seen in a trace.
   struct TaskInfo {
     uint64_t start_ns;
     uint64_t end_ns;
@@ -142,24 +136,31 @@ class TraceStorage {
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
-  std::pair<UniqueProcessIterator, UniqueProcessIterator> UpidsForPid(
-      uint32_t pid);
+  UniqueProcessRange UpidsForPid(uint32_t pid);
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
+    PERFETTO_CHECK(cpu < cpu_events_.size());
     return cpu_events_[cpu];
   }
 
-  const TaskInfo& GetProcess(UniquePid upid) { return unique_processes_[upid]; }
+  const TaskInfo& GetProcess(UniquePid upid) {
+    PERFETTO_CHECK(upid < unique_processes_.size());
+    return unique_processes_[upid];
+  }
 
-  const TaskInfo& GetThread(UniqueTid utid) { return unique_threads_[utid]; }
+  const TaskInfo& GetThread(UniqueTid utid) {
+    PERFETTO_CHECK(utid < unique_threads_.size());
+    return unique_threads_[utid];
+  }
 
-  const std::string& GetString(StringId id) { return string_pool_[id]; }
+  const std::string& GetString(StringId id) {
+    PERFETTO_CHECK(id < string_pool_.size());
+    return string_pool_[id];
+  }
 
  private:
   using StringHash = uint32_t;
-  UniquePid current_upid_ = 0;
-  UniqueTid current_utid_ = 0;
 
   struct SchedSwitchEvent {
     uint64_t cpu = 0;
@@ -204,6 +205,9 @@ class TraceStorage {
 
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<TaskInfo> unique_threads_;
+
+  UniquePid current_upid_ = 1;
+  UniqueTid current_utid_ = 1;
 };
 
 }  // namespace trace_processor

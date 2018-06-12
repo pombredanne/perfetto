@@ -48,10 +48,10 @@ TEST(TraceStorageTest, InsertSecondSched) {
 
   ASSERT_EQ(timestamps.size(), 1ul);
   ASSERT_EQ(timestamps[0], timestamp);
-  ASSERT_EQ(storage.GetThread(0).start_ns, timestamp);
-  ASSERT_EQ(std::string(storage.GetString(storage.GetThread(0).name_id)),
+  ASSERT_EQ(storage.GetThread(1).start_ns, timestamp);
+  ASSERT_EQ(std::string(storage.GetString(storage.GetThread(1).name_id)),
             "process1");
-  ASSERT_EQ(storage.SlicesForCpu(cpu).utids().front(), 0);
+  ASSERT_EQ(storage.SlicesForCpu(cpu).utids().front(), 1);
 }
 
 TEST(TraceStorageTest, InsertThirdSched_SameThread) {
@@ -71,24 +71,22 @@ TEST(TraceStorageTest, InsertThirdSched_SameThread) {
   ASSERT_EQ(timestamps.size(), 0);
 
   storage.PushSchedSwitch(cpu, timestamp + 1, pid_1, prev_state, kCommProc1,
-                          sizeof(kCommProc2) - 1, pid_2);
+                          sizeof(kCommProc1) - 1, pid_2);
   storage.PushSchedSwitch(cpu, timestamp + 2, pid_2, prev_state, kCommProc2,
                           sizeof(kCommProc2) - 1, pid_1);
 
   ASSERT_EQ(timestamps.size(), 2ul);
   ASSERT_EQ(timestamps[0], timestamp);
-  ASSERT_EQ(storage.GetThread(0).start_ns, timestamp);
+  ASSERT_EQ(storage.GetThread(1).start_ns, timestamp);
   ASSERT_EQ(storage.SlicesForCpu(cpu).utids().at(0),
             storage.SlicesForCpu(cpu).utids().at(1));
-  ASSERT_EQ(storage.GetString(storage.GetThread(0).name_id),
-            storage.GetString(storage.GetThread(0).name_id));
 }
 
 TEST(TraceStorageTest, PushProcess) {
   TraceStorage storage;
   storage.PushProcess(1, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
 }
 
 TEST(TraceStorageTest, PushTwoProcessEntries_SamePidAndName) {
@@ -96,7 +94,7 @@ TEST(TraceStorageTest, PushTwoProcessEntries_SamePidAndName) {
   storage.PushProcess(1, "test", 4);
   storage.PushProcess(1, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
   ASSERT_EQ(++pair_it.first, pair_it.second);
 }
 
@@ -105,15 +103,15 @@ TEST(TraceStorageTest, PushTwoProcessEntries_DifferentPid) {
   storage.PushProcess(1, "test", 4);
   storage.PushProcess(3, "test", 4);
   auto pair_it = storage.UpidsForPid(1);
-  ASSERT_EQ(pair_it.first->second, 0);
+  ASSERT_EQ(pair_it.first->second, 1);
   auto second_pair_it = storage.UpidsForPid(3);
-  ASSERT_EQ(second_pair_it.first->second, 1);
+  ASSERT_EQ(second_pair_it.first->second, 2);
 }
 
 TEST(TraceStorageTest, AddProcessEntry_CorrectName) {
   TraceStorage storage;
   storage.PushProcess(1, "test", 4);
-  ASSERT_EQ(storage.GetString(storage.GetProcess(0).name_id), "test");
+  ASSERT_EQ(storage.GetString(storage.GetProcess(1).name_id), "test");
 }
 
 }  // namespace
