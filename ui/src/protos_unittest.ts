@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Re-export commonly used protos without the painfully long namespace.
-
 import { TraceConfig } from './protos';
 
-test('adds 1 + 2 to equal 3', () => {
+test('round trip config proto', () => {
   const input = TraceConfig.create({
-    durationMs: 42, 
+    durationMs: 42,
   });
   const output = TraceConfig.decode(TraceConfig.encode(input).finish());
   expect(output.durationMs).toBe(42);
