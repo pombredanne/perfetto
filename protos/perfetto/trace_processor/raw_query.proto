@@ -31,6 +31,7 @@ message RawQueryResult {
       LONG = 2;
       UNSIGNED_INT = 3;
       UNSIGNED_LONG = 4;
+      STRING = 5;
     }
     optional Type type = 2;
   }

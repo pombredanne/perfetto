@@ -132,6 +132,8 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
     if (!cs.usable)
       continue;
     constraints->emplace_back(cs);
+
+    // argvIndex is 1-based so use the current size of the vector.
     idx->aConstraintUsage[i].argvIndex = static_cast<int>(constraints->size());
   }
   return SQLITE_OK;

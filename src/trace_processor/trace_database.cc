@@ -36,12 +36,13 @@ bool IsColumnULong(const char* type) {
 
 TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
     : task_runner_(task_runner), weak_factory_(this) {
+  static_assert(offsetof(TraceDatabase, db_) == 0,
+                "SQLite database must be the first field.");
   sqlite3_open(":memory:", &db_);
 
   // Setup the sched slice table.
   static sqlite3_module module = SchedSliceTable::CreateModule();
-  sqlite3_create_module(db_, "sched_slices", &module,
-                        static_cast<void*>(&storage_));
+  sqlite3_create_module(db_, "sched", &module, static_cast<void*>(&storage_));
 }
 
 TraceDatabase::~TraceDatabase() {
@@ -90,8 +91,7 @@ void TraceDatabase::ExecuteQuery(
   }
 
   int row_count = 0;
-  int result = sqlite3_step(stmt);
-  while (result == SQLITE_ROW) {
+  for (int r = sqlite3_step(stmt); r == SQLITE_ROW; r = sqlite3_step(stmt)) {
     for (int i = 0; i < proto.columns_size(); i++) {
       auto* column = proto.mutable_columns(i);
       switch (proto.column_descriptors(i).type()) {
@@ -105,12 +105,12 @@ void TraceDatabase::ExecuteQuery(
           break;
         case protos::RawQueryResult_ColumnDesc_Type_INT:
         case protos::RawQueryResult_ColumnDesc_Type_LONG:
+        case protos::RawQueryResult_ColumnDesc_Type_STRING:
           PERFETTO_FATAL("Unexpected column type found in SQL query");
           break;
       }
     }
     row_count++;
-    result = sqlite3_step(stmt);
   }
   proto.set_num_records(static_cast<uint64_t>(row_count));
 
@@ -124,12 +124,12 @@ void TraceDatabase::LoadTraceChunk(std::function<void()> callback) {
     return;
   }
 
-  auto ptr = weak_factory_.GetWeakPtr();
-  task_runner_->PostTask([ptr, callback] {
-    if (!ptr)
+  auto weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this, callback] {
+    if (!weak_this)
       return;
 
-    ptr->LoadTraceChunk(callback);
+    weak_this->LoadTraceChunk(callback);
   });
 }
 
