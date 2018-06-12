@@ -21,6 +21,11 @@
 namespace perfetto {
 namespace trace_processor {
 
+TraceStorage::TraceStorage() {
+  // Upid 0 is reserved for invalid processes.
+  unique_processes_.emplace_back();
+}
+
 TraceStorage::~TraceStorage() {}
 
 void TraceStorage::PushSchedSwitch(uint32_t cpu,
@@ -72,8 +77,8 @@ void TraceStorage::PushProcess(uint32_t pid,
     ProcessEntry new_process;
     new_process.start_ns = 0;
     new_process.end_ns = 0;
-    new_process.process_name_id = InternString(process_name, process_name_len);
-    unique_processes_.emplace_back(new_process);
+    new_process.process_name_id = proc_name_id;
+    unique_processes_.emplace_back(std::move(new_process));
   }
 }
 

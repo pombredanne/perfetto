@@ -34,10 +34,7 @@ namespace trace_processor {
 // names for a given CPU).
 class TraceStorage {
  public:
-  TraceStorage() {
-    ProcessEntry blank_process;
-    unique_processes_.emplace_back(blank_process);
-  }
+  TraceStorage();
 
   constexpr static size_t kMaxCpus = 128;
   // StringId is an offset into |string_pool_|.
@@ -109,6 +106,7 @@ class TraceStorage {
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
+    PERFETTO_CHECK(cpu < cpu_events_.size());
     return cpu_events_[cpu];
   }
 
