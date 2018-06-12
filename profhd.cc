@@ -18,6 +18,7 @@
 #include <inttypes.h>
 #include <linux/memfd.h>
 #include <signal.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -35,6 +36,23 @@
 namespace perfetto {
 
 static long total_read = 0;
+
+struct Metadata {
+  unwindstack::ArchEnum arch;
+  uint8_t regs[66];
+  int64_t pid;
+  uint64_t size;
+};
+
+void Done(int fd, size_t sz);
+void Done(int fd, size_t sz) {
+  void* mem = mmap(nullptr, sz, PROT_READ, 0, fd, 0);
+  Metadata* metadata = reinterpret_cast<Metadata*>(mem);
+  uint8_t* stack = reinterpret_cast<uint8_t*>(mem);
+  stack += sizeof(Metadata);
+  munmap(mem, sz);
+  close(fd);
+}
 
 class PipeSender : public ipc::UnixSocket::EventListener {
  public:
@@ -65,29 +83,32 @@ void PipeSender::OnNewIncomingConnection(
   socks_.emplace(p, std::move(new_connection));
   int fd = pipes[0];
   int outfd = static_cast<int>(syscall(__NR_memfd_create, "data", 0));
+  size_t read_bytes = 0;
   fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
   base::WeakPtr<PipeSender> weak_this = weak_factory_.GetWeakPtr();
-  task_runner_->AddFileDescriptorWatch(fd, [fd, outfd, weak_this] {
-    if (!weak_this) {
-      close(fd);
-      close(outfd);
-      return;
-    }
+  task_runner_->AddFileDescriptorWatch(
+      fd, [fd, outfd, weak_this, read_bytes]() mutable {
+        if (!weak_this) {
+          close(fd);
+          close(outfd);
+          return;
+        }
 
-    long rd = PERFETTO_EINTR(
-        splice(fd, nullptr, outfd, nullptr, 16 * 4096, SPLICE_F_NONBLOCK));
-    PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
-    if (rd == -1)
-      return;
-    total_read += rd;
-    if ((total_read / 10000000) != ((total_read - rd) / 10000000))
-      PERFETTO_LOG("perfhd: %lu\n", total_read);
-    if (rd == 0) {
-      weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
-      close(outfd);
-      close(fd);
-    }
-  });
+        long rd = PERFETTO_EINTR(
+            splice(fd, nullptr, outfd, nullptr, 16 * 4096, SPLICE_F_NONBLOCK));
+        PERFETTO_CHECK(rd != -1 || errno == EAGAIN || errno == EWOULDBLOCK);
+        if (rd == -1)
+          return;
+        read_bytes += static_cast<size_t>(rd);
+        total_read += static_cast<size_t>(rd);
+        if ((total_read / 10000000) != ((total_read - rd) / 10000000))
+          PERFETTO_LOG("perfhd: %lu\n", total_read);
+        if (rd == 0) {
+          weak_this->task_runner_->RemoveFileDescriptorWatch(fd);
+          close(fd);
+          Done(outfd, read_bytes);
+        }
+      });
 }
 
 void PipeSender::OnDisconnect(ipc::UnixSocket* self) {

@@ -3818,6 +3818,47 @@ cc_test {
   },
 }
 
+// GN target: //:profhd
+cc_binary {
+  name: "profhd",
+  srcs: [
+    ":perfetto_src_ipc_wire_protocol_gen",
+    "profhd.cc",
+    "src/base/file_utils.cc",
+    "src/base/metatrace.cc",
+    "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
+    "src/base/string_utils.cc",
+    "src/base/temp_file.cc",
+    "src/base/thread_checker.cc",
+    "src/base/time.cc",
+    "src/base/unix_task_runner.cc",
+    "src/base/virtual_destructors.cc",
+    "src/base/watchdog_posix.cc",
+    "src/ipc/buffered_frame_deserializer.cc",
+    "src/ipc/client_impl.cc",
+    "src/ipc/deferred.cc",
+    "src/ipc/host_impl.cc",
+    "src/ipc/service_proxy.cc",
+    "src/ipc/unix_socket.cc",
+    "src/ipc/virtual_destructors.cc",
+  ],
+  shared_libs: [
+    "liblog",
+    "libprotobuf-cpp-lite",
+  ],
+  generated_headers: [
+    "perfetto_src_ipc_wire_protocol_gen_headers",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+  cflags: [
+    "-DGOOGLE_PROTOBUF_NO_RTTI",
+    "-DGOOGLE_PROTOBUF_NO_STATIC_INITIALIZER",
+  ],
+}
+
 // GN target: //:trace_to_text
 cc_binary_host {
   name: "trace_to_text",

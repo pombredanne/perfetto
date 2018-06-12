@@ -251,6 +251,7 @@ executable("profhd") {
   sources = [
     "profhd.cc",
   ]
+  libs = [ "unwindstack" ]
 }
 
 template("fifoclient_template") {
