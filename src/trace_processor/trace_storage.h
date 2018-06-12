@@ -37,8 +37,8 @@ class TraceStorage {
   TraceStorage() {
     ProcessEntry blank_process;
     unique_processes_.emplace_back(blank_process);
-    ++current_upid_;
   }
+
   constexpr static size_t kMaxCpus = 128;
   // StringId is an offset into |string_pool_|.
   using StringId = size_t;
@@ -124,7 +124,7 @@ class TraceStorage {
 
  private:
   using StringHash = uint32_t;
-  UniquePid current_upid_ = 0;
+  UniquePid current_upid_ = 1;
 
   struct SchedSwitchEvent {
     uint64_t cpu = 0;
