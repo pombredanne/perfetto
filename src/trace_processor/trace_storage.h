@@ -112,7 +112,7 @@ class TraceStorage {
 
   virtual ~TraceStorage();
 
-  // Information about a unique process seen in a trace.
+  // Information about a unique process or thread seen in a trace.
   struct TaskInfo {
     uint64_t start_ns;
     uint64_t end_ns;
