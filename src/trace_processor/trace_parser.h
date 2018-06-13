@@ -47,6 +47,9 @@ class TraceParser {
                         uint64_t timestamp,
                         const uint8_t* data,
                         uint32_t length);
+  void ParseProcessTree(const uint8_t* data, uint32_t length);
+  void ParseProcess(const uint8_t* data, uint32_t length);
+  void ParseThread(const uint8_t* data, uint32_t length);
 
   BlobReader* const reader_;
   TraceStorage* const storage_;

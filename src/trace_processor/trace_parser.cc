@@ -79,10 +79,90 @@ void TraceParser::ParsePacket(const uint8_t* data, uint32_t length) {
             fld.length_limited.data,
             static_cast<uint32_t>(fld.length_limited.length));
         break;
+      case protos::TracePacket::kProcessTreeFieldNumber:
+        ParseProcessTree(fld.length_limited.data,
+                         static_cast<uint32_t>(fld.length_limited.length));
+        break;
       default:
         break;
     }
   }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void TraceParser::ParseProcessTree(const uint8_t* data, uint32_t length) {
+  ProtoDecoder decoder(data, length);
+  // TODO(taylori): We currently rely on process packets always coming before
+  // their corresponding threads. This should be true but it is better
+  // not to rely on it.
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ProcessTree::kProcessesFieldNumber:
+        ParseProcess(fld.length_limited.data,
+                     static_cast<uint32_t>(fld.length_limited.length));
+        break;
+      case protos::ProcessTree::kThreadsFieldNumber:
+        ParseThread(fld.length_limited.data,
+                    static_cast<uint32_t>(fld.length_limited.length));
+        break;
+      default:
+        break;
+    }
+  }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void TraceParser::ParseThread(const uint8_t* data, uint32_t length) {
+  ProtoDecoder decoder(data, length);
+  uint32_t tid = 0;
+  uint32_t tgid = 0;
+  const char* thread_name = nullptr;
+  size_t thread_name_len = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ProcessTree::Thread::kTidFieldNumber:
+        tid = fld.as_uint32();
+        break;
+      case protos::ProcessTree::Thread::kTgidFieldNumber:
+        tgid = fld.as_uint32();
+        break;
+      case protos::ProcessTree::Thread::kNameFieldNumber:
+        thread_name = fld.as_char_ptr();
+        thread_name_len = fld.size();
+        break;
+      default:
+        break;
+    }
+  }
+  // TODO(taylori): Store the thread.
+
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void TraceParser::ParseProcess(const uint8_t* data, uint32_t length) {
+  ProtoDecoder decoder(data, length);
+  uint32_t pid = 0;
+  uint32_t ppid = 0;
+  const char* process_name = nullptr;
+  size_t process_name_len = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::ProcessTree::Process::kPidFieldNumber:
+        pid = fld.as_uint32();
+        break;
+      case protos::ProcessTree::Process::kPpidFieldNumber:
+        ppid = fld.as_uint32();
+        break;
+      case protos::ProcessTree::Process::kCmdlineFieldNumber:
+        process_name = fld.as_char_ptr();
+        process_name_len = fld.size();
+        break;
+      default:
+        break;
+    }
+  }
+  storage_->PushProcess(pid, process_name, process_name_len);
+
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
