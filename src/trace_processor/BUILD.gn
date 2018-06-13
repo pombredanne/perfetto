@@ -35,6 +35,10 @@ wasm_lib("trace_processor") {
 source_set("lib") {
   sources = [
     "blob_reader.h",
+    "sched_slice_table.cc",
+    "sched_slice_table.h",
+    "trace_database.cc",
+    "trace_database.h",
     "trace_parser.cc",
     "trace_parser.h",
     "trace_storage.cc",
@@ -42,8 +46,10 @@ source_set("lib") {
     "virtual_destructors.cc",
   ]
   deps = [
+    "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../protozero",
   ]
@@ -52,11 +58,13 @@ source_set("lib") {
 source_set("unittests") {
   testonly = true
   sources = [
+    "sched_slice_table_unittest.cc",
     "trace_parser_unittest.cc",
     "trace_storage_unittest.cc",
   ]
   deps = [
     ":lib",
+    "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace:lite",
