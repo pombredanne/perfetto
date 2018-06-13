@@ -109,6 +109,14 @@ executable("perfetto_unittests") {
 }
 
 if (!build_with_chromium) {
+  executable("battery_dump") {
+    deps = [
+      "gn:default_deps",
+      "include/perfetto/base",
+    ]
+    sources = ["battery_dump.cc"]
+  }
+
   executable("perfetto_benchmarks") {
     testonly = true
     deps = [
@@ -241,3 +249,4 @@ if (use_libfuzzer && !build_with_chromium) {
     ]
   }
 }
+
