@@ -31,15 +31,14 @@ class SchedSliceTable {
  public:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
-  enum Column { kTimestamp = 0, kCpu = 1, kDuration = 2, kMax = kDuration + 1 };
+  enum Column { kTimestamp = 0, kCpu = 1, kDuration = 2 };
   struct OrderBy {
-    Column column = kMax;
+    Column column = kTimestamp;
     bool desc = false;
   };
-  using OrderByArray = std::array<OrderBy, Column::kMax>;
 
   struct IndexInfo {
-    std::array<OrderBy, Column::kMax> order_by;
+    std::vector<OrderBy> order_by;
     std::vector<Constraint> constraints;
   };
 
@@ -110,7 +109,7 @@ class SchedSliceTable {
       uint32_t next_cpu() const { return static_cast<uint32_t>(next_cpu_); }
       void set_next_cpu(uint32_t cpu) { next_cpu_ = cpu; }
 
-      std::array<OrderBy, Column::kMax>* order_by() { return &order_by_; }
+      std::vector<OrderBy>* order_by() { return &order_by_; }
 
       NumericConstraints<uint32_t>* cpu_constraints() {
         return &cpu_constraints_;
@@ -121,7 +120,7 @@ class SchedSliceTable {
       std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
       size_t next_cpu_ = 0;
 
-      std::array<OrderBy, Column::kMax> order_by_;
+      std::vector<OrderBy> order_by_;
       NumericConstraints<uint32_t> cpu_constraints_;
     };
 

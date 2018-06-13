@@ -79,15 +79,13 @@ inline int CompareValuesForColumn(uint32_t f_cpu,
       return Compare(f_slices.durations()[f], s_slices.durations()[s], desc);
     case SchedSliceTable::Column::kCpu:
       return Compare(f_cpu, s_cpu, desc);
-    case SchedSliceTable::Column::kMax:
-      return 0;
   }
 }
 
 std::vector<size_t> CreateSortedIndexVector(
     uint32_t cpu,
     const TraceStorage::SlicesPerCpu& slices,
-    const SchedSliceTable::OrderByArray& order_by) {
+    const std::vector<SchedSliceTable::OrderBy>& order_by) {
   std::vector<size_t> indices;
   indices.resize(slices.slice_count());
   std::iota(indices.begin(), indices.end(), 0);
@@ -172,7 +170,10 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
   IndexInfo* index = &indexes_.back();
   for (int i = 0; i < idx->nOrderBy; i++) {
-    OrderBy* order = &index->order_by[static_cast<size_t>(i)];
+    index->order_by.emplace_back();
+
+    OrderBy* order = &index->order_by.back();
+    order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     order->desc = idx->aOrderBy[i].desc;
   }
   idx->orderByConsumed = true;
