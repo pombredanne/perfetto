@@ -62,8 +62,7 @@ bool TraceParser::ParseNextChunk() {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
       continue;
     }
-    ParsePacket(fld.length_limited.data,
-                static_cast<uint32_t>(fld.length_limited.length));
+    ParsePacket(fld.length_limited.data, fld.size_as_uint32());
   }
 
   offset_ += decoder.offset();
@@ -75,13 +74,10 @@ void TraceParser::ParsePacket(const uint8_t* data, uint32_t length) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kFtraceEventsFieldNumber:
-        ParseFtraceEventBundle(
-            fld.length_limited.data,
-            static_cast<uint32_t>(fld.length_limited.length));
+        ParseFtraceEventBundle(fld.length_limited.data, fld.size_as_uint32());
         break;
       case protos::TracePacket::kProcessTreeFieldNumber:
-        ParseProcessTree(fld.length_limited.data,
-                         static_cast<uint32_t>(fld.length_limited.length));
+        ParseProcessTree(fld.length_limited.data, fld.size_as_uint32());
         break;
       default:
         break;
@@ -98,12 +94,10 @@ void TraceParser::ParseProcessTree(const uint8_t* data, uint32_t length) {
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
-        ParseProcess(fld.length_limited.data,
-                     static_cast<uint32_t>(fld.length_limited.length));
+        ParseProcess(fld.length_limited.data, fld.size_as_uint32());
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
-        ParseThread(fld.length_limited.data,
-                    static_cast<uint32_t>(fld.length_limited.length));
+        ParseThread(fld.length_limited.data, fld.size_as_uint32());
         break;
       default:
         break;
@@ -180,7 +174,7 @@ void TraceParser::ParseFtraceEventBundle(const uint8_t* data, uint32_t length) {
     switch (fld.id) {
       case protos::FtraceEventBundle::kEventFieldNumber:
         ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.length_limited.data,
-                         static_cast<uint32_t>(fld.length_limited.length));
+                         fld.size_as_uint32());
         break;
       default:
         break;
@@ -206,7 +200,7 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
       case protos::FtraceEvent::kSchedSwitchFieldNumber:
         PERFETTO_DCHECK(timestamp > 0);
         ParseSchedSwitch(cpu, timestamp, fld.length_limited.data,
-                         static_cast<uint32_t>(fld.length_limited.length));
+                         fld.size_as_uint32());
         break;
       default:
         break;
