@@ -51,12 +51,6 @@ class ProtoDecoder {
       return static_cast<uint32_t>(int_value);
     }
 
-    inline uint32_t size_as_uint32() const {
-      PERFETTO_DCHECK(type ==
-                      proto_utils::FieldType::kFieldTypeLengthDelimited);
-      return static_cast<uint32_t>(length_limited.length);
-    }
-
     inline const char* as_char_ptr() const {
       PERFETTO_DCHECK(type ==
                       proto_utils::FieldType::kFieldTypeLengthDelimited);
