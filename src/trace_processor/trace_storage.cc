@@ -42,12 +42,19 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   if (prev->valid()) {
     uint64_t duration = timestamp - prev->timestamp;
     cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_thread_id);
+
+    // If the this events previous pid does not match the previous event's next
+    // pid, make a note of this.
+    if (prev_pid != prev->next_pid) {
+      stats_.mismatched_sched_switch_tids_++;
+    }
   }
 
-  // If the this events previous pid does not match the previous event's next
-  // pid, make a note of this.
-  if (prev_pid != prev->next_pid) {
-    stats_.mismatched_sched_switch_tids_++;
+  // We are switching into the swapper (i.e. idle) process. Reset the prev
+  // event so we do not add a slice for the time spent in idle.
+  if (next_pid == 0) {
+    *prev = {};
+    return;
   }
 
   // Update the map with the current event.
