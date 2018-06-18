@@ -64,11 +64,12 @@ class TraceStorage {
 
       auto pair_it = storage_->tids_.equal_range(tid);
       bool exists = false;
-      // If the previous utid has the same name then we assume it's the same
-      // thread.
+      // If the previous utid has the same name and hasn't ended then we assume
+      // it's the same thread.
       if (pair_it.first != pair_it.second) {
         UniqueTid prev_utid = std::prev(pair_it.second)->second;
-        if (storage_->unique_threads_[prev_utid].name_id == thread_name_id) {
+        TaskInfo prev = storage_->unique_threads_[prev_utid];
+        if (prev.name_id == thread_name_id && prev.end_ns == 0) {
           utids_.emplace_back(prev_utid);
           exists = true;
         }
