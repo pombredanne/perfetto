@@ -66,17 +66,11 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
 void TraceStorage::PushProcess(uint32_t pid,
                                const char* process_name,
                                size_t process_name_len) {
-  bool exists = false;
   auto pids_pair = pids_.equal_range(pid);
   auto proc_name_id = InternString(process_name, process_name_len);
-  if (pids_pair.first != pids_pair.second) {
-    UniquePid prev_upid = std::prev(pids_pair.second)->second;
-    // If the previous process with the same pid also has the same name,
-    // then no action needs to be taken.
-    exists = unique_processes_[prev_upid].name_id == proc_name_id;
-  }
 
-  if (!exists) {
+  // We only create a new upid if there isn't one for that pid.
+  if (pids_pair.first == pids_pair.second) {
     pids_.emplace(pid, current_upid_++);
     TaskInfo new_process;
     new_process.start_ns = 0;
