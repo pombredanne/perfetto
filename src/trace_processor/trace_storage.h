@@ -37,8 +37,10 @@ class TraceStorage {
   TraceStorage();
 
   constexpr static size_t kMaxCpus = 128;
+
   // StringId is an offset into |string_pool_|.
   using StringId = size_t;
+
   // UniquePid is an offset into |unique_processes_|. This is necessary because
   // Unix pids are reused and thus not guaranteed to be unique over a long
   // period of time.
@@ -47,6 +49,7 @@ class TraceStorage {
       std::multimap<uint32_t, UniquePid>::const_iterator;
   using UniqueProcessRange =
       std::pair<UniqueProcessIterator, UniqueProcessIterator>;
+
   // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
   // be reused.
   using UniqueTid = uint32_t;
@@ -64,27 +67,21 @@ class TraceStorage {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
 
-      PERFETTO_DCHECK(storage_ != nullptr);
+      auto pair_it = storage_->tids_.equal_range(tid);
 
-      auto pair_it = storage_->UtidsForTid(tid);
-      bool exists = false;
       // If there is a previous utid for that tid, use that.
       if (pair_it.first != pair_it.second) {
         UniqueTid prev_utid = std::prev(pair_it.second)->second;
         utids_.emplace_back(prev_utid);
-        exists = true;
-      }
-
-      if (!exists) {
-        // No entries for the current tid exist.
-        // Assign a new utid and store it.
+      } else {
+        // If none exist, assign a new utid and store it.
         Thread new_thread;
         new_thread.name_id = thread_name_id;
         new_thread.start_ns = start_ns;
         new_thread.upid = 0;
+        storage_->tids_.emplace(tid, storage_->unique_threads_.size());
+        utids_.emplace_back(storage_->unique_threads_.size());
         storage_->unique_threads_.emplace_back(std::move(new_thread));
-        storage_->tids_.emplace(tid, storage_->current_utid_);
-        utids_.emplace_back(storage_->current_utid_++);
       }
     }
 
@@ -116,15 +113,15 @@ class TraceStorage {
 
   // Information about a unique process seen in a trace.
   struct Process {
-    uint64_t start_ns;
-    uint64_t end_ns;
+    uint64_t start_ns = 0;
+    uint64_t end_ns = 0;
     StringId name_id;
   };
 
   // Information about a unique thread seen in a trace.
   struct Thread {
-    uint64_t start_ns;
-    uint64_t end_ns;
+    uint64_t start_ns = 0;
+    uint64_t end_ns = 0;
     StringId name_id;
     UniquePid upid;
   };
@@ -216,15 +213,12 @@ class TraceStorage {
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<Process> unique_processes_;
 
-  // Each pid can have multiple UniqueTid entries, a new UniqueTid is assigned
+  // Each tid can have multiple UniqueTid entries, a new UniqueTid is assigned
   // each time a thread is seen in the trace.
   std::multimap<uint32_t, UniqueTid> tids_;
 
   // One entry for each UniqueTid, with UniqueTid as the index.
   std::deque<Thread> unique_threads_;
-
-  UniquePid current_upid_ = 1;
-  UniqueTid current_utid_ = 1;
 };
 
 }  // namespace trace_processor

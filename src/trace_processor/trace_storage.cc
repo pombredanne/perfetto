@@ -71,10 +71,8 @@ void TraceStorage::PushProcess(uint32_t pid,
 
   // We only create a new upid if there isn't one for that pid.
   if (pids_pair.first == pids_pair.second) {
-    pids_.emplace(pid, current_upid_++);
+    pids_.emplace(pid, unique_processes_.size());
     Process new_process;
-    new_process.start_ns = 0;
-    new_process.end_ns = 0;
     new_process.name_id = proc_name_id;
     unique_processes_.emplace_back(std::move(new_process));
   }

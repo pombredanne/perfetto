@@ -236,6 +236,27 @@ TEST(TraceParse, LoadProcessPacket) {
   parser.ParseNextChunk();
 }
 
+TEST(TraceParse, LoadProcessPacket_FirstCmdline) {
+  protos::Trace trace;
+
+  auto* tree = trace.add_packet()->mutable_process_tree();
+  auto* process = tree->add_processes();
+  static const char kProcName1[] = "proc1";
+  static const char kProcName2[] = "proc2";
+
+  process->add_cmdline(kProcName1);
+  process->add_cmdline(kProcName2);
+  process->set_pid(1);
+  process->set_ppid(2);
+
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, PushProcess(1, _, _))
+      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &storage, 1024);
+  parser.ParseNextChunk();
+}
+
 TEST(TraceParse, LoadThreadPacket) {
   protos::Trace trace;
 

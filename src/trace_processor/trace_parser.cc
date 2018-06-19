@@ -89,15 +89,19 @@ void TraceParser::ParsePacket(const uint8_t* data, size_t length) {
 
 void TraceParser::ParseProcessTree(const uint8_t* data, size_t length) {
   ProtoDecoder decoder(data, length);
+
   // TODO(taylori): We currently rely on process packets always coming before
   // their corresponding threads. This should be true but it is better
   // not to rely on it.
+  bool parsed_thread_packet = false;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
+        PERFETTO_DCHECK(!parsed_thread_packet);
         ParseProcess(fld.length_limited.data, fld.length_limited.length);
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
+        parsed_thread_packet = true;
         ParseThread(fld.length_limited.data, fld.length_limited.length);
         break;
       default:
@@ -131,7 +135,6 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
 void TraceParser::ParseProcess(const uint8_t* data, size_t length) {
   ProtoDecoder decoder(data, length);
   uint32_t pid = 0;
-  uint32_t ppid = 0;
   const char* process_name = nullptr;
   size_t process_name_len = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -139,12 +142,11 @@ void TraceParser::ParseProcess(const uint8_t* data, size_t length) {
       case protos::ProcessTree::Process::kPidFieldNumber:
         pid = fld.as_uint32();
         break;
-      case protos::ProcessTree::Process::kPpidFieldNumber:
-        ppid = fld.as_uint32();
-        break;
       case protos::ProcessTree::Process::kCmdlineFieldNumber:
-        process_name = fld.as_char_ptr();
-        process_name_len = fld.size();
+        if (process_name == nullptr) {
+          process_name = fld.as_char_ptr();
+          process_name_len = fld.size();
+        }
         break;
       default:
         break;
