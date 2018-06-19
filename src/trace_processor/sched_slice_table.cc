@@ -54,6 +54,49 @@ inline SchedSliceTable::Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
   return reinterpret_cast<SchedSliceTable::Cursor*>(cursor);
 }
 
+template <size_t N>
+bool PopulateFilterBitmap(int op,
+                          sqlite3_value* value,
+                          std::bitset<N>* filter) {
+  bool constraint_implemented = true;
+  int64_t int_value = sqlite3_value_int64(value);
+  if (IsOpGe(op) || IsOpGt(op)) {
+    // If the operator is gt, then add one to the upper bound.
+    int_value = IsOpGt(op) ? int_value + 1 : int_value;
+
+    // Set to false all values less than |int_value|.
+    size_t ub = static_cast<size_t>(std::max(0l, int_value));
+    ub = std::min(ub, filter->size());
+    for (size_t i = 0; i < ub; i++) {
+      filter->set(i, false);
+    }
+  } else if (IsOpLe(op) || IsOpLt(op)) {
+    // If the operator is lt, then minus one to the lower bound.
+    int_value = IsOpLt(op) ? int_value - 1 : int_value;
+
+    // Set to false all values greater than |int_value|.
+    size_t lb = static_cast<size_t>(std::max(0l, int_value));
+    lb = std::min(lb, filter->size());
+    for (size_t i = lb; i < filter->size(); i++) {
+      filter->set(i, false);
+    }
+  } else if (IsOpEq(op)) {
+    if (int_value >= 0 && static_cast<size_t>(int_value) < filter->size()) {
+      // If the value is in bounds, set all bits to false and restore the value
+      // of the bit at the specified index.
+      bool existing = filter->test(static_cast<size_t>(int_value));
+      filter->reset();
+      filter->set(static_cast<size_t>(int_value), existing);
+    } else {
+      // If the index is out of bounds, nothing should match.
+      filter->reset();
+    }
+  } else {
+    constraint_implemented = false;
+  }
+  return constraint_implemented;
+}
+
 template <class T>
 inline int Compare(T first, T second, bool desc) {
   if (first < second) {
@@ -82,14 +125,16 @@ inline int CompareValuesForColumn(uint32_t f_cpu,
   }
 }
 
-std::vector<size_t> CreateSortedIndexVector(
+std::vector<uint32_t> CreateSortedIndexVector(
     uint32_t cpu,
     const TraceStorage::SlicesPerCpu& slices,
     const std::vector<SchedSliceTable::OrderBy>& order_by) {
-  std::vector<size_t> indices;
+  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+
+  std::vector<uint32_t> indices;
   indices.resize(slices.slice_count());
-  std::iota(indices.begin(), indices.end(), 0);
-  auto callback = [cpu, &order_by, &slices](size_t f, size_t s) {
+  std::iota(indices.begin(), indices.end(), 0u);
+  auto callback = [cpu, &order_by, &slices](uint32_t f, uint32_t s) {
     for (const auto& ob : order_by) {
       int value = CompareValuesForColumn(cpu, slices, f, cpu, slices, s,
                                          ob.column, ob.desc);
@@ -208,13 +253,14 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
   // Reset the filter state.
   filter_state_ = {};
 
+  std::bitset<TraceStorage::kMaxCpus> cpu_filter;
   const auto& index = table_->indexes_[static_cast<size_t>(idxNum)];
   PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
   for (size_t i = 0; i < index.constraints.size(); i++) {
     const auto& cs = index.constraints[i];
     switch (cs.iColumn) {
       case Column::kCpu:
-        filter_state_.cpu_constraints()->Initialize(cs, argv[i]);
+        PopulateFilterBitmap(cs.op, argv[i], &cpu_filter);
         break;
     }
   }
@@ -224,17 +270,14 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
 
   // First setup CPU filtering because the trace storage is indexed by CPU.
   for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
-    if (!filter_state_.cpu_constraints()->Matches(cpu))
+    if (!cpu_filter.test(cpu))
       continue;
 
     PerCpuState* state = filter_state_.StateForCpu(cpu);
 
     // Create a sorted index vector based on the order by requirements.
-    *state->sorted_data_indices() = CreateSortedIndexVector(
+    *state->sorted_row_ids() = CreateSortedIndexVector(
         cpu, storage_->SlicesForCpu(cpu), *filter_state_.order_by());
-
-    // Start yielding values from the first index onwards.
-    state->set_index_into_indices(0ul);
   }
 
   // Set the cpu index to be the first item to look at.
@@ -250,26 +293,26 @@ int SchedSliceTable::Cursor::Next() {
 
   // TODO(lalitm): maybe one day we may want to filter more efficiently. If so
   // update this method with filter logic.
-  state->set_index_into_indices(state->index_into_indices() + 1);
+  state->set_next_row_id_index(state->next_row_id_index() + 1);
 
   FindNextSliceAmongCpus();
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Eof() {
-  return filter_state_.IsNextCpuInvalid();
+  return !filter_state_.IsNextCpuValid();
 }
 
 int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
-  if (filter_state_.IsNextCpuInvalid())
+  if (!filter_state_.IsNextCpuValid())
     return SQLITE_ERROR;
 
   uint32_t cpu = filter_state_.next_cpu();
-  size_t index = filter_state_.StateForCpu(cpu)->GetNextDataIndex();
+  size_t row = filter_state_.StateForCpu(cpu)->GetNextRowId();
   const auto& slices = storage_->SlicesForCpu(cpu);
   switch (N) {
     case Column::kTimestamp: {
-      auto timestamp = static_cast<sqlite3_int64>(slices.start_ns()[index]);
+      auto timestamp = static_cast<sqlite3_int64>(slices.start_ns()[row]);
       sqlite3_result_int64(context, timestamp);
       break;
     }
@@ -278,7 +321,7 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kDuration: {
-      auto duration = static_cast<sqlite3_int64>(slices.durations()[index]);
+      auto duration = static_cast<sqlite3_int64>(slices.durations()[row]);
       sqlite3_result_int64(context, duration);
       break;
     }
@@ -295,23 +338,24 @@ void SchedSliceTable::Cursor::FindNextSliceAmongCpus() {
 
   for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
     const auto& cpu_state = *filter_state_.StateForCpu(cpu);
-    if (cpu_state.IsEndOfData())
+    if (!cpu_state.IsNextRowIdIndexValid())
       continue;
 
     // The first CPU with a valid slice can be set to the next CPU.
-    if (filter_state_.IsNextCpuInvalid()) {
+    if (!filter_state_.IsNextCpuValid()) {
       filter_state_.set_next_cpu(cpu);
       continue;
     }
+
     uint32_t cur_cpu = filter_state_.next_cpu();
-    size_t cur_index = filter_state_.StateForCpu(cur_cpu)->GetNextDataIndex();
     const auto& cur_slices = storage_->SlicesForCpu(cur_cpu);
+    size_t cur_row = filter_state_.StateForCpu(cur_cpu)->GetNextRowId();
 
     const auto& slices = storage_->SlicesForCpu(cpu);
-    size_t index = cpu_state.GetNextDataIndex();
+    size_t row = cpu_state.GetNextRowId();
     for (const auto& ob : *filter_state_.order_by()) {
-      int ret = CompareValuesForColumn(cpu, slices, index, cur_cpu, cur_slices,
-                                       cur_index, ob.column, ob.desc);
+      int ret = CompareValuesForColumn(cpu, slices, row, cur_cpu, cur_slices,
+                                       cur_row, ob.column, ob.desc);
       if (ret < 0) {
         filter_state_.set_next_cpu(cpu);
         break;
@@ -320,33 +364,6 @@ void SchedSliceTable::Cursor::FindNextSliceAmongCpus() {
       }
     }
   }
-}
-
-template <typename T>
-bool SchedSliceTable::Cursor::NumericConstraints<T>::Initialize(
-    const Constraint& cs,
-    sqlite3_value* value) {
-  bool is_integral = std::is_integral<T>::value;
-  PERFETTO_DCHECK(is_integral ? sqlite3_value_type(value) == SQLITE_INTEGER
-                              : sqlite3_value_type(value) == SQLITE_FLOAT);
-  bool constraint_implemented = true;
-  T const_value = static_cast<T>(is_integral ? sqlite3_value_int64(value)
-                                             : sqlite3_value_double(value));
-  if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-    min_value = const_value;
-    min_equals = IsOpGt(cs.op);
-  } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-    max_value = const_value;
-    max_equals = IsOpLt(cs.op);
-  } else if (IsOpEq(cs.op)) {
-    max_value = const_value;
-    max_equals = true;
-    min_value = const_value;
-    min_equals = true;
-  } else {
-    constraint_implemented = false;
-  }
-  return constraint_implemented;
 }
 
 }  // namespace trace_processor

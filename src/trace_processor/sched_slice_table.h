@@ -17,6 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 
+#include <bitset>
 #include <limits>
 
 #include "sqlite3.h"
@@ -54,46 +55,31 @@ class SchedSliceTable {
     int RowId(sqlite_int64* pRowid);
 
    private:
-    template <class T>
-    class NumericConstraints {
-     public:
-      bool Initialize(const Constraint& cs, sqlite3_value* value);
-      bool Matches(T value) {
-        if (value < min_value || (value == min_value && !min_equals)) {
-          return false;
-        } else if (value > max_value || (value == max_value && !max_equals)) {
-          return false;
-        }
-        return true;
-      }
-
-     private:
-      T min_value = std::numeric_limits<T>::min();
-      bool min_equals = true;
-      T max_value = std::numeric_limits<T>::max();
-      bool max_equals = true;
-    };
-
     class PerCpuState {
      public:
-      size_t GetNextDataIndex() const {
-        return sorted_data_indices_[index_into_indices_];
+      size_t GetNextRowId() const {
+        return sorted_row_ids_[next_row_id_index_];
       }
 
-      bool IsEndOfData() const {
-        return index_into_indices_ >= sorted_data_indices_.size();
+      bool IsNextRowIdIndexValid() const {
+        return next_row_id_index_ < sorted_row_ids_.size();
       }
 
-      size_t index_into_indices() const { return index_into_indices_; }
-      void set_index_into_indices(size_t index) { index_into_indices_ = index; }
+      uint32_t next_row_id_index() const { return next_row_id_index_; }
 
-      std::vector<size_t>* sorted_data_indices() {
-        return &sorted_data_indices_;
+      void set_next_row_id_index(uint32_t index) {
+        PERFETTO_DCHECK(next_row_id_index_ < sorted_row_ids_.size());
+        next_row_id_index_ = index;
       }
+
+      std::vector<uint32_t>* sorted_row_ids() { return &sorted_row_ids_; }
 
      private:
-      size_t index_into_indices_ = 0;
-      std::vector<size_t> sorted_data_indices_;
+      // Vector of row ids sorted by the the given order by constraints.
+      std::vector<uint32_t> sorted_row_ids_;
+
+      // An offset into |sorted_row_ids_| indicating the next row to return.
+      uint32_t next_row_id_index_ = 0;
     };
 
     class FilterState {
@@ -102,18 +88,16 @@ class SchedSliceTable {
 
       void InvalidateNextCpu() { next_cpu_ = per_cpu_state_.size(); }
 
-      bool IsNextCpuInvalid() const {
-        return next_cpu_ >= per_cpu_state_.size();
-      }
+      bool IsNextCpuValid() const { return next_cpu_ < per_cpu_state_.size(); }
 
       uint32_t next_cpu() const { return static_cast<uint32_t>(next_cpu_); }
-      void set_next_cpu(uint32_t cpu) { next_cpu_ = cpu; }
+
+      void set_next_cpu(uint32_t cpu) {
+        PERFETTO_DCHECK(cpu < per_cpu_state_.size());
+        next_cpu_ = cpu;
+      }
 
       std::vector<OrderBy>* order_by() { return &order_by_; }
-
-      NumericConstraints<uint32_t>* cpu_constraints() {
-        return &cpu_constraints_;
-      }
 
      private:
       // One entry for each cpu which is used in filtering.
@@ -121,7 +105,6 @@ class SchedSliceTable {
       size_t next_cpu_ = 0;
 
       std::vector<OrderBy> order_by_;
-      NumericConstraints<uint32_t> cpu_constraints_;
     };
 
     void FindNextSliceAmongCpus();
