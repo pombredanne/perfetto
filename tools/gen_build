@@ -257,7 +257,7 @@ def create_target(build, desc, target_name):
 
   build.add_target(target)
 
- 
+
 def main():
   parser = argparse.ArgumentParser(
       description='Generate BUILD from a GN description.')
