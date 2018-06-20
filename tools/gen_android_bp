@@ -531,7 +531,7 @@ def resolve_dependencies(desc, target_name):
 
     Args:
         blueprint: Blueprint instance which is being generated.
-        desc: JSON GN description.
+        target_name: Name of target
 
     Returns:
         A set of transitive dependencies in the form of GN targets.
