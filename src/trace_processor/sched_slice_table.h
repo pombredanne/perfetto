@@ -17,7 +17,6 @@
 #ifndef SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 
-#include <bitset>
 #include <limits>
 
 #include "sqlite3.h"
@@ -25,8 +24,6 @@
 
 namespace perfetto {
 namespace trace_processor {
-
-class SchedSliceTable;
 
 class SchedSliceTable {
  public:
@@ -57,10 +54,6 @@ class SchedSliceTable {
    private:
     class PerCpuState {
      public:
-      size_t GetNextRowId() const {
-        return sorted_row_ids_[next_row_id_index_];
-      }
-
       bool IsNextRowIdIndexValid() const {
         return next_row_id_index_ < sorted_row_ids_.size();
       }
@@ -73,6 +66,8 @@ class SchedSliceTable {
       }
 
       std::vector<uint32_t>* sorted_row_ids() { return &sorted_row_ids_; }
+
+      size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
 
      private:
       // Vector of row ids sorted by the the given order by constraints.

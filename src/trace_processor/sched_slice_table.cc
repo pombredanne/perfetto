@@ -18,6 +18,7 @@
 
 #include <string.h>
 #include <algorithm>
+#include <bitset>
 #include <numeric>
 
 #include "perfetto/base/logging.h"
@@ -54,7 +55,7 @@ inline SchedSliceTable::Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
   return reinterpret_cast<SchedSliceTable::Cursor*>(cursor);
 }
 
-template <size_t N>
+template <size_t N = TraceStorage::kMaxCpus>
 bool PopulateFilterBitmap(int op,
                           sqlite3_value* value,
                           std::bitset<N>* filter) {
@@ -100,13 +101,18 @@ bool PopulateFilterBitmap(int op,
 template <class T>
 inline int Compare(T first, T second, bool desc) {
   if (first < second) {
-    return !desc ? -1 : 1;
+    return desc ? 1 : -1;
   } else if (first > second) {
-    return !desc ? 1 : -1;
+    return desc ? -1 : 1;
   }
   return 0;
 }
 
+// Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
+// slice at index |s| in |s_slices| for CPU |s_cpu| on |column| in either
+// ascending or descending mode depending on |desc|
+// Returns -1 if the first slice is before the second in the ordering, 1 if
+// the first slice is after the second and 0 if they are equal.
 inline int CompareValuesForColumn(uint32_t f_cpu,
                                   const TraceStorage::SlicesPerCpu& f_slices,
                                   size_t f,
@@ -125,6 +131,8 @@ inline int CompareValuesForColumn(uint32_t f_cpu,
   }
 }
 
+// Creates a vector of indices into the given |slices| sorted by the ordering
+// criteria given by |order_by|.
 std::vector<uint32_t> CreateSortedIndexVector(
     uint32_t cpu,
     const TraceStorage::SlicesPerCpu& slices,
@@ -212,7 +220,6 @@ int SchedSliceTable::Open(sqlite3_vtab_cursor** ppCursor) {
 // the best time to keep track of constriants.
 int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   indexes_.emplace_back();
-
   IndexInfo* index = &indexes_.back();
   for (int i = 0; i < idx->nOrderBy; i++) {
     index->order_by.emplace_back();
@@ -308,7 +315,7 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
     return SQLITE_ERROR;
 
   uint32_t cpu = filter_state_.next_cpu();
-  size_t row = filter_state_.StateForCpu(cpu)->GetNextRowId();
+  size_t row = filter_state_.StateForCpu(cpu)->next_row_id();
   const auto& slices = storage_->SlicesForCpu(cpu);
   switch (N) {
     case Column::kTimestamp: {
@@ -349,10 +356,10 @@ void SchedSliceTable::Cursor::FindNextSliceAmongCpus() {
 
     uint32_t cur_cpu = filter_state_.next_cpu();
     const auto& cur_slices = storage_->SlicesForCpu(cur_cpu);
-    size_t cur_row = filter_state_.StateForCpu(cur_cpu)->GetNextRowId();
+    size_t cur_row = filter_state_.StateForCpu(cur_cpu)->next_row_id();
 
     const auto& slices = storage_->SlicesForCpu(cpu);
-    size_t row = cpu_state.GetNextRowId();
+    size_t row = cpu_state.next_row_id();
     for (const auto& ob : *filter_state_.order_by()) {
       int ret = CompareValuesForColumn(cpu, slices, row, cur_cpu, cur_slices,
                                        cur_row, ob.column, ob.desc);
@@ -360,6 +367,8 @@ void SchedSliceTable::Cursor::FindNextSliceAmongCpus() {
         filter_state_.set_next_cpu(cpu);
         break;
       } else if (ret > 0) {
+        // If the cpu we are iterating over is not ordered before the current
+        // lowest CPU, then exit the loop.
         break;
       }
     }
