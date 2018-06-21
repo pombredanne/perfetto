@@ -368,14 +368,15 @@ void SchedSliceTable::Cursor::FilterState::FindCpuWithNextSlice() {
 }
 
 int SchedSliceTable::Cursor::FilterState::CompareCpuToNextCpu(uint32_t cpu) {
-  const auto& cur_slices = storage_->SlicesForCpu(next_cpu_);
-  size_t cur_row = per_cpu_state_[next_cpu_].next_row_id();
+  const auto& next_cpu_slices = storage_->SlicesForCpu(next_cpu_);
+  size_t next_cpu_row = per_cpu_state_[next_cpu_].next_row_id();
 
   const auto& slices = storage_->SlicesForCpu(cpu);
   size_t row = per_cpu_state_[cpu].next_row_id();
   for (const auto& ob : order_by_) {
-    int ret = CompareValuesForColumn(cpu, slices, row, next_cpu_, cur_slices,
-                                     cur_row, ob.column, ob.desc);
+    int ret =
+        CompareValuesForColumn(cpu, slices, row, next_cpu_, next_cpu_slices,
+                               next_cpu_row, ob.column, ob.desc);
     if (ret != 0) {
       return ret;
     }
