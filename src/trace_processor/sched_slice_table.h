@@ -103,6 +103,9 @@ class SchedSliceTable {
       uint32_t next_cpu() const { return next_cpu_; }
 
      private:
+      // Compares the next slice of the given |cpu| with the next slice of the
+      // |next_cpu_|. Return <0 if |cpu| is ordered before, >0 if ordered after,
+      // and 0 if they are equal.
       int CompareCpuToNextCpu(uint32_t cpu);
 
       const TraceStorage* const storage_;
