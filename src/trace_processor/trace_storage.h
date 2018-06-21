@@ -68,7 +68,6 @@ class TraceStorage {
       durations_.emplace_back(duration_ns);
 
       auto pair_it = storage_->tids_.equal_range(tid);
-
       // If there is a previous utid for that tid, use that.
       if (pair_it.first != pair_it.second) {
         UniqueTid prev_utid = std::prev(pair_it.second)->second;
