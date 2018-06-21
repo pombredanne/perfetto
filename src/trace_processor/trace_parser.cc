@@ -62,7 +62,7 @@ bool TraceParser::ParseNextChunk() {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
       continue;
     }
-    ParsePacket(fld.length_limited.data, fld.length_limited.length);
+    ParsePacket(fld.data(), fld.size());
   }
 
   offset_ += decoder.offset();
@@ -78,7 +78,7 @@ void TraceParser::ParsePacket(const uint8_t* data, size_t length) {
                                fld.length_limited.length);
         break;
       case protos::TracePacket::kProcessTreeFieldNumber:
-        ParseProcessTree(fld.length_limited.data, fld.length_limited.length);
+        ParseProcessTree(fld.data(), fld.size());
         break;
       default:
         break;
@@ -98,11 +98,11 @@ void TraceParser::ParseProcessTree(const uint8_t* data, size_t length) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
         PERFETTO_DCHECK(!parsed_thread_packet);
-        ParseProcess(fld.length_limited.data, fld.length_limited.length);
+        ParseProcess(fld.data(), fld.size());
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
         parsed_thread_packet = true;
-        ParseThread(fld.length_limited.data, fld.length_limited.length);
+        ParseThread(fld.data(), fld.size());
         break;
       default:
         break;
@@ -134,7 +134,10 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
     }
   }
   // TODO(taylori): Store the thread.
-
+  base::ignore_result(tid);
+  base::ignore_result(tgid);
+  base::ignore_result(thread_name);
+  base::ignore_result(thread_name_len);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 

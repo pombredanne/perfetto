@@ -66,7 +66,7 @@ bool PopulateFilterBitmap(int op,
     int_value = IsOpGt(op) ? int_value + 1 : int_value;
 
     // Set to false all values less than |int_value|.
-    size_t ub = static_cast<size_t>(std::max(0l, int_value));
+    size_t ub = static_cast<size_t>(std::max(int64_t(0), int_value));
     ub = std::min(ub, filter->size());
     for (size_t i = 0; i < ub; i++) {
       filter->set(i, false);
@@ -76,7 +76,7 @@ bool PopulateFilterBitmap(int op,
     int_value = IsOpLt(op) ? int_value - 1 : int_value;
 
     // Set to false all values greater than |int_value|.
-    size_t lb = static_cast<size_t>(std::max(0l, int_value));
+    size_t lb = static_cast<size_t>(std::max(int64_t(0), int_value));
     lb = std::min(lb, filter->size());
     for (size_t i = lb; i < filter->size(); i++) {
       filter->set(i, false);
@@ -129,6 +129,7 @@ inline int CompareValuesForColumn(uint32_t f_cpu,
     case SchedSliceTable::Column::kCpu:
       return Compare(f_cpu, s_cpu, desc);
   }
+  PERFETTO_FATAL("Unexepcted column %d", column);
 }
 
 // Creates a vector of indices into the given |slices| sorted by the ordering
