@@ -55,7 +55,6 @@ class SchedSliceTable {
   struct IndexInfo {
     std::vector<OrderBy> order_by;
     std::vector<Constraint> constraints;
-    bool is_quantized_group_order_by = false;
   };
 
   class PerCpuState {
@@ -89,7 +88,7 @@ class SchedSliceTable {
     uint64_t next_timestamp_ = 0;
 
     uint32_t cpu_ = 0;
-    uint64_t quantum_ = 1;
+    uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
     const TraceStorage* storage_ = nullptr;
   };
 
@@ -137,9 +136,7 @@ class SchedSliceTable {
     std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
     uint32_t next_cpu_ = 0;
 
-    uint64_t quantum_ = 1;
-    const bool is_quantized_group_order_by_;
-
+    uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
     std::vector<OrderBy> order_by_;
     const TraceStorage* const storage_;
   };
