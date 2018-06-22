@@ -16,6 +16,7 @@
 
 console.log('Hello from the main thread!');
 
+
 function writeToUIConsole(line:string) {
   const lineElement = document.createElement('div');
   lineElement.innerText = line;
