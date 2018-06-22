@@ -17,14 +17,13 @@ For more details on `gn` configs see
 
 To run the tests:
 ```
-ui/node ui/node_modules/jest/bin/jest.js --projects=ui/jest.unit.config.js
---projects=ui/jest.jsdom.config.js --roots=../out/l/obj/ui
+$ out/debug/ui_unittests
+$ out/debug/ui_tests
 ```
 
 To run the tests in watch mode:
 ```
-ui/node ui/node_modules/jest/bin/jest.js --projects=ui/jest.unit.config.js
---projects=ui/jest.jsdom.config.js --roots=../out/l/obj/ui --watch
+$ out/debug/ui_unittests --watch
 ```
 
 Finally run:
