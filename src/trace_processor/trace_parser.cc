@@ -100,11 +100,13 @@ void TraceParser::ParseProcessTree(const uint8_t* data, size_t length) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
         PERFETTO_DCHECK(!parsed_thread_packet);
-        ParseProcess(fld.length_limited.data, fld.length_limited.length);
+        ParseProcess(fld.length_limited.data,
+                     static_cast<size_t>(fld.length_limited.length));
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
         parsed_thread_packet = true;
-        ParseThread(fld.length_limited.data, fld.length_limited.length);
+        ParseThread(fld.length_limited.data,
+                    static_cast<size_t>(fld.length_limited.length));
         break;
       default:
         break;
