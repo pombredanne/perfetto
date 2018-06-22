@@ -31,11 +31,11 @@ namespace trace_processor {
 class SchedSliceTable {
  public:
   enum Column {
-    kQuantisationDuration = 0,
+    kQuantum = 0,
     kTimestamp = 1,
     kCpu = 2,
     kDuration = 3,
-    kQuantisedGroup = 4
+    kQuantizedGroup = 4
   };
   struct OrderBy {
     Column column = kTimestamp;
@@ -55,14 +55,14 @@ class SchedSliceTable {
   struct IndexInfo {
     std::vector<OrderBy> order_by;
     std::vector<Constraint> constraints;
-    bool is_quantised_order_by = false;
+    bool is_quantized_group_order_by = false;
   };
 
   class PerCpuState {
    public:
     void Initialize(uint32_t cpu,
                     const TraceStorage* storage,
-                    uint64_t qd,
+                    uint64_t quantum,
                     std::vector<uint32_t> sorted_row_ids);
     void FindNextSlice();
 
@@ -84,12 +84,12 @@ class SchedSliceTable {
     uint32_t next_row_id_index_ = 0;
 
     // The timestamp of the row to index. This is either the timestamp of
-    // the slice at |next_row_id_index_| or the timestamp of the next quantised
+    // the slice at |next_row_id_index_| or the timestamp of the next quantized
     // group boundary.
     uint64_t next_timestamp_ = 0;
 
     uint32_t cpu_ = 0;
-    uint64_t quantisation_duration_ = 1;
+    uint64_t quantum_ = 1;
     const TraceStorage* storage_ = nullptr;
   };
 
@@ -104,7 +104,7 @@ class SchedSliceTable {
     PerCpuState* StateForCpu(uint32_t cpu) { return &per_cpu_state_[cpu]; }
 
     uint32_t next_cpu() const { return next_cpu_; }
-    uint64_t quantisation_duration() const { return quantisation_duration_; }
+    uint64_t quantum() const { return quantum_; }
 
    private:
     // Creates a vector of indices into the slices for the given |cpu| sorted
@@ -137,8 +137,8 @@ class SchedSliceTable {
     std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
     uint32_t next_cpu_ = 0;
 
-    uint64_t quantisation_duration_ = 1;
-    const bool is_quantised_order_by_;
+    uint64_t quantum_ = 1;
+    const bool is_quantized_group_order_by_;
 
     std::vector<OrderBy> order_by_;
     const TraceStorage* const storage_;
