@@ -138,17 +138,17 @@ class TraceStorage {
     return cpu_events_[cpu];
   }
 
-  const TaskInfo& GetProcess(UniquePid upid) {
+  const TaskInfo& GetProcess(UniquePid upid) const {
     PERFETTO_CHECK(upid < unique_processes_.size());
     return unique_processes_[upid];
   }
 
-  const TaskInfo& GetThread(UniqueTid utid) {
+  const TaskInfo& GetThread(UniqueTid utid) const {
     PERFETTO_CHECK(utid < unique_threads_.size());
     return unique_threads_[utid];
   }
 
-  const std::string& GetString(StringId id) {
+  const std::string& GetString(StringId id) const {
     PERFETTO_CHECK(id < string_pool_.size());
     return string_pool_[id];
   }

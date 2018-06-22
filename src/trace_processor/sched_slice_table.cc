@@ -104,55 +104,6 @@ inline int Compare(T first, T second, bool desc) {
   return 0;
 }
 
-// Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
-// slice at index |s| in |s_slices| for CPU |s_cpu| on |column| in either
-// ascending or descending mode depending on |desc|
-// Returns -1 if the first slice is before the second in the ordering, 1 if
-// the first slice is after the second and 0 if they are equal.
-inline int CompareValuesForColumn(uint32_t f_cpu,
-                                  const TraceStorage::SlicesPerCpu& f_slices,
-                                  size_t f,
-                                  uint32_t s_cpu,
-                                  const TraceStorage::SlicesPerCpu& s_slices,
-                                  size_t s,
-                                  SchedSliceTable::Column column,
-                                  bool desc) {
-  switch (column) {
-    case SchedSliceTable::Column::kTimestamp:
-      return Compare(f_slices.start_ns()[f], s_slices.start_ns()[s], desc);
-    case SchedSliceTable::Column::kDuration:
-      return Compare(f_slices.durations()[f], s_slices.durations()[s], desc);
-    case SchedSliceTable::Column::kCpu:
-      return Compare(f_cpu, s_cpu, desc);
-  }
-}
-
-// Creates a vector of indices into the given |slices| sorted by the ordering
-// criteria given by |order_by|.
-std::vector<uint32_t> CreateSortedIndexVector(
-    uint32_t cpu,
-    const TraceStorage::SlicesPerCpu& slices,
-    const std::vector<SchedSliceTable::OrderBy>& order_by) {
-  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
-
-  std::vector<uint32_t> indices;
-  indices.resize(slices.slice_count());
-  std::iota(indices.begin(), indices.end(), 0u);
-  auto callback = [cpu, &order_by, &slices](uint32_t f, uint32_t s) {
-    for (const auto& ob : order_by) {
-      int value = CompareValuesForColumn(cpu, slices, f, cpu, slices, s,
-                                         ob.column, ob.desc);
-      if (value < 0)
-        return true;
-      else if (value > 0)
-        return false;
-    }
-    return false;
-  };
-  std::sort(indices.begin(), indices.end(), callback);
-  return indices;
-}
-
 }  // namespace
 
 SchedSliceTable::SchedSliceTable(const TraceStorage* storage)
@@ -169,9 +120,11 @@ sqlite3_module SchedSliceTable::CreateModule() {
                        sqlite3_vtab** tab, char**) {
     int res = sqlite3_declare_vtab(db,
                                    "CREATE TABLE sched_slices("
+                                   "_quantisation_duration HIDDEN BIG INT, "
                                    "ts UNSIGNED BIG INT, "
                                    "cpu UNSIGNED INT, "
                                    "dur UNSIGNED BIG INT, "
+                                   "quantized_group UNSIGNED BIG INT, "
                                    "PRIMARY KEY(cpu, ts)"
                                    ") WITHOUT ROWID;");
     if (res != SQLITE_OK)
@@ -217,14 +170,26 @@ int SchedSliceTable::Open(sqlite3_vtab_cursor** ppCursor) {
 int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   indexes_.emplace_back();
   IndexInfo* index = &indexes_.back();
+
   for (int i = 0; i < idx->nOrderBy; i++) {
     index->order_by.emplace_back();
 
     OrderBy* order = &index->order_by.back();
     order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     order->desc = idx->aOrderBy[i].desc;
+
+    if (order->column == Column::kQuantisationDuration) {
+      index->is_quantised_order_by = true;
+    }
   }
-  idx->orderByConsumed = true;
+
+  // We consume the order by unless we are both asked to quantise and order
+  // by another column in the same query.
+  bool has_quantised_and_other_order_by =
+      index->is_quantised_order_by && index->order_by.size() > 1;
+  idx->orderByConsumed = !has_quantised_and_other_order_by;
+  if (has_quantised_and_other_order_by)
+    index->order_by.clear();
 
   for (int i = 0; i < idx->nConstraint; i++) {
     const auto& cs = idx->aConstraint[i];
@@ -253,25 +218,18 @@ int SchedSliceTable::Cursor::Filter(int idxNum,
                                     const char* /* idxStr */,
                                     int argc,
                                     sqlite3_value** argv) {
-  // Reset the filter state.
   const auto& index = table_->indexes_[static_cast<size_t>(idxNum)];
   PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
 
-  filter_state_.reset(new FilterState(storage_, std::move(index.order_by),
-                                      std::move(index.constraints), argv));
+  filter_state_.reset(new FilterState(storage_, std::move(index), argv));
 
   table_->indexes_.clear();
   return SQLITE_OK;
 }
 
 int SchedSliceTable::Cursor::Next() {
-  uint32_t cpu = filter_state_->next_cpu();
-  auto* state = filter_state_->StateForCpu(cpu);
-
-  // TODO(lalitm): maybe one day we may want to filter more efficiently. If so
-  // update this method with filter logic.
-  state->set_next_row_id_index(state->next_row_id_index() + 1);
-
+  auto* state = filter_state_->StateForCpu(filter_state_->next_cpu());
+  state->FindNextSlice();
   filter_state_->FindCpuWithNextSlice();
   return SQLITE_OK;
 }
@@ -284,13 +242,15 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
   if (!filter_state_->IsNextCpuValid())
     return SQLITE_ERROR;
 
+  uint64_t q_duration = filter_state_->quantisation_duration();
   uint32_t cpu = filter_state_->next_cpu();
-  size_t row = filter_state_->StateForCpu(cpu)->next_row_id();
+  const auto* state = filter_state_->StateForCpu(cpu);
+  size_t row = state->next_row_id();
   const auto& slices = storage_->SlicesForCpu(cpu);
   switch (N) {
     case Column::kTimestamp: {
-      auto timestamp = static_cast<sqlite3_int64>(slices.start_ns()[row]);
-      sqlite3_result_int64(context, timestamp);
+      auto timestamp = state->next_timestamp();
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(timestamp));
       break;
     }
     case Column::kCpu: {
@@ -298,8 +258,25 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kDuration: {
-      auto duration = static_cast<sqlite3_int64>(slices.durations()[row]);
-      sqlite3_result_int64(context, duration);
+      uint64_t start_quantised_group = state->next_timestamp() / q_duration;
+      uint64_t slice_end = slices.start_ns()[row] + slices.durations()[row];
+      uint64_t next_group_start = (start_quantised_group + 1) * q_duration;
+
+      // Compute the minimum of the start of the next group boundary and the
+      // end of this slice.
+      uint64_t min_slice_end = std::min<uint64_t>(slice_end, next_group_start);
+
+      auto duration = min_slice_end - state->next_timestamp();
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(duration));
+      break;
+    }
+    case Column::kQuantisedGroup: {
+      auto group = state->next_timestamp() / q_duration;
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(group));
+      break;
+    }
+    case Column::kQuantisationDuration: {
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(q_duration));
       break;
     }
   }
@@ -310,41 +287,44 @@ int SchedSliceTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
   return SQLITE_ERROR;
 }
 
-SchedSliceTable::Cursor::FilterState::FilterState(
-    const TraceStorage* storage,
-    std::vector<OrderBy> order_by,
-    std::vector<Constraint> constraints,
-    sqlite3_value** argv)
-    : storage_(storage), order_by_(std::move(order_by)) {
+SchedSliceTable::FilterState::FilterState(const TraceStorage* storage,
+                                          IndexInfo index,
+                                          sqlite3_value** argv)
+    : is_quantised_order_by_(index.is_quantised_order_by),
+      order_by_(std::move(index.order_by)),
+      storage_(storage) {
   std::bitset<TraceStorage::kMaxCpus> cpu_filter;
   cpu_filter.set();
 
-  for (size_t i = 0; i < constraints.size(); i++) {
-    const auto& cs = constraints[i];
+  for (size_t i = 0; i < index.constraints.size(); i++) {
+    const auto& cs = index.constraints[i];
     switch (cs.iColumn) {
       case Column::kCpu:
         PopulateFilterBitmap(cs.op, argv[i], &cpu_filter);
         break;
+      case Column::kQuantisationDuration:
+        quantisation_duration_ =
+            static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
+        break;
     }
   }
+
+  // Setting to zero requires all sorts of edge cases so set to 1 instead.
+  quantisation_duration_ = std::max<uint64_t>(quantisation_duration_, 1);
 
   // First setup CPU filtering because the trace storage is indexed by CPU.
   for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
     if (!cpu_filter.test(cpu))
       continue;
-
-    PerCpuState* state = StateForCpu(cpu);
-
-    // Create a sorted index vector based on the order by requirements.
-    *state->sorted_row_ids() =
-        CreateSortedIndexVector(cpu, storage_->SlicesForCpu(cpu), order_by_);
+    StateForCpu(cpu)->Initialize(cpu, storage_, quantisation_duration_,
+                                 CreateSortedIndexVectorForCpu(cpu));
   }
 
   // Set the cpu index to be the first item to look at.
   FindCpuWithNextSlice();
 }
 
-void SchedSliceTable::Cursor::FilterState::FindCpuWithNextSlice() {
+void SchedSliceTable::FilterState::FindCpuWithNextSlice() {
   next_cpu_ = TraceStorage::kMaxCpus;
 
   for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
@@ -367,21 +347,113 @@ void SchedSliceTable::Cursor::FilterState::FindCpuWithNextSlice() {
   }
 }
 
-int SchedSliceTable::Cursor::FilterState::CompareCpuToNextCpu(uint32_t cpu) {
-  const auto& next_cpu_slices = storage_->SlicesForCpu(next_cpu_);
-  size_t next_cpu_row = per_cpu_state_[next_cpu_].next_row_id();
-
-  const auto& slices = storage_->SlicesForCpu(cpu);
+int SchedSliceTable::FilterState::CompareCpuToNextCpu(uint32_t cpu) {
+  // If we're in the quantised case, handle it using quantised group
+  // comparisions.
+  if (is_quantised_order_by_) {
+    PERFETTO_DCHECK(order_by_.size() == 1);
+    uint64_t group =
+        StateForCpu(cpu)->next_timestamp() / quantisation_duration_;
+    uint64_t next_group =
+        StateForCpu(next_cpu_)->next_timestamp() / quantisation_duration_;
+    return Compare(group, next_group, order_by_[0].desc);
+  }
+  size_t next_row = per_cpu_state_[next_cpu_].next_row_id();
   size_t row = per_cpu_state_[cpu].next_row_id();
+  return CompareSlices(cpu, row, next_cpu_, next_row);
+}
+
+std::vector<uint32_t>
+SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu) {
+  const auto& slices = storage_->SlicesForCpu(cpu);
+  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+
+  std::vector<uint32_t> indices;
+  indices.resize(slices.slice_count());
+  std::iota(indices.begin(), indices.end(), 0u);
+
+  // For quantised groups, simply return the index vector as it's equal to
+  // sorting by timestamp.
+  if (is_quantised_order_by_) {
+    PERFETTO_DCHECK(order_by_.size() == 1);
+    return indices;
+  }
+
+  // In other cases, sort by the given criteria.
+  std::sort(indices.begin(), indices.end(),
+            [this, cpu](uint32_t f, uint32_t s) {
+              return CompareSlices(cpu, f, cpu, s) < 0;
+            });
+  return indices;
+}
+
+int SchedSliceTable::FilterState::CompareSlices(uint32_t f_cpu,
+                                                size_t f,
+                                                uint32_t s_cpu,
+                                                size_t s) {
   for (const auto& ob : order_by_) {
-    int ret =
-        CompareValuesForColumn(cpu, slices, row, next_cpu_, next_cpu_slices,
-                               next_cpu_row, ob.column, ob.desc);
-    if (ret != 0) {
-      return ret;
-    }
+    int c = CompareSlicesOnColumn(f_cpu, f, s_cpu, s, ob);
+    if (c != 0)
+      return c;
   }
   return 0;
+}
+
+int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
+                                                        size_t f,
+                                                        uint32_t s_cpu,
+                                                        size_t s,
+                                                        const OrderBy& ob) {
+  const auto& f_slices = storage_->SlicesForCpu(f_cpu);
+  const auto& s_slices = storage_->SlicesForCpu(s_cpu);
+  switch (ob.column) {
+    case SchedSliceTable::Column::kQuantisationDuration:
+      return 0;
+    case SchedSliceTable::Column::kTimestamp:
+      return Compare(f_slices.start_ns()[f], s_slices.start_ns()[s], ob.desc);
+    case SchedSliceTable::Column::kDuration:
+      return Compare(f_slices.durations()[f], s_slices.durations()[s], ob.desc);
+    case SchedSliceTable::Column::kCpu:
+      return Compare(f_cpu, s_cpu, ob.desc);
+    case SchedSliceTable::Column::kQuantisedGroup:
+      // Sorting by quantised group is unsupported in this method as it needs
+      // special computation.
+      PERFETTO_CHECK(false);
+  }
+}
+
+void SchedSliceTable::PerCpuState::Initialize(
+    uint32_t cpu,
+    const TraceStorage* storage,
+    uint64_t qd,
+    std::vector<uint32_t> sorted_row_ids) {
+  cpu_ = cpu;
+  storage_ = storage;
+  quantisation_duration_ = qd;
+  sorted_row_ids_ = std::move(sorted_row_ids);
+
+  // Set the next timestamp to be the first row's timestamp.
+  if (sorted_row_ids.empty())
+    return;
+  next_timestamp_ = Slices().start_ns()[next_row_id()];
+}
+
+void SchedSliceTable::PerCpuState::FindNextSlice() {
+  const auto& slices = Slices();
+
+  uint64_t start_quantised_group = next_timestamp_ / quantisation_duration_;
+  uint64_t end_slice =
+      slices.start_ns()[next_row_id()] + slices.durations()[next_row_id()];
+  uint64_t end_quantised_group = end_slice / quantisation_duration_;
+
+  // If the end of the current slice is not in the same quantised group
+  // as the current slice, set the next timestamp to be the start of the next
+  // quantised group.
+  if (start_quantised_group == end_quantised_group) {
+    next_row_id_index_++;
+  } else {
+    next_timestamp_ = (start_quantised_group + 1) * quantisation_duration_;
+  }
 }
 
 }  // namespace trace_processor
