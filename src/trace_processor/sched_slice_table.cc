@@ -434,10 +434,8 @@ void SchedSliceTable::PerCpuState::Initialize(
   quantum_ = quantum;
   sorted_row_ids_ = std::move(sorted_row_ids);
 
-  // Set the next timestamp to be the first row's timestamp.
-  if (sorted_row_ids_.empty())
-    return;
-  next_timestamp_ = Slices().start_ns()[next_row_id()];
+  if (IsNextRowIdIndexValid())
+    next_timestamp_ = Slices().start_ns()[next_row_id()];
 }
 
 void SchedSliceTable::PerCpuState::FindNextSlice() {
@@ -453,9 +451,8 @@ void SchedSliceTable::PerCpuState::FindNextSlice() {
   // quantised group.
   if (start_quantised_group == end_quantised_group) {
     next_row_id_index_++;
-    if (IsNextRowIdIndexValid()) {
+    if (IsNextRowIdIndexValid())
       next_timestamp_ = slices.start_ns()[next_row_id()];
-    }
   } else {
     next_timestamp_ = (start_quantised_group + 1) * quantum_;
   }
