@@ -52,11 +52,14 @@ class SchedSliceTable {
  private:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
+  // Metadata associated with a BestIndex call which is useful in the Filter
+  // callback.
   struct IndexInfo {
     std::vector<OrderBy> order_by;
     std::vector<Constraint> constraints;
   };
 
+  // Transient filter state for each CPU of this trace.
   class PerCpuState {
    public:
     void Initialize(uint32_t cpu,
@@ -87,19 +90,31 @@ class SchedSliceTable {
     // group boundary.
     uint64_t next_timestamp_ = 0;
 
+    // The CPU this state is associated with.
     uint32_t cpu_ = 0;
+
+    // The quantum the output slices should fall within.
     uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
+
     const TraceStorage* storage_ = nullptr;
   };
 
+  // Transient state for a filter operation on a Cursor.
   class FilterState {
    public:
     FilterState(const TraceStorage* storage,
                 IndexInfo index,
                 sqlite3_value** argv);
 
+    // Chooses the next CPU which should be returned according to the sorting
+    // citeria specified by |order_by_|.
     void FindCpuWithNextSlice();
+
+    // Returns whether the next CPU to be returned by this filter operation is
+    // valid.
     bool IsNextCpuValid() const { return next_cpu_ < per_cpu_state_.size(); }
+
+    // Returns the transient state associated with a single CPU.
     PerCpuState* StateForCpu(uint32_t cpu) { return &per_cpu_state_[cpu]; }
 
     uint32_t next_cpu() const { return next_cpu_; }
@@ -134,13 +149,20 @@ class SchedSliceTable {
 
     // One entry for each cpu which is used in filtering.
     std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
+
+    // The next CPU which should be returned to the user.
     uint32_t next_cpu_ = 0;
 
+    // The quantum the output slices should fall within.
     uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
+
+    // The sorting criteria for this filter operation.
     std::vector<OrderBy> order_by_;
+
     const TraceStorage* const storage_;
   };
 
+  // Implementation of the SQLite cursor interface.
   class Cursor {
    public:
     Cursor(SchedSliceTable* table, const TraceStorage* storage);
