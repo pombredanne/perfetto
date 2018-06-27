@@ -79,6 +79,8 @@ class SchedSliceTable {
       return storage_->SlicesForCpu(cpu_);
     }
 
+    void UpdateNextTimestampForNextRow();
+
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
 
@@ -154,7 +156,7 @@ class SchedSliceTable {
     uint32_t next_cpu_ = 0;
 
     // The quantum the output slices should fall within.
-    uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
+    uint64_t quantum_ = 0;
 
     // The sorting criteria for this filter operation.
     std::vector<OrderBy> order_by_;

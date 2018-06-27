@@ -171,8 +171,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   indexes_.emplace_back();
   IndexInfo* index = &indexes_.back();
 
-  bool is_order_by_supported = true;
-  bool is_quantized_group_order = false;
+  bool has_quantized_group_order_desc = false;
   bool is_duration_timestamp_order = false;
   for (int i = 0; i < idx->nOrderBy; i++) {
     index->order_by.emplace_back();
@@ -183,8 +182,9 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
     switch (order->column) {
       case Column::kQuantizedGroup:
-        is_quantized_group_order = true;
-        is_order_by_supported = is_order_by_supported && !order->desc;
+        if (order->desc) {
+          has_quantized_group_order_desc = true;
+        }
         break;
       case Column::kTimestamp:
       case Column::kDuration:
@@ -196,27 +196,32 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
     }
   }
 
-  // Don't allow sorting by quantization group and timestamp/duration in the
-  // same order by.
-  if (is_quantized_group_order && is_duration_timestamp_order) {
-    is_order_by_supported = false;
-  }
-
-  idx->orderByConsumed = is_order_by_supported;
-  if (!is_order_by_supported)
-    index->order_by.clear();
-
+  bool has_quantum_constraint = false;
   for (int i = 0; i < idx->nConstraint; i++) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
     index->constraints.emplace_back(cs);
 
+    if (cs.iColumn == Column::kDuration) {
+      has_quantum_constraint = true;
+    }
+
     // argvIndex is 1-based so use the current size of the vector.
     int argv_index = static_cast<int>(index->constraints.size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
   }
   idx->idxNum = static_cast<int>(indexes_.size() - 1);
+
+  // If a quantum constraint is present, we don't support native ordering by
+  // time related parameters or by quantized group in descending order.
+  bool needs_sqlite_orderby =
+      has_quantum_constraint &&
+      (is_duration_timestamp_order || has_quantized_group_order_desc);
+
+  idx->orderByConsumed = !needs_sqlite_orderby;
+  if (needs_sqlite_orderby)
+    index->order_by.clear();
 
   return SQLITE_OK;
 }
@@ -273,20 +278,25 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kDuration: {
-      uint64_t start_quantised_group = state->next_timestamp() / quantum;
-      uint64_t slice_end = slices.start_ns()[row] + slices.durations()[row];
-      uint64_t next_group_start = (start_quantised_group + 1) * quantum;
+      uint64_t duration;
+      if (quantum == 0) {
+        duration = slices.durations()[row];
+      } else {
+        uint64_t start_quantised_group = state->next_timestamp() / quantum;
+        uint64_t end = slices.start_ns()[row] + slices.durations()[row];
+        uint64_t next_group_start = (start_quantised_group + 1) * quantum;
 
-      // Compute the minimum of the start of the next group boundary and the
-      // end of this slice.
-      uint64_t min_slice_end = std::min<uint64_t>(slice_end, next_group_start);
-
-      auto duration = min_slice_end - state->next_timestamp();
+        // Compute the minimum of the start of the next group boundary and the
+        // end of this slice.
+        uint64_t min_slice_end = std::min<uint64_t>(end, next_group_start);
+        duration = min_slice_end - state->next_timestamp();
+      }
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(duration));
       break;
     }
     case Column::kQuantizedGroup: {
-      auto group = state->next_timestamp() / quantum;
+      auto group = quantum == 0 ? state->next_timestamp()
+                                : state->next_timestamp() / quantum;
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(group));
       break;
     }
@@ -319,11 +329,6 @@ SchedSliceTable::FilterState::FilterState(const TraceStorage* storage,
         quantum_ = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
         break;
     }
-  }
-
-  // Setting to zero requires all sorts of edge cases so set to max instead.
-  if (quantum_ == 0) {
-    quantum_ = std::numeric_limits<uint64_t>::max();
   }
 
   // First setup CPU filtering because the trace storage is indexed by CPU.
@@ -413,11 +418,15 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
     case SchedSliceTable::Column::kCpu:
       return Compare(f_cpu, s_cpu, ob.desc);
     case SchedSliceTable::Column::kQuantizedGroup: {
-      // We don't support sorting in descending order on quantized group.
-      PERFETTO_CHECK(!ob.desc);
+      // We don't support sorting in descending order on quantized group when
+      // we have a non-zero quantum.
+      PERFETTO_CHECK(!ob.desc || quantum_ == 0);
 
-      uint64_t f_group = StateForCpu(f_cpu)->next_timestamp() / quantum_;
-      uint64_t s_group = StateForCpu(s_cpu)->next_timestamp() / quantum_;
+      uint64_t f_timestamp = StateForCpu(f_cpu)->next_timestamp();
+      uint64_t s_timestamp = StateForCpu(s_cpu)->next_timestamp();
+
+      uint64_t f_group = quantum_ == 0 ? f_timestamp : f_timestamp / quantum_;
+      uint64_t s_group = quantum_ == 0 ? s_timestamp : s_timestamp / quantum_;
       return Compare(f_group, s_group, ob.desc);
     }
   }
@@ -433,29 +442,35 @@ void SchedSliceTable::PerCpuState::Initialize(
   storage_ = storage;
   quantum_ = quantum;
   sorted_row_ids_ = std::move(sorted_row_ids);
-
-  if (IsNextRowIdIndexValid())
-    next_timestamp_ = Slices().start_ns()[next_row_id()];
+  UpdateNextTimestampForNextRow();
 }
 
 void SchedSliceTable::PerCpuState::FindNextSlice() {
-  const auto& slices = Slices();
+  PERFETTO_DCHECK(next_timestamp_ != 0);
 
-  uint64_t start_quantised_group = next_timestamp_ / quantum_;
+  const auto& slices = Slices();
+  if (quantum_ == 0) {
+    next_row_id_index_++;
+    UpdateNextTimestampForNextRow();
+    return;
+  }
+
+  uint64_t start_group = next_timestamp_ / quantum_;
   uint64_t end_slice =
       slices.start_ns()[next_row_id()] + slices.durations()[next_row_id()];
-  uint64_t end_quantised_group = end_slice / quantum_;
+  uint64_t next_group_start = (start_group + 1) * quantum_;
 
-  // If the end of the current slice is not in the same quantised group
-  // as the current slice, set the next timestamp to be the start of the next
-  // quantised group.
-  if (start_quantised_group == end_quantised_group) {
+  if (next_group_start >= end_slice) {
     next_row_id_index_++;
-    if (IsNextRowIdIndexValid())
-      next_timestamp_ = slices.start_ns()[next_row_id()];
+    UpdateNextTimestampForNextRow();
   } else {
-    next_timestamp_ = (start_quantised_group + 1) * quantum_;
+    next_timestamp_ = next_group_start;
   }
+}
+
+void SchedSliceTable::PerCpuState::UpdateNextTimestampForNextRow() {
+  next_timestamp_ =
+      IsNextRowIdIndexValid() ? Slices().start_ns()[next_row_id()] : 0;
 }
 
 }  // namespace trace_processor
