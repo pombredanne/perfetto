@@ -177,7 +177,7 @@ TEST_F(SchedSliceTableIntegrationTest, Quanitsiation) {
                            sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement(
-      "SELECT dur, ts, cpu from sched where _quantum = 5 order by dur");
+      "SELECT dur, ts, cpu from sched where _quantum MATCH 5 order by dur");
 
   // Full event at ts.
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);

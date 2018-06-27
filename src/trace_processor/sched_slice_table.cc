@@ -156,6 +156,21 @@ sqlite3_module SchedSliceTable::CreateModule() {
   module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
     return AsCursor(c)->Column(a, b);
   };
+  module.xFindFunction = [](sqlite3_vtab*, int, const char* z,
+                            void (**f)(sqlite3_context*, int, sqlite3_value**),
+                            void** a) {
+    // Add an identity match function to prevent throwing an exception when
+    // matching on the quantum column.
+    if (strcmp(z, "match") == 0) {
+      *f = [](sqlite3_context* ctx, int n, sqlite3_value** v) {
+        PERFETTO_DCHECK(n == 2 && sqlite3_value_type(v[0]) == SQLITE_INTEGER);
+        sqlite3_result_int64(ctx, sqlite3_value_int64(v[0]));
+      };
+      *a = nullptr;
+      return 1;
+    }
+    return 0;
+  };
   return module;
 }
 
