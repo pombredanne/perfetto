@@ -219,7 +219,7 @@ TEST_F(SchedSliceTableIntegrationTest, QuanitsiationSqliteDurationOrder) {
                            sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement(
-      "SELECT dur, ts, cpu FROM sched WHERE _quantum MATCH 5 ORDER BY dur");
+      "SELECT dur, ts, cpu FROM sched WHERE _quantum match 5 ORDER BY dur");
 
   // Event at ts + 3 sliced off at quantum boundary (105).
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
@@ -263,7 +263,7 @@ TEST_F(SchedSliceTableIntegrationTest, QuanitsiationGroupAndSum) {
   PrepareValidStatement(
       "SELECT SUM(dur) as sum_dur "
       "FROM sched "
-      "WHERE _quantum MATCH 5 "
+      "WHERE _quantum match 5 "
       "GROUP BY quantized_group "
       "ORDER BY sum_dur");
 
