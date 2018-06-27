@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "benchmark/benchmark.h"
+#include "src/trace_processor/trace_database.h"
 
 #include <sys/stat.h>
 
+#include "benchmark/benchmark.h"
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "src/base/test/test_task_runner.h"
-#include "src/trace_processor/trace_database.h"
 
 namespace perfetto {
 namespace trace_processor {

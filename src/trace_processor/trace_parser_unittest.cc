@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open foo Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,11 @@ class MockTraceStorage : public TraceStorage {
                     const char* prev_comm,
                     size_t prev_comm_len,
                     uint32_t next_pid));
+  MOCK_METHOD3(PushProcess,
+               void(uint32_t pid,
+                    const char* process_name,
+                    size_t process_name_len));
+  MOCK_METHOD2(MatchThreadToProcess, void(uint32_t tid, uint32_t tgid));
 };
 
 TEST(TraceParser, LoadSingleEvent) {
@@ -209,6 +214,61 @@ TEST(TraceParser, RepeatedLoadSinglePacket) {
   EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
+  parser.ParseNextChunk();
+}
+
+TEST(TraceParse, LoadProcessPacket) {
+  protos::Trace trace;
+
+  auto* tree = trace.add_packet()->mutable_process_tree();
+  auto* process = tree->add_processes();
+  static const char kProcName1[] = "proc1";
+
+  process->add_cmdline(kProcName1);
+  process->set_pid(1);
+  process->set_ppid(2);
+
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, PushProcess(1, _, _))
+      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &storage, 1024);
+  parser.ParseNextChunk();
+}
+
+TEST(TraceParse, LoadProcessPacket_FirstCmdline) {
+  protos::Trace trace;
+
+  auto* tree = trace.add_packet()->mutable_process_tree();
+  auto* process = tree->add_processes();
+  static const char kProcName1[] = "proc1";
+  static const char kProcName2[] = "proc2";
+
+  process->add_cmdline(kProcName1);
+  process->add_cmdline(kProcName2);
+  process->set_pid(1);
+  process->set_ppid(2);
+
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, PushProcess(1, _, _))
+      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &storage, 1024);
+  parser.ParseNextChunk();
+}
+
+TEST(TraceParse, LoadThreadPacket) {
+  protos::Trace trace;
+
+  auto* tree = trace.add_packet()->mutable_process_tree();
+  auto* thread = tree->add_threads();
+  thread->set_tid(1);
+  thread->set_tgid(2);
+
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, MatchThreadToProcess(1, 2));
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &storage, 1024);
   parser.ParseNextChunk();
 }
 

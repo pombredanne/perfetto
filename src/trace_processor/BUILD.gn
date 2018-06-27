@@ -17,13 +17,17 @@ import("../../gn/wasm.gni")
 
 wasm_lib("trace_processor") {
   sources = [
+    "emscripten_task_runner.cc",
+    "emscripten_task_runner.h",
     "wasm_bridge.cc",
   ]
 
   # All the deps below are implicitly xxx($wasm_toolchain) because of the
   # outer "is_wasm" block.
   deps = [
+    ":lib",
     "../../gn:default_deps",
+    "../../include/perfetto/base",
     "../../protos/perfetto/trace_processor:lite",
   ]
 }
@@ -45,6 +49,7 @@ source_set("lib") {
     "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../protozero",
   ]
@@ -59,6 +64,22 @@ source_set("unittests") {
   ]
   deps = [
     ":lib",
+    "../../buildtools:sqlite",
+    "../../gn:default_deps",
+    "../../gn:gtest_deps",
+    "../../protos/perfetto/trace:lite",
+    "../base",
+  ]
+}
+
+source_set("integrationtests") {
+  testonly = true
+  sources = [
+    "sched_slice_table_integrationtest.cc",
+  ]
+  deps = [
+    ":lib",
+    "../../buildtools:sqlite",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace:lite",
