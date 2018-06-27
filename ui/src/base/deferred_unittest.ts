@@ -16,7 +16,6 @@ import { defer } from './deferred';
 
 test('deferred can resolve', async () => {
   const deferred = defer<void>();
-  console.log(deferred);
   deferred.resolve();
   let i = 0;
   deferred.then(() => i++);

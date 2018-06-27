@@ -15,7 +15,7 @@
 /**
  * Promise wrapper with exposed resolve and reject callbacks.
  */
-export interface Deferred<T> extends  Promise<T>{
+export interface Deferred<T> extends Promise<T>{
   readonly resolve: (value?: T | PromiseLike<T>) => void;
   readonly reject: (reason?: any) => void;
 }
