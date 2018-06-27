@@ -158,7 +158,49 @@ TEST_F(SchedSliceTableIntegrationTest, FilterCpus) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, Quanitsiation) {
+TEST_F(SchedSliceTableIntegrationTest, QuanitsiationCpuNativeOrder) {
+  uint32_t cpu_1 = 3;
+  uint32_t cpu_2 = 8;
+  uint64_t timestamp = 100;
+  uint32_t pid_1 = 2;
+  uint32_t prev_state = 32;
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  uint32_t pid_2 = 4;
+  storage_.PushSchedSwitch(cpu_2, timestamp, pid_1, prev_state, kCommProc1,
+                           sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 3, pid_2, prev_state, kCommProc2,
+                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 4, pid_1, prev_state, kCommProc1,
+                           sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 10, pid_2, prev_state, kCommProc2,
+                           sizeof(kCommProc2) - 1, pid_1);
+
+  PrepareValidStatement(
+      "SELECT dur, ts, cpu from sched where _quantum MATCH 5 order by cpu");
+
+  // Event at ts + 3 sliced off at quantum boundary (105).
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 2 /* duration */);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp + 3);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_1);
+
+  // Remainder of event at ts + 3 after quantum boundary (105 onwards).
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 5 /* duration */);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp + 5);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_1);
+
+  // Full event at ts.
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 4 /* duration */);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_2);
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+}
+
+TEST_F(SchedSliceTableIntegrationTest, QuanitsiationSqliteDurationOrder) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
@@ -179,17 +221,17 @@ TEST_F(SchedSliceTableIntegrationTest, Quanitsiation) {
   PrepareValidStatement(
       "SELECT dur, ts, cpu from sched where _quantum MATCH 5 order by dur");
 
-  // Full event at ts.
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 4 /* duration */);
-  ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp);
-  ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_1);
-
   // Event at ts + 3 sliced off at quantum boundary (105).
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 2 /* duration */);
   ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp + 3);
   ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_2);
+
+  // Full event at ts.
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 0), 4 /* duration */);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 1), timestamp);
+  ASSERT_EQ(sqlite3_column_int64(stmt_, 2), cpu_1);
 
   // Remainder of event at ts + 3 after quantum boundary (105 onwards).
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);

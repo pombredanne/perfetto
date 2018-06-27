@@ -218,7 +218,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
       continue;
     index->constraints.emplace_back(cs);
 
-    if (cs.iColumn == Column::kDuration) {
+    if (cs.iColumn == Column::kQuantum) {
       has_quantum_constraint = true;
     }
 
