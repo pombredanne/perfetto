@@ -96,7 +96,7 @@ class SchedSliceTable {
     uint32_t cpu_ = 0;
 
     // The quantum the output slices should fall within.
-    uint64_t quantum_ = std::numeric_limits<uint64_t>::max();
+    uint64_t quantum_ = 0;
 
     const TraceStorage* storage_ = nullptr;
   };
