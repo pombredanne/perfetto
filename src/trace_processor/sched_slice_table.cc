@@ -197,9 +197,8 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
     switch (order->column) {
       case Column::kQuantizedGroup:
-        if (order->desc) {
+        if (order->desc)
           has_quantized_group_order_desc = true;
-        }
         break;
       case Column::kTimestamp:
       case Column::kDuration:
@@ -218,9 +217,8 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
       continue;
     index->constraints.emplace_back(cs);
 
-    if (cs.iColumn == Column::kQuantum) {
+    if (cs.iColumn == Column::kQuantum)
       has_quantum_constraint = true;
-    }
 
     // argvIndex is 1-based so use the current size of the vector.
     int argv_index = static_cast<int>(index->constraints.size());
@@ -375,9 +373,8 @@ void SchedSliceTable::FilterState::FindCpuWithNextSlice() {
     // If the current CPU is ordered before the current "next" CPU, then update
     // the cpu value.
     int cmp = CompareCpuToNextCpu(cpu);
-    if (cmp < 0) {
+    if (cmp < 0)
       next_cpu_ = cpu;
-    }
   }
 }
 
