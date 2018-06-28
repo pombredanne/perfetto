@@ -22,8 +22,10 @@ export const track = {
     return m('.track',
       {
         style: {
-          'z-index': 200,
-          position: 'relative'
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%'
         }
       },
       m(trackShell, attrs)

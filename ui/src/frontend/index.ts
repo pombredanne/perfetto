@@ -23,17 +23,16 @@ export const frontend = {
     return m('.frontend',
       {
         style: {
-          border: "1px solid #ccc",
-          padding: "20px",
+          padding: '20px',
           position: 'relative',
           width: attrs.width.toString() + 'px'
         }
       },
-      m(track, { name: 'Track 123' }),
       m(canvasWrapper, {
         width: attrs.width,
         height: attrs.height
-      })
+      }),
+      m(track, { name: 'Track 123' }),
     );
   }
 } as m.Comp<{width: number, height: number}>;

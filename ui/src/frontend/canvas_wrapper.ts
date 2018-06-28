@@ -27,7 +27,6 @@ export const canvasWrapper = {
           left: 0,
           width: attrs.width.toString() + 'px',
           height: attrs.height.toString() + 'px',
-          'z-index': 100
         }
       }
     );

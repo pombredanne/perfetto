@@ -33,10 +33,9 @@ function createFrontend() {
     return;
   }
   const rect = root.getBoundingClientRect();
-  const scrollbarWidth = 16;
 
   m.render(root, m(frontend, {
-    width: rect.width - scrollbarWidth,
+    width: rect.width,
     height: rect.height
   }));
 }
