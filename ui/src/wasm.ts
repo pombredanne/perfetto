@@ -13,4 +13,3 @@ init_trace_processor({
   print: writeToUIConsole,
   printErr: writeToUIConsole,
 });
-
