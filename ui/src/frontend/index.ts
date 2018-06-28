@@ -15,14 +15,14 @@
  */
 
 import * as m from 'mithril';
-import track from './track';
+import Track from './track';
 
 const Frontend = {
   view() {
     return m('.frontend',
       { style: { border: "1px solid #ccc", padding: "20px" } },
       m('h1', "Frontend"),
-      m(track)
+      m(Track)
     );
   }
 } as m.Component;
