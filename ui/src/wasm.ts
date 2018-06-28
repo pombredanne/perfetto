@@ -4,8 +4,7 @@ function writeToUIConsole(line:string) {
   const lineElement = document.createElement('div');
   lineElement.innerText = line;
   const container = document.getElementById('console');
-  if (!container)
-    throw new Error('OMG');
+  if (!container) throw new Error('OMG');
   container.appendChild(lineElement);
 }
 

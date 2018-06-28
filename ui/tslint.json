@@ -1,0 +1,7 @@
+{
+  "extends": "./google.tslint.json",
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": []
+}

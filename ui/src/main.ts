@@ -20,7 +20,7 @@ function main() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
-  }
+  };
 }
 
 main();
