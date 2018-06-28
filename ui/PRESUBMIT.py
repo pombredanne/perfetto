@@ -27,6 +27,7 @@ def CheckChangeOnUpload(input_api, output_api):
 def CheckChangeOnCommit(input_api, output_api):
     return CheckChange(input_api, output_api)
 
+
 def CheckTslint(input_api, output_api):
   path = input_api.os_path
   ui_path = input_api.PresubmitLocalPath();
