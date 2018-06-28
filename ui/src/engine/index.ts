@@ -14,17 +14,6 @@
  * limitations under the License.
  */
 
-import * as m from 'mithril';
-import trackShell from './track_shell';
+export class PerfettoEngine {
 
-const Track = {
-  view() {
-    return m('.track',
-      { style: { border: "1px solid #ccc", padding: "20px" } },
-      m('h1', "Track"),
-      m(trackShell)
-    );
-  }
-} as m.Component;
-
-export default Track;
+}

@@ -15,7 +15,7 @@
  */
 
 import * as m from 'mithril';
-import frontend from './frontend/frontend';
+import Frontend from './frontend';
 
 console.log('Hello from the main thread!');
 
@@ -27,13 +27,12 @@ function createController() {
 }
 
 function createFrontend() {
-    let root = document.getElementById('frontend');
-    if(root) {
-        m.mount(root, frontend);
-    }
-    else {
-        console.error('root element not found.');
-    }
+  const root = document.getElementById('frontend');
+  if (!root) {
+    console.error('root element not found.');
+    return;
+  }
+  m.mount(root, Frontend);
 }
 
 function main() {

@@ -15,16 +15,16 @@
  */
 
 import * as m from 'mithril';
-import trackShell from './track_shell';
+import track from './track';
 
-const Track = {
+const Frontend = {
   view() {
-    return m('.track',
+    return m('.frontend',
       { style: { border: "1px solid #ccc", padding: "20px" } },
-      m('h1', "Track"),
-      m(trackShell)
+      m('h1', "Frontend"),
+      m(track)
     );
   }
 } as m.Component;
 
-export default Track;
+export default Frontend;
