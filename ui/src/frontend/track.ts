@@ -1,12 +1,12 @@
 import * as m from 'mithril';
-import track from './track';
+import trackShell from './track_shell';
 
 export default {
     view () {
-        return m('.frontend',
+        return m('.track',
             { style: { border: "1px solid #ccc", padding: "20px" } }, [
-            m('h1', "Frontend"),
-            m(track)
+            m('h1', "Track"),
+            m(trackShell)
         ]);
     }
 } as m.Component;

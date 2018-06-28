@@ -14,13 +14,31 @@
  * limitations under the License.
  */
 
+import * as m from 'mithril';
+import frontend from './frontend/frontend';
+
 console.log('Hello from the main thread!');
 
-function main() {
+function createController() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
   }
+}
+
+function createFrontend() {
+    let root = document.getElementById('frontend');
+    if(root) {
+        m.mount(root, frontend);
+    }
+    else {
+        console.error('root element not found.');
+    }
+}
+
+function main() {
+  createController();
+  createFrontend();
 }
 
 main();
