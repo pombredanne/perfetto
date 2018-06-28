@@ -41,6 +41,6 @@ def CheckTslint(input_api, output_api):
       output_api.PresubmitError(
         'There were tslint errors. You may be able to fix some of them' +
         'using \n' +
-        '$ tslint --project ' + ui_path + ' --fix')
+        '$ ' + tslint + ' --project ' + ui_path + ' --fix')
     ]
   return []
