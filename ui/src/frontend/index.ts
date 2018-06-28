@@ -14,6 +14,28 @@
  * limitations under the License.
  */
 
-export class CpuSlicesTrack {
+import * as m from 'mithril';
+import Track from './track';
+import CanvasWrapper from './canvas_wrapper';
 
-}
+const Frontend = {
+  view({attrs}) {
+    return m('.frontend',
+      {
+        style: {
+          border: "1px solid #ccc",
+          padding: "20px",
+          position: 'relative',
+          width: attrs.width + 'px'
+        }
+      },
+      m(Track, { name: 'Track 123' }),
+      m(CanvasWrapper, {
+        width: attrs.width,
+        height: attrs.height
+      })
+    );
+  }
+} as m.Comp<{width: number, height: number}>;
+
+export default Frontend;

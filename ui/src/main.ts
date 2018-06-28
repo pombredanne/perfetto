@@ -14,13 +14,36 @@
  * limitations under the License.
  */
 
+import * as m from 'mithril';
+import Frontend from './frontend';
+
 console.log('Hello from the main thread!');
 
-function main() {
+function createController() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
   }
+}
+
+function createFrontend() {
+  const root = document.getElementById('frontend');
+  if (!root) {
+    console.error('root element not found.');
+    return;
+  }
+  const rect = root.getBoundingClientRect();
+  const scrollbarWidth = 16;
+
+  m.render(root, m(Frontend, {
+    width: rect.width - scrollbarWidth,
+    height: rect.height
+  }));
+}
+
+function main() {
+  createController();
+  createFrontend();
 }
 
 main();

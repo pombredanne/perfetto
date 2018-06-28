@@ -14,6 +14,27 @@
  * limitations under the License.
  */
 
-export class CpuSlicesTrack {
+import * as m from 'mithril';
 
-}
+const CanvasWrapper = {
+  view({attrs}) {
+    return m('canvas',
+      {
+        style: {
+          background: '#ccc',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: attrs.width + 'px',
+          height: attrs.height + 'px',
+          'z-index': 100
+        }
+      }
+    );
+  }
+} as m.Comp<{
+  width: number
+  height: number,
+}>;
+
+export default CanvasWrapper;
