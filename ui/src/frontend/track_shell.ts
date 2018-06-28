@@ -15,29 +15,14 @@
  */
 
 import * as m from 'mithril';
-import Frontend from './frontend';
 
-console.log('Hello from the main thread!');
-
-function createController() {
-  const worker = new Worker("worker_bundle.js");
-  worker.onerror = e => {
-    console.error(e);
+const TrackShell = {
+  view() {
+    return m('.trackshell',
+      { style: { border: "1px solid #ccc", padding: "20px" } },
+      m('h1', "Track Shell")
+    );
   }
-}
+} as m.Component;
 
-function createFrontend() {
-  const root = document.getElementById('frontend');
-  if (!root) {
-    console.error('root element not found.');
-    return;
-  }
-  m.mount(root, Frontend);
-}
-
-function main() {
-  createController();
-  createFrontend();
-}
-
-main();
+export default TrackShell;
