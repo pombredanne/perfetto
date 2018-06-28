@@ -16,6 +16,8 @@
 
 import * as m from 'mithril';
 import Frontend from './frontend';
+import { Engine } from './engine';
+import { WasmEngine, warmupWasmEngineWorker } from './engine/wasm_engine';
 
 console.log('Hello from the main thread!');
 
@@ -35,9 +37,28 @@ function createFrontend() {
   m.mount(root, Frontend);
 }
 
-function main() {
+function main(input: Element, button: Element) {
   createController();
   createFrontend();
-}
 
-main();
+  warmupWasmEngineWorker();
+  const worker = new Worker("worker_bundle.js");
+  worker.onerror = (e: ErrorEvent) => {
+    console.error(e);
+  };
+  input.addEventListener('change', (e: any) => {
+    const blob: Blob = e.target.files.item(0);
+    if (blob === null)
+      return;
+    const engine: Engine = WasmEngine.create(blob);
+    button.addEventListener('click', () => {
+      engine.rawQuery({sqlQuery: 'select * from sched;'}).then(
+        result => console.log(result)
+      );
+    });
+  });
+}
+const input = document.querySelector('#trace');
+const button = document.querySelector('#query');
+if (input && button)
+  main(input, button);

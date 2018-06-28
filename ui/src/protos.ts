@@ -14,10 +14,18 @@
 
 // Re-export commonly used protos without the painfully long namespace.
 
-import * as x from './gen/protos';
+import * as protos from './gen/protos';
 
-const TraceConfig = x.perfetto.protos.TraceConfig;
+import TraceConfig = protos.perfetto.protos.TraceConfig;
+import TraceProcessor = protos.perfetto.protos.TraceProcessor;
+import IRawQueryArgs = protos.perfetto.protos.IRawQueryArgs;
+import RawQueryArgs = protos.perfetto.protos.RawQueryArgs;
+import RawQueryResult = protos.perfetto.protos.RawQueryResult;
 
 export {
   TraceConfig,
+  TraceProcessor,
+  IRawQueryArgs,
+  RawQueryArgs,
+  RawQueryResult,
 };
