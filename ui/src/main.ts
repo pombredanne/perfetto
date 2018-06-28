@@ -15,7 +15,7 @@
  */
 
 import * as m from 'mithril';
-import Frontend from './frontend';
+import {frontend} from './frontend';
 
 console.log('Hello from the main thread!');
 
@@ -23,7 +23,7 @@ function createController() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
-  }
+  };
 }
 
 function createFrontend() {
@@ -35,7 +35,7 @@ function createFrontend() {
   const rect = root.getBoundingClientRect();
   const scrollbarWidth = 16;
 
-  m.render(root, m(Frontend, {
+  m.render(root, m(frontend, {
     width: rect.width - scrollbarWidth,
     height: rect.height
   }));

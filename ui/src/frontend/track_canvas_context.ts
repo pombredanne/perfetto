@@ -36,41 +36,41 @@ export class TrackCanvasContext {
     this.ctx.fillRect(x + this.rect.left, y + this.rect.top, width, height);
   }
 
-  public setDimensions(width: number, height: number)
+  setDimensions(width: number, height: number)
   {
     this.rect.width = width;
     this.rect.height = height;
   }
 
-  public setYOffset(offset: number) {
+  setYOffset(offset: number) {
     this.rect.top = offset;
   }
 
-  public moveTo(x: number, y: number) {
+  moveTo(x: number, y: number) {
     this.ctx.moveTo(x + this.rect.left, y + this.rect.top);
   }
 
-  public lineTo(x: number, y: number) {
+  lineTo(x: number, y: number) {
     this.ctx.lineTo(x + this.rect.left, y + this.rect.top);
   }
 
-  public stroke() {
+  stroke() {
     this.ctx.stroke();
   }
 
-  public beginPath() {
+  beginPath() {
     this.ctx.beginPath();
   }
 
-  public closePath() {
+  closePath() {
     this.ctx.closePath();
   }
 
-  public measureText(text: string): TextMetrics {
+  measureText(text: string): TextMetrics {
     return this.ctx.measureText(text);
   }
 
-  public fillText(text: string, x: number, y: number) {
+  fillText(text: string, x: number, y: number) {
     this.ctx.fillText(text, x + this.rect.left, y + this.rect.top);
   }
 

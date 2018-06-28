@@ -16,7 +16,7 @@
 
 import * as m from 'mithril';
 
-const CanvasWrapper = {
+export const canvasWrapper = {
   view({attrs}) {
     return m('canvas',
       {
@@ -25,8 +25,8 @@ const CanvasWrapper = {
           position: 'absolute',
           top: 0,
           left: 0,
-          width: attrs.width + 'px',
-          height: attrs.height + 'px',
+          width: attrs.width.toString() + 'px',
+          height: attrs.height.toString() + 'px',
           'z-index': 100
         }
       }
@@ -36,5 +36,3 @@ const CanvasWrapper = {
   width: number
   height: number,
 }>;
-
-export default CanvasWrapper;

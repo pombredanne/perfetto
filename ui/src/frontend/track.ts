@@ -15,9 +15,9 @@
  */
 
 import * as m from 'mithril';
-import TrackShell from './track_shell';
+import {trackShell} from './track_shell';
 
-const Track = {
+export const track = {
   view({attrs}) {
     return m('.track',
       {
@@ -26,9 +26,7 @@ const Track = {
           position: 'relative'
         }
       },
-      m(TrackShell, attrs)
+      m(trackShell, attrs)
     );
   }
 } as m.Comp<{ name: string }>;
-
-export default Track;
