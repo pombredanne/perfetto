@@ -19,11 +19,10 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/trace_processor/raw_query.pb.h"
 #include "perfetto/trace_processor/sched.pb.h"
 #include "src/trace_processor/emscripten_task_runner.h"
 #include "src/trace_processor/trace_database.h"
-
-#include "perfetto/trace_processor/raw_query.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -113,6 +112,7 @@ void trace_processor_rawQuery(RequestID id,
   if (!parsed) {
     std::string err = "Failed to parse input request";
     g_reply(id, false, err.data(), err.size());
+    return;
   }
 
   // When the C++ class implementing the service replies, serialize the protobuf
