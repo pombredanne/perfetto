@@ -48,8 +48,7 @@ export class TrackCanvasContext {
     this.ctx.fillRect(x + this.rect.left, y + this.rect.top, width, height);
   }
 
-  setDimensions(width: number, height: number)
-  {
+  setDimensions(width: number, height: number) {
     this.rect.width = width;
     this.rect.height = height;
   }
