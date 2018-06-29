@@ -1,6 +1,3 @@
-/**
- * @fileoverview Description of this file.
- */
 /*
  * Copyright (C) 2018 The Android Open Source Project
  *
@@ -17,6 +14,21 @@
  * limitations under the License.
  */
 
-module.exports = async function() {
-  console.log("End!");
-}
+import * as m from 'mithril';
+import {trackShell} from './track_shell';
+
+export const track = {
+  view({attrs}) {
+    return m('.track',
+      {
+        style: {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%'
+        }
+      },
+      m(trackShell, attrs)
+    );
+  }
+} as m.Comp<{ name: string }>;

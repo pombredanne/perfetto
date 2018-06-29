@@ -200,7 +200,7 @@ TEST_F(SchedSliceTableIntegrationTest, QuanitsiationCpuNativeOrder) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, QuanitsiationSqliteDurationOrder) {
+TEST_F(SchedSliceTableIntegrationTest, QuantizationSqliteDurationOrder) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
@@ -242,7 +242,7 @@ TEST_F(SchedSliceTableIntegrationTest, QuanitsiationSqliteDurationOrder) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, QuanitsiationGroupAndSum) {
+TEST_F(SchedSliceTableIntegrationTest, QuantizationGroupAndSum) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;

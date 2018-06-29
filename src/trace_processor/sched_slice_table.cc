@@ -156,17 +156,17 @@ sqlite3_module SchedSliceTable::CreateModule() {
   module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
     return AsCursor(c)->Column(a, b);
   };
-  module.xFindFunction = [](sqlite3_vtab*, int, const char* z,
-                            void (**f)(sqlite3_context*, int, sqlite3_value**),
-                            void** a) {
+  module.xFindFunction = [](sqlite3_vtab*, int, const char* name,
+                            void (**fn)(sqlite3_context*, int, sqlite3_value**),
+                            void** args) {
     // Add an identity match function to prevent throwing an exception when
     // matching on the quantum column.
-    if (strcmp(z, "match") == 0) {
-      *f = [](sqlite3_context* ctx, int n, sqlite3_value** v) {
+    if (strcmp(name, "match") == 0) {
+      *fn = [](sqlite3_context* ctx, int n, sqlite3_value** v) {
         PERFETTO_DCHECK(n == 2 && sqlite3_value_type(v[0]) == SQLITE_INTEGER);
         sqlite3_result_int64(ctx, sqlite3_value_int64(v[0]));
       };
-      *a = nullptr;
+      *args = nullptr;
       return 1;
     }
     return 0;
@@ -186,7 +186,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   indexes_.emplace_back();
   IndexInfo* index = &indexes_.back();
 
-  bool has_quantized_group_order_desc = false;
+  bool is_quantized_group_order_desc = false;
   bool is_duration_timestamp_order = false;
   for (int i = 0; i < idx->nOrderBy; i++) {
     index->order_by.emplace_back();
@@ -198,7 +198,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
     switch (order->column) {
       case Column::kQuantizedGroup:
         if (order->desc)
-          has_quantized_group_order_desc = true;
+          is_quantized_group_order_desc = true;
         break;
       case Column::kTimestamp:
       case Column::kDuration:
@@ -230,7 +230,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   // time related parameters or by quantized group in descending order.
   bool needs_sqlite_orderby =
       has_quantum_constraint &&
-      (is_duration_timestamp_order || has_quantized_group_order_desc);
+      (is_duration_timestamp_order || is_quantized_group_order_desc);
 
   idx->orderByConsumed = !needs_sqlite_orderby;
   if (needs_sqlite_orderby)
@@ -389,8 +389,7 @@ SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu) {
   const auto& slices = storage_->SlicesForCpu(cpu);
   PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
 
-  std::vector<uint32_t> indices;
-  indices.resize(slices.slice_count());
+  std::vector<uint32_t> indices(slices.slice_count());
   std::iota(indices.begin(), indices.end(), 0u);
 
   // In other cases, sort by the given criteria.
@@ -402,11 +401,11 @@ SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu) {
 }
 
 int SchedSliceTable::FilterState::CompareSlices(uint32_t f_cpu,
-                                                size_t f,
+                                                size_t f_idx,
                                                 uint32_t s_cpu,
-                                                size_t s) {
+                                                size_t s_idx) {
   for (const auto& ob : order_by_) {
-    int c = CompareSlicesOnColumn(f_cpu, f, s_cpu, s, ob);
+    int c = CompareSlicesOnColumn(f_cpu, f_idx, s_cpu, s_idx, ob);
     if (c != 0)
       return c;
   }
@@ -414,19 +413,19 @@ int SchedSliceTable::FilterState::CompareSlices(uint32_t f_cpu,
 }
 
 int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
-                                                        size_t f,
+                                                        size_t f_idx,
                                                         uint32_t s_cpu,
-                                                        size_t s,
+                                                        size_t s_idx,
                                                         const OrderBy& ob) {
-  const auto& f_slices = storage_->SlicesForCpu(f_cpu);
-  const auto& s_slices = storage_->SlicesForCpu(s_cpu);
+  const auto& f_sl = storage_->SlicesForCpu(f_cpu);
+  const auto& s_sl = storage_->SlicesForCpu(s_cpu);
   switch (ob.column) {
     case SchedSliceTable::Column::kQuantum:
       return 0;
     case SchedSliceTable::Column::kTimestamp:
-      return Compare(f_slices.start_ns()[f], s_slices.start_ns()[s], ob.desc);
+      return Compare(f_sl.start_ns()[f_idx], s_sl.start_ns()[s_idx], ob.desc);
     case SchedSliceTable::Column::kDuration:
-      return Compare(f_slices.durations()[f], s_slices.durations()[s], ob.desc);
+      return Compare(f_sl.durations()[f_idx], s_sl.durations()[s_idx], ob.desc);
     case SchedSliceTable::Column::kCpu:
       return Compare(f_cpu, s_cpu, ob.desc);
     case SchedSliceTable::Column::kQuantizedGroup: {
