@@ -1,6 +1,3 @@
-/**
- * @fileoverview Description of this file.
- */
 /*
  * Copyright (C) 2018 The Android Open Source Project
  *
@@ -17,6 +14,6 @@
  * limitations under the License.
  */
 
-module.exports = async function() {
-  console.log("End!");
+export class CpuSlicesTrack {
+
 }
