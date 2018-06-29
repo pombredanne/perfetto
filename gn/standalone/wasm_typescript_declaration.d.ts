@@ -1,9 +1,9 @@
-export = InitThisWasm;
+export = Wasm;
 
-declare function InitThisWasm(_: InitThisWasm.ModuleArgs): InitThisWasm.Module;
+declare function Wasm(_: Wasm.ModuleArgs): Wasm.Module;
 
 // See https://kripken.github.io/emscripten-site/docs/api_reference/module.html
-declare namespace InitThisWasm {
+declare namespace Wasm {
   export interface InitWasm {
     (_: ModuleArgs): Module;
   }

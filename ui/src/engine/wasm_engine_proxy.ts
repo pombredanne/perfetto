@@ -5,48 +5,51 @@ import { WasmBridgeResponse, WasmBridgeRequest } from './wasm_bridge';
 
 let gWarmWasmWorker: null|Worker = null;
 
-function createWasmEngineWorker(): Worker {
+function createNewWasmEngineWorker(): Worker {
   return new Worker("wasm_bundle.js");
 }
 
-function getWasmEngineWorker(): Worker {
+function createWasmEngineWorker(): Worker {
   if (gWarmWasmWorker === null) {
-    return createWasmEngineWorker();
+    return createNewWasmEngineWorker();
   }
   const worker = gWarmWasmWorker;
-  gWarmWasmWorker = createWasmEngineWorker();
+  gWarmWasmWorker = createNewWasmEngineWorker();
   return worker;
 }
 
 /**
  * It's quite slow to compile WASM and (in Chrome) this happens every time
- * (there is no way to cache the compiled code currently). To mitigate this
- * we can always keep a WASM backend 'ready to go' just waiting to be provided
- * with a trace file. warmupWasmEngineWorker (together with getWasmEngineWorker)
+ * a worker thread attempts to load a WASM module since there is no way to
+ * cache the compiled code currently. To mitigate this we can always keep a
+ * WASM backend 'ready to go' just waiting to be provided with a trace file.
+ * warmupWasmEngineWorker (together with getWasmEngineWorker)
  * implement this behaviour.
  */
 export function warmupWasmEngineWorker(): void {
-  if (gWarmWasmWorker !== null)
+  if (gWarmWasmWorker !== null) {
     return;
-  gWarmWasmWorker = createWasmEngineWorker();
+  }
+  gWarmWasmWorker = createNewWasmEngineWorker();
 }
 
 /**
- * This implementation of Engine uses a WASM backend hosted in a seprate worker
- * thread.
+ * This implementation of Engine uses a WASM backend hosted in a seperate
+ * worker thread.
  */
-export class WasmEngine extends Engine {
+export class WasmEngineProxy extends Engine {
   private worker: Worker;
   private readonly traceProcessor_: TraceProcessor;
   private pendingCallbacks: Map<number, protobufjs.RPCImplCallback>;
   private nextRequestId: number;
 
   static create(blob: Blob): Engine {
-    const worker = getWasmEngineWorker();
+    const worker = createWasmEngineWorker();
+    // tslint:disable-next-line deprecation
     worker.postMessage({
       blob,
     });
-    return new WasmEngine(worker);
+    return new WasmEngineProxy(worker);
   }
 
   constructor(worker: Worker) {
@@ -68,11 +71,12 @@ export class WasmEngine extends Engine {
     console.error(e);
   }
 
-  onMessage(m: any) {
+  onMessage(m: MessageEvent) {
     const response = m.data as WasmBridgeResponse;
     const callback = this.pendingCallbacks.get(response.id);
-    if (callback === undefined)
-      throw `No such request: ${response.id}`;
+    if (callback === undefined) {
+      throw new Error(`No such request: ${response.id}`);
+    }
     this.pendingCallbacks.delete(response.id);
     callback(null, response.data);
   }
@@ -86,11 +90,12 @@ export class WasmEngine extends Engine {
     const id = this.nextRequestId++;
     this.pendingCallbacks.set(id, callback);
     const request: WasmBridgeRequest = {
-      id: id,
+      id,
       serviceName,
       methodName,
       data: requestData,
     };
+    // tslint:disable-next-line deprecation
     this.worker.postMessage(request);
   }
 }

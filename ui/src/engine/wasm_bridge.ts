@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// tslint:disable:no-any
+
 import * as init_trace_processor from '../gen/trace_processor';
 import { defer, Deferred } from '../base/deferred';
 
@@ -14,7 +32,7 @@ export interface WasmBridgeRequest {
 
 export interface WasmBridgeResponse {
   id: number;
-  success: boolean,
+  success: boolean;
   data: Uint8Array;
 }
 
@@ -58,7 +76,7 @@ export class WasmBridge {
 
   onRead(offset: number, length: number, dstPtr: number): number {
     if (this.blob === null) {
-      throw 'No blob set';
+      throw new Error('No blob set');
     }
     const slice = this.blob.slice(offset, offset + length);
     const buf: ArrayBuffer = this.fileReader.readAsArrayBuffer(slice);
@@ -68,10 +86,14 @@ export class WasmBridge {
   }
 
   onReply(reqId: number, success: boolean, heapPtr: number, size: number) {
-    if (this.replyCount++ === 0) {
+    // The first reply (from Initialize) is special. It has no proto payload
+    // and no associated callback.
+    if (this.replyCount === 0) {
+      this.replyCount++;
       this.deferredInitialized.resolve();
       return;
     }
+    this.replyCount++;
     const data = this.connection.HEAPU8.slice(heapPtr, heapPtr + size);
     this.callback({
       id: reqId,
@@ -81,7 +103,7 @@ export class WasmBridge {
   }
 
   setBlob(blob: Blob) {
-    console.assert(this.blob === null);
+    if (this.blob !== null) throw new Error('Blob set twice.');
     this.blob = blob;
     this.deferredHaveBlob.resolve();
   }

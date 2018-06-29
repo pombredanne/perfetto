@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// tslint:disable:no-any
 
 /**
  * Promise wrapper with exposed resolve and reject callbacks.
@@ -27,6 +28,6 @@ export interface Deferred<T> extends Promise<T>{
 export function defer<T>(): Deferred<T> {
   let resolve = null as any;
   let reject = null as any;
-  let p = new Promise((res, rej) => [resolve, reject] = [res, rej]);
+  const p = new Promise((res, rej) => [resolve, reject] = [res, rej]);
   return Object.assign(p, {resolve, reject}) as any;
 }

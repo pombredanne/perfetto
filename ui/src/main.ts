@@ -15,9 +15,10 @@
  */
 
 import * as m from 'mithril';
-import Frontend from './frontend';
+import { frontend } from './frontend';
 import { Engine } from './engine';
-import { WasmEngine, warmupWasmEngineWorker } from './engine/wasm_engine';
+import { WasmEngineProxy, warmupWasmEngineWorker }
+    from './engine/wasm_engine_proxy';
 
 console.log('Hello from the main thread!');
 
@@ -25,7 +26,7 @@ function createController() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
-  }
+  };
 }
 
 function createFrontend() {
@@ -34,7 +35,12 @@ function createFrontend() {
     console.error('root element not found.');
     return;
   }
-  m.mount(root, Frontend);
+  const rect = root.getBoundingClientRect();
+
+  m.render(root, m(frontend, {
+    width: rect.width,
+    height: rect.height,
+  }));
 }
 
 function main(input: Element, button: Element) {
@@ -42,17 +48,15 @@ function main(input: Element, button: Element) {
   createFrontend();
 
   warmupWasmEngineWorker();
-  const worker = new Worker("worker_bundle.js");
-  worker.onerror = (e: ErrorEvent) => {
-    console.error(e);
-  };
+  // tslint:disable-next-line:no-any
   input.addEventListener('change', (e: any) => {
     const blob: Blob = e.target.files.item(0);
-    if (blob === null)
-      return;
-    const engine: Engine = WasmEngine.create(blob);
+    if (blob === null) return;
+    const engine: Engine = WasmEngineProxy.create(blob);
     button.addEventListener('click', () => {
-      engine.rawQuery({sqlQuery: 'select * from sched;'}).then(
+      engine.rawQuery({
+        sqlQuery: 'select * from sched;',
+      }).then(
         result => console.log(result)
       );
     });
@@ -60,5 +64,6 @@ function main(input: Element, button: Element) {
 }
 const input = document.querySelector('#trace');
 const button = document.querySelector('#query');
-if (input && button)
+if (input && button) {
   main(input, button);
+}

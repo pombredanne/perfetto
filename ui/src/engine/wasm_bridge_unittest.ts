@@ -24,13 +24,13 @@ class MockModule implements Module {
 
   constructor() {
     this.locateFile = (_) => {
-      throw "locateFile not set";
+      throw new Error("locateFile not set");
     };
     this.onRuntimeInitialized = () => {
-      throw "onRuntimeInitialized not set";
+      throw new Error("onRuntimeInitialized not set");
     };
     this.onAbort = () => {
-      throw "onAbort not set";
+      throw new Error("onAbort not set");
     };
   }
 
@@ -52,7 +52,8 @@ test('wasm bridge should locate files', async () => {
   const m = new MockModule();
   const callback = jest.fn();
   const fileReader = jest.fn();
-  new WasmBridge(m.init.bind(m), callback, fileReader);
+  const bridge = new WasmBridge(m.init.bind(m), callback, fileReader);
+  expect(bridge);
   expect(m.locateFile('foo.wasm')).toBe('foo.wasm');
 });
 
@@ -61,7 +62,7 @@ test('wasm bridge early calls are delayed', async () => {
   const callback = jest.fn();
   const fileReader = jest.fn();
   const bridge = new WasmBridge(m.init.bind(m), callback, fileReader);
-  
+
   const requestPromise = bridge.callWasm({
     id: 100,
     serviceName: 'service',
@@ -72,6 +73,7 @@ test('wasm bridge early calls are delayed', async () => {
   const readyPromise = bridge.initialize();
 
   m.onRuntimeInitialized();
+  // tslint:disable-next-line no-any
   bridge.setBlob(null as any);
   bridge.onReply(0, true, 0, 0);
 

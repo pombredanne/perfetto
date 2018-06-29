@@ -15,22 +15,24 @@
 import { WasmBridge, WasmBridgeRequest } from "./engine/wasm_bridge";
 import * as init_trace_processor from './gen/trace_processor';
 
+// tslint:disable no-any
+
 declare var FileReaderSync: any;
 
-const any_self = (self as any);
+const anySelf = (self as any);
 
 const bridge = new WasmBridge(
   init_trace_processor, 
-  any_self.postMessage.bind(any_self),
+  anySelf.postMessage.bind(anySelf),
   new FileReaderSync(),
 );
 bridge.initialize();
 
-any_self.onmessage = (m: any) => {
+anySelf.onmessage = (m: any) => {
   if (m.data.blob) {
     bridge.setBlob(m.data.blob);
     return;
   }
   const request = (m.data as WasmBridgeRequest);
   bridge.callWasm(request);
-}
+};
