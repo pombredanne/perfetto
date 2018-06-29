@@ -15,16 +15,24 @@
  */
 
 import * as m from 'mithril';
-import Track from './track';
+import {track} from './track';
+import {canvasWrapper} from './canvas_wrapper';
 
-const Frontend = {
-  view() {
+export const frontend = {
+  view({attrs}) {
     return m('.frontend',
-      { style: { border: "1px solid #ccc", padding: "20px" } },
-      m('h1', "Frontend"),
-      m(Track)
+      {
+        style: {
+          padding: '20px',
+          position: 'relative',
+          width: attrs.width.toString() + 'px'
+        }
+      },
+      m(canvasWrapper, {
+        width: attrs.width,
+        height: attrs.height
+      }),
+      m(track, { name: 'Track 123' }),
     );
   }
-} as m.Component;
-
-export default Frontend;
+} as m.Comp<{width: number, height: number}>;
