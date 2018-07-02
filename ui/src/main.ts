@@ -14,31 +14,35 @@
  * limitations under the License.
  */
 
+import * as m from 'mithril';
+import {frontend} from './frontend';
+
 console.log('Hello from the main thread!');
 
-function writeToUIConsole(line:string) {
-  const lineElement = document.createElement('div');
-  lineElement.innerText = line;
-  const container = document.getElementById('console');
-  if (!container)
-    throw new Error('OMG');
-  container.appendChild(lineElement);
-}
-
-// TODO(primiano): temporary for testing, just instantiates the WASM module on
-// the main thread.
-(<any>window).Module = {
-    locateFile: (s: string) => '/wasm/' + s,
-    print: writeToUIConsole,
-    printErr: writeToUIConsole,
-};
-
-
-function main() {
+function createController() {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
+  };
+}
+
+function createFrontend() {
+  const root = document.getElementById('frontend');
+  if (!root) {
+    console.error('root element not found.');
+    return;
   }
+  const rect = root.getBoundingClientRect();
+
+  m.render(root, m(frontend, {
+    width: rect.width,
+    height: rect.height
+  }));
+}
+
+function main() {
+  createController();
+  createFrontend();
 }
 
 main();
