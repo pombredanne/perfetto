@@ -1,6 +1,3 @@
-/**
- * @fileoverview Description of this file.
- */
 /*
  * Copyright (C) 2018 The Android Open Source Project
  *
@@ -17,6 +14,24 @@
  * limitations under the License.
  */
 
-module.exports = async function() {
-  console.log("End!");
-}
+import * as m from 'mithril';
+
+export const canvasWrapper = {
+  view({attrs}) {
+    return m('canvas',
+      {
+        style: {
+          background: '#ccc',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: attrs.width.toString() + 'px',
+          height: attrs.height.toString() + 'px',
+        }
+      }
+    );
+  }
+} as m.Comp<{
+  width: number
+  height: number,
+}>;

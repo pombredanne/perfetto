@@ -224,7 +224,6 @@ if (build_with_chromium) {
   component("libperfetto") {
     public_configs = [ "gn:public_config" ]
     deps = [
-      "protos/perfetto/trace:zero",
       "src/tracing",
     ]
     configs -= [ "//build/config/compiler:chromium_code" ]

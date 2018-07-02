@@ -1,6 +1,3 @@
-/**
- * @fileoverview Description of this file.
- */
 /*
  * Copyright (C) 2018 The Android Open Source Project
  *
@@ -17,6 +14,25 @@
  * limitations under the License.
  */
 
-module.exports = async function() {
-  console.log("End!");
-}
+import * as m from 'mithril';
+import {track} from './track';
+import {canvasWrapper} from './canvas_wrapper';
+
+export const frontend = {
+  view({attrs}) {
+    return m('.frontend',
+      {
+        style: {
+          padding: '20px',
+          position: 'relative',
+          width: attrs.width.toString() + 'px'
+        }
+      },
+      m(canvasWrapper, {
+        width: attrs.width,
+        height: attrs.height
+      }),
+      m(track, { name: 'Track 123' }),
+    );
+  }
+} as m.Comp<{width: number, height: number}>;
