@@ -12,19 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
+import {Global} from '../base/global';
 
-export const CanvasWrapper = {
-  view({attrs}) {
-    return m('.canvasWrapper', {
-      style: {
-        position: 'absolute',
-        top: attrs.topOffset.toString() + 'px',
-        overflow: 'none',
-      }
-    });
-  },
-  oncreate(vnode) {
-    vnode.dom.appendChild(vnode.attrs.canvasElement);
-  }
-} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
+const exampleGlobal = new Global<string>();
+
+beforeEach(() => {
+  exampleGlobal.resetForTesting();
+});
+
+afterEach(() => {
+  exampleGlobal.resetForTesting();
+});
+
+test('it throws if accessed before set', () => {
+  expect(() => exampleGlobal.get()).toThrow('Global not set');
+});
+
+test('it can be set', () => {
+  exampleGlobal.set('hello');
+  expect(exampleGlobal.get()).toEqual('hello');
+  exampleGlobal.set('world');
+  expect(exampleGlobal.get()).toEqual('world');
+});

@@ -14,35 +14,21 @@
  * limitations under the License.
  */
 
-import * as m from 'mithril';
-import {frontend} from './frontend';
+#ifndef SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#define SRC_TRACE_PROCESSOR_SCOPED_DB_H_
 
-console.log('Hello from the main thread!');
+#include <sqlite3.h>
 
-function createController() {
-  const worker = new Worker("worker_bundle.js");
-  worker.onerror = e => {
-    console.error(e);
-  };
-}
+#include "perfetto/base/scoped_file.h"
 
-function createFrontend() {
-  const root = document.getElementById('frontend');
-  if (!root) {
-    console.error('root element not found.');
-    return;
-  }
-  const rect = root.getBoundingClientRect();
+namespace perfetto {
+namespace trace_processor {
 
-  m.render(root, m(frontend, {
-    width: rect.width,
-    height: rect.height
-  }));
-}
+using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
+using ScopedStmt =
+    base::ScopedResource<sqlite3_stmt*, sqlite3_finalize, nullptr>;
 
-function main() {
-  createController();
-  createFrontend();
-}
+}  // namespace trace_processor
+}  // namespace perfetto
 
-main();
+#endif  // SRC_TRACE_PROCESSOR_SCOPED_DB_H_
