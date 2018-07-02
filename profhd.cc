@@ -138,6 +138,37 @@ struct Frame {
   unwindstack::FrameData data;
   size_t size = 0;
   std::map<std::string, Frame> children;
+
+  void Print(std::ostream& o) const {
+    o << "{";
+    bool prev = false;
+    if (!data.function_name.empty()) {
+      if (prev)
+        o << ",";
+      prev = true;
+      o << " \"name\": \"" << data.map_name << "`" << data.function_name
+        << "\"\n";
+    }
+    if (prev)
+      o << ",";
+    prev = true;
+    o << "  \"value\": " << size << "\n";
+    if (!children.empty()) {
+      if (prev)
+        o << ",";
+      prev = true;
+      o << "  \"children\": [";
+      bool first = true;
+      for (const auto& c : children) {
+        if (!first)
+          o << ",\n";
+        first = false;
+        c.second.Print(o);
+      }
+      o << "]\n";
+    }
+    o << "}";
+  }
 };
 
 class HeapDump {
@@ -150,7 +181,9 @@ class HeapDump {
     std::lock_guard<std::mutex> l(mutex_);
 
     Frame* frame = &top_frame_;
-    for (const unwindstack::FrameData frame_data : data) {
+    frame->size += metadata.size;
+    for (auto it = data.rbegin(); it != data.rend(); ++it) {
+      const unwindstack::FrameData& frame_data = *it;
       auto itr = frame->children.find(frame_data.function_name);
       if (itr == frame->children.end()) {
         auto pair =
@@ -170,10 +203,27 @@ class HeapDump {
     auto itr = addr_info_.find(addr);
     if (itr == addr_info_.end())
       return;
+
+    const std::vector<unwindstack::FrameData>& data = itr->second.first;
+    const AllocMetadata& metadata = itr->second.second;
+
+    Frame* frame = &top_frame_;
+    frame->size -= metadata.size;
+    for (const unwindstack::FrameData frame_data : data) {
+      auto itr = frame->children.find(frame_data.function_name);
+      if (itr == frame->children.end())
+        break;
+      itr->second.size -= metadata.size;
+      frame = &itr->second;
+    }
+
     addr_info_.erase(addr);
   }
 
-  void Print(std::ostream& o) const {}
+  void Print(std::ostream& o) {
+    std::lock_guard<std::mutex> l(mutex_);
+    top_frame_.Print(o);
+  }
 
  private:
   std::mutex mutex_;
@@ -209,12 +259,10 @@ void DoneAlloc(void* mem, size_t sz) {
   if (unwinder.LastErrorCode() != 0)
     PERFETTO_ELOG("Unwinder: %" PRIu8, unwinder.LastErrorCode());
 */
-  //  heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(),
-  //  *metadata);
+  heapdump_for_pid[metadata->header.pid].AddStack(unwinder.frames(), *metadata);
 }
 
 void DoneFree(void* mem, size_t sz) {
-  return;
   MetadataHeader* header = reinterpret_cast<MetadataHeader*>(mem);
   uint64_t* freed = reinterpret_cast<uint64_t*>(mem);
   for (size_t n = 3; n < sz / sizeof(*freed); n++) {
@@ -447,7 +495,7 @@ void DumpHeaps() {
   std::ofstream f("/data/local/heapd");
   f << "{\n";
   bool first = true;
-  for (const auto& p : heapdump_for_pid) {
+  for (auto& p : heapdump_for_pid) {
     if (!first)
       f << ",\n";
     first = false;
