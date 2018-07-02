@@ -14,17 +14,17 @@
 
 import { createMockClass } from '../test/mock_class';
 
-test('can mock from prototype', async () => {
+test('can mock existing class', async () => {
 
-  const map = createMockClass<Map<number,number>>(Map.prototype);
+  const map = createMockClass<Map<number,number>>();
 
   map.set(123, 456);
   expect(map.set.mock.calls[0]).toEqual([123, 456]);
 });
 
-test('can mock from list of methods', async () => {
+test('can mock missing class', async () => {
 
-  const ctx = createMockClass<CanvasRenderingContext2D>(['lineTo']);
+  const ctx = createMockClass<CanvasRenderingContext2D>();
 
   ctx.lineTo(123, 456);
   expect(ctx.lineTo.mock.calls[0]).toEqual([123, 456]);

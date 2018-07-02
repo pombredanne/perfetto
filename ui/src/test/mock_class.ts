@@ -18,14 +18,14 @@ export type MockClass<T> = {
   [P in keyof T]: Mock<T>;
 };
 
-export function createMockClass<T>(t: T|(Array<keyof T>)): MockClass<T> & T {
-
-  const props: Array<keyof T> = t instanceof Array ? t :
-    Object.getOwnPropertyNames(t) as Array<keyof T>;
-
-  const result = {} as MockClass<T>;
-  for (const k of props) {
-      result[k] = jest.fn<T>();
-  }
-  return result as MockClass<T> & T;
+export function createMockClass<T>(): MockClass<T> & T {
+  const mockFcts: {[prop: string]: Mock<T>} = {};
+  return new Proxy({}, {
+    get: (_, propKey: string) => {
+      if(!mockFcts[propKey]) {
+        mockFcts[propKey] = jest.fn<T>();
+      }
+      return mockFcts[propKey];
+    }
+  }) as MockClass<T> & T;
 }
