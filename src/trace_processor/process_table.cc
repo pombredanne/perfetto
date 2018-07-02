@@ -164,32 +164,39 @@ int ProcessTable::Cursor::Filter(int idxNum,
   const auto& index = table_->indexes_[static_cast<size_t>(idxNum)];
   PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
 
-  smallest_upid = 1;
-  largest_upid = static_cast<uint32_t>(storage_->process_count());
+  min_upid = 1;
+  max_upid = static_cast<uint32_t>(storage_->process_count());
   desc = false;
-  current_upid = smallest_upid;
+  current_upid = min_upid;
 
   for (size_t i = 0; i < index.constraints.size(); i++) {
     const auto& cs = index.constraints[i];
     if (cs.iColumn == Column::kUpid) {
-      TraceStorage::UniquePid upid =
+      TraceStorage::UniquePid constraint_upid =
           static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[i]));
+      // Set the range of upids that we are interested in, based on the
+      // constraints in the query. Everything between min and max (inclusive)
+      // will be returned.
       if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-        upid = IsOpGt(cs.op) ? upid + 1 : upid;
-        smallest_upid = upid;
+        constraint_upid = IsOpGt(cs.op) ? constraint_upid + 1 : constraint_upid;
+        min_upid = constraint_upid;
       } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-        upid = IsOpLt(cs.op) ? upid - 1 : upid;
-        largest_upid = upid;
+        constraint_upid = IsOpLt(cs.op) ? constraint_upid - 1 : constraint_upid;
+        max_upid = constraint_upid;
       } else if (IsOpEq(cs.op)) {
-        smallest_upid = upid;
-        largest_upid = upid;
+        min_upid = constraint_upid;
+        max_upid = constraint_upid;
       }
     }
   }
   for (const auto& ob : index.order_by) {
     if (ob.column == Column::kUpid) {
       desc = ob.desc;
-      desc ? current_upid = largest_upid : current_upid = smallest_upid;
+      if (desc) {
+        current_upid = max_upid;
+      } else {
+        current_upid = min_upid;
+      }
     }
   }
 
@@ -198,7 +205,11 @@ int ProcessTable::Cursor::Filter(int idxNum,
 }  // namespace trace_processor
 
 int ProcessTable::Cursor::Next() {
-  desc ? --current_upid : ++current_upid;
+  if (desc) {
+    --current_upid;
+  } else {
+    ++current_upid;
+  }
   return SQLITE_OK;
 }
 
@@ -207,7 +218,11 @@ int ProcessTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
 }
 
 int ProcessTable::Cursor::Eof() {
-  return desc ? current_upid < smallest_upid : current_upid > largest_upid;
+  if (desc) {
+    return current_upid < min_upid;
+  } else {
+    return current_upid > max_upid;
+  }
 }
 
 }  // namespace trace_processor

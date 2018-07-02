@@ -68,10 +68,10 @@ class ProcessTable {
 
     ProcessTable* const table_;
     const TraceStorage* const storage_;
-    TraceStorage::UniquePid smallest_upid = 1;
-    TraceStorage::UniquePid largest_upid =
+    TraceStorage::UniquePid min_upid = 1;
+    TraceStorage::UniquePid max_upid =
         static_cast<uint32_t>(storage_->process_count());
-    TraceStorage::UniquePid current_upid = smallest_upid;
+    TraceStorage::UniquePid current_upid = min_upid;
     bool desc = false;
   };
 
