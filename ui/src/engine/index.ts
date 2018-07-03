@@ -14,6 +14,4 @@
  * limitations under the License.
  */
 
-export class PerfettoEngine {
-
-}
+export class PerfettoEngine {}

@@ -20,7 +20,7 @@ import {frontend} from './frontend';
 console.log('Hello from the main thread!');
 
 function createController() {
-  const worker = new Worker("worker_bundle.js");
+  const worker = new Worker('worker_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
@@ -34,10 +34,7 @@ function createFrontend() {
   }
   const rect = root.getBoundingClientRect();
 
-  m.render(root, m(frontend, {
-    width: rect.width,
-    height: rect.height
-  }));
+  m.render(root, m(frontend, {width: rect.width, height: rect.height}));
 }
 
 function main() {
