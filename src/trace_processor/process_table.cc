@@ -124,6 +124,12 @@ int ProcessTable::BestIndex(sqlite3_index_info* idx) {
       continue;
     index->constraints.emplace_back(cs);
 
+    if (cs.iColumn == Column::kUpid) {
+      idx->estimatedCost = 10;
+    } else {
+      idx->estimatedCost = 100;
+    }
+
     // argvIndex is 1-based so use the current size of the vector.
     int argv_index = static_cast<int>(index->constraints.size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
@@ -202,7 +208,7 @@ int ProcessTable::Cursor::Filter(int idxNum,
 
   table_->indexes_.clear();
   return SQLITE_OK;
-}  // namespace trace_processor
+}
 
 int ProcessTable::Cursor::Next() {
   if (desc) {
