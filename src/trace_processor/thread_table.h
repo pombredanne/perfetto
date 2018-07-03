@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_PROCESS_TABLE_H_
-#define SRC_TRACE_PROCESSOR_PROCESS_TABLE_H_
+#ifndef SRC_TRACE_PROCESSOR_THREAD_TABLE_H_
+#define SRC_TRACE_PROCESSOR_THREAD_TABLE_H_
 
 #include <limits>
 #include <memory>
@@ -28,15 +28,15 @@ namespace trace_processor {
 
 // The implementation of the SQLite table containing each unique process with
 // the metadata for those processes.
-class ProcessTable {
+class ThreadTable {
  public:
-  enum Column { kUpid = 0, kName = 1 };
+  enum Column { kUtid = 0, kUpid = 1, kName = 2 };
   struct OrderBy {
     Column column = kUpid;
     bool desc = false;
   };
 
-  ProcessTable(const TraceStorage* storage);
+  ThreadTable(const TraceStorage* storage);
   static sqlite3_module CreateModule();
 
   // Implementation for sqlite3_vtab.
@@ -53,7 +53,7 @@ class ProcessTable {
 
   class Cursor {
    public:
-    Cursor(ProcessTable* table, const TraceStorage* storage);
+    Cursor(ThreadTable* table, const TraceStorage* storage);
 
     // Implementation of sqlite3_vtab_cursor.
     int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
@@ -66,16 +66,16 @@ class ProcessTable {
    private:
     sqlite3_vtab_cursor base_;  // Must be first.
 
-    struct UpidFilter {
-      TraceStorage::UniquePid min;
-      TraceStorage::UniquePid max;
-      TraceStorage::UniquePid current;
+    struct UtidFilter {
+      TraceStorage::UniqueTid min;
+      TraceStorage::UniqueTid max;
+      TraceStorage::UniqueTid current;
       bool desc;
     };
 
-    ProcessTable* const table_;
+    ThreadTable* const table_;
     const TraceStorage* const storage_;
-    UpidFilter upid_filter_;
+    UtidFilter utid_filter_;
   };
 
   static inline Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
@@ -91,4 +91,4 @@ class ProcessTable {
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_PROCESS_TABLE_H_
+#endif  // SRC_TRACE_PROCESSOR_THREAD_TABLE_H_
