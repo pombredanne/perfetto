@@ -441,7 +441,7 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
       return Compare(f_group, s_group, ob.desc);
     }
   }
-  return 0;
+  PERFETTO_CHECK(false);
 }
 
 void SchedSliceTable::PerCpuState::Initialize(
