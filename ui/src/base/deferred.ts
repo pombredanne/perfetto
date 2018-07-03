@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as protos from './gen/protos';
+// tslint:disable:no-any
 
-// Aliases protos to avoid the super nested namespaces.
-// See https://www.typescriptlang.org/docs/handbook/namespaces.html#aliases
-import TraceConfig = protos.perfetto.protos.TraceConfig;
-import TraceProcessor = protos.perfetto.protos.TraceProcessor;
-import IRawQueryArgs = protos.perfetto.protos.IRawQueryArgs;
-import RawQueryArgs = protos.perfetto.protos.RawQueryArgs;
-import RawQueryResult = protos.perfetto.protos.RawQueryResult;
+/**
+ * Promise wrapper with exposed resolve and reject callbacks.
+ */
+export interface Deferred<T> extends Promise<T>{
+  readonly resolve: (value?: T | PromiseLike<T>) => void;
+  readonly reject: (reason?: any) => void;
+}
 
-export {
-  TraceConfig,
-  TraceProcessor,
-  IRawQueryArgs,
-  RawQueryArgs,
-  RawQueryResult,
-};
+/**
+ * Create a promise with exposed resolve and reject callbacks.
+ */
+export function defer<T>(): Deferred<T> {
+  let resolve = null as any;
+  let reject = null as any;
+  const p = new Promise((res, rej) => [resolve, reject] = [res, rej]);
+  return Object.assign(p, {resolve, reject}) as any;
+}
