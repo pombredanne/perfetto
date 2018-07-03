@@ -172,6 +172,9 @@ class TraceStorage {
     return string_pool_[id];
   }
 
+  size_t process_count() const { return unique_processes_.size() - 1; }
+  size_t thread_count() const { return unique_threads_.size() - 1; }
+
  private:
   using StringHash = uint32_t;
 
