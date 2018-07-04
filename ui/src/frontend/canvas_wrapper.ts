@@ -29,6 +29,4 @@ export const canvasWrapper = {
       }
     });
   }
-} as m.Comp < {width: number
-  height: number,
-}>;
+} as m.Comp<{width: number, height: number}>;
