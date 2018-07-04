@@ -182,14 +182,15 @@ int SchedSliceTable::Open(sqlite3_vtab_cursor** ppCursor) {
 // Called at least once but possibly many times before filtering things and is
 // the best time to keep track of constriants.
 int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
-  IndexInfo* index = static_cast<IndexInfo*>(sqlite3_malloc(sizeof((*index))));
+  std::vector<Constraint> constraints;
+  std::vector<OrderBy> order_by;
 
   bool is_quantized_group_order_desc = false;
   bool is_duration_timestamp_order = false;
   for (int i = 0; i < idx->nOrderBy; i++) {
-    index->order_by.emplace_back();
+    order_by.emplace_back();
 
-    OrderBy* order = &index->order_by.back();
+    OrderBy* order = &order_by.back();
     order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     order->desc = idx->aOrderBy[i].desc;
 
@@ -213,13 +214,13 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
-    index->constraints.emplace_back(cs);
+    constraints.emplace_back(cs);
 
     if (cs.iColumn == Column::kQuantum)
       has_quantum_constraint = true;
 
     // argvIndex is 1-based so use the current size of the vector.
-    int argv_index = static_cast<int>(index->constraints.size());
+    int argv_index = static_cast<int>(constraints.size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
   }
   // If a quantum constraint is present, we don't support native ordering by
@@ -230,9 +231,25 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
   idx->orderByConsumed = !needs_sqlite_orderby;
   if (needs_sqlite_orderby)
-    index->order_by.clear();
+    order_by.clear();
 
-  idx->idxStr = reinterpret_cast<char*>(index);
+  int size = static_cast<int>(
+      sizeof(int) * (1 + order_by.size() * 2 + 1 + constraints.size() * 2));
+  int* encoded_index = static_cast<int*>(sqlite3_malloc(size));
+
+  int i = 0;
+  encoded_index[i++] = static_cast<int>(constraints.size());
+  for (const auto& cs : constraints) {
+    encoded_index[i++] = cs.iColumn;
+    encoded_index[i++] = cs.op;
+  }
+  encoded_index[i++] = static_cast<int>(order_by.size());
+  for (const auto& ob : order_by) {
+    encoded_index[i++] = ob.column;
+    encoded_index[i++] = ob.desc;
+  }
+
+  idx->idxStr = reinterpret_cast<char*>(encoded_index);
   idx->needToFreeIdxStr = true;
 
   return SQLITE_OK;
@@ -249,7 +266,24 @@ int SchedSliceTable::Cursor::Filter(int /* idxNum */,
                                     const char* idxStr,
                                     int argc,
                                     sqlite3_value** argv) {
-  const auto& index = *reinterpret_cast<const IndexInfo*>(idxStr);
+  IndexInfo index;
+  const int* encoded_index = reinterpret_cast<const int*>(idxStr);
+  int i = 0;
+  int no_constraints = encoded_index[i++];
+  for (int j = 0; j < no_constraints; j++) {
+    Constraint cs;
+    cs.iColumn = encoded_index[i++];
+    cs.op = static_cast<unsigned char>(encoded_index[i++]);
+    index.constraints.emplace_back(std::move(cs));
+  }
+  int no_order_by = encoded_index[i++];
+  for (int j = 0; j < no_order_by; j++) {
+    OrderBy ob;
+    ob.column = static_cast<enum Column>(encoded_index[i++]);
+    ob.desc = static_cast<unsigned char>(encoded_index[i++]);
+    index.order_by.emplace_back(std::move(ob));
+  }
+
   PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
 
   filter_state_.reset(new FilterState(storage_, index, argv));
