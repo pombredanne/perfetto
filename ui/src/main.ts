@@ -20,13 +20,17 @@ import { Engine } from './engine';
 import { WasmEngineProxy, warmupWasmEngineWorker }
     from './engine/wasm_engine_proxy';
 
+import { Action, updateQueryAction} from './actions';
+import { State, createZeroState } from './state';
+
 console.log('Hello from the main thread!');
 
-function createController() {
+function createController(): Worker {
   const worker = new Worker("worker_bundle.js");
   worker.onerror = e => {
     console.error(e);
   };
+  return worker;
 }
 
 function createFrontend() {
@@ -43,23 +47,59 @@ function createFrontend() {
   }));
 }
 
+class Dispatcher {
+  constructor(private worker: Worker) {
+  }
+
+  dispatch(action: Action) {
+    console.log(action);
+    this.worker.postMessage(action);
+  }
+}
+
+class FrontendStateStore {
+  private state: State;
+  constructor() {
+    this.state = createZeroState();
+  }
+
+  updateState(state: State) {
+    this.state = state;
+    console.log('re-imported', this.state);
+  }
+}
+
 function main(input: Element, button: Element) {
-  createController();
+  const worker = createController();
+  const dispatcher = new Dispatcher(worker);
+  const frontendStateStore = new FrontendStateStore();
   createFrontend();
 
   warmupWasmEngineWorker();
+  button.addEventListener('click', () => {
+    // engine.rawQuery({
+    //   sqlQuery: 'select * from sched;',
+    // }).then(
+    //   result => console.log(result)
+    // );
+    console.log("I'm being clicked!")
+    dispatcher.dispatch(updateQueryAction("select * from sched;"));
+  });
+
+  worker.onmessage = (message: MessageEvent) => {
+    console.log(message, 'in main thread');
+    const state = message.data as State;
+    console.log(state);
+    frontendStateStore.updateState(state);
+  }
+
   // tslint:disable-next-line:no-any
   input.addEventListener('change', (e: any) => {
     const blob: Blob = e.target.files.item(0);
     if (blob === null) return;
     const engine: Engine = WasmEngineProxy.create(blob);
-    button.addEventListener('click', () => {
-      engine.rawQuery({
-        sqlQuery: 'select * from sched;',
-      }).then(
-        result => console.log(result)
-      );
-    });
+    engine;
+
   });
 }
 const input = document.querySelector('#trace');

@@ -14,31 +14,23 @@
  * limitations under the License.
  */
 
-import { Action, isUpdateQuery } from "./actions";
-import {createZeroState, State} from './state';
-
-console.log('Hello from the worker!');
-
-class StateStore {
-  private state: State;
-  constructor() {
-    this.state = createZeroState();
-  }
-
-  dispatch(action: Action) {
-    if (isUpdateQuery(action)) {
-      console.log(action.query);
-      this.state.query = action.query;
-    }
-    (self as any).postMessage(this.state);
-  }
+export interface Action {
+  type: string;
 }
 
-const store = new StateStore();
+const UPDATE_QUERY_ACTION = 'UPDATE_QUERY';
+export interface UpdateQueryAction extends Action {
+  type: 'UPDATE_QUERY';
+  query: string;
+}
 
-self.onmessage = (message: MessageEvent) => {
-  const action = message.data as Action;
-  store.dispatch(action);
+export function isUpdateQuery(action: Action): action is UpdateQueryAction {
+  return action.type === UPDATE_QUERY_ACTION;
+}
 
-};
-
+export function updateQueryAction(query: string): UpdateQueryAction {
+  return {
+    type: "UPDATE_QUERY",
+    query
+  };
+}

@@ -14,31 +14,12 @@
  * limitations under the License.
  */
 
-import { Action, isUpdateQuery } from "./actions";
-import {createZeroState, State} from './state';
-
-console.log('Hello from the worker!');
-
-class StateStore {
-  private state: State;
-  constructor() {
-    this.state = createZeroState();
-  }
-
-  dispatch(action: Action) {
-    if (isUpdateQuery(action)) {
-      console.log(action.query);
-      this.state.query = action.query;
-    }
-    (self as any).postMessage(this.state);
-  }
+export interface State {
+  query: string;
 }
 
-const store = new StateStore();
-
-self.onmessage = (message: MessageEvent) => {
-  const action = message.data as Action;
-  store.dispatch(action);
-
-};
-
+export function createZeroState(): State {
+  return {
+    query: '',
+  }
+}
