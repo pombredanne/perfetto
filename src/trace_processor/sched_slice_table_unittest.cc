@@ -68,6 +68,9 @@ TEST(SchedSliceTableTest, IndexWithConstraintsAndOrderBy) {
   ASSERT_EQ(info.orderByConsumed, true);
   ASSERT_EQ(info.aConstraintUsage[0].argvIndex, 1);
   ASSERT_EQ(info.aConstraintUsage[1].argvIndex, 0);
+
+  // Free the pointer returned from BestIndex.
+  sqlite3_free(info.idxStr);
 }
 
 }  // namespace
