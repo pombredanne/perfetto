@@ -15,10 +15,10 @@
  */
 
 import * as m from 'mithril';
-import {track} from './track';
-import {canvasWrapper} from './canvas_wrapper';
+import {Track} from './track';
+import {CanvasWrapper} from './canvas_wrapper';
 
-export const frontend = {
+export const Frontend = {
   view({attrs}) {
     return m('.frontend',
       {
@@ -28,11 +28,11 @@ export const frontend = {
           width: attrs.width.toString() + 'px'
         }
       },
-      m(canvasWrapper, {
+      m(CanvasWrapper, {
         width: attrs.width,
         height: attrs.height
       }),
-      m(track, { name: 'Track 123' }),
+      m(Track, { name: 'Track 123' }),
     );
   }
-} as m.Comp<{width: number, height: number}>;
+} as m.Component<{width: number, height: number}>;

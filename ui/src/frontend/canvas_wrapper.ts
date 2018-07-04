@@ -16,7 +16,7 @@
 
 import * as m from 'mithril';
 
-export const canvasWrapper = {
+export const CanvasWrapper = {
   view({attrs}) {
     return m('canvas',
       {
@@ -31,7 +31,7 @@ export const canvasWrapper = {
       }
     );
   }
-} as m.Comp<{
+} as m.Component<{
   width: number
   height: number,
 }>;

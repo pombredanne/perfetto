@@ -16,7 +16,7 @@
 
 import * as m from 'mithril';
 
-export const trackShell = {
+export const TrackShell = {
   view({attrs}) {
     return m('.trackshell',
       {
@@ -41,4 +41,4 @@ export const trackShell = {
       )
     );
   }
-} as m.Comp<{ name: string }>;
+} as m.Component<{ name: string }>;

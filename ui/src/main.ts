@@ -15,7 +15,7 @@
  */
 
 import * as m from 'mithril';
-import { homePage } from './frontend/home_page';
+import { HomePage } from './frontend/home_page';
 import { Engine } from './engine';
 import { WasmEngineProxy, warmupWasmEngineWorker }
     from './engine/wasm_engine_proxy';
@@ -53,7 +53,7 @@ function main(input: Element, button: Element) {
     return;
   }
 
-  m.mount(root, homePage);
+  m.mount(root, HomePage);
 }
 
 const input = document.querySelector('#trace');
