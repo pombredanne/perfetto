@@ -74,7 +74,6 @@ TEST_F(ThreadTableUnittest, Select) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* utid */);
   ASSERT_EQ(sqlite3_column_int(stmt_, 1), 1 /* upid */);
-  PERFETTO_LOG("%s", sqlite3_column_text(stmt_, 2));
   ASSERT_EQ(
       strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 2)),
               kCommProc1, 7),
@@ -106,8 +105,6 @@ TEST_F(ThreadTableUnittest, JoinWithProcess) {
 
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* utid */);
-
-  PERFETTO_LOG("%s", sqlite3_column_text(stmt_, 1));
   ASSERT_EQ(
       strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
               kCommProc1, 7),

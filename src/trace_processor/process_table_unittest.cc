@@ -154,6 +154,51 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterName) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
+TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterDifferentOr) {
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  storage_.PushProcess(1, kCommProc1, 8);
+  storage_.PushProcess(2, kCommProc2, 8);
+
+  PrepareValidStatement(
+      "SELECT upid, name FROM process where upid = 2 or name = \"process2\"");
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
+  ASSERT_EQ(
+      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
+              kCommProc2, 8),
+      0);
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+}
+
+TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterSameOr) {
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  storage_.PushProcess(1, kCommProc1, 8);
+  storage_.PushProcess(2, kCommProc2, 8);
+
+  PrepareValidStatement(
+      "SELECT upid, name FROM process where upid = 1 or upid = 2");
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* upid */);
+  ASSERT_EQ(
+      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
+              kCommProc1, 8),
+      0);
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
+  ASSERT_EQ(
+      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
+              kCommProc2, 8),
+      0);
+
+  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+}
+
 }  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto

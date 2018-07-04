@@ -100,20 +100,20 @@ sqlite3_module ThreadTable::CreateModule() {
 }
 
 int ThreadTable::Open(sqlite3_vtab_cursor** ppCursor) {
-  *ppCursor =
-      reinterpret_cast<sqlite3_vtab_cursor*>(new Cursor(this, storage_));
+  *ppCursor = reinterpret_cast<sqlite3_vtab_cursor*>(new Cursor(storage_));
   return SQLITE_OK;
 }
 
 // Called at least once but possibly many times before filtering things and is
 // the best time to keep track of constriants.
 int ThreadTable::BestIndex(sqlite3_index_info* idx) {
-  indexes_.emplace_back();
-  IndexInfo* index = &indexes_.back();
-  for (int i = 0; i < idx->nOrderBy; i++) {
-    index->order_by.emplace_back();
+  std::vector<Constraint> constraints;
+  std::vector<OrderBy> order_by;
 
-    OrderBy* order = &index->order_by.back();
+  for (int i = 0; i < idx->nOrderBy; i++) {
+    order_by.emplace_back();
+
+    OrderBy* order = &order_by.back();
     order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     order->desc = idx->aOrderBy[i].desc;
   }
@@ -123,7 +123,7 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
-    index->constraints.emplace_back(cs);
+    constraints.emplace_back(cs);
 
     if (cs.iColumn == Column::kUpid) {
       idx->estimatedCost = 10;
@@ -132,16 +132,33 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
     }
 
     // argvIndex is 1-based so use the current size of the vector.
-    int argv_index = static_cast<int>(index->constraints.size());
+    int argv_index = static_cast<int>(constraints.size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
   }
-  idx->idxNum = static_cast<int>(indexes_.size() - 1);
+
+  int size = static_cast<int>(
+      sizeof(int) * (1 + order_by.size() * 2 + 1 + constraints.size() * 2));
+  int* encoded_index = static_cast<int*>(sqlite3_malloc(size));
+
+  int i = 0;
+  encoded_index[i++] = static_cast<int>(constraints.size());
+  for (const auto& cs : constraints) {
+    encoded_index[i++] = cs.iColumn;
+    encoded_index[i++] = cs.op;
+  }
+  encoded_index[i++] = static_cast<int>(order_by.size());
+  for (const auto& ob : order_by) {
+    encoded_index[i++] = ob.column;
+    encoded_index[i++] = ob.desc;
+  }
+
+  idx->idxStr = reinterpret_cast<char*>(encoded_index);
+  idx->needToFreeIdxStr = true;
 
   return SQLITE_OK;
 }
 
-ThreadTable::Cursor::Cursor(ThreadTable* table, const TraceStorage* storage)
-    : table_(table), storage_(storage) {
+ThreadTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
   static_assert(offsetof(Cursor, base_) == 0,
                 "SQLite base class must be first member of the cursor");
   memset(&base_, 0, sizeof(base_));
@@ -168,11 +185,28 @@ int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
-int ThreadTable::Cursor::Filter(int idxNum,
-                                const char* /* idxStr */,
+int ThreadTable::Cursor::Filter(int /*idxNum*/,
+                                const char* idxStr,
                                 int argc,
                                 sqlite3_value** argv) {
-  const auto& index = table_->indexes_[static_cast<size_t>(idxNum)];
+  IndexInfo index;
+  const int* encoded_index = reinterpret_cast<const int*>(idxStr);
+  int i = 0;
+  int no_constraints = encoded_index[i++];
+  for (int j = 0; j < no_constraints; j++) {
+    Constraint cs;
+    cs.iColumn = encoded_index[i++];
+    cs.op = static_cast<unsigned char>(encoded_index[i++]);
+    index.constraints.emplace_back(std::move(cs));
+  }
+  int no_order_by = encoded_index[i++];
+  for (int j = 0; j < no_order_by; j++) {
+    OrderBy ob;
+    ob.column = static_cast<enum Column>(encoded_index[i++]);
+    ob.desc = static_cast<unsigned char>(encoded_index[i++]);
+    index.order_by.emplace_back(std::move(ob));
+  }
+
   PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
 
   utid_filter_.min = 1;
@@ -180,11 +214,11 @@ int ThreadTable::Cursor::Filter(int idxNum,
   utid_filter_.desc = false;
   utid_filter_.current = utid_filter_.min;
 
-  for (size_t i = 0; i < index.constraints.size(); i++) {
-    const auto& cs = index.constraints[i];
+  for (size_t j = 0; j < index.constraints.size(); j++) {
+    const auto& cs = index.constraints[j];
     if (cs.iColumn == Column::kUpid) {
       TraceStorage::UniquePid constraint_upid =
-          static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[i]));
+          static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[j]));
       // Filter the range of utids that we are interested in, based on the
       // constraints in the query. Everything between min and max (inclusive)
       // will be returned.
