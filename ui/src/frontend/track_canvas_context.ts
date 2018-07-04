@@ -38,8 +38,11 @@ export class TrackCanvasContext {
 
     if(x < 0 || x + width > this.rect.width ||
       y < 0 || y + height > this.rect.height) {
-      throw new OutOfBoundsDrawingError('draw a rect',
-        {x, y, width, height}.toString(), this.rect);
+      throw new OutOfBoundsDrawingError('Rect out of bounds ' +
+        this.rect.width.toString() + ', ' + this.rect.height.toString() +
+        ': topleft ' + x.toString() + ', ' + y.toString() +
+        ', bottom right: ' + (x + width).toString() + ', ' +
+        (y + height).toString());
     }
 
     this.ctx.fillRect(x + this.rect.left, y + this.rect.top, width, height);
@@ -55,31 +58,14 @@ export class TrackCanvasContext {
   }
 
   moveTo(x: number, y: number) {
-    if(x < 0 || x > this.rect.width ||
-      y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('moveto',
-        {x, y}.toString(), this.rect);
-    }
-
     this.ctx.moveTo(x + this.rect.left, y + this.rect.top);
   }
 
   lineTo(x: number, y: number) {
-    if(x < 0 || x > this.rect.width ||
-      y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('lineto',
-        {x, y}.toString(), this.rect);
-    }
-
     this.ctx.lineTo(x + this.rect.left, y + this.rect.top);
   }
 
   fillText(text: string, x: number, y: number) {
-    if(x < 0 || x > this.rect.width ||
-      y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('draw text',
-        {x, y}.toString(), this.rect);
-    }
     this.ctx.fillText(text, x + this.rect.left, y + this.rect.top);
   }
 
@@ -101,10 +87,5 @@ export class TrackCanvasContext {
 }
 
 export class OutOfBoundsDrawingError extends Error {
-  constructor(action: string, drawing: string, bounds: {
-    left: number, top: number, width: number, height: number
-  }) {
-    super('Attempted to ' + action +
-      ' (' + drawing + ') in bounds ' + bounds.toString());
-  }
+
 }

@@ -35,12 +35,8 @@ function createFrontend() {
     console.error('root element not found.');
     return;
   }
-  const rect = root.getBoundingClientRect();
 
-  m.render(root, m(frontend, {
-    width: rect.width,
-    height: rect.height,
-  }));
+  m.mount(root, frontend);
 }
 
 function main(input: Element, button: Element) {

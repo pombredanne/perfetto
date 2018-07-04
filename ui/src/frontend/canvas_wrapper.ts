@@ -15,23 +15,34 @@
  */
 
 import * as m from 'mithril';
+import {CanvasOffsetRect} from './canvas_offset_rect';
 
 export const canvasWrapper = {
   view({attrs}) {
-    return m('canvas',
-      {
+    return m('.canvasWrapper', {
         style: {
-          background: '#ccc',
-          position: 'absolute',
-          top: 0,
-          left: 0,
+          position: 'relative',
           width: attrs.width.toString() + 'px',
           height: attrs.height.toString() + 'px',
+          overflow: 'hidden'
         }
-      }
+      },
+      /*m('.canvasPositioner',
+        {
+          id: 'canvasPositioner',
+          style: {
+            background: '#ccc',
+            position: 'absolute',
+            top: attrs.cor.top,
+            left: 0,
+            width: attrs.cor.width.toString() + 'px',
+            height: attrs.cor.height.toString() + 'px',
+          }
+        })*/
     );
   }
 } as m.Comp<{
-  width: number
-  height: number,
+  cor: CanvasOffsetRect,
+  width: number,
+  height: number
 }>;

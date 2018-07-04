@@ -14,22 +14,20 @@
  * limitations under the License.
  */
 
-import * as m from 'mithril';
-import {trackShell} from './track_shell';
-import {TrackCanvasContext} from "./track_canvas_context";
+export class CanvasOffsetRect {
 
-export const track = {
-  view({attrs}) {
-    return m('.track',
-      {
-        style: {
-          position: 'absolute',
-          top: attrs.top + 'px',
-          left: 0,
-          width: '100%'
-        }
-      },
-      m(trackShell, attrs)
-    );
+  public height: number;
+  public top: number = 0;
+  public readonly left = 0;
+
+  constructor(private winHeight: number, public width: number, public heightFactor = 2) {
+
+    this.height = this.winHeight * heightFactor;
   }
-} as m.Comp<{ name: string, cctx: TrackCanvasContext, top: number}>;
+
+  setScrollTop(scrollTop: number)
+  {
+    const extraHeight = this.height - this.winHeight;
+    this.top = scrollTop - Math.round(extraHeight / 2);
+  }
+}
