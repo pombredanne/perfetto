@@ -53,7 +53,7 @@ class ProcessTable {
 
   class Cursor {
    public:
-    Cursor(ProcessTable* table, const TraceStorage* storage);
+    Cursor(const TraceStorage* storage);
 
     // Implementation of sqlite3_vtab_cursor.
     int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
@@ -66,7 +66,6 @@ class ProcessTable {
    private:
     sqlite3_vtab_cursor base_;  // Must be first.
 
-    ProcessTable* const table_;
     const TraceStorage* const storage_;
     TraceStorage::UniquePid min_upid = 1;
     TraceStorage::UniquePid max_upid =
@@ -81,9 +80,6 @@ class ProcessTable {
 
   sqlite3_vtab base_;  // Must be first.
   const TraceStorage* const storage_;
-
-  // One entry for each BestIndex call.
-  std::vector<IndexInfo> indexes_;
 };
 }  // namespace trace_processor
 }  // namespace perfetto
