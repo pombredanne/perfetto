@@ -29,9 +29,9 @@ using Column = SchedSliceTable::Column;
 class SchedSliceTableIntegrationTest : public ::testing::Test {
  public:
   SchedSliceTableIntegrationTest() {
-    sqlite3* db;
-    sqlite3_open(":memory:", &db);
-    db_.reset(std::move(db));
+    sqlite3* db = nullptr;
+    PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    db_.reset(db);
 
     static sqlite3_module module = SchedSliceTable::CreateModule();
     sqlite3_create_module(*db_, "sched", &module,
@@ -41,8 +41,9 @@ class SchedSliceTableIntegrationTest : public ::testing::Test {
   void PrepareValidStatement(const std::string& sql) {
     int size = static_cast<int>(sql.size());
     sqlite3_stmt* stmt;
-    ASSERT_EQ(sqlite3_prepare_v2(*db_, sql.c_str(), size, &stmt, nullptr), 0);
-    stmt_.reset(std::move(stmt));
+    ASSERT_EQ(sqlite3_prepare_v2(*db_, sql.c_str(), size, &stmt, nullptr),
+              SQLITE_OK);
+    stmt_.reset(stmt);
   }
 
  protected:

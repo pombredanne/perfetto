@@ -26,8 +26,8 @@ constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
 
 TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
     : task_runner_(task_runner), weak_factory_(this) {
-  sqlite3* db;
-  sqlite3_open(":memory:", &db);
+  sqlite3* db = nullptr;
+  PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   db_.reset(std::move(db));
 
   // Setup the sched slice table.
