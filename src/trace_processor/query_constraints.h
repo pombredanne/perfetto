@@ -48,14 +48,17 @@ class QueryConstraints {
     ob.desc = desc;
     order_by_.emplace_back(ob);
   }
+
+  void ClearOrderBy() { order_by_.clear(); }
+
   // Converts the constraints and order by information to a string for
   // use by sqlite.
-  const char* ToNewSqlite3String();
+  char* ToNewSqlite3String();
   static QueryConstraints FromString(const char* encoded_string);
 
-  const std::vector<OrderBy>& order_by() { return order_by_; }
+  const std::vector<OrderBy>& order_by() const { return order_by_; }
 
-  const std::vector<Constraint>& constraints() { return constraints_; }
+  const std::vector<Constraint>& constraints() const { return constraints_; }
 
  private:
   std::vector<OrderBy> order_by_;

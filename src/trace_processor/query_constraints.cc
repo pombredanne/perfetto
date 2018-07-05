@@ -32,7 +32,7 @@ const char* FindNextInteger(const char* idxStr) {
 }
 }  // namespace
 
-const char* QueryConstraints::ToNewSqlite3String() {
+char* QueryConstraints::ToNewSqlite3String() {
   std::vector<std::string> vec_result;
   vec_result.emplace_back(std::to_string(constraints_.size()));
   for (const auto& cs : constraints_) {
