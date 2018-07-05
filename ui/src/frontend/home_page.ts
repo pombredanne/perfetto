@@ -15,7 +15,7 @@
  */
 
 import * as m from 'mithril';
-import { frontend } from './';
+import {frontend} from './';
 
 export const homePage = {
   view() {

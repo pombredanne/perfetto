@@ -15,15 +15,18 @@
  */
 
 import * as m from 'mithril';
-import { homePage } from './frontend/home_page';
-import { Engine } from './engine';
-import { WasmEngineProxy, warmupWasmEngineWorker }
-    from './engine/wasm_engine_proxy';
+
+import {Engine} from './engine';
+import {
+  warmupWasmEngineWorker,
+  WasmEngineProxy
+} from './engine/wasm_engine_proxy';
+import {homePage} from './frontend/home_page';
 
 console.log('Hello from the main thread!');
 
 function createController() {
-  const worker = new Worker("worker_bundle.js");
+  const worker = new Worker('worker_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
@@ -39,11 +42,11 @@ function main(input: Element, button: Element) {
     if (blob === null) return;
     const engine: Engine = WasmEngineProxy.create(blob);
     button.addEventListener('click', () => {
-      engine.rawQuery({
-        sqlQuery: 'select * from sched;',
-      }).then(
-        result => console.log(result)
-      );
+      engine
+          .rawQuery({
+            sqlQuery: 'select * from sched;',
+          })
+          .then(result => console.log(result));
     });
   });
 
