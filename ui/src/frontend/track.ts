@@ -19,16 +19,9 @@ import {TrackShell} from './track_shell';
 
 export const Track = {
   view({attrs}) {
-    return m('.track',
-      {
-        style: {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%'
-        }
-      },
-      m(TrackShell, attrs)
-    );
+    return m(
+        '.track',
+        {style: {position: 'absolute', top: 0, left: 0, width: '100%'}},
+        m(TrackShell, attrs));
   }
-} as m.Component<{ name: string }>;
+} as m.Component<{name: string}>;
