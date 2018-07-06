@@ -50,7 +50,8 @@ class SchedSliceTableIntegrationTest : public ::testing::Test {
   sqlite3_stmt* stmt_ = nullptr;
 };
 
-TEST_F(SchedSliceTableIntegrationTest, RowsReturnedInCorrectOrderWithinCpu) {
+TEST_F(SchedSliceTableIntegrationTest,
+       DISABLED_RowsReturnedInCorrectOrderWithinCpu) {
   uint32_t cpu = 3;
   uint64_t timestamp = 100;
   uint32_t pid_1 = 2;
@@ -87,7 +88,8 @@ TEST_F(SchedSliceTableIntegrationTest, RowsReturnedInCorrectOrderWithinCpu) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, RowsReturnedInCorrectOrderBetweenCpu) {
+TEST_F(SchedSliceTableIntegrationTest,
+       DISABLED_RowsReturnedInCorrectOrderBetweenCpu) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint32_t cpu_3 = 4;
@@ -130,7 +132,7 @@ TEST_F(SchedSliceTableIntegrationTest, RowsReturnedInCorrectOrderBetweenCpu) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, FilterCpus) {
+TEST_F(SchedSliceTableIntegrationTest, DISABLED_FilterCpus) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
@@ -158,7 +160,7 @@ TEST_F(SchedSliceTableIntegrationTest, FilterCpus) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, QuanitsiationCpuNativeOrder) {
+TEST_F(SchedSliceTableIntegrationTest, DISABLED_QuanitsiationCpuNativeOrder) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
@@ -200,7 +202,8 @@ TEST_F(SchedSliceTableIntegrationTest, QuanitsiationCpuNativeOrder) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, QuantizationSqliteDurationOrder) {
+TEST_F(SchedSliceTableIntegrationTest,
+       DISABLED_QuantizationSqliteDurationOrder) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
@@ -242,7 +245,7 @@ TEST_F(SchedSliceTableIntegrationTest, QuantizationSqliteDurationOrder) {
   ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
 }
 
-TEST_F(SchedSliceTableIntegrationTest, QuantizationGroupAndSum) {
+TEST_F(SchedSliceTableIntegrationTest, DISABLED_QuantizationGroupAndSum) {
   uint32_t cpu_1 = 3;
   uint32_t cpu_2 = 8;
   uint64_t timestamp = 100;
