@@ -22,6 +22,8 @@
 namespace perfetto {
 namespace trace_processor {
 namespace {
+using SqliteString =
+    base::ScopedResource<char*, QueryConstraints::FreeSqliteString, nullptr>;
 
 TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   QueryConstraints qc;
@@ -29,20 +31,32 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   qc.AddOrderBy(1, false);
   qc.AddOrderBy(21, true);
 
-  const char* result = qc.ToNewSqlite3String();
-  ASSERT_TRUE(strcmp(result, "1,12,0,2,1,0,21,1") == 0);
+  SqliteString result = qc.ToNewSqlite3String();
+  ASSERT_TRUE(strcmp(result.get(), "C1,12,0,O2,1,0,21,1") == 0);
 
-  QueryConstraints back = QueryConstraints::FromString(result);
+  QueryConstraints qc_result = QueryConstraints::FromString(result.get());
 
   for (size_t i = 0; i < qc.constraints().size(); i++) {
-    ASSERT_EQ(qc.constraints()[i].iColumn, back.constraints()[i].iColumn);
-    ASSERT_EQ(qc.constraints()[i].op, back.constraints()[i].op);
+    ASSERT_EQ(qc.constraints()[i].iColumn, qc_result.constraints()[i].iColumn);
+    ASSERT_EQ(qc.constraints()[i].op, qc_result.constraints()[i].op);
   }
 
   for (size_t i = 0; i < qc.order_by().size(); i++) {
-    ASSERT_EQ(qc.order_by()[i].column, back.order_by()[i].column);
-    ASSERT_EQ(qc.order_by()[i].desc, back.order_by()[i].desc);
+    ASSERT_EQ(qc.order_by()[i].iColumn, qc_result.order_by()[i].iColumn);
+    ASSERT_EQ(qc.order_by()[i].desc, qc_result.order_by()[i].desc);
   }
+}
+
+TEST(QueryConstraintsTest, CheckEmptyConstraints) {
+  QueryConstraints qc;
+
+  SqliteString string_result = qc.ToNewSqlite3String();
+  ASSERT_TRUE(strcmp(string_result.get(), "C0,O0") == 0);
+
+  QueryConstraints qc_result =
+      QueryConstraints::FromString(string_result.get());
+  ASSERT_EQ(qc_result.constraints().size(), 0);
+  ASSERT_EQ(qc_result.order_by().size(), 0);
 }
 
 }  // namespace

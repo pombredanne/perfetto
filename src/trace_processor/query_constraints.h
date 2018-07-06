@@ -18,44 +18,60 @@
 #define SRC_TRACE_PROCESSOR_QUERY_CONSTRAINTS_H_
 
 #include <vector>
+#include "perfetto/base/scoped_file.h"
 #include "sqlite3.h"
 
 namespace perfetto {
 namespace trace_processor {
+
 // This class stores the constraints (including the order by information) for
-// a query on a sqlite3 virtual table.
-// The constraints must be converted to and from a const char* to be used
-// by sqlite.
+// a query on a sqlite3 virtual table and handles their de/serialization into
+// strings.
+// This is because the constraint columns and the order-by clauses are passed
+// to the xBestIndex method but the constraint value are available only in the
+// xFilter method. Unfortunately sqlite vtable API don't give any hint about
+// the validity of the constraints (i.e. constraints passed to xBestIndex can
+// be used by future xFilter calls in the far future). The only mechanism
+// offered by sqlite is the idxStr string which is returned by the vtable
+// in the xBestIndex call and passed to each corresponding xFilter call.
 class QueryConstraints {
  public:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
+  using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
 
-  struct OrderBy {
-    int column = 0;
-    bool desc = false;
-  };
+  static int FreeSqliteString(char* resource) {
+    sqlite3_free(resource);
+    return 0;
+  }
 
   void AddConstraint(int column, unsigned char op) {
-    Constraint c;
+    Constraint c{};
     c.iColumn = column;
     c.op = op;
-    constraints_.emplace_back(c);
+    constraints_.emplace_back(std::move(c));
   }
 
-  void AddOrderBy(int column, bool desc) {
-    OrderBy ob;
-    ob.column = column;
+  void AddOrderBy(int column, unsigned char desc) {
+    OrderBy ob{};
+    ob.iColumn = column;
     ob.desc = desc;
-    order_by_.emplace_back(ob);
+    order_by_.emplace_back(std::move(ob));
   }
+
+  using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
+
   // Converts the constraints and order by information to a string for
   // use by sqlite.
-  const char* ToNewSqlite3String();
-  static QueryConstraints FromString(const char* encoded_string);
+  SqliteString ToNewSqlite3String();
 
-  const std::vector<OrderBy>& order_by() { return order_by_; }
+  // Deserializes the string into QueryConstraints. String given is in the form
+  // C{# of constraints},col1,op1,col2,op2...,O{# of order by},col1,desc1...
+  // For example C1,0,3,O2,1,0,4,1
+  static QueryConstraints FromString(const char* idxStr);
 
-  const std::vector<Constraint>& constraints() { return constraints_; }
+  const std::vector<OrderBy>& order_by() const { return order_by_; }
+
+  const std::vector<Constraint>& constraints() const { return constraints_; }
 
  private:
   std::vector<OrderBy> order_by_;
