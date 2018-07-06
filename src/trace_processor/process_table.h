@@ -27,14 +27,10 @@ namespace perfetto {
 namespace trace_processor {
 
 // The implementation of the SQLite table containing each unique process with
-// the metadata for those processes.
+// their details (only name at the moment).
 class ProcessTable {
  public:
   enum Column { kUpid = 0, kName = 1 };
-  struct OrderBy {
-    Column column = kUpid;
-    bool desc = false;
-  };
 
   ProcessTable(const TraceStorage* storage);
   static sqlite3_module CreateModule();
@@ -45,11 +41,7 @@ class ProcessTable {
 
  private:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
-
-  struct IndexInfo {
-    std::vector<OrderBy> order_by;
-    std::vector<Constraint> constraints;
-  };
+  using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
 
   class Cursor {
    public:
@@ -67,11 +59,11 @@ class ProcessTable {
     sqlite3_vtab_cursor base_;  // Must be first.
 
     const TraceStorage* const storage_;
-    TraceStorage::UniquePid min_upid = 1;
-    TraceStorage::UniquePid max_upid =
+    TraceStorage::UniquePid min_upid_ = 1;
+    TraceStorage::UniquePid max_upid_ =
         static_cast<uint32_t>(storage_->process_count());
-    TraceStorage::UniquePid current_upid = min_upid;
-    bool desc = false;
+    TraceStorage::UniquePid current_upid_ = min_upid_;
+    bool desc_ = false;
   };
 
   static inline Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
