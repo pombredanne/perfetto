@@ -14,4 +14,11 @@
  * limitations under the License.
  */
 
-export class PerfettoController {}
+import * as m from 'mithril';
+import {frontend} from './';
+
+export const homePage = {
+  view() {
+    return m(frontend, {width: 1000, height: 300});
+  }
+} as m.Component;
