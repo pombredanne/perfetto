@@ -59,10 +59,9 @@ class ProcessTable {
     sqlite3_vtab_cursor base_;  // Must be first.
 
     const TraceStorage* const storage_;
-    TraceStorage::UniquePid min_upid_ = 1;
-    TraceStorage::UniquePid max_upid_ =
-        static_cast<uint32_t>(storage_->process_count());
-    TraceStorage::UniquePid current_upid_ = min_upid_;
+    TraceStorage::UniquePid min_upid_;
+    TraceStorage::UniquePid max_upid_;
+    TraceStorage::UniquePid current_upid_;
     bool desc_ = false;
   };
 
