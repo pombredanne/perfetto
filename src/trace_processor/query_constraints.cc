@@ -23,10 +23,8 @@
 
 namespace perfetto {
 namespace trace_processor {
-using SqliteString =
-    base::ScopedResource<char*, QueryConstraints::FreeSqliteString, nullptr>;
 
-SqliteString QueryConstraints::ToNewSqlite3String() {
+QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
   std::string str_result;
   str_result.append("C" + std::to_string(constraints_.size()) + ",");
   for (const auto& cs : constraints_) {

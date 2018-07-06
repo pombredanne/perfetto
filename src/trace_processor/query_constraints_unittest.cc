@@ -22,8 +22,6 @@
 namespace perfetto {
 namespace trace_processor {
 namespace {
-using SqliteString =
-    base::ScopedResource<char*, QueryConstraints::FreeSqliteString, nullptr>;
 
 TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   QueryConstraints qc;
@@ -31,7 +29,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   qc.AddOrderBy(1, false);
   qc.AddOrderBy(21, true);
 
-  SqliteString result = qc.ToNewSqlite3String();
+  QueryConstraints::SqliteString result = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(result.get(), "C1,12,0,O2,1,0,21,1") == 0);
 
   QueryConstraints qc_result = QueryConstraints::FromString(result.get());
@@ -50,7 +48,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
 TEST(QueryConstraintsTest, CheckEmptyConstraints) {
   QueryConstraints qc;
 
-  SqliteString string_result = qc.ToNewSqlite3String();
+  QueryConstraints::SqliteString string_result = qc.ToNewSqlite3String();
   ASSERT_TRUE(strcmp(string_result.get(), "C0,O0") == 0);
 
   QueryConstraints qc_result =
