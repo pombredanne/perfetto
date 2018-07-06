@@ -24,17 +24,21 @@ export class CanvasController {
 
   private top = 0;
   private canvasHeight: number;
+  private maxHeight = 100000;
+  private extraHeightPerSide = 0;
 
   constructor(private width: number, private height: number) {
 
     this.canvas = document.createElement('canvas');
     this.canvasHeight = this.height * 2;
+    this.extraHeightPerSide = Math.round(
+      (this.canvasHeight - this.height) / 2);
 
     this.canvas.style.position = 'absolute';
-    this.canvas.style.top = '-' + (this.canvasHeight - this.height) / 2 + 'px';
+    this.canvas.style.top = (-1 * this.extraHeightPerSide).toString() + 'px';
     this.canvas.style.left = '0';
-    this.canvas.style.width = this.width + 'px';
-    this.canvas.style.height = this.canvasHeight + 'px';
+    this.canvas.style.width = this.width.toString() + 'px';
+    this.canvas.style.height = this.canvasHeight.toString() + 'px';
     this.canvas.width = this.width;
     this.canvas.height = this.canvasHeight;
 
@@ -47,11 +51,15 @@ export class CanvasController {
     this.ctx = ctx;
     this.cctx = new TrackCanvasContext(this.ctx, {
       left: 0,
-      top: this.top,
+      top: this.extraHeightPerSide,
       width: this.width,
-      height: this.canvasHeight
+      height: this.maxHeight
     });
-    console.log('ya');
+  }
+
+  clear() {
+    this.cctx.fillStyle = 'white';
+    this.cctx.fillRect(0, 0, this.width, this.maxHeight);
   }
 
   getContext() {
@@ -63,7 +71,7 @@ export class CanvasController {
   }
 
   updateScrollOffset(scrollOffset: number) {
-    this.top = scrollOffset;
+    this.top = scrollOffset + this.extraHeightPerSide;
   }
 
   getCanvasScrollOffset() {

@@ -15,34 +15,24 @@
  */
 
 import * as m from 'mithril';
-import {CanvasOffsetRect} from './canvas_offset_rect';
+
+type CanvasWrapper = m.Comp<{
+  scrollOffset: number,
+  canvasElement: HTMLCanvasElement,
+}, {}>;
 
 export const canvasWrapper = {
   view({attrs}) {
     return m('.canvasWrapper', {
-        style: {
-          position: 'relative',
-          width: attrs.width.toString() + 'px',
-          height: attrs.height.toString() + 'px',
-          overflow: 'hidden'
-        }
-      },
-      /*m('.canvasPositioner',
-        {
-          id: 'canvasPositioner',
-          style: {
-            background: '#ccc',
-            position: 'absolute',
-            top: attrs.cor.top,
-            left: 0,
-            width: attrs.cor.width.toString() + 'px',
-            height: attrs.cor.height.toString() + 'px',
-          }
-        })*/
-    );
+      style: {
+        position: 'absolute',
+        top: attrs.scrollOffset.toString() + 'px',
+        overflow: 'none',
+      }
+    });
+  },
+
+  oncreate(vnode) {
+    vnode.dom.appendChild(vnode.attrs.canvasElement);
   }
-} as m.Comp<{
-  cor: CanvasOffsetRect,
-  width: number,
-  height: number
-}>;
+} as CanvasWrapper;

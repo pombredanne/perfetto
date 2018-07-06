@@ -22,7 +22,7 @@ const scrollableContent = {
       {
         style: {
           'will-change': 'transform',
-          height: attrs.contentHeight + 'px',
+          height: attrs.contentHeight.toString() + 'px',
           overflow: 'hidden'
         }
       }, children);
@@ -32,13 +32,20 @@ const scrollableContent = {
   contentHeight: number
 }, {}>;
 
+type ScrollableContainer = m.Comp<{
+  width: number,
+  height: number,
+  contentHeight: number,
+  onPassiveScroll: (scrollTop: number) => void,
+}, {}>;
+
 export const scrollableContainer = {
   view({attrs, children}) {
     return m('.scrollableContainer',
       {
         style: {
-          width: attrs.width + 'px',
-          height: attrs.height + 'px',
+          width: attrs.width.toString() + 'px',
+          height: attrs.height.toString() + 'px',
           overflow: 'auto',
           position: 'relative'
         }
@@ -47,18 +54,11 @@ export const scrollableContainer = {
         onPassiveScroll: attrs.onPassiveScroll,
         contentHeight: attrs.contentHeight
       }, children));
-
   },
 
-  oncreate(vnode) {
-    vnode.dom.addEventListener('scroll', _ => {
-      vnode.attrs.onPassiveScroll((vnode.dom as any).scrollTop);
-      console.log('i scrolled', (vnode.dom as any).scrollTop);
-    }, {passive: true})
+  oncreate({dom, attrs}) {
+    dom.addEventListener('scroll', _ => {
+      attrs.onPassiveScroll(dom.scrollTop);
+    }, {passive: true});
   }
-} as m.Comp<{
-  width: number,
-  height: number,
-  contentHeight: number,
-  onPassiveScroll: (scrollTop: number) => void,
-}, {}>;
+} as ScrollableContainer;

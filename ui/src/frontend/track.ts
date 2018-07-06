@@ -20,11 +20,19 @@ import {TrackCanvasContext} from "./track_canvas_context";
 
 export const track = {
   view({attrs}) {
+
+    attrs.cctx.fillStyle = '#ccc';
+    attrs.cctx.fillRect(0, 0, 1000, 73);
+
+    attrs.cctx.font = '16px Arial';
+    attrs.cctx.fillStyle = '#000';
+    attrs.cctx.fillText(attrs.name + ' rendered by canvas', 500, 20);
+
     return m('.track',
       {
         style: {
           position: 'absolute',
-          top: attrs.top + 'px',
+          top: attrs.top.toString() + 'px',
           left: 0,
           width: '100%'
         }
