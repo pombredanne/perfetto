@@ -15,6 +15,7 @@
  */
 
 #include "src/trace_processor/thread_table.h"
+#include "src/trace_processor/query_constraints.h"
 
 #include "perfetto/base/logging.h"
 
@@ -107,15 +108,12 @@ int ThreadTable::Open(sqlite3_vtab_cursor** ppCursor) {
 // Called at least once but possibly many times before filtering things and is
 // the best time to keep track of constriants.
 int ThreadTable::BestIndex(sqlite3_index_info* idx) {
-  std::vector<Constraint> constraints;
-  std::vector<OrderBy> order_by;
+  QueryConstraints qc;
 
   for (int i = 0; i < idx->nOrderBy; i++) {
-    order_by.emplace_back();
-
-    OrderBy* order = &order_by.back();
-    order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
-    order->desc = idx->aOrderBy[i].desc;
+    int column = static_cast<Column>(idx->aOrderBy[i].iColumn);
+    unsigned char desc = idx->aOrderBy[i].desc;
+    qc.AddOrderBy(column, desc);
   }
   idx->orderByConsumed = true;
 
@@ -123,7 +121,7 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
-    constraints.emplace_back(cs);
+    qc.AddConstraint(cs.iColumn, cs.op);
 
     if (cs.iColumn == Column::kUpid) {
       idx->estimatedCost = 10;
@@ -132,27 +130,11 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
     }
 
     // argvIndex is 1-based so use the current size of the vector.
-    int argv_index = static_cast<int>(constraints.size());
+    int argv_index = static_cast<int>(qc.constraints().size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
   }
 
-  int size = static_cast<int>(
-      sizeof(int) * (1 + order_by.size() * 2 + 1 + constraints.size() * 2));
-  int* encoded_index = static_cast<int*>(sqlite3_malloc(size));
-
-  int i = 0;
-  encoded_index[i++] = static_cast<int>(constraints.size());
-  for (const auto& cs : constraints) {
-    encoded_index[i++] = cs.iColumn;
-    encoded_index[i++] = cs.op;
-  }
-  encoded_index[i++] = static_cast<int>(order_by.size());
-  for (const auto& ob : order_by) {
-    encoded_index[i++] = ob.column;
-    encoded_index[i++] = ob.desc;
-  }
-
-  idx->idxStr = reinterpret_cast<char*>(encoded_index);
+  idx->idxStr = qc.ToNewSqlite3String().release();
   idx->needToFreeIdxStr = true;
 
   return SQLITE_OK;
@@ -189,33 +171,17 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
                                 const char* idxStr,
                                 int argc,
                                 sqlite3_value** argv) {
-  IndexInfo index;
-  const int* encoded_index = reinterpret_cast<const int*>(idxStr);
-  int i = 0;
-  int no_constraints = encoded_index[i++];
-  for (int j = 0; j < no_constraints; j++) {
-    Constraint cs;
-    cs.iColumn = encoded_index[i++];
-    cs.op = static_cast<unsigned char>(encoded_index[i++]);
-    index.constraints.emplace_back(std::move(cs));
-  }
-  int no_order_by = encoded_index[i++];
-  for (int j = 0; j < no_order_by; j++) {
-    OrderBy ob;
-    ob.column = static_cast<enum Column>(encoded_index[i++]);
-    ob.desc = static_cast<unsigned char>(encoded_index[i++]);
-    index.order_by.emplace_back(std::move(ob));
-  }
+  QueryConstraints qc = QueryConstraints::FromString(idxStr);
 
-  PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
+  PERFETTO_CHECK(qc.constraints().size() == static_cast<size_t>(argc));
 
   utid_filter_.min = 1;
   utid_filter_.max = static_cast<uint32_t>(storage_->thread_count());
   utid_filter_.desc = false;
   utid_filter_.current = utid_filter_.min;
 
-  for (size_t j = 0; j < index.constraints.size(); j++) {
-    const auto& cs = index.constraints[j];
+  for (size_t j = 0; j < qc.constraints().size(); j++) {
+    const auto& cs = qc.constraints()[j];
     if (cs.iColumn == Column::kUpid) {
       TraceStorage::UniquePid constraint_upid =
           static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[j]));
@@ -234,8 +200,8 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
       }
     }
   }
-  for (const auto& ob : index.order_by) {
-    if (ob.column == Column::kUpid) {
+  for (const auto& ob : qc.order_by()) {
+    if (ob.iColumn == Column::kUpid) {
       utid_filter_.desc = ob.desc;
       if (utid_filter_.desc) {
         utid_filter_.current = utid_filter_.max;
@@ -245,7 +211,6 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
     }
   }
 
-  // table_->indexes_.clear();
   return SQLITE_OK;
 }
 
