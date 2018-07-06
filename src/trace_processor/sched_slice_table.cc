@@ -408,11 +408,12 @@ int SchedSliceTable::FilterState::CompareSlices(uint32_t f_cpu,
   return 0;
 }
 
-int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
-                                                        size_t f_idx,
-                                                        uint32_t s_cpu,
-                                                        size_t s_idx,
-                                                        const OrderBy& ob) {
+int SchedSliceTable::FilterState::CompareSlicesOnColumn(
+    uint32_t f_cpu,
+    size_t f_idx,
+    uint32_t s_cpu,
+    size_t s_idx,
+    const QueryConstraints::OrderBy& ob) {
   const auto& f_sl = storage_->SlicesForCpu(f_cpu);
   const auto& s_sl = storage_->SlicesForCpu(s_cpu);
   switch (ob.column) {
