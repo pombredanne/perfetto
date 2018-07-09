@@ -36,19 +36,21 @@ export class CanvasController {
     this.extraHeightPerSide = Math.round(
       (this.canvasHeight - this.height) / 2);
 
+    const dpr = window.devicePixelRatio;
     this.canvas.style.position = 'absolute';
     this.canvas.style.top = (-1 * this.extraHeightPerSide).toString() + 'px';
-    this.canvas.style.left = '0';
     this.canvas.style.width = this.width.toString() + 'px';
     this.canvas.style.height = this.canvasHeight.toString() + 'px';
-    this.canvas.width = this.width;
-    this.canvas.height = this.canvasHeight;
+    this.canvas.width = this.width * dpr;
+    this.canvas.height = this.canvasHeight * dpr;
 
     const ctx = this.canvas.getContext('2d');
 
     if(!ctx) {
       throw new Error('Canvas Context not found');
     }
+
+    ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
     this.cctx = new TrackCanvasContext(this.ctx, {

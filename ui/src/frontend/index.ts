@@ -21,7 +21,6 @@ import {TrackCanvasContext} from './track_canvas_context';
 
 export const Frontend = {
   oninit() {
-
     this.width = 1000;
     this.height = 400;
 
