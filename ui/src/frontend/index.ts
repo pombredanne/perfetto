@@ -15,7 +15,7 @@
 import * as m from 'mithril';
 
 import {CanvasWrapper} from './canvas_wrapper';
-import {Nav} from './nav';
+import {createPage} from './pages';
 import {Track} from './track';
 
 const Frontend = {
@@ -34,8 +34,8 @@ const Frontend = {
   }
 } as m.Component<{width: number, height: number}>;
 
-export const FrontendPage = {
+export const FrontendPage = createPage({
   view() {
-    return [m(Nav), m(Frontend, {width: 1000, height: 300})];
+    return m(Frontend, {width: 1000, height: 300});
   }
-} as m.Component;
+});

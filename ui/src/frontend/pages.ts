@@ -14,7 +14,7 @@
 
 import * as m from 'mithril';
 
-export const Nav = {
+const Nav = {
   view() {
     return m(
         'ul',
@@ -22,3 +22,17 @@ export const Nav = {
         m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), );
   }
 } as m.Component;
+
+/**
+ * Wrap component with common UI elements (nav bar etc).
+ */
+export function createPage(component: m.Component): m.Component {
+  return {
+    view() {
+      return [
+        m(Nav),
+        m(component),
+      ];
+    },
+  };
+}

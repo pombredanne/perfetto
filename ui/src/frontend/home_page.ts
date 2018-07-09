@@ -17,7 +17,7 @@ import * as m from 'mithril';
 import {Engine} from '../engine';
 import {WasmEngineProxy} from '../engine/wasm_engine_proxy';
 
-import {Nav} from './nav';
+import {createPage} from './pages';
 
 function extractBlob(e: Event): Blob|null {
   if (!(e.target instanceof HTMLInputElement)) {
@@ -30,11 +30,10 @@ function extractBlob(e: Event): Blob|null {
 // TODO(hjd): Temporary while bringing up controller worker.
 let engine: Engine|null = null;
 
-export const HomePage = {
+export const HomePage = createPage({
   view() {
     return m(
         'div',
-        m(Nav),
         m('input[type=file]', {
           onchange: (e: Event) => {
             const blob = extractBlob(e);
@@ -56,4 +55,4 @@ export const HomePage = {
           },
           'Query'));
   }
-} as m.Component;
+});
