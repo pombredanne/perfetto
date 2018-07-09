@@ -18,17 +18,21 @@ import {CanvasWrapper} from './canvas_wrapper';
 import {Track} from './track';
 
 export const Frontend = {
-  view({attrs}) {
+  oninit() {
+    this.width = 1000;
+    this.height = 400;
+  },
+  view() {
     return m(
         '.frontend',
         {
           style: {
             padding: '20px',
             position: 'relative',
-            width: attrs.width.toString() + 'px'
+            width: this.width.toString() + 'px'
           }
         },
-        m(CanvasWrapper, {width: attrs.width, height: attrs.height}),
+        m(CanvasWrapper, {width: this.width, height: this.height}),
         m(Track, {name: 'Track 123'}), );
   }
-} as m.Component<{width: number, height: number}>;
+} as m.Component<{}, {width: number, height: number}>;
