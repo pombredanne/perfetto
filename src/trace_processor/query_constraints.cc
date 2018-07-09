@@ -63,8 +63,7 @@ QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
 QueryConstraints QueryConstraints::FromString(const char* idxStr) {
   QueryConstraints qc;
 
-  std::string current = idxStr;
-  base::StringSplitter splitter(std::move(current), ',');
+  base::StringSplitter splitter(std::string(idxStr), ',');
 
   PERFETTO_CHECK(splitter.Next() && splitter.cur_token_size() > 1);
   // The '+ 1' skips the letter 'C' in the first token.
