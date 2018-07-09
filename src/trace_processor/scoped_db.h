@@ -14,26 +14,21 @@
  * limitations under the License.
  */
 
-import * as m from 'mithril';
+#ifndef SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#define SRC_TRACE_PROCESSOR_SCOPED_DB_H_
 
-export const TrackShell = {
-  view({attrs}) {
-    return m(
-        '.trackshell',
-        {
-          style: {
-            border: '1px solid #666',
-          }
-        },
-        m('.shell-content',
-          {
-            style: {
-              background: '#fff',
-              padding: '20px',
-              width: '20%',
-              'border-right': '1px solid #666'
-            }
-          },
-          m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)));
-  }
-} as m.Component<{name: string}>;
+#include <sqlite3.h>
+
+#include "perfetto/base/scoped_file.h"
+
+namespace perfetto {
+namespace trace_processor {
+
+using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
+using ScopedStmt =
+    base::ScopedResource<sqlite3_stmt*, sqlite3_finalize, nullptr>;
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_SCOPED_DB_H_
