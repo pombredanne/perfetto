@@ -230,7 +230,7 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
   if (needs_sqlite_orderby)
     query_constraints.ClearOrderBy();
 
-  idx->idxStr = query_constraints.ToNewSqlite3String();
+  idx->idxStr = query_constraints.ToNewSqlite3String().release();
   idx->needToFreeIdxStr = true;
 
   return SQLITE_OK;
@@ -416,7 +416,7 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(
     const QueryConstraints::OrderBy& ob) {
   const auto& f_sl = storage_->SlicesForCpu(f_cpu);
   const auto& s_sl = storage_->SlicesForCpu(s_cpu);
-  switch (ob.column) {
+  switch (ob.iColumn) {
     case SchedSliceTable::Column::kQuantum:
       return 0;
     case SchedSliceTable::Column::kTimestamp:
@@ -438,7 +438,7 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(
       return Compare(f_group, s_group, ob.desc);
     }
   }
-  PERFETTO_FATAL("Unexepcted column %d", ob.column);
+  PERFETTO_FATAL("Unexepcted column %d", ob.iColumn);
 }
 
 void SchedSliceTable::PerCpuState::Initialize(
