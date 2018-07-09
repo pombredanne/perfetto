@@ -14,11 +14,8 @@
 
 import * as m from 'mithril';
 
-import {Engine} from './engine';
-import {
-  warmupWasmEngineWorker,
-  WasmEngineProxy
-} from './engine/wasm_engine_proxy';
+import {warmupWasmEngineWorker} from './engine/wasm_engine_proxy';
+import {FrontendPage} from './frontend';
 import {HomePage} from './frontend/home_page';
 
 console.log('Hello from the main thread!');
@@ -30,23 +27,10 @@ function createController() {
   };
 }
 
-function main(input: Element, button: Element) {
+function main() {
   createController();
   warmupWasmEngineWorker();
 
-  // tslint:disable-next-line:no-any
-  input.addEventListener('change', (e: any) => {
-    const blob: Blob = e.target.files.item(0);
-    if (blob === null) return;
-    const engine: Engine = WasmEngineProxy.create(blob);
-    button.addEventListener('click', () => {
-      engine
-          .rawQuery({
-            sqlQuery: 'select * from sched;',
-          })
-          .then(result => console.log(result));
-    });
-  });
 
   const root = document.getElementById('frontend');
   if (!root) {
@@ -54,11 +38,10 @@ function main(input: Element, button: Element) {
     return;
   }
 
-  m.mount(root, HomePage);
+  m.route(root, '/', {
+    '/': HomePage,
+    '/viewer': FrontendPage,
+  });
 }
 
-const input = document.querySelector('#trace');
-const button = document.querySelector('#query');
-if (input && button) {
-  main(input, button);
-}
+main();

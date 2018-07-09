@@ -14,28 +14,11 @@
 
 import * as m from 'mithril';
 
-import {CanvasWrapper} from './canvas_wrapper';
-import {Nav} from './nav';
-import {Track} from './track';
-
-const Frontend = {
-  view({attrs}) {
-    return m(
-        '.frontend',
-        {
-          style: {
-            padding: '20px',
-            position: 'relative',
-            width: attrs.width.toString() + 'px'
-          }
-        },
-        m(CanvasWrapper, {width: attrs.width, height: attrs.height}),
-        m(Track, {name: 'Track 123'}), );
-  }
-} as m.Component<{width: number, height: number}>;
-
-export const FrontendPage = {
+export const Nav = {
   view() {
-    return [m(Nav), m(Frontend, {width: 1000, height: 300})];
+    return m(
+        'ul',
+        m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
+        m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), );
   }
 } as m.Component;
