@@ -14,12 +14,28 @@
 
 import * as m from 'mithril';
 import {TrackShell} from './track_shell';
+import {TrackCanvasContext} from "./track_canvas_context";
 
 export const Track = {
   view({attrs}) {
-    return m(
-        '.track',
-        {style: {position: 'absolute', top: 0, left: 0, width: '100%'}},
-        m(TrackShell, attrs));
+
+    attrs.cctx.fillStyle = '#ccc';
+    attrs.cctx.fillRect(0, 0, 1000, 73);
+
+    attrs.cctx.font = '16px Arial';
+    attrs.cctx.fillStyle = '#000';
+    attrs.cctx.fillText(attrs.name + ' rendered by canvas', 500, 20);
+
+    return m('.track',
+      {
+        style: {
+          position: 'absolute',
+          top: attrs.top.toString() + 'px',
+          left: 0,
+          width: '100%'
+        }
+      },
+      m(TrackShell, attrs)
+    );
   }
-} as m.Component<{name: string}>;
+} as m.Component<{name: string, cctx: TrackCanvasContext, top: number}>;

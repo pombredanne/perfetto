@@ -31,7 +31,10 @@
     }
     #frontend {
       width: 100%;
-      height: 80%;
+      height: calc(80% - 24px);
+    }
+    .query {
+      height: 24px;
     }
   </style>
 </head>
@@ -39,8 +42,10 @@
   <div id="console">
     WASM output goes here
   </div>
-  <input type="file" id="trace" name="trace"/>
-  <button id="query">Query</button>
+  <div class="query">
+    <input type="file" id="trace" name="trace"/>
+    <button id="query">Query</button>
+  </div>
   <div id="frontend">
     Loading...
   </div>

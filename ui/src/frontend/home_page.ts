@@ -17,6 +17,6 @@ import {Frontend} from './';
 
 export const HomePage = {
   view() {
-    return m(Frontend, {width: 1000, height: 300});
+    return m(Frontend);
   }
 } as m.Component;
