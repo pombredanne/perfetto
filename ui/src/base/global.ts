@@ -18,8 +18,8 @@
  * access the same instance of a class) without some of the features/downsides
  * of a singleton, namely:
  * - The functionality isn't built into the class.
- * - Since initalization ins't lazy it must be done explicity which is easier to
- *   reason about.
+ * - Since initalization isn't lazy it must be done explicity which is easier
+ *   to reason about.
  */
 export class Global<T> {
   private value: T|null;
