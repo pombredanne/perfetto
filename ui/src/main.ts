@@ -23,7 +23,7 @@ import {
   WasmEngineProxy
 } from './engine/wasm_engine_proxy';
 import {gState} from './frontend/globals';
-import {homePage} from './frontend/home_page';
+import {HomePage} from './frontend/home_page';
 
 console.log('Hello from the main thread!');
 
@@ -59,7 +59,7 @@ function main(input: Element, button: Element) {
     return;
   }
 
-  m.mount(root, homePage);
+  m.mount(root, HomePage);
 }
 
 const input = document.querySelector('#trace');
