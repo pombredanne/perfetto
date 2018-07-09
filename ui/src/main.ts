@@ -16,11 +16,13 @@
 
 import * as m from 'mithril';
 
+import {createEmptyState} from './common/state';
 import {Engine} from './engine';
 import {
   warmupWasmEngineWorker,
   WasmEngineProxy
 } from './engine/wasm_engine_proxy';
+import {gState} from './frontend/globals';
 import {homePage} from './frontend/home_page';
 
 console.log('Hello from the main thread!');
@@ -33,6 +35,7 @@ function createController() {
 }
 
 function main(input: Element, button: Element) {
+  gState.set(createEmptyState());
   createController();
   warmupWasmEngineWorker();
 
