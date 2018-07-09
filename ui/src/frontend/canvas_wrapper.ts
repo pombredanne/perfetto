@@ -30,4 +30,4 @@ export const CanvasWrapper = {
 } as m.Component<{
   scrollOffset: number,
   canvasElement: HTMLCanvasElement
-}, {}>;
+}>;
