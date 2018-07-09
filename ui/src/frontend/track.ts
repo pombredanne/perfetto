@@ -13,8 +13,9 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+
+import {TrackCanvasContext} from './track_canvas_context';
 import {TrackShell} from './track_shell';
-import {TrackCanvasContext} from "./track_canvas_context";
 
 export const Track = {
   view({attrs}) {
@@ -26,16 +27,16 @@ export const Track = {
     attrs.cctx.fillStyle = '#000';
     attrs.cctx.fillText(attrs.name + ' rendered by canvas', 500, 20);
 
-    return m('.track',
-      {
-        style: {
-          position: 'absolute',
-          top: attrs.top.toString() + 'px',
-          left: 0,
-          width: '100%'
-        }
-      },
-      m(TrackShell, attrs)
-    );
+    return m(
+        '.track',
+        {
+          style: {
+            position: 'absolute',
+            top: attrs.top.toString() + 'px',
+            left: 0,
+            width: '100%'
+          }
+        },
+        m(TrackShell, attrs));
   }
 } as m.Component<{name: string, cctx: TrackCanvasContext, top: number}>;

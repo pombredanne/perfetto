@@ -27,7 +27,4 @@ export const CanvasWrapper = {
   oncreate(vnode) {
     vnode.dom.appendChild(vnode.attrs.canvasElement);
   }
-} as m.Component<{
-  scrollOffset: number,
-  canvasElement: HTMLCanvasElement
-}>;
+} as m.Component<{scrollOffset: number, canvasElement: HTMLCanvasElement}>;

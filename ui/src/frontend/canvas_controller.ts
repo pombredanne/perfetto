@@ -12,29 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackCanvasContext} from "./track_canvas_context";
+import {TrackCanvasContext} from './track_canvas_context';
+
+// Creates virtual (width, height) canvas context backed by a
+// real (width, height*2) canvas for the the purposes of implementing
+// a (width, Inf) canvas with smooth scrolling.
 
 export class CanvasController {
-
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private cctx: TrackCanvasContext;
+  private tctx: TrackCanvasContext;
 
   private top = 0;
   private canvasHeight: number;
 
-  // The top level context should not worry about clipping
+  // TODO: This should be removed, and canvasHeight used instead, once
+  // conditional rendering of tracks has been figured out.
   private maxHeight = 100000;
 
   // Number of additionally rendered pixels above/below for compositor scrolling
-  private extraHeightPerSide = 0;
+  private extraHeightPerSide: number;
 
   constructor(private width: number, private height: number) {
-
     this.canvas = document.createElement('canvas');
     this.canvasHeight = this.height * 2;
-    this.extraHeightPerSide = Math.round(
-      (this.canvasHeight - this.height) / 2);
+    this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
 
     const dpr = window.devicePixelRatio;
     this.canvas.style.position = 'absolute';
@@ -46,14 +48,14 @@ export class CanvasController {
 
     const ctx = this.canvas.getContext('2d');
 
-    if(!ctx) {
-      throw new Error('Canvas Context not found');
+    if (!ctx) {
+      throw new Error('Could not create canvas context');
     }
 
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.cctx = new TrackCanvasContext(this.ctx, {
+    this.tctx = new TrackCanvasContext(this.ctx, {
       left: 0,
       top: this.extraHeightPerSide,
       width: this.width,
@@ -62,12 +64,12 @@ export class CanvasController {
   }
 
   clear() {
-    this.cctx.fillStyle = 'white';
-    this.cctx.fillRect(0, 0, this.width, this.maxHeight);
+    this.tctx.fillStyle = 'white';
+    this.tctx.fillRect(0, 0, this.width, this.maxHeight);
   }
 
   getContext() {
-    return this.cctx;
+    return this.tctx;
   }
 
   getCanvasElement() {
@@ -76,6 +78,7 @@ export class CanvasController {
 
   updateScrollOffset(scrollOffset: number) {
     this.top = scrollOffset + this.extraHeightPerSide;
+    this.tctx.setYOffset(scrollOffset * -1);
   }
 
   getCanvasScrollOffset() {

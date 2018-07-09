@@ -13,10 +13,11 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-import {Track} from './track';
+
 import {CanvasController} from './canvas_controller';
-import {ScrollableContainer} from './scrollable_container';
 import {CanvasWrapper} from './canvas_wrapper';
+import {ScrollableContainer} from './scrollable_container';
+import {Track} from './track';
 import {TrackCanvasContext} from './track_canvas_context';
 
 export const Frontend = {
@@ -28,68 +29,87 @@ export const Frontend = {
   },
   view({}) {
     const canvasScrollOffset = this.cc.getCanvasScrollOffset();
-    const cctx = this.cc.getContext();
+    const ctx = this.cc.getContext();
 
     this.cc.clear();
 
-    return m('.frontend',
-      {
-        style: {
-          position: 'relative',
-          width: this.width.toString() + 'px'
-        }
-      },
-      m(ScrollableContainer,
-        {
-          width: this.width,
-          height: this.height,
-          contentHeight: 1000,
-          onPassiveScroll: (scrollTop: number) => {
-            this.cc.updateScrollOffset(scrollTop);
-            this.cc.getContext().setYOffset(scrollTop * -1);
-            m.redraw();
+    return m(
+        '.frontend',
+        {style: {position: 'relative', width: this.width.toString() + 'px'}},
+        m(ScrollableContainer,
+          {
+            width: this.width,
+            height: this.height,
+            contentHeight: 1000,
+            onPassiveScroll: (scrollTop: number) => {
+              this.cc.updateScrollOffset(scrollTop);
+              m.redraw();
+            },
           },
-        },
-        m(CanvasWrapper, {
-          scrollOffset: canvasScrollOffset,
-          canvasElement: this.cc.getCanvasElement()
-        }),
-        m(Track, { name: 'Track 1', cctx: new TrackCanvasContext(
-          cctx, {top: 0, left: 0, width: this.width, height: 90}
-        ), top: 0 }),
-        m(Track, { name: 'Track 2', cctx: new TrackCanvasContext(cctx,
-          {top: 100, left: 0, width: this.width, height: 90}
-        ), top: 100 }),
-        m(Track, { name: 'Track 3', cctx: new TrackCanvasContext(
-          cctx, {top: 200, left: 0, width: this.width, height: 90}
-        ), top: 200 }),
-        m(Track, { name: 'Track 4', cctx: new TrackCanvasContext(
-          cctx, {top: 300, left: 0, width: this.width, height: 90}
-        ), top: 300 }),
-        m(Track, { name: 'Track 5', cctx: new TrackCanvasContext(
-          cctx, {top: 400, left: 0, width: this.width, height: 90}
-        ), top: 400 }),
-        m(Track, { name: 'Track 6', cctx: new TrackCanvasContext(
-          cctx, {top: 500, left: 0, width: this.width, height: 90}
-        ), top: 500 }),
-        m(Track, { name: 'Track 7', cctx: new TrackCanvasContext(
-          cctx, {top: 600, left: 0, width: this.width, height: 90}
-        ), top: 600 }),
-        m(Track, { name: 'Track 8', cctx: new TrackCanvasContext(
-          cctx, {top: 700, left: 0, width: this.width, height: 90}
-        ), top: 700 }),
-        m(Track, { name: 'Track 9', cctx: new TrackCanvasContext(
-          cctx, {top: 800, left: 0, width: this.width, height: 90}
-        ), top: 800 }),
-        m(Track, { name: 'Track 10', cctx: new TrackCanvasContext(
-          cctx, {top: 900, left: 0, width: this.width, height: 90}
-        ), top: 900 }),
-      ),
-    );
+          m(CanvasWrapper, {
+            scrollOffset: canvasScrollOffset,
+            canvasElement: this.cc.getCanvasElement()
+          }),
+          m(Track, {
+            name: 'Track 1',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 0, left: 0, width: this.width, height: 90}),
+            top: 0
+          }),
+          m(Track, {
+            name: 'Track 2',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 100, left: 0, width: this.width, height: 90}),
+            top: 100
+          }),
+          m(Track, {
+            name: 'Track 3',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 200, left: 0, width: this.width, height: 90}),
+            top: 200
+          }),
+          m(Track, {
+            name: 'Track 4',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 300, left: 0, width: this.width, height: 90}),
+            top: 300
+          }),
+          m(Track, {
+            name: 'Track 5',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 400, left: 0, width: this.width, height: 90}),
+            top: 400
+          }),
+          m(Track, {
+            name: 'Track 6',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 500, left: 0, width: this.width, height: 90}),
+            top: 500
+          }),
+          m(Track, {
+            name: 'Track 7',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 600, left: 0, width: this.width, height: 90}),
+            top: 600
+          }),
+          m(Track, {
+            name: 'Track 8',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 700, left: 0, width: this.width, height: 90}),
+            top: 700
+          }),
+          m(Track, {
+            name: 'Track 9',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 800, left: 0, width: this.width, height: 90}),
+            top: 800
+          }),
+          m(Track, {
+            name: 'Track 10',
+            cctx: new TrackCanvasContext(
+                ctx, {top: 900, left: 0, width: this.width, height: 90}),
+            top: 900
+          }), ), );
   },
-} as m.Component<{width: number, height: number}, {
-  oninit: () => void,
-  cc: CanvasController,
-  width: number,
-  height: number
-}>;
+} as m.Component<{width: number, height: number},
+                        {cc: CanvasController, width: number, height: number}>;
