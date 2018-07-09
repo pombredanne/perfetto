@@ -27,19 +27,19 @@ const scrollableContent = {
         }
       }, children);
   }
-} as m.Comp<{
+} as m.Component<{
   onPassiveScroll: (scrollOffset: number) => void,
   contentHeight: number
 }, {}>;
 
-type ScrollableContainer = m.Comp<{
+type ScrollableContainer = m.Component<{
   width: number,
   height: number,
   contentHeight: number,
   onPassiveScroll: (scrollTop: number) => void,
 }, {}>;
 
-export const scrollableContainer = {
+export const ScrollableContainer = {
   view({attrs, children}) {
     return m('.scrollableContainer',
       {

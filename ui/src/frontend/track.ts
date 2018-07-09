@@ -15,10 +15,10 @@
  */
 
 import * as m from 'mithril';
-import {trackShell} from './track_shell';
+import {TrackShell} from './track_shell';
 import {TrackCanvasContext} from "./track_canvas_context";
 
-export const track = {
+export const Track = {
   view({attrs}) {
 
     attrs.cctx.fillStyle = '#ccc';
@@ -37,7 +37,7 @@ export const track = {
           width: '100%'
         }
       },
-      m(trackShell, attrs)
+      m(TrackShell, attrs)
     );
   }
-} as m.Comp<{ name: string, cctx: TrackCanvasContext, top: number}>;
+} as m.Component<{name: string, cctx: TrackCanvasContext, top: number}>;
