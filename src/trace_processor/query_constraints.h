@@ -24,11 +24,11 @@
 namespace perfetto {
 namespace trace_processor {
 
-// This class stores the constraints (including the order by information) for
+// This class stores the constraints (including the order-by information) for
 // a query on a sqlite3 virtual table and handles their de/serialization into
 // strings.
 // This is because the constraint columns and the order-by clauses are passed
-// to the xBestIndex method but the constraint value are available only in the
+// to the xBestIndex method but the constraint values are available only in the
 // xFilter method. Unfortunately sqlite vtable API don't give any hint about
 // the validity of the constraints (i.e. constraints passed to xBestIndex can
 // be used by future xFilter calls in the far future). The only mechanism
@@ -36,31 +36,33 @@ namespace trace_processor {
 // in the xBestIndex call and passed to each corresponding xFilter call.
 class QueryConstraints {
  public:
+  QueryConstraints() = default;
+  ~QueryConstraints() = default;
+  QueryConstraints(QueryConstraints&&) = default;
+  QueryConstraints& operator=(QueryConstraints&&) = default;
+
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
   using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
 
-  static int FreeSqliteString(char* resource) {
-    sqlite3_free(resource);
-    return 0;
-  }
+  static int FreeSqliteString(char* resource);
+
+  using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
 
   void AddConstraint(int column, unsigned char op) {
     Constraint c{};
     c.iColumn = column;
     c.op = op;
-    constraints_.emplace_back(std::move(c));
+    constraints_.emplace_back(c);
   }
 
   void AddOrderBy(int column, unsigned char desc) {
     OrderBy ob{};
     ob.iColumn = column;
     ob.desc = desc;
-    order_by_.emplace_back(std::move(ob));
+    order_by_.emplace_back(ob);
   }
 
   void ClearOrderBy() { order_by_.clear(); }
-
-  using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
 
   // Converts the constraints and order by information to a string for
   // use by sqlite.
@@ -76,6 +78,9 @@ class QueryConstraints {
   const std::vector<Constraint>& constraints() const { return constraints_; }
 
  private:
+  QueryConstraints(const QueryConstraints&) = delete;
+  QueryConstraints& operator=(const QueryConstraints&) = delete;
+
   std::vector<OrderBy> order_by_;
   std::vector<Constraint> constraints_;
 };

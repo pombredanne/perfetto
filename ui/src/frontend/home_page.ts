@@ -15,25 +15,10 @@
  */
 
 import * as m from 'mithril';
+import {Frontend} from './';
 
-export const TrackShell = {
-  view({attrs}) {
-    return m(
-        '.trackshell',
-        {
-          style: {
-            border: '1px solid #666',
-          }
-        },
-        m('.shell-content',
-          {
-            style: {
-              background: '#fff',
-              padding: '20px',
-              width: '20%',
-              'border-right': '1px solid #666'
-            }
-          },
-          m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)));
+export const HomePage = {
+  view() {
+    return m(Frontend, {width: 1000, height: 300});
   }
-} as m.Component<{name: string}>;
+} as m.Component;

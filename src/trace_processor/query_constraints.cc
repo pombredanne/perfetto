@@ -24,23 +24,38 @@
 namespace perfetto {
 namespace trace_processor {
 
+int QueryConstraints::FreeSqliteString(char* resource) {
+  sqlite3_free(resource);
+  return 0;
+}
+
 QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
   std::string str_result;
-  str_result.append("C" + std::to_string(constraints_.size()) + ",");
+  str_result.reserve(512);
+  str_result.append("C");
+  str_result.append(std::to_string(constraints_.size()));
+  str_result.append(",");
   for (const auto& cs : constraints_) {
-    str_result.append(std::to_string(cs.iColumn) + ",");
-    str_result.append(std::to_string(cs.op) + ",");
+    str_result.append(std::to_string(cs.iColumn));
+    str_result.append(",");
+    str_result.append(std::to_string(cs.op));
+    str_result.append(",");
   }
-  str_result.append("O" + std::to_string(order_by_.size()) + ",");
+  str_result.append("O");
+  str_result.append(std::to_string(order_by_.size()));
+  str_result.append(",");
   for (const auto& ob : order_by_) {
-    str_result.append(std::to_string(ob.iColumn) + ",");
-    str_result.append(std::to_string(ob.desc) + ",");
+    str_result.append(std::to_string(ob.iColumn));
+    str_result.append(",");
+    str_result.append(std::to_string(ob.desc));
+    str_result.append(",");
   }
 
-  int total_size = static_cast<int>(str_result.size());
-  char* result = static_cast<char*>(sqlite3_malloc(total_size));
+  // The last char is a "," so overwriting with the null terminator on purpose.
+  char* result =
+      static_cast<char*>(sqlite3_malloc(static_cast<int>(str_result.size())));
   strncpy(result, str_result.c_str(), str_result.size());
-  result[total_size - 1] = '\0';
+  result[str_result.size() - 1] = '\0';
 
   return SqliteString(result);
 }
@@ -48,25 +63,26 @@ QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
 QueryConstraints QueryConstraints::FromString(const char* idxStr) {
   QueryConstraints qc;
 
-  const char* current = idxStr;
-  base::StringSplitter splitter(std::move(current), ',');
+  base::StringSplitter splitter(std::string(idxStr), ',');
 
+  PERFETTO_CHECK(splitter.Next() && splitter.cur_token_size() > 1);
   // The '+ 1' skips the letter 'C' in the first token.
-  int num_constraints = splitter.Next() ? atoi(splitter.cur_token() + 1) : 0;
+  int num_constraints = atoi(splitter.cur_token() + 1);
   for (int i = 0; i < num_constraints; ++i) {
-    splitter.Next();
+    PERFETTO_CHECK(splitter.Next());
     int col = atoi(splitter.cur_token());
-    splitter.Next();
+    PERFETTO_CHECK(splitter.Next());
     unsigned char op = static_cast<unsigned char>(atoi(splitter.cur_token()));
     qc.AddConstraint(col, op);
   }
 
+  PERFETTO_CHECK(splitter.Next() && splitter.cur_token_size() > 1);
   // The '+ 1' skips the letter 'O' in the current token.
-  int num_order_by = splitter.Next() ? atoi(splitter.cur_token() + 1) : 0;
+  int num_order_by = atoi(splitter.cur_token() + 1);
   for (int i = 0; i < num_order_by; ++i) {
-    splitter.Next();
+    PERFETTO_CHECK(splitter.Next());
     int col = atoi(splitter.cur_token());
-    splitter.Next();
+    PERFETTO_CHECK(splitter.Next());
     unsigned char desc = static_cast<unsigned char>(atoi(splitter.cur_token()));
     qc.AddOrderBy(col, desc);
   }
