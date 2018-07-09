@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-import * as m from 'mithril';
+#ifndef SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#define SRC_TRACE_PROCESSOR_SCOPED_DB_H_
 
-export const CanvasWrapper = {
-  view({attrs}) {
-    return m('canvas', {
-      style: {
-        background: '#ccc',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: attrs.width.toString() + 'px',
-        height: attrs.height.toString() + 'px',
-      }
-    });
-  }
-} as m.Component<{width: number, height: number}>;
+#include <sqlite3.h>
+
+#include "perfetto/base/scoped_file.h"
+
+namespace perfetto {
+namespace trace_processor {
+
+using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
+using ScopedStmt =
+    base::ScopedResource<sqlite3_stmt*, sqlite3_finalize, nullptr>;
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_SCOPED_DB_H_
