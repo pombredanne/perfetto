@@ -21,9 +21,9 @@ const scrollableContent = {
     return m('.scrollableContent',
       {
         style: {
-          'will-change': 'transform',
           height: attrs.contentHeight.toString() + 'px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }
       }, children);
   }
@@ -46,7 +46,9 @@ export const ScrollableContainer = {
         style: {
           width: attrs.width.toString() + 'px',
           height: attrs.height.toString() + 'px',
-          overflow: 'auto',
+          'overflow-y': 'auto',
+          'overflow-x': 'hidden',
+          'will-change': 'transform',
           position: 'relative'
         }
       },
