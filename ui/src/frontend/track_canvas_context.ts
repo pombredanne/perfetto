@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export class TrackCanvasContext {
+export class VirtualCanvasContext {
   stroke: () => void;
   beginPath: () => void;
   closePath: () => void;
   measureText: () => TextMetrics;
 
   constructor(
-      private ctx: CanvasRenderingContext2D|TrackCanvasContext,
+      private ctx: CanvasRenderingContext2D|VirtualCanvasContext,
       private rect:
           {left: number, top: number, width: number, height: number}) {
     this.stroke = this.ctx.stroke.bind(this.ctx);
