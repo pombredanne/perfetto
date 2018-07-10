@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as init_trace_processor from '../gen/trace_processor';
+
 import {WasmBridge, WasmBridgeRequest} from './engine/wasm_bridge';
-import * as init_trace_processor from './gen/trace_processor';
 
 // tslint:disable no-any
 

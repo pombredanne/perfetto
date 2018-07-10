@@ -14,8 +14,8 @@
 
 // tslint:disable:no-any
 
+import * as init_trace_processor from '../../gen/trace_processor';
 import {defer, Deferred} from '../base/deferred';
-import * as init_trace_processor from '../gen/trace_processor';
 
 function writeToUIConsole(line: string) {
   console.log(line);

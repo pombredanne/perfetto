@@ -68,6 +68,37 @@ template("node_bin") {
   }
 }
 
+template("node_bin_multi") {
+  action_foreach(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "sources",
+                             "inputs",
+                             "outputs",
+                           ])
+    deps = [
+      ":node_modules",
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+    script = "../gn/standalone/build_tool_wrapper.py"
+    _node_cmd = invoker.node_cmd
+    args = []
+    if (defined(invoker.suppress_stdout) && invoker.suppress_stdout) {
+      args += [ "--suppress_stdout" ]
+    }
+    if (defined(invoker.suppress_stderr) && invoker.suppress_stderr) {
+      args += [ "--suppress_stderr" ]
+    }
+    args += [
+              "--path=$nodejs_bin",
+              "node",
+              rebase_path("node_modules/.bin/$_node_cmd", root_build_dir),
+            ] + invoker.args
+  }
+}
+
 # +----------------------------------------------------------------------------+
 # | Template for "sorcery" the source map resolver.                            |
 # +----------------------------------------------------------------------------+
@@ -135,7 +166,7 @@ bundle("main_bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  input = "$target_out_dir/main.js"
+  input = "$target_out_dir/src/main.js"
   output = "$target_out_dir/main_bundle.js"
 }
 
@@ -143,7 +174,7 @@ bundle("worker_bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  input = "$target_out_dir/worker.js"
+  input = "$target_out_dir/src/worker.js"
   output = "$target_out_dir/worker_bundle.js"
 }
 
@@ -151,7 +182,7 @@ bundle("wasm_bundle") {
   deps = [
     ":transpile_all_ts",
   ]
-  input = "$target_out_dir/wasm.js"
+  input = "$target_out_dir/src/wasm.js"
   output = "$target_out_dir/wasm_bundle.js"
 }
 
@@ -207,9 +238,38 @@ node_bin("protos_to_ts") {
 # +----------------------------------------------------------------------------+
 
 # Builds all .ts sources in the repo that are reachable from |sources|.
-node_bin("transpile_all_ts") {
+node_bin_multi("transpile_all_ts") {
   sources = [
+    "src/backend/globals.ts",
+    "src/base/deferred.ts",
+    "src/base/deferred_unittest.ts",
+    "src/base/global.ts",
+    "src/base/global_unittest.ts",
+    "src/common/state.ts",
+    "src/common/state_unittest.ts",
+    "src/controller/index.ts",
+    "src/engine/index.ts",
+    "src/engine/wasm_bridge.ts",
+    "src/engine/wasm_bridge_unittest.ts",
+    "src/engine/wasm_engine_proxy.ts",
+    "src/frontend/canvas_wrapper.ts",
+    "src/frontend/globals.ts",
+    "src/frontend/globals_unittest.ts",
+    "src/frontend/home_page.ts",
+    "src/frontend/index.ts",
+    "src/frontend/track.ts",
+    "src/frontend/track_canvas_context.ts",
+    "src/frontend/track_canvas_context_unittest.ts",
+    "src/frontend/track_shell.ts",
     "src/main.ts",
+    "src/panels/slice_details/slice_details.ts",
+    "src/protos.ts",
+    "src/protos_unittest.ts",
+    "src/test/example_async_unittest.ts",
+    "src/test/example_headlesstest.ts",
+    "src/test/example_jsdomtest.ts",
+    "src/test/example_unittest.ts",
+    "src/tracks/cpu_slices/frontend.ts",
     "src/wasm.ts",
     "src/worker.ts",
   ]
@@ -218,33 +278,19 @@ node_bin("transpile_all_ts") {
     ":protos_to_ts",
     ":wasm_gen",
   ]
-  inputs = sources + [ "tsconfig.json" ]
+  inputs = [
+    "tsconfig.json",
+  ]
   outputs = [
-    "$target_out_dir/main.js",
-    "$target_out_dir/worker.js",
-    "$target_out_dir/wasm.js",
+    "$target_out_dir/../{{source_dir}}/{{source_name_part}}.js",
   ]
 
-  # Find all *.ts files and pass them as input triggers. This does NOT affect
-  # which files will get built. This defines only the set of files that, when
-  # changes, will re-trigger this rule in ninja. The files that get transpiled
-  # are the transitive dependencies of |sources|.
-  all_ts_files = exec_script("../gn/standalone/glob.py",
-                             [
-                               "--root=" + rebase_path(".", root_build_dir),
-                               "--filter=*.ts",
-                               "--exclude=node_modules",
-                               "--exclude=dist",
-                             ],
-                             "list lines",
-                             [ "." ])
-  inputs += all_ts_files
   node_cmd = "tsc"
   args = [
     "--project",
     rebase_path(".", root_build_dir),
     "--outDir",
-    rebase_path(target_out_dir, root_build_dir),
+    rebase_path("$target_out_dir/src", root_build_dir),
   ]
 }
 
