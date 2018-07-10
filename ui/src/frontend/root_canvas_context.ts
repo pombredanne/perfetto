@@ -16,7 +16,7 @@ import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export class RootCanvasContext extends VirtualCanvasContext {
   constructor(
-      ctx: CanvasRenderingContext2D|VirtualCanvasContext,
+      protected ctx: CanvasRenderingContext2D|VirtualCanvasContext,
       protected rect:
           {left: number, top: number, width: number, height: number},
       private canvasHeight: number) {
@@ -31,5 +31,47 @@ export class RootCanvasContext extends VirtualCanvasContext {
     return rect.top >= topPos && rect.top + rect.height <= botPos;
   }
 
-  // TODO: check bounds on draw functions, throw error if outside of canvas.
+  private pointIsOnCanvas(x: number, y: number) {
+    const topPos = -1 * this.rect.top;
+    const botPos = topPos + this.canvasHeight;
+    return x >= 0 && x <= this.rect.width && y >= topPos && y <= botPos;
+  }
+
+  moveTo(x: number, y: number) {
+    if (!this.pointIsOnCanvas(x, y)) {
+      throw new NotOnCanvasError(
+          'moveto', {x, y}, this.rect, this.canvasHeight);
+    }
+
+    this.ctx.moveTo(x + this.rect.left, y + this.rect.top);
+  }
+
+  lineTo(x: number, y: number) {
+    if (!this.pointIsOnCanvas(x, y)) {
+      throw new NotOnCanvasError(
+          'lineto', {x, y}, this.rect, this.canvasHeight);
+    }
+
+    this.ctx.lineTo(x + this.rect.left, y + this.rect.top);
+  }
+
+  fillText(text: string, x: number, y: number) {
+    if (!this.pointIsOnCanvas(x, y)) {
+      throw new NotOnCanvasError(
+          'fill text', {x, y}, this.rect, this.canvasHeight);
+    }
+    this.ctx.fillText(text, x + this.rect.left, y + this.rect.top);
+  }
+}
+
+export class NotOnCanvasError extends Error {
+  constructor(
+      action: string, drawing: {},
+      bounds: {left: number, top: number, width: number, height: number},
+      canvasHeight: number) {
+    super(
+        `Attempted to ${action} (${JSON.stringify(drawing)})` +
+        `out of canvas bounds ${JSON.stringify(bounds)} with canvas height` +
+        `${canvasHeight}`);
+  }
 }

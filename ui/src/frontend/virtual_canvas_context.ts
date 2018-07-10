@@ -19,7 +19,7 @@ export class VirtualCanvasContext {
   measureText: () => TextMetrics;
 
   constructor(
-      private ctx: CanvasRenderingContext2D|VirtualCanvasContext,
+      protected ctx: CanvasRenderingContext2D|VirtualCanvasContext,
       protected rect:
           {left: number, top: number, width: number, height: number}) {
     this.stroke = this.ctx.stroke.bind(this.ctx);
