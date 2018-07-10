@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackCanvasContext} from './track_canvas_context';
+import {RootCanvasContext} from './root_canvas_context';
 
 const CANVAS_OVERDRAW_FACTOR = 2;
 
@@ -25,7 +25,7 @@ const CANVAS_OVERDRAW_FACTOR = 2;
 export class CanvasController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private rootTrackContext: TrackCanvasContext;
+  private rootTrackContext: RootCanvasContext;
 
   private scrollOffset = 0;
   private canvasHeight: number;
@@ -54,12 +54,15 @@ export class CanvasController {
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.rootTrackContext = new TrackCanvasContext(this.ctx, {
-      left: 0,
-      top: this.extraHeightPerSide,
-      width: this.width,
-      height: Number.MAX_SAFE_INTEGER  // The top context should not clip.
-    });
+    this.rootTrackContext = new RootCanvasContext(
+        this.ctx,
+        {
+          left: 0,
+          top: this.extraHeightPerSide,
+          width: this.width,
+          height: Number.MAX_SAFE_INTEGER  // The top context should not clip.,
+        },
+        this.canvasHeight);
   }
 
   clear(): void {
@@ -67,7 +70,7 @@ export class CanvasController {
     this.ctx.fillRect(0, 0, this.width, this.canvasHeight);
   }
 
-  getContext(): TrackCanvasContext {
+  getContext(): RootCanvasContext {
     return this.rootTrackContext;
   }
 

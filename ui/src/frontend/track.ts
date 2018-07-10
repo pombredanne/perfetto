@@ -14,8 +14,8 @@
 
 import * as m from 'mithril';
 
-import {TrackCanvasContext} from './track_canvas_context';
 import {TrackShell} from './track_shell';
+import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
   view({attrs}) {
@@ -39,4 +39,6 @@ export const Track = {
         },
         m(TrackShell, attrs));
   }
-} as m.Component<{name: string, trackContext: TrackCanvasContext, top: number}>;
+} as
+    m.Component<
+        {name: string, trackContext: VirtualCanvasContext, top: number}>;

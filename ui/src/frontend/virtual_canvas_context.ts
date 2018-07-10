@@ -20,12 +20,21 @@ export class VirtualCanvasContext {
 
   constructor(
       private ctx: CanvasRenderingContext2D|VirtualCanvasContext,
-      private rect:
+      protected rect:
           {left: number, top: number, width: number, height: number}) {
     this.stroke = this.ctx.stroke.bind(this.ctx);
     this.beginPath = this.ctx.beginPath.bind(this.ctx);
     this.closePath = this.ctx.closePath.bind(this.ctx);
     this.measureText = this.ctx.measureText.bind(this.ctx);
+  }
+
+  isOnCanvas(rect: {left: number,
+                    top: number,
+                    width: number,
+                    height: number} = this.rect): boolean {
+    return this.ctx instanceof VirtualCanvasContext ?
+        this.ctx.isOnCanvas(rect) :
+        true;
   }
 
   fillRect(x: number, y: number, width: number, height: number) {
