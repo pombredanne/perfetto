@@ -28,7 +28,7 @@ export const Frontend = {
     this.canvasController = new CanvasController(this.width, this.height);
   },
   view({}) {
-    const canvasScrollOffset = this.canvasController.getCanvasScrollOffset();
+    const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
 
     this.canvasController.clear();
@@ -47,7 +47,7 @@ export const Frontend = {
             },
           },
           m(CanvasWrapper, {
-            scrollOffset: canvasScrollOffset,
+            topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
           m(Track, {

@@ -25,7 +25,7 @@ export class CanvasController {
   private ctx: CanvasRenderingContext2D;
   private rootTrackContext: TrackCanvasContext;
 
-  private top = 0;
+  private scrollOffset = 0;
   private canvasHeight: number;
 
   // Number of additionally rendered pixels above/below for compositor scrolling
@@ -38,8 +38,6 @@ export class CanvasController {
     this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
 
     const dpr = window.devicePixelRatio;
-    this.canvas.style.position = 'absolute';
-    this.canvas.style.top = (-1 * this.extraHeightPerSide).toString() + 'px';
     this.canvas.style.width = this.width.toString() + 'px';
     this.canvas.style.height = this.canvasHeight.toString() + 'px';
     this.canvas.width = this.width * dpr;
@@ -82,11 +80,11 @@ export class CanvasController {
    * first track within the viewport.
    */
   updateScrollOffset(scrollOffset: number): void {
-    this.top = scrollOffset;
+    this.scrollOffset = scrollOffset;
     this.rootTrackContext.setYOffset(this.extraHeightPerSide - scrollOffset);
   }
 
-  getCanvasScrollOffset() {
-    return this.top;
+  getCanvasTopOffset(): number {
+    return this.scrollOffset - this.extraHeightPerSide;
   }
 }

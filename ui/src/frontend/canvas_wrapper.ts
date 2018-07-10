@@ -19,7 +19,7 @@ export const CanvasWrapper = {
     return m('.canvasWrapper', {
       style: {
         position: 'absolute',
-        top: attrs.scrollOffset.toString() + 'px',
+        top: attrs.topOffset.toString() + 'px',
         overflow: 'none',
       }
     });
@@ -27,4 +27,4 @@ export const CanvasWrapper = {
   oncreate(vnode) {
     vnode.dom.appendChild(vnode.attrs.canvasElement);
   }
-} as m.Component<{scrollOffset: number, canvasElement: HTMLCanvasElement}>;
+} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
