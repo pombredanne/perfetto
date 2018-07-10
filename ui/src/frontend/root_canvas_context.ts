@@ -25,7 +25,9 @@ export class RootCanvasContext extends VirtualCanvasContext {
 
   isOnCanvas(rect: {left: number, top: number, width: number, height: number}):
       boolean {
-    return rect.top >= this.rect.top &&
-        rect.top + rect.height <= this.rect.top + this.canvasHeight;
+    const topPos = -1 * this.rect.top;
+    const botPos = topPos + this.canvasHeight;
+
+    return rect.top >= topPos && rect.top + rect.height <= botPos;
   }
 }
