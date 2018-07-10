@@ -76,6 +76,7 @@ export class NotOnCanvasError extends Error {
                                       top: bounds.top * -1,
                                       width: bounds.width,
                                       height: canvasHeight
-                                    })}`);
+                                    })}. ` +
+        `Did you check trackContext.isOnCanvas()?`);
   }
 }
