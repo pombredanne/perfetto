@@ -19,8 +19,8 @@ const CANVAS_OVERDRAW_FACTOR = 2;
 /**
  * Creates a canvas with a context that is set up of compositor scrolling.
  * Creates virtual (width, height) canvas context backed by a  real
- * (width, height*2) canvas for the the purposes of implementing a (width, Inf)
- * canvas with smooth scrolling.
+ * (width, height * CANVAS_OVERDRAW_FACTOR) canvas for the the purposes of
+ * implementing a (width, Inf) canvas with smooth scrolling.
  */
 export class CanvasController {
   private canvas: HTMLCanvasElement;
@@ -30,7 +30,7 @@ export class CanvasController {
   private scrollOffset = 0;
   private canvasHeight: number;
 
-  // Number of additionally rendered pixels above/below for compositor scrolling
+  // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide: number;
 
   constructor(private width: number, private height: number) {
