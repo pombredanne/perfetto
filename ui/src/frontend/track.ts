@@ -13,29 +13,30 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+
+import {TrackCanvasContext} from './track_canvas_context';
 import {TrackShell} from './track_shell';
-import {TrackCanvasContext} from "./track_canvas_context";
 
 export const Track = {
   view({attrs}) {
 
-    attrs.cctx.fillStyle = '#ccc';
-    attrs.cctx.fillRect(0, 0, 1000, 73);
+    attrs.trackContext.fillStyle = '#ccc';
+    attrs.trackContext.fillRect(0, 0, 1000, 73);
 
-    attrs.cctx.font = '16px Arial';
-    attrs.cctx.fillStyle = '#000';
-    attrs.cctx.fillText(attrs.name + ' rendered by canvas', 500, 20);
+    attrs.trackContext.font = '16px Arial';
+    attrs.trackContext.fillStyle = '#000';
+    attrs.trackContext.fillText(attrs.name + ' rendered by canvas', 500, 20);
 
-    return m('.track',
-      {
-        style: {
-          position: 'absolute',
-          top: attrs.top.toString() + 'px',
-          left: 0,
-          width: '100%'
-        }
-      },
-      m(TrackShell, attrs)
-    );
+    return m(
+        '.track',
+        {
+          style: {
+            position: 'absolute',
+            top: attrs.top.toString() + 'px',
+            left: 0,
+            width: '100%'
+          }
+        },
+        m(TrackShell, attrs));
   }
-} as m.Component<{name: string, cctx: TrackCanvasContext, top: number}>;
+} as m.Component<{name: string, trackContext: TrackCanvasContext, top: number}>;

@@ -14,17 +14,26 @@
 
 import * as m from 'mithril';
 
-export const CanvasWrapper = {
-  view({attrs}) {
-    return m('.canvasWrapper', {
-      style: {
-        position: 'absolute',
-        top: attrs.topOffset.toString() + 'px',
-        overflow: 'none',
-      }
-    });
-  },
-  oncreate(vnode) {
-    vnode.dom.appendChild(vnode.attrs.canvasElement);
+const Nav = {
+  view() {
+    return m(
+        'ul',
+        {style: {height: '100px', margin: '0', padding: '20px'}},
+        m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
+        m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), );
   }
-} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
+} as m.Component;
+
+/**
+ * Wrap component with common UI elements (nav bar etc).
+ */
+export function createPage(component: m.Component): m.Component {
+  return {
+    view() {
+      return [
+        m(Nav),
+        m(component),
+      ];
+    },
+  };
+}
