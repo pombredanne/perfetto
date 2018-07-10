@@ -14,6 +14,8 @@
 
 import {TrackCanvasContext} from './track_canvas_context';
 
+const CANVAS_OVERDRAW_FACTOR = 2;
+
 /**
  * Creates a canvas with a context that is set up of compositor scrolling.
  * Creates virtual (width, height) canvas context backed by a  real
@@ -33,7 +35,7 @@ export class CanvasController {
 
   constructor(private width: number, private height: number) {
     this.canvas = document.createElement('canvas');
-    const CANVAS_OVERDRAW_FACTOR = 2;
+
     this.canvasHeight = this.height * CANVAS_OVERDRAW_FACTOR;
     this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
 
@@ -81,7 +83,7 @@ export class CanvasController {
    */
   updateScrollOffset(scrollOffset: number): void {
     this.scrollOffset = scrollOffset;
-    this.rootTrackContext.setYOffset(this.extraHeightPerSide - scrollOffset);
+    this.rootTrackContext.setYOffset(-1 * this.getCanvasTopOffset());
   }
 
   getCanvasTopOffset(): number {
