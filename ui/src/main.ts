@@ -14,8 +14,10 @@
 
 import * as m from 'mithril';
 
+import {createEmptyState} from './common/state';
 import {warmupWasmEngineWorker} from './engine/wasm_engine_proxy';
 import {FrontendPage} from './frontend';
+import {gState} from './frontend/globals';
 import {HomePage} from './frontend/home_page';
 
 console.log('Hello from the main thread!');
@@ -28,9 +30,9 @@ function createController() {
 }
 
 function main() {
+  gState.set(createEmptyState());
   createController();
   warmupWasmEngineWorker();
-
 
   const root = document.getElementById('frontend');
   if (!root) {
