@@ -70,8 +70,12 @@ export class NotOnCanvasError extends Error {
       bounds: {left: number, top: number, width: number, height: number},
       canvasHeight: number) {
     super(
-        `Attempted to ${action} (${JSON.stringify(drawing)})` +
-        `out of canvas bounds ${JSON.stringify(bounds)} with canvas height` +
-        `${canvasHeight}`);
+        `Attempted to ${action} (${JSON.stringify(drawing)}) ` +
+        `outside of canvas bounds ${JSON.stringify({
+                                      left: bounds.left,
+                                      top: bounds.top * -1,
+                                      width: bounds.width,
+                                      height: canvasHeight
+                                    })}`);
   }
 }
