@@ -30,4 +30,6 @@ export class RootCanvasContext extends VirtualCanvasContext {
 
     return rect.top >= topPos && rect.top + rect.height <= botPos;
   }
+
+  // TODO: check bounds on draw functions, throw error if outside of canvas.
 }
