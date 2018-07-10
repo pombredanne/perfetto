@@ -45,7 +45,7 @@ class QueryConstraints {
 
   QueryConstraints();
   ~QueryConstraints();
-  QueryConstraints(QueryConstraints&&);
+  QueryConstraints(QueryConstraints&&) noexcept;
   QueryConstraints& operator=(QueryConstraints&&);
 
   void AddConstraint(int column, unsigned char op);
