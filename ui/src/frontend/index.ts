@@ -14,8 +14,14 @@
 
 import * as m from 'mithril';
 
+import {createEmptyState} from '../common/state';
+import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
+
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
+import {gState} from './globals';
+import {HomePage} from './home_page';
+import {createPage} from './pages';
 import {ScrollableContainer} from './scrollable_container';
 import {Track} from './track';
 import {TrackCanvasContext} from './track_canvas_context';
@@ -115,3 +121,35 @@ export const Frontend = {
     m.Component<
         {width: number, height: number},
         {canvasController: CanvasController, width: number, height: number}>;
+
+export const FrontendPage = createPage({
+  view() {
+    return m(Frontend, {width: 1000, height: 300});
+  }
+});
+
+function createController() {
+  const worker = new Worker('worker_bundle.js');
+  worker.onerror = e => {
+    console.error(e);
+  };
+}
+
+function main() {
+  gState.set(createEmptyState());
+  createController();
+  warmupWasmEngineWorker();
+
+  const root = document.getElementById('frontend');
+  if (!root) {
+    console.error('root element not found.');
+    return;
+  }
+
+  m.route(root, '/', {
+    '/': HomePage,
+    '/viewer': FrontendPage,
+  });
+}
+
+main();
