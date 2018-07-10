@@ -20,12 +20,12 @@ import {TrackShell} from './track_shell';
 export const Track = {
   view({attrs}) {
 
-    attrs.cctx.fillStyle = '#ccc';
-    attrs.cctx.fillRect(0, 0, 1000, 73);
+    attrs.trackContext.fillStyle = '#ccc';
+    attrs.trackContext.fillRect(0, 0, 1000, 73);
 
-    attrs.cctx.font = '16px Arial';
-    attrs.cctx.fillStyle = '#000';
-    attrs.cctx.fillText(attrs.name + ' rendered by canvas', 500, 20);
+    attrs.trackContext.font = '16px Arial';
+    attrs.trackContext.fillStyle = '#000';
+    attrs.trackContext.fillText(attrs.name + ' rendered by canvas', 500, 20);
 
     return m(
         '.track',
@@ -39,4 +39,4 @@ export const Track = {
         },
         m(TrackShell, attrs));
   }
-} as m.Component<{name: string, cctx: TrackCanvasContext, top: number}>;
+} as m.Component<{name: string, trackContext: TrackCanvasContext, top: number}>;

@@ -14,28 +14,27 @@
 
 import {TrackCanvasContext} from './track_canvas_context';
 
-// Creates virtual (width, height) canvas context backed by a
-// real (width, height*2) canvas for the the purposes of implementing
-// a (width, Inf) canvas with smooth scrolling.
-
+/**
+ * Creates a canvas with a context that is set up of compositor scrolling.
+ * Creates virtual (width, height) canvas context backed by a  real
+ * (width, height*2) canvas for the the purposes of implementing a (width, Inf)
+ * canvas with smooth scrolling.
+ */
 export class CanvasController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private tctx: TrackCanvasContext;
+  private rootTrackContext: TrackCanvasContext;
 
   private top = 0;
   private canvasHeight: number;
-
-  // TODO: This should be removed, and canvasHeight used instead, once
-  // conditional rendering of tracks has been figured out.
-  private maxHeight = 100000;
 
   // Number of additionally rendered pixels above/below for compositor scrolling
   private extraHeightPerSide: number;
 
   constructor(private width: number, private height: number) {
     this.canvas = document.createElement('canvas');
-    this.canvasHeight = this.height * 2;
+    const CANVAS_OVERDRAW_FACTOR = 2;
+    this.canvasHeight = this.height * CANVAS_OVERDRAW_FACTOR;
     this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
 
     const dpr = window.devicePixelRatio;
@@ -55,30 +54,36 @@ export class CanvasController {
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.tctx = new TrackCanvasContext(this.ctx, {
+    this.rootTrackContext = new TrackCanvasContext(this.ctx, {
       left: 0,
       top: this.extraHeightPerSide,
       width: this.width,
-      height: this.maxHeight
+      height: Number.MAX_SAFE_INTEGER  // The top context should not clip.
     });
   }
 
-  clear() {
-    this.tctx.fillStyle = 'white';
-    this.tctx.fillRect(0, 0, this.width, this.maxHeight);
+  clear(): void {
+    this.ctx.fillStyle = 'white';
+    this.ctx.fillRect(0, 0, this.width, this.canvasHeight);
   }
 
-  getContext() {
-    return this.tctx;
+  getContext(): TrackCanvasContext {
+    return this.rootTrackContext;
   }
 
-  getCanvasElement() {
+  getCanvasElement(): HTMLCanvasElement {
     return this.canvas;
   }
 
-  updateScrollOffset(scrollOffset: number) {
-    this.top = scrollOffset + this.extraHeightPerSide;
-    this.tctx.setYOffset(scrollOffset * -1);
+  /**
+   * Places the canvas and its contents at the correct position.
+   * Re-centers the canvas element in the current viewport, and sets the context
+   * offsets such that the contents move up as we scroll, while rendering the
+   * first track within the viewport.
+   */
+  updateScrollOffset(scrollOffset: number): void {
+    this.top = scrollOffset;
+    this.rootTrackContext.setYOffset(this.extraHeightPerSide - scrollOffset);
   }
 
   getCanvasScrollOffset() {
