@@ -36,11 +36,6 @@ namespace trace_processor {
 // in the xBestIndex call and passed to each corresponding xFilter call.
 class QueryConstraints {
  public:
-  QueryConstraints() = default;
-  ~QueryConstraints() = default;
-  QueryConstraints(QueryConstraints&&) = default;
-  QueryConstraints& operator=(QueryConstraints&&) = default;
-
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
   using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
 
@@ -48,20 +43,14 @@ class QueryConstraints {
 
   using SqliteString = base::ScopedResource<char*, FreeSqliteString, nullptr>;
 
-  void AddConstraint(int column, unsigned char op) {
-    Constraint c{};
-    c.iColumn = column;
-    c.op = op;
-    constraints_.emplace_back(c);
-  }
+  QueryConstraints();
+  ~QueryConstraints();
+  QueryConstraints(QueryConstraints&&);
+  QueryConstraints& operator=(QueryConstraints&&);
 
-  void AddOrderBy(int column, unsigned char desc) {
-    OrderBy ob{};
-    ob.iColumn = column;
-    ob.desc = desc;
-    order_by_.emplace_back(ob);
-  }
+  void AddConstraint(int column, unsigned char op);
 
+  void AddOrderBy(int column, unsigned char desc);
   // Converts the constraints and order by information to a string for
   // use by sqlite.
   SqliteString ToNewSqlite3String();
