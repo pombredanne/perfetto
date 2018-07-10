@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {VirtualCanvasContext} from './track_canvas_context';
+import {VirtualCanvasContext} from './virtual_canvas_context';
 import Mock = jest.Mock;
 
 const setupCanvasContext = () => {

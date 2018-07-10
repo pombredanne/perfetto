@@ -24,7 +24,7 @@ import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {ScrollableContainer} from './scrollable_container';
 import {Track} from './track';
-import {TrackCanvasContext} from './track_canvas_context';
+import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Frontend = {
   oninit() {
@@ -58,61 +58,61 @@ export const Frontend = {
           }),
           m(Track, {
             name: 'Track 1',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 0, left: 0, width: this.width, height: 90}),
             top: 0
           }),
           m(Track, {
             name: 'Track 2',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 100, left: 0, width: this.width, height: 90}),
             top: 100
           }),
           m(Track, {
             name: 'Track 3',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 200, left: 0, width: this.width, height: 90}),
             top: 200
           }),
           m(Track, {
             name: 'Track 4',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 300, left: 0, width: this.width, height: 90}),
             top: 300
           }),
           m(Track, {
             name: 'Track 5',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 400, left: 0, width: this.width, height: 90}),
             top: 400
           }),
           m(Track, {
             name: 'Track 6',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 500, left: 0, width: this.width, height: 90}),
             top: 500
           }),
           m(Track, {
             name: 'Track 7',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 600, left: 0, width: this.width, height: 90}),
             top: 600
           }),
           m(Track, {
             name: 'Track 8',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 700, left: 0, width: this.width, height: 90}),
             top: 700
           }),
           m(Track, {
             name: 'Track 9',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 800, left: 0, width: this.width, height: 90}),
             top: 800
           }),
           m(Track, {
             name: 'Track 10',
-            trackContext: new TrackCanvasContext(
+            trackContext: new VirtualCanvasContext(
                 ctx, {top: 900, left: 0, width: this.width, height: 90}),
             top: 900
           }), ), );
@@ -129,7 +129,7 @@ export const FrontendPage = createPage({
 });
 
 function createController() {
-  const worker = new Worker('worker_bundle.js');
+  const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
