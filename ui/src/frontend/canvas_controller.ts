@@ -17,10 +17,10 @@ import {TrackCanvasContext} from './track_canvas_context';
 const CANVAS_OVERDRAW_FACTOR = 2;
 
 /**
- * Creates a canvas with a context that is set up of compositor scrolling.
- * Creates virtual (width, height) canvas context backed by a  real
- * (width, height * CANVAS_OVERDRAW_FACTOR) canvas for the the purposes of
- * implementing a (width, Inf) canvas with smooth scrolling.
+ * Creates a canvas with a context that is set up for compositor scrolling.
+ * Creates a canvas and a virtual context and handles their size and position
+ * for smooth scrolling. The canvas is (width, height * CANVAS_OVERDRAW_FACTOR),
+ * and through the virtual context behaves like (width, Inf).
  */
 export class CanvasController {
   private canvas: HTMLCanvasElement;
