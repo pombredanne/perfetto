@@ -48,6 +48,10 @@ class QueryConstraints {
   QueryConstraints(QueryConstraints&&) noexcept;
   QueryConstraints& operator=(QueryConstraints&&);
 
+  // Two QueryConstraints with the same constraint and orderby vectors
+  // are equal.
+  bool operator==(const QueryConstraints& other) const;
+
   void AddConstraint(int column, unsigned char op);
 
   void AddOrderBy(int column, unsigned char desc);

@@ -29,30 +29,6 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-Matcher<QueryConstraints::Constraint> MatchesConstraint(
-    const QueryConstraints::Constraint& b) {
-  return AllOf(Field(&QueryConstraints::Constraint::iColumn, b.iColumn),
-               Field(&QueryConstraints::Constraint::op, b.op));
-}
-
-MATCHER(MatchConstraint, "") {
-  auto& a = ::testing::get<0>(arg);
-  auto& b = ::testing::get<1>(arg);
-  return Matches(MatchesConstraint(b))(a);
-}
-
-Matcher<QueryConstraints::OrderBy> MatchesOrderBy(
-    const QueryConstraints::OrderBy& b) {
-  return AllOf(Field(&QueryConstraints::OrderBy::iColumn, b.iColumn),
-               Field(&QueryConstraints::OrderBy::desc, b.desc));
-}
-
-MATCHER(MatchOrderBy, "") {
-  auto& a = ::testing::get<0>(arg);
-  auto& b = ::testing::get<1>(arg);
-  return Matches(MatchesOrderBy(b))(a);
-}
-
 TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   QueryConstraints qc;
   qc.AddConstraint(12, 0);
@@ -62,10 +38,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
 
   QueryConstraints qc_constraint =
       QueryConstraints::FromString(only_constraint.get());
-  ASSERT_THAT(qc.constraints(),
-              Pointwise(MatchConstraint(), qc_constraint.constraints()));
-  ASSERT_THAT(qc.order_by(),
-              Pointwise(MatchOrderBy(), qc_constraint.order_by()));
+  ASSERT_EQ(qc, qc_constraint);
 
   qc.AddOrderBy(1, false);
   qc.AddOrderBy(21, true);
@@ -74,10 +47,7 @@ TEST(QueryConstraintsTest, ConvertToAndFromSqlString) {
   ASSERT_TRUE(strcmp(result.get(), "C1,12,0,O2,1,0,21,1") == 0);
 
   QueryConstraints qc_result = QueryConstraints::FromString(result.get());
-
-  ASSERT_THAT(qc.constraints(),
-              Pointwise(MatchConstraint(), qc_result.constraints()));
-  ASSERT_THAT(qc.order_by(), Pointwise(MatchOrderBy(), qc_result.order_by()));
+  ASSERT_EQ(qc, qc_result);
 }
 
 TEST(QueryConstraintsTest, CheckEmptyConstraints) {
@@ -101,9 +71,7 @@ TEST(QueryConstraintsTest, OnlyOrderBy) {
 
   QueryConstraints qc_result =
       QueryConstraints::FromString(string_result.get());
-  ASSERT_THAT(qc.constraints(),
-              Pointwise(MatchConstraint(), qc_result.constraints()));
-  ASSERT_THAT(qc.order_by(), Pointwise(MatchOrderBy(), qc_result.order_by()));
+  ASSERT_EQ(qc, qc_result);
 }
 
 }  // namespace

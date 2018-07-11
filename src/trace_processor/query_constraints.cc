@@ -34,6 +34,29 @@ int QueryConstraints::FreeSqliteString(char* resource) {
   return 0;
 }
 
+bool QueryConstraints::operator==(const QueryConstraints& other) const {
+  if ((other.constraints().size() != constraints().size()) ||
+      (other.order_by().size() != order_by().size())) {
+    return false;
+  }
+
+  for (size_t i = 0; i < constraints().size(); ++i) {
+    if ((constraints()[i].iColumn != other.constraints()[i].iColumn) ||
+        (constraints()[i].op != other.constraints()[i].op)) {
+      return false;
+    }
+  }
+
+  for (size_t i = 0; i < order_by().size(); ++i) {
+    if ((order_by()[i].iColumn != other.order_by()[i].iColumn) ||
+        (order_by()[i].desc != other.order_by()[i].desc)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void QueryConstraints::AddConstraint(int column, unsigned char op) {
   Constraint c{};
   c.iColumn = column;
