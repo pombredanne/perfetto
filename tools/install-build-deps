@@ -290,7 +290,6 @@ def Main():
     deps += BUILD_DEPS_ANDROID + TEST_DEPS_ANDROID
   if args.ui:
     deps += UI_DEPS
-    InstallNodeModules()
   for rel_path, url, expected_sha1, platform in deps:
     if (platform != 'all' and platform != sys.platform):
       continue
@@ -349,6 +348,9 @@ def Main():
         stamp_file.write(expected_sha1)
       os.remove(local_path)
 
+  if args.ui:
+    # Needs to happen after nodejs is installed above.
+    InstallNodeModules()
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
