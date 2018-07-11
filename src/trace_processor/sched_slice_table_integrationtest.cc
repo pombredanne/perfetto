@@ -61,14 +61,14 @@ TEST_F(SchedSliceTableIntegrationTest,
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu, timestamp, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu, timestamp + 3, pid_2, prev_state, kCommProc2,
+  storage_.PushSchedSwitch(cpu, timestamp + 3, 0, pid_2, prev_state, kCommProc2,
                            sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu, timestamp + 4, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur");
 
@@ -101,18 +101,18 @@ TEST_F(SchedSliceTableIntegrationTest,
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu_3, timestamp - 2, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu_3, timestamp - 2, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_3, timestamp - 1, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp, pid_1, 0, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_3, timestamp - 1, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 3, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 4, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur desc");
 
@@ -143,14 +143,14 @@ TEST_F(SchedSliceTableIntegrationTest, DISABLED_FilterCpus) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu_1, timestamp, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 3, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 4, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched WHERE cpu = 3");
 
@@ -171,14 +171,14 @@ TEST_F(SchedSliceTableIntegrationTest, DISABLED_QuanitsiationCpuNativeOrder) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu_2, timestamp, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu_2, timestamp, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 3, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 4, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement(
       "SELECT dur, ts, cpu FROM sched WHERE _quantum MATCH 5 ORDER BY cpu");
@@ -214,14 +214,14 @@ TEST_F(SchedSliceTableIntegrationTest,
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu_1, timestamp, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 3, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 4, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement(
       "SELECT dur, ts, cpu FROM sched WHERE _quantum match 5 ORDER BY dur");
@@ -256,14 +256,14 @@ TEST_F(SchedSliceTableIntegrationTest, DISABLED_QuantizationGroupAndSum) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state, kCommProc1,
+  storage_.PushSchedSwitch(cpu_1, timestamp, 0, pid_1, prev_state, kCommProc1,
                            sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu_1, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu_2, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 3, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
+  storage_.PushSchedSwitch(cpu_1, timestamp + 4, 0, pid_1, prev_state,
+                           kCommProc1, sizeof(kCommProc1) - 1, pid_2);
+  storage_.PushSchedSwitch(cpu_2, timestamp + 10, 0, pid_2, prev_state,
+                           kCommProc2, sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement(
       "SELECT SUM(dur) as sum_dur "

@@ -31,6 +31,7 @@ TraceStorage::~TraceStorage() {}
 
 void TraceStorage::PushSchedSwitch(uint32_t cpu,
                                    uint64_t timestamp,
+                                   double cycles,
                                    uint32_t prev_pid,
                                    uint32_t prev_state,
                                    const char* prev_comm,
@@ -42,7 +43,7 @@ void TraceStorage::PushSchedSwitch(uint32_t cpu,
   // slice.
   if (prev->valid() && prev->next_pid != 0 /* Idle process (swapper/N) */) {
     uint64_t duration = timestamp - prev->timestamp;
-    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_pid,
+    cpu_events_[cpu].AddSlice(prev->timestamp, duration, cycles, prev->prev_pid,
                               prev->prev_thread_name_id);
   } else {
     cpu_events_[cpu].InitalizeSlices(this);

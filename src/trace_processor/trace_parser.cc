@@ -190,17 +190,50 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
   }
   decoder.Reset();
 
+  // The first time we see a cpu we set the timestamp to the current timestamp.
+  if (cycle_counters_[cpu].timestamp_last_counted == 0)
+    cycle_counters_[cpu].timestamp_last_counted = timestamp;
+
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber:
         PERFETTO_DCHECK(timestamp > 0);
         ParseSchedSwitch(cpu, timestamp, fld.data(), fld.size());
         break;
+      case protos::FtraceEvent::kCpuFrequency:
+        ParseCpuFrequency(cpu, timestamp, fld.data(), fld.size());
+        break;
       default:
         break;
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void TraceParser::ParseCpuFrequency(uint32_t cpu,
+                                    uint64_t timestamp,
+                                    const uint8_t* data,
+                                    size_t length) {
+  ProtoDecoder decoder(data, length);
+
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::CpuFrequencyFtraceEvent::kStateFieldNumber: {
+        // Add the cycle count since we last calculated multiplied by the
+        // prev frequency and then update the frequency to the new frequency.
+        double time_diff_s =
+            (timestamp - cycle_counters_[cpu].timestamp_last_counted) /
+            1000000000.0;
+        cycle_counters_[cpu].current_slice_cycles +=
+            time_diff_s * cycle_counters_[cpu].frequency;
+        cycle_counters_[cpu].timestamp_last_counted = timestamp;
+        cycle_counters_[cpu].frequency = fld.as_uint32();
+        break;
+      }
+      default:
+        break;
+    }
+  }
 }
 
 void TraceParser::ParseSchedSwitch(uint32_t cpu,
@@ -233,8 +266,20 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         break;
     }
   }
-  storage_->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
-                            prev_comm_len, next_pid);
+  double time_diff_s =
+      (timestamp - cycle_counters_[cpu].timestamp_last_counted) / 1000000000.0;
+
+  // If we have never seen a cpu_frequency event for this cpu then the
+  // frequency will be 0 so the cycle count will be 0.
+  cycle_counters_[cpu].current_slice_cycles +=
+      (time_diff_s * cycle_counters_[cpu].frequency);
+
+  storage_->PushSchedSwitch(cpu, timestamp,
+                            cycle_counters_[cpu].current_slice_cycles, prev_pid,
+                            prev_state, prev_comm, prev_comm_len, next_pid);
+
+  cycle_counters_[cpu].current_slice_cycles = 0;
+  cycle_counters_[cpu].timestamp_last_counted = timestamp;
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }

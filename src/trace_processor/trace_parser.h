@@ -39,6 +39,12 @@ class TraceParser {
   // if there are more chunks which can be read and false otherwise.
   bool ParseNextChunk();
 
+  struct CycleCounter {
+    double current_slice_cycles = 0;
+    uint64_t timestamp_last_counted = 0;
+    uint64_t frequency = 0;
+  };
+
  private:
   void ParsePacket(const uint8_t* data, size_t length);
   void ParseFtraceEventBundle(const uint8_t* data, size_t length);
@@ -47,6 +53,10 @@ class TraceParser {
                         uint64_t timestamp,
                         const uint8_t* data,
                         size_t length);
+  void ParseCpuFrequency(uint32_t cpu,
+                         uint64_t timestamp,
+                         const uint8_t* data,
+                         size_t length);
   void ParseProcessTree(const uint8_t* data, size_t length);
   void ParseProcess(const uint8_t* data, size_t length);
   void ParseThread(const uint8_t* data, size_t length);
@@ -54,6 +64,9 @@ class TraceParser {
   BlobReader* const reader_;
   TraceStorage* const storage_;
   const uint32_t chunk_size_b_;
+
+  // Used to keep track of the current cycle count for each cpu.
+  std::unordered_map<uint32_t, CycleCounter> cycle_counters_;
 
   uint64_t offset_ = 0;
   std::unique_ptr<uint8_t[]> buffer_;

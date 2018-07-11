@@ -39,11 +39,11 @@ TEST(TraceStorageTest, InsertSecondSched) {
   uint32_t pid_2 = 4;
 
   const auto& timestamps = storage.SlicesForCpu(cpu).start_ns();
-  storage.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+  storage.PushSchedSwitch(cpu, timestamp, 0, pid_1, prev_state, kCommProc1,
                           sizeof(kCommProc1) - 1, pid_2);
   ASSERT_EQ(timestamps.size(), 0);
 
-  storage.PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+  storage.PushSchedSwitch(cpu, timestamp + 1, 0, pid_2, prev_state, kCommProc2,
                           sizeof(kCommProc2) - 1, pid_1);
 
   ASSERT_EQ(timestamps.size(), 1ul);
@@ -66,13 +66,13 @@ TEST(TraceStorageTest, InsertThirdSched_SameThread) {
   uint32_t pid_2 = 4;
 
   const auto& timestamps = storage.SlicesForCpu(cpu).start_ns();
-  storage.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+  storage.PushSchedSwitch(cpu, timestamp, 0, pid_1, prev_state, kCommProc1,
                           sizeof(kCommProc1) - 1, pid_1);
   ASSERT_EQ(timestamps.size(), 0);
 
-  storage.PushSchedSwitch(cpu, timestamp + 1, pid_1, prev_state, kCommProc1,
+  storage.PushSchedSwitch(cpu, timestamp + 1, 0, pid_1, prev_state, kCommProc1,
                           sizeof(kCommProc1) - 1, pid_2);
-  storage.PushSchedSwitch(cpu, timestamp + 2, pid_2, prev_state, kCommProc2,
+  storage.PushSchedSwitch(cpu, timestamp + 2, 0, pid_2, prev_state, kCommProc2,
                           sizeof(kCommProc2) - 1, pid_1);
 
   ASSERT_EQ(timestamps.size(), 2ul);
@@ -125,9 +125,9 @@ TEST(TraceStorageTest, MatchThreadToProcess) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
 
-  storage.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
+  storage.PushSchedSwitch(cpu, timestamp, 0, pid_1, prev_state, kCommProc1,
                           sizeof(kCommProc1) - 1, pid_2);
-  storage.PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state, kCommProc2,
+  storage.PushSchedSwitch(cpu, timestamp + 1, 0, pid_2, prev_state, kCommProc2,
                           sizeof(kCommProc2) - 1, pid_1);
 
   storage.PushProcess(2, "test", 4);

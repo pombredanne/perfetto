@@ -62,10 +62,12 @@ class TraceStorage {
    public:
     inline void AddSlice(uint64_t start_ns,
                          uint64_t duration_ns,
+                         double m_cycles,
                          uint32_t tid,
                          StringId thread_name_id) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
+      m_cycles_.emplace_back(m_cycles);
 
       auto pair_it = storage_->tids_.equal_range(tid);
       // If there is a previous utid for that tid, use that.
@@ -90,6 +92,8 @@ class TraceStorage {
 
     const std::deque<uint64_t>& durations() const { return durations_; }
 
+    const std::deque<double>& m_cycles() const { return m_cycles_; }
+
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
     void InitalizeSlices(TraceStorage* storage) { storage_ = storage; }
@@ -99,6 +103,7 @@ class TraceStorage {
     // in the trace for the CPU).
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
+    std::deque<double> m_cycles_;
     std::deque<UniqueTid> utids_;
 
     TraceStorage* storage_;
@@ -129,6 +134,7 @@ class TraceStorage {
   // Virtual for testing.
   virtual void PushSchedSwitch(uint32_t cpu,
                                uint64_t timestamp,
+                               double m_cycles,
                                uint32_t prev_pid,
                                uint32_t prev_state,
                                const char* prev_comm,

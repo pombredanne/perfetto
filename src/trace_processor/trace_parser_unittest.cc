@@ -52,9 +52,10 @@ class MockTraceStorage : public TraceStorage {
  public:
   MockTraceStorage() : TraceStorage() {}
 
-  MOCK_METHOD7(PushSchedSwitch,
+  MOCK_METHOD8(PushSchedSwitch,
                void(uint32_t cpu,
                     uint64_t timestamp,
+                    double cycles,
                     uint32_t prev_pid,
                     uint32_t prev_state,
                     const char* prev_comm,
@@ -84,8 +85,8 @@ TEST(TraceParser, LoadSingleEvent) {
   sched_switch->set_next_pid(100);
 
   MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 0, 10, 32, _, _, 100))
+      .With(Args<5, 6>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   TraceParser parser(&reader, &storage, 1024);
@@ -119,11 +120,11 @@ TEST(TraceParser, LoadMultipleEvents) {
   sched_switch->set_next_pid(10);
 
   MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 0, 10, 32, _, _, 100))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 0, 100, 32, _, _, 10))
+      .With(Args<5, 6>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   TraceParser parser(&reader, &storage, 1024);
@@ -160,11 +161,11 @@ TEST(TraceParser, LoadMultiplePackets) {
   sched_switch->set_next_pid(10);
 
   MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 0, 10, 32, _, _, 100))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 0, 100, 32, _, _, 10))
+      .With(Args<5, 6>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   TraceParser parser(&reader, &storage, 1024);
@@ -204,15 +205,15 @@ TEST(TraceParser, RepeatedLoadSinglePacket) {
   sched_switch->set_next_pid(10);
 
   MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 0, 10, 32, _, _, 100))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   TraceParser parser(&reader, &storage, chunk_size);
   parser.ParseNextChunk();
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 0, 100, 32, _, _, 10))
+      .With(Args<5, 6>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   parser.ParseNextChunk();
 }
@@ -267,6 +268,58 @@ TEST(TraceParse, LoadThreadPacket) {
 
   MockTraceStorage storage;
   EXPECT_CALL(storage, MatchThreadToProcess(1, 2));
+  FakeStringBlobReader reader(trace.SerializeAsString());
+  TraceParser parser(&reader, &storage, 1024);
+  parser.ParseNextChunk();
+}
+
+TEST(TraceParse, CountCycles) {
+  protos::Trace trace;
+
+  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(1);
+
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000000000);
+
+  static const char kProcName1[] = "proc1";
+  auto* sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(100);
+
+  event = bundle->add_event();
+  event->set_timestamp(1001000000);
+  auto* freq = event->mutable_cpu_frequency();
+  freq->set_state(1000000);
+
+  event = bundle->add_event();
+  event->set_timestamp(1002000000);
+  sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(100);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(10);
+
+  event = bundle->add_event();
+  event->set_timestamp(1003500000);
+  sched_switch = event->mutable_sched_switch();
+  sched_switch->set_prev_pid(10);
+  sched_switch->set_prev_state(32);
+  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_pid(20);
+
+  MockTraceStorage storage;
+  EXPECT_CALL(storage, PushSchedSwitch(1, 1000000000, 0, 10, 32, _, _, 100))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
+  EXPECT_CALL(storage, PushSchedSwitch(1, 1002000000, 1000, 100, 32, _, _, 10))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
+  EXPECT_CALL(storage, PushSchedSwitch(1, 1003000000, 1500, 10, 32, _, _, 20))
+      .With(Args<5, 6>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+
   FakeStringBlobReader reader(trace.SerializeAsString());
   TraceParser parser(&reader, &storage, 1024);
   parser.ParseNextChunk();
