@@ -21,12 +21,11 @@
  * It implements a subset of the CanvasRenderingContext2D API, but it translates
  * all the coordinates to the parent context's coordinate space by applying
  * appropriate offsets. The user of this context can thus assume a local
- * coordinate space of (0, 0, width, height.) In addition, VirtualCanvasContexts
+ * coordinate space of (0, 0, width, height). In addition, VirtualCanvasContexts
  * performs strict bounds checking on some drawing, and it allows the user to
  * to query if the virtual context is on the (eventual) backing real canvas, so
  * the user can avoid executing unnecessary drawing logic.
  */
-
 export abstract class VirtualCanvasContext {
   stroke: () => void;
   beginPath: () => void;
@@ -54,8 +53,8 @@ export abstract class VirtualCanvasContext {
     }
 
     this.ctx.fillRect(
-        x + this.getBoundingRect().left,
-        y + this.getBoundingRect().top,
+        x + this.getBoundingRect().x,
+        y + this.getBoundingRect().y,
         width,
         height);
   }
@@ -69,8 +68,7 @@ export abstract class VirtualCanvasContext {
     if (!this.isOnCanvas()) {
       throw new NotOnCanvasError();
     }
-    this.ctx.moveTo(
-        x + this.getBoundingRect().left, y + this.getBoundingRect().top);
+    this.ctx.moveTo(x + this.getBoundingRect().x, y + this.getBoundingRect().y);
   }
 
   lineTo(x: number, y: number) {
@@ -82,8 +80,7 @@ export abstract class VirtualCanvasContext {
     if (!this.isOnCanvas()) {
       throw new NotOnCanvasError();
     }
-    this.ctx.lineTo(
-        x + this.getBoundingRect().left, y + this.getBoundingRect().top);
+    this.ctx.lineTo(x + this.getBoundingRect().x, y + this.getBoundingRect().y);
   }
 
   fillText(text: string, x: number, y: number) {
@@ -96,7 +93,7 @@ export abstract class VirtualCanvasContext {
       throw new NotOnCanvasError();
     }
     this.ctx.fillText(
-        text, x + this.getBoundingRect().left, y + this.getBoundingRect().top);
+        text, x + this.getBoundingRect().x, y + this.getBoundingRect().y);
   }
 
   set strokeStyle(v: string) {
@@ -126,7 +123,6 @@ export class OutOfBoundsDrawingError extends Error {
   }
 }
 
-
 export class NotOnCanvasError extends Error {
   constructor() {
     super(
@@ -136,8 +132,8 @@ export class NotOnCanvasError extends Error {
 }
 
 export interface BoundingRect {
-  left: number;
-  top: number;
+  x: number;
+  y: number;
   width: number;
   height: number;
 }

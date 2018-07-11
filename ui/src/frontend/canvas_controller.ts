@@ -25,26 +25,29 @@ const CANVAS_OVERDRAW_FACTOR = 2;
 export class CanvasController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private rootTrackContext: RootVirtualContext;
+  private rootVirtualContext: RootVirtualContext;
 
   private scrollOffset = 0;
 
   // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide: number;
 
-  height: number;
+  canvasHeight: number;
+  canvasWidth: number;
 
-  constructor(public width: number, viewportHeight: number) {
+  constructor(canvasWidth: number, visibleCanvasHeight: number) {
     this.canvas = document.createElement('canvas');
 
-    this.height = viewportHeight * CANVAS_OVERDRAW_FACTOR;
-    this.extraHeightPerSide = Math.round((this.height - viewportHeight) / 2);
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
+    this.extraHeightPerSide =
+        Math.round((this.canvasHeight - visibleCanvasHeight) / 2);
 
     const dpr = window.devicePixelRatio;
-    this.canvas.style.width = this.width.toString() + 'px';
-    this.canvas.style.height = this.height.toString() + 'px';
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
+    this.canvas.style.width = this.canvasWidth.toString() + 'px';
+    this.canvas.style.height = this.canvasHeight.toString() + 'px';
+    this.canvas.width = this.canvasWidth * dpr;
+    this.canvas.height = this.canvasHeight * dpr;
 
     const ctx = this.canvas.getContext('2d');
 
@@ -55,20 +58,24 @@ export class CanvasController {
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.rootTrackContext = new RootVirtualContext(this);
+    this.rootVirtualContext = new RootVirtualContext(this);
   }
 
   clear(): void {
     this.ctx.fillStyle = 'white';
-    this.ctx.fillRect(0, 0, this.width, this.height);
+    this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
   }
 
   getContext(): RootVirtualContext {
-    return this.rootTrackContext;
+    return this.rootVirtualContext;
   }
 
   getCanvasElement(): HTMLCanvasElement {
     return this.canvas;
+  }
+
+  getCanvasContext(): CanvasRenderingContext2D {
+    return this.ctx;
   }
 
   /**

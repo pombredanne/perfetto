@@ -15,20 +15,15 @@
 import {CanvasController} from './canvas_controller';
 import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
 
+/**
+ * RootVirtualContext is a VirtualCanvasContext that has knowledge of the
+ * actual canvas element and the scroll position, which it can use to determine
+ * whether any rect is within the canvas. ChildVirtualContexts can use this to
+ * determine whether they should execute their draw calls.
+ */
 export class RootVirtualContext extends VirtualCanvasContext {
-  private cc: CanvasController;
-  protected ctx: CanvasRenderingContext2D;
-
-  constructor(cc: CanvasController) {
-    const context = cc.getCanvasElement().getContext('2d');
-    if (!context) {
-      throw new Error('Could not create Canvas Context');
-    }
-
-    super(context);
-
-    this.cc = cc;
-    this.ctx = context;
+  constructor(private canvasController: CanvasController) {
+    super(canvasController.getCanvasContext());
   }
 
   isOnCanvas() {
@@ -36,23 +31,28 @@ export class RootVirtualContext extends VirtualCanvasContext {
   }
 
   checkRectOnCanvas(boundingRect: BoundingRect) {
-    const canvasTop = this.cc.getCanvasTopOffset();
-    const canvasBottom = canvasTop + this.cc.height;
-    const rectBottom = boundingRect.top + boundingRect.height;
-    const rectRight = boundingRect.left + boundingRect.width;
+    const canvasTop = this.canvasController.getCanvasTopOffset();
+    const canvasBottom = canvasTop + this.canvasController.canvasHeight;
+    const rectBottom = boundingRect.y + boundingRect.height;
+    const rectRight = boundingRect.x + boundingRect.width;
 
     const heightIntersects =
-        boundingRect.top <= canvasBottom && rectBottom >= canvasTop;
+        boundingRect.y <= canvasBottom && rectBottom >= canvasTop;
     const widthIntersects =
-        boundingRect.left <= this.cc.width && rectRight >= 0;
+        boundingRect.x <= this.canvasController.canvasWidth && rectRight >= 0;
 
     return heightIntersects && widthIntersects;
   }
 
-  getBoundingRect() {
+  /**
+   * This defines a BoundingRect that causes correct positioning of the context
+   * contents due to the scroll position, without causing bounds checking.
+   */
+  getBoundingRect(): BoundingRect {
     return {
-      top: this.cc.getCanvasTopOffset() * -1,
-      left: 0,
+      // As the user scrolls down, the contents have to move up.
+      y: this.canvasController.getCanvasTopOffset() * -1,
+      x: 0,
       width: Infinity,
       height: Infinity
     };

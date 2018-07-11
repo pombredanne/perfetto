@@ -14,6 +14,13 @@
 
 import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
 
+/**
+ * ChildVirtualContext is a VirtualCanvasContext that is a child of another
+ * VirtualCanvasContext. A ChildVirtualContext has a boundingRect within the
+ * parent context, and uses this to determine whether it is currently on the
+ * canvas, hence disabling unnecessary draw calls. ChildVirtualContexts can be
+ * nested, and their bounds are relative to one another.
+ */
 export class ChildVirtualContext extends VirtualCanvasContext {
   constructor(
       protected parentCtx: VirtualCanvasContext,
@@ -27,8 +34,8 @@ export class ChildVirtualContext extends VirtualCanvasContext {
 
   checkRectOnCanvas(boundingRect: BoundingRect): boolean {
     return this.parentCtx.checkRectOnCanvas({
-      top: boundingRect.top + this.boundingRect.top,
-      left: boundingRect.left + this.boundingRect.left,
+      y: boundingRect.y + this.boundingRect.y,
+      x: boundingRect.x + this.boundingRect.x,
       width: boundingRect.width,
       height: boundingRect.height
     });

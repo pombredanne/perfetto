@@ -35,8 +35,8 @@ const setupCanvasContext = () => {
 test('virtual canvas context offsets work on fillrect', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext = new ChildVirtualContext(
-      ctx, {left: 100, top: 200, width: 200, height: 150});
+  const trackContext =
+      new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const mockCalls = (ctx.fillRect as Mock).mock.calls;
 
   trackContext.fillRect(10, 5, 100, 20);
@@ -47,8 +47,8 @@ test('virtual canvas context offsets work on fillrect', async () => {
 test('virtual canvas context offsets work on filltext', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext = new ChildVirtualContext(
-      ctx, {left: 100, top: 200, width: 200, height: 150});
+  const trackContext =
+      new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const mockCalls = (ctx.fillText as Mock).mock.calls;
 
   trackContext.fillText('', 10, 5);
@@ -60,8 +60,8 @@ test('virtual canvas context offsets work on filltext', async () => {
 test('virtual canvas context offsets work on moveto and lineto', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext = new ChildVirtualContext(
-      ctx, {left: 100, top: 200, width: 200, height: 150});
+  const trackContext =
+      new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
 
   const mockCallsMove = (ctx.moveTo as Mock).mock.calls;
   trackContext.moveTo(10, 5);
@@ -75,8 +75,8 @@ test('virtual canvas context offsets work on moveto and lineto', async () => {
 test('virtual canvas context limits the bbox', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext = new ChildVirtualContext(
-      ctx, {left: 100, top: 200, width: 200, height: 150});
+  const trackContext =
+      new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
 
   // Filling the entire rect should work.
   trackContext.fillRect(0, 0, 200, 150);
@@ -114,10 +114,10 @@ test('virtual canvas context limits the bbox', async () => {
 test('nested virtual canvas contexts work', async () => {
   const ctx = setupCanvasContext();
   const mockCalls = (ctx.moveTo as Mock).mock.calls;
-  const trackContext = new ChildVirtualContext(
-      ctx, {left: 100, top: 200, width: 200, height: 150});
+  const trackContext =
+      new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const trackContext2 = new ChildVirtualContext(
-      trackContext, {left: 10, top: 10, width: 10, height: 10});
+      trackContext, {x: 10, y: 10, width: 10, height: 10});
 
   trackContext2.moveTo(10, 5);
   expect(mockCalls[0]).toEqual([120, 215]);
