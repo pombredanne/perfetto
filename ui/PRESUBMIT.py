@@ -40,8 +40,8 @@ def CheckTslint(input_api, output_api):
         repo_root = input_api.change.RepositoryRoot()
         install_path = path.join(repo_root, 'tools', 'install-build-deps')
         return [
-            output_api.PresubmitError(
-                "Tslint not found. Please run {0} --ui".format(install_path))
+            output_api.PresubmitError("Tslint not found. Please first run\n" +
+                "$ {0} --ui".format(install_path))
         ]
 
     # Some tslint rules require type information and thus need the whole
