@@ -24,9 +24,51 @@
 namespace perfetto {
 namespace trace_processor {
 
+QueryConstraints::QueryConstraints() = default;
+QueryConstraints::~QueryConstraints() = default;
+QueryConstraints::QueryConstraints(QueryConstraints&&) noexcept = default;
+QueryConstraints& QueryConstraints::operator=(QueryConstraints&&) = default;
+
 int QueryConstraints::FreeSqliteString(char* resource) {
   sqlite3_free(resource);
   return 0;
+}
+
+bool QueryConstraints::operator==(const QueryConstraints& other) const {
+  if ((other.constraints().size() != constraints().size()) ||
+      (other.order_by().size() != order_by().size())) {
+    return false;
+  }
+
+  for (size_t i = 0; i < constraints().size(); ++i) {
+    if ((constraints()[i].iColumn != other.constraints()[i].iColumn) ||
+        (constraints()[i].op != other.constraints()[i].op)) {
+      return false;
+    }
+  }
+
+  for (size_t i = 0; i < order_by().size(); ++i) {
+    if ((order_by()[i].iColumn != other.order_by()[i].iColumn) ||
+        (order_by()[i].desc != other.order_by()[i].desc)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void QueryConstraints::AddConstraint(int column, unsigned char op) {
+  Constraint c{};
+  c.iColumn = column;
+  c.op = op;
+  constraints_.emplace_back(c);
+}
+
+void QueryConstraints::AddOrderBy(int column, unsigned char desc) {
+  OrderBy ob{};
+  ob.iColumn = column;
+  ob.desc = desc;
+  order_by_.emplace_back(ob);
 }
 
 QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
@@ -52,12 +94,12 @@ QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
   }
 
   // The last char is a "," so overwriting with the null terminator on purpose.
-  char* result =
-      static_cast<char*>(sqlite3_malloc(static_cast<int>(str_result.size())));
-  strncpy(result, str_result.c_str(), str_result.size());
-  result[str_result.size() - 1] = '\0';
+  SqliteString result(
+      static_cast<char*>(sqlite3_malloc(static_cast<int>(str_result.size()))));
+  strncpy(result.get(), str_result.c_str(), str_result.size());
+  (*result)[str_result.size() - 1] = '\0';
 
-  return SqliteString(result);
+  return result;
 }
 
 QueryConstraints QueryConstraints::FromString(const char* idxStr) {
@@ -67,23 +109,25 @@ QueryConstraints QueryConstraints::FromString(const char* idxStr) {
 
   PERFETTO_CHECK(splitter.Next() && splitter.cur_token_size() > 1);
   // The '+ 1' skips the letter 'C' in the first token.
-  int num_constraints = atoi(splitter.cur_token() + 1);
+  long num_constraints = strtol(splitter.cur_token() + 1, nullptr, 10);
   for (int i = 0; i < num_constraints; ++i) {
     PERFETTO_CHECK(splitter.Next());
-    int col = atoi(splitter.cur_token());
+    int col = static_cast<int>(strtol(splitter.cur_token(), nullptr, 10));
     PERFETTO_CHECK(splitter.Next());
-    unsigned char op = static_cast<unsigned char>(atoi(splitter.cur_token()));
+    unsigned char op =
+        static_cast<unsigned char>(strtol(splitter.cur_token(), nullptr, 10));
     qc.AddConstraint(col, op);
   }
 
   PERFETTO_CHECK(splitter.Next() && splitter.cur_token_size() > 1);
   // The '+ 1' skips the letter 'O' in the current token.
-  int num_order_by = atoi(splitter.cur_token() + 1);
+  long num_order_by = strtol(splitter.cur_token() + 1, nullptr, 10);
   for (int i = 0; i < num_order_by; ++i) {
     PERFETTO_CHECK(splitter.Next());
-    int col = atoi(splitter.cur_token());
+    int col = static_cast<int>(strtol(splitter.cur_token(), nullptr, 10));
     PERFETTO_CHECK(splitter.Next());
-    unsigned char desc = static_cast<unsigned char>(atoi(splitter.cur_token()));
+    unsigned char desc =
+        static_cast<unsigned char>(strtol(splitter.cur_token(), nullptr, 10));
     qc.AddOrderBy(col, desc);
   }
 
