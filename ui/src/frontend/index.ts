@@ -22,6 +22,7 @@ import {CanvasWrapper} from './canvas_wrapper';
 import {gState} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
+import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
 import {Track} from './track';
 import {TrackCanvasContext} from './track_canvas_context';
@@ -149,6 +150,7 @@ function main() {
   m.route(root, '/', {
     '/': HomePage,
     '/viewer': FrontendPage,
+    '/query/:trace': QueryPage,
   });
 }
 

@@ -17,9 +17,11 @@ import * as m from 'mithril';
 const Nav = {
   view() {
     return m(
-        'ul',
-        m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
-        m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), );
+        'nav',
+        m('ul',
+          m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
+          m('li',
+            m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), ), );
   }
 } as m.Component;
 
