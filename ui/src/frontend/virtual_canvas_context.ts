@@ -127,7 +127,7 @@ export class NotOnCanvasError extends Error {
   constructor() {
     super(
         `Attempted to draw on a track that is not on the canvas. ` +
-        `Did you check trackContext.isOnCanvas()?`);
+        `Did you check virtualContext.isOnCanvas()?`);
   }
 }
 

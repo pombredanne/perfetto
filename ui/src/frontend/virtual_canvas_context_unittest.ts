@@ -35,11 +35,11 @@ const setupCanvasContext = () => {
 test('virtual canvas context offsets work on fillrect', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext =
+  const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const mockCalls = (ctx.fillRect as Mock).mock.calls;
 
-  trackContext.fillRect(10, 5, 100, 20);
+  virtualContext.fillRect(10, 5, 100, 20);
 
   expect(mockCalls[0]).toEqual([110, 205, 100, 20]);
 });
@@ -47,11 +47,11 @@ test('virtual canvas context offsets work on fillrect', async () => {
 test('virtual canvas context offsets work on filltext', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext =
+  const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const mockCalls = (ctx.fillText as Mock).mock.calls;
 
-  trackContext.fillText('', 10, 5);
+  virtualContext.fillText('', 10, 5);
 
   mockCalls[0].shift();
   expect(mockCalls[0]).toEqual([110, 205]);
@@ -60,53 +60,53 @@ test('virtual canvas context offsets work on filltext', async () => {
 test('virtual canvas context offsets work on moveto and lineto', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext =
+  const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
 
   const mockCallsMove = (ctx.moveTo as Mock).mock.calls;
-  trackContext.moveTo(10, 5);
+  virtualContext.moveTo(10, 5);
   expect(mockCallsMove[0]).toEqual([110, 205]);
 
   const mockCallsLine = (ctx.lineTo as Mock).mock.calls;
-  trackContext.lineTo(10, 5);
+  virtualContext.lineTo(10, 5);
   expect(mockCallsLine[0]).toEqual([110, 205]);
 });
 
 test('virtual canvas context limits the bbox', async () => {
 
   const ctx = setupCanvasContext();
-  const trackContext =
+  const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
 
   // Filling the entire rect should work.
-  trackContext.fillRect(0, 0, 200, 150);
+  virtualContext.fillRect(0, 0, 200, 150);
 
   // Too much width should not work.
   expect(() => {
-    trackContext.fillRect(0, 0, 201, 150);
+    virtualContext.fillRect(0, 0, 201, 150);
   }).toThrow();
 
   expect(() => {
-    trackContext.fillRect(1, 0, 200, 150);
+    virtualContext.fillRect(1, 0, 200, 150);
   }).toThrow();
 
   // Being too far to the left should not work.
   expect(() => {
-    trackContext.fillRect(-1, 0, 200, 150);
+    virtualContext.fillRect(-1, 0, 200, 150);
   }).toThrow();
 
   // Too much height should not work.
   expect(() => {
-    trackContext.fillRect(0, 0, 200, 151);
+    virtualContext.fillRect(0, 0, 200, 151);
   }).toThrow();
 
   expect(() => {
-    trackContext.fillRect(0, 1, 200, 150);
+    virtualContext.fillRect(0, 1, 200, 150);
   }).toThrow();
 
   // Being too far to the top should not work.
   expect(() => {
-    trackContext.fillRect(0, -1, 200, 150);
+    virtualContext.fillRect(0, -1, 200, 150);
   }).toThrow();
 });
 
@@ -114,11 +114,11 @@ test('virtual canvas context limits the bbox', async () => {
 test('nested virtual canvas contexts work', async () => {
   const ctx = setupCanvasContext();
   const mockCalls = (ctx.moveTo as Mock).mock.calls;
-  const trackContext =
+  const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
-  const trackContext2 = new ChildVirtualContext(
-      trackContext, {x: 10, y: 10, width: 10, height: 10});
+  const virtualContext2 = new ChildVirtualContext(
+      virtualContext, {x: 10, y: 10, width: 10, height: 10});
 
-  trackContext2.moveTo(10, 5);
+  virtualContext2.moveTo(10, 5);
   expect(mockCalls[0]).toEqual([120, 215]);
 });
