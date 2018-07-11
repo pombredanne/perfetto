@@ -273,6 +273,12 @@ def CheckoutGitRepo(path, git_url, revision):
   subprocess.check_call(['git', 'checkout', revision, '--quiet'], cwd=path)
   assert(IsGitRepoCheckoutOutAtRevision(path, revision))
 
+def InstallNodeModules():
+  ui_dir = os.path.join(ROOT_DIR, 'ui')
+  logging.info("Running npm install in {0}".format(ui_dir))
+  subprocess.check_call(
+    [os.path.join(ui_dir, 'npm'), 'install', '--no-save'],
+    cwd=os.path.join(ROOT_DIR, 'ui'))
 
 def Main():
   parser = argparse.ArgumentParser()
@@ -284,6 +290,7 @@ def Main():
     deps += BUILD_DEPS_ANDROID + TEST_DEPS_ANDROID
   if args.ui:
     deps += UI_DEPS
+    InstallNodeModules()
   for rel_path, url, expected_sha1, platform in deps:
     if (platform != 'all' and platform != sys.platform):
       continue
