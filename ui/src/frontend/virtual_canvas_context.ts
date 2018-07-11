@@ -12,71 +12,91 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export class VirtualCanvasContext {
+/**
+ * VirtualCanvasContext is similar to a CanvasRenderingContext2D object, with
+ * knowledge of where it is positioned relative to the parent rendering context.
+ * The parent rendering context is either another VirtualRenderingContext, or a
+ * real CanvasRenderingContext2D.
+ *
+ * It implements a subset of the CanvasRenderingContext2D API, but it translates
+ * all the coordinates to the parent context's coordinate space by applying
+ * appropriate offsets. The user of this context can thus assume a local
+ * coordinate space of (0, 0, width, height.) In addition, VirtualCanvasContexts
+ * performs strict bounds checking on some drawing, and it allows the user to
+ * to query if the virtual context is on the (eventual) backing real canvas, so
+ * the user can avoid executing unnecessary drawing logic.
+ */
+
+export abstract class VirtualCanvasContext {
   stroke: () => void;
   beginPath: () => void;
   closePath: () => void;
   measureText: () => TextMetrics;
 
-  constructor(
-      protected ctx: CanvasRenderingContext2D|VirtualCanvasContext,
-      protected rect:
-          {left: number, top: number, width: number, height: number}) {
+  constructor(protected ctx: CanvasRenderingContext2D|VirtualCanvasContext) {
     this.stroke = this.ctx.stroke.bind(this.ctx);
     this.beginPath = this.ctx.beginPath.bind(this.ctx);
     this.closePath = this.ctx.closePath.bind(this.ctx);
     this.measureText = this.ctx.measureText.bind(this.ctx);
   }
 
-  isOnCanvas(rect: {left: number,
-                    top: number,
-                    width: number,
-                    height: number} = this.rect): boolean {
-    return this.ctx instanceof VirtualCanvasContext ?
-        this.ctx.isOnCanvas(rect) :
-        true;
-  }
+  abstract isOnCanvas(): boolean;
+  abstract checkRectOnCanvas(boundingRect: BoundingRect): boolean;
 
   fillRect(x: number, y: number, width: number, height: number) {
-    if (x < 0 || x + width > this.rect.width || y < 0 ||
-        y + height > this.rect.height) {
+    if (x < 0 || x + width > this.getBoundingRect().width || y < 0 ||
+        y + height > this.getBoundingRect().height) {
       throw new OutOfBoundsDrawingError(
-          'draw a rect', {x, y, width, height}, this.rect);
+          'draw a rect', {x, y, width, height}, this.getBoundingRect());
+    }
+    if (!this.isOnCanvas()) {
+      throw new NotOnCanvasError();
     }
 
-    this.ctx.fillRect(x + this.rect.left, y + this.rect.top, width, height);
-  }
-
-  setDimensions(width: number, height: number) {
-    this.rect.width = width;
-    this.rect.height = height;
-  }
-
-  setYOffset(offset: number) {
-    this.rect.top = offset;
+    this.ctx.fillRect(
+        x + this.getBoundingRect().left,
+        y + this.getBoundingRect().top,
+        width,
+        height);
   }
 
   moveTo(x: number, y: number) {
-    if (x < 0 || x > this.rect.width || y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('moveto', {x, y}, this.rect);
+    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
+        y > this.getBoundingRect().height) {
+      throw new OutOfBoundsDrawingError(
+          'moveto', {x, y}, this.getBoundingRect());
     }
-
-    this.ctx.moveTo(x + this.rect.left, y + this.rect.top);
+    if (!this.isOnCanvas()) {
+      throw new NotOnCanvasError();
+    }
+    this.ctx.moveTo(
+        x + this.getBoundingRect().left, y + this.getBoundingRect().top);
   }
 
   lineTo(x: number, y: number) {
-    if (x < 0 || x > this.rect.width || y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('lineto', {x, y}, this.rect);
+    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
+        y > this.getBoundingRect().height) {
+      throw new OutOfBoundsDrawingError(
+          'lineto', {x, y}, this.getBoundingRect());
     }
-
-    this.ctx.lineTo(x + this.rect.left, y + this.rect.top);
+    if (!this.isOnCanvas()) {
+      throw new NotOnCanvasError();
+    }
+    this.ctx.lineTo(
+        x + this.getBoundingRect().left, y + this.getBoundingRect().top);
   }
 
   fillText(text: string, x: number, y: number) {
-    if (x < 0 || x > this.rect.width || y < 0 || y > this.rect.height) {
-      throw new OutOfBoundsDrawingError('draw text', {x, y}, this.rect);
+    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
+        y > this.getBoundingRect().height) {
+      throw new OutOfBoundsDrawingError(
+          'draw text', {x, y}, this.getBoundingRect());
     }
-    this.ctx.fillText(text, x + this.rect.left, y + this.rect.top);
+    if (!this.isOnCanvas()) {
+      throw new NotOnCanvasError();
+    }
+    this.ctx.fillText(
+        text, x + this.getBoundingRect().left, y + this.getBoundingRect().top);
   }
 
   set strokeStyle(v: string) {
@@ -94,14 +114,30 @@ export class VirtualCanvasContext {
   set font(fontString: string) {
     this.ctx.font = fontString;
   }
+
+  abstract getBoundingRect(): BoundingRect;
 }
 
 export class OutOfBoundsDrawingError extends Error {
-  constructor(
-      action: string, drawing: {},
-      bounds: {left: number, top: number, width: number, height: number}) {
+  constructor(action: string, drawing: {}, boundingRect: BoundingRect) {
     super(
         `Attempted to ${action} (${JSON.stringify(drawing)})` +
-        `in bounds ${JSON.stringify(bounds)}`);
+        `in bounds ${JSON.stringify(boundingRect)}`);
   }
+}
+
+
+export class NotOnCanvasError extends Error {
+  constructor() {
+    super(
+        `Attempted to draw on a track that is not on the canvas. ` +
+        `Did you check trackContext.isOnCanvas()?`);
+  }
+}
+
+export interface BoundingRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }

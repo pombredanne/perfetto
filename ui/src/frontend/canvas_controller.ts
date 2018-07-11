@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {RootCanvasContext} from './root_canvas_context';
+import {RootVirtualContext} from './root_virtual_context';
 
 const CANVAS_OVERDRAW_FACTOR = 2;
 
@@ -25,25 +25,26 @@ const CANVAS_OVERDRAW_FACTOR = 2;
 export class CanvasController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private rootTrackContext: RootCanvasContext;
+  private rootTrackContext: RootVirtualContext;
 
   private scrollOffset = 0;
-  private canvasHeight: number;
 
   // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide: number;
 
-  constructor(private width: number, private height: number) {
+  height: number;
+
+  constructor(public width: number, viewportHeight: number) {
     this.canvas = document.createElement('canvas');
 
-    this.canvasHeight = this.height * CANVAS_OVERDRAW_FACTOR;
-    this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
+    this.height = viewportHeight * CANVAS_OVERDRAW_FACTOR;
+    this.extraHeightPerSide = Math.round((this.height - viewportHeight) / 2);
 
     const dpr = window.devicePixelRatio;
     this.canvas.style.width = this.width.toString() + 'px';
-    this.canvas.style.height = this.canvasHeight.toString() + 'px';
+    this.canvas.style.height = this.height.toString() + 'px';
     this.canvas.width = this.width * dpr;
-    this.canvas.height = this.canvasHeight * dpr;
+    this.canvas.height = this.height * dpr;
 
     const ctx = this.canvas.getContext('2d');
 
@@ -54,23 +55,15 @@ export class CanvasController {
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.rootTrackContext = new RootCanvasContext(
-        this.ctx,
-        {
-          left: 0,
-          top: this.extraHeightPerSide,
-          width: this.width,
-          height: Number.MAX_SAFE_INTEGER  // The top context should not clip.,
-        },
-        this.canvasHeight);
+    this.rootTrackContext = new RootVirtualContext(this);
   }
 
   clear(): void {
     this.ctx.fillStyle = 'white';
-    this.ctx.fillRect(0, 0, this.width, this.canvasHeight);
+    this.ctx.fillRect(0, 0, this.width, this.height);
   }
 
-  getContext(): RootCanvasContext {
+  getContext(): RootVirtualContext {
     return this.rootTrackContext;
   }
 
@@ -86,7 +79,6 @@ export class CanvasController {
    */
   updateScrollOffset(scrollOffset: number): void {
     this.scrollOffset = scrollOffset;
-    this.rootTrackContext.setYOffset(-1 * this.getCanvasTopOffset());
   }
 
   getCanvasTopOffset(): number {
