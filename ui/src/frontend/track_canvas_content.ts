@@ -12,29 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
-
-import {OffsetTimeScale, TimeScale} from './time_scale';
-import {TrackContent} from './track_content';
-import {TrackShell} from './track_shell';
+import {OffsetTimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export const Track = {
+export abstract class TrackCanvasContent {
+  constructor(protected x: OffsetTimeScale) {}
 
-  view({attrs}) {
-    return m(
-        '.track',
-        {
-          style: {
-            position: 'absolute',
-            top: attrs.top.toString() + 'px',
-            left: 0,
-            width: '100%'
-          }
-        },
-        m(TrackShell, attrs, m(TrackContent, attrs)));
-  }
-} as
-    m.Component < {name: string, trackContext: VirtualCanvasContext, top: number
-  timeScale: TimeScale
-}, {x: OffsetTimeScale}>;
+  abstract render(ctx: VirtualCanvasContext, data?: {}): void;
+}

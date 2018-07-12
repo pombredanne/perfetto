@@ -24,18 +24,19 @@ import {gState} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {ScrollableContainer} from './scrollable_container';
+import {GlobalTimeScale} from './time_scale';
 import {Track} from './track';
 
 export const Frontend = {
   oninit() {
     this.width = 1000;
     this.height = 400;
-
     this.canvasController = new CanvasController(this.width, this.height);
   },
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
+    const timeScale = new GlobalTimeScale(0, 1000000, 0, 1000);
 
     this.canvasController.clear();
 
@@ -60,61 +61,71 @@ export const Frontend = {
             name: 'Track 1',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 0, x: 0, width: this.width, height: 90}),
-            top: 0
+            top: 0,
+            timeScale
           }),
           m(Track, {
             name: 'Track 2',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 100, x: 0, width: this.width, height: 90}),
-            top: 100
+            top: 100,
+            timeScale
           }),
           m(Track, {
             name: 'Track 3',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 200, x: 0, width: this.width, height: 90}),
-            top: 200
+            top: 200,
+            timeScale
           }),
           m(Track, {
             name: 'Track 4',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 300, x: 0, width: this.width, height: 90}),
-            top: 300
+            top: 300,
+            timeScale
           }),
           m(Track, {
             name: 'Track 5',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 400, x: 0, width: this.width, height: 90}),
-            top: 400
+            top: 400,
+            timeScale
           }),
           m(Track, {
             name: 'Track 6',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 500, x: 0, width: this.width, height: 90}),
-            top: 500
+            top: 500,
+            timeScale
           }),
           m(Track, {
             name: 'Track 7',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 600, x: 0, width: this.width, height: 90}),
-            top: 600
+            top: 600,
+            timeScale
           }),
           m(Track, {
             name: 'Track 8',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 700, x: 0, width: this.width, height: 90}),
-            top: 700
+            top: 700,
+            timeScale
           }),
           m(Track, {
             name: 'Track 9',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 800, x: 0, width: this.width, height: 90}),
-            top: 800
+            top: 800,
+            timeScale
           }),
           m(Track, {
             name: 'Track 10',
             trackContext: new ChildVirtualContext(
                 ctx, {y: 900, x: 0, width: this.width, height: 90}),
-            top: 900
+            top: 900,
+            timeScale
           }), ), );
   },
 } as

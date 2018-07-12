@@ -12,4 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export class CpuSlicesTrack {}
+import {Nanoseconds} from '../../frontend/time_scale';
+import {TrackCanvasContent} from '../../frontend/track_canvas_content';
+import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+
+export class CpuSlicesTrack extends TrackCanvasContent {
+  render(ctx: VirtualCanvasContext, data: {trackName: string}) {
+    ctx.fillStyle = '#ccc';
+    ctx.fillRect(0, 0, 1000, 73);
+
+    const sliceStart: Nanoseconds = 100000;
+    const sliceEnd: Nanoseconds = 400000;
+
+    const rectStart = this.x.tsToPx(sliceStart);
+    const rectWidth = this.x.tsToPx(sliceEnd) - rectStart;
+
+    ctx.fillStyle = '#c00';
+    ctx.fillRect(rectStart, 40, rectWidth, 30);
+
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#000';
+    ctx.fillText(data.trackName + ' Canvas content', rectStart, 60);
+  }
+}

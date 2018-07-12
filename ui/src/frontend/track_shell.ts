@@ -15,7 +15,7 @@
 import * as m from 'mithril';
 
 export const TrackShell = {
-  view({attrs}) {
+  view({attrs, children}) {
     return m(
         '.trackshell',
         {
@@ -29,9 +29,11 @@ export const TrackShell = {
               background: '#fff',
               padding: '20px',
               width: '20%',
-              'border-right': '1px solid #666'
+              'border-right': '1px solid #666',
+              float: 'left'
             }
           },
-          m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)));
+          m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)),
+        m('.track-content', {style: {width: '80%', float: 'left'}}, children));
   }
 } as m.Component<{name: string}>;
