@@ -38,19 +38,17 @@ export const CpuSlicesFrontend = {
     const rectWidth = attrs.x.tsToPx(sliceEnd) - rectStart;
 
     return m(
-        '.dom-content',
-        {style: {width: '100%'}},
-        m('.marker',
-          {
-            style: {
-              'font-size': '1.5em',
-              position: 'absolute',
-              left: rectStart.toString() + 'px',
-              width: rectWidth.toString() + 'px',
-              background: '#aca'
-            }
-          },
-          attrs.name + ' DOM Content'));
+        '.marker',
+        {
+          style: {
+            'font-size': '1.5em',
+            position: 'absolute',
+            left: rectStart.toString() + 'px',
+            width: rectWidth.toString() + 'px',
+            background: '#aca'
+          }
+        },
+        attrs.name + ' DOM Content');
   }
 } as
     m.Component<

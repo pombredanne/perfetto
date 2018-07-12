@@ -25,7 +25,22 @@ export abstract class TrackCanvasContent {
     ctx.lineWidth = 1;
 
     const limits = this.x.getTimeLimits();
-    const range = limits.end - limits.start;
+    const step = TrackCanvasContent.getStepSize(limits.end - limits.start);
+
+    const start = Math.round(limits.start / step) * step;
+
+    for (let t: Nanoseconds = start; t < limits.end; t += step) {
+      const xPos = Math.floor(this.x.tsToPx(t)) + 0.5;
+
+      ctx.beginPath();
+      ctx.moveTo(xPos, 0);
+      ctx.lineTo(xPos, height);
+      ctx.stroke();
+    }
+  }
+
+  // TODO: This should live somewhere else, where it can be used by an axis.
+  static getStepSize(range: number) {
     let step = 0.001;
     while (range / step > 20) {
       step *= 10;
@@ -36,16 +51,6 @@ export abstract class TrackCanvasContent {
     if (range / step < 10) {
       step /= 2;
     }
-
-    const start = Math.round(limits.start / step) * step;
-
-    for (let t: Nanoseconds = start; t < limits.end - step; t += step) {
-      const xPos = Math.floor(this.x.tsToPx(t)) + 0.5;
-
-      ctx.beginPath();
-      ctx.moveTo(xPos, 0);
-      ctx.lineTo(xPos, height);
-      ctx.stroke();
-    }
+    return step;
   }
 }

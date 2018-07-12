@@ -51,8 +51,8 @@ export class GlobalTimeScale {
 
 export class OffsetTimeScale {
   constructor(
-      private scale: TimeScale, private pxOffset: Pixels,
-      private width: Pixels) {}
+      private scale: TimeScale, private pxOffset: Pixels = 0,
+      private width: Pixels = 0) {}
 
   tsToPx(time: Nanoseconds): Pixels {
     const result = this.scale.tsToPx(time) - this.pxOffset;
@@ -77,6 +77,10 @@ export class OffsetTimeScale {
 
   setWidth(width: Pixels) {
     this.width = width;
+  }
+
+  getWidth(): Pixels {
+    return this.width;
   }
 
   setOffset(pxOffset: Pixels) {

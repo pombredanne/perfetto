@@ -21,17 +21,13 @@ import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
   oncreate(vdom) {
-    const domContent = vdom.dom.querySelector('.dom-content');
-    if (!domContent) {
-      throw Error('Could not create Track DOM content container');
-    }
-    const bcr = domContent.getBoundingClientRect();
-    this.x.setOffset(bcr.left * -1);
+    const bcr = vdom.dom.getBoundingClientRect();
+    // this.x.setOffset(bcr.left * -1);
     this.x.setWidth(bcr.width);
   },
   view({attrs}) {
     if (!this.x) {
-      this.x = new OffsetTimeScale(attrs.timeScale, 0, 1000);
+      this.x = new OffsetTimeScale(attrs.timeScale);
     }
     return m(
         '.track',

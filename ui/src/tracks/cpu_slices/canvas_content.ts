@@ -19,7 +19,7 @@ import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 export class CpuSlicesTrackCanvasContent extends TrackCanvasContent {
   render(ctx: VirtualCanvasContext, data: {trackName: string}) {
     ctx.fillStyle = '#eee';
-    ctx.fillRect(0, 0, 1000, 73);
+    ctx.fillRect(0, 0, this.x.getWidth(), 73);
 
     this.drawGridLines(ctx, 73);
 
