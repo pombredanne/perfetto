@@ -59,7 +59,10 @@ export class CanvasController {
 
     this.ctx = ctx;
     this.rootVirtualContext = new RootVirtualContext(
-        this.ctx, this.scrollOffset, this.canvasWidth, this.canvasHeight);
+        this.ctx,
+        this.getCanvasTopOffset(),
+        this.canvasWidth,
+        this.canvasHeight);
   }
 
   clear(): void {
