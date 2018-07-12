@@ -41,6 +41,7 @@ export abstract class VirtualCanvasContext {
 
   abstract isOnCanvas(): boolean;
   abstract checkRectOnCanvas(boundingRect: BoundingRect): boolean;
+  abstract getBoundingRect(): BoundingRect;
 
   fillRect(x: number, y: number, width: number, height: number) {
     if (x < 0 || x + width > this.getBoundingRect().width || y < 0 ||
@@ -49,7 +50,7 @@ export abstract class VirtualCanvasContext {
           'draw a rect', {x, y, width, height}, this.getBoundingRect());
     }
     if (!this.isOnCanvas()) {
-      throw new NotOnCanvasError();
+      throw new ContextNotOnCanvasError();
     }
 
     this.ctx.fillRect(
@@ -66,7 +67,7 @@ export abstract class VirtualCanvasContext {
           'moveto', {x, y}, this.getBoundingRect());
     }
     if (!this.isOnCanvas()) {
-      throw new NotOnCanvasError();
+      throw new ContextNotOnCanvasError();
     }
     this.ctx.moveTo(x + this.getBoundingRect().x, y + this.getBoundingRect().y);
   }
@@ -78,7 +79,7 @@ export abstract class VirtualCanvasContext {
           'lineto', {x, y}, this.getBoundingRect());
     }
     if (!this.isOnCanvas()) {
-      throw new NotOnCanvasError();
+      throw new ContextNotOnCanvasError();
     }
     this.ctx.lineTo(x + this.getBoundingRect().x, y + this.getBoundingRect().y);
   }
@@ -90,7 +91,7 @@ export abstract class VirtualCanvasContext {
           'draw text', {x, y}, this.getBoundingRect());
     }
     if (!this.isOnCanvas()) {
-      throw new NotOnCanvasError();
+      throw new ContextNotOnCanvasError();
     }
     this.ctx.fillText(
         text, x + this.getBoundingRect().x, y + this.getBoundingRect().y);
@@ -111,8 +112,6 @@ export abstract class VirtualCanvasContext {
   set font(fontString: string) {
     this.ctx.font = fontString;
   }
-
-  abstract getBoundingRect(): BoundingRect;
 }
 
 export class OutOfBoundsDrawingError extends Error {
@@ -123,10 +122,10 @@ export class OutOfBoundsDrawingError extends Error {
   }
 }
 
-export class NotOnCanvasError extends Error {
+export class ContextNotOnCanvasError extends Error {
   constructor() {
     super(
-        `Attempted to draw on a track that is not on the canvas. ` +
+        `Attempted to draw on a virtual context that is not on the canvas. ` +
         `Did you check virtualContext.isOnCanvas()?`);
   }
 }

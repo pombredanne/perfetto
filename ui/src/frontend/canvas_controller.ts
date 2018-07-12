@@ -32,8 +32,8 @@ export class CanvasController {
   // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide: number;
 
-  canvasHeight: number;
-  canvasWidth: number;
+  private canvasHeight: number;
+  private canvasWidth: number;
 
   constructor(canvasWidth: number, visibleCanvasHeight: number) {
     this.canvas = document.createElement('canvas');
@@ -58,7 +58,8 @@ export class CanvasController {
     ctx.scale(dpr, dpr);
 
     this.ctx = ctx;
-    this.rootVirtualContext = new RootVirtualContext(this);
+    this.rootVirtualContext = new RootVirtualContext(
+        this.ctx, this.scrollOffset, this.canvasWidth, this.canvasHeight);
   }
 
   clear(): void {
@@ -74,10 +75,6 @@ export class CanvasController {
     return this.canvas;
   }
 
-  getCanvasContext(): CanvasRenderingContext2D {
-    return this.ctx;
-  }
-
   /**
    * Places the canvas and its contents at the correct position.
    * Re-centers the canvas element in the current viewport, and sets the context
@@ -86,6 +83,7 @@ export class CanvasController {
    */
   updateScrollOffset(scrollOffset: number): void {
     this.scrollOffset = scrollOffset;
+    this.rootVirtualContext.setCanvasTopOffset(this.getCanvasTopOffset());
   }
 
   getCanvasTopOffset(): number {

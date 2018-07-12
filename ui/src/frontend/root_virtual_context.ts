@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {CanvasController} from './canvas_controller';
 import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
 
 /**
@@ -22,24 +21,29 @@ import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
  * determine whether they should execute their draw calls.
  */
 export class RootVirtualContext extends VirtualCanvasContext {
-  constructor(private canvasController: CanvasController) {
-    super(canvasController.getCanvasContext());
+  private boundingRect: BoundingRect = {x: 0, y: 0, width: 0, height: 0};
+
+  constructor(
+      context: CanvasRenderingContext2D, private canvasTopOffset: number,
+      private canvasWidth: number, private canvasHeight: number) {
+    super(context);
+
+    this.setBoundingRect();
   }
 
-  isOnCanvas() {
+  isOnCanvas(): boolean {
     return this.checkRectOnCanvas(this.getBoundingRect());
   }
 
-  checkRectOnCanvas(boundingRect: BoundingRect) {
-    const canvasTop = this.canvasController.getCanvasTopOffset();
-    const canvasBottom = canvasTop + this.canvasController.canvasHeight;
+  checkRectOnCanvas(boundingRect: BoundingRect): boolean {
+    const canvasBottom = this.canvasTopOffset + this.canvasHeight;
     const rectBottom = boundingRect.y + boundingRect.height;
     const rectRight = boundingRect.x + boundingRect.width;
 
     const heightIntersects =
-        boundingRect.y <= canvasBottom && rectBottom >= canvasTop;
+        boundingRect.y <= canvasBottom && rectBottom >= this.canvasTopOffset;
     const widthIntersects =
-        boundingRect.x <= this.canvasController.canvasWidth && rectRight >= 0;
+        boundingRect.x <= this.canvasWidth && rectRight >= 0;
 
     return heightIntersects && widthIntersects;
   }
@@ -48,13 +52,22 @@ export class RootVirtualContext extends VirtualCanvasContext {
    * This defines a BoundingRect that causes correct positioning of the context
    * contents due to the scroll position, without causing bounds checking.
    */
-  getBoundingRect(): BoundingRect {
-    return {
+  private setBoundingRect(): void {
+    this.boundingRect = {
       // As the user scrolls down, the contents have to move up.
-      y: this.canvasController.getCanvasTopOffset() * -1,
+      y: this.canvasTopOffset * -1,
       x: 0,
       width: Infinity,
       height: Infinity
     };
+  }
+
+  setCanvasTopOffset(topOffset: number): void {
+    this.canvasTopOffset = topOffset;
+    this.setBoundingRect();
+  }
+
+  getBoundingRect(): BoundingRect {
+    return this.boundingRect;
   }
 }
