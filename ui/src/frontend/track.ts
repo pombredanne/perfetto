@@ -20,7 +20,19 @@ import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
+  oncreate(vdom) {
+    const domContent = vdom.dom.querySelector('.dom-content');
+    if (!domContent) {
+      throw Error('Could not create Track DOM content container');
+    }
+    const bcr = domContent.getBoundingClientRect();
+    this.x.setOffset(bcr.left * -1);
+    this.x.setWidth(bcr.width);
+  },
   view({attrs}) {
+    if (!this.x) {
+      this.x = new OffsetTimeScale(attrs.timeScale, 0, 1000);
+    }
     return m(
         '.track',
         {
@@ -31,7 +43,13 @@ export const Track = {
             width: '100%'
           }
         },
-        m(TrackShell, attrs, m(CpuSlicesFrontend, attrs)));
+        m(TrackShell,
+          attrs,
+          m('.dom-content', {style: {width: '100%'}}, m(CpuSlicesFrontend, {
+              name: attrs.name,
+              trackContext: attrs.trackContext,
+              x: this.x
+            }))));
   }
 } as
     m.Component < {name: string, trackContext: VirtualCanvasContext, top: number

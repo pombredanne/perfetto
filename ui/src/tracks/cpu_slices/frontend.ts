@@ -17,7 +17,6 @@ import * as m from 'mithril';
 import {
   Nanoseconds,
   OffsetTimeScale,
-  TimeScale
 } from '../../frontend/time_scale';
 import {TrackCanvasContent} from '../../frontend/track_canvas_content';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
@@ -25,16 +24,9 @@ import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 import {CpuSlicesTrackCanvasContent} from './canvas_content';
 
 export const CpuSlicesFrontend = {
-  oncreate(vdom) {
-    const bcr = vdom.dom.getBoundingClientRect();
-    this.x.setOffset(bcr.left * -1);
-
-    setTimeout(() => m.redraw());
-  },
   view({attrs}) {
-    if (!this.x) {
-      this.x = new OffsetTimeScale(attrs.timeScale, 0, 1000);
-      this.canvasContent = new CpuSlicesTrackCanvasContent(this.x);
+    if (!this.canvasContent) {
+      this.canvasContent = new CpuSlicesTrackCanvasContent(attrs.x);
     }
     if (attrs.trackContext.isOnCanvas()) {
       this.canvasContent.render(attrs.trackContext, {trackName: attrs.name});
@@ -42,8 +34,8 @@ export const CpuSlicesFrontend = {
 
     const sliceStart: Nanoseconds = 100000;
     const sliceEnd: Nanoseconds = 400000;
-    const rectStart = this.x.tsToPx(sliceStart);
-    const rectWidth = this.x.tsToPx(sliceEnd) - rectStart;
+    const rectStart = attrs.x.tsToPx(sliceStart);
+    const rectWidth = attrs.x.tsToPx(sliceEnd) - rectStart;
 
     return m(
         '.dom-content',
@@ -62,9 +54,5 @@ export const CpuSlicesFrontend = {
   }
 } as
     m.Component<
-        {
-          name: string,
-          trackContext: VirtualCanvasContext,
-          timeScale: TimeScale
-        },
-        {canvasContent: TrackCanvasContent, x: OffsetTimeScale}>;
+        {name: string, trackContext: VirtualCanvasContext, x: OffsetTimeScale},
+        {canvasContent: TrackCanvasContent}>;

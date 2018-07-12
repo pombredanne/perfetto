@@ -33,6 +33,10 @@ export const Frontend = {
     this.height = 400;
     this.canvasController = new CanvasController(this.width, this.height);
   },
+  oncreate() {
+    // Some elements need DOM before they can draw properly.
+    setTimeout(() => m.redraw());
+  },
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
