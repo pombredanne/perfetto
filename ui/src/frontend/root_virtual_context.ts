@@ -28,7 +28,7 @@ export class RootVirtualContext extends VirtualCanvasContext {
       private canvasWidth: number, private canvasHeight: number) {
     super(context);
 
-    this.setBoundingRect();
+    this.updateBoundingRect();
   }
 
   isOnCanvas(): boolean {
@@ -52,7 +52,7 @@ export class RootVirtualContext extends VirtualCanvasContext {
    * This defines a BoundingRect that causes correct positioning of the context
    * contents due to the scroll position, without causing bounds checking.
    */
-  private setBoundingRect(): void {
+  private updateBoundingRect(): void {
     this.boundingRect = {
       // As the user scrolls down, the contents have to move up.
       y: this.canvasTopOffset * -1,
@@ -64,7 +64,7 @@ export class RootVirtualContext extends VirtualCanvasContext {
 
   setCanvasTopOffset(topOffset: number): void {
     this.canvasTopOffset = topOffset;
-    this.setBoundingRect();
+    this.updateBoundingRect();
   }
 
   getBoundingRect(): BoundingRect {
