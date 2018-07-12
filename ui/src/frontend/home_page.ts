@@ -27,6 +27,14 @@ function extractBlob(e: Event): Blob|null {
   return e.target.files.item(0);
 }
 
+async function loadExampleTrace() {
+  const url = 'https://storage.googleapis.com/perfetto-misc/example_trace';
+  const repsonse = await fetch(url);
+  const blob = await repsonse.blob();
+  gEngines.set('0', WasmEngineProxy.create(blob));
+  m.route.set('/query/0');
+}
+
 export const HomePage = createPage({
   view() {
     return m(
@@ -46,8 +54,8 @@ export const HomePage = createPage({
           ' or ',
           m('button',
             {
-              disabled: true,
+              onclick: loadExampleTrace,
             },
-            'Open demo trace'), ));
+            'Open demo trace')));
   }
 });

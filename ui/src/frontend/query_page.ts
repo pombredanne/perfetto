@@ -20,6 +20,11 @@ import {Engine} from '../controller/engine';
 import {gEngines} from './globals';
 import {createPage} from './pages';
 
+// TODO(hjd): Something mangles unicode in strings – we should fix that.
+// A –.
+const EMDASH = '\u2014';
+const MAX_DISPLAYED_ROWS = 1000;
+
 interface ExampleQuery {
   name: string;
   query: string;
@@ -79,17 +84,15 @@ function table(result?: RawQueryResult): m.Children {
         return 0;
       };
   const rows = result.numRecords;
-  const rowsToDisplay = Math.min(+rows, 1000);
+  const rowsToDisplay = Math.min(+rows, MAX_DISPLAYED_ROWS);
   return m(
       'table',
       m('thead', m('tr', result.columnDescriptors.map(d => m('th', d.name)))),
-      m('tbody',
-        Array.from(Array.from({length: rowsToDisplay}).keys()).map(i => {
-          return m(
-              'tr', result.columns.map((c: RawQueryResult.IColumnValues) => {
-                return m('td', extract(c, i));
-              }));
-        })));
+      m('tbody', [...Array.from({length: rowsToDisplay}).keys()].map(i => {
+        return m('tr', result.columns.map((c: RawQueryResult.IColumnValues) => {
+          return m('td', extract(c, i));
+        }));
+      })));
 }
 
 const ExampleQuery = {
@@ -111,10 +114,9 @@ const QueryBox = {
     const examples: m.Children = ['Examples: '];
     for (let i = 0; i < ExampleQueries.length; i++) {
       if (i !== 0) examples.push(', ');
-      examples.push(
-          m(ExampleQuery,
-            {chosen: () => this.query = ExampleQueries[i].query},
-            ExampleQueries[i].name));
+      examples.push(m(ExampleQuery, {
+        chosen: () => this.query = ExampleQueries[i].query;
+      }, ExampleQueries[i].name));
     }
 
     return m(
@@ -134,20 +136,26 @@ const QueryBox = {
           value: this.query,
         }),
         examples);
-  }
+  },
 } as m.Component<{}, {query: string}>;
+
+function logEntry(entry: LogEntry) {
+  const stats = [
+    entry.rowCount > MAX_DISPLAYED_ROWS ?
+        `first ${MAX_DISPLAYED_ROWS} of ${entry.rowCount} rows` :
+        `${entry.rowCount} rows`,
+    EMDASH,
+    `${entry.durationMs} ms`,
+  ].join(' ');
+  return m(
+      '.query-log-entry',
+      m('.query-log-entry-query', entry.query),
+      m('.query-log-entry-stats', stats),
+      m('.query-log-entry-result', table(entry.result)));
+}
 
 export const QueryPage = createPage({
   view() {
-    return m(
-        '.query-page',
-        m(QueryBox),
-        Log.map(
-            (entry: LogEntry) =>
-                m('.query-log-entry',
-                  m('.query-log-entry-query', entry.query),
-                  m('.query-log-entry-stats',
-                    `${entry.rowCount} rows \u2014 ${entry.durationMs} ms`),
-                  m('.query-log-entry-result', table(entry.result)), )), );
+    return m('.query-page', m(QueryBox), Log.map(logEntry));
   }
 });
