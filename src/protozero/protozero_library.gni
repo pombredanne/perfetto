@@ -32,7 +32,7 @@ template("protozero_library") {
     generate_python = false
     generator_plugin_label = perfetto_root_path + "src/protozero/protoc_plugin"
     generator_plugin_suffix = ".pbzero"
-    component_build_force_source_set = true
+    component_build_force_source_set = build_with_chromium
 
     if (defined(invoker.deps)) {
       deps = invoker.deps
