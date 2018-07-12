@@ -12,26 +12,59 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Nanoseconds} from '../../frontend/time_scale';
+import * as m from 'mithril';
+
+import {
+  Nanoseconds,
+  OffsetTimeScale,
+  TimeScale
+} from '../../frontend/time_scale';
 import {TrackCanvasContent} from '../../frontend/track_canvas_content';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 
-export class CpuSlicesTrack extends TrackCanvasContent {
-  render(ctx: VirtualCanvasContext, data: {trackName: string}) {
-    ctx.fillStyle = '#ccc';
-    ctx.fillRect(0, 0, 1000, 73);
+import {CpuSlicesTrackCanvasContent} from './canvas_content';
+
+export const CpuSlicesFrontend = {
+  oncreate(vdom) {
+    const bcr = vdom.dom.getBoundingClientRect();
+    this.x.setOffset(bcr.left * -1);
+
+    setTimeout(() => m.redraw());
+  },
+  view({attrs}) {
+    if (!this.x) {
+      this.x = new OffsetTimeScale(attrs.timeScale, 0, 1000);
+      this.canvasContent = new CpuSlicesTrackCanvasContent(this.x);
+    }
+    if (attrs.trackContext.isOnCanvas()) {
+      this.canvasContent.render(attrs.trackContext, {trackName: attrs.name});
+    }
 
     const sliceStart: Nanoseconds = 100000;
     const sliceEnd: Nanoseconds = 400000;
-
     const rectStart = this.x.tsToPx(sliceStart);
     const rectWidth = this.x.tsToPx(sliceEnd) - rectStart;
 
-    ctx.fillStyle = '#c00';
-    ctx.fillRect(rectStart, 40, rectWidth, 30);
-
-    ctx.font = '16px Arial';
-    ctx.fillStyle = '#000';
-    ctx.fillText(data.trackName + ' Canvas content', rectStart, 60);
+    return m(
+        '.dom-content',
+        {style: {width: '100%'}},
+        m('.marker',
+          {
+            style: {
+              'font-size': '1.5em',
+              position: 'absolute',
+              left: rectStart.toString() + 'px',
+              width: rectWidth.toString() + 'px',
+              background: '#aca'
+            }
+          },
+          attrs.name + ' DOM Content'));
   }
-}
+} as
+    m.Component<
+        {
+          name: string,
+          trackContext: VirtualCanvasContext,
+          timeScale: TimeScale
+        },
+        {canvasContent: TrackCanvasContent, x: OffsetTimeScale}>;

@@ -14,13 +14,12 @@
 
 import * as m from 'mithril';
 
+import {CpuSlicesFrontend} from '../tracks/cpu_slices/frontend';
 import {OffsetTimeScale, TimeScale} from './time_scale';
-import {TrackContent} from './track_content';
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
-
   view({attrs}) {
     return m(
         '.track',
@@ -32,7 +31,7 @@ export const Track = {
             width: '100%'
           }
         },
-        m(TrackShell, attrs, m(TrackContent, attrs)));
+        m(TrackShell, attrs, m(CpuSlicesFrontend, attrs)));
   }
 } as
     m.Component < {name: string, trackContext: VirtualCanvasContext, top: number

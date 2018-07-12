@@ -12,11 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {OffsetTimeScale} from './time_scale';
+import {Nanoseconds, OffsetTimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export abstract class TrackCanvasContent {
   constructor(protected x: OffsetTimeScale) {}
 
   abstract render(ctx: VirtualCanvasContext, data?: {}): void;
+
+  protected drawGridLines(ctx: VirtualCanvasContext, height: number): void {
+    ctx.strokeStyle = '#999999';
+    ctx.lineWidth = 1;
+
+    const limits = this.x.getTimeLimits();
+    const range = limits.end - limits.start;
+    let step = 0.001;
+    while (range / step > 20) {
+      step *= 10;
+    }
+    if (range / step < 5) {
+      step /= 5;
+    }
+    if (range / step < 10) {
+      step /= 2;
+    }
+
+    const start = Math.round(limits.start / step) * step;
+
+    for (let t: Nanoseconds = start; t < limits.end - step; t += step) {
+      const xPos = Math.floor(this.x.tsToPx(t)) + 0.5;
+
+      ctx.beginPath();
+      ctx.moveTo(xPos, 0);
+      ctx.lineTo(xPos, height);
+      ctx.stroke();
+    }
+  }
 }
