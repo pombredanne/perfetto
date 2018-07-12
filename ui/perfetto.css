@@ -94,20 +94,28 @@ nav > ul > li {
   display: grid;
   grid-template: "query stats" "result result";
   margin: 50px 0;
+  grid-row-gap: 25px;
 }
 
 .query-log-entry-query {
-  font-family: monospace;
   grid-area: query;
+  align-self: center;
+  font-family: monospace;
 }
 
 .query-log-entry-stats {
   grid-area: stats;
+  align-self: center;
   text-align: right;
 }
 
 .query-log-entry-result {
   grid-area: result;
+}
+
+th {
+  font-weight: 400;
+  font-style: italic;
 }
 
 .home-page {

@@ -12,25 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// tslint:disable no-any
-
 import * as m from 'mithril';
 
+import {RawQueryResult} from '../common/protos';
 import {Engine} from '../controller/engine';
+
 import {gEngines} from './globals';
 import {createPage} from './pages';
 
-const Log: LogEntry[] = [];
+interface ExampleQuery {
+  name: string;
+  query: string;
+}
+
+const ExampleQueries = [
+  {name: 'All sched slices', query: 'select * from sched;'},
+  {
+    name: 'Cpu time per Cpu',
+    query: 'select cpu, sum(dur)/1000/1000 as ms from sched group by cpu;'
+  },
+];
 
 interface LogEntry {
   query: string;
   success: boolean;
   rowCount: number;
-  result: any,
+  durationMs: number;
+  result: RawQueryResult;
 }
-;
+
+const Log: LogEntry[] = [];
 
 async function doQuery(engine: Engine, query: string) {
+  const start = performance.now();
   const log: Partial<LogEntry> = {
     query,
     success: true,
@@ -47,28 +61,35 @@ async function doQuery(engine: Engine, query: string) {
   } catch (error) {
     log.success = false;
   }
+  const end = performance.now();
+  log.durationMs = Math.round(end - start);
   Log.unshift(log as LogEntry);
   m.redraw();
 }
 
-function table(result: any): any {
+function table(result?: RawQueryResult): m.Children {
   if (!result) return m('');
 
-  const extract = (d: any, i: number): number | string => {
-    if (d.longValues.length > 0) return d.longValues[i];
-    if (d.doubleValues.length > 0) return d.doubleValues[i];
-    if (d.stringValues.length > 0) return d.stringValues[i];
-    return 0;
-  };
+  const extract =
+      (d: RawQueryResult.IColumnValues, i: number): number | string => {
+        if (!d || !d.longValues || !d.doubleValues || !d.stringValues) return 0;
+        if (d.longValues.length > 0) return +d.longValues[i];
+        if (d.doubleValues.length > 0) return +d.doubleValues[i];
+        if (d.stringValues.length > 0) return d.stringValues[i];
+        return 0;
+      };
+  const rows = result.numRecords;
+  const rowsToDisplay = Math.min(+rows, 1000);
   return m(
       'table',
-      m('thead',
-        m('tr', result.columnDescriptors.map((d: any) => m('th', d.name)))),
-      m('tbody', Array.from(Array(1000).keys()).map(i => {
-        return m('tr', result.columns.map((c: any) => {
-          return m('td', extract(c, i));
-        }));
-      })), );
+      m('thead', m('tr', result.columnDescriptors.map(d => m('th', d.name)))),
+      m('tbody',
+        Array.from(Array.from({length: rowsToDisplay}).keys()).map(i => {
+          return m(
+              'tr', result.columns.map((c: RawQueryResult.IColumnValues) => {
+                return m('td', extract(c, i));
+              }));
+        })));
 }
 
 const ExampleQuery = {
@@ -87,6 +108,15 @@ const ExampleQuery = {
 
 const QueryBox = {
   view() {
+    const examples: m.Children = ['Examples: '];
+    for (let i = 0; i < ExampleQueries.length; i++) {
+      if (i !== 0) examples.push(', ');
+      examples.push(
+          m(ExampleQuery,
+            {chosen: () => this.query = ExampleQueries[i].query},
+            ExampleQueries[i].name));
+    }
+
     return m(
         'form',
         {
@@ -103,18 +133,7 @@ const QueryBox = {
           oninput: m.withAttr('value', (q: string) => this.query = q),
           value: this.query,
         }),
-        'Examples: ',
-        m(ExampleQuery,
-          {
-            chosen: () => this.query = 'select * from sched;',
-          },
-          'all sched events'),
-        ', ',
-        m(ExampleQuery,
-          {
-            chosen: () => this.query = 'select * from sched where cpu = 1;',
-          },
-          'sched events for cpu 1'), );
+        examples);
   }
 } as m.Component<{}, {query: string}>;
 
@@ -127,7 +146,8 @@ export const QueryPage = createPage({
             (entry: LogEntry) =>
                 m('.query-log-entry',
                   m('.query-log-entry-query', entry.query),
-                  m('.query-log-entry-stats', entry.rowCount),
+                  m('.query-log-entry-stats',
+                    `${entry.rowCount} rows \u2014 ${entry.durationMs} ms`),
                   m('.query-log-entry-result', table(entry.result)), )), );
   }
 });
