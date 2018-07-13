@@ -24,8 +24,7 @@
 
 #include <limits>
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_USE_EVENTFD()
 #include <sys/eventfd.h>
 #endif
 
@@ -33,8 +32,7 @@ namespace perfetto {
 namespace base {
 
 UnixTaskRunner::UnixTaskRunner() {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_USE_EVENTFD()
   event_.reset(eventfd(/* start value */ 0, EFD_CLOEXEC | EFD_NONBLOCK));
 #else
   int pipe_fds[2];
@@ -50,7 +48,7 @@ UnixTaskRunner::UnixTaskRunner() {
   }
   event_.reset(pipe_fds[0]);
   event_write_.reset(pipe_fds[1]);
-#endif
+#endif  // !PERFETTO_USE_EVENTFD()
   AddFileDescriptorWatch(event_.get(), [] {
     // Not reached -- see PostFileDescriptorWatches().
     PERFETTO_DCHECK(false);
@@ -61,8 +59,7 @@ UnixTaskRunner::~UnixTaskRunner() = default;
 
 void UnixTaskRunner::WakeUp() {
   const uint64_t value = 1;
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_USE_EVENTFD()
   ssize_t ret = write(event_.get(), &value, sizeof(value));
 #else
   ssize_t ret = write(event_write_.get(), &value, sizeof(uint8_t));
@@ -157,8 +154,7 @@ void UnixTaskRunner::PostFileDescriptorWatches() {
     // The wake-up event is handled inline to avoid an infinite recursion of
     // posted tasks.
     if (poll_fds_[i].fd == event_.get()) {
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#if PERFETTO_USE_EVENTFD()
       uint64_t value;
       ssize_t ret = read(event_.get(), &value, sizeof(value));
 #else
