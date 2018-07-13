@@ -314,7 +314,7 @@ copy("wasm_gen") {
 }
 
 # +----------------------------------------------------------------------------+
-# | Node JS: run npm install and creates a symlink in the out directory.       |
+# | Node JS: Creates a symlink in the out directory to node_modules.           |
 # +----------------------------------------------------------------------------+
 
 action("check_node_exists") {
