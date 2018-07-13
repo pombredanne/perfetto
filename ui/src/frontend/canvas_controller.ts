@@ -32,13 +32,11 @@ export class CanvasController {
   // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide = 0;
 
-  private canvasHeight: number;
-  private canvasWidth: number;
+  private canvasHeight = 0;
+  private canvasWidth = 0;
 
-  constructor(canvasWidth = 0, visibleCanvasHeight = 0) {
+  constructor() {
     this.canvas = document.createElement('canvas');
-    this.canvasWidth = canvasWidth;
-    this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
 
     const ctx = this.canvas.getContext('2d');
 
@@ -47,11 +45,7 @@ export class CanvasController {
     }
 
     this.ctx = ctx;
-    this.rootVirtualContext = new RootVirtualContext(
-        this.ctx,
-        this.getCanvasTopOffset(),
-        this.canvasWidth,
-        this.canvasHeight);
+    this.rootVirtualContext = new RootVirtualContext(this.ctx);
   }
 
   setDimensions(width: number, visibleCanvasHeight: number) {

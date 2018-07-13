@@ -22,10 +22,11 @@ import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
  */
 export class RootVirtualContext extends VirtualCanvasContext {
   private boundingRect: BoundingRect = {x: 0, y: 0, width: 0, height: 0};
+  private canvasWidth = 0;
+  private canvasHeight = 0;
+  private canvasTopOffset = 0;
 
-  constructor(
-      context: CanvasRenderingContext2D, private canvasTopOffset: number,
-      private canvasWidth: number, private canvasHeight: number) {
+  constructor(context: CanvasRenderingContext2D) {
     super(context);
 
     this.updateBoundingRect();
