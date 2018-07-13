@@ -65,8 +65,14 @@ class UnixTaskRunner : public TaskRunner {
 
   ThreadChecker thread_checker_;
 
-  ScopedFile control_read_;
-  ScopedFile control_write_;
+  // On Linux, an eventfd(2) used to waking up the task runner when a new task
+  // is posted. Otherwise the read end of a pipe used for the same purpose.
+  ScopedFile event_;
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) && \
+    !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  // The write end of the wakeup pipe.
+  ScopedFile event_write_;
+#endif
 
   std::vector<struct pollfd> poll_fds_;
 
