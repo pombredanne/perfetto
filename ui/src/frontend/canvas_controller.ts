@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackCanvasContext} from './track_canvas_context';
+import {RootVirtualContext} from './root_virtual_context';
 
 const CANVAS_OVERDRAW_FACTOR = 2;
 
@@ -25,16 +25,20 @@ const CANVAS_OVERDRAW_FACTOR = 2;
 export class CanvasController {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private rootTrackContext: TrackCanvasContext;
+  private rootVirtualContext: RootVirtualContext;
 
   private scrollOffset = 0;
-  private canvasHeight = 0;
 
   // Number of additional pixels above/below for compositor scrolling.
   private extraHeightPerSide = 0;
 
-  constructor(private width = 1000, private height = 600) {
+  private canvasHeight: number;
+  private canvasWidth: number;
+
+  constructor(canvasWidth = 0, visibleCanvasHeight = 0) {
     this.canvas = document.createElement('canvas');
+    this.canvasWidth = canvasWidth;
+    this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
 
     const ctx = this.canvas.getContext('2d');
 
@@ -43,37 +47,38 @@ export class CanvasController {
     }
 
     this.ctx = ctx;
-    this.rootTrackContext = new TrackCanvasContext(this.ctx, {
-      left: 0,
-      top: this.extraHeightPerSide,
-      width: this.width,
-      height: Number.MAX_SAFE_INTEGER  // The top context should not clip.
-    });
+    this.rootVirtualContext = new RootVirtualContext(
+        this.ctx,
+        this.getCanvasTopOffset(),
+        this.canvasWidth,
+        this.canvasHeight);
   }
 
-  setDimensions(width: number, height: number) {
-    this.width = width;
-    this.height = height;
-
-    this.canvasHeight = this.height * CANVAS_OVERDRAW_FACTOR;
-    this.extraHeightPerSide = Math.round((this.canvasHeight - this.height) / 2);
+  setDimensions(width: number, visibleCanvasHeight: number) {
+    this.canvasWidth = width;
+    this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
+    this.extraHeightPerSide =
+        Math.round((this.canvasHeight - visibleCanvasHeight) / 2);
 
     const dpr = window.devicePixelRatio;
-    this.canvas.style.width = this.width.toString() + 'px';
+    this.canvas.style.width = this.canvasWidth.toString() + 'px';
     this.canvas.style.height = this.canvasHeight.toString() + 'px';
-    this.canvas.width = this.width * dpr;
+    this.canvas.width = this.canvasWidth * dpr;
     this.canvas.height = this.canvasHeight * dpr;
 
     this.ctx.scale(dpr, dpr);
+
+    this.rootVirtualContext.setCanvasTopOffset(this.getCanvasTopOffset());
+    this.rootVirtualContext.setCanvasHeight(this.canvasHeight);
   }
 
   clear(): void {
     this.ctx.fillStyle = 'white';
-    this.ctx.fillRect(0, 0, this.width, this.canvasHeight);
+    this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
   }
 
-  getContext(): TrackCanvasContext {
-    return this.rootTrackContext;
+  getContext(): RootVirtualContext {
+    return this.rootVirtualContext;
   }
 
   getCanvasElement(): HTMLCanvasElement {
@@ -88,7 +93,7 @@ export class CanvasController {
    */
   updateScrollOffset(scrollOffset: number): void {
     this.scrollOffset = scrollOffset;
-    this.rootTrackContext.setYOffset(-1 * this.getCanvasTopOffset());
+    this.rootVirtualContext.setCanvasTopOffset(this.getCanvasTopOffset());
   }
 
   getCanvasTopOffset(): number {
