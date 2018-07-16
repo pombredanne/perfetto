@@ -36,12 +36,12 @@ class ThreadTable {
     bool desc = false;
   };
 
-  ThreadTable(const TraceStorage* storage);
+  ThreadTable(const TraceStorage*);
   static sqlite3_module CreateModule();
 
   // Implementation for sqlite3_vtab.
-  int BestIndex(sqlite3_index_info* index_info);
-  int Open(sqlite3_vtab_cursor** ppCursor);
+  int BestIndex(sqlite3_index_info*);
+  int Open(sqlite3_vtab_cursor**);
 
  private:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
@@ -53,7 +53,7 @@ class ThreadTable {
 
   class Cursor {
    public:
-    Cursor(const TraceStorage* storage);
+    Cursor(const TraceStorage*);
 
     // Implementation of sqlite3_vtab_cursor.
     int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
@@ -61,7 +61,7 @@ class ThreadTable {
     int Eof();
 
     int Column(sqlite3_context* context, int N);
-    int RowId(sqlite_int64* pRowid);
+    int RowId(sqlite_int64* rowId);
 
    private:
     sqlite3_vtab_cursor base_;  // Must be first.

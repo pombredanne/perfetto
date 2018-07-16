@@ -97,6 +97,9 @@ sqlite3_module ThreadTable::CreateModule() {
   module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
     return AsCursor(c)->Column(a, b);
   };
+  module.xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
+    return SQLITE_ERROR;
+  };
   return module;
 }
 
@@ -111,7 +114,7 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
   QueryConstraints qc;
 
   for (int i = 0; i < idx->nOrderBy; i++) {
-    int column = static_cast<Column>(idx->aOrderBy[i].iColumn);
+    Column column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     unsigned char desc = idx->aOrderBy[i].desc;
     qc.AddOrderBy(column, desc);
   }
@@ -123,11 +126,7 @@ int ThreadTable::BestIndex(sqlite3_index_info* idx) {
       continue;
     qc.AddConstraint(cs.iColumn, cs.op);
 
-    if (cs.iColumn == Column::kUpid) {
-      idx->estimatedCost = 10;
-    } else {
-      idx->estimatedCost = 100;
-    }
+    idx->estimatedCost = cs.iColumn == Column::kUtid ? 10 : 100;
 
     // argvIndex is 1-based so use the current size of the vector.
     int argv_index = static_cast<int>(qc.constraints().size());
@@ -163,6 +162,10 @@ int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
                           static_cast<int>(name.length()), nullptr);
       break;
     }
+    default: {
+      PERFETTO_FATAL("Unknown column %d", N);
+      break;
+    }
   }
   return SQLITE_OK;
 }
@@ -173,7 +176,7 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
                                 sqlite3_value** argv) {
   QueryConstraints qc = QueryConstraints::FromString(idxStr);
 
-  PERFETTO_CHECK(qc.constraints().size() == static_cast<size_t>(argc));
+  PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
 
   utid_filter_.min = 1;
   utid_filter_.max = static_cast<uint32_t>(storage_->thread_count());
@@ -182,32 +185,29 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
 
   for (size_t j = 0; j < qc.constraints().size(); j++) {
     const auto& cs = qc.constraints()[j];
-    if (cs.iColumn == Column::kUpid) {
-      TraceStorage::UniquePid constraint_upid =
-          static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[j]));
+    if (cs.iColumn == Column::kUtid) {
+      TraceStorage::UniqueTid constraint_utid =
+          static_cast<TraceStorage::UniqueTid>(sqlite3_value_int(argv[j]));
       // Filter the range of utids that we are interested in, based on the
       // constraints in the query. Everything between min and max (inclusive)
       // will be returned.
       if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-        constraint_upid = IsOpGt(cs.op) ? constraint_upid + 1 : constraint_upid;
-        utid_filter_.min = constraint_upid;
+        utid_filter_.min =
+            IsOpGt(cs.op) ? constraint_utid + 1 : constraint_utid;
       } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-        constraint_upid = IsOpLt(cs.op) ? constraint_upid - 1 : constraint_upid;
-        utid_filter_.max = constraint_upid;
+        utid_filter_.max =
+            IsOpLt(cs.op) ? constraint_utid - 1 : constraint_utid;
       } else if (IsOpEq(cs.op)) {
-        utid_filter_.min = constraint_upid;
-        utid_filter_.max = constraint_upid;
+        utid_filter_.min = constraint_utid;
+        utid_filter_.max = constraint_utid;
       }
     }
   }
   for (const auto& ob : qc.order_by()) {
-    if (ob.iColumn == Column::kUpid) {
+    if (ob.iColumn == Column::kUtid) {
       utid_filter_.desc = ob.desc;
-      if (utid_filter_.desc) {
-        utid_filter_.current = utid_filter_.max;
-      } else {
-        utid_filter_.current = utid_filter_.min;
-      }
+      utid_filter_.current =
+          utid_filter_.desc ? utid_filter_.max : utid_filter_.min;
     }
   }
 
@@ -215,24 +215,14 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
 }
 
 int ThreadTable::Cursor::Next() {
-  if (utid_filter_.desc) {
-    --utid_filter_.current;
-  } else {
-    ++utid_filter_.current;
-  }
+  utid_filter_.desc ? --utid_filter_.current : ++utid_filter_.current;
+
   return SQLITE_OK;
 }
 
-int ThreadTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
-  return SQLITE_ERROR;
-}
-
 int ThreadTable::Cursor::Eof() {
-  if (utid_filter_.desc) {
-    return utid_filter_.current < utid_filter_.min;
-  } else {
-    return utid_filter_.current > utid_filter_.max;
-  }
+  return utid_filter_.desc ? utid_filter_.current < utid_filter_.min
+                           : utid_filter_.current > utid_filter_.max;
 }
 }  // namespace trace_processor
 }  // namespace perfetto
