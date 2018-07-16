@@ -36,7 +36,7 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
                         static_cast<void*>(&storage_));
 
   // Setup the process table.
-  static sqlite3_module p_module = SchedSliceTable::CreateModule();
+  static sqlite3_module p_module = ProcessTable::CreateModule();
   sqlite3_create_module(*db_, "process", &p_module,
                         static_cast<void*>(&storage_));
 }
