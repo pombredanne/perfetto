@@ -11,20 +11,3 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-import * as m from 'mithril';
-
-export const CanvasWrapper = {
-  view({attrs}) {
-    return m('.canvasWrapper', {
-      style: {
-        position: 'absolute',
-        top: attrs.topOffset.toString() + 'px',
-        overflow: 'none',
-      }
-    });
-  },
-  oncreate(vnode) {
-    vnode.dom.appendChild(vnode.attrs.canvasElement);
-  }
-} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
