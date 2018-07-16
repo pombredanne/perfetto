@@ -43,6 +43,7 @@ source_set("lib") {
     "sched_slice_table.cc",
     "sched_slice_table.h",
     "scoped_db.h",
+    "sqlite_utils.h",
     "thread_table.cc",
     "thread_table.h",
     "trace_database.cc",

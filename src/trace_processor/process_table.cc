@@ -15,34 +15,15 @@
  */
 
 #include "src/trace_processor/process_table.h"
-#include "src/trace_processor/query_constraints.h"
 
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/query_constraints.h"
+#include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 namespace {
-
-inline bool IsOpEq(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_EQ;
-}
-
-inline bool IsOpGe(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_GE;
-}
-
-inline bool IsOpGt(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_GT;
-}
-
-inline bool IsOpLe(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_LE;
-}
-
-inline bool IsOpLt(int op) {
-  return op == SQLITE_INDEX_CONSTRAINT_LT;
-}
 
 inline ProcessTable* AsTable(sqlite3_vtab* vtab) {
   return reinterpret_cast<ProcessTable*>(vtab);
