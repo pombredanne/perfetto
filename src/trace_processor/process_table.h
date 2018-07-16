@@ -53,7 +53,7 @@ class ProcessTable {
     int Eof();
 
     int Column(sqlite3_context* context, int N);
-    int RowId(sqlite_int64* rowid);
+    int RowId(sqlite_int64* rowId);
 
    private:
     sqlite3_vtab_cursor base_;  // Must be first.
