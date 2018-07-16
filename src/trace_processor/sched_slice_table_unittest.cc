@@ -33,6 +33,7 @@ TEST(SchedSliceTableTest, IndexWithNoConstraintsOrderBy) {
   table.BestIndex(&info);
 
   ASSERT_EQ(info.orderByConsumed, true);
+  sqlite3_free(info.idxStr);
 }
 
 TEST(SchedSliceTableTest, IndexWithConstraintsAndOrderBy) {
@@ -68,6 +69,7 @@ TEST(SchedSliceTableTest, IndexWithConstraintsAndOrderBy) {
   ASSERT_EQ(info.orderByConsumed, true);
   ASSERT_EQ(info.aConstraintUsage[0].argvIndex, 1);
   ASSERT_EQ(info.aConstraintUsage[1].argvIndex, 0);
+  sqlite3_free(info.idxStr);
 }
 
 }  // namespace
