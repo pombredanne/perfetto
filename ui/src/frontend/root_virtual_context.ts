@@ -68,7 +68,8 @@ export class RootVirtualContext extends VirtualCanvasContext {
     this.updateBoundingRect();
   }
 
-  setCanvasHeight(canvasHeight: number): void {
+  setCanvasSize(canvasWidth: number, canvasHeight: number): void {
+    this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
   }
 

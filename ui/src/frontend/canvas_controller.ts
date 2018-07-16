@@ -59,11 +59,10 @@ export class CanvasController {
     this.canvas.style.height = this.canvasHeight.toString() + 'px';
     this.canvas.width = this.canvasWidth * dpr;
     this.canvas.height = this.canvasHeight * dpr;
-
     this.ctx.scale(dpr, dpr);
 
     this.rootVirtualContext.setCanvasTopOffset(this.getCanvasTopOffset());
-    this.rootVirtualContext.setCanvasHeight(this.canvasHeight);
+    this.rootVirtualContext.setCanvasSize(this.canvasWidth, this.canvasHeight);
   }
 
   clear(): void {

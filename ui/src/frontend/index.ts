@@ -33,21 +33,21 @@ export const Frontend = {
     this.canvasController = new CanvasController();
   },
   oncreate(vnode) {
-    const rect = vnode.dom.getBoundingClientRect();
-    this.width = rect.width;
-    this.height = rect.height;
-    this.canvasController.setDimensions(this.width, this.height);
-
-    setTimeout(() => m.redraw());
-
-    // Once ResizeObservers are out, we can stop accessing the window here.
-    window.addEventListener('resize', () => {
+    this.onResize = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
       this.height = rect.height;
       this.canvasController.setDimensions(this.width, this.height);
       m.redraw();
-    });
+    };
+    // Have to redraw after initialization to provide dimensions to view().
+    setTimeout(() => this.onResize());
+
+    // Once ResizeObservers are out, we can stop accessing the window here.
+    window.addEventListener('resize', this.onResize);
+  },
+  onremove() {
+    window.removeEventListener('resize', this.onResize);
   },
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
@@ -150,10 +150,12 @@ export const Frontend = {
             width: this.width
           }), ), );
   },
-} as
-    m.Component<
-        {width: number, height: number},
-        {canvasController: CanvasController, width: number, height: number}>;
+} as m.Component<{width: number, height: number}, {
+  canvasController: CanvasController,
+  width: number,
+  height: number,
+  onResize: () => void
+}>;
 
 export const FrontendPage = createPage({
   view() {
