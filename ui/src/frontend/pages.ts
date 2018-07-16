@@ -20,8 +20,7 @@ const Nav = {
         'nav',
         m('ul',
           m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
-          m('li',
-            m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer')), ), );
+          m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer'))));
   }
 } as m.Component;
 

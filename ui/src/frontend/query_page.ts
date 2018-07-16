@@ -38,7 +38,7 @@ const ExampleQueries = [
   },
 ];
 
-interface LogEntry {
+interface QueryResponse {
   query: string;
   success: boolean;
   rowCount: number;
@@ -46,11 +46,11 @@ interface LogEntry {
   result: RawQueryResult;
 }
 
-const Log: LogEntry[] = [];
+const responses: QueryResponse[] = [];
 
 async function doQuery(engine: Engine, query: string) {
   const start = performance.now();
-  const log: Partial<LogEntry> = {
+  const log: Partial<QueryResponse> = {
     query,
     success: true,
     rowCount: 0,
@@ -68,7 +68,7 @@ async function doQuery(engine: Engine, query: string) {
   }
   const end = performance.now();
   log.durationMs = Math.round(end - start);
-  Log.unshift(log as LogEntry);
+  responses.unshift(log as QueryResponse);
   m.redraw();
 }
 
@@ -114,9 +114,10 @@ const QueryBox = {
     const examples: m.Children = ['Examples: '];
     for (let i = 0; i < ExampleQueries.length; i++) {
       if (i !== 0) examples.push(', ');
-      examples.push(m(ExampleQuery, {
-        chosen: () => this.query = ExampleQueries[i].query;
-      }, ExampleQueries[i].name));
+      examples.push(
+          m(ExampleQuery,
+            {chosen: () => this.query = ExampleQueries[i].query},
+            ExampleQueries[i].name));
     }
 
     return m(
@@ -130,7 +131,8 @@ const QueryBox = {
             doQuery(engine, this.query);
           },
         },
-        m('input[placeholder=Query].query-input', {
+        m('input.query-input', {
+          placeholder: 'Query',
           disabled: !gEngines.get('0'),
           oninput: m.withAttr('value', (q: string) => this.query = q),
           value: this.query,
@@ -139,7 +141,7 @@ const QueryBox = {
   },
 } as m.Component<{}, {query: string}>;
 
-function logEntry(entry: LogEntry) {
+function createQueryResponse(entry: QueryResponse) {
   const stats = [
     entry.rowCount > MAX_DISPLAYED_ROWS ?
         `first ${MAX_DISPLAYED_ROWS} of ${entry.rowCount} rows` :
@@ -156,6 +158,6 @@ function logEntry(entry: LogEntry) {
 
 export const QueryPage = createPage({
   view() {
-    return m('.query-page', m(QueryBox), Log.map(logEntry));
+    return m('.query-page', m(QueryBox), responses.map(createQueryResponse));
   }
 });
