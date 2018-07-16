@@ -15,6 +15,7 @@
  */
 
 #include "src/trace_processor/process_table.h"
+#include "src/trace_processor/scoped_db.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -28,27 +29,31 @@ using Column = ProcessTable::Column;
 class ProcessTableUnittest : public ::testing::Test {
  public:
   ProcessTableUnittest() {
-    sqlite3_open(":memory:", &db_);
+    sqlite3* db = nullptr;
+    PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
+    db_.reset(db);
 
     static sqlite3_module module = ProcessTable::CreateModule();
-    sqlite3_create_module(db_, "process", &module,
+    sqlite3_create_module(*db_, "process", &module,
                           static_cast<void*>(&storage_));
-  }
-
-  virtual ~ProcessTableUnittest() {
-    sqlite3_finalize(stmt_);
-    sqlite3_close(db_);
   }
 
   void PrepareValidStatement(const std::string& sql) {
     int size = static_cast<int>(sql.size());
-    ASSERT_EQ(sqlite3_prepare_v2(db_, sql.c_str(), size, &stmt_, nullptr), 0);
+    sqlite3_stmt* stmt;
+    ASSERT_EQ(sqlite3_prepare_v2(*db_, sql.c_str(), size, &stmt, nullptr),
+              SQLITE_OK);
+    stmt_.reset(stmt);
+  }
+
+  const char* GetColumnAsText(int colId) {
+    return reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, colId));
   }
 
  protected:
   TraceStorage storage_;
-  sqlite3* db_ = nullptr;
-  sqlite3_stmt* stmt_ = nullptr;
+  ScopedDb db_;
+  ScopedStmt stmt_;
 };
 
 TEST_F(ProcessTableUnittest, SelectUpidAndName) {
@@ -59,21 +64,15 @@ TEST_F(ProcessTableUnittest, SelectUpidAndName) {
 
   PrepareValidStatement("SELECT upid, name FROM process");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc1, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 1 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc1);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameWithFilter) {
@@ -84,14 +83,11 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameWithFilter) {
 
   PrepareValidStatement("SELECT upid, name FROM process where upid = 2");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameWithOrder) {
@@ -102,21 +98,15 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameWithOrder) {
 
   PrepareValidStatement("SELECT upid, name FROM process ORDER BY upid desc");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc1, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 1 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc1);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterGt) {
@@ -127,14 +117,11 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterGt) {
 
   PrepareValidStatement("SELECT upid, name FROM process where upid > 1");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterName) {
@@ -146,14 +133,11 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterName) {
   PrepareValidStatement(
       "SELECT upid, name FROM process where name = \"process2\"");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterDifferentOr) {
@@ -165,14 +149,11 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterDifferentOr) {
   PrepareValidStatement(
       "SELECT upid, name FROM process where upid = 2 or name = \"process2\"");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterSameOr) {
@@ -184,21 +165,15 @@ TEST_F(ProcessTableUnittest, SelectUpidAndNameFilterSameOr) {
   PrepareValidStatement(
       "SELECT upid, name FROM process where upid = 1 or upid = 2");
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 1 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc1, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 1 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc1);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int(stmt_, 0), 2 /* upid */);
-  ASSERT_EQ(
-      strncmp(reinterpret_cast<const char*>(sqlite3_column_text(stmt_, 1)),
-              kCommProc2, 8),
-      0);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int(*stmt_, 0), 2 /* upid */);
+  ASSERT_STREQ(GetColumnAsText(1), kCommProc2);
 
-  ASSERT_EQ(sqlite3_step(stmt_), SQLITE_DONE);
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 }  // namespace

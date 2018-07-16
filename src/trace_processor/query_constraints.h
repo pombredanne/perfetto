@@ -55,9 +55,6 @@ class QueryConstraints {
   void AddConstraint(int column, unsigned char op);
 
   void AddOrderBy(int column, unsigned char desc);
-
-  void ClearOrderBy() { order_by_.clear(); }
-
   // Converts the constraints and order by information to a string for
   // use by sqlite.
   SqliteString ToNewSqlite3String();

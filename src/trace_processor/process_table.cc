@@ -96,6 +96,9 @@ sqlite3_module ProcessTable::CreateModule() {
   module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
     return AsCursor(c)->Column(a, b);
   };
+  module.xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
+    return SQLITE_ERROR;
+  };
   return module;
 }
 
@@ -110,7 +113,7 @@ int ProcessTable::BestIndex(sqlite3_index_info* idx) {
   QueryConstraints qc;
 
   for (int i = 0; i < idx->nOrderBy; i++) {
-    int column = static_cast<Column>(idx->aOrderBy[i].iColumn);
+    Column column = static_cast<Column>(idx->aOrderBy[i].iColumn);
     unsigned char desc = idx->aOrderBy[i].desc;
     qc.AddOrderBy(column, desc);
   }
@@ -122,11 +125,7 @@ int ProcessTable::BestIndex(sqlite3_index_info* idx) {
       continue;
     qc.AddConstraint(cs.iColumn, cs.op);
 
-    if (cs.iColumn == Column::kUpid) {
-      idx->estimatedCost = 10;
-    } else {
-      idx->estimatedCost = 100;
-    }
+    idx->estimatedCost = cs.iColumn == Column::kUpid ? 10 : 100;
 
     // argvIndex is 1-based so use the current size of the vector.
     int argv_index = static_cast<int>(qc.constraints().size());
@@ -158,6 +157,9 @@ int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
                           static_cast<int>(name.length()), nullptr);
       break;
     }
+    default:
+      PERFETTO_FATAL("Unknown column %d", N);
+      break;
   }
   return SQLITE_OK;
 }
@@ -168,7 +170,7 @@ int ProcessTable::Cursor::Filter(int /*idxNum*/,
                                  sqlite3_value** argv) {
   QueryConstraints qc = QueryConstraints::FromString(idxStr);
 
-  PERFETTO_CHECK(qc.constraints().size() == static_cast<size_t>(argc));
+  PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
 
   min_upid_ = 1;
   max_upid_ = static_cast<uint32_t>(storage_->process_count());
@@ -178,17 +180,15 @@ int ProcessTable::Cursor::Filter(int /*idxNum*/,
   for (size_t j = 0; j < qc.constraints().size(); j++) {
     const auto& cs = qc.constraints()[j];
     if (cs.iColumn == Column::kUpid) {
-      TraceStorage::UniquePid constraint_upid =
+      auto constraint_upid =
           static_cast<TraceStorage::UniquePid>(sqlite3_value_int(argv[j]));
       // Set the range of upids that we are interested in, based on the
       // constraints in the query. Everything between min and max (inclusive)
       // will be returned.
       if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-        constraint_upid = IsOpGt(cs.op) ? constraint_upid + 1 : constraint_upid;
-        min_upid_ = constraint_upid;
+        min_upid_ = IsOpGt(cs.op) ? constraint_upid + 1 : constraint_upid;
       } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-        constraint_upid = IsOpLt(cs.op) ? constraint_upid - 1 : constraint_upid;
-        max_upid_ = constraint_upid;
+        max_upid_ = IsOpLt(cs.op) ? constraint_upid - 1 : constraint_upid;
       } else if (IsOpEq(cs.op)) {
         min_upid_ = constraint_upid;
         max_upid_ = constraint_upid;
@@ -198,11 +198,7 @@ int ProcessTable::Cursor::Filter(int /*idxNum*/,
   for (const auto& ob : qc.order_by()) {
     if (ob.iColumn == Column::kUpid) {
       desc_ = ob.desc;
-      if (desc_) {
-        current_upid_ = max_upid_;
-      } else {
-        current_upid_ = min_upid_;
-      }
+      current_upid_ = desc_ ? max_upid_ : min_upid_;
     }
   }
 
@@ -210,11 +206,7 @@ int ProcessTable::Cursor::Filter(int /*idxNum*/,
 }
 
 int ProcessTable::Cursor::Next() {
-  if (desc_) {
-    --current_upid_;
-  } else {
-    ++current_upid_;
-  }
+  desc_ ? --current_upid_ : ++current_upid_;
   return SQLITE_OK;
 }
 
@@ -223,11 +215,7 @@ int ProcessTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
 }
 
 int ProcessTable::Cursor::Eof() {
-  if (desc_) {
-    return current_upid_ < min_upid_;
-  } else {
-    return current_upid_ > max_upid_;
-  }
+  return desc_ ? current_upid_ < min_upid_ : current_upid_ > max_upid_;
 }
 
 }  // namespace trace_processor
