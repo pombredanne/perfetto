@@ -12,26 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {WasmBridge, WasmBridgeRequest} from './engine/wasm_bridge';
-import * as init_trace_processor from './gen/trace_processor';
+import {Global} from '../base/global';
 
-// tslint:disable no-any
+const exampleGlobal = new Global<string>();
 
-declare var FileReaderSync: any;
+beforeEach(() => {
+  exampleGlobal.resetForTesting();
+});
 
-const anySelf = (self as any);
+afterEach(() => {
+  exampleGlobal.resetForTesting();
+});
 
-const bridge = new WasmBridge(
-    init_trace_processor,
-    anySelf.postMessage.bind(anySelf),
-    new FileReaderSync(), );
-bridge.initialize();
+test('it throws if accessed before set', () => {
+  expect(() => exampleGlobal.get()).toThrow('Global not set');
+});
 
-anySelf.onmessage = (m: any) => {
-  if (m.data.blob) {
-    bridge.setBlob(m.data.blob);
-    return;
-  }
-  const request = (m.data as WasmBridgeRequest);
-  bridge.callWasm(request);
-};
+test('it can be set', () => {
+  exampleGlobal.set('hello');
+  expect(exampleGlobal.get()).toEqual('hello');
+  exampleGlobal.set('world');
+  expect(exampleGlobal.get()).toEqual('world');
+});
