@@ -12,25 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Global} from '../base/global';
+export type Call = [string, any[], Dingus];
 
-const exampleGlobal = new Global<string>();
+export interface Dingus { calls: Call[]; }
 
-beforeEach(() => {
-  exampleGlobal.resetForTesting();
-});
+export type DingusAttrs<T> = {
+  [P in keyof T]: Dingus & DingusAttrs<T[P]>& MaybeCallable<T[P]>;
+};
 
-afterEach(() => {
-  exampleGlobal.resetForTesting();
-});
+type F = (...args: any[]) => any;
 
-test('it throws if accessed before set', () => {
-  expect(() => exampleGlobal.get()).toThrow('Global not set');
-});
+type Callable<T extends F> = {
+  (...args: any[]):
+      Dingus&DingusAttrs<ReturnType<T>>&MaybeCallable<ReturnType<T>>;
+};
 
-test('it can be set', () => {
-  exampleGlobal.set('hello');
-  expect(exampleGlobal.get()).toEqual('hello');
-  exampleGlobal.set('world');
-  expect(exampleGlobal.get()).toEqual('world');
-});
+type MaybeCallable<T> = T extends F ? Callable<T>: {};
+
+export function dingus<T>(name?: string): Dingus&DingusAttrs<T>&
+    MaybeCallable<T>;
