@@ -131,7 +131,7 @@ QueryConstraints QueryConstraints::FromString(const char* idxStr) {
     qc.AddOrderBy(col, desc);
   }
 
-  PERFETTO_DCHECK(splitter.Next() == false);
+  PERFETTO_DCHECK(!splitter.Next());
   return qc;
 }
 
