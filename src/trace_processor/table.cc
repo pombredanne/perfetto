@@ -41,17 +41,20 @@ sqlite3_module Table::CreateModule() {
     return ToTable(t)->Open(c);
   };
   module.xClose = [](sqlite3_vtab_cursor* c) {
-    delete ToCusor(c);
+    delete ToCursor(c);
     return SQLITE_OK;
   };
   module.xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
                       sqlite3_value** v) {
-    return ToCusor(c)->Filter(i, s, a, v);
+    return ToCursor(c)->Filter(i, s, a, v);
   };
-  module.xNext = [](sqlite3_vtab_cursor* c) { return ToCusor(c)->Next(); };
-  module.xEof = [](sqlite3_vtab_cursor* c) { return ToCusor(c)->Eof(); };
+  module.xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
+  module.xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
   module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
-    return ToCusor(c)->Column(a, b);
+    return ToCursor(c)->Column(a, b);
+  };
+  module.xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
+    return SQLITE_ERROR;
   };
   return module;
 }

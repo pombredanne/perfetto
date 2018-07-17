@@ -52,7 +52,7 @@ class Table : public sqlite3_vtab {
     return static_cast<Table*>(vtab);
   }
 
-  static Cursor* ToCusor(sqlite3_vtab_cursor* cursor) {
+  static Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
     return static_cast<Cursor*>(cursor);
   }
 };
