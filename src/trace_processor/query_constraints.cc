@@ -61,14 +61,14 @@ void QueryConstraints::AddConstraint(int column, unsigned char op) {
   Constraint c{};
   c.iColumn = column;
   c.op = op;
-  constraints_.emplace_back(c);
+  constraints_.emplace_back(std::move(c));
 }
 
 void QueryConstraints::AddOrderBy(int column, unsigned char desc) {
   OrderBy ob{};
   ob.iColumn = column;
   ob.desc = desc;
-  order_by_.emplace_back(ob);
+  order_by_.emplace_back(std::move(ob));
 }
 
 QueryConstraints::SqliteString QueryConstraints::ToNewSqlite3String() {
