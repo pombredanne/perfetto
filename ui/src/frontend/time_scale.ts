@@ -13,31 +13,39 @@
 // limitations under the License.
 
 /**
- * Defines a mapping between pixels and nanoseconds for the entire application.
+ * Defines a mapping between pixels and Milliseconds for the entire application.
+ * Scales times from tStart to tEnd to pixel values pxStart to pxEnd.
  */
-export class GlobalTimeScale {
-  constructor(
-      private tStart: Nanoseconds, private tEnd: Nanoseconds,
-      private pxStart: Pixels, private pxEnd: Pixels,
-      private pxOffset: Pixels = 0) {}
+export class TimeScale {
+  private tStart: Milliseconds;
+  private tEnd: Milliseconds;
+  private pxStart: Pixels;
+  private pxEnd: Pixels;
 
-  tsToPx(time: Nanoseconds): Pixels {
+  constructor(timeBounds: [number, number], pxBounds: [number, number]) {
+    this.tStart = timeBounds[0];
+    this.tEnd = timeBounds[1];
+    this.pxStart = pxBounds[0];
+    this.pxEnd = pxBounds[1];
+  }
+
+  tsToPx(time: Milliseconds): Pixels {
     const percentage: number = (time - this.tStart) / (this.tEnd - this.tStart);
     const percentagePx = percentage * (this.pxEnd - this.pxStart);
 
-    return this.pxStart as number + percentagePx - this.pxOffset;
+    return this.pxStart as number + percentagePx;
   }
 
-  pxToTs(px: Pixels): Nanoseconds {
+  pxToTs(px: Pixels): Milliseconds {
     const percentage = (px - this.pxStart) / (this.pxEnd - this.pxStart);
     return this.tStart as number + percentage * (this.tEnd - this.tStart);
   }
 
-  relativePxToTs(px: Pixels): Nanoseconds {
-    return this.pxToTs(px) - this.pxToTs(0);
+  relativePxToTs(px: Pixels): Milliseconds {
+    return px * (this.tEnd - this.tStart) / (this.pxEnd - this.pxStart);
   }
 
-  setTimeLimits(tStart: Nanoseconds, tEnd: Nanoseconds) {
+  setTimeLimits(tStart: Milliseconds, tEnd: Milliseconds) {
     this.tStart = tStart;
     this.tEnd = tEnd;
   }
@@ -52,51 +60,6 @@ export class GlobalTimeScale {
   }
 }
 
-/**
- * Defines a mapping between pixels and nanoseconds given a different local
- * coordinate system caused by a smaller bounding rectangle such as a Track
- * content container, which defines an offset and a width.
- */
-export class OffsetTimeScale {
-  constructor(
-      private scale: TimeScale, private pxOffset: Pixels = 0,
-      private width: Pixels = 0) {}
-
-  tsToPx(time: Nanoseconds): Pixels {
-    const result = this.scale.tsToPx(time) - this.pxOffset;
-
-    if (result < 0) return 0;
-    if (result > this.width) return this.width;
-
-    return result;
-  }
-
-  pxToTs(px: Pixels): Nanoseconds {
-    return this.scale.pxToTs(px as number + (this.pxOffset as number));
-  }
-
-  relativePxToTs(px: Pixels): Nanoseconds {
-    return this.scale.pxToTs(px as number + (this.pxOffset as number)) -
-        this.scale.pxToTs(0);
-  }
-
-  getTimeLimits(): {start: Nanoseconds, end: Nanoseconds} {
-    return this.scale.getTimeLimits();
-  }
-
-  setWidth(width: Pixels) {
-    this.width = width;
-  }
-
-  getWidth(): Pixels {
-    return this.width;
-  }
-
-  setOffset(pxOffset: Pixels) {
-    this.pxOffset = pxOffset;
-  }
-}
-
 // We are using enums because TypeScript does proper type checking for those,
 // and disallows assigning a pixel value to a milliseconds value, even though
 // they are numbers. Using types, this safeguard would not be here.
@@ -104,6 +67,5 @@ export class OffsetTimeScale {
 
 export enum Pixels {
 }
-export enum Nanoseconds {
+export enum Milliseconds {
 }
-export type TimeScale = GlobalTimeScale | OffsetTimeScale;

@@ -14,22 +14,17 @@
 
 import * as m from 'mithril';
 
-import {Nanoseconds, OffsetTimeScale, TimeScale} from './time_scale';
+import {Milliseconds, TimeScale} from './time_scale';
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
   view({attrs}) {
-    const sliceStart: Nanoseconds = 100000;
-    const sliceEnd: Nanoseconds = 400000;
+    const sliceStart: Milliseconds = 100000;
+    const sliceEnd: Milliseconds = 400000;
 
     const rectStart = attrs.x.tsToPx(sliceStart);
     const rectWidth = attrs.x.tsToPx(sliceEnd) - rectStart;
-
-    // TODO: This offset should be based on TrackShell. Need Track Refactoring.
-    const domX = new OffsetTimeScale(attrs.x, 200, 800);
-    const domStart = domX.tsToPx(sliceStart);
-    const domWidth = domX.tsToPx(sliceEnd) - domStart;
 
     if (attrs.trackContext.isOnCanvas()) {
       attrs.trackContext.fillStyle = '#ccc';
@@ -61,8 +56,8 @@ export const Track = {
               style: {
                 'font-size': '1.5em',
                 position: 'absolute',
-                left: domStart.toString() + 'px',
-                width: domWidth.toString() + 'px',
+                left: rectStart.toString() + 'px',
+                width: rectWidth.toString() + 'px',
                 background: '#aca'
               }
             },

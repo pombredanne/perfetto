@@ -24,7 +24,7 @@ import {gState} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {ScrollableContainer} from './scrollable_container';
-import {GlobalTimeScale} from './time_scale';
+import {TimeScale} from './time_scale';
 import {Track} from './track';
 
 export const Frontend = {
@@ -37,7 +37,7 @@ export const Frontend = {
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
-    const timeScale = new GlobalTimeScale(0, 1000000, 200, 1000);
+    const timeScale = new TimeScale([0, 1000000], [0, 1000]);
 
     this.canvasController.clear();
 
