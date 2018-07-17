@@ -29,7 +29,7 @@ namespace trace_processor {
 
 // The implementation of the SQLite table containing each unique process with
 // the metadata for those processes.
-class ThreadTable : Table {
+class ThreadTable : public Table {
  public:
   enum Column { kUtid = 0, kUpid = 1, kName = 2 };
   struct OrderBy {
@@ -47,21 +47,20 @@ class ThreadTable : Table {
  private:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
-  class Cursor : Table::Cursor {
+  class Cursor : public Table::Cursor {
    public:
     Cursor(const TraceStorage*);
 
     // Implementation of sqlite3_vtab_cursor.
-    int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
-    int Next();
-    int Eof();
-
-    int Column(sqlite3_context* context, int N);
-    int RowId(sqlite_int64* rowId);
+    int Filter(int idxNum,
+               const char* idxStr,
+               int argc,
+               sqlite3_value** argv) override;
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context* context, int N) override;
 
    private:
-    sqlite3_vtab_cursor base_;  // Must be first.
-
     struct UtidFilter {
       TraceStorage::UniqueTid min;
       TraceStorage::UniqueTid max;
@@ -73,11 +72,6 @@ class ThreadTable : Table {
     UtidFilter utid_filter_;
   };
 
-  static inline Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
-    return reinterpret_cast<Cursor*>(cursor);
-  }
-
-  sqlite3_vtab base_;  // Must be first.
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

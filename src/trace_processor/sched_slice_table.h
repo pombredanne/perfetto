@@ -169,10 +169,6 @@ class SchedSliceTable : public Table {
     std::unique_ptr<FilterState> filter_state_;
   };
 
-  static inline Cursor* AsCursor(sqlite3_vtab_cursor* cursor) {
-    return reinterpret_cast<Cursor*>(cursor);
-  }
-
   const TraceStorage* const storage_;
 };
 

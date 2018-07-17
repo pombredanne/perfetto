@@ -25,6 +25,8 @@ namespace trace_processor {
 
 Table::Table() {}
 
+Table::~Table() {}
+
 sqlite3_module Table::CreateModule() {
   sqlite3_module module;
   memset(&module, 0, sizeof(module));
@@ -53,6 +55,8 @@ sqlite3_module Table::CreateModule() {
   };
   return module;
 }
+
+Table::Cursor::~Cursor() {}
 
 }  // namespace trace_processor
 }  // namespace perfetto
