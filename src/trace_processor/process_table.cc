@@ -155,7 +155,11 @@ int ProcessTable::Cursor::Filter(int /*idxNum*/,
 }
 
 int ProcessTable::Cursor::Next() {
-  upid_filter_.desc ? --upid_filter_.current : ++upid_filter_.current;
+  if (upid_filter_.desc) {
+    --upid_filter_.current;
+  } else {
+    ++upid_filter_.current;
+  }
   return SQLITE_OK;
 }
 

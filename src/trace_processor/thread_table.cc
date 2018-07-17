@@ -161,7 +161,11 @@ int ThreadTable::Cursor::Filter(int /*idxNum*/,
 }
 
 int ThreadTable::Cursor::Next() {
-  utid_filter_.desc ? --utid_filter_.current : ++utid_filter_.current;
+  if (utid_filter_.desc) {
+    --utid_filter_.current;
+  } else {
+    ++utid_filter_.current;
+  }
 
   return SQLITE_OK;
 }
