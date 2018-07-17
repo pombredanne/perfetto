@@ -21,6 +21,7 @@
 #include <memory>
 
 #include "sqlite3.h"
+#include "src/trace_processor/query_constraints.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -37,10 +38,6 @@ class SchedSliceTable {
     kDuration = 3,
     kQuantizedGroup = 4
   };
-  struct OrderBy {
-    Column column = kTimestamp;
-    bool desc = false;
-  };
 
   SchedSliceTable(const TraceStorage* storage);
   static sqlite3_module CreateModule();
@@ -50,15 +47,6 @@ class SchedSliceTable {
   int Open(sqlite3_vtab_cursor** ppCursor);
 
  private:
-  using Constraint = sqlite3_index_info::sqlite3_index_constraint;
-
-  // Metadata associated with a BestIndex call which is useful in the Filter
-  // callback.
-  struct IndexInfo {
-    std::vector<OrderBy> order_by;
-    std::vector<Constraint> constraints;
-  };
-
   // Transient filter state for each CPU of this trace.
   class PerCpuState {
    public:
@@ -105,7 +93,7 @@ class SchedSliceTable {
   class FilterState {
    public:
     FilterState(const TraceStorage* storage,
-                IndexInfo index,
+                const QueryConstraints& query_constraints,
                 sqlite3_value** argv);
 
     // Chooses the next CPU which should be returned according to the sorting
@@ -147,7 +135,7 @@ class SchedSliceTable {
                               size_t f,
                               uint32_t s_cpu,
                               size_t s,
-                              const OrderBy& order_by);
+                              const QueryConstraints::OrderBy& order_by);
 
     // One entry for each cpu which is used in filtering.
     std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
@@ -159,7 +147,7 @@ class SchedSliceTable {
     uint64_t quantum_ = 0;
 
     // The sorting criteria for this filter operation.
-    std::vector<OrderBy> order_by_;
+    std::vector<QueryConstraints::OrderBy> order_by_;
 
     const TraceStorage* const storage_;
   };
@@ -167,7 +155,7 @@ class SchedSliceTable {
   // Implementation of the SQLite cursor interface.
   class Cursor {
    public:
-    Cursor(SchedSliceTable* table, const TraceStorage* storage);
+    Cursor(const TraceStorage* storage);
 
     // Implementation of sqlite3_vtab_cursor.
     int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
@@ -179,9 +167,7 @@ class SchedSliceTable {
    private:
     sqlite3_vtab_cursor base_;  // Must be first.
 
-    SchedSliceTable* const table_;
     const TraceStorage* const storage_;
-
     std::unique_ptr<FilterState> filter_state_;
   };
 
@@ -191,9 +177,6 @@ class SchedSliceTable {
 
   sqlite3_vtab base_;  // Must be first.
   const TraceStorage* const storage_;
-
-  // One entry for each BestIndex call.
-  std::vector<IndexInfo> indexes_;
 };
 
 }  // namespace trace_processor

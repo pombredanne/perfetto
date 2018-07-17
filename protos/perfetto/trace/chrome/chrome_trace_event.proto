@@ -56,10 +56,13 @@ message ChromeTraceEvent {
 
 message ChromeMetadata {
   optional string name = 1;
-  optional string string_value = 2;
-  optional bool bool_value = 3;
-  optional int64 int_value = 4;
-  optional string json_value = 5;
+
+  oneof value {
+    string string_value = 2;
+    bool bool_value = 3;
+    int64 int_value = 4;
+    string json_value = 5;
+  }
 }
 
 message ChromeEventBundle {
