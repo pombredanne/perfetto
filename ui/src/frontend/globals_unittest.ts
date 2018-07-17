@@ -18,6 +18,7 @@ beforeEach(() => {
   gState.resetForTesting();
 });
 
+// TODO(hjd): Do this in jsdom environment.
 afterEach(() => {
   gState.resetForTesting();
 });

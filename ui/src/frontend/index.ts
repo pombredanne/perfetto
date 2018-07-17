@@ -20,7 +20,7 @@ import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
 import {ChildVirtualContext} from './child_virtual_context';
-import {gState} from './globals';
+import {gDispatch, gState} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {QueryPage} from './query_page';
@@ -164,16 +164,23 @@ export const FrontendPage = createPage({
   }
 });
 
-function createController() {
+function createController(): Worker {
   const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
+  worker.onmessage = msg => {
+    gState.set(msg.data);
+    m.redraw();
+  };
+  return worker;
 }
 
 function main() {
   gState.set(createEmptyState());
-  createController();
+  const worker = createController();
+  // tslint:disable-next-line deprecation
+  gDispatch.set(action => worker.postMessage(action));
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');

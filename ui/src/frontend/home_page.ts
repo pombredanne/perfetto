@@ -16,7 +16,8 @@ import * as m from 'mithril';
 
 import {WasmEngineProxy} from '../controller/wasm_engine_proxy';
 
-import {gEngines} from './globals';
+import {gEngines, gState} from './globals';
+import {quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';
 
 function extractBlob(e: Event): Blob|null {
@@ -56,6 +57,13 @@ export const HomePage = createPage({
             {
               onclick: loadExampleTrace,
             },
-            'Open demo trace')));
+            'Open demo trace'),
+          ' or ',
+          m('button',
+            {
+              onclick: quietDispatch({}),
+            },
+            `Increment Counter ${gState.get().i}`)));
+
   }
 });

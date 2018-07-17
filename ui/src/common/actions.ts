@@ -12,22 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Global} from '../base/global';
-import {Action} from '../common/actions';
-import {State} from '../common/state';
-import {Engine} from '../controller/engine';
-
-/**
- * Global accessor for the state in the frontend.
- */
-export const gState = new Global<State>();
-
-/**
- * Global accessor for the state in the frontend.
- */
-// TODO(hjd): gDispatch.get()(action) is awkward, update to g.dispatch.
-export const gDispatch = new Global<(action: Action) => void>();
-
-
-// TODO(hjd): Temporary while bringing up controller worker.
-export const gEngines = new Map<string, Engine>();
+export interface Action {}
