@@ -21,6 +21,7 @@
 
 namespace perfetto {
 namespace trace_processor {
+namespace sqlite_utils {
 
 inline bool IsOpEq(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_EQ;
@@ -42,6 +43,7 @@ inline bool IsOpLt(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_LT;
 }
 
+}  // namespace sqlite_utils
 }  // namespace trace_processor
 }  // namespace perfetto
 

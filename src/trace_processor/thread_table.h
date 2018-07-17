@@ -17,10 +17,11 @@
 #ifndef SRC_TRACE_PROCESSOR_THREAD_TABLE_H_
 #define SRC_TRACE_PROCESSOR_THREAD_TABLE_H_
 
+#include <sqlite3.h>
 #include <limits>
 #include <memory>
 
-#include "sqlite3.h"
+#include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -28,7 +29,7 @@ namespace trace_processor {
 
 // The implementation of the SQLite table containing each unique process with
 // the metadata for those processes.
-class ThreadTable {
+class ThreadTable : Table {
  public:
   enum Column { kUtid = 0, kUpid = 1, kName = 2 };
   struct OrderBy {
@@ -36,24 +37,19 @@ class ThreadTable {
     bool desc = false;
   };
 
-  ThreadTable(const TraceStorage* storage);
+  ThreadTable(const TraceStorage*);
   static sqlite3_module CreateModule();
 
   // Implementation for sqlite3_vtab.
-  int BestIndex(sqlite3_index_info* index_info);
-  int Open(sqlite3_vtab_cursor** ppCursor);
+  int BestIndex(sqlite3_index_info*) override;
+  int Open(sqlite3_vtab_cursor**) override;
 
  private:
   using Constraint = sqlite3_index_info::sqlite3_index_constraint;
 
-  struct IndexInfo {
-    std::vector<OrderBy> order_by;
-    std::vector<Constraint> constraints;
-  };
-
-  class Cursor {
+  class Cursor : Table::Cursor {
    public:
-    Cursor(const TraceStorage* storage);
+    Cursor(const TraceStorage*);
 
     // Implementation of sqlite3_vtab_cursor.
     int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
@@ -61,7 +57,7 @@ class ThreadTable {
     int Eof();
 
     int Column(sqlite3_context* context, int N);
-    int RowId(sqlite_int64* pRowid);
+    int RowId(sqlite_int64* rowId);
 
    private:
     sqlite3_vtab_cursor base_;  // Must be first.

@@ -29,9 +29,7 @@ namespace trace_processor {
 
 namespace {
 
-inline SchedSliceTable* AsTable(sqlite3_vtab* vtab) {
-  return reinterpret_cast<SchedSliceTable*>(vtab);
-}
+using namespace sqlite_utils;
 
 template <size_t N = TraceStorage::kMaxCpus>
 bool PopulateFilterBitmap(int op,
@@ -90,14 +88,10 @@ inline int Compare(T first, T second, bool desc) {
 
 SchedSliceTable::SchedSliceTable(const TraceStorage* storage)
     : storage_(storage) {
-  static_assert(offsetof(SchedSliceTable, base_) == 0,
-                "SQLite base class must be first member of the table");
-  memset(&base_, 0, sizeof(base_));
 }
 
 sqlite3_module SchedSliceTable::CreateModule() {
-  sqlite3_module module;
-  memset(&module, 0, sizeof(module));
+  sqlite3_module module = Table::CreateModule();
   module.xConnect = [](sqlite3* db, void* raw_args, int, const char* const*,
                        sqlite3_vtab** tab, char**) {
     int res = sqlite3_declare_vtab(db,
@@ -112,31 +106,8 @@ sqlite3_module SchedSliceTable::CreateModule() {
     if (res != SQLITE_OK)
       return res;
     TraceStorage* storage = static_cast<TraceStorage*>(raw_args);
-    *tab = reinterpret_cast<sqlite3_vtab*>(new SchedSliceTable(storage));
+    *tab = static_cast<sqlite3_vtab*>(new SchedSliceTable(storage));
     return SQLITE_OK;
-  };
-  module.xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
-    return AsTable(t)->BestIndex(i);
-  };
-  module.xDisconnect = [](sqlite3_vtab* t) {
-    delete AsTable(t);
-    return SQLITE_OK;
-  };
-  module.xOpen = [](sqlite3_vtab* t, sqlite3_vtab_cursor** c) {
-    return AsTable(t)->Open(c);
-  };
-  module.xClose = [](sqlite3_vtab_cursor* c) {
-    delete AsCursor(c);
-    return SQLITE_OK;
-  };
-  module.xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
-                      sqlite3_value** v) {
-    return AsCursor(c)->Filter(i, s, a, v);
-  };
-  module.xNext = [](sqlite3_vtab_cursor* c) { return AsCursor(c)->Next(); };
-  module.xEof = [](sqlite3_vtab_cursor* c) { return AsCursor(c)->Eof(); };
-  module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
-    return AsCursor(c)->Column(a, b);
   };
   module.xFindFunction = [](sqlite3_vtab*, int, const char* name,
                             void (**fn)(sqlite3_context*, int, sqlite3_value**),
@@ -157,27 +128,25 @@ sqlite3_module SchedSliceTable::CreateModule() {
 }
 
 int SchedSliceTable::Open(sqlite3_vtab_cursor** ppCursor) {
-  *ppCursor = reinterpret_cast<sqlite3_vtab_cursor*>(new Cursor(storage_));
+  *ppCursor = static_cast<sqlite3_vtab_cursor*>(new Cursor(storage_));
   return SQLITE_OK;
 }
 
 // Called at least once but possibly many times before filtering things and is
 // the best time to keep track of constriants.
 int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
-  IndexInfo* index = static_cast<IndexInfo*>(sqlite3_malloc(sizeof((*index))));
+  QueryConstraints query_constraints;
 
   bool is_quantized_group_order_desc = false;
   bool is_duration_timestamp_order = false;
   for (int i = 0; i < idx->nOrderBy; i++) {
-    index->order_by.emplace_back();
+    int column = idx->aOrderBy[i].iColumn;
+    bool desc = idx->aOrderBy[i].desc;
+    query_constraints.AddOrderBy(column, desc);
 
-    OrderBy* order = &index->order_by.back();
-    order->column = static_cast<Column>(idx->aOrderBy[i].iColumn);
-    order->desc = idx->aOrderBy[i].desc;
-
-    switch (order->column) {
+    switch (column) {
       case Column::kQuantizedGroup:
-        if (order->desc)
+        if (desc)
           is_quantized_group_order_desc = true;
         break;
       case Column::kTimestamp:
@@ -195,13 +164,13 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
     const auto& cs = idx->aConstraint[i];
     if (!cs.usable)
       continue;
-    index->constraints.emplace_back(cs);
+    query_constraints.AddConstraint(cs.iColumn, cs.op);
 
     if (cs.iColumn == Column::kQuantum)
       has_quantum_constraint = true;
 
     // argvIndex is 1-based so use the current size of the vector.
-    int argv_index = static_cast<int>(index->constraints.size());
+    int argv_index = static_cast<int>(query_constraints.constraints().size());
     idx->aConstraintUsage[i].argvIndex = argv_index;
   }
   // If a quantum constraint is present, we don't support native ordering by
@@ -212,9 +181,9 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
   idx->orderByConsumed = !needs_sqlite_orderby;
   if (needs_sqlite_orderby)
-    index->order_by.clear();
+    query_constraints.ClearOrderBy();
 
-  idx->idxStr = reinterpret_cast<char*>(index);
+  idx->idxStr = query_constraints.ToNewSqlite3String().release();
   idx->needToFreeIdxStr = true;
 
   return SQLITE_OK;
@@ -222,19 +191,17 @@ int SchedSliceTable::BestIndex(sqlite3_index_info* idx) {
 
 SchedSliceTable::Cursor::Cursor(const TraceStorage* storage)
     : storage_(storage) {
-  static_assert(offsetof(Cursor, base_) == 0,
-                "SQLite base class must be first member of the cursor");
-  memset(&base_, 0, sizeof(base_));
 }
 
 int SchedSliceTable::Cursor::Filter(int /* idxNum */,
                                     const char* idxStr,
                                     int argc,
                                     sqlite3_value** argv) {
-  const auto& index = *reinterpret_cast<const IndexInfo*>(idxStr);
-  PERFETTO_CHECK(index.constraints.size() == static_cast<size_t>(argc));
+  auto query_constraints = QueryConstraints::FromString(idxStr);
+  PERFETTO_CHECK(query_constraints.constraints().size() ==
+                 static_cast<size_t>(argc));
 
-  filter_state_.reset(new FilterState(storage_, index, argv));
+  filter_state_.reset(new FilterState(storage_, query_constraints, argv));
   return SQLITE_OK;
 }
 
@@ -299,19 +266,16 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
-int SchedSliceTable::Cursor::RowId(sqlite_int64* /* pRowid */) {
-  return SQLITE_ERROR;
-}
-
-SchedSliceTable::FilterState::FilterState(const TraceStorage* storage,
-                                          const IndexInfo& index,
-                                          sqlite3_value** argv)
-    : order_by_(index.order_by), storage_(storage) {
+SchedSliceTable::FilterState::FilterState(
+    const TraceStorage* storage,
+    const QueryConstraints& query_constraints,
+    sqlite3_value** argv)
+    : order_by_(query_constraints.order_by()), storage_(storage) {
   std::bitset<TraceStorage::kMaxCpus> cpu_filter;
   cpu_filter.set();
 
-  for (size_t i = 0; i < index.constraints.size(); i++) {
-    const auto& cs = index.constraints[i];
+  for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
+    const auto& cs = query_constraints.constraints()[i];
     switch (cs.iColumn) {
       case Column::kCpu:
         PopulateFilterBitmap(cs.op, argv[i], &cpu_filter);
@@ -390,14 +354,15 @@ int SchedSliceTable::FilterState::CompareSlices(uint32_t f_cpu,
   return 0;
 }
 
-int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
-                                                        size_t f_idx,
-                                                        uint32_t s_cpu,
-                                                        size_t s_idx,
-                                                        const OrderBy& ob) {
+int SchedSliceTable::FilterState::CompareSlicesOnColumn(
+    uint32_t f_cpu,
+    size_t f_idx,
+    uint32_t s_cpu,
+    size_t s_idx,
+    const QueryConstraints::OrderBy& ob) {
   const auto& f_sl = storage_->SlicesForCpu(f_cpu);
   const auto& s_sl = storage_->SlicesForCpu(s_cpu);
-  switch (ob.column) {
+  switch (ob.iColumn) {
     case SchedSliceTable::Column::kQuantum:
       return 0;
     case SchedSliceTable::Column::kTimestamp:
@@ -419,7 +384,7 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(uint32_t f_cpu,
       return Compare(f_group, s_group, ob.desc);
     }
   }
-  PERFETTO_FATAL("Unexepcted column %d", ob.column);
+  PERFETTO_FATAL("Unexepcted column %d", ob.iColumn);
 }
 
 void SchedSliceTable::PerCpuState::Initialize(
