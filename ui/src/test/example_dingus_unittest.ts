@@ -18,6 +18,18 @@ interface VoidFunctionWithNumberArg {
   (_: number): void;
 }
 
+class ExampleClass {
+  isEven(n: number): boolean {
+    return n % 2 === 0;
+  }
+}
+
+function* evenNumbers(n: number, math: ExampleClass) {
+  for (let i = 0; i < n; i++) {
+    if (math.isEven(i)) yield i;
+  }
+}
+
 /**
  * Call |f| |n| times (once with each number [0, n)).
  */
@@ -32,4 +44,10 @@ test('example dingus test', () => {
   iterMap(d, 3);
   expect(d.calls.length).toBe(3);
   expect(d.calls.filter(([_a, args, _b]) => args[0] === 1).length).toBe(1);
+});
+
+test('example dingus test class', () => {
+  const d = dingus<ExampleClass>('math');
+  // Dingus returns a truthy dingus in all situations - so bear that in mind!
+  expect([...evenNumbers(3, d)]).toEqual([0, 1, 2]);
 });
