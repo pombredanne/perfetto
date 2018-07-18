@@ -16,6 +16,15 @@ import {Action} from '../common/actions';
 import {globals} from './globals';
 
 /**
+ * Events triggered by Mithril have an adittional property: redraw.
+ * Redraw is a boolean which controls whether Mithril schedules an automatic
+ * redraw after this event is handled.
+ */
+interface MithrilEvent extends Event {
+  redraw: boolean;
+}
+
+/**
  * Create a Mithril event handler which (when triggered) dispatches an action
  * to the controller thread without causing a Mithril redraw.
  * This prevents redrawing twice for every action (once immediately and once
@@ -26,7 +35,7 @@ import {globals} from './globals';
 export function quietDispatch(action: ((e: Event) => Action)|
                               Action): (e: Event) => void {
   return (event: Event): void => {
-    (event as {} as {redraw: boolean}).redraw = false;
+    (event as MithrilEvent).redraw = false;
     if (action instanceof Function) {
       return globals.dispatch(action(event));
     }
