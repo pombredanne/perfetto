@@ -25,18 +25,22 @@ export const Track = {
 
     const rectStart = attrs.x.tsToPx(sliceStart);
     const rectWidth = attrs.x.tsToPx(sliceEnd) - rectStart;
+    const shownStart = rectStart > attrs.width ? attrs.width : rectStart;
+    const shownWidth = rectWidth + (rectStart as number) > attrs.width ?
+        attrs.width :
+        rectWidth;
 
     if (attrs.trackContext.isOnCanvas()) {
       attrs.trackContext.fillStyle = '#ccc';
-      attrs.trackContext.fillRect(0, 0, 1000, 73);
+      attrs.trackContext.fillRect(0, 0, attrs.width, 73);
 
       attrs.trackContext.fillStyle = '#c00';
-      attrs.trackContext.fillRect(rectStart, 40, rectWidth, 30);
+      attrs.trackContext.fillRect(shownStart, 40, shownWidth, 30);
 
       attrs.trackContext.font = '16px Arial';
       attrs.trackContext.fillStyle = '#000';
       attrs.trackContext.fillText(
-          attrs.name + ' rendered by canvas', rectStart, 60);
+          attrs.name + ' rendered by canvas', shownStart, 60);
     }
 
     return m(
@@ -67,5 +71,6 @@ export const Track = {
   name: string,
   trackContext: VirtualCanvasContext,
   top: number,
+  width: number,
   x: TimeScale
 }>;
