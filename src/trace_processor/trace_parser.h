@@ -22,7 +22,7 @@
 
 #include "perfetto/protozero/proto_decoder.h"
 #include "src/trace_processor/blob_reader.h"
-#include "src/trace_processor/trace_storage.h"
+#include "src/trace_processor/trace_inserter.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -33,7 +33,9 @@ class TraceParser {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
-  TraceParser(BlobReader* reader, TraceStorage* storage, uint32_t chunk_size_b);
+  TraceParser(BlobReader* reader,
+              TraceInserter* inserter,
+              uint32_t chunk_size_b);
 
   // Parses the next chunk of TracePackets from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.
@@ -52,7 +54,7 @@ class TraceParser {
   void ParseThread(const uint8_t* data, size_t length);
 
   BlobReader* const reader_;
-  TraceStorage* const storage_;
+  TraceInserter* const inserter_;
   const uint32_t chunk_size_b_;
 
   uint64_t offset_ = 0;

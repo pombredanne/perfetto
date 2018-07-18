@@ -44,9 +44,9 @@ bool FindIntField(ProtoDecoder* decoder,
 }  // namespace
 
 TraceParser::TraceParser(BlobReader* reader,
-                         TraceStorage* storage,
+                         TraceInserter* inserter,
                          uint32_t chunk_size_b)
-    : reader_(reader), storage_(storage), chunk_size_b_(chunk_size_b) {}
+    : reader_(reader), inserter_(inserter), chunk_size_b_(chunk_size_b) {}
 
 bool TraceParser::ParseNextChunk() {
   if (!buffer_)
@@ -126,7 +126,7 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
         break;
     }
   }
-  storage_->MatchThreadToProcess(tid, tgid);
+  inserter_->PushThread(last_timestamp + 1, tid, tgid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -151,7 +151,8 @@ void TraceParser::ParseProcess(const uint8_t* data, size_t length) {
         break;
     }
   }
-  storage_->PushProcess(pid, process_name, process_name_len);
+  inserter_->PushProcess(last_timestamp + 1, pid, process_name,
+                         process_name_len);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -188,6 +189,7 @@ void TraceParser::ParseFtraceEvent(uint32_t cpu,
     PERFETTO_ELOG("Timestamp field not found in FtraceEvent");
     return;
   }
+  last_timestamp = timestamp;
   decoder.Reset();
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -233,8 +235,8 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         break;
     }
   }
-  storage_->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
-                            prev_comm_len, next_pid);
+  inserter_->PushSchedSwitch(cpu, timestamp, prev_pid, prev_comm, prev_comm_len,
+                             next_pid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }

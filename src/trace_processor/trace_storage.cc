@@ -29,43 +29,9 @@ TraceStorage::TraceStorage() {
 
 TraceStorage::~TraceStorage() {}
 
-void TraceStorage::PushSchedSwitch(uint32_t cpu,
-                                   uint64_t timestamp,
-                                   uint32_t prev_pid,
-                                   uint32_t prev_state,
-                                   const char* prev_comm,
-                                   size_t prev_comm_len,
-                                   uint32_t next_pid) {
-  SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
-
-  // If we had a valid previous event, then inform the storage about the
-  // slice.
-  if (prev->valid() && prev->next_pid != 0 /* Idle process (swapper/N) */) {
-    uint64_t duration = timestamp - prev->timestamp;
-    cpu_events_[cpu].AddSlice(prev->timestamp, duration, prev->prev_pid,
-                              prev->prev_thread_name_id);
-  } else {
-    cpu_events_[cpu].InitalizeSlices(this);
-  }
-
-  // If the this events previous pid does not match the previous event's next
-  // pid, make a note of this.
-  if (prev_pid != prev->next_pid) {
-    stats_.mismatched_sched_switch_tids_++;
-  }
-
-  // Update the map with the current event.
-  prev->cpu = cpu;
-  prev->timestamp = timestamp;
-  prev->prev_pid = prev_pid;
-  prev->prev_state = prev_state;
-  prev->prev_thread_name_id = InternString(prev_comm, prev_comm_len);
-  prev->next_pid = next_pid;
-}
-
-void TraceStorage::PushProcess(uint32_t pid,
-                               const char* process_name,
-                               size_t process_name_len) {
+void TraceStorage::StoreProcess(uint32_t pid,
+                                const char* process_name,
+                                size_t process_name_len) {
   auto pids_pair = UpidsForPid(pid);
   auto proc_name_id = InternString(process_name, process_name_len);
 

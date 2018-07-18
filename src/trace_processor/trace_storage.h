@@ -83,6 +83,7 @@ class TraceStorage {
         storage_->unique_threads_.emplace_back(std::move(new_thread));
       }
     }
+    bool initialized() const { return initialized_; }
 
     size_t slice_count() const { return start_ns_.size(); }
 
@@ -92,7 +93,10 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
-    void InitalizeSlices(TraceStorage* storage) { storage_ = storage; }
+    void InitalizeStorage(TraceStorage* storage) {
+      storage_ = storage;
+      initialized_ = true;
+    }
 
    private:
     // Each vector below has the same number of entries (the number of slices
@@ -100,6 +104,8 @@ class TraceStorage {
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
     std::deque<UniqueTid> utids_;
+
+    bool initialized_ = false;
 
     TraceStorage* storage_;
   };
@@ -136,9 +142,9 @@ class TraceStorage {
                                uint32_t next_pid);
 
   // Adds a process entry for a given pid.
-  virtual void PushProcess(uint32_t pid,
-                           const char* process_name,
-                           size_t process_name_len);
+  virtual void StoreProcess(uint32_t pid,
+                            const char* process_name,
+                            size_t process_name_len);
 
   // Adds a thread entry for the tid.
   virtual void MatchThreadToProcess(uint32_t tid, uint32_t tgid);
@@ -172,6 +178,25 @@ class TraceStorage {
     return string_pool_[id];
   }
 
+  void AddToMismatchedSchedSwitches(uint64_t value) {
+    stats_.mismatched_sched_switch_tids_ += value;
+  }
+
+  // Return an unqiue identifier for the contents of each string.
+  // The string is copied internally and can be destroyed after this called.
+  StringId InternString(const char* data, size_t length);
+
+  void AddSliceToCpu(size_t cpu,
+                     uint64_t start_ns,
+                     uint64_t duration_ns,
+                     uint32_t tid,
+                     StringId thread_name_id) {
+    if (!cpu_events_[cpu].initialized()) {
+      cpu_events_[cpu].InitalizeStorage(this);
+    }
+    cpu_events_[cpu].AddSlice(start_ns, duration_ns, tid, thread_name_id);
+  }
+
  private:
   using StringHash = uint32_t;
 
@@ -186,15 +211,8 @@ class TraceStorage {
     bool valid() const { return timestamp != 0; }
   };
 
-  // Return an unqiue identifier for the contents of each string.
-  // The string is copied internally and can be destroyed after this called.
-  StringId InternString(const char* data, size_t length);
-
   // Metadata counters for events being added.
   Stats stats_;
-
-  // One entry for each CPU in the trace.
-  std::array<SchedSwitchEvent, kMaxCpus> last_sched_per_cpu_;
 
   // One entry for each CPU in the trace.
   std::array<SlicesPerCpu, kMaxCpus> cpu_events_;

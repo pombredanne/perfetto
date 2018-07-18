@@ -52,7 +52,7 @@ class TraceDatabase {
 
   ScopedDb db_;  // Keep first.
 
-  TraceStorage storage_;
+  TraceInserter* inserter_;
   std::unique_ptr<TraceParser> parser_;
 
   base::TaskRunner* const task_runner_;
