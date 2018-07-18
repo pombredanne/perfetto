@@ -32,14 +32,14 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
 
   // Setup the sched slice table.
   static sqlite3_module module = SchedSliceTable::CreateModule();
-  sqlite3_create_module(*db_, "sched", &module, static_cast<void*>(inserter_));
+  sqlite3_create_module(*db_, "sched", &module, static_cast<void*>(&inserter_));
 }
 
 void TraceDatabase::LoadTrace(BlobReader* reader,
                               std::function<void()> callback) {
   // Reset storage and start a new trace parsing task.
-  inserter_->ResetStorage();
-  parser_.reset(new TraceParser(reader, inserter_, kTraceChunkSizeB));
+  inserter_.ResetStorage();
+  parser_.reset(new TraceParser(reader, &inserter_, kTraceChunkSizeB));
   LoadTraceChunk(callback);
 }
 
