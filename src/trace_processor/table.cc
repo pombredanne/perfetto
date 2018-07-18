@@ -150,13 +150,11 @@ int Table::Cursor::Filter(int,
   return Filter(qc, argv);
 }
 
-Table::RegisterArgs::RegisterArgs(sqlite3* db,
-                                  std::string create_stmt,
+Table::RegisterArgs::RegisterArgs(std::string create_stmt,
                                   std::string table_name,
                                   TableFactory factory,
                                   const void* inner)
-    : db_(db),
-      create_stmt_(create_stmt),
+    : create_stmt_(create_stmt),
       table_name_(table_name),
       factory_(factory),
       inner_(inner) {}
