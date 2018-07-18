@@ -34,28 +34,23 @@ class ProcessTable : public Table {
   enum Column { kUpid = 0, kName = 1 };
 
   ProcessTable(const TraceStorage*);
-  static sqlite3_module CreateModule();
+
+  static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   // Implementation of Table.
-  int BestIndex(sqlite3_index_info*) override;
-  int Open(sqlite3_vtab_cursor**) override;
+  std::unique_ptr<Cursor> CreateCursor() override;
+  int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  using Constraint = sqlite3_index_info::sqlite3_index_constraint;
-  using OrderBy = sqlite3_index_info::sqlite3_index_orderby;
-
   class Cursor : public Table::Cursor {
    public:
     Cursor(const TraceStorage*);
 
     // Implementation of Table::Cursor.
-    int Filter(int idxNum,
-               const char* idxStr,
-               int argc,
-               sqlite3_value** argv) override;
+    int Filter(const QueryConstraints&, sqlite3_value**) override;
     int Next() override;
     int Eof() override;
-    int Column(sqlite3_context* context, int N) override;
+    int Column(sqlite3_context*, int N) override;
 
    private:
     struct UpidFilter {

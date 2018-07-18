@@ -32,58 +32,32 @@ using namespace sqlite_utils;
 ProcessTable::ProcessTable(const TraceStorage* storage) : storage_(storage) {
 }
 
-sqlite3_module ProcessTable::CreateModule() {
-  sqlite3_module module = Table::CreateModule();
-  module.xConnect = [](sqlite3* db, void* raw_args, int, const char* const*,
-                       sqlite3_vtab** tab, char**) {
-    int res = sqlite3_declare_vtab(db,
-                                   "CREATE TABLE processes("
-                                   "upid UNSIGNED INT, "
-                                   "name TEXT, "
-                                   "PRIMARY KEY(upid)"
-                                   ") WITHOUT ROWID;");
-    if (res != SQLITE_OK)
-      return res;
-    TraceStorage* storage = static_cast<TraceStorage*>(raw_args);
-    *tab = static_cast<sqlite3_vtab*>(new ProcessTable(storage));
-    return SQLITE_OK;
+void ProcessTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
+  static constexpr const char* kCreateTableStmt =
+      "CREATE TABLE processes("
+      "upid UNSIGNED INT, "
+      "name TEXT, "
+      "PRIMARY KEY(upid)"
+      ") WITHOUT ROWID;";
+  auto factory = [](const void* raw_arg) {
+    const auto* inner_storage = static_cast<const TraceStorage*>(raw_arg);
+    return std::unique_ptr<Table>(new ProcessTable(inner_storage));
   };
-  return module;
+  auto* args =
+      RegisterArgs::Create(db, kCreateTableStmt, "process", factory, storage);
+  Table::RegisterTable(args);
 }
 
-int ProcessTable::Open(sqlite3_vtab_cursor** ppCursor) {
-  *ppCursor = static_cast<sqlite3_vtab_cursor*>(new Cursor(storage_));
-  return SQLITE_OK;
+std::unique_ptr<Table::Cursor> ProcessTable::CreateCursor() {
+  return std::unique_ptr<Cursor>(new Cursor(storage_));
 }
 
-// Called at least once but possibly many times before filtering things and is
-// the best time to keep track of constriants.
-int ProcessTable::BestIndex(sqlite3_index_info* idx) {
-  QueryConstraints qc;
-
-  for (int i = 0; i < idx->nOrderBy; i++) {
-    Column column = static_cast<Column>(idx->aOrderBy[i].iColumn);
-    unsigned char desc = idx->aOrderBy[i].desc;
-    qc.AddOrderBy(column, desc);
+int ProcessTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+  for (const auto& constraint : qc.constraints()) {
+    // Add a cost of 10 for filtering on upid (because we can do that
+    // efficiently) and 100 otherwise.
+    info->estimated_cost += constraint.iColumn == Column::kUpid ? 10 : 100;
   }
-  idx->orderByConsumed = true;
-
-  for (int i = 0; i < idx->nConstraint; i++) {
-    const auto& cs = idx->aConstraint[i];
-    if (!cs.usable)
-      continue;
-    qc.AddConstraint(cs.iColumn, cs.op);
-
-    idx->estimatedCost = cs.iColumn == Column::kUpid ? 10 : 100;
-
-    // argvIndex is 1-based so use the current size of the vector.
-    int argv_index = static_cast<int>(qc.constraints().size());
-    idx->aConstraintUsage[i].argvIndex = argv_index;
-  }
-
-  idx->idxStr = qc.ToNewSqlite3String().release();
-  idx->needToFreeIdxStr = true;
-
   return SQLITE_OK;
 }
 
@@ -110,14 +84,8 @@ int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
-int ProcessTable::Cursor::Filter(int /*idxNum*/,
-                                 const char* idxStr,
-                                 int argc,
+int ProcessTable::Cursor::Filter(const QueryConstraints& qc,
                                  sqlite3_value** argv) {
-  QueryConstraints qc = QueryConstraints::FromString(idxStr);
-
-  PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
-
   upid_filter_.min = 1;
   upid_filter_.max = static_cast<uint32_t>(storage_->process_count());
   upid_filter_.desc = false;

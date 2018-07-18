@@ -31,19 +31,13 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
   db_.reset(std::move(db));
 
   // Setup the sched slice table.
-  static sqlite3_module s_module = SchedSliceTable::CreateModule();
-  sqlite3_create_module(*db_, "sched", &s_module,
-                        static_cast<void*>(&storage_));
+  SchedSliceTable::RegisterTable(*db_, &storage_);
 
   // Setup the process table.
-  static sqlite3_module p_module = ProcessTable::CreateModule();
-  sqlite3_create_module(*db_, "process", &p_module,
-                        static_cast<void*>(&storage_));
+  ProcessTable::RegisterTable(*db_, &storage_);
 
   // Setup the thread table.
-  static sqlite3_module t_module = ThreadTable::CreateModule();
-  sqlite3_create_module(*db_, "thread", &t_module,
-                        static_cast<void*>(&storage_));
+  ThreadTable::RegisterTable(*db_, &storage_);
 }
 
 void TraceDatabase::LoadTrace(BlobReader* reader,

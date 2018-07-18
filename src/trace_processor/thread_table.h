@@ -32,33 +32,25 @@ namespace trace_processor {
 class ThreadTable : public Table {
  public:
   enum Column { kUtid = 0, kUpid = 1, kName = 2 };
-  struct OrderBy {
-    Column column = kUpid;
-    bool desc = false;
-  };
 
   ThreadTable(const TraceStorage*);
-  static sqlite3_module CreateModule();
 
-  // Implementation for sqlite3_vtab.
-  int BestIndex(sqlite3_index_info*) override;
-  int Open(sqlite3_vtab_cursor**) override;
+  static void RegisterTable(sqlite3* db, const TraceStorage* storage);
+
+  // Implementation of Table.
+  std::unique_ptr<Cursor> CreateCursor() override;
+  int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  using Constraint = sqlite3_index_info::sqlite3_index_constraint;
-
   class Cursor : public Table::Cursor {
    public:
     Cursor(const TraceStorage*);
 
-    // Implementation of sqlite3_vtab_cursor.
-    int Filter(int idxNum,
-               const char* idxStr,
-               int argc,
-               sqlite3_value** argv) override;
+    // Implementation of Table::Cursor.
+    int Filter(const QueryConstraints&, sqlite3_value**) override;
     int Next() override;
     int Eof() override;
-    int Column(sqlite3_context* context, int N) override;
+    int Column(sqlite3_context*, int N) override;
 
    private:
     struct UtidFilter {

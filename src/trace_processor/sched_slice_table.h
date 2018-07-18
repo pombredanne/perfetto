@@ -41,11 +41,13 @@ class SchedSliceTable : public Table {
   };
 
   SchedSliceTable(const TraceStorage* storage);
-  static sqlite3_module CreateModule();
 
-  // Implementation for sqlite3_vtab.
-  int BestIndex(sqlite3_index_info* index_info);
-  int Open(sqlite3_vtab_cursor** ppCursor);
+  static void RegisterTable(sqlite3* db, const TraceStorage* storage);
+
+  // Implementation of Table.
+  std::unique_ptr<Cursor> CreateCursor() override;
+  int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
+  int FindFunction(const char* name, FindFunctionFn fn, void** args) override;
 
  private:
   // Transient filter state for each CPU of this trace.
@@ -158,11 +160,11 @@ class SchedSliceTable : public Table {
    public:
     Cursor(const TraceStorage* storage);
 
-    // Implementation of sqlite3_vtab_cursor.
-    int Filter(int idxNum, const char* idxStr, int argc, sqlite3_value** argv);
-    int Next();
-    int Eof();
-    int Column(sqlite3_context* context, int N);
+    // Implementation of Table::Cursor.
+    int Filter(const QueryConstraints&, sqlite3_value**) override;
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context*, int N) override;
 
    private:
     const TraceStorage* const storage_;
