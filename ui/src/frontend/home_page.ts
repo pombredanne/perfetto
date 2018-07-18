@@ -38,6 +38,7 @@ async function loadExampleTrace() {
 
 export const HomePage = createPage({
   view() {
+    const count = globals.state.i;
     return m(
         '.home-page',
         m('.home-page-title', 'Perfetto'),
@@ -51,19 +52,9 @@ export const HomePage = createPage({
                 m.route.set('/query/0');
               },
             }),
-            'Load trace', ),
+            'Load trace'),
           ' or ',
-          m('button',
-            {
-              onclick: loadExampleTrace,
-            },
-            'Open demo trace'),
-          ' or ',
-          m('button',
-            {
-              onclick: quietDispatch({}),
-            },
-            `Increment Counter ${globals.state.i}`)));
-
+          m('button', {onclick: loadExampleTrace}, 'Open demo trace'),
+          m('button', {onclick: quietDispatch({})}, `Increment ${count}`)));
   }
 });
