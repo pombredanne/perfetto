@@ -106,7 +106,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"alert-id", required_argument, nullptr, OPT_ALERT_ID},
       {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
-      {"reset-guardrails", required_argument, nullptr, OPT_RESET_GUARDRAILS},
+      {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
