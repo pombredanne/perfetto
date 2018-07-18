@@ -57,6 +57,10 @@ class TraceParser {
   TraceInserter* const inserter_;
   const uint32_t chunk_size_b_;
 
+  // This temporary because process trees don't have a timestamp field.
+  // For global ordering we give them the timestamp of last_timestamp + 1;
+  uint64_t last_timestamp = 0;
+
   uint64_t offset_ = 0;
   std::unique_ptr<uint8_t[]> buffer_;
 };

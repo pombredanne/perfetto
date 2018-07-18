@@ -25,7 +25,7 @@ namespace trace_processor {
 
 class TraceInserter {
  public:
-  TraceInserter();
+  virtual ~TraceInserter();
 
   void ResetStorage() { storage_ = {}; }
 
@@ -38,25 +38,24 @@ class TraceInserter {
                                size_t prev_comm_len,
                                uint32_t next_pid);
 
-  void PushProcess(uint64_t timestamp,
-                   uint32_t pid,
-                   const char* process_name,
-                   size_t process_name_len);
+  virtual void PushProcess(uint64_t timestamp,
+                           uint32_t pid,
+                           const char* process_name,
+                           size_t process_name_len);
 
-  void PushThread(uint64_t timestamp, uint32_t tid, uint32_t tgid);
+  virtual void PushThread(uint64_t timestamp, uint32_t tid, uint32_t tgid);
 
  private:
   struct Event {
     virtual ~Event();
-    virtual void StoreEvent(TraceStorage*);
+    virtual void StoreEvent(TraceStorage*) = 0;
     uint64_t timestamp = 0;
   };
 
   struct SchedSwitchEvent : Event {
+    ~SchedSwitchEvent() override = default;
     bool valid() const { return timestamp != 0; }
-    void StoreEvent(TraceStorage* storage) override {
-      storage->AddSliceToCpu(cpu, timestamp, duration, tid, thread_name_id);
-    }
+    void StoreEvent(TraceStorage*) override;
     uint64_t cpu = 0;
     uint32_t tid = 0;
     uint64_t duration = 0;
@@ -65,29 +64,32 @@ class TraceInserter {
   };
 
   struct ProcessEvent : Event {
-    void StoreEvent(TraceStorage* storage) override {
-      storage->StoreProcess(pid, process_name, process_name_len);
-    }
+    ~ProcessEvent() override = default;
+    void StoreEvent(TraceStorage*) override;
     uint32_t pid;
     const char* process_name;
     size_t process_name_len;
   };
 
   struct ThreadEvent : Event {
-    void StoreEvent(TraceStorage* storage) override {
-      storage->MatchThreadToProcess(tid, tgid);
-    }
+    ~ThreadEvent() override = default;
+    void StoreEvent(TraceStorage*) override;
     uint32_t tid;
     uint32_t tgid;
   };
 
-  virtual ~TraceInserter();
+  void SetWindow(uint64_t value) { window = value; }
 
-  TraceStorage* storage_;
+  TraceStorage storage_;
 
-  uint64_t window = 1000000000;  // 1 sec
+  uint64_t window = 0;  // 1 sec
   uint64_t first_timestamp = 0;
   uint64_t latest_timestamp = 0;
+
+  // In order to store the duration of an event, we don't store it in
+  // |sched_events_| until we see the next event. This stores the last event
+  // for each cpu temporarily.
+  std::array<SchedSwitchEvent, TraceStorage::kMaxCpus> last_sched_event_;
 
   // One deque for every CPU in the trace.
   std::array<std::deque<SchedSwitchEvent>, TraceStorage::kMaxCpus>

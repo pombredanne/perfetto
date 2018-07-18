@@ -18,7 +18,9 @@
 namespace perfetto {
 namespace trace_processor {
 
-TraceInserter::TraceInserter(){};
+TraceInserter::~TraceInserter() = default;
+
+TraceInserter::Event::~Event() = default;
 
 void TraceInserter::PushSchedSwitch(uint32_t cpu,
                                     uint64_t timestamp,
@@ -26,29 +28,28 @@ void TraceInserter::PushSchedSwitch(uint32_t cpu,
                                     const char* prev_comm,
                                     size_t prev_comm_len,
                                     uint32_t next_pid) {
-  SchedSwitchEvent* prev = &sched_events_[cpu].back();
+  SchedSwitchEvent* prev = &last_sched_event_[cpu];
 
   // If we had a valid previous event, then inform the storage about the
   // slice.
   if (prev->valid() && prev->next_tid != 0 /* Idle process (swapper/N) */) {
     prev->duration = timestamp - prev->timestamp;
 
-    SchedSwitchEvent current;
-    current.timestamp = timestamp;
-    current.cpu = cpu;
-    current.thread_name_id = storage_->InternString(prev_comm, prev_comm_len);
-    current.tid = prev_pid;
-    current.next_tid = next_pid;
-
     // Store event in the trace inserter until it is flushed.
-    sched_events_[cpu].emplace_back(std::move(current));
+    sched_events_[cpu].emplace_back(*prev);
   }
 
   // If the this events previous pid does not match the previous event's next
   // pid, make a note of this.
   if (prev_pid != prev->next_tid) {
-    storage_->AddToMismatchedSchedSwitches(1);
+    storage_.AddToMismatchedSchedSwitches(1);
   }
+
+  prev->timestamp = timestamp;
+  prev->cpu = cpu;
+  prev->thread_name_id = storage_.InternString(prev_comm, prev_comm_len);
+  prev->tid = prev_pid;
+  prev->next_tid = next_pid;
 
   CheckWindow(timestamp);
 }
@@ -95,6 +96,18 @@ void TraceInserter::FlushEvents() {
   // This will use a priority queue to order the events and store the
   // data in the TraceStorage.
   // Will implement in the next CL.
+}
+
+void TraceInserter::SchedSwitchEvent::StoreEvent(TraceStorage* storage) {
+  storage->AddSliceToCpu(cpu, timestamp, duration, tid, thread_name_id);
+}
+
+void TraceInserter::ProcessEvent::StoreEvent(TraceStorage* storage) {
+  storage->StoreProcess(pid, process_name, process_name_len);
+}
+
+void TraceInserter::ThreadEvent::StoreEvent(TraceStorage* storage) {
+  storage->MatchThreadToProcess(tid, tgid);
 }
 
 }  // namespace trace_processor

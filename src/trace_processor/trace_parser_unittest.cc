@@ -48,23 +48,24 @@ class FakeStringBlobReader : public BlobReader {
   std::string data_;
 };
 
-class MockTraceStorage : public TraceStorage {
+class MockTraceInserter : public TraceInserter {
  public:
-  MockTraceStorage() : TraceStorage() {}
+  MockTraceInserter() : TraceInserter() {}
 
-  MOCK_METHOD7(PushSchedSwitch,
+  MOCK_METHOD6(PushSchedSwitch,
                void(uint32_t cpu,
                     uint64_t timestamp,
                     uint32_t prev_pid,
-                    uint32_t prev_state,
                     const char* prev_comm,
                     size_t prev_comm_len,
                     uint32_t next_pid));
-  MOCK_METHOD3(PushProcess,
-               void(uint32_t pid,
+  MOCK_METHOD4(PushProcess,
+               void(uint64_t timestamp,
+                    uint32_t pid,
                     const char* process_name,
                     size_t process_name_len));
-  MOCK_METHOD2(MatchThreadToProcess, void(uint32_t tid, uint32_t tgid));
+  MOCK_METHOD3(PushThread,
+               void(uint64_t timestamp, uint32_t tid, uint32_t tgid));
 };
 
 TEST(TraceParser, LoadSingleEvent) {
@@ -79,16 +80,15 @@ TEST(TraceParser, LoadSingleEvent) {
   static const char kProcName[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
-  sched_switch->set_prev_state(32);
   sched_switch->set_prev_comm(kProcName);
   sched_switch->set_next_pid(100);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1000, 10, _, _, 100))
+      .With(Args<3, 4>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 
@@ -118,15 +118,15 @@ TEST(TraceParser, LoadMultipleEvents) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1000, 10, _, _, 100))
+      .With(Args<3, 4>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1001, 100, _, _, 10))
+      .With(Args<3, 4>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 
@@ -159,15 +159,15 @@ TEST(TraceParser, LoadMultiplePackets) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1000, 10, _, _, 100))
+      .With(Args<3, 4>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1001, 100, _, _, 10))
+      .With(Args<3, 4>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 
@@ -203,16 +203,16 @@ TEST(TraceParser, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
-      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1000, 10, _, _, 100))
+      .With(Args<3, 4>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, chunk_size);
+  TraceParser parser(&reader, &inserter, chunk_size);
   parser.ParseNextChunk();
 
-  EXPECT_CALL(storage, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
-      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
+  EXPECT_CALL(inserter, PushSchedSwitch(10, 1001, 100, _, _, 10))
+      .With(Args<3, 4>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   parser.ParseNextChunk();
 }
@@ -228,11 +228,11 @@ TEST(TraceParse, LoadProcessPacket) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushProcess(1, _, _))
-      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushProcess(1, 1, _, _))
+      .With(Args<2, 3>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 
@@ -249,11 +249,11 @@ TEST(TraceParse, LoadProcessPacket_FirstCmdline) {
   process->set_pid(1);
   process->set_ppid(2);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, PushProcess(1, _, _))
-      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushProcess(1, 1, _, _))
+      .With(Args<2, 3>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 
@@ -265,10 +265,10 @@ TEST(TraceParse, LoadThreadPacket) {
   thread->set_tid(1);
   thread->set_tgid(2);
 
-  MockTraceStorage storage;
-  EXPECT_CALL(storage, MatchThreadToProcess(1, 2));
+  MockTraceInserter inserter;
+  EXPECT_CALL(inserter, PushThread(1, 1, 2));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  TraceParser parser(&reader, &storage, 1024);
+  TraceParser parser(&reader, &inserter, 1024);
   parser.ParseNextChunk();
 }
 

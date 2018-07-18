@@ -43,6 +43,8 @@ source_set("lib") {
     "scoped_db.h",
     "trace_database.cc",
     "trace_database.h",
+    "trace_inserter.cc",
+    "trace_inserter.h",
     "trace_parser.cc",
     "trace_parser.h",
     "trace_storage.cc",

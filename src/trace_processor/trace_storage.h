@@ -131,16 +131,6 @@ class TraceStorage {
     UniquePid upid;
   };
 
-  // Adds a sched slice for a given cpu.
-  // Virtual for testing.
-  virtual void PushSchedSwitch(uint32_t cpu,
-                               uint64_t timestamp,
-                               uint32_t prev_pid,
-                               uint32_t prev_state,
-                               const char* prev_comm,
-                               size_t prev_comm_len,
-                               uint32_t next_pid);
-
   // Adds a process entry for a given pid.
   virtual void StoreProcess(uint32_t pid,
                             const char* process_name,
