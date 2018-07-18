@@ -27,14 +27,14 @@ Table::Table() {}
 
 Table::~Table() {}
 
-void Table::RegisterTable(RegisterArgs* args) {
+void Table::RegisterTable(sqlite3* db, RegisterArgs* args) {
   auto* map = GetModuleMapInstance();
   PERFETTO_DCHECK(map->find(args->table_name_) == map->end());
 
   auto it = map->emplace(args->table_name_, CreateModule());
   auto* module = &it.first->second;
   sqlite3_create_module_v2(
-      args->db_, args->table_name_.c_str(), module, args,
+      db, args->table_name_.c_str(), module, args,
       [](void* inner) { delete static_cast<RegisterArgs*>(inner); });
 }
 
