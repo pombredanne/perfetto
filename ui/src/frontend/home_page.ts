@@ -16,7 +16,7 @@ import * as m from 'mithril';
 
 import {WasmEngineProxy} from '../controller/wasm_engine_proxy';
 
-import {gEngines, gState} from './globals';
+import {gEngines, globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';
 
@@ -63,7 +63,7 @@ export const HomePage = createPage({
             {
               onclick: quietDispatch({}),
             },
-            `Increment Counter ${gState.get().i}`)));
+            `Increment Counter ${globals.state.i}`)));
 
   }
 });

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Action} from '../common/actions';
-import {gDispatch} from './globals';
+import {globals} from './globals';
 
 /**
  * Create a Mithril event handler which (when triggered) dispatches an action
@@ -28,8 +28,8 @@ export function quietDispatch(action: ((e: Event) => Action)|
   return (event: Event): void => {
     (event as {} as {redraw: boolean}).redraw = false;
     if (action instanceof Function) {
-      return gDispatch.get()(action(event));
+      return globals.dispatch(action(event));
     }
-    return gDispatch.get()(action);
+    return globals.dispatch(action);
   };
 }

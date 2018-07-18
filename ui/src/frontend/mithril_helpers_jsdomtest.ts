@@ -15,19 +15,19 @@
 import {Action} from '../common/actions';
 import {dingus} from '../test/dingus';
 
-import {gDispatch} from './globals';
+import {globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 
 // TODO(hjd): Do this in jsdom environment.
-afterEach(() => {
-  gDispatch.resetForTesting();
+beforeEach(() => {
+  globals.resetForTesting();
 });
 
 test('quietDispatch with object', () => {
   const e = new Event('an_event');
   (e as {} as {redraw: boolean}).redraw = true;
   const d = dingus<(action: Action) => void>('dispatch');
-  gDispatch.set(d);
+  globals.dispatch = d;
   const action = {};
   quietDispatch(action)(e);
   expect((e as {} as {redraw: boolean}).redraw).toBe(false);
@@ -39,7 +39,7 @@ test('quietDispatch with function', () => {
   (e as {} as {redraw: boolean}).redraw = true;
 
   const dispatch = dingus<(action: Action) => void>('dispatch');
-  gDispatch.set(dispatch);
+  globals.dispatch = dispatch;
 
   const theAction = {};
 
