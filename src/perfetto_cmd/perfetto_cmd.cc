@@ -76,7 +76,7 @@ Usage: %s
   --out            -o     : /path/to/out/trace/file
   --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
-  --reset-guardrails      : Resets the state of the guardails (for testing).
+  --reset-guardrails      : Resets the state of the guardails and exits (for testing).
   --help           -h
 
 statsd-specific flags:
