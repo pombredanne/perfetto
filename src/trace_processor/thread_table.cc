@@ -45,8 +45,8 @@ void ThreadTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
     return std::unique_ptr<Table>(new ThreadTable(inner_storage));
   };
   auto* args =
-      RegisterArgs::Create(db, kCreateTableStmt, "thread", factory, storage);
-  Table::RegisterTable(args);
+      RegisterArgs::Create(kCreateTableStmt, "thread", factory, storage);
+  Table::RegisterTable(db, args);
 }
 
 std::unique_ptr<Table::Cursor> ThreadTable::CreateCursor() {

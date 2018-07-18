@@ -44,8 +44,8 @@ void ProcessTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
     return std::unique_ptr<Table>(new ProcessTable(inner_storage));
   };
   auto* args =
-      RegisterArgs::Create(db, kCreateTableStmt, "process", factory, storage);
-  Table::RegisterTable(args);
+      RegisterArgs::Create(kCreateTableStmt, "process", factory, storage);
+  Table::RegisterTable(db, args);
 }
 
 std::unique_ptr<Table::Cursor> ProcessTable::CreateCursor() {

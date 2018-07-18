@@ -104,9 +104,9 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
     const auto* inner_storage = static_cast<const TraceStorage*>(raw_arg);
     return std::unique_ptr<Table>(new SchedSliceTable(inner_storage));
   };
-  auto* args = RegisterArgs::Create(db, kCreateTableStmt, "sched", factory,
-                                    static_cast<const void*>(storage));
-  Table::RegisterTable(args);
+  auto* args =
+      RegisterArgs::Create(kCreateTableStmt, "sched", factory, storage);
+  Table::RegisterTable(db, args);
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor() {
