@@ -16,27 +16,35 @@ import {Action} from '../common/actions';
 import {dingus} from '../test/dingus';
 
 import {globals} from './globals';
-import {quietDispatch} from './mithril_helpers';
+import {MithrilEvent, quietDispatch, quietHandler} from './mithril_helpers';
 
 // TODO(hjd): Do this in jsdom environment.
 beforeEach(() => {
   globals.resetForTesting();
 });
 
+test('quietHandler', () => {
+  const e = new Event('an_event') as MithrilEvent;
+  e.redraw = true;
+  const handler = dingus<(e: Event) => void>('handler');
+  quietHandler(handler)(e);
+  expect(handler.calls[0][1][0]).toBe(e);
+});
+
 test('quietDispatch with object', () => {
-  const e = new Event('an_event');
-  (e as {} as {redraw: boolean}).redraw = true;
+  const e = new Event('an_event') as MithrilEvent;
+  e.redraw = true;
   const d = dingus<(action: Action) => void>('dispatch');
   globals.dispatch = d;
   const action = {};
   quietDispatch(action)(e);
-  expect((e as {} as {redraw: boolean}).redraw).toBe(false);
+  expect(e.redraw).toBe(false);
   expect(d.calls[0][1][0]).toBe(action);
 });
 
 test('quietDispatch with function', () => {
-  const e = new Event('an_event');
-  (e as {} as {redraw: boolean}).redraw = true;
+  const e = new Event('an_event') as MithrilEvent;
+  e.redraw = true;
 
   const dispatch = dingus<(action: Action) => void>('dispatch');
   globals.dispatch = dispatch;
@@ -49,6 +57,6 @@ test('quietDispatch with function', () => {
   };
 
   quietDispatch(action)(e);
-  expect((e as {} as {redraw: boolean}).redraw).toBe(false);
+  expect(e.redraw).toBe(false);
   expect(dispatch.calls[0][1][0]).toBe(theAction);
 });
