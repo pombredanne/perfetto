@@ -78,8 +78,8 @@ class Table : public sqlite3_vtab {
   };
 
   struct BestIndexInfo {
-    bool order_by_consumed;
-    uint32_t estimated_cost;
+    bool order_by_consumed = false;
+    uint32_t estimated_cost = 0;
     std::vector<bool> omit;
   };
 
