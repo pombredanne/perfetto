@@ -58,10 +58,10 @@ class SchedSliceTable : public Table {
                     uint64_t quantum,
                     std::vector<uint32_t> sorted_row_ids);
     void FindNextSlice();
-
     bool IsNextRowIdIndexValid() const {
       return next_row_id_index_ < sorted_row_ids_.size();
     }
+
     size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
     uint64_t next_timestamp() const { return next_timestamp_; }
 
