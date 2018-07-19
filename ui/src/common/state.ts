@@ -19,7 +19,10 @@
  */
 export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 
-export interface State { tracks: ObjectById<TrackState>; }
+export interface State {
+  i: number;
+  tracks: ObjectById<TrackState>;
+}
 
 export interface TrackState {
   id: string;
@@ -29,6 +32,7 @@ export interface TrackState {
 
 export function createEmptyState(): State {
   return {
+    i: 0,
     tracks: {},
   };
 }

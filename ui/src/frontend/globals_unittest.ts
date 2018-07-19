@@ -13,19 +13,16 @@
 // limitations under the License.
 
 import {createEmptyState} from '../common/state';
-
-import {gState} from './globals';
+import {globals} from './globals';
 
 beforeEach(() => {
-  gState.resetForTesting();
+  globals.resetForTesting();
 });
 
-afterEach(() => {
-  gState.resetForTesting();
-});
-
-test('gState', () => {
-  const state = createEmptyState();
-  gState.set(state);
-  expect(gState.get()).toBe(state);
+test('globals state', () => {
+  expect(() => globals.state).toThrow();
+  const state = globals.state = createEmptyState();
+  expect(globals.state).toBe(state);
+  globals.resetForTesting();
+  expect(() => globals.state).toThrow();
 });

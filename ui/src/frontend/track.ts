@@ -73,4 +73,5 @@ export const Track = {
   height: number,
   trackState: TrackState,
 },
+                     // TODO(dproy): Fix formmatter. This is ridiculous.
                      {trackInstance: TrackImpl}>;

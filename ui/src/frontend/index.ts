@@ -23,9 +23,10 @@ import {CpuSliceTrack} from '../tracks/cpu_slices/frontend';
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
 import {ChildVirtualContext} from './child_virtual_context';
-import {gState} from './globals';
+import {globals} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
+import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
 import {Track, TrackImpl} from './track';
 import {VirtualCanvasContext} from './virtual_canvas_context';
@@ -57,7 +58,7 @@ export const Frontend = {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
     this.canvasController.clear();
-    const tracks = gState.get().tracks;
+    const tracks = globals.state.tracks;
 
     // TODO: Create a type alias here.
     const trackRenders: Array < m.Vnode < {
@@ -127,11 +128,16 @@ export const FrontendPage = createPage({
   }
 });
 
-function createController() {
+function createController(): Worker {
   const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
+  worker.onmessage = msg => {
+    globals.state = msg.data;
+    m.redraw();
+  };
+  return worker;
 }
 
 function getDemoTracks(): ObjectById<TrackState> {
@@ -153,9 +159,11 @@ function getDemoTracks(): ObjectById<TrackState> {
 }
 
 function main() {
-  gState.set({tracks: getDemoTracks()});
+  globals.state = {i: 0, tracks: getDemoTracks()};
+  const worker = createController();
+  // tslint:disable-next-line deprecation
+  globals.dispatch = action => worker.postMessage(action);
   registerAllTracks();
-  createController();
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');
@@ -167,6 +175,7 @@ function main() {
   m.route(root, '/', {
     '/': HomePage,
     '/viewer': FrontendPage,
+    '/query/:trace': QueryPage,
   });
 }
 
