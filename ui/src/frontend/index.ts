@@ -14,8 +14,11 @@
 
 import * as m from 'mithril';
 
-import {createEmptyState} from '../common/state';
+import {ObjectById, TrackState} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
+import {registerAllTracks} from '../tracks/all_tracks';
+import {CpuCounterTrack} from '../tracks/cpu_counters/frontend';
+import {CpuSliceTrack} from '../tracks/cpu_slices/frontend';
 
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
@@ -24,7 +27,8 @@ import {gState} from './globals';
 import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {ScrollableContainer} from './scrollable_container';
-import {Track} from './track';
+import {Track, TrackImpl} from './track';
+import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Frontend = {
   oninit() {
@@ -52,8 +56,37 @@ export const Frontend = {
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
-
     this.canvasController.clear();
+    const tracks = gState.get().tracks;
+
+    // TODO: Create a type alias here.
+    const trackRenders: Array < m.Vnode < {
+      name: string;
+      trackContext: VirtualCanvasContext;
+      top: number;
+      width: number;
+      height: number;
+      trackState: TrackState;
+    }
+    , {
+      trackInstance: TrackImpl;
+    }
+    >> = [];
+
+    // TODO: Make this prettier
+    let y = 0;
+    for (const trackState of Object.values(tracks)) {
+      trackRenders.push(m(Track, {
+        name: `Track ${trackState.id}`,
+        trackContext: new ChildVirtualContext(
+            ctx, {y, x: 0, width: this.width, height: trackState.height}),
+        top: y,
+        width: this.width,
+        height: trackState.height,
+        trackState,
+      }));
+      y += trackState.height;
+    }
 
     return m(
         '.frontend',
@@ -79,76 +112,7 @@ export const Frontend = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          m(Track, {
-            name: 'Track 1',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 0, x: 0, width: this.width, height: 90}),
-            top: 0,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 2',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 100, x: 0, width: this.width, height: 90}),
-            top: 100,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 3',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 200, x: 0, width: this.width, height: 90}),
-            top: 200,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 4',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 300, x: 0, width: this.width, height: 90}),
-            top: 300,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 5',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 400, x: 0, width: this.width, height: 90}),
-            top: 400,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 6',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 500, x: 0, width: this.width, height: 90}),
-            top: 500,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 7',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 600, x: 0, width: this.width, height: 90}),
-            top: 600,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 8',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 700, x: 0, width: this.width, height: 90}),
-            top: 700,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 9',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 800, x: 0, width: this.width, height: 90}),
-            top: 800,
-            width: this.width
-          }),
-          m(Track, {
-            name: 'Track 10',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 900, x: 0, width: this.width, height: 90}),
-            top: 900,
-            width: this.width
-          }), ), );
+          ...trackRenders, ), );
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
@@ -170,8 +134,27 @@ function createController() {
   };
 }
 
+function getDemoTracks(): ObjectById<TrackState> {
+  const tracks: {[key: string]: TrackState;} = {};
+  for (let i = 0; i < 10; i++) {
+    let trackType;
+    if (i % 2 === 0) {
+      trackType = CpuSliceTrack.type;
+    } else {
+      trackType = CpuCounterTrack.type;
+    }
+    tracks[i] = {
+      id: i.toString(),
+      type: trackType,
+      height: 100,
+    };
+  }
+  return tracks;
+}
+
 function main() {
-  gState.set(createEmptyState());
+  gState.set({tracks: getDemoTracks()});
+  registerAllTracks();
   createController();
   warmupWasmEngineWorker();
 

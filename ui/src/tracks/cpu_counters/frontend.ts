@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackState} from '../../common/state';
 import {TrackImpl} from '../../frontend/track';
+// import { TrackState } from '../../common/state';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 
-export class CpuSliceTrack extends TrackImpl {
-  static type = 'CpuSliceTrack';
-  constructor(trackState: TrackState, width: number) {
-    super(trackState, width);
-  }
+// Dummy implementation as an exmaple of a second type of track.
+export class CpuCounterTrack extends TrackImpl {
+  static type = 'CpuCounterTrack';
 
   draw(vCtx: VirtualCanvasContext): void {
     if (vCtx.isOnCanvas()) {
-      vCtx.fillStyle = '#ccc';
+      vCtx.fillStyle = '#eee';
       vCtx.fillRect(0, 0, this.width, this.trackState.height);
       vCtx.font = '16px Arial';
       vCtx.fillStyle = '#000';
-      vCtx.fillText('Drawing ' + CpuSliceTrack.type, this.width / 2, 20);
+      vCtx.fillText(
+          'Drawing ' + CpuCounterTrack.type, Math.round(this.width / 2), 20);
     }
   }
 }

@@ -14,8 +14,11 @@
 
 import {Global} from '../base/global';
 import {State} from '../common/state';
+import {TrackCreator} from '../tracks/all_tracks';
 
 /**
  * Global accessor for the state in the frontend.
  */
 export const gState = new Global<State>();
+
+export const gTrackRegistry = new Map<string, TrackCreator>();

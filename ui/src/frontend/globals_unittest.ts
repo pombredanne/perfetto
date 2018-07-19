@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {createEmptyState} from '../common/state';
+
 import {gState} from './globals';
 
 beforeEach(() => {
@@ -23,6 +25,7 @@ afterEach(() => {
 });
 
 test('gState', () => {
-  gState.set({i: 1});
-  expect(gState.get().i).toEqual(1);
+  const state = createEmptyState();
+  gState.set(state);
+  expect(gState.get()).toBe(state);
 });

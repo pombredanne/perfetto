@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/**
- * A plain js object, holding objects of type |Class| keyed by string id.
- * We use this instead of using |Map| object since it is simpler and faster to
- * serialize.
- */
-export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
+import * as m from 'mithril';
+import {TrackImpl} from './track';
+import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export interface State { tracks: ObjectById<TrackState>; }
+export const TrackContent = {
+  view() {},
+  onupdate({attrs}) {
+    // ugly. fix.
+    attrs.trackInstance.width = attrs.width;
+    attrs.trackInstance.draw(attrs.trackVirtualContext);
+  }
 
-export interface TrackState {
-  id: string;
-  type: string;
-  height: number;
-}
-
-export function createEmptyState(): State {
-  return {
-    tracks: {},
-  };
-}
+} as m.Component<{
+  trackVirtualContext: VirtualCanvasContext,
+  trackInstance: TrackImpl,
+  width: number,
+}>;

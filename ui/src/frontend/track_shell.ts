@@ -21,6 +21,7 @@ export const TrackShell = {
         {
           style: {
             border: '1px solid #666',
+            height: '100%',
           }
         },
         m('.shell-content',
@@ -29,7 +30,8 @@ export const TrackShell = {
               background: '#fff',
               padding: '20px',
               width: '20%',
-              'border-right': '1px solid #666'
+              'border-right': '1px solid #666',
+              height: '100%',
             }
           },
           m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)));
