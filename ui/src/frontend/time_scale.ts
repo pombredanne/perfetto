@@ -17,46 +17,48 @@
  * Scales times from tStart to tEnd to pixel values pxStart to pxEnd.
  */
 export class TimeScale {
-  private tStart: Milliseconds;
-  private tEnd: Milliseconds;
-  private pxStart: Pixels;
-  private pxEnd: Pixels;
+  private startMs: Milliseconds;
+  private endMs: Milliseconds;
+  private startPx: Pixels;
+  private endPx: Pixels;
+  private slopeMsPerPx = 0;
 
-  constructor(timeBounds: [number, number], pxBounds: [number, number]) {
-    this.tStart = timeBounds[0];
-    this.tEnd = timeBounds[1];
-    this.pxStart = pxBounds[0];
-    this.pxEnd = pxBounds[1];
+  constructor(
+      boundsMs: [Milliseconds, Milliseconds], boundsPx: [Pixels, Pixels]) {
+    this.startMs = boundsMs[0];
+    this.endMs = boundsMs[1];
+    this.startPx = boundsPx[0];
+    this.endPx = boundsPx[1];
+    this.updateSlope();
   }
 
-  tsToPx(time: Milliseconds): Pixels {
-    const percentage: number = (time - this.tStart) / (this.tEnd - this.tStart);
-    const percentagePx = percentage * (this.pxEnd - this.pxStart);
-
-    return this.pxStart as number + percentagePx;
+  private updateSlope() {
+    this.slopeMsPerPx =
+        (this.endMs - this.startMs) / (this.endPx - this.startPx);
   }
 
-  pxToTs(px: Pixels): Milliseconds {
-    const percentage = (px - this.pxStart) / (this.pxEnd - this.pxStart);
-    return this.tStart as number + percentage * (this.tEnd - this.tStart);
+  msToPx(time: Milliseconds): Pixels {
+    return this.startPx as number + (time - this.startMs) / this.slopeMsPerPx;
   }
 
-  relativePxToTs(px: Pixels): Milliseconds {
-    return px * (this.tEnd - this.tStart) / (this.pxEnd - this.pxStart);
+  pxToMs(px: Pixels): Milliseconds {
+    return this.startMs as number + (px - this.startPx) * this.slopeMsPerPx;
+  }
+
+  deltaPxToDurationMs(px: Pixels): Milliseconds {
+    return px * this.slopeMsPerPx;
   }
 
   setTimeLimits(tStart: Milliseconds, tEnd: Milliseconds) {
-    this.tStart = tStart;
-    this.tEnd = tEnd;
+    this.startMs = tStart;
+    this.endMs = tEnd;
+    this.updateSlope();
   }
 
   setPxLimits(pxStart: Pixels, pxEnd: Pixels) {
-    this.pxStart = pxStart;
-    this.pxEnd = pxEnd;
-  }
-
-  getTimeLimits() {
-    return {start: this.tStart, end: this.tEnd};
+    this.startPx = pxStart;
+    this.endPx = pxEnd;
+    this.updateSlope();
   }
 }
 

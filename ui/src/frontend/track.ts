@@ -23,8 +23,8 @@ export const Track = {
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
-    const rectStart = attrs.x.tsToPx(sliceStart);
-    const rectWidth = attrs.x.tsToPx(sliceEnd) - rectStart;
+    const rectStart = attrs.x.msToPx(sliceStart);
+    const rectWidth = attrs.x.msToPx(sliceEnd) - rectStart;
     const shownStart = rectStart > attrs.width ? attrs.width : rectStart;
     const shownWidth = rectWidth + (rectStart as number) > attrs.width ?
         attrs.width :
