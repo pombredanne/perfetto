@@ -49,13 +49,13 @@ export class TimeScale {
     return px * this.slopeMsPerPx;
   }
 
-  setTimeLimits(tStart: Milliseconds, tEnd: Milliseconds) {
+  setLimitsMs(tStart: Milliseconds, tEnd: Milliseconds) {
     this.startMs = tStart;
     this.endMs = tEnd;
     this.updateSlope();
   }
 
-  setPxLimits(pxStart: Pixels, pxEnd: Pixels) {
+  setLimitsPx(pxStart: Pixels, pxEnd: Pixels) {
     this.startPx = pxStart;
     this.endPx = pxEnd;
     this.updateSlope();
