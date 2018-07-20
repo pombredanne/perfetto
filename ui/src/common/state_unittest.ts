@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// import {createEmptyState, State} from './state';
+import {createEmptyState, State} from './state';
 
-// test('createEmptyState', () => {
-//   const state: State = createEmptyState();
-//   expect(state.i).toEqual(0);
-// });
+test('createEmptyState', () => {
+  const state: State = createEmptyState();
+  expect(state.i).toEqual(0);
+});

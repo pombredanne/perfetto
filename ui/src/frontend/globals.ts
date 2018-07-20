@@ -15,9 +15,9 @@
 import {Action} from '../common/actions';
 import {State} from '../common/state';
 import {Engine} from '../controller/engine';
+import {TrackCreator} from '../tracks/all_tracks';
 
 type Dispatch = (action: Action) => void;
-import {TrackCreator} from '../tracks/all_tracks';
 
 /**
  * Global accessors for state/dispatch in the frontend.

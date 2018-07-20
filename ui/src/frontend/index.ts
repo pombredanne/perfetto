@@ -113,7 +113,7 @@ export const Frontend = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          ...trackRenders, ), );
+          ...trackRenders));
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
