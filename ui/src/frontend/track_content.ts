@@ -18,13 +18,13 @@ import {TrackImpl} from './track_impl';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const TrackContent = {
-  view() {},
+  view() {
+    // TODO(dproy): Figure out how track implementations should render DOM.
+  },
   onupdate({attrs}) {
-    // ugly. fix.
     attrs.trackImpl.width = attrs.width;
     attrs.trackImpl.draw(attrs.trackVirtualContext);
   }
-
 } as m.Component<{
   trackVirtualContext: VirtualCanvasContext,
   trackImpl: TrackImpl,

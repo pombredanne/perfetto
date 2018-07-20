@@ -25,8 +25,8 @@ import {TrackImpl} from './track_impl';
  * on an abstract class.
  */
 export interface TrackCreator<T = TrackImpl> {
-  // We store the type explicitly as a string as opposed to using class.name in
-  // case we minify our code in the future.
+  // Store the type explicitly as a string as opposed to using class.name in
+  // case we ever minify our code.
   readonly type: string;
 
   create(TrackState: TrackState, width: number): T;

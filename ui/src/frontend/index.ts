@@ -61,18 +61,21 @@ export const Frontend = {
 
     const trackVNodes: m.Children[] = [];
 
-    // TODO: Make this prettier
-    let y = 0;
+    let trackYOffset = 0;
     for (const trackState of Object.values(tracks)) {
       trackVNodes.push(m(Track, {
         name: `Track ${trackState.id}`,
-        trackContext: new ChildVirtualContext(
-            ctx, {y, x: 0, width: this.width, height: trackState.height}),
-        top: y,
+        trackContext: new ChildVirtualContext(ctx, {
+          y: trackYOffset,
+          x: 0,
+          width: this.width,
+          height: trackState.height
+        }),
+        top: trackYOffset,
         width: this.width,
         trackState,
       }));
-      y += trackState.height;
+      trackYOffset += trackState.height;
     }
 
     return m(
