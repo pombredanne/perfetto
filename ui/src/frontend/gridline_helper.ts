@@ -41,7 +41,7 @@ export abstract class GridlineHelper {
   /**
    * Calculates a step size of gridlines for a given time range such that there
    * are between 10 and 25 steps. The only possible step sizes are 2, 5, or 10,
-   * except for powers of 10 for scaling.
+   * except for factors of 10 for scaling.
    */
   static getStepSize(range: Milliseconds): Milliseconds {
     const zeros = Math.floor(Math.log10(range));
