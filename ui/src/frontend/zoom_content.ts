@@ -14,10 +14,9 @@
 
 export class ZoomContent {
   static SCROLL_SPEED = 1;
-  static SCROLLBAR_WIDTH = 16;
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
   static ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
-  static PAN_SPEED = 20;  // In px per frame
+  static KEYBOARD_PAN_PX_PER_FRAME = 20;
 
   protected mouseDownX = -1;
   private mouseXpos = 0;
@@ -65,21 +64,7 @@ export class ZoomContent {
     const zoom = (zoomIn: boolean) => {
       const percentage = zoomIn ? ZoomContent.ZOOM_IN_PERCENTAGE_SPEED :
                                   ZoomContent.ZOOM_OUT_PERCENTAGE_SPEED;
-      /*const t = this.state.gps.endVisibleWindow -
-      this.state.gps.startVisibleWindow;
-
-      const newT = t * percentage;
-
-      const zoomPosition: Nanoseconds = this.scale.pxToTs(this.mouseXpos);
-      const zoomPositionPercentage = (zoomPosition -
-          this.state.gps.startVisibleWindow) / t;
-
-      this.state.gps.startVisibleWindow = zoomPosition - newT *
-      zoomPositionPercentage; this.state.gps.endVisibleWindow = zoomPosition +
-      newT * (1 - zoomPositionPercentage);*/
-
       this.onZoomed(this.mouseXpos, percentage);
-      // this.onPanned();
 
       if (zooming) {
         requestAnimationFrame(() => zoom(zoomIn));
@@ -100,12 +85,7 @@ export class ZoomContent {
     let panning = false;
     const pan = (left: boolean) => {
       const leftFactor = left ? -1 : 1;
-      /*const panAmount: Nanoseconds =
-      this.scale.relativePxToTs(PanContent.PAN_SPEED);
-      this.state.gps.startVisibleWindow += leftFactor * panAmount;
-      this.state.gps.endVisibleWindow += leftFactor * panAmount;*/
-
-      this.onPanned(leftFactor * ZoomContent.PAN_SPEED);
+      this.onPanned(leftFactor * ZoomContent.KEYBOARD_PAN_PX_PER_FRAME);
 
       if (panning) {
         requestAnimationFrame(() => pan(left));
@@ -131,27 +111,16 @@ export class ZoomContent {
   protected onMouseMove(e: MouseEvent) {
     if (this.mouseDownX !== -1) {
       const movedPx = this.mouseDownX - e.offsetX;
-      // this.panByPx(movedPx);
       this.onPanned(movedPx);
       this.mouseDownX = e.offsetX;
       e.preventDefault();
     }
     this.mouseXpos = e.offsetX;
-    // console.log(this.mouseXpos, this.scale.pxToTs(this.mouseXpos));
   }
 
   protected onMouseUp() {
     this.mouseDownX = -1;
   }
-
-  /*protected panByPx(movedPx: number) {
-    const movedTime = this.scale.relativePxToTs(movedPx);
-
-    this.state.gps.startVisibleWindow += movedTime;
-    this.state.gps.endVisibleWindow += movedTime;
-
-    this.onPanned();
-  }*/
 
   protected onWheel(e: WheelEvent) {
     if (e.deltaX) {

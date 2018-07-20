@@ -67,14 +67,15 @@ export const Frontend = {
               this.visibleWindowMs.end - this.visibleWindowMs.start;
           const newTotalTimespanMs = totalTimespanMs * zoomPercentage;
 
-          const zoomedPositionMs = this.timeScale.pxToMs(zoomedPositionPx);
+          const zoomedPositionMs =
+              this.timeScale.pxToMs(zoomedPositionPx) as number;
           const positionPercentage =
               (zoomedPositionMs - this.visibleWindowMs.start) / totalTimespanMs;
 
           this.visibleWindowMs.start =
-              zoomedPositionPx - newTotalTimespanMs * positionPercentage;
+              zoomedPositionMs - newTotalTimespanMs * positionPercentage;
           this.visibleWindowMs.end =
-              zoomedPositionPx - newTotalTimespanMs * (1 - positionPercentage);
+              zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
           this.timeScale.setLimitsMs(
               this.visibleWindowMs.start, this.visibleWindowMs.end);
           m.redraw();

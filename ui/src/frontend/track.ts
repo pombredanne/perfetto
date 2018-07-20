@@ -25,10 +25,22 @@ export const Track = {
 
     const rectStart = attrs.timeScale.msToPx(sliceStart);
     const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
-    const shownStart = rectStart > attrs.width ? attrs.width : rectStart;
-    const shownWidth = rectWidth + (rectStart as number) > attrs.width ?
-        attrs.width :
-        rectWidth;
+
+    let shownStart = rectStart as number;
+    let shownWidth = rectWidth;
+
+    if (shownStart < 0) {
+      shownWidth += shownStart;
+      shownStart = 0;
+    }
+    if (shownStart > attrs.width) {
+      shownStart = attrs.width;
+      shownWidth = 0;
+    }
+
+    if (shownStart + shownWidth > attrs.width) {
+      shownWidth = attrs.width - shownStart;
+    }
 
     if (attrs.trackContext.isOnCanvas()) {
       attrs.trackContext.fillStyle = '#ccc';
