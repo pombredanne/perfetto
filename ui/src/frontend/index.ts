@@ -14,7 +14,9 @@
 
 import * as m from 'mithril';
 
-import {createEmptyState} from '../common/state';
+import {forwardRemoteCalls, Remote} from '../base/remote';
+import {Action} from '../common/actions';
+import {createEmptyState, State} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
 
 import {CanvasController} from './canvas_controller';
@@ -164,23 +166,49 @@ export const FrontendPage = createPage({
   }
 });
 
-function createController(): Worker {
+
+function createController(): ControllerProxy {
   const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
-  worker.onmessage = msg => {
-    globals.state = msg.data;
-    m.redraw();
-  };
-  return worker;
+  return new ControllerProxy(worker as {} as MessagePort);
 }
 
-function main() {
+/**
+ * The API the main thread exposes to the controller.
+ */
+class FrontendApi {
+  updateState(state: State) {
+    globals.state = state;
+    m.redraw();
+  }
+}
+
+/**
+ * Proxy for the Controller worker.
+ * This allows us to send strongly typed messages to the contoller.
+ */
+class ControllerProxy extends Remote {
+  init(port: MessagePort): Promise<void> {
+    return this.send<void>('init', [port], [port]);
+  }
+
+  doAction(action: Action): Promise<void> {
+    return this.send<void>('doAction', [action]);
+  }
+}
+
+async function main() {
   globals.state = createEmptyState();
-  const worker = createController();
+
+  const controller = createController();
+  const channel = new MessageChannel();
+  await controller.init(channel.port1);
+  forwardRemoteCalls(channel.port2, new FrontendApi());
+
   // tslint:disable-next-line deprecation
-  globals.dispatch = action => worker.postMessage(action);
+  globals.dispatch = controller.doAction.bind(controller);
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');
