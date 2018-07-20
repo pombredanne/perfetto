@@ -54,6 +54,7 @@ export const Frontend = {
 
     const zoomContent = new ZoomContent(
         vnode.dom as HTMLElement,
+        200,
         (pannedPx: number) => {
           const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
           this.visibleWindowMs.start += deltaMs;

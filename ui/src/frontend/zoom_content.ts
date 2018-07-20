@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
 export class ZoomContent {
   static SCROLL_SPEED = 1;
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
@@ -22,7 +23,8 @@ export class ZoomContent {
   private mouseXpos = 0;
 
   constructor(
-      private element: HTMLElement, private onPanned: (movedPx: number) => void,
+      private element: HTMLElement, private contentOffsetX: number,
+      private onPanned: (movedPx: number) => void,
       private onZoomed:
           (zoomPositionPx: number, zoomPercentage: number) => void) {}
 
@@ -105,17 +107,21 @@ export class ZoomContent {
   }
 
   protected onMouseDown(e: MouseEvent) {
-    this.mouseDownX = e.offsetX;
+    this.mouseDownX = this.getMouseX(e);
   }
 
   protected onMouseMove(e: MouseEvent) {
     if (this.mouseDownX !== -1) {
-      const movedPx = this.mouseDownX - e.offsetX;
+      const movedPx = this.mouseDownX - this.getMouseX(e);
       this.onPanned(movedPx);
-      this.mouseDownX = e.offsetX;
+      this.mouseDownX = this.getMouseX(e);
       e.preventDefault();
     }
-    this.mouseXpos = e.offsetX;
+    this.mouseXpos = this.getMouseX(e);
+  }
+
+  private getMouseX(e: MouseEvent) {
+    return e.clientX - this.contentOffsetX;
   }
 
   protected onMouseUp() {

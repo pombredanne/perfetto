@@ -25,7 +25,10 @@ export const TrackShell = {
               background: '#fff',
               padding: '20px',
               width: '200px',
-              'border-right': '1px solid #666'
+              'border-right': '1px solid #666',
+              position: 'absolute',
+              left: '0',
+              'z-index': 100
             }
           },
           m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)),
