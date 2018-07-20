@@ -52,6 +52,8 @@ export const Frontend = {
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
 
+    // TODO: ContentOffsetX should be defined somewhere central.
+    // Currently it lives here, in canvas wrapper, and in track shell.
     const zoomContent = new ZoomContent(
         vnode.dom as HTMLElement,
         200,

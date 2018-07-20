@@ -18,6 +18,7 @@ export class ZoomContent {
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
   static ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
   static KEYBOARD_PAN_PX_PER_FRAME = 20;
+  static FINGER_PAN_DIRECTION_CHANGE_FINGER_SWITCH_TIME = 200;
 
   protected mouseDownX = -1;
   private mouseXpos = 0;
@@ -29,39 +30,70 @@ export class ZoomContent {
           (zoomPositionPx: number, zoomPercentage: number) => void) {}
 
   init() {
-    this.attachEventListeners();
-    this.handleKeyNavigation();
+    this.attachMouseEventListeners();
+    this.handleKeyPanning();
+    this.handleKeyZooming();
   }
 
-  protected attachEventListeners() {
-    this.element.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    this.element.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    this.element.addEventListener('mouseup', () => this.onMouseUp());
-    this.element.addEventListener('wheel', (e) => this.onWheel(e));
-  }
-
-  protected handleKeyNavigation() {
-    let zooming = false;
-
+  private handleKeyPanning() {
     document.body.addEventListener('keydown', (e) => {
-      if (e.key === 'w') {
-        startZoom(true);
-      } else if (e.key === 's') {
-        startZoom(false);
-      } else if (e.key === 'a') {
+      if (e.key === 'a') {
         startPan(true);
       } else if (e.key === 'd') {
         startPan(false);
       }
     });
     document.body.addEventListener('keyup', (e) => {
-      if (e.key === 'w' || e.key === 's') {
-        endZoom();
-      }
       if (e.key === 'a' || e.key === 'd') {
         endPan();
       }
     });
+
+    let panning = false;
+    let gracePeriodForPanFingerSwitch = 0;
+    let panLeftFactor = 0;
+
+    const pan = () => {
+      this.onPanned(panLeftFactor * ZoomContent.KEYBOARD_PAN_PX_PER_FRAME);
+      if (panning) {
+        requestAnimationFrame(() => pan());
+      }
+    };
+
+    const startPan = (left: boolean) => {
+      panLeftFactor = left ? -1 : 1;
+      if (panning) {
+        gracePeriodForPanFingerSwitch = Date.now();
+        return;
+      }
+      panning = true;
+      pan();
+    };
+    const endPan = () => {
+      if (gracePeriodForPanFingerSwitch === 0 ||
+          Date.now() - gracePeriodForPanFingerSwitch >
+              ZoomContent.FINGER_PAN_DIRECTION_CHANGE_FINGER_SWITCH_TIME) {
+        panning = false;
+      }
+      gracePeriodForPanFingerSwitch = 0;
+    };
+  }
+
+  private handleKeyZooming() {
+    document.body.addEventListener('keydown', (e) => {
+      if (e.key === 'w') {
+        startZoom(true);
+      } else if (e.key === 's') {
+        startZoom(false);
+      }
+    });
+    document.body.addEventListener('keyup', (e) => {
+      if (e.key === 'w' || e.key === 's') {
+        endZoom();
+      }
+    });
+
+    let zooming = false;
 
     const zoom = (zoomIn: boolean) => {
       const percentage = zoomIn ? ZoomContent.ZOOM_IN_PERCENTAGE_SPEED :
@@ -83,27 +115,13 @@ export class ZoomContent {
     const endZoom = () => {
       zooming = false;
     };
+  }
 
-    let panning = false;
-    const pan = (left: boolean) => {
-      const leftFactor = left ? -1 : 1;
-      this.onPanned(leftFactor * ZoomContent.KEYBOARD_PAN_PX_PER_FRAME);
-
-      if (panning) {
-        requestAnimationFrame(() => pan(left));
-      }
-    };
-
-    const startPan = (left: boolean) => {
-      if (panning) {
-        return;
-      }
-      panning = true;
-      pan(left);
-    };
-    const endPan = () => {
-      panning = false;
-    };
+  private attachMouseEventListeners() {
+    this.element.addEventListener('mousedown', (e) => this.onMouseDown(e));
+    this.element.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    this.element.addEventListener('mouseup', () => this.onMouseUp());
+    this.element.addEventListener('wheel', (e) => this.onWheel(e));
   }
 
   protected onMouseDown(e: MouseEvent) {
@@ -124,11 +142,11 @@ export class ZoomContent {
     return e.clientX - this.contentOffsetX;
   }
 
-  protected onMouseUp() {
+  private onMouseUp() {
     this.mouseDownX = -1;
   }
 
-  protected onWheel(e: WheelEvent) {
+  private onWheel(e: WheelEvent) {
     if (e.deltaX) {
       this.onPanned(e.deltaX * ZoomContent.SCROLL_SPEED);
     }
