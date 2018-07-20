@@ -59,6 +59,7 @@ class Globals {
   resetForTesting() {
     this._state = undefined;
     this._dispatch = undefined;
+    this._trackRegistry = undefined;
   }
 }
 
