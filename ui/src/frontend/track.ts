@@ -56,7 +56,6 @@ export const Track = {
   name: string,
   trackContext: VirtualCanvasContext,
   top: number,
-  // TODO: Delete dups from trackState
   width: number,
   trackState: TrackState,
 },
