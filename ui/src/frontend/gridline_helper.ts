@@ -39,10 +39,8 @@ export abstract class GridlineHelper {
   }
 
   static getStepSize(range: Milliseconds): Milliseconds {
-    let step = 0.001;
-    while (range / step > 20) {
-      step *= 10;
-    }
+    const zeros = Math.floor(Math.log10(range));
+    let step = Math.pow(10, zeros);
     if (range / step < 5) {
       step /= 5;
     }

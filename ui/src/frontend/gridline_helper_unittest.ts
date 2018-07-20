@@ -14,14 +14,14 @@
 
 import {GridlineHelper} from './gridline_helper';
 
-test('gridline helper to work', () => {
+test('gridline helper to have sensible step sizes', () => {
   expect(GridlineHelper.getStepSize(10)).toEqual(1);
   expect(GridlineHelper.getStepSize(30)).toEqual(2);
   expect(GridlineHelper.getStepSize(60)).toEqual(5);
   expect(GridlineHelper.getStepSize(100)).toEqual(10);
 });
 
-test('gridline helper to scale', () => {
-  expect(GridlineHelper.getStepSize(.1)).toEqual(.01);
-  expect(GridlineHelper.getStepSize(1000)).toEqual(100);
+test('gridline helper to scale to very small and very large values', () => {
+  expect(GridlineHelper.getStepSize(.01)).toEqual(.001);
+  expect(GridlineHelper.getStepSize(10000)).toEqual(1000);
 });
