@@ -88,7 +88,7 @@ export const Frontend = {
                 ctx, {y: 0, x: 0, width: this.width, height: 90}),
             top: 0,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 2',
@@ -96,7 +96,7 @@ export const Frontend = {
                 ctx, {y: 100, x: 0, width: this.width, height: 90}),
             top: 100,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 3',
@@ -104,7 +104,7 @@ export const Frontend = {
                 ctx, {y: 200, x: 0, width: this.width, height: 90}),
             top: 200,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 4',
@@ -112,7 +112,7 @@ export const Frontend = {
                 ctx, {y: 300, x: 0, width: this.width, height: 90}),
             top: 300,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 5',
@@ -120,7 +120,7 @@ export const Frontend = {
                 ctx, {y: 400, x: 0, width: this.width, height: 90}),
             top: 400,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 6',
@@ -128,7 +128,7 @@ export const Frontend = {
                 ctx, {y: 500, x: 0, width: this.width, height: 90}),
             top: 500,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 7',
@@ -136,7 +136,7 @@ export const Frontend = {
                 ctx, {y: 600, x: 0, width: this.width, height: 90}),
             top: 600,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 8',
@@ -144,7 +144,7 @@ export const Frontend = {
                 ctx, {y: 700, x: 0, width: this.width, height: 90}),
             top: 700,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 9',
@@ -152,7 +152,7 @@ export const Frontend = {
                 ctx, {y: 800, x: 0, width: this.width, height: 90}),
             top: 800,
             width: this.width,
-            x: timeScale
+            timeScale
           }),
           m(Track, {
             name: 'Track 10',
@@ -160,7 +160,7 @@ export const Frontend = {
                 ctx, {y: 900, x: 0, width: this.width, height: 90}),
             top: 900,
             width: this.width,
-            x: timeScale
+            timeScale
           }), ), );
   },
 } as m.Component<{width: number, height: number}, {

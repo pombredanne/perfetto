@@ -23,8 +23,8 @@ export const Track = {
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
-    const rectStart = attrs.x.msToPx(sliceStart);
-    const rectWidth = attrs.x.msToPx(sliceEnd) - rectStart;
+    const rectStart = attrs.timeScale.msToPx(sliceStart);
+    const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
     const shownStart = rectStart > attrs.width ? attrs.width : rectStart;
     const shownWidth = rectWidth + (rectStart as number) > attrs.width ?
         attrs.width :
@@ -72,5 +72,5 @@ export const Track = {
   trackContext: VirtualCanvasContext,
   top: number,
   width: number,
-  x: TimeScale
+  timeScale: TimeScale
 }>;

@@ -14,7 +14,8 @@
 
 /**
  * Defines a mapping between pixels and Milliseconds for the entire application.
- * Scales times from tStart to tEnd to pixel values pxStart to pxEnd.
+ * Linearly scales time values from boundsMs to pixel values in boundsPx and
+ * back.
  */
 export class TimeScale {
   private startMs: Milliseconds;
