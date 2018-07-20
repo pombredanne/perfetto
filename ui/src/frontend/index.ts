@@ -16,7 +16,7 @@ import * as m from 'mithril';
 
 import {ObjectById, TrackState} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
-import {registerAllTracks} from '../tracks/all_tracks';
+import {createAllTracksRegistry} from '../tracks/all_tracks';
 import {CpuCounterTrack} from '../tracks/cpu_counters/frontend';
 import {CpuSliceTrack} from '../tracks/cpu_slices/frontend';
 
@@ -28,8 +28,7 @@ import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
-import {Track, TrackImpl} from './track';
-import {VirtualCanvasContext} from './virtual_canvas_context';
+import {Track} from './track';
 
 export const Frontend = {
   oninit() {
@@ -60,30 +59,17 @@ export const Frontend = {
     this.canvasController.clear();
     const tracks = globals.state.tracks;
 
-    // TODO: Create a type alias here.
-    const trackRenders: Array < m.Vnode < {
-      name: string;
-      trackContext: VirtualCanvasContext;
-      top: number;
-      width: number;
-      height: number;
-      trackState: TrackState;
-    }
-    , {
-      trackInstance: TrackImpl;
-    }
-    >> = [];
+    const trackVNodes: m.Children[] = [];
 
     // TODO: Make this prettier
     let y = 0;
     for (const trackState of Object.values(tracks)) {
-      trackRenders.push(m(Track, {
+      trackVNodes.push(m(Track, {
         name: `Track ${trackState.id}`,
         trackContext: new ChildVirtualContext(
             ctx, {y, x: 0, width: this.width, height: trackState.height}),
         top: y,
         width: this.width,
-        height: trackState.height,
         trackState,
       }));
       y += trackState.height;
@@ -113,7 +99,7 @@ export const Frontend = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          ...trackRenders));
+          ...trackVNodes));
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
@@ -163,7 +149,7 @@ function main() {
   const worker = createController();
   // tslint:disable-next-line deprecation
   globals.dispatch = action => worker.postMessage(action);
-  registerAllTracks();
+  globals.trackRegistry = createAllTracksRegistry();
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');

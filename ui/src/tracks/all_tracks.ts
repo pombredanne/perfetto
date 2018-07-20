@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackState} from '../common/state';
-import {gTrackRegistry} from '../frontend/globals';
-import {TrackImpl} from '../frontend/track';
+import {TrackRegistry} from '../frontend/track_registry';
 
 import {CpuCounterTrack} from './cpu_counters/frontend';
 import {CpuSliceTrack} from './cpu_slices/frontend';
@@ -28,15 +26,10 @@ const allTracks = [
   CpuSliceTrack,
 ];
 
-// We store a function that calls the constructor and returns and instantiated
-// TrackImpl instead of storing the TrackImpl subclass directly, because
-// otherwise the values in the map has the type of abstract class TrackImpl when
-// retrieved, which cannot be instantiated.
-export type TrackCreator = (trackState: TrackState, width: number) => TrackImpl;
-
-export function registerAllTracks() {
+export function createAllTracksRegistry() {
+  const registry = new TrackRegistry();
   for (const TrackClass of allTracks) {
-    gTrackRegistry.set(
-        TrackClass.type, (ts, width) => new TrackClass(ts, width));
+    registry.register(TrackClass);
   }
+  return registry;
 }

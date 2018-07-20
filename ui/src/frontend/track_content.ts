@@ -13,19 +13,20 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-import {TrackImpl} from './track';
+
+import {TrackImpl} from './track_impl';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const TrackContent = {
   view() {},
   onupdate({attrs}) {
     // ugly. fix.
-    attrs.trackInstance.width = attrs.width;
-    attrs.trackInstance.draw(attrs.trackVirtualContext);
+    attrs.trackImpl.width = attrs.width;
+    attrs.trackImpl.draw(attrs.trackVirtualContext);
   }
 
 } as m.Component<{
   trackVirtualContext: VirtualCanvasContext,
-  trackInstance: TrackImpl,
+  trackImpl: TrackImpl,
   width: number,
 }>;

@@ -13,39 +13,27 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+
 import {TrackState} from '../common/state';
-import {gTrackRegistry} from './globals';
+
+import {globals} from './globals';
 import {TrackContent} from './track_content';
+import {TrackImpl} from './track_impl';
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export abstract class TrackImpl {
-  constructor(protected trackState: TrackState, public width: number) {}
-  abstract draw(vCtx: VirtualCanvasContext): void;
-}
-
 export const Track = {
   oninit({attrs}) {
-    const trackCreator = gTrackRegistry.get(attrs.trackState.type);
+    const trackCreator =
+        globals.trackRegistry.getCreator(attrs.trackState.type);
     if (trackCreator == null) {
       throw new Error(
           'No Track implementation found for type ' + attrs.trackState.type);
     }
-    this.trackInstance = trackCreator(attrs.trackState, attrs.width);
+    this.trackImpl = trackCreator.create(attrs.trackState, attrs.width);
   },
 
   view({attrs}) {
-    // if (attrs.trackContext.isOnCanvas()) {
-    //   attrs.trackContext.fillStyle = '#ccc';
-    //   attrs.trackContext.fillRect(0, 0, attrs.width, 73);
-
-    //   attrs.trackContext.font = '16px Arial';
-    //   attrs.trackContext.fillStyle = '#000';
-    //   attrs.trackContext.fillText(
-    //       attrs.name + ' rendered by canvas', Math.round(attrs.width / 2),
-    //       20);
-    // }
-
     return m(
         '.track',
         {
@@ -54,13 +42,13 @@ export const Track = {
             top: attrs.top.toString() + 'px',
             left: 0,
             width: '100%',
-            height: `${attrs.height} px`,
+            height: `${attrs.trackState.height} px`,
           }
         },
         m(TrackShell, attrs),
         m(TrackContent, {
           trackVirtualContext: attrs.trackContext,
-          trackInstance: this.trackInstance,
+          trackImpl: this.trackImpl,
           width: attrs.width
         }));
   }
@@ -70,8 +58,7 @@ export const Track = {
   top: number,
   // TODO: Delete dups from trackState
   width: number,
-  height: number,
   trackState: TrackState,
 },
-                     // TODO(dproy): Fix formmatter. This is ridiculous.
-                     {trackInstance: TrackImpl}>;
+                     // TODO(dproy): Fix formatter. This is ridiculous.
+                     {trackImpl: TrackImpl}>;

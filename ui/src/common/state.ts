@@ -15,7 +15,7 @@
 /**
  * A plain js object, holding objects of type |Class| keyed by string id.
  * We use this instead of using |Map| object since it is simpler and faster to
- * serialize.
+ * serialize for use in postMessage.
  */
 export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 
