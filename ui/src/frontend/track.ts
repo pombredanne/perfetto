@@ -38,7 +38,6 @@ export const Track = {
       shownStart = attrs.width;
       shownWidth = 0;
     }
-
     if (shownStart + shownWidth > attrs.width) {
       shownWidth = attrs.width - shownStart;
     }
@@ -48,7 +47,11 @@ export const Track = {
       attrs.trackContext.fillRect(0, 0, attrs.width, 73);
 
       GridlineHelper.drawGridLines(
-          attrs.trackContext, attrs.timeScale, [0, 1000000], attrs.width, 73);
+          attrs.trackContext,
+          attrs.timeScale,
+          [attrs.visibleWindowMs.start, attrs.visibleWindowMs.end],
+          attrs.width,
+          73);
 
       attrs.trackContext.fillStyle = '#c00';
       attrs.trackContext.fillRect(shownStart, 40, shownWidth, 30);
@@ -88,5 +91,6 @@ export const Track = {
   trackContext: VirtualCanvasContext,
   top: number,
   width: number,
-  timeScale: TimeScale
+  timeScale: TimeScale,
+  visibleWindowMs: {start: number, end: number}
 }>;
