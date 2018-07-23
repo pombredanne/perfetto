@@ -16,7 +16,7 @@ import * as m from 'mithril';
 
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action} from '../common/actions';
-import {createEmptyState, State} from '../common/state';
+import {State} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
 
 import {CanvasController} from './canvas_controller';
@@ -202,8 +202,8 @@ class FrontendApi {
  * TODO(hjd): Remove the boiler plate.
  */
 class ControllerProxy extends Remote {
-  init(port: MessagePort): Promise<void> {
-    return this.send<void>('init', [port], [port]);
+  init(port: MessagePort): Promise<State> {
+    return this.send<State>('init', [port], [port]);
   }
 
   doAction(action: Action): Promise<void> {
@@ -212,12 +212,10 @@ class ControllerProxy extends Remote {
 }
 
 async function main() {
-  globals.state = createEmptyState();
-
   const controller = createController();
   const channel = new MessageChannel();
-  await controller.init(channel.port1);
   forwardRemoteCalls(channel.port2, new FrontendApi());
+  globals.state = await controller.init(channel.port1);
 
   // tslint:disable-next-line deprecation
   globals.dispatch = controller.doAction.bind(controller);
