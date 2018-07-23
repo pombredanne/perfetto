@@ -15,6 +15,23 @@
 import {TrackState} from '../common/state';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
+/**
+ * This interface forces track implementations to have two static properties:
+ * type and a create function.
+ *
+ * Typescript does not have abstract static members, which is why this needs to
+ * be in a seperate interface. We need the |create| method because the stored
+ * value in the registry is an abstract class, and we cannot call 'new'
+ * on an abstract class.
+ */
+export interface TrackCreator {
+  // Store the type explicitly as a string as opposed to using class.name in
+  // case we ever minify our code.
+  readonly type: string;
+
+  create(TrackState: TrackState): TrackImpl;
+}
+
 // TODO(dproy): TrackImpl is not a great name. We can change this to something
 // better as we figure out the rest of the pieces of track rendering
 // architecture.
@@ -22,6 +39,6 @@ import {VirtualCanvasContext} from './virtual_canvas_context';
  * The abstract class that needs to be implemented by all tracks.
  */
 export abstract class TrackImpl {
-  constructor(protected trackState: TrackState, public width: number) {}
-  abstract draw(vCtx: VirtualCanvasContext): void;
+  constructor(protected trackState: TrackState) {}
+  abstract draw(vCtx: VirtualCanvasContext, width: number): void;
 }

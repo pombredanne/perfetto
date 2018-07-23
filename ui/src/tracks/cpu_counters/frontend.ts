@@ -14,26 +14,26 @@
 
 import {TrackState} from '../../common/state';
 import {TrackImpl} from '../../frontend/track_impl';
+import {trackRegistry} from '../../frontend/track_registry';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 
-export class CpuCounterTrack extends TrackImpl {
+class CpuCounterTrack extends TrackImpl {
   static readonly type = 'CpuCounterTrack';
-  static create(trackState: TrackState, width: number): CpuCounterTrack {
-    return new CpuCounterTrack(trackState, width);
+  static create(trackState: TrackState): CpuCounterTrack {
+    return new CpuCounterTrack(trackState);
   }
 
-  constructor(trackState: TrackState, width: number) {
-    super(trackState, width);
+  constructor(trackState: TrackState) {
+    super(trackState);
   }
 
-  draw(vCtx: VirtualCanvasContext): void {
-    if (vCtx.isOnCanvas()) {
-      vCtx.fillStyle = '#eee';
-      vCtx.fillRect(0, 0, this.width, this.trackState.height);
-      vCtx.font = '16px Arial';
-      vCtx.fillStyle = '#000';
-      vCtx.fillText(
-          'Drawing ' + CpuCounterTrack.name, Math.round(this.width / 2), 20);
-    }
+  draw(vCtx: VirtualCanvasContext, width: number): void {
+    vCtx.fillStyle = '#eee';
+    vCtx.fillRect(0, 0, width, this.trackState.height);
+    vCtx.font = '16px Arial';
+    vCtx.fillStyle = '#000';
+    vCtx.fillText('Drawing ' + CpuCounterTrack.name, Math.round(width / 2), 20);
   }
 }
+
+trackRegistry.register(CpuCounterTrack);

@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import '../tracks/all_tracks';
+
 import * as m from 'mithril';
 
 import {ObjectById, TrackState} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
-import {createAllTracksRegistry} from '../tracks/all_tracks';
-import {CpuCounterTrack} from '../tracks/cpu_counters/frontend';
-import {CpuSliceTrack} from '../tracks/cpu_slices/frontend';
 
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
@@ -53,17 +52,17 @@ export const Frontend = {
   onremove() {
     window.removeEventListener('resize', this.onResize);
   },
-  view({}) {
+  view() {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
     this.canvasController.clear();
     const tracks = globals.state.tracks;
 
-    const trackVNodes: m.Children[] = [];
+    const childTracks: m.Children[] = [];
 
     let trackYOffset = 0;
     for (const trackState of Object.values(tracks)) {
-      trackVNodes.push(m(Track, {
+      childTracks.push(m(Track, {
         name: `Track ${trackState.id}`,
         trackContext: new ChildVirtualContext(ctx, {
           y: trackYOffset,
@@ -102,7 +101,7 @@ export const Frontend = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          ...trackVNodes));
+          ...childTracks));
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
@@ -133,10 +132,12 @@ function getDemoTracks(): ObjectById<TrackState> {
   const tracks: {[key: string]: TrackState;} = {};
   for (let i = 0; i < 10; i++) {
     let trackType;
+    // The track type strings here are temporary. They will be supplied by the
+    // controller side track implementation.
     if (i % 2 === 0) {
-      trackType = CpuSliceTrack.type;
+      trackType = 'CpuSliceTrack';
     } else {
-      trackType = CpuCounterTrack.type;
+      trackType = 'CpuCounterTrack';
     }
     tracks[i] = {
       id: i.toString(),
@@ -152,7 +153,6 @@ function main() {
   const worker = createController();
   // tslint:disable-next-line deprecation
   globals.dispatch = action => worker.postMessage(action);
-  globals.trackRegistry = createAllTracksRegistry();
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');

@@ -15,7 +15,6 @@
 import {Action} from '../common/actions';
 import {State} from '../common/state';
 import {Engine} from '../controller/engine';
-import {TrackRegistry} from './track_registry';
 
 type Dispatch = (action: Action) => void;
 
@@ -25,7 +24,6 @@ type Dispatch = (action: Action) => void;
 class Globals {
   _dispatch?: Dispatch = undefined;
   _state?: State = undefined;
-  _trackRegistry?: TrackRegistry = undefined;
 
   get state(): State {
     if (this._state === undefined) throw new Error('Global not set');
@@ -45,21 +43,9 @@ class Globals {
     this._dispatch = value;
   }
 
-  set trackRegistry(value: TrackRegistry) {
-    this._trackRegistry = value;
-  }
-
-  get trackRegistry() {
-    if (this._trackRegistry === undefined) {
-      throw new Error('Global TrackRegistry not set.');
-    }
-    return this._trackRegistry;
-  }
-
   resetForTesting() {
     this._state = undefined;
     this._dispatch = undefined;
-    this._trackRegistry = undefined;
   }
 }
 

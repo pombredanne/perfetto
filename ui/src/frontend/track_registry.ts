@@ -12,30 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackState} from '../common/state';
-import {TrackImpl} from './track_impl';
+import {TrackCreator} from './track_impl';
 
-/**
- * This interface forces track implementations to have two static properties:
- * type and a create function.
- *
- * Typescript does not have abstract static members, which is why this needs to
- * be in a seperate interface. We need the |create| method because the stored
- * value in the registry is an abstract class, and we cannot call 'new'
- * on an abstract class.
- */
-export interface TrackCreator<T = TrackImpl> {
-  // Store the type explicitly as a string as opposed to using class.name in
-  // case we ever minify our code.
-  readonly type: string;
-
-  create(TrackState: TrackState, width: number): T;
-}
-
-/**
- * Track type to track creator registry. Throws error on name collision.
- */
-export class TrackRegistry {
+class TrackRegistry {
   private registry: Map<string, TrackCreator>;
 
   constructor() {
@@ -57,4 +36,14 @@ export class TrackRegistry {
     }
     return creator;
   }
+
+  unregisterAllTracksForTesting(): void {
+    this.registry.clear();
+  }
 }
+
+/**
+ * Global registry that maps types to TrackCreator. Throws error on name
+ * collision.
+ */
+export const trackRegistry = new TrackRegistry();

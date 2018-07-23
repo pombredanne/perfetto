@@ -16,8 +16,8 @@
 import {TrackState} from '../common/state';
 import {dingus} from '../test/dingus';
 
-import {TrackImpl} from './track_impl';
-import {TrackCreator, TrackRegistry} from './track_registry';
+import {TrackCreator, TrackImpl} from './track_impl';
+import {trackRegistry} from './track_registry';
 
 // Cannot use dingus on an abstract class.
 class MockTrackImpl extends TrackImpl {
@@ -27,29 +27,29 @@ class MockTrackImpl extends TrackImpl {
 function mockTrackCreator(type: string): TrackCreator {
   return {
     type,
-    create: () => new MockTrackImpl(dingus<TrackState>(), 0),
+    create: () => new MockTrackImpl(dingus<TrackState>()),
   };
 }
 
-test('registry returns correct track', () => {
-  const registry = new TrackRegistry();
-
-  registry.register(mockTrackCreator('track1'));
-  registry.register(mockTrackCreator('track2'));
-
-  expect(registry.getCreator('track1').type).toEqual('track1');
-  expect(registry.getCreator('track2').type).toEqual('track2');
+beforeEach(() => {
+  trackRegistry.unregisterAllTracksForTesting();
 });
 
-test('registry throws error on name collision', () => {
-  const registry = new TrackRegistry();
+test('trackRegistry returns correct track', () => {
+  trackRegistry.register(mockTrackCreator('track1'));
+  trackRegistry.register(mockTrackCreator('track2'));
+
+  expect(trackRegistry.getCreator('track1').type).toEqual('track1');
+  expect(trackRegistry.getCreator('track2').type).toEqual('track2');
+});
+
+test('trackRegistry throws error on name collision', () => {
   const creator1 = mockTrackCreator('someTrack');
   const creator2 = mockTrackCreator('someTrack');
-  registry.register(creator1);
-  expect(() => registry.register(creator2)).toThrow();
+  trackRegistry.register(creator1);
+  expect(() => trackRegistry.register(creator2)).toThrow();
 });
 
-test('registry throws error on non-existent track', () => {
-  const registry = new TrackRegistry();
-  expect(() => registry.getCreator('nonExistentTrack')).toThrow();
+test('trackRegistry throws error on non-existent track', () => {
+  expect(() => trackRegistry.getCreator('nonExistentTrack')).toThrow();
 });

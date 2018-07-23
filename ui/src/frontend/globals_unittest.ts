@@ -14,7 +14,6 @@
 
 import {createEmptyState} from '../common/state';
 import {globals} from './globals';
-import {TrackRegistry} from './track_registry';
 
 beforeEach(() => {
   globals.resetForTesting();
@@ -26,13 +25,4 @@ test('globals state', () => {
   expect(globals.state).toBe(state);
   globals.resetForTesting();
   expect(() => globals.state).toThrow();
-});
-
-test('globals trackRegistry', () => {
-  expect(() => globals.trackRegistry).toThrow();
-  const trackRegistry = new TrackRegistry();
-  globals.trackRegistry = trackRegistry;
-  expect(globals.trackRegistry).toBe(trackRegistry);
-  globals.resetForTesting();
-  expect(() => globals.trackRegistry).toThrow();
 });

@@ -14,25 +14,26 @@
 
 import {TrackState} from '../../common/state';
 import {TrackImpl} from '../../frontend/track_impl';
+import {trackRegistry} from '../../frontend/track_registry';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 
-export class CpuSliceTrack extends TrackImpl {
+class CpuSliceTrack extends TrackImpl {
   static readonly type = 'CpuSliceTrack';
-  static create(trackState: TrackState, width: number): CpuSliceTrack {
-    return new CpuSliceTrack(trackState, width);
+  static create(trackState: TrackState): CpuSliceTrack {
+    return new CpuSliceTrack(trackState);
   }
 
-  constructor(trackState: TrackState, width: number) {
-    super(trackState, width);
+  constructor(trackState: TrackState) {
+    super(trackState);
   }
 
-  draw(vCtx: VirtualCanvasContext): void {
-    if (vCtx.isOnCanvas()) {
-      vCtx.fillStyle = '#ccc';
-      vCtx.fillRect(0, 0, this.width, this.trackState.height);
-      vCtx.font = '16px Arial';
-      vCtx.fillStyle = '#000';
-      vCtx.fillText('Drawing ' + CpuSliceTrack.name, this.width / 2, 20);
-    }
+  draw(vCtx: VirtualCanvasContext, width: number): void {
+    vCtx.fillStyle = '#ccc';
+    vCtx.fillRect(0, 0, width, this.trackState.height);
+    vCtx.font = '16px Arial';
+    vCtx.fillStyle = '#000';
+    vCtx.fillText('Drawing ' + CpuSliceTrack.name, width / 2, 20);
   }
 }
+
+trackRegistry.register(CpuSliceTrack);

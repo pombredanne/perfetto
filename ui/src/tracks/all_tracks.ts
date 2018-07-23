@@ -12,24 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackRegistry} from '../frontend/track_registry';
-
-import {CpuCounterTrack} from './cpu_counters/frontend';
-import {CpuSliceTrack} from './cpu_slices/frontend';
-
-/**
- * List of all the currently implemented tracks. When a new track is
- * implemented, the track class must be added here.
- */
-const allTracks = [
-  CpuCounterTrack,
-  CpuSliceTrack,
-];
-
-export function createAllTracksRegistry() {
-  const registry = new TrackRegistry();
-  for (const TrackClass of allTracks) {
-    registry.register(TrackClass);
-  }
-  return registry;
-}
+// Import all currently implemented tracks. After implemeting a new track, an
+// import state for it needs to be added here.
+import './cpu_counters/frontend';
+import './cpu_slices/frontend';
