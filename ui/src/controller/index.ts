@@ -27,7 +27,7 @@ class Controller {
   }
 
   init(frontendProxyPort: MessagePort): void {
-    this._frontend = new FrontendProxy(frontendProxyPort);
+    this._frontend = new FrontendProxy(new Remote(frontendProxyPort));
   }
 
   doAction(_: Action): void {
@@ -40,9 +40,15 @@ class Controller {
  * Proxy for talking to the main thread.
  * TODO(hjd): Reduce the boilerplate.
  */
-class FrontendProxy extends Remote {
+class FrontendProxy {
+  private readonly remote: Remote;
+
+  constructor(remote: Remote) {
+    this.remote = remote;
+  }
+
   updateState(state: State) {
-    return this.send<void>('updateState', [state]);
+    return this.remote.send<void>('updateState', [state]);
   }
 }
 

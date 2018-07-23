@@ -24,9 +24,9 @@ interface RemoteResponse {
  */
 export class Remote {
   private nextRequestId: number;
-  protected port: MessagePort;
+  private port: MessagePort;
   // tslint:disable-next-line no-any
-  protected deferred: Map<number, Deferred<any>>;
+  private deferred: Map<number, Deferred<any>>;
 
   constructor(port: MessagePort) {
     this.nextRequestId = 0;
@@ -39,11 +39,11 @@ export class Remote {
 
   /**
    * Invoke method with name |method| with |args| on the remote object.
-   * Optionally set |transfer| to transfer those objects.
+   * Optionally set |transferList| to transfer those objects.
    */
   // tslint:disable-next-line no-any
-  protected send<T extends any>(
-      method: string, args: Array<{}>, transfer?: Array<{}>): Promise<T> {
+  send<T extends any>(
+      method: string, args: Array<{}>, transferList?: Array<{}>): Promise<T> {
     const d = defer<T>();
     this.deferred.set(this.nextRequestId, d);
     this.port.postMessage(
@@ -52,12 +52,12 @@ export class Remote {
           method,
           args,
         },
-        transfer);
+        transferList);
     this.nextRequestId += 1;
     return d;
   }
 
-  protected receive(response: RemoteResponse): void {
+  private receive(response: RemoteResponse): void {
     const d = this.deferred.get(response.id);
     if (!d) throw new Error(`No deferred response with ID ${response.id}`);
     this.deferred.delete(response.id);

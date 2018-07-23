@@ -183,7 +183,8 @@ function createController(): ControllerProxy {
   worker.onerror = e => {
     console.error(e);
   };
-  return new ControllerProxy(worker as {} as MessagePort);
+  const port = worker as {} as MessagePort;
+  return new ControllerProxy(new Remote(port));
 }
 
 /**
@@ -201,13 +202,19 @@ class FrontendApi {
  * This allows us to send strongly typed messages to the contoller.
  * TODO(hjd): Remove the boiler plate.
  */
-class ControllerProxy extends Remote {
+class ControllerProxy {
+  private readonly remote: Remote;
+
+  constructor(remote: Remote) {
+    this.remote = remote;
+  }
+
   init(port: MessagePort): Promise<void> {
-    return this.send<void>('init', [port], [port]);
+    return this.remote.send<void>('init', [port], [port]);
   }
 
   doAction(action: Action): Promise<void> {
-    return this.send<void>('doAction', [action]);
+    return this.remote.send<void>('doAction', [action]);
   }
 }
 
