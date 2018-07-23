@@ -14,11 +14,9 @@
 
 import * as m from 'mithril';
 
-import {forwardRemoteCalls, Remote} from '../base/remote';
-import {Action} from '../common/actions';
+import {forwardRemoteCalls} from '../base/remote';
 import {State} from '../common/state';
-import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
-
+import {warmupWasmEngineWorker, createWasmEngineWorkerPort} from '../controller/wasm_engine_proxy';
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
 import {ChildVirtualContext} from './child_virtual_context';
@@ -29,6 +27,7 @@ import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
 import {TimeScale} from './time_scale';
 import {Track} from './track';
+import {ControllerProxy} from './controller_proxy';
 
 export const Frontend = {
   oninit() {
@@ -195,37 +194,27 @@ class FrontendApi {
     globals.state = state;
     m.redraw();
   }
-}
 
-/**
- * Proxy for the Controller worker.
- * This allows us to send strongly typed messages to the contoller.
- * TODO(hjd): Remove the boiler plate.
- */
-class ControllerProxy {
-  private readonly remote: Remote;
-
-  constructor(remote: Remote) {
-    this.remote = remote;
-  }
-
-  init(port: MessagePort): Promise<State> {
-    return this.remote.send<State>('init', [port], [port]);
-  }
-
-  doAction(action: Action): Promise<void> {
-    return this.remote.send<void>('doAction', [action]);
+  /**
+   * Creates a new trace processor wasm engine (backed by a worker running
+   * engine_bundle.js) and returns a MessagePort for talking to it.
+   * This indirection is due to workers not being able create workers in
+   * Chrome which is tracked at: crbug.com/31666
+   * TODO(hjd): Remove this once the fix has landed.
+   */
+  createWasmEnginePort(): MessagePort {
+    return createWasmEngineWorkerPort();
   }
 }
 
 async function main() {
   const controller = createController();
+  globals.controller = controller;
   const channel = new MessageChannel();
   forwardRemoteCalls(channel.port2, new FrontendApi());
   globals.state = await controller.init(channel.port1);
 
-  // tslint:disable-next-line deprecation
-  globals.dispatch = controller.doAction.bind(controller);
+  globals.dispatch = controller.dispatch.bind(controller);
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');

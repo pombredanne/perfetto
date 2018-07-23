@@ -20,6 +20,8 @@ export function rootReducer(state: State, action: Action): State {
     case 'INCREMENT':
       state.i++;
       break;
+    case 'OPEN_TRACE':
+      break;
     default:
       break;
   }

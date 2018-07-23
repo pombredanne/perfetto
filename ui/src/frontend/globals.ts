@@ -14,7 +14,7 @@
 
 import {Action} from '../common/actions';
 import {State} from '../common/state';
-import {Engine} from '../controller/engine';
+import {ControllerProxy} from './controller_proxy';
 
 type Dispatch = (action: Action) => void;
 
@@ -24,6 +24,7 @@ type Dispatch = (action: Action) => void;
 class Globals {
   _dispatch?: Dispatch = undefined;
   _state?: State = undefined;
+  _controller?: ControllerProxy = undefined;
 
   get state(): State {
     if (this._state === undefined) throw new Error('Global not set');
@@ -43,13 +44,20 @@ class Globals {
     this._dispatch = value;
   }
 
+  get controller(): ControllerProxy {
+    if (this._controller === undefined) throw new Error('Global not set');
+    return this._controller;
+  }
+
+  set controller(value: ControllerProxy) {
+    this._controller = value;
+  }
+
   resetForTesting() {
     this._state = undefined;
     this._dispatch = undefined;
+    this._controller = undefined;
   }
 }
-
-// TODO(hjd): Temporary while bringing up controller worker.
-export const gEngines = new Map<string, Engine>();
 
 export const globals = new Globals();

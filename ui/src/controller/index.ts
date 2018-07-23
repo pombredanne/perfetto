@@ -16,6 +16,7 @@ import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action} from '../common/actions';
 import {createEmptyState, State} from '../common/state';
 import {rootReducer} from './reducer';
+import {WasmEngineProxy} from './wasm_engine_proxy';
 
 class Controller {
   private state: State;
@@ -35,9 +36,31 @@ class Controller {
     return this.state;
   }
 
-  doAction(action: Action): void {
-    this.state = rootReducer(this.state, action);
+  dispatch(action: Action): void {
+    this.doAction(action);
     this.frontend.updateState(this.state);
+  }
+
+  /**
+   * Special case handling of loading a trace from a blob.
+   * This can't be a pure action since we don't want to store
+   * the Blob in the state.
+   */
+  loadTraceFromBlob(blob: Blob): void {
+    this.createEngine(blob);
+    this.frontend.updateState(this.state);
+  }
+
+  private async createEngine(blob: Blob) {
+    const port = await this.frontend.createWasmEnginePort();
+    const engine = WasmEngineProxy.create(port, blob);
+    engine.rawQuery({sqlQuery: 'select * from sched;'}).then((result) => {
+      console.log(result);
+    });
+  }
+
+  private doAction(action: Action): void {
+    this.state = rootReducer(this.state, action);
   }
 }
 
@@ -54,6 +77,10 @@ class FrontendProxy {
 
   updateState(state: State) {
     return this.remote.send<void>('updateState', [state]);
+  }
+
+  createWasmEnginePort() {
+    return this.remote.send<MessagePort>('createWasmEnginePort', []);
   }
 }
 

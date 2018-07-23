@@ -14,9 +14,7 @@
 
 import * as m from 'mithril';
 
-import {WasmEngineProxy} from '../controller/wasm_engine_proxy';
-
-import {gEngines, globals} from './globals';
+import {globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';
 
@@ -32,8 +30,7 @@ async function loadExampleTrace() {
   const url = 'https://storage.googleapis.com/perfetto-misc/example_trace';
   const repsonse = await fetch(url);
   const blob = await repsonse.blob();
-  gEngines.set('0', WasmEngineProxy.create(blob));
-  m.route.set('/query/0');
+  globals.controller.loadTraceFromBlob(blob);
 }
 
 export const HomePage = createPage({
@@ -48,7 +45,7 @@ export const HomePage = createPage({
               onchange: (e: Event) => {
                 const blob = extractBlob(e);
                 if (!blob) return;
-                gEngines.set('0', WasmEngineProxy.create(blob));
+                globals.controller.loadTraceFromBlob(blob);
                 m.route.set('/query/0');
               },
             }),

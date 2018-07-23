@@ -16,8 +16,6 @@ import * as m from 'mithril';
 
 import {RawQueryResult} from '../common/protos';
 import {Engine} from '../controller/engine';
-
-import {gEngines} from './globals';
 import {createPage} from './pages';
 
 // TODO(hjd): Something mangles unicode in strings – we should fix that.
@@ -126,14 +124,14 @@ const QueryBox = {
           onsubmit: (e: Event) => {
             e.preventDefault();
             console.log(this.query);
-            const engine = gEngines.get('0');
+            const engine = null;
             if (!engine) return;
             doQuery(engine, this.query);
           },
         },
         m('input.query-input', {
           placeholder: 'Query',
-          disabled: !gEngines.get('0'),
+          disabled: true,
           oninput: m.withAttr('value', (q: string) => this.query = q),
           value: this.query,
         }),
