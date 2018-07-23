@@ -18,7 +18,6 @@ export class ZoomContent {
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
   static ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
   static KEYBOARD_PAN_PX_PER_FRAME = 20;
-  static FINGER_PAN_DIRECTION_CHANGE_FINGER_SWITCH_TIME = 200;
 
   protected mouseDownX = -1;
   private mouseXpos = 0;
@@ -37,20 +36,25 @@ export class ZoomContent {
 
   private handleKeyPanning() {
     document.body.addEventListener('keydown', (e) => {
+      if (e.repeat) {
+        return;
+      }
       if (e.key === 'a') {
         startPan(true);
       } else if (e.key === 'd') {
         startPan(false);
       }
-    });
+    }, {passive: true});
     document.body.addEventListener('keyup', (e) => {
+      if (e.repeat) {
+        return;
+      }
       if (e.key === 'a' || e.key === 'd') {
         endPan();
       }
     });
 
     let panning = false;
-    let gracePeriodForPanFingerSwitch = 0;
     let panLeftFactor = 0;
 
     const pan = () => {
@@ -63,19 +67,13 @@ export class ZoomContent {
     const startPan = (left: boolean) => {
       panLeftFactor = left ? -1 : 1;
       if (panning) {
-        gracePeriodForPanFingerSwitch = Date.now();
         return;
       }
       panning = true;
       pan();
     };
     const endPan = () => {
-      if (gracePeriodForPanFingerSwitch === 0 ||
-          Date.now() - gracePeriodForPanFingerSwitch >
-              ZoomContent.FINGER_PAN_DIRECTION_CHANGE_FINGER_SWITCH_TIME) {
-        panning = false;
-      }
-      gracePeriodForPanFingerSwitch = 0;
+      panning = false;
     };
   }
 

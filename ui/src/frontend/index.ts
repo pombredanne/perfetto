@@ -36,7 +36,8 @@ export const Frontend = {
     this.canvasController = new CanvasController();
     this.visibleWindowMs = {start: 0, end: 1000000};
     this.timeScale = new TimeScale(
-        [this.visibleWindowMs.start, this.visibleWindowMs.end], [0, 1000]);
+        [this.visibleWindowMs.start, this.visibleWindowMs.end],
+        [0, this.width]);
   },
   oncreate(vnode) {
     this.onResize = () => {
@@ -44,6 +45,7 @@ export const Frontend = {
       this.width = rect.width;
       this.height = rect.height;
       this.canvasController.setDimensions(this.width, this.height);
+      this.timeScale.setLimitsPx(0, this.width);
       m.redraw();
     };
     // Have to redraw after initialization to provide dimensions to view().
