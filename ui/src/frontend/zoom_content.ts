@@ -12,15 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Animation} from './animation';
+import Timer = NodeJS.Timer;
 
+/**
+ * Enables horizontal pan and zoom with mouse-based drag and WASD navigation.
+ */
 export class ZoomContent {
-  static SCROLL_SPEED = 1;
+  static HORIZONTAL_WHEEL_PAN_SPEED = 1;
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
   static ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
   static KEYBOARD_PAN_PX_PER_FRAME = 20;
+  static ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS = 700;
+  static ANIMATION_TIME_AFTER_KEYPRESS_MS = 80;
+  static TAP_ANIMATION_TIME = 200;
 
-  protected mouseDownX = -1;
-  private mouseXpos = 0;
+  static PAN_LEFT_KEYS = ['a'];
+  static PAN_RIGHT_KEYS = ['d'];
+  static PAN_KEYS =
+      ZoomContent.PAN_LEFT_KEYS.concat(ZoomContent.PAN_RIGHT_KEYS);
+  static ZOOM_IN_KEYS = ['w'];
+  static ZOOM_OUT_KEYS = ['s'];
+  static ZOOM_KEYS = ZoomContent.ZOOM_IN_KEYS.concat(ZoomContent.ZOOM_OUT_KEYS);
+
+  protected mouseDownPositionX = -1;
+  private mousePositionX = -1;
 
   constructor(
       private element: HTMLElement, private contentOffsetX: number,
@@ -35,84 +51,71 @@ export class ZoomContent {
   }
 
   private handleKeyPanning() {
-    document.body.addEventListener('keydown', (e) => {
-      if (e.repeat) {
-        return;
-      }
-      if (e.key === 'a') {
-        startPan(true);
-      } else if (e.key === 'd') {
-        startPan(false);
-      }
-    }, {passive: true});
-    document.body.addEventListener('keyup', (e) => {
-      if (e.repeat) {
-        return;
-      }
-      if (e.key === 'a' || e.key === 'd') {
-        endPan();
-      }
+    let directionFactor = 0;
+    let tapCancelTimeout: Timer;
+
+    const panAnimation = new Animation(() => {
+      this.onPanned(directionFactor * ZoomContent.KEYBOARD_PAN_PX_PER_FRAME);
     });
 
-    let panning = false;
-    let panLeftFactor = 0;
-
-    const pan = () => {
-      this.onPanned(panLeftFactor * ZoomContent.KEYBOARD_PAN_PX_PER_FRAME);
-      if (panning) {
-        requestAnimationFrame(() => pan());
+    document.body.addEventListener('keydown', (e) => {
+      if (ZoomContent.PAN_KEYS.indexOf(e.key) !== -1) {
+        directionFactor =
+            ZoomContent.PAN_LEFT_KEYS.indexOf(e.key) !== -1 ? -1 : 1;
+        const animationTime = e.repeat ?
+            ZoomContent.ANIMATION_TIME_AFTER_KEYPRESS_MS :
+            ZoomContent.ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS;
+        panAnimation.start(animationTime);
+        clearTimeout(tapCancelTimeout);
       }
-    };
+    });
+    document.body.addEventListener('keyup', (e) => {
+      if (ZoomContent.PAN_KEYS.indexOf(e.key) !== -1) {
+        const cancellingDirectionFactor =
+            ZoomContent.PAN_LEFT_KEYS.indexOf(e.key) !== -1 ? -1 : 1;
 
-    const startPan = (left: boolean) => {
-      panLeftFactor = left ? -1 : 1;
-      if (panning) {
-        return;
+        if (cancellingDirectionFactor === directionFactor) {
+          const minEndTime =
+              panAnimation.getStartTimeMs() + ZoomContent.TAP_ANIMATION_TIME;
+          const waitTime = minEndTime - Date.now();
+          tapCancelTimeout = setTimeout(() => panAnimation.stop(), waitTime);
+        }
       }
-      panning = true;
-      pan();
-    };
-    const endPan = () => {
-      panning = false;
-    };
+    });
   }
 
   private handleKeyZooming() {
+    let zoomingIn = true;
+    let tapCancelTimeout: Timer;
+
+    const zoomAnimation = new Animation(() => {
+      const percentage = zoomingIn ? ZoomContent.ZOOM_IN_PERCENTAGE_SPEED :
+                                     ZoomContent.ZOOM_OUT_PERCENTAGE_SPEED;
+      this.onZoomed(this.mousePositionX, percentage);
+    });
+
     document.body.addEventListener('keydown', (e) => {
-      if (e.key === 'w') {
-        startZoom(true);
-      } else if (e.key === 's') {
-        startZoom(false);
+      if (ZoomContent.ZOOM_KEYS.indexOf(e.key) !== -1) {
+        zoomingIn = ZoomContent.ZOOM_IN_KEYS.indexOf(e.key) !== -1;
+        const animationTime = e.repeat ?
+            ZoomContent.ANIMATION_TIME_AFTER_KEYPRESS_MS :
+            ZoomContent.ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS;
+        zoomAnimation.start(animationTime);
+        clearTimeout(tapCancelTimeout);
       }
     });
     document.body.addEventListener('keyup', (e) => {
-      if (e.key === 'w' || e.key === 's') {
-        endZoom();
+      if (ZoomContent.ZOOM_KEYS.indexOf(e.key) !== -1) {
+        const cancellingZoomIn = ZoomContent.ZOOM_IN_KEYS.indexOf(e.key) !== -1;
+
+        if (cancellingZoomIn === zoomingIn) {
+          const minEndTime =
+              zoomAnimation.getStartTimeMs() + ZoomContent.TAP_ANIMATION_TIME;
+          const waitTime = minEndTime - Date.now();
+          tapCancelTimeout = setTimeout(() => zoomAnimation.stop(), waitTime);
+        }
       }
     });
-
-    let zooming = false;
-
-    const zoom = (zoomIn: boolean) => {
-      const percentage = zoomIn ? ZoomContent.ZOOM_IN_PERCENTAGE_SPEED :
-                                  ZoomContent.ZOOM_OUT_PERCENTAGE_SPEED;
-      this.onZoomed(this.mouseXpos, percentage);
-
-      if (zooming) {
-        requestAnimationFrame(() => zoom(zoomIn));
-      }
-    };
-
-    const startZoom = (zoomIn: boolean) => {
-      if (zooming) {
-        return;
-      }
-      zooming = true;
-      zoom(zoomIn);
-    };
-    const endZoom = () => {
-      zooming = false;
-    };
   }
 
   private attachMouseEventListeners() {
@@ -123,17 +126,16 @@ export class ZoomContent {
   }
 
   protected onMouseDown(e: MouseEvent) {
-    this.mouseDownX = this.getMouseX(e);
+    this.mouseDownPositionX = this.getMouseX(e);
   }
 
   protected onMouseMove(e: MouseEvent) {
-    if (this.mouseDownX !== -1) {
-      const movedPx = this.mouseDownX - this.getMouseX(e);
-      this.onPanned(movedPx);
-      this.mouseDownX = this.getMouseX(e);
+    if (this.mouseDownPositionX !== -1) {
+      this.onPanned(this.mouseDownPositionX - this.getMouseX(e));
+      this.mouseDownPositionX = this.getMouseX(e);
       e.preventDefault();
     }
-    this.mouseXpos = this.getMouseX(e);
+    this.mousePositionX = this.getMouseX(e);
   }
 
   private getMouseX(e: MouseEvent) {
@@ -141,12 +143,12 @@ export class ZoomContent {
   }
 
   private onMouseUp() {
-    this.mouseDownX = -1;
+    this.mouseDownPositionX = -1;
   }
 
   private onWheel(e: WheelEvent) {
     if (e.deltaX) {
-      this.onPanned(e.deltaX * ZoomContent.SCROLL_SPEED);
+      this.onPanned(e.deltaX * ZoomContent.HORIZONTAL_WHEEL_PAN_SPEED);
     }
   }
 }

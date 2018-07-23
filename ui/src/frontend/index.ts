@@ -27,12 +27,17 @@ import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
 import {TimeScale} from './time_scale';
 import {Track} from './track';
+import {ZoomContent} from './zoom_content';
 
 export const Frontend = {
   oninit() {
     this.width = 0;
     this.height = 0;
     this.canvasController = new CanvasController();
+    this.visibleWindowMs = {start: 0, end: 1000000};
+    this.timeScale = new TimeScale(
+        [this.visibleWindowMs.start, this.visibleWindowMs.end],
+        [0, this.width]);
   },
   oncreate(vnode) {
     this.onResize = () => {
@@ -40,6 +45,7 @@ export const Frontend = {
       this.width = rect.width;
       this.height = rect.height;
       this.canvasController.setDimensions(this.width, this.height);
+      this.timeScale.setLimitsPx(0, this.width);
       m.redraw();
     };
     // Have to redraw after initialization to provide dimensions to view().
@@ -47,6 +53,40 @@ export const Frontend = {
 
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
+
+    // TODO: ContentOffsetX should be defined somewhere central.
+    // Currently it lives here, in canvas wrapper, and in track shell.
+    const zoomContent = new ZoomContent(
+        vnode.dom as HTMLElement,
+        200,
+        (pannedPx: number) => {
+          const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
+          this.visibleWindowMs.start += deltaMs;
+          this.visibleWindowMs.end += deltaMs;
+          this.timeScale.setLimitsMs(
+              this.visibleWindowMs.start, this.visibleWindowMs.end);
+          m.redraw();
+        },
+        (zoomedPositionPx: number, zoomPercentage: number) => {
+          const totalTimespanMs =
+              this.visibleWindowMs.end - this.visibleWindowMs.start;
+          const newTotalTimespanMs = totalTimespanMs * zoomPercentage;
+
+          const zoomedPositionMs =
+              this.timeScale.pxToMs(zoomedPositionPx) as number;
+          const positionPercentage =
+              (zoomedPositionMs - this.visibleWindowMs.start) / totalTimespanMs;
+
+          this.visibleWindowMs.start =
+              zoomedPositionMs - newTotalTimespanMs * positionPercentage;
+          this.visibleWindowMs.end =
+              zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
+          this.timeScale.setLimitsMs(
+              this.visibleWindowMs.start, this.visibleWindowMs.end);
+          m.redraw();
+        });
+
+    zoomContent.init();
   },
   onremove() {
     window.removeEventListener('resize', this.onResize);
@@ -54,7 +94,6 @@ export const Frontend = {
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
-    const timeScale = new TimeScale([0, 1000000], [0, this.width]);
 
     this.canvasController.clear();
 
@@ -88,7 +127,8 @@ export const Frontend = {
                 ctx, {y: 0, x: 0, width: this.width, height: 90}),
             top: 0,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 2',
@@ -96,7 +136,8 @@ export const Frontend = {
                 ctx, {y: 100, x: 0, width: this.width, height: 90}),
             top: 100,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 3',
@@ -104,7 +145,8 @@ export const Frontend = {
                 ctx, {y: 200, x: 0, width: this.width, height: 90}),
             top: 200,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 4',
@@ -112,7 +154,8 @@ export const Frontend = {
                 ctx, {y: 300, x: 0, width: this.width, height: 90}),
             top: 300,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 5',
@@ -120,7 +163,8 @@ export const Frontend = {
                 ctx, {y: 400, x: 0, width: this.width, height: 90}),
             top: 400,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 6',
@@ -128,7 +172,8 @@ export const Frontend = {
                 ctx, {y: 500, x: 0, width: this.width, height: 90}),
             top: 500,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 7',
@@ -136,7 +181,8 @@ export const Frontend = {
                 ctx, {y: 600, x: 0, width: this.width, height: 90}),
             top: 600,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 8',
@@ -144,7 +190,8 @@ export const Frontend = {
                 ctx, {y: 700, x: 0, width: this.width, height: 90}),
             top: 700,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 9',
@@ -152,7 +199,8 @@ export const Frontend = {
                 ctx, {y: 800, x: 0, width: this.width, height: 90}),
             top: 800,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }),
           m(Track, {
             name: 'Track 10',
@@ -160,14 +208,17 @@ export const Frontend = {
                 ctx, {y: 900, x: 0, width: this.width, height: 90}),
             top: 900,
             width: this.width,
-            timeScale
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs
           }), ), );
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
   width: number,
   height: number,
-  onResize: () => void
+  onResize: () => void,
+  timeScale: TimeScale,
+  visibleWindowMs: {start: number, end: number}
 }>;
 
 export const FrontendPage = createPage({
