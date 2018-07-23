@@ -56,7 +56,7 @@ export const Frontend = {
   view({}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
-    const timeScale = new TimeScale([0, 1000000], [0, 1000]);
+    const timeScale = new TimeScale([0, 1000000], [0, this.width]);
 
     this.canvasController.clear();
 
@@ -183,7 +183,8 @@ function createController(): ControllerProxy {
   worker.onerror = e => {
     console.error(e);
   };
-  return new ControllerProxy(worker as {} as MessagePort);
+  const port = worker as {} as MessagePort;
+  return new ControllerProxy(new Remote(port));
 }
 
 /**
@@ -201,13 +202,19 @@ class FrontendApi {
  * This allows us to send strongly typed messages to the contoller.
  * TODO(hjd): Remove the boiler plate.
  */
-class ControllerProxy extends Remote {
+class ControllerProxy {
+  private readonly remote: Remote;
+
+  constructor(remote: Remote) {
+    this.remote = remote;
+  }
+
   init(port: MessagePort): Promise<State> {
-    return this.send<State>('init', [port], [port]);
+    return this.remote.send<State>('init', [port], [port]);
   }
 
   doAction(action: Action): Promise<void> {
-    return this.send<void>('doAction', [action]);
+    return this.remote.send<void>('doAction', [action]);
   }
 }
 
