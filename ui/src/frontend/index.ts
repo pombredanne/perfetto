@@ -178,7 +178,6 @@ export const FrontendPage = createPage({
   }
 });
 
-
 function createController(): ControllerProxy {
   const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
@@ -200,6 +199,7 @@ class FrontendApi {
 /**
  * Proxy for the Controller worker.
  * This allows us to send strongly typed messages to the contoller.
+ * TODO(hjd): Remove the boiler plate.
  */
 class ControllerProxy extends Remote {
   init(port: MessagePort): Promise<void> {

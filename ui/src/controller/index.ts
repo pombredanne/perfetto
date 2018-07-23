@@ -38,6 +38,7 @@ class Controller {
 
 /**
  * Proxy for talking to the main thread.
+ * TODO(hjd): Reduce the boilerplate.
  */
 class FrontendProxy extends Remote {
   updateState(state: State) {
