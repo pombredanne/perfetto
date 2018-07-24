@@ -14,53 +14,30 @@
 
 import * as m from 'mithril';
 
-import {GridlineHelper} from './gridline_helper';
+import {TrackState} from '../common/state';
+
 import {Milliseconds, TimeScale} from './time_scale';
+import {TrackImpl} from './track_impl';
+import {trackRegistry} from './track_registry';
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export const Track = {
+  oninit({attrs}) {
+    // TODO: Since ES6 modules are asynchronous and it is conceivable that we
+    // want to load a track implementation on demand, we should not rely here on
+    // the fact that the track is already registered. We should show some
+    // default content until a track implementation is found.
+    const trackCreator = trackRegistry.getCreator(attrs.trackState.type);
+    this.trackImpl = trackCreator.create(attrs.trackState);
+  },
+
   view({attrs}) {
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
     const rectStart = attrs.timeScale.msToPx(sliceStart);
     const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
-
-    let shownStart = rectStart as number;
-    let shownWidth = rectWidth;
-
-    if (shownStart < 0) {
-      shownWidth += shownStart;
-      shownStart = 0;
-    }
-    if (shownStart > attrs.width) {
-      shownStart = attrs.width;
-      shownWidth = 0;
-    }
-    if (shownStart + shownWidth > attrs.width) {
-      shownWidth = attrs.width - shownStart;
-    }
-
-    if (attrs.trackContext.isOnCanvas()) {
-      attrs.trackContext.fillStyle = '#ccc';
-      attrs.trackContext.fillRect(0, 0, attrs.width, 73);
-
-      GridlineHelper.drawGridLines(
-          attrs.trackContext,
-          attrs.timeScale,
-          [attrs.visibleWindowMs.start, attrs.visibleWindowMs.end],
-          attrs.width,
-          73);
-
-      attrs.trackContext.fillStyle = '#c00';
-      attrs.trackContext.fillRect(shownStart, 40, shownWidth, 30);
-
-      attrs.trackContext.font = '16px Arial';
-      attrs.trackContext.fillStyle = '#000';
-      attrs.trackContext.fillText(
-          attrs.name + ' rendered by canvas', shownStart, 60);
-    }
 
     return m(
         '.track',
@@ -69,11 +46,13 @@ export const Track = {
             position: 'absolute',
             top: attrs.top.toString() + 'px',
             left: 0,
-            width: '100%'
+            width: '100%',
+            height: `${attrs.trackState.height}px`,
           }
         },
         m(TrackShell,
-          attrs,
+          {name: attrs.trackState.name},
+          // TODO(dproy): Move out DOM Content from the track class.
           m('.marker',
             {
               style: {
@@ -84,13 +63,26 @@ export const Track = {
                 background: '#aca'
               }
             },
-            attrs.name + ' DOM Content')));
+            attrs.trackState.name + ' DOM Content')));
+  },
+
+  onupdate({attrs}) {
+    // TODO(dproy): Figure out how track implementations should render DOM.
+    if (attrs.trackContext.isOnCanvas()) {
+      this.trackImpl.draw(
+          attrs.trackContext,
+          attrs.width,
+          attrs.timeScale,
+          attrs.visibleWindowMs);
+    }
   }
 } as m.Component<{
-  name: string,
   trackContext: VirtualCanvasContext,
   top: number,
   width: number,
   timeScale: TimeScale,
-  visibleWindowMs: {start: number, end: number}
-}>;
+  trackState: TrackState,
+  visibleWindowMs: {start: number, end: number},
+},
+                     // TODO(dproy): Fix formatter. This is ridiculous.
+                     {trackImpl: TrackImpl}>;

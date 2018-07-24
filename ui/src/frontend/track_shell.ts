@@ -18,7 +18,13 @@ export const TrackShell = {
   view({attrs, children}) {
     return m(
         '.trackshell',
-        {style: {border: '1px solid #666', position: 'relative'}},
+        {
+          style: {
+            border: '1px solid #666',
+            position: 'relative',
+            height: '100%',
+          }
+        },
         m('.shell-content',
           {
             style: {
@@ -28,7 +34,8 @@ export const TrackShell = {
               'border-right': '1px solid #666',
               position: 'absolute',
               left: '0',
-              'z-index': 100
+              'z-index': 100,
+              height: '100%',
             }
           },
           m('h1', {style: {margin: 0, 'font-size': '1.5em'}}, attrs.name)),

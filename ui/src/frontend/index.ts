@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import '../tracks/all_tracks';
+
 import * as m from 'mithril';
 
-import {createEmptyState} from '../common/state';
+import {ObjectById, TrackState} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
 
 import {CanvasController} from './canvas_controller';
@@ -54,6 +56,7 @@ export const Frontend = {
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
 
+
     // TODO: ContentOffsetX should be defined somewhere central.
     // Currently it lives here, in canvas wrapper, and in track shell.
     const zoomContent = new ZoomContent(
@@ -91,11 +94,32 @@ export const Frontend = {
   onremove() {
     window.removeEventListener('resize', this.onResize);
   },
-  view({}) {
+  view() {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
 
     this.canvasController.clear();
+    const tracks = globals.state.tracks;
+
+    const childTracks: m.Children[] = [];
+
+    let trackYOffset = 0;
+    for (const trackState of Object.values(tracks)) {
+      childTracks.push(m(Track, {
+        trackContext: new ChildVirtualContext(ctx, {
+          y: trackYOffset,
+          x: 0,
+          width: this.width,
+          height: trackState.height,
+        }),
+        top: trackYOffset,
+        width: this.width,
+        trackState,
+        timeScale: this.timeScale,
+        visibleWindowMs: this.visibleWindowMs
+      }));
+      trackYOffset += trackState.height;
+    }
 
     return m(
         '.frontend',
@@ -121,96 +145,7 @@ export const Frontend = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          m(Track, {
-            name: 'Track 1',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 0, x: 0, width: this.width, height: 90}),
-            top: 0,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 2',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 100, x: 0, width: this.width, height: 90}),
-            top: 100,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 3',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 200, x: 0, width: this.width, height: 90}),
-            top: 200,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 4',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 300, x: 0, width: this.width, height: 90}),
-            top: 300,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 5',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 400, x: 0, width: this.width, height: 90}),
-            top: 400,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 6',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 500, x: 0, width: this.width, height: 90}),
-            top: 500,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 7',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 600, x: 0, width: this.width, height: 90}),
-            top: 600,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 8',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 700, x: 0, width: this.width, height: 90}),
-            top: 700,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 9',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 800, x: 0, width: this.width, height: 90}),
-            top: 800,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }),
-          m(Track, {
-            name: 'Track 10',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 900, x: 0, width: this.width, height: 90}),
-            top: 900,
-            width: this.width,
-            timeScale: this.timeScale,
-            visibleWindowMs: this.visibleWindowMs
-          }), ), );
+          ...childTracks));
   },
 } as m.Component<{width: number, height: number}, {
   canvasController: CanvasController,
@@ -218,7 +153,7 @@ export const Frontend = {
   height: number,
   onResize: () => void,
   timeScale: TimeScale,
-  visibleWindowMs: {start: number, end: number}
+  visibleWindowMs: {start: number, end: number},
 }>;
 
 export const FrontendPage = createPage({
@@ -239,8 +174,29 @@ function createController(): Worker {
   return worker;
 }
 
+function getDemoTracks(): ObjectById<TrackState> {
+  const tracks: {[key: string]: TrackState;} = {};
+  for (let i = 0; i < 10; i++) {
+    let trackType;
+    // The track type strings here are temporary. They will be supplied by the
+    // controller side track implementation.
+    if (i % 2 === 0) {
+      trackType = 'CpuSliceTrack';
+    } else {
+      trackType = 'CpuCounterTrack';
+    }
+    tracks[i] = {
+      id: i.toString(),
+      type: trackType,
+      height: 100,
+      name: `Track ${i}`,
+    };
+  }
+  return tracks;
+}
+
 function main() {
-  globals.state = createEmptyState();
+  globals.state = {i: 0, tracks: getDemoTracks()};
   const worker = createController();
   // tslint:disable-next-line deprecation
   globals.dispatch = action => worker.postMessage(action);
