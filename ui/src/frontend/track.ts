@@ -69,7 +69,11 @@ export const Track = {
   onupdate({attrs}) {
     // TODO(dproy): Figure out how track implementations should render DOM.
     if (attrs.trackContext.isOnCanvas()) {
-      this.trackImpl.draw(attrs.trackContext, attrs.width, attrs.timeScale);
+      this.trackImpl.draw(
+          attrs.trackContext,
+          attrs.width,
+          attrs.timeScale,
+          attrs.visibleWindowMs);
     }
   }
 } as m.Component<{
@@ -78,6 +82,7 @@ export const Track = {
   width: number,
   timeScale: TimeScale,
   trackState: TrackState,
+  visibleWindowMs: {start: number, end: number},
 },
                      // TODO(dproy): Fix formatter. This is ridiculous.
                      {trackImpl: TrackImpl}>;

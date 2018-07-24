@@ -32,6 +32,9 @@ export const TrackShell = {
               padding: '20px',
               width: '200px',
               'border-right': '1px solid #666',
+              position: 'absolute',
+              left: '0',
+              'z-index': 100,
               height: '100%',
             }
           },

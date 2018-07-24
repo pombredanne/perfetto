@@ -43,5 +43,6 @@ export interface TrackCreator {
 export abstract class TrackImpl {
   constructor(protected trackState: TrackState) {}
   abstract draw(
-      vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale): void;
+      vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
+      visibleWindowMs: {start: number, end: number}): void;
 }
