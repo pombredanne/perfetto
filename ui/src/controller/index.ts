@@ -30,7 +30,7 @@ class Controller {
     return this._frontend;
   }
 
-  init(frontendProxyPort: MessagePort): State {
+  initAndGetState(frontendProxyPort: MessagePort): State {
     this._frontend = new FrontendProxy(new Remote(frontendProxyPort));
     return this.state;
   }

@@ -17,6 +17,7 @@ import {State} from '../common/state';
 
 export function rootReducer(state: State, action: Action): State {
   switch (action.type) {
+    // TODO(hjd): Make pure.
     case 'INCREMENT':
       state.i++;
       break;

@@ -209,8 +209,8 @@ class ControllerProxy {
     this.remote = remote;
   }
 
-  init(port: MessagePort): Promise<State> {
-    return this.remote.send<State>('init', [port], [port]);
+  initAndGetState(port: MessagePort): Promise<State> {
+    return this.remote.send<State>('initAndGetState', [port], [port]);
   }
 
   doAction(action: Action): Promise<void> {
