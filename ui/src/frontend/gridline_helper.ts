@@ -20,7 +20,9 @@ export abstract class GridlineHelper {
       ctx: VirtualCanvasContext, x: TimeScale,
       timeBounds: [Milliseconds, Milliseconds], width: number,
       height: number): void {
-    const step = GridlineHelper.getStepSize(timeBounds[1] - timeBounds[0]);
+    const range = timeBounds[1] - timeBounds[0];
+    const desiredSteps = width / 80;
+    const step = GridlineHelper.getStepSize(range, desiredSteps);
     const start = Math.round(timeBounds[0] / step) * step;
 
     ctx.strokeStyle = '#999999';
@@ -43,13 +45,19 @@ export abstract class GridlineHelper {
    * are between 10 and 25 steps. The only possible step sizes are 2, 5, or 10,
    * except for factors of 10 for scaling.
    */
-  static getStepSize(range: Milliseconds): Milliseconds {
+  static getStepSize(range: Milliseconds, desiredSteps = 15): Milliseconds {
     const zeros = Math.floor(Math.log10(range));
     let step = Math.pow(10, zeros);
-    if (range / step < 5) {
+    const distToDesired = (step: number) =>
+        Math.abs(range / step - desiredSteps);
+
+    if (distToDesired(step / 10) < distToDesired(step)) {
+      step /= 10;
+    }
+    if (distToDesired(step / 5) < distToDesired(step)) {
       step /= 5;
     }
-    if (range / step < 10) {
+    if (distToDesired(step / 2) < distToDesired(step)) {
       step /= 2;
     }
     return step;
