@@ -32,7 +32,7 @@ export const ScrollingTrackDisplay = {
     this.canvasController = new CanvasController();
   },
   oncreate(vnode) {
-    // TODO: Consider moving this in top level TraceViewer.
+    // TODO: Consider moving this to top level TraceViewer.
     this.onResize = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
