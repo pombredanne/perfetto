@@ -43,10 +43,10 @@ export class ZoomContent {
   private mouseDownPositionX = -1;
   private mousePositionX = -1;
 
-  private onMouseDownLambda = (e: MouseEvent) => this.onMouseDown(e);
-  private onMouseMoveLambda = (e: MouseEvent) => this.onMouseMove(e);
-  private onMouseUpLambda = () => this.onMouseUp();
-  private onWheelLambda = (e: WheelEvent) => this.onWheel(e);
+  private readonly onMouseDownLambda = (e: MouseEvent) => this.onMouseDown(e);
+  private readonly onMouseMoveLambda = (e: MouseEvent) => this.onMouseMove(e);
+  private readonly onMouseUpLambda = () => this.onMouseUp();
+  private readonly onWheelLambda = (e: WheelEvent) => this.onWheel(e);
 
   constructor(
       private element: HTMLElement, private contentOffsetX: number,
