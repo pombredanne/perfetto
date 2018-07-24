@@ -27,6 +27,7 @@ import {HomePage} from './home_page';
 import {createPage} from './pages';
 import {QueryPage} from './query_page';
 import {ScrollableContainer} from './scrollable_container';
+import {TimeScale} from './time_scale';
 import {Track} from './track';
 
 export const Frontend = {
@@ -55,6 +56,8 @@ export const Frontend = {
   view() {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
     const ctx = this.canvasController.getContext();
+    const timeScale = new TimeScale([0, 1000000], [0, this.width]);
+
     this.canvasController.clear();
     const tracks = globals.state.tracks;
 
@@ -63,16 +66,16 @@ export const Frontend = {
     let trackYOffset = 0;
     for (const trackState of Object.values(tracks)) {
       childTracks.push(m(Track, {
-        name: `Track ${trackState.id}`,
         trackContext: new ChildVirtualContext(ctx, {
           y: trackYOffset,
           x: 0,
           width: this.width,
-          height: trackState.height
+          height: trackState.height,
         }),
         top: trackYOffset,
         width: this.width,
         trackState,
+        timeScale
       }));
       trackYOffset += trackState.height;
     }
@@ -83,7 +86,7 @@ export const Frontend = {
           style: {
             position: 'relative',
             width: '100%',
-            height: 'calc(100% - 100px)',
+            height: 'calc(100% - 105px)',
             overflow: 'hidden'
           }
         },
@@ -143,6 +146,7 @@ function getDemoTracks(): ObjectById<TrackState> {
       id: i.toString(),
       type: trackType,
       height: 100,
+      name: `Track ${i}`,
     };
   }
   return tracks;

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {TrackState} from '../common/state';
+
+import {TimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 /**
@@ -40,5 +42,6 @@ export interface TrackCreator {
  */
 export abstract class TrackImpl {
   constructor(protected trackState: TrackState) {}
-  abstract draw(vCtx: VirtualCanvasContext, width: number): void;
+  abstract draw(
+      vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale): void;
 }
