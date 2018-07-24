@@ -47,6 +47,10 @@ export class ZoomContent {
   private readonly onMouseMoveLambda = (e: MouseEvent) => this.onMouseMove(e);
   private readonly onMouseUpLambda = () => this.onMouseUp();
   private readonly onWheelLambda = (e: WheelEvent) => this.onWheel(e);
+  private panKeyDownLambda: (e: KeyboardEvent) => void = () => {};
+  private panKeyUpLambda: (e: KeyboardEvent) => void = () => {};
+  private zoomKeyDownLambda: (e: KeyboardEvent) => void = () => {};
+  private zoomKeyUpLambda: (e: KeyboardEvent) => void = () => {};
 
   constructor(
       private element: HTMLElement, private contentOffsetX: number,
@@ -62,6 +66,11 @@ export class ZoomContent {
 
   shutdown() {
     this.detachMouseEventListeners();
+
+    document.body.removeEventListener('keydown', this.panKeyDownLambda);
+    document.body.removeEventListener('keyup', this.panKeyUpLambda);
+    document.body.removeEventListener('keydown', this.zoomKeyDownLambda);
+    document.body.removeEventListener('keyup', this.zoomKeyUpLambda);
   }
 
   private handleKeyPanning() {
@@ -72,7 +81,7 @@ export class ZoomContent {
       this.onPanned(directionFactor * KEYBOARD_PAN_PX_PER_FRAME);
     });
 
-    document.body.addEventListener('keydown', e => {
+    this.panKeyDownLambda = e => {
       if (!PAN_KEYS.includes(e.key)) {
         return;
       }
@@ -82,8 +91,8 @@ export class ZoomContent {
           ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS;
       panAnimation.start(animationTime);
       clearTimeout(tapCancelTimeout);
-    });
-    document.body.addEventListener('keyup', e => {
+    };
+    this.panKeyUpLambda = e => {
       if (!PAN_KEYS.includes(e.key)) {
         return;
       }
@@ -95,7 +104,10 @@ export class ZoomContent {
         const waitTime = minEndTime - Date.now();
         tapCancelTimeout = setTimeout(() => panAnimation.stop(), waitTime);
       }
-    });
+    };
+
+    document.body.addEventListener('keydown', this.panKeyDownLambda);
+    document.body.addEventListener('keyup', this.panKeyUpLambda);
   }
 
   private handleKeyZooming() {
@@ -108,7 +120,7 @@ export class ZoomContent {
       this.onZoomed(this.mousePositionX, percentage);
     });
 
-    document.body.addEventListener('keydown', e => {
+    this.zoomKeyDownLambda = e => {
       if (ZOOM_KEYS.includes(e.key)) {
         zoomingIn = ZOOM_IN_KEYS.includes(e.key);
         const animationTime = e.repeat ?
@@ -117,8 +129,8 @@ export class ZoomContent {
         zoomAnimation.start(animationTime);
         clearTimeout(tapCancelTimeout);
       }
-    });
-    document.body.addEventListener('keyup', e => {
+    };
+    this.zoomKeyUpLambda = e => {
       if (ZOOM_KEYS.includes(e.key)) {
         const cancellingZoomIn = ZOOM_IN_KEYS.includes(e.key);
 
@@ -130,7 +142,10 @@ export class ZoomContent {
           tapCancelTimeout = setTimeout(() => zoomAnimation.stop(), waitTime);
         }
       }
-    });
+    };
+
+    document.body.addEventListener('keydown', this.zoomKeyDownLambda);
+    document.body.addEventListener('keyup', this.zoomKeyUpLambda);
   }
 
   private attachMouseEventListeners() {
