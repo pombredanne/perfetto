@@ -26,8 +26,8 @@
 namespace perfetto {
 namespace trace_processor {
 
-// The implementation of the SQLite table containing each unique process with
-// the metadata for those processes.
+// The implementation of the SQLite table containing unique threads with their
+// metadata.
 class ThreadTable {
  public:
   enum Column { kUtid = 0, kUpid = 1, kName = 2 };

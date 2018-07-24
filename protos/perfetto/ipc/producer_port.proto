@@ -41,7 +41,14 @@ service ProducerPort {
   // Sent by the client to request the service to:
   // 1) Move some chunks from the shmem buffer into the logging buffer.
   // 2) Patch the content of some chunks previously moved.
+  // 3) Acknowledge a Flush() request.
   rpc CommitData(protos.CommitDataRequest) returns (CommitDataResponse) {}
+
+  // Sent by the client in response to a StopDataSource message, when a data
+  // source is succesfully stopped. This is expected only for data sources that
+  // set the DataSourceDescriptor.will_notify_on_stop flag when registering.
+  rpc NotifyDataSourceStopped(NotifyDataSourceStoppedRequest)
+      returns (NotifyDataSourceStoppedResponse) {}
 
   // This is a backchannel to get asynchronous commands / notifications back
   // from the Service.
@@ -97,6 +104,15 @@ message UnregisterDataSourceResponse {}
 
 message CommitDataResponse {}
 
+// Arguments for rpc NotifyDataSourceStoppedRequest().
+
+message NotifyDataSourceStoppedRequest {
+  // IDs of data sources that completed their teardown.
+  repeated uint64 data_source_ids = 1;
+}
+
+message NotifyDataSourceStoppedResponse {}
+
 // Arguments for rpc GetAsyncCommand().
 
 message GetAsyncCommandRequest {}
@@ -107,7 +123,16 @@ message GetAsyncCommandResponse {
     optional protos.DataSourceConfig config = 2;
   }
 
-  message StopDataSource { optional uint64 instance_id = 1; }
+  message StopDataSource {
+    optional uint64 instance_id = 1;
+
+    // If the data source, upon registration, did set the flag
+    // DataSourceConfig.supports_flush_on_teardown, this field will be
+    // non-zero. When this field is non-zero the data source is expected
+    // to perform a final flush before stopping and ack it similarly to
+    // a conventional Flush request (i.e. through the CommitData IPC).
+    optional uint64 flush_request_id = 2;
+  }
 
   // This message also transports the file descriptor for the shared memory
   // buffer.

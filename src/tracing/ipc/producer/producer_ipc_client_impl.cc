@@ -213,6 +213,22 @@ void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,
   producer_port_.CommitData(proto_req, std::move(async_response));
 }
 
+void ProducerIPCClientImpl::NotifyDataSourceStopped(
+    const DataSourceInstanceID* ids,
+    size_t num_ids) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+ if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot NotifyDataSourceStopped(), not connected to tracing service");
+    return;
+  }
+  protos::NotifyDataSourceStoppedRequest req;
+  for (size_t i = 0; i < num_ids; i++)
+    req.add_data_source_ids(ids[i]);
+  producer_port_.NotifyDataSourceStopped(
+      req, ipc::Deferred<protos::NotifyDataSourceStoppedResponse>());
+}
+
 std::unique_ptr<TraceWriter> ProducerIPCClientImpl::CreateTraceWriter(
     BufferID target_buffer) {
   // This method can be called by different threads. |shared_memory_arbiter_| is
