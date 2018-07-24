@@ -213,9 +213,7 @@ void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,
   producer_port_.CommitData(proto_req, std::move(async_response));
 }
 
-void ProducerIPCClientImpl::NotifyDataSourceStopped(
-    const DataSourceInstanceID* ids,
-    size_t num_ids) {
+void ProducerIPCClientImpl::NotifyDataSourceStopped(DataSourceInstanceID id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!connected_) {
     PERFETTO_DLOG(
@@ -223,8 +221,7 @@ void ProducerIPCClientImpl::NotifyDataSourceStopped(
     return;
   }
   protos::NotifyDataSourceStoppedRequest req;
-  for (size_t i = 0; i < num_ids; i++)
-    req.add_data_source_ids(ids[i]);
+  req.set_data_source_id(id);
   producer_port_.NotifyDataSourceStopped(
       req, ipc::Deferred<protos::NotifyDataSourceStoppedResponse>());
 }

@@ -169,9 +169,7 @@ void ProducerIPCService::NotifyDataSourceStopped(
         "InitializeConnection()");
     return;
   }
-  producer->service_endpoint->NotifyDataSourceStopped(
-      request.data_source_ids().data(),
-      static_cast<size_t>(request.data_source_ids_size()));
+  producer->service_endpoint->NotifyDataSourceStopped(request.data_source_id());
 
   // NotifyDataSourceStopped doesn't expect any meaningful response.
   response.Resolve(

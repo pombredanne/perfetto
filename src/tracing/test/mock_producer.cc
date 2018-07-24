@@ -124,4 +124,10 @@ void MockProducer::WaitForFlush(TraceWriter* writer_to_flush) {
       }));
 }
 
+DataSourceInstanceID MockProducer::GetDataSourceInstanceId(
+    const std::string& name) {
+  auto it = data_source_instances_.find(name);
+  return it == data_source_instances_.end() ? 0 : it->second.id;
+}
+
 }  // namespace perfetto

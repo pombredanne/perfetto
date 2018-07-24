@@ -103,10 +103,8 @@ class PERFETTO_EXPORT TracingService {
 
     // Called in response to one or more Producer::TearDownDataSourceInstance(),
     // if the data source registered setting the flag
-    // DataSourceDescriptor.will_notify_on_stop. The input argument is an array
-    // of DataSourceInstanceID(s) that have been stopped.
-    virtual void NotifyDataSourceStopped(const DataSourceInstanceID*,
-                                         size_t) = 0;
+    // DataSourceDescriptor.will_notify_on_stop.
+    virtual void NotifyDataSourceStopped(DataSourceInstanceID) = 0;
   };  // class ProducerEndpoint.
 
   // The API for the Consumer port of the Service.

@@ -51,6 +51,7 @@ class MockProducer : public Producer {
   void WaitForTracingSetup();
   void WaitForDataSourceStart(const std::string& name);
   void WaitForDataSourceStop(const std::string& name);
+  DataSourceInstanceID GetDataSourceInstanceId(const std::string& name);
   std::unique_ptr<TraceWriter> CreateTraceWriter(
       const std::string& data_source_name);
 

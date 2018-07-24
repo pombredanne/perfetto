@@ -108,7 +108,7 @@ message CommitDataResponse {}
 
 message NotifyDataSourceStoppedRequest {
   // IDs of data sources that completed their teardown.
-  repeated uint64 data_source_ids = 1;
+  optional uint64 data_source_id = 1;
 }
 
 message NotifyDataSourceStoppedResponse {}

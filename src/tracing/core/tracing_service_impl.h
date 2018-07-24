@@ -55,6 +55,7 @@ class TracingServiceImpl : public TracingService {
  public:
   static constexpr size_t kDefaultShmSize = 256 * 1024ul;
   static constexpr size_t kMaxShmSize = 32 * 1024 * 1024ul;
+  static constexpr uint32_t kDataSourceStopTimeoutMs = 5000;
 
   // The implementation behind the service endpoint exposed to each producer.
   class ProducerEndpointImpl : public TracingService::ProducerEndpoint {
@@ -74,7 +75,7 @@ class TracingServiceImpl : public TracingService {
     void SetSharedMemory(std::unique_ptr<SharedMemory>);
     std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override;
     void NotifyFlushComplete(FlushRequestID) override;
-    void NotifyDataSourceStopped(const DataSourceInstanceID*, size_t) override;
+    void NotifyDataSourceStopped(DataSourceInstanceID) override;
     SharedMemory* shared_memory() const override;
     size_t shared_buffer_page_size_kb() const override;
 
@@ -157,14 +158,14 @@ class TracingServiceImpl : public TracingService {
   void ApplyChunkPatches(ProducerID,
                          const std::vector<CommitDataRequest::ChunkToPatch>&);
   void NotifyFlushDoneForProducer(ProducerID, FlushRequestID);
-  void NotifyDataSourceStopped(ProducerID, const DataSourceInstanceID*, size_t);
+  void NotifyDataSourceStopped(ProducerID, const DataSourceInstanceID);
 
   // Called by ConsumerEndpointImpl.
   void DisconnectConsumer(ConsumerEndpointImpl*);
   bool EnableTracing(ConsumerEndpointImpl*,
                      const TraceConfig&,
                      base::ScopedFile);
-  void DisableTracing(TracingSessionID);
+  void DisableTracing(TracingSessionID, bool disable_immediately = false);
   void Flush(TracingSessionID tsid,
              uint32_t timeout_ms,
              ConsumerEndpoint::FlushCallback);
@@ -185,6 +186,8 @@ class TracingServiceImpl : public TracingService {
   // Exposed mainly for testing.
   size_t num_producers() const { return producers_.size(); }
   ProducerEndpointImpl* GetProducer(ProducerID) const;
+
+  uint32_t override_data_source_test_timeout_ms_for_testing = 0;
 
  private:
   friend class TracingServiceImplTest;
