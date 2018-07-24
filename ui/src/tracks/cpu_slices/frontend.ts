@@ -53,25 +53,22 @@ class CpuSliceTrack extends TrackImpl {
       shownWidth = width - shownStart;
     }
 
-    if (vCtx.isOnCanvas()) {
-      vCtx.fillStyle = '#ccc';
-      vCtx.fillRect(0, 0, width, 73);
+    vCtx.fillStyle = '#ccc';
+    vCtx.fillRect(0, 0, width, 73);
 
-      GridlineHelper.drawGridLines(
-          vCtx,
-          timeScale,
-          [visibleWindowMs.start, visibleWindowMs.end],
-          width,
-          73);
+    GridlineHelper.drawGridLines(
+        vCtx,
+        timeScale,
+        [visibleWindowMs.start, visibleWindowMs.end],
+        width,
+        73);
 
-      vCtx.fillStyle = '#c00';
-      vCtx.fillRect(shownStart, 40, shownWidth, 30);
+    vCtx.fillStyle = '#c00';
+    vCtx.fillRect(shownStart, 40, shownWidth, 30);
 
-      vCtx.font = '16px Arial';
-      vCtx.fillStyle = '#000';
-      vCtx.fillText(
-          this.trackState.name + ' rendered by canvas', shownStart, 60);
-    }
+    vCtx.font = '16px Arial';
+    vCtx.fillStyle = '#000';
+    vCtx.fillText(this.trackState.name + ' rendered by canvas', shownStart, 60);
   }
 }
 

@@ -59,7 +59,7 @@ export const Frontend = {
 
     // TODO: ContentOffsetX should be defined somewhere central.
     // Currently it lives here, in canvas wrapper, and in track shell.
-    const zoomContent = new ZoomContent(
+    this.zoomContent = new ZoomContent(
         vnode.dom as HTMLElement,
         200,
         (pannedPx: number) => {
@@ -89,10 +89,11 @@ export const Frontend = {
           m.redraw();
         });
 
-    zoomContent.init();
+    this.zoomContent.init();
   },
   onremove() {
     window.removeEventListener('resize', this.onResize);
+    this.zoomContent.shutdown();
   },
   view() {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
@@ -154,6 +155,7 @@ export const Frontend = {
   onResize: () => void,
   timeScale: TimeScale,
   visibleWindowMs: {start: number, end: number},
+  zoomContent: ZoomContent,
 }>;
 
 export const FrontendPage = createPage({

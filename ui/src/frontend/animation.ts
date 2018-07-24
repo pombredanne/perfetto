@@ -21,7 +21,9 @@ export class Animation {
   constructor(private onAnimationStep: () => void) {}
 
   start(durationMs?: number) {
-    this.setEnd(durationMs);
+    if (durationMs !== undefined) {
+      this.end = Date.now() + durationMs;
+    }
     this.runRecursion();
   }
 
@@ -34,28 +36,24 @@ export class Animation {
     return this.runningStartedMs;
   }
 
-  private setEnd(durationMs?: number) {
-    if (durationMs) {
-      this.end = Date.now() + durationMs;
-    }
-  }
-
   private runRecursion() {
-    if (!this.running) {
-      const raf = () => {
-        this.onAnimationStep();
-        if (this.running) {
-          if (Date.now() < this.end) {
-            this.requestedAnimationFrame = requestAnimationFrame(raf);
-          } else {
-            this.running = false;
-          }
-        }
-      };
-
-      this.running = true;
-      this.runningStartedMs = Date.now();
-      raf();
+    if (this.running) {
+      return;
     }
+
+    const raf = () => {
+      this.onAnimationStep();
+      if (this.running) {
+        if (Date.now() < this.end) {
+          this.requestedAnimationFrame = requestAnimationFrame(raf);
+        } else {
+          this.running = false;
+        }
+      }
+    };
+
+    this.running = true;
+    this.runningStartedMs = Date.now();
+    raf();
   }
 }
