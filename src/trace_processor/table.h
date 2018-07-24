@@ -19,30 +19,25 @@
 
 #include <sqlite3.h>
 #include <functional>
-#include <map>
 #include <memory>
 #include <string>
-
-#include "src/trace_processor/query_constraints.h"
-
-#if defined(LEAK_SANITIZER)
-#include <sanitizer/lsan_interface.h>
-#endif
+#include <vector>
 
 namespace perfetto {
 namespace trace_processor {
+
+class QueryConstraints;
+class TraceStorage;
 
 // Abstract base class representing a SQLite virtual table. Implements the
 // common bookeeping required across all tables and allows subclasses to
 // implement a friendlier API than that required by SQLite
 class Table : public sqlite3_vtab {
  public:
+  using Factory = std::function<std::unique_ptr<Table>(const void*)>;
+
   // public for unique_ptr destructor calls.
   virtual ~Table();
-
- protected:
-  using TableFactory = std::function<std::unique_ptr<Table>(const void*)>;
-  using FindFunctionFn = void (**)(sqlite3_context*, int, sqlite3_value**);
 
   // Abstract base class representing an SQLite Cursor. Presents a friendlier
   // API for subclasses to implement.
@@ -63,25 +58,7 @@ class Table : public sqlite3_vtab {
                        sqlite3_value** argv) final;
   };
 
-  // Holds the arguments for registering a virtual table with SQLite.
-  class RegisterArgs {
-   public:
-    static RegisterArgs* Create(std::string create_stmt,
-                                std::string table_name,
-                                TableFactory factory,
-                                const void* inner) {
-      return new RegisterArgs(create_stmt, table_name, factory, inner);
-    }
-
-    std::string create_stmt_;
-    std::string table_name_;
-    TableFactory factory_;
-    const void* inner_;
-
-   private:
-    RegisterArgs(std::string, std::string, TableFactory, const void*);
-  };
-
+ protected:
   // Populated by a BestIndex call to allow subclasses to tweak SQLite's
   // handling of sets of constraints.
   struct BestIndexInfo {
@@ -92,40 +69,39 @@ class Table : public sqlite3_vtab {
 
   Table();
 
-  // Should be called by base classes to register themselves with the SQLite
-  // database.
-  static void RegisterTable(sqlite3* db, RegisterArgs* args);
+  // Called by derived classes to register themselves with the SQLite db.
+  template <typename T>
+  static void Register(sqlite3* db,
+                       const TraceStorage* storage,
+                       const std::string& create_statement) {
+    RegisterInternal(db, storage, create_statement, GetFactory<T>());
+  }
 
-  // Methods to be implemented.
+  // Methods to be implemented by the derived table classes.
   virtual std::unique_ptr<Cursor> CreateCursor() = 0;
   virtual int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) = 0;
 
   // Optional metods to implement.
+  using FindFunctionFn = void (**)(sqlite3_context*, int, sqlite3_value**);
   virtual int FindFunction(const char* name, FindFunctionFn fn, void** args);
 
-  // Overriden functions from sqlite3_vtab.
-  virtual int Open(sqlite3_vtab_cursor**) final;
-  virtual int BestIndex(sqlite3_index_info*) final;
-
  private:
-  using ModuleMap = std::map<std::string, sqlite3_module>;
-
-  static ModuleMap* GetModuleMapInstance() {
-    static ModuleMap* map = new ModuleMap();
-#if defined(LEAK_SANITIZER)
-    __lsan_ignore_object(map);
-#endif
-    return map;
-  }
-  static sqlite3_module CreateModule();
-
-  static Table* ToTable(sqlite3_vtab* vtab) {
-    return static_cast<Table*>(vtab);
+  template <typename TableType>
+  static Factory GetFactory() {
+    return [](const void* arg) {
+      return std::unique_ptr<Table>(
+          new TableType(static_cast<const TraceStorage*>(arg)));
+    };
   }
 
-  static Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
-    return static_cast<Cursor*>(cursor);
-  }
+  static void RegisterInternal(sqlite3* db,
+                               const TraceStorage*,
+                               const std::string& create,
+                               Factory);
+
+  // Overriden functions from sqlite3_vtab.
+  int OpenInternal(sqlite3_vtab_cursor**);
+  int BestIndexInternal(sqlite3_index_info*);
 };
 
 }  // namespace trace_processor

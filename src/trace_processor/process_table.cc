@@ -29,23 +29,15 @@ using namespace sqlite_utils;
 
 }  // namespace
 
-ProcessTable::ProcessTable(const TraceStorage* storage) : storage_(storage) {
-}
+ProcessTable::ProcessTable(const TraceStorage* storage) : storage_(storage) {}
 
 void ProcessTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  static constexpr const char* kCreateTableStmt =
-      "CREATE TABLE processes("
-      "upid UNSIGNED INT, "
-      "name TEXT, "
-      "PRIMARY KEY(upid)"
-      ") WITHOUT ROWID;";
-  auto factory = [](const void* raw_arg) {
-    const auto* inner_storage = static_cast<const TraceStorage*>(raw_arg);
-    return std::unique_ptr<Table>(new ProcessTable(inner_storage));
-  };
-  auto* args =
-      RegisterArgs::Create(kCreateTableStmt, "process", factory, storage);
-  Table::RegisterTable(db, args);
+  Table::Register<ProcessTable>(db, storage,
+                                "CREATE TABLE process("
+                                "upid UNSIGNED INT, "
+                                "name TEXT, "
+                                "PRIMARY KEY(upid)"
+                                ") WITHOUT ROWID;");
 }
 
 std::unique_ptr<Table::Cursor> ProcessTable::CreateCursor() {
@@ -61,8 +53,7 @@ int ProcessTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-ProcessTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-}
+ProcessTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 
 int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {

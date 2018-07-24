@@ -29,24 +29,16 @@ using namespace sqlite_utils;
 
 }  // namespace
 
-ThreadTable::ThreadTable(const TraceStorage* storage) : storage_(storage) {
-}
+ThreadTable::ThreadTable(const TraceStorage* storage) : storage_(storage) {}
 
 void ThreadTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  static constexpr const char* kCreateTableStmt =
-      "CREATE TABLE threads("
-      "utid UNSIGNED INT, "
-      "upid UNSIGNED INT, "
-      "name TEXT, "
-      "PRIMARY KEY(utid)"
-      ") WITHOUT ROWID;";
-  auto factory = [](const void* raw_arg) {
-    const auto* inner_storage = static_cast<const TraceStorage*>(raw_arg);
-    return std::unique_ptr<Table>(new ThreadTable(inner_storage));
-  };
-  auto* args =
-      RegisterArgs::Create(kCreateTableStmt, "thread", factory, storage);
-  Table::RegisterTable(db, args);
+  Table::Register<ThreadTable>(db, storage,
+                               "CREATE TABLE thread("
+                               "utid UNSIGNED INT, "
+                               "upid UNSIGNED INT, "
+                               "name TEXT, "
+                               "PRIMARY KEY(utid)"
+                               ") WITHOUT ROWID;");
 }
 
 std::unique_ptr<Table::Cursor> ThreadTable::CreateCursor() {
@@ -62,8 +54,7 @@ int ThreadTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-ThreadTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-}
+ThreadTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 
 int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
   auto thread = storage_->GetThread(utid_filter_.current);

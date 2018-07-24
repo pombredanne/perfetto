@@ -16,80 +16,109 @@
 
 #include "src/trace_processor/table.h"
 
-#include <cstring>
+#include <ctype.h>
+#include <string.h>
 
-#include "src/trace_processor/trace_storage.h"
+#include "perfetto/base/logging.h"
+#include "src/trace_processor/query_constraints.h"
 
 namespace perfetto {
 namespace trace_processor {
+
+namespace {
+
+struct TableDescriptor {
+  std::string create_statement;
+  Table::Factory factory;
+  const TraceStorage* storage = nullptr;
+  sqlite3_module module = {};
+};
+
+Table* ToTable(sqlite3_vtab* vtab) {
+  return static_cast<Table*>(vtab);
+}
+
+Table::Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
+  return static_cast<Table::Cursor*>(cursor);
+}
+
+}  // namespace
 
 Table::Table() {}
 
 Table::~Table() {}
 
-void Table::RegisterTable(sqlite3* db, RegisterArgs* args) {
-  auto* map = GetModuleMapInstance();
-  PERFETTO_DCHECK(map->find(args->table_name_) == map->end());
+void Table::RegisterInternal(sqlite3* db,
+                             const TraceStorage* storage,
+                             const std::string& create_statement,
+                             Factory factory) {
+  const std::string prefix = "CREATE TABLE ";
+  PERFETTO_CHECK(create_statement.substr(0, prefix.size()) == prefix);
+  size_t name_end = create_statement.find("(");
+  PERFETTO_CHECK(name_end != std::string::npos && name_end > prefix.size());
+  auto table_name =
+      create_statement.substr(prefix.size(), name_end - prefix.size());
+  PERFETTO_CHECK(table_name.size() > 0 && isalnum(table_name.front()) &&
+                 isalnum(table_name.back()));
 
-  auto it = map->emplace(args->table_name_, CreateModule());
-  auto* module = &it.first->second;
-  sqlite3_create_module_v2(
-      db, args->table_name_.c_str(), module, args,
-      [](void* inner) { delete static_cast<RegisterArgs*>(inner); });
+  std::unique_ptr<TableDescriptor> desc(new TableDescriptor());
+  desc->create_statement = create_statement;
+  desc->storage = storage;
+  desc->factory = factory;
+  sqlite3_module* module = &desc->module;
+  memset(module, 0, sizeof(*module));
+  module->xConnect = [](sqlite3* xdb, void* arg, int, const char* const*,
+                        sqlite3_vtab** tab, char**) {
+    const TableDescriptor* xdesc = static_cast<const TableDescriptor*>(arg);
+    int res = sqlite3_declare_vtab(xdb, xdesc->create_statement.c_str());
+    if (res != SQLITE_OK)
+      return res;
+    *tab = xdesc->factory(xdesc->storage).release();
+    return SQLITE_OK;
+  };
+  module->xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
+    return ToTable(t)->BestIndexInternal(i);
+  };
+  module->xDisconnect = [](sqlite3_vtab* t) {
+    delete ToTable(t);
+    return SQLITE_OK;
+  };
+  module->xOpen = [](sqlite3_vtab* t, sqlite3_vtab_cursor** c) {
+    return ToTable(t)->OpenInternal(c);
+  };
+  module->xClose = [](sqlite3_vtab_cursor* c) {
+    delete ToCursor(c);
+    return SQLITE_OK;
+  };
+  module->xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
+                       sqlite3_value** v) {
+    return ToCursor(c)->Filter(i, s, a, v);
+  };
+  module->xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
+  module->xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
+  module->xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
+    return ToCursor(c)->Column(a, b);
+  };
+  module->xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
+    return SQLITE_ERROR;
+  };
+  module->xFindFunction =
+      [](sqlite3_vtab* t, int, const char* name,
+         void (**fn)(sqlite3_context*, int, sqlite3_value**),
+         void** args) { return ToTable(t)->FindFunction(name, fn, args); };
+
+  int res = sqlite3_create_module_v2(
+      db, table_name.c_str(), module, desc.release(),
+      [](void* arg) { delete static_cast<TableDescriptor*>(arg); });
+  PERFETTO_CHECK(res == SQLITE_OK);
 }
 
-int Table::Open(sqlite3_vtab_cursor** ppCursor) {
+int Table::OpenInternal(sqlite3_vtab_cursor** ppCursor) {
   *ppCursor = static_cast<sqlite3_vtab_cursor*>(CreateCursor().release());
   return SQLITE_OK;
 }
 
-sqlite3_module Table::CreateModule() {
-  sqlite3_module module;
-  memset(&module, 0, sizeof(module));
-  module.xConnect = [](sqlite3* db, void* raw_args, int, const char* const*,
-                       sqlite3_vtab** tab, char**) {
-    auto* args = static_cast<RegisterArgs*>(raw_args);
-    int res = sqlite3_declare_vtab(db, args->create_stmt_.c_str());
-    if (res != SQLITE_OK)
-      return res;
-    *tab = static_cast<sqlite3_vtab*>(args->factory_(args->inner_).release());
-    return SQLITE_OK;
-  };
-  module.xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
-    return ToTable(t)->BestIndex(i);
-  };
-  module.xDisconnect = [](sqlite3_vtab* t) {
-    delete ToTable(t);
-    return SQLITE_OK;
-  };
-  module.xOpen = [](sqlite3_vtab* t, sqlite3_vtab_cursor** c) {
-    return ToTable(t)->Open(c);
-  };
-  module.xClose = [](sqlite3_vtab_cursor* c) {
-    delete ToCursor(c);
-    return SQLITE_OK;
-  };
-  module.xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
-                      sqlite3_value** v) {
-    return ToCursor(c)->Filter(i, s, a, v);
-  };
-  module.xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
-  module.xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
-  module.xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
-    return ToCursor(c)->Column(a, b);
-  };
-  module.xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
-    return SQLITE_ERROR;
-  };
-  module.xFindFunction = [](sqlite3_vtab* t, int, const char* name,
-                            void (**fn)(sqlite3_context*, int, sqlite3_value**),
-                            void** args) {
-    return ToTable(t)->FindFunction(name, fn, args);
-  };
-  return module;
-}
-
-int Table::BestIndex(sqlite3_index_info* idx) {
+int Table::BestIndexInternal(sqlite3_index_info* idx) {
   QueryConstraints query_constraints;
 
   for (int i = 0; i < idx->nOrderBy; i++) {
@@ -149,15 +178,6 @@ int Table::Cursor::Filter(int,
   PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
   return Filter(qc, argv);
 }
-
-Table::RegisterArgs::RegisterArgs(std::string create_stmt,
-                                  std::string table_name,
-                                  TableFactory factory,
-                                  const void* inner)
-    : create_stmt_(create_stmt),
-      table_name_(table_name),
-      factory_(factory),
-      inner_(inner) {}
 
 }  // namespace trace_processor
 }  // namespace perfetto
