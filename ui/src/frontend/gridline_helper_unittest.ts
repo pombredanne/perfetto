@@ -25,3 +25,11 @@ test('gridline helper to scale to very small and very large values', () => {
   expect(GridlineHelper.getStepSize(.01)).toEqual(.001);
   expect(GridlineHelper.getStepSize(10000)).toEqual(1000);
 });
+
+test('gridline helper to always return a reasonable number of steps', () => {
+  for (let i = 1; i <= 1000; i++) {
+    const stepSize = GridlineHelper.getStepSize(i, 15);
+    expect(Math.round(i / stepSize)).toBeGreaterThanOrEqual(10);
+    expect(Math.round(i / stepSize)).toBeLessThanOrEqual(30);
+  }
+});
