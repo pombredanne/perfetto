@@ -527,4 +527,35 @@ TEST_F(TracingServiceImplTest, BatchFlushes) {
                         Property(&protos::TestEvent::str, Eq("payload")))));
 }
 
+TEST_F(TracingServiceImplTest, DisableTracingTimeout) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  std::unique_ptr<MockProducer> producer = CreateMockProducer();
+  producer->Connect(svc.get(), "mock_producer");
+  producer->RegisterDataSource("ds_will_ack", /*ack_stop=*/true);
+  producer->RegisterDataSource("ds_wont_ack");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  trace_config.add_data_sources()->mutable_config()->set_name("ds_will_ack");
+  trace_config.add_data_sources()->mutable_config()->set_name("ds_wont_ack");
+  trace_config.set_duration_ms(1);
+
+  consumer->EnableTracing(trace_config);
+  producer->WaitForTracingSetup();
+  producer->WaitForDataSourceStart("ds_will_ack");
+  producer->WaitForDataSourceStart("ds_wont_ack");
+
+  std::unique_ptr<TraceWriter> writer =
+      producer->CreateTraceWriter("ds_will_ack");
+  producer->WaitForFlush(writer.get());
+
+  producer->WaitForDataSourceStop("ds_will_ack");
+  producer->WaitForDataSourceStop("ds_wont_ack");
+  // DataSourceInstanceID x = 1;
+  // producer->endpoint()->NotifyDataSourceStopped(&x, 1);
+  consumer->WaitForTracingDisabled();
+}
+
 }  // namespace perfetto

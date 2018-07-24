@@ -217,7 +217,7 @@ void ProducerIPCClientImpl::NotifyDataSourceStopped(
     const DataSourceInstanceID* ids,
     size_t num_ids) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
- if (!connected_) {
+  if (!connected_) {
     PERFETTO_DLOG(
         "Cannot NotifyDataSourceStopped(), not connected to tracing service");
     return;

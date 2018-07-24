@@ -210,7 +210,7 @@ class TracingServiceImpl : public TracingService {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    enum State { DISABLED = 0, ENABLED, DISABLING_WAITING_STOP_ACKS};
+    enum State { DISABLED = 0, ENABLED, DISABLING_WAITING_STOP_ACKS };
 
     TracingSession(ConsumerEndpointImpl*, const TraceConfig&);
 
@@ -240,7 +240,7 @@ class TracingServiceImpl : public TracingService {
     // After DisableTracing() is called, this contains the subset of data
     // sources that did set the |will_notify_on_stop| flag upon registration and
     // that have the haven't replied yet to the stop request.
-    std::set<DataSourceInstanceID> pending_stop_acks;
+    std::set<std::pair<ProducerID, DataSourceInstanceID>> pending_stop_acks;
 
     // Maps a per-trace-session buffer index into the corresponding global
     // BufferID (shared namespace amongst all consumers). This vector has as
@@ -291,7 +291,7 @@ class TracingServiceImpl : public TracingService {
   void MaybeEmitTraceConfig(TracingSession*, std::vector<TracePacket>*);
   void MaybeSnapshotStats(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
-  void OnDisableTimeout(TracingSessionID);
+  void OnDisableTracingTimeout(TracingSessionID);
   TraceBuffer* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;

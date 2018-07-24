@@ -411,8 +411,10 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid) {
     const ProducerID producer_id = data_source_inst.first;
     const DataSourceInstanceID ds_inst_id = data_source_inst.second.instance_id;
     ProducerEndpointImpl* producer = GetProducer(producer_id);
-    if (data_source_inst.second.will_notify_on_stop)
-      tracing_session->pending_stop_acks.insert(ds_inst_id);
+    if (data_source_inst.second.will_notify_on_stop) {
+      tracing_session->pending_stop_acks.insert(
+          std::make_pair(producer_id, ds_inst_id));
+    }
     producer->TearDownDataSource(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
@@ -437,7 +439,7 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid) {
         task_runner_->PostDelayedTask(
             [weak_this, tsid] {
               if (weak_this)
-                weak_this->OnDisableTimeout(tsid);
+                weak_this->OnDisableTracingTimeout(tsid);
             },
             kDataSourceStopTimeoutMs);
       }
@@ -453,21 +455,49 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid) {
   // needed to call ReadBuffers(). FreeBuffers() will erase() the session.
 }
 
-void TracingServiceImpl::OnDisableTimeout(TracingSessionID tsid) {
+void TracingServiceImpl::NotifyDataSourceStopped(
+    ProducerID producer_id,
+    const DataSourceInstanceID* data_source_ids,
+    size_t num_ids) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  for (auto& kv : tracing_sessions_) {
+    TracingSession& tracing_session = kv.second;
+    auto& pending_stop_acks = tracing_session.pending_stop_acks;
+    if (pending_stop_acks.empty())
+      continue;
+    if (tracing_session.state != TracingSession::DISABLING_WAITING_STOP_ACKS) {
+      PERFETTO_DCHECK(false);
+      continue;
+    }
+    for (size_t i = 0; i < num_ids; i++)
+      pending_stop_acks.erase(std::make_pair(producer_id, data_source_ids[i]));
+    if (!pending_stop_acks.empty())
+      continue;
+
+    // All data source acked the termination.
+    tracing_session.state = TracingSession::DISABLED;
+    tracing_session.consumer->NotifyOnTracingDisabled();
+    // TODO test concurrent sessions.
+  }  // for (tracing_session)
+}
+
+// Always invoked kDataSourceStopTimeoutMs after DisableTracing(). In nominal
+// conditions all data sources should have ack-ed the stop and this will early
+// out.
+void TracingServiceImpl::OnDisableTracingTimeout(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
-  if (!tracing_session)
+  if (!tracing_session ||
+      tracing_session->state != TracingSession::DISABLING_WAITING_STOP_ACKS)
     return;  // Tracing session was succesfully disabled.
-  PERFETTO_DLOG("Timeout while waiting for ACKs for tracing session " PRIu64,
+  PERFETTO_DLOG("Timeout while waiting for ACKs for tracing session %" PRIu64,
                 tsid);
   PERFETTO_DCHECK(!tracing_session->pending_stop_acks.empty());
-  PERFETTO_DCHECK(tracing_session->state ==
-                  TracingSession::DISABLING_WAITING_STOP_ACKS);
   tracing_session->pending_stop_acks.clear();
   tracing_session->state = TracingSession::DISABLED;
   tracing_session->consumer->NotifyOnTracingDisabled();
-
-  TODO on producer ACK or disabling, fix this.
+  // TODO add generation for short stop/start.
+  // TODO on producer ACK or disabling, fix this.
 }
 
 void TracingServiceImpl::Flush(TracingSessionID tsid,
@@ -540,24 +570,6 @@ void TracingServiceImpl::NotifyFlushDoneForProducer(
       }
     }  // for (pending_flushes)
   }    // for (tracing_session)
-}
-
-void TracingServiceImpl::NotifyDataSourceStopped(
-    ProducerID producer_id,
-    const DataSourceInstanceID* data_source_ids,
-    size_t num_ids) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  for (auto& kv : tracing_sessions_) {
-    auto& pending_stop_acks = kv.second.pending_flushes;
-    if (pending_stop_acks.empty())
-      continue;
-    for (size_t i = 0; i < num_ids; i++)
-      pending_stop_acks.erase(data_source_ids[i]);
-    if (!pending_stop_acks.empty())
-      continue;
-    // All data source acked the termination.
-    TODO here.
-  }  // for (tracing_session)
 }
 
 void TracingServiceImpl::OnFlushTimeout(TracingSessionID tsid,
