@@ -39,7 +39,7 @@ const ZOOM_KEYS = ZOOM_IN_KEYS.concat(ZOOM_OUT_KEYS);
 /**
  * Enables horizontal pan and zoom with mouse-based drag and WASD navigation.
  */
-export class ZoomContent {
+export class PanAndZoomHandler {
   private mouseDownPositionX = -1;
   private mousePositionX = -1;
 
@@ -56,9 +56,7 @@ export class ZoomContent {
       private element: HTMLElement, private contentOffsetX: number,
       private onPanned: (movedPx: number) => void,
       private onZoomed:
-          (zoomPositionPx: number, zoomPercentage: number) => void) {}
-
-  init() {
+          (zoomPositionPx: number, zoomPercentage: number) => void) {
     this.attachMouseEventListeners();
     this.handleKeyPanning();
     this.handleKeyZooming();

@@ -16,9 +16,9 @@
 import * as m from 'mithril';
 
 import {createPage} from './pages';
+import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingTrackDisplay} from './scrolling_track_display';
 import {TimeScale} from './time_scale';
-import {ZoomContent} from './zoom_content';
 
 /**
  * Top-most level component for the viewer page. Holds tracks, brush timeline,
@@ -48,7 +48,7 @@ const TraceViewer = {
 
     // TODO: ContentOffsetX should be defined somewhere central.
     // Currently it lives here, in canvas wrapper, and in track shell.
-    this.zoomContent = new ZoomContent(
+    this.zoomContent = new PanAndZoomHandler(
         vnode.dom as HTMLElement,
         200,
         (pannedPx: number) => {
@@ -77,8 +77,6 @@ const TraceViewer = {
               this.visibleWindowMs.start, this.visibleWindowMs.end);
           m.redraw();
         });
-
-    this.zoomContent.init();
   },
   onremove() {
     window.removeEventListener('resize', this.onResize);
@@ -95,7 +93,7 @@ const TraceViewer = {
   onResize: () => void,
   timeScale: TimeScale,
   width: number,
-  zoomContent: ZoomContent,
+  zoomContent: PanAndZoomHandler,
 }>;
 
 export const ViewerPage = createPage({
