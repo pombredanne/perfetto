@@ -13,6 +13,6 @@
 // limitations under the License.
 
 // Import all currently implemented tracks. After implemeting a new track, an
-// import state for it needs to be added here.
+// import statement for it needs to be added here.
 import './cpu_counters/frontend';
 import './cpu_slices/frontend';
