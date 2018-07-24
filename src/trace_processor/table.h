@@ -31,12 +31,12 @@ class TraceStorage;
 
 // Abstract base class representing a SQLite virtual table. Implements the
 // common bookeeping required across all tables and allows subclasses to
-// implement a friendlier API than that required by SQLite
+// implement a friendlier API than that required by SQLite.
 class Table : public sqlite3_vtab {
  public:
   using Factory = std::function<std::unique_ptr<Table>(const void*)>;
 
-  // public for unique_ptr destructor calls.
+  // Public for unique_ptr destructor calls.
   virtual ~Table();
 
   // Abstract base class representing an SQLite Cursor. Presents a friendlier
@@ -45,17 +45,17 @@ class Table : public sqlite3_vtab {
    public:
     virtual ~Cursor();
 
-    // Methods to be implemented.
+    // Methods to be implemented by derived table classes.
     virtual int Filter(const QueryConstraints& qc, sqlite3_value** argv) = 0;
     virtual int Next() = 0;
     virtual int Eof() = 0;
     virtual int Column(sqlite3_context* context, int N) = 0;
 
+   private:
+    friend class Table;
+
     // Overriden functions from sqlite3_vtab_cursor.
-    virtual int Filter(int idxNum,
-                       const char* idxStr,
-                       int argc,
-                       sqlite3_value** argv) final;
+    int FilterInternal(int num, const char* idxStr, int argc, sqlite3_value**);
   };
 
  protected:
@@ -77,7 +77,7 @@ class Table : public sqlite3_vtab {
     RegisterInternal(db, storage, create_statement, GetFactory<T>());
   }
 
-  // Methods to be implemented by the derived table classes.
+  // Methods to be implemented by derived table classes.
   virtual std::unique_ptr<Cursor> CreateCursor() = 0;
   virtual int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) = 0;
 
@@ -102,6 +102,9 @@ class Table : public sqlite3_vtab {
   // Overriden functions from sqlite3_vtab.
   int OpenInternal(sqlite3_vtab_cursor**);
   int BestIndexInternal(sqlite3_index_info*);
+
+  Table(const Table&) = delete;
+  Table& operator=(const Table&) = delete;
 };
 
 }  // namespace trace_processor

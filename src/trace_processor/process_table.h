@@ -33,12 +33,12 @@ class ProcessTable : public Table {
  public:
   enum Column { kUpid = 0, kName = 1 };
 
-  ProcessTable(const TraceStorage*);
-
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  // Implementation of Table.
-  std::unique_ptr<Cursor> CreateCursor() override;
+  ProcessTable(const TraceStorage*);
+
+  // Table implementation.
+  std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:

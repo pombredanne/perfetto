@@ -41,7 +41,7 @@ void ProcessTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::unique_ptr<Table::Cursor> ProcessTable::CreateCursor() {
-  return std::unique_ptr<Cursor>(new Cursor(storage_));
+  return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
 }
 
 int ProcessTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {

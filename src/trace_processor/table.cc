@@ -44,9 +44,8 @@ Table::Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
 
 }  // namespace
 
-Table::Table() {}
-
-Table::~Table() {}
+Table::Table() = default;
+Table::~Table() = default;
 
 void Table::RegisterInternal(sqlite3* db,
                              const TraceStorage* storage,
@@ -67,41 +66,49 @@ void Table::RegisterInternal(sqlite3* db,
   desc->factory = factory;
   sqlite3_module* module = &desc->module;
   memset(module, 0, sizeof(*module));
+
   module->xConnect = [](sqlite3* xdb, void* arg, int, const char* const*,
                         sqlite3_vtab** tab, char**) {
     const TableDescriptor* xdesc = static_cast<const TableDescriptor*>(arg);
     int res = sqlite3_declare_vtab(xdb, xdesc->create_statement.c_str());
     if (res != SQLITE_OK)
       return res;
-    *tab = xdesc->factory(xdesc->storage).release();
+    *tab = xdesc->factory(xdesc->storage).release();  // Freed in xDisconnect().
     return SQLITE_OK;
   };
-  module->xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
-    return ToTable(t)->BestIndexInternal(i);
-  };
+
   module->xDisconnect = [](sqlite3_vtab* t) {
     delete ToTable(t);
     return SQLITE_OK;
   };
+
   module->xOpen = [](sqlite3_vtab* t, sqlite3_vtab_cursor** c) {
     return ToTable(t)->OpenInternal(c);
   };
+
   module->xClose = [](sqlite3_vtab_cursor* c) {
     delete ToCursor(c);
     return SQLITE_OK;
   };
+
+  module->xBestIndex = [](sqlite3_vtab* t, sqlite3_index_info* i) {
+    return ToTable(t)->BestIndexInternal(i);
+  };
+
   module->xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
                        sqlite3_value** v) {
-    return ToCursor(c)->Filter(i, s, a, v);
+    return ToCursor(c)->FilterInternal(i, s, a, v);
   };
   module->xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
   module->xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
   module->xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
     return ToCursor(c)->Column(a, b);
   };
+
   module->xRowid = [](sqlite3_vtab_cursor*, sqlite_int64*) {
     return SQLITE_ERROR;
   };
+
   module->xFindFunction =
       [](sqlite3_vtab* t, int, const char* name,
          void (**fn)(sqlite3_context*, int, sqlite3_value**),
@@ -114,6 +121,7 @@ void Table::RegisterInternal(sqlite3* db,
 }
 
 int Table::OpenInternal(sqlite3_vtab_cursor** ppCursor) {
+  // Freed in xClose().
   *ppCursor = static_cast<sqlite3_vtab_cursor*>(CreateCursor().release());
   return SQLITE_OK;
 }
@@ -168,12 +176,12 @@ int Table::FindFunction(const char*, FindFunctionFn, void**) {
   return 0;
 };
 
-Table::Cursor::~Cursor() {}
+Table::Cursor::~Cursor() = default;
 
-int Table::Cursor::Filter(int,
-                          const char* idxStr,
-                          int argc,
-                          sqlite3_value** argv) {
+int Table::Cursor::FilterInternal(int,
+                                  const char* idxStr,
+                                  int argc,
+                                  sqlite3_value** argv) {
   QueryConstraints qc = QueryConstraints::FromString(idxStr);
   PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
   return Filter(qc, argv);

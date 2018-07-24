@@ -102,7 +102,7 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor() {
-  return std::unique_ptr<Cursor>(new Cursor(storage_));
+  return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,

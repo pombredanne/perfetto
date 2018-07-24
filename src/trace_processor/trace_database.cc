@@ -30,13 +30,8 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   db_.reset(std::move(db));
 
-  // Setup the sched slice table.
   SchedSliceTable::RegisterTable(*db_, &storage_);
-
-  // Setup the process table.
   ProcessTable::RegisterTable(*db_, &storage_);
-
-  // Setup the thread table.
   ThreadTable::RegisterTable(*db_, &storage_);
 }
 

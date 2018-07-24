@@ -44,8 +44,8 @@ class SchedSliceTable : public Table {
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  // Implementation of Table.
-  std::unique_ptr<Cursor> CreateCursor() override;
+  // Table implementation.
+  std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
   int FindFunction(const char* name, FindFunctionFn fn, void** args) override;
 

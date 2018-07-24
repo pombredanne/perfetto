@@ -33,12 +33,12 @@ class ThreadTable : public Table {
  public:
   enum Column { kUtid = 0, kUpid = 1, kName = 2 };
 
-  ThreadTable(const TraceStorage*);
-
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  // Implementation of Table.
-  std::unique_ptr<Cursor> CreateCursor() override;
+  ThreadTable(const TraceStorage*);
+
+  // Table implementation.
+  std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
