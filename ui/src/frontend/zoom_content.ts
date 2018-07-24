@@ -19,12 +19,18 @@ import Timer = NodeJS.Timer;
  * Enables horizontal pan and zoom with mouse-based drag and WASD navigation.
  */
 export class ZoomContent {
-  static HORIZONTAL_WHEEL_PAN_SPEED = 1;
   static ZOOM_IN_PERCENTAGE_SPEED = 0.95;
   static ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
   static KEYBOARD_PAN_PX_PER_FRAME = 20;
-  static ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS = 700;
-  static ANIMATION_TIME_AFTER_KEYPRESS_MS = 80;
+  static HORIZONTAL_WHEEL_PAN_SPEED = 1;
+
+  // Usually, animations are cancelled on keyup. However, in case the keyup
+  // event is not captured by the document, e.g. if it loses focus first, then
+  // we want to stop the animation as soon as possible.
+  static ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS = 700;
+  static ANIMATION_AUTO_END_AFTER_KEYPRESS_MS = 80;
+
+  // This defines the step size for an individual pan or zoom keyboard tap.
   static TAP_ANIMATION_TIME = 200;
 
   static PAN_LEFT_KEYS = ['a'];
@@ -59,12 +65,13 @@ export class ZoomContent {
     });
 
     document.body.addEventListener('keydown', (e) => {
+      console.log(e);
       if (ZoomContent.PAN_KEYS.indexOf(e.key) !== -1) {
         directionFactor =
             ZoomContent.PAN_LEFT_KEYS.indexOf(e.key) !== -1 ? -1 : 1;
         const animationTime = e.repeat ?
-            ZoomContent.ANIMATION_TIME_AFTER_KEYPRESS_MS :
-            ZoomContent.ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS;
+            ZoomContent.ANIMATION_AUTO_END_AFTER_KEYPRESS_MS :
+            ZoomContent.ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS;
         panAnimation.start(animationTime);
         clearTimeout(tapCancelTimeout);
       }
@@ -74,6 +81,7 @@ export class ZoomContent {
         const cancellingDirectionFactor =
             ZoomContent.PAN_LEFT_KEYS.indexOf(e.key) !== -1 ? -1 : 1;
 
+        // Only cancel if the lifted key is the one controlling the animation.
         if (cancellingDirectionFactor === directionFactor) {
           const minEndTime =
               panAnimation.getStartTimeMs() + ZoomContent.TAP_ANIMATION_TIME;
@@ -98,8 +106,8 @@ export class ZoomContent {
       if (ZoomContent.ZOOM_KEYS.indexOf(e.key) !== -1) {
         zoomingIn = ZoomContent.ZOOM_IN_KEYS.indexOf(e.key) !== -1;
         const animationTime = e.repeat ?
-            ZoomContent.ANIMATION_TIME_AFTER_KEYPRESS_MS :
-            ZoomContent.ANIMATION_TIME_AFTER_INITIAL_KEYPRESS_MS;
+            ZoomContent.ANIMATION_AUTO_END_AFTER_KEYPRESS_MS :
+            ZoomContent.ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS;
         zoomAnimation.start(animationTime);
         clearTimeout(tapCancelTimeout);
       }
@@ -108,6 +116,7 @@ export class ZoomContent {
       if (ZoomContent.ZOOM_KEYS.indexOf(e.key) !== -1) {
         const cancellingZoomIn = ZoomContent.ZOOM_IN_KEYS.indexOf(e.key) !== -1;
 
+        // Only cancel if the lifted key is the one controlling the animation.
         if (cancellingZoomIn === zoomingIn) {
           const minEndTime =
               zoomAnimation.getStartTimeMs() + ZoomContent.TAP_ANIMATION_TIME;
