@@ -171,9 +171,12 @@ void ProducerIPCService::NotifyDataSourceStopped(
   }
   producer->service_endpoint->NotifyDataSourceStopped(request.data_source_id());
 
-  // NotifyDataSourceStopped doesn't expect any meaningful response.
-  response.Resolve(
-      ipc::AsyncResult<protos::NotifyDataSourceStoppedResponse>::Create());
+  // NotifyDataSourceStopped shouldn't expect any meaningful response, avoid
+  // a useless IPC in that case.
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::NotifyDataSourceStoppedResponse>::Create());
+  }
 }
 
 void ProducerIPCService::GetAsyncCommand(

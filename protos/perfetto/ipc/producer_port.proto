@@ -107,7 +107,7 @@ message CommitDataResponse {}
 // Arguments for rpc NotifyDataSourceStoppedRequest().
 
 message NotifyDataSourceStoppedRequest {
-  // IDs of data sources that completed their teardown.
+  // ID of the data source that has successfully stopped.
   optional uint64 data_source_id = 1;
 }
 
@@ -123,16 +123,7 @@ message GetAsyncCommandResponse {
     optional protos.DataSourceConfig config = 2;
   }
 
-  message StopDataSource {
-    optional uint64 instance_id = 1;
-
-    // If the data source, upon registration, did set the flag
-    // DataSourceConfig.supports_flush_on_teardown, this field will be
-    // non-zero. When this field is non-zero the data source is expected
-    // to perform a final flush before stopping and ack it similarly to
-    // a conventional Flush request (i.e. through the CommitData IPC).
-    optional uint64 flush_request_id = 2;
-  }
+  message StopDataSource { optional uint64 instance_id = 1; }
 
   // This message also transports the file descriptor for the shared memory
   // buffer.
