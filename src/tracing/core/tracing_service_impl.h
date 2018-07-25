@@ -215,7 +215,7 @@ class TracingServiceImpl : public TracingService {
   struct TracingSession {
     enum State { DISABLED = 0, ENABLED, DISABLING_WAITING_STOP_ACKS };
 
-    TracingSession(ConsumerEndpointImpl*, const TraceConfig&);
+    TracingSession(TracingSessionID, ConsumerEndpointImpl*, const TraceConfig&);
 
     size_t num_buffers() const { return buffers_index.size(); }
 
@@ -224,6 +224,8 @@ class TracingServiceImpl : public TracingService {
       return write_period_ms -
              (base::GetWallTimeMs().count() % write_period_ms);
     }
+
+    const TracingSessionID id;
 
     // The consumer that started the session.
     ConsumerEndpointImpl* const consumer;
@@ -295,6 +297,7 @@ class TracingServiceImpl : public TracingService {
   void MaybeSnapshotStats(TracingSession*, std::vector<TracePacket>*);
   void OnFlushTimeout(TracingSessionID, FlushRequestID);
   void OnDisableTracingTimeout(TracingSessionID);
+  void DisableTracingNotifyConsumerAndFlushFile(TracingSession*);
   TraceBuffer* GetBufferByID(BufferID);
 
   base::TaskRunner* const task_runner_;
