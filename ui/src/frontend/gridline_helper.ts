@@ -45,25 +45,42 @@ export function drawGridLines(
 
 
 /**
- * Calculates a step size of grid lines for a given time range such that the
- * number of steps is as close as possible to the desired number. The only
- * possible step sizes are 2, 5, or 10, save for factors of 10 for scaling.
+ * Returns the step size of a grid line. The returned step size has two
+ * properties:
+ *
+ * (1) It is 1, 2, or 5, multipled by some integer power of 10.
+ * (2) It is as close to possible to |desiredSteps|.
  */
 export function getGridStepSize(
     range: Milliseconds, desiredSteps: number): Milliseconds {
-  const zeros = Math.floor(Math.log10(range));
+  // First, get the largest possible power of 10 that is smaller than the
+  // desired step size, and set it to the current step size.
+  // For example, if the range is 2345ms and the desired steps is 10, then the
+  // desired step size is 234.5 and the step size will be set to 100.
+  const desiredStepSize = range / desiredSteps;
+  const zeros = Math.floor(Math.log10(desiredStepSize));
   let stepSize = Math.pow(10, zeros);
+
+  // This function first calculates how many steps within the range a certain
+  // stepSize will produce, and returns the difference between that and
+  // desiredSteps.
   const distToDesired = (evaluatedStepSize: number) =>
       Math.abs(range / evaluatedStepSize - desiredSteps);
 
-  if (distToDesired(stepSize / 10) < distToDesired(stepSize)) {
-    stepSize /= 10;
+  // We now check if we can lower distToDesired(stepSize) by increasing
+  // stepSize. Since we only want step sizes that are 1, 2, or 5 times some
+  // power of 10, we can only multiply by 5 and 2. We try these factors in
+  // descending order. Note that we only need make the step size bigger, not
+  // smaller, to get to the desired stepSize, since the power of 10 obtained
+  // above is never smaller than the desired step size. Also note that we can
+  // only multiply the initial stepSize by up to 10 since we are already close
+  // to the desired number of steps.
+  if (distToDesired(stepSize * 5) < distToDesired(stepSize) &&
+      distToDesired(stepSize * 5) < distToDesired(stepSize * 2)) {
+    stepSize *= 5;
   }
-  if (distToDesired(stepSize / 5) < distToDesired(stepSize)) {
-    stepSize /= 5;
-  }
-  if (distToDesired(stepSize / 2) < distToDesired(stepSize)) {
-    stepSize /= 2;
+  if (distToDesired(stepSize * 2) < distToDesired(stepSize)) {
+    stepSize *= 2;
   }
   return stepSize;
 }

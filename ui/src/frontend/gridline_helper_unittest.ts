@@ -15,21 +15,33 @@
 import {getGridStepSize} from './gridline_helper';
 
 test('gridline helper to have sensible step sizes', () => {
-  expect(getGridStepSize(10, 15)).toEqual(1);
-  expect(getGridStepSize(30, 15)).toEqual(2);
-  expect(getGridStepSize(60, 15)).toEqual(5);
-  expect(getGridStepSize(100, 15)).toEqual(10);
+  expect(getGridStepSize(10, 14)).toEqual(1);
+  expect(getGridStepSize(30, 14)).toEqual(2);
+  expect(getGridStepSize(60, 14)).toEqual(5);
+  expect(getGridStepSize(100, 14)).toEqual(10);
+
+  expect(getGridStepSize(10, 21)).toEqual(0.5);
+  expect(getGridStepSize(30, 21)).toEqual(2);
+  expect(getGridStepSize(60, 21)).toEqual(2);
+  expect(getGridStepSize(100, 21)).toEqual(5);
+
+  expect(getGridStepSize(10, 3)).toEqual(5);
+  expect(getGridStepSize(30, 3)).toEqual(10);
+  expect(getGridStepSize(60, 3)).toEqual(20);
+  expect(getGridStepSize(100, 3)).toEqual(50);
+
+  expect(getGridStepSize(800, 4)).toEqual(200);
 });
 
 test('gridline helper to scale to very small and very large values', () => {
-  expect(getGridStepSize(.01, 15)).toEqual(.001);
-  expect(getGridStepSize(10000, 15)).toEqual(1000);
+  expect(getGridStepSize(.01, 14)).toEqual(.001);
+  expect(getGridStepSize(10000, 14)).toEqual(1000);
 });
 
 test('gridline helper to always return a reasonable number of steps', () => {
   for (let i = 1; i <= 1000; i++) {
-    const stepSize = getGridStepSize(i, 15);
-    expect(Math.round(i / stepSize)).toBeGreaterThanOrEqual(10);
-    expect(Math.round(i / stepSize)).toBeLessThanOrEqual(30);
+    const stepSize = getGridStepSize(i, 14);
+    expect(Math.round(i / stepSize)).toBeGreaterThanOrEqual(7);
+    expect(Math.round(i / stepSize)).toBeLessThanOrEqual(21);
   }
 });
