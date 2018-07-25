@@ -58,16 +58,16 @@ export class PanAndZoomHandler {
   private onPanned: (movedPx: number) => void;
   private onZoomed: (zoomPositionPx: number, zoomPercentage: number) => void;
 
-  constructor(data: {
+  constructor({element, contentOffsetX, onPanned, onZoomed}: {
     element: HTMLElement,
     contentOffsetX: number,
     onPanned: (movedPx: number) => void,
     onZoomed: (zoomPositionPx: number, zoomPercentage: number) => void,
   }) {
-    this.element = data.element;
-    this.contentOffsetX = data.contentOffsetX;
-    this.onPanned = data.onPanned;
-    this.onZoomed = data.onZoomed;
+    this.element = element;
+    this.contentOffsetX = contentOffsetX;
+    this.onPanned = onPanned;
+    this.onZoomed = onZoomed;
 
     this.attachMouseEventListeners();
     this.handleKeyPanning();
