@@ -187,7 +187,7 @@ export class PanAndZoomHandler {
     this.element.addEventListener('mousedown', this.boundOnMouseDown);
     this.element.addEventListener('mousemove', this.boundOnMouseMove);
     this.element.addEventListener('mouseup', this.boundOnMouseUp);
-    this.element.addEventListener('wheel', this.boundOnWheel);
+    this.element.addEventListener('wheel', this.boundOnWheel, {passive: true});
   }
 
   private detachMouseEventListeners() {
