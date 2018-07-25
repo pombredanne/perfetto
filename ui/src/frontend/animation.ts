@@ -18,13 +18,13 @@ export class Animation {
   private end = Infinity;
   private requestedAnimationFrame = 0;
 
-  constructor(private onAnimationStep: () => void) {}
+  constructor(private onAnimationStep: (timeSinceLastMs: number) => void) {}
 
   start(durationMs?: number) {
     if (durationMs !== undefined) {
       this.end = Date.now() + durationMs;
     }
-    this.runRecursion();
+    this.run();
   }
 
   stop() {
@@ -36,13 +36,19 @@ export class Animation {
     return this.runningStartedMs;
   }
 
-  private runRecursion() {
+  private run() {
     if (this.running) {
       return;
     }
+    let lastFrameTimeMs = 0;
 
-    const raf = () => {
-      this.onAnimationStep();
+    const raf = (timestampMs: number) => {
+      if (!lastFrameTimeMs) {
+        lastFrameTimeMs = timestampMs;
+      }
+      this.onAnimationStep(timestampMs - lastFrameTimeMs);
+      lastFrameTimeMs = timestampMs;
+
       if (this.running) {
         if (Date.now() < this.end) {
           this.requestedAnimationFrame = requestAnimationFrame(raf);
@@ -54,6 +60,7 @@ export class Animation {
 
     this.running = true;
     this.runningStartedMs = Date.now();
-    raf();
+
+    requestAnimationFrame(raf);
   }
 }

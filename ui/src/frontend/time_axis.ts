@@ -19,7 +19,7 @@ import {GridlineHelper} from './gridline_helper';
 import {Milliseconds, TimeScale} from './time_scale';
 
 /**
- * Axis for showing time ticks
+ * Axis for showing time ticks.
  */
 export const TimeAxis = {
   view({attrs}) {
@@ -43,7 +43,7 @@ export const TimeAxis = {
 
     for (let t: Milliseconds = start; t < attrs.visibleWindowMs.end;
          t += step) {
-      const xPos = attrs.timeScale.msToPx(t);
+      const xPos = Math.floor(attrs.timeScale.msToPx(t)) + 0.5;
 
       if (xPos >= 0 && xPos <= attrs.width - attrs.contentOffset) {
         const template =

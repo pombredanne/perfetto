@@ -49,35 +49,36 @@ const TraceViewer = {
 
     // TODO: ContentOffsetX should be defined somewhere central.
     // Currently it lives here, in canvas wrapper, and in track shell.
-    this.zoomContent = new PanAndZoomHandler(
-        vnode.dom as HTMLElement,
-        200,
-        (pannedPx: number) => {
-          const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
-          this.visibleWindowMs.start += deltaMs;
-          this.visibleWindowMs.end += deltaMs;
-          this.timeScale.setLimitsMs(
-              this.visibleWindowMs.start, this.visibleWindowMs.end);
-          m.redraw();
-        },
-        (zoomedPositionPx: number, zoomPercentage: number) => {
-          const totalTimespanMs =
-              this.visibleWindowMs.end - this.visibleWindowMs.start;
-          const newTotalTimespanMs = totalTimespanMs * zoomPercentage;
+    this.zoomContent = new PanAndZoomHandler({
+      element: vnode.dom as HTMLElement,
+      contentOffsetX: 200,
+      onPanned: (pannedPx: number) => {
+        const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
+        this.visibleWindowMs.start += deltaMs;
+        this.visibleWindowMs.end += deltaMs;
+        this.timeScale.setLimitsMs(
+            this.visibleWindowMs.start, this.visibleWindowMs.end);
+        m.redraw();
+      },
+      onZoomed: (zoomedPositionPx: number, zoomPercentage: number) => {
+        const totalTimespanMs =
+            this.visibleWindowMs.end - this.visibleWindowMs.start;
+        const newTotalTimespanMs = totalTimespanMs * zoomPercentage;
 
-          const zoomedPositionMs =
-              this.timeScale.pxToMs(zoomedPositionPx) as number;
-          const positionPercentage =
-              (zoomedPositionMs - this.visibleWindowMs.start) / totalTimespanMs;
+        const zoomedPositionMs =
+            this.timeScale.pxToMs(zoomedPositionPx) as number;
+        const positionPercentage =
+            (zoomedPositionMs - this.visibleWindowMs.start) / totalTimespanMs;
 
-          this.visibleWindowMs.start =
-              zoomedPositionMs - newTotalTimespanMs * positionPercentage;
-          this.visibleWindowMs.end =
-              zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
-          this.timeScale.setLimitsMs(
-              this.visibleWindowMs.start, this.visibleWindowMs.end);
-          m.redraw();
-        });
+        this.visibleWindowMs.start =
+            zoomedPositionMs - newTotalTimespanMs * positionPercentage;
+        this.visibleWindowMs.end =
+            zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
+        this.timeScale.setLimitsMs(
+            this.visibleWindowMs.start, this.visibleWindowMs.end);
+        m.redraw();
+      }
+    });
   },
   onremove() {
     window.removeEventListener('resize', this.onResize);
