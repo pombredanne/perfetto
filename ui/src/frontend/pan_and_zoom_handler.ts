@@ -15,9 +15,9 @@
 import {Animation} from './animation';
 import Timer = NodeJS.Timer;
 
-const ZOOM_IN_PERCENTAGE_SPEED = 0.95;
-const ZOOM_OUT_PERCENTAGE_SPEED = 1.05;
-const KEYBOARD_PAN_PX_PER_FRAME = 20;
+const ZOOM_IN_PERCENTAGE_PER_MS = 0.998;
+const ZOOM_OUT_PERCENTAGE_PER_MS = 1 / ZOOM_IN_PERCENTAGE_PER_MS;
+const KEYBOARD_PAN_PX_PER_MS = 1;
 const HORIZONTAL_WHEEL_PAN_SPEED = 1;
 
 // Usually, animations are cancelled on keyup. However, in case the keyup
@@ -40,23 +40,35 @@ const ZOOM_KEYS = ZOOM_IN_KEYS.concat(ZOOM_OUT_KEYS);
  * Enables horizontal pan and zoom with mouse-based drag and WASD navigation.
  */
 export class PanAndZoomHandler {
-  private mouseDownPositionX = -1;
-  private mousePositionX = -1;
+  private mouseDownPositionX: number|null = null;
+  private mousePositionX: number|null = null;
 
-  private readonly onMouseDownLambda = (e: MouseEvent) => this.onMouseDown(e);
-  private readonly onMouseMoveLambda = (e: MouseEvent) => this.onMouseMove(e);
-  private readonly onMouseUpLambda = () => this.onMouseUp();
-  private readonly onWheelLambda = (e: WheelEvent) => this.onWheel(e);
-  private panKeyDownLambda: (e: KeyboardEvent) => void = () => {};
-  private panKeyUpLambda: (e: KeyboardEvent) => void = () => {};
-  private zoomKeyDownLambda: (e: KeyboardEvent) => void = () => {};
-  private zoomKeyUpLambda: (e: KeyboardEvent) => void = () => {};
+  private boundOnMouseDown: (e: MouseEvent) => void = () => {};
+  private boundOnMouseMove: (e: MouseEvent) => void = () => {};
+  private boundOnMouseUp: () => void = () => {};
+  private boundOnWheel: (e: WheelEvent) => void = () => {};
 
-  constructor(
-      private element: HTMLElement, private contentOffsetX: number,
-      private onPanned: (movedPx: number) => void,
-      private onZoomed:
-          (zoomPositionPx: number, zoomPercentage: number) => void) {
+  private boundOnPanKeyDown: (e: KeyboardEvent) => void = () => {};
+  private boundOnPanKeyUp: (e: KeyboardEvent) => void = () => {};
+  private boundOnZoomKeyDown: (e: KeyboardEvent) => void = () => {};
+  private boundOnZoomKeyUp: (e: KeyboardEvent) => void = () => {};
+
+  private element: HTMLElement;
+  private contentOffsetX: number;
+  private onPanned: (movedPx: number) => void;
+  private onZoomed: (zoomPositionPx: number, zoomPercentage: number) => void;
+
+  constructor(data: {
+    element: HTMLElement,
+    contentOffsetX: number,
+    onPanned: (movedPx: number) => void,
+    onZoomed: (zoomPositionPx: number, zoomPercentage: number) => void,
+  }) {
+    this.element = data.element;
+    this.contentOffsetX = data.contentOffsetX;
+    this.onPanned = data.onPanned;
+    this.onZoomed = data.onZoomed;
+
     this.attachMouseEventListeners();
     this.handleKeyPanning();
     this.handleKeyZooming();
@@ -65,21 +77,21 @@ export class PanAndZoomHandler {
   shutdown() {
     this.detachMouseEventListeners();
 
-    document.body.removeEventListener('keydown', this.panKeyDownLambda);
-    document.body.removeEventListener('keyup', this.panKeyUpLambda);
-    document.body.removeEventListener('keydown', this.zoomKeyDownLambda);
-    document.body.removeEventListener('keyup', this.zoomKeyUpLambda);
+    document.body.removeEventListener('keydown', this.boundOnPanKeyDown);
+    document.body.removeEventListener('keyup', this.boundOnPanKeyUp);
+    document.body.removeEventListener('keydown', this.boundOnZoomKeyDown);
+    document.body.removeEventListener('keyup', this.boundOnZoomKeyUp);
   }
 
   private handleKeyPanning() {
     let directionFactor = 0;
     let tapCancelTimeout: Timer;
 
-    const panAnimation = new Animation(() => {
-      this.onPanned(directionFactor * KEYBOARD_PAN_PX_PER_FRAME);
+    const panAnimation = new Animation((timeSinceLastMs) => {
+      this.onPanned(directionFactor * KEYBOARD_PAN_PX_PER_MS * timeSinceLastMs);
     });
 
-    this.panKeyDownLambda = e => {
+    this.boundOnPanKeyDown = e => {
       if (!PAN_KEYS.includes(e.key)) {
         return;
       }
@@ -90,7 +102,7 @@ export class PanAndZoomHandler {
       panAnimation.start(animationTime);
       clearTimeout(tapCancelTimeout);
     };
-    this.panKeyUpLambda = e => {
+    this.boundOnPanKeyUp = e => {
       if (!PAN_KEYS.includes(e.key)) {
         return;
       }
@@ -104,86 +116,88 @@ export class PanAndZoomHandler {
       }
     };
 
-    document.body.addEventListener('keydown', this.panKeyDownLambda);
-    document.body.addEventListener('keyup', this.panKeyUpLambda);
+    document.body.addEventListener('keydown', this.boundOnPanKeyDown);
+    document.body.addEventListener('keyup', this.boundOnPanKeyUp);
   }
 
   private handleKeyZooming() {
     let zoomingIn = true;
     let tapCancelTimeout: Timer;
 
-    const zoomAnimation = new Animation(() => {
-      const percentage =
-          zoomingIn ? ZOOM_IN_PERCENTAGE_SPEED : ZOOM_OUT_PERCENTAGE_SPEED;
+    const zoomAnimation = new Animation((timeSinceLastMs: number) => {
+      if (this.mousePositionX === null) {
+        return;
+      }
+      const percentagePerMs =
+          zoomingIn ? ZOOM_IN_PERCENTAGE_PER_MS : ZOOM_OUT_PERCENTAGE_PER_MS;
+      const percentage = Math.pow(percentagePerMs, timeSinceLastMs);
       this.onZoomed(this.mousePositionX, percentage);
     });
 
-    this.zoomKeyDownLambda = e => {
+    this.boundOnZoomKeyDown = e => {
+      if (!ZOOM_KEYS.includes(e.key)) {
+        return;
+      }
+      zoomingIn = ZOOM_IN_KEYS.includes(e.key);
+      const animationTime = e.repeat ?
+          ANIMATION_AUTO_END_AFTER_KEYPRESS_MS :
+          ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS;
+      zoomAnimation.start(animationTime);
+      clearTimeout(tapCancelTimeout);
+    };
+    this.boundOnZoomKeyUp = e => {
       if (ZOOM_KEYS.includes(e.key)) {
-        zoomingIn = ZOOM_IN_KEYS.includes(e.key);
-        const animationTime = e.repeat ?
-            ANIMATION_AUTO_END_AFTER_KEYPRESS_MS :
-            ANIMATION_AUTO_END_AFTER_INITIAL_KEYPRESS_MS;
-        zoomAnimation.start(animationTime);
-        clearTimeout(tapCancelTimeout);
+        return;
+      }
+      const cancellingZoomIn = ZOOM_IN_KEYS.includes(e.key);
+
+      // Only cancel if the lifted key is the one controlling the animation.
+      if (cancellingZoomIn === zoomingIn) {
+        const minEndTime = zoomAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
+        const waitTime = minEndTime - Date.now();
+        tapCancelTimeout = setTimeout(() => zoomAnimation.stop(), waitTime);
       }
     };
-    this.zoomKeyUpLambda = e => {
-      if (ZOOM_KEYS.includes(e.key)) {
-        const cancellingZoomIn = ZOOM_IN_KEYS.includes(e.key);
 
-        // Only cancel if the lifted key is the one controlling the animation.
-        if (cancellingZoomIn === zoomingIn) {
-          const minEndTime =
-              zoomAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
-          const waitTime = minEndTime - Date.now();
-          tapCancelTimeout = setTimeout(() => zoomAnimation.stop(), waitTime);
-        }
-      }
-    };
-
-    document.body.addEventListener('keydown', this.zoomKeyDownLambda);
-    document.body.addEventListener('keyup', this.zoomKeyUpLambda);
+    document.body.addEventListener('keydown', this.boundOnZoomKeyDown);
+    document.body.addEventListener('keyup', this.boundOnZoomKeyUp);
   }
 
   private attachMouseEventListeners() {
-    this.element.addEventListener('mousedown', this.onMouseDownLambda);
-    this.element.addEventListener('mousemove', this.onMouseMoveLambda);
-    this.element.addEventListener('mouseup', this.onMouseUpLambda);
-    this.element.addEventListener('wheel', this.onWheelLambda);
+    this.boundOnMouseDown = e => {
+      this.mouseDownPositionX = this.getMouseX(e);
+    };
+    this.boundOnMouseMove = e => {
+      if (this.mouseDownPositionX !== null) {
+        this.onPanned(this.mouseDownPositionX - this.getMouseX(e));
+        this.mouseDownPositionX = this.getMouseX(e);
+        e.preventDefault();
+      }
+      this.mousePositionX = this.getMouseX(e);
+    };
+    this.boundOnMouseUp = () => {
+      this.mouseDownPositionX = null;
+    };
+    this.boundOnWheel = e => {
+      if (e.deltaX) {
+        this.onPanned(e.deltaX * HORIZONTAL_WHEEL_PAN_SPEED);
+      }
+    };
+
+    this.element.addEventListener('mousedown', this.boundOnMouseDown);
+    this.element.addEventListener('mousemove', this.boundOnMouseMove);
+    this.element.addEventListener('mouseup', this.boundOnMouseUp);
+    this.element.addEventListener('wheel', this.boundOnWheel);
   }
 
   private detachMouseEventListeners() {
-    this.element.removeEventListener('mousedown', this.onMouseDownLambda);
-    this.element.removeEventListener('mousemove', this.onMouseMoveLambda);
-    this.element.removeEventListener('mouseup', this.onMouseUpLambda);
-    this.element.removeEventListener('wheel', this.onWheelLambda);
-  }
-
-  protected onMouseDown(e: MouseEvent) {
-    this.mouseDownPositionX = this.getMouseX(e);
-  }
-
-  protected onMouseMove(e: MouseEvent) {
-    if (this.mouseDownPositionX !== -1) {
-      this.onPanned(this.mouseDownPositionX - this.getMouseX(e));
-      this.mouseDownPositionX = this.getMouseX(e);
-      e.preventDefault();
-    }
-    this.mousePositionX = this.getMouseX(e);
+    this.element.removeEventListener('mousedown', this.boundOnMouseDown);
+    this.element.removeEventListener('mousemove', this.boundOnMouseMove);
+    this.element.removeEventListener('mouseup', this.boundOnMouseUp);
+    this.element.removeEventListener('wheel', this.boundOnWheel);
   }
 
   private getMouseX(e: MouseEvent) {
     return e.clientX - this.contentOffsetX;
-  }
-
-  private onMouseUp() {
-    this.mouseDownPositionX = -1;
-  }
-
-  private onWheel(e: WheelEvent) {
-    if (e.deltaX) {
-      this.onPanned(e.deltaX * HORIZONTAL_WHEEL_PAN_SPEED);
-    }
   }
 }
