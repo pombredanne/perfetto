@@ -38,7 +38,7 @@ export class Animation {
 
   private run() {
     if (this.running) {
-      return;  // que pasa
+      return;
     }
     let lastFrameTimeMs = 0;
 
