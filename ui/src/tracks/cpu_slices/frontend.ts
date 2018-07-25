@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {TrackState} from '../../common/state';
-import {GridlineHelper} from '../../frontend/gridline_helper';
+import {drawGridLines} from '../../frontend/gridline_helper';
 import {Milliseconds, TimeScale} from '../../frontend/time_scale';
 import {TrackImpl} from '../../frontend/track_impl';
 import {trackRegistry} from '../../frontend/track_registry';
@@ -42,7 +42,7 @@ class CpuSliceTrack extends TrackImpl {
     vCtx.fillStyle = '#ccc';
     vCtx.fillRect(0, 0, width, 73);
 
-    GridlineHelper.drawGridLines(vCtx, timeScale, [0, 1000000], width, 73);
+    drawGridLines(vCtx, timeScale, [0, 1000000], width, 73);
 
     vCtx.fillStyle = '#c00';
     vCtx.fillRect(shownStart, 40, shownWidth, 30);

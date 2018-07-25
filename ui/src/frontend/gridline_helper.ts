@@ -15,51 +15,55 @@
 import {Milliseconds, TimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export abstract class GridlineHelper {
-  static drawGridLines(
-      ctx: VirtualCanvasContext, x: TimeScale,
-      timeBounds: [Milliseconds, Milliseconds], width: number,
-      height: number): void {
-    const range = timeBounds[1] - timeBounds[0];
-    const desiredSteps = width / 80;
-    const step = GridlineHelper.getStepSize(range, desiredSteps);
-    const start = Math.round(timeBounds[0] / step) * step;
+const DESIRED_PX_PER_STEP = 80;
 
-    ctx.strokeStyle = '#999999';
-    ctx.lineWidth = 1;
+export function drawGridLines(
+    ctx: VirtualCanvasContext,
+    x: TimeScale,
+    timeBounds: [Milliseconds, Milliseconds],
+    width: number,
+    height: number): void {
+  const range = timeBounds[1] - timeBounds[0];
+  const desiredSteps = width / DESIRED_PX_PER_STEP;
+  const step = getGridStepSize(range, desiredSteps);
+  const start = Math.round(timeBounds[0] / step) * step;
 
-    for (let t: Milliseconds = start; t < timeBounds[1]; t += step) {
-      const xPos = Math.floor(x.msToPx(t)) + 0.5;
+  ctx.strokeStyle = '#999999';
+  ctx.lineWidth = 1;
 
-      if (xPos <= width) {
-        ctx.beginPath();
-        ctx.moveTo(xPos, 0);
-        ctx.lineTo(xPos, height);
-        ctx.stroke();
-      }
+  for (let t: Milliseconds = start; t < timeBounds[1]; t += step) {
+    const xPos = Math.floor(x.msToPx(t)) + 0.5;
+
+    if (xPos <= width) {
+      ctx.beginPath();
+      ctx.moveTo(xPos, 0);
+      ctx.lineTo(xPos, height);
+      ctx.stroke();
     }
   }
+}
 
-  /**
-   * Calculates a step size of gridlines for a given time range such that there
-   * are between 10 and 25 steps. The only possible step sizes are 2, 5, or 10,
-   * except for factors of 10 for scaling.
-   */
-  static getStepSize(range: Milliseconds, desiredSteps = 15): Milliseconds {
-    const zeros = Math.floor(Math.log10(range));
-    let step = Math.pow(10, zeros);
-    const distToDesired = (step: number) =>
-        Math.abs(range / step - desiredSteps);
 
-    if (distToDesired(step / 10) < distToDesired(step)) {
-      step /= 10;
-    }
-    if (distToDesired(step / 5) < distToDesired(step)) {
-      step /= 5;
-    }
-    if (distToDesired(step / 2) < distToDesired(step)) {
-      step /= 2;
-    }
-    return step;
+/**
+ * Calculates a step size of grid lines for a given time range such that the
+ * number of steps is as close as possible to the desired number. The only
+ * possible step sizes are 2, 5, or 10, save for factors of 10 for scaling.
+ */
+export function getGridStepSize(
+    range: Milliseconds, desiredSteps: number): Milliseconds {
+  const zeros = Math.floor(Math.log10(range));
+  let stepSize = Math.pow(10, zeros);
+  const distToDesired = (evaluatedStepSize: number) =>
+      Math.abs(range / evaluatedStepSize - desiredSteps);
+
+  if (distToDesired(stepSize / 10) < distToDesired(stepSize)) {
+    stepSize /= 10;
   }
+  if (distToDesired(stepSize / 5) < distToDesired(stepSize)) {
+    stepSize /= 5;
+  }
+  if (distToDesired(stepSize / 2) < distToDesired(stepSize)) {
+    stepSize /= 2;
+  }
+  return stepSize;
 }
