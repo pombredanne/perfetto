@@ -15,6 +15,7 @@
 
 import * as m from 'mithril';
 
+import {OverviewTimeline} from './overview_timeline';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingTrackDisplay} from './scrolling_track_display';
@@ -29,6 +30,7 @@ const TraceViewer = {
   oninit() {
     this.width = 0;
     this.visibleWindowMs = {start: 0, end: 1000000};
+    this.maxVisibleWindowMs = {start: 0, end: 10000000};
     this.timeScale = new TimeScale(
         [this.visibleWindowMs.start, this.visibleWindowMs.end],
         [0, this.width]);
@@ -93,6 +95,11 @@ const TraceViewer = {
             height: '100%',
           },
         },
+        m(OverviewTimeline, {
+          visibleWindowMs: this.visibleWindowMs,
+          maxVisibleWindowMs: this.maxVisibleWindowMs,
+          width: this.width,
+        }),
         m(TimeAxis, {
           timeScale: this.timeScale,
           contentOffset: 200,
@@ -106,6 +113,7 @@ const TraceViewer = {
   },
 } as m.Component<{}, {
   visibleWindowMs: {start: number, end: number},
+  maxVisibleWindowMs: {start: number, end: number},
   onResize: () => void,
   timeScale: TimeScale,
   width: number,
