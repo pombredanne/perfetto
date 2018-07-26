@@ -12,26 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface Action { type: string; }
+// Import all currently implemented tracks. After implemeting a new track, an
+// import statement for it needs to be added here.
+import './cpu_counters/frontend';
+import './cpu_slices/frontend';
 
-export function openTrace(url: string) {
-  return {
-    type: 'OPEN_TRACE',
-    url,
-  };
-};
-
-export function addTrack(engineId: string, trackType: string) {
-  return {
-    type: 'ADD_TRACK',
-    engineId,
-    trackType,
-  };
-};
-
-export function navigate(route: string) {
-  return {
-    type: 'NAVIGATE',
-    route,
-  };
-};

@@ -21,22 +21,22 @@ import {Remote} from '../base/remote';
  * This allows us to send strongly typed messages to the contoller.
  * TODO(hjd): Remove the boiler plate.
  */
-class ControllerProxy {
+export class ControllerProxy {
   private readonly remote: Remote;
 
   constructor(remote: Remote) {
     this.remote = remote;
   }
 
-  init(port: MessagePort): Promise<State> {
-    return this.remote.send<State>('init', [port], [port]);
+  initAndGetState(port: MessagePort): Promise<State> {
+    return this.remote.send<State>('initAndGetState', [port], [port]);
   }
 
   dispatch(action: Action): Promise<void> {
     return this.remote.send<void>('dispatch', [action]);
   }
 
-  loadTraceFromBlob(blob: Blob): Promise<void> {
-    return this.remote.send<void>('loadTraceFromBlob', [blob]);
+  addLocalFile(file: File): Promise<string> {
+    return this.remote.send<string>('addLocalFile', [file]);
   }
 }

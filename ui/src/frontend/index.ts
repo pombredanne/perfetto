@@ -12,170 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import '../tracks/all_tracks';
+
 import * as m from 'mithril';
 
-import {forwardRemoteCalls} from '../base/remote';
+import {forwardRemoteCalls, Remote} from '../base/remote';
 import {State} from '../common/state';
 import {warmupWasmEngineWorker, createWasmEngineWorkerPort} from '../controller/wasm_engine_proxy';
-import {CanvasController} from './canvas_controller';
-import {CanvasWrapper} from './canvas_wrapper';
-import {ChildVirtualContext} from './child_virtual_context';
+import {ControllerProxy} from './controller_proxy';
 import {globals} from './globals';
 import {HomePage} from './home_page';
-import {createPage} from './pages';
 import {QueryPage} from './query_page';
-import {ScrollableContainer} from './scrollable_container';
-import {TimeScale} from './time_scale';
-import {Track} from './track';
-import {ControllerProxy} from './controller_proxy';
-
-export const Frontend = {
-  oninit() {
-    this.width = 0;
-    this.height = 0;
-    this.canvasController = new CanvasController();
-  },
-  oncreate(vnode) {
-    this.onResize = () => {
-      const rect = vnode.dom.getBoundingClientRect();
-      this.width = rect.width;
-      this.height = rect.height;
-      this.canvasController.setDimensions(this.width, this.height);
-      m.redraw();
-    };
-    // Have to redraw after initialization to provide dimensions to view().
-    setTimeout(() => this.onResize());
-
-    // Once ResizeObservers are out, we can stop accessing the window here.
-    window.addEventListener('resize', this.onResize);
-  },
-  onremove() {
-    window.removeEventListener('resize', this.onResize);
-  },
-  view({}) {
-    const canvasTopOffset = this.canvasController.getCanvasTopOffset();
-    const ctx = this.canvasController.getContext();
-    const timeScale = new TimeScale([0, 1000000], [0, this.width]);
-
-    this.canvasController.clear();
-
-    return m(
-        '.frontend',
-        {
-          style: {
-            position: 'relative',
-            width: '100%',
-            height: 'calc(100% - 105px)',
-            overflow: 'hidden'
-          }
-        },
-        m(ScrollableContainer,
-          {
-            width: this.width,
-            height: this.height,
-            contentHeight: 1000,
-            onPassiveScroll: (scrollTop: number) => {
-              this.canvasController.updateScrollOffset(scrollTop);
-              m.redraw();
-            },
-          },
-          m(CanvasWrapper, {
-            topOffset: canvasTopOffset,
-            canvasElement: this.canvasController.getCanvasElement()
-          }),
-          m(Track, {
-            name: 'Track 1',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 0, x: 0, width: this.width, height: 90}),
-            top: 0,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 2',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 100, x: 0, width: this.width, height: 90}),
-            top: 100,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 3',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 200, x: 0, width: this.width, height: 90}),
-            top: 200,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 4',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 300, x: 0, width: this.width, height: 90}),
-            top: 300,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 5',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 400, x: 0, width: this.width, height: 90}),
-            top: 400,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 6',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 500, x: 0, width: this.width, height: 90}),
-            top: 500,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 7',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 600, x: 0, width: this.width, height: 90}),
-            top: 600,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 8',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 700, x: 0, width: this.width, height: 90}),
-            top: 700,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 9',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 800, x: 0, width: this.width, height: 90}),
-            top: 800,
-            width: this.width,
-            timeScale
-          }),
-          m(Track, {
-            name: 'Track 10',
-            trackContext: new ChildVirtualContext(
-                ctx, {y: 900, x: 0, width: this.width, height: 90}),
-            top: 900,
-            width: this.width,
-            timeScale
-          }), ), );
-  },
-} as m.Component<{width: number, height: number}, {
-  canvasController: CanvasController,
-  width: number,
-  height: number,
-  onResize: () => void
-}>;
-
-export const FrontendPage = createPage({
-  view() {
-    return m(Frontend, {width: 1000, height: 300});
-  }
-});
+import {ViewerPage} from './viewer_page';
 
 function createController(): ControllerProxy {
   const worker = new Worker('controller_bundle.js');
@@ -192,7 +40,12 @@ function createController(): ControllerProxy {
 class FrontendApi {
   updateState(state: State) {
     globals.state = state;
-    m.redraw();
+    console.log(state);
+    if (state.route && state.route !== m.route.get()) {
+      m.route.set(state.route);
+    } else {
+      m.redraw();
+    }
   }
 
   /**
@@ -209,11 +62,10 @@ class FrontendApi {
 
 async function main() {
   const controller = createController();
-  globals.controller = controller;
   const channel = new MessageChannel();
   forwardRemoteCalls(channel.port2, new FrontendApi());
-  globals.state = await controller.init(channel.port1);
-
+  globals.controller = controller;
+  globals.state = await controller.initAndGetState(channel.port1);
   globals.dispatch = controller.dispatch.bind(controller);
   warmupWasmEngineWorker();
 
@@ -225,9 +77,12 @@ async function main() {
 
   m.route(root, '/', {
     '/': HomePage,
-    '/viewer': FrontendPage,
+    '/viewer': ViewerPage,
     '/query/:trace': QueryPage,
   });
+
+  (window as any).m = m;
+  (window as any).globals = globals;
 }
 
 main();

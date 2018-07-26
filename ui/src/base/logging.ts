@@ -12,26 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface Action { type: string; }
-
-export function openTrace(url: string) {
-  return {
-    type: 'OPEN_TRACE',
-    url,
-  };
-};
-
-export function addTrack(engineId: string, trackType: string) {
-  return {
-    type: 'ADD_TRACK',
-    engineId,
-    trackType,
-  };
-};
-
-export function navigate(route: string) {
-  return {
-    type: 'NAVIGATE',
-    route,
-  };
-};
+export function assertExists<A>(value: A | null | undefined): A {
+  if (value === null || value === undefined) {
+    throw new Error("Value doesn't exist");
+  }
+  return value;
+}

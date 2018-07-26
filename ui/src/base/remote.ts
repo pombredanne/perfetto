@@ -26,11 +26,11 @@ export class Remote {
   private nextRequestId: number;
   private port: MessagePort;
   // tslint:disable-next-line no-any
-  private deferred: Map<number, Deferred<any>>;
+  private deferredRequests: Map<number, Deferred<any>>;
 
   constructor(port: MessagePort) {
     this.nextRequestId = 0;
-    this.deferred = new Map();
+    this.deferredRequests = new Map();
     this.port = port;
     this.port.onmessage = (event: MessageEvent) => {
       this.receive(event.data);
@@ -45,7 +45,7 @@ export class Remote {
   send<T extends any>(
       method: string, args: Array<{}>, transferList?: Array<{}>): Promise<T> {
     const d = defer<T>();
-    this.deferred.set(this.nextRequestId, d);
+    this.deferredRequests.set(this.nextRequestId, d);
     this.port.postMessage(
         {
           responseId: this.nextRequestId,
@@ -58,9 +58,9 @@ export class Remote {
   }
 
   private receive(response: RemoteResponse): void {
-    const d = this.deferred.get(response.id);
+    const d = this.deferredRequests.get(response.id);
     if (!d) throw new Error(`No deferred response with ID ${response.id}`);
-    this.deferred.delete(response.id);
+    this.deferredRequests.delete(response.id);
     d.resolve(response.result);
   }
 }
@@ -68,7 +68,7 @@ export class Remote {
 /**
  * Given a MessagePort |port| where the other end is owned by a Remote
  * (see above) turn each incoming MessageEvent into a call on |handler|
- * and post the result back to the main thread.
+ * and post the result back to the calling thread.
  */
 export function forwardRemoteCalls(
     port: MessagePort,
@@ -87,15 +87,15 @@ export function forwardRemoteCalls(
     }
 
     const result = handler[method].apply(handler, args);
-    const transfer = [];
+    const transferList = [];
 
     if (result instanceof MessagePort) {
-      transfer.push(result);
+      transferList.push(result);
     }
 
     port.postMessage({
       id,
       result,
-    }, transfer);
+    }, transferList);
   };
 }

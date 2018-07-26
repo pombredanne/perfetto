@@ -13,12 +13,15 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-
+import {EngineConfig} from '../common/state';
 import {globals} from './globals';
-import {quietDispatch} from './mithril_helpers';
+import {MithrilEvent, quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';
+import {openTrace} from '../common/actions';
 
-function extractBlob(e: Event): Blob|null {
+const EXAMPLE_TRACE_URL = 'https://storage.googleapis.com/perfetto-misc/example_trace';
+
+function extractFile(e: Event): File|null {
   if (!(e.target instanceof HTMLInputElement)) {
     throw new Error('Not input element');
   }
@@ -26,38 +29,37 @@ function extractBlob(e: Event): Blob|null {
   return e.target.files.item(0);
 }
 
-async function loadExampleTrace() {
-  const url = 'https://storage.googleapis.com/perfetto-misc/example_trace';
-  const repsonse = await fetch(url);
-  const blob = await repsonse.blob();
-  globals.controller.loadTraceFromBlob(blob);
+async function loadTraceFromFile(e: MithrilEvent) {
+  e.redraw = false;
+  const file = extractFile(e);
+  if (!file) return;
+  const url = await globals.controller.addLocalFile(file);
+  globals.dispatch(openTrace(url));
 }
+
+const EngineView: m.Component<{engine: EngineConfig}, {}> = {
+  view({attrs}) {
+    return m('', attrs.engine.id);
+  },
+};
 
 export const HomePage = createPage({
   view() {
-    const count = globals.state.i;
+    const engines = Object.values(globals.state.engines);
     return m(
-        '.home-page',
-        m('.home-page-title', 'Perfetto'),
-        m('.home-page-controls',
-          m('label.file-input',
-            m('input[type=file]', {
-              onchange: (e: Event) => {
-                const blob = extractBlob(e);
-                if (!blob) return;
-                globals.controller.loadTraceFromBlob(blob);
-                m.route.set('/query/0');
-              },
-            }),
-            'Load trace'),
-          ' or ',
-          m('button', {onclick: loadExampleTrace}, 'Open demo trace'),
-          m('button',
-            {
-              onclick: quietDispatch({
-                type: 'INCREMENT',
-              })
-            },
-            `Increment ${count}`)));
-  }
+      '.home-page',
+      m('.home-page-title', 'Perfetto'),
+      m('.home-page-controls',
+        m('label.file-input',
+          m('input[type=file]', {
+            onchange: loadTraceFromFile,
+          }),
+          'Load trace'),
+        ' or ',
+        m('button', {
+          onclick: quietDispatch(openTrace(EXAMPLE_TRACE_URL)),
+        }, 'Open example trace')),
+      m('.home-page-traces', engines.map(engine => m(EngineView, {engine}))),
+    );
+  },
 });

@@ -12,8 +12,10 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@types/mithril": "^1.1.12",
+    "immer": "^1.5.0",
     "mithril": "^1.1.6",
-    "protobufjs": "^6.8.6"
+    "protobufjs": "^6.8.6",
+    "rollup-plugin-replace": "^2.0.0"
   },
   "devDependencies": {
     "@types/jest": "^22.2.3",

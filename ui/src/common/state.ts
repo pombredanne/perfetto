@@ -17,37 +17,39 @@
  * We use this instead of using |Map| object since it is simpler and faster to
  * serialize for use in postMessage.
  */
-export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
+export interface ObjectById<Class extends {id: string}> { [id: string]: Class; }
 
-export interface BlobDescription {
+export interface TrackConfig {
   id: string;
-  filename: string;
+  engineId: string;
+  type: string;
+  height: number;
+  name: string;
 }
 
 export interface EngineConfig {
   id: string;
-  blobId: string;
+  url: string;
 }
 
 export interface State {
+  route: string|null;
   nextId: number;
-
-  i: number;
 
   /**
    * Open traces.
    */
   engines: ObjectById<EngineConfig>;
 
-  /**
-   * XXX: Fill this in.
-   */
-  blobs: ObjectById<BlobDescription>;
+
+  tracks: ObjectById<TrackConfig>;
 }
 
 export function createEmptyState(): State {
   return {
+    route: null,
+    nextId: 0,
+    tracks: {},
     engines: {},
-    i: 0,
   };
 }

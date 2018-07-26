@@ -1,3 +1,4 @@
+
 // Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +13,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface Action { type: string; }
+import * as m from 'mithril';
 
-export function openTrace(url: string) {
-  return {
-    type: 'OPEN_TRACE',
-    url,
-  };
-};
+import {createPage} from './pages';
+import {ScrollingTrackDisplay} from './scrolling_track_display';
+import {TimeScale} from './time_scale';
 
-export function addTrack(engineId: string, trackType: string) {
-  return {
-    type: 'ADD_TRACK',
-    engineId,
-    trackType,
-  };
-};
+/**
+ * Top-most level component for the viewer page. Holds tracks, brush timeline,
+ * panels, and everything else that's part of the main trace viewer page.
+ */
+const TraceViewer = {
+  view() {
+    const timeScale = new TimeScale([0, 1000000], [0, 1000]);
+    return m(ScrollingTrackDisplay, {
+      timeScale,
+    });
+  },
+} as m.Component<{}, {}>;
 
-export function navigate(route: string) {
-  return {
-    type: 'NAVIGATE',
-    route,
-  };
-};
+export const ViewerPage = createPage({
+  view() {
+    return m(TraceViewer);
+  }
+});

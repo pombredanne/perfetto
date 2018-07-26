@@ -14,7 +14,7 @@
 
 import * as m from 'mithril';
 
-const Nav = {
+const Nav: m.Component = {
   view() {
     return m(
         'nav',
@@ -22,7 +22,7 @@ const Nav = {
           m('li', m('a[href=/]', {oncreate: m.route.link}, 'Home')),
           m('li', m('a[href=/viewer]', {oncreate: m.route.link}, 'Viewer'))));
   }
-} as m.Component;
+};
 
 /**
  * Wrap component with common UI elements (nav bar etc).
