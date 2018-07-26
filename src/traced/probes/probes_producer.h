@@ -28,6 +28,7 @@
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/ftrace/ftrace_controller.h"
+#include "src/traced/probes/ftrace/ftrace_metadata.h"
 #include "src/traced/probes/ps/process_stats_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
@@ -68,65 +69,6 @@ class ProbesProducer : public Producer {
   void OnMetadata(const FtraceMetadata& metadata);
 
  private:
-  using FtraceBundleHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-  using FtraceStatsHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceStats>;
-
-  class SinkDelegate : public FtraceSink::Delegate {
-   public:
-    SinkDelegate(TracingSessionID,
-                 base::TaskRunner*,
-                 std::unique_ptr<TraceWriter>);
-    ~SinkDelegate() override;
-
-    TracingSessionID session_id() const { return session_id_; }
-
-    void Flush();
-
-    // FtraceDelegateImpl
-    FtraceBundleHandle GetBundleForCpu(size_t cpu) override;
-    void OnBundleComplete(size_t cpu,
-                          FtraceBundleHandle bundle,
-                          const FtraceMetadata& metadata) override;
-    void OnCreate(FtraceSink*) override;
-
-    void WriteStats();
-
-    void set_sink(std::unique_ptr<FtraceSink> sink) { sink_ = std::move(sink); }
-
-    void set_ps_source(base::WeakPtr<ProcessStatsDataSource> ptr) {
-      ps_source_ = std::move(ptr);
-    }
-    const base::WeakPtr<ProcessStatsDataSource>& ps_source() const {
-      return ps_source_;
-    }
-
-    void set_file_source(base::WeakPtr<InodeFileDataSource> ptr) {
-      file_source_ = std::move(ptr);
-    }
-    const base::WeakPtr<InodeFileDataSource>& file_source() const {
-      return file_source_;
-    }
-
-   private:
-    const TracingSessionID session_id_;
-    base::TaskRunner* task_runner_;
-    std::unique_ptr<FtraceSink> sink_ = nullptr;
-    std::unique_ptr<TraceWriter> writer_;
-    FtraceStats stats_before_ = {};
-
-    base::WeakPtr<ProcessStatsDataSource> ps_source_;
-    base::WeakPtr<InodeFileDataSource> file_source_;
-
-    // Keep this after the TraceWriter because TracePackets must not outlive
-    // their originating writer.
-    TraceWriter::TracePacketHandle trace_packet_;
-
-    // Keep this last.
-    base::WeakPtrFactory<SinkDelegate> weak_factory_;
-  };
-
   enum State {
     kNotStarted = 0,
     kNotConnected,
@@ -154,7 +96,8 @@ class ProbesProducer : public Producer {
   std::set<DataSourceInstanceID> failed_sources_;
   std::map<DataSourceInstanceID, std::unique_ptr<ProcessStatsDataSource>>
       process_stats_sources_;
-  std::map<DataSourceInstanceID, std::unique_ptr<SinkDelegate>> delegates_;
+  std::map<DataSourceInstanceID, std::unique_ptr<FtraceDataSource>>
+      ftrace_data_sources_;
   std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
       file_map_sources_;

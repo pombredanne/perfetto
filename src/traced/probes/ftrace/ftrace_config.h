@@ -20,6 +20,7 @@
 #include <set>
 #include <string>
 
+// TODO why we have this autogen header and not use protozero?
 #include "perfetto/tracing/core/ftrace_config.h"
 
 namespace perfetto {

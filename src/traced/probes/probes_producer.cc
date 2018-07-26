@@ -33,6 +33,7 @@
 #include "perfetto/tracing/core/trace_packet.h"
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
+#include "src/traced/probes/ftrace/ftrace_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
@@ -59,7 +60,11 @@ constexpr char kInodeMapSourceName[] = "linux.inode_file_map";
 //
 
 ProbesProducer::ProbesProducer() {}
-ProbesProducer::~ProbesProducer() = default;
+ProbesProducer::~ProbesProducer() {
+  // The data sources must be deleted before the ftrace controller.
+  ftrace_data_sources_.clear();
+  ftrace_.reset();
+}
 
 void ProbesProducer::OnConnect() {
   PERFETTO_DCHECK(state_ == kConnecting);
@@ -136,8 +141,8 @@ void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID instance_id,
   for (const auto& pair : process_stats_sources_)
     ps_sources[pair.second->session_id()] = pair.second.get();
 
-  for (const auto& id_to_source : delegates_) {
-    const std::unique_ptr<SinkDelegate>& source = id_to_source.second;
+  for (const auto& id_to_source : ftrace_data_sources_) {
+    const std::unique_ptr<FtraceDataSource>& source = id_to_source.second;
     if (session_id != source->session_id())
       continue;
     if (!source->ps_source() && ps_sources.count(session_id))
@@ -180,20 +185,18 @@ bool ProbesProducer::CreateFtraceDataSourceInstance(
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                config.target_buffer());
-
   FtraceConfig proto_config = config.ftrace_config();
+  const BufferID buffer_id = static_cast<BufferID>(config.target_buffer());
+  auto writer = endpoint_->CreateTraceWriter(buffer_id);
+  std::unique_ptr<FtraceDataSource> data_source(
+      new FtraceDataSource(task_runner_, ftrace_->GetWeakPtr(), session_id,
+                           std::move(proto_config), std::move(writer)));
 
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(config.target_buffer()));
-  auto delegate = std::unique_ptr<SinkDelegate>(
-      new SinkDelegate(session_id, task_runner_, std::move(trace_writer)));
-  auto sink = ftrace_->CreateSink(std::move(proto_config), delegate.get());
-  if (!sink) {
+  if (!ftrace_->AddDataSource(data_source.get())) {
     PERFETTO_ELOG("Failed to start tracing (maybe someone else is using it?)");
     return false;
   }
-  delegate->set_sink(std::move(sink));
-  delegates_.emplace(id, std::move(delegate));
+  ftrace_data_sources_.emplace(id, std::move(data_source));
   AddWatchdogsTimer(id, config);
   return true;
 }
@@ -239,11 +242,11 @@ void ProbesProducer::CreateProcessStatsDataSourceInstance(
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
   // |id| could be the id of any of the datasources we handle:
-  PERFETTO_DCHECK((failed_sources_.count(id) + delegates_.count(id) +
+  PERFETTO_DCHECK((failed_sources_.count(id) + ftrace_data_sources_.count(id) +
                    process_stats_sources_.count(id) +
                    file_map_sources_.count(id)) == 1);
   failed_sources_.erase(id);
-  delegates_.erase(id);
+  ftrace_data_sources_.erase(id);
   process_stats_sources_.erase(id);
   file_map_sources_.erase(id);
   watchdogs_.erase(id);
@@ -267,8 +270,8 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
         it->second->Flush();
     }
     {
-      auto it = delegates_.find(ds_id);
-      if (it != delegates_.end())
+      auto it = ftrace_data_sources_.find(ds_id);
+      if (it != ftrace_data_sources_.end())
         it->second->Flush();
     }
   }
@@ -301,83 +304,6 @@ void ProbesProducer::IncreaseConnectionBackoff() {
 
 void ProbesProducer::ResetConnectionBackoff() {
   connection_backoff_ms_ = kInitialConnectionBackoffMs;
-}
-
-ProbesProducer::SinkDelegate::SinkDelegate(TracingSessionID id,
-                                           base::TaskRunner* task_runner,
-                                           std::unique_ptr<TraceWriter> writer)
-    : session_id_(id),
-      task_runner_(task_runner),
-      writer_(std::move(writer)),
-      weak_factory_(this) {}
-
-ProbesProducer::SinkDelegate::~SinkDelegate() = default;
-
-void ProbesProducer::SinkDelegate::OnCreate(FtraceSink* sink) {
-  sink->DumpFtraceStats(&stats_before_);
-}
-
-void ProbesProducer::SinkDelegate::Flush() {
-  // TODO(primiano): this still doesn't flush data from the kernel ftrace
-  // buffers (see b/73886018). We should do that and delay the
-  // NotifyFlushComplete() until the ftrace data has been drained from the
-  // kernel ftrace buffer and written in the SMB.
-  if (writer_ && (!trace_packet_ || trace_packet_->is_finalized())) {
-    WriteStats();
-    writer_->Flush();
-  }
-}
-
-void ProbesProducer::SinkDelegate::WriteStats() {
-  {
-    auto before_packet = writer_->NewTracePacket();
-    auto out = before_packet->set_ftrace_stats();
-    out->set_phase(protos::pbzero::FtraceStats_Phase_START_OF_TRACE);
-    stats_before_.Write(out);
-  }
-  {
-    FtraceStats stats_after{};
-    sink_->DumpFtraceStats(&stats_after);
-    auto after_packet = writer_->NewTracePacket();
-    auto out = after_packet->set_ftrace_stats();
-    out->set_phase(protos::pbzero::FtraceStats_Phase_END_OF_TRACE);
-    stats_after.Write(out);
-  }
-}
-
-ProbesProducer::FtraceBundleHandle
-ProbesProducer::SinkDelegate::GetBundleForCpu(size_t) {
-  trace_packet_ = writer_->NewTracePacket();
-  return FtraceBundleHandle(trace_packet_->set_ftrace_events());
-}
-
-void ProbesProducer::SinkDelegate::OnBundleComplete(
-    size_t,
-    FtraceBundleHandle,
-    const FtraceMetadata& metadata) {
-  trace_packet_->Finalize();
-
-  if (file_source_ && !metadata.inode_and_device.empty()) {
-    auto inodes = metadata.inode_and_device;
-    auto weak_file_source = file_source_;
-    task_runner_->PostTask([weak_file_source, inodes] {
-      if (weak_file_source)
-        weak_file_source->OnInodes(inodes);
-    });
-  }
-  if (ps_source_ && !metadata.pids.empty()) {
-    const auto& quirks = ps_source_->config().process_stats_config().quirks();
-    if (std::find(quirks.begin(), quirks.end(),
-                  ProcessStatsConfig::DISABLE_ON_DEMAND) != quirks.end()) {
-      return;
-    }
-    const auto& pids = metadata.pids;
-    auto weak_ps_source = ps_source_;
-    task_runner_->PostTask([weak_ps_source, pids] {
-      if (weak_ps_source)
-        weak_ps_source->OnPids(pids);
-    });
-  }
 }
 
 }  // namespace perfetto

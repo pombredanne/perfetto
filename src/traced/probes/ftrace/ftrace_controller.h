@@ -31,40 +31,22 @@
 #include "gtest/gtest_prod.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/protozero/message_handle.h"
 #include "perfetto/traced/data_source_types.h"
-#include "src/traced/probes/ftrace/ftrace_sink.h"
 
 namespace perfetto {
 
-namespace protos {
-namespace pbzero {
-class FtraceEventBundle;
-class FtraceStats;
-class FtraceCpuStats;
-}  // namespace pbzero
-}  // namespace protos
-
-struct FtraceCpuStats {
-  uint64_t cpu;
-  uint64_t entries;
-  uint64_t overrun;
-  uint64_t commit_overrun;
-  uint64_t bytes_read;
-  double oldest_event_ts;
-  double now_ts;
-  uint64_t dropped_events;
-  uint64_t read_events;
-
-  void Write(protos::pbzero::FtraceCpuStats*) const;
-};
-
-struct FtraceStats {
-  std::vector<FtraceCpuStats> cpu_stats;
-
-  void Write(protos::pbzero::FtraceStats*) const;
-};
+class FtraceDataSource;
+class CpuReader;
+class EventFilter;
+class FtraceConfig;
+class FtraceController;
+class FtraceConfigMuxer;
+class FtraceProcfs;
+struct FtraceStats;
+class ProtoTranslationTable;
 
 constexpr size_t kMaxSinks = 32;
 constexpr size_t kMaxCpus = 64;
@@ -72,25 +54,23 @@ constexpr size_t kMaxCpus = 64;
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();
 
-class CpuReader;
-class EventFilter;
-class FtraceConfig;
-class FtraceController;
-class FtraceConfigMuxer;
-class FtraceProcfs;
-class ProtoTranslationTable;
-
 // Utility class for controlling ftrace.
 class FtraceController {
  public:
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
   virtual ~FtraceController();
 
-  std::unique_ptr<FtraceSink> CreateSink(FtraceConfig, FtraceSink::Delegate*);
-
   void DisableAllEvents();
   void WriteTraceMarker(const std::string& s);
   void ClearTrace();
+
+  bool AddDataSource(FtraceDataSource*) PERFETTO_WARN_UNUSED_RESULT;
+  void RemoveDataSource(FtraceDataSource*);
+  void DumpFtraceStats(FtraceStats*);
+
+  base::WeakPtr<FtraceController> GetWeakPtr() {
+    return weak_factory_.GetWeakPtr();
+  }
 
  protected:
   // Protected for testing.
@@ -98,9 +78,6 @@ class FtraceController {
                    std::unique_ptr<ProtoTranslationTable>,
                    std::unique_ptr<FtraceConfigMuxer>,
                    base::TaskRunner*);
-
-  // Write
-  void DumpFtraceStats(FtraceStats*);
 
   // Called to read data from the staging pipe for the given |cpu| and parse it
   // into the sinks. Protected and virtual for testing.
@@ -110,7 +87,6 @@ class FtraceController {
   virtual uint64_t NowMs() const;
 
  private:
-  friend FtraceSink;
   friend class TestFtraceController;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
 
@@ -129,9 +105,6 @@ class FtraceController {
 
   uint32_t GetDrainPeriodMs();
 
-  void Register(FtraceSink*);
-  void Unregister(FtraceSink*);
-
   void StartIfNeeded();
   void StopIfNeeded();
 
@@ -149,7 +122,7 @@ class FtraceController {
   bool atrace_running_ = false;
   base::TaskRunner* task_runner_ = nullptr;
   std::map<size_t, std::unique_ptr<CpuReader>> cpu_readers_;
-  std::set<FtraceSink*> sinks_;
+  std::set<FtraceDataSource*> data_sources_;
   base::WeakPtrFactory<FtraceController> weak_factory_;
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
