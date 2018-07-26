@@ -28,7 +28,7 @@ export const TrackComponent = {
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
     const trackCreator = trackRegistry.getCreator(attrs.trackState.type);
-    this.trackImpl = trackCreator.create(attrs.trackState);
+    this.track = trackCreator.create(attrs.trackState);
   },
 
   view({attrs}) {
@@ -42,6 +42,7 @@ export const TrackComponent = {
         '.track',
         {
           style: {
+            border: '1px solid #666',
             position: 'absolute',
             top: attrs.top.toString() + 'px',
             left: 0,
@@ -49,55 +50,47 @@ export const TrackComponent = {
             height: `${attrs.trackState.height}px`,
           }
         },
-        m('.trackshell',
+        m('.track-shell',
           {
             style: {
-              border: '1px solid #666',
-              position: 'relative',
+              background: '#fff',
+              padding: '20px',
+              width: '200px',
+              'border-right': '1px solid #666',
               height: '100%',
             }
           },
-          m('.shell-content',
+          m('h1',
+            {style: {margin: 0, 'font-size': '1.5em'}},
+            attrs.trackState.name)),
+        m('.track-content',
+          {
+            style: {
+              width: 'calc(100% - 200px)',
+              height: '100%',
+              position: 'absolute',
+              left: '200px',
+              top: '0'
+            }
+          },
+          // TODO(dproy): Move out DOM Content from the track class.
+          m('.marker',
             {
               style: {
-                background: '#fff',
-                padding: '20px',
-                width: '200px',
-                'border-right': '1px solid #666',
-                height: '100%',
-              }
-            },
-            m('h1',
-              {style: {margin: 0, 'font-size': '1.5em'}},
-              attrs.trackState.name)),
-          m('.track-content',
-            {
-              style: {
-                width: '80%',
+                'font-size': '1.5em',
                 position: 'absolute',
-                left: '200px',
-                top: '0'
+                left: rectStart.toString() + 'px',
+                width: rectWidth.toString() + 'px',
+                background: '#aca'
               }
             },
-            // TODO(dproy): Move out DOM Content from the track class.
-            m('.marker',
-              {
-                style: {
-                  'font-size': '1.5em',
-                  position: 'absolute',
-                  left: rectStart.toString() + 'px',
-                  width: rectWidth.toString() + 'px',
-                  background: '#aca'
-                }
-              },
-              attrs.trackState.name + ' DOM Content'))));
+            attrs.trackState.name + ' DOM Content')));
   },
 
   onupdate({attrs}) {
     // TODO(dproy): Figure out how track implementations should render DOM.
     if (attrs.trackContext.isOnCanvas()) {
-      this.trackImpl.renderCanvas(
-          attrs.trackContext, attrs.width, attrs.timeScale);
+      this.track.renderCanvas(attrs.trackContext, attrs.width, attrs.timeScale);
     }
   }
 } as m.Component<{
@@ -108,4 +101,4 @@ export const TrackComponent = {
   trackState: TrackState,
 },
                               // TODO(dproy): Fix formatter. This is ridiculous.
-                              {trackImpl: Track}>;
+                              {track: Track}>;
