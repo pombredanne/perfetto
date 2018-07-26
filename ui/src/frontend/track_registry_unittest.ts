@@ -20,14 +20,14 @@ import {Track, TrackCreator} from './track';
 import {trackRegistry} from './track_registry';
 
 // Cannot use dingus on an abstract class.
-class MockTrackImpl extends Track {
+class MockTrack extends Track {
   renderCanvas() {}
 }
 
 function mockTrackCreator(type: string): TrackCreator {
   return {
     type,
-    create: () => new MockTrackImpl(dingus<TrackState>()),
+    create: () => new MockTrack(dingus<TrackState>()),
   };
 }
 
