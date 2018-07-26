@@ -24,6 +24,7 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/traced/traced.h"
 #include "perfetto/tracing/core/data_source_config.h"
@@ -34,6 +35,7 @@
 #include "perfetto/tracing/ipc/producer_ipc_client.h"
 #include "src/traced/probes/filesystem/inode_file_data_source.h"
 #include "src/traced/probes/ftrace/ftrace_data_source.h"
+#include "src/traced/probes/probes_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
@@ -59,10 +61,10 @@ constexpr char kInodeMapSourceName[] = "linux.inode_file_map";
 //                    +--------------+
 //
 
-ProbesProducer::ProbesProducer() {}
+ProbesProducer::ProbesProducer() : weak_factory_(this) {}
 ProbesProducer::~ProbesProducer() {
-  // The data sources must be deleted before the ftrace controller.
-  ftrace_data_sources_.clear();
+  // The ftrace data sources must be deleted before the ftrace controller.
+  data_sources_.clear();
   ftrace_.reset();
 }
 
@@ -116,50 +118,38 @@ void ProbesProducer::Restart() {
 
 void ProbesProducer::CreateDataSourceInstance(DataSourceInstanceID instance_id,
                                               const DataSourceConfig& config) {
+  PERFETTO_DCHECK(data_sources_.count(instance_id) == 0);
+
   // TODO(hjd): This a hack since we don't actually know the session id. For
   // now we'll assume anything wit hthe same target buffer is in the same
   // session.
   TracingSessionID session_id = config.target_buffer();
 
+  std::unique_ptr<ProbesDataSource> data_source;
   if (config.name() == kFtraceSourceName) {
-    if (!CreateFtraceDataSourceInstance(session_id, instance_id, config))
-      failed_sources_.insert(instance_id);
+    data_source = CreateFtraceDataSource(session_id, instance_id, config);
   } else if (config.name() == kInodeMapSourceName) {
-    CreateInodeFileDataSourceInstance(session_id, instance_id, config);
+    data_source = CreateInodeFileDataSource(session_id, instance_id, config);
   } else if (config.name() == kProcessStatsSourceName) {
-    CreateProcessStatsDataSourceInstance(session_id, instance_id, config);
-  } else {
-    PERFETTO_ELOG("Data source name: %s not recognised.",
-                  config.name().c_str());
+    data_source = CreateProcessStatsDataSource(session_id, instance_id, config);
+  }
+
+  if (!data_source) {
+    PERFETTO_ELOG("Failed to create data source '%s'", config.name().c_str());
     return;
   }
 
-  std::map<TracingSessionID, InodeFileDataSource*> file_sources;
-  std::map<TracingSessionID, ProcessStatsDataSource*> ps_sources;
-  for (const auto& pair : file_map_sources_)
-    file_sources[pair.second->session_id()] = pair.second.get();
-  for (const auto& pair : process_stats_sources_)
-    ps_sources[pair.second->session_id()] = pair.second.get();
+  session_data_sources_.emplace(session_id, data_source.get());
+  data_sources_[instance_id] = std::move(data_source);
 
-  for (const auto& id_to_source : ftrace_data_sources_) {
-    const std::unique_ptr<FtraceDataSource>& source = id_to_source.second;
-    if (session_id != source->session_id())
-      continue;
-    if (!source->ps_source() && ps_sources.count(session_id))
-      source->set_ps_source(ps_sources[session_id]->GetWeakPtr());
-    if (!source->file_source() && file_sources.count(session_id))
-      source->set_file_source(file_sources[session_id]->GetWeakPtr());
+  if (config.trace_duration_ms() != 0) {
+    uint32_t timeout = 5000 + 2 * config.trace_duration_ms();
+    watchdogs_.emplace(
+        instance_id, base::Watchdog::GetInstance()->CreateFatalTimer(timeout));
   }
 }
 
-void ProbesProducer::AddWatchdogsTimer(DataSourceInstanceID id,
-                                       const DataSourceConfig& config) {
-  if (config.trace_duration_ms() != 0)
-    watchdogs_.emplace(id, base::Watchdog::GetInstance()->CreateFatalTimer(
-                               5000 + 2 * config.trace_duration_ms()));
-}
-
-bool ProbesProducer::CreateFtraceDataSourceInstance(
+std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
     TracingSessionID session_id,
     DataSourceInstanceID id,
     const DataSourceConfig& config) {
@@ -167,7 +157,7 @@ bool ProbesProducer::CreateFtraceDataSourceInstance(
   // This can legitimately happen on user builds where we cannot access the
   // debug paths, e.g., because of SELinux rules.
   if (ftrace_creation_failed_)
-    return false;
+    return nullptr;
 
   // Lazily create on the first instance.
   if (!ftrace_) {
@@ -176,11 +166,13 @@ bool ProbesProducer::CreateFtraceDataSourceInstance(
     if (!ftrace_) {
       PERFETTO_ELOG("Failed to create FtraceController");
       ftrace_creation_failed_ = true;
-      return false;
+      return nullptr;
     }
 
     ftrace_->DisableAllEvents();
     ftrace_->ClearTrace();
+    ftrace_->set_on_metadata_callback(std::bind(
+        &ProbesProducer::OnFtraceMetadata, weak_factory_.GetWeakPtr()));
   }
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
@@ -189,19 +181,18 @@ bool ProbesProducer::CreateFtraceDataSourceInstance(
   const BufferID buffer_id = static_cast<BufferID>(config.target_buffer());
   auto writer = endpoint_->CreateTraceWriter(buffer_id);
   std::unique_ptr<FtraceDataSource> data_source(
-      new FtraceDataSource(task_runner_, ftrace_->GetWeakPtr(), session_id,
+      new FtraceDataSource(ftrace_->GetWeakPtr(), session_id,
                            std::move(proto_config), std::move(writer)));
-
   if (!ftrace_->AddDataSource(data_source.get())) {
-    PERFETTO_ELOG("Failed to start tracing (maybe someone else is using it?)");
-    return false;
+    PERFETTO_ELOG(
+        "Failed to start tracing (too many concurrent sessions or ftrace is "
+        "already in use)");
+    return nullptr;
   }
-  ftrace_data_sources_.emplace(id, std::move(data_source));
-  AddWatchdogsTimer(id, config);
-  return true;
+  return data_source;
 }
 
-void ProbesProducer::CreateInodeFileDataSourceInstance(
+std::unique_ptr<ProbesDataSource> ProbesProducer::CreateInodeFileDataSource(
     TracingSessionID session_id,
     DataSourceInstanceID id,
     DataSourceConfig source_config) {
@@ -211,44 +202,43 @@ void ProbesProducer::CreateInodeFileDataSourceInstance(
       static_cast<BufferID>(source_config.target_buffer()));
   if (system_inodes_.empty())
     CreateStaticDeviceToInodeMap("/system", &system_inodes_);
-  auto file_map_source =
-      std::unique_ptr<InodeFileDataSource>(new InodeFileDataSource(
-          std::move(source_config), task_runner_, session_id, &system_inodes_,
-          &cache_, std::move(trace_writer)));
-  file_map_sources_.emplace(id, std::move(file_map_source));
-  AddWatchdogsTimer(id, source_config);
+  return std::unique_ptr<InodeFileDataSource>(new InodeFileDataSource(
+      std::move(source_config), task_runner_, session_id, &system_inodes_,
+      &cache_, std::move(trace_writer)));
 }
 
-void ProbesProducer::CreateProcessStatsDataSourceInstance(
+std::unique_ptr<ProbesDataSource> ProbesProducer::CreateProcessStatsDataSource(
     TracingSessionID session_id,
     DataSourceInstanceID id,
     const DataSourceConfig& config) {
-  PERFETTO_DCHECK(process_stats_sources_.count(id) == 0);
+  base::ignore_result(id);
   auto trace_writer = endpoint_->CreateTraceWriter(
       static_cast<BufferID>(config.target_buffer()));
-  auto source = std::unique_ptr<ProcessStatsDataSource>(
+  auto data_source = std::unique_ptr<ProcessStatsDataSource>(
       new ProcessStatsDataSource(session_id, std::move(trace_writer), config));
-  auto it_and_inserted = process_stats_sources_.emplace(id, std::move(source));
-  if (!it_and_inserted.second) {
-    PERFETTO_DCHECK(false);
-    return;
-  }
-  ProcessStatsDataSource* ps_data_source = it_and_inserted.first->second.get();
   if (config.process_stats_config().scan_all_processes_on_start()) {
-    ps_data_source->WriteAllProcesses();
+    data_source->WriteAllProcesses();
   }
+  return data_source;
 }
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
-  // |id| could be the id of any of the datasources we handle:
-  PERFETTO_DCHECK((failed_sources_.count(id) + ftrace_data_sources_.count(id) +
-                   process_stats_sources_.count(id) +
-                   file_map_sources_.count(id)) == 1);
-  failed_sources_.erase(id);
-  ftrace_data_sources_.erase(id);
-  process_stats_sources_.erase(id);
-  file_map_sources_.erase(id);
+  auto it = data_sources_.find(id);
+  if (it == data_sources_.end()) {
+    PERFETTO_ELOG("Cannot find data source id=%" PRIu64, id);
+    return;
+  }
+  ProbesDataSource* data_source = it->second.get();
+  TracingSessionID session_id = data_source->tracing_session_id;
+  auto range = session_data_sources_.equal_range(session_id);
+  for (auto kv = range.first; kv != range.second; kv++) {
+    if (kv->second != data_source)
+      continue;
+    session_data_sources_.erase(kv);
+    break;
+  }
+  data_sources_.erase(it);
   watchdogs_.erase(id);
 }
 
@@ -258,24 +248,62 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
                            const DataSourceInstanceID* data_source_ids,
                            size_t num_data_sources) {
   for (size_t i = 0; i < num_data_sources; i++) {
-    DataSourceInstanceID ds_id = data_source_ids[i];
-    {
-      auto it = process_stats_sources_.find(ds_id);
-      if (it != process_stats_sources_.end())
-        it->second->Flush();
-    }
-    {
-      auto it = file_map_sources_.find(ds_id);
-      if (it != file_map_sources_.end())
-        it->second->Flush();
-    }
-    {
-      auto it = ftrace_data_sources_.find(ds_id);
-      if (it != ftrace_data_sources_.end())
-        it->second->Flush();
-    }
+    auto it = data_sources_.find(data_source_ids[i]);
+    if (it == data_sources_.end())
+      continue;
+    it->second->Flush();
   }
   endpoint_->NotifyFlushComplete(flush_request_id);
+}
+
+// static
+void ProbesProducer::OnFtraceMetadata(base::WeakPtr<ProbesProducer> weak_this) {
+  ProbesProducer* thiz = weak_this.get();
+  if (!thiz)
+    return;
+
+  // unordered_multimap guarantees that entries with the same key are contiguous
+  // during the iteration.
+  TracingSessionID last_session_id = 0;
+  FtraceMetadata* metadata = nullptr;
+  InodeFileDataSource* inode_data_source = nullptr;
+  ProcessStatsDataSource* ps_data_source = nullptr;
+  for (auto it = thiz->session_data_sources_.begin(); /* check below*/; it++) {
+    // If this is the last iteration or this is the session id has changed,
+    // dispatch the metadata update to the linked data sources, if any.
+    if (it == thiz->session_data_sources_.end() ||
+        it->first != last_session_id) {
+      bool has_inodes = metadata && !metadata->inode_and_device.empty();
+      bool has_pids = metadata && !metadata->pids.empty();
+      if (has_inodes && inode_data_source)
+        inode_data_source->OnInodes(metadata->inode_and_device);
+      if (has_pids && ps_data_source)
+        ps_data_source->OnPids(metadata->pids);
+      // TODO who deals with overwrite_count?
+      if (metadata)
+        metadata->Clear();
+      metadata = nullptr;
+      inode_data_source = nullptr;
+      ps_data_source = nullptr;
+      if (it == thiz->session_data_sources_.end())
+        break;
+      last_session_id = it->first;
+    }
+    ProbesDataSource* ds = it->second;
+    switch (ds->type_id) {
+      case FtraceDataSource::kTypeId:
+        metadata = static_cast<FtraceDataSource*>(ds)->metadata_mutable();
+        break;
+      case InodeFileDataSource::kTypeId:
+        inode_data_source = static_cast<InodeFileDataSource*>(ds);
+        break;
+      case ProcessStatsDataSource::kTypeId:
+        ps_data_source = static_cast<ProcessStatsDataSource*>(ds);
+        break;
+      default:
+        PERFETTO_DCHECK(false);
+    }  // switch (type_id)
+  }    // for (session_data_sources_)
 }
 
 void ProbesProducer::ConnectWithRetries(const char* socket_name,

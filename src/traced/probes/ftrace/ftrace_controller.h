@@ -21,6 +21,7 @@
 
 #include <bitset>
 #include <condition_variable>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -71,6 +72,9 @@ class FtraceController {
   base::WeakPtr<FtraceController> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }
+
+  using OnMetadataCallback = std::function<void()>;
+  void set_on_metadata_callback(OnMetadataCallback cb) { on_metadata_ = cb; }
 
  protected:
   // Protected for testing.
@@ -123,7 +127,9 @@ class FtraceController {
   base::TaskRunner* task_runner_ = nullptr;
   std::map<size_t, std::unique_ptr<CpuReader>> cpu_readers_;
   std::set<FtraceDataSource*> data_sources_;
-  base::WeakPtrFactory<FtraceController> weak_factory_;
+  OnMetadataCallback on_metadata_;
+  bool did_post_on_metadata_callback_ = false;
+  base::WeakPtrFactory<FtraceController> weak_factory_;  // Keep last.
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 

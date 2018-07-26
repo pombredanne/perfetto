@@ -22,7 +22,6 @@
 #include <string>
 
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/protozero/message_handle.h"
 #include "perfetto/tracing/core/basic_types.h"
@@ -30,6 +29,7 @@
 #include "src/traced/probes/ftrace/ftrace_config.h"
 #include "src/traced/probes/ftrace/ftrace_metadata.h"
 #include "src/traced/probes/ftrace/ftrace_stats.h"
+#include "src/traced/probes/probes_data_source.h"
 
 namespace perfetto {
 
@@ -49,17 +49,17 @@ class FtraceEventBundle;
 // and this class is essentially the building block used to multiplex them.
 // This class is istantiated by ProbesProducer. ProbesProducer also owns the
 // FtraceController.
-class FtraceDataSource {
+class FtraceDataSource : public ProbesDataSource {
  public:
+  static constexpr int kTypeId = 1;
   using FtraceBundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
 
-  FtraceDataSource(base::TaskRunner*,
-                   base::WeakPtr<FtraceController>,
+  FtraceDataSource(base::WeakPtr<FtraceController>,
                    TracingSessionID,
                    FtraceConfig,
                    std::unique_ptr<TraceWriter>);
-  virtual ~FtraceDataSource();
+  ~FtraceDataSource() override;
 
   // Called by FtraceController soon after ProbesProducer creates the data
   // source, to inject ftrace dependencies.
@@ -67,33 +67,15 @@ class FtraceDataSource {
 
   // Flushes the ftrace buffers into the userspace trace buffers and writes
   // also ftrace stats.
-  void Flush();
+  void Flush() override;
 
   FtraceBundleHandle GetBundleForCpu(size_t cpu);
-  void OnBundleComplete(size_t cpu,
-                        FtraceBundleHandle bundle,
-                        const FtraceMetadata& metadata);
+  void OnBundleComplete();
 
-  TracingSessionID session_id() const { return session_id_; }
   FtraceConfigId config_id() const { return config_id_; }
   const FtraceConfig& config() const { return config_; }
   EventFilter* event_filter() { return event_filter_.get(); }
   FtraceMetadata* metadata_mutable() { return &metadata_; }
-
-  // void set_ps_source(base::WeakPtr<ProcessStatsDataSource> ptr) {
-  //   ps_source_ = std::move(ptr);
-  // }
-
-  // const base::WeakPtr<ProcessStatsDataSource>& ps_source() const {
-  //   return ps_source_;
-  // }
-
-  // void set_file_source(base::WeakPtr<InodeFileDataSource> ptr) {
-  //   file_source_ = std::move(ptr);
-  // }
-  // const base::WeakPtr<InodeFileDataSource>& file_source() const {
-  //   return file_source_;
-  // }
 
  private:
   FtraceDataSource(const FtraceDataSource&) = delete;
@@ -102,24 +84,19 @@ class FtraceDataSource {
   void WriteStats();
   void DumpFtraceStats(FtraceStats*);
 
-  base::TaskRunner* const task_runner_;
   const FtraceConfig config_;
-  const TracingSessionID session_id_;
+  FtraceMetadata metadata_;
   FtraceStats stats_before_ = {};
 
   // Initialized by the Initialize() call.
   FtraceConfigId config_id_ = 0;
   std::unique_ptr<TraceWriter> writer_;
 
-  // base::WeakPtr<ProcessStatsDataSource> ps_source_;
-  // base::WeakPtr<InodeFileDataSource> file_source_;
-
   // Keep this after the TraceWriter because TracePackets must not outlive
   // their originating writer.
   TraceWriter::TracePacketHandle trace_packet_;
   base::WeakPtr<FtraceController> controller_weak_;
   std::unique_ptr<EventFilter> event_filter_;
-  FtraceMetadata metadata_;
 };
 
 }  // namespace perfetto

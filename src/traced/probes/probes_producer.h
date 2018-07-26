@@ -17,12 +17,13 @@
 #ifndef SRC_TRACED_PROBES_PROBES_PRODUCER_H_
 #define SRC_TRACED_PROBES_PROBES_PRODUCER_H_
 
-#include <map>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/watchdog.h"
+#include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "perfetto/tracing/core/tracing_service.h"
@@ -34,6 +35,8 @@
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 
 namespace perfetto {
+
+class ProbesDataSource;
 
 const uint64_t kLRUInodeCacheSize = 1000;
 
@@ -56,17 +59,20 @@ class ProbesProducer : public Producer {
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
                           base::TaskRunner* task_runner);
-  bool CreateFtraceDataSourceInstance(TracingSessionID session_id,
-                                      DataSourceInstanceID id,
-                                      const DataSourceConfig& config);
-  void CreateProcessStatsDataSourceInstance(TracingSessionID session_id,
-                                            DataSourceInstanceID id,
-                                            const DataSourceConfig& config);
-  void CreateInodeFileDataSourceInstance(TracingSessionID session_id,
-                                         DataSourceInstanceID id,
-                                         DataSourceConfig config);
+  std::unique_ptr<ProbesDataSource> CreateFtraceDataSource(
+      TracingSessionID session_id,
+      DataSourceInstanceID id,
+      const DataSourceConfig& config);
+  std::unique_ptr<ProbesDataSource> CreateProcessStatsDataSource(
+      TracingSessionID session_id,
+      DataSourceInstanceID id,
+      const DataSourceConfig& config);
+  std::unique_ptr<ProbesDataSource> CreateInodeFileDataSource(
+      TracingSessionID session_id,
+      DataSourceInstanceID id,
+      DataSourceConfig config);
 
-  void OnMetadata(const FtraceMetadata& metadata);
+  static void OnFtraceMetadata(base::WeakPtr<ProbesProducer>);
 
  private:
   enum State {
@@ -83,8 +89,6 @@ class ProbesProducer : public Producer {
   void Restart();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
-  void AddWatchdogsTimer(DataSourceInstanceID id,
-                         const DataSourceConfig& source_config);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_ = nullptr;
@@ -93,17 +97,16 @@ class ProbesProducer : public Producer {
   bool ftrace_creation_failed_ = false;
   uint32_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
-  std::set<DataSourceInstanceID> failed_sources_;
-  std::map<DataSourceInstanceID, std::unique_ptr<ProcessStatsDataSource>>
-      process_stats_sources_;
-  std::map<DataSourceInstanceID, std::unique_ptr<FtraceDataSource>>
-      ftrace_data_sources_;
-  std::map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
-  std::map<DataSourceInstanceID, std::unique_ptr<InodeFileDataSource>>
-      file_map_sources_;
+  std::unordered_map<DataSourceInstanceID, std::unique_ptr<ProbesDataSource>>
+      data_sources_;
+  std::unordered_multimap<TracingSessionID, ProbesDataSource*>
+      session_data_sources_;
+  std::unordered_map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   LRUInodeCache cache_{kLRUInodeCacheSize};
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>
       system_inodes_;
+
+  base::WeakPtrFactory<ProbesProducer> weak_factory_;  // Keep last.
 };
 
 }  // namespace perfetto

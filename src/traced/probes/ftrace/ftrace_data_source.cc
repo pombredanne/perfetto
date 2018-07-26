@@ -19,20 +19,22 @@
 #include "src/traced/probes/ftrace/cpu_reader.h"
 #include "src/traced/probes/ftrace/ftrace_controller.h"
 
+#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_stats.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
 
+// static
+constexpr int FtraceDataSource::kTypeId;
+
 FtraceDataSource::FtraceDataSource(
-    base::TaskRunner* task_runner,
     base::WeakPtr<FtraceController> controller_weak,
     TracingSessionID session_id,
     FtraceConfig config,
     std::unique_ptr<TraceWriter> writer)
-    : task_runner_(task_runner),
+    : ProbesDataSource(session_id, kTypeId),
       config_(std::move(config)),
-      session_id_(session_id),
       writer_(std::move(writer)),
       controller_weak_(std::move(controller_weak)){};
 
@@ -81,10 +83,9 @@ void FtraceDataSource::WriteStats() {
   }
 }
 
-void FtraceDataSource::OnBundleComplete(size_t,
-                                        FtraceBundleHandle,
-                                        const FtraceMetadata& /* metadata*/) {
-  trace_packet_->Finalize();
+void FtraceDataSource::OnBundleComplete() {
+  trace_packet_->Finalize();  // TODO move this to
+                              // FtraceController::OnRawFtraceDataAvailable
   /*
     if (file_source_ && !metadata.inode_and_device.empty()) {
       auto inodes = metadata.inode_and_device;

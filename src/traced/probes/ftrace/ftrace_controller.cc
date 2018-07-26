@@ -174,6 +174,7 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
     std::swap(cpus_to_drain, ctrl->cpus_to_drain_);
   }
 
+  ctrl->did_post_on_metadata_callback_ = false;
   for (size_t cpu = 0; cpu < ctrl->ftrace_procfs_->NumberOfCpus(); cpu++) {
     if (!cpus_to_drain[cpu])
       continue;
@@ -265,15 +266,23 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   std::array<FtraceMetadata*, kMaxSinks> metadatas{};
   size_t sink_count = data_sources_.size();
   size_t i = 0;
+
   for (FtraceDataSource* data_source : data_sources_) {
     filters[i] = data_source->event_filter();
     metadatas[i] = data_source->metadata_mutable();
-    bundles[i++] = data_source->GetBundleForCpu(cpu);
+    bundles[i] = data_source->GetBundleForCpu(cpu);
+    i++;
   }
   reader->Drain(filters, bundles, metadatas);
   i = 0;
-  for (FtraceDataSource* data_source : data_sources_)
-    data_source->OnBundleComplete(cpu, std::move(bundles[i++]));
+  // TODO remove layers from the Finalize() call.
+  for (FtraceDataSource* data_source : data_sources_) {
+    data_source->OnBundleComplete();  // Invokes trace_packet_->Finalize().
+    if (on_metadata_ && !did_post_on_metadata_callback_) {
+      task_runner_->PostTask(on_metadata_);
+      did_post_on_metadata_callback_ = true;
+    }
+  }
   PERFETTO_DCHECK(data_sources_.size() == sink_count);
 }
 

@@ -108,6 +108,7 @@ source_set("ftrace") {
     "../../../tracing",
   ]
   deps = [
+    "..:data_source",
     "../../../../gn:default_deps",
     "../../../../include/perfetto/traced",
     "../../../base",
