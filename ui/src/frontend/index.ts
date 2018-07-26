@@ -16,24 +16,34 @@ import '../tracks/all_tracks';
 
 import * as m from 'mithril';
 
+import {forwardRemoteCalls, Remote} from '../base/remote';
 import {ObjectById, TrackState} from '../common/state';
+import {State} from '../common/state';
 import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
 
+import {ControllerProxy} from './controller_proxy';
 import {globals} from './globals';
 import {HomePage} from './home_page';
 import {QueryPage} from './query_page';
 import {ViewerPage} from './viewer_page';
 
-function createController(): Worker {
+function createController(): ControllerProxy {
   const worker = new Worker('controller_bundle.js');
   worker.onerror = e => {
     console.error(e);
   };
-  worker.onmessage = msg => {
-    globals.state = msg.data;
+  const port = worker as {} as MessagePort;
+  return new ControllerProxy(new Remote(port));
+}
+
+/**
+ * The API the main thread exposes to the controller.
+ */
+class FrontendApi {
+  updateState(state: State) {
+    globals.state = state;
     m.redraw();
-  };
-  return worker;
+  }
 }
 
 function getDemoTracks(): ObjectById<TrackState> {
@@ -57,11 +67,16 @@ function getDemoTracks(): ObjectById<TrackState> {
   return tracks;
 }
 
-function main() {
+async function main() {
   globals.state = {i: 0, tracks: getDemoTracks()};
-  const worker = createController();
-  // tslint:disable-next-line deprecation
-  globals.dispatch = action => worker.postMessage(action);
+
+  const controller = createController();
+  const channel = new MessageChannel();
+  await controller.initAndGetState(channel.port1);
+  forwardRemoteCalls(channel.port2, new FrontendApi());
+
+  globals.controller = controller;
+  globals.dispatch = controller.dispatch.bind(controller);
   warmupWasmEngineWorker();
 
   const root = document.getElementById('frontend');
