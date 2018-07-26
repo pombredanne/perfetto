@@ -82,7 +82,7 @@ export const ScrollingTrackDisplay = {
           style: {
             position: 'relative',
             width: '100%',
-            height: 'calc(100% - 105px)',
+            height: 'calc(100% - 163px)',
             overflow: 'hidden'
           }
         },
@@ -93,7 +93,7 @@ export const ScrollingTrackDisplay = {
             contentHeight: 1000,
             onPassiveScroll: (scrollTop: number) => {
               this.canvasController.updateScrollOffset(scrollTop);
-              m.redraw();
+              m.redraw();  // TODO: Remove this comment;
             },
           },
           m(CanvasWrapper, {

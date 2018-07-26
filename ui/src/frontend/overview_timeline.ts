@@ -23,6 +23,7 @@ import {TimeScale} from './time_scale';
 export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
+    this.padding = {top: 0, right: 20, bottom: 0, left: 20};
   },
   view({attrs}) {
     this.timeScale.setLimitsPx(0, attrs.width);
@@ -42,7 +43,7 @@ export const OverviewTimeline = {
         },
         m(TimeAxis, {
           timeScale: this.timeScale,
-          contentOffset: 20,
+          contentOffset: this.padding.left,
           visibleWindowMs: attrs.maxVisibleWindowMs,
           width: attrs.width,
         }),
@@ -62,15 +63,21 @@ export const OverviewTimeline = {
           })),
         m('.brushes',
           {
-
+            style: {
+              position: 'absolute',
+              left: `${this.padding.left}px`,
+              top: '41px',
+              width: '100%',
+              height: 'calc(100% - 41px)',
+            }
           },
           m('.brush-left .brush', {
             style: {
               background: 'rgba(210,210,210,0.7)',
               position: 'absolute',
               'pointer-events': 'none',
-              height: 'calc(100% - 41px)',
-              top: '41px',
+              top: '0',
+              height: '100%',
               left: '0',
               width: `${this.timeScale.msToPx(attrs.visibleWindowMs.start)}px`,
             }
@@ -80,8 +87,8 @@ export const OverviewTimeline = {
               background: 'rgba(210,210,210,0.7)',
               position: 'absolute',
               'pointer-events': 'none',
-              height: 'calc(100% - 41px)',
-              top: '41px',
+              top: '0',
+              height: '100%',
               left: `${this.timeScale.msToPx(attrs.visibleWindowMs.end)}px`,
               width: `${
                         attrs.width -
@@ -90,9 +97,14 @@ export const OverviewTimeline = {
             }
           })));
   },
-} as m.Component<{
-  visibleWindowMs: {start: number, end: number},
-  maxVisibleWindowMs: {start: number, end: number},
-  width: number,
-},
-                                {timeScale: TimeScale}>;
+} as
+    m.Component<
+        {
+          visibleWindowMs: {start: number, end: number},
+          maxVisibleWindowMs: {start: number, end: number},
+          width: number,
+        },
+        {
+          timeScale: TimeScale,
+          padding: {top: number, right: number, bottom: number, left: number}
+        }>;
