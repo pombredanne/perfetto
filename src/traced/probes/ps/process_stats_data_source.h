@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACED_PROBES_PROCESS_STATS_DATA_SOURCE_H_
-#define SRC_TRACED_PROBES_PROCESS_STATS_DATA_SOURCE_H_
+#ifndef SRC_TRACED_PROBES_PS_PROCESS_STATS_DATA_SOURCE_H_
+#define SRC_TRACED_PROBES_PS_PROCESS_STATS_DATA_SOURCE_H_
 
 #include <memory>
 #include <set>
@@ -77,4 +77,4 @@ class ProcessStatsDataSource {
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACED_PROBES_PROCESS_STATS_DATA_SOURCE_H_
+#endif  // SRC_TRACED_PROBES_PS_PROCESS_STATS_DATA_SOURCE_H_
