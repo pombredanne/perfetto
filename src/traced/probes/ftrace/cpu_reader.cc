@@ -262,7 +262,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
   base::ignore_result(trace_fd);
   base::ignore_result(staging_write_fd);
   base::ignore_result(on_data_available);
-  base::ignore_result(cmd);
+  base::ignore_result(cmd_atomic);
   PERFETTO_ELOG("Supported only on Linux/Android");
 #endif
 }
