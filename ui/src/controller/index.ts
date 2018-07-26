@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import '../tracks/all_controller';
+
 import {assertExists} from '../base/logging';
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action, addTrack} from '../common/actions';
