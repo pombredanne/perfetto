@@ -32,7 +32,7 @@ export abstract class VirtualCanvasContext {
   closePath: () => void;
   measureText: () => TextMetrics;
 
-  constructor(protected ctx: CanvasRenderingContext2D|VirtualCanvasContext) {
+  constructor(protected ctx: CanvasRenderingContext2D | VirtualCanvasContext) {
     this.stroke = this.ctx.stroke.bind(this.ctx);
     this.beginPath = this.ctx.beginPath.bind(this.ctx);
     this.closePath = this.ctx.closePath.bind(this.ctx);
@@ -44,27 +44,42 @@ export abstract class VirtualCanvasContext {
   abstract getBoundingRect(): BoundingRect;
 
   fillRect(x: number, y: number, width: number, height: number) {
-    if (x < 0 || x + width > this.getBoundingRect().width || y < 0 ||
-        y + height > this.getBoundingRect().height) {
+    if (
+      x < 0 ||
+      x + width > this.getBoundingRect().width ||
+      y < 0 ||
+      y + height > this.getBoundingRect().height
+    ) {
       throw new OutOfBoundsDrawingError(
-          'draw a rect', {x, y, width, height}, this.getBoundingRect());
+        'draw a rect',
+        {x, y, width, height},
+        this.getBoundingRect()
+      );
     }
     if (!this.isOnCanvas()) {
       throw new ContextNotOnCanvasError();
     }
 
     this.ctx.fillRect(
-        x + this.getBoundingRect().x,
-        y + this.getBoundingRect().y,
-        width,
-        height);
+      x + this.getBoundingRect().x,
+      y + this.getBoundingRect().y,
+      width,
+      height
+    );
   }
 
   moveTo(x: number, y: number) {
-    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
-        y > this.getBoundingRect().height) {
+    if (
+      x < 0 ||
+      x > this.getBoundingRect().width ||
+      y < 0 ||
+      y > this.getBoundingRect().height
+    ) {
       throw new OutOfBoundsDrawingError(
-          'moveto', {x, y}, this.getBoundingRect());
+        'moveto',
+        {x, y},
+        this.getBoundingRect()
+      );
     }
     if (!this.isOnCanvas()) {
       throw new ContextNotOnCanvasError();
@@ -73,10 +88,17 @@ export abstract class VirtualCanvasContext {
   }
 
   lineTo(x: number, y: number) {
-    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
-        y > this.getBoundingRect().height) {
+    if (
+      x < 0 ||
+      x > this.getBoundingRect().width ||
+      y < 0 ||
+      y > this.getBoundingRect().height
+    ) {
       throw new OutOfBoundsDrawingError(
-          'lineto', {x, y}, this.getBoundingRect());
+        'lineto',
+        {x, y},
+        this.getBoundingRect()
+      );
     }
     if (!this.isOnCanvas()) {
       throw new ContextNotOnCanvasError();
@@ -85,16 +107,26 @@ export abstract class VirtualCanvasContext {
   }
 
   fillText(text: string, x: number, y: number) {
-    if (x < 0 || x > this.getBoundingRect().width || y < 0 ||
-        y > this.getBoundingRect().height) {
+    if (
+      x < 0 ||
+      x > this.getBoundingRect().width ||
+      y < 0 ||
+      y > this.getBoundingRect().height
+    ) {
       throw new OutOfBoundsDrawingError(
-          'draw text', {x, y}, this.getBoundingRect());
+        'draw text',
+        {x, y},
+        this.getBoundingRect()
+      );
     }
     if (!this.isOnCanvas()) {
       throw new ContextNotOnCanvasError();
     }
     this.ctx.fillText(
-        text, x + this.getBoundingRect().x, y + this.getBoundingRect().y);
+      text,
+      x + this.getBoundingRect().x,
+      y + this.getBoundingRect().y
+    );
   }
 
   set strokeStyle(v: string) {
@@ -117,16 +149,18 @@ export abstract class VirtualCanvasContext {
 export class OutOfBoundsDrawingError extends Error {
   constructor(action: string, drawing: {}, boundingRect: BoundingRect) {
     super(
-        `Attempted to ${action} (${JSON.stringify(drawing)})` +
-        `in bounds ${JSON.stringify(boundingRect)}`);
+      `Attempted to ${action} (${JSON.stringify(drawing)})` +
+        `in bounds ${JSON.stringify(boundingRect)}`
+    );
   }
 }
 
 export class ContextNotOnCanvasError extends Error {
   constructor() {
     super(
-        `Attempted to draw on a virtual context that is not on the canvas. ` +
-        `Did you check virtualContext.isOnCanvas()?`);
+      `Attempted to draw on a virtual context that is not on the canvas. ` +
+        `Did you check virtualContext.isOnCanvas()?`
+    );
   }
 }
 

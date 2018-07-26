@@ -51,8 +51,9 @@ export class CanvasController {
   setDimensions(width: number, visibleCanvasHeight: number) {
     this.canvasWidth = width;
     this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
-    this.extraHeightPerSide =
-        Math.round((this.canvasHeight - visibleCanvasHeight) / 2);
+    this.extraHeightPerSide = Math.round(
+      (this.canvasHeight - visibleCanvasHeight) / 2
+    );
 
     const dpr = window.devicePixelRatio;
     this.canvas.style.width = this.canvasWidth.toString() + 'px';

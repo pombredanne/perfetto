@@ -42,9 +42,9 @@ export class RootVirtualContext extends VirtualCanvasContext {
     const rectRight = boundingRect.x + boundingRect.width;
 
     const heightIntersects =
-        boundingRect.y <= canvasBottom && rectBottom >= this.canvasTopOffset;
+      boundingRect.y <= canvasBottom && rectBottom >= this.canvasTopOffset;
     const widthIntersects =
-        boundingRect.x <= this.canvasWidth && rectRight >= 0;
+      boundingRect.x <= this.canvasWidth && rectRight >= 0;
 
     return heightIntersects && widthIntersects;
   }
@@ -59,7 +59,7 @@ export class RootVirtualContext extends VirtualCanvasContext {
       y: this.canvasTopOffset * -1,
       x: 0,
       width: Infinity,
-      height: Infinity
+      height: Infinity,
     };
   }
 

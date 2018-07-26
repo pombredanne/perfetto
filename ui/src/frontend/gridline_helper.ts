@@ -17,9 +17,12 @@ import {VirtualCanvasContext} from './virtual_canvas_context';
 
 export abstract class GridlineHelper {
   static drawGridLines(
-      ctx: VirtualCanvasContext, x: TimeScale,
-      timeBounds: [Milliseconds, Milliseconds], width: number,
-      height: number): void {
+    ctx: VirtualCanvasContext,
+    x: TimeScale,
+    timeBounds: [Milliseconds, Milliseconds],
+    width: number,
+    height: number
+  ): void {
     const step = GridlineHelper.getStepSize(timeBounds[1] - timeBounds[0]);
     const start = Math.round(timeBounds[0] / step) * step;
 

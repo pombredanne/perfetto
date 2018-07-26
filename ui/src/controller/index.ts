@@ -59,7 +59,7 @@ class FrontendProxy {
 
 function main() {
   const controller = new Controller();
-  forwardRemoteCalls(self as {} as MessagePort, controller);
+  forwardRemoteCalls((self as {}) as MessagePort, controller);
 }
 
 main();

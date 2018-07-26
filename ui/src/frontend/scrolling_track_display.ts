@@ -60,50 +60,58 @@ export const ScrollingTrackDisplay = {
 
     let trackYOffset = 0;
     for (const trackState of Object.values(tracks)) {
-      childTracks.push(m(TrackComponent, {
-        trackContext: new ChildVirtualContext(ctx, {
-          y: trackYOffset,
-          x: 0,
+      childTracks.push(
+        m(TrackComponent, {
+          trackContext: new ChildVirtualContext(ctx, {
+            y: trackYOffset,
+            x: 0,
+            width: this.width,
+            height: trackState.height,
+          }),
+          top: trackYOffset,
           width: this.width,
-          height: trackState.height,
-        }),
-        top: trackYOffset,
-        width: this.width,
-        timeScale: attrs.timeScale,
-        trackState,
-      }));
+          timeScale: attrs.timeScale,
+          trackState,
+        })
+      );
       trackYOffset += trackState.height;
     }
 
     return m(
-        '.scrolling-track-display',
-        {
-          style: {
-            position: 'relative',
-            width: '100%',
-            height: 'calc(100% - 105px)',
-            overflow: 'hidden'
-          }
+      '.scrolling-track-display',
+      {
+        style: {
+          position: 'relative',
+          width: '100%',
+          height: 'calc(100% - 105px)',
+          overflow: 'hidden',
         },
-        m(ScrollableContainer,
-          {
-            width: this.width,
-            height: this.height,
-            contentHeight: 1000,
-            onPassiveScroll: (scrollTop: number) => {
-              this.canvasController.updateScrollOffset(scrollTop);
-              m.redraw();
-            },
+      },
+      m(
+        ScrollableContainer,
+        {
+          width: this.width,
+          height: this.height,
+          contentHeight: 1000,
+          onPassiveScroll: (scrollTop: number) => {
+            this.canvasController.updateScrollOffset(scrollTop);
+            m.redraw();
           },
-          m(CanvasWrapper, {
-            topOffset: canvasTopOffset,
-            canvasElement: this.canvasController.getCanvasElement()
-          }),
-          ...childTracks));
+        },
+        m(CanvasWrapper, {
+          topOffset: canvasTopOffset,
+          canvasElement: this.canvasController.getCanvasElement(),
+        }),
+        ...childTracks
+      )
+    );
   },
-} as m.Component<{timeScale: TimeScale}, {
-  canvasController: CanvasController,
-  width: number,
-  height: number,
-  onResize: () => void
-}>;
+} as m.Component<
+  {timeScale: TimeScale},
+  {
+    canvasController: CanvasController;
+    width: number;
+    height: number;
+    onResize: () => void;
+  }
+>;

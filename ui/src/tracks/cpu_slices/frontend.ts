@@ -29,8 +29,11 @@ class CpuSliceTrack extends Track {
     super(trackState);
   }
 
-  renderCanvas(vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale):
-      void {
+  renderCanvas(
+    vCtx: VirtualCanvasContext,
+    width: number,
+    timeScale: TimeScale
+  ): void {
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
@@ -38,7 +41,7 @@ class CpuSliceTrack extends Track {
     const rectWidth = timeScale.msToPx(sliceEnd) - rectStart;
     const shownStart = rectStart > width ? width : rectStart;
     const shownWidth =
-        rectWidth + (rectStart as number) > width ? width : rectWidth;
+      rectWidth + (rectStart as number) > width ? width : rectWidth;
 
     vCtx.fillStyle = '#ccc';
     vCtx.fillRect(0, 0, width, 73);

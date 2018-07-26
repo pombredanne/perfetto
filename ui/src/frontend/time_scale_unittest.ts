@@ -28,7 +28,6 @@ test('time scale to work', () => {
   expect(scale.deltaPxToDurationMs(400)).toEqual(50);
 });
 
-
 test('time scale to be updatable', () => {
   const scale = new TimeScale([0, 100], [100, 1000]);
 

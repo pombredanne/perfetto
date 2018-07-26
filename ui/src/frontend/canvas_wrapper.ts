@@ -22,10 +22,10 @@ export const CanvasWrapper = {
         left: '200px',
         top: attrs.topOffset.toString() + 'px',
         overflow: 'none',
-      }
+      },
     });
   },
   oncreate(vnode) {
     vnode.dom.appendChild(vnode.attrs.canvasElement);
-  }
-} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
+  },
+} as m.Component<{topOffset: number; canvasElement: HTMLCanvasElement}>;

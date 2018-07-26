@@ -40,7 +40,7 @@ export class WasmBridge {
   private deferredInitialized: Deferred<void>;
   private deferredReady: Deferred<void>;
   private fileReader: any;
-  private blob: Blob|null;
+  private blob: Blob | null;
   private callback: (_: WasmBridgeResponse) => void;
   private replyCount: number;
   private aborted: boolean;
@@ -49,8 +49,10 @@ export class WasmBridge {
   connection: init_trace_processor.Module;
 
   constructor(
-      init: init_trace_processor.InitWasm,
-      callback: (_: WasmBridgeResponse) => void, fileReader: any) {
+    init: init_trace_processor.InitWasm,
+    callback: (_: WasmBridgeResponse) => void,
+    fileReader: any
+  ) {
     this.replyCount = 0;
     this.deferredRuntimeInitialized = defer<void>();
     this.deferredHaveBlob = defer<void>();
@@ -134,25 +136,30 @@ export class WasmBridge {
 
     this.outstandingRequests.add(req.id);
     this.connection.ccall(
-        `${req.serviceName}_${req.methodName}`,  // C method name.
-        'void',                                  // Return type.
-        ['number', 'array', 'number'],           // Input args.
-        [req.id, req.data, req.data.length]      // Args.
-        );
+      `${req.serviceName}_${req.methodName}`, // C method name.
+      'void', // Return type.
+      ['number', 'array', 'number'], // Input args.
+      [req.id, req.data, req.data.length] // Args.
+    );
   }
 
   async initialize(): Promise<void> {
     await this.deferredRuntimeInitialized;
     await this.deferredHaveBlob;
-    const readTraceFn =
-        this.connection.addFunction(this.onRead.bind(this), 'iiii');
-    const replyFn =
-        this.connection.addFunction(this.onReply.bind(this), 'viiii');
+    const readTraceFn = this.connection.addFunction(
+      this.onRead.bind(this),
+      'iiii'
+    );
+    const replyFn = this.connection.addFunction(
+      this.onReply.bind(this),
+      'viiii'
+    );
     this.connection.ccall(
-        'Initialize',
-        'void',
-        ['number', 'number', 'number'],
-        [0, readTraceFn, replyFn]);
+      'Initialize',
+      'void',
+      ['number', 'number', 'number'],
+      [0, readTraceFn, replyFn]
+    );
     await this.deferredInitialized;
     this.deferredReady.resolve();
   }

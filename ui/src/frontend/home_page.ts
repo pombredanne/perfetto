@@ -20,7 +20,7 @@ import {gEngines, globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';
 
-function extractBlob(e: Event): Blob|null {
+function extractBlob(e: Event): Blob | null {
   if (!(e.target instanceof HTMLInputElement)) {
     throw new Error('Not input element');
   }
@@ -40,27 +40,34 @@ export const HomePage = createPage({
   view() {
     const count = globals.state.i;
     return m(
-        '.home-page',
-        m('.home-page-title', 'Perfetto'),
-        m('.home-page-controls',
-          m('label.file-input',
-            m('input[type=file]', {
-              onchange: (e: Event) => {
-                const blob = extractBlob(e);
-                if (!blob) return;
-                gEngines.set('0', WasmEngineProxy.create(blob));
-                m.route.set('/query/0');
-              },
-            }),
-            'Load trace'),
-          ' or ',
-          m('button', {onclick: loadExampleTrace}, 'Open demo trace'),
-          m('button',
-            {
-              onclick: quietDispatch({
-                type: 'INCREMENT',
-              })
+      '.home-page',
+      m('.home-page-title', 'Perfetto'),
+      m(
+        '.home-page-controls',
+        m(
+          'label.file-input',
+          m('input[type=file]', {
+            onchange: (e: Event) => {
+              const blob = extractBlob(e);
+              if (!blob) return;
+              gEngines.set('0', WasmEngineProxy.create(blob));
+              m.route.set('/query/0');
             },
-            `Increment ${count}`)));
-  }
+          }),
+          'Load trace'
+        ),
+        ' or ',
+        m('button', {onclick: loadExampleTrace}, 'Open demo trace'),
+        m(
+          'button',
+          {
+            onclick: quietDispatch({
+              type: 'INCREMENT',
+            }),
+          },
+          `Increment ${count}`
+        )
+      )
+    );
+  },
 });

@@ -39,52 +39,61 @@ export const TrackComponent = {
     const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
 
     return m(
-        '.track',
+      '.track',
+      {
+        style: {
+          border: '1px solid #666',
+          position: 'absolute',
+          top: attrs.top.toString() + 'px',
+          left: 0,
+          width: '100%',
+          height: `${attrs.trackState.height}px`,
+        },
+      },
+      m(
+        '.track-shell',
         {
           style: {
-            border: '1px solid #666',
-            position: 'absolute',
-            top: attrs.top.toString() + 'px',
-            left: 0,
-            width: '100%',
-            height: `${attrs.trackState.height}px`,
-          }
+            background: '#fff',
+            padding: '20px',
+            width: '200px',
+            'border-right': '1px solid #666',
+            height: '100%',
+          },
         },
-        m('.track-shell',
-          {
-            style: {
-              background: '#fff',
-              padding: '20px',
-              width: '200px',
-              'border-right': '1px solid #666',
-              height: '100%',
-            }
+        m(
+          'h1',
+          {style: {margin: 0, 'font-size': '1.5em'}},
+          attrs.trackState.name
+        )
+      ),
+      m(
+        '.track-content',
+        {
+          style: {
+            width: 'calc(100% - 200px)',
+            height: '100%',
+            position: 'absolute',
+            left: '200px',
+            top: '0',
           },
-          m('h1',
-            {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.name)),
-        m('.track-content',
+        },
+        // TODO(dproy): Move out DOM Content from the track class.
+        m(
+          '.marker',
           {
             style: {
-              width: 'calc(100% - 200px)',
-              height: '100%',
+              'font-size': '1.5em',
               position: 'absolute',
-              left: '200px',
-              top: '0'
-            }
-          },
-          // TODO(dproy): Move out DOM Content from the track class.
-          m('.marker',
-            {
-              style: {
-                'font-size': '1.5em',
-                position: 'absolute',
-                left: rectStart.toString() + 'px',
-                width: rectWidth.toString() + 'px',
-                background: '#aca'
-              }
+              left: rectStart.toString() + 'px',
+              width: rectWidth.toString() + 'px',
+              background: '#aca',
             },
-            attrs.trackState.name + ' DOM Content')));
+          },
+          attrs.trackState.name + ' DOM Content'
+        )
+      )
+    );
   },
 
   onupdate({attrs}) {
@@ -92,13 +101,15 @@ export const TrackComponent = {
     if (attrs.trackContext.isOnCanvas()) {
       this.track.renderCanvas(attrs.trackContext, attrs.width, attrs.timeScale);
     }
-  }
-} as m.Component<{
-  trackContext: VirtualCanvasContext,
-  top: number,
-  width: number,
-  timeScale: TimeScale,
-  trackState: TrackState,
-},
-                              // TODO(dproy): Fix formatter. This is ridiculous.
-                              {track: Track}>;
+  },
+} as m.Component<
+  {
+    trackContext: VirtualCanvasContext;
+    top: number;
+    width: number;
+    timeScale: TimeScale;
+    trackState: TrackState;
+  },
+  // TODO(dproy): Fix formatter. This is ridiculous.
+  {track: Track}
+>;

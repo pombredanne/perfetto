@@ -43,16 +43,20 @@ export class Remote {
    */
   // tslint:disable-next-line no-any
   send<T extends any>(
-      method: string, args: Array<{}>, transferList?: Array<{}>): Promise<T> {
+    method: string,
+    args: Array<{}>,
+    transferList?: Array<{}>
+  ): Promise<T> {
     const d = defer<T>();
     this.deferredRequests.set(this.nextRequestId, d);
     this.port.postMessage(
-        {
-          responseId: this.nextRequestId,
-          method,
-          args,
-        },
-        transferList);
+      {
+        responseId: this.nextRequestId,
+        method,
+        args,
+      },
+      transferList
+    );
     this.nextRequestId += 1;
     return d;
   }
@@ -71,9 +75,10 @@ export class Remote {
  * and post the result back to the calling thread.
  */
 export function forwardRemoteCalls(
-    port: MessagePort,
-    // tslint:disable-next-line no-any
-    handler: {[key: string]: any}) {
+  port: MessagePort,
+  // tslint:disable-next-line no-any
+  handler: {[key: string]: any}
+) {
   port.onmessage = (msg: MessageEvent) => {
     const method = msg.data.method;
     const id = msg.data.responseId;

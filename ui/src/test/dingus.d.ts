@@ -14,20 +14,24 @@
 
 export type Call = [string, any[], Dingus];
 
-export interface Dingus { calls: Call[]; }
+export interface Dingus {
+  calls: Call[];
+}
 
 export type DingusAttrs<T> = {
-  [P in keyof T]: Dingus & DingusAttrs<T[P]>& MaybeCallable<T[P]>;
+  [P in keyof T]: Dingus & DingusAttrs<T[P]> & MaybeCallable<T[P]>
 };
 
 type F = (...args: any[]) => any;
 
 type Callable<T extends F> = {
-  (...args: any[]):
-      Dingus&DingusAttrs<ReturnType<T>>&MaybeCallable<ReturnType<T>>;
+  (...args: any[]): Dingus &
+    DingusAttrs<ReturnType<T>> &
+    MaybeCallable<ReturnType<T>>;
 };
 
-type MaybeCallable<T> = T extends F ? Callable<T>: {};
+type MaybeCallable<T> = T extends F ? Callable<T> : {};
 
-export function dingus<T>(name?: string): Dingus&DingusAttrs<T>&
-    MaybeCallable<T>;
+export function dingus<T>(
+  name?: string
+): Dingus & DingusAttrs<T> & MaybeCallable<T>;

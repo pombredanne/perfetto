@@ -32,7 +32,7 @@ function createController(): ControllerProxy {
   worker.onerror = e => {
     console.error(e);
   };
-  const port = worker as {} as MessagePort;
+  const port = (worker as {}) as MessagePort;
   return new ControllerProxy(new Remote(port));
 }
 
@@ -47,7 +47,7 @@ class FrontendApi {
 }
 
 function getDemoTracks(): ObjectById<TrackState> {
-  const tracks: {[key: string]: TrackState;} = {};
+  const tracks: {[key: string]: TrackState} = {};
   for (let i = 0; i < 10; i++) {
     let trackType;
     // The track type strings here are temporary. They will be supplied by the

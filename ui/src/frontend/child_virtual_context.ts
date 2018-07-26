@@ -23,8 +23,9 @@ import {BoundingRect, VirtualCanvasContext} from './virtual_canvas_context';
  */
 export class ChildVirtualContext extends VirtualCanvasContext {
   constructor(
-      protected parentCtx: VirtualCanvasContext,
-      protected boundingRect: BoundingRect) {
+    protected parentCtx: VirtualCanvasContext,
+    protected boundingRect: BoundingRect
+  ) {
     super(parentCtx);
   }
 
@@ -37,7 +38,7 @@ export class ChildVirtualContext extends VirtualCanvasContext {
       y: boundingRect.y + this.boundingRect.y,
       x: boundingRect.x + this.boundingRect.x,
       width: boundingRect.width,
-      height: boundingRect.height
+      height: boundingRect.height,
     });
   }
 

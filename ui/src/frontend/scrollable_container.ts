@@ -17,44 +17,49 @@ import * as m from 'mithril';
 export const ScrollableContainer = {
   view({attrs, children}) {
     return m(
-        '.scrollableContainer',
-        {
-          style: {
-            width: attrs.width.toString() + 'px',
-            height: attrs.height.toString() + 'px',
-            'overflow-y': 'auto',
-            'overflow-x': 'hidden',
-            'will-change': 'transform',
-            position: 'relative'
-          }
+      '.scrollableContainer',
+      {
+        style: {
+          width: attrs.width.toString() + 'px',
+          height: attrs.height.toString() + 'px',
+          'overflow-y': 'auto',
+          'overflow-x': 'hidden',
+          'will-change': 'transform',
+          position: 'relative',
         },
-        m(ScrollableContent, {contentHeight: attrs.contentHeight}, children));
+      },
+      m(ScrollableContent, {contentHeight: attrs.contentHeight}, children)
+    );
   },
 
   oncreate({dom, attrs}) {
-    dom.addEventListener('scroll', () => {
-      attrs.onPassiveScroll(dom.scrollTop);
-    }, {passive: true});
-  }
+    dom.addEventListener(
+      'scroll',
+      () => {
+        attrs.onPassiveScroll(dom.scrollTop);
+      },
+      {passive: true}
+    );
+  },
 } as m.Component<{
-  width: number,
-  height: number,
-  contentHeight: number,
-  onPassiveScroll: (scrollTop: number) => void,
+  width: number;
+  height: number;
+  contentHeight: number;
+  onPassiveScroll: (scrollTop: number) => void;
 }>;
-
 
 const ScrollableContent = {
   view({attrs, children}) {
     return m(
-        '.scrollableContent',
-        {
-          style: {
-            height: attrs.contentHeight.toString() + 'px',
-            overflow: 'hidden',
-            position: 'relative'
-          }
+      '.scrollableContent',
+      {
+        style: {
+          height: attrs.contentHeight.toString() + 'px',
+          overflow: 'hidden',
+          position: 'relative',
         },
-        children);
-  }
+      },
+      children
+    );
+  },
 } as m.Component<{contentHeight: number}>;

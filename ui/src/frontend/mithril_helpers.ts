@@ -20,7 +20,9 @@ import {globals} from './globals';
  * Redraw is a boolean which controls whether Mithril schedules an automatic
  * redraw after this event is handled.
  */
-export interface MithrilEvent extends Event { redraw: boolean; }
+export interface MithrilEvent extends Event {
+  redraw: boolean;
+}
 
 /**
  * Create a Mithril event handler which (when triggered) dispatches an action
@@ -30,8 +32,9 @@ export interface MithrilEvent extends Event { redraw: boolean; }
  * handler which ignores the event entirely (via the (e: Event) overload) or
  * compute the Action from the Event (via the ((e: Event) => Action) overload.
  */
-export function quietDispatch(action: ((e: Event) => Action)|
-                              Action): (e: Event) => void {
+export function quietDispatch(
+  action: ((e: Event) => Action) | Action
+): (e: Event) => void {
   if (action instanceof Function) {
     return quietHandler(event => globals.dispatch(action(event)));
   }

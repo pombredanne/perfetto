@@ -24,7 +24,7 @@ class MockModule implements Module {
   ccall = jest.fn();
 
   constructor() {
-    this.locateFile = (_) => {
+    this.locateFile = _ => {
       throw new Error('locateFile not set');
     };
     this.onRuntimeInitialized = () => {

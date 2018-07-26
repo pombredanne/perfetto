@@ -25,7 +25,9 @@ export class TimeScale {
   private slopeMsPerPx = 0;
 
   constructor(
-      boundsMs: [Milliseconds, Milliseconds], boundsPx: [Pixels, Pixels]) {
+    boundsMs: [Milliseconds, Milliseconds],
+    boundsPx: [Pixels, Pixels]
+  ) {
     this.startMs = boundsMs[0];
     this.endMs = boundsMs[1];
     this.startPx = boundsPx[0];
@@ -35,15 +37,15 @@ export class TimeScale {
 
   private updateSlope() {
     this.slopeMsPerPx =
-        (this.endMs - this.startMs) / (this.endPx - this.startPx);
+      (this.endMs - this.startMs) / (this.endPx - this.startPx);
   }
 
   msToPx(time: Milliseconds): Pixels {
-    return this.startPx as number + (time - this.startMs) / this.slopeMsPerPx;
+    return (this.startPx as number) + (time - this.startMs) / this.slopeMsPerPx;
   }
 
   pxToMs(px: Pixels): Milliseconds {
-    return this.startMs as number + (px - this.startPx) * this.slopeMsPerPx;
+    return (this.startMs as number) + (px - this.startPx) * this.slopeMsPerPx;
   }
 
   deltaPxToDurationMs(px: Pixels): Milliseconds {
@@ -68,7 +70,5 @@ export class TimeScale {
 // they are numbers. Using types, this safeguard would not be here.
 // See: https://stackoverflow.com/a/43832165
 
-export enum Pixels {
-}
-export enum Milliseconds {
-}
+export enum Pixels {}
+export enum Milliseconds {}

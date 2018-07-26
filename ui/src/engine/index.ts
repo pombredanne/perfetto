@@ -20,12 +20,13 @@ import {WasmBridge, WasmBridgeRequest} from './wasm_bridge';
 
 declare var FileReaderSync: any;
 
-const anySelf = (self as any);
+const anySelf = self as any;
 
 const bridge = new WasmBridge(
-    init_trace_processor,
-    anySelf.postMessage.bind(anySelf),
-    new FileReaderSync(), );
+  init_trace_processor,
+  anySelf.postMessage.bind(anySelf),
+  new FileReaderSync()
+);
 bridge.initialize();
 
 anySelf.onmessage = (m: any) => {
@@ -33,6 +34,6 @@ anySelf.onmessage = (m: any) => {
     bridge.setBlob(m.data.blob);
     return;
   }
-  const request = (m.data as WasmBridgeRequest);
+  const request = m.data as WasmBridgeRequest;
   bridge.callWasm(request);
 };

@@ -17,7 +17,9 @@
  * We use this instead of using |Map| object since it is simpler and faster to
  * serialize for use in postMessage.
  */
-export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
+export interface ObjectById<Class extends {id: string}> {
+  [id: string]: Class;
+}
 
 export interface State {
   i: number;

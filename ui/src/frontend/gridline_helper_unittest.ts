@@ -22,7 +22,7 @@ test('gridline helper to have sensible step sizes', () => {
 });
 
 test('gridline helper to scale to very small and very large values', () => {
-  expect(GridlineHelper.getStepSize(.01)).toEqual(.001);
+  expect(GridlineHelper.getStepSize(0.01)).toEqual(0.001);
   expect(GridlineHelper.getStepSize(10000)).toEqual(1000);
 });
 
