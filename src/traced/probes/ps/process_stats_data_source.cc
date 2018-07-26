@@ -23,6 +23,8 @@
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/string_splitter.h"
+
+#include "perfetto/trace/ps/process_tree.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 // TODO(primiano): the code in this file assumes that PIDs are never recycled
