@@ -48,8 +48,9 @@ export function drawGridLines(
  * Returns the step size of a grid line. The returned step size has two
  * properties:
  *
- * (1) It is 1, 2, or 5, multipled by some integer power of 10.
- * (2) It is as close to possible to |desiredSteps|.
+ * (1) It is 1, 2, or 5, multiplied by some integer power of 10.
+ * (2) The number steps in |range| produced by |stepSize| is as close as
+ *     possible to |desiredSteps|.
  */
 export function getGridStepSize(
     range: Milliseconds, desiredSteps: number): Milliseconds {
@@ -59,7 +60,7 @@ export function getGridStepSize(
   // desired step size is 234.5 and the step size will be set to 100.
   const desiredStepSize = range / desiredSteps;
   const zeros = Math.floor(Math.log10(desiredStepSize));
-  let stepSize = Math.pow(10, zeros);
+  const initialStepSize = Math.pow(10, zeros);
 
   // This function first calculates how many steps within the range a certain
   // stepSize will produce, and returns the difference between that and
@@ -67,20 +68,22 @@ export function getGridStepSize(
   const distToDesired = (evaluatedStepSize: number) =>
       Math.abs(range / evaluatedStepSize - desiredSteps);
 
-  // We now check if we can lower distToDesired(stepSize) by increasing
-  // stepSize. Since we only want step sizes that are 1, 2, or 5 times some
-  // power of 10, we can only multiply by 5 and 2. We try these factors in
-  // descending order. Note that we only need make the step size bigger, not
-  // smaller, to get to the desired stepSize, since the power of 10 obtained
-  // above is never smaller than the desired step size. Also note that we can
-  // only multiply the initial stepSize by up to 10 since we are already close
-  // to the desired number of steps.
-  if (distToDesired(stepSize * 5) < distToDesired(stepSize) &&
-      distToDesired(stepSize * 5) < distToDesired(stepSize * 2)) {
-    stepSize *= 5;
+  // We know that |initialStepSize| is a power of 10, and
+  // initialStepSize <= desiredStepSize <= 10 * initialStepSize. There are four
+  // possible candidates for final step size: 1, 2, 5 or 10 * initialStepSize.
+  // We pick the candidate that minimizes distToDesired(stepSize).
+  const stepSizeMultipliers = [2, 5, 10];
+
+  let minimalDistance = distToDesired(initialStepSize);
+  let minimizingStepSize = initialStepSize;
+
+  for (const multiplier of stepSizeMultipliers) {
+    const newStepSize = multiplier * initialStepSize;
+    const newDistance = distToDesired(newStepSize);
+    if (newDistance < minimalDistance) {
+      minimalDistance = newDistance;
+      minimizingStepSize = newStepSize;
+    }
   }
-  if (distToDesired(stepSize * 2) < distToDesired(stepSize)) {
-    stepSize *= 2;
-  }
-  return stepSize;
+  return minimizingStepSize;
 }
