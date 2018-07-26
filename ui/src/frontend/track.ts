@@ -22,13 +22,21 @@ import {trackRegistry} from './track_registry';
 import {TrackShell} from './track_shell';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export const Track = {
+export const Track: m.Component < {
+  trackContext: VirtualCanvasContext;
+  top: number;
+  width: number;
+  timeScale: TimeScale;
+  trackState: TrackState;
+}
+, {trackImpl: TrackImpl} > = {
+
   oninit({attrs}) {
     // TODO: Since ES6 modules are asynchronous and it is conceivable that we
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.getCreator(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.type);
     this.trackImpl = trackCreator.create(attrs.trackState);
   },
 
@@ -71,13 +79,5 @@ export const Track = {
     if (attrs.trackContext.isOnCanvas()) {
       this.trackImpl.draw(attrs.trackContext, attrs.width, attrs.timeScale);
     }
-  }
-} as m.Component<{
-  trackContext: VirtualCanvasContext,
-  top: number,
-  width: number,
-  timeScale: TimeScale,
-  trackState: TrackState,
-},
-                     // TODO(dproy): Fix formatter. This is ridiculous.
-                     {trackImpl: TrackImpl}>;
+  },
+};

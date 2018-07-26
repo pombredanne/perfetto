@@ -12,11 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Registry} from '../common/registry';
-
-import {TrackCreator} from './track_impl';
-
 /**
- * Global registry that maps types to TrackCreator.
+ * This interface forces track implementations to have two static properties:
+ * type and a create function.
  */
-export const trackRegistry = new Registry<TrackCreator>();
+export interface TrackControllerCreator {
+  // Store the type explicitly as a string as opposed to using class.name in
+  // case we ever minify our code.
+  readonly type: string;
+
+  create(): TrackController;
+}
+
+export abstract class TrackController {}

@@ -12,11 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Registry} from '../common/registry';
+import {TrackController} from '../../controller/track_controller';
+import {
+  trackControllerRegistry
+} from '../../controller/track_controller_registry';
 
-import {TrackCreator} from './track_impl';
+class CpuSliceTrackController extends TrackController {
+  static readonly type = 'CpuSliceTrack';
+  static create(): CpuSliceTrackController {
+    return new CpuSliceTrackController();
+  }
 
-/**
- * Global registry that maps types to TrackCreator.
- */
-export const trackRegistry = new Registry<TrackCreator>();
+  constructor() {
+    super();
+  }
+}
+
+trackControllerRegistry.register(CpuSliceTrackController);

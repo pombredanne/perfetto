@@ -14,9 +14,9 @@
 
 import {Registry} from '../common/registry';
 
-import {TrackCreator} from './track_impl';
+import {TrackControllerCreator} from './track_controller';
 
 /**
  * Global registry that maps types to TrackCreator.
  */
-export const trackRegistry = new Registry<TrackCreator>();
+export const trackControllerRegistry = new Registry<TrackControllerCreator>();
