@@ -57,7 +57,7 @@ int ThreadTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 ThreadTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 
 int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
-  auto thread = storage_->GetThread(utid_filter_.current);
+  const auto& thread = storage_->GetThread(utid_filter_.current);
   switch (N) {
     case Column::kUtid: {
       sqlite3_result_int64(context, utid_filter_.current);

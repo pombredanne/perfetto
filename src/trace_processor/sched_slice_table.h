@@ -37,7 +37,7 @@ class SchedSliceTable : public Table {
     kTimestamp = 1,
     kCpu = 2,
     kDuration = 3,
-    kQuantizedGroup = 4
+    kQuantizedGroup = 4,
   };
 
   SchedSliceTable(const TraceStorage* storage);

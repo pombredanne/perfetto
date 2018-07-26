@@ -44,9 +44,9 @@ bool FindIntField(ProtoDecoder* decoder,
 }  // namespace
 
 TraceParser::TraceParser(BlobReader* reader,
-                         TraceStorage* storage,
+                         TraceProcessorContext* context,
                          uint32_t chunk_size_b)
-    : reader_(reader), storage_(storage), chunk_size_b_(chunk_size_b) {}
+    : reader_(reader), chunk_size_b_(chunk_size_b), context_(context) {}
 
 bool TraceParser::ParseNextChunk() {
   if (!buffer_)
@@ -126,7 +126,7 @@ void TraceParser::ParseThread(const uint8_t* data, size_t length) {
         break;
     }
   }
-  storage_->MatchThreadToProcess(tid, tgid);
+  context_->process_tracker->UpdateThread(tid, tgid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -151,7 +151,7 @@ void TraceParser::ParseProcess(const uint8_t* data, size_t length) {
         break;
     }
   }
-  storage_->PushProcess(pid, process_name, process_name_len);
+  context_->process_tracker->UpdateProcess(pid, process_name, process_name_len);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -233,8 +233,8 @@ void TraceParser::ParseSchedSwitch(uint32_t cpu,
         break;
     }
   }
-  storage_->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state, prev_comm,
-                            prev_comm_len, next_pid);
+  context_->sched_tracker->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state,
+                                           prev_comm, prev_comm_len, next_pid);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }

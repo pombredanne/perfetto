@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_TRACE_DATABASE_H_
-#define SRC_TRACE_PROCESSOR_TRACE_DATABASE_H_
+#ifndef SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_H_
+#define SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_H_
 
 #include <sqlite3.h>
 #include <memory>
@@ -23,11 +23,15 @@
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/trace_processor/raw_query.pb.h"
+#include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/process_table.h"
+#include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/sched_slice_table.h"
+#include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/thread_table.h"
 #include "src/trace_processor/trace_parser.h"
+#include "src/trace_processor/trace_processor_context.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -35,10 +39,10 @@ namespace trace_processor {
 
 // Coordinates the loading of traces from an arbitary source and allows
 // execution of SQL queries on the events in these traces.
-class TraceDatabase {
+class TraceProcessor {
  public:
-  TraceDatabase(base::TaskRunner* task_runner);
-  ~TraceDatabase();
+  TraceProcessor(base::TaskRunner* task_runner);
+  ~TraceProcessor();
 
   // Loads a trace by reading from the given blob reader. Invokes |callback|
   // when the trace has been fully read and parsed.
@@ -54,14 +58,20 @@ class TraceDatabase {
 
   ScopedDb db_;  // Keep first.
 
-  TraceStorage storage_;
-  std::unique_ptr<TraceParser> parser_;
+  TraceProcessorContext* context_;
+
+  // The TraceProcessor owns this memory but loads it to the other classes
+  // through the TraceProcessorContext.
+  std::unique_ptr<ProcessTracker> process_tracker;
+  std::unique_ptr<SchedTracker> sched_tracker;
+  std::unique_ptr<TraceParser> parser;
+  std::unique_ptr<TraceStorage> storage;
 
   base::TaskRunner* const task_runner_;
-  base::WeakPtrFactory<TraceDatabase> weak_factory_;  // Keep last.
+  base::WeakPtrFactory<TraceProcessor> weak_factory_;  // Keep last.
 };
 
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_TRACE_DATABASE_H_
+#endif  // SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_H_
