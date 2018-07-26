@@ -25,7 +25,7 @@ const anySelf = self as any;
 const bridge = new WasmBridge(
   init_trace_processor,
   anySelf.postMessage.bind(anySelf),
-  new FileReaderSync()
+  new FileReaderSync(),
 );
 bridge.initialize();
 

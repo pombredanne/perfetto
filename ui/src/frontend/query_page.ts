@@ -77,7 +77,7 @@ function table(result?: RawQueryResult): m.Children {
 
   const extract = (
     d: RawQueryResult.IColumnValues,
-    i: number
+    i: number,
   ): number | string => {
     if (!d || !d.longValues || !d.doubleValues || !d.stringValues) return 0;
     if (d.longValues.length > 0) return +d.longValues[i];
@@ -97,10 +97,10 @@ function table(result?: RawQueryResult): m.Children {
           'tr',
           result.columns.map((c: RawQueryResult.IColumnValues) => {
             return m('td', extract(c, i));
-          })
+          }),
         );
-      })
-    )
+      }),
+    ),
   );
 }
 
@@ -114,7 +114,7 @@ const ExampleQuery = {
           vnode.attrs.chosen();
         },
       },
-      vnode.children
+      vnode.children,
     );
   },
 } as m.Component<{chosen: () => void}>;
@@ -128,8 +128,8 @@ const QueryBox = {
         m(
           ExampleQuery,
           {chosen: () => (this.query = ExampleQueries[i].query)},
-          ExampleQueries[i].name
-        )
+          ExampleQueries[i].name,
+        ),
       );
     }
 
@@ -150,7 +150,7 @@ const QueryBox = {
         oninput: m.withAttr('value', (q: string) => (this.query = q)),
         value: this.query,
       }),
-      examples
+      examples,
     );
   },
 } as m.Component<{}, {query: string}>;
@@ -167,7 +167,7 @@ function createQueryResponse(entry: QueryResponse) {
     '.query-log-entry',
     m('.query-log-entry-query', entry.query),
     m('.query-log-entry-stats', stats),
-    m('.query-log-entry-result', table(entry.result))
+    m('.query-log-entry-result', table(entry.result)),
   );
 }
 

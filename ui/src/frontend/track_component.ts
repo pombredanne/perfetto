@@ -64,8 +64,8 @@ export const TrackComponent = {
         m(
           'h1',
           {style: {margin: 0, 'font-size': '1.5em'}},
-          attrs.trackState.name
-        )
+          attrs.trackState.name,
+        ),
       ),
       m(
         '.track-content',
@@ -90,9 +90,9 @@ export const TrackComponent = {
               background: '#aca',
             },
           },
-          attrs.trackState.name + ' DOM Content'
-        )
-      )
+          attrs.trackState.name + ' DOM Content',
+        ),
+      ),
     );
   },
 

@@ -42,6 +42,6 @@ export abstract class Track {
   abstract renderCanvas(
     vCtx: VirtualCanvasContext,
     width: number,
-    timeScale: TimeScale
+    timeScale: TimeScale,
   ): void;
 }

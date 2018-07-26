@@ -33,7 +33,7 @@ export interface MithrilEvent extends Event {
  * compute the Action from the Event (via the ((e: Event) => Action) overload.
  */
 export function quietDispatch(
-  action: ((e: Event) => Action) | Action
+  action: ((e: Event) => Action) | Action,
 ): (e: Event) => void {
   if (action instanceof Function) {
     return quietHandler(event => globals.dispatch(action(event)));

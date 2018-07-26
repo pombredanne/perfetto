@@ -51,7 +51,7 @@ export class WasmBridge {
   constructor(
     init: init_trace_processor.InitWasm,
     callback: (_: WasmBridgeResponse) => void,
-    fileReader: any
+    fileReader: any,
   ) {
     this.replyCount = 0;
     this.deferredRuntimeInitialized = defer<void>();
@@ -139,7 +139,7 @@ export class WasmBridge {
       `${req.serviceName}_${req.methodName}`, // C method name.
       'void', // Return type.
       ['number', 'array', 'number'], // Input args.
-      [req.id, req.data, req.data.length] // Args.
+      [req.id, req.data, req.data.length], // Args.
     );
   }
 
@@ -148,17 +148,17 @@ export class WasmBridge {
     await this.deferredHaveBlob;
     const readTraceFn = this.connection.addFunction(
       this.onRead.bind(this),
-      'iiii'
+      'iiii',
     );
     const replyFn = this.connection.addFunction(
       this.onReply.bind(this),
-      'viiii'
+      'viiii',
     );
     this.connection.ccall(
       'Initialize',
       'void',
       ['number', 'number', 'number'],
-      [0, readTraceFn, replyFn]
+      [0, readTraceFn, replyFn],
     );
     await this.deferredInitialized;
     this.deferredReady.resolve();

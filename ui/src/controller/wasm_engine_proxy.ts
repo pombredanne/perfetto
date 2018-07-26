@@ -76,7 +76,7 @@ export class WasmEngineProxy extends Engine {
     this.worker.onerror = this.onError.bind(this);
     this.worker.onmessage = this.onMessage.bind(this);
     this.traceProcessor_ = TraceProcessor.create(
-      this.rpcImpl.bind(this, 'trace_processor')
+      this.rpcImpl.bind(this, 'trace_processor'),
     );
   }
 
@@ -102,7 +102,7 @@ export class WasmEngineProxy extends Engine {
     serviceName: string,
     method: Function,
     requestData: Uint8Array,
-    callback: protobufjs.RPCImplCallback
+    callback: protobufjs.RPCImplCallback,
   ): void {
     const methodName = method.name;
     const id = this.nextRequestId++;

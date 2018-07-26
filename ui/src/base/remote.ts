@@ -45,7 +45,7 @@ export class Remote {
   send<T extends any>(
     method: string,
     args: Array<{}>,
-    transferList?: Array<{}>
+    transferList?: Array<{}>,
   ): Promise<T> {
     const d = defer<T>();
     this.deferredRequests.set(this.nextRequestId, d);
@@ -55,7 +55,7 @@ export class Remote {
         method,
         args,
       },
-      transferList
+      transferList,
     );
     this.nextRequestId += 1;
     return d;
@@ -77,7 +77,7 @@ export class Remote {
 export function forwardRemoteCalls(
   port: MessagePort,
   // tslint:disable-next-line no-any
-  handler: {[key: string]: any}
+  handler: {[key: string]: any},
 ) {
   port.onmessage = (msg: MessageEvent) => {
     const method = msg.data.method;

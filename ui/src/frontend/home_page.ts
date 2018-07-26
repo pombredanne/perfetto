@@ -54,7 +54,7 @@ export const HomePage = createPage({
               m.route.set('/query/0');
             },
           }),
-          'Load trace'
+          'Load trace',
         ),
         ' or ',
         m('button', {onclick: loadExampleTrace}, 'Open demo trace'),
@@ -65,9 +65,9 @@ export const HomePage = createPage({
               type: 'INCREMENT',
             }),
           },
-          `Increment ${count}`
-        )
-      )
+          `Increment ${count}`,
+        ),
+      ),
     );
   },
 });

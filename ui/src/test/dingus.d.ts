@@ -33,5 +33,5 @@ type Callable<T extends F> = {
 type MaybeCallable<T> = T extends F ? Callable<T> : {};
 
 export function dingus<T>(
-  name?: string
+  name?: string,
 ): Dingus & DingusAttrs<T> & MaybeCallable<T>;

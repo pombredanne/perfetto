@@ -21,7 +21,7 @@ export abstract class GridlineHelper {
     x: TimeScale,
     timeBounds: [Milliseconds, Milliseconds],
     width: number,
-    height: number
+    height: number,
   ): void {
     const step = GridlineHelper.getStepSize(timeBounds[1] - timeBounds[0]);
     const start = Math.round(timeBounds[0] / step) * step;

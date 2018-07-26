@@ -26,7 +26,7 @@ export class TimeScale {
 
   constructor(
     boundsMs: [Milliseconds, Milliseconds],
-    boundsPx: [Pixels, Pixels]
+    boundsPx: [Pixels, Pixels],
   ) {
     this.startMs = boundsMs[0];
     this.endMs = boundsMs[1];

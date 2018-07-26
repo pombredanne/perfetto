@@ -72,7 +72,7 @@ export const ScrollingTrackDisplay = {
           width: this.width,
           timeScale: attrs.timeScale,
           trackState,
-        })
+        }),
       );
       trackYOffset += trackState.height;
     }
@@ -102,8 +102,8 @@ export const ScrollingTrackDisplay = {
           topOffset: canvasTopOffset,
           canvasElement: this.canvasController.getCanvasElement(),
         }),
-        ...childTracks
-      )
+        ...childTracks,
+      ),
     );
   },
 } as m.Component<

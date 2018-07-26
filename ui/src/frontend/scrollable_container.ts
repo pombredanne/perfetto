@@ -28,7 +28,7 @@ export const ScrollableContainer = {
           position: 'relative',
         },
       },
-      m(ScrollableContent, {contentHeight: attrs.contentHeight}, children)
+      m(ScrollableContent, {contentHeight: attrs.contentHeight}, children),
     );
   },
 
@@ -38,7 +38,7 @@ export const ScrollableContainer = {
       () => {
         attrs.onPassiveScroll(dom.scrollTop);
       },
-      {passive: true}
+      {passive: true},
     );
   },
 } as m.Component<{
@@ -59,7 +59,7 @@ const ScrollableContent = {
           position: 'relative',
         },
       },
-      children
+      children,
     );
   },
 } as m.Component<{contentHeight: number}>;

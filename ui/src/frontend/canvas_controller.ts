@@ -52,7 +52,7 @@ export class CanvasController {
     this.canvasWidth = width;
     this.canvasHeight = visibleCanvasHeight * CANVAS_OVERDRAW_FACTOR;
     this.extraHeightPerSide = Math.round(
-      (this.canvasHeight - visibleCanvasHeight) / 2
+      (this.canvasHeight - visibleCanvasHeight) / 2,
     );
 
     const dpr = window.devicePixelRatio;
