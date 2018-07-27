@@ -15,7 +15,7 @@
 import {Milliseconds, TimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-const DESIRED_PX_PER_STEP = 80;
+export const DESIRED_PX_PER_STEP = 80;
 
 export function drawGridLines(
     ctx: VirtualCanvasContext,
@@ -34,7 +34,7 @@ export function drawGridLines(
   for (let t: Milliseconds = start; t < timeBounds[1]; t += step) {
     const xPos = Math.floor(x.msToPx(t)) + 0.5;
 
-    if (xPos <= width) {
+    if (xPos >= 0 && xPos <= width) {
       ctx.beginPath();
       ctx.moveTo(xPos, 0);
       ctx.lineTo(xPos, height);
@@ -42,7 +42,6 @@ export function drawGridLines(
     }
   }
 }
-
 
 /**
  * Returns the step size of a grid line. The returned step size has two
