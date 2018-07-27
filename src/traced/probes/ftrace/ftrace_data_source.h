@@ -57,7 +57,7 @@ class FtraceDataSource : public ProbesDataSource {
 
   FtraceDataSource(base::WeakPtr<FtraceController>,
                    TracingSessionID,
-                   FtraceConfig,
+                   const FtraceConfig&,
                    std::unique_ptr<TraceWriter>);
   ~FtraceDataSource() override;
 

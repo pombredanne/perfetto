@@ -27,30 +27,23 @@
 #include <mutex>
 #include <set>
 #include <string>
-#include <vector>
 
 #include "gtest/gtest_prod.h"
-#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/base/weak_ptr.h"
-#include "perfetto/protozero/message_handle.h"
-#include "perfetto/traced/data_source_types.h"
+#include "src/traced/probes/ftrace/ftrace_config.h"
 
 namespace perfetto {
 
-class FtraceDataSource;
 class CpuReader;
 class EventFilter;
-class FtraceConfig;
-class FtraceController;
 class FtraceConfigMuxer;
+class FtraceController;
+class FtraceDataSource;
 class FtraceProcfs;
-struct FtraceStats;
 class ProtoTranslationTable;
-
-constexpr size_t kMaxSinks = 32;
-constexpr size_t kMaxCpus = 64;
+struct FtraceStats;
 
 // Method of last resort to reset ftrace state.
 void HardResetFtraceState();

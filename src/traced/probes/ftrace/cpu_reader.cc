@@ -78,9 +78,6 @@ bool ReadDataLoc(const uint8_t* start,
   return true;
 }
 
-using BundleHandle =
-    protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-
 const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
                                            const std::set<std::string>& names) {
   std::vector<bool> enabled(table.largest_id() + 1);
@@ -267,9 +264,10 @@ void CpuReader::RunWorkerThread(size_t cpu,
 #endif
 }
 
-bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
-                      const std::array<BundleHandle, kMaxSinks>& bundles,
-                      const std::array<FtraceMetadata*, kMaxSinks>& metadatas) {
+bool CpuReader::Drain(
+    const std::array<const EventFilter*, kMaxFtraceConcurrency>& filters,
+    const std::array<BundleHandle, kMaxFtraceConcurrency>& bundles,
+    const std::array<FtraceMetadata*, kMaxFtraceConcurrency>& metadatas) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   while (true) {
     uint8_t* buffer = GetBuffer();
@@ -280,7 +278,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     PERFETTO_CHECK(static_cast<size_t>(bytes) == base::kPageSize);
 
     size_t evt_size = 0;
-    for (size_t i = 0; i < kMaxSinks; i++) {
+    for (size_t i = 0; i < kMaxFtraceConcurrency; i++) {
       if (!filters[i])
         break;
       evt_size =
@@ -289,7 +287,7 @@ bool CpuReader::Drain(const std::array<const EventFilter*, kMaxSinks>& filters,
     }
   }
 
-  for (size_t i = 0; i < kMaxSinks; i++) {
+  for (size_t i = 0; i < kMaxFtraceConcurrency; i++) {
     if (!filters[i])
       break;
     bundles[i]->set_cpu(static_cast<uint32_t>(cpu_));

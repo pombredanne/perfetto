@@ -24,10 +24,13 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "perfetto/base/utils.h"
+#include "perfetto/protozero/message_handle.h"
 #include "perfetto/protozero/scattered_stream_writer.h"
 #include "src/protozero/scattered_stream_delegate_for_testing.h"
 #include "src/traced/probes/ftrace/ftrace_config.h"
 #include "src/traced/probes/ftrace/ftrace_controller.h"
+#include "src/traced/probes/ftrace/ftrace_data_source.h"
+#include "src/traced/probes/ftrace/ftrace_metadata.h"
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
@@ -46,8 +49,7 @@ constexpr char kTracingPath[] = "/sys/kernel/debug/tracing/";
 using FtraceBundleHandle =
     protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
 
-class EndToEndIntegrationTest : public ::testing::Test,
-                                public FtraceSink::Delegate {
+class EndToEndIntegrationTest : public ::testing::Test {
  public:
   void Finalize(protos::TestBundleWrapper* wrapper) {
     message->set_after("--- Bundle wrapper after ---");
@@ -89,6 +91,13 @@ class EndToEndIntegrationTest : public ::testing::Test,
       runner_.Quit();
   }
 
+  std::unique_ptr<FtraceDataSource> CreateFtraceDataSource(
+      const FtraceConfig& config,
+      FtraceController* controller) {
+    return std::unique_ptr<FtraceDataSource>(new FtraceDataSource(
+        controller->GetWeakPtr(), 0 /* session_id */, config, nullptr));
+  }
+
   base::UnixTaskRunner* runner() { return &runner_; }
 
  private:
@@ -113,7 +122,7 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   FtraceConfig config;
   *config.add_ftrace_events() = "print";
   *config.add_ftrace_events() = "sched_switch";
-  std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
+  auto data_source = CreateFtraceDataSource(config, ftrace.get());
 
   // Let some events build up.
   sleep(1);
@@ -122,7 +131,7 @@ TEST_F(EndToEndIntegrationTest, DISABLED_SchedSwitchAndPrint) {
   runner()->Run();
 
   // Disable events.
-  sink.reset();
+  data_source.reset();
 
   // Read the output into a full proto so we can use reflection.
   protos::TestBundleWrapper output;
@@ -147,7 +156,7 @@ TEST_F(EndToEndIntegrationTest, DISABLED_Atrace) {
   FtraceConfig config;
   *config.add_ftrace_events() = "print";
   *config.add_ftrace_events() = "sched_switch";
-  std::unique_ptr<FtraceSink> sink = ftrace->CreateSink(config, this);
+  auto data_source = CreateFtraceDataSource(config, ftrace.get());
 
   // Let some events build up.
   sleep(1);
@@ -156,7 +165,7 @@ TEST_F(EndToEndIntegrationTest, DISABLED_Atrace) {
   runner()->Run();
 
   // Disable events.
-  sink.reset();
+  data_source.reset();
 
   // Read the output into a full proto so we can use reflection.
   protos::TestBundleWrapper output;

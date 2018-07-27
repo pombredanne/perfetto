@@ -97,10 +97,15 @@ class ProbesProducer : public Producer {
   bool ftrace_creation_failed_ = false;
   uint32_t connection_backoff_ms_ = 0;
   const char* socket_name_ = nullptr;
+
+  // Owning map for all active data sources.
   std::unordered_map<DataSourceInstanceID, std::unique_ptr<ProbesDataSource>>
       data_sources_;
+
+  // Keeps (pointers to) data sources ordered by session id.
   std::unordered_multimap<TracingSessionID, ProbesDataSource*>
       session_data_sources_;
+
   std::unordered_map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   LRUInodeCache cache_{kLRUInodeCacheSize};
   std::map<BlockDeviceID, std::unordered_map<Inode, InodeMapValue>>

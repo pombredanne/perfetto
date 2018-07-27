@@ -177,12 +177,10 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                config.target_buffer());
-  FtraceConfig proto_config = config.ftrace_config();
   const BufferID buffer_id = static_cast<BufferID>(config.target_buffer());
-  auto writer = endpoint_->CreateTraceWriter(buffer_id);
-  std::unique_ptr<FtraceDataSource> data_source(
-      new FtraceDataSource(ftrace_->GetWeakPtr(), session_id,
-                           std::move(proto_config), std::move(writer)));
+  std::unique_ptr<FtraceDataSource> data_source(new FtraceDataSource(
+      ftrace_->GetWeakPtr(), session_id, config.ftrace_config(),
+      endpoint_->CreateTraceWriter(buffer_id)));
   if (!ftrace_->AddDataSource(data_source.get())) {
     PERFETTO_ELOG(
         "Failed to start tracing (too many concurrent sessions or ftrace is "
@@ -198,13 +196,12 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateInodeFileDataSource(
     DataSourceConfig source_config) {
   PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
                id, source_config.target_buffer());
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(source_config.target_buffer()));
+  auto buffer_id = static_cast<BufferID>(source_config.target_buffer());
   if (system_inodes_.empty())
     CreateStaticDeviceToInodeMap("/system", &system_inodes_);
   return std::unique_ptr<InodeFileDataSource>(new InodeFileDataSource(
       std::move(source_config), task_runner_, session_id, &system_inodes_,
-      &cache_, std::move(trace_writer)));
+      &cache_, endpoint_->CreateTraceWriter(buffer_id)));
 }
 
 std::unique_ptr<ProbesDataSource> ProbesProducer::CreateProcessStatsDataSource(
@@ -212,10 +209,10 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateProcessStatsDataSource(
     DataSourceInstanceID id,
     const DataSourceConfig& config) {
   base::ignore_result(id);
-  auto trace_writer = endpoint_->CreateTraceWriter(
-      static_cast<BufferID>(config.target_buffer()));
-  auto data_source = std::unique_ptr<ProcessStatsDataSource>(
-      new ProcessStatsDataSource(session_id, std::move(trace_writer), config));
+  auto buffer_id = static_cast<BufferID>(config.target_buffer());
+  auto data_source =
+      std::unique_ptr<ProcessStatsDataSource>(new ProcessStatsDataSource(
+          session_id, endpoint_->CreateTraceWriter(buffer_id), config));
   if (config.process_stats_config().scan_all_processes_on_start()) {
     data_source->WriteAllProcesses();
   }
@@ -226,7 +223,7 @@ void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {
   PERFETTO_LOG("Producer stop (id=%" PRIu64 ")", id);
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
-    PERFETTO_ELOG("Cannot find data source id=%" PRIu64, id);
+    PERFETTO_ELOG("Cannot stop data source id=%" PRIu64 ", not found", id);
     return;
   }
   ProbesDataSource* data_source = it->second.get();
@@ -256,6 +253,10 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
   endpoint_->NotifyFlushComplete(flush_request_id);
 }
 
+// This function is called by the FtraceController in batches, whenever it has
+// read and one or more pages from one or more cpus and written that into the
+// userspace tracing buffer. If more than one ftrace data sources are active,
+// this call typically happens after writing for all session has been handled.
 // static
 void ProbesProducer::OnFtraceMetadata(base::WeakPtr<ProbesProducer> weak_this) {
   ProbesProducer* thiz = weak_this.get();

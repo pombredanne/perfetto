@@ -35,7 +35,6 @@
 #include "src/traced/probes/ftrace/cpu_reader.h"
 #include "src/traced/probes/ftrace/cpu_stats_parser.h"
 #include "src/traced/probes/ftrace/event_info.h"
-#include "src/traced/probes/ftrace/ftrace_config.h"
 #include "src/traced/probes/ftrace/ftrace_config_muxer.h"
 #include "src/traced/probes/ftrace/ftrace_data_source.h"
 #include "src/traced/probes/ftrace/ftrace_metadata.h"
@@ -261,9 +260,9 @@ void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
   CpuReader* reader = cpu_readers_[cpu].get();
   using BundleHandle =
       protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-  std::array<const EventFilter*, kMaxSinks> filters{};
-  std::array<BundleHandle, kMaxSinks> bundles{};
-  std::array<FtraceMetadata*, kMaxSinks> metadatas{};
+  std::array<const EventFilter*, kMaxFtraceConcurrency> filters{};
+  std::array<BundleHandle, kMaxFtraceConcurrency> bundles{};
+  std::array<FtraceMetadata*, kMaxFtraceConcurrency> metadatas{};
   size_t sink_count = data_sources_.size();
   size_t i = 0;
 
@@ -317,7 +316,7 @@ void FtraceController::OnDataAvailable(
 
 bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (data_sources_.size() >= kMaxSinks)
+  if (data_sources_.size() >= kMaxFtraceConcurrency)
     return false;
   if (!ValidConfig(data_source->config()))
     return false;
@@ -338,7 +337,8 @@ bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
 void FtraceController::RemoveDataSource(FtraceDataSource* data_source) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   size_t removed = data_sources_.erase(data_source);
-  PERFETTO_DCHECK(removed == 1);
+  if (!removed)
+    return;  // Can happen if AddDataSource failed (e.g. too many sessions).
   ftrace_config_muxer_->RemoveConfig(data_source->config_id());
   StopIfNeeded();
 }
