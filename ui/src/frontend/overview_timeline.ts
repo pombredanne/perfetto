@@ -108,7 +108,6 @@ export const OverviewTimeline = {
         attrs.maxVisibleWindowMs.start, attrs.maxVisibleWindowMs.end);
     this.visibleWindowMs = attrs.visibleWindowMs;
     this.onBrushed = attrs.onBrushed;
-    // a b c
 
     return m(
         '.overview-timeline',
