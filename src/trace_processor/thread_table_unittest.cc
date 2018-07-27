@@ -16,12 +16,11 @@
 
 #include "src/trace_processor/thread_table.h"
 #include "src/trace_processor/process_table.h"
-#include "src/trace_processor/scoped_db.h"
-#include "src/trace_processor/trace_processor_context.h"
-
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/trace_parser.h"
+#include "src/trace_processor/trace_processor_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -40,7 +39,6 @@ class ThreadTableUnittest : public ::testing::Test {
     context_.storage.reset(new TraceStorage);
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.sched_tracker.reset(new SchedTracker(&context_));
-    // context_.parser = nullptr;
 
     ThreadTable::RegisterTable(&*db, context_.storage.get());
     ProcessTable::RegisterTable(&*db, context_.storage.get());
