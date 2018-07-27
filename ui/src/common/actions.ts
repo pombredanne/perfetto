@@ -21,11 +21,11 @@ export function openTrace(url: string) {
   };
 };
 
-export function addTrack(engineId: string, trackType: string) {
+export function addTrack(engineId: string, trackKind: string) {
   return {
     type: 'ADD_TRACK',
     engineId,
-    trackType,
+    trackKind,
   };
 };
 

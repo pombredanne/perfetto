@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_counters/frontend';
-import './cpu_slices/frontend';
+import {Registry} from '../common/registry';
+
+import {TrackControllerCreator} from './track_controller';
+
+/**
+ * Global registry that maps names to TrackControllerCreator.
+ */
+export const trackControllerRegistry = new Registry<TrackControllerCreator>();

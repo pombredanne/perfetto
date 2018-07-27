@@ -17,7 +17,7 @@ import '../tracks/all_controller';
 import {assertExists} from '../base/logging';
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action, addTrack} from '../common/actions';
-import {createEmptyState, State, EngineConfig, TrackConfig} from '../common/state';
+import {createEmptyState, State, EngineConfig, TrackState} from '../common/state';
 import {rootReducer} from './reducer';
 import {WasmEngineProxy} from './wasm_engine_proxy';
 import {Engine} from './engine';
@@ -77,11 +77,11 @@ class EngineController {
 }
 
 class TrackController {
-  private readonly config: TrackConfig;
+  private readonly config: TrackState;
   private readonly controller: Controller;
   private readonly engineController: EngineController;
 
-  constructor(config: TrackConfig, controller: Controller, engineController: EngineController) {
+  constructor(config: TrackState, controller: Controller, engineController: EngineController) {
     this.config = config;
     this.controller = controller;
     this.engineController = engineController;
@@ -134,7 +134,7 @@ class Controller {
       this.engines.set(config.id, new EngineController(config, this));
     }
 
-    for (const config of Object.values<TrackConfig>(this.state.tracks)) {
+    for (const config of Object.values<TrackState>(this.state.tracks)) {
       if (this.tracks.has(config.id)) continue;
       const engine = assertExists<EngineController>(this.engines.get(config.engineId));
       this.tracks.set(config.id, new TrackController(config, this, engine));
@@ -163,22 +163,6 @@ class Controller {
     this.localFiles.set(name, file);
     return name;
   }
-
-  ///**
-  // * Special case handling of loading a trace from a blob.
-  // * This can't be a pure action since we don't want to store
-  // * the Blob in the state.
-  // */
-  //loadTraceFromBlob(blob: Blob): void {
-  //  //this.createEngine(blob);
-  //  this.doAction(addBlob('[local trace]'));
-  //  const id = this.state.newestBlobId;
-  //  if (id === null) throw new Error('newestBlobId not set');
-  //  this.blobs.set(id, blob);
-  //  this.doAction(openTraceFromBlob(id));
-  //  this.frontend.updateState(this.state);
-  //  this.createEngine(blob);
-  //}
 
   async createEngine(blob: Blob): Promise<Engine> {
     const port = await this.frontend.createWasmEnginePort();

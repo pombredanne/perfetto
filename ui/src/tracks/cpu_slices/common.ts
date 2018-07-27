@@ -12,7 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_counters/frontend';
-import './cpu_slices/frontend';
+export const TRACK_KIND = 'CpuSliceTrack';

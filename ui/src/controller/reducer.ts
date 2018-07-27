@@ -65,8 +65,8 @@ export function rootReducer(state: State, action: any): State {
       nextState.tracks[id] = {
         id,
         engineId: action.engineId,
-        type: action.trackType,
-        name: 'Cpu zero track',
+        kind: action.trackKind,
+        name: 'Cpu Track',
         height: 100,
       };
       return nextState;

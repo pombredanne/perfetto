@@ -19,11 +19,11 @@
  */
 export interface ObjectById<Class extends {id: string}> { [id: string]: Class; }
 
-export interface TrackConfig {
+export interface TrackState {
   id: string;
   engineId: string;
-  type: string;
   height: number;
+  kind: string;
   name: string;
 }
 
@@ -42,7 +42,7 @@ export interface State {
   engines: ObjectById<EngineConfig>;
 
 
-  tracks: ObjectById<TrackConfig>;
+  tracks: ObjectById<TrackState>;
 }
 
 export function createEmptyState(): State {
