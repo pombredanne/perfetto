@@ -27,7 +27,7 @@ export const TrackComponent = {
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.getCreator(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.type);
     this.track = trackCreator.create(attrs.trackState);
   },
 
@@ -58,11 +58,13 @@ export const TrackComponent = {
               width: '200px',
               'border-right': '1px solid #666',
               height: '100%',
+              'z-index': '100',
+              position: 'relative',
             }
           },
           m('h1',
             {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.name)),
+            attrs.trackState.kind)),
         m('.track-content',
           {
             style: {
@@ -84,7 +86,7 @@ export const TrackComponent = {
                 background: '#aca'
               }
             },
-            attrs.trackState.name + ' DOM Content')));
+            attrs.trackState.kind + ' DOM Content')));
   },
 
   onupdate({attrs}) {

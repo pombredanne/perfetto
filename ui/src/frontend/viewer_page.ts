@@ -29,17 +29,18 @@ import {TimeScale} from './time_scale';
 const TraceViewer = {
   oninit() {
     this.width = 0;
+    this.contentOffsetX = 200;
     this.visibleWindowMs = {start: 1000000, end: 2000000};
     this.maxVisibleWindowMs = {start: 0, end: 10000000};
     this.timeScale = new TimeScale(
         [this.visibleWindowMs.start, this.visibleWindowMs.end],
-        [0, this.width]);
+        [0, this.width - this.contentOffsetX]);
   },
   oncreate(vnode) {
     this.onResize = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
-      this.timeScale.setLimitsPx(0, this.width);
+      this.timeScale.setLimitsPx(0, this.width - this.contentOffsetX);
       m.redraw();
     };
 
@@ -53,7 +54,7 @@ const TraceViewer = {
     // Currently it lives here, in canvas wrapper, and in track shell.
     this.zoomContent = new PanAndZoomHandler({
       element: vnode.dom as HTMLElement,
-      contentOffsetX: 200,
+      contentOffsetX: this.contentOffsetX,
       onPanned: (pannedPx: number) => {
         const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
         this.visibleWindowMs.start += deltaMs;
@@ -87,6 +88,14 @@ const TraceViewer = {
     this.zoomContent.shutdown();
   },
   view() {
+    const onBrushed = (start: number, end: number) => {
+      this.visibleWindowMs.start = start;
+      this.visibleWindowMs.end = end;
+      this.timeScale.setLimitsMs(
+          this.visibleWindowMs.start, this.visibleWindowMs.end);
+      m.redraw();
+    };
+
     return m(
         '.frontend-content',
         {
@@ -99,6 +108,7 @@ const TraceViewer = {
           visibleWindowMs: this.visibleWindowMs,
           maxVisibleWindowMs: this.maxVisibleWindowMs,
           width: this.width,
+          onBrushed
         }),
         m(TimeAxis, {
           timeScale: this.timeScale,
@@ -118,6 +128,7 @@ const TraceViewer = {
   timeScale: TimeScale,
   width: number,
   zoomContent: PanAndZoomHandler,
+  contentOffsetX: number,
 }>;
 
 export const ViewerPage = createPage({

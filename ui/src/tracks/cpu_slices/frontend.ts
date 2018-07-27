@@ -18,9 +18,10 @@ import {Milliseconds, TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+import {TRACK_KIND} from './common';
 
 class CpuSliceTrack extends Track {
-  static readonly type = 'CpuSliceTrack';
+  static readonly kind = TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
     return new CpuSliceTrack(trackState);
   }
@@ -32,8 +33,8 @@ class CpuSliceTrack extends Track {
   renderCanvas(
       vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
       visibleWindowMs: {start: number, end: number}): void {
-    const sliceStart: Milliseconds = 100000;
-    const sliceEnd: Milliseconds = 400000;
+    const sliceStart: Milliseconds = 1100000;
+    const sliceEnd: Milliseconds = 1400000;
 
     const rectStart = timeScale.msToPx(sliceStart);
     const rectWidth = timeScale.msToPx(sliceEnd) - rectStart;
@@ -68,7 +69,7 @@ class CpuSliceTrack extends Track {
 
     vCtx.font = '16px Arial';
     vCtx.fillStyle = '#000';
-    vCtx.fillText(this.trackState.name + ' rendered by canvas', shownStart, 60);
+    vCtx.fillText(this.trackState.kind + ' rendered by canvas', shownStart, 60);
   }
 }
 
