@@ -187,7 +187,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
         "already in use)");
     return nullptr;
   }
-  return data_source;
+  return std::move(data_source);
 }
 
 std::unique_ptr<ProbesDataSource> ProbesProducer::CreateInodeFileDataSource(
@@ -216,7 +216,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateProcessStatsDataSource(
   if (config.process_stats_config().scan_all_processes_on_start()) {
     data_source->WriteAllProcesses();
   }
-  return data_source;
+  return std::move(data_source);
 }
 
 void ProbesProducer::TearDownDataSourceInstance(DataSourceInstanceID id) {

@@ -322,7 +322,6 @@ cc_test {
     "src/traced/probes/ftrace/atrace_wrapper.cc",
     "src/traced/probes/ftrace/cpu_reader.cc",
     "src/traced/probes/ftrace/cpu_stats_parser.cc",
-    "src/traced/probes/ftrace/end_to_end_integrationtest.cc",
     "src/traced/probes/ftrace/event_info.cc",
     "src/traced/probes/ftrace/event_info_constants.cc",
     "src/traced/probes/ftrace/format_parser.cc",

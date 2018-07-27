@@ -96,7 +96,6 @@ source_set("integrationtests") {
     "../../../tracing",
   ]
   sources = [
-    "end_to_end_integrationtest.cc",
     "ftrace_procfs_integrationtest.cc",
   ]
 }

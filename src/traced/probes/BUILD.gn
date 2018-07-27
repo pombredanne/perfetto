@@ -52,6 +52,7 @@ source_set("probes_src") {
 source_set("data_source") {
   deps = [
     "../../../gn:default_deps",
+    "../../tracing",
   ]
   sources = [
     "probes_data_source.cc",
