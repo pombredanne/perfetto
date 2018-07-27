@@ -52,9 +52,6 @@ class FtraceEventBundle;
 class FtraceDataSource : public ProbesDataSource {
  public:
   static constexpr int kTypeId = 1;
-  using FtraceBundleHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-
   FtraceDataSource(base::WeakPtr<FtraceController>,
                    TracingSessionID,
                    const FtraceConfig&,
@@ -68,8 +65,6 @@ class FtraceDataSource : public ProbesDataSource {
   // Flushes the ftrace buffers into the userspace trace buffers and writes
   // also ftrace stats.
   void Flush() override;
-
-  FtraceBundleHandle GetBundleForCpu(size_t cpu);
 
   FtraceConfigId config_id() const { return config_id_; }
   const FtraceConfig& config() const { return config_; }
@@ -91,10 +86,6 @@ class FtraceDataSource : public ProbesDataSource {
   // Initialized by the Initialize() call.
   FtraceConfigId config_id_ = 0;
   std::unique_ptr<TraceWriter> writer_;
-
-  // Keep this after the TraceWriter because TracePackets must not outlive
-  // their originating writer.
-  TraceWriter::TracePacketHandle trace_packet_;
   base::WeakPtr<FtraceController> controller_weak_;
   std::unique_ptr<EventFilter> event_filter_;
 };

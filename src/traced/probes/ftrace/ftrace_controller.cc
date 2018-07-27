@@ -179,7 +179,7 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
     // This methods reads the pipe and converts the raw ftrace data into
     // protobufs using the |data_source|'s TraceWriter.
     ctrl->cpu_readers_[cpu]->Drain(ctrl->data_sources_);
-    if (ctrl->on_metadata_ && !did_post_on_metadata_callback) {
+    if (!did_post_on_metadata_callback && ctrl->on_metadata_) {
       did_post_on_metadata_callback = true;
       ctrl->task_runner_->PostTask(ctrl->on_metadata_);
     }

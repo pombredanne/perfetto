@@ -24,13 +24,13 @@ namespace perfetto {
 // Base class for all data sources in traced_probes.
 class ProbesDataSource {
  public:
-  // |type_id| is a hand-rolled RTTI, e.g. InodeFileDataSource::kTypeId.
+  // |type_id| is a home-brewed RTTI, e.g. InodeFileDataSource::kTypeId.
   ProbesDataSource(TracingSessionID, int type_id);
   virtual ~ProbesDataSource();
 
   virtual void Flush() = 0;
 
-  const TracingSessionID tracing_session_id = 0;
+  const TracingSessionID tracing_session_id;
   const int type_id;
 
  private:

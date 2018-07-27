@@ -276,15 +276,12 @@ bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
       break;
     PERFETTO_CHECK(static_cast<size_t>(bytes) == base::kPageSize);
 
-    size_t evt_size = 0;
-    PERFETTO_DCHECK(data_sources.size() <= kMaxFtraceConcurrency);
-
     for (FtraceDataSource* data_source : data_sources) {
       auto packet = data_source->trace_writer()->NewTracePacket();
       auto* bundle = packet->set_ftrace_events();
       auto* metadata = data_source->metadata_mutable();
-      auto* event_filter = data_source->event_filter();
-      evt_size = ParsePage(buffer, event_filter, bundle, table_, metadata);
+      auto* filter = data_source->event_filter();
+      size_t evt_size = ParsePage(buffer, filter, bundle, table_, metadata);
       PERFETTO_DCHECK(evt_size);
       bundle->set_cpu(static_cast<uint32_t>(cpu_));
       bundle->set_overwrite_count(metadata->overwrite_count);

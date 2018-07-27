@@ -470,18 +470,18 @@ TEST(FtraceControllerTest, BackToBackEnableDisable) {
   std::thread worker([on_data_available] { on_data_available(); });
   controller->WaitForData(0u);
 
-  // Disable the first sink and run the delayed task that it generated. It
-  // should be a no-op.
+  // Disable the first data source and run the delayed task that it generated.
+  // It should be a no-op.
   data_source.reset();
   controller->runner()->RunLastTask();
   worker.join();
 
-  // Register another sink and wait for it to generate data.
+  // Register another data source and wait for it to generate data.
   data_source = controller->AddFakeDataSource(config);
   std::thread worker2([on_data_available] { on_data_available(); });
   controller->WaitForData(0u);
 
-  // This drain should also be a no-op after the sink is unregistered.
+  // This drain should also be a no-op after the data source is unregistered.
   data_source.reset();
   controller->runner()->RunLastTask();
   worker2.join();

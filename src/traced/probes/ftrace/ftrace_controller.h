@@ -37,9 +37,7 @@
 namespace perfetto {
 
 class CpuReader;
-class EventFilter;
 class FtraceConfigMuxer;
-class FtraceController;
 class FtraceDataSource;
 class FtraceProcfs;
 class ProtoTranslationTable;
@@ -60,6 +58,7 @@ class FtraceController {
 
   bool AddDataSource(FtraceDataSource*) PERFETTO_WARN_UNUSED_RESULT;
   void RemoveDataSource(FtraceDataSource*);
+
   void DumpFtraceStats(FtraceStats*);
 
   base::WeakPtr<FtraceController> GetWeakPtr() {

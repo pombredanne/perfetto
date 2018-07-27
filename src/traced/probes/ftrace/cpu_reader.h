@@ -50,8 +50,8 @@ class FtraceEventBundle;
 
 class EventFilter;  // Declared down below.
 
-// Readers raw ftrace data for a core and writes that into the perfetto
-// userspace buffer.
+// Reads raw ftrace data for a cpu and writes that into the perfetto userspace
+// buffer.
 class CpuReader {
  public:
   using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
@@ -64,7 +64,8 @@ class CpuReader {
             std::function<void()> on_data_available);
   ~CpuReader();
 
-  // Drains all available data from the staging pipe into the given sinks.
+  // Drains all available data from the staging pipe into the buffer of the
+  // passed data sources.
   // Should be called in response to the |on_data_available| callback.
   bool Drain(const std::set<FtraceDataSource*>&);
 

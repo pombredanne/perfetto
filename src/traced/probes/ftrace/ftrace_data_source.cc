@@ -60,10 +60,10 @@ void FtraceDataSource::Flush() {
   // buffers (see b/73886018). We should do that and delay the
   // NotifyFlushComplete() until the ftrace data has been drained from the
   // kernel ftrace buffer and written in the SMB.
-  if (writer_ && (!trace_packet_ || trace_packet_->is_finalized())) {
-    WriteStats();
-    writer_->Flush();
-  }
+  if (!writer_)
+    return;
+  WriteStats();
+  writer_->Flush();
 }
 
 void FtraceDataSource::WriteStats() {
