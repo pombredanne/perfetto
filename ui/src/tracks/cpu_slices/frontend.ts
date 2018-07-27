@@ -12,4 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export class CpuSlicesTrack {}
+import {TrackState} from '../../common/state';
+import {GridlineHelper} from '../../frontend/gridline_helper';
+import {Milliseconds, TimeScale} from '../../frontend/time_scale';
+import {Track} from '../../frontend/track';
+import {trackRegistry} from '../../frontend/track_registry';
+import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+
+class CpuSliceTrack extends Track {
+  static readonly type = 'CpuSliceTrack';
+  static create(trackState: TrackState): CpuSliceTrack {
+    return new CpuSliceTrack(trackState);
+  }
+
+  constructor(trackState: TrackState) {
+    super(trackState);
+  }
+
+  renderCanvas(
+      vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
+      visibleWindowMs: {start: number, end: number}): void {
+    const sliceStart: Milliseconds = 100000;
+    const sliceEnd: Milliseconds = 400000;
+
+    const rectStart = timeScale.msToPx(sliceStart);
+    const rectWidth = timeScale.msToPx(sliceEnd) - rectStart;
+
+    let shownStart = rectStart as number;
+    let shownWidth = rectWidth;
+
+    if (shownStart < 0) {
+      shownWidth += shownStart;
+      shownStart = 0;
+    }
+    if (shownStart > width) {
+      shownStart = width;
+      shownWidth = 0;
+    }
+    if (shownStart + shownWidth > width) {
+      shownWidth = width - shownStart;
+    }
+
+    vCtx.fillStyle = '#ccc';
+    vCtx.fillRect(0, 0, width, 73);
+
+    GridlineHelper.drawGridLines(
+        vCtx,
+        timeScale,
+        [visibleWindowMs.start, visibleWindowMs.end],
+        width,
+        73);
+
+    vCtx.fillStyle = '#c00';
+    vCtx.fillRect(shownStart, 40, shownWidth, 30);
+
+    vCtx.font = '16px Arial';
+    vCtx.fillStyle = '#000';
+    vCtx.fillText(this.trackState.name + ' rendered by canvas', shownStart, 60);
+  }
+}
+
+trackRegistry.register(CpuSliceTrack);

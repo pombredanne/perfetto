@@ -12,69 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
+import {TrackState} from '../common/state';
 
-import {GridlineHelper} from './gridline_helper';
-import {Milliseconds, TimeScale} from './time_scale';
-import {TrackShell} from './track_shell';
+import {TimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
-export const Track = {
-  view({attrs}) {
-    const sliceStart: Milliseconds = 100000;
-    const sliceEnd: Milliseconds = 400000;
+/**
+ * This interface forces track implementations to have two static properties:
+ * type and a create function.
+ *
+ * Typescript does not have abstract static members, which is why this needs to
+ * be in a seperate interface. We need the |create| method because the stored
+ * value in the registry is an abstract class, and we cannot call 'new'
+ * on an abstract class.
+ */
+export interface TrackCreator {
+  // Store the type explicitly as a string as opposed to using class.name in
+  // case we ever minify our code.
+  readonly type: string;
 
-    const rectStart = attrs.timeScale.msToPx(sliceStart);
-    const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
-    const shownStart = rectStart > attrs.width ? attrs.width : rectStart;
-    const shownWidth = rectWidth + (rectStart as number) > attrs.width ?
-        attrs.width :
-        rectWidth;
+  create(TrackState: TrackState): Track;
+}
 
-    if (attrs.trackContext.isOnCanvas()) {
-      attrs.trackContext.fillStyle = '#ccc';
-      attrs.trackContext.fillRect(0, 0, attrs.width, 73);
-
-      GridlineHelper.drawGridLines(
-          attrs.trackContext, attrs.timeScale, [0, 1000000], attrs.width, 73);
-
-      attrs.trackContext.fillStyle = '#c00';
-      attrs.trackContext.fillRect(shownStart, 40, shownWidth, 30);
-
-      attrs.trackContext.font = '16px Arial';
-      attrs.trackContext.fillStyle = '#000';
-      attrs.trackContext.fillText(
-          attrs.name + ' rendered by canvas', shownStart, 60);
-    }
-
-    return m(
-        '.track',
-        {
-          style: {
-            position: 'absolute',
-            top: attrs.top.toString() + 'px',
-            left: 0,
-            width: '100%'
-          }
-        },
-        m(TrackShell,
-          attrs,
-          m('.marker',
-            {
-              style: {
-                'font-size': '1.5em',
-                position: 'absolute',
-                left: rectStart.toString() + 'px',
-                width: rectWidth.toString() + 'px',
-                background: '#aca'
-              }
-            },
-            attrs.name + ' DOM Content')));
-  }
-} as m.Component<{
-  name: string,
-  trackContext: VirtualCanvasContext,
-  top: number,
-  width: number,
-  timeScale: TimeScale
-}>;
+/**
+ * The abstract class that needs to be implemented by all tracks.
+ */
+export abstract class Track {
+  constructor(protected trackState: TrackState) {}
+  abstract renderCanvas(
+      vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
+      visibleWindowMs: {start: number, end: number}): void;
+}
