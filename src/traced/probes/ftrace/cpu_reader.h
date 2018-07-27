@@ -39,6 +39,7 @@
 
 namespace perfetto {
 
+class FtraceDataSource;
 class ProtoTranslationTable;
 
 namespace protos {
@@ -53,8 +54,7 @@ class EventFilter;  // Declared down below.
 // userspace buffer.
 class CpuReader {
  public:
-  using BundleHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
+  using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
 
   // |on_data_available| will be called on an arbitrary thread when at least one
   // page of ftrace data is available for draining on this CPU.
@@ -66,10 +66,7 @@ class CpuReader {
 
   // Drains all available data from the staging pipe into the given sinks.
   // Should be called in response to the |on_data_available| callback.
-  bool Drain(
-      const std::array<const EventFilter*, kMaxFtraceConcurrency>&,
-      const std::array<BundleHandle, kMaxFtraceConcurrency>&,
-      const std::array<FtraceMetadata*, kMaxFtraceConcurrency>& metadatas);
+  bool Drain(const std::set<FtraceDataSource*>&);
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {

@@ -195,7 +195,7 @@ class TestFtraceController : public FtraceController {
         runner_(std::move(runner)),
         procfs_(raw_procfs) {}
 
-  MOCK_METHOD1(OnRawFtraceDataAvailable, void(size_t cpu));
+  MOCK_METHOD1(OnDrainCpuForTesting, void(size_t cpu));
 
   MockTaskRunner* runner() { return runner_.get(); }
   MockFtraceProcfs* procfs() { return procfs_; }
@@ -384,7 +384,7 @@ TEST(FtraceControllerTest, TaskScheduling) {
   EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
 
   // However both CPUs should be drained.
-  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(2);
+  EXPECT_CALL(*controller, OnDrainCpuForTesting(_)).Times(2);
 
   // Finally, another task should be posted to unblock the workers.
   EXPECT_CALL(*controller->runner(), PostTask(_));
@@ -430,7 +430,7 @@ TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
   EXPECT_CALL(*controller->runner(),
               PostDelayedTask(_, controller->drain_period_ms()))
       .Times(kCycles);
-  EXPECT_CALL(*controller, OnRawFtraceDataAvailable(_)).Times(kCycles);
+  EXPECT_CALL(*controller, OnDrainCpuForTesting(_)).Times(kCycles);
   EXPECT_CALL(*controller->runner(), PostTask(_)).Times(kCycles);
 
   // Simulate a worker thread continually reporting pages of available data.

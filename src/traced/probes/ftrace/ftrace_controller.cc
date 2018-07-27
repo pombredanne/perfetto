@@ -32,6 +32,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
+#include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/ftrace/cpu_reader.h"
 #include "src/traced/probes/ftrace/cpu_stats_parser.h"
 #include "src/traced/probes/ftrace/event_info.h"
@@ -41,8 +42,6 @@
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/traced/probes/ftrace/ftrace_stats.h"
 #include "src/traced/probes/ftrace/proto_translation_table.h"
-
-#include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
 
 namespace perfetto {
 namespace {
@@ -173,11 +172,18 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
     std::swap(cpus_to_drain, ctrl->cpus_to_drain_);
   }
 
-  ctrl->did_post_on_metadata_callback_ = false;
+  bool did_post_on_metadata_callback = false;
   for (size_t cpu = 0; cpu < ctrl->ftrace_procfs_->NumberOfCpus(); cpu++) {
     if (!cpus_to_drain[cpu])
       continue;
-    ctrl->OnRawFtraceDataAvailable(cpu);
+    // This methods reads the pipe and converts the raw ftrace data into
+    // protobufs using the |data_source|'s TraceWriter.
+    ctrl->cpu_readers_[cpu]->Drain(ctrl->data_sources_);
+    if (ctrl->on_metadata_ && !did_post_on_metadata_callback) {
+      did_post_on_metadata_callback = true;
+      ctrl->task_runner_->PostTask(ctrl->on_metadata_);
+    }
+    ctrl->OnDrainCpuForTesting(cpu);
   }
 
   // If we filled up any SHM pages while draining the data, we will have posted
@@ -253,36 +259,6 @@ void FtraceController::StopIfNeeded() {
   }
   data_drained_.notify_all();
   cpu_readers_.clear();
-}
-
-void FtraceController::OnRawFtraceDataAvailable(size_t cpu) {
-  PERFETTO_CHECK(cpu < ftrace_procfs_->NumberOfCpus());
-  CpuReader* reader = cpu_readers_[cpu].get();
-  using BundleHandle =
-      protozero::MessageHandle<protos::pbzero::FtraceEventBundle>;
-  std::array<const EventFilter*, kMaxFtraceConcurrency> filters{};
-  std::array<BundleHandle, kMaxFtraceConcurrency> bundles{};
-  std::array<FtraceMetadata*, kMaxFtraceConcurrency> metadatas{};
-  size_t sink_count = data_sources_.size();
-  size_t i = 0;
-
-  for (FtraceDataSource* data_source : data_sources_) {
-    filters[i] = data_source->event_filter();
-    metadatas[i] = data_source->metadata_mutable();
-    bundles[i] = data_source->GetBundleForCpu(cpu);
-    i++;
-  }
-  reader->Drain(filters, bundles, metadatas);
-  i = 0;
-  // TODO remove layers from the Finalize() call.
-  for (FtraceDataSource* data_source : data_sources_) {
-    data_source->OnBundleComplete();  // Invokes trace_packet_->Finalize().
-    if (on_metadata_ && !did_post_on_metadata_callback_) {
-      task_runner_->PostTask(on_metadata_);
-      did_post_on_metadata_callback_ = true;
-    }
-  }
-  PERFETTO_DCHECK(data_sources_.size() == sink_count);
 }
 
 void FtraceController::OnDataAvailable(

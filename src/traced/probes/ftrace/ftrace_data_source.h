@@ -70,12 +70,12 @@ class FtraceDataSource : public ProbesDataSource {
   void Flush() override;
 
   FtraceBundleHandle GetBundleForCpu(size_t cpu);
-  void OnBundleComplete();
 
   FtraceConfigId config_id() const { return config_id_; }
   const FtraceConfig& config() const { return config_; }
   EventFilter* event_filter() { return event_filter_.get(); }
   FtraceMetadata* metadata_mutable() { return &metadata_; }
+  TraceWriter* trace_writer() { return writer_.get(); }
 
  private:
   FtraceDataSource(const FtraceDataSource&) = delete;

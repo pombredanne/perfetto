@@ -76,9 +76,7 @@ class FtraceController {
                    std::unique_ptr<FtraceConfigMuxer>,
                    base::TaskRunner*);
 
-  // Called to read data from the staging pipe for the given |cpu| and parse it
-  // into the sinks. Protected and virtual for testing.
-  virtual void OnRawFtraceDataAvailable(size_t cpu);
+  virtual void OnDrainCpuForTesting(size_t /*cpu*/) {}
 
   // Protected and virtual for testing.
   virtual uint64_t NowMs() const;
@@ -121,7 +119,6 @@ class FtraceController {
   std::map<size_t, std::unique_ptr<CpuReader>> cpu_readers_;
   std::set<FtraceDataSource*> data_sources_;
   OnMetadataCallback on_metadata_;
-  bool did_post_on_metadata_callback_ = false;
   base::WeakPtrFactory<FtraceController> weak_factory_;  // Keep last.
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };

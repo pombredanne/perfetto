@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
 #include <utility>
 
 #include "perfetto/base/file_utils.h"

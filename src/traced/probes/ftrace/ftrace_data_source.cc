@@ -83,15 +83,4 @@ void FtraceDataSource::WriteStats() {
   }
 }
 
-void FtraceDataSource::OnBundleComplete() {
-  trace_packet_->Finalize();  // TODO move this to
-                              // FtraceController::OnRawFtraceDataAvailable
-  metadata_.Clear();          // TODO sould be unnecessary now.
-}
-
-FtraceDataSource::FtraceBundleHandle FtraceDataSource::GetBundleForCpu(size_t) {
-  trace_packet_ = writer_->NewTracePacket();
-  return FtraceBundleHandle(trace_packet_->set_ftrace_events());
-}
-
 }  // namespace perfetto
