@@ -26,6 +26,7 @@ namespace trace_processor {
 class ProcessTracker {
  public:
   ProcessTracker(TraceProcessorContext*);
+  virtual ~ProcessTracker();
 
   using UniqueProcessIterator =
       std::multimap<uint32_t, TraceStorage::UniquePid>::const_iterator;
@@ -50,13 +51,13 @@ class ProcessTracker {
 
   // Called when a thread is seen the process tree. Retrieves the matching utid
   // for the tid and the matching upid for the tgid and stores both.
-  TraceStorage::UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
+  virtual TraceStorage::UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
-  TraceStorage::UniquePid UpdateProcess(uint32_t pid,
-                                        const char* process_name,
-                                        size_t process_name_len);
+  virtual TraceStorage::UniquePid UpdateProcess(uint32_t pid,
+                                                const char* process_name,
+                                                size_t process_name_len);
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.

@@ -14,30 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_
-#define SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_
-
-#include <memory>
+#include "src/trace_processor/trace_processor_context.h"
+#include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/trace_parser.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class ProcessTracker;
-class TraceStorage;
-class TraceParser;
-class SchedTracker;
-
-class TraceProcessorContext {
- public:
-  ~TraceProcessorContext();
-
-  std::unique_ptr<ProcessTracker> process_tracker;
-  std::unique_ptr<SchedTracker> sched_tracker;
-  std::unique_ptr<TraceStorage> storage;
-  std::unique_ptr<TraceParser> parser;
-};
+TraceProcessorContext::~TraceProcessorContext() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto
-
-#endif  // SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_

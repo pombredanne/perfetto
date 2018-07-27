@@ -22,6 +22,8 @@ namespace trace_processor {
 ProcessTracker::ProcessTracker(TraceProcessorContext* context)
     : context_(context){};
 
+ProcessTracker::~ProcessTracker() = default;
+
 TraceStorage::UniqueTid ProcessTracker::UpdateThread(
     uint64_t timestamp,
     uint32_t tid,

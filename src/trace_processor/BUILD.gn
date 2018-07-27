@@ -56,6 +56,8 @@ source_set("lib") {
     "trace_parser.h",
     "trace_processor.cc",
     "trace_processor.h",
+    "trace_processor_context.cc",
+    "trace_processor_context.h",
     "trace_storage.cc",
     "trace_storage.h",
     "virtual_destructors.cc",
@@ -73,15 +75,13 @@ source_set("lib") {
 source_set("unittests") {
   testonly = true
   sources = [
-    #"process_table_unittest.cc",
-    #"query_constraints_unittest.cc",
-    #"sched_slice_table_unittest.cc",
+    "process_table_unittest.cc",
     "process_tracker_unittest.cc",
+    "query_constraints_unittest.cc",
+    "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
-
-    #"thread_table_unittest.cc",
-    #"trace_parser_unittest.cc",
-    #"trace_storage_unittest.cc",
+    "thread_table_unittest.cc",
+    "trace_parser_unittest.cc",
   ]
   deps = [
     ":lib",

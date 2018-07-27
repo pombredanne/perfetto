@@ -28,6 +28,7 @@ namespace trace_processor {
 class SchedTracker {
  public:
   SchedTracker(TraceProcessorContext*);
+  virtual ~SchedTracker();
 
   struct SchedSwitchEvent {
     uint32_t cpu = 0;
@@ -40,13 +41,13 @@ class SchedTracker {
     bool valid() const { return timestamp != 0; }
   };
 
-  void PushSchedSwitch(uint32_t cpu,
-                       uint64_t timestamp,
-                       uint32_t prev_pid,
-                       uint32_t prev_state,
-                       const char* prev_comm,
-                       size_t prev_comm_len,
-                       uint32_t next_pid);
+  virtual void PushSchedSwitch(uint32_t cpu,
+                               uint64_t timestamp,
+                               uint32_t prev_pid,
+                               uint32_t prev_state,
+                               const char* prev_comm,
+                               size_t prev_comm_len,
+                               uint32_t next_pid);
 
  private:
   // One entry for each CPU in the trace.

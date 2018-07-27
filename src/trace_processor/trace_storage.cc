@@ -56,5 +56,16 @@ TraceStorage::StringId TraceStorage::InternString(const char* data,
   return string_id;
 }
 
+void TraceStorage::ResetStorage() {
+  for (SlicesPerCpu cpu : cpu_events_) {
+    cpu.ClearSlices();
+  }
+  unique_processes_.clear();
+  unique_threads_.clear();
+  string_pool_.clear();
+  string_index_.clear();
+  stats_.mismatched_sched_switch_tids_ = 0;
+}
+
 }  // namespace trace_processor
 }  // namespace perfetto

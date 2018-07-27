@@ -22,6 +22,8 @@ namespace trace_processor {
 SchedTracker::SchedTracker(TraceProcessorContext* context)
     : context_(context){};
 
+SchedTracker::~SchedTracker() = default;
+
 void SchedTracker::PushSchedSwitch(uint32_t cpu,
                                    uint64_t timestamp,
                                    uint32_t prev_pid,

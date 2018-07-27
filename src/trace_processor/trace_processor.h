@@ -58,14 +58,7 @@ class TraceProcessor {
 
   ScopedDb db_;  // Keep first.
 
-  TraceProcessorContext* context_;
-
-  // The TraceProcessor owns this memory but loads it to the other classes
-  // through the TraceProcessorContext.
-  std::unique_ptr<ProcessTracker> process_tracker;
-  std::unique_ptr<SchedTracker> sched_tracker;
-  std::unique_ptr<TraceParser> parser;
-  std::unique_ptr<TraceStorage> storage;
+  TraceProcessorContext context_;
 
   base::TaskRunner* const task_runner_;
   base::WeakPtrFactory<TraceProcessor> weak_factory_;  // Keep last.

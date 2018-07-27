@@ -15,8 +15,6 @@
  */
 
 #include "src/trace_processor/trace_processor.h"
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/trace_parser.h"
 
 #include <functional>
 
@@ -32,27 +30,20 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   db_.reset(std::move(db));
 
-  sched_tracker.reset(new SchedTracker(context_));
-  process_tracker.reset(new ProcessTracker(context_));
-  storage.reset(new TraceStorage);
+  context_.sched_tracker.reset(new SchedTracker(&context_));
+  context_.process_tracker.reset(new ProcessTracker(&context_));
+  context_.storage.reset(new TraceStorage);
 
-  context_->storage = storage.get();
-  context_->sched_tracker = sched_tracker.get();
-  context_->process_tracker = process_tracker.get();
-  context_->parser = nullptr;
-
-  SchedSliceTable::RegisterTable(*db_, context_->storage);
-  ProcessTable::RegisterTable(*db_, context_->storage);
-  ThreadTable::RegisterTable(*db_, context_->storage);
+  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
+  ProcessTable::RegisterTable(*db_, context_.storage.get());
+  ThreadTable::RegisterTable(*db_, context_.storage.get());
 }
 
 void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
   // Reset storage and start a new trace parsing task.
-  storage.reset(new TraceStorage);
-  context_->storage = storage.get();
-  parser.reset(new TraceParser(reader, context_, kTraceChunkSizeB));
-  context_->parser = parser.get();
+  context_.storage.reset(new TraceStorage);
+  context_.parser.reset(new TraceParser(reader, &context_, kTraceChunkSizeB));
   LoadTraceChunk(callback);
 }
 
@@ -121,7 +112,7 @@ void TraceProcessor::ExecuteQuery(
 }
 
 void TraceProcessor::LoadTraceChunk(std::function<void()> callback) {
-  bool has_more = context_->parser->ParseNextChunk();
+  bool has_more = context_.parser->ParseNextChunk();
   if (!has_more) {
     callback();
     return;

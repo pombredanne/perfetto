@@ -30,23 +30,14 @@ using ::testing::Invoke;
 class SchedTrackerTest : public ::testing::Test {
  public:
   SchedTrackerTest() {
-    process_tracker.reset(new ProcessTracker(&context));
-    sched_tracker.reset(new SchedTracker(&context));
-
-    context.process_tracker = process_tracker.get();
-    context.sched_tracker = sched_tracker.get();
+    context.process_tracker.reset(new ProcessTracker(&context));
+    context.sched_tracker.reset(new SchedTracker(&context));
   }
 
-  void SetUp() override {
-    storage.reset(new TraceStorage);
-    context.storage = storage.get();
-  }
+  void SetUp() override { context.storage.reset(new TraceStorage); }
 
  protected:
   TraceProcessorContext context;
-  std::unique_ptr<ProcessTracker> process_tracker;
-  std::unique_ptr<SchedTracker> sched_tracker;
-  std::unique_ptr<TraceStorage> storage;
 };
 
 TEST_F(SchedTrackerTest, InsertSecondSched) {
