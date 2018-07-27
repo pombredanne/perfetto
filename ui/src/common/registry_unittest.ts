@@ -15,16 +15,16 @@
 
 import {Registry} from './registry';
 
-interface Registrent {
-  type: string;
+interface Registrant {
+  kind: string;
   n: number;
 }
 
-test('registry returns correct track', () => {
-  const registry = new Registry<Registrent>();
+test('registry returns correct registrant', () => {
+  const registry = new Registry<Registrant>();
 
-  const a: Registrent = {type: 'a', n: 1};
-  const b: Registrent = {type: 'b', n: 2};
+  const a: Registrant = {kind: 'a', n: 1};
+  const b: Registrant = {kind: 'b', n: 2};
   registry.register(a);
   registry.register(b);
 
@@ -32,17 +32,17 @@ test('registry returns correct track', () => {
   expect(registry.get('b')).toBe(b);
 });
 
-test('registry throws error on name collision', () => {
-  const registry = new Registry<Registrent>();
+test('registry throws error on kind collision', () => {
+  const registry = new Registry<Registrant>();
 
-  const a1: Registrent = {type: 'a', n: 1};
-  const a2: Registrent = {type: 'a', n: 2};
+  const a1: Registrant = {kind: 'a', n: 1};
+  const a2: Registrant = {kind: 'a', n: 2};
 
   registry.register(a1);
   expect(() => registry.register(a2)).toThrow();
 });
 
 test('registry throws error on non-existent track', () => {
-  const registry = new Registry<Registrent>();
+  const registry = new Registry<Registrant>();
   expect(() => registry.get('foo')).toThrow();
 });

@@ -12,29 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface HasType { type: string; }
+export interface HasKind { kind: string; }
 
-export class Registry<T extends HasType> {
+export class Registry<T extends HasKind> {
   private registry: Map<string, T>;
 
   constructor() {
     this.registry = new Map<string, T>();
   }
 
-  register(registrent: T) {
-    const type = registrent.type;
-    if (this.registry.has(type)) {
-      throw new Error(`TrackType ${type} already exists in the registry`);
+  register(registrant: T) {
+    const kind = registrant.kind;
+    if (this.registry.has(kind)) {
+      throw new Error(`Registrant ${kind} already exists in the registry`);
     }
-    this.registry.set(type, registrent);
+    this.registry.set(kind, registrant);
   }
 
-  get(type: string): T {
-    const registrent = this.registry.get(type);
-    if (registrent === undefined) {
-      throw new Error(`No creator for ${type} has been registered yet.`);
+  get(kind: string): T {
+    const registrant = this.registry.get(kind);
+    if (registrant === undefined) {
+      throw new Error(`${kind} has not been registered.`);
     }
-    return registrent;
+    return registrant;
   }
 
   unregisterAllForTesting(): void {

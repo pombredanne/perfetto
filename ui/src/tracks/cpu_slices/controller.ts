@@ -16,9 +16,10 @@ import {TrackController} from '../../controller/track_controller';
 import {
   trackControllerRegistry
 } from '../../controller/track_controller_registry';
+import {TRACK_KIND} from './common';
 
 class CpuSliceTrackController extends TrackController {
-  static readonly type = 'CpuSliceTrack';
+  static readonly kind = TRACK_KIND;
   static create(): CpuSliceTrackController {
     return new CpuSliceTrackController();
   }

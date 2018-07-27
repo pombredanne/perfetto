@@ -14,12 +14,12 @@
 
 /**
  * This interface forces track implementations to have two static properties:
- * type and a create function.
+ * kind and a create function.
  */
 export interface TrackControllerCreator {
-  // Store the type explicitly as a string as opposed to using class.name in
+  // Store the kind explicitly as a string as opposed to using class.name in
   // case we ever minify our code.
-  readonly type: string;
+  readonly kind: string;
 
   create(): TrackController;
 }

@@ -12,21 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackController} from '../../controller/track_controller';
-import {
-  trackControllerRegistry
-} from '../../controller/track_controller_registry';
-import {TRACK_KIND} from './common';
-
-class CpuCounterTrackController extends TrackController {
-  static readonly kind = TRACK_KIND;
-  static create(): CpuCounterTrackController {
-    return new CpuCounterTrackController();
-  }
-
-  constructor() {
-    super();
-  }
-}
-
-trackControllerRegistry.register(CpuCounterTrackController);
+export const TRACK_KIND = 'CpuSliceTrack';

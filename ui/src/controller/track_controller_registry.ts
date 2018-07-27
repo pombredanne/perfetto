@@ -17,6 +17,6 @@ import {Registry} from '../common/registry';
 import {TrackControllerCreator} from './track_controller';
 
 /**
- * Global registry that maps types to TrackCreator.
+ * Global registry that maps names to TrackControllerCreator.
  */
 export const trackControllerRegistry = new Registry<TrackControllerCreator>();

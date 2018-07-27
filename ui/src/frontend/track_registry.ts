@@ -13,8 +13,7 @@
 // limitations under the License.
 
 import {Registry} from '../common/registry';
-
-import {TrackCreator} from './track_impl';
+import {TrackCreator} from './track';
 
 /**
  * Global registry that maps types to TrackCreator.
