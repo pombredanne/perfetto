@@ -86,30 +86,7 @@ void FtraceDataSource::WriteStats() {
 void FtraceDataSource::OnBundleComplete() {
   trace_packet_->Finalize();  // TODO move this to
                               // FtraceController::OnRawFtraceDataAvailable
-  /*
-    if (file_source_ && !metadata.inode_and_device.empty()) {
-      auto inodes = metadata.inode_and_device;
-      auto weak_file_source = file_source_;
-      task_runner_->PostTask([weak_file_source, inodes] {
-        if (weak_file_source)
-          weak_file_source->OnInodes(inodes);
-      });
-    }
-    if (ps_source_ && !metadata.pids.empty()) {
-      const auto& quirks = ps_source_->config().process_stats_config().quirks();
-      if (std::find(quirks.begin(), quirks.end(),
-                    ProcessStatsConfig::DISABLE_ON_DEMAND) != quirks.end()) {
-        return;
-      }
-      const auto& pids = metadata.pids;
-      auto weak_ps_source = ps_source_;
-      task_runner_->PostTask([weak_ps_source, pids] {
-        if (weak_ps_source)
-          weak_ps_source->OnPids(pids);
-      });
-    }
-    */
-  metadata_.Clear();
+  metadata_.Clear();          // TODO sould be unnecessary now.
 }
 
 FtraceDataSource::FtraceBundleHandle FtraceDataSource::GetBundleForCpu(size_t) {
