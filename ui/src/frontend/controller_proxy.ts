@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {State} from '../common/state';
-import {Action} from '../common/actions';
 import {Remote} from '../base/remote';
+import {Action} from '../common/actions';
+import {State} from '../common/state';
 
 /**
  * Proxy for the Controller worker.

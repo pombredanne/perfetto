@@ -18,7 +18,11 @@ import * as m from 'mithril';
 
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {State} from '../common/state';
-import {warmupWasmEngineWorker, createWasmEngineWorkerPort} from '../controller/wasm_engine_proxy';
+import {
+  createWasmEngineWorkerPort,
+  warmupWasmEngineWorker
+} from '../controller/wasm_engine_proxy';
+
 import {ControllerProxy} from './controller_proxy';
 import {globals} from './globals';
 import {HomePage} from './home_page';
@@ -40,12 +44,12 @@ function createController(): ControllerProxy {
 class FrontendApi {
   updateState(state: State) {
     globals.state = state;
-    console.log(state);
-    if (state.route && state.route !== m.route.get()) {
-      m.route.set(state.route);
-    } else {
-      m.redraw();
-    }
+    this.redraw();
+  }
+
+  publish(id: string, data: any) {
+    globals.published.set(id, data);
+    this.redraw();
   }
 
   /**
@@ -57,6 +61,14 @@ class FrontendApi {
    */
   createWasmEnginePort(): MessagePort {
     return createWasmEngineWorkerPort();
+  }
+
+  private redraw(): void {
+    if (globals.state.route && globals.state.route !== m.route.get()) {
+      m.route.set(globals.state.route);
+    } else {
+      m.redraw();
+    }
   }
 }
 
@@ -78,7 +90,17 @@ async function main() {
   m.route(root, '/', {
     '/': HomePage,
     '/viewer': ViewerPage,
-    '/query/:trace': QueryPage,
+    '/query/:engineId': {
+      onmatch(args) {
+        if (globals.state.engines[args.engineId]) {
+          return QueryPage;
+        }
+        // We only hit this case if the user reloads/navigates
+        // while on the query page.
+        m.route.set('/');
+        return undefined;
+      }
+    },
   });
 
   (window as any).m = m;

@@ -14,18 +14,35 @@
 
 import '../tracks/all_controller';
 
+import {defer, Deferred} from '../base/deferred';
 import {assertExists} from '../base/logging';
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action, addTrack} from '../common/actions';
-import {createEmptyState, State, EngineConfig, TrackState} from '../common/state';
-import {rootReducer} from './reducer';
-import {WasmEngineProxy} from './wasm_engine_proxy';
-import {Engine} from './engine';
+import {
+  rawQueryResultToColumns,
+  rawQueryResultToRows,
+  Row
+} from '../common/protos';
+import {QueryResponse} from '../common/queries';
+import {
+  createEmptyState,
+  EngineConfig,
+  QueryConfig,
+  State,
+  TrackState
+} from '../common/state';
 
-type EngineControllerState = 'init'|'waiting_for_file'|'loading'|'ready'; 
+import {Engine} from './engine';
+import {rootReducer} from './reducer';
+import {TrackController} from './track_controller';
+import {trackControllerRegistry} from './track_controller_registry';
+import {WasmEngineProxy} from './wasm_engine_proxy';
+
+type EngineControllerState = 'init'|'waiting_for_file'|'loading'|'ready';
 class EngineController {
   private readonly config: EngineConfig;
   private readonly controller: Controller;
+  private readonly deferredOnReady: Set<Deferred<Engine>>;
   private _state: EngineControllerState;
   private blob?: Blob;
   private engine?: Engine;
@@ -34,6 +51,7 @@ class EngineController {
     this.controller = controller;
     this.config = config;
     this._state = 'init';
+    this.deferredOnReady = new Set();
     this.move('waiting_for_file');
   }
 
@@ -41,7 +59,7 @@ class EngineController {
     return this._state;
   }
 
-  move(newState: EngineControllerState) {
+  async move(newState: EngineControllerState) {
     switch (newState) {
       case 'waiting_for_file':
         this.controller.fetchBlob(this.config.url).then(blob => {
@@ -51,46 +69,85 @@ class EngineController {
         break;
       case 'loading':
         const blob = assertExists<Blob>(this.blob);
-        this.controller.createEngine(blob).then(engine => {
-          this.engine = engine;
-          this.move('ready');
-        });
+        this.engine = await this.controller.createEngine(blob);
+        this.move('ready');
         break;
       case 'ready':
         const engine = assertExists<Engine>(this.engine);
-        this.controller.dispatchMultiple([
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-          addTrack(this.config.id, 'CpuSliceTrack'),
-        ]);
-        engine.rawQuery({sqlQuery: 'select * from sched;'}).then((result) => {
-          console.log(result);
-        });
+        const numberOfCpus = await engine.getNumberOfCpus();
+        const tracks = [];
+        for (let i = 0; i < numberOfCpus; i++) {
+          tracks.push(addTrack(this.config.id, 'CpuSliceTrack', i));
+        }
+        this.controller.dispatchMultiple(tracks);
+        this.deferredOnReady.forEach(d => d.resolve(engine));
+        this.deferredOnReady.clear();
         break;
     }
     this._state = newState;
   }
+
+  waitForReady(): Promise<Engine> {
+    if (this.engine) return Promise.resolve(this.engine);
+    const deferred = defer<Engine>();
+    this.deferredOnReady.add(deferred);
+    return deferred;
+  }
 }
 
-class TrackController {
+class TrackControllerWrapper {
   private readonly config: TrackState;
   private readonly controller: Controller;
-  private readonly engineController: EngineController;
+  private trackController?: TrackController;
 
-  constructor(config: TrackState, controller: Controller, engineController: EngineController) {
+  constructor(
+      config: TrackState, controller: Controller,
+      engineController: EngineController) {
     this.config = config;
     this.controller = controller;
-    this.engineController = engineController;
+    const publish = (data: {}) => this.controller.publish(config.id, data);
+    engineController.waitForReady().then(async engine => {
+      const factory = trackControllerRegistry.get(this.config.kind);
+      this.trackController = factory.create(config, engine, publish);
+    });
   }
 
-  foo() {
-    console.log(this.config);
-    console.log(this.controller);
-    console.log(this.engineController)
+  onBoundsChange(start: number, end: number): void {
+    if (!this.trackController) return;
+    this.trackController.onBoundsChange(start, end);
+  }
+}
+
+function firstN<T>(n: number, iter: IterableIterator<T>): Array<T> {
+  const list = [];
+  for (let i = 0; i < n; i++) {
+    const {done, value} = iter.next();
+    if (done) break;
+    list.push(value);
+  }
+  return list;
+}
+
+class QueryController {
+  constructor(
+      config: QueryConfig, controller: Controller,
+      engineController: EngineController) {
+    engineController.waitForReady().then(async engine => {
+      const start = performance.now();
+      const rawResult = await engine.rawQuery({sqlQuery: config.query});
+      const end = performance.now();
+      const columns = rawQueryResultToColumns(rawResult);
+      const rows = firstN<Row>(100, rawQueryResultToRows(rawResult));
+      const result: QueryResponse = {
+        id: config.id,
+        query: config.query,
+        durationMs: Math.round(end - start),
+        totalRowCount: +rawResult.numRecords,
+        columns,
+        rows,
+      };
+      controller.publish(config.id, result);
+    });
   }
 }
 
@@ -99,13 +156,15 @@ class Controller {
   private _frontend?: FrontendProxy;
   private readonly localFiles: Map<string, File>;
   private readonly engines: Map<string, EngineController>;
-  private readonly tracks: Map<string, TrackController>;
+  private readonly tracks: Map<string, TrackControllerWrapper>;
+  private readonly queries: Map<string, QueryController>;
 
   constructor() {
     this.state = createEmptyState();
     this.localFiles = new Map();
     this.engines = new Map();
     this.tracks = new Map();
+    this.queries = new Map();
   }
 
   get frontend(): FrontendProxy {
@@ -123,21 +182,29 @@ class Controller {
   }
 
   dispatchMultiple(actions: Action[]): void {
-    //const oldState = this.state;
     for (const action of actions) {
-      console.log(action);
       this.state = rootReducer(this.state, action);
     }
 
+    // TODO(hjd): Handle teardown.
     for (const config of Object.values<EngineConfig>(this.state.engines)) {
       if (this.engines.has(config.id)) continue;
       this.engines.set(config.id, new EngineController(config, this));
     }
 
+    // TODO(hjd): Handle teardown.
     for (const config of Object.values<TrackState>(this.state.tracks)) {
       if (this.tracks.has(config.id)) continue;
-      const engine = assertExists<EngineController>(this.engines.get(config.engineId));
-      this.tracks.set(config.id, new TrackController(config, this, engine));
+      const engine = this.engines.get(config.engineId)!;
+      this.tracks.set(
+          config.id, new TrackControllerWrapper(config, this, engine));
+    }
+
+    // TODO(hjd): Handle teardown.
+    for (const config of Object.values<QueryConfig>(this.state.queries)) {
+      if (this.queries.has(config.id)) continue;
+      const engine = this.engines.get(config.engineId)!;
+      this.queries.set(config.id, new QueryController(config, this, engine));
     }
 
     this.frontend.updateState(this.state);
@@ -152,10 +219,11 @@ class Controller {
 
     // If not lets try to fetch from network:
     const repsonse = await fetch(url);
-    return await repsonse.blob();
+    return repsonse.blob();
   }
 
-  publish() {
+  publish(id: string, result: any) {
+    this.frontend.publish(id, result);
   }
 
   addLocalFile(file: File): string {
@@ -187,6 +255,10 @@ class FrontendProxy {
 
   createWasmEnginePort() {
     return this.remote.send<MessagePort>('createWasmEnginePort', []);
+  }
+
+  publish(id: string, data: any) {
+    return this.remote.send<void>('publish', [id, data]);
   }
 }
 

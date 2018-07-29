@@ -33,9 +33,7 @@ anySelf.onmessage = (msg: MessageEvent) => {
   const port: MessagePort = msg.data;
 
   const bridge = new WasmBridge(
-    init_trace_processor,
-    port.postMessage.bind(port),
-    new FileReaderSync());
+      init_trace_processor, port.postMessage.bind(port), new FileReaderSync());
   bridge.initialize();
 
   port.onmessage = (msg: MessageEvent) => {
@@ -47,4 +45,3 @@ anySelf.onmessage = (msg: MessageEvent) => {
     bridge.callWasm(request);
   };
 };
-

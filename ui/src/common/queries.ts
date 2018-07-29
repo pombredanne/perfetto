@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export function assertExists<A>(value: A | null | undefined): A {
-  if (value === null || value === undefined) {
-    throw new Error('Value doesn\'t exist');
-  }
-  return value;
+import {Row} from './protos';
+
+export interface QueryResponse {
+  id: string;
+  query: string;
+  totalRowCount: number;
+  durationMs: number;
+  columns: string[];
+  rows: Row[];
 }

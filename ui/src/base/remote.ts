@@ -93,9 +93,11 @@ export function forwardRemoteCalls(
       transferList.push(result);
     }
 
-    port.postMessage({
-      id,
-      result,
-    }, transferList);
+    port.postMessage(
+        {
+          id,
+          result,
+        },
+        transferList);
   };
 }

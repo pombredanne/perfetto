@@ -12,29 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//import {Action} from '../common/actions';
 import {State} from '../common/state';
-
-//function getDemoTracks(): ObjectById<TrackState> {
-//  const tracks: {[key: string]: TrackState;} = {};
-//  for (let i = 0; i < 10; i++) {
-//    let trackType;
-//    // The track type strings here are temporary. They will be supplied by the
-//    // controller side track implementation.
-//    if (i % 2 === 0) {
-//      trackType = 'CpuSliceTrack';
-//    } else {
-//      trackType = 'CpuCounterTrack';
-//    }
-//    tracks[i] = {
-//      id: i.toString(),
-//      type: trackType,
-//      height: 100,
-//      name: `Track ${i}`,
-//    };
-//  }
-//  return tracks;
-//}
 
 export function rootReducer(state: State, action: any): State {
   switch (action.type) {
@@ -53,7 +31,7 @@ export function rootReducer(state: State, action: any): State {
         id,
         url: action.url,
       };
-      nextState.route = `/query/${id}`;
+      nextState.route = `/viewer`;
 
       return nextState;
     }
@@ -67,7 +45,21 @@ export function rootReducer(state: State, action: any): State {
         engineId: action.engineId,
         kind: action.trackKind,
         name: 'Cpu Track',
-        height: 100,
+        // TODO(hjd): Should height be part of published information.
+        height: 73,
+        cpu: action.cpu,
+      };
+      return nextState;
+    }
+
+    case 'EXECUTE_QUERY': {
+      const nextState = {...state};
+      nextState.queries = {...state.queries};
+      const id = '' + nextState.nextId++;
+      nextState.queries[id] = {
+        id,
+        engineId: action.engineId,
+        query: action.query,
       };
       return nextState;
     }

@@ -26,6 +26,8 @@ class Globals {
   _state?: State = undefined;
   _controller?: ControllerProxy = undefined;
 
+  published = new Map<string, any>();
+
   get state(): State {
     if (this._state === undefined) throw new Error('Global not set');
     return this._state;

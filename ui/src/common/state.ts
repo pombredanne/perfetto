@@ -17,7 +17,7 @@
  * We use this instead of using |Map| object since it is simpler and faster to
  * serialize for use in postMessage.
  */
-export interface ObjectById<Class extends {id: string}> { [id: string]: Class; }
+export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 
 export interface TrackState {
   id: string;
@@ -25,11 +25,19 @@ export interface TrackState {
   height: number;
   kind: string;
   name: string;
+  // TODO(hjd): This needs to be nested into track kind spesific state.
+  cpu: number;
 }
 
 export interface EngineConfig {
   id: string;
   url: string;
+}
+
+export interface QueryConfig {
+  id: string;
+  engineId: string;
+  query: string;
 }
 
 export interface State {
@@ -40,9 +48,8 @@ export interface State {
    * Open traces.
    */
   engines: ObjectById<EngineConfig>;
-
-
   tracks: ObjectById<TrackState>;
+  queries: ObjectById<QueryConfig>;
 }
 
 export function createEmptyState(): State {
@@ -51,5 +58,6 @@ export function createEmptyState(): State {
     nextId: 0,
     tracks: {},
     engines: {},
+    queries: {},
   };
 }

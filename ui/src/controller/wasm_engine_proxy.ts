@@ -64,7 +64,7 @@ export class WasmEngineProxy extends Engine {
   private nextRequestId: number;
 
   static create(port: MessagePort, blob: Blob): Engine {
-    //const worker = createWasmEngineWorker();
+    // const worker = createWasmEngineWorker();
     // tslint:disable-next-line deprecation
     port.postMessage({
       blob,

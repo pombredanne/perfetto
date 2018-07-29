@@ -22,6 +22,39 @@ import IRawQueryArgs = protos.perfetto.protos.IRawQueryArgs;
 import RawQueryArgs = protos.perfetto.protos.RawQueryArgs;
 import RawQueryResult = protos.perfetto.protos.RawQueryResult;
 
+// TODO(hjd): Maybe these should go in their own file.
+export interface Row { [key: string]: number|string; }
+
+function getCell(result: RawQueryResult, column: number, row: number): number|
+    string {
+  const values = result.columns[column];
+  switch (result.columnDescriptors[column].type) {
+    case RawQueryResult.ColumnDesc.Type.LONG:
+      return +values.longValues![row];
+    case RawQueryResult.ColumnDesc.Type.DOUBLE:
+      return +values.doubleValues![row];
+    case RawQueryResult.ColumnDesc.Type.STRING:
+      return values.stringValues![row];
+  }
+  throw new Error('Unhandled type!');
+}
+
+export function rawQueryResultToColumns(result: RawQueryResult): string[] {
+  return result.columnDescriptors.map(d => d.name || '');
+}
+
+export function* rawQueryResultToRows(result: RawQueryResult) {
+  const columns: Array<[string, number]> = rawQueryResultToColumns(result).map(
+      (name, i): [string, number] => [name, i]);
+  for (let rowNum = 0; rowNum < result.numRecords; rowNum++) {
+    const row: Row = {};
+    for (let [name, colNum] of columns) {
+      row[name] = getCell(result, colNum, rowNum);
+    }
+    yield row;
+  }
+}
+
 export {
   TraceConfig,
   TraceProcessor,
