@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-import {Vnode} from 'mithril';
 
 import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
@@ -25,33 +24,6 @@ export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
     this.padding = {top: 0, right: 20, bottom: 0, left: 20};
-
-    const handleBar = m('.handle-bar', {
-      style: {
-        height: '5px',
-        width: '8px',
-        'margin-left': '2px',
-        'border-top': '1px solid #888',
-      }
-    });
-    this.handleBars =
-        m('.handle-bars',
-          {
-            style: {
-              position: 'relative',
-              top: '9px',
-            }
-          },
-          handleBar,
-          handleBar,
-          handleBar);
-  },
-  oncreate(vnode) {
-    const el = vnode.dom as HTMLElement;
-    const leftHandle =
-        el.getElementsByClassName('brush-left-handle')[0] as HTMLElement;
-    const rightHandle =
-        el.getElementsByClassName('brush-right-handle')[0] as HTMLElement;
 
     let draggingStart = false;
     let draggingEnd = false;
@@ -79,28 +51,16 @@ export const OverviewTimeline = {
       draggingStart = false;
       draggingEnd = false;
     };
-
-    leftHandle.addEventListener('mousedown', this.leftHandleMouseDownListener);
-    rightHandle.addEventListener(
-        'mousedown', this.rightHandleMouseDownListener);
-
+  },
+  oncreate(vnode) {
+    const el = vnode.dom as HTMLElement;
     el.addEventListener('mousemove', this.mouseMoveListener);
     document.body.addEventListener('mouseup', this.mouseUpListener);
   },
   onremove(vnode) {
     const el = vnode.dom as HTMLElement;
-    const leftHandle =
-        el.getElementsByClassName('brush-left-handle')[0] as HTMLElement;
-    const rightHandle =
-        el.getElementsByClassName('brush-right-handle')[0] as HTMLElement;
-
-    leftHandle.removeEventListener(
-        'mousedown', this.leftHandleMouseDownListener);
-    rightHandle.removeEventListener(
-        'mousedown', this.rightHandleMouseDownListener);
-
-    el.addEventListener('mousemove', this.mouseMoveListener);
-    document.body.addEventListener('mouseup', this.mouseUpListener);
+    el.removeEventListener('mousemove', this.mouseMoveListener);
+    document.body.removeEventListener('mouseup', this.mouseUpListener);
   },
   view({attrs}) {
     this.timeScale.setLimitsPx(0, attrs.width);
@@ -161,25 +121,10 @@ export const OverviewTimeline = {
                     `${this.timeScale.msToPx(attrs.visibleWindowMs.start)}px`,
               }
             },
-            m('.brush-left-handle',
-              {
-                style: {
-                  position: 'absolute',
-                  left:
-                      `${
-                         this.timeScale.msToPx(attrs.visibleWindowMs.start) - 6
-                       }px`,
-                  'border-radius': '3px',
-                  border: '1px solid #999',
-                  cursor: 'pointer',
-                  background: '#fff',
-                  top: '25px',
-                  width: '14px',
-                  height: '30px',
-                  'pointer-events': 'auto',
-                }
-              },
-              this.handleBars)),
+            m(BrushHandle, {
+              left: this.timeScale.msToPx(attrs.visibleWindowMs.start),
+              onMouseDown: this.leftHandleMouseDownListener
+            })),
           m('.brush-right',
             {
               style: {
@@ -195,22 +140,8 @@ export const OverviewTimeline = {
                         }px`,
               }
             },
-            m('.brush-right-handle',
-              {
-                style: {
-                  position: 'absolute',
-                  left: '-6px',
-                  'border-radius': '3px',
-                  border: '1px solid #999',
-                  cursor: 'pointer',
-                  background: '#fff',
-                  top: '25px',
-                  width: '14px',
-                  height: '30px',
-                  'pointer-events': 'auto',
-                }
-              },
-              this.handleBars))));
+            m(BrushHandle,
+              {left: 0, onMouseDown: this.rightHandleMouseDownListener}))));
   },
 } as
     m.Component<
@@ -223,8 +154,6 @@ export const OverviewTimeline = {
         {
           timeScale: TimeScale,
           padding: {top: number, right: number, bottom: number, left: number},
-          // tslint:disable no-any
-          handleBars: Vnode<any, any>,
           visibleWindowMs: {start: number, end: number},
           onBrushed: (start: number, end: number) => void,
           rightHandleMouseDownListener: (e: MouseEvent) => void,
@@ -232,3 +161,61 @@ export const OverviewTimeline = {
           mouseMoveListener: (e: MouseEvent) => void,
           mouseUpListener: () => void,
         }>;
+
+const BrushHandle = {
+  oncreate(vnode) {
+    const el = vnode.dom as HTMLElement;
+    el.addEventListener('mousedown', this.boundOnMouseDown);
+  },
+  onremove(vnode) {
+    const el = vnode.dom as HTMLElement;
+    el.removeEventListener('mousedown', this.boundOnMouseDown);
+  },
+  view({attrs}) {
+    if (!this.boundOnMouseDown) {
+      this.boundOnMouseDown = attrs.onMouseDown.bind(this);
+    }
+
+    const handleBar = m('.handle-bar', {
+      style: {
+        height: '5px',
+        width: '8px',
+        'margin-left': '2px',
+        'border-top': '1px solid #888',
+      }
+    });
+
+    return m(
+        '.brush-handle',
+        {
+          style: {
+            position: 'absolute',
+            left: `${attrs.left - 6}px`,
+            'border-radius': '3px',
+            border: '1px solid #999',
+            cursor: 'pointer',
+            background: '#fff',
+            top: '25px',
+            width: '14px',
+            height: '30px',
+            'pointer-events': 'auto',
+          }
+        },
+        m('.handle-bars',
+          {
+            style: {
+              position: 'relative',
+              top: '9px',
+            }
+          },
+          handleBar,
+          handleBar,
+          handleBar));
+  }
+} as m.Component<{
+  left: number,
+  onMouseDown: (e: MouseEvent) => void,
+},
+                    {
+                      boundOnMouseDown: (e: MouseEvent) => void,
+                    }>;
