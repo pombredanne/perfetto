@@ -41,8 +41,9 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
 
 void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
-  // Reset storage and start a new trace parsing task.
-  context_.storage.reset(new TraceStorage);
+  // Reset storage.
+  context_.storage->ResetStorage();
+  // Start a new trace parsing task.
   context_.parser.reset(new TraceParser(reader, &context_, kTraceChunkSizeB));
   LoadTraceChunk(callback);
 }
