@@ -70,7 +70,7 @@ TEST_F(ProcessTrackerTest, AddProcessEntry_CorrectName) {
             "test");
 }
 
-TEST_F(ProcessTrackerTest, MatchThreadToProcess) {
+TEST_F(ProcessTrackerTest, UpdateThreadMatch) {
   uint32_t cpu = 3;
   uint64_t timestamp = 100;
   uint32_t pid_1 = 1;
@@ -94,6 +94,16 @@ TEST_F(ProcessTrackerTest, MatchThreadToProcess) {
 
   ASSERT_EQ(thread.upid, 1);
   ASSERT_EQ(process.start_ns, timestamp);
+}
+
+TEST_F(ProcessTrackerTest, UpdateThreadCreate) {
+  context.process_tracker->UpdateThread(1, 2);
+
+  TraceStorage::Thread thread = context.storage->GetThread(1);
+
+  ASSERT_EQ(context.storage->thread_count(), 1);
+  ASSERT_EQ(thread.upid, 1);
+  ASSERT_EQ(context.storage->process_count(), 1);
 }
 
 }  // namespace

@@ -69,12 +69,11 @@ class MockProcessTracker : public ProcessTracker {
       : ProcessTracker(context) {}
 
   MOCK_METHOD3(UpdateProcess,
-               TraceStorage::UniquePid(uint32_t pid,
-                                       const char* process_name,
-                                       size_t process_name_len));
+               UniquePid(uint32_t pid,
+                         const char* process_name,
+                         size_t process_name_len));
 
-  MOCK_METHOD2(UpdateThread,
-               TraceStorage::UniqueTid(uint32_t tid, uint32_t tgid));
+  MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
 
 TEST(TraceParser, LoadSingleEvent) {

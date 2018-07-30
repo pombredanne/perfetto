@@ -36,12 +36,12 @@ class ThreadTableUnittest : public ::testing::Test {
     PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
     db_.reset(db);
 
-    context_.storage.reset(new TraceStorage);
+    context_.storage.reset(new TraceStorage());
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.sched_tracker.reset(new SchedTracker(&context_));
 
-    ThreadTable::RegisterTable(&*db, context_.storage.get());
-    ProcessTable::RegisterTable(&*db, context_.storage.get());
+    ThreadTable::RegisterTable(db_.get(), context_.storage.get());
+    ProcessTable::RegisterTable(db_.get(), context_.storage.get());
   }
 
   void PrepareValidStatement(const std::string& sql) {

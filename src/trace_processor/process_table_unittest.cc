@@ -35,10 +35,10 @@ class ProcessTableUnittest : public ::testing::Test {
     PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
     db_.reset(db);
 
-    context_.storage.reset(new TraceStorage);
+    context_.storage.reset(new TraceStorage());
     context_.process_tracker.reset(new ProcessTracker(&context_));
 
-    ProcessTable::RegisterTable(&*db, context_.storage.get());
+    ProcessTable::RegisterTable(db_.get(), context_.storage.get());
   }
 
   void PrepareValidStatement(const std::string& sql) {

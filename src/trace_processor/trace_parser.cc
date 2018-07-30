@@ -89,18 +89,12 @@ void TraceParser::ParsePacket(const uint8_t* data, size_t length) {
 void TraceParser::ParseProcessTree(const uint8_t* data, size_t length) {
   ProtoDecoder decoder(data, length);
 
-  // TODO(taylori): We currently rely on process packets always coming before
-  // their corresponding threads. This should be true but it is better
-  // not to rely on it.
-  bool parsed_thread_packet = false;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber:
-        PERFETTO_DCHECK(!parsed_thread_packet);
         ParseProcess(fld.data(), fld.size());
         break;
       case protos::ProcessTree::kThreadsFieldNumber:
-        parsed_thread_packet = true;
         ParseThread(fld.data(), fld.size());
         break;
       default:

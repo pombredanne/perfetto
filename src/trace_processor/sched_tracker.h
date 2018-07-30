@@ -18,24 +18,32 @@
 #define SRC_TRACE_PROCESSOR_SCHED_TRACKER_H_
 
 #include <array>
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/trace_processor_context.h"
+
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
+class TraceProcessorContext;
+
+// TODO:(b/111252261): The processing of cpu freq events and calculation
+// of cycles is yet to be implemented here.
+
+// This class takes sched events from the trace and processes them to store
+// as sched slices.
 class SchedTracker {
  public:
-  SchedTracker(TraceProcessorContext*);
+  explicit SchedTracker(TraceProcessorContext*);
+  SchedTracker(const SchedTracker&) = delete;
+  SchedTracker& operator=(const SchedTracker&) = delete;
   virtual ~SchedTracker();
 
   struct SchedSwitchEvent {
-    uint32_t cpu = 0;
     uint64_t timestamp = 0;
+    TraceStorage::StringId prev_thread_name_id = 0;
+    uint32_t cpu = 0;
     uint32_t prev_pid = 0;
     uint32_t prev_state = 0;
-    TraceStorage::StringId prev_thread_name_id = 0;
     uint32_t next_pid = 0;
 
     bool valid() const { return timestamp != 0; }
@@ -53,7 +61,7 @@ class SchedTracker {
   // One entry for each CPU in the trace.
   std::array<SchedSwitchEvent, TraceStorage::kMaxCpus> last_sched_per_cpu_;
 
-  TraceProcessorContext* context_;
+  TraceProcessorContext* const context_;
 };
 }  // namespace trace_processor
 }  // namespace perfetto

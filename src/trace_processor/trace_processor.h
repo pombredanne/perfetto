@@ -41,25 +41,23 @@ namespace trace_processor {
 // execution of SQL queries on the events in these traces.
 class TraceProcessor {
  public:
-  TraceProcessor(base::TaskRunner* task_runner);
+  explicit TraceProcessor(base::TaskRunner*);
   ~TraceProcessor();
 
   // Loads a trace by reading from the given blob reader. Invokes |callback|
   // when the trace has been fully read and parsed.
-  void LoadTrace(BlobReader* reader, std::function<void()> callback);
+  void LoadTrace(BlobReader*, std::function<void()> callback);
 
   // Executes a SQLite query on the loaded portion of the trace. |result| will
   // be invoked once after the result of the query is available.
-  void ExecuteQuery(const protos::RawQueryArgs& args,
-                    std::function<void(protos::RawQueryResult)> result);
+  void ExecuteQuery(const protos::RawQueryArgs&,
+                    std::function<void(protos::RawQueryResult)>);
 
  private:
   void LoadTraceChunk(std::function<void()> callback);
 
   ScopedDb db_;  // Keep first.
-
   TraceProcessorContext context_;
-
   base::TaskRunner* const task_runner_;
   base::WeakPtrFactory<TraceProcessor> weak_factory_;  // Keep last.
 };

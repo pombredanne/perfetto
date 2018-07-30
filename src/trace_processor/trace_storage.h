@@ -29,25 +29,28 @@
 namespace perfetto {
 namespace trace_processor {
 
+// UniquePid is an offset into |unique_processes_|. This is necessary because
+// Unix pids are reused and thus not guaranteed to be unique over a long
+// period of time.
+using UniquePid = uint32_t;
+// UniqueTid is an offset into |unique_threads_|. Necessary because tids can
+// be reused.
+using UniqueTid = uint32_t;
+
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
 // names for a given CPU).
 class TraceStorage {
  public:
   TraceStorage();
+  TraceStorage(const TraceStorage&) = delete;
+
   virtual ~TraceStorage();
 
   constexpr static size_t kMaxCpus = 128;
 
   // StringId is an offset into |string_pool_|.
   using StringId = size_t;
-  // UniquePid is an offset into |unique_processes_|. This is necessary because
-  // Unix pids are reused and thus not guaranteed to be unique over a long
-  // period of time.
-  using UniquePid = uint32_t;
-  // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
-  // be reused.
-  using UniqueTid = uint32_t;
 
   struct Stats {
     uint64_t mismatched_sched_switch_tids_ = 0;
@@ -57,15 +60,15 @@ class TraceStorage {
   struct Process {
     uint64_t start_ns = 0;
     uint64_t end_ns = 0;
-    StringId name_id;
+    StringId name_id = 0;
   };
 
   // Information about a unique thread seen in a trace.
   struct Thread {
     uint64_t start_ns = 0;
     uint64_t end_ns = 0;
-    StringId name_id;
-    UniquePid upid;
+    StringId name_id = 0;
+    UniquePid upid = 0;
   };
 
   class SlicesPerCpu {
@@ -108,50 +111,44 @@ class TraceStorage {
                      uint64_t duration_ns,
                      UniqueTid utid);
 
-  void StoreNewThread(Thread thread) {
-    unique_threads_.emplace_back(std::move(thread));
-  }
+  void StoreEmptyThread() { unique_threads_.emplace_back(); }
 
-  void StoreNewProcess(Process process) {
-    unique_processes_.emplace_back(std::move(process));
-  }
+  void StoreEmptyProcess() { unique_processes_.emplace_back(); }
 
-  void AddMismatchedSchedSwitch(uint32_t value) {
-    stats_.mismatched_sched_switch_tids_ += value;
-  }
+  void AddMismatchedSchedSwitch() { ++stats_.mismatched_sched_switch_tids_; }
 
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
   StringId InternString(const char* data, size_t length);
 
   Process* GetMutableProcess(UniquePid upid) {
-    PERFETTO_CHECK(upid < unique_processes_.size());
+    PERFETTO_DCHECK(upid < unique_processes_.size());
     return &unique_processes_[upid];
   }
 
   Thread* GetMutableThread(UniqueTid utid) {
-    PERFETTO_CHECK(utid < unique_threads_.size());
+    PERFETTO_DCHECK(utid < unique_threads_.size());
     return &unique_threads_[utid];
   }
 
   // Reading methods.
   const SlicesPerCpu& SlicesForCpu(uint32_t cpu) const {
-    PERFETTO_CHECK(cpu < cpu_events_.size());
+    PERFETTO_DCHECK(cpu < cpu_events_.size());
     return cpu_events_[cpu];
   }
 
   const std::string& GetString(StringId id) const {
-    PERFETTO_CHECK(id < string_pool_.size());
+    PERFETTO_DCHECK(id < string_pool_.size());
     return string_pool_[id];
   }
 
   const Process& GetProcess(UniquePid upid) const {
-    PERFETTO_CHECK(upid < unique_processes_.size());
+    PERFETTO_DCHECK(upid < unique_processes_.size());
     return unique_processes_[upid];
   }
 
   const Thread& GetThread(UniqueTid utid) const {
-    PERFETTO_CHECK(utid < unique_threads_.size());
+    PERFETTO_DCHECK(utid < unique_threads_.size());
     return unique_threads_[utid];
   }
 
@@ -163,6 +160,8 @@ class TraceStorage {
   size_t thread_count() const { return unique_threads_.size() - 1; }
 
  private:
+  TraceStorage& operator=(const TraceStorage&) = default;
+
   using StringHash = uint32_t;
 
   // Metadata counters for events being added.

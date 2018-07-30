@@ -91,8 +91,8 @@ int ThreadTable::Cursor::Filter(const QueryConstraints& qc,
   for (size_t j = 0; j < qc.constraints().size(); j++) {
     const auto& cs = qc.constraints()[j];
     if (cs.iColumn == Column::kUtid) {
-      TraceStorage::UniqueTid constraint_utid =
-          static_cast<TraceStorage::UniqueTid>(sqlite3_value_int(argv[j]));
+      UniqueTid constraint_utid =
+          static_cast<UniqueTid>(sqlite3_value_int(argv[j]));
       // Filter the range of utids that we are interested in, based on the
       // constraints in the query. Everything between min and max (inclusive)
       // will be returned.

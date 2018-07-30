@@ -37,11 +37,11 @@ class SchedSliceTableIntegrationTest : public ::testing::Test {
     PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
     db_.reset(db);
 
-    context_.storage.reset(new TraceStorage);
+    context_.storage.reset(new TraceStorage());
     context_.process_tracker.reset(new ProcessTracker(&context_));
     context_.sched_tracker.reset(new SchedTracker(&context_));
 
-    SchedSliceTable::RegisterTable(&*db, context_.storage.get());
+    SchedSliceTable::RegisterTable(db_.get(), context_.storage.get());
   }
 
   void PrepareValidStatement(const std::string& sql) {
@@ -320,14 +320,18 @@ TEST_F(SchedSliceTableIntegrationTest, UtidTest) {
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
-  storage_.PushSchedSwitch(cpu, timestamp, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu, timestamp + 3, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
-  storage_.PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state, kCommProc1,
-                           sizeof(kCommProc1) - 1, pid_2);
-  storage_.PushSchedSwitch(cpu, timestamp + 10, pid_2, prev_state, kCommProc2,
-                           sizeof(kCommProc2) - 1, pid_1);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
+                                          kCommProc1, sizeof(kCommProc1) - 1,
+                                          pid_2);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 3, pid_2, prev_state,
+                                          kCommProc2, sizeof(kCommProc2) - 1,
+                                          pid_1);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state,
+                                          kCommProc1, sizeof(kCommProc1) - 1,
+                                          pid_2);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 10, pid_2,
+                                          prev_state, kCommProc2,
+                                          sizeof(kCommProc2) - 1, pid_1);
 
   PrepareValidStatement("SELECT utid FROM sched ORDER BY utid");
 
