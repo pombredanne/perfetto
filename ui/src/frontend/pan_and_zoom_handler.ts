@@ -119,7 +119,6 @@ export class PanAndZoomHandler {
       if (cancellingDirectionFactor === directionFactor) {
         const minEndTime = panAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
         const waitTime = minEndTime - Date.now();
-        console.log(waitTime);
         tapCancelTimeout = setTimeout(() => panAnimation.stop(), waitTime);
       }
     };
