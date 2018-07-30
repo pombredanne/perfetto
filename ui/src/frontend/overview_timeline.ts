@@ -110,11 +110,20 @@ const HorizontalBrushSelection = {
       e.stopPropagation();
     };
     this.mouseMoveListener = (e: MouseEvent) => {
-      if (draggingStart) {
-        this.onBrushedPx(e.clientX - this.offsetLeft, this.selectionPx.end);
-      }
-      if (draggingEnd) {
-        this.onBrushedPx(this.selectionPx.start, e.clientX - this.offsetLeft);
+      if (draggingStart || draggingEnd) {
+        const posX = e.clientX - this.offsetLeft;
+        if ((draggingEnd && posX < this.selectionPx.start) ||
+            (draggingStart && posX > this.selectionPx.end)) {
+          // Flip start and end if handle has been dragged past the other limit.
+          draggingStart = !draggingStart;
+          draggingEnd = !draggingEnd;
+        }
+        if (draggingStart) {
+          this.onBrushedPx(posX, this.selectionPx.end);
+        }
+        if (draggingEnd) {
+          this.onBrushedPx(this.selectionPx.start, posX);
+        }
       }
       e.stopPropagation();
     };
@@ -147,38 +156,38 @@ const HorizontalBrushSelection = {
             height: '100%',
           }
         },
-        m('.brush-left',
-          {
-            style: {
-              background: 'rgba(210,210,210,0.7)',
-              position: 'absolute',
-              'pointer-events': 'none',
-              'border-right': '1px solid #aaa',
-              top: '0',
-              height: '100%',
-              left: '0',
-              width: `${attrs.selectionPx.start}px`,
-            }
-          },
-          m(BrushHandle, {
-            left: attrs.selectionPx.start,
-            onMouseDown: this.leftHandleMouseDownListener
-          })),
-        m('.brush-right',
-          {
-            style: {
-              background: 'rgba(210,210,210,0.7)',
-              position: 'absolute',
-              'pointer-events': 'none',
-              top: '0',
-              height: '100%',
-              'border-left': '1px solid #aaa',
-              left: `${attrs.selectionPx.end}px`,
-              width: `calc(100% - ${attrs.selectionPx.end}px)`,
-            }
-          },
-          m(BrushHandle,
-            {left: 0, onMouseDown: this.rightHandleMouseDownListener})));
+        m('.brush-left', {
+          style: {
+            background: 'rgba(210,210,210,0.7)',
+            position: 'absolute',
+            'pointer-events': 'none',
+            'border-right': '1px solid #aaa',
+            top: '0',
+            height: '100%',
+            left: '0',
+            width: `${attrs.selectionPx.start}px`,
+          }
+        }),
+        m('.brush-right', {
+          style: {
+            background: 'rgba(210,210,210,0.7)',
+            position: 'absolute',
+            'pointer-events': 'none',
+            top: '0',
+            height: '100%',
+            'border-left': '1px solid #aaa',
+            left: `${attrs.selectionPx.end}px`,
+            width: `calc(100% - ${attrs.selectionPx.end}px)`,
+          }
+        }),
+        m(BrushHandle, {
+          left: attrs.selectionPx.start,
+          onMouseDown: this.leftHandleMouseDownListener
+        }),
+        m(BrushHandle, {
+          left: attrs.selectionPx.end,
+          onMouseDown: this.rightHandleMouseDownListener
+        }));
   }
 } as
     m.Component<
