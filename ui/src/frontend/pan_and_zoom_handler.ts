@@ -119,6 +119,7 @@ export class PanAndZoomHandler {
       if (cancellingDirectionFactor === directionFactor) {
         const minEndTime = panAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
         const waitTime = minEndTime - Date.now();
+        console.log(waitTime);
         tapCancelTimeout = setTimeout(() => panAnimation.stop(), waitTime);
       }
     };
@@ -153,7 +154,7 @@ export class PanAndZoomHandler {
       clearTimeout(tapCancelTimeout);
     };
     this.boundOnZoomKeyUp = e => {
-      if (ZOOM_KEYS.includes(e.key)) {
+      if (!ZOOM_KEYS.includes(e.key)) {
         return;
       }
       const cancellingZoomIn = ZOOM_IN_KEYS.includes(e.key);
