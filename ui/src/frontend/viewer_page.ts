@@ -88,7 +88,7 @@ const TraceViewer = {
     this.zoomContent.shutdown();
   },
   view() {
-    const onBrushed = (start: number, end: number) => {
+    const onBrushedMs = (start: number, end: number) => {
       this.visibleWindowMs.start = start;
       this.visibleWindowMs.end = end;
       this.timeScale.setLimitsMs(
@@ -108,7 +108,7 @@ const TraceViewer = {
           visibleWindowMs: this.visibleWindowMs,
           maxVisibleWindowMs: this.maxVisibleWindowMs,
           width: this.width,
-          onBrushed
+          onBrushedMs
         }),
         m(TimeAxis, {
           timeScale: this.timeScale,
