@@ -35,6 +35,8 @@ TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
   ThreadTable::RegisterTable(*db_, &storage_);
 }
 
+TraceDatabase::~TraceDatabase() = default;
+
 void TraceDatabase::LoadTrace(BlobReader* reader,
                               std::function<void()> callback) {
   // Reset storage and start a new trace parsing task.
