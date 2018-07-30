@@ -20,6 +20,7 @@ import {ChildVirtualContext} from './child_virtual_context';
 import {globals} from './globals';
 import {ScrollableContainer} from './scrollable_container';
 import {TimeScale} from './time_scale';
+import {TrackCollectionComponent} from './track_collection_component';
 import {TrackComponent} from './track_component';
 
 /**
@@ -55,25 +56,46 @@ export const ScrollingTrackDisplay = {
 
     this.canvasController.clear();
     const tracks = globals.state.tracks;
+    const trackValues = Object.values(tracks);
 
-    const childTracks: m.Children[] = [];
-
+    const trackCollections: m.Children[] = [];
+    let collectionYOffset = 0;
     let trackYOffset = 0;
-    for (const trackState of Object.values(tracks)) {
-      childTracks.push(m(TrackComponent, {
-        trackContext: new ChildVirtualContext(ctx, {
-          y: trackYOffset,
-          x: 0,
+    for (let i = 0; i < 2; i++) {
+      const collectionTracks: m.Children[] = [];
+      const trackStates = [];
+      trackYOffset += 25;
+
+      for (let j = Math.round(i * trackValues.length / 2);
+           j < (i + 1) * trackValues.length / 2;
+           j++) {
+        const trackState = trackValues[j];
+        trackStates.push(trackState);
+        collectionTracks.push(m(TrackComponent, {
+          trackContext: new ChildVirtualContext(ctx, {
+            y: trackYOffset,
+            x: 0,
+            width: this.width,
+            height: trackState.height,
+          }),
+          top: trackYOffset,
           width: this.width,
-          height: trackState.height,
-        }),
-        top: trackYOffset,
-        width: this.width,
-        timeScale: attrs.timeScale,
-        trackState,
-        visibleWindowMs: attrs.visibleWindowMs,
-      }));
-      trackYOffset += trackState.height;
+          timeScale: attrs.timeScale,
+          trackState,
+          visibleWindowMs: attrs.visibleWindowMs,
+        }));
+        trackYOffset += trackState.height;
+      }
+
+      trackCollections.push(
+          m(TrackCollectionComponent,
+            {
+              name: `Collection ${i}`,
+              top: collectionYOffset,
+              trackStates,
+            },
+            ...collectionTracks));
+      collectionYOffset += trackYOffset;
     }
 
     return m(
@@ -100,7 +122,7 @@ export const ScrollingTrackDisplay = {
             topOffset: canvasTopOffset,
             canvasElement: this.canvasController.getCanvasElement()
           }),
-          ...childTracks));
+          ...trackCollections));
   },
 } as m.Component<{
   timeScale: TimeScale,

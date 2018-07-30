@@ -89,7 +89,7 @@ export const TrackComponent = {
 
   onupdate({attrs}) {
     // TODO(dproy): Figure out how track implementations should render DOM.
-    if (attrs.trackContext.isOnCanvas()) {
+    if (attrs.trackContext.isOnCanvas() && attrs.trackState.height > 0) {
       this.track.renderCanvas(
           attrs.trackContext,
           attrs.width,
