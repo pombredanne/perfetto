@@ -35,9 +35,7 @@ class TraceParser {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
-  TraceParser(BlobReader* reader,
-              TraceProcessorContext*,
-              uint32_t chunk_size_b);
+  TraceParser(BlobReader*, TraceProcessorContext*, uint32_t chunk_size_b);
 
   // Parses the next chunk of TracePackets from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.

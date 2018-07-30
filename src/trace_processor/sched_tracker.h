@@ -27,7 +27,7 @@ namespace trace_processor {
 class TraceProcessorContext;
 
 // TODO:(b/111252261): The processing of cpu freq events and calculation
-// of cycles is yet to be implemented here.
+// of cycles is still to be implemented here.
 
 // This class takes sched events from the trace and processes them to store
 // as sched slices.
@@ -49,6 +49,7 @@ class SchedTracker {
     bool valid() const { return timestamp != 0; }
   };
 
+  // This method is called when a sched switch event is seen in the trace.
   virtual void PushSchedSwitch(uint32_t cpu,
                                uint64_t timestamp,
                                uint32_t prev_pid,
@@ -58,7 +59,7 @@ class SchedTracker {
                                uint32_t next_pid);
 
  private:
-  // One entry for each CPU in the trace.
+  // Store the previous sched event to calculate the duration before storing it.
   std::array<SchedSwitchEvent, TraceStorage::kMaxCpus> last_sched_per_cpu_;
 
   TraceProcessorContext* const context_;
