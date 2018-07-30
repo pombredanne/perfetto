@@ -89,12 +89,6 @@ class TraceStorage {
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
-    void ClearSlices() {
-      start_ns_.clear();
-      durations_.clear();
-      utids_.clear();
-    }
-
    private:
     // Each vector below has the same number of entries (the number of slices
     // in the trace for the CPU).
