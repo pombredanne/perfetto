@@ -13,14 +13,15 @@
 // limitations under the License.
 
 import {TrackState} from '../../common/state';
-import {GridlineHelper} from '../../frontend/gridline_helper';
+import {drawGridLines} from '../../frontend/gridline_helper';
 import {Milliseconds, TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+import {TRACK_KIND} from './common';
 
 class CpuSliceTrack extends Track {
-  static readonly type = 'CpuSliceTrack';
+  static readonly kind = TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
     return new CpuSliceTrack(trackState);
   }
@@ -56,7 +57,7 @@ class CpuSliceTrack extends Track {
     vCtx.fillStyle = '#ccc';
     vCtx.fillRect(0, 0, width, 73);
 
-    GridlineHelper.drawGridLines(
+    drawGridLines(
         vCtx,
         timeScale,
         [visibleWindowMs.start, visibleWindowMs.end],
@@ -68,7 +69,7 @@ class CpuSliceTrack extends Track {
 
     vCtx.font = '16px Arial';
     vCtx.fillStyle = '#000';
-    vCtx.fillText(this.trackState.name + ' rendered by canvas', shownStart, 60);
+    vCtx.fillText(this.trackState.kind + ' rendered by canvas', shownStart, 60);
   }
 }
 
