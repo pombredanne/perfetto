@@ -12,28 +12,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Action} from '../common/actions';
 import {State} from '../common/state';
 
-export function rootReducer(state: State, action: Action): State {
+// tslint:disable-next-line no-any
+export function rootReducer(state: State, action: any): State {
   switch (action.type) {
-    // TODO(hjd): Make pure.
-    case 'INCREMENT':
-      state.i++;
-      break;
+    case 'NAVIGATE': {
+      const nextState = {...state};
+      nextState.route = action.route;
+      return nextState;
+    }
+
+    case 'OPEN_TRACE': {
+      const nextState = {...state};
+      nextState.engines = {...state.engines};
+      const id = `${nextState.nextId++}`;
+      nextState.engines[id] = {
+        id,
+        url: action.url,
+      };
+      nextState.route = `/viewer`;
+
+      return nextState;
+    }
+
+    case 'ADD_TRACK': {
+      const nextState = {...state};
+      nextState.tracks = {...state.tracks};
+      const id = `${nextState.nextId++}`;
+      nextState.tracks[id] = {
+        id,
+        engineId: action.engineId,
+        kind: action.trackKind,
+        name: `Cpu Track ${nextState.nextId - 1}`,
+        // TODO(hjd): Should height be part of published information.
+        height: 73,
+        cpu: action.cpu,
+        order: nextState.nextId * 100
+      };
+      return nextState;
+    }
+
+    case 'EXECUTE_QUERY': {
+      const nextState = {...state};
+      nextState.queries = {...state.queries};
+      const id = `${nextState.nextId++}`;
+      nextState.queries[id] = {
+        id,
+        engineId: action.engineId,
+        query: action.query,
+      };
+      return nextState;
+    }
+
     case 'TRACK_ORDER_SWAP':
-      // TODO (michaschwab): Better type for action.
-      const orderSwapAction =
-          action as {type: string, swapIndex1: number, swapIndex2: number};
-      if (!state.tracks[orderSwapAction.swapIndex1] ||
-          state.tracks[orderSwapAction.swapIndex2]) {
+      const nextState = {...state};  // Creates a shallow (!) copy.
+      if (!state.tracks[action.trackId1] || !state.tracks[action.trackId2]) {
         break;
       }
-      const tempOrder = state.tracks[orderSwapAction.swapIndex1].order;
-      state.tracks[orderSwapAction.swapIndex1].order =
-          state.tracks[orderSwapAction.swapIndex2].order;
-      state.tracks[orderSwapAction.swapIndex2].order = tempOrder;
-      break;
+      // Have to save the order since it is overwritten by writing the new order
+      // on nextState because it is only a shallow copy.
+      const tempOrder = state.tracks[action.trackId1].order;
+      nextState.tracks[action.trackId1].order =
+          state.tracks[action.trackId2].order;
+      nextState.tracks[action.trackId2].order = tempOrder;
+      return nextState;
     default:
       break;
   }

@@ -18,5 +18,5 @@ import {rootReducer} from './reducer';
 test('increment', async () => {
   const before = createEmptyState();
   const after = rootReducer(before, {type: 'INCREMENT'});
-  expect(after.i).toBe(1);
+  expect(after.nextId).toBe(1);
 });

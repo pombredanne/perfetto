@@ -71,7 +71,7 @@ export const ScrollingTrackDisplay = {
         return;
       }
 
-      globals.dispatch(swapTrackOrder(oldIndex, newIndex));
+      globals.dispatch(swapTrackOrder(trackState.id, trackValues[newIndex].id));
     };
 
     let trackYOffset = 0;

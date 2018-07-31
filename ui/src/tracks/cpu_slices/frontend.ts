@@ -69,7 +69,7 @@ class CpuSliceTrack extends Track {
 
     vCtx.font = '16px Arial';
     vCtx.fillStyle = '#000';
-    vCtx.fillText(this.trackState.kind + ' rendered by canvas', shownStart, 60);
+    vCtx.fillText(this.trackState.name + ' rendered by canvas', shownStart, 60);
   }
 }
 

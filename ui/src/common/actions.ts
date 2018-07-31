@@ -14,11 +14,42 @@
 
 export interface Action { type: string; }
 
-// TODO (michaschwab): Should these be TrackStates? Or leave as Index?
-export function swapTrackOrder(swapIndex1: number, swapIndex2: number) {
+export function openTrace(url: string) {
+  return {
+    type: 'OPEN_TRACE',
+    url,
+  };
+}
+
+// TODO(hjd): Remove CPU and add a generic way to handle track specific state.
+export function addTrack(engineId: string, trackKind: string, cpu: number) {
+  return {
+    type: 'ADD_TRACK',
+    engineId,
+    trackKind,
+    cpu,
+  };
+}
+
+export function executeQuery(engineId: string, query: string) {
+  return {
+    type: 'EXECUTE_QUERY',
+    engineId,
+    query,
+  };
+}
+
+export function navigate(route: string) {
+  return {
+    type: 'NAVIGATE',
+    route,
+  };
+}
+
+export function swapTrackOrder(trackId1: string, trackId2: string) {
   return {
     type: 'TRACK_ORDER_SWAP',
-    swapIndex1,
-    swapIndex2,
+    trackId1,
+    trackId2,
   };
 }

@@ -19,22 +19,46 @@
  */
 export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 
-export interface State {
-  i: number;
-  tracks: ObjectById<TrackState>;
-}
-
 export interface TrackState {
   id: string;
-  type: string;
+  engineId: string;
   height: number;
   kind: string;
   order: number;
+  name: string;
+  // TODO(hjd): This needs to be nested into track kind spesific state.
+  cpu: number;
+}
+
+export interface EngineConfig {
+  id: string;
+  url: string;
+}
+
+export interface QueryConfig {
+  id: string;
+  engineId: string;
+  query: string;
+}
+
+export interface State {
+  route: string|null;
+  nextId: number;
+
+  /**
+   * Open traces.
+   */
+  engines: ObjectById<EngineConfig>;
+  tracks: ObjectById<TrackState>;
+  queries: ObjectById<QueryConfig>;
 }
 
 export function createEmptyState(): State {
   return {
-    i: 0,
+    route: null,
+    nextId: 0,
     tracks: {},
+    engines: {},
+    queries: {},
   };
 }

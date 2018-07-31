@@ -27,7 +27,7 @@ export const TrackComponent = {
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.get(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.kind);
     this.track = trackCreator.create(attrs.trackState);
   },
 
@@ -64,7 +64,7 @@ export const TrackComponent = {
           },
           m('h1',
             {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.kind),
+            attrs.trackState.name),
           m('.reorder-icons',
             m('a.move-up',
               {
@@ -129,7 +129,7 @@ export const TrackComponent = {
                 background: '#aca'
               }
             },
-            attrs.trackState.kind + ' DOM Content')));
+            attrs.trackState.name + ' DOM Content')));
   },
 
   onupdate({attrs}) {
