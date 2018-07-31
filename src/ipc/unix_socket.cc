@@ -405,6 +405,10 @@ void UnixSocket::Shutdown(bool notify) {
   state_ = State::kDisconnected;
 }
 
+size_t UnixSocket::Receive(void* msg, size_t len) {
+  return Receive(msg, len, nullptr, 0);
+}
+
 size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* fd_vec, size_t max_files) {
   if (state_ != State::kConnected) {
     last_error_ = ENOTCONN;
