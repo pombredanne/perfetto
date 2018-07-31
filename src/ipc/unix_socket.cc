@@ -335,19 +335,16 @@ bool UnixSocket::Send(const void* msg,
 
   if (num_fds > 0) {
     const CBufLenType control_buf_len =
-        static_cast<CBufLenType>(num_fds * CMSG_SPACE(sizeof(int)));
+        static_cast<CBufLenType>(CMSG_SPACE(num_fds * sizeof(int)));
     PERFETTO_CHECK(control_buf_len <= sizeof(control_buf));
     memset(control_buf, 0, sizeof(control_buf));
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen = control_buf_len;
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg_hdr);
-    for (size_t i = 0; i < num_fds; ++i) {
-      cmsg->cmsg_level = SOL_SOCKET;
-      cmsg->cmsg_type = SCM_RIGHTS;
-      cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-      memcpy(CMSG_DATA(cmsg), &send_fds[i], sizeof(int));
-      cmsg = CMSG_NXTHDR(&msg_hdr, cmsg);
-    }
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(num_fds * sizeof(int));
+    memcpy(CMSG_DATA(cmsg), send_fds, num_fds * sizeof(int));
   }
 
   if (blocking_mode == BlockingMode::kBlocking)
@@ -427,7 +424,7 @@ size_t UnixSocket::Receive(void* msg,
   if (max_files > 0) {
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen =
-        static_cast<CBufLenType>(max_files * CMSG_SPACE(sizeof(int)));
+        static_cast<CBufLenType>(CMSG_SPACE(max_files * sizeof(int)));
     PERFETTO_CHECK(msg_hdr.msg_controllen <= sizeof(control_buf));
   }
   const ssize_t sz = PERFETTO_EINTR(recvmsg(*fd_, &msg_hdr, kNoSigPipe));
