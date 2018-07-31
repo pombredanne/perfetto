@@ -91,38 +91,35 @@ export const OverviewTimeline = {
  */
 const HorizontalBrushSelection = {
   oninit() {
-    let draggingStart = false;
-    let draggingEnd = false;
+    let dragState: 'start'|'end'|'none' = 'none';
 
     this.rightHandleMouseDownListener = () => {
-      draggingEnd = true;
+      dragState = 'end';
     };
     this.leftHandleMouseDownListener = () => {
-      draggingStart = true;
+      dragState = 'start';
     };
     this.mouseMoveListener = (e: MouseEvent) => {
-      if (draggingStart || draggingEnd) {
-        // Prevent text selections
-        e.preventDefault();
+      if (dragState === 'none') {
+        return;
+      }
+      // Prevent text selections
+      e.preventDefault();
 
-        const posX = e.clientX - this.offsetLeft;
-        if ((draggingEnd && posX < this.selectionPx.start) ||
-            (draggingStart && posX > this.selectionPx.end)) {
-          // Flip start and end if handle has been dragged past the other limit.
-          draggingStart = !draggingStart;
-          draggingEnd = !draggingEnd;
-        }
-        if (draggingStart) {
-          this.onBrushedPx(posX, this.selectionPx.end);
-        }
-        if (draggingEnd) {
-          this.onBrushedPx(this.selectionPx.start, posX);
-        }
+      const posX = e.clientX - this.offsetLeft;
+      if ((dragState === 'end' && posX < this.selectionPx.start) ||
+          (dragState === 'start' && posX > this.selectionPx.end)) {
+        // Flip start and end if handle has been dragged past the other limit.
+        dragState = dragState === 'start' ? 'end' : 'start';
+      }
+      if (dragState === 'start') {
+        this.onBrushedPx(posX, this.selectionPx.end);
+      } else {
+        this.onBrushedPx(this.selectionPx.start, posX);
       }
     };
     this.mouseUpListener = () => {
-      draggingStart = false;
-      draggingEnd = false;
+      dragState = 'none';
     };
   },
   oncreate(vnode) {

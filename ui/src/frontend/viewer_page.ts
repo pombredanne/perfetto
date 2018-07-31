@@ -104,7 +104,7 @@ const TraceViewer = {
         {
           style: {
             width: '100%',
-            height: 'calc(100% - 104px)',
+            height: '100%',
           },
         },
         m(OverviewTimeline, {
