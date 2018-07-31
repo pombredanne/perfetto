@@ -21,7 +21,6 @@
 #include <sys/types.h>
 
 #include <memory>
-#include <vector>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -171,7 +170,10 @@ class UnixSocket {
   // received FD into that. If a FD is received but the ScopedFile pointer is
   // null, the FD will be automatically closed.
   size_t Receive(void* msg, size_t len);
-  size_t Receive(void* msg, size_t len, base::ScopedFile*, size_t max_files = 1);
+  size_t Receive(void* msg,
+                 size_t len,
+                 base::ScopedFile*,
+                 size_t max_files = 1);
 
   // Only for tests. This is slower than Receive() as it requires a heap
   // allocation and a copy for the std::string. Guarantees that the returned
