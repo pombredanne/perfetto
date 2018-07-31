@@ -29,9 +29,9 @@ function createNewWasmEngineWorkerPort(): MessagePort {
   return channel.port2;
 }
 
-export function createWasmEngineWorkerPort(): MessagePort {
+export function takeWasmEngineWorkerPort(): MessagePort {
   if (warmWasmWorkerPort === null) {
-    return createNewWasmEngineWorkerPort();
+    throw new Error('warmWasmEngineWorker not called');
   }
   const port = warmWasmWorkerPort;
   warmWasmWorkerPort = createNewWasmEngineWorkerPort();
@@ -48,7 +48,7 @@ export function createWasmEngineWorkerPort(): MessagePort {
  */
 export function warmupWasmEngineWorker(): void {
   if (warmWasmWorkerPort !== null) {
-    return;
+    throw new Error('warmWasmEngineWorker already called');
   }
   warmWasmWorkerPort = createNewWasmEngineWorkerPort();
 }

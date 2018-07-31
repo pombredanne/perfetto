@@ -14,7 +14,7 @@
 
 import {
   Engine,
-  Publish,
+  PublishFn,
   TrackController,
   TrackState
 } from '../../controller/track_controller';
@@ -26,7 +26,7 @@ import {TRACK_KIND} from './common';
 
 class CpuCounterTrackController extends TrackController {
   static readonly kind = TRACK_KIND;
-  static create(_config: TrackState, _engine: Engine, _publish: Publish):
+  static create(_config: TrackState, _engine: Engine, _publish: PublishFn):
       TrackController {
     return new CpuCounterTrackController();
   }

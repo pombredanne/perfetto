@@ -15,7 +15,7 @@
 import {rawQueryResultToRows} from '../../common/protos';
 import {
   Engine,
-  Publish,
+  PublishFn,
   TrackController,
   TrackState
 } from '../../controller/track_controller';
@@ -31,16 +31,16 @@ import {TRACK_KIND} from './common';
 class CpuSliceTrackController extends TrackController {
   static readonly kind = TRACK_KIND;
 
-  static create(config: TrackState, engine: Engine, publish: Publish):
+  static create(config: TrackState, engine: Engine, publish: PublishFn):
       TrackController {
     return new CpuSliceTrackController(config.cpu, engine, publish);
   }
 
   private cpu: number;
   private engine: Engine;
-  private publish: Publish;
+  private publish: PublishFn;
 
-  constructor(cpu: number, engine: Engine, publish: Publish) {
+  constructor(cpu: number, engine: Engine, publish: PublishFn) {
     super();
     this.cpu = cpu;
     this.engine = engine;

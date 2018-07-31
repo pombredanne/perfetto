@@ -52,37 +52,39 @@ class EngineController {
     this.config = config;
     this._state = 'init';
     this.deferredOnReady = new Set();
-    this.move('waiting_for_file');
+    this.transition('waiting_for_file');
   }
 
   get state(): EngineControllerState {
     return this._state;
   }
 
-  async move(newState: EngineControllerState) {
+  async transition(newState: EngineControllerState) {
     switch (newState) {
       case 'waiting_for_file':
         this.controller.fetchBlob(this.config.url).then(blob => {
           this.blob = blob;
-          this.move('loading');
+          this.transition('loading');
         });
         break;
       case 'loading':
         const blob = assertExists<Blob>(this.blob);
         this.engine = await this.controller.createEngine(blob);
-        this.move('ready');
+        this.transition('ready');
         break;
       case 'ready':
         const engine = assertExists<Engine>(this.engine);
         const numberOfCpus = await engine.getNumberOfCpus();
-        const tracks = [];
+        const addToTrackActions = [];
         for (let i = 0; i < numberOfCpus; i++) {
-          tracks.push(addTrack(this.config.id, 'CpuSliceTrack', i));
+          addToTrackActions.push(addTrack(this.config.id, 'CpuSliceTrack', i));
         }
-        this.controller.dispatchMultiple(tracks);
+        this.controller.dispatchMultiple(addToTrackActions);
         this.deferredOnReady.forEach(d => d.resolve(engine));
         this.deferredOnReady.clear();
         break;
+      default:
+        throw new Error(`No such state ${newState}`);
     }
     this._state = newState;
   }
@@ -222,8 +224,8 @@ class Controller {
     return repsonse.blob();
   }
 
-  publish(id: string, result: any) {
-    this.frontend.publish(id, result);
+  publish(id: string, data: {}) {
+    this.frontend.publish(id, data);
   }
 
   addLocalFile(file: File): string {
@@ -257,7 +259,7 @@ class FrontendProxy {
     return this.remote.send<MessagePort>('createWasmEnginePort', []);
   }
 
-  publish(id: string, data: any) {
+  publish(id: string, data: {}) {
     return this.remote.send<void>('publish', [id, data]);
   }
 }

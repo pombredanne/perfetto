@@ -51,7 +51,7 @@ export abstract class Engine {
 
   // TODO(hjd): Maybe we should cache result? But then Engine must be
   // streaming aware.
-  async getStartEnd(): Promise<[number, number]> {
+  async getTraceTimeBounds(): Promise<[number, number]> {
     const result = await this.rawQuery({
       sqlQuery: 'select max(ts) as start, min(ts) as end from sched;',
     });

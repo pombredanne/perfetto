@@ -14,6 +14,7 @@
 
 import {State} from '../common/state';
 
+// tslint:disable-next-line no-any
 export function rootReducer(state: State, action: any): State {
   switch (action.type) {
     case 'NAVIGATE': {
@@ -25,8 +26,7 @@ export function rootReducer(state: State, action: any): State {
     case 'OPEN_TRACE': {
       const nextState = {...state};
       nextState.engines = {...state.engines};
-
-      const id = '' + nextState.nextId++;
+      const id = `${nextState.nextId++}`;
       nextState.engines[id] = {
         id,
         url: action.url,
@@ -39,7 +39,7 @@ export function rootReducer(state: State, action: any): State {
     case 'ADD_TRACK': {
       const nextState = {...state};
       nextState.tracks = {...state.tracks};
-      const id = '' + nextState.nextId++;
+      const id = `${nextState.nextId++}`;
       nextState.tracks[id] = {
         id,
         engineId: action.engineId,
@@ -55,7 +55,7 @@ export function rootReducer(state: State, action: any): State {
     case 'EXECUTE_QUERY': {
       const nextState = {...state};
       nextState.queries = {...state.queries};
-      const id = '' + nextState.nextId++;
+      const id = `${nextState.nextId++}`;
       nextState.queries[id] = {
         id,
         engineId: action.engineId,

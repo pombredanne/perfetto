@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import {ChildVirtualContext} from './child_virtual_context';
+import Mock = jest.Mock;
 import {RootVirtualContext} from './root_virtual_context';
 
 const setupCanvasContext = () => {
@@ -36,7 +37,7 @@ test('virtual canvas context offsets work on fillrect', async () => {
   const ctx = setupCanvasContext();
   const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
-  const mockCalls = (ctx.fillRect).mock.calls;
+  const mockCalls = (ctx.fillRect as Mock).mock.calls;
 
   virtualContext.fillRect(10, 5, 100, 20);
 
@@ -48,7 +49,7 @@ test('virtual canvas context offsets work on filltext', async () => {
   const ctx = setupCanvasContext();
   const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
-  const mockCalls = (ctx.fillText).mock.calls;
+  const mockCalls = (ctx.fillText as Mock).mock.calls;
 
   virtualContext.fillText('', 10, 5);
 
@@ -62,11 +63,11 @@ test('virtual canvas context offsets work on moveto and lineto', async () => {
   const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
 
-  const mockCallsMove = (ctx.moveTo).mock.calls;
+  const mockCallsMove = (ctx.moveTo as Mock).mock.calls;
   virtualContext.moveTo(10, 5);
   expect(mockCallsMove[0]).toEqual([110, 205]);
 
-  const mockCallsLine = (ctx.lineTo).mock.calls;
+  const mockCallsLine = (ctx.lineTo as Mock).mock.calls;
   virtualContext.lineTo(10, 5);
   expect(mockCallsLine[0]).toEqual([110, 205]);
 });
@@ -112,7 +113,7 @@ test('virtual canvas context limits the bbox', async () => {
 
 test('nested virtual canvas contexts work', async () => {
   const ctx = setupCanvasContext();
-  const mockCalls = (ctx.moveTo).mock.calls;
+  const mockCalls = (ctx.moveTo as Mock).mock.calls;
   const virtualContext =
       new ChildVirtualContext(ctx, {x: 100, y: 200, width: 200, height: 150});
   const virtualContext2 = new ChildVirtualContext(

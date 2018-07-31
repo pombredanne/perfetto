@@ -26,7 +26,9 @@ class Globals {
   _state?: State = undefined;
   _controller?: ControllerProxy = undefined;
 
-  published = new Map<string, any>();
+  // Frequently changing data from the controller. Each item is keyed by an ID.
+  // TODO(dproy): Replace with the real thing.
+  published = new Map<string, {}>();
 
   get state(): State {
     if (this._state === undefined) throw new Error('Global not set');

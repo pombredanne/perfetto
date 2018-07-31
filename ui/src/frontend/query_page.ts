@@ -87,9 +87,9 @@ function getQueryResponses(engineId: string): Array<Partial<QueryResponse>> {
   for (const config of Object.values<QueryConfig>(globals.state.queries)) {
     if (config.engineId !== engineId) continue;
 
-    const response: QueryResponse|undefined = globals.published.get(config.id);
+    const response = globals.published.get(config.id);
     if (response) {
-      responses.push(response);
+      responses.push(response as QueryResponse);
     } else {
       responses.push({
         id: config.id,

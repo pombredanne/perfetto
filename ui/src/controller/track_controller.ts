@@ -15,7 +15,7 @@
 import {TrackState} from '../common/state';
 import {Engine} from './engine';
 
-export interface Publish { (data: {}): void; }
+export interface PublishFn { (data: {}): void; }
 
 /**
  * This interface forces track implementations to have two static properties:
@@ -26,7 +26,8 @@ export interface TrackControllerCreator {
   // case we ever minify our code.
   readonly kind: string;
 
-  create(config: TrackState, engine: Engine, publish: Publish): TrackController;
+  create(config: TrackState, engine: Engine, publish: PublishFn):
+      TrackController;
 }
 
 export abstract class TrackController {

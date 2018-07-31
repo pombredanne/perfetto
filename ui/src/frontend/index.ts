@@ -19,7 +19,7 @@ import * as m from 'mithril';
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {State} from '../common/state';
 import {
-  createWasmEngineWorkerPort,
+  takeWasmEngineWorkerPort,
   warmupWasmEngineWorker
 } from '../controller/wasm_engine_proxy';
 
@@ -47,7 +47,7 @@ class FrontendApi {
     this.redraw();
   }
 
-  publish(id: string, data: any) {
+  publish(id: string, data: {}) {
     globals.published.set(id, data);
     this.redraw();
   }
@@ -60,7 +60,7 @@ class FrontendApi {
    * TODO(hjd): Remove this once the fix has landed.
    */
   createWasmEnginePort(): MessagePort {
-    return createWasmEngineWorkerPort();
+    return takeWasmEngineWorkerPort();
   }
 
   private redraw(): void {
@@ -103,7 +103,9 @@ async function main() {
     },
   });
 
+  // tslint:disable-next-line no-any
   (window as any).m = m;
+  // tslint:disable-next-line no-any
   (window as any).globals = globals;
 }
 
