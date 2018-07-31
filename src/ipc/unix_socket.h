@@ -21,6 +21,7 @@
 #include <sys/types.h>
 
 #include <memory>
+#include <vector>
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -156,6 +157,10 @@ class UnixSocket {
             size_t len,
             int send_fd = -1,
             BlockingMode blocking = BlockingMode::kNonBlocking);
+  bool Send(const void* msg,
+            size_t len,
+            std::vector<int> send_fds,
+            BlockingMode blocking = BlockingMode::kNonBlocking);
   bool Send(const std::string& msg);
 
   // Returns the number of bytes (<= |len|) written in |msg| or 0 if there
@@ -165,6 +170,7 @@ class UnixSocket {
   // received FD into that. If a FD is received but the ScopedFile pointer is
   // null, the FD will be automatically closed.
   size_t Receive(void* msg, size_t len, base::ScopedFile* = nullptr);
+  size_t ReceiveMany(void* msg, size_t len, std::vector<base::ScopedFile>* fds);
 
   // Only for tests. This is slower than Receive() as it requires a heap
   // allocation and a copy for the std::string. Guarantees that the returned
