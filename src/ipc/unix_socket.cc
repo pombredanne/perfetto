@@ -331,7 +331,7 @@ bool UnixSocket::Send(const void* msg,
   iovec iov = {const_cast<void*>(msg), len};
   msg_hdr.msg_iov = &iov;
   msg_hdr.msg_iovlen = 1;
-  alignas(cmsghdr) char control_buf[256] = {};
+  alignas(cmsghdr) char control_buf[256];
 
   if (num_fds > 0) {
     const CBufLenType control_buf_len =
@@ -345,6 +345,7 @@ bool UnixSocket::Send(const void* msg,
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(num_fds * sizeof(int));
     memcpy(CMSG_DATA(cmsg), send_fds, num_fds * sizeof(int));
+    msg_hdr.msg_controllen = cmsg->cmsg_len;
   }
 
   if (blocking_mode == BlockingMode::kBlocking)
@@ -448,7 +449,7 @@ size_t UnixSocket::Receive(void* msg,
       const size_t payload_len = cmsg->cmsg_len - CMSG_LEN(0);
       if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
         PERFETTO_DCHECK(payload_len % sizeof(int) == 0u);
-        PERFETTO_DCHECK(fds == nullptr);
+        PERFETTO_CHECK(fds == nullptr);
         fds = reinterpret_cast<int*>(CMSG_DATA(cmsg));
         fds_len = static_cast<uint32_t>(payload_len / sizeof(int));
       }
