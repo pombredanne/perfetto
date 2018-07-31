@@ -22,6 +22,29 @@ import {Track} from './track';
 import {trackRegistry} from './track_registry';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
+interface TrackComponentAttrs {
+  trackContext: VirtualCanvasContext;
+  top: number;
+  width: number;
+  timeScale: TimeScale;
+  trackState: TrackState;
+  visibleWindowMs: {start: number, end: number};
+}
+
+function oncreateAndUpdate(attrs: TrackComponentAttrs, track: Track) {
+  // TODO(dproy): Figure out how track implementations should render DOM.
+  const trackData = globals.trackDataStore.getTrackData(attrs.trackState.id);
+  if (trackData !== undefined) track.setData(trackData);
+
+  if (attrs.trackContext.isOnCanvas()) {
+    track.renderCanvas(
+        attrs.trackContext,
+        attrs.width,
+        attrs.timeScale,
+        attrs.visibleWindowMs);
+  }
+}
+
 export const TrackComponent = {
   oninit({attrs}) {
     // TODO: Since ES6 modules are asynchronous and it is conceivable that we
@@ -33,8 +56,6 @@ export const TrackComponent = {
   },
 
   view({attrs}) {
-    const trackData = globals.trackDataStore.getTrackData(attrs.trackState.id);
-    if (trackData !== undefined) this.track.setData(trackData);
 
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
@@ -91,34 +112,12 @@ export const TrackComponent = {
             attrs.trackState.kind + ' DOM Content')));
   },
 
+
   oncreate({attrs}): void {
-    // TODO: Remove duplication.
-    if (attrs.trackContext.isOnCanvas()) {
-      this.track.renderCanvas(
-          attrs.trackContext,
-          attrs.width,
-          attrs.timeScale,
-          attrs.visibleWindowMs);
-    }
+    oncreateAndUpdate(attrs, this.track);
   },
 
   onupdate({attrs}) {
-    // TODO(dproy): Figure out how track implementations should render DOM.
-    if (attrs.trackContext.isOnCanvas()) {
-      this.track.renderCanvas(
-          attrs.trackContext,
-          attrs.width,
-          attrs.timeScale,
-          attrs.visibleWindowMs);
-    }
+    oncreateAndUpdate(attrs, this.track);
   }
-} as m.Component<{
-  trackContext: VirtualCanvasContext,
-  top: number,
-  width: number,
-  timeScale: TimeScale,
-  trackState: TrackState,
-  visibleWindowMs: {start: number, end: number},
-},
-                              // TODO(dproy): Fix formatter. This is ridiculous.
-                              {track: Track}>;
+} as m.Component<TrackComponentAttrs, {track: Track}>;

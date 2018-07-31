@@ -13,44 +13,44 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// import {TrackState} from '../common/state';
-// import {dingus} from '../test/dingus';
+import {TrackState} from '../common/state';
+import {dingus} from '../test/dingus';
 
-// import {Track, TrackCreator} from './track';
-// import {trackRegistry} from './track_registry';
+import {Track, TrackCreator} from './track';
+import {trackRegistry} from './track_registry';
 
-// // Cannot use dingus on an abstract class.
-// class MockTrack extends Track {
-//   setData() {}
-//   renderCanvas() {}
-// }
+// Cannot use dingus on an abstract class.
+class MockTrack extends Track {
+  setData() {}
+  renderCanvas() {}
+}
 
-// function mockTrackCreator(type: string): TrackCreator {
-//   return {
-//     type,
-//     create: () => new MockTrack(dingus<TrackState>()),
-//   };
-// }
+function mockTrackCreator(kind: string): TrackCreator {
+  return {
+    kind,
+    create: () => new MockTrack(dingus<TrackState>()),
+  };
+}
 
-// beforeEach(() => {
-//   trackRegistry.unregisterAllTracksForTesting();
-// });
+beforeEach(() => {
+  trackRegistry.unregisterAllForTesting();
+});
 
-// test('trackRegistry returns correct track', () => {
-//   trackRegistry.register(mockTrackCreator('track1'));
-//   trackRegistry.register(mockTrackCreator('track2'));
+test('trackRegistry returns correct track', () => {
+  trackRegistry.register(mockTrackCreator('track1'));
+  trackRegistry.register(mockTrackCreator('track2'));
 
-//   expect(trackRegistry.getCreator('track1').type).toEqual('track1');
-//   expect(trackRegistry.getCreator('track2').type).toEqual('track2');
-// });
+  expect(trackRegistry.get('track1').kind).toEqual('track1');
+  expect(trackRegistry.get('track2').kind).toEqual('track2');
+});
 
-// test('trackRegistry throws error on name collision', () => {
-//   const creator1 = mockTrackCreator('someTrack');
-//   const creator2 = mockTrackCreator('someTrack');
-//   trackRegistry.register(creator1);
-//   expect(() => trackRegistry.register(creator2)).toThrow();
-// });
+test('trackRegistry throws error on name collision', () => {
+  const creator1 = mockTrackCreator('someTrack');
+  const creator2 = mockTrackCreator('someTrack');
+  trackRegistry.register(creator1);
+  expect(() => trackRegistry.register(creator2)).toThrow();
+});
 
-// test('trackRegistry throws error on non-existent track', () => {
-//   expect(() => trackRegistry.getCreator('nonExistentTrack')).toThrow();
-// });
+test('trackRegistry throws error on non-existent track', () => {
+  expect(() => trackRegistry.get('nonExistentTrack')).toThrow();
+});

@@ -15,8 +15,20 @@
 import {TrackState} from '../common/state';
 
 import {TimeScale} from './time_scale';
-import {TrackData} from './track_data_store';
 import {VirtualCanvasContext} from './virtual_canvas_context';
+
+/**
+ * To recieve data from the controller, tracks must declare the data type by
+ * extending this TrackData interface.
+ */
+export interface TrackData {
+  id: string;
+  // Putting in the kind so that we can do the very basic validation.
+  // TODO: This should be the same as track kind. Can we remove the duplication?
+  // TODO: The validation currently lives within extension code. Is there any
+  // way to put the validation in core code?
+  trackKind: string;
+}
 
 /**
  * This interface forces track implementations to have some static properties.

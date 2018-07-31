@@ -16,7 +16,7 @@ import {TrackState} from '../../common/state';
 import {drawGridLines} from '../../frontend/gridline_helper';
 import {TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
-import {TrackData} from '../../frontend/track_data_store';
+import {TrackData} from '../../frontend/track';
 
 interface CpuSlice {
   start: number;
@@ -26,14 +26,14 @@ interface CpuSlice {
 
 export interface CpuSliceTrackData extends TrackData {
   id: string;
-  // TODO: Rename to kind.
-  trackType: (typeof CpuSliceTrack)['kind'];
+  trackKind: (typeof CpuSliceTrack)['kind'];
   // TODO: Is there any point of having this extra nesting?
   data: {slices: CpuSlice[];};
 }
 
-function isCpuSliceTrackData(d: TrackData): d is CpuSliceTrackData {
-  return d.trackType === CpuSliceTrack.kind;
+function isCpuSliceTrackData(trackData: TrackData):
+    trackData is CpuSliceTrackData {
+  return trackData.trackKind === CpuSliceTrack.kind;
 }
 
 function sliceIsVisible(
@@ -55,7 +55,7 @@ class CpuSliceTrack extends Track {
   }
 
   static validataData(trackData: TrackData): trackData is CpuSliceTrackData {
-    return trackData.trackType === 'CpuSliceTrackData';
+    return trackData.trackKind === 'CpuSliceTrackData';
   }
 
   setData(trackData: TrackData) {
@@ -81,7 +81,7 @@ class CpuSliceTrack extends Track {
         const rectStart = timeScale.msToPx(slice.start);
         const rectEnd = timeScale.msToPx(slice.end);
 
-        // // TODO: Doing this for every slice is super ugly. Should we remove
+        // TODO: Doing this for every slice is super ugly. Should we remove
         // bounds checking from virtual canvas context?
         const shownStart = Math.max(rectStart, 0);
         const shownEnd = Math.min(width, rectEnd);

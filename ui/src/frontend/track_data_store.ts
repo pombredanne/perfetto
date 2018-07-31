@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export interface TrackData {
-  id: string;
-  // Putting in the type so that we can do the very basic validation.
-  // TODO: Rename to kind.
-  trackType: string;
-}
+import {TrackData} from './track';
 
 /**
  * Maps track IDs to the data a track needs to render. Track data is assumed to

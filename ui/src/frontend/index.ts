@@ -103,7 +103,7 @@ function setDemoData(): void {
     if (i % 2 !== 0) continue;
     const d = {
       id: i.toString(),
-      trackType: 'CpuSliceTrack',
+      trackKind: 'CpuSliceTrack',
       data: {
         slices: generateRandomSlices(
             0, maxVisibleWidth, initialSliceWidth, initialSliceWidth),
