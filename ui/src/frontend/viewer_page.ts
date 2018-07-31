@@ -50,10 +50,13 @@ const TraceViewer = {
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
 
+    const panZoomEl =
+        vnode.dom.getElementsByClassName('page-content')[0] as HTMLElement;
+
     // TODO: ContentOffsetX should be defined somewhere central.
     // Currently it lives here, in canvas wrapper, and in track shell.
     this.zoomContent = new PanAndZoomHandler({
-      element: vnode.dom as HTMLElement,
+      element: panZoomEl,
       contentOffsetX: this.contentOffsetX,
       onPanned: (pannedPx: number) => {
         const deltaMs = this.timeScale.deltaPxToDurationMs(pannedPx);
@@ -97,7 +100,7 @@ const TraceViewer = {
     };
 
     return m(
-        '.frontend-content',
+        '#page',
         {
           style: {
             width: '100%',
@@ -110,16 +113,23 @@ const TraceViewer = {
           width: this.width,
           onBrushedMs
         }),
-        m(TimeAxis, {
-          timeScale: this.timeScale,
-          contentOffset: 200,
-          visibleWindowMs: this.visibleWindowMs,
-          width: this.width,
-        }),
-        m(ScrollingTrackDisplay, {
-          timeScale: this.timeScale,
-          visibleWindowMs: this.visibleWindowMs,
-        }));
+        m('.page-content',
+          {
+            style: {
+              width: '100%',
+              height: '100%',
+            }
+          },
+          m(TimeAxis, {
+            timeScale: this.timeScale,
+            contentOffset: 200,
+            visibleWindowMs: this.visibleWindowMs,
+            width: this.width,
+          }),
+          m(ScrollingTrackDisplay, {
+            timeScale: this.timeScale,
+            visibleWindowMs: this.visibleWindowMs,
+          })));
   },
 } as m.Component<{}, {
   visibleWindowMs: {start: number, end: number},

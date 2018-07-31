@@ -101,13 +101,11 @@ const HorizontalBrushSelection = {
     let draggingStart = false;
     let draggingEnd = false;
 
-    this.rightHandleMouseDownListener = e => {
+    this.rightHandleMouseDownListener = () => {
       draggingEnd = true;
-      e.stopPropagation();
     };
-    this.leftHandleMouseDownListener = e => {
+    this.leftHandleMouseDownListener = () => {
       draggingStart = true;
-      e.stopPropagation();
     };
     this.mouseMoveListener = (e: MouseEvent) => {
       if (draggingStart || draggingEnd) {
@@ -125,7 +123,6 @@ const HorizontalBrushSelection = {
           this.onBrushedPx(this.selectionPx.start, posX);
         }
       }
-      e.stopPropagation();
     };
     this.mouseUpListener = () => {
       draggingStart = false;

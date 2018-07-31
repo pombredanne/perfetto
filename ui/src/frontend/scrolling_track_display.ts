@@ -93,7 +93,7 @@ export const ScrollingTrackDisplay = {
             contentHeight: 1000,
             onPassiveScroll: (scrollTop: number) => {
               this.canvasController.updateScrollOffset(scrollTop);
-              m.redraw();  // TODO: Remove this comment;
+              m.redraw();
             },
           },
           m(CanvasWrapper, {

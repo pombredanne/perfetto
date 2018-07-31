@@ -79,7 +79,6 @@ export const TimeAxis = {
             width: attrs.width.toString() + 'px',
             overflow: 'hidden',
             height: '41px',
-            /*background: '#eef',*/
             position: 'relative',
           },
         },
