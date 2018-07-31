@@ -13,3 +13,12 @@
 // limitations under the License.
 
 export interface Action { type: string; }
+
+// TODO (michaschwab): Should these be TrackStates? Or leave as Index?
+export function swapTrackOrder(swapIndex1: number, swapIndex2: number) {
+  return {
+    type: 'TRACK_ORDER_SWAP',
+    swapIndex1,
+    swapIndex2,
+  };
+}

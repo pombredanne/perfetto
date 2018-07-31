@@ -14,6 +14,7 @@
 
 import * as m from 'mithril';
 
+import {swapTrackOrder} from '../common/actions';
 import {TrackState} from '../common/state';
 
 import {CanvasController} from './canvas_controller';
@@ -70,10 +71,7 @@ export const ScrollingTrackDisplay = {
         return;
       }
 
-      const temp = trackValues[newIndex].order;
-      trackValues[newIndex].order = trackState.order;
-      trackValues[oldIndex].order = temp;
-      m.redraw();
+      globals.dispatch(swapTrackOrder(oldIndex, newIndex));
     };
 
     let trackYOffset = 0;
@@ -103,7 +101,7 @@ export const ScrollingTrackDisplay = {
           style: {
             position: 'relative',
             width: '100%',
-            height: 'calc(100% - 105px)',
+            height: 'calc(100% - 163px)',
             overflow: 'hidden'
           }
         },

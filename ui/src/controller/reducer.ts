@@ -21,6 +21,19 @@ export function rootReducer(state: State, action: Action): State {
     case 'INCREMENT':
       state.i++;
       break;
+    case 'TRACK_ORDER_SWAP':
+      // TODO (michaschwab): Better type for action.
+      const orderSwapAction =
+          action as {type: string, swapIndex1: number, swapIndex2: number};
+      if (!state.tracks[orderSwapAction.swapIndex1] ||
+          state.tracks[orderSwapAction.swapIndex2]) {
+        break;
+      }
+      const tempOrder = state.tracks[orderSwapAction.swapIndex1].order;
+      state.tracks[orderSwapAction.swapIndex1].order =
+          state.tracks[orderSwapAction.swapIndex2].order;
+      state.tracks[orderSwapAction.swapIndex2].order = tempOrder;
+      break;
     default:
       break;
   }
