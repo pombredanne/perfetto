@@ -257,6 +257,7 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   cli->Shutdown(true);
   srv->Shutdown(true);
   task_runner_.RunUntilCheckpoint("srv_disconnected");
+  task_runner_.RunUntilCheckpoint("cli_disconnected");
 }
 
 TEST_F(UnixSocketTest, ListenWithPassedFileDescriptor) {
