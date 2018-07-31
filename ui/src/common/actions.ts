@@ -19,7 +19,7 @@ export function openTrace(url: string) {
     type: 'OPEN_TRACE',
     url,
   };
-};
+}
 
 // TODO(hjd): Remove CPU and add a genric way to handle track specific state.
 export function addTrack(engineId: string, trackKind: string, cpu: number) {
@@ -29,7 +29,7 @@ export function addTrack(engineId: string, trackKind: string, cpu: number) {
     trackKind,
     cpu,
   };
-};
+}
 
 export function executeQuery(engineId: string, query: string) {
   return {
@@ -37,11 +37,11 @@ export function executeQuery(engineId: string, query: string) {
     engineId,
     query,
   };
-};
+}
 
 export function navigate(route: string) {
   return {
     type: 'NAVIGATE',
     route,
   };
-};
+}

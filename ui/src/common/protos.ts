@@ -35,8 +35,9 @@ function getCell(result: RawQueryResult, column: number, row: number): number|
       return +values.doubleValues![row];
     case RawQueryResult.ColumnDesc.Type.STRING:
       return values.stringValues![row];
+    default:
+      throw new Error('Unhandled type!');
   }
-  throw new Error('Unhandled type!');
 }
 
 export function rawQueryResultToColumns(result: RawQueryResult): string[] {
@@ -48,7 +49,7 @@ export function* rawQueryResultToRows(result: RawQueryResult) {
       (name, i): [string, number] => [name, i]);
   for (let rowNum = 0; rowNum < result.numRecords; rowNum++) {
     const row: Row = {};
-    for (let [name, colNum] of columns) {
+    for (const [name, colNum] of columns) {
       row[name] = getCell(result, colNum, rowNum);
     }
     yield row;

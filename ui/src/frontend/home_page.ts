@@ -54,7 +54,7 @@ export const HomePage = createPage({
   view() {
     const engines = Object.values(globals.state.engines);
     return m(
-        '.home-page',
+        '#page.home-page',
         m('.home-page-title', 'Perfetto'),
         m('.home-page-controls',
           m('label.file-input',

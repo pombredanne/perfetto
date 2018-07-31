@@ -108,8 +108,7 @@ function renderTable(columns?: string[], rows?: Row[]): m.Children {
       'table',
       m('thead', m('tr', columns.map(column => m('th', column)))),
       m('tbody',
-        rows.map(
-            row => m('tr', columns.map(column => m('td', row[column]))))));
+        rows.map(row => m('tr', columns.map(column => m('td', row[column]))))));
 }
 
 function renderQueryResponse(entry: Partial<QueryResponse>): m.Children {
@@ -136,8 +135,8 @@ export const QueryPage = createPage({
   view() {
     const engineId = m.route.param('engineId');
     return m(
-        '.query-page',
+        '#page.query-page',
         m(QueryBox, {engineId}),
-        getQueryResponses(engineId).map(renderQueryResponse), );
+        getQueryResponses(engineId).map(renderQueryResponse));
   }
 });

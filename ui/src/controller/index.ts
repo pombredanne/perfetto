@@ -118,7 +118,7 @@ class TrackControllerWrapper {
   }
 }
 
-function firstN<T>(n: number, iter: IterableIterator<T>): Array<T> {
+function firstN<T>(n: number, iter: IterableIterator<T>): T[] {
   const list = [];
   for (let i = 0; i < n; i++) {
     const {done, value} = iter.next();
