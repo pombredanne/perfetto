@@ -14,11 +14,33 @@
 
 import {TrackState} from '../../common/state';
 import {drawGridLines} from '../../frontend/gridline_helper';
-import {Milliseconds, TimeScale} from '../../frontend/time_scale';
+import {TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
-import {trackRegistry} from '../../frontend/track_registry';
-import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
-import {TRACK_KIND} from './common';
+import {TrackData} from '../../frontend/track_data_store';
+
+interface CpuSlice {
+  start: number;
+  end: number;
+  title: string;
+}
+
+export interface CpuSliceTrackData extends TrackData {
+  id: string;
+  // TODO: Rename to kind.
+  trackType: (typeof CpuSliceTrack)['kind'];
+  // TODO: Is there any point of having this extra nesting?
+  data: {slices: CpuSlice[];};
+}
+
+function isCpuSliceTrackData(d: TrackData): d is CpuSliceTrackData {
+  return d.trackType === CpuSliceTrack.kind;
+}
+
+function sliceIsVisible(
+    slice: {start: number, end: number},
+    visibleWindowMs: {start: number, end: number}) {
+  return slice.end > visibleWindowMs.start && slice.start < visibleWindowMs.end;
+}
 
 class CpuSliceTrack extends Track {
   static readonly kind = TRACK_KIND;
@@ -26,37 +48,26 @@ class CpuSliceTrack extends Track {
     return new CpuSliceTrack(trackState);
   }
 
+  private trackData: CpuSliceTrackData|undefined;
+
   constructor(trackState: TrackState) {
     super(trackState);
+  }
+
+  static validataData(trackData: TrackData): trackData is CpuSliceTrackData {
+    return trackData.trackType === 'CpuSliceTrackData';
+  }
+
+  setData(trackData: TrackData) {
+    if (!isCpuSliceTrackData(trackData)) {
+      throw Error('Wrong type assigned :(');
+    }
+    this.trackData = trackData;
   }
 
   renderCanvas(
       vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
       visibleWindowMs: {start: number, end: number}): void {
-    const sliceStart: Milliseconds = 100000;
-    const sliceEnd: Milliseconds = 400000;
-
-    const rectStart = timeScale.msToPx(sliceStart);
-    const rectWidth = timeScale.msToPx(sliceEnd) - rectStart;
-
-    let shownStart = rectStart as number;
-    let shownWidth = rectWidth;
-
-    if (shownStart < 0) {
-      shownWidth += shownStart;
-      shownStart = 0;
-    }
-    if (shownStart > width) {
-      shownStart = width;
-      shownWidth = 0;
-    }
-    if (shownStart + shownWidth > width) {
-      shownWidth = width - shownStart;
-    }
-
-    vCtx.fillStyle = '#ccc';
-    vCtx.fillRect(0, 0, width, 73);
-
     drawGridLines(
         vCtx,
         timeScale,
@@ -64,13 +75,26 @@ class CpuSliceTrack extends Track {
         width,
         73);
 
-    vCtx.fillStyle = '#c00';
-    vCtx.fillRect(shownStart, 40, shownWidth, 30);
+    if (this.trackData) {
+      for (const slice of this.trackData.data.slices) {
+        if (!sliceIsVisible(slice, visibleWindowMs)) continue;
+        const rectStart = timeScale.msToPx(slice.start);
+        const rectEnd = timeScale.msToPx(slice.end);
 
-    vCtx.font = '16px Arial';
-    vCtx.fillStyle = '#000';
-    vCtx.fillText(this.trackState.kind + ' rendered by canvas', shownStart, 60);
+        // // TODO: Doing this for every slice is super ugly. Should we remove
+        // bounds checking from virtual canvas context?
+        const shownStart = Math.max(rectStart, 0);
+        const shownEnd = Math.min(width, rectEnd);
+        const shownWidth = shownEnd - shownStart;
+        vCtx.fillStyle = '#c00';
+        vCtx.fillRect(shownStart, 40, shownWidth, 30);
+      }
+    }
   }
 }
 
 trackRegistry.register(CpuSliceTrack);
+import {trackRegistry} from '../../frontend/track_registry';
+import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+
+import {TRACK_KIND} from './common';

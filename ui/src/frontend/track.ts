@@ -13,23 +13,23 @@
 // limitations under the License.
 
 import {TrackState} from '../common/state';
+
 import {TimeScale} from './time_scale';
+import {TrackData} from './track_data_store';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 /**
- * This interface forces track implementations to have two static properties:
- * kind and a create function.
- *
- * Kindscript does not have abstract static members, which is why this needs to
- * be in a seperate interface. We need the |create| method because the stored
- * value in the registry is an abstract class, and we cannot call 'new'
- * on an abstract class.
+ * This interface forces track implementations to have some static properties.
+ * Typescript does not have abstract static members, which is why this needs to
+ * be in a seperate interface.
  */
 export interface TrackCreator {
   // Store the kind explicitly as a string as opposed to using class.kind in
   // case we ever minify our code.
   readonly kind: string;
 
+  // We need the |create| method because the stored value in the registry is an
+  // abstract class, and we cannot call 'new' on an abstract class.
   create(TrackState: TrackState): Track;
 }
 
@@ -37,6 +37,7 @@ export interface TrackCreator {
  * The abstract class that needs to be implemented by all tracks.
  */
 export abstract class Track {
+  abstract setData(trackData: TrackData): void;
   constructor(protected trackState: TrackState) {}
   abstract renderCanvas(
       vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,

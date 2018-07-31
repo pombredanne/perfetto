@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import '../tracks/all_tracks';
+import '../tracks/all_frontend';
 
 import * as m from 'mithril';
 
@@ -25,6 +25,7 @@ import {ControllerProxy} from './controller_proxy';
 import {globals} from './globals';
 import {HomePage} from './home_page';
 import {QueryPage} from './query_page';
+import {TrackDataStore} from './track_data_store';
 import {ViewerPage} from './viewer_page';
 
 function createController(): ControllerProxy {
@@ -59,16 +60,64 @@ function getDemoTracks(): ObjectById<TrackState> {
     }
     tracks[i] = {
       id: i.toString(),
-      type: trackType,
+      kind: trackType,
       height: 100,
-      kind: `Track ${i}`,
+      name: `Track ${i}`,
     };
   }
   return tracks;
 }
 
+/**
+ * Generates random slices with duration between (0, maxDuratoin) and gap from
+ * one slice to the next between (0, maxInterval).
+ */
+function generateRandomSlices(
+    boundStart: number,
+    boundEnd: number,
+    maxDuration: number,
+    maxInterval: number) {
+  const slices = [];
+  let nextSliceStart = boundStart;
+  let i = 1;
+  while (true) {
+    const randDuration = Math.random() * maxDuration;
+    const randInterval = Math.random() * maxInterval;
+
+    const start = nextSliceStart;
+    const end = start + randDuration;
+    if (end > boundEnd) break;
+
+    slices.push({start, end, title: `Slice ${i}`});
+
+    i++;
+    nextSliceStart = end + randInterval;
+  }
+  return slices;
+}
+
+function setDemoData(): void {
+  const maxVisibleWidth = 1000000;
+  const initialSliceWidth = maxVisibleWidth / 50;
+  for (let i = 0; i < 10; i++) {
+    if (i % 2 !== 0) continue;
+    const d = {
+      id: i.toString(),
+      trackType: 'CpuSliceTrack',
+      data: {
+        slices: generateRandomSlices(
+            0, maxVisibleWidth, initialSliceWidth, initialSliceWidth),
+      }
+    };
+    globals.trackDataStore.storeData(d);
+  }
+}
+
 async function main() {
   globals.state = {i: 0, tracks: getDemoTracks()};
+  globals.trackDataStore = new TrackDataStore();
+
+  setDemoData();
 
   const controller = createController();
   const channel = new MessageChannel();

@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {TrackState} from '../common/state';
 
+import {globals} from './globals';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
@@ -27,11 +28,14 @@ export const TrackComponent = {
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.get(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.kind);
     this.track = trackCreator.create(attrs.trackState);
   },
 
   view({attrs}) {
+    const trackData = globals.trackDataStore.getTrackData(attrs.trackState.id);
+    if (trackData !== undefined) this.track.setData(trackData);
+
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
@@ -62,7 +66,7 @@ export const TrackComponent = {
           },
           m('h1',
             {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.kind)),
+            attrs.trackState.name)),
         m('.track-content',
           {
             style: {
@@ -85,6 +89,17 @@ export const TrackComponent = {
               }
             },
             attrs.trackState.kind + ' DOM Content')));
+  },
+
+  oncreate({attrs}): void {
+    // TODO: Remove duplication.
+    if (attrs.trackContext.isOnCanvas()) {
+      this.track.renderCanvas(
+          attrs.trackContext,
+          attrs.width,
+          attrs.timeScale,
+          attrs.visibleWindowMs);
+    }
   },
 
   onupdate({attrs}) {

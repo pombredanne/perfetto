@@ -26,9 +26,9 @@ export interface State {
 
 export interface TrackState {
   id: string;
-  type: string;
   height: number;
   kind: string;
+  name: string;
 }
 
 export function createEmptyState(): State {

@@ -17,6 +17,7 @@ import {State} from '../common/state';
 import {Engine} from '../controller/engine';
 
 import {ControllerProxy} from './controller_proxy';
+import {TrackDataStore} from './track_data_store';
 
 type Dispatch = (action: Action) => void;
 
@@ -27,6 +28,7 @@ class Globals {
   _dispatch?: Dispatch = undefined;
   _state?: State = undefined;
   _controller?: ControllerProxy = undefined;
+  _trackDataStore?: TrackDataStore = undefined;
 
   get state(): State {
     if (this._state === undefined) throw new Error('Global not set');
@@ -53,6 +55,15 @@ class Globals {
 
   set controller(value: ControllerProxy) {
     this._controller = value;
+  }
+
+  get trackDataStore(): TrackDataStore {
+    if (this._trackDataStore === undefined) throw new Error('Global not set');
+    return this._trackDataStore;
+  }
+
+  set trackDataStore(value: TrackDataStore) {
+    this._trackDataStore = value;
   }
 
   resetForTesting() {
