@@ -206,7 +206,6 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   EXPECT_CALL(event_listener_, OnDataAvailable(cli.get()))
       .WillRepeatedly(Invoke([cli_did_recv](UnixSocket* s) {
         base::ScopedFile fd_buf[2];
-        ;
         char buf[sizeof(cli_str)];
         if (!s->Receive(buf, sizeof(buf), fd_buf, sizeof(fd_buf) / 2))
           return;
@@ -226,7 +225,6 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   EXPECT_CALL(event_listener_, OnDataAvailable(srv_conn.get()))
       .WillRepeatedly(Invoke([srv_did_recv](UnixSocket* s) {
         base::ScopedFile fd_buf[2];
-        ;
         char buf[sizeof(srv_str)];
         if (!s->Receive(buf, sizeof(buf), fd_buf, sizeof(fd_buf) / 2))
           return;
