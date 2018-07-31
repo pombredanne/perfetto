@@ -307,10 +307,20 @@ void UnixSocket::OnEvent() {
 bool UnixSocket::Send(const std::string& msg) {
   return Send(msg.c_str(), msg.size() + 1);
 }
-
 bool UnixSocket::Send(const void* msg,
                       size_t len,
                       int send_fd,
+                      BlockingMode blocking_mode) {
+  if (send_fd != -1)
+    return Send(msg, len, &send_fd, 1, blocking_mode);
+  return Send(msg, len, nullptr, 0, blocking_mode);
+
+}
+
+bool UnixSocket::Send(const void* msg,
+                      size_t len,
+                      const int* send_fds,
+                      size_t num_fds,
                       BlockingMode blocking_mode) {
   if (state_ != State::kConnected) {
     errno = last_error_ = ENOTCONN;
@@ -321,21 +331,23 @@ bool UnixSocket::Send(const void* msg,
   iovec iov = {const_cast<void*>(msg), len};
   msg_hdr.msg_iov = &iov;
   msg_hdr.msg_iovlen = 1;
-  alignas(cmsghdr) char control_buf[256];
+  alignas(cmsghdr) char control_buf[256] = {};
 
-  if (send_fd > -1) {
+  if (num_fds > 0) {
     const CBufLenType control_buf_len =
-        static_cast<CBufLenType>(CMSG_SPACE(sizeof(int)));
+        static_cast<CBufLenType>(num_fds * CMSG_SPACE(sizeof(int)));
     PERFETTO_CHECK(control_buf_len <= sizeof(control_buf));
     memset(control_buf, 0, sizeof(control_buf));
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen = control_buf_len;
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg_hdr);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-    memcpy(CMSG_DATA(cmsg), &send_fd, sizeof(int));
-    msg_hdr.msg_controllen = cmsg->cmsg_len;
+    for (size_t i = 0; i < num_fds; ++i) {
+      cmsg->cmsg_level = SOL_SOCKET;
+      cmsg->cmsg_type = SCM_RIGHTS;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+      memcpy(CMSG_DATA(cmsg), &send_fds[i], sizeof(int));
+      cmsg = CMSG_NXTHDR(&msg_hdr, cmsg);
+    }
   }
 
   if (blocking_mode == BlockingMode::kBlocking)
@@ -393,7 +405,7 @@ void UnixSocket::Shutdown(bool notify) {
   state_ = State::kDisconnected;
 }
 
-size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
+size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* fd_vec, size_t max_files) {
   if (state_ != State::kConnected) {
     last_error_ = ENOTCONN;
     return 0;
@@ -405,7 +417,7 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   msg_hdr.msg_iovlen = 1;
   alignas(cmsghdr) char control_buf[256];
 
-  if (recv_fd) {
+  if (max_files > 0) {
     msg_hdr.msg_control = control_buf;
     msg_hdr.msg_controllen = static_cast<CBufLenType>(CMSG_SPACE(sizeof(int)));
     PERFETTO_CHECK(msg_hdr.msg_controllen <= sizeof(control_buf));
@@ -447,11 +459,10 @@ size_t UnixSocket::Receive(void* msg, size_t len, base::ScopedFile* recv_fd) {
   }
 
   for (size_t i = 0; fds && i < fds_len; ++i) {
-    if (recv_fd && i == 0) {
-      recv_fd->reset(fds[i]);
-    } else {
+    if (i < max_files)
+      fd_vec[i].reset(fds[i]);
+    else
       close(fds[i]);
-    }
   }
 
   last_error_ = 0;
