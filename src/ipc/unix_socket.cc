@@ -307,6 +307,7 @@ void UnixSocket::OnEvent() {
 bool UnixSocket::Send(const std::string& msg) {
   return Send(msg.c_str(), msg.size() + 1);
 }
+
 bool UnixSocket::Send(const void* msg,
                       size_t len,
                       int send_fd,
