@@ -205,13 +205,14 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   auto cli_did_recv = task_runner_.CreateCheckpoint("cli_did_recv");
   EXPECT_CALL(event_listener_, OnDataAvailable(cli.get()))
       .WillRepeatedly(Invoke([cli_did_recv](UnixSocket* s) {
-        base::ScopedFile fd_buf[2];
+        base::ScopedFile fd_buf[3];
         char buf[sizeof(cli_str)];
-        if (!s->Receive(buf, sizeof(buf), fd_buf, sizeof(fd_buf) / 2))
+        if (!s->Receive(buf, sizeof(buf), fd_buf, base::ArraySize(fd_buf)))
           return;
         ASSERT_STREQ(srv_str, buf);
         ASSERT_NE(*fd_buf[0], -1);
         ASSERT_NE(*fd_buf[1], -1);
+        ASSERT_EQ(*fd_buf[2], -1);
 
         char rd_buf[1];
         // /dev/null
@@ -224,13 +225,14 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   auto srv_did_recv = task_runner_.CreateCheckpoint("srv_did_recv");
   EXPECT_CALL(event_listener_, OnDataAvailable(srv_conn.get()))
       .WillRepeatedly(Invoke([srv_did_recv](UnixSocket* s) {
-        base::ScopedFile fd_buf[2];
+        base::ScopedFile fd_buf[3];
         char buf[sizeof(srv_str)];
-        if (!s->Receive(buf, sizeof(buf), fd_buf, sizeof(fd_buf) / 2))
+        if (!s->Receive(buf, sizeof(buf), fd_buf, base::ArraySize(fd_buf)))
           return;
         ASSERT_STREQ(cli_str, buf);
         ASSERT_NE(*fd_buf[0], -1);
         ASSERT_NE(*fd_buf[1], -1);
+        ASSERT_EQ(*fd_buf[2], -1);
 
         char rd_buf[1];
         // /dev/null
@@ -243,9 +245,9 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   int buf_fd[2] = {null_fd.get(), zero_fd.get()};
 
   ASSERT_TRUE(cli->Send(cli_str, sizeof(cli_str), buf_fd,
-                        sizeof(buf_fd) / sizeof(int)));
+                        base::ArraySize(buf_fd)));
   ASSERT_TRUE(srv_conn->Send(srv_str, sizeof(srv_str), buf_fd,
-                             sizeof(buf_fd) / sizeof(int)));
+                             base::ArraySize(buf_fd)));
   task_runner_.RunUntilCheckpoint("srv_did_recv");
   task_runner_.RunUntilCheckpoint("cli_did_recv");
 
