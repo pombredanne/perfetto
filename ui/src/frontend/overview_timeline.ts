@@ -46,19 +46,12 @@ export const OverviewTimeline = {
           visibleWindowMs: attrs.maxVisibleWindowMs,
           width: attrs.width,
         }),
-        m('svg.visualization',
-          {
-            style: {
-              width: `${attrs.width}px`,
-              height: '100%',
-            }
-          },
-          m('path', {
-            stroke: '#000',
-            fill: 'none',
-            d: `M${this.padding.left} 0 L50 80 L200 10 L600 50 L800 20 ` +
-                `L900 70L ${attrs.width - this.padding.right} 30`,
-          })),
+        m('svg.visualization', {
+          style: {
+            width: `${attrs.width}px`,
+            height: '100%',
+          }
+        }),
         m('.brushes',
           {
             style: {
@@ -136,6 +129,10 @@ const HorizontalBrushSelection = {
 
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
+  onupdate(vnode) {
+    const el = vnode.dom as HTMLElement;
+    this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
+  },
   onremove(vnode) {
     const el = vnode.dom as HTMLElement;
     el.removeEventListener('mousemove', this.mouseMoveListener);
@@ -206,19 +203,7 @@ const HorizontalBrushSelection = {
  * Creates a visual handle with three horizontal bars.
  */
 const BrushHandle = {
-  oncreate(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.addEventListener('mousedown', this.boundOnMouseDown);
-  },
-  onremove(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.removeEventListener('mousedown', this.boundOnMouseDown);
-  },
   view({attrs}) {
-    if (!this.boundOnMouseDown) {
-      this.boundOnMouseDown = attrs.onMouseDown.bind(this);
-    }
-
     const handleBar = m('.handle-bar', {
       style: {
         height: '5px',
@@ -231,6 +216,7 @@ const BrushHandle = {
     return m(
         '.brush-handle',
         {
+          onmousedown: attrs.onMouseDown,
           style: {
             position: 'absolute',
             left: `${attrs.left - 6}px`,
@@ -259,6 +245,4 @@ const BrushHandle = {
   left: number,
   onMouseDown: (e: MouseEvent) => void,
 },
-                    {
-                      boundOnMouseDown: (e: MouseEvent) => void,
-                    }>;
+                    {}>;
