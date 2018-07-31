@@ -62,6 +62,7 @@ function getDemoTracks(): ObjectById<TrackState> {
       type: trackType,
       height: 100,
       kind: `Track ${i}`,
+      order: i * 100
     };
   }
   return tracks;

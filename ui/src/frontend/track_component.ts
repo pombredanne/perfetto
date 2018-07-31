@@ -58,11 +58,55 @@ export const TrackComponent = {
               width: '200px',
               'border-right': '1px solid #666',
               height: '100%',
+              position: 'relative',
             }
           },
           m('h1',
             {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.kind)),
+            attrs.trackState.kind),
+          m('.reorder-icons',
+            m('a.move-up',
+              {
+                onclick: () => {
+                  attrs.onReorder(attrs.trackState, -1);
+                },
+                style: {
+                  position: 'absolute',
+                  right: '10px',
+                  top: '10px',
+                  color: '#fff',
+                  'font-weight': 'bold',
+                  'text-align': 'center',
+                  cursor: 'pointer',
+                  background: '#ced0e7',
+                  'border-radius': '12px',
+                  display: 'block',
+                  width: '24px',
+                  height: '24px',
+                }
+              },
+              '⇧'),
+            m('a.move-down',
+              {
+                onclick: () => {
+                  attrs.onReorder(attrs.trackState, +1);
+                },
+                style: {
+                  position: 'absolute',
+                  right: '10px',
+                  bottom: '10px',
+                  color: '#fff',
+                  'font-weight': 'bold',
+                  'text-align': 'center',
+                  cursor: 'pointer',
+                  background: '#ced0e7',
+                  'border-radius': '12px',
+                  display: 'block',
+                  width: '24px',
+                  height: '24px',
+                }
+              },
+              '⇩'))),
         m('.track-content',
           {
             style: {
@@ -104,6 +148,7 @@ export const TrackComponent = {
   timeScale: TimeScale,
   trackState: TrackState,
   visibleWindowMs: {start: number, end: number},
+  onReorder: (trackState: TrackState, delta: number) => void,
 },
                               // TODO(dproy): Fix formatter. This is ridiculous.
                               {track: Track}>;
