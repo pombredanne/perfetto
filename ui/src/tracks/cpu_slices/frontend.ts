@@ -17,6 +17,11 @@ import {drawGridLines} from '../../frontend/gridline_helper';
 import {TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
 import {TrackData} from '../../frontend/track';
+import {trackRegistry} from '../../frontend/track_registry';
+import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
+
+import {TRACK_KIND} from './common';
+
 
 interface CpuSlice {
   start: number;
@@ -31,6 +36,8 @@ export interface CpuSliceTrackData extends TrackData {
   data: {slices: CpuSlice[];};
 }
 
+// TODO: Can we force tracks to implement this typeguard, or make this typeguard
+// more generic?
 function isCpuSliceTrackData(trackData: TrackData):
     trackData is CpuSliceTrackData {
   return trackData.trackKind === CpuSliceTrack.kind;
@@ -60,7 +67,7 @@ class CpuSliceTrack extends Track {
 
   setData(trackData: TrackData) {
     if (!isCpuSliceTrackData(trackData)) {
-      throw Error('Wrong type assigned :(');
+      throw Error('Incorrect TrackData type provided.');
     }
     this.trackData = trackData;
   }
@@ -94,7 +101,3 @@ class CpuSliceTrack extends Track {
 }
 
 trackRegistry.register(CpuSliceTrack);
-import {trackRegistry} from '../../frontend/track_registry';
-import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
-
-import {TRACK_KIND} from './common';
