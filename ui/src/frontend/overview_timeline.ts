@@ -46,7 +46,7 @@ export const OverviewTimeline = {
           visibleWindowMs: attrs.maxVisibleWindowMs,
           width: attrs.width,
         }),
-        m('svg.visualization', {
+        m('.visualization', {
           style: {
             width: `${attrs.width}px`,
             height: '100%',
