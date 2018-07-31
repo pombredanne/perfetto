@@ -102,6 +102,9 @@ const HorizontalBrushSelection = {
     };
     this.mouseMoveListener = (e: MouseEvent) => {
       if (draggingStart || draggingEnd) {
+        // Prevent text selections
+        e.preventDefault();
+
         const posX = e.clientX - this.offsetLeft;
         if ((draggingEnd && posX < this.selectionPx.start) ||
             (draggingStart && posX > this.selectionPx.end)) {
@@ -123,19 +126,18 @@ const HorizontalBrushSelection = {
     };
   },
   oncreate(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.addEventListener('mousemove', this.mouseMoveListener);
+    document.body.addEventListener('mousemove', this.mouseMoveListener);
     document.body.addEventListener('mouseup', this.mouseUpListener);
 
+    const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
   onupdate(vnode) {
     const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
-  onremove(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.removeEventListener('mousemove', this.mouseMoveListener);
+  onremove() {
+    document.body.removeEventListener('mousemove', this.mouseMoveListener);
     document.body.removeEventListener('mouseup', this.mouseUpListener);
   },
   view({attrs}) {
