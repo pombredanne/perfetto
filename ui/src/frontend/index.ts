@@ -17,15 +17,16 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls, Remote} from '../base/remote';
-import {ObjectById, TrackState} from '../common/state';
 import {State} from '../common/state';
-import {warmupWasmEngineWorker} from '../controller/wasm_engine_proxy';
+import {
+  takeWasmEngineWorkerPort,
+  warmupWasmEngineWorker
+} from '../controller/wasm_engine_proxy';
 
 import {ControllerProxy} from './controller_proxy';
 import {globals} from './globals';
 import {HomePage} from './home_page';
 import {QueryPage} from './query_page';
-import {TrackDataStore} from './track_data_store';
 import {ViewerPage} from './viewer_page';
 
 function createController(): ControllerProxy {
@@ -43,89 +44,42 @@ function createController(): ControllerProxy {
 class FrontendApi {
   updateState(state: State) {
     globals.state = state;
-    m.redraw();
+    this.redraw();
   }
-}
 
-function getDemoTracks(): ObjectById<TrackState> {
-  const tracks: {[key: string]: TrackState;} = {};
-  for (let i = 0; i < 10; i++) {
-    let trackType;
-    // The track type strings here are temporary. They will be supplied by the
-    // controller side track implementation.
-    if (i % 2 === 0) {
-      trackType = 'CpuSliceTrack';
+  publishTrackData(id: string, data: {}) {
+    globals.trackDataStore.set(id, data);
+    this.redraw();
+  }
+
+  /**
+   * Creates a new trace processor wasm engine (backed by a worker running
+   * engine_bundle.js) and returns a MessagePort for talking to it.
+   * This indirection is due to workers not being able create workers in
+   * Chrome which is tracked at: crbug.com/31666
+   * TODO(hjd): Remove this once the fix has landed.
+   */
+  createWasmEnginePort(): MessagePort {
+    return takeWasmEngineWorkerPort();
+  }
+
+  private redraw(): void {
+    if (globals.state.route && globals.state.route !== m.route.get()) {
+      m.route.set(globals.state.route);
     } else {
-      trackType = 'CpuCounterTrack';
+      m.redraw();
     }
-    tracks[i] = {
-      id: i.toString(),
-      kind: trackType,
-      height: 100,
-      name: `Track ${i}`,
-    };
-  }
-  return tracks;
-}
-
-/**
- * Generates random slices with duration between (0, maxDuratoin) and gap from
- * one slice to the next between (0, maxInterval).
- */
-function generateRandomSlices(
-    boundStart: number,
-    boundEnd: number,
-    maxDuration: number,
-    maxInterval: number) {
-  const slices = [];
-  let nextSliceStart = boundStart;
-  let i = 1;
-  while (true) {
-    const randDuration = Math.random() * maxDuration;
-    const randInterval = Math.random() * maxInterval;
-
-    const start = nextSliceStart;
-    const end = start + randDuration;
-    if (end > boundEnd) break;
-
-    slices.push({start, end, title: `Slice ${i}`});
-
-    i++;
-    nextSliceStart = end + randInterval;
-  }
-  return slices;
-}
-
-function setDemoData(): void {
-  const maxVisibleWidth = 1000000;
-  const initialSliceWidth = maxVisibleWidth / 50;
-  for (let i = 0; i < 10; i++) {
-    if (i % 2 !== 0) continue;
-    const d = {
-      id: i.toString(),
-      trackKind: 'CpuSliceTrack',
-      data: {
-        slices: generateRandomSlices(
-            0, maxVisibleWidth, initialSliceWidth, initialSliceWidth),
-      }
-    };
-    globals.trackDataStore.storeData(d);
   }
 }
 
 async function main() {
-  globals.state = {i: 0, tracks: getDemoTracks()};
-  globals.trackDataStore = new TrackDataStore();
-
-  setDemoData();
-
   const controller = createController();
   const channel = new MessageChannel();
-  await controller.initAndGetState(channel.port1);
   forwardRemoteCalls(channel.port2, new FrontendApi());
-
   globals.controller = controller;
+  globals.state = await controller.initAndGetState(channel.port1);
   globals.dispatch = controller.dispatch.bind(controller);
+  globals.trackDataStore = new Map<string, {}>();
   warmupWasmEngineWorker();
 
   const root = document.querySelector('main');
@@ -137,8 +91,23 @@ async function main() {
   m.route(root, '/', {
     '/': HomePage,
     '/viewer': ViewerPage,
-    '/query/:trace': QueryPage,
+    '/query/:engineId': {
+      onmatch(args) {
+        if (globals.state.engines[args.engineId]) {
+          return QueryPage;
+        }
+        // We only hit this case if the user reloads/navigates
+        // while on the query page.
+        m.route.set('/');
+        return undefined;
+      }
+    },
   });
+
+  // tslint:disable-next-line no-any
+  (window as any).m = m;
+  // tslint:disable-next-line no-any
+  (window as any).globals = globals;
 }
 
 main();

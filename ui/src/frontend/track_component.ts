@@ -31,10 +31,15 @@ interface TrackComponentAttrs {
   visibleWindowMs: {start: number, end: number};
 }
 
-function oncreateAndUpdate(attrs: TrackComponentAttrs, track: Track) {
+/**
+ * Passes the necessary handles and data to Track so it can render canvas and
+ * DOM.
+ */
+function renderTrack(attrs: TrackComponentAttrs, track: Track) {
   // TODO(dproy): Figure out how track implementations should render DOM.
-  const trackData = globals.trackDataStore.getTrackData(attrs.trackState.id);
-  if (trackData !== undefined) track.setData(trackData);
+
+  const trackData = globals.trackDataStore.get(attrs.trackState.id);
+  if (trackData !== undefined) track.consumeData(trackData);
 
   if (attrs.trackContext.isOnCanvas()) {
     track.renderCanvas(
@@ -114,10 +119,10 @@ export const TrackComponent = {
 
 
   oncreate({attrs}): void {
-    oncreateAndUpdate(attrs, this.track);
+    renderTrack(attrs, this.track);
   },
 
   onupdate({attrs}) {
-    oncreateAndUpdate(attrs, this.track);
+    renderTrack(attrs, this.track);
   }
 } as m.Component<TrackComponentAttrs, {track: Track}>;

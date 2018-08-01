@@ -16,32 +16,10 @@ import {TrackState} from '../../common/state';
 import {drawGridLines} from '../../frontend/gridline_helper';
 import {TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
-import {TrackData} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 import {VirtualCanvasContext} from '../../frontend/virtual_canvas_context';
 
-import {TRACK_KIND} from './common';
-
-
-interface CpuSlice {
-  start: number;
-  end: number;
-  title: string;
-}
-
-export interface CpuSliceTrackData extends TrackData {
-  id: string;
-  trackKind: (typeof CpuSliceTrack)['kind'];
-  // TODO: Is there any point of having this extra nesting?
-  data: {slices: CpuSlice[];};
-}
-
-// TODO: Can we force tracks to implement this typeguard, or make this typeguard
-// more generic?
-function isCpuSliceTrackData(trackData: TrackData):
-    trackData is CpuSliceTrackData {
-  return trackData.trackKind === CpuSliceTrack.kind;
-}
+import {CpuSliceTrackData, TRACK_KIND} from './common';
 
 function sliceIsVisible(
     slice: {start: number, end: number},
@@ -61,14 +39,7 @@ class CpuSliceTrack extends Track {
     super(trackState);
   }
 
-  static validataData(trackData: TrackData): trackData is CpuSliceTrackData {
-    return trackData.trackKind === 'CpuSliceTrackData';
-  }
-
-  setData(trackData: TrackData) {
-    if (!isCpuSliceTrackData(trackData)) {
-      throw Error('Incorrect TrackData type provided.');
-    }
+  consumeData(trackData: CpuSliceTrackData) {
     this.trackData = trackData;
   }
 
@@ -83,7 +54,7 @@ class CpuSliceTrack extends Track {
         73);
 
     if (this.trackData) {
-      for (const slice of this.trackData.data.slices) {
+      for (const slice of this.trackData.slices) {
         if (!sliceIsVisible(slice, visibleWindowMs)) continue;
         const rectStart = timeScale.msToPx(slice.start);
         const rectEnd = timeScale.msToPx(slice.end);
@@ -93,7 +64,7 @@ class CpuSliceTrack extends Track {
         const shownStart = Math.max(rectStart, 0);
         const shownEnd = Math.min(width, rectEnd);
         const shownWidth = shownEnd - shownStart;
-        vCtx.fillStyle = '#c00';
+        vCtx.fillStyle = '#4682b4';
         vCtx.fillRect(shownStart, 40, shownWidth, 30);
       }
     }

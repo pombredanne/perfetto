@@ -18,19 +18,6 @@ import {TimeScale} from './time_scale';
 import {VirtualCanvasContext} from './virtual_canvas_context';
 
 /**
- * To recieve data from the controller, tracks must declare the data type by
- * extending this TrackData interface.
- */
-export interface TrackData {
-  id: string;
-  // Putting in the kind so that we can do the very basic validation.
-  // TODO: This should be the same as track kind. Can we remove the duplication?
-  // TODO: The validation currently lives within extension code. Is there any
-  // way to put the validation in core code?
-  trackKind: string;
-}
-
-/**
  * This interface forces track implementations to have some static properties.
  * Typescript does not have abstract static members, which is why this needs to
  * be in a seperate interface.
@@ -49,9 +36,15 @@ export interface TrackCreator {
  * The abstract class that needs to be implemented by all tracks.
  */
 export abstract class Track {
-  abstract setData(trackData: TrackData): void;
+  // TODO: Typecheck that the consumeData and publishData for a Track has the
+  // same type.
+  /**
+   * Receive data published by the TrackController of this track. This is the
+   * opposite of publishData method in TrackController.
+   */
+  abstract consumeData(trackData: {}): void;
   constructor(protected trackState: TrackState) {}
   abstract renderCanvas(
       vCtx: VirtualCanvasContext, width: number, timeScale: TimeScale,
-      visibleWindowMs: {start: number, end: number}): void;
+      visibleWindowMs: {start: number, end: number}, data?: {}): void;
 }

@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {IRawQueryArgs, RawQueryResult, TraceProcessor} from '../common/protos';
+import {
+  IRawQueryArgs,
+  RawQueryResult,
+  rawQueryResultToRows,
+  TraceProcessor
+} from '../common/protos';
 
 /**
  * Abstract interface of a trace proccessor.
@@ -33,5 +38,24 @@ export abstract class Engine {
    */
   rawQuery(args: IRawQueryArgs): Promise<RawQueryResult> {
     return this.traceProcessor.rawQuery(args);
+  }
+
+  // TODO(hjd): Maybe we should cache result? But then Engine must be
+  // streaming aware.
+  async getNumberOfCpus(): Promise<number> {
+    const result = await this.rawQuery({
+      sqlQuery: 'select count(distinct(cpu)) as cpuCount from sched;',
+    });
+    return [...rawQueryResultToRows(result)][0].cpuCount as number;
+  }
+
+  // TODO(hjd): Maybe we should cache result? But then Engine must be
+  // streaming aware.
+  async getTraceTimeBounds(): Promise<[number, number]> {
+    const result = await this.rawQuery({
+      sqlQuery: 'select max(ts) as start, min(ts) as end from sched;',
+    });
+    const firstRow = [...rawQueryResultToRows(result)][0];
+    return [firstRow.start as number, firstRow.end as number];
   }
 }
