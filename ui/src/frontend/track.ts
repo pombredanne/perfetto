@@ -36,11 +36,10 @@ export interface TrackCreator {
  * The abstract class that needs to be implemented by all tracks.
  */
 export abstract class Track {
-  // TODO: Typecheck that the consumeData and publishData for a Track has the
-  // same type.
+  // TODO: Typecheck that arg of consumeData and published data for a Track has
+  // the same type.
   /**
-   * Receive data published by the TrackController of this track. This is the
-   * opposite of publishData method in TrackController.
+   * Receive data published by the TrackController of this track.
    */
   abstract consumeData(trackData: {}): void;
   constructor(protected trackState: TrackState) {}

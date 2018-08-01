@@ -53,20 +53,19 @@ class CpuSliceTrack extends Track {
         width,
         73);
 
-    if (this.trackData) {
-      for (const slice of this.trackData.slices) {
-        if (!sliceIsVisible(slice, visibleWindowMs)) continue;
-        const rectStart = timeScale.msToPx(slice.start);
-        const rectEnd = timeScale.msToPx(slice.end);
+    if (!this.trackData) return;
+    for (const slice of this.trackData.slices) {
+      if (!sliceIsVisible(slice, visibleWindowMs)) continue;
+      const rectStart = timeScale.msToPx(slice.start);
+      const rectEnd = timeScale.msToPx(slice.end);
 
-        // TODO: Doing this for every slice is super ugly. Should we remove
-        // bounds checking from virtual canvas context?
-        const shownStart = Math.max(rectStart, 0);
-        const shownEnd = Math.min(width, rectEnd);
-        const shownWidth = shownEnd - shownStart;
-        vCtx.fillStyle = '#4682b4';
-        vCtx.fillRect(shownStart, 40, shownWidth, 30);
-      }
+      // TODO: Doing this for every slice is super ugly. Should we remove
+      // bounds checking from virtual canvas context?
+      const shownStart = Math.max(rectStart, 0);
+      const shownEnd = Math.min(width, rectEnd);
+      const shownWidth = shownEnd - shownStart;
+      vCtx.fillStyle = '#4682b4';
+      vCtx.fillRect(shownStart, 40, shownWidth, 30);
     }
   }
 }
