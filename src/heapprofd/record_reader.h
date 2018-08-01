@@ -39,7 +39,7 @@ class RecordReader {
   ssize_t ReadRecord(int fd);
 
   std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function_;
-  uint64_t read_idx_;
+  size_t read_idx_;
   uint64_t record_size_;
   std::unique_ptr<uint8_t[]> buf_;
 };

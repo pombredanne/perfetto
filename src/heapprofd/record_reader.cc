@@ -20,10 +20,11 @@
 
 #include <unistd.h>
 #include <algorithm>
+#include <limits>
 
 namespace perfetto {
 namespace {
-constexpr uint64_t kChunkSize = 16u * 4096u;
+constexpr size_t kChunkSize = 16u * 4096u;
 }
 
 RecordReader::RecordReader(
@@ -63,7 +64,8 @@ ssize_t RecordReader::Read(int fd) {
 
 void RecordReader::MaybeCallback() {
   if (done()) {
-    callback_function_(record_size_, std::move(buf_));
+    PERFETTO_DCHECK(record_size_ < std::numeric_limits<size_t>::max());
+    callback_function_(static_cast<size_t>(record_size_), std::move(buf_));
     Reset();
   }
 }
@@ -96,7 +98,9 @@ ssize_t RecordReader::ReadRecordSize(int fd) {
 }
 
 ssize_t RecordReader::ReadRecord(int fd) {
-  uint64_t sz = std::min(kChunkSize, record_size_ - read_idx());
+  PERFETTO_DCHECK(record_size_ <= std::numeric_limits<size_t>::max());
+  size_t sz =
+      std::min(kChunkSize, static_cast<size_t>(record_size_) - read_idx());
   ssize_t rd = read(fd, buf_.get() + read_idx(), sz);
   if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
     PERFETTO_PLOG("read record (fd: %d)", fd);
