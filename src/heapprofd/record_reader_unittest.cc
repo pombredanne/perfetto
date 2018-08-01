@@ -44,11 +44,14 @@ TEST(RecordReaderTest, ZeroLengthRecord) {
   RecordReader r(std::move(callback_fn));
   uint64_t size = 0;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
-  while (!called) {
+
+  size_t itr = 0;
+  while (!called || ++itr > 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
+  ASSERT_TRUE(called);
 }
 
 TEST(RecordReaderTest, OneRecord) {
@@ -63,11 +66,13 @@ TEST(RecordReaderTest, OneRecord) {
   uint64_t size = 1;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "1", 1), -1);
-  while (!called) {
+  size_t itr = 0;
+  while (!called || ++itr > 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
+  ASSERT_TRUE(called);
 }
 
 TEST(RecordReaderTest, TwoRecords) {
@@ -84,11 +89,13 @@ TEST(RecordReaderTest, TwoRecords) {
   size = 2;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "12", 2), -1);
-  while (called != 2) {
+  size_t itr = 0;
+  while (!called || ++itr > 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
+  ASSERT_TRUE(called);
 }
 
 }  // namespace
