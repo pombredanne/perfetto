@@ -44,11 +44,9 @@ class MetaTrace {
 };
 
 #if PERFETTO_DCHECK_IS_ON() && !PERFETTO_BUILDFLAG(PERFETTO_CHROMIUM_BUILD)
-#define PERFETTO_METATRACE_UNIQUE2(n) metatrace_##n
-#define PERFETTO_METATRACE_UNIQUE() PERFETTO_METATRACE_UNIQUE2(__COUNTER__)
 
 #define PERFETTO_METATRACE(...) \
-  ::perfetto::base::MetaTrace PERFETTO_METATRACE_UNIQUE()(__VA_ARGS__)
+  ::perfetto::base::MetaTrace metatrace_##__COUNTER__(__VA_ARGS__)
 #else
 #define PERFETTO_METATRACE(...) ::perfetto::base::ignore_result(__VA_ARGS__)
 #endif
