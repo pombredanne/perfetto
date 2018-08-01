@@ -29,6 +29,8 @@ function createNewWasmEngineWorkerPort(): MessagePort {
   return channel.port2;
 }
 
+// Take warm engine and start creating a new WASM engine in the background
+// for the next person.
 export function takeWasmEngineWorkerPort(): MessagePort {
   if (warmWasmWorkerPort === null) {
     throw new Error('warmWasmEngineWorker not called');
