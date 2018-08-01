@@ -161,7 +161,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
 
   // Lazily create on the first instance.
   if (!ftrace_) {
-    ftrace_ = FtraceController::Create(task_runner_);
+    ftrace_ = FtraceController::Create(task_runner_, this);
 
     if (!ftrace_) {
       PERFETTO_ELOG("Failed to create FtraceController");
@@ -171,8 +171,6 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
 
     ftrace_->DisableAllEvents();
     ftrace_->ClearTrace();
-    ftrace_->set_on_metadata_callback(std::bind(
-        &ProbesProducer::OnFtraceMetadata, weak_factory_.GetWeakPtr()));
   }
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
@@ -257,43 +255,37 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
 // read and one or more pages from one or more cpus and written that into the
 // userspace tracing buffer. If more than one ftrace data sources are active,
 // this call typically happens after writing for all session has been handled.
-// static
-void ProbesProducer::OnFtraceMetadata(base::WeakPtr<ProbesProducer> weak_this) {
-  ProbesProducer* thiz = weak_this.get();
-  if (!thiz)
-    return;
-
-  // unordered_multimap guarantees that entries with the same key are contiguous
-  // during the iteration.
+void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
   TracingSessionID last_session_id = 0;
   FtraceMetadata* metadata = nullptr;
   InodeFileDataSource* inode_data_source = nullptr;
   ProcessStatsDataSource* ps_data_source = nullptr;
-  for (auto it = thiz->session_data_sources_.begin(); /* check below*/; it++) {
+
+  // unordered_multimap guarantees that entries with the same key are contiguous
+  // in the iteration.
+  for (auto it = session_data_sources_.begin(); /* check below*/; it++) {
     // If this is the last iteration or this is the session id has changed,
     // dispatch the metadata update to the linked data sources, if any.
-    if (it == thiz->session_data_sources_.end() ||
-        it->first != last_session_id) {
+    if (it == session_data_sources_.end() || it->first != last_session_id) {
       bool has_inodes = metadata && !metadata->inode_and_device.empty();
       bool has_pids = metadata && !metadata->pids.empty();
       if (has_inodes && inode_data_source)
         inode_data_source->OnInodes(metadata->inode_and_device);
       if (has_pids && ps_data_source)
         ps_data_source->OnPids(metadata->pids);
-      // TODO who deals with overwrite_count?
       if (metadata)
         metadata->Clear();
       metadata = nullptr;
       inode_data_source = nullptr;
       ps_data_source = nullptr;
-      if (it == thiz->session_data_sources_.end())
+      if (it == session_data_sources_.end())
         break;
       last_session_id = it->first;
     }
     ProbesDataSource* ds = it->second;
     switch (ds->type_id) {
       case FtraceDataSource::kTypeId:
-        metadata = static_cast<FtraceDataSource*>(ds)->metadata_mutable();
+        metadata = static_cast<FtraceDataSource*>(ds)->mutable_metadata();
         break;
       case InodeFileDataSource::kTypeId:
         inode_data_source = static_cast<InodeFileDataSource*>(ds);

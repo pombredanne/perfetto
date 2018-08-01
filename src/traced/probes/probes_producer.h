@@ -40,7 +40,7 @@ class ProbesDataSource;
 
 const uint64_t kLRUInodeCacheSize = 1000;
 
-class ProbesProducer : public Producer {
+class ProbesProducer : public Producer, public FtraceController::Observer {
  public:
   ProbesProducer();
   ~ProbesProducer() override;
@@ -55,6 +55,9 @@ class ProbesProducer : public Producer {
   void Flush(FlushRequestID,
              const DataSourceInstanceID* data_source_ids,
              size_t num_data_sources) override;
+
+  // FtraceController::Observer implementation.
+  void OnFtraceDataWrittenIntoDataSourceBuffers() override;
 
   // Our Impl
   void ConnectWithRetries(const char* socket_name,
@@ -71,8 +74,6 @@ class ProbesProducer : public Producer {
       TracingSessionID session_id,
       DataSourceInstanceID id,
       DataSourceConfig config);
-
-  static void OnFtraceMetadata(base::WeakPtr<ProbesProducer>);
 
  private:
   enum State {

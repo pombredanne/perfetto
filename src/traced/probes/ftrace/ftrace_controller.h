@@ -49,7 +49,12 @@ void HardResetFtraceState();
 // Utility class for controlling ftrace.
 class FtraceController {
  public:
-  static std::unique_ptr<FtraceController> Create(base::TaskRunner*);
+  class Observer {
+   public:
+    virtual ~Observer();
+    virtual void OnFtraceDataWrittenIntoDataSourceBuffers() = 0;
+  };
+  static std::unique_ptr<FtraceController> Create(base::TaskRunner*, Observer*);
   virtual ~FtraceController();
 
   void DisableAllEvents();
@@ -65,15 +70,13 @@ class FtraceController {
     return weak_factory_.GetWeakPtr();
   }
 
-  using OnMetadataCallback = std::function<void()>;
-  void set_on_metadata_callback(OnMetadataCallback cb) { on_metadata_ = cb; }
-
  protected:
   // Protected for testing.
   FtraceController(std::unique_ptr<FtraceProcfs>,
                    std::unique_ptr<ProtoTranslationTable>,
                    std::unique_ptr<FtraceConfigMuxer>,
-                   base::TaskRunner*);
+                   base::TaskRunner*,
+                   Observer*);
 
   virtual void OnDrainCpuForTesting(size_t /*cpu*/) {}
 
@@ -109,15 +112,15 @@ class FtraceController {
   bool listening_for_raw_trace_data_ = false;
   // End lock-protected members.
 
+  base::TaskRunner* const task_runner_;
+  Observer* const observer_;
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   std::unique_ptr<ProtoTranslationTable> table_;
   std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;
   size_t generation_ = 0;
   bool atrace_running_ = false;
-  base::TaskRunner* task_runner_ = nullptr;
   std::map<size_t, std::unique_ptr<CpuReader>> cpu_readers_;
   std::set<FtraceDataSource*> data_sources_;
-  OnMetadataCallback on_metadata_;
   base::WeakPtrFactory<FtraceController> weak_factory_;  // Keep last.
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };

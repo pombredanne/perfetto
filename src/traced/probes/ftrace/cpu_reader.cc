@@ -279,7 +279,7 @@ bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
     for (FtraceDataSource* data_source : data_sources) {
       auto packet = data_source->trace_writer()->NewTracePacket();
       auto* bundle = packet->set_ftrace_events();
-      auto* metadata = data_source->metadata_mutable();
+      auto* metadata = data_source->mutable_metadata();
       auto* filter = data_source->event_filter();
       size_t evt_size = ParsePage(buffer, filter, bundle, table_, metadata);
       PERFETTO_DCHECK(evt_size);

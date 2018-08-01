@@ -108,7 +108,8 @@ void HardResetFtraceState() {
 // static
 // TODO(taylori): Add a test for tracing paths in integration tests.
 std::unique_ptr<FtraceController> FtraceController::Create(
-    base::TaskRunner* runner) {
+    base::TaskRunner* runner,
+    Observer* observer) {
   size_t index = 0;
   std::unique_ptr<FtraceProcfs> ftrace_procfs = nullptr;
   while (!ftrace_procfs && kTracingPaths[index]) {
@@ -123,18 +124,21 @@ std::unique_ptr<FtraceController> FtraceController::Create(
 
   std::unique_ptr<FtraceConfigMuxer> model = std::unique_ptr<FtraceConfigMuxer>(
       new FtraceConfigMuxer(ftrace_procfs.get(), table.get()));
-  return std::unique_ptr<FtraceController>(new FtraceController(
-      std::move(ftrace_procfs), std::move(table), std::move(model), runner));
+  return std::unique_ptr<FtraceController>(
+      new FtraceController(std::move(ftrace_procfs), std::move(table),
+                           std::move(model), runner, observer));
 }
 
 FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
                                    std::unique_ptr<ProtoTranslationTable> table,
                                    std::unique_ptr<FtraceConfigMuxer> model,
-                                   base::TaskRunner* task_runner)
-    : ftrace_procfs_(std::move(ftrace_procfs)),
+                                   base::TaskRunner* task_runner,
+                                   Observer* observer)
+    : task_runner_(task_runner),
+      observer_(observer),
+      ftrace_procfs_(std::move(ftrace_procfs)),
       table_(std::move(table)),
       ftrace_config_muxer_(std::move(model)),
-      task_runner_(task_runner),
       weak_factory_(this) {}
 
 FtraceController::~FtraceController() {
@@ -172,17 +176,12 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
     std::swap(cpus_to_drain, ctrl->cpus_to_drain_);
   }
 
-  bool did_post_on_metadata_callback = false;
   for (size_t cpu = 0; cpu < ctrl->ftrace_procfs_->NumberOfCpus(); cpu++) {
     if (!cpus_to_drain[cpu])
       continue;
-    // This methods reads the pipe and converts the raw ftrace data into
+    // This method reads the pipe and converts the raw ftrace data into
     // protobufs using the |data_source|'s TraceWriter.
     ctrl->cpu_readers_[cpu]->Drain(ctrl->data_sources_);
-    if (!did_post_on_metadata_callback && ctrl->on_metadata_) {
-      did_post_on_metadata_callback = true;
-      ctrl->task_runner_->PostTask(ctrl->on_metadata_);
-    }
     ctrl->OnDrainCpuForTesting(cpu);
   }
 
@@ -192,6 +191,8 @@ void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
   // from traced.
   ctrl->task_runner_->PostTask(
       std::bind(&FtraceController::UnblockReaders, weak_this));
+
+  ctrl->observer_->OnFtraceDataWrittenIntoDataSourceBuffers();
 }
 
 // static
@@ -261,13 +262,15 @@ void FtraceController::StopIfNeeded() {
   cpu_readers_.clear();
 }
 
+// This method is called on the worker thread. Lifetime is guaranteed to be
+// valid, because the FtraceController dtor (that happens on the main thread)
+// joins the worker threads. |weak_this| is passed and not derived, because the
+// WeakPtrFactory is accessible only on the main thread.
 void FtraceController::OnDataAvailable(
     base::WeakPtr<FtraceController> weak_this,
     size_t generation,
     size_t cpu,
     uint32_t drain_period_ms) {
-  // TODO is it right that this uses |this| and not |weak_this|?
-  // Called on the worker thread.
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
   std::unique_lock<std::mutex> lock(lock_);
   if (!listening_for_raw_trace_data_)
@@ -292,8 +295,6 @@ void FtraceController::OnDataAvailable(
 
 bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (data_sources_.size() >= kMaxFtraceConcurrency)
-    return false;
   if (!ValidConfig(data_source->config()))
     return false;
 
@@ -305,7 +306,7 @@ bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
       *table_, FtraceEventsAsSet(*ftrace_config_muxer_->GetConfig(config_id))));
   auto it_and_inserted = data_sources_.insert(data_source);
   PERFETTO_DCHECK(it_and_inserted.second);
-  StartIfNeeded();  // TODO check that this sould go before and not after.
+  StartIfNeeded();
   data_source->Initialize(config_id, std::move(filter));
   return true;
 }
@@ -322,5 +323,7 @@ void FtraceController::RemoveDataSource(FtraceDataSource* data_source) {
 void FtraceController::DumpFtraceStats(FtraceStats* stats) {
   DumpAllCpuStats(ftrace_procfs_.get(), stats);
 }
+
+FtraceController::Observer::~Observer() = default;
 
 }  // namespace perfetto

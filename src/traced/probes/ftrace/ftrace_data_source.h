@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ class FtraceEventBundle;
 // This class handles the state for one particular tracing session involving
 // ftrace. There can be several concurrent tracing sessions involving ftrace
 // and this class is essentially the building block used to multiplex them.
-// This class is istantiated by ProbesProducer. ProbesProducer also owns the
+// This class is instantiated by ProbesProducer. ProbesProducer also owns the
 // FtraceController.
 class FtraceDataSource : public ProbesDataSource {
  public:
@@ -69,7 +69,7 @@ class FtraceDataSource : public ProbesDataSource {
   FtraceConfigId config_id() const { return config_id_; }
   const FtraceConfig& config() const { return config_; }
   EventFilter* event_filter() { return event_filter_.get(); }
-  FtraceMetadata* metadata_mutable() { return &metadata_; }
+  FtraceMetadata* mutable_metadata() { return &metadata_; }
   TraceWriter* trace_writer() { return writer_.get(); }
 
  private:

@@ -27,7 +27,6 @@ namespace perfetto {
 // 0 is invalid.
 using FtraceConfigId = uint64_t;
 
-constexpr size_t kMaxFtraceConcurrency = 32;
 constexpr size_t kMaxCpus = 64;
 
 // Utility method for the common case where we don't care about atrace events.

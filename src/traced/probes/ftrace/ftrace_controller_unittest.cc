@@ -181,7 +181,8 @@ class MockFtraceProcfs : public FtraceProcfs {
 
 }  // namespace
 
-class TestFtraceController : public FtraceController {
+class TestFtraceController : public FtraceController,
+                             public FtraceController::Observer {
  public:
   TestFtraceController(std::unique_ptr<MockFtraceProcfs> ftrace_procfs,
                        std::unique_ptr<Table> table,
@@ -191,7 +192,8 @@ class TestFtraceController : public FtraceController {
       : FtraceController(std::move(ftrace_procfs),
                          std::move(table),
                          std::move(model),
-                         runner.get()),
+                         runner.get(),
+                         /*observer=*/this),
         runner_(std::move(runner)),
         procfs_(raw_procfs) {}
 
@@ -230,6 +232,8 @@ class TestFtraceController : public FtraceController {
       return nullptr;
     return data_source;
   }
+
+  void OnFtraceDataWrittenIntoDataSourceBuffers() override {}
 
   uint64_t now_ms = 0;
 
