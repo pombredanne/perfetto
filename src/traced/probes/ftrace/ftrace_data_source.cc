@@ -34,7 +34,7 @@ FtraceDataSource::FtraceDataSource(
     const FtraceConfig& config,
     std::unique_ptr<TraceWriter> writer)
     : ProbesDataSource(session_id, kTypeId),
-      config_(std::move(config)),
+      config_(config),
       writer_(std::move(writer)),
       controller_weak_(std::move(controller_weak)){};
 

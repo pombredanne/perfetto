@@ -252,7 +252,7 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
 }
 
 // This function is called by the FtraceController in batches, whenever it has
-// read and one or more pages from one or more cpus and written that into the
+// read one or more pages from one or more cpus and written that into the
 // userspace tracing buffer. If more than one ftrace data sources are active,
 // this call typically happens after writing for all session has been handled.
 void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {

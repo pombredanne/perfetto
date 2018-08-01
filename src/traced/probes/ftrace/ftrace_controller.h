@@ -54,6 +54,8 @@ class FtraceController {
     virtual ~Observer();
     virtual void OnFtraceDataWrittenIntoDataSourceBuffers() = 0;
   };
+
+  // The passed Observer must outlive the returned FtraceController instance.
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*, Observer*);
   virtual ~FtraceController();
 
@@ -86,6 +88,8 @@ class FtraceController {
  private:
   friend class TestFtraceController;
   FRIEND_TEST(FtraceControllerIntegrationTest, EnableDisableEvent);
+
+  static constexpr size_t kMaxCpus = 64;
 
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;

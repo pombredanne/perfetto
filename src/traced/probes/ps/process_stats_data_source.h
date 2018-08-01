@@ -71,6 +71,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
   TraceWriter::TracePacketHandle cur_packet_;
   protos::pbzero::ProcessTree* cur_ps_tree_ = nullptr;
   bool record_thread_names_ = false;
+  bool enable_on_demand_dumps_ = true;
 
   // This set contains PIDs as per the Linux kernel notion of a PID (which is
   // really a TID). In practice this set will contain all TIDs for all processes

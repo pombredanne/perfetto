@@ -77,7 +77,12 @@ ProcessStatsDataSource::ProcessStatsDataSource(
       writer_(std::move(writer)),
       config_(config),
       record_thread_names_(config.process_stats_config().record_thread_names()),
-      weak_factory_(this) {}
+      weak_factory_(this) {
+  const auto& quirks = config_.process_stats_config().quirks();
+  enable_on_demand_dumps_ =
+      (std::find(quirks.begin(), quirks.end(),
+                 ProcessStatsConfig::DISABLE_ON_DEMAND) == quirks.end());
+}
 
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
 
@@ -110,12 +115,8 @@ void ProcessStatsDataSource::WriteAllProcesses() {
 }
 
 void ProcessStatsDataSource::OnPids(const std::vector<int32_t>& pids) {
-  const auto& quirks = config_.process_stats_config().quirks();
-  if (std::find(quirks.begin(), quirks.end(),
-                ProcessStatsConfig::DISABLE_ON_DEMAND) != quirks.end()) {
+  if (!enable_on_demand_dumps_)
     return;
-  }
-
   PERFETTO_DCHECK(!cur_ps_tree_);
   for (int32_t pid : pids) {
     if (seen_pids_.count(pid) || pid == 0)
