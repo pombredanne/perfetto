@@ -28,7 +28,7 @@ constexpr uint64_t kChunkSize = 16u * 4096u;
 
 RecordReader::RecordReader(
     std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function)
-    : callback_function_(callback_function) {
+    : callback_function_(std::move(callback_function)) {
   Reset();
 }
 
