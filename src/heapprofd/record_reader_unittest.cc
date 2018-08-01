@@ -46,7 +46,7 @@ TEST(RecordReaderTest, ZeroLengthRecord) {
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
 
   size_t itr = 0;
-  while (!called || ++itr > 1000) {
+  while (!called && ++itr < 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
@@ -67,7 +67,7 @@ TEST(RecordReaderTest, OneRecord) {
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "1", 1), -1);
   size_t itr = 0;
-  while (!called || ++itr > 1000) {
+  while (!called && ++itr < 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
@@ -90,7 +90,7 @@ TEST(RecordReaderTest, TwoRecords) {
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "12", 2), -1);
   size_t itr = 0;
-  while (!called || ++itr > 1000) {
+  while (!called && ++itr < 1000) {
     ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
