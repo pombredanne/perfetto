@@ -24,7 +24,7 @@
 
 namespace perfetto {
 namespace {
-constexpr size_t kChunkSize = 16u * 4096u;
+constexpr size_t kMaxReadSize = 16u * 4096u;
 }
 
 RecordReader::RecordReader(
@@ -48,7 +48,7 @@ ssize_t RecordReader::Read(int fd) {
       // Without this check, the caller would re-enter in here, and ReadRecord
       // would be called with a record_size_ of zero, which will make read(2)
       // return 0.
-      MaybeCallback();
+      MaybeFinishAndReset();
     }
     return rd;
   }
@@ -58,11 +58,11 @@ ssize_t RecordReader::Read(int fd) {
     PERFETTO_DCHECK(rd >= 0);
     read_idx_ += static_cast<size_t>(rd);
   }
-  MaybeCallback();
+  MaybeFinishAndReset();
   return rd;
 }
 
-void RecordReader::MaybeCallback() {
+void RecordReader::MaybeFinishAndReset() {
   if (done()) {
     PERFETTO_DCHECK(record_size_ < std::numeric_limits<size_t>::max());
     callback_function_(static_cast<size_t>(record_size_), std::move(buf_));
@@ -80,12 +80,6 @@ bool RecordReader::done() {
          read_idx_ - sizeof(record_size_) == record_size_;
 }
 
-size_t RecordReader::read_idx() {
-  if (read_idx_ < sizeof(record_size_))
-    return read_idx_;
-  return read_idx_ - sizeof(record_size_);
-}
-
 ssize_t RecordReader::ReadRecordSize(int fd) {
   ssize_t rd = PERFETTO_EINTR(
       read(fd, reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
@@ -99,9 +93,10 @@ ssize_t RecordReader::ReadRecordSize(int fd) {
 
 ssize_t RecordReader::ReadRecord(int fd) {
   PERFETTO_DCHECK(record_size_ <= std::numeric_limits<size_t>::max());
+  size_t read_so_far = read_idx_ - sizeof(record_size_);
   size_t sz =
-      std::min(kChunkSize, static_cast<size_t>(record_size_) - read_idx());
-  ssize_t rd = read(fd, buf_.get() + read_idx(), sz);
+      std::min(kMaxReadSize, static_cast<size_t>(record_size_) - read_so_far);
+  ssize_t rd = read(fd, buf_.get() + read_so_far, sz);
   if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
     PERFETTO_PLOG("read record (fd: %d)", fd);
     PERFETTO_DCHECK(false);

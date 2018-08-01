@@ -31,7 +31,7 @@ class RecordReader {
   ssize_t Read(int fd);
 
  private:
-  void MaybeCallback();
+  void MaybeFinishAndReset();
   void Reset();
   bool done();
   size_t read_idx();
