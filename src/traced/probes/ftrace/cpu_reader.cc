@@ -213,7 +213,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // pipe.
     ssize_t splice_res;
     {
-      PERFETTO_METATRACE("name", "splice_blocking", "pid", cpu);
+      PERFETTO_METATRACE("splice_blocking", cpu);
       splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                           base::kPageSize, SPLICE_F_MOVE);
     }
@@ -241,7 +241,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
     // data in the former and space in the latter.
     while (true) {
       {
-        PERFETTO_METATRACE("name", "splice_nonblocking", "pid", cpu);
+        PERFETTO_METATRACE("splice_nonblocking", cpu);
         splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
                             base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
       }
@@ -252,7 +252,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
       }
     }
     {
-      PERFETTO_METATRACE("name", "splice_waitcallback", "pid", cpu);
+      PERFETTO_METATRACE("splice_waitcallback", cpu);
       // This callback will block until we are allowed to read more data.
       on_data_available();
     }
