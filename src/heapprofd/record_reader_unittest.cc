@@ -16,10 +16,22 @@
 
 #include "src/heapprofd/record_reader.h"
 
+#include "perfetto/base/scoped_file.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace perfetto {
+namespace {
+
+int ScopedPipe(base::ScopedFile scoped_fds[2]) {
+  int fds[2];
+  if (pipe(fds) == -1)
+    return -1;
+  scoped_fds[0].reset(fds[0]);
+  scoped_fds[1].reset(fds[1]);
+  return 0;
+}
 
 TEST(RecordReaderTest, ZeroLengthRecord) {
   bool called = false;
@@ -27,13 +39,13 @@ TEST(RecordReaderTest, ZeroLengthRecord) {
     called = true;
     ASSERT_EQ(size, 0);
   };
-  int fd[2];
-  ASSERT_NE(pipe(fd), -1);
+  base::ScopedFile fd[2];
+  ASSERT_NE(ScopedPipe(fd), -1);
   RecordReader r(std::move(callback_fn));
   uint64_t size = 0;
-  ASSERT_NE(write(fd[1], &size, sizeof(size)), -1);
+  ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   while (!called) {
-    ssize_t rd = r.Read(fd[0]);
+    ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
@@ -45,14 +57,14 @@ TEST(RecordReaderTest, OneRecord) {
     called = true;
     ASSERT_EQ(size, 1);
   };
-  int fd[2];
-  ASSERT_NE(pipe(fd), -1);
+  base::ScopedFile fd[2];
+  ASSERT_NE(ScopedPipe(fd), -1);
   RecordReader r(std::move(callback_fn));
   uint64_t size = 1;
-  ASSERT_NE(write(fd[1], &size, sizeof(size)), -1);
-  ASSERT_NE(write(fd[1], "1", 1), -1);
+  ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
+  ASSERT_NE(write(*fd[1], "1", 1), -1);
   while (!called) {
-    ssize_t rd = r.Read(fd[0]);
+    ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
@@ -63,20 +75,21 @@ TEST(RecordReaderTest, TwoRecords) {
   auto callback_fn = [&called](size_t size, std::unique_ptr<uint8_t[]>) {
     ASSERT_EQ(size, ++called);
   };
-  int fd[2];
-  ASSERT_NE(pipe(fd), -1);
+  base::ScopedFile fd[2];
+  ASSERT_NE(ScopedPipe(fd), -1);
   RecordReader r(std::move(callback_fn));
   uint64_t size = 1;
-  ASSERT_NE(write(fd[1], &size, sizeof(size)), -1);
-  ASSERT_NE(write(fd[1], "1", 1), -1);
+  ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
+  ASSERT_NE(write(*fd[1], "1", 1), -1);
   size = 2;
-  ASSERT_NE(write(fd[1], &size, sizeof(size)), -1);
-  ASSERT_NE(write(fd[1], "12", 2), -1);
+  ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
+  ASSERT_NE(write(*fd[1], "12", 2), -1);
   while (called != 2) {
-    ssize_t rd = r.Read(fd[0]);
+    ssize_t rd = r.Read(*fd[0]);
     ASSERT_NE(rd, -1);
     ASSERT_NE(rd, 0);
   }
 }
 
+}  // namespace
 }  // namespace perfetto
