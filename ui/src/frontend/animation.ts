@@ -13,54 +13,38 @@
 // limitations under the License.
 
 export class Animation {
-  private running = false;
-  private runningStartedMs = 0;
-  private end = Infinity;
-  private requestedAnimationFrame = 0;
+  private tStart = 0;
+  private tEnd = 0;
+  private tLastFrame = 0;
+  private rafId = 0;
 
   constructor(private onAnimationStep: (timeSinceLastMs: number) => void) {}
 
-  start(durationMs?: number) {
-    if (durationMs !== undefined) {
-      this.end = Date.now() + durationMs;
+  start(durationMs: number) {
+    const nowMs = performance.now();
+    if (nowMs <= this.tEnd) {
+      return;  // Another animation is in progress.
     }
-    this.run();
+    this.tLastFrame = 0;
+    this.tStart = nowMs;
+    this.tEnd = this.tStart + durationMs;
+    this.rafId = requestAnimationFrame(this.onAnimationFrame.bind(this));
   }
 
   stop() {
-    this.running = false;
-    cancelAnimationFrame(this.requestedAnimationFrame);
+    this.tStart = this.tEnd = 0;
+    cancelAnimationFrame(this.rafId);
   }
 
-  getStartTimeMs(): number {
-    return this.runningStartedMs;
+  get startTimeMs(): number {
+    return this.tStart;
   }
 
-  private run() {
-    if (this.running) {
-      return;
+  private onAnimationFrame(nowMs: number) {
+    if (nowMs < this.tEnd) {
+      this.rafId = requestAnimationFrame(this.onAnimationFrame.bind(this));
     }
-    let lastFrameTimeMs = 0;
-
-    const raf = (timestampMs: number) => {
-      if (!lastFrameTimeMs) {
-        lastFrameTimeMs = timestampMs;
-      }
-      this.onAnimationStep(timestampMs - lastFrameTimeMs);
-      lastFrameTimeMs = timestampMs;
-
-      if (this.running) {
-        if (Date.now() < this.end) {
-          this.requestedAnimationFrame = requestAnimationFrame(raf);
-        } else {
-          this.running = false;
-        }
-      }
-    };
-
-    this.running = true;
-    this.runningStartedMs = Date.now();
-
-    requestAnimationFrame(raf);
+    this.onAnimationStep(nowMs - (this.tLastFrame || nowMs));
+    this.tLastFrame = nowMs;
   }
 }
