@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "record_reader.h"
+#include "src/heapprofd/record_reader.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
