@@ -40,12 +40,12 @@ function getCell(result: RawQueryResult, column: number, row: number): number|
   }
 }
 
-export function rawQueryResultToColumns(result: RawQueryResult): string[] {
+export function rawQueryResultColumns(result: RawQueryResult): string[] {
   return result.columnDescriptors.map(d => d.name || '');
 }
 
-export function* rawQueryResultToRows(result: RawQueryResult) {
-  const columns: Array<[string, number]> = rawQueryResultToColumns(result).map(
+export function* rawQueryResultIter(result: RawQueryResult) {
+  const columns: Array<[string, number]> = rawQueryResultColumns(result).map(
       (name, i): [string, number] => [name, i]);
   for (let rowNum = 0; rowNum < result.numRecords; rowNum++) {
     const row: Row = {};
