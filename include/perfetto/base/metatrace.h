@@ -17,7 +17,7 @@
 #ifndef INCLUDE_PERFETTO_BASE_METATRACE_H_
 #define INCLUDE_PERFETTO_BASE_METATRACE_H_
 
-#include <stdint.h>
+#include <string.h>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
