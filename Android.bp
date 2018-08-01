@@ -3670,6 +3670,8 @@ cc_test {
     "src/base/watchdog_posix.cc",
     "src/base/watchdog_unittest.cc",
     "src/base/weak_ptr_unittest.cc",
+    "src/heapprofd/record_reader.cc",
+    "src/heapprofd/record_reader_unittest.cc",
     "src/ipc/buffered_frame_deserializer.cc",
     "src/ipc/buffered_frame_deserializer_unittest.cc",
     "src/ipc/client_impl.cc",
