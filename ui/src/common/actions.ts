@@ -46,10 +46,10 @@ export function navigate(route: string) {
   };
 }
 
-export function swapTrackOrder(trackId1: string, trackId2: string) {
+export function moveTrack(trackId: string, direction: 'up'|'down') {
   return {
-    type: 'TRACK_ORDER_SWAP',
-    trackId1,
-    trackId2,
+    type: 'MOVE_TRACK',
+    trackId,
+    direction,
   };
 }

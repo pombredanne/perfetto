@@ -14,9 +14,6 @@
 
 import * as m from 'mithril';
 
-import {swapTrackOrder} from '../common/actions';
-import {TrackState} from '../common/state';
-
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
 import {ChildVirtualContext} from './child_virtual_context';
@@ -58,26 +55,11 @@ export const ScrollingTrackDisplay = {
 
     this.canvasController.clear();
 
-    const tracks = globals.state.tracks;
-    const trackValues = Object.values(tracks);
-    trackValues.sort((a, b) => {
-      return a.order - b.order;
-    });
-
-    const onReorder = (trackState: TrackState, delta: number) => {
-      const oldIndex = trackValues.indexOf(trackState);
-      const newIndex = oldIndex + delta;
-      if (!trackValues[newIndex]) {
-        return;
-      }
-
-      globals.dispatch(swapTrackOrder(trackState.id, trackValues[newIndex].id));
-    };
-
     let trackYOffset = 0;
     const childTracks: m.Children[] = [];
 
-    for (const trackState of trackValues) {
+    for (const id of globals.state.displayedTrackIds) {
+      const trackState = globals.state.tracks[id];
       childTracks.push(m(TrackComponent, {
         trackContext: new ChildVirtualContext(ctx, {
           y: trackYOffset,
@@ -89,8 +71,7 @@ export const ScrollingTrackDisplay = {
         width: this.width,
         timeScale: attrs.timeScale,
         trackState,
-        visibleWindowMs: attrs.visibleWindowMs,
-        onReorder
+        visibleWindowMs: attrs.visibleWindowMs
       }));
       trackYOffset += trackState.height;
     }

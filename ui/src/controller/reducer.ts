@@ -48,9 +48,9 @@ export function rootReducer(state: State, action: any): State {
         name: `Cpu Track ${nextState.nextId - 1}`,
         // TODO(hjd): Should height be part of published information?
         height: 73,
-        cpu: action.cpu,
-        order: nextState.nextId * 100
+        cpu: action.cpu
       };
+      nextState.displayedTrackIds.push(id);
       return nextState;
     }
 
@@ -66,17 +66,22 @@ export function rootReducer(state: State, action: any): State {
       return nextState;
     }
 
-    case 'TRACK_ORDER_SWAP':
+    case 'MOVE_TRACK':
       const nextState = {...state};  // Creates a shallow (!) copy.
-      if (!state.tracks[action.trackId1] || !state.tracks[action.trackId2]) {
+      if (!state.displayedTrackIds.includes(action.trackId) ||
+          !action.direction) {
         break;
       }
-      // Have to save the order since it is overwritten by writing the new order
-      // on nextState because it is only a shallow copy.
-      const tempOrder = state.tracks[action.trackId1].order;
-      nextState.tracks[action.trackId1].order =
-          state.tracks[action.trackId2].order;
-      nextState.tracks[action.trackId2].order = tempOrder;
+      const oldIndex = state.displayedTrackIds.indexOf(action.trackId);
+      const newIndex = action.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
+      const swappedTrackId = state.displayedTrackIds[newIndex];
+
+      if (!swappedTrackId) {
+        break;
+      }
+      nextState.displayedTrackIds[newIndex] = action.trackId;
+      nextState.displayedTrackIds[oldIndex] = swappedTrackId;
+
       return nextState;
 
     default:

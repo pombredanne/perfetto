@@ -14,8 +14,10 @@
 
 import * as m from 'mithril';
 
+import {moveTrack} from '../common/actions';
 import {TrackState} from '../common/state';
 
+import {quietDispatch} from './mithril_helpers';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
@@ -66,48 +68,16 @@ export const TrackComponent = {
             {style: {margin: 0, 'font-size': '1.5em'}},
             attrs.trackState.name),
           m('.reorder-icons',
-            m('a.move-up',
-              {
-                onclick: () => {
-                  attrs.onReorder(attrs.trackState, -1);
-                },
-                style: {
-                  position: 'absolute',
-                  right: '10px',
-                  top: '10px',
-                  color: '#fff',
-                  'font-weight': 'bold',
-                  'text-align': 'center',
-                  cursor: 'pointer',
-                  background: '#ced0e7',
-                  'border-radius': '12px',
-                  display: 'block',
-                  width: '24px',
-                  height: '24px',
-                }
-              },
-              '⇧'),
-            m('a.move-down',
-              {
-                onclick: () => {
-                  attrs.onReorder(attrs.trackState, +1);
-                },
-                style: {
-                  position: 'absolute',
-                  right: '10px',
-                  bottom: '10px',
-                  color: '#fff',
-                  'font-weight': 'bold',
-                  'text-align': 'center',
-                  cursor: 'pointer',
-                  background: '#ced0e7',
-                  'border-radius': '12px',
-                  display: 'block',
-                  width: '24px',
-                  height: '24px',
-                }
-              },
-              '⇩'))),
+            m(TrackSwapLink, {
+              direction: 'up',
+              trackId: attrs.trackState.id,
+              top: 10,
+            }),
+            m(TrackSwapLink, {
+              direction: 'down',
+              trackId: attrs.trackState.id,
+              top: 40,
+            }))),
         m('.track-content',
           {
             style: {
@@ -149,7 +119,37 @@ export const TrackComponent = {
   timeScale: TimeScale,
   trackState: TrackState,
   visibleWindowMs: {start: number, end: number},
-  onReorder: (trackState: TrackState, delta: number) => void,
 },
                               // TODO(dproy): Fix formatter. This is ridiculous.
                               {track: Track}>;
+
+const TrackSwapLink = {
+  view({attrs}) {
+    const content = attrs.direction === 'up' ? '⇧' : '⇩';
+    return m(
+        `a.move-${attrs.direction}`,
+        {
+          onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
+          style: {
+            position: 'absolute',
+            right: '10px',
+            top: `${attrs.top}px`,
+            color: '#fff',
+            'font-weight': 'bold',
+            'text-align': 'center',
+            cursor: 'pointer',
+            background: '#ced0e7',
+            'border-radius': '12px',
+            display: 'block',
+            width: '24px',
+            height: '24px',
+          }
+        },
+        content);
+  }
+} as m.Component<{
+  direction: 'up' | 'down',
+  trackId: string,
+  top: number,
+},
+                      {}>;
