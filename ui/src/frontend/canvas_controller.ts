@@ -88,13 +88,19 @@ export class CanvasController {
     this.scrollOffset = scrollOffset;
   }
 
-  getCanvasTopOffset(): number {
+  /**
+   * Returns the desired y position of canvas relative to the
+   * ScrollingTrackDisplay that owns this so the canvas is centered in the
+   * visible area. Since we overdraw the canvas on top, this value can be
+   * negative.
+   */
+  getCanvasYStart(): number {
     return this.scrollOffset - this.extraHeightPerSide;
   }
 
   // TODO(dproy): Need to write tests for this.
   isYBoundsOnCanvas(bounds: {yStart: number, yEnd: number}) {
-    const canvasYStart = this.getCanvasTopOffset();
+    const canvasYStart = this.getCanvasYStart();
     const canvasYEnd = canvasYStart + this.canvasHeight;
     return (bounds.yEnd >= canvasYStart && bounds.yStart <= canvasYEnd);
   }

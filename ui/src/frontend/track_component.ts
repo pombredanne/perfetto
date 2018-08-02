@@ -32,11 +32,48 @@ interface TrackComponentAttrs {
 }
 
 /**
+ * Returns yStart for a track relative to canvas top.
+ *
+ * When the canvas extends above ScrollingTrackDisplay, we have:
+ *
+ * -------------------------------- canvas
+ *   |
+ *   |  canvasYStart (negative here)
+ *   |
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * Otherwise, we have:
+ *
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |      |
+ *   |      |  canvasYStart (positive here)
+ *   |      |
+ *   |     ------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * In both cases, trackYStartOnCanvas for track is trackYStart - canvasYStart.
+ *
+ * @param trackYStart Y position of a Track relative to
+ * ScrollingTrackDisplay.
+ * @param canvasYStart Y position of canvas relative to
+ * ScrollingTrackDisplay.
+ */
+function getTrackYStartOnCanvas(trackYStart: number, canvasYStart: number) {
+  return trackYStart - canvasYStart;
+}
+
+/**
  * Passes the necessary handles and data to Track so it can render canvas and
  * DOM.
  */
 function renderTrack(attrs: TrackComponentAttrs, track: Track) {
-  // TODO(dproy): Figure out how track implementations should render DOM.
   const trackData = globals.trackDataStore.get(attrs.trackState.id);
   if (trackData !== undefined) track.consumeData(trackData);
 
@@ -46,36 +83,8 @@ function renderTrack(attrs: TrackComponentAttrs, track: Track) {
   };
 
   if (attrs.canvasController.isYBoundsOnCanvas(trackBounds)) {
-    // We either have
-    //
-    // -------------------------------- canvas
-    //   |
-    //   |  canvasYStart (negative here, because
-    //   |                we overdraw the canvas on top as well as bottom)
-    //   |
-    // -------------------------------- ScrollableTrackDisplay top
-    //   |
-    //   |  trackYStart (track.attrs.top)
-    //   |
-    // -------------------------------- track
-    //
-    // OR,
-    //
-    // -------------------------------- ScrollableTrackDisplay top
-    //   |      |
-    //   |      |  canvasYStart (positive here)
-    //   |      |
-    //   |     ------------------------- ScrollableTrackDisplay top
-    //   |
-    //   |  trackYStart (track.attrs.top)
-    //   |
-    // -------------------------------- track
-    //
-    // In both cases, trackYStartOnCanvas for track is
-    // trackYStart - canvasYStart.
-    const canvasYStart = attrs.canvasController.getCanvasTopOffset();
-    const trackYStart = attrs.top;
-    const trackYStartOnCanvas = trackYStart - canvasYStart;
+    const trackYStartOnCanvas = getTrackYStartOnCanvas(
+        attrs.top, attrs.canvasController.getCanvasYStart());
 
     // Translate and clip the canvas context.
     const ctx = attrs.canvasController.get2DContext();
@@ -85,6 +94,7 @@ function renderTrack(attrs: TrackComponentAttrs, track: Track) {
     clipRect.rect(0, 0, attrs.width, attrs.trackState.height);
     ctx.clip(clipRect);
 
+    // TODO(dproy): Figure out how track implementations should render DOM.
     track.renderCanvas(
         ctx, attrs.width, attrs.timeScale, attrs.visibleWindowMs);
 

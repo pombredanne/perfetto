@@ -49,7 +49,7 @@ export const ScrollingTrackDisplay = {
     window.removeEventListener('resize', this.onResize);
   },
   view({attrs}) {
-    const canvasTopOffset = this.canvasController.getCanvasTopOffset();
+    const canvasTopOffset = this.canvasController.getCanvasYStart();
 
     this.canvasController.clear();
     const tracks = globals.state.tracks;
