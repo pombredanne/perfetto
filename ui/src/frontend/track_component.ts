@@ -14,10 +14,12 @@
 
 import * as m from 'mithril';
 
+import {moveTrack} from '../common/actions';
 import {TrackState} from '../common/state';
 
 import {CanvasController} from './canvas_controller';
 import {globals} from './globals';
+import {quietDispatch} from './mithril_helpers';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {
@@ -100,7 +102,20 @@ export const TrackComponent = {
               width: `${TRACK_SHELL_WIDTH}px`,
             }
           },
-          m('h1', attrs.trackState.name)),
+          m('h1',
+            {style: {margin: 0, 'font-size': '1.5em'}},
+            attrs.trackState.name),
+          m('.reorder-icons',
+            m(TrackMoveButton, {
+              direction: 'up',
+              trackId: attrs.trackState.id,
+              top: 10,
+            }),
+            m(TrackMoveButton, {
+              direction: 'down',
+              trackId: attrs.trackState.id,
+              top: 40,
+            }))),
         m('.track-content',
           {
             style: {
@@ -116,7 +131,7 @@ export const TrackComponent = {
                 width: rectWidth.toString() + 'px',
               }
             },
-            attrs.trackState.kind + ' DOM Content')));
+            attrs.trackState.name + ' DOM Content')));
   },
 
 
@@ -128,3 +143,36 @@ export const TrackComponent = {
     renderTrack(attrs, this.track);
   }
 } as m.Component<TrackComponentAttrs, {track: Track}>;
+
+const TrackMoveButton = {
+  view({attrs}) {
+    const content = attrs.direction === 'up' ? '⇧' : '⇩';
+    return m(
+        'button',
+        {
+          onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
+          style: {
+            position: 'absolute',
+            right: '10px',
+            top: `${attrs.top}px`,
+            color: '#fff',
+            'font-weight': 'bold',
+            'text-align': 'center',
+            cursor: 'pointer',
+            background: '#ced0e7',
+            'border-radius': '12px',
+            display: 'block',
+            width: '24px',
+            height: '24px',
+            border: 'none',
+            outline: 'none',
+          }
+        },
+        content);
+  }
+} as m.Component<{
+  direction: 'up' | 'down',
+  trackId: string,
+  top: number,
+},
+                        {}>;
