@@ -45,7 +45,7 @@ export function rootReducer(state: State, action: any): State {
         id,
         engineId: action.engineId,
         kind: action.trackKind,
-        name: `Cpu Track ${nextState.nextId - 1}`,
+        name: `Cpu Track ${id}`,
         // TODO(hjd): Should height be part of published information?
         height: 73,
         cpu: action.cpu,
@@ -69,7 +69,9 @@ export function rootReducer(state: State, action: any): State {
     case 'MOVE_TRACK':
       if (!state.displayedTrackIds.includes(action.trackId) ||
           !action.direction) {
-        break;
+        throw new Error(
+            'Trying to move a track that does not exist' +
+            ' or not providing a direction to move to.');
       }
       const nextState = {...state};  // Creates a shallow copy.
       // Copy the displayedTrackIds to prevent side effects.
