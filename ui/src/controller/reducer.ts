@@ -48,7 +48,7 @@ export function rootReducer(state: State, action: any): State {
         name: `Cpu Track ${nextState.nextId - 1}`,
         // TODO(hjd): Should height be part of published information?
         height: 73,
-        cpu: action.cpu
+        cpu: action.cpu,
       };
       nextState.displayedTrackIds.push(id);
       return nextState;
