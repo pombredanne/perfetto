@@ -132,20 +132,17 @@ const HorizontalBrushSelection = {
     };
   },
   oncreate(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.addEventListener('mousedown', this.mouseDownListener);
     document.body.addEventListener('mousemove', this.mouseMoveListener);
     document.body.addEventListener('mouseup', this.mouseUpListener);
 
+    const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
   onupdate(vnode) {
     const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
-  onremove(vnode) {
-    const el = vnode.dom as HTMLElement;
-    el.addEventListener('mousedown', this.mouseDownListener);
+  onremove() {
     document.body.removeEventListener('mousemove', this.mouseMoveListener);
     document.body.removeEventListener('mouseup', this.mouseUpListener);
   },
@@ -156,6 +153,7 @@ const HorizontalBrushSelection = {
     return m(
         '.brushes',
         {
+          onmousedown: this.mouseDownListener.bind(this),
           style: {
             width: '100%',
             height: '100%',
