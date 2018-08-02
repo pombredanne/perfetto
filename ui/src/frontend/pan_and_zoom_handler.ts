@@ -117,8 +117,8 @@ export class PanAndZoomHandler {
 
       // Only cancel if the lifted key is the one controlling the animation.
       if (cancellingDirectionFactor === directionFactor) {
-        const minEndTime = panAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
-        const waitTime = minEndTime - Date.now();
+        const minEndTime = panAnimation.startTimeMs + TAP_ANIMATION_TIME;
+        const waitTime = minEndTime - performance.now();
         tapCancelTimeout = setTimeout(() => panAnimation.stop(), waitTime);
       }
     };
@@ -153,15 +153,15 @@ export class PanAndZoomHandler {
       clearTimeout(tapCancelTimeout);
     };
     this.boundOnZoomKeyUp = e => {
-      if (ZOOM_KEYS.includes(e.key)) {
+      if (!ZOOM_KEYS.includes(e.key)) {
         return;
       }
       const cancellingZoomIn = ZOOM_IN_KEYS.includes(e.key);
 
       // Only cancel if the lifted key is the one controlling the animation.
       if (cancellingZoomIn === zoomingIn) {
-        const minEndTime = zoomAnimation.getStartTimeMs() + TAP_ANIMATION_TIME;
-        const waitTime = minEndTime - Date.now();
+        const minEndTime = zoomAnimation.startTimeMs + TAP_ANIMATION_TIME;
+        const waitTime = minEndTime - performance.now();
         tapCancelTimeout = setTimeout(() => zoomAnimation.stop(), waitTime);
       }
     };

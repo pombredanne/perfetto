@@ -27,13 +27,13 @@ export const TrackComponent = {
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.get(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.kind);
     this.track = trackCreator.create(attrs.trackState);
   },
 
   view({attrs}) {
-    const sliceStart: Milliseconds = 100000;
-    const sliceEnd: Milliseconds = 400000;
+    const sliceStart: Milliseconds = 1100000;
+    const sliceEnd: Milliseconds = 1400000;
 
     const rectStart = attrs.timeScale.msToPx(sliceStart);
     const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
@@ -58,6 +58,8 @@ export const TrackComponent = {
               width: '200px',
               'border-right': '1px solid #666',
               height: '100%',
+              'z-index': '100',
+              position: 'relative',
             }
           },
           m('h1',

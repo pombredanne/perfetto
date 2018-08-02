@@ -1,4 +1,3 @@
-
 // Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,7 +43,7 @@ export const TimeAxis = {
 
     for (let t: Milliseconds = start; t < attrs.visibleWindowMs.end;
          t += step) {
-      const xPos = Math.floor(attrs.timeScale.msToPx(t)) + 0.5;
+      const xPos = Math.floor(attrs.timeScale.msToPx(t));
 
       if (xPos >= 0 && xPos <= attrs.width - attrs.contentOffset) {
         const template =
@@ -80,7 +79,6 @@ export const TimeAxis = {
             width: attrs.width.toString() + 'px',
             overflow: 'hidden',
             height: '41px',
-            background: '#eef',
             position: 'relative',
           },
         },

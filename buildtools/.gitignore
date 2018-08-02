@@ -16,3 +16,4 @@ ndk/
 nodejs/
 protobuf/
 sqlite/
+example_traces/

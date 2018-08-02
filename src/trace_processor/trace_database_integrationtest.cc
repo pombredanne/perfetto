@@ -30,6 +30,9 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
+const char* kAndroidSchedAndPsPath =
+    "buildtools/example_traces/android_sched_and_ps.pb";
+
 class FileReader : public BlobReader {
  public:
   FileReader(base::ScopedFile file) : file_(std::move(file)) {}
@@ -44,8 +47,8 @@ class FileReader : public BlobReader {
   base::ScopedFile file_;
 };
 
-TEST(TraceDatabaseIntegrationTest, ExampleTrace) {
-  FileReader reader(base::OpenFile("trace.protobuf", O_RDONLY));
+TEST(TraceDatabaseIntegrationTest, CanLoadATrace) {
+  FileReader reader(base::OpenFile(kAndroidSchedAndPsPath, O_RDONLY));
   base::TestTaskRunner task_runner;
   TraceDatabase db(&task_runner);
 
