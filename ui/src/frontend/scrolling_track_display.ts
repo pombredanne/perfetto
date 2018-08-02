@@ -16,7 +16,6 @@ import * as m from 'mithril';
 
 import {CanvasController} from './canvas_controller';
 import {CanvasWrapper} from './canvas_wrapper';
-import {ChildVirtualContext} from './child_virtual_context';
 import {globals} from './globals';
 import {ScrollableContainer} from './scrollable_container';
 import {TimeScale} from './time_scale';
@@ -51,7 +50,6 @@ export const ScrollingTrackDisplay = {
   },
   view({attrs}) {
     const canvasTopOffset = this.canvasController.getCanvasTopOffset();
-    const ctx = this.canvasController.getContext();
 
     this.canvasController.clear();
     const tracks = globals.state.tracks;
@@ -61,12 +59,7 @@ export const ScrollingTrackDisplay = {
     let trackYOffset = 0;
     for (const trackState of Object.values(tracks)) {
       childTracks.push(m(TrackComponent, {
-        trackContext: new ChildVirtualContext(ctx, {
-          y: trackYOffset,
-          x: 0,
-          width: this.width,
-          height: trackState.height,
-        }),
+        canvasController: this.canvasController,
         top: trackYOffset,
         width: this.width,
         timeScale: attrs.timeScale,

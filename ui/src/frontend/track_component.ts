@@ -16,14 +16,14 @@ import * as m from 'mithril';
 
 import {TrackState} from '../common/state';
 
+import {CanvasController} from './canvas_controller';
 import {globals} from './globals';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
-import {VirtualCanvasContext} from './virtual_canvas_context';
 
 interface TrackComponentAttrs {
-  trackContext: VirtualCanvasContext;
+  canvasController: CanvasController;
   top: number;
   width: number;
   timeScale: TimeScale;
@@ -40,12 +40,55 @@ function renderTrack(attrs: TrackComponentAttrs, track: Track) {
   const trackData = globals.trackDataStore.get(attrs.trackState.id);
   if (trackData !== undefined) track.consumeData(trackData);
 
-  if (attrs.trackContext.isOnCanvas()) {
+  const trackBounds = {
+    yStart: attrs.top,
+    yEnd: attrs.top + attrs.trackState.height,
+  };
+
+  if (attrs.canvasController.isYBoundsOnCanvas(trackBounds)) {
+    // We either have
+    //
+    // -------------------------------- canvas
+    //   |
+    //   |  canvasYStart (negative here, because
+    //   |                we overdraw the canvas on top as well as bottom)
+    //   |
+    // -------------------------------- ScrollableTrackDisplay top
+    //   |
+    //   |  trackYStart (track.attrs.top)
+    //   |
+    // -------------------------------- track
+    //
+    // OR,
+    //
+    // -------------------------------- ScrollableTrackDisplay top
+    //   |      |
+    //   |      |  canvasYStart (positive here)
+    //   |      |
+    //   |     ------------------------- ScrollableTrackDisplay top
+    //   |
+    //   |  trackYStart (track.attrs.top)
+    //   |
+    // -------------------------------- track
+    //
+    // In both cases, trackYStartOnCanvas for track is
+    // trackYStart - canvasYStart.
+    const canvasYStart = attrs.canvasController.getCanvasTopOffset();
+    const trackYStart = attrs.top;
+    const trackYStartOnCanvas = trackYStart - canvasYStart;
+
+    // Translate and clip the canvas context.
+    const ctx = attrs.canvasController.get2DContext();
+    ctx.save();
+    ctx.translate(0, trackYStartOnCanvas);
+    const clipRect = new Path2D();
+    clipRect.rect(0, 0, attrs.width, attrs.trackState.height);
+    ctx.clip(clipRect);
+
     track.renderCanvas(
-        attrs.trackContext,
-        attrs.width,
-        attrs.timeScale,
-        attrs.visibleWindowMs);
+        ctx, attrs.width, attrs.timeScale, attrs.visibleWindowMs);
+
+    ctx.restore();
   }
 }
 
