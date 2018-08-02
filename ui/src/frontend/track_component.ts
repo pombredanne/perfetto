@@ -14,12 +14,95 @@
 
 import * as m from 'mithril';
 
+import {moveTrack} from '../common/actions';
 import {TrackState} from '../common/state';
 
+import {CanvasController} from './canvas_controller';
+import {globals} from './globals';
+import {quietDispatch} from './mithril_helpers';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
-import {VirtualCanvasContext} from './virtual_canvas_context';
+
+interface TrackComponentAttrs {
+  canvasController: CanvasController;
+  top: number;
+  width: number;
+  timeScale: TimeScale;
+  trackState: TrackState;
+  visibleWindowMs: {start: number, end: number};
+}
+
+/**
+ * Returns yStart for a track relative to canvas top.
+ *
+ * When the canvas extends above ScrollingTrackDisplay, we have:
+ *
+ * -------------------------------- canvas
+ *   |
+ *   |  canvasYStart (negative here)
+ *   |
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * Otherwise, we have:
+ *
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |      |
+ *   |      |  canvasYStart (positive here)
+ *   |      |
+ *   |     ------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * In both cases, trackYStartOnCanvas for track is trackYStart - canvasYStart.
+ *
+ * @param trackYStart Y position of a Track relative to
+ * ScrollingTrackDisplay.
+ * @param canvasYStart Y position of canvas relative to
+ * ScrollingTrackDisplay.
+ */
+function getTrackYStartOnCanvas(trackYStart: number, canvasYStart: number) {
+  return trackYStart - canvasYStart;
+}
+
+/**
+ * Passes the necessary handles and data to Track so it can render canvas and
+ * DOM.
+ */
+function renderTrack(attrs: TrackComponentAttrs, track: Track) {
+  const trackData = globals.trackDataStore.get(attrs.trackState.id);
+  if (trackData !== undefined) track.consumeData(trackData);
+
+  const trackBounds = {
+    yStart: attrs.top,
+    yEnd: attrs.top + attrs.trackState.height,
+  };
+
+  if (attrs.canvasController.isYBoundsOnCanvas(trackBounds)) {
+    const trackYStartOnCanvas = getTrackYStartOnCanvas(
+        attrs.top, attrs.canvasController.getCanvasYStart());
+
+    // Translate and clip the canvas context.
+    const ctx = attrs.canvasController.get2DContext();
+    ctx.save();
+    ctx.translate(0, trackYStartOnCanvas);
+    const clipRect = new Path2D();
+    clipRect.rect(0, 0, attrs.width, attrs.trackState.height);
+    ctx.clip(clipRect);
+
+    // TODO(dproy): Figure out how track implementations should render DOM.
+    track.renderCanvas(
+        ctx, attrs.width, attrs.timeScale, attrs.visibleWindowMs);
+
+    ctx.restore();
+  }
+}
 
 export const TrackComponent = {
   oninit({attrs}) {
@@ -27,11 +110,12 @@ export const TrackComponent = {
     // want to load a track implementation on demand, we should not rely here on
     // the fact that the track is already registered. We should show some
     // default content until a track implementation is found.
-    const trackCreator = trackRegistry.get(attrs.trackState.type);
+    const trackCreator = trackRegistry.get(attrs.trackState.kind);
     this.track = trackCreator.create(attrs.trackState);
   },
 
   view({attrs}) {
+
     const sliceStart: Milliseconds = 100000;
     const sliceEnd: Milliseconds = 400000;
 
@@ -42,7 +126,7 @@ export const TrackComponent = {
         '.track',
         {
           style: {
-            border: '1px solid #666',
+            'border-top': '1px solid hsl(213, 22%, 82%)',
             position: 'absolute',
             top: attrs.top.toString() + 'px',
             left: 0,
@@ -56,13 +140,27 @@ export const TrackComponent = {
               background: '#fff',
               padding: '20px',
               width: '200px',
-              'border-right': '1px solid #666',
+              'border-right': '1px solid hsl(213, 22%, 82%)',
               height: '100%',
+              'z-index': '100',
+              color: 'hsl(213, 22%, 30%)',
+              position: 'relative',
             }
           },
           m('h1',
             {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.kind)),
+            attrs.trackState.name),
+          m('.reorder-icons',
+            m(TrackMoveButton, {
+              direction: 'up',
+              trackId: attrs.trackState.id,
+              top: 10,
+            }),
+            m(TrackMoveButton, {
+              direction: 'down',
+              trackId: attrs.trackState.id,
+              top: 40,
+            }))),
         m('.track-content',
           {
             style: {
@@ -84,26 +182,48 @@ export const TrackComponent = {
                 background: '#aca'
               }
             },
-            attrs.trackState.kind + ' DOM Content')));
+            attrs.trackState.name + ' DOM Content')));
+  },
+
+
+  oncreate({attrs}): void {
+    renderTrack(attrs, this.track);
   },
 
   onupdate({attrs}) {
-    // TODO(dproy): Figure out how track implementations should render DOM.
-    if (attrs.trackContext.isOnCanvas()) {
-      this.track.renderCanvas(
-          attrs.trackContext,
-          attrs.width,
-          attrs.timeScale,
-          attrs.visibleWindowMs);
-    }
+    renderTrack(attrs, this.track);
+  }
+} as m.Component<TrackComponentAttrs, {track: Track}>;
+
+const TrackMoveButton = {
+  view({attrs}) {
+    const content = attrs.direction === 'up' ? '⇧' : '⇩';
+    return m(
+        'button',
+        {
+          onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
+          style: {
+            position: 'absolute',
+            right: '10px',
+            top: `${attrs.top}px`,
+            color: '#fff',
+            'font-weight': 'bold',
+            'text-align': 'center',
+            cursor: 'pointer',
+            background: '#ced0e7',
+            'border-radius': '12px',
+            display: 'block',
+            width: '24px',
+            height: '24px',
+            border: 'none',
+            outline: 'none',
+          }
+        },
+        content);
   }
 } as m.Component<{
-  trackContext: VirtualCanvasContext,
+  direction: 'up' | 'down',
+  trackId: string,
   top: number,
-  width: number,
-  timeScale: TimeScale,
-  trackState: TrackState,
-  visibleWindowMs: {start: number, end: number},
 },
-                              // TODO(dproy): Fix formatter. This is ridiculous.
-                              {track: Track}>;
+                        {}>;
