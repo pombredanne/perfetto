@@ -42,7 +42,7 @@ export const TrackComponent = {
         '.track',
         {
           style: {
-            border: '1px solid #666',
+            'border-top': '1px solid hsl(213, 22%, 82%)',
             position: 'absolute',
             top: attrs.top.toString() + 'px',
             left: 0,
@@ -56,9 +56,10 @@ export const TrackComponent = {
               background: '#fff',
               padding: '20px',
               width: '200px',
-              'border-right': '1px solid #666',
+              'border-right': '1px solid hsl(213, 22%, 82%)',
               height: '100%',
               'z-index': '100',
+              color: 'hsl(213, 22%, 30%)',
               position: 'relative',
             }
           },
