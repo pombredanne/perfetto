@@ -18,11 +18,7 @@ import {defer, Deferred} from '../base/deferred';
 import {assertExists} from '../base/logging';
 import {forwardRemoteCalls, Remote} from '../base/remote';
 import {Action, addTrack} from '../common/actions';
-import {
-  rawQueryResultToColumns,
-  rawQueryResultToRows,
-  Row
-} from '../common/protos';
+import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
 import {QueryResponse} from '../common/queries';
 import {
   createEmptyState,
@@ -139,8 +135,8 @@ class QueryController {
       const start = performance.now();
       const rawResult = await engine.rawQuery({sqlQuery: config.query});
       const end = performance.now();
-      const columns = rawQueryResultToColumns(rawResult);
-      const rows = firstN<Row>(100, rawQueryResultToRows(rawResult));
+      const columns = rawQueryResultColumns(rawResult);
+      const rows = firstN<Row>(100, rawQueryResultIter(rawResult));
       const result: QueryResponse = {
         id: config.id,
         query: config.query,

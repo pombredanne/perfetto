@@ -14,6 +14,7 @@
 
 import {State} from '../common/state';
 
+// TODO(hjd): Type check this better.
 // tslint:disable-next-line no-any
 export function rootReducer(state: State, action: any): State {
   switch (action.type) {
@@ -45,7 +46,7 @@ export function rootReducer(state: State, action: any): State {
         engineId: action.engineId,
         kind: action.trackKind,
         name: 'Cpu Track',
-        // TODO(hjd): Should height be part of published information.
+        // TODO(hjd): Should height be part of published information?
         height: 73,
         cpu: action.cpu,
       };

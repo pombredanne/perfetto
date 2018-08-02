@@ -59,8 +59,8 @@ class CpuSliceTrack extends Track {
       const rectStart = timeScale.msToPx(slice.start);
       const rectEnd = timeScale.msToPx(slice.end);
 
-      // TODO: Doing this for every slice is super ugly. Should we remove
-      // bounds checking from virtual canvas context?
+      // TODO(dproy): Remove vctx and associated bounds checking so we don't
+      // have to do this.
       const shownStart = Math.max(rectStart, 0);
       const shownEnd = Math.min(width, rectEnd);
       const shownWidth = shownEnd - shownStart;

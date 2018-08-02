@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {rawQueryResultToRows} from '../../common/protos';
+import {rawQueryResultIter} from '../../common/protos';
 import {
   Engine,
   PublishFn,
@@ -60,7 +60,7 @@ class CpuSliceTrackController extends TrackController {
     const query = `select * from sched where cpu = ${this.cpu} limit 1000;`;
     const rawResult = await this.engine.rawQuery({'sqlQuery': query});
     // TODO(hjd): Remove.
-    const result = [...rawQueryResultToRows(rawResult)];
+    const result = [...rawQueryResultIter(rawResult)];
     const slices = [];
 
     // Hacking time for now. http://bit.ly/2LNElLB

@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {
-  IRawQueryArgs,
-  RawQueryResult,
-  rawQueryResultToRows,
-  TraceProcessor
-} from '../common/protos';
+import {IRawQueryArgs, RawQueryResult, TraceProcessor} from '../common/protos';
 
 /**
  * Abstract interface of a trace proccessor.
@@ -46,7 +41,7 @@ export abstract class Engine {
     const result = await this.rawQuery({
       sqlQuery: 'select count(distinct(cpu)) as cpuCount from sched;',
     });
-    return [...rawQueryResultToRows(result)][0].cpuCount as number;
+    return +result.columns[0].longValues![0];
   }
 
   // TODO(hjd): Maybe we should cache result? But then Engine must be
@@ -55,7 +50,8 @@ export abstract class Engine {
     const result = await this.rawQuery({
       sqlQuery: 'select max(ts) as start, min(ts) as end from sched;',
     });
-    const firstRow = [...rawQueryResultToRows(result)][0];
-    return [firstRow.start as number, firstRow.end as number];
+    const start = +result.columns[0].longValues![0];
+    const end = +result.columns[1].longValues![0];
+    return [start, end];
   }
 }

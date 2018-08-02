@@ -37,7 +37,6 @@ interface TrackComponentAttrs {
  */
 function renderTrack(attrs: TrackComponentAttrs, track: Track) {
   // TODO(dproy): Figure out how track implementations should render DOM.
-
   const trackData = globals.trackDataStore.get(attrs.trackState.id);
   if (trackData !== undefined) track.consumeData(trackData);
 
@@ -88,6 +87,8 @@ export const TrackComponent = {
               width: '200px',
               'border-right': '1px solid #666',
               height: '100%',
+              'z-index': '100',
+              position: 'relative',
             }
           },
           m('h1',
