@@ -27,5 +27,7 @@ test('open trace', async () => {
     type: 'OPEN_TRACE',
     url: 'https://example.com/bar',
   });
-  expect(after.route).toBe('/foo');
+  expect(after.engines[0].source).toBe('https://example.com/bar');
+  expect(after.nextId).toBe(1);
+  expect(after.route).toBe('/viewer');
 });

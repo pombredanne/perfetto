@@ -14,7 +14,6 @@
 
 import {Action} from '../common/actions';
 import {State} from '../common/state';
-import {ControllerProxy} from './controller_proxy';
 
 type Dispatch = (action: Action) => void;
 
@@ -24,7 +23,6 @@ type Dispatch = (action: Action) => void;
 class Globals {
   _dispatch?: Dispatch = undefined;
   _state?: State = undefined;
-  _controller?: ControllerProxy = undefined;
 
   // Frequently changing data from the controller. Each item is keyed by an ID.
   // TODO(dproy): Replace with the real thing.
@@ -48,19 +46,9 @@ class Globals {
     this._dispatch = value;
   }
 
-  get controller(): ControllerProxy {
-    if (this._controller === undefined) throw new Error('Global not set');
-    return this._controller;
-  }
-
-  set controller(value: ControllerProxy) {
-    this._controller = value;
-  }
-
   resetForTesting() {
     this._state = undefined;
     this._dispatch = undefined;
-    this._controller = undefined;
   }
 }
 
