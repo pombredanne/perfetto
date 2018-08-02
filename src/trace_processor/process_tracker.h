@@ -53,10 +53,12 @@ class ProcessTracker {
 
   // Called when a thread is seen the process tree. Retrieves the matching utid
   // for the tid and the matching upid for the tgid and stores both.
+  // Virtual for testing.
   virtual UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
+  // Virtual for testing.
   virtual UniquePid UpdateProcess(uint32_t pid,
                                   const char* process_name,
                                   size_t process_name_len);

@@ -53,7 +53,7 @@ class ProcessTableUnittest : public ::testing::Test {
     return reinterpret_cast<const char*>(sqlite3_column_text(*stmt_, colId));
   }
 
-  void TearDown() override { context_.storage->ResetStorage(); }
+  ~ProcessTableUnittest() override { context_.storage->ResetStorage(); }
 
  protected:
   TraceProcessorContext context_;

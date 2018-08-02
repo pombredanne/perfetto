@@ -39,9 +39,7 @@ UniqueTid ProcessTracker::UpdateThread(uint64_t timestamp,
   }
 
   // If none exist, assign a new utid and store it.
-  context_->storage->StoreEmptyThread();
-  UniqueTid new_utid =
-      static_cast<UniqueTid>(context_->storage->thread_count());
+  UniqueTid new_utid = context_->storage->AddEmptyThread();
   TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
   thread->name_id = thread_name_id;
   thread->start_ns = timestamp;
@@ -59,8 +57,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t tgid) {
   // Find matching thread for tid or create new one.
   TraceStorage::Thread* thread = nullptr;
   if (tids_pair.first == tids_pair.second) {
-    context_->storage->StoreEmptyThread();
-    utid = static_cast<UniqueTid>(context_->storage->thread_count());
+    utid = context_->storage->AddEmptyThread();
     tids_.emplace(tid, utid);
     thread = context_->storage->GetMutableThread(utid);
   } else {
@@ -77,9 +74,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t tgid) {
 
     TraceStorage::Process* process = nullptr;
     if (pids_pair.first == pids_pair.second) {
-      context_->storage->StoreEmptyProcess();
-      UniquePid new_upid =
-          static_cast<UniquePid>(context_->storage->process_count());
+      UniquePid new_upid = context_->storage->AddEmptyProcess();
       pids_.emplace(tid, new_upid);
       process = context_->storage->GetMutableProcess(new_upid);
       thread->upid = new_upid;
@@ -110,9 +105,7 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
   }
 
   // Create a new upid if there isn't one for that pid.
-  context_->storage->StoreEmptyProcess();
-  UniquePid new_upid =
-      static_cast<UniquePid>(context_->storage->process_count());
+  UniquePid new_upid = context_->storage->AddEmptyProcess();
   TraceStorage::Process* process =
       context_->storage->GetMutableProcess(new_upid);
   pids_.emplace(pid, new_upid);

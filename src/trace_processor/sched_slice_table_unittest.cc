@@ -52,7 +52,9 @@ class SchedSliceTableIntegrationTest : public ::testing::Test {
     stmt_.reset(stmt);
   }
 
-  void TearDown() override { context_.storage->ResetStorage(); }
+  ~SchedSliceTableIntegrationTest() override {
+    context_.storage->ResetStorage();
+  }
 
  protected:
   TraceProcessorContext context_;

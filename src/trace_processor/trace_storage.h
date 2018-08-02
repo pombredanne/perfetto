@@ -105,9 +105,15 @@ class TraceStorage {
                      uint64_t duration_ns,
                      UniqueTid utid);
 
-  void StoreEmptyThread() { unique_threads_.emplace_back(); }
+  UniqueTid AddEmptyThread() {
+    unique_threads_.emplace_back();
+    return static_cast<UniqueTid>(unique_threads_.size() - 1);
+  }
 
-  void StoreEmptyProcess() { unique_processes_.emplace_back(); }
+  UniquePid AddEmptyProcess() {
+    unique_processes_.emplace_back();
+    return static_cast<UniquePid>(unique_processes_.size() - 1);
+  }
 
   void AddMismatchedSchedSwitch() { ++stats_.mismatched_sched_switch_tids_; }
 

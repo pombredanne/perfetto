@@ -32,9 +32,8 @@ class SchedTrackerTest : public ::testing::Test {
   SchedTrackerTest() {
     context.process_tracker.reset(new ProcessTracker(&context));
     context.sched_tracker.reset(new SchedTracker(&context));
+    context.storage.reset(new TraceStorage());
   }
-
-  void SetUp() override { context.storage.reset(new TraceStorage); }
 
  protected:
   TraceProcessorContext context;
