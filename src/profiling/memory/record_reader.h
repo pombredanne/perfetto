@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_HEAPPROFD_RECORD_READER_H_
-#define SRC_HEAPPROFD_RECORD_READER_H_
+#ifndef SRC_PROFILING_MEMORY_RECORD_READER_H_
+#define SRC_PROFILING_MEMORY_RECORD_READER_H_
 
 #include <functional>
 #include <memory>
@@ -45,4 +45,4 @@ class RecordReader {
 };
 
 }  // namespace perfetto
-#endif  // SRC_HEAPPROFD_RECORD_READER_H_
+#endif  // SRC_PROFILING_MEMORY_RECORD_READER_H_

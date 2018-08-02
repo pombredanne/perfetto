@@ -13,10 +13,10 @@
 # limitations under the License.
 
 source_set("record_reader") {
-  public_configs = [ "../../gn:default_config" ]
+  public_configs = [ "../../../gn:default_config" ]
   deps = [
-    "../../gn:default_deps",
-    "../../src/base",
+    "../../../gn:default_deps",
+    "../../../src/base",
   ]
   sources = [
     "record_reader.cc",
@@ -28,8 +28,8 @@ source_set("unittests") {
   testonly = true
   deps = [
     ":record_reader",
-    "../../gn:gtest_deps",
-    "../base",
+    "../../../gn:gtest_deps",
+    "../../base",
   ]
   sources = [
     "record_reader_unittest.cc",

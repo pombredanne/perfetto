@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/heapprofd/record_reader.h"
+#include "src/profiling/memory/record_reader.h"
 
 #include "perfetto/base/logging.h"
 
