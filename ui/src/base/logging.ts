@@ -12,19 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
-import {Sidebar} from './sidebar';
-
-/**
- * Wrap component with common UI elements (nav bar etc).
- */
-export function createPage(component: m.Component): m.Component {
-  return {
-    view() {
-      return [
-        m(Sidebar),
-        m('.page-content', m(component)),
-      ];
-    },
-  };
+export function assertExists<A>(value: A | null | undefined): A {
+  if (value === null || value === undefined) {
+    throw new Error('Value doesn\'t exist');
+  }
+  return value;
 }

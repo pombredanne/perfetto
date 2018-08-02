@@ -14,6 +14,10 @@ html, body {
 
 * {
   box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: none;
+  touch-action: none;
 }
 
 main {
@@ -190,7 +194,7 @@ h3 {
   display: inline-block;
   content: '';
   vertical-align: middle;
-  background-image: url('https://chromy.github.io/perfetto-ui-site/logo.png');
+  background-image: url('/assets/logo.png');
   background-size: contain;
   background-repeat: no-repeat;
   margin-right: 15px;
@@ -201,7 +205,6 @@ h3 {
   max-height: 80px;
   overflow: hidden;
   transition: max-height 0.1s ease-out;
-  /*cursor: pointer;*/
 }
 
 .sidebar>section .section-content {
@@ -292,4 +295,16 @@ h3 {
   padding: 5px 10px;
   border-top: 1px solid hsl(213, 22%, 75%);
   border-bottom: 1px solid hsl(213, 22%, 75%);
+}
+
+
+.page-content {
+  position: fixed;
+  left: 256px;
+  width: calc(100% - 256px);
+  height: 100%;
+}
+
+.track-shell h1 {
+  font-family: 'Google Sans';
 }
