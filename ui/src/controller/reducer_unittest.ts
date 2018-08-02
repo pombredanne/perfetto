@@ -20,3 +20,12 @@ test('navigate', async () => {
   const after = rootReducer(before, {type: 'NAVIGATE', route: '/foo'});
   expect(after.route).toBe('/foo');
 });
+
+test('open trace', async () => {
+  const before = createEmptyState();
+  const after = rootReducer(before, {
+    type: 'OPEN_TRACE',
+    url: 'https://example.com/bar',
+  });
+  expect(after.route).toBe('/foo');
+});
