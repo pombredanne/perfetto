@@ -99,6 +99,11 @@ const HorizontalBrushSelection = {
     this.leftHandleMouseDownListener = () => {
       dragState = 'start';
     };
+    this.mouseDownListener = (e: MouseEvent) => {
+      const posX = e.clientX - this.offsetLeft;
+      dragState = 'end';
+      this.onBrushedPx(posX, posX + 1);
+    };
     this.mouseMoveListener = (e: MouseEvent) => {
       if (dragState === 'none') {
         return;
@@ -123,17 +128,20 @@ const HorizontalBrushSelection = {
     };
   },
   oncreate(vnode) {
+    const el = vnode.dom as HTMLElement;
+    el.addEventListener('mousedown', this.mouseDownListener);
     document.body.addEventListener('mousemove', this.mouseMoveListener);
     document.body.addEventListener('mouseup', this.mouseUpListener);
 
-    const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
   onupdate(vnode) {
     const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
   },
-  onremove() {
+  onremove(vnode) {
+    const el = vnode.dom as HTMLElement;
+    el.addEventListener('mousedown', this.mouseDownListener);
     document.body.removeEventListener('mousemove', this.mouseMoveListener);
     document.body.removeEventListener('mouseup', this.mouseUpListener);
   },
@@ -191,6 +199,7 @@ const HorizontalBrushSelection = {
         {
           rightHandleMouseDownListener: (e: MouseEvent) => void,
           leftHandleMouseDownListener: (e: MouseEvent) => void,
+          mouseDownListener: (e: MouseEvent) => void,
           mouseMoveListener: (e: MouseEvent) => void,
           mouseUpListener: () => void,
           selectionPx: {start: number, end: number},
