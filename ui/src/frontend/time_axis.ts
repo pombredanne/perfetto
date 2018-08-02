@@ -51,23 +51,13 @@ export const TimeAxis = {
               {
                 style: {
                   position: 'absolute',
-                  left: xPos.toString() + 'px',
                   overflow: 'visible',
+                  left: `${xPos}px`,
                 }
               },
               m('.mark-label',
-                {
-                  style: {
-                    position: 'relative',
-                    left: '-100px',
-                    width: '200px',
-                    'text-align': 'center',
-                    cursor: 'default',
-                  }
-                },
                 Math.round(t / representationFactor).toString() + unit),
-              m('.tick',
-                {style: {height: '20px', width: '1px', background: '#666'}}));
+              m('.tick'));
 
         gridMarks.push(template);
       }
@@ -77,17 +67,14 @@ export const TimeAxis = {
         '.axis',
         {
           style: {
-            width: attrs.width.toString() + 'px',
-            overflow: 'hidden',
-            height: '41px',
-            position: 'relative',
+            width: `${attrs.width}px`,
           },
         },
         m('.axis-content',
           {
             style: {
               position: 'absolute',
-              left: attrs.contentOffset.toString() + 'px',
+              left: `${attrs.contentOffset}px`,
               width: '100%',
               height: '100%',
               overflow: 'visible',

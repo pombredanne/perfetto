@@ -20,6 +20,10 @@ import {CanvasController} from './canvas_controller';
 import {globals} from './globals';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
+import {
+  getTrackYStartOnCanvas,
+  TRACK_SHELL_WIDTH
+} from './track_position_helper';
 import {trackRegistry} from './track_registry';
 
 interface TrackComponentAttrs {
@@ -29,44 +33,6 @@ interface TrackComponentAttrs {
   timeScale: TimeScale;
   trackState: TrackState;
   visibleWindowMs: {start: number, end: number};
-}
-
-/**
- * Returns yStart for a track relative to canvas top.
- *
- * When the canvas extends above ScrollingTrackDisplay, we have:
- *
- * -------------------------------- canvas
- *   |
- *   |  canvasYStart (negative here)
- *   |
- * -------------------------------- ScrollingTrackDisplay top
- *   |
- *   |  trackYStart (track.attrs.top)
- *   |
- * -------------------------------- track
- *
- * Otherwise, we have:
- *
- * -------------------------------- ScrollingTrackDisplay top
- *   |      |
- *   |      |  canvasYStart (positive here)
- *   |      |
- *   |     ------------------------- ScrollingTrackDisplay top
- *   |
- *   |  trackYStart (track.attrs.top)
- *   |
- * -------------------------------- track
- *
- * In both cases, trackYStartOnCanvas for track is trackYStart - canvasYStart.
- *
- * @param trackYStart Y position of a Track relative to
- * ScrollingTrackDisplay.
- * @param canvasYStart Y position of canvas relative to
- * ScrollingTrackDisplay.
- */
-function getTrackYStartOnCanvas(trackYStart: number, canvasYStart: number) {
-  return trackYStart - canvasYStart;
 }
 
 /**
@@ -124,49 +90,30 @@ export const TrackComponent = {
         '.track',
         {
           style: {
-            'border-top': '1px solid hsl(213, 22%, 82%)',
-            position: 'absolute',
-            top: attrs.top.toString() + 'px',
-            left: 0,
-            width: '100%',
+            top: `${attrs.top}px`,
             height: `${attrs.trackState.height}px`,
           }
         },
         m('.track-shell',
           {
             style: {
-              background: '#fff',
-              padding: '20px',
-              width: '200px',
-              'border-right': '1px solid hsl(213, 22%, 82%)',
-              height: '100%',
-              'z-index': '100',
-              color: 'hsl(213, 22%, 30%)',
-              position: 'relative',
+              width: `${TRACK_SHELL_WIDTH}px`,
             }
           },
-          m('h1',
-            {style: {margin: 0, 'font-size': '1.5em'}},
-            attrs.trackState.name)),
+          m('h1', attrs.trackState.name)),
         m('.track-content',
           {
             style: {
-              width: 'calc(100% - 200px)',
-              height: '100%',
-              position: 'absolute',
-              left: '200px',
-              top: '0'
+              width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
+              left: `${TRACK_SHELL_WIDTH}px`,
             }
           },
           // TODO(dproy): Move out DOM Content from the track class.
           m('.marker',
             {
               style: {
-                'font-size': '1.5em',
-                position: 'absolute',
                 left: rectStart.toString() + 'px',
                 width: rectWidth.toString() + 'px',
-                background: '#aca'
               }
             },
             attrs.trackState.kind + ' DOM Content')));
