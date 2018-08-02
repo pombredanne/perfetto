@@ -111,7 +111,6 @@ const TraceViewer = {
         m(OverviewTimeline, {
           visibleWindowMs: this.visibleWindowMs,
           maxVisibleWindowMs: this.maxVisibleWindowMs,
-          width: this.width,
           onBrushedMs
         }),
         m('.tracks-content',
@@ -126,7 +125,6 @@ const TraceViewer = {
             timeScale: this.timeScale,
             contentOffset: TRACK_SHELL_WIDTH,
             visibleWindowMs: this.visibleWindowMs,
-            width: this.width,
           }),
           m(ScrollingTrackDisplay, {
             timeScale: this.timeScale,

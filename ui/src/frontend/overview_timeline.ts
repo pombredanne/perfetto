@@ -49,7 +49,6 @@ export const OverviewTimeline = {
           timeScale: this.timeScale,
           contentOffset: 0,
           visibleWindowMs: attrs.maxVisibleWindowMs,
-          width: attrs.width,
         }),
         m('.visualization', {
           style: {
@@ -83,7 +82,6 @@ export const OverviewTimeline = {
         {
           visibleWindowMs: {start: number, end: number},
           maxVisibleWindowMs: {start: number, end: number},
-          width: number,
           onBrushedMs: (start: number, end: number) => void,
         },
         {

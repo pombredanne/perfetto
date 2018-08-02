@@ -21,9 +21,17 @@ import {Milliseconds, TimeScale} from './time_scale';
  * Axis for showing time ticks.
  */
 export const TimeAxis = {
+  oncreate(vnode) {
+    const rect = vnode.dom.getBoundingClientRect();
+    this.width = rect.width;
+  },
+  onupdate(vnode) {
+    const rect = vnode.dom.getBoundingClientRect();
+    this.width = rect.width;
+  },
   view({attrs}) {
     const range = attrs.visibleWindowMs.end - attrs.visibleWindowMs.start;
-    const desiredSteps = attrs.width / DESIRED_PX_PER_STEP;
+    const desiredSteps = this.width / DESIRED_PX_PER_STEP;
     const step = getGridStepSize(range, desiredSteps);
 
     let unit = 'ns';
@@ -45,7 +53,7 @@ export const TimeAxis = {
          t += step) {
       const xPos = Math.floor(attrs.timeScale.msToPx(t));
 
-      if (xPos >= 0 && xPos <= attrs.width - attrs.contentOffset) {
+      if (xPos >= 0 && xPos <= this.width - attrs.contentOffset) {
         const template =
             m('.mark',
               {
@@ -67,7 +75,7 @@ export const TimeAxis = {
         '.axis',
         {
           style: {
-            width: `${attrs.width}px`,
+            width: `${this.width}px`,
           },
         },
         m('.axis-content',
@@ -86,6 +94,7 @@ export const TimeAxis = {
   timeScale: TimeScale,
   contentOffset: number,
   visibleWindowMs: {start: number, end: number},
-  width: number,
 },
-                        {}>;
+                        {
+                          width: number,
+                        }>;
