@@ -68,12 +68,12 @@ export const TrackComponent = {
             {style: {margin: 0, 'font-size': '1.5em'}},
             attrs.trackState.name),
           m('.reorder-icons',
-            m(TrackSwapLink, {
+            m(TrackMoveButton, {
               direction: 'up',
               trackId: attrs.trackState.id,
               top: 10,
             }),
-            m(TrackSwapLink, {
+            m(TrackMoveButton, {
               direction: 'down',
               trackId: attrs.trackState.id,
               top: 40,
@@ -123,11 +123,11 @@ export const TrackComponent = {
                               // TODO(dproy): Fix formatter. This is ridiculous.
                               {track: Track}>;
 
-const TrackSwapLink = {
+const TrackMoveButton = {
   view({attrs}) {
     const content = attrs.direction === 'up' ? '⇧' : '⇩';
     return m(
-        `a.move-${attrs.direction}`,
+        'button',
         {
           onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
           style: {
@@ -143,6 +143,8 @@ const TrackSwapLink = {
             display: 'block',
             width: '24px',
             height: '24px',
+            border: 'none',
+            outline: 'none',
           }
         },
         content);
@@ -152,4 +154,4 @@ const TrackSwapLink = {
   trackId: string,
   top: number,
 },
-                      {}>;
+                        {}>;

@@ -67,11 +67,14 @@ export function rootReducer(state: State, action: any): State {
     }
 
     case 'MOVE_TRACK':
-      const nextState = {...state};  // Creates a shallow (!) copy.
       if (!state.displayedTrackIds.includes(action.trackId) ||
           !action.direction) {
         break;
       }
+      const nextState = {...state};  // Creates a shallow copy.
+      // Copy the displayedTrackIds to prevent side effects.
+      nextState.displayedTrackIds = state.displayedTrackIds.slice();
+
       const oldIndex = state.displayedTrackIds.indexOf(action.trackId);
       const newIndex = action.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
       const swappedTrackId = state.displayedTrackIds[newIndex];
