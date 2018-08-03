@@ -28,7 +28,7 @@ TEST(StringInternerTest, Basic) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     ASSERT_EQ(interned_str.str(), "foo");
   }
-  ASSERT_EQ(interner.entries_for_testing(), 0);
+  ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
 TEST(StringInternerTest, TwoStrings) {
@@ -39,7 +39,7 @@ TEST(StringInternerTest, TwoStrings) {
     ASSERT_EQ(interned_str.str(), "foo");
     ASSERT_EQ(other_interned_str.str(), "bar");
   }
-  ASSERT_EQ(interner.entries_for_testing(), 0);
+  ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
 TEST(StringInternerTest, TwoReferences) {
@@ -48,10 +48,10 @@ TEST(StringInternerTest, TwoReferences) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     ASSERT_EQ(interned_str.str(), "foo");
     StringInterner::InternedString interned_str2 = interner.Intern("foo");
-    ASSERT_EQ(interner.entries_for_testing(), 1);
+    ASSERT_EQ(interner.entry_count_for_testing(), 1);
     ASSERT_EQ(interned_str2.str(), "foo");
   }
-  ASSERT_EQ(interner.entries_for_testing(), 0);
+  ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
 TEST(StringInternerTest, Move) {
@@ -60,10 +60,10 @@ TEST(StringInternerTest, Move) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     {
       StringInterner::InternedString interned_str2(std::move(interned_str));
-      ASSERT_EQ(interner.entries_for_testing(), 1);
+      ASSERT_EQ(interner.entry_count_for_testing(), 1);
       ASSERT_EQ(interned_str2.str(), "foo");
     }
-    ASSERT_EQ(interner.entries_for_testing(), 0);
+    ASSERT_EQ(interner.entry_count_for_testing(), 0);
   }
 }
 
@@ -73,10 +73,10 @@ TEST(StringInternerTest, Copy) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     {
       StringInterner::InternedString interned_str2(interned_str);
-      ASSERT_EQ(interner.entries_for_testing(), 1);
+      ASSERT_EQ(interner.entry_count_for_testing(), 1);
       ASSERT_EQ(interned_str2.str(), "foo");
     }
-    ASSERT_EQ(interner.entries_for_testing(), 1);
+    ASSERT_EQ(interner.entry_count_for_testing(), 1);
     ASSERT_EQ(interned_str.str(), "foo");
   }
 }
@@ -87,10 +87,10 @@ TEST(StringInternerTest, MoveAssign) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     {
       StringInterner::InternedString interned_str2 = std::move(interned_str);
-      ASSERT_EQ(interner.entries_for_testing(), 1);
+      ASSERT_EQ(interner.entry_count_for_testing(), 1);
       ASSERT_EQ(interned_str2.str(), "foo");
     }
-    ASSERT_EQ(interner.entries_for_testing(), 0);
+    ASSERT_EQ(interner.entry_count_for_testing(), 0);
   }
 }
 
@@ -100,10 +100,10 @@ TEST(StringInternerTest, CopyAssign) {
     StringInterner::InternedString interned_str = interner.Intern("foo");
     {
       StringInterner::InternedString interned_str2 = interned_str;
-      ASSERT_EQ(interner.entries_for_testing(), 1);
+      ASSERT_EQ(interner.entry_count_for_testing(), 1);
       ASSERT_EQ(interned_str2.str(), "foo");
     }
-    ASSERT_EQ(interner.entries_for_testing(), 1);
+    ASSERT_EQ(interner.entry_count_for_testing(), 1);
     ASSERT_EQ(interned_str.str(), "foo");
   }
 }

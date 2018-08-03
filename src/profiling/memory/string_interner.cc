@@ -18,47 +18,35 @@
 
 namespace perfetto {
 
-StringInterner::Entry::Entry(std::string string, StringInterner* interner)
-    : string_(string), interner_(interner) {}
+StringInterner::Entry::Entry(std::string s, StringInterner* in)
+    : string(s), interner(in) {}
 
 bool StringInterner::Entry::operator<(const Entry& other) const {
-  return string_ < other.string_;
-}
-
-const std::string& StringInterner::Entry::str() {
-  return string_;
-}
-
-int& StringInterner::Entry::ref_count() {
-  return ref_count_;
-}
-
-StringInterner& StringInterner::Entry::interner() {
-  return *interner_;
+  return string < other.string;
 }
 
 StringInterner::InternedString::InternedString(Entry* entry) : entry_(entry) {}
 
 const std::string& StringInterner::InternedString::str() const {
-  return entry_->str();
+  return entry_->string;
 }
 
 StringInterner::InternedString::~InternedString() {
   if (entry_ != nullptr)
-    entry_->interner().Return(entry_);
+    entry_->interner->Return(entry_);
 }
 
 StringInterner::InternedString StringInterner::Intern(std::string str) {
   auto itr = entries_.emplace(std::move(str), this);
   Entry& entry = const_cast<Entry&>(*itr.first);
-  entry.ref_count()++;
+  entry.ref_count++;
   return InternedString(&entry);
 }
 
 StringInterner::InternedString::InternedString(const InternedString& other)
     : entry_(other.entry_) {
   if (entry_ != nullptr)
-    entry_->ref_count()++;
+    entry_->ref_count++;
 }
 
 StringInterner::InternedString::InternedString(InternedString&& other)
@@ -72,12 +60,12 @@ StringInterner::InternedString& StringInterner::InternedString::operator=(
   return *this;
 }
 
-size_t StringInterner::entries_for_testing() {
+size_t StringInterner::entry_count_for_testing() {
   return entries_.size();
 }
 
 void StringInterner::Return(Entry* entry) {
-  if (--entry->ref_count() == 0)
+  if (--entry->ref_count == 0)
     entries_.erase(*entry);
 }
 

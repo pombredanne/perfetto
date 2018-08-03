@@ -25,18 +25,13 @@ namespace perfetto {
 
 class StringInterner {
  private:
-  class Entry {
-   public:
+  struct Entry {
     Entry(std::string string, StringInterner* interner);
     bool operator<(const Entry& other) const;
-    const std::string& str();
-    int& ref_count();
-    StringInterner& interner();
 
-   private:
-    const std::string string_;
-    int ref_count_ = 0;
-    StringInterner* interner_;
+    const std::string string;
+    size_t ref_count = 0;
+    StringInterner* interner;
   };
 
  public:
@@ -56,7 +51,7 @@ class StringInterner {
   };
 
   InternedString Intern(std::string str);
-  size_t entries_for_testing();
+  size_t entry_count_for_testing();
 
  private:
   void Return(Entry* entry);
