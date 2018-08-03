@@ -96,12 +96,16 @@ TEST_F(ProcessTrackerTest, UpdateThreadMatch) {
 }
 
 TEST_F(ProcessTrackerTest, UpdateThreadCreate) {
-  context.process_tracker->UpdateThread(1, 2);
+  context.process_tracker->UpdateThread(12, 2);
 
   TraceStorage::Thread thread = context.storage->GetThread(1);
 
   ASSERT_EQ(context.storage->thread_count(), 1);
+  auto tid_it = context.process_tracker->UtidsForTid(12);
+  ASSERT_NE(tid_it.first, tid_it.second);
   ASSERT_EQ(thread.upid, 1);
+  auto pid_it = context.process_tracker->UpidsForPid(2);
+  ASSERT_NE(pid_it.first, pid_it.second);
   ASSERT_EQ(context.storage->process_count(), 1);
 }
 

@@ -65,11 +65,15 @@ class ProcessTracker {
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
-  UniqueProcessBounds UpidsForPid(uint32_t pid);
+  UniqueProcessBounds UpidsForPid(uint32_t pid) {
+    return pids_.equal_range(pid);
+  }
 
   // Returns the bounds of a range that includes all UniqueTids that have the
   // requested tid.
-  UniqueThreadBounds UtidsForTid(uint32_t tid);
+  UniqueThreadBounds UtidsForTid(uint32_t tid) {
+    return tids_.equal_range(tid);
+  }
 
  private:
   TraceProcessorContext* const context_;

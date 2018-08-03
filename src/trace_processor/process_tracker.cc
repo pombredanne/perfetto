@@ -75,7 +75,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t tgid) {
     TraceStorage::Process* process = nullptr;
     if (pids_pair.first == pids_pair.second) {
       UniquePid new_upid = context_->storage->AddEmptyProcess();
-      pids_.emplace(tid, new_upid);
+      pids_.emplace(tgid, new_upid);
       process = context_->storage->GetMutableProcess(new_upid);
       thread->upid = new_upid;
     } else {
@@ -111,14 +111,6 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid,
   pids_.emplace(pid, new_upid);
   process->name_id = proc_name_id;
   return new_upid;
-}
-
-ProcessTracker::UniqueProcessBounds ProcessTracker::UpidsForPid(uint32_t pid) {
-  return pids_.equal_range(pid);
-}
-
-ProcessTracker::UniqueThreadBounds ProcessTracker::UtidsForTid(uint32_t tid) {
-  return tids_.equal_range(tid);
 }
 
 }  // namespace trace_processor

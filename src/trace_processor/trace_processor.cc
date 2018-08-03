@@ -32,7 +32,7 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
-  context_.storage.reset(new TraceStorage);
+  context_.storage.reset(new TraceStorage());
 
   SchedSliceTable::RegisterTable(*db_, context_.storage.get());
   ProcessTable::RegisterTable(*db_, context_.storage.get());

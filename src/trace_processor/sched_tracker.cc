@@ -42,8 +42,7 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
 
     UniqueTid utid = context_->process_tracker->UpdateThread(
         prev->timestamp, prev->prev_pid, prev->prev_thread_name_id);
-    context_->storage->AddSliceToCpu(prev->cpu, prev->timestamp, duration,
-                                     utid);
+    context_->storage->AddSliceToCpu(cpu, prev->timestamp, duration, utid);
   }
 
   // If the this events previous pid does not match the previous event's next
@@ -53,7 +52,6 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   }
 
   // Update the map with the current event.
-  prev->cpu = cpu;
   prev->timestamp = timestamp;
   prev->prev_pid = prev_pid;
   prev->prev_state = prev_state;
