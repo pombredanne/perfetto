@@ -31,6 +31,17 @@ TEST(StringInternerTest, Basic) {
   ASSERT_EQ(interner.entries_for_testing(), 0);
 }
 
+TEST(StringInternerTest, TwoStrings) {
+  StringInterner interner;
+  {
+    StringInterner::InternedString interned_str = interner.Intern("foo");
+    StringInterner::InternedString other_interned_str = interner.Intern("bar");
+    ASSERT_EQ(interned_str.str(), "foo");
+    ASSERT_EQ(other_interned_str.str(), "bar");
+  }
+  ASSERT_EQ(interner.entries_for_testing(), 0);
+}
+
 TEST(StringInternerTest, TwoReferences) {
   StringInterner interner;
   {
