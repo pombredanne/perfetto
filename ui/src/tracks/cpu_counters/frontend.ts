@@ -30,12 +30,12 @@ class CpuCounterTrack extends Track {
     super(trackState);
   }
 
-  renderCanvas(ctx: CanvasRenderingContext2D, width: number): void {
+  renderCanvas(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = '#eee';
-    ctx.fillRect(0, 0, width, this.trackState.height);
+    ctx.fillRect(0, 0, 700, this.trackState.height);
     ctx.font = '16px Arial';
     ctx.fillStyle = '#000';
-    ctx.fillText('Drawing ' + CpuCounterTrack.kind, Math.round(width / 2), 20);
+    ctx.fillText('Drawing ' + CpuCounterTrack.kind, Math.round(710 / 2), 20);
   }
 }
 
