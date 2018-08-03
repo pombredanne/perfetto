@@ -63,6 +63,9 @@ class StringInterner {
   std::set<Entry> entries_;
 };
 
+static_assert(sizeof(StringInterner::InternedString) == sizeof(void*),
+              "interned strings should be small");
+
 }  // namespace perfetto
 
 #endif  // SRC_PROFILING_MEMORY_STRING_INTERNER_H_
