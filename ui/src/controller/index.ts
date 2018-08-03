@@ -73,7 +73,8 @@ class EngineController {
         const numberOfCpus = await engine.getNumberOfCpus();
         const addToTrackActions = [];
         for (let i = 0; i < numberOfCpus; i++) {
-          addToTrackActions.push(addTrack(this.config.id, 'CpuSliceTrack', i));
+          addToTrackActions.push(
+              addTrack(this.config.id, 'CpuCounterTrack', i));
         }
         this.controller.dispatchMultiple(addToTrackActions);
         this.deferredOnReady.forEach(d => d.resolve(engine));
