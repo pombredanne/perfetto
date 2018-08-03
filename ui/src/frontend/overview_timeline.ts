@@ -14,6 +14,7 @@
 
 import * as m from 'mithril';
 
+import {DragGestureHandler} from './drag_gesture_handler';
 import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
 
@@ -92,29 +93,19 @@ export const OverviewTimeline = {
  * Interactive horizontal brush for pixel-based selections.
  */
 const HorizontalBrushSelection = {
-  oninit() {
+  oncreate(vnode) {
+    const el = vnode.dom as HTMLElement;
+    this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
+
+    const startHandle =
+        el.getElementsByClassName('brush-handle-start')[0] as HTMLElement;
+    const endHandle =
+        el.getElementsByClassName('brush-handle-end')[0] as HTMLElement;
+
     let dragState: 'draggingStartHandle'|'draggingEndHandle'|'notDragging' =
         'notDragging';
 
-    this.rightHandleMouseDownListener = () => {
-      dragState = 'draggingEndHandle';
-    };
-    this.leftHandleMouseDownListener = () => {
-      dragState = 'draggingStartHandle';
-    };
-    this.mouseDownListener = (e: MouseEvent) => {
-      const posX = e.clientX - this.offsetLeft;
-      dragState = 'draggingEndHandle';
-      this.onBrushedPx(posX, posX + 1);
-    };
-    this.mouseMoveListener = (e: MouseEvent) => {
-      if (dragState === 'notDragging') {
-        return;
-      }
-      // Prevent text selections
-      e.preventDefault();
-
-      const posX = e.clientX - this.offsetLeft;
+    const dragged = (posX: number) => {
       if ((dragState === 'draggingEndHandle' &&
            posX < this.selectionPx.start) ||
           (dragState === 'draggingStartHandle' &&
@@ -129,24 +120,26 @@ const HorizontalBrushSelection = {
         this.onBrushedPx(this.selectionPx.start, posX);
       }
     };
-    this.mouseUpListener = () => {
-      dragState = 'notDragging';
-    };
-  },
-  oncreate(vnode) {
-    document.body.addEventListener('mousemove', this.mouseMoveListener);
-    document.body.addEventListener('mouseup', this.mouseUpListener);
 
-    const el = vnode.dom as HTMLElement;
-    this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
+    new DragGestureHandler(
+        startHandle,
+        x => dragged(x - this.offsetLeft),
+        () => dragState = 'draggingStartHandle',
+        () => dragState = 'notDragging');
+    new DragGestureHandler(
+        endHandle,
+        x => dragged(x - this.offsetLeft),
+        () => dragState = 'draggingEndHandle',
+        () => dragState = 'notDragging');
+
+    new DragGestureHandler(el, x => dragged(x - this.offsetLeft), x => {
+      this.selectionPx.start = this.selectionPx.end = x - this.offsetLeft;
+      dragState = 'draggingEndHandle';
+    }, () => dragState = 'notDragging');
   },
   onupdate(vnode) {
     const el = vnode.dom as HTMLElement;
     this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
-  },
-  onremove() {
-    document.body.removeEventListener('mousemove', this.mouseMoveListener);
-    document.body.removeEventListener('mouseup', this.mouseUpListener);
   },
   view({attrs}) {
     this.onBrushedPx = attrs.onBrushedPx;
@@ -155,7 +148,6 @@ const HorizontalBrushSelection = {
     return m(
         '.brushes',
         {
-          onmousedown: this.mouseDownListener.bind(this),
           style: {
             width: '100%',
             height: '100%',
@@ -187,29 +179,26 @@ const HorizontalBrushSelection = {
         }),
         m(BrushHandle, {
           left: attrs.selectionPx.start,
-          onMouseDown: this.leftHandleMouseDownListener
+          className: 'brush-handle-start',
         }),
         m(BrushHandle, {
           left: attrs.selectionPx.end,
-          onMouseDown: this.rightHandleMouseDownListener
+          className: 'brush-handle-end',
         }));
   }
-} as
-    m.Component<
-        {
-          onBrushedPx: (start: number, end: number) => void,
-          selectionPx: {start: number, end: number},
-        },
-        {
-          rightHandleMouseDownListener: (e: MouseEvent) => void,
-          leftHandleMouseDownListener: (e: MouseEvent) => void,
-          mouseDownListener: (e: MouseEvent) => void,
-          mouseMoveListener: (e: MouseEvent) => void,
-          mouseUpListener: () => void,
-          selectionPx: {start: number, end: number},
-          onBrushedPx: (start: number, end: number) => void,
-          offsetLeft: number
-        }>;
+} as m.Component<{
+  onBrushedPx: (start: number, end: number) => void,
+  selectionPx: {start: number, end: number},
+},
+                                 {
+                                   mouseDownListener: (e: MouseEvent) => void,
+                                   mouseMoveListener: (e: MouseEvent) => void,
+                                   mouseUpListener: () => void,
+                                   selectionPx: {start: number, end: number},
+                                   onBrushedPx: (start: number, end: number) =>
+                                       void,
+                                   offsetLeft: number
+                                 }>;
 
 /**
  * Creates a visual handle with three horizontal bars.
@@ -226,9 +215,8 @@ const BrushHandle = {
     });
 
     return m(
-        '.brush-handle',
+        `.brush-handle.${attrs.className}`,
         {
-          onmousedown: attrs.onMouseDown,
           style: {
             position: 'absolute',
             left: `${attrs.left - 6}px`,
@@ -255,6 +243,6 @@ const BrushHandle = {
   }
 } as m.Component<{
   left: number,
-  onMouseDown: (e: MouseEvent) => void,
+  className: string,
 },
                     {}>;
