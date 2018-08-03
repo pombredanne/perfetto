@@ -21,7 +21,6 @@ import {
   openTraceFromFile
 } from '../common/actions';
 import {EngineConfig} from '../common/state';
-
 import {globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 import {createPage} from './pages';

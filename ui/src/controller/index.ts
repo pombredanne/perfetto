@@ -40,10 +40,10 @@ import {WasmEngineProxy} from './wasm_engine_proxy';
  */
 async function fetchTrace(source: string|File): Promise<Blob> {
   if (source instanceof File) {
-    return Promise.resolve(source);
+    return source;
   }
-  const repsonse = await fetch(source);
-  return repsonse.blob();
+  const response = await fetch(source);
+  return response.blob();
 }
 
 type EngineControllerState = 'init'|'waiting_for_file'|'loading'|'ready';
@@ -67,7 +67,7 @@ class EngineController {
     return this._state;
   }
 
-  async transition(newState: EngineControllerState) {
+  private async transition(newState: EngineControllerState) {
     switch (newState) {
       case 'waiting_for_file':
         this.blob = await fetchTrace(this.config.source);
@@ -113,7 +113,8 @@ class TrackControllerWrapper {
       engineController: EngineController) {
     this.config = config;
     this.controller = controller;
-    const publish = (data: {}) => this.controller.publish(config.id, data);
+    const publish = (data: {}) =>
+        this.controller.publishTrackData(config.id, data);
     engineController.waitForReady().then(async engine => {
       const factory = trackControllerRegistry.get(this.config.kind);
       this.trackController = factory.create(config, engine, publish);
@@ -154,7 +155,7 @@ class QueryController {
         columns,
         rows,
       };
-      controller.publish(config.id, result);
+      controller.publishTrackData(config.id, result);
     });
   }
 }
@@ -216,8 +217,8 @@ class Controller {
     this.frontend.updateState(this.state);
   }
 
-  publish(id: string, data: {}) {
-    this.frontend.publish(id, data);
+  publishTrackData(id: string, data: {}) {
+    this.frontend.publishTrackData(id, data);
   }
 
   async createEngine(blob: Blob): Promise<Engine> {
@@ -245,8 +246,8 @@ class FrontendProxy {
     return this.remote.send<MessagePort>('createWasmEnginePort', []);
   }
 
-  publish(id: string, data: {}) {
-    return this.remote.send<void>('publish', [id, data]);
+  publishTrackData(id: string, data: {}) {
+    return this.remote.send<void>('publishTrackData', [id, data]);
   }
 }
 
