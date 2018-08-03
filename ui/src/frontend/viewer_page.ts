@@ -21,7 +21,7 @@ import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingTrackDisplay} from './scrolling_track_display';
 import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
-import {TRACK_SHELL_WIDTH} from './track_position_helper';
+import {TRACK_SHELL_WIDTH} from './track_component';
 
 /**
  * Top-most level component for the viewer page. Holds tracks, brush timeline,

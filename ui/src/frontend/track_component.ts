@@ -22,10 +22,6 @@ import {globals} from './globals';
 import {quietDispatch} from './mithril_helpers';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
-import {
-  getTrackYStartOnCanvas,
-  TRACK_SHELL_WIDTH
-} from './track_position_helper';
 import {trackRegistry} from './track_registry';
 
 interface TrackComponentAttrs {
@@ -35,6 +31,48 @@ interface TrackComponentAttrs {
   timeScale: TimeScale;
   trackState: TrackState;
   visibleWindowMs: {start: number, end: number};
+}
+
+export const TRACK_SHELL_WIDTH = 200;
+
+
+/**
+ * Returns yStart for a track relative to canvas top.
+ *
+ * When the canvas extends above ScrollingTrackDisplay, we have:
+ *
+ * -------------------------------- canvas
+ *   |
+ *   |  canvasYStart (negative here)
+ *   |
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * Otherwise, we have:
+ *
+ * -------------------------------- ScrollingTrackDisplay top
+ *   |      |
+ *   |      |  canvasYStart (positive here)
+ *   |      |
+ *   |     ------------------------- ScrollingTrackDisplay top
+ *   |
+ *   |  trackYStart (track.attrs.top)
+ *   |
+ * -------------------------------- track
+ *
+ * In both cases, trackYStartOnCanvas for track is trackYStart - canvasYStart.
+ *
+ * @param trackYStart Y position of a Track relative to
+ * ScrollingTrackDisplay.
+ * @param canvasYStart Y position of canvas relative to
+ * ScrollingTrackDisplay.
+ */
+export function getTrackYStartOnCanvas(
+    trackYStart: number, canvasYStart: number) {
+  return trackYStart - canvasYStart;
 }
 
 /**

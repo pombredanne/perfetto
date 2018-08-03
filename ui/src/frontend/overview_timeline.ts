@@ -27,17 +27,15 @@ export const OverviewTimeline = {
   },
   oncreate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
-    this.width = rect.width;
 
     this.timeScale.setLimitsPx(
-        this.padding.left, this.width - this.padding.left - this.padding.right);
+        this.padding.left, rect.width - this.padding.left - this.padding.right);
   },
   onupdate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
-    this.width = rect.width;
 
     this.timeScale.setLimitsPx(
-        this.padding.left, this.width - this.padding.left - this.padding.right);
+        this.padding.left, rect.width - this.padding.left - this.padding.right);
   },
   view({attrs}) {
     this.timeScale.setLimitsMs(
@@ -85,7 +83,6 @@ export const OverviewTimeline = {
           onBrushedMs: (start: number, end: number) => void,
         },
         {
-          width: number,
           timeScale: TimeScale,
           padding: {top: number, right: number, bottom: number, left: number},
         }>;
