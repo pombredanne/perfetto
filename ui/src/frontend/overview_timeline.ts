@@ -191,9 +191,6 @@ const HorizontalBrushSelection = {
   selectionPx: {start: number, end: number},
 },
                                  {
-                                   mouseDownListener: (e: MouseEvent) => void,
-                                   mouseMoveListener: (e: MouseEvent) => void,
-                                   mouseUpListener: () => void,
                                    selectionPx: {start: number, end: number},
                                    onBrushedPx: (start: number, end: number) =>
                                        void,
