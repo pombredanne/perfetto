@@ -27,21 +27,23 @@ class StringInterner {
  private:
   class Entry {
    public:
-    Entry(std::string string);
+    Entry(std::string string, StringInterner* interner);
     bool operator<(const Entry& other) const;
     const std::string& str();
     int& ref_count();
+    StringInterner& interner();
 
    private:
     const std::string string_;
     int ref_count_ = 0;
+    StringInterner* interner_;
   };
 
  public:
   class InternedString {
    public:
     friend class StringInterner;
-    InternedString(StringInterner* interner, StringInterner::Entry* str);
+    InternedString(StringInterner::Entry* str);
     InternedString(const InternedString& other);
     InternedString(InternedString&& other);
     InternedString& operator=(InternedString other);
@@ -51,7 +53,6 @@ class StringInterner {
 
    private:
     StringInterner::Entry* entry_;
-    StringInterner* interner_;
   };
 
   InternedString Intern(std::string str);
