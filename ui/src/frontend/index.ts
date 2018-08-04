@@ -81,13 +81,7 @@ async function main() {
   globals.trackDataStore = new Map<string, {}>();
   warmupWasmEngineWorker();
 
-  const root = document.querySelector('main');
-  if (!root) {
-    console.error('root element not found.');
-    return;
-  }
-
-  m.route(root, '/', {
+  m.route(document.body, '/', {
     '/': HomePage,
     '/viewer': ViewerPage,
     '/query/:engineId': {

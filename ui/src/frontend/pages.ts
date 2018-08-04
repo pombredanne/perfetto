@@ -23,7 +23,7 @@ export function createPage(component: m.Component): m.Component {
     view() {
       return [
         m(Sidebar),
-        m('.page-content', m(component)),
+        m(component),
       ];
     },
   };

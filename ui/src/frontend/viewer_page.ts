@@ -100,7 +100,7 @@ const TraceViewer = {
     };
 
     return m(
-        '#page',
+        '.page',
         {
           style: {
             width: '100%',

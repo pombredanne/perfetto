@@ -135,7 +135,7 @@ export const QueryPage = createPage({
   view() {
     const engineId = m.route.param('engineId');
     return m(
-        '#page.query-page',
+        '.page.query-page',
         m(QueryBox, {engineId}),
         getQueryResponses(engineId).map(renderQueryResponse));
   }

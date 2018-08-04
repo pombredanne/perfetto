@@ -14,112 +14,95 @@
 
 import * as m from 'mithril';
 
-export const Sidebar: m.Component<{}, {expanded: boolean[]}> = {
+interface SidebarItem {
+  t: string;
+  l: string;
+  i: string;
+}
+
+interface SidebarSection {
+  title: string;
+  summary: string;
+  expanded?: boolean;
+  items: SidebarItem[];
+}
+
+export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
   oninit() {
-    this.expanded = [true, false, false, false];
+    this.sections = [
+      {
+        title: 'Traces',
+        expanded: true,
+        summary: 'Open or record a trace',
+        items: [
+          {t: 'Open trace file', l: '/', i: 'folder_open'},
+          {t: 'Open example trace', l: '/', i: 'description'},
+          {t: 'View trace', l: '/viewer', i: 'art_track'},
+          {t: 'Record new trace', l: '/record', i: 'fiber_smart_record'},
+          {t: 'Share current trace', l: '/record', i: 'share'},
+        ],
+      },
+      {
+        title: 'Workspaces',
+        summary: 'Custom and pre-arranged views',
+        items: [
+          {t: 'Big Picture', l: '/', i: 'art_track'},
+          {t: 'Apps and process', l: '/', i: 'apps'},
+          {t: 'Storage and I/O', l: '/', i: 'storage'},
+          {t: 'Add custom...', l: '/', i: 'library_add'},
+        ],
+      },
+      {
+        title: 'Tracks and views',
+        summary: 'Add new tracks to the workspace',
+        items: [
+          {t: 'User interactions', l: '/', i: 'touch_app'},
+          {t: 'Device info', l: '/', i: 'perm_device_information'},
+          {t: 'Scheduler trace', l: '/', i: 'blur_linear'},
+          {t: 'Process list', l: '/', i: 'equalizer'},
+          {t: 'Battery and power', l: '/', i: 'battery_alert'},
+        ],
+      },
+      {
+        title: 'Metrics and auditors',
+        summary: 'Add new tracks to the workspace',
+        items: [
+          {t: 'CPU Usage breakdown', l: '/', i: 'table_chart'},
+          {t: 'Memory breakdown', l: '/', i: 'memory'},
+        ],
+      },
+    ];
   },
   view() {
-    return m(
-        'nav.sidebar',
-        m('header', 'Perfetto'),
-        m(`section${this.expanded[0] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[0] = !this.expanded[0]},
-          m('h1', 'Traces'),
-          m('h2', 'Open or record a trace'),
-          m('.section-content',
-            m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'folder_open'),
-                  'Open Trace File')),
-              m('li',
-                m('a[href=/viewer]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'art_track'),
-                  'View Trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'fiber_smart_record'),
-                  'Record new trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'share'),
-                  'Share current trace'))))),
-        m(`section${this.expanded[1] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[1] = !this.expanded[1]},
-          m('h1', 'Workspaces'),
-          m('h2', 'Custom and pre-arranged views'),
-          m('.section-content',
-            m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'art_track'),
-                  'Big Picture')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'apps'),
-                  'Apps and process')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'storage'),
-                  'Storage and I/O')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'library_add'),
-                  'Add custom...'))))),
-        m(`section${this.expanded[2] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[2] = !this.expanded[2]},
-          m('h1', 'Tracks and Views'),
-          m('h2', 'Add new tracks to the workspace'),
-          m('.section-content',
-            m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'touch_app'),
-                  'User interactions')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'perm_device_information'),
-                  'Device info')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'blur_linear'),
-                  'Scheduler trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'equalizer'),
-                  'Process list')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'battery_alert'),
-                  'Battern & power'))))),
-        m(`section${this.expanded[3] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[3] = !this.expanded[3]},
-          m('h1', 'Metrics and Auditors'),
-          m('h2', 'Summary analysis of the trace'),
-          m('.section-content',
-            m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'table_chart'),
-                  'CPU usage breakdown')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'memory'),
-                  'Memory breakdown'))))));
+    const vdomSections = [];
+    for (const section of this.sections) {
+      const vdomItems = [];
+      for (const item of section.items) {
+        vdomItems.push(
+            m('li',
+              m(`a[href=${item.l}]`,
+                {oncreate: m.route.link},
+                m('i.material-icons', item.i),
+                item.t)));
+      }
+      vdomSections.push(
+          m(`section${section.expanded ? '.expanded' : ''}`,
+            {onclick: () => section.expanded = !section.expanded},
+            m('h1', section.title),
+            m('h2', section.summary),
+            m('.section-content', m('ul', vdomItems))));
+    }
+    return m('nav.sidebar', m('header', 'Perfetto'), ...vdomSections);
+  },
+  oncreate(vnode) {
+    // In lieu of a link on the <li> element, prevent that the click propagates
+    // up to the <section> triggering its compression.
+    const uls = vnode.dom.querySelectorAll('ul');
+    for (let i = 0; i < uls.length; i++) {
+      const ul = uls[i];
+      (ul as HTMLElement).addEventListener('click', (e) => {
+        e.stopImmediatePropagation();
+      });
+    }
   }
 };
