@@ -62,16 +62,24 @@
             }
         }
         &.command-mode {
-            background-color: #354252;
-            border-radius: 6px;
+            // background-color: #354252;
+            background-color: #111;
+            border-radius: 0;
+            width: 100%;
+            max-width: 100%;
+            margin-top: 0;
+            border-left: 1px solid #404854;
+            height: var(--topbar-height);
             input {
                 color: #9ddc67;
                 font-family: 'Inconsolata', monospace;
+                padding-left: 0;
             }
             &:before {
                 content: 'attach_money';
                 color: #9ddc67;
                 font-size: 26px;
+                padding-top: 5px;
             }
         }
     }

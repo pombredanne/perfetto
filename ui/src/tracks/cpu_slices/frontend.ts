@@ -48,8 +48,8 @@ class CpuSliceTrack extends Track {
     ctx.font = '12px Inconsolata';
     for (const slice of this.trackData.slices) {
       if (!sliceIsVisible(slice, visibleWindowMs)) continue;
-      const rectStart = timeScale.msToPx(slice.start);
-      const rectEnd = timeScale.msToPx(slice.end);
+      const rectStart = timeScale.msToPx(slice.start) as number;
+      const rectEnd = timeScale.msToPx(slice.end) as number;
       ctx.fillStyle = '#4682b4';
       const width = rectEnd - rectStart;
       ctx.fillRect(rectStart, 40, width, 30);

@@ -85,8 +85,8 @@ function onKeyUp(state: OmniboxState, e: Event) {
         `select name from process where name like '%${name}%' limit 10`;
     globals.dispatch(executeQuery('0', QUERY_ID, query));
   }
-  if (state.mode === 'command' && key == 'Enter') {
-    globals.dispatch(executeQuery('0', QUERY_ID, txt.value));
+  if (state.mode === 'command' && key === 'Enter') {
+    globals.dispatch(executeQuery('0', 'command', txt.value));
   }
 }
 
@@ -113,7 +113,7 @@ const Omnibox: m.Component<{}, OmniboxState> = {
     }
     const placeholder = {
       search: 'Search or type : to enter command mode',
-      command: 'e.g., select * from sched limit 10'
+      command: 'e.g., select * from sched left join thread using(utid) limit 10'
     };
     const commandMode = vnode.state.mode === 'command';
     return m(
