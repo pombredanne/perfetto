@@ -54,7 +54,7 @@ void TraceProcessor::LoadTrace(BlobReader* reader,
 
 void TraceProcessor::ExecuteQuery(
     const protos::RawQueryArgs& args,
-    std::function<void(protos::RawQueryResult)> callback) {
+    std::function<void(const protos::RawQueryResult&)> callback) {
   protos::RawQueryResult proto;
 
   const auto& sql = args.sql_query();
@@ -114,7 +114,7 @@ void TraceProcessor::ExecuteQuery(
   }
   proto.set_num_records(static_cast<uint64_t>(row_count));
 
-  callback(std::move(proto));
+  callback(proto);
 }
 
 void TraceProcessor::LoadTraceChunk(std::function<void()> callback) {

@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <functional>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
@@ -61,12 +63,14 @@ void PrintPrompt() {
   fflush(stdout);
 }
 
-void OnQueryResult(protos::RawQueryResult res) {
+void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
   PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
   if (res.has_error()) {
     PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
     return;
   }
+
+  base::TimeNanos t_end = base::GetWallTimeNs();
 
   for (int r = 0; r < static_cast<int>(res.num_records()); r++) {
     if (r % 32 == 0) {
@@ -103,6 +107,7 @@ void OnQueryResult(protos::RawQueryResult res) {
     }
     printf("\n");
   }
+  printf("\nQuery executed in %.3f ms\n\n", (t_end - t_start).count() / 1E6);
 }
 
 }  // namespace
@@ -134,7 +139,10 @@ int main(int argc, char** argv) {
       task_runner.Quit();
     protos::RawQueryArgs query;
     query.set_sql_query(line);
-    tp.ExecuteQuery(query, OnQueryResult);
+    base::TimeNanos t_start = base::GetWallTimeNs();
+    tp.ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
+      OnQueryResult(t_start, res);
+    });
     PrintPrompt();
   });
 

@@ -56,7 +56,7 @@ class TraceProcessor {
   // Executes a SQLite query on the loaded portion of the trace. |result| will
   // be invoked once after the result of the query is available.
   void ExecuteQuery(const protos::RawQueryArgs&,
-                    std::function<void(protos::RawQueryResult)>);
+                    std::function<void(const protos::RawQueryResult&)>);
 
  private:
   void LoadTraceChunk(std::function<void()> callback);
