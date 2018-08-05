@@ -73,10 +73,12 @@ function onKeyUp(state: OmniboxState, e: Event) {
     state.selResult = Math.max(state.selResult, 0);
     state.selResult = Math.min(state.selResult, state.numResults - 1);
     e.preventDefault();
+    m.redraw();
     return;
   }
   if (txt.value.length <= 0 || key === 'Escape') {
     clearOmniboxResults();
+    m.redraw();
     return;
   }
   if (state.mode === 'search') {
