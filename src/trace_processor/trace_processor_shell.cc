@@ -51,7 +51,7 @@ class FileReader : public BlobReader {
     return res > 0 ? static_cast<uint32_t>(res) : 0;
   }
 
-  size_t file_size() const { return file_size_; }
+  uint64_t file_size() const { return file_size_; }
 
  private:
   base::ScopedFile fd_;
