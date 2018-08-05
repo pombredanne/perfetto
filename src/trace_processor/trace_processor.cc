@@ -16,7 +16,16 @@
 
 #include "src/trace_processor/trace_processor.h"
 
+#include <sqlite3.h>
 #include <functional>
+
+#include "perfetto/base/task_runner.h"
+#include "src/trace_processor/process_table.h"
+#include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/sched_slice_table.h"
+#include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/thread_table.h"
+#include "src/trace_processor/trace_parser.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
