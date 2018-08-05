@@ -44,12 +44,17 @@ class CpuSliceTrack extends Track {
       ctx: CanvasRenderingContext2D, timeScale: TimeScale,
       visibleWindowMs: {start: number, end: number}): void {
     if (!this.trackData) return;
+    ctx.textAlign = 'center';
+    ctx.font = '12px Inconsolata';
     for (const slice of this.trackData.slices) {
       if (!sliceIsVisible(slice, visibleWindowMs)) continue;
       const rectStart = timeScale.msToPx(slice.start);
       const rectEnd = timeScale.msToPx(slice.end);
       ctx.fillStyle = '#4682b4';
-      ctx.fillRect(rectStart, 40, rectEnd - rectStart, 30);
+      const width = rectEnd - rectStart;
+      ctx.fillRect(rectStart, 40, width, 30);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(slice.title.substr(0, 16), rectStart + width/2, 55, width - 10);
     }
   }
 }

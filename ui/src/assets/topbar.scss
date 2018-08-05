@@ -26,6 +26,7 @@
     line-height: var(--topbar-height);
     .omnibox {
         @include omnibox-width();
+        @include transition(0.25s);
         display: grid;
         grid-template-areas: "icon input";
         grid-template-columns: 34px auto;
@@ -60,6 +61,19 @@
                 font-weight: 100;
             }
         }
+        &.command-mode {
+            background-color: #354252;
+            border-radius: 6px;
+            input {
+                color: #9ddc67;
+                font-family: 'Inconsolata', monospace;
+            }
+            &:before {
+                content: 'attach_money';
+                color: #9ddc67;
+                font-size: 26px;
+            }
+        }
     }
     .omnibox-results {
         @include transition(0.25s);
@@ -83,17 +97,13 @@
             vertical-align: middle;
             color: #666;
             border-bottom: 1px solid #eee;
-            &:hover{
+            &:hover {
                 background-color: hsl(213, 20%, 92%);
             }
             &.selected {
                 background-color: hsl(213, 40%, 90%);
             }
-            &:first-child {
-                // margin-top: 5px;
-            }
         }
-
     }
     .progress {
         position: absolute;

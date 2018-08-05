@@ -22,9 +22,10 @@ import {globals} from './globals';
 
 const QUERY_ID = 'quicksearch';
 
-interface OmniboxAttrs {
+interface OmniboxState {
   selResult: number;
   numResults: number;
+  mode: 'search'|'command';
 }
 
 function clearOmniboxResults() {
@@ -32,7 +33,38 @@ function clearOmniboxResults() {
   globals.dispatch(deleteQuery(QUERY_ID));
 }
 
-function onKeyUp(state: OmniboxAttrs, e: Event) {
+function onKeyDown(dom: HTMLInputElement, state: OmniboxState, e: Event) {
+  e.stopPropagation();
+  const key = (e as KeyboardEvent).key;
+
+  // Avoid that the global 'a', 'd', 'w', 's' handler sees these keystrokes.
+  // TODO: this seems a bug in the pan_and_zoom_handler.ts.
+  if (key === 'ArrowUp' || key === 'ArrowDown') {
+    e.preventDefault();
+    return;
+  }
+  const txt = dom.querySelector('input') as HTMLInputElement;
+  if (key === ':' && txt.value === '') {
+    state.mode = 'command';
+    m.redraw();
+    e.preventDefault();
+    return;
+  }
+  if (key === 'Escape' && state.mode === 'command') {
+    txt.value = '';
+    state.mode = 'search';
+    m.redraw();
+    return;
+  }
+  if (key === 'Backspace' && txt.value.length === 0 &&
+      state.mode === 'command') {
+    state.mode = 'search';
+    m.redraw();
+    return;
+  }
+}
+
+function onKeyUp(state: OmniboxState, e: Event) {
   e.stopPropagation();
   const key = (e as KeyboardEvent).key;
   const txt = e.target as HTMLInputElement;
@@ -40,7 +72,6 @@ function onKeyUp(state: OmniboxAttrs, e: Event) {
     state.selResult += (key === 'ArrowUp') ? -1 : 1;
     state.selResult = Math.max(state.selResult, 0);
     state.selResult = Math.min(state.selResult, state.numResults - 1);
-    m.redraw();
     e.preventDefault();
     return;
   }
@@ -48,44 +79,46 @@ function onKeyUp(state: OmniboxAttrs, e: Event) {
     clearOmniboxResults();
     return;
   }
-  const name = txt.value.replace(/'/g, '\\\'').replace(/[*]/g, '%');
-  const query = `select * from process where name like '%${name}%' limit 10`;
-  globals.dispatch(executeQuery('0', QUERY_ID, query));
+  if (state.mode === 'search') {
+    const name = txt.value.replace(/'/g, '\\\'').replace(/[*]/g, '%');
+    const query =
+        `select name from process where name like '%${name}%' limit 10`;
+    globals.dispatch(executeQuery('0', QUERY_ID, query));
+  }
+  if (state.mode === 'command' && key == 'Enter') {
+    globals.dispatch(executeQuery('0', QUERY_ID, txt.value));
+  }
 }
 
-const Omnibox: m.Component<{}, OmniboxAttrs> = {
-  oncreate(vdom) {
-    const txt = vdom.dom.querySelector('input') as HTMLInputElement;
-    vdom.state.selResult = 0;
-    vdom.state.numResults = 0;
-    txt.addEventListener('blur', clearOmniboxResults);
-    txt.addEventListener('keyup', onKeyUp.bind(undefined, vdom.state));
-
-    // Avoid that the global 'a', 'd', 'w', 's' handler sees these keystrokes.
-    // TODO: this seems a bug in the pan_and_zoom_handler.ts.
-    txt.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault();
-      }
-      e.stopPropagation();
-    });
+const Omnibox: m.Component<{}, OmniboxState> = {
+  oninit(vnode) {
+    vnode.state = {selResult: 0, numResults: 0, mode: 'search'};
   },
-  view(vdom) {
+  oncreate(vnode) {
+    const txt = vnode.dom.querySelector('input') as HTMLInputElement;
+    txt.addEventListener('blur', clearOmniboxResults);
+    txt.addEventListener(
+        'keydown', onKeyDown.bind(undefined, vnode.dom, vnode.state));
+    txt.addEventListener('keyup', onKeyUp.bind(undefined, vnode.state));
+  },
+  view(vnode) {
     const results = [];
     const resp = globals.queryResults.get(QUERY_ID) as QueryResponse;
     if (resp !== undefined) {
-      vdom.state.numResults = resp.rows ? resp.rows.length : 0;
+      vnode.state.numResults = resp.rows ? resp.rows.length : 0;
       for (let i = 0; i < resp.rows.length; i++) {
-        const row = resp.rows[i];
-        const clazz = (i === vdom.state.selResult) ? '.selected' : '';
-        results.push(m(`div${clazz}`, row.name));
+        const clazz = (i === vnode.state.selResult) ? '.selected' : '';
+        results.push(m(`div${clazz}`, resp.rows[i][resp.columns[0]]));
       }
     }
-
-    const placeholder = 'Type to search';
+    const placeholder = {
+      search: 'Search or type : to enter command mode',
+      command: 'e.g., select * from sched limit 10'
+    };
+    const commandMode = vnode.state.mode === 'command';
     return m(
-        '.omnibox',
-        m(`input[type=text][placeholder=${placeholder}]`),
+        `.omnibox${commandMode ? '.command-mode' : ''}`,
+        m(`input[type=text][placeholder=${placeholder[vnode.state.mode]}]`),
         m('.omnibox-results', results));
   },
 };
