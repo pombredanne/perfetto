@@ -22,7 +22,6 @@
 
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/weak_ptr.h"
-#include "perfetto/trace_processor/raw_query.pb.h"
 #include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -35,6 +34,12 @@
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
+
+namespace protos {
+class RawQueryArgs;
+class RawQueryResult;
+}  // namespace protos
+
 namespace trace_processor {
 
 // Coordinates the loading of traces from an arbitary source and allows

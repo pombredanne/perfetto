@@ -72,6 +72,18 @@ source_set("lib") {
   ]
 }
 
+source_set("shell") {
+  deps = [
+    ":lib",
+    "../../gn:default_deps",
+    "../../protos/perfetto/trace_processor:lite",
+    "../base",
+  ]
+  sources = [
+    "trace_processor_shell.cc",
+  ]
+}
+
 source_set("unittests") {
   testonly = true
   sources = [

@@ -18,6 +18,8 @@
 
 #include <functional>
 
+#include "perfetto/trace_processor/raw_query.pb.h"
+
 namespace perfetto {
 namespace trace_processor {
 namespace {
@@ -39,6 +41,8 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
   ThreadTable::RegisterTable(*db_, context_.storage.get());
 }
 
+TraceProcessor::~TraceProcessor() = default;
+
 void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
   // Reset storage.
@@ -59,6 +63,7 @@ void TraceProcessor::ExecuteQuery(
                                &raw_stmt, nullptr);
   ScopedStmt stmt(std::move(raw_stmt));
   if (err) {
+    proto.set_error(sqlite3_errmsg(*db_));
     callback(std::move(proto));
     return;
   }
