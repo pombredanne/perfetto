@@ -259,6 +259,7 @@ node_bin("scss") {
   inputs = [
     main_css,
     "src/assets/sidebar.scss",
+    "src/assets/topbar.scss",
   ]
   outputs = [
     "$ui_dir/perfetto.css",

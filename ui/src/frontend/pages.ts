@@ -14,6 +14,7 @@
 
 import * as m from 'mithril';
 import {Sidebar} from './sidebar';
+import {Topbar} from './topbar';
 
 /**
  * Wrap component with common UI elements (nav bar etc).
@@ -23,6 +24,7 @@ export function createPage(component: m.Component): m.Component {
     view() {
       return [
         m(Sidebar),
+        m(Topbar),
         m(component),
       ];
     },

@@ -14,9 +14,13 @@
 
 import * as m from 'mithril';
 
+import {navigate, openTraceFromFile, openTraceFromURL} from '../common/actions';
+
+import {globals} from './globals';
+
 interface SidebarItem {
   t: string;
-  l: string;
+  a: string|((e: Event) => void);
   i: string;
 }
 
@@ -27,48 +31,73 @@ interface SidebarSection {
   items: SidebarItem[];
 }
 
+const EXAMPLE_TRACE_URL =
+    'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
+
+function popupFileSelectionDialog(e: Event) {
+  e.preventDefault();
+  (document.querySelector('input[type=file]')! as HTMLInputElement).click();
+}
+
+function handleOpenTraceURL(e: Event) {
+  e.preventDefault();
+  globals.dispatch(openTraceFromURL(EXAMPLE_TRACE_URL));
+  globals.dispatch(navigate('/viewer'));
+}
+
+function onInputElementFileSelectionChanged(e: Event) {
+  if (!(e.target instanceof HTMLInputElement)) {
+    throw new Error('Not an input element');
+  }
+  if (!e.target.files) return;
+  globals.dispatch(openTraceFromFile(e.target.files[0]));
+}
+
+function stopClickPropagation(e: Event) {
+  e.stopImmediatePropagation();
+}
+
 export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
   oninit() {
     this.sections = [
       {
         title: 'Traces',
-        expanded: true,
         summary: 'Open or record a trace',
+        expanded: true,
         items: [
-          {t: 'Open trace file', l: '/', i: 'folder_open'},
-          {t: 'Open example trace', l: '/', i: 'description'},
-          {t: 'View trace', l: '/viewer', i: 'art_track'},
-          {t: 'Record new trace', l: '/record', i: 'fiber_smart_record'},
-          {t: 'Share current trace', l: '/record', i: 'share'},
+          {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
+          {t: 'Open example trace', a: handleOpenTraceURL, i: 'description'},
+          {t: 'Record new trace', a: '/record', i: 'fiber_smart_record'},
+          {t: 'Share current trace', a: '/record', i: 'share'},
         ],
       },
       {
         title: 'Workspaces',
         summary: 'Custom and pre-arranged views',
         items: [
-          {t: 'Big Picture', l: '/', i: 'art_track'},
-          {t: 'Apps and process', l: '/', i: 'apps'},
-          {t: 'Storage and I/O', l: '/', i: 'storage'},
-          {t: 'Add custom...', l: '/', i: 'library_add'},
+          {t: 'Big Picture', a: '/', i: 'art_track'},
+          {t: 'Apps and process', a: '/', i: 'apps'},
+          {t: 'Storage and I/O', a: '/', i: 'storage'},
+          {t: 'Add custom...', a: '/', i: 'library_add'},
         ],
       },
       {
         title: 'Tracks and views',
         summary: 'Add new tracks to the workspace',
         items: [
-          {t: 'User interactions', l: '/', i: 'touch_app'},
-          {t: 'Device info', l: '/', i: 'perm_device_information'},
-          {t: 'Scheduler trace', l: '/', i: 'blur_linear'},
-          {t: 'Process list', l: '/', i: 'equalizer'},
-          {t: 'Battery and power', l: '/', i: 'battery_alert'},
+          {t: 'User interactions', a: '/', i: 'touch_app'},
+          {t: 'Device info', a: '/', i: 'perm_device_information'},
+          {t: 'Scheduler trace', a: '/', i: 'blur_linear'},
+          {t: 'Process list', a: '/', i: 'equalizer'},
+          {t: 'Battery and power', a: '/', i: 'battery_alert'},
         ],
       },
       {
         title: 'Metrics and auditors',
         summary: 'Add new tracks to the workspace',
         items: [
-          {t: 'CPU Usage breakdown', l: '/', i: 'table_chart'},
-          {t: 'Memory breakdown', l: '/', i: 'memory'},
+          {t: 'CPU Usage breakdown', a: '/', i: 'table_chart'},
+          {t: 'Memory breakdown', a: '/', i: 'memory'},
         ],
       },
     ];
@@ -78,10 +107,11 @@ export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
     for (const section of this.sections) {
       const vdomItems = [];
       for (const item of section.items) {
+        const linkIsUrl = typeof item.a === 'string';
         vdomItems.push(
             m('li',
-              m(`a[href=${item.l}]`,
-                {oncreate: m.route.link},
+              m(`a[href=${linkIsUrl ? item.a : '/'}]`,
+                linkIsUrl ? {oncreate: m.route.link} : {onclick: item.a},
                 m('i.material-icons', item.i),
                 item.t)));
       }
@@ -90,19 +120,15 @@ export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
             {onclick: () => section.expanded = !section.expanded},
             m('h1', section.title),
             m('h2', section.summary),
-            m('.section-content', m('ul', vdomItems))));
+            m('.section-content',
+              // Prevent that the clicks on the bottom part of the expanded
+              // sections propagate up to and trigger their compression.
+              m('ul', {onclick: stopClickPropagation}, vdomItems))));
     }
-    return m('nav.sidebar', m('header', 'Perfetto'), ...vdomSections);
+    return m(
+        'nav.sidebar',
+        m('header', 'Perfetto'),
+        m('input[type=file]', {onchange: onInputElementFileSelectionChanged}),
+        ...vdomSections);
   },
-  oncreate(vnode) {
-    // In lieu of a link on the <li> element, prevent that the click propagates
-    // up to the <section> triggering its compression.
-    const uls = vnode.dom.querySelectorAll('ul');
-    for (let i = 0; i < uls.length; i++) {
-      const ul = uls[i];
-      (ul as HTMLElement).addEventListener('click', (e) => {
-        e.stopImmediatePropagation();
-      });
-    }
-  }
 };

@@ -40,6 +40,7 @@ group("all") {
       ":perfetto",
       ":perfetto_benchmarks",
       ":perfetto_integrationtests",
+      ":trace_processor_shell",
       ":traced",
       ":traced_probes",
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
@@ -196,6 +197,13 @@ if (!build_with_chromium) {
         "utils",
       ]
     }
+  }
+
+  executable("trace_processor_shell") {
+    deps = [
+      "gn:default_deps",
+      "src/trace_processor:shell",
+    ]
   }
 
   if (build_with_android) {
