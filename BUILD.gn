@@ -99,7 +99,6 @@ executable("perfetto_unittests") {
     "gn:default_deps",
     "gn:gtest_main",
     "src/base:unittests",
-    "src/profiling/memory:unittests",
     "src/protozero:unittests",
     "src/tracing:unittests",
   ]
@@ -108,6 +107,7 @@ executable("perfetto_unittests") {
     deps += [
       "src/ipc:unittests",
       "src/perfetto_cmd:unittests",
+      "src/profiling/memory:unittests",
       "src/traced/probes:unittests",
       "src/traced/probes/filesystem:unittests",
       "src/traced/probes/ftrace:unittests",
