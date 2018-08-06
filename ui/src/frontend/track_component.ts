@@ -21,7 +21,7 @@ import {CanvasController} from './canvas_controller';
 import {globals} from './globals';
 import {drawGridLines} from './gridline_helper';
 import {quietDispatch} from './mithril_helpers';
-import {TimeScale} from './time_scale';
+import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
 
@@ -126,6 +126,13 @@ export const TrackComponent = {
   },
 
   view({attrs}) {
+
+    const sliceStart: Milliseconds = 100000;
+    const sliceEnd: Milliseconds = 400000;
+
+    const rectStart = attrs.timeScale.msToPx(sliceStart);
+    const rectWidth = attrs.timeScale.msToPx(sliceEnd) - rectStart;
+
     return m(
         '.track',
         {
@@ -141,7 +148,7 @@ export const TrackComponent = {
             }
           },
           m('h1',
-            {},
+            {style: {margin: 0, 'font-size': '1.5em'}},
             attrs.trackState.name),
           m('.reorder-icons',
             m(TrackMoveButton, {
@@ -154,12 +161,22 @@ export const TrackComponent = {
               trackId: attrs.trackState.id,
               top: 40,
             }))),
-        m('.track-content', {
-          style: {
-            width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
-            left: `${TRACK_SHELL_WIDTH}px`,
-          }
-        }));
+        m('.track-content',
+          {
+            style: {
+              width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
+              left: `${TRACK_SHELL_WIDTH}px`,
+            }
+          },
+          // TODO(dproy): Move out DOM Content from the track class.
+          m('.marker',
+            {
+              style: {
+                left: rectStart.toString() + 'px',
+                width: rectWidth.toString() + 'px',
+              }
+            },
+            attrs.trackState.name + ' DOM Content')));
   },
 
 
