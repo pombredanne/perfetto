@@ -19,6 +19,7 @@ import {TrackState} from '../common/state';
 
 import {CanvasController} from './canvas_controller';
 import {globals} from './globals';
+import {drawGridLines} from './gridline_helper';
 import {quietDispatch} from './mithril_helpers';
 import {Milliseconds, TimeScale} from './time_scale';
 import {Track} from './track';
@@ -32,6 +33,9 @@ interface TrackComponentAttrs {
   trackState: TrackState;
   visibleWindowMs: {start: number, end: number};
 }
+
+export const TRACK_SHELL_WIDTH = 200;
+
 
 /**
  * Returns yStart for a track relative to canvas top.
@@ -67,7 +71,8 @@ interface TrackComponentAttrs {
  * @param canvasYStart Y position of canvas relative to
  * ScrollingTrackDisplay.
  */
-function getTrackYStartOnCanvas(trackYStart: number, canvasYStart: number) {
+export function getTrackYStartOnCanvas(
+    trackYStart: number, canvasYStart: number) {
   return trackYStart - canvasYStart;
 }
 
@@ -96,9 +101,15 @@ function renderTrack(attrs: TrackComponentAttrs, track: Track) {
     clipRect.rect(0, 0, attrs.width, attrs.trackState.height);
     ctx.clip(clipRect);
 
+    drawGridLines(
+        ctx,
+        attrs.timeScale,
+        [attrs.visibleWindowMs.start, attrs.visibleWindowMs.end],
+        attrs.width,
+        attrs.trackState.height);
+
     // TODO(dproy): Figure out how track implementations should render DOM.
-    track.renderCanvas(
-        ctx, attrs.width, attrs.timeScale, attrs.visibleWindowMs);
+    track.renderCanvas(ctx, attrs.timeScale, attrs.visibleWindowMs);
 
     ctx.restore();
   }
@@ -126,25 +137,14 @@ export const TrackComponent = {
         '.track',
         {
           style: {
-            'border-top': '1px solid hsl(213, 22%, 82%)',
-            position: 'absolute',
-            top: attrs.top.toString() + 'px',
-            left: 0,
-            width: '100%',
+            top: `${attrs.top}px`,
             height: `${attrs.trackState.height}px`,
           }
         },
         m('.track-shell',
           {
             style: {
-              background: '#fff',
-              padding: '20px',
-              width: '200px',
-              'border-right': '1px solid hsl(213, 22%, 82%)',
-              height: '100%',
-              'z-index': '100',
-              color: 'hsl(213, 22%, 30%)',
-              position: 'relative',
+              width: `${TRACK_SHELL_WIDTH}px`,
             }
           },
           m('h1',
@@ -164,22 +164,16 @@ export const TrackComponent = {
         m('.track-content',
           {
             style: {
-              width: 'calc(100% - 200px)',
-              height: '100%',
-              position: 'absolute',
-              left: '200px',
-              top: '0'
+              width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
+              left: `${TRACK_SHELL_WIDTH}px`,
             }
           },
           // TODO(dproy): Move out DOM Content from the track class.
           m('.marker',
             {
               style: {
-                'font-size': '1.5em',
-                position: 'absolute',
                 left: rectStart.toString() + 'px',
                 width: rectWidth.toString() + 'px',
-                background: '#aca'
               }
             },
             attrs.trackState.name + ' DOM Content')));
@@ -197,9 +191,8 @@ export const TrackComponent = {
 
 const TrackMoveButton = {
   view({attrs}) {
-    const content = attrs.direction === 'up' ? '⇧' : '⇩';
     return m(
-        'button',
+        'i.material-icons',
         {
           onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
           style: {
@@ -219,7 +212,7 @@ const TrackMoveButton = {
             outline: 'none',
           }
         },
-        content);
+        attrs.direction === 'up' ? 'arrow_upward_alt' : 'arrow_downward_alt');
   }
 } as m.Component<{
   direction: 'up' | 'down',

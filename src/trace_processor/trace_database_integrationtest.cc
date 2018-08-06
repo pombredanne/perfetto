@@ -21,8 +21,7 @@
 #include "perfetto/trace_processor/raw_query.pb.h"
 #include "perfetto/trace_processor/sched.pb.h"
 #include "src/base/test/test_task_runner.h"
-#include "src/trace_processor/emscripten_task_runner.h"
-#include "src/trace_processor/trace_database.h"
+#include "src/trace_processor/trace_processor.h"
 
 #include "gtest/gtest.h"
 
@@ -31,7 +30,7 @@ namespace trace_processor {
 namespace {
 
 const char* kAndroidSchedAndPsPath =
-    "buildtools/example_traces/android_sched_and_ps.pb";
+    "buildtools/test_data/android_sched_and_ps.pb";
 
 class FileReader : public BlobReader {
  public:
@@ -47,10 +46,10 @@ class FileReader : public BlobReader {
   base::ScopedFile file_;
 };
 
-TEST(TraceDatabaseIntegrationTest, CanLoadATrace) {
+TEST(TraceProcessorIntegrationTest, CanLoadATrace) {
   FileReader reader(base::OpenFile(kAndroidSchedAndPsPath, O_RDONLY));
   base::TestTaskRunner task_runner;
-  TraceDatabase db(&task_runner);
+  TraceProcessor db(&task_runner);
 
   auto loading_done = task_runner.CreateCheckpoint("loading_done");
   db.LoadTrace(&reader, [loading_done]() { loading_done(); });
