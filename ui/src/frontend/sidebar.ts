@@ -32,7 +32,8 @@ function navlink(iconName: string, text: string, action: Action): m.Children {
             return action;
           }),
         },
-        m('i.material-icons', iconName) text));
+        m('i.material-icons', iconName),
+        text));
 }
 
 function sectionHeader(
