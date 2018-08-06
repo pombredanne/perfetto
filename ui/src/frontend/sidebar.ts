@@ -14,112 +14,75 @@
 
 import * as m from 'mithril';
 
-export const Sidebar: m.Component<{}, {expanded: boolean[]}> = {
-  oninit() {
-    this.expanded = [true, false, false, false];
-  },
+import {Action, navigate} from '../common/actions';
+
+import {quietDispatch} from './mithril_helpers';
+
+const navigateHome = navigate('/');
+const navigateViewer = navigate('/viewer');
+const expanded = [true, false, false, false];
+
+function navlink(iconName: string, text: string, action: Action): m.Children {
+  return m(
+      'li',
+      m('a[href=/]',
+        {
+          onclick: quietDispatch(e => {
+            e.preventDefault();
+            return action;
+          }),
+        },
+        m('i.material-icons', iconName) text));
+}
+
+function sectionHeader(
+    title: string, subtitle: string, sectionId: number): m.Children {
+  return m(
+      '.section-header',
+      {onclick: () => expanded[sectionId] = !expanded[sectionId]},
+      m('h1', title),
+      m('h2', subtitle));
+}
+
+export const Sidebar: m.Component = {
   view() {
+    console.log('view', expanded);
     return m(
         'nav.sidebar',
         m('header', 'Perfetto'),
-        m(`section${this.expanded[0] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[0] = !this.expanded[0]},
-          m('h1', 'Traces'),
-          m('h2', 'Open or record a trace'),
+        m(`section${expanded[0] ? '.expanded' : ''}`,
+          sectionHeader('Traces', 'Open or record a trace', 0),
           m('.section-content',
             m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'folder_open'),
-                  'Open Trace File')),
-              m('li',
-                m('a[href=/viewer]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'art_track'),
-                  'View Trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'fiber_smart_record'),
-                  'Record new trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'share'),
-                  'Share current trace'))))),
-        m(`section${this.expanded[1] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[1] = !this.expanded[1]},
-          m('h1', 'Workspaces'),
-          m('h2', 'Custom and pre-arranged views'),
+              navlink('folder_open', 'Open trace file', navigateHome),
+              navlink('art_track', 'View Trace', navigateViewer),
+              navlink('fiber_smart_record', 'Record new trace', navigateHome),
+              navlink('share', 'Share current trace', navigateHome)))),
+        m(`section${expanded[1] ? '.expanded' : ''}`,
+          sectionHeader('Workspaces', 'Custom and pre-arranged views', 1),
           m('.section-content',
             m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'art_track'),
-                  'Big Picture')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'apps'),
-                  'Apps and process')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'storage'),
-                  'Storage and I/O')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'library_add'),
-                  'Add custom...'))))),
-        m(`section${this.expanded[2] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[2] = !this.expanded[2]},
-          m('h1', 'Tracks and Views'),
-          m('h2', 'Add new tracks to the workspace'),
+              navlink('art_track', 'Big picture', navigateHome),
+              navlink('apps', 'Apps and processes', navigateHome),
+              navlink('storage', 'Storage and I/O', navigateHome),
+              navlink('library_add', 'Add custom...', navigateHome)))),
+        m(`section${expanded[2] ? '.expanded' : ''}`,
+          sectionHeader(
+              'Tracks and Views', 'Add new tracks to the workspace', 2),
           m('.section-content',
             m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'touch_app'),
-                  'User interactions')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'perm_device_information'),
-                  'Device info')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'blur_linear'),
-                  'Scheduler trace')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'equalizer'),
-                  'Process list')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'battery_alert'),
-                  'Battern & power'))))),
-        m(`section${this.expanded[3] ? '.expanded' : ''}`,
-          {onclick: () => this.expanded[3] = !this.expanded[3]},
-          m('h1', 'Metrics and Auditors'),
-          m('h2', 'Summary analysis of the trace'),
+              navlink('touch_app', 'User interactions', navigateHome),
+              navlink(
+                  'perm_device_information', 'User interactions', navigateHome),
+              navlink('blur_linear', 'Scheduler trace', navigateHome),
+              navlink('equalizer', 'Process list', navigateHome),
+              navlink('battery_alert', 'Battary & power', navigateHome)))),
+        m(`section${expanded[3] ? '.expanded' : ''}`,
+          sectionHeader(
+              'Metrics and Auditors', 'Summary analysis of the trace', 3),
           m('.section-content',
             m('ul',
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'table_chart'),
-                  'CPU usage breakdown')),
-              m('li',
-                m('a[href=/]',
-                  {oncreate: m.route.link},
-                  m('i.material-icons', 'memory'),
-                  'Memory breakdown'))))));
+              navlink('table_chart', 'CPU usage breakdown ', navigateHome),
+              navlink('memory', 'Memory breakdown', navigateHome)))));
   }
 };
