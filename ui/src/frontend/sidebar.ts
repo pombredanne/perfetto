@@ -46,7 +46,6 @@ function sectionHeader(
 
 export const Sidebar: m.Component = {
   view() {
-    console.log('view', expanded);
     return m(
         'nav.sidebar',
         m('header', 'Perfetto'),
