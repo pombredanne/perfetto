@@ -15,7 +15,7 @@
     grid-area: sidebar;
     z-index: 2;
     background-color: #262f3c;
-    overflow-y: auto; // z-index: 2;
+    overflow-y: auto;
     >* {
         border-bottom: 1px solid #404854;
     }

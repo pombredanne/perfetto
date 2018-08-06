@@ -13,18 +13,19 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+import { globals } from './globals';
+import { quietDispatch } from './mithril_helpers';
+import { navigate } from '../common/actions';
 
-interface OmniboxState {
-  selResult: number;
-  numResults: number;
-  mode: 'search'|'command';
-}
+let selResult = 0;
+let numResults = 0;
+let mode: 'search'|'command' = 'search';
 
 function clearOmniboxResults() {
   // TODO(primiano): Implement in next CLs.
 }
 
-function onKeyDown(dom: HTMLInputElement, state: OmniboxState, e: Event) {
+function onKeyDown(e: Event) {
   e.stopPropagation();
   const key = (e as KeyboardEvent).key;
 
@@ -34,36 +35,36 @@ function onKeyDown(dom: HTMLInputElement, state: OmniboxState, e: Event) {
     e.preventDefault();
     return;
   }
-  const txt = dom.querySelector('input') as HTMLInputElement;
+  const txt =
+      (e.target as HTMLElement).querySelector('input') as HTMLInputElement;
   if (key === ':' && txt.value === '') {
-    state.mode = 'command';
+    mode = 'command';
     m.redraw();
     e.preventDefault();
     return;
   }
-  if (key === 'Escape' && state.mode === 'command') {
+  if (key === 'Escape' && mode === 'command') {
     txt.value = '';
-    state.mode = 'search';
+    mode = 'search';
     m.redraw();
     return;
   }
-  if (key === 'Backspace' && txt.value.length === 0 &&
-      state.mode === 'command') {
-    state.mode = 'search';
+  if (key === 'Backspace' && txt.value.length === 0 && mode === 'command') {
+    mode = 'search';
     m.redraw();
     return;
   }
   // TODO(primiano): add query handling here.
 }
 
-function onKeyUp(state: OmniboxState, e: Event) {
+function onKeyUp(e: Event) {
   e.stopPropagation();
   const key = (e as KeyboardEvent).key;
   const txt = e.target as HTMLInputElement;
   if (key === 'ArrowUp' || key === 'ArrowDown') {
-    state.selResult += (key === 'ArrowUp') ? -1 : 1;
-    state.selResult = Math.max(state.selResult, 0);
-    state.selResult = Math.min(state.selResult, state.numResults - 1);
+    selResult += (key === 'ArrowUp') ? -1 : 1;
+    selResult = Math.max(selResult, 0);
+    selResult = Math.min(selResult, numResults - 1);
     e.preventDefault();
     m.redraw();
     return;
@@ -76,31 +77,28 @@ function onKeyUp(state: OmniboxState, e: Event) {
   // TODO(primiano): add query handling here.
 }
 
-const Omnibox: m.Component<{}, OmniboxState> = {
-  oninit(vnode) {
-    vnode.state = {selResult: 0, numResults: 0, mode: 'search'};
-  },
+
+const Omnibox: m.Component = {
   oncreate(vnode) {
     const txt = vnode.dom.querySelector('input') as HTMLInputElement;
     txt.addEventListener('blur', clearOmniboxResults);
-    txt.addEventListener(
-        'keydown', onKeyDown.bind(undefined, vnode.dom, vnode.state));
-    txt.addEventListener('keyup', onKeyUp.bind(undefined, vnode.state));
+    txt.addEventListener('keydown', onKeyDown);
+    txt.addEventListener('keyup', onKeyUp);
   },
-  view(vnode) {
+  view() {
     // TODO(primiano): handle query results here.
     const placeholder = {
       search: 'Search or type : to enter command mode',
       command: 'e.g., select * from sched left join thread using(utid) limit 10'
     };
-    const commandMode = vnode.state.mode === 'command';
+    const commandMode = mode === 'command';
     return m(
         `.omnibox${commandMode ? '.command-mode' : ''}`,
-        m(`input[type=text][placeholder=${placeholder[vnode.state.mode]}]`));
+        m(`input[type=text][placeholder=${placeholder[mode]}]`));
   },
 };
 
-export const Topbar: m.Component<{}, {}> = {
+export const Topbar: m.Component = {
   view() {
     return m('.topbar', m(Omnibox));
   },

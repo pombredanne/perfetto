@@ -14,25 +14,56 @@
 
 import * as m from 'mithril';
 
-import {navigate, openTraceFromFile, openTraceFromURL} from '../common/actions';
+import {navigate, openTraceFromFile, openTraceFromUrl} from '../common/actions';
 
 import {globals} from './globals';
-
-interface SidebarItem {
-  t: string;
-  a: string|((e: Event) => void);
-  i: string;
-}
-
-interface SidebarSection {
-  title: string;
-  summary: string;
-  expanded?: boolean;
-  items: SidebarItem[];
-}
+import {quietHandler} from './mithril_helpers';
 
 const EXAMPLE_TRACE_URL =
     'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
+
+const SECTIONS = [
+  {
+    title: 'Traces',
+    summary: 'Open or record a trace',
+    expanded: true,
+    items: [
+      {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
+      {t: 'Open example trace', a: handleOpenTraceURL, i: 'description'},
+      {t: 'Record new trace', a: navigateHome, i: 'fiber_smart_record'},
+      {t: 'Share current trace', a: navigateHome, i: 'share'},
+    ],
+  },
+  {
+    title: 'Workspaces',
+    summary: 'Custom and pre-arranged views',
+    items: [
+      {t: 'Big Picture', a: navigateHome, i: 'art_track'},
+      {t: 'Apps and process', a: navigateHome, i: 'apps'},
+      {t: 'Storage and I/O', a: navigateHome, i: 'storage'},
+      {t: 'Add custom...', a: navigateHome, i: 'library_add'},
+    ],
+  },
+  {
+    title: 'Tracks and views',
+    summary: 'Add new tracks to the workspace',
+    items: [
+      {t: 'User interactions', a: navigateHome, i: 'touch_app'},
+      {t: 'Device info', a: navigateHome, i: 'perm_device_information'},
+      {t: 'Scheduler trace', a: navigateHome, i: 'blur_linear'},
+      {t: 'Process list', a: navigateHome, i: 'equalizer'},
+      {t: 'Battery and power', a: navigateHome, i: 'battery_alert'},
+    ],
+  },
+  {
+    title: 'Metrics and auditors',
+    summary: 'Add new tracks to the workspace',
+    items: [
+      {t: 'CPU Usage breakdown', a: navigateHome, i: 'table_chart'},
+      {t: 'Memory breakdown', a: navigateHome, i: 'memory'},
+    ],
+  },
+];
 
 function popupFileSelectionDialog(e: Event) {
   e.preventDefault();
@@ -41,8 +72,7 @@ function popupFileSelectionDialog(e: Event) {
 
 function handleOpenTraceURL(e: Event) {
   e.preventDefault();
-  globals.dispatch(openTraceFromURL(EXAMPLE_TRACE_URL));
-  globals.dispatch(navigate('/viewer'));
+  globals.dispatch(openTraceFromUrl(EXAMPLE_TRACE_URL));
 }
 
 function onInputElementFileSelectionChanged(e: Event) {
@@ -57,61 +87,21 @@ function stopClickPropagation(e: Event) {
   e.stopImmediatePropagation();
 }
 
-export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
-  oninit() {
-    this.sections = [
-      {
-        title: 'Traces',
-        summary: 'Open or record a trace',
-        expanded: true,
-        items: [
-          {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
-          {t: 'Open example trace', a: handleOpenTraceURL, i: 'description'},
-          {t: 'Record new trace', a: '/record', i: 'fiber_smart_record'},
-          {t: 'Share current trace', a: '/record', i: 'share'},
-        ],
-      },
-      {
-        title: 'Workspaces',
-        summary: 'Custom and pre-arranged views',
-        items: [
-          {t: 'Big Picture', a: '/', i: 'art_track'},
-          {t: 'Apps and process', a: '/', i: 'apps'},
-          {t: 'Storage and I/O', a: '/', i: 'storage'},
-          {t: 'Add custom...', a: '/', i: 'library_add'},
-        ],
-      },
-      {
-        title: 'Tracks and views',
-        summary: 'Add new tracks to the workspace',
-        items: [
-          {t: 'User interactions', a: '/', i: 'touch_app'},
-          {t: 'Device info', a: '/', i: 'perm_device_information'},
-          {t: 'Scheduler trace', a: '/', i: 'blur_linear'},
-          {t: 'Process list', a: '/', i: 'equalizer'},
-          {t: 'Battery and power', a: '/', i: 'battery_alert'},
-        ],
-      },
-      {
-        title: 'Metrics and auditors',
-        summary: 'Add new tracks to the workspace',
-        items: [
-          {t: 'CPU Usage breakdown', a: '/', i: 'table_chart'},
-          {t: 'Memory breakdown', a: '/', i: 'memory'},
-        ],
-      },
-    ];
-  },
+function navigateHome(_: Event) {
+  globals.dispatch(navigate('/'));
+}
+
+
+export const Sidebar: m.Component<{}, {}> = {
   view() {
     const vdomSections = [];
-    for (const section of this.sections) {
+    for (const section of SECTIONS) {
       const vdomItems = [];
       for (const item of section.items) {
-        const linkIsUrl = typeof item.a === 'string';
         vdomItems.push(
             m('li',
-              m(`a[href=${linkIsUrl ? item.a : '/'}]`,
-                linkIsUrl ? {oncreate: m.route.link} : {onclick: item.a},
+              m(`a[href=#]`,
+                {onclick: quietHandler(item.a)},
                 m('i.material-icons', item.i),
                 item.t)));
       }
@@ -128,7 +118,8 @@ export const Sidebar: m.Component<{}, {sections: SidebarSection[]}> = {
     return m(
         'nav.sidebar',
         m('header', 'Perfetto'),
-        m('input[type=file]', {onchange: onInputElementFileSelectionChanged}),
+        m('input[type=file]',
+          {onchange: quietHandler(onInputElementFileSelectionChanged)}),
         ...vdomSections);
   },
 };
