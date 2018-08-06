@@ -33,33 +33,20 @@ RecordReader::RecordReader(
   Reset();
 }
 
-ssize_t RecordReader::Read(int fd) {
+void RecordReader::Read(ipc::UnixSocket* fd) {
   if (read_idx_ < sizeof(record_size_)) {
-    ssize_t rd = ReadRecordSize(fd);
-    if (rd != -1) {
-      PERFETTO_DCHECK(rd >= 0);
-      read_idx_ += static_cast<size_t>(rd);
-    }
+    read_idx_ += ReadRecordSize(fd);
     if (read_idx_ == sizeof(record_size_)) {
       buf_.reset(new uint8_t[record_size_]);
-      // Make sure zero sized records don't make us return zero from this
-      // method which gets interpreted as fd closed.
-      //
-      // Without this check, the caller would re-enter in here, and ReadRecord
-      // would be called with a record_size_ of zero, which will make read(2)
-      // return 0.
+      // If we get a zero length record, we need to handle that here, as we
+      // might not get another OnDataAvailable event.
       MaybeFinishAndReset();
     }
-    return rd;
+    return;
   }
 
-  ssize_t rd = ReadRecord(fd);
-  if (rd != -1) {
-    PERFETTO_DCHECK(rd >= 0);
-    read_idx_ += static_cast<size_t>(rd);
-  }
+  read_idx_ += ReadRecord(fd);
   MaybeFinishAndReset();
-  return rd;
 }
 
 void RecordReader::MaybeFinishAndReset() {
@@ -80,28 +67,17 @@ bool RecordReader::done() {
          read_idx_ - sizeof(record_size_) == record_size_;
 }
 
-ssize_t RecordReader::ReadRecordSize(int fd) {
-  ssize_t rd = PERFETTO_EINTR(
-      read(fd, reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
-           sizeof(record_size_) - read_idx_));
-  if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-    PERFETTO_PLOG("read record size (fd: %d)", fd);
-    PERFETTO_DCHECK(false);
-  }
-  return rd;
+size_t RecordReader::ReadRecordSize(ipc::UnixSocket* fd) {
+  return fd->Receive(reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
+                     sizeof(record_size_) - read_idx_);
 }
 
-ssize_t RecordReader::ReadRecord(int fd) {
+size_t RecordReader::ReadRecord(ipc::UnixSocket* fd) {
   PERFETTO_DCHECK(record_size_ <= std::numeric_limits<size_t>::max());
   size_t read_so_far = read_idx_ - sizeof(record_size_);
   size_t sz =
       std::min(kMaxReadSize, static_cast<size_t>(record_size_) - read_so_far);
-  ssize_t rd = read(fd, buf_.get() + read_so_far, sz);
-  if (rd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-    PERFETTO_PLOG("read record (fd: %d)", fd);
-    PERFETTO_DCHECK(false);
-  }
-  return rd;
+  return fd->Receive(buf_.get() + read_so_far, sz);
 }
 
 }  // namespace perfetto
