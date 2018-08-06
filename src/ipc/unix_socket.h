@@ -130,6 +130,12 @@ class UnixSocket {
                                              EventListener*,
                                              base::TaskRunner*);
 
+  static std::unique_ptr<UnixSocket> AdoptForTesting(
+      base::ScopedFile fd,
+      State adopt_state,
+      EventListener* event_listener,
+      base::TaskRunner* task_runner);
+
   // Creates a Unix domain socket and binds it to |socket_name| (see comment
   // of Listen() above for the format). This file descriptor is suitable to be
   // passed to Listen(ScopedFile, ...). Returns the file descriptor, or -1 in
