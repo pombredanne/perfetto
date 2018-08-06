@@ -22,21 +22,23 @@
 
 #include <stdint.h>
 
+#include "src/ipc/unix_socket.h"
+
 namespace perfetto {
 
 class RecordReader {
  public:
   RecordReader(std::function<void(size_t, std::unique_ptr<uint8_t[]>)>
                    callback_function);
-  ssize_t Read(int fd);
+  void Read(ipc::UnixSocket* fd);
 
  private:
   void MaybeFinishAndReset();
   void Reset();
   bool done();
   size_t read_idx();
-  ssize_t ReadRecordSize(int fd);
-  ssize_t ReadRecord(int fd);
+  size_t ReadRecordSize(ipc::UnixSocket* fd);
+  size_t ReadRecord(ipc::UnixSocket* fd);
 
   std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function_;
   size_t read_idx_;
