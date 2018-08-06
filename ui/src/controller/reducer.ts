@@ -47,6 +47,7 @@ export function rootReducer(state: State, action: any): State {
         ready: false,
         source: action.url,
       };
+      nextState.route = `/viewer`;
       return nextState;
     }
 
