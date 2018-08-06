@@ -59,7 +59,6 @@ TEST(RecordReaderTest, ZeroLengthRecord) {
 
   base::ScopedFile fd[2];
   ASSERT_NE(ScopedSocketPair(fd), -1);
-  RecordReader r(std::move(callback_fn));
   uint64_t size = 0;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
 
@@ -82,7 +81,6 @@ TEST(RecordReaderTest, OneRecord) {
 
   base::ScopedFile fd[2];
   ASSERT_NE(ScopedSocketPair(fd), -1);
-  RecordReader r(std::move(callback_fn));
   uint64_t size = 1;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "1", 1), -1);
@@ -101,14 +99,13 @@ TEST(RecordReaderTest, TwoRecords) {
   size_t called = 0;
   auto callback_fn = [&callback_called, &called](size_t size,
                                                  std::unique_ptr<uint8_t[]>) {
-    ASSERT_EQ(size, 1u);
     if (++called == 2)
       callback_called();
+    ASSERT_EQ(size, called);
   };
 
   base::ScopedFile fd[2];
   ASSERT_NE(ScopedSocketPair(fd), -1);
-  RecordReader r(std::move(callback_fn));
   uint64_t size = 1;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "1", 1), -1);
