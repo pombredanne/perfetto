@@ -14,26 +14,30 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_SCOPED_DB_H_
-#define SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#ifndef SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_
+#define SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_
 
-#include "perfetto/base/scoped_file.h"
-
-extern "C" {
-struct sqlite3;
-struct sqlite3_stmt;
-extern int sqlite3_close(sqlite3*);
-extern int sqlite3_finalize(sqlite3_stmt* pStmt);
-}
+#include <memory>
 
 namespace perfetto {
 namespace trace_processor {
 
-using ScopedDb = base::ScopedResource<sqlite3*, sqlite3_close, nullptr>;
-using ScopedStmt =
-    base::ScopedResource<sqlite3_stmt*, sqlite3_finalize, nullptr>;
+class ProcessTracker;
+class TraceStorage;
+class TraceParser;
+class SchedTracker;
+
+class TraceProcessorContext {
+ public:
+  ~TraceProcessorContext();
+
+  std::unique_ptr<ProcessTracker> process_tracker;
+  std::unique_ptr<SchedTracker> sched_tracker;
+  std::unique_ptr<TraceStorage> storage;
+  std::unique_ptr<TraceParser> parser;
+};
 
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_SCOPED_DB_H_
+#endif  // SRC_TRACE_PROCESSOR_TRACE_PROCESSOR_CONTEXT_H_

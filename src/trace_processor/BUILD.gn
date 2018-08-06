@@ -36,22 +36,30 @@ wasm_lib("trace_processor") {
 source_set("lib") {
   sources = [
     "blob_reader.h",
+    "file_reader.cc",
+    "file_reader.h",
     "process_table.cc",
     "process_table.h",
+    "process_tracker.cc",
+    "process_tracker.h",
     "query_constraints.cc",
     "query_constraints.h",
     "sched_slice_table.cc",
     "sched_slice_table.h",
+    "sched_tracker.cc",
+    "sched_tracker.h",
     "scoped_db.h",
     "sqlite_utils.h",
     "table.cc",
     "table.h",
     "thread_table.cc",
     "thread_table.h",
-    "trace_database.cc",
-    "trace_database.h",
     "trace_parser.cc",
     "trace_parser.h",
+    "trace_processor.cc",
+    "trace_processor.h",
+    "trace_processor_context.cc",
+    "trace_processor_context.h",
     "trace_storage.cc",
     "trace_storage.h",
     "virtual_destructors.cc",
@@ -66,15 +74,28 @@ source_set("lib") {
   ]
 }
 
+executable("trace_processor_shell") {
+  deps = [
+    ":lib",
+    "../../gn:default_deps",
+    "../../protos/perfetto/trace_processor:lite",
+    "../base",
+  ]
+  sources = [
+    "trace_processor_shell.cc",
+  ]
+}
+
 source_set("unittests") {
   testonly = true
   sources = [
     "process_table_unittest.cc",
+    "process_tracker_unittest.cc",
     "query_constraints_unittest.cc",
     "sched_slice_table_unittest.cc",
+    "sched_tracker_unittest.cc",
     "thread_table_unittest.cc",
     "trace_parser_unittest.cc",
-    "trace_storage_unittest.cc",
   ]
   deps = [
     ":lib",

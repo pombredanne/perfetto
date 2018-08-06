@@ -14,9 +14,20 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_database.h"
+#include "src/trace_processor/trace_processor.h"
 
+#include <sqlite3.h>
 #include <functional>
+
+#include "perfetto/base/task_runner.h"
+#include "src/trace_processor/process_table.h"
+#include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/sched_slice_table.h"
+#include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/thread_table.h"
+#include "src/trace_processor/trace_parser.h"
+
+#include "perfetto/trace_processor/raw_query.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -24,28 +35,35 @@ namespace {
 constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
 }  // namespace
 
-TraceDatabase::TraceDatabase(base::TaskRunner* task_runner)
+TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
     : task_runner_(task_runner), weak_factory_(this) {
   sqlite3* db = nullptr;
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   db_.reset(std::move(db));
 
-  SchedSliceTable::RegisterTable(*db_, &storage_);
-  ProcessTable::RegisterTable(*db_, &storage_);
-  ThreadTable::RegisterTable(*db_, &storage_);
+  context_.sched_tracker.reset(new SchedTracker(&context_));
+  context_.process_tracker.reset(new ProcessTracker(&context_));
+  context_.storage.reset(new TraceStorage());
+
+  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
+  ProcessTable::RegisterTable(*db_, context_.storage.get());
+  ThreadTable::RegisterTable(*db_, context_.storage.get());
 }
 
-void TraceDatabase::LoadTrace(BlobReader* reader,
-                              std::function<void()> callback) {
-  // Reset storage and start a new trace parsing task.
-  storage_ = {};
-  parser_.reset(new TraceParser(reader, &storage_, kTraceChunkSizeB));
+TraceProcessor::~TraceProcessor() = default;
+
+void TraceProcessor::LoadTrace(BlobReader* reader,
+                               std::function<void()> callback) {
+  // Reset storage.
+  context_.storage->ResetStorage();
+  // Start a new trace parsing task.
+  context_.parser.reset(new TraceParser(reader, &context_, kTraceChunkSizeB));
   LoadTraceChunk(callback);
 }
 
-void TraceDatabase::ExecuteQuery(
+void TraceProcessor::ExecuteQuery(
     const protos::RawQueryArgs& args,
-    std::function<void(protos::RawQueryResult)> callback) {
+    std::function<void(const protos::RawQueryResult&)> callback) {
   protos::RawQueryResult proto;
 
   const auto& sql = args.sql_query();
@@ -54,6 +72,7 @@ void TraceDatabase::ExecuteQuery(
                                &raw_stmt, nullptr);
   ScopedStmt stmt(std::move(raw_stmt));
   if (err) {
+    proto.set_error(sqlite3_errmsg(*db_));
     callback(std::move(proto));
     return;
   }
@@ -104,11 +123,11 @@ void TraceDatabase::ExecuteQuery(
   }
   proto.set_num_records(static_cast<uint64_t>(row_count));
 
-  callback(std::move(proto));
+  callback(proto);
 }
 
-void TraceDatabase::LoadTraceChunk(std::function<void()> callback) {
-  bool has_more = parser_->ParseNextChunk();
+void TraceProcessor::LoadTraceChunk(std::function<void()> callback) {
+  bool has_more = context_.parser->ParseNextChunk();
   if (!has_more) {
     callback();
     return;
