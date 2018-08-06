@@ -112,8 +112,9 @@ TEST(RecordReaderTest, TwoRecords) {
   uint64_t size = 1;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
   ASSERT_NE(write(*fd[1], "1", 1), -1);
+  size = 2;
   ASSERT_NE(write(*fd[1], &size, sizeof(size)), -1);
-  ASSERT_NE(write(*fd[1], "1", 1), -1);
+  ASSERT_NE(write(*fd[1], "12", 2), -1);
 
   RecordReaderListener listener(std::move(callback_fn));
   std::unique_ptr<ipc::UnixSocket> recv_socket =
