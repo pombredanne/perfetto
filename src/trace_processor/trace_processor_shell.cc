@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <functional>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
-#include "src/trace_processor/blob_reader.h"
+#include "src/trace_processor/file_reader.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
@@ -33,31 +30,6 @@ using namespace perfetto;
 using namespace perfetto::trace_processor;
 
 namespace {
-class FileReader : public BlobReader {
- public:
-  FileReader(const char* path) {
-    fd_.reset(open(path, O_RDONLY));
-    if (!fd_)
-      PERFETTO_FATAL("Could not open %s", path);
-    struct stat stat_buf {};
-    PERFETTO_CHECK(fstat(*fd_, &stat_buf) == 0);
-    file_size_ = static_cast<uint64_t>(stat_buf.st_size);
-  }
-
-  ~FileReader() override = default;
-
-  uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
-    ssize_t res = pread(*fd_, dst, len, static_cast<off_t>(offset));
-    return res > 0 ? static_cast<uint32_t>(res) : 0;
-  }
-
-  uint64_t file_size() const { return file_size_; }
-
- private:
-  base::ScopedFile fd_;
-  uint64_t file_size_;
-};
-
 void PrintPrompt() {
   printf("\r%80s\r> ", "");
   fflush(stdout);
@@ -135,8 +107,10 @@ int main(int argc, char** argv) {
 
   task_runner.AddFileDescriptorWatch(STDIN_FILENO, [&tp, &task_runner] {
     char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin))
+    if (!fgets(line, sizeof(line) - 1, stdin)) {
       task_runner.Quit();
+      return;
+    }
     protos::RawQueryArgs query;
     query.set_sql_query(line);
     base::TimeNanos t_start = base::GetWallTimeNs();

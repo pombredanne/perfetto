@@ -36,6 +36,8 @@ wasm_lib("trace_processor") {
 source_set("lib") {
   sources = [
     "blob_reader.h",
+    "file_reader.cc",
+    "file_reader.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
@@ -72,7 +74,7 @@ source_set("lib") {
   ]
 }
 
-source_set("shell") {
+executable("trace_processor_shell") {
   deps = [
     ":lib",
     "../../gn:default_deps",
