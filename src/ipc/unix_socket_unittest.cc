@@ -485,6 +485,7 @@ TEST_F(UnixSocketTest, PeerUidRetainedAfterDisconnect) {
           [&srv_client_conn, srv_connected](UnixSocket*, UnixSocket* srv_conn) {
             srv_client_conn = srv_conn;
             EXPECT_EQ(geteuid(), static_cast<uint32_t>(srv_conn->peer_uid()));
+            EXPECT_EQ(getpid(), static_cast<uint32_t>(srv_conn->peer_pid()));
             srv_connected();
           }));
   auto cli_connected = task_runner_.CreateCheckpoint("cli_connected");
@@ -511,6 +512,7 @@ TEST_F(UnixSocketTest, PeerUidRetainedAfterDisconnect) {
   task_runner_.RunUntilCheckpoint("cli_disconnected");
   ASSERT_FALSE(srv_client_conn->is_connected());
   EXPECT_EQ(geteuid(), static_cast<uint32_t>(srv_client_conn->peer_uid()));
+  EXPECT_EQ(getpid(), static_cast<uint32_t>(srv_client_conn->peer_pid()));
 }
 
 TEST_F(UnixSocketTest, BlockingSend) {
