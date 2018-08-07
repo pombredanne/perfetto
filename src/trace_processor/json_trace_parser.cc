@@ -131,7 +131,7 @@ bool JsonTraceParser::ParseNextChunk() {
     UniqueTid utid = procs->UpdateThread(tid, pid);
     SlicesStack& stack = threads_[utid];
 
-    auto add_slice = [slices, &stack, ts, utid, cat_id,
+    auto add_slice = [slices, &stack, utid, cat_id,
                       name_id](const Slice& slice) {
       if (stack.size() >= 0xff)
         return;
