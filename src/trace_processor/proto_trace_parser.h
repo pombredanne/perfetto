@@ -28,8 +28,8 @@ namespace trace_processor {
 class BlobReader;
 class TraceProcessorContext;
 
-// Reads a trace in chunks from an abstract data source and parses it into a
-// form which is efficient to query.
+// Reads a protobuf trace in chunks and parses it into a form which is
+// efficient to query.
 class ProtoTraceParser : public TraceParser {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
@@ -60,11 +60,10 @@ class ProtoTraceParser : public TraceParser {
   void ParseThread(const uint8_t* data, size_t length);
 
   BlobReader* const reader_;
+  TraceProcessorContext* context_;
   uint32_t chunk_size_ = kTraceChunkSize;
   uint64_t offset_ = 0;
   std::unique_ptr<uint8_t[]> buffer_;
-
-  TraceProcessorContext* context_;
 };
 
 }  // namespace trace_processor

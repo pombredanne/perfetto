@@ -220,6 +220,7 @@ class TraceStorage {
   // One entry for each UniqueTid, with UniqueTid as the index.
   std::deque<Thread> unique_threads_;
 
+  // Slices coming from userspace events (e.g. Chromium TRACE_EVENT macros).
   NestableSlices nestable_slices_;
 };
 
