@@ -163,6 +163,12 @@ export const TrackComponent = {
             }))),
         m('.track-content',
           {
+            onmousemove: (e: MouseEvent) => {
+              this.track.onMouseMove({x: e.layerX, y: e.layerY});
+            },
+            onmouseout: () => {
+              this.track.onMouseOut();
+            },
             style: {
               width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
               left: `${TRACK_SHELL_WIDTH}px`,
