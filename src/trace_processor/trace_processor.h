@@ -49,6 +49,7 @@ class TraceProcessor {
   // Loads a trace by reading from the given blob reader. Invokes |callback|
   // when the trace has been fully read and parsed.
   void LoadTrace(BlobReader*, std::function<void()> callback);
+  void LoadJSONTrace(BlobReader*, std::function<void()> callback);
 
   // Executes a SQLite query on the loaded portion of the trace. |result| will
   // be invoked once after the result of the query is available.

@@ -49,6 +49,8 @@ source_set("lib") {
     "sched_tracker.cc",
     "sched_tracker.h",
     "scoped_db.h",
+    "slice_table.cc",
+    "slice_table.h",
     "sqlite_utils.h",
     "table.cc",
     "table.h",
@@ -72,6 +74,13 @@ source_set("lib") {
     "../base",
     "../protozero",
   ]
+  if (build_standalone) {
+    sources += [
+      "json_trace_parser.cc",
+      "json_trace_parser.h",
+    ]
+    deps += [ "../../gn:jsoncpp_deps" ]
+  }
 }
 
 executable("trace_processor_shell") {

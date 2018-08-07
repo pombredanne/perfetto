@@ -20,10 +20,12 @@
 #include <functional>
 
 #include "perfetto/base/task_runner.h"
+#include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/thread_table.h"
 #include "src/trace_processor/trace_parser.h"
 
@@ -45,8 +47,9 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
   context_.process_tracker.reset(new ProcessTracker(&context_));
   context_.storage.reset(new TraceStorage());
 
-  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
   ProcessTable::RegisterTable(*db_, context_.storage.get());
+  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
+  SliceTable::RegisterTable(*db_, context_.storage.get());
   ThreadTable::RegisterTable(*db_, context_.storage.get());
 }
 
@@ -54,11 +57,20 @@ TraceProcessor::~TraceProcessor() = default;
 
 void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
-  // Reset storage.
   context_.storage->ResetStorage();
   // Start a new trace parsing task.
   context_.parser.reset(new TraceParser(reader, &context_, kTraceChunkSizeB));
   LoadTraceChunk(callback);
+}
+
+void TraceProcessor::LoadJSONTrace(BlobReader* reader,
+                                   std::function<void()> callback) {
+  context_.storage->ResetStorage();
+  // Start a new trace parsing task.
+  context_.json_parser.reset(new JsonTraceParser(reader, &context_));
+  while (context_.json_parser->ParseNextChunk()) {
+  }
+  callback();
 }
 
 void TraceProcessor::ExecuteQuery(
