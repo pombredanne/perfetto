@@ -56,6 +56,12 @@ class ProcessTracker {
   // Virtual for testing.
   virtual UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
 
+  // Sets the name of the thread identified by the tuple (tid,pid).
+  void UpdateThreadName(uint32_t tid,
+                        uint32_t pid,
+                        const char* name,
+                        size_t name_len);
+
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
   // Virtual for testing.

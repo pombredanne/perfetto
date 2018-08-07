@@ -42,15 +42,26 @@ UniqueTid ProcessTracker::UpdateThread(uint64_t timestamp,
   UniqueTid new_utid = context_->storage->AddEmptyThread(tid);
   TraceStorage::Thread* thread = context_->storage->GetMutableThread(new_utid);
   thread->name_id = thread_name_id;
-  thread->start_ns = timestamp;
+  if (timestamp)
+    thread->start_ns = timestamp;
   tids_.emplace(tid, new_utid);
   return new_utid;
 };
 
+void ProcessTracker::UpdateThreadName(uint32_t tid,
+                                      uint32_t pid,
+                                      const char* name,
+                                      size_t name_len) {
+  UniqueTid utid = UpdateThread(tid, pid);
+  auto* thread = context_->storage->GetMutableThread(utid);
+  auto name_id = context_->storage->InternString(name, name_len);
+  thread->name_id = name_id;
+}
+
 UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
   auto tids_pair = tids_.equal_range(tid);
 
-  // Find matching thread for tid or create new one.
+  // Try looking for a thread that matches both tid and thread group id (pid).
   TraceStorage::Thread* thread = nullptr;
   UniqueTid utid = 0;
   for (auto it = tids_pair.first; it != tids_pair.second; it++) {
@@ -73,7 +84,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
   }
 
   // Find matching process or create new one.
-  if (thread->upid == 0)  // TODO: is upid guaranteed to start at 0?
+  if (thread->upid == 0)  // Not set, upid == 0 is invalid.
     thread->upid = GetOrCreateProcess(pid, thread->start_ns);
 
   return utid;

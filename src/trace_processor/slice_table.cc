@@ -106,8 +106,8 @@ int SliceTable::Cursor::Column(sqlite3_context* context, int col) {
                            static_cast<sqlite3_int64>(slices.depths()[row_]));
       break;
     case Column::kStackId:
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(slices.stack_ids()[row_]));
+      sqlite3_result_int64(
+          context, static_cast<sqlite3_int64>(slices.stack_ids()[row_]));
       break;
     case Column::kParentStackId:
       sqlite3_result_int64(
