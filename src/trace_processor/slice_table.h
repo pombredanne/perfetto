@@ -17,16 +17,16 @@
 #ifndef SRC_TRACE_PROCESSOR_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SLICE_TABLE_H_
 
-#include <sqlite3.h>
 #include <limits>
 #include <memory>
 
-#include "src/trace_processor/query_constraints.h"
 #include "src/trace_processor/table.h"
-#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
+
+class QueryConstraints;
+class TraceStorage;
 
 // The implementation of the SQLite table containing slices of CPU time with the
 // metadata for those slices.

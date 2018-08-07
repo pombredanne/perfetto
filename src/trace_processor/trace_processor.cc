@@ -23,19 +23,16 @@
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/thread_table.h"
-#include "src/trace_processor/trace_parser.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
 namespace perfetto {
 namespace trace_processor {
-namespace {
-constexpr uint32_t kTraceChunkSizeB = 16 * 1024 * 1024;  // 16 MB
-}  // namespace
 
 TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
     : task_runner_(task_runner), weak_factory_(this) {
@@ -59,7 +56,7 @@ void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
   context_.storage->ResetStorage();
   // Start a new trace parsing task.
-  context_.parser.reset(new TraceParser(reader, &context_, kTraceChunkSizeB));
+  context_.parser.reset(new ProtoTraceParser(reader, &context_));
   LoadTraceChunk(callback);
 }
 
@@ -67,10 +64,8 @@ void TraceProcessor::LoadJSONTrace(BlobReader* reader,
                                    std::function<void()> callback) {
   context_.storage->ResetStorage();
   // Start a new trace parsing task.
-  context_.json_parser.reset(new JsonTraceParser(reader, &context_));
-  while (context_.json_parser->ParseNextChunk()) {
-  }
-  callback();
+  context_.parser.reset(new JsonTraceParser(reader, &context_));
+  LoadTraceChunk(callback);
 }
 
 void TraceProcessor::ExecuteQuery(

@@ -22,6 +22,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -32,18 +33,21 @@ class TraceProcessorContext;
 
 // Parses legacy chrome JSON traces. The support for now is extremely rough
 // and supports only explicit TRACE_EVENT_BEGIN/END events.
-class JsonTraceParser {
+class JsonTraceParser : public TraceParser {
  public:
   JsonTraceParser(BlobReader*, TraceProcessorContext*);
+  ~JsonTraceParser() override;
 
-  // Parses the next chunk of TracePackets from the BlobReader. Returns true
+  // TraceParser implementation.
+
+  // Parses a batch of JSON events from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.
-  bool ParseNextChunk();
+  bool ParseNextChunk() override;
 
  private:
   struct Slice {
-    TraceStorage::StringId cat_id;
-    TraceStorage::StringId name_id;
+    StringId cat_id;
+    StringId name_id;
     uint64_t start_ts;
   };
   struct ThreadState {

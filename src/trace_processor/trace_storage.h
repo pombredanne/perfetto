@@ -33,9 +33,13 @@ namespace trace_processor {
 // Unix pids are reused and thus not guaranteed to be unique over a long
 // period of time.
 using UniquePid = uint32_t;
+
 // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
 // be reused.
 using UniqueTid = uint32_t;
+
+// StringId is an offset into |string_pool_|.
+using StringId = size_t;
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -49,8 +53,6 @@ class TraceStorage {
 
   constexpr static size_t kMaxCpus = 128;
 
-  // StringId is an offset into |string_pool_|.
-  using StringId = size_t;
 
   struct Stats {
     uint64_t mismatched_sched_switch_tids_ = 0;

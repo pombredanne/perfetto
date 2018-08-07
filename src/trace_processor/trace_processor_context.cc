@@ -23,6 +23,7 @@
 namespace perfetto {
 namespace trace_processor {
 
+TraceProcessorContext::TraceProcessorContext() = default;
 TraceProcessorContext::~TraceProcessorContext() = default;
 
 }  // namespace trace_processor

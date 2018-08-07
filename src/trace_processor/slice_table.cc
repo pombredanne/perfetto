@@ -16,10 +16,14 @@
 
 #include "src/trace_processor/slice_table.h"
 
+#include <sqlite3.h>
 #include <string.h>
+
 #include <algorithm>
 #include <bitset>
 #include <numeric>
+
+#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {

@@ -24,19 +24,18 @@ namespace trace_processor {
 
 class ProcessTracker;
 class TraceStorage;
-class TraceParser;
 class SchedTracker;
-class JsonTraceParser;
+class TraceParser;
 
 class TraceProcessorContext {
  public:
+  TraceProcessorContext();
   ~TraceProcessorContext();
 
   std::unique_ptr<ProcessTracker> process_tracker;
   std::unique_ptr<SchedTracker> sched_tracker;
   std::unique_ptr<TraceStorage> storage;
   std::unique_ptr<TraceParser> parser;
-  std::unique_ptr<JsonTraceParser> json_parser;
 };
 
 }  // namespace trace_processor

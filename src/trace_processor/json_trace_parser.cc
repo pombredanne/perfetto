@@ -71,7 +71,7 @@ const char* ReadOneJsonDict(const char* start,
       }
       return s + 1;
     }
-    // TODO(primiano): skip braces in quoted strings, {"foo": "ba{z" }
+    // TODO(primiano): skip braces in quoted strings, e.g.: {"foo": "ba{z" }
   }
   return nullptr;
 }
@@ -79,9 +79,9 @@ const char* ReadOneJsonDict(const char* start,
 
 JsonTraceParser::JsonTraceParser(BlobReader* reader,
                                  TraceProcessorContext* context)
-    : reader_(reader), context_(context) {
-  base::ignore_result(context_);
-}
+    : reader_(reader), context_(context) {}
+
+JsonTraceParser::~JsonTraceParser() = default;
 
 bool JsonTraceParser::ParseNextChunk() {
   if (!buffer_)
@@ -122,8 +122,8 @@ bool JsonTraceParser::ParseNextChunk() {
     uint64_t ts = value["ts"].asLargestUInt();
     const char* cat = value["cat"].asCString();
     const char* name = value["name"].asCString();
-    TraceStorage::StringId cat_id = storage->InternString(cat, strlen(cat));
-    TraceStorage::StringId name_id = storage->InternString(name, strlen(name));
+    StringId cat_id = storage->InternString(cat, strlen(cat));
+    StringId name_id = storage->InternString(name, strlen(name));
     UniqueTid utid = procs->UpdateThread(tid, pid);
     std::vector<Slice>& stack = threads_[utid].stack;
 
