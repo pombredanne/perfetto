@@ -37,7 +37,6 @@ namespace trace_processor {
 
 namespace {
 const uint32_t kChunkSize = 65536;
-const char kPreamble[] = "{\"traceEvents\":[";
 
 // Parses at most one JSON dictionary and returns a pointer to the end of it,
 // or nullptr if no dict could be detected.
@@ -76,6 +75,9 @@ const char* ReadOneJsonDict(const char* start,
   return nullptr;
 }
 }  // namespace
+
+// static
+constexpr char JsonTraceParser::kPreamble[];
 
 JsonTraceParser::JsonTraceParser(BlobReader* reader,
                                  TraceProcessorContext* context)

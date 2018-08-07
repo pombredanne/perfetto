@@ -31,7 +31,7 @@ class TraceStorage;
 // A virtual table that allows to query slices coming from userspace events
 // such as chromium TRACE_EVENT macros. Conversely to "shced" slices, these
 // slices can be nested and form stacks.
-// The current implementation of this table is extremely similar and not
+// The current implementation of this table is extremely simple and not
 // particularly efficient, as it delegates all the sorting and filtering to
 // the SQLite query engine.
 class SliceTable : public Table {

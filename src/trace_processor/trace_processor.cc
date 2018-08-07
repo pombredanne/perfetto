@@ -20,6 +20,7 @@
 #include <functional>
 
 #include "perfetto/base/task_runner.h"
+#include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -55,16 +56,19 @@ TraceProcessor::~TraceProcessor() = default;
 void TraceProcessor::LoadTrace(BlobReader* reader,
                                std::function<void()> callback) {
   context_.storage->ResetStorage();
-  // Start a new trace parsing task.
-  context_.parser.reset(new ProtoTraceParser(reader, &context_));
-  LoadTraceChunk(callback);
-}
 
-void TraceProcessor::LoadJSONTrace(BlobReader* reader,
-                                   std::function<void()> callback) {
-  context_.storage->ResetStorage();
-  // Start a new trace parsing task.
-  context_.parser.reset(new JsonTraceParser(reader, &context_));
+  // Guess the trace type (JSON vs proto).
+  char buf[32] = "";
+  const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
+  reader->Read(0, kPreambleLen, reinterpret_cast<uint8_t*>(buf));
+  if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
+    PERFETTO_DLOG("Legacy JSON trace detected");
+    context_.parser.reset(new JsonTraceParser(reader, &context_));
+  } else {
+    context_.parser.reset(new ProtoTraceParser(reader, &context_));
+  }
+
+  // Kick off the parsing task chain.
   LoadTraceChunk(callback);
 }
 

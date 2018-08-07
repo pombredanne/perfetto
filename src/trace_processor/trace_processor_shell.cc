@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
   FileReader reader(argv[1]);
   TraceProcessor tp(&task_runner);
 
-  task_runner.PostTask([&tp, &reader, argv]() {
+  task_runner.PostTask([&tp, &reader]() {
     auto t_start = base::GetWallTimeMs();
     auto on_trace_loaded = [t_start, &reader] {
       double s = (base::GetWallTimeMs() - t_start).count() / 1000.0;
@@ -102,12 +102,7 @@ int main(int argc, char** argv) {
       PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
       PrintPrompt();
     };
-    if (strcasecmp(argv[1] + strlen(argv[1]) - 5, ".json") == 0) {
-      PERFETTO_DLOG("Loading legacy JSON trace");
-      tp.LoadJSONTrace(&reader, on_trace_loaded);
-    } else {
-      tp.LoadTrace(&reader, on_trace_loaded);
-    }
+    tp.LoadTrace(&reader, on_trace_loaded);
   });
 
   task_runner.AddFileDescriptorWatch(STDIN_FILENO, [&tp, &task_runner] {

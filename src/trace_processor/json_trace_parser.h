@@ -35,6 +35,8 @@ class TraceProcessorContext;
 // and supports only explicit TRACE_EVENT_BEGIN/END events.
 class JsonTraceParser : public TraceParser {
  public:
+  static constexpr char kPreamble[] = "{\"traceEvents\":[";
+
   JsonTraceParser(BlobReader*, TraceProcessorContext*);
   ~JsonTraceParser() override;
 
