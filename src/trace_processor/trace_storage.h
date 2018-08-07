@@ -53,7 +53,6 @@ class TraceStorage {
 
   constexpr static size_t kMaxCpus = 128;
 
-
   struct Stats {
     uint64_t mismatched_sched_switch_tids_ = 0;
   };
@@ -110,13 +109,17 @@ class TraceStorage {
                          UniqueTid utid,
                          StringId cat,
                          StringId name,
-                         uint8_t depth) {
+                         uint8_t depth,
+                         uint64_t stack_id,
+                         uint64_t parent_stack_id) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
       cats_.emplace_back(cat);
       names_.emplace_back(name);
       depths_.emplace_back(depth);
+      stack_ids_.emplace_back(stack_id);
+      parent_stack_ids_.emplace_back(parent_stack_id);
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -126,6 +129,10 @@ class TraceStorage {
     const std::deque<StringId>& cats() const { return cats_; }
     const std::deque<StringId>& names() const { return names_; }
     const std::deque<uint8_t>& depths() const { return depths_; }
+    const std::deque<uint64_t>& stack_ids() const { return stack_ids_; }
+    const std::deque<uint64_t>& parent_stack_ids() const {
+      return parent_stack_ids_;
+    }
 
    private:
     std::deque<uint64_t> start_ns_;
@@ -134,6 +141,8 @@ class TraceStorage {
     std::deque<StringId> cats_;
     std::deque<StringId> names_;
     std::deque<uint8_t> depths_;
+    std::deque<uint64_t> stack_ids_;
+    std::deque<uint64_t> parent_stack_ids_;
   };
 
   void ResetStorage();

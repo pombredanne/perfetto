@@ -133,7 +133,7 @@ bool JsonTraceParser::ParseNextChunk() {
     switch (phase) {
       case 'B':  // TRACE_EVENT_BEGIN
         MaybeCloseStack(phase, ts, stack);
-        stack.emplace_back(Slice{cat_id, name_id, ts, 0});
+        stack.emplace_back(Slice{cat_id, name_id, ts, 0, GetStackHash(stack)});
         break;
       case 'E': {  // TRACE_EVENT_END
         PERFETTO_CHECK(!stack.empty());
@@ -141,9 +141,11 @@ bool JsonTraceParser::ParseNextChunk() {
         PERFETTO_CHECK(stack.back().cat_id == cat_id);
         PERFETTO_CHECK(stack.back().name_id == name_id);
         Slice& slice = stack.back();
+        uint64_t stack_id = GetStackHash(stack);
         if (stack.size() < 0xff) {
           slices->AddSlice(slice.start_ts, ts - slice.start_ts, utid, cat_id,
-                           name_id, static_cast<uint8_t>(stack.size()));
+                           name_id, static_cast<uint8_t>(stack.size()),
+                           stack_id, slice.parent_stack_id);
         }
         stack.pop_back();
         break;
@@ -153,11 +155,14 @@ bool JsonTraceParser::ParseNextChunk() {
         MaybeCloseStack(phase, ts, stack);
 
         // Add the slice to both the stack and the DB.
-        stack.emplace_back(Slice{cat_id, name_id, ts, end_ts});
+        uint64_t parent_stack_id = GetStackHash(stack);
+        stack.emplace_back(Slice{cat_id, name_id, ts, end_ts, parent_stack_id});
         Slice& slice = stack.back();
+        uint64_t stack_id = GetStackHash(stack);
         if (stack.size() < 0xff) {
           slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts, utid,
-                           cat_id, name_id, static_cast<uint8_t>(stack.size()));
+                           cat_id, name_id, static_cast<uint8_t>(stack.size()),
+                           stack_id, parent_stack_id);
         }
         break;
       }
@@ -206,6 +211,16 @@ void JsonTraceParser::DebugStack(char phase,
            context_->storage->GetString(stack[i].name_id).c_str());
   }
   printf("\n");
+}
+
+uint64_t JsonTraceParser::GetStackHash(const std::vector<Slice>& stack) {
+  std::string s;
+  s.reserve(stack.size() * sizeof(uint64_t) * 2);
+  for (const Slice& slice : stack) {
+    s.append(reinterpret_cast<const char*>(&slice.cat_id), sizeof(uint64_t));
+    s.append(reinterpret_cast<const char*>(&slice.name_id), sizeof(uint64_t));
+  }
+  return std::hash<std::string>{}(s) & 0x7fffffffffffffff;
 }
 
 }  // namespace trace_processor

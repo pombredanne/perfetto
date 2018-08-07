@@ -51,7 +51,8 @@ class JsonTraceParser : public TraceParser {
     StringId cat_id;
     StringId name_id;
     uint64_t start_ts;
-    uint64_t end_ts;  // Only for
+    uint64_t end_ts;  // Only for complete events (scoped TRACE_EVENT macros).
+    uint64_t parent_stack_id;
   };
   struct ThreadState {
     std::vector<Slice> stack;
@@ -59,6 +60,7 @@ class JsonTraceParser : public TraceParser {
 
   void MaybeCloseStack(char phase, uint64_t end_ts, std::vector<Slice>&);
   void DebugStack(char phase, uint64_t end_ts, std::vector<Slice>&);
+  inline uint64_t GetStackHash(const std::vector<Slice>&);
 
   BlobReader* const reader_;
   TraceProcessorContext* const context_;
