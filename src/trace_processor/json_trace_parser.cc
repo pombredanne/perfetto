@@ -74,6 +74,7 @@ const char* ReadOneJsonDict(const char* start,
   }
   return nullptr;
 }
+
 }  // namespace
 
 // static
@@ -131,11 +132,14 @@ bool JsonTraceParser::ParseNextChunk() {
 
     switch (phase) {
       case 'B':  // TRACE_EVENT_BEGIN
-        stack.emplace_back(Slice{cat_id, name_id, ts});
+        MaybeCloseStack(phase, ts, stack);
+        stack.emplace_back(Slice{cat_id, name_id, ts, 0});
         break;
-      case 'E':  // TRACE_EVENT_END
-        PERFETTO_CHECK(!stack.empty() && stack.back().cat_id == cat_id &&
-                       stack.back().name_id == name_id);
+      case 'E': {  // TRACE_EVENT_END
+        PERFETTO_CHECK(!stack.empty());
+        MaybeCloseStack(phase, ts, stack);
+        PERFETTO_CHECK(stack.back().cat_id == cat_id);
+        PERFETTO_CHECK(stack.back().name_id == name_id);
         Slice& slice = stack.back();
         if (stack.size() < 0xff) {
           slices->AddSlice(slice.start_ts, ts - slice.start_ts, utid, cat_id,
@@ -143,10 +147,65 @@ bool JsonTraceParser::ParseNextChunk() {
         }
         stack.pop_back();
         break;
+      }
+      case 'X': {  // TRACE_EVENT (complete event)
+        uint64_t end_ts = ts + value["dur"].asUInt();
+        MaybeCloseStack(phase, ts, stack);
+
+        // Add the slice to both the stack and the DB.
+        stack.emplace_back(Slice{cat_id, name_id, ts, end_ts});
+        Slice& slice = stack.back();
+        if (stack.size() < 0xff) {
+          slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts, utid,
+                           cat_id, name_id, static_cast<uint8_t>(stack.size()));
+        }
+        break;
+      }
     }
+    // TODO auto-close slices at the end.
   }
   offset_ += static_cast<uint64_t>(next - buf);
   return next > buf;
+}
+
+void JsonTraceParser::MaybeCloseStack(char phase,
+                                      uint64_t ts,
+                                      std::vector<Slice>& stack) {
+  bool check_only = false;
+  for (int i = static_cast<int>(stack.size()) - 1; i >= 0; i--) {
+    const Slice& slice = stack[size_t(i)];
+    if (slice.end_ts == 0) {
+      check_only = true;
+    }
+
+    if (check_only) {
+      if (ts < slice.start_ts) {
+        DebugStack(phase, ts, stack);
+        PERFETTO_ELOG("At iteration %d", i);
+      }
+
+      PERFETTO_DCHECK(ts >= slice.start_ts);
+      PERFETTO_DCHECK(slice.end_ts == 0 || ts <= slice.end_ts);
+      continue;
+    }
+
+    if (slice.end_ts <= ts) {
+      stack.pop_back();
+    }
+  }
+}
+
+void JsonTraceParser::DebugStack(char phase,
+                                 uint64_t end_ts,
+                                 std::vector<Slice>& stack) {
+  printf("\nInserting %c @ %llu\n", phase, end_ts);
+  for (size_t i = 0; i < stack.size(); i++) {
+    printf("%zu: [ %12llu - %12llu ] - %s %s\n", i, stack[i].start_ts,
+           stack[i].end_ts,
+           context_->storage->GetString(stack[i].cat_id).c_str(),
+           context_->storage->GetString(stack[i].name_id).c_str());
+  }
+  printf("\n");
 }
 
 }  // namespace trace_processor

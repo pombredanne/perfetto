@@ -60,17 +60,21 @@ class TraceStorage {
 
   // Information about a unique process seen in a trace.
   struct Process {
+    explicit Process(uint32_t p) : pid(p) {}
     uint64_t start_ns = 0;
     uint64_t end_ns = 0;
     StringId name_id = 0;
+    uint32_t pid = 0;
   };
 
   // Information about a unique thread seen in a trace.
   struct Thread {
+    explicit Thread(uint32_t t) : tid(t) {}
     uint64_t start_ns = 0;
     uint64_t end_ns = 0;
     StringId name_id = 0;
     UniquePid upid = 0;
+    uint32_t tid = 0;
   };
 
   class SlicesPerCpu {
@@ -139,13 +143,13 @@ class TraceStorage {
                      uint64_t duration_ns,
                      UniqueTid utid);
 
-  UniqueTid AddEmptyThread() {
-    unique_threads_.emplace_back();
+  UniqueTid AddEmptyThread(uint32_t tid) {
+    unique_threads_.emplace_back(tid);
     return static_cast<UniqueTid>(unique_threads_.size() - 1);
   }
 
-  UniquePid AddEmptyProcess() {
-    unique_processes_.emplace_back();
+  UniquePid AddEmptyProcess(uint32_t pid) {
+    unique_processes_.emplace_back(pid);
     return static_cast<UniquePid>(unique_processes_.size() - 1);
   }
 

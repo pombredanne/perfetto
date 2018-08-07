@@ -51,10 +51,14 @@ class JsonTraceParser : public TraceParser {
     StringId cat_id;
     StringId name_id;
     uint64_t start_ts;
+    uint64_t end_ts;  // Only for
   };
   struct ThreadState {
     std::vector<Slice> stack;
   };
+
+  void MaybeCloseStack(char phase, uint64_t end_ts, std::vector<Slice>&);
+  void DebugStack(char phase, uint64_t end_ts, std::vector<Slice>&);
 
   BlobReader* const reader_;
   TraceProcessorContext* const context_;

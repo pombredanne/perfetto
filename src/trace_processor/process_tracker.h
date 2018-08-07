@@ -75,16 +75,18 @@ class ProcessTracker {
     return tids_.equal_range(tid);
   }
 
+  UniquePid GetOrCreateProcess(uint32_t pid, uint64_t start_ns);
+
  private:
   TraceProcessorContext* const context_;
 
   // Each tid can have multiple UniqueTid entries, a new UniqueTid is assigned
   // each time a thread is seen in the trace.
-  std::multimap<uint32_t, UniqueTid> tids_;
+  std::multimap<uint32_t /* tid */, UniqueTid> tids_;
 
   // Each pid can have multiple UniquePid entries, a new UniquePid is assigned
   // each time a process is seen in the trace.
-  std::multimap<uint32_t, UniquePid> pids_;
+  std::multimap<uint32_t /* pid (aka tgid) */, UniquePid> pids_;
 };
 
 }  // namespace trace_processor
