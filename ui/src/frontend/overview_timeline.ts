@@ -167,7 +167,13 @@ const HorizontalBrushSelection = {
     });
 
     this.onWheel = e => {
-      if (e.deltaY) {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // Horizontal motion: panning.
+        this.selectionPx.start += e.deltaX;
+        this.selectionPx.end += e.deltaX;
+        this.onBrushedPx(this.selectionPx.start, this.selectionPx.end);
+      } else {
+        // Vertical motion: zooming.
         zoomingIn = e.deltaY < 0;
         zoomAnimation.start(WHEEL_ZOOM_DURATION);
       }
