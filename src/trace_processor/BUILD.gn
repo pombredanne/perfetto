@@ -101,11 +101,11 @@ source_set("unittests") {
   sources = [
     "process_table_unittest.cc",
     "process_tracker_unittest.cc",
+    "proto_trace_parser_unittest.cc",
     "query_constraints_unittest.cc",
     "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
     "thread_table_unittest.cc",
-    "trace_parser_unittest.cc",
   ]
   deps = [
     ":lib",
