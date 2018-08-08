@@ -169,12 +169,12 @@ class TraceStorage {
   StringId InternString(const char* data, size_t length);
 
   Process* GetMutableProcess(UniquePid upid) {
-    PERFETTO_DCHECK(upid < unique_processes_.size());
+    PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());
     return &unique_processes_[upid];
   }
 
   Thread* GetMutableThread(UniqueTid utid) {
-    PERFETTO_DCHECK(utid < unique_threads_.size());
+    PERFETTO_DCHECK(utid > 0 && utid < unique_threads_.size());
     return &unique_threads_[utid];
   }
 
@@ -190,12 +190,12 @@ class TraceStorage {
   }
 
   const Process& GetProcess(UniquePid upid) const {
-    PERFETTO_DCHECK(upid < unique_processes_.size());
+    PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());
     return unique_processes_[upid];
   }
 
   const Thread& GetThread(UniqueTid utid) const {
-    PERFETTO_DCHECK(utid < unique_threads_.size());
+    PERFETTO_DCHECK(utid > 0 && utid < unique_threads_.size());
     return unique_threads_[utid];
   }
 
