@@ -98,7 +98,6 @@ function renderPanelCanvas(
     width: number,
     yStartOnCanvas: number,
     panelStruct: PanelStruct) {
-  console.log('render args', arguments);
   ctx.save();
   ctx.translate(0, yStartOnCanvas);
   const clipRect = new Path2D();
