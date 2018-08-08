@@ -16,7 +16,6 @@ import * as m from 'mithril';
 
 import {assertExists} from '../base/logging';
 
-import {FrameGraphPanel} from './flame_graph_panel';
 import {globals} from './globals';
 import {lightRedrawer} from './light_redrawer';
 import {Panel} from './panel';
@@ -65,7 +64,6 @@ function updateDimensionsFromDom(vnode: CanvasScrollingContainerVnode) {
  */
 interface PanelStruct {
   height: number;
-  yStart: number;
   panel: Panel;
   key: string;
 }
@@ -74,20 +72,20 @@ const PanelComponent = {
   view({attrs}) {
     return m('.panel', {
       style: {
-        height: `${attrs.height}px`,
+        height: `${attrs.panelStruct.height}px`,
         width: '100%',
         overflow: 'hidden',
         position: 'absolute',
         top: `${attrs.yStart}px`,
       },
-      key: attrs.key,
+      key: attrs.panelStruct.key,
     });
   },
 
   onupdate({dom, attrs}) {
-    attrs.panel.updateDom(dom);
+    attrs.panelStruct.panel.updateDom(dom);
   }
-} as m.Component<PanelStruct>;
+} as m.Component<{panelStruct: PanelStruct, yStart: number}>;
 
 function panelIsOnCanvas(
     panelYBoundsOnCanvas: {start: number, end: number}, canvasHeight: number) {
@@ -118,17 +116,20 @@ function drawCanvas(state: ScrollingPanelContainerState) {
   const canvasYStart =
       state.scrollTop - getCanvasOverdrawHeightPerSide(state.domHeight);
 
+  let panelYStart = 0;
   for (const panelStruct of state.keyToPanelStructs.values()) {
-    const yStartOnCanvas = panelStruct.yStart - canvasYStart;
+    const yStartOnCanvas = panelYStart - canvasYStart;
     const panelYBoundsOnCanvas = {
       start: yStartOnCanvas,
       end: yStartOnCanvas + panelStruct.height
     };
     if (!panelIsOnCanvas(panelYBoundsOnCanvas, canvasHeight)) {
+      panelYStart += panelStruct.height;
       continue;
     }
 
     renderPanelCanvas(state.ctx, state.domWidth, yStartOnCanvas, panelStruct);
+    panelYStart += panelStruct.height;
   }
 }
 
@@ -138,6 +139,7 @@ interface ScrollingPanelContainerState {
   scrollTop: number;
   ctx: CanvasRenderingContext2D|null;
   keyToPanelStructs: Map<string, PanelStruct>;
+  panelDisplayOrder: string[];
 
   // We store this function so we can remove it.
   onResize: () => void;
@@ -152,13 +154,7 @@ export const ScrollingPanelContainer = {
     this.scrollTop = 0;
     this.ctx = null;
     this.keyToPanelStructs = new Map<string, PanelStruct>();
-    this.keyToPanelStructs
-        .set('flamegraph', {
-          panel: new FrameGraphPanel(),
-          height: 400,
-          yStart: 600,
-          key: 'framegraph',
-        }) this.canvasRedrawer = () => drawCanvas(state);
+    this.canvasRedrawer = () => drawCanvas(state);
     lightRedrawer.addCallback(this.canvasRedrawer);
   },
 
@@ -195,37 +191,34 @@ export const ScrollingPanelContainer = {
   },
 
   view() {
-    let panelYStart = 0;
-    const orderedPanelStructs = [];
-
     // TODO: Handle panel deletion.
+    // Create all the track panels if they don't already exist.
     for (const id of globals.state.displayedTrackIds) {
       const trackState = globals.state.tracks[id];
-      let panelStruct = this.keyToPanelStructs.get(id);
+      // Makeshift name mangling.
+      let panelStruct = this.keyToPanelStructs.get('track-' + id);
       if (panelStruct === undefined) {
         panelStruct = {
           panel: new TrackPanel(trackState),
           height: trackState.height,
-          yStart: panelYStart,
           key: id,
         };
-
-        // TODO: Track ID and other panel id might collide. Consider using a
-        // more robust key.
-        this.keyToPanelStructs.set(id, panelStruct);
-      } else {
-        panelStruct.yStart = panelYStart;
+        this.keyToPanelStructs.set('track-' + id, panelStruct);
       }
-
-      orderedPanelStructs.push(panelStruct);
-      panelYStart += panelStruct.height;
     }
 
-    const flameGraphPanel = this.keyToPanelStructs.get('flamegraph');
-    if (flameGraphPanel) orderedPanelStructs.push(flameGraphPanel);
+    // Ordered list of panel to display, by key. Store this in state so canvas
+    // can use it.
+    this.panelDisplayOrder =
+        globals.state.displayedTrackIds.map(id => 'track-' + id);
+    const panelComponents: m.Children[] = [];
 
-    const renderedPanels =
-        orderedPanelStructs.map(panelStruct => m(PanelComponent, panelStruct));
+    let yStart = 0;
+    for (const key of this.panelDisplayOrder) {
+      const panelStruct = assertExists(this.keyToPanelStructs.get(key));
+      panelComponents.push(m(PanelComponent, {panelStruct, yStart}));
+      yStart += panelStruct.height;
+    }
 
     let totalContentHeight = 0;
     for (const panelStruct of this.keyToPanelStructs.values()) {
@@ -257,6 +250,6 @@ export const ScrollingPanelContainer = {
               'background-color': '#eee',
             }
           }),
-          ...renderedPanels, ));
+          ...panelComponents));
   },
 } as m.Component<{}, ScrollingPanelContainerState>;
