@@ -18,9 +18,9 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/trace_processor/raw_query.pb.h"
-#include "perfetto/trace_processor/sched.pb.h"
+#include "perfetto/base/test_utils.h"
 #include "src/base/test/test_task_runner.h"
+#include "src/trace_processor/file_reader.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "gtest/gtest.h"
@@ -29,32 +29,29 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-const char* kAndroidSchedAndPsPath =
-    "buildtools/test_data/android_sched_and_ps.pb";
-
-class FileReader : public BlobReader {
+class TraceProcessorIntegrationTest : public ::testing::Test {
  public:
-  FileReader(base::ScopedFile file) : file_(std::move(file)) {}
+  base::TestTaskRunner task_runner;
+  TraceProcessor processor;
 
-  ~FileReader() override = default;
+ protected:
+  TraceProcessorIntegrationTest() : processor(&task_runner) {}
 
-  uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
-    lseek(file_.get(), static_cast<off_t>(offset), SEEK_SET);
-    return static_cast<uint32_t>(PERFETTO_EINTR(read(file_.get(), dst, len)));
+  void LoadTrace(const char* name) {
+    FileReader reader(base::test_utils::GetTestDataPath(name).c_str());
+    auto loading_done = task_runner.CreateCheckpoint("loading_done");
+    processor.LoadTrace(&reader, [loading_done]() { loading_done(); });
+    task_runner.RunUntilCheckpoint("loading_done");
   }
-
-  base::ScopedFile file_;
 };
 
-TEST(TraceProcessorIntegrationTest, CanLoadATrace) {
-  FileReader reader(base::OpenFile(kAndroidSchedAndPsPath, O_RDONLY));
-  base::TestTaskRunner task_runner;
-  TraceProcessor db(&task_runner);
+TEST_F(TraceProcessorIntegrationTest, AndroidSchedAndPs) {
+  LoadTrace("android_sched_and_ps.pb");
+}
 
-  auto loading_done = task_runner.CreateCheckpoint("loading_done");
-  db.LoadTrace(&reader, [loading_done]() { loading_done(); });
-
-  task_runner.RunUntilCheckpoint("loading_done");
+TEST_F(TraceProcessorIntegrationTest, Sfgate) {
+  LoadTrace("sfgate.json");
+  // TODO(hjd): Write some assertions here.
 }
 
 }  // namespace

@@ -145,11 +145,19 @@ BUILD_DEPS_HOST = [
    'all'
   ),
 
-  # Example traces for regression tests.
-  ('buildtools/example_traces.zip',
-   'https://storage.googleapis.com/perfetto/example_traces.zip',
-   'hector needs to upload this',
+  # JsonCpp for legacy json import. Used only by the trace processor in
+  # standalone builds.
+  ('buildtools/jsoncpp.zip',
+   'https://github.com/open-source-parsers/jsoncpp/archive/1.0.0.zip',
+   '3219e26f2e249bb46b7d688478208c7ec138fea4',
    'all'
+  ),
+
+  # Example traces for regression tests.
+  ('buildtools/test_data.zip',
+   'https://storage.googleapis.com/perfetto/test-data-20180808.zip',
+   'hector needs to upload this',
+   'all',
   ),
 ]
 

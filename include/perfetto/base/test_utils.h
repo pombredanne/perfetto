@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_processor_context.h"
-#include "src/trace_processor/json_trace_parser.h"
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/sched_tracker.h"
-#include "src/trace_processor/trace_parser.h"
+#ifndef INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
+#define INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
+
+#include <string>
 
 namespace perfetto {
-namespace trace_processor {
+namespace base {
+namespace test_utils {
 
-TraceProcessorContext::TraceProcessorContext() = default;
-TraceProcessorContext::~TraceProcessorContext() = default;
+std::string GetTestDataPath(const std::string& path);
 
-}  // namespace trace_processor
+}  // namespace test_utils
+}  // namespace base
 }  // namespace perfetto
+
+#endif  // INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
