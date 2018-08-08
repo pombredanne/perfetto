@@ -28,7 +28,10 @@ namespace {
 int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<ipc::UnixSocket> sock;
 
-  SocketListener listener;
+  SocketListener listener(
+      [](size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>) {
+        printf("Record received.\n");
+      });
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on

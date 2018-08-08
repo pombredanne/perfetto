@@ -28,6 +28,10 @@ namespace perfetto {
 
 class SocketListener : public ipc::UnixSocket::EventListener {
  public:
+  SocketListener(std::function<void(size_t,
+                                    std::unique_ptr<uint8_t[]>,
+                                    std::weak_ptr<ProcessMetadata>)> fn)
+      : callback_function_(std::move(fn)) {}
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnNewIncomingConnection(
       ipc::UnixSocket* self,
@@ -47,6 +51,9 @@ class SocketListener : public ipc::UnixSocket::EventListener {
     // for a PID disconnects, the metadata is destroyed. The unwinding threads
     // get a weak_ptr, which will be invalidated so we do not unwind for
     // processes that have already gone away.
+    //
+    // This does not get initialized in the ctor because the file descriptors
+    // only get received after the first Receive call of the socket.
     std::shared_ptr<ProcessMetadata> process_metadata;
   };
 
@@ -58,6 +65,9 @@ class SocketListener : public ipc::UnixSocket::EventListener {
 
   std::map<ipc::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
+  std::function<
+      void(size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>)>
+      callback_function_;
 };
 
 }  // namespace perfetto
