@@ -29,10 +29,8 @@ void SocketListener::OnNewIncomingConnection(
       std::piecewise_construct, std::forward_as_tuple(self),
       std::forward_as_tuple(
           std::move(new_connection),
-          // This does not need a WeakPtr because
-          // it gets called inline of the Read
-          // call, which is called in
-          // OnDataAvailable below.
+          // This does not need a WeakPtr because it gets called inline of the
+          // Read call, which is called in OnDataAvailable below.
           [this, self](size_t size, std::unique_ptr<uint8_t[]> buf) {
             RecordReceived(self, size, std::move(buf));
           }));
