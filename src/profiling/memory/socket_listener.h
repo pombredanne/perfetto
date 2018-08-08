@@ -1,0 +1,53 @@
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
+#define SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
+
+#include "src/ipc/unix_socket.h"
+#include "src/profiling/memory/record_reader.h"
+
+#include <map>
+#include <memory>
+
+namespace perfetto {
+
+class SocketListener : public ipc::UnixSocket::EventListener {
+ public:
+  void OnDisconnect(ipc::UnixSocket* self) override;
+  void OnNewIncomingConnection(
+      ipc::UnixSocket* self,
+      std::unique_ptr<ipc::UnixSocket> new_connection) override;
+  void OnDataAvailable(ipc::UnixSocket* self) override;
+
+ private:
+  struct Entry {
+    Entry(std::unique_ptr<ipc::UnixSocket> s,
+          std::function<void(size_t size, std::unique_ptr<uint8_t[]>)> fn)
+        : sock(std::move(s)), record_reader(std::move(fn)) {}
+    // Only here for ownership of the object.
+    const std::unique_ptr<ipc::UnixSocket> sock;
+    RecordReader record_reader;
+  };
+
+  void RecordReceived(ipc::UnixSocket*, size_t, std::unique_ptr<uint8_t[]>);
+
+  std::map<ipc::UnixSocket*, Entry> sockets_;
+};
+
+}  // namespace perfetto
+
+#endif  // SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_

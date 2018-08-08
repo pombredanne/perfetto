@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("../../../gn/perfetto.gni")
+import("//build_overrides/build.gni")
 
 assert(!build_with_chromium)
 
@@ -26,6 +27,20 @@ source_set("record_reader") {
   sources = [
     "record_reader.cc",
     "record_reader.h",
+  ]
+}
+
+source_set("socket_listener") {
+  public_configs = [ "../../../gn:default_config" ]
+  deps = [
+    ":record_reader",
+    "../../../gn:default_deps",
+    "../../../src/base",
+    "../../../src/ipc",
+  ]
+  sources = [
+    "socket_listener.cc",
+    "socket_listener.h",
   ]
 }
 
@@ -53,5 +68,31 @@ source_set("unittests") {
   sources = [
     "record_reader_unittest.cc",
     "string_interner_unittest.cc",
+  ]
+}
+
+source_set("unwinding") {
+  deps = [
+    "../../../buildtools:libunwindstack",
+    "../../../gn:default_deps",
+    "../../../src/base",
+  ]
+  sources = [
+    "unwinding.cc",
+    "unwinding.h",
+  ]
+}
+
+executable("heapprofd") {
+  public_configs = [ "../../../gn:default_config" ]
+  deps = [
+    ":socket_listener",
+    ":unwinding",
+    "../../../gn:default_deps",
+    "../../../src/base",
+    "../../../src/ipc",
+  ]
+  sources = [
+    "main.cc",
   ]
 }
