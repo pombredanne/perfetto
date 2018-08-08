@@ -14,11 +14,19 @@
 
 import * as m from 'mithril';
 
+import {QueryResponse} from '../common/queries';
+
 import {Animation} from './animation';
 import {DragGestureHandler} from './drag_gesture_handler';
+import {globals} from './globals';
 import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
+import {OVERVIEW_QUERY_ID} from './viewer_page';
 
+const SATURATION = 70;
+// The bigger load the darker.
+const LIGHTNESS_MIN_LOAD = 80;
+const LIGHTNESS_MAX_LOAD = 20;
 /**
  * Overview timeline with a brush for time-based selections.
  */
@@ -30,8 +38,17 @@ export const OverviewTimeline = {
   oncreate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
 
-    this.timeScale.setLimitsPx(
-        this.padding.left, rect.width - this.padding.left - this.padding.right);
+    this.contentWidth = rect.width - this.padding.left - this.padding.right;
+    this.contentHeight = rect.height - 41;
+
+    this.timeScale.setLimitsPx(this.padding.left, this.contentWidth);
+
+    const context =
+        vnode.dom.getElementsByTagName('canvas')[0].getContext('2d');
+    if (!context) {
+      throw Error('Overview canvas context not found.');
+    }
+    this.context = context;
   },
   onupdate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
@@ -43,6 +60,66 @@ export const OverviewTimeline = {
     this.timeScale.setLimitsMs(
         attrs.maxVisibleWindowMs.start, attrs.maxVisibleWindowMs.end);
 
+    const resp = globals.queryResults.get(OVERVIEW_QUERY_ID) as QueryResponse;
+
+    if (this.context && (resp || this.queryResponse)) {
+      // Render canvas
+
+      if (!this.processesById || resp !== this.queryResponse) {
+        // Update data
+        this.processesById = {};
+        this.queryResponse = resp;
+
+        const data = resp.rows;
+        const times = data.map(processLoad => processLoad.rts as number);
+        const minTime = Math.min(...times);
+
+        for (const processLoad of data) {
+          const upid = processLoad.upid as number;
+          if (!this.processesById[upid]) {
+            this.processesById[upid] = {
+              upid,
+              name: processLoad.name as string,
+              loadByTime: {},
+              hue: Math.random() * 360,
+            };
+          }
+          const time = (processLoad.rts as number - minTime) * 1000;
+          this.processesById[upid].loadByTime[time] =
+              processLoad.load as number;
+        }
+      }
+
+      const processes = Object.values(this.processesById);
+      const height = 79;
+      const heightPerProcess = height / processes.length;
+      const roundedHeightPerProcess = Math.round(heightPerProcess);
+
+      for (let i = 0; i < processes.length; i++) {
+        const process = processes[i];
+        const startY = Math.round(i * heightPerProcess);
+        const loadTimes = Object.keys(process.loadByTime)
+                              .map(stringTime => Number(stringTime));
+
+        for (const loadTime of loadTimes) {
+          const load = process.loadByTime[loadTime];
+          const startPx = this.timeScale.msToPx(loadTime - 500);
+          const endPx = this.timeScale.msToPx(loadTime + 500);
+
+          this.context.fillRect(
+              startPx, startY, endPx - startPx, roundedHeightPerProcess);
+          this.context.fillStyle =
+              `hsl(${process.hue}, ${SATURATION}%, ${
+                                                     LIGHTNESS_MIN_LOAD +
+                                                     (LIGHTNESS_MAX_LOAD -
+                                                      LIGHTNESS_MIN_LOAD) *
+                                                         load / 100
+                                                   }%)`;
+        }
+      }
+      this.context.fill();
+    }
+
     return m(
         '.overview-timeline',
         m(TimeAxis, {
@@ -50,32 +127,38 @@ export const OverviewTimeline = {
           contentOffset: 0,
           visibleWindowMs: attrs.maxVisibleWindowMs,
         }),
-        m('.visualization', {
-          style: {
-            width: '100%',
-            height: '100%',
-          }
-        }),
-        m('.brushes',
+        m('.timeline-content',
           {
             style: {
               position: 'absolute',
               left: `${this.padding.left}px`,
               top: '41px',
-              width: 'calc(100% - 40px)',
-              height: 'calc(100% - 41px)',
+              width: `${this.contentWidth}px`,
+              height: `${this.contentHeight}px`,
             }
           },
-          m(HorizontalBrushSelection, {
-            onBrushedPx: (startPx: number, endPx: number) => {
-              attrs.onBrushedMs(
-                  this.timeScale.pxToMs(startPx), this.timeScale.pxToMs(endPx));
+          m('canvas.visualization', {
+            width: this.contentWidth,
+            height: this.contentHeight,
+          }),
+          m('.brushes',
+            {
+              style: {
+                width: '100%',
+                height: '100%',
+              }
             },
-            selectionPx: {
-              start: this.timeScale.msToPx(attrs.visibleWindowMs.start),
-              end: this.timeScale.msToPx(attrs.visibleWindowMs.end)
-            },
-          })));
+            m(HorizontalBrushSelection, {
+              onBrushedPx: (startPx: number, endPx: number) => {
+                attrs.onBrushedMs(
+                    this.timeScale.pxToMs(startPx),
+                    this.timeScale.pxToMs(endPx));
+              },
+              selectionPx: {
+                start: this.timeScale.msToPx(attrs.visibleWindowMs.start),
+                end: this.timeScale.msToPx(attrs.visibleWindowMs.end)
+              },
+            }))));
   },
 } as
     m.Component<
@@ -87,6 +170,18 @@ export const OverviewTimeline = {
         {
           timeScale: TimeScale,
           padding: {top: number, right: number, bottom: number, left: number},
+          context: CanvasRenderingContext2D | undefined,
+          contentWidth: number,
+          contentHeight: number,
+          queryResponse: QueryResponse,
+          processesById: {
+            [upid: number]: {
+              upid: number,
+              name: string,
+              loadByTime: {[time: number]: number},
+              hue: number,
+            }
+          }
         }>;
 
 const ZOOM_IN_PERCENTAGE_PER_MS = 0.998;
