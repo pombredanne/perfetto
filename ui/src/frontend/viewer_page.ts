@@ -85,8 +85,6 @@ const TraceViewer = {
     const panZoomEl =
         vnode.dom.getElementsByClassName('tracks-content')[0] as HTMLElement;
 
-    // TODO: ContentOffsetX should be defined somewhere central.
-    // Currently it lives here, in canvas wrapper, and in track shell.
     this.zoomContent = new PanAndZoomHandler({
       element: panZoomEl,
       contentOffsetX: TRACK_INFO_WIDTH,
@@ -98,7 +96,8 @@ const TraceViewer = {
         visibleWindowMs.end += deltaMs;
         frontendLocalState.timeScale.setLimitsMs(
             visibleWindowMs.start, visibleWindowMs.end);
-        lightRedrawer.scheduleRedraw();
+        // TODO: Replace this with lightRedrawer.scheduleRedraw().
+        m.redraw();
       },
       onZoomed: (zoomedPositionPx: number, zoomPercentage: number) => {
         const visibleWindowMs = frontendLocalState.visibleWindowMs;
@@ -116,7 +115,8 @@ const TraceViewer = {
             zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
         frontendLocalState.timeScale.setLimitsMs(
             visibleWindowMs.start, visibleWindowMs.end);
-        lightRedrawer.scheduleRedraw();
+        // TODO: Replace this with lightRedrawer.scheduleRedraw().
+        m.redraw();
       }
     });
   },
@@ -140,12 +140,6 @@ const TraceViewer = {
 
     return m(
         '.page',
-        {
-          style: {
-            width: '100%',
-            height: '100%',
-          },
-        },
         m('header.overview', 'Big picture'),
         m(OverviewTimeline, {
           // TODO: Remove global attrs.

@@ -210,15 +210,14 @@ body {
     }
 }
 
-.scrollable-container {
+.scrolling-panel-container {
+    position: relative;
     width: 100%;
     height: 100%;
-    overflow-y: auto;
     overflow-x: hidden;
-    will-change: transform;
-    position: relative;
+    overflow-y: auto;
+    will-change: 'transform';  // Force layer creation.
 }
-
 /** Time Axis **/
 
 .axis {

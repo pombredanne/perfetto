@@ -20,12 +20,14 @@ import {TimeScale} from './time_scale';
  */
 export interface FrontendLocalState {
   timeScale: TimeScale;
-  visibleWindowMs: {start: number; end: number;}; i: number;
+  visibleWindowMs: {start: number; end: number;};
+  i: number;
 }
 
 export function createEmptyFrontendState(): FrontendLocalState {
   return {
     timeScale: new TimeScale([0, 0], [0, 0]),
-        visibleWindowMs: {start: 0, end: 1000000}, i: 0,
+    visibleWindowMs: {start: 0, end: 1000000},
+    i: 0,
   };
 }
