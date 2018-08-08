@@ -23,10 +23,18 @@ import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
 import {OVERVIEW_QUERY_ID} from './viewer_page';
 
+interface ProcessSummaryData {
+  upid: number;
+  name: string;
+  loadByTime: {[time: number]: number};
+  hue: number;
+}
+
 const SATURATION = 70;
 // The bigger load the darker.
 const LIGHTNESS_MIN_LOAD = 80;
 const LIGHTNESS_MAX_LOAD = 20;
+
 /**
  * Overview timeline with a brush for time-based selections.
  */
@@ -34,6 +42,19 @@ export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
     this.padding = {top: 0, right: 20, bottom: 0, left: 20};
+
+    this.onmousemove = e => {
+      if (!this.processesById || !e.target ||
+          (e.target as Element).className !== 'brushes') {
+        return;
+      }
+      const y = e.layerY;
+      const processes = Object.values(this.processesById);
+      const heightPerProcess = this.contentHeight / processes.length;
+      const index = Math.floor(y / heightPerProcess);
+      this.hoveredProcess = processes[index];
+      this.hoveredMs = this.timeScale.pxToMs(e.layerX);
+    };
   },
   oncreate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
@@ -91,13 +112,19 @@ export const OverviewTimeline = {
       }
 
       const processes = Object.values(this.processesById);
-      const height = 79;
-      const heightPerProcess = height / processes.length;
+      const heightPerProcess = this.contentHeight / processes.length;
       const roundedHeightPerProcess = Math.round(heightPerProcess);
 
       for (let i = 0; i < processes.length; i++) {
         const process = processes[i];
         const startY = Math.round(i * heightPerProcess);
+
+        // Add a background behind the hovered process
+        this.context.fillStyle =
+            process === this.hoveredProcess ? '#eee' : '#fff';
+        this.context.fillRect(
+            0, startY, this.contentWidth, roundedHeightPerProcess);
+
         const loadTimes = Object.keys(process.loadByTime)
                               .map(stringTime => Number(stringTime));
 
@@ -106,8 +133,6 @@ export const OverviewTimeline = {
           const startPx = this.timeScale.msToPx(loadTime - 500);
           const endPx = this.timeScale.msToPx(loadTime + 500);
 
-          this.context.fillRect(
-              startPx, startY, endPx - startPx, roundedHeightPerProcess);
           this.context.fillStyle =
               `hsl(${process.hue}, ${SATURATION}%, ${
                                                      LIGHTNESS_MIN_LOAD +
@@ -115,6 +140,10 @@ export const OverviewTimeline = {
                                                       LIGHTNESS_MIN_LOAD) *
                                                          load / 100
                                                    }%)`;
+          this.context.fillRect(
+              startPx, startY, endPx - startPx, roundedHeightPerProcess);
+
+          // TODO: Add tooltip to the slice neat this.hoveredMs.
         }
       }
       this.context.fill();
@@ -129,6 +158,8 @@ export const OverviewTimeline = {
         }),
         m('.timeline-content',
           {
+            onmousemove: this.onmousemove,
+            onmouseout: () => this.hoveredProcess = undefined,
             style: {
               position: 'absolute',
               left: `${this.padding.left}px`,
@@ -146,6 +177,8 @@ export const OverviewTimeline = {
               style: {
                 width: '100%',
                 height: '100%',
+                position: 'absolute',
+                top: '0',
               }
             },
             m(HorizontalBrushSelection, {
@@ -174,14 +207,10 @@ export const OverviewTimeline = {
           contentWidth: number,
           contentHeight: number,
           queryResponse: QueryResponse,
-          processesById: {
-            [upid: number]: {
-              upid: number,
-              name: string,
-              loadByTime: {[time: number]: number},
-              hue: number,
-            }
-          }
+          processesById: {[upid: number]: ProcessSummaryData},
+          hoveredProcess: ProcessSummaryData | undefined,
+          hoveredMs: number,
+          onmousemove: (e: MouseEvent) => void,
         }>;
 
 const ZOOM_IN_PERCENTAGE_PER_MS = 0.998;
@@ -285,7 +314,9 @@ const HorizontalBrushSelection = {
   },
   onupdate(vnode) {
     const el = vnode.dom as HTMLElement;
-    this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
+    const bcr = el.getBoundingClientRect() as DOMRect;
+    this.offsetLeft = bcr.x;
+    this.width = bcr.width;
   },
   view({attrs}) {
     this.onBrushedPx = attrs.onBrushedPx;
