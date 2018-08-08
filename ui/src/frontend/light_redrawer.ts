@@ -35,10 +35,13 @@ class LightRedrawer {
 
   scheduleRedraw() {
     // There should be no good reason to schedule redraw while redrawing.
-    if (this.currentlyDrawing) throw Error('Cannot call redraw while drawing.');
+    if (this.currentlyDrawing) {
+      throw Error('Cannot schedule redraw while drawing.');
+    }
 
     if (this.scheduledRedrawNextFrame) return;
     this.scheduledRedrawNextFrame = true;
+
     window.requestAnimationFrame(() => {
       this.currentlyDrawing = true;
       for (const cb of this.redrawCallbacks) {
