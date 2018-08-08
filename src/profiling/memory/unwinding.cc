@@ -37,22 +37,40 @@
 namespace perfetto {
 
 namespace {
-class StackMemory : public unwindstack::MemoryRemote {
+
+size_t kMaxFrames = 1000;
+
+class StackMemory : public unwindstack::Memory {
  public:
-  /*
-  StackMemory(pid_t pid, uint64_t sp, uint8_t* stack, size_t size)
-      : MemoryRemote(pid) {}, sp_(sp), stack_(stack), size_(size) {}
-      */
-  StackMemory(pid_t pid, uint64_t, uint8_t*, size_t) : MemoryRemote(pid) {}
+  StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
+      : mem_fd_(mem_fd),
+        sp_(sp),
+        stack_end_(sp + size),
+        stack_(stack),
+        size_(size) {}
+
   size_t Read(uint64_t addr, void* dst, size_t size) override {
-    return unwindstack::MemoryRemote::Read(addr, dst, size);
+    if (addr >= sp_ && addr + size_ < stack_end_) {
+      size_t offset = addr - sp_;
+      memcpy(dst, stack_ + offset, size);
+      return size;
+    }
+
+    if (lseek(mem_fd_, static_cast<off_t>(addr), SEEK_SET) == -1)
+      return 0;
+
+    ssize_t rd = read(mem_fd_, &dst, size);
+    if (rd == -1)
+      return 0;
+    return static_cast<size_t>(rd);
   }
-  /*
-   private:
-    uint64_t sp_;
-    uint8_t* stack_;
-    size_t size_;
-    */
+
+ private:
+  int mem_fd_;
+  uint64_t sp_;
+  uint64_t stack_end_;
+  uint8_t* stack_;
+  size_t size_;
 };
 
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
@@ -89,12 +107,17 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
     PERFETTO_ELOG("regs");
     return;
   }
+  if (alloc_metadata->stack_pointer_offset < sizeof(AllocMetadata) ||
+      alloc_metadata->stack_pointer_offset > sz) {
+    PERFETTO_ELOG("out-of-bound stack_pointer_offset");
+    return;
+  }
   uint8_t* stack =
       reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       metadata->pid, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
-  unwindstack::Unwinder unwinder(1000, &metadata->maps, regs, mems);
+  unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
   int error_code;
   for (int attempt = 0; attempt < 2; ++attempt) {
     unwinder.Unwind();
