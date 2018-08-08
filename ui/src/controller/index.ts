@@ -16,8 +16,14 @@ import '../tracks/all_controller';
 
 import {defer, Deferred} from '../base/deferred';
 import {assertExists} from '../base/logging';
-import {forwardRemoteCalls, Remote} from '../base/remote';
-import {Action, addTrack} from '../common/actions';
+import {Remote} from '../base/remote';
+import {
+  Action,
+  addTrack,
+  deleteQuery,
+  navigate,
+  setEngineReady
+} from '../common/actions';
 import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
 import {QueryResponse} from '../common/queries';
 import {
@@ -88,6 +94,8 @@ class EngineController {
         this.controller.dispatchMultiple(addToTrackActions);
         this.deferredOnReady.forEach(d => d.resolve(engine));
         this.deferredOnReady.clear();
+        this.controller.dispatch(setEngineReady(this.config.id));
+        this.controller.dispatch(navigate('/viewer'));
         break;
       default:
         throw new Error(`No such state ${newState}`);
@@ -151,37 +159,30 @@ class QueryController {
         id: config.id,
         query: config.query,
         durationMs: Math.round(end - start),
+        error: rawResult.error,
         totalRowCount: +rawResult.numRecords,
         columns,
         rows,
       };
-      controller.publishTrackData(config.id, result);
+      controller.publishQueryResult(config.id, result);
+      controller.dispatch(deleteQuery(config.id));
     });
   }
 }
 
 class Controller {
   private state: State;
-  private _frontend?: FrontendProxy;
+  private frontend: FrontendProxy;
   private readonly engines: Map<string, EngineController>;
   private readonly tracks: Map<string, TrackControllerWrapper>;
   private readonly queries: Map<string, QueryController>;
 
-  constructor() {
+  constructor(frontend: FrontendProxy) {
     this.state = createEmptyState();
+    this.frontend = frontend;
     this.engines = new Map();
     this.tracks = new Map();
     this.queries = new Map();
-  }
-
-  get frontend(): FrontendProxy {
-    if (!this._frontend) throw new Error('No FrontendProxy');
-    return this._frontend;
-  }
-
-  initAndGetState(frontendProxyPort: MessagePort): State {
-    this._frontend = new FrontendProxy(new Remote(frontendProxyPort));
-    return this.state;
   }
 
   dispatch(action: Action): void {
@@ -207,10 +208,16 @@ class Controller {
           config.id, new TrackControllerWrapper(config, this, engine));
     }
 
-    // TODO(hjd): Handle teardown.
+    // Delete queries that aren't in the state anymore.
+    for (const id of this.queries.keys()) {
+      if (this.state.queries[id] === undefined) {
+        this.queries.delete(id);
+      }
+    }
     for (const config of Object.values<QueryConfig>(this.state.queries)) {
       if (this.queries.has(config.id)) continue;
       const engine = this.engines.get(config.engineId)!;
+      if (engine === undefined) continue;
       this.queries.set(config.id, new QueryController(config, this, engine));
     }
 
@@ -219,6 +226,11 @@ class Controller {
 
   publishTrackData(id: string, data: {}) {
     this.frontend.publishTrackData(id, data);
+  }
+
+
+  publishQueryResult(id: string, data: {}) {
+    this.frontend.publishQueryResult(id, data);
   }
 
   async createEngine(blob: Blob): Promise<Engine> {
@@ -249,11 +261,20 @@ class FrontendProxy {
   publishTrackData(id: string, data: {}) {
     return this.remote.send<void>('publishTrackData', [id, data]);
   }
+
+  publishQueryResult(id: string, data: {}) {
+    return this.remote.send<void>('publishQueryResult', [id, data]);
+  }
 }
 
 function main() {
-  const controller = new Controller();
-  forwardRemoteCalls(self as {} as MessagePort, controller);
+  const port = self as {} as MessagePort;
+  port.onmessage = ({data}) => {
+    const frontendPort = data as MessagePort;
+    const frontend = new FrontendProxy(new Remote(frontendPort));
+    const controller = new Controller(frontend);
+    port.onmessage = ({data}) => controller.dispatch(data);
+  };
 }
 
 main();

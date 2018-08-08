@@ -14,17 +14,34 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_processor_context.h"
-#include "src/trace_processor/json_trace_parser.h"
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/sched_tracker.h"
-#include "src/trace_processor/trace_parser.h"
+#ifndef SRC_TRACE_PROCESSOR_FILE_READER_H_
+#define SRC_TRACE_PROCESSOR_FILE_READER_H_
+
+#include <stdint.h>
+
+#include "perfetto/base/scoped_file.h"
+#include "src/trace_processor/blob_reader.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-TraceProcessorContext::TraceProcessorContext() = default;
-TraceProcessorContext::~TraceProcessorContext() = default;
+class FileReader : public BlobReader {
+ public:
+  explicit FileReader(const char* path);
+  ~FileReader() override;
+
+  uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override;
+  uint64_t file_size() const { return file_size_; }
+
+ private:
+  FileReader(const FileReader&) = delete;
+  FileReader& operator=(const FileReader&) = delete;
+
+  base::ScopedFile fd_;
+  uint64_t file_size_ = 0;
+};
 
 }  // namespace trace_processor
 }  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_FILE_READER_H_
