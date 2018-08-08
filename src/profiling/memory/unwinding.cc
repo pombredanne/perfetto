@@ -44,38 +44,6 @@ namespace {
 
 size_t kMaxFrames = 1000;
 
-class StackMemory : public unwindstack::Memory {
- public:
-  StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
-      : mem_fd_(mem_fd),
-        sp_(sp),
-        stack_end_(sp + size),
-        stack_(stack),
-        size_(size) {}
-
-  size_t Read(uint64_t addr, void* dst, size_t size) override {
-    if (addr >= sp_ && addr + size_ < stack_end_) {
-      size_t offset = addr - sp_;
-      memcpy(dst, stack_ + offset, size);
-      return size;
-    }
-
-    if (lseek(mem_fd_, static_cast<off_t>(addr), SEEK_SET) == -1)
-      return 0;
-
-    ssize_t rd = read(mem_fd_, &dst, size);
-    if (rd == -1)
-      return 0;
-    return static_cast<size_t>(rd);
-  }
-
- private:
-  int mem_fd_;
-  uint64_t sp_;
-  uint64_t stack_end_;
-  uint8_t* stack_;
-  size_t size_;
-};
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
                                      void* raw_data) {
   switch (arch) {
@@ -98,6 +66,30 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
 
 }  // namespace
 
+StackMemory::StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
+    : mem_fd_(mem_fd),
+      sp_(sp),
+      stack_end_(sp + size),
+      stack_(stack),
+      size_(size) {}
+
+size_t StackMemory::Read(uint64_t addr, void* dst, size_t size) {
+  if (addr >= sp_ && addr + size_ <= stack_end_) {
+    size_t offset = addr - sp_;
+    memcpy(dst, stack_ + offset, size);
+    return size;
+  }
+  if (lseek(mem_fd_, static_cast<off_t>(addr), SEEK_SET) == -1)
+    return 0;
+
+  ssize_t rd = read(mem_fd_, dst, size);
+  if (rd == -1) {
+    PERFETTO_DPLOG("read");
+    return 0;
+  }
+  return static_cast<size_t>(rd);
+}
+
 FileDescriptorMaps::FileDescriptorMaps(base::ScopedFile fd)
     : fd_(std::move(fd)) {}
 
@@ -108,9 +100,11 @@ bool FileDescriptorMaps::Parse() {
   std::string content;
   if (!base::ReadFileDescriptor(*fd_, &content))
     return false;
+  // Add a trailing \0.
+  content.resize(content.size() + 1);
   return android::procinfo::ReadMapFileContent(
-      content.c_str(), [&](uint64_t start, uint64_t end, uint16_t flags,
-                           uint64_t pgoff, const char* name) {
+      &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
+                       uint64_t pgoff, const char* name) {
         // Mark a device map in /dev/ and not in /dev/ashmem/ specially.
         if (strncmp(name, "/dev/", 5) == 0 &&
             strncmp(name + 5, "ashmem/", 7) != 0) {
@@ -121,7 +115,7 @@ bool FileDescriptorMaps::Parse() {
       });
 }
 
-bool FileDescriptorMaps::Reset() {
+void FileDescriptorMaps::Reset() {
   maps_.clear();
 }
 
@@ -154,7 +148,7 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
     error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
-        metadata->maps.clear();
+        metadata->maps.Reset();
         metadata->maps.Parse();
       } else {
         break;

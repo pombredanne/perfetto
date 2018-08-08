@@ -57,10 +57,15 @@ source_set("string_interner") {
 }
 
 source_set("unittests") {
+  public_configs = [
+    "../../../gn:default_config",
+    "../../../buildtools:libunwindstack_config",
+  ]
   testonly = true
   deps = [
     ":record_reader",
     ":string_interner",
+    ":unwinding",
     "../../../gn:gtest_deps",
     "../../../src/base:test_support",
     "../../base",
@@ -68,10 +73,12 @@ source_set("unittests") {
   sources = [
     "record_reader_unittest.cc",
     "string_interner_unittest.cc",
+    "unwinding_unittest.cc",
   ]
 }
 
 source_set("unwinding") {
+  public_configs = [ "../../../gn:default_config" ]
   deps = [
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",

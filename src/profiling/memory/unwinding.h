@@ -18,9 +18,9 @@
 #define SRC_PROFILING_MEMORY_UNWINDING_H_
 
 #include <unwindstack/Maps.h>
+#include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
-
 class FileDescriptorMaps : public unwindstack::Maps {
  public:
   FileDescriptorMaps(base::ScopedFile fd);
@@ -35,6 +35,19 @@ struct ProcessMetadata {
   FileDescriptorMaps maps;
   pid_t pid;
   base::ScopedFile mem_fd;
+};
+
+class StackMemory : public unwindstack::Memory {
+ public:
+  StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size);
+  size_t Read(uint64_t addr, void* dst, size_t size) override;
+
+ private:
+  int mem_fd_;
+  uint64_t sp_;
+  uint64_t stack_end_;
+  uint8_t* stack_;
+  size_t size_;
 };
 
 void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata);
