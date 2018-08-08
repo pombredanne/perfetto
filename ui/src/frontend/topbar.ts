@@ -81,7 +81,7 @@ function onKeyUp(e: Event) {
   if (mode === 'search') {
     const name = txt.value.replace(/'/g, '\\\'').replace(/[*]/g, '%');
     const query =
-        `select name from process where name like '%${name}%' limit 10`;
+        `select str from strings where str like '%${name}%' limit 10`;
     globals.dispatch(executeQuery('0', QUERY_ID, query));
   }
   if (mode === 'command' && key === 'Enter') {
