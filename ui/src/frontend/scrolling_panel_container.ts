@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {assertExists} from '../base/logging';
 
+import {FlameGraphPanel} from './flame_graph_panel';
 import {globals} from './globals';
 import {lightRedrawer} from './light_redrawer';
 import {Panel} from './panel';
@@ -78,7 +79,6 @@ const PanelComponent = {
         position: 'absolute',
         top: `${attrs.yStart}px`,
       },
-      key: attrs.panelStruct.key,
     });
   },
 
@@ -98,6 +98,7 @@ function renderPanelCanvas(
     width: number,
     yStartOnCanvas: number,
     panelStruct: PanelStruct) {
+  console.log('render args', arguments);
   ctx.save();
   ctx.translate(0, yStartOnCanvas);
   const clipRect = new Path2D();
@@ -212,12 +213,25 @@ export const ScrollingPanelContainer = {
     // can use it.
     this.panelDisplayOrder =
         globals.state.displayedTrackIds.map(id => 'track-' + id);
-    const panelComponents: m.Children[] = [];
 
+    // Show a fake flame graph if there is at least one track.
+    if (globals.state.displayedTrackIds.length > 0) {
+      if (!this.keyToPanelStructs.has('flamegraph')) {
+        const flameGraphPanelStruct = {
+          panel: new FlameGraphPanel(),
+          height: 500,
+          key: 'flamegraph',
+        };
+        this.keyToPanelStructs.set('flamegraph', flameGraphPanelStruct);
+      }
+      this.panelDisplayOrder.push('flamegraph');
+    }
+
+    const panelComponents: m.Children[] = [];
     let yStart = 0;
     for (const key of this.panelDisplayOrder) {
       const panelStruct = assertExists(this.keyToPanelStructs.get(key));
-      panelComponents.push(m(PanelComponent, {panelStruct, yStart}));
+      panelComponents.push(m(PanelComponent, {panelStruct, yStart, key}));
       yStart += panelStruct.height;
     }
 
