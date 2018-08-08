@@ -30,7 +30,11 @@
 #include <unwindstack/UserX86.h>
 #include <unwindstack/UserX86_64.h>
 
+#include <procinfo/process_map.h>
+
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/transport_data.h"
 #include "src/profiling/memory/unwinding.h"
 
@@ -72,7 +76,6 @@ class StackMemory : public unwindstack::Memory {
   uint8_t* stack_;
   size_t size_;
 };
-
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
                                      void* raw_data) {
   switch (arch) {
@@ -95,6 +98,35 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
 
 }  // namespace
 
+FileDescriptorMaps::FileDescriptorMaps(base::ScopedFile fd)
+    : fd_(std::move(fd)) {}
+
+bool FileDescriptorMaps::Parse() {
+  if (lseek(*fd_, 0, SEEK_SET) == -1)
+    return false;
+
+  std::string content;
+  if (!base::ReadFileDescriptor(*fd_, &content))
+    return false;
+  // Add null byte.
+  content.resize(content.size() + 1);
+  return android::procinfo::ReadMapFileContent(
+      &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
+                       uint64_t pgoff, const char* name) {
+        // Mark a device map in /dev/ and not in /dev/ashmem/ specially.
+        if (strncmp(name, "/dev/", 5) == 0 &&
+            strncmp(name + 5, "ashmem/", 7) != 0) {
+          flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
+        }
+        maps_.push_back(
+            new unwindstack::MapInfo(start, end, pgoff, flags, name));
+      });
+}
+
+bool FileDescriptorMaps::Reset() {
+  maps_.clear();
+}
+
 void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
@@ -115,7 +147,7 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
   uint8_t* stack =
       reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->mem_fd, alloc_metadata->stack_pointer, stack,
+      *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
   int error_code;
@@ -124,7 +156,7 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
     error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
-        metadata->maps = unwindstack::RemoteMaps(metadata->pid);
+        metadata->maps.clear();
         metadata->maps.Parse();
       } else {
         break;

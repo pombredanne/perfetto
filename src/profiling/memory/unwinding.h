@@ -21,10 +21,20 @@
 
 namespace perfetto {
 
+class FileDescriptorMaps : public unwindstack::Maps {
+ public:
+  FileDescriptorMaps(base::ScopedFile fd);
+  bool Parse() override;
+  void Reset();
+
+ private:
+  base::ScopedFile fd_;
+};
+
 struct ProcessMetadata {
-  unwindstack::RemoteMaps maps;
+  FileDescriptorMaps maps;
   pid_t pid;
-  int mem_fd;
+  base::ScopedFile mem_fd;
 };
 
 void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata);
