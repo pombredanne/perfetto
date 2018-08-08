@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
+import {TimeScale} from './time_scale';
 
-export const CanvasWrapper = {
-  view({attrs}) {
-    return m('.canvasWrapper', {
-      style: {
-        position: 'absolute',
-        left: '200px',
-        top: attrs.topOffset.toString() + 'px',
-        overflow: 'none',
-      }
-    });
-  },
-  oncreate(vnode) {
-    vnode.dom.appendChild(vnode.attrs.canvasElement);
-  }
-} as m.Component<{topOffset: number, canvasElement: HTMLCanvasElement}>;
+/**
+ * State that is shared between several frontend components, but not the
+ * controller. This state is updated at 60fps.
+ */
+export interface FrontendLocalState {
+  timeScale: TimeScale;
+  visibleWindowMs: {start: number; end: number;};
+  i: number;
+}
+
+export function createEmptyFrontendState(): FrontendLocalState {
+  return {
+    timeScale: new TimeScale([0, 0], [0, 0]),
+    visibleWindowMs: {start: 0, end: 1000000},
+    i: 0,
+  };
+}
