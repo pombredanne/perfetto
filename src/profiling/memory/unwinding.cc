@@ -108,11 +108,9 @@ bool FileDescriptorMaps::Parse() {
   std::string content;
   if (!base::ReadFileDescriptor(*fd_, &content))
     return false;
-  // Add null byte.
-  content.resize(content.size() + 1);
   return android::procinfo::ReadMapFileContent(
-      &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
-                       uint64_t pgoff, const char* name) {
+      content.c_str(), [&](uint64_t start, uint64_t end, uint16_t flags,
+                           uint64_t pgoff, const char* name) {
         // Mark a device map in /dev/ and not in /dev/ashmem/ specially.
         if (strncmp(name, "/dev/", 5) == 0 &&
             strncmp(name + 5, "ashmem/", 7) != 0) {
