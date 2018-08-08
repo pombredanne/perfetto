@@ -21,6 +21,8 @@
 #include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
+
+// Read /proc/[pid]/maps from an open file descriptor.
 class FileDescriptorMaps : public unwindstack::Maps {
  public:
   FileDescriptorMaps(base::ScopedFile fd);
@@ -39,6 +41,9 @@ struct ProcessMetadata {
   base::ScopedFile mem_fd;
 };
 
+// Overlays size bytes pointed to by stack for addresses in [sp, sp + size).
+// Addresses outside of that range are read from mem_fd, which should be an fd
+// that opened /proc/[pid]/mem.
 class StackMemory : public unwindstack::Memory {
  public:
   StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size);

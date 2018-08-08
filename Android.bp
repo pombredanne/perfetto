@@ -3728,6 +3728,8 @@ cc_test {
     "src/perfetto_cmd/rate_limiter_unittest.cc",
     "src/profiling/memory/record_reader.cc",
     "src/profiling/memory/record_reader_unittest.cc",
+    "src/profiling/memory/socket_listener.cc",
+    "src/profiling/memory/socket_listener_unittest.cc",
     "src/profiling/memory/string_interner.cc",
     "src/profiling/memory/string_interner_unittest.cc",
     "src/profiling/memory/unwinding.cc",

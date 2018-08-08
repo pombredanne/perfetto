@@ -24,22 +24,23 @@ void SocketListener::OnDisconnect(ipc::UnixSocket* self) {
 }
 
 void SocketListener::OnNewIncomingConnection(
-    ipc::UnixSocket* self,
+    ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
+  ipc::UnixSocket* new_connection_raw = new_connection.get();
   sockets_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(self),
+      std::piecewise_construct, std::forward_as_tuple(new_connection_raw),
       std::forward_as_tuple(
           std::move(new_connection),
           // This does not need a WeakPtr because it gets called inline of the
           // Read call, which is called in OnDataAvailable below.
-          [this, self](size_t size, std::unique_ptr<uint8_t[]> buf) {
-            RecordReceived(self, size, std::move(buf));
+          [this, new_connection_raw](size_t size,
+                                     std::unique_ptr<uint8_t[]> buf) {
+            RecordReceived(new_connection_raw, size, std::move(buf));
           }));
 }
 
 void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
   auto it = sockets_.find(self);
-  PERFETTO_DCHECK(it != sockets_.end());
   if (it == sockets_.end())
     return;
 
@@ -86,11 +87,13 @@ void SocketListener::InitProcess(Entry* entry,
 }
 
 void SocketListener::RecordReceived(ipc::UnixSocket* self,
-                                    size_t,
-                                    std::unique_ptr<uint8_t[]>) {
+                                    size_t size,
+                                    std::unique_ptr<uint8_t[]> buf) {
   auto it = sockets_.find(self);
-  PERFETTO_DCHECK(it != sockets_.end());
   if (it == sockets_.end())
+    // This happens for zero-length records, because the callback gets called
+    // in the first call to Read, before InitProcess is called. Because zero
+    // length records are useless anyway, this is not a problem.
     return;
   Entry& entry = it->second;
   // This needs to be a weak_ptr for two reasons:
@@ -99,6 +102,7 @@ void SocketListener::RecordReceived(ipc::UnixSocket* self,
   // PID might reuse incorrect metadata.
   // 2) it is a waste to unwind for a process that had already gone away.
   std::weak_ptr<ProcessMetadata> weak_metadata(entry.process_metadata);
+  callback_function_(size, std::move(buf), std::move(weak_metadata));
 }
 
 }  // namespace perfetto
