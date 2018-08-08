@@ -117,7 +117,8 @@ function drawCanvas(state: ScrollingPanelContainerState) {
       state.scrollTop - getCanvasOverdrawHeightPerSide(state.domHeight);
 
   let panelYStart = 0;
-  for (const panelStruct of state.keyToPanelStructs.values()) {
+  for (const key of state.panelDisplayOrder) {
+    const panelStruct = assertExists(state.keyToPanelStructs.get(key));
     const yStartOnCanvas = panelYStart - canvasYStart;
     const panelYBoundsOnCanvas = {
       start: yStartOnCanvas,
