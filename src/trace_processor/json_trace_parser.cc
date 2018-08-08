@@ -19,6 +19,7 @@
 #include <json/reader.h>
 #include <json/value.h>
 
+#include <limits>
 #include <string>
 
 #include "perfetto/base/build_config.h"
@@ -133,7 +134,7 @@ bool JsonTraceParser::ParseNextChunk() {
 
     auto add_slice = [slices, &stack, utid, cat_id,
                       name_id](const Slice& slice) {
-      if (stack.size() >= 0xff)
+      if (stack.size() >= std::numeric_limits(uint8_t)::max())
         return;
       const uint8_t depth = static_cast<uint8_t>(stack.size()) - 1;
       uint64_t parent_stack_id, stack_id;
@@ -217,12 +218,14 @@ std::tuple<uint64_t, uint64_t> JsonTraceParser::GetStackHashes(
   uint64_t parent_stack_id = 0;
   for (size_t i = 0; i < stack.size(); i++) {
     if (i == stack.size() - 1)
-      parent_stack_id = i > 0 ? std::hash<std::string>{}(s)&kMask : 0;
+      parent_stack_id = i > 0 ? (std::hash<std::string>{}(s)) & kMask : 0;
     const Slice& slice = stack[i];
-    s.append(reinterpret_cast<const char*>(&slice.cat_id), sizeof(uint64_t));
-    s.append(reinterpret_cast<const char*>(&slice.name_id), sizeof(uint64_t));
+    s.append(reinterpret_cast<const char*>(&slice.cat_id),
+             sizeof(slice.cat_id));
+    s.append(reinterpret_cast<const char*>(&slice.name_id),
+             sizeof(slice.name_id));
   }
-  uint64_t stack_id = std::hash<std::string>{}(s)&kMask;
+  uint64_t stack_id = (std::hash<std::string>{}(s)) & kMask;
   return std::make_tuple(parent_stack_id, stack_id);
 }
 
