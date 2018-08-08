@@ -134,7 +134,7 @@ bool JsonTraceParser::ParseNextChunk() {
 
     auto add_slice = [slices, &stack, utid, cat_id,
                       name_id](const Slice& slice) {
-      if (stack.size() >= std::numeric_limits(uint8_t)::max())
+      if (stack.size() >= std::numeric_limits<uint8_t>::max())
         return;
       const uint8_t depth = static_cast<uint8_t>(stack.size()) - 1;
       uint64_t parent_stack_id, stack_id;
