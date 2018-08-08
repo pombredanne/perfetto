@@ -15,6 +15,7 @@
  */
 
 #include "src/profiling/memory/socket_listener.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 
@@ -39,7 +40,39 @@ void SocketListener::OnNewIncomingConnection(
 void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
   auto it = sockets_.find(self);
   PERFETTO_DCHECK(it != sockets_.end());
-  it->second.record_reader.Read(self);
+  if (it == sockets_.end())
+    return;
+
+  Entry& entry = it->second;
+  if (entry.recv_fds) {
+    entry.record_reader.Read(self);
+  } else {
+    base::ScopedFile fds[2];
+    entry.record_reader.Read(self, fds, base::ArraySize(fds));
+    if (fds[0] && fds[1]) {
+      InitProcess(&entry, self->peer_pid(), std::move(fds[0]),
+                  std::move(fds[1]));
+      entry.recv_fds = true;
+    } else if (fds[0] || fds[1]) {
+      PERFETTO_ELOG("Received partial FDs.");
+    } else {
+      PERFETTO_ELOG("Received no FDs.");
+    }
+  }
+}
+
+void SocketListener::InitProcess(Entry* entry,
+                                 pid_t peer_pid,
+                                 base::ScopedFile maps_fd,
+                                 base::ScopedFile mem_fd) {
+  auto it = process_metadata_.find(peer_pid);
+  if (it == process_metadata_.end() || it->second.expired()) {
+    entry->process_metadata = std::make_shared<ProcessMetadata>(
+        peer_pid, std::move(maps_fd), std::move(mem_fd));
+    process_metadata_[peer_pid] = entry->process_metadata;
+  } else {
+    entry->process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
+  }
 }
 
 void SocketListener::RecordReceived(ipc::UnixSocket* self,
@@ -48,8 +81,7 @@ void SocketListener::RecordReceived(ipc::UnixSocket* self,
   auto it = sockets_.find(self);
   PERFETTO_CHECK(it != sockets_.end());
   Entry& entry = it->second;
-  // TODO(fmayer): actually do something with this.
-  printf("%p\n", static_cast<void*>(entry.sock.get()));
+  std::weak_ptr<ProcessMetadata> weak_metadata(entry.process_metadata);
 }
 
 }  // namespace perfetto

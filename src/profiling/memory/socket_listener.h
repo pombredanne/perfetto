@@ -19,6 +19,7 @@
 
 #include "src/ipc/unix_socket.h"
 #include "src/profiling/memory/record_reader.h"
+#include "src/profiling/memory/unwinding.h"
 
 #include <map>
 #include <memory>
@@ -41,11 +42,22 @@ class SocketListener : public ipc::UnixSocket::EventListener {
     // Only here for ownership of the object.
     const std::unique_ptr<ipc::UnixSocket> sock;
     RecordReader record_reader;
+    bool recv_fds = false;
+    // The sockets own the metadata for a particular PID. When the last socket
+    // for a PID disconnects, the metadata is destroyed. The unwinding threads
+    // get a weak_ptr, which will be invalidated so we do not unwind for
+    // processes that have already gone away.
+    std::shared_ptr<ProcessMetadata> process_metadata;
   };
 
   void RecordReceived(ipc::UnixSocket*, size_t, std::unique_ptr<uint8_t[]>);
+  void InitProcess(Entry* entry,
+                   pid_t peer_pid,
+                   base::ScopedFile maps_fd,
+                   base::ScopedFile mem_fd);
 
   std::map<ipc::UnixSocket*, Entry> sockets_;
+  std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
 };
 
 }  // namespace perfetto

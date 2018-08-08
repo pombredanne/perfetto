@@ -32,8 +32,10 @@ class FileDescriptorMaps : public unwindstack::Maps {
 };
 
 struct ProcessMetadata {
-  FileDescriptorMaps maps;
+  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
+      : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {}
   pid_t pid;
+  FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
 };
 

@@ -30,15 +30,21 @@ class RecordReader {
  public:
   RecordReader(std::function<void(size_t, std::unique_ptr<uint8_t[]>)>
                    callback_function);
-  void Read(ipc::UnixSocket* fd);
+  void Read(ipc::UnixSocket* fd,
+            base::ScopedFile* fds = nullptr,
+            size_t num_fds = 0);
 
  private:
   void MaybeFinishAndReset();
   void Reset();
   bool done();
   size_t read_idx();
-  size_t ReadRecordSize(ipc::UnixSocket* fd);
-  size_t ReadRecord(ipc::UnixSocket* fd);
+  size_t ReadRecordSize(ipc::UnixSocket* fd,
+                        base::ScopedFile* fds = nullptr,
+                        size_t num_fds = 0);
+  size_t ReadRecord(ipc::UnixSocket* fd,
+                    base::ScopedFile* fds = nullptr,
+                    size_t num_fds = 0);
 
   std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function_;
   size_t read_idx_;
