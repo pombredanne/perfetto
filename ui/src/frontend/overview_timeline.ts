@@ -97,9 +97,28 @@ const WHEEL_ZOOM_DURATION = 200;
  * Interactive horizontal brush for pixel-based selections.
  */
 const HorizontalBrushSelection = {
+  oninit() {
+    this.limitThenBrush = (startPx: number, endPx: number) => {
+      if (startPx < 0) {
+        startPx = 0;
+      }
+      if (endPx < 0) {
+        endPx = 0;
+      }
+      if (startPx > this.width) {
+        startPx = this.width;
+      }
+      if (endPx > this.width) {
+        endPx = this.width;
+      }
+      this.onBrushedPx(startPx, endPx);
+    };
+  },
   oncreate(vnode) {
     const el = vnode.dom as HTMLElement;
-    this.offsetLeft = (el.getBoundingClientRect() as DOMRect).x;
+    const bcr = el.getBoundingClientRect() as DOMRect;
+    this.offsetLeft = bcr.x;
+    this.width = bcr.width;
 
     const startHandle =
         el.getElementsByClassName('brush-handle-start')[0] as HTMLElement;
@@ -119,9 +138,9 @@ const HorizontalBrushSelection = {
                                                           'draggingStartHandle';
       }
       if (dragState === 'draggingStartHandle') {
-        this.onBrushedPx(posX, this.selectionPx.end);
+        this.limitThenBrush(posX, this.selectionPx.end);
       } else {
-        this.onBrushedPx(this.selectionPx.start, posX);
+        this.limitThenBrush(this.selectionPx.start, posX);
       }
     };
 
@@ -139,7 +158,7 @@ const HorizontalBrushSelection = {
     new DragGestureHandler(el, x => dragged(x - this.offsetLeft), x => {
       this.selectionPx.start = this.selectionPx.end = x - this.offsetLeft;
       dragState = 'draggingEndHandle';
-      this.onBrushedPx(this.selectionPx.start, this.selectionPx.end);
+      this.limitThenBrush(this.selectionPx.start, this.selectionPx.end);
     }, () => dragState = 'notDragging');
 
     this.onMouseMove = e => {
@@ -164,15 +183,14 @@ const HorizontalBrushSelection = {
       const brushEnd = this.mousePositionX +
           (1 - zoomPositionPercentage) * newSelectionLength;
 
-      this.onBrushedPx(brushStart, brushEnd);
+      this.limitThenBrush(brushStart, brushEnd);
     });
 
     this.onWheel = e => {
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         // Horizontal motion: panning.
-        this.selectionPx.start += e.deltaX;
-        this.selectionPx.end += e.deltaX;
-        this.onBrushedPx(this.selectionPx.start, this.selectionPx.end);
+        this.limitThenBrush(
+            this.selectionPx.start + e.deltaX, this.selectionPx.end + e.deltaX);
       } else {
         // Vertical motion: zooming.
         zoomingIn = e.deltaY < 0;
@@ -221,19 +239,22 @@ const HorizontalBrushSelection = {
           className: 'brush-handle-end',
         }));
   }
-} as m.Component<{
-  onBrushedPx: (start: number, end: number) => void,
-  selectionPx: {start: number, end: number},
-},
-                                 {
-                                   selectionPx: {start: number, end: number},
-                                   onBrushedPx: (start: number, end: number) =>
-                                       void,
-                                   offsetLeft: number,
-                                   onWheel: (e: WheelEvent) => void,
-                                   onMouseMove: (e: MouseEvent) => void,
-                                   mousePositionX: number,
-                                 }>;
+} as
+    m.Component<
+        {
+          onBrushedPx: (start: number, end: number) => void,
+          selectionPx: {start: number, end: number},
+        },
+        {
+          selectionPx: {start: number, end: number},
+          onBrushedPx: (start: number, end: number) => void,
+          offsetLeft: number,
+          onWheel: (e: WheelEvent) => void,
+          onMouseMove: (e: MouseEvent) => void,
+          mousePositionX: number,
+          width: number,
+          limitThenBrush: (startPx: number, endPx: number) => void,
+        }>;
 
 /**
  * Creates a visual handle with three horizontal bars.
