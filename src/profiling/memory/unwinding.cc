@@ -115,7 +115,7 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
   uint8_t* stack =
       reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
-      metadata->pid, alloc_metadata->stack_pointer, stack,
+      metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
   int error_code;

@@ -24,6 +24,7 @@ namespace perfetto {
 struct ProcessMetadata {
   unwindstack::RemoteMaps maps;
   pid_t pid;
+  int mem_fd;
 };
 
 void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata);
