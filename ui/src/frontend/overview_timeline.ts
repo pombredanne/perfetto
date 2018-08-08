@@ -99,18 +99,8 @@ const WHEEL_ZOOM_DURATION = 200;
 const HorizontalBrushSelection = {
   oninit() {
     this.limitThenBrush = (startPx: number, endPx: number) => {
-      if (startPx < 0) {
-        startPx = 0;
-      }
-      if (endPx < 0) {
-        endPx = 0;
-      }
-      if (startPx > this.width) {
-        startPx = this.width;
-      }
-      if (endPx > this.width) {
-        endPx = this.width;
-      }
+      startPx = Math.min(Math.max(0, startPx), this.width);
+      endPx = Math.min(Math.max(0, endPx), this.width);
       this.onBrushedPx(startPx, endPx);
     };
   },
