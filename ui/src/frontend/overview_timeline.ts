@@ -19,6 +19,7 @@ import {QueryResponse} from '../common/queries';
 import {Animation} from './animation';
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
+import {quietHandler} from './mithril_helpers';
 import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
 import {OVERVIEW_QUERY_ID} from './viewer_page';
@@ -35,6 +36,14 @@ const SATURATION = 70;
 const LIGHTNESS_MIN_LOAD = 80;
 const LIGHTNESS_MAX_LOAD = 20;
 
+function getTooltip(e: Event): HTMLElement|null {
+  const timeline = (e.target as Element).closest('.overview-timeline');
+  if (!timeline) {
+    return null;
+  }
+  return timeline.querySelector('.tooltip') as HTMLElement;
+}
+
 /**
  * Overview timeline with a brush for time-based selections.
  */
@@ -42,33 +51,53 @@ export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
     this.padding = {top: 0, right: 20, bottom: 0, left: 20};
-    this.hoveredLoad = null;
 
     this.onmousemove = e => {
-      if (!this.processesById || !e.target ||
-          (e.target as Element).className !== 'brushes') {
+      const tooltip = getTooltip(e);
+      if (!tooltip || !this.processesById) {
         return;
       }
-      const y = e.layerY;
+      const y = (e as MouseEvent).layerY;
       const processes = Object.values(this.processesById);
       const heightPerProcess = this.contentHeight / processes.length;
       const index = Math.floor(y / heightPerProcess);
-      this.hoveredProcess = processes[index];
-      const hoveredMs = this.timeScale.pxToMs(e.layerX);
+      const hoveredProcess = processes[index];
+      const hoveredMs = this.timeScale.pxToMs((e as MouseEvent).layerX);
 
-      const loadTimes = Object.keys(this.hoveredProcess.loadByTime)
+      const loadTimes = Object.keys(hoveredProcess.loadByTime)
                             .map(stringTime => Number(stringTime));
-      this.hoveredLoad = null;
+      let hoveredLoad = null;
       for (const loadTime of loadTimes) {
         if (Math.abs(loadTime - hoveredMs) <= 500) {
-          this.hoveredLoad = {
+          hoveredLoad = {
             time: loadTime,
-            load: this.hoveredProcess.loadByTime[loadTime]
+            load: hoveredProcess.loadByTime[loadTime]
           };
         }
       }
+
+      if (hoveredLoad == null) {
+        tooltip.classList.remove('visible');
+        return;
+      }
+      tooltip.style.left =
+          `${~~(this.timeScale.msToPx(hoveredLoad.time) - 90)}px`;
+      tooltip.style.top = `${
+                             ~~(processes.indexOf(hoveredProcess) *
+                                    this.contentHeight / processes.length -
+                                10)
+                           }px`;
+      tooltip.innerHTML = hoveredProcess.name;
+      tooltip.classList.add('visible');
+    };
+    this.onmouseout = e => {
+      const tooltip = getTooltip(e);
+      if (tooltip) {
+        tooltip.classList.remove('visible');
+      }
     };
   },
+
   oncreate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
 
@@ -132,8 +161,7 @@ export const OverviewTimeline = {
         const startY = Math.round(i * heightPerProcess);
 
         // Add a background behind the hovered process
-        this.context.fillStyle =
-            process === this.hoveredProcess ? '#eee' : '#fff';
+        this.context.fillStyle = '#fff';
         this.context.fillRect(
             0, startY, this.contentWidth, roundedHeightPerProcess);
 
@@ -159,9 +187,6 @@ export const OverviewTimeline = {
       this.context.fill();
     }
 
-    const processes =
-        !this.processesById ? [] : Object.values(this.processesById);
-
     return m(
         '.overview-timeline',
         m(TimeAxis, {
@@ -169,31 +194,11 @@ export const OverviewTimeline = {
           contentOffset: 0,
           visibleWindowMs: attrs.maxVisibleWindowMs,
         }),
-        m('.tooltip',
-          {
-            style: {
-              display: this.hoveredLoad === null ? 'none' : 'block',
-              left: `${
-                       this.hoveredLoad === null ?
-                           0 :
-                           this.timeScale.msToPx(this.hoveredLoad.time) - 90
-                     }px`,
-              top: `${
-                      this.hoveredProcess === null ?
-                          0 :
-                          processes.indexOf(this.hoveredProcess) *
-                                  this.contentHeight / processes.length -
-                              10
-                    }px`,
-            }
-          },
-          m('b', `${this.hoveredProcess ? this.hoveredProcess.name : ''}`),
-          m('br'),
-          m('span', `${this.hoveredLoad ? this.hoveredLoad.load : 0}%`)),
+        m('.tooltip'),
         m('.timeline-content',
           {
-            onmousemove: this.onmousemove,
-            onmouseout: () => this.hoveredProcess = null,
+            onmousemove:  quietHandler(this.onmousemove),
+            onmouseout: quietHandler(this.onmouseout),
             style: {
               position: 'absolute',
               left: `${this.padding.left}px`,
@@ -206,26 +211,17 @@ export const OverviewTimeline = {
             width: this.contentWidth,
             height: this.contentHeight,
           }),
-          m('.brushes',
-            {
-              style: {
-                width: '100%',
-                height: '100%',
-                position: 'absolute',
-                top: '0',
-              }
+
+          m(HorizontalBrushSelection, {
+            onBrushedPx: (startPx: number, endPx: number) => {
+              attrs.onBrushedMs(
+                  this.timeScale.pxToMs(startPx), this.timeScale.pxToMs(endPx));
             },
-            m(HorizontalBrushSelection, {
-              onBrushedPx: (startPx: number, endPx: number) => {
-                attrs.onBrushedMs(
-                    this.timeScale.pxToMs(startPx),
-                    this.timeScale.pxToMs(endPx));
-              },
-              selectionPx: {
-                start: this.timeScale.msToPx(attrs.visibleWindowMs.start),
-                end: this.timeScale.msToPx(attrs.visibleWindowMs.end)
-              },
-            }))));
+            selectionPx: {
+              start: this.timeScale.msToPx(attrs.visibleWindowMs.start),
+              end: this.timeScale.msToPx(attrs.visibleWindowMs.end)
+            },
+          })));
   },
 } as
     m.Component<
@@ -242,9 +238,8 @@ export const OverviewTimeline = {
           contentHeight: number,
           queryResponse: QueryResponse,
           processesById: {[upid: number]: ProcessSummaryData},
-          hoveredProcess: ProcessSummaryData | null,
-          hoveredLoad: {time: number, load: number} | null,
-          onmousemove: (e: MouseEvent) => void,
+          onmousemove: (e: Event) => void,
+          onmouseout: (e: Event) => void,
         }>;
 
 const ZOOM_IN_PERCENTAGE_PER_MS = 0.998;
@@ -364,6 +359,8 @@ const HorizontalBrushSelection = {
           style: {
             width: '100%',
             height: '100%',
+            position: 'absolute',
+            top: 0,
           }
         },
         m('.brush-left.brush-rect', {

@@ -280,25 +280,35 @@ body {
 }
 
 .tooltip {
-    background: #19212b;
+    @include transition();
+    background: rgba(0,0,0, 0.5);
     color: #fff;
     position: absolute;
     padding: 5px;
     border-radius: 4px;
     width: 200px;
+    margin-left: -100px;
     text-align: center;
     font-size: 12px;
     pointer-events: none;
     z-index: 300;
     overflow: visible; // For the arrow.
-}
-.tooltip:after {
-    content: " ";
-    position: absolute;
-    top: 100%; /* At the bottom of the tooltip */
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: black transparent transparent transparent;
+    pointer-events: none;
+    opacity: 0;
+
+    &.visible {
+        opacity: 1;
+    }
+
+    &:after {
+        content: " ";
+        position: absolute;
+        top: 100%; /* At the bottom of the tooltip */
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: black transparent transparent transparent;
+        pointer-events: none;
+    }
 }
