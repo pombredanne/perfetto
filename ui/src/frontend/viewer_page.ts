@@ -17,13 +17,13 @@ import * as m from 'mithril';
 import {QueryResponse} from '../common/queries';
 
 import {globals} from './globals';
-import {lightRedrawer} from './light_redrawer';
 import {OverviewTimeline} from './overview_timeline';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
+import {rafScheduler} from './raf_scheduler';
 import {ScrollingPanelContainer} from './scrolling_panel_container';
 import {TimeAxis} from './time_axis';
-import {TRACK_INFO_WIDTH} from './track_panel';
+import {TRACK_SHELL_WIDTH} from './track_panel';
 
 
 const QueryTable: m.Component<{}, {}> = {
@@ -72,7 +72,7 @@ const TraceViewer = {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
-          0, this.width - TRACK_INFO_WIDTH);
+          0, this.width - TRACK_SHELL_WIDTH);
       m.redraw();
     };
 
@@ -87,7 +87,7 @@ const TraceViewer = {
 
     this.zoomContent = new PanAndZoomHandler({
       element: panZoomEl,
-      contentOffsetX: TRACK_INFO_WIDTH,
+      contentOffsetX: TRACK_SHELL_WIDTH,
       onPanned: (pannedPx: number) => {
         const deltaMs =
             frontendLocalState.timeScale.deltaPxToDurationMs(pannedPx);
@@ -96,7 +96,7 @@ const TraceViewer = {
         visibleWindowMs.end += deltaMs;
         frontendLocalState.timeScale.setLimitsMs(
             visibleWindowMs.start, visibleWindowMs.end);
-        // TODO: Replace this with lightRedrawer.scheduleRedraw().
+        // TODO: Replace this with repaint canvas only instead of full redraw.
         m.redraw();
       },
       onZoomed: (zoomedPositionPx: number, zoomPercentage: number) => {
@@ -115,7 +115,7 @@ const TraceViewer = {
             zoomedPositionMs + newTotalTimespanMs * (1 - positionPercentage);
         frontendLocalState.timeScale.setLimitsMs(
             visibleWindowMs.start, visibleWindowMs.end);
-        // TODO: Replace this with lightRedrawer.scheduleRedraw().
+        // TODO: Replace this with repaint canvas only instead of full redraw.
         m.redraw();
       }
     });
@@ -125,7 +125,7 @@ const TraceViewer = {
     this.zoomContent.shutdown();
   },
   onupdate() {
-    lightRedrawer.scheduleRedraw();
+    rafScheduler.syncRedraw();
   },
   view() {
     const frontendLocalState = globals.frontendLocalState;
@@ -160,7 +160,7 @@ const TraceViewer = {
           m(TimeAxis, {
             // TODO: Remove global attrs.
             timeScale: frontendLocalState.timeScale,
-            contentOffset: TRACK_INFO_WIDTH,
+            contentOffset: TRACK_SHELL_WIDTH,
             visibleWindowMs,
           }),
           m(ScrollingPanelContainer), ), );

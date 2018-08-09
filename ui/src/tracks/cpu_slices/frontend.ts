@@ -16,8 +16,7 @@ import {TrackState} from '../../common/state';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
-
-import {CpuSliceTrackData, TRACK_KIND} from './common';
+import {CpuSlice, CpuSliceTrackData, TRACK_KIND} from './common';
 
 function sliceIsVisible(
     slice: {start: number, end: number},
@@ -32,6 +31,7 @@ class CpuSliceTrack extends Track {
   }
 
   private trackData: CpuSliceTrackData|undefined;
+  private hoveredSlice: CpuSlice|null = null;
 
   constructor(trackState: TrackState) {
     super(trackState);
@@ -48,9 +48,30 @@ class CpuSliceTrack extends Track {
       if (!sliceIsVisible(slice, visibleWindowMs)) continue;
       const rectStart = timeScale.msToPx(slice.start);
       const rectEnd = timeScale.msToPx(slice.end);
-      ctx.fillStyle = '#4682b4';
+      ctx.fillStyle = slice === this.hoveredSlice ? '#b35846' : '#4682b4';
       ctx.fillRect(rectStart, 40, rectEnd - rectStart, 30);
     }
+  }
+
+  onMouseMove({x, y}: {x: number, y: number}) {
+    if (!this.trackData) return;
+    const {timeScale} = globals.frontendLocalState;
+    if (y < 40 || y > 70) {
+      this.hoveredSlice = null;
+      return;
+    }
+    const xMs = timeScale.pxToMs(x);
+    this.hoveredSlice = null;
+
+    for (const slice of this.trackData.slices) {
+      if (slice.start <= xMs && slice.end >= xMs) {
+        this.hoveredSlice = slice;
+      }
+    }
+  }
+
+  onMouseOut() {
+    this.hoveredSlice = null;
   }
 }
 

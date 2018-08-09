@@ -24,54 +24,67 @@ import {Panel} from './panel';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
 
-export const TRACK_INFO_WIDTH = 200;
+export const TRACK_SHELL_WIDTH = 200;
 
-export const TrackShell = {
+const TrackShell = {
   view({attrs}) {
     return m(
         '.track-shell',
-        m('.track-info',
-          {
-            style: {
-              width: `${TRACK_INFO_WIDTH}px`,
-            }
-          },
-          m('h1', attrs.trackState.name),
-          m('.reorder-icons',
-            m(TrackMoveButton, {
-              direction: 'up',
-              trackId: attrs.trackState.id,
-              top: 10,
-            }),
-            m(TrackMoveButton, {
-              direction: 'down',
-              trackId: attrs.trackState.id,
-              top: 40,
-            }))));
+        {
+          style: {
+            width: `${TRACK_SHELL_WIDTH}px`,
+          }
+        },
+        m('h1', attrs.trackState.name),
+        m('.reorder-icons',
+          m(TrackMoveButton, {
+            direction: 'up',
+            trackId: attrs.trackState.id,
+            top: 10,
+          }),
+          m(TrackMoveButton, {
+            direction: 'down',
+            trackId: attrs.trackState.id,
+            top: 40,
+          })));
   },
 } as m.Component<{trackState: TrackState}>;
+
+const TrackContent = {
+  view({attrs}) {
+    return m('.track-content', {
+      style: {
+        position: 'absolute',
+        left: `${TRACK_SHELL_WIDTH}px`,
+      },
+      onmousemove: (e: MouseEvent) => {
+        // TODO(hjd): Trigger a repaint here not a full m.redraw.
+        attrs.track.onMouseMove({x: e.layerX, y: e.layerY});
+      },
+      onmouseout: () => {
+        attrs.track.onMouseOut();
+      },
+    }, );
+  }
+} as m.Component<{track: Track}>;
+
+const TrackComponent = {
+  view({attrs}) {
+    return m('.track', [
+      m(TrackShell, {trackState: attrs.trackState}),
+      m(TrackContent, {track: attrs.track})
+    ], );
+  }
+} as m.Component<{trackState: TrackState, track: Track}>;
 
 const TrackMoveButton = {
   view({attrs}) {
     return m(
-        'i.material-icons',
+        'i.material-icons.track-move-icons',
         {
           onclick: quietDispatch(moveTrack(attrs.trackId, attrs.direction)),
           style: {
-            position: 'absolute',
-            right: '10px',
             top: `${attrs.top}px`,
-            color: '#fff',
-            'font-weight': 'bold',
-            'text-align': 'center',
-            cursor: 'pointer',
-            background: '#ced0e7',
-            'border-radius': '12px',
-            display: 'block',
-            width: '24px',
-            height: '24px',
-            border: 'none',
-            outline: 'none',
           }
         },
         attrs.direction === 'up' ? 'arrow_upward_alt' : 'arrow_downward_alt');
@@ -83,7 +96,6 @@ const TrackMoveButton = {
 },
                         {}>;
 
-// TODO: Rename this file to track_panel.ts
 export class TrackPanel implements Panel {
   private track: Track;
   constructor(public trackState: TrackState) {
@@ -97,12 +109,13 @@ export class TrackPanel implements Panel {
 
   updateDom(dom: Element): void {
     // TOOD: Let tracks render DOM in the content area.
-    m.render(dom, m(TrackShell, {trackState: this.trackState}));
+    m.render(
+        dom,
+        m(TrackComponent, {trackState: this.trackState, track: this.track}));
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    ctx.translate(TRACK_INFO_WIDTH, 0);
+    ctx.translate(TRACK_SHELL_WIDTH, 0);
     const {visibleWindowMs} = globals.frontendLocalState;
     drawGridLines(
         ctx,
@@ -114,7 +127,5 @@ export class TrackPanel implements Panel {
     const trackData = globals.trackDataStore.get(this.trackState.id);
     if (trackData !== undefined) this.track.consumeData(trackData);
     this.track.renderCanvas(ctx);
-
-    ctx.restore();
   }
 }
