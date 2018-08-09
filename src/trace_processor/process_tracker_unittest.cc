@@ -17,8 +17,8 @@
 #include "src/trace_processor/process_tracker.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_tracker.h"
-#include "src/trace_processor/trace_parser.h"
 #include "src/trace_processor/trace_processor.h"
 
 namespace perfetto {
@@ -74,26 +74,27 @@ TEST_F(ProcessTrackerTest, AddProcessEntry_CorrectName) {
 TEST_F(ProcessTrackerTest, UpdateThreadMatch) {
   uint32_t cpu = 3;
   uint64_t timestamp = 100;
-  uint32_t pid_1 = 1;
   uint32_t prev_state = 32;
   static const char kCommProc1[] = "process1";
   static const char kCommProc2[] = "process2";
-  uint32_t pid_2 = 4;
 
-  context.sched_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
+  context.sched_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1, prev_state,
                                          kCommProc1, sizeof(kCommProc1) - 1,
-                                         pid_2);
-  context.sched_tracker->PushSchedSwitch(cpu, timestamp + 1, pid_2, prev_state,
-                                         kCommProc2, sizeof(kCommProc2) - 1,
-                                         pid_1);
+                                         /*tid=*/4);
+  context.sched_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/4,
+                                         prev_state, kCommProc2,
+                                         sizeof(kCommProc2) - 1,
+                                         /*tid=*/1);
 
-  context.process_tracker->UpdateProcess(2, "test", 4);
-  context.process_tracker->UpdateThread(1, 2);
+  context.process_tracker->UpdateProcess(2, "test", strlen("test"));
+  context.process_tracker->UpdateThread(4, 2);
 
-  TraceStorage::Thread thread = context.storage->GetThread(1);
-  TraceStorage::Process process = context.storage->GetProcess(1);
+  TraceStorage::Thread thread = context.storage->GetThread(/*utid=*/1);
+  TraceStorage::Process process = context.storage->GetProcess(/*utid=*/1);
 
+  ASSERT_EQ(thread.tid, 4);
   ASSERT_EQ(thread.upid, 1);
+  ASSERT_EQ(process.pid, 2);
   ASSERT_EQ(process.start_ns, timestamp);
 }
 

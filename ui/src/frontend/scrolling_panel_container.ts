@@ -18,8 +18,8 @@ import {assertExists} from '../base/logging';
 
 import {FlameGraphPanel} from './flame_graph_panel';
 import {globals} from './globals';
-import {lightRedrawer} from './light_redrawer';
 import {Panel} from './panel';
+import {rafScheduler} from './raf_scheduler';
 import {TrackPanel} from './track_panel';
 
 /**
@@ -36,16 +36,6 @@ function getCanvasYStart(visibleHeight: number, containerScrollTop: number) {
   return containerScrollTop - getCanvasOverdrawHeightPerSide(visibleHeight);
 }
 
-function setCanvasDimensions(
-    ctx: CanvasRenderingContext2D,
-    containerWidth: number,
-    containerHeight: number) {
-  const dpr = window.devicePixelRatio;
-  ctx.canvas.width = containerWidth * dpr;
-  ctx.canvas.height = containerHeight * CANVAS_OVERDRAW_FACTOR * dpr;
-  ctx.scale(dpr, dpr);
-}
-
 type CanvasScrollingContainerVnode =
     m.VnodeDOM<{}, ScrollingPanelContainerState>;
 
@@ -53,17 +43,17 @@ function updateDimensionsFromDom(vnode: CanvasScrollingContainerVnode) {
   const rect = vnode.dom.getBoundingClientRect();
   vnode.state.domWidth = rect.width;
   vnode.state.domHeight = rect.height;
-  setCanvasDimensions(
-      assertExists(vnode.state.ctx),
-      vnode.state.domWidth,
-      vnode.state.domHeight);
-  m.redraw();
+  const dpr = window.devicePixelRatio;
+  const ctx = assertExists(vnode.state.ctx);
+  ctx.canvas.width = vnode.state.domWidth * dpr;
+  ctx.canvas.height = vnode.state.domHeight * CANVAS_OVERDRAW_FACTOR * dpr;
+  ctx.scale(dpr, dpr);
 }
 
 /**
  * Stores a panel, and associated metadata.
  */
-interface PanelStruct {
+interface PanelAttrs {
   height: number;
   panel: Panel;
   key: string;
@@ -73,9 +63,8 @@ const PanelComponent = {
   view({attrs}) {
     return m('.panel', {
       style: {
-        height: `${attrs.panelStruct.height}px`,
+        height: `${attrs.panelAttrs.height}px`,
         width: '100%',
-        overflow: 'hidden',
         position: 'absolute',
         top: `${attrs.yStart}px`,
       },
@@ -83,9 +72,9 @@ const PanelComponent = {
   },
 
   onupdate({dom, attrs}) {
-    attrs.panelStruct.panel.updateDom(dom);
+    attrs.panelAttrs.panel.updateDom(dom);
   }
-} as m.Component<{panelStruct: PanelStruct, yStart: number}>;
+} as m.Component<{panelAttrs: PanelAttrs, yStart: number}>;
 
 function panelIsOnCanvas(
     panelYBoundsOnCanvas: {start: number, end: number}, canvasHeight: number) {
@@ -97,14 +86,14 @@ function renderPanelCanvas(
     ctx: CanvasRenderingContext2D,
     width: number,
     yStartOnCanvas: number,
-    panelStruct: PanelStruct) {
+    panelAttrs: PanelAttrs) {
   ctx.save();
   ctx.translate(0, yStartOnCanvas);
   const clipRect = new Path2D();
-  clipRect.rect(0, 0, width, panelStruct.height);
+  clipRect.rect(0, 0, width, panelAttrs.height);
   ctx.clip(clipRect);
 
-  panelStruct.panel.renderCanvas(ctx);
+  panelAttrs.panel.renderCanvas(ctx);
 
   ctx.restore();
 }
@@ -118,19 +107,19 @@ function drawCanvas(state: ScrollingPanelContainerState) {
 
   let panelYStart = 0;
   for (const key of state.panelDisplayOrder) {
-    const panelStruct = assertExists(state.keyToPanelStructs.get(key));
+    const panelAttrs = assertExists(state.keyToPanelAttrs.get(key));
     const yStartOnCanvas = panelYStart - canvasYStart;
     const panelYBoundsOnCanvas = {
       start: yStartOnCanvas,
-      end: yStartOnCanvas + panelStruct.height
+      end: yStartOnCanvas + panelAttrs.height
     };
     if (!panelIsOnCanvas(panelYBoundsOnCanvas, canvasHeight)) {
-      panelYStart += panelStruct.height;
+      panelYStart += panelAttrs.height;
       continue;
     }
 
-    renderPanelCanvas(state.ctx, state.domWidth, yStartOnCanvas, panelStruct);
-    panelYStart += panelStruct.height;
+    renderPanelCanvas(state.ctx, state.domWidth, yStartOnCanvas, panelAttrs);
+    panelYStart += panelAttrs.height;
   }
 }
 
@@ -139,7 +128,7 @@ interface ScrollingPanelContainerState {
   domHeight: number;
   scrollTop: number;
   ctx: CanvasRenderingContext2D|null;
-  keyToPanelStructs: Map<string, PanelStruct>;
+  keyToPanelAttrs: Map<string, PanelAttrs>;
   panelDisplayOrder: string[];
 
   // We store this function so we can remove it.
@@ -154,9 +143,9 @@ export const ScrollingPanelContainer = {
     this.domHeight = 0;
     this.scrollTop = 0;
     this.ctx = null;
-    this.keyToPanelStructs = new Map<string, PanelStruct>();
+    this.keyToPanelAttrs = new Map<string, PanelAttrs>();
     this.canvasRedrawer = () => drawCanvas(state);
-    lightRedrawer.addCallback(this.canvasRedrawer);
+    rafScheduler.addCallback(this.canvasRedrawer);
   },
 
   oncreate(vnode) {
@@ -168,14 +157,20 @@ export const ScrollingPanelContainer = {
     }
     this.ctx = ctx;
 
-    // updateDimensionsFromDom calls m.redraw, which cannot be called while a
-    // redraw is already happening. Use setTimeout to do it at the end of the
-    // current redraw.
-    setTimeout(() => updateDimensionsFromDom(vnode));
+    // updateDimensionsFromDom calls m.redraw, but calling m.redraw during a
+    // lifecycle method results in undefined behavior. Use setTimeout to do it
+    // asyncronously at the end of the current redraw.
+    setTimeout(() => {
+      updateDimensionsFromDom(vnode);
+      m.redraw();
+    });
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
-    this.onResize = () => updateDimensionsFromDom(vnode);
+    this.onResize = () => {
+      updateDimensionsFromDom(vnode);
+      m.redraw();
+    };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
@@ -188,7 +183,7 @@ export const ScrollingPanelContainer = {
 
   onremove() {
     window.removeEventListener('resize', this.onResize);
-    lightRedrawer.removeCallback(this.canvasRedrawer);
+    rafScheduler.removeCallback(this.canvasRedrawer);
   },
 
   view() {
@@ -197,14 +192,14 @@ export const ScrollingPanelContainer = {
     for (const id of globals.state.displayedTrackIds) {
       const trackState = globals.state.tracks[id];
       // Makeshift name mangling.
-      let panelStruct = this.keyToPanelStructs.get('track-' + id);
-      if (panelStruct === undefined) {
-        panelStruct = {
+      let panelAttrs = this.keyToPanelAttrs.get('track-' + id);
+      if (panelAttrs === undefined) {
+        panelAttrs = {
           panel: new TrackPanel(trackState),
           height: trackState.height,
           key: id,
         };
-        this.keyToPanelStructs.set('track-' + id, panelStruct);
+        this.keyToPanelAttrs.set('track-' + id, panelAttrs);
       }
     }
 
@@ -215,13 +210,13 @@ export const ScrollingPanelContainer = {
 
     // Show a fake flame graph if there is at least one track.
     if (globals.state.displayedTrackIds.length > 0) {
-      if (!this.keyToPanelStructs.has('flamegraph')) {
+      if (!this.keyToPanelAttrs.has('flamegraph')) {
         const flameGraphPanelStruct = {
           panel: new FlameGraphPanel(),
           height: 500,
           key: 'flamegraph',
         };
-        this.keyToPanelStructs.set('flamegraph', flameGraphPanelStruct);
+        this.keyToPanelAttrs.set('flamegraph', flameGraphPanelStruct);
       }
       this.panelDisplayOrder.push('flamegraph');
     }
@@ -229,16 +224,18 @@ export const ScrollingPanelContainer = {
     const panelComponents: m.Children[] = [];
     let yStart = 0;
     for (const key of this.panelDisplayOrder) {
-      const panelStruct = assertExists(this.keyToPanelStructs.get(key));
-      panelComponents.push(m(PanelComponent, {panelStruct, yStart, key}));
-      yStart += panelStruct.height;
+      const panelAttrs = assertExists(this.keyToPanelAttrs.get(key));
+      panelComponents.push(m(PanelComponent, {panelAttrs, yStart, key}));
+      yStart += panelAttrs.height;
     }
 
     let totalContentHeight = 0;
-    for (const panelStruct of this.keyToPanelStructs.values()) {
-      totalContentHeight += panelStruct.height;
+    for (const panelAttrs of this.keyToPanelAttrs.values()) {
+      totalContentHeight += panelAttrs.height;
     }
+
     const canvasYStart = getCanvasYStart(this.domHeight, this.scrollTop);
+    const canvasHeight = this.domHeight * CANVAS_OVERDRAW_FACTOR;
 
     return m(
         '.scrolling-panel-container',
@@ -250,18 +247,17 @@ export const ScrollingPanelContainer = {
             style: {
               height: `${totalContentHeight}px`,
               overflow: 'hidden',
-              position: 'relative',
+              position: 'absolute',
+              top: '0px',
+              width: '100%',
             }
           },
           m('canvas.main-canvas', {
             style: {
-              height: `${this.domHeight * CANVAS_OVERDRAW_FACTOR}px`,
-              // translateY is allegedly better than updating 'top' because it
-              // doesn't trigger layout.
-              transform: `translateY(${canvasYStart}px)`,
+              height: `${canvasHeight}px`,
+              top: `${canvasYStart}px`,
               width: '100%',
               position: 'absolute',
-              'background-color': '#eee',
             }
           }),
           ...panelComponents));

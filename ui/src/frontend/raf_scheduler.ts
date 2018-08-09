@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/**
- * Raf scheduler intended to use for higher frequency drawing, like canvas
- * updates.
- */
-class LightRedrawer {
+// TODO: Ensure RafScheduler does redraw after all other raf callbacks are
+// done.
+class RafScheduler {
   private redrawCallbacks: Set<(() => void)>;
   private scheduledRedrawNextFrame = false;
   private currentlyDrawing = false;
@@ -44,12 +42,19 @@ class LightRedrawer {
 
     window.requestAnimationFrame(() => {
       this.currentlyDrawing = true;
-      for (const cb of this.redrawCallbacks) {
-        cb();
-      }
+      this.syncRedraw();
       this.scheduledRedrawNextFrame = false;
       this.currentlyDrawing = false;
     });
+  }
+
+  /**
+   * Synchronously executes all redraw callbacks. Use with caution.
+   */
+  syncRedraw() {
+    for (const cb of this.redrawCallbacks) {
+      cb();
+    }
   }
 
   clearCallbacks() {
@@ -57,4 +62,4 @@ class LightRedrawer {
   }
 }
 
-export const lightRedrawer = new LightRedrawer();
+export const rafScheduler = new RafScheduler();
