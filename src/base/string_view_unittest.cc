@@ -55,7 +55,7 @@ TEST(StringViewTest, BasicCases) {
 }
 
 TEST(StringViewTest, HashCollisions) {
-  std::unordered_map<size_t, StringView> hashes;
+  std::unordered_map<uint64_t, StringView> hashes;
   std::unordered_set<StringView> sv_set;
   auto insert_sv = [&hashes, &sv_set](StringView sv) {
     hashes.emplace(sv.Hash(), sv);
