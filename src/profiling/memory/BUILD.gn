@@ -22,7 +22,6 @@ source_set("record_reader") {
   deps = [
     "../../../gn:default_deps",
     "../../../src/base",
-    "../../../src/ipc",
   ]
   sources = [
     "record_reader.cc",
@@ -71,7 +70,6 @@ source_set("unittests") {
     ":string_interner",
     ":unwinding",
     "../../../gn:gtest_deps",
-    "../../../src/base:test_support",
     "../../base",
   ]
   sources = [

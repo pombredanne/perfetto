@@ -44,25 +44,6 @@ namespace {
 
 size_t kMaxFrames = 1000;
 
-size_t RegSize(unwindstack::ArchEnum arch) {
-  switch (arch) {
-    case unwindstack::ARCH_X86:
-      return sizeof(unwindstack::x86_user_regs);
-    case unwindstack::ARCH_X86_64:
-      return sizeof(unwindstack::x86_64_user_regs);
-    case unwindstack::ARCH_ARM:
-      return sizeof(unwindstack::arm_user_regs);
-    case unwindstack::ARCH_ARM64:
-      return sizeof(unwindstack::arm64_user_regs);
-    case unwindstack::ARCH_MIPS:
-      return sizeof(unwindstack::mips_user_regs);
-    case unwindstack::ARCH_MIPS64:
-      return sizeof(unwindstack::mips64_user_regs);
-    case unwindstack::ARCH_UNKNOWN:
-      return 0;
-  }
-}
-
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
                                      void* raw_data) {
   switch (arch) {
@@ -85,6 +66,25 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
 
 }  // namespace
 
+size_t RegSize(unwindstack::ArchEnum arch) {
+  switch (arch) {
+    case unwindstack::ARCH_X86:
+      return sizeof(unwindstack::x86_user_regs);
+    case unwindstack::ARCH_X86_64:
+      return sizeof(unwindstack::x86_64_user_regs);
+    case unwindstack::ARCH_ARM:
+      return sizeof(unwindstack::arm_user_regs);
+    case unwindstack::ARCH_ARM64:
+      return sizeof(unwindstack::arm64_user_regs);
+    case unwindstack::ARCH_MIPS:
+      return sizeof(unwindstack::mips_user_regs);
+    case unwindstack::ARCH_MIPS64:
+      return sizeof(unwindstack::mips64_user_regs);
+    case unwindstack::ARCH_UNKNOWN:
+      return 0;
+  }
+}
+
 StackMemory::StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
     : mem_fd_(mem_fd),
       sp_(sp),
@@ -98,6 +98,7 @@ size_t StackMemory::Read(uint64_t addr, void* dst, size_t size) {
     memcpy(dst, stack_ + offset, size);
     return size;
   }
+
   if (lseek(mem_fd_, static_cast<off_t>(addr), SEEK_SET) == -1)
     return 0;
 
@@ -119,6 +120,7 @@ bool FileDescriptorMaps::Parse() {
   std::string content;
   if (!base::ReadFileDescriptor(*fd_, &content))
     return false;
+  PERFETTO_DLOG("%s", content.c_str());
   // Add a trailing \0.
   content.resize(content.size() + 1);
   return android::procinfo::ReadMapFileContent(
@@ -179,6 +181,7 @@ bool DoUnwind(void* mem,
     unwinder.Unwind();
     error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
+      PERFETTO_DLOG("Error: %d", error_code);
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
         metadata->maps.Reset();
         metadata->maps.Parse();

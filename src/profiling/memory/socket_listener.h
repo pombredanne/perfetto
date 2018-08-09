@@ -40,9 +40,7 @@ class SocketListener : public ipc::UnixSocket::EventListener {
 
  private:
   struct Entry {
-    Entry(std::unique_ptr<ipc::UnixSocket> s,
-          std::function<void(size_t size, std::unique_ptr<uint8_t[]>)> fn)
-        : sock(std::move(s)), record_reader(std::move(fn)) {}
+    Entry(std::unique_ptr<ipc::UnixSocket> s) : sock(std::move(s)) {}
     // Only here for ownership of the object.
     const std::unique_ptr<ipc::UnixSocket> sock;
     RecordReader record_reader;

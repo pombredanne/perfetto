@@ -23,67 +23,32 @@
 #include <limits>
 
 namespace perfetto {
-namespace {
-constexpr size_t kMaxReadSize = 16u * 4096u;
+
+RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
+  if (read_idx_ < sizeof(record_size_))
+    return {&record_size_, sizeof(record_size_) - read_idx_};
+  return {buf_.get(), (record_size_ + sizeof(record_size_) - read_idx_)};
 }
 
-RecordReader::RecordReader(
-    std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function)
-    : callback_function_(std::move(callback_function)) {
-  Reset();
-}
+bool RecordReader::EndReceive(size_t recv_size, Record* record) {
+  read_idx_ += recv_size;
+  if (read_idx_ == sizeof(record_size_))
+    buf_.reset(new uint8_t[record_size_]);
 
-void RecordReader::Read(ipc::UnixSocket* fd,
-                        base::ScopedFile* fds,
-                        size_t num_fds) {
-  if (read_idx_ < sizeof(record_size_)) {
-    read_idx_ += ReadRecordSize(fd, fds, num_fds);
-    if (read_idx_ == sizeof(record_size_)) {
-      buf_.reset(new uint8_t[record_size_]);
-      // If we get a zero length record, we need to handle that here, as we
-      // might not get another OnDataAvailable event.
-      MaybeFinishAndReset();
-    }
-    return;
-  }
-
-  read_idx_ += ReadRecord(fd, fds, num_fds);
-  MaybeFinishAndReset();
-}
-
-void RecordReader::MaybeFinishAndReset() {
-  if (done()) {
-    PERFETTO_DCHECK(record_size_ < std::numeric_limits<size_t>::max());
-    callback_function_(static_cast<size_t>(record_size_), std::move(buf_));
+  if (read_idx_ == record_size_ + sizeof(record_size_)) {
+    std::unique_ptr<uint8_t[]> ret = std::move(buf_);
+    size_t size = record_size_;
     Reset();
+    record->data = std::move(ret);
+    record->size = size;
+    return true;
   }
+  return false;
 }
 
 void RecordReader::Reset() {
   read_idx_ = 0;
   record_size_ = 0;
-}
-
-bool RecordReader::done() {
-  return read_idx_ >= sizeof(record_size_) &&
-         read_idx_ - sizeof(record_size_) == record_size_;
-}
-
-size_t RecordReader::ReadRecordSize(ipc::UnixSocket* fd,
-                                    base::ScopedFile* fds,
-                                    size_t num_fds) {
-  return fd->Receive(reinterpret_cast<uint8_t*>(&record_size_) + read_idx_,
-                     sizeof(record_size_) - read_idx_, fds, num_fds);
-}
-
-size_t RecordReader::ReadRecord(ipc::UnixSocket* fd,
-                                base::ScopedFile* fds,
-                                size_t num_fds) {
-  PERFETTO_DCHECK(record_size_ <= std::numeric_limits<size_t>::max());
-  size_t read_so_far = read_idx_ - sizeof(record_size_);
-  size_t sz =
-      std::min(kMaxReadSize, static_cast<size_t>(record_size_) - read_so_far);
-  return fd->Receive(buf_.get() + read_so_far, sz, fds, num_fds);
 }
 
 }  // namespace perfetto

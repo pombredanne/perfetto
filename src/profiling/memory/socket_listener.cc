@@ -27,16 +27,7 @@ void SocketListener::OnNewIncomingConnection(
     ipc::UnixSocket*,
     std::unique_ptr<ipc::UnixSocket> new_connection) {
   ipc::UnixSocket* new_connection_raw = new_connection.get();
-  sockets_.emplace(
-      std::piecewise_construct, std::forward_as_tuple(new_connection_raw),
-      std::forward_as_tuple(
-          std::move(new_connection),
-          // This does not need a WeakPtr because it gets called inline of the
-          // Read call, which is called in OnDataAvailable below.
-          [this, new_connection_raw](size_t size,
-                                     std::unique_ptr<uint8_t[]> buf) {
-            RecordReceived(new_connection_raw, size, std::move(buf));
-          }));
+  sockets_.emplace(new_connection_raw, std::move(new_connection));
 }
 
 void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
@@ -45,8 +36,10 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
     return;
 
   Entry& entry = it->second;
+  RecordReader::ReceiveBuffer buf = entry.record_reader.BeginReceive();
+  size_t rd;
   if (PERFETTO_LIKELY(entry.recv_fds)) {
-    entry.record_reader.Read(self);
+    rd = self->Receive(buf.data, buf.size);
   } else {
     // The first record we receive should contain file descriptors for the
     // process' /proc/[pid]/maps and /proc/[pid]/mem. Receive those and store
@@ -55,7 +48,7 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
     // If metadata for the process already exists, they will just go out of
     // scope in InitProcess.
     base::ScopedFile fds[2];
-    entry.record_reader.Read(self, fds, base::ArraySize(fds));
+    rd = self->Receive(buf.data, buf.size, fds, base::ArraySize(fds));
     if (fds[0] && fds[1]) {
       InitProcess(&entry, self->peer_pid(), std::move(fds[0]),
                   std::move(fds[1]));
@@ -66,6 +59,9 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
       PERFETTO_DLOG("Received no FDs.");
     }
   }
+  RecordReader::Record record;
+  if (entry.record_reader.EndReceive(rd, &record))
+    RecordReceived(self, record.size, std::move(record.data));
 }
 
 void SocketListener::InitProcess(Entry* entry,
