@@ -75,7 +75,7 @@ export const OverviewTimeline = {
     this.contentWidth = rect.width - this.padding.left - this.padding.right;
     this.contentHeight = rect.height - 41;
 
-    this.timeScale.setLimitsPx(this.padding.left, this.contentWidth);
+    this.timeScale.setLimitsPx(0, this.contentWidth);
 
     const context =
         vnode.dom.getElementsByTagName('canvas')[0].getContext('2d');
@@ -87,8 +87,10 @@ export const OverviewTimeline = {
   onupdate(vnode) {
     const rect = vnode.dom.getBoundingClientRect();
 
-    this.timeScale.setLimitsPx(
-        this.padding.left, rect.width - this.padding.left - this.padding.right);
+    this.contentWidth = rect.width - this.padding.left - this.padding.right;
+    this.contentHeight = rect.height - 41;
+
+    this.timeScale.setLimitsPx(0, this.contentWidth);
   },
   view({attrs}) {
     this.timeScale.setLimitsMs(
@@ -164,44 +166,53 @@ export const OverviewTimeline = {
 
     return m(
         '.overview-timeline',
+        {
+          style: {
+            padding: `0 0 0 ${this.padding.left}px`,
+            overflow: 'visible',
+          }
+        },
         m(TimeAxis, {
           timeScale: this.timeScale,
           contentOffset: 0,
           visibleWindowMs: attrs.maxVisibleWindowMs,
         }),
-        m('.tooltip',
-          {
-            style: {
-              display: this.hoveredLoad === null ? 'none' : 'block',
-              left: `${
-                       this.hoveredLoad === null ?
-                           0 :
-                           this.timeScale.msToPx(this.hoveredLoad.time) - 90
-                     }px`,
-              top: `${
-                      this.hoveredProcess === null ?
-                          0 :
-                          processes.indexOf(this.hoveredProcess) *
-                                  this.contentHeight / processes.length -
-                              10
-                    }px`,
-            }
-          },
-          m('b', `${this.hoveredProcess ? this.hoveredProcess.name : ''}`),
-          m('br'),
-          m('span', `${this.hoveredLoad ? this.hoveredLoad.load : 0}%`)),
         m('.timeline-content',
           {
             onmousemove: this.onmousemove,
-            onmouseout: () => this.hoveredProcess = null,
+            onmouseout: () => {
+              this.hoveredProcess = null;
+              this.hoveredLoad = null;
+            },
             style: {
               position: 'absolute',
               left: `${this.padding.left}px`,
               top: '41px',
               width: `${this.contentWidth}px`,
               height: `${this.contentHeight}px`,
+              overflow: 'visible',  // For tooltip
             }
           },
+          m('.tooltip',
+            {
+              style: {
+                display: this.hoveredLoad === null ? 'none' : 'block',
+                left: `${
+                         this.hoveredLoad === null ?
+                             0 :
+                             this.timeScale.msToPx(this.hoveredLoad.time) - 100
+                       }px`,
+                top: `${
+                        this.hoveredProcess === null ?
+                            0 :
+                            processes.indexOf(this.hoveredProcess) *
+                                this.contentHeight / processes.length
+                      }px`,
+              }
+            },
+            m('b', `${this.hoveredProcess ? this.hoveredProcess.name : ''}`),
+            m('br'),
+            m('span', `${this.hoveredLoad ? this.hoveredLoad.load : 0}%`)),
           m('canvas.visualization', {
             width: this.contentWidth,
             height: this.contentHeight,

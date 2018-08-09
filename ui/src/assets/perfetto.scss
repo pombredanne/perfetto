@@ -235,7 +235,7 @@ body {
 /** Time Axis **/
 
 .axis {
-    overflow: hidden;
+    overflow: visible;
     height: 41px;
     position: relative;
     .mark-label {
@@ -260,7 +260,6 @@ body {
 
 .overview-timeline {
     width: 100%;
-    overflow: hidden;
     height: 120px;
     position: relative;
 }
@@ -297,6 +296,8 @@ body {
     pointer-events: none;
     z-index: 300;
     overflow: visible; // For the arrow.
+    height: 42px;
+    margin-top:-47px; // Height + arrow
 }
 .tooltip:after {
     content: " ";
