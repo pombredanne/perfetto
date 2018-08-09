@@ -16,6 +16,7 @@ import * as uuidv4 from 'uuid/v4';
 import {State} from './state';
 
 export const PERMALINK_ID = 'permalink';
+const BUCKET_NAME = 'perfetto-ui-data';
 
 async function toSha256(str: string): Promise<string> {
   // TODO(hjd): TypeScript bug with definition of TextEncoder.
@@ -27,12 +28,9 @@ async function toSha256(str: string): Promise<string> {
 
 export async function saveState(state: State): Promise<string> {
   const text = JSON.stringify(state);
-  console.log(state);
-  console.log(text);
-  const bucketName = 'perfetto-ui-data';
   const name = await toSha256(text);
   const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-      `${bucketName}/o?uploadType=media&name=${name}`;
+      `${BUCKET_NAME}/o?uploadType=media&name=${name}&predefinedAcl=publicRead`;
   const response = await fetch(url, {
     method: 'post',
     headers: {
@@ -46,25 +44,23 @@ export async function saveState(state: State): Promise<string> {
 }
 
 export async function loadState(id: string): Promise<State> {
-  const url = `https://storage.googleapis.com/perfetto-ui-data/${id}`;
+  const url = `https://storage.googleapis.com/${BUCKET_NAME}/${id}`;
   const response = await fetch(url);
   const text = await response.text();
   const stateHash = await toSha256(text);
   const state = JSON.parse(text);
   if (stateHash !== id) {
-    console.log(state);
     throw new Error(`State hash does not match ${id} vs. ${stateHash}`);
   }
   return state;
 }
 
 export async function saveTrace(trace: File): Promise<string> {
-  const bucketName = 'perfetto-ui-data';
   // TODO(hjd): This should probably also be a hash but that requires
   // trace processor support.
   const name = uuidv4();
   const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-      `${bucketName}/o?uploadType=media&name=${name}`;
+      `${BUCKET_NAME}/o?uploadType=media&name=${name}&predefinedAcl=publicRead`;
   const response = await fetch(url, {
     method: 'post',
     headers: {
@@ -74,5 +70,5 @@ export async function saveTrace(trace: File): Promise<string> {
   });
   await response.json();
 
-  return `https://storage.googleapis.com/perfetto-ui-data/${name}`;
+  return `https://storage.googleapis.com/${BUCKET_NAME}/${name}`;
 }
