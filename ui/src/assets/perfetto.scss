@@ -64,7 +64,7 @@ body {
     width: 100%;
     padding: 0;
     margin: 0;
-    user-select: text;
+    user-select: none;
 }
 
 h1,
@@ -83,7 +83,7 @@ table {
 
 body {
     display: grid;
-    grid-template-areas:  
+    grid-template-areas:
       "sidebar topbar"
       "sidebar page"
       "sidebar alerts";
@@ -104,7 +104,6 @@ button {
 
 button.close {
   font-family: var(--monospace-font);
-
 }
 
 .full-page-loading-screen {
@@ -136,12 +135,9 @@ button.close {
     letter-spacing: 0.25px;
     color: white;
     padding: 25px;
-  }
-}
-
-.alert-permalink {
-  a {
-    color: white;
+    a {
+      color: white;
+    }
   }
 }
 
@@ -314,4 +310,3 @@ button.close {
     height: 30px;
     pointer-events: auto;
 }
-

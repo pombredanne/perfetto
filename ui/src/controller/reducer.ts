@@ -118,10 +118,7 @@ export function rootReducer(state: State, action: any): State {
 
     case 'CREATE_PERMALINK': {
       const nextState = {...state};
-      nextState.permalinks = {...state.permalinks};
-      const id = `${nextState.nextId++}`;
-      nextState.permalinks[id] = {
-        id,
+      nextState.permalink = {
         state,
       };
       return nextState;

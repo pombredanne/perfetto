@@ -18,8 +18,8 @@ import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
 import {setState} from '../common/actions';
-import {State} from '../common/state';
-import {createEmptyState, loadState} from '../common/state';
+import {loadState} from '../common/permalinks';
+import {createEmptyState, State} from '../common/state';
 import {
   takeWasmEngineWorkerPort,
   warmupWasmEngineWorker,
@@ -97,11 +97,8 @@ async function main() {
   (window as {} as {globals: {}}).globals = globals;
 
   const stateHash = m.route.param('s');
-  console.log(stateHash);
   if (stateHash) {
-    console.log('loading state');
     const state = await loadState(stateHash);
-    console.log(state);
     globals.dispatch(setState(state));
   }
 }

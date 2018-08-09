@@ -24,6 +24,7 @@ import {
   navigate,
   setEngineReady
 } from '../common/actions';
+import {PERMALINK_ID, saveState, saveTrace} from '../common/permalinks';
 import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
 import {QueryResponse} from '../common/queries';
 import {
@@ -31,8 +32,6 @@ import {
   EngineConfig,
   PermalinkConfig,
   QueryConfig,
-  saveState,
-  saveTrace,
   State,
   TrackState,
 } from '../common/state';
@@ -177,7 +176,7 @@ async function createPermalink(
     config: PermalinkConfig, controller: Controller) {
   const state = {...config.state};
   state.engines = {...state.engines};
-  state.permalinks = {};
+  state.permalink = null;
   for (const engine of Object.values<EngineConfig>(state.engines)) {
     if (typeof engine.source === 'string') {
       continue;
@@ -187,19 +186,28 @@ async function createPermalink(
     engine.source = url;
   }
   const url = await saveState(state);
-  controller.publishTrackData(config.id, {
+  controller.publishTrackData(PERMALINK_ID, {
     url,
   });
 }
 
 class PermalinkController {
-  private readonly config: PermalinkConfig;
   private readonly controller: Controller;
+  private config: PermalinkConfig|null;
 
-  constructor(config: PermalinkConfig, controller: Controller) {
-    this.config = config;
+  constructor(controller: Controller) {
     this.controller = controller;
-    createPermalink(this.config, this.controller);
+    this.config = null;
+  }
+
+  updateConfig(config: PermalinkConfig|null) {
+    if (this.config === config) {
+      return;
+    }
+    this.config = config;
+    if (this.config) {
+      createPermalink(this.config, this.controller);
+    }
   }
 }
 
@@ -209,7 +217,7 @@ class Controller {
   private readonly engines: Map<string, EngineController>;
   private readonly tracks: Map<string, TrackControllerWrapper>;
   private readonly queries: Map<string, QueryController>;
-  private readonly permalinks: Map<string, PermalinkController>;
+  private readonly permalink: PermalinkController;
 
   constructor(frontend: FrontendProxy) {
     this.state = createEmptyState();
@@ -217,7 +225,7 @@ class Controller {
     this.engines = new Map();
     this.tracks = new Map();
     this.queries = new Map();
-    this.permalinks = new Map();
+    this.permalink = new PermalinkController(this);
   }
 
   dispatch(action: Action): void {
@@ -229,11 +237,7 @@ class Controller {
       this.state = rootReducer(this.state, action);
     }
 
-    for (const config of Object.values<PermalinkConfig>(
-             this.state.permalinks)) {
-      if (this.permalinks.has(config.id)) continue;
-      this.permalinks.set(config.id, new PermalinkController(config, this));
-    }
+    this.permalink.updateConfig(this.state.permalink);
 
     // TODO(hjd): Handle teardown.
     for (const config of Object.values<EngineConfig>(this.state.engines)) {

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as uuidv4 from 'uuid/v4';
-
 /**
  * A plain js object, holding objects of type |Class| keyed by string id.
  * We use this instead of using |Map| object since it is simpler and faster to
@@ -43,10 +41,7 @@ export interface QueryConfig {
   query: string;
 }
 
-export interface PermalinkConfig {
-  id: string;
-  state: State;
-}
+export interface PermalinkConfig { state: State; }
 
 export interface State {
   route: string|null;
@@ -59,7 +54,7 @@ export interface State {
   tracks: ObjectById<TrackState>;
   displayedTrackIds: string[];
   queries: ObjectById<QueryConfig>;
-  permalinks: ObjectById<PermalinkConfig>;
+  permalink: null|PermalinkConfig;
 }
 
 export function createEmptyState(): State {
@@ -70,56 +65,6 @@ export function createEmptyState(): State {
     displayedTrackIds: [],
     engines: {},
     queries: {},
-    permalinks: {},
+    permalink: null,
   };
-}
-
-async function toSha256(str: string): Promise<string> {
-  // TODO(hjd): TypeScript bug with definition of TextEncoder.
-  // tslint:disable-next-line no-any
-  const buffer = new (TextEncoder as any)('utf-8').encode(str);
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-  return Array.from(new Uint8Array(digest)).map(x => x.toString(16)).join('');
-}
-
-export async function saveState(state: State): Promise<string> {
-  const text = JSON.stringify(state);
-  const bucketName = 'perfetto-ui-data';
-  const name = await toSha256(text);
-  const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-      `${bucketName}/o?uploadType=media&name=${name}`;
-  const response = await fetch(url, {
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-    body: text,
-  });
-  await response.json();
-
-  // return `${self.location.origin}/?s=${name}`;
-  return `${self.location.origin}/index.html#!/?s=${name}`;
-}
-
-export async function loadState(id: string): Promise<State> {
-  const url = `https://storage.googleapis.com/perfetto-ui-data/${id}`;
-  const response = await fetch(url);
-  return response.json();
-}
-
-export async function saveTrace(trace: File): Promise<string> {
-  const bucketName = 'perfetto-ui-data';
-  const name = uuidv4();
-  const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-      `${bucketName}/o?uploadType=media&name=${name}`;
-  const response = await fetch(url, {
-    method: 'post',
-    headers: {
-      'Content-Type': 'application/octet-stream;',
-    },
-    body: trace,
-  });
-  const json = await response.json();
-  console.log(json);
-  return `https://storage.googleapis.com/perfetto-ui-data/${name}`;
 }

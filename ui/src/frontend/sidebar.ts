@@ -22,9 +22,7 @@ import {
 } from '../common/actions';
 
 import {globals} from './globals';
-import {quietDispatch, quietHandler} from './mithril_helpers';
-
-const navigateHome = navigate('/');
+import {quietHandler} from './mithril_helpers';
 
 const EXAMPLE_TRACE_URL =
     'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
@@ -38,7 +36,7 @@ const SECTIONS = [
       {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
       {t: 'Open example trace', a: handleOpenTraceUrl, i: 'description'},
       {t: 'Record new trace', a: navigateHome, i: 'fiber_smart_record'},
-      {t: 'Share current trace', a: createPermalink(), i: 'share'},
+      {t: 'Share current trace', a: dispatchCreatePermalink, i: 'share'},
     ],
   },
   {
@@ -90,19 +88,13 @@ function onInputElementFileSelectionChanged(e: Event) {
   globals.dispatch(openTraceFromFile(e.target.files[0]));
 }
 
-const NavLink: m.Component<{onclick: (e: Event) => void}, {}> = {
-  view(vnode) {
-    return m(
-        'a[href=#]',
-        {
-          onclick: (e: Event) => {
-            e.preventDefault();
-            vnode.attrs.onclick(e);
-          },
-        },
-        vnode.children);
-  },
-};
+function navigateHome(_: Event) {
+  globals.dispatch(navigate('/'));
+}
+
+function dispatchCreatePermalink(_: Event) {
+  globals.dispatch(createPermalink());
+}
 
 export const Sidebar: m.Component = {
   view() {
@@ -110,15 +102,12 @@ export const Sidebar: m.Component = {
     for (const section of SECTIONS) {
       const vdomItems = [];
       for (const item of section.items) {
-        vdomItems.push(m(
-            'li',
-            m(NavLink,
-              {
-                onclick: (typeof item.a === 'function') ? quietHandler(item.a) :
-                                                          quietDispatch(item.a)
-              },
-              m('i.material-icons', item.i),
-              item.t)));
+        vdomItems.push(
+            m('li',
+              m(`a[href=#]`,
+                {onclick: quietHandler(item.a)},
+                m('i.material-icons', item.i),
+                item.t)));
       }
       vdomSections.push(
           m(`section${section.expanded ? '.expanded' : ''}`,
