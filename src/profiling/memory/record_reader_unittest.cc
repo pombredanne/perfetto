@@ -16,13 +16,6 @@
 
 #include "src/profiling/memory/record_reader.h"
 
-#include <sys/socket.h>
-#include <sys/types.h>
-
-#include "perfetto/base/scoped_file.h"
-#include "src/base/test/test_task_runner.h"
-
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace perfetto {
