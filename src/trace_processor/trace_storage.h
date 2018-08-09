@@ -20,12 +20,14 @@
 #include <array>
 #include <deque>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_view.h"
+#include "src/trace_processor/string_pool.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -38,9 +40,6 @@ using UniquePid = uint32_t;
 // UniqueTid is an offset into |unique_threads_|. Necessary because tids can
 // be reused.
 using UniqueTid = uint32_t;
-
-// StringId is an offset into |string_pool_|.
-using StringId = size_t;
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -167,7 +166,7 @@ class TraceStorage {
 
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
-  StringId InternString(base::StringView);
+  StringId InternString(base::StringView sv) { return string_pool_.Insert(sv); }
 
   Process* GetMutableProcess(UniquePid upid) {
     PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());
@@ -185,9 +184,10 @@ class TraceStorage {
     return cpu_events_[cpu];
   }
 
-  const std::string& GetString(StringId id) const {
-    PERFETTO_DCHECK(id < string_pool_.size());
-    return string_pool_[id];
+  // The returned string pointer is valid as long as TraceStorage is alive.
+  // The char* string returned is always null terminated.
+  base::StringView GetString(StringId string_id) const {
+    return string_pool_.Get(string_id);
   }
 
   const Process& GetProcess(UniquePid upid) const {
@@ -215,7 +215,7 @@ class TraceStorage {
   size_t string_count() const { return string_pool_.size(); }
 
  private:
-  TraceStorage& operator=(const TraceStorage&) = default;
+  TraceStorage& operator=(TraceStorage&&) noexcept;
 
   using StringHash = uint64_t;
 
@@ -226,10 +226,7 @@ class TraceStorage {
   std::array<SlicesPerCpu, kMaxCpus> cpu_events_;
 
   // One entry for each unique string in the trace.
-  std::deque<std::string> string_pool_;
-
-  // One entry for each unique string in the trace.
-  std::unordered_map<StringHash, StringId> string_index_;
+  StringPool string_pool_;
 
   // One entry for each UniquePid, with UniquePid as the index.
   std::deque<Process> unique_processes_;

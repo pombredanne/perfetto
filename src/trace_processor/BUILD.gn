@@ -54,6 +54,8 @@ source_set("lib") {
     "slice_table.cc",
     "slice_table.h",
     "sqlite_utils.h",
+    "string_pool.cc",
+    "string_pool.h",
     "string_table.cc",
     "string_table.h",
     "table.cc",
@@ -107,6 +109,7 @@ source_set("unittests") {
     "query_constraints_unittest.cc",
     "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
+    "string_pool_unittest.cc",
     "thread_table_unittest.cc",
   ]
   deps = [

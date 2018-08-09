@@ -64,9 +64,8 @@ int ProcessTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kName: {
       const auto& process = storage_->GetProcess(upid_filter_.current);
-      const auto& name = storage_->GetString(process.name_id);
-      sqlite3_result_text(context, name.c_str(),
-                          static_cast<int>(name.length()), nullptr);
+      base::StringView name = storage_->GetString(process.name_id);
+      sqlite3_result_text(context, name.data(), name.int_size(), nullptr);
       break;
     }
     case Column::kPid: {

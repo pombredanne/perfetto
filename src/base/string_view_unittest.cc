@@ -44,6 +44,11 @@ TEST(StringViewTest, BasicCases) {
   EXPECT_FALSE(StringView("x").empty());
 
   {
+    StringView sv("copy");
+    EXPECT_NE(sv.data(), sv.ToStdString().data());
+  }
+
+  {
     StringView x("abc");
     EXPECT_EQ(x.size(), 3u);
     EXPECT_EQ(x.data()[0], 'a');

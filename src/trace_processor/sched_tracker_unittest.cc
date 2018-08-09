@@ -61,8 +61,7 @@ TEST_F(SchedTrackerTest, InsertSecondSched) {
   ASSERT_EQ(timestamps.size(), 1ul);
   ASSERT_EQ(timestamps[0], timestamp);
   ASSERT_EQ(context.storage->GetThread(1).start_ns, timestamp);
-  ASSERT_EQ(std::string(context.storage->GetString(
-                context.storage->GetThread(1).name_id)),
+  ASSERT_EQ(context.storage->GetString(context.storage->GetThread(1).name_id),
             kCommProc2);
   ASSERT_EQ(context.storage->SlicesForCpu(cpu).utids().front(), 1);
 }

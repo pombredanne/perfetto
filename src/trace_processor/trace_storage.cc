@@ -18,6 +18,8 @@
 
 #include <string.h>
 
+#include <type_traits>
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -25,12 +27,11 @@ TraceStorage::TraceStorage() {
   // Upid/utid 0 is reserved for invalid processes/threads.
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
-
-  // Reserve string ID 0 for the empty string.
-  InternString("");
 }
 
 TraceStorage::~TraceStorage() {}
+
+TraceStorage& TraceStorage::operator=(TraceStorage&&) noexcept = default;
 
 void TraceStorage::AddSliceToCpu(uint32_t cpu,
                                  uint64_t start_ns,
@@ -38,19 +39,6 @@ void TraceStorage::AddSliceToCpu(uint32_t cpu,
                                  UniqueTid utid) {
   cpu_events_[cpu].AddSlice(start_ns, duration_ns, utid);
 };
-
-StringId TraceStorage::InternString(base::StringView str) {
-  auto hash = str.Hash();
-  auto id_it = string_index_.find(hash);
-  if (id_it != string_index_.end()) {
-    PERFETTO_DCHECK(string_pool_[id_it->second] == str);
-    return id_it->second;
-  }
-  string_pool_.emplace_back(str.ToStdString());
-  StringId string_id = string_pool_.size() - 1;
-  string_index_.emplace(hash, string_id);
-  return string_id;
-}
 
 void TraceStorage::ResetStorage() {
   *this = TraceStorage();

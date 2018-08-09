@@ -40,6 +40,7 @@ class StringView {
 
   bool empty() const { return size_ == 0; }
   size_t size() const { return size_; }
+  int int_size() const { return static_cast<int>(size_); }
   const char* data() const { return data_; }
 
   std::string ToStdString() { return std::string(data_, size_); }

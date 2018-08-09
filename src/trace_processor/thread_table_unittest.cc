@@ -129,11 +129,9 @@ TEST_F(ThreadTableUnittest, JoinWithProcess) {
 
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp, /*tid=*/1, prev_state,
                                           kThreadName1,
-
                                           /*tid=*/4);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 1, /*tid=*/4,
                                           prev_state, kThreadName2,
-
                                           /*tid=*/1);
 
   // Also create a process for which we haven't seen any thread.
