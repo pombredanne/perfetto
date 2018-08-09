@@ -96,6 +96,8 @@ source_set("test_support") {
     "../../gn:gtest_deps",
   ]
   sources = [
+    "test/utils.cc",
+    "test/utils.h",
     "test/vm_test_utils.cc",
     "test/vm_test_utils.h",
   ]
@@ -105,8 +107,6 @@ source_set("test_support") {
     sources += [
       "test/test_task_runner.cc",
       "test/test_task_runner.h",
-      "test/utils.cc",
-      "test/utils.h",
     ]
   }
 }
