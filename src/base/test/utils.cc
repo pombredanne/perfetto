@@ -25,10 +25,6 @@
 namespace perfetto {
 namespace base {
 
-namespace {
-constexpr size_t kPathMax = 128;
-}  // namespace
-
 std::string GetTestDataPath(const std::string& path) {
   char const* test_data_root = getenv("TEST_DATA_ROOT");
   if (test_data_root) {
@@ -37,8 +33,8 @@ std::string GetTestDataPath(const std::string& path) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  char buf[kPathMax];
-  ssize_t bytes = readlink("/proc/self/exe", buf, kPathMax);
+  char buf[128];
+  ssize_t bytes = readlink("/proc/self/exe", buf, 128);
   PERFETTO_CHECK(bytes != -1);
   // readlink does not null terminate.
   buf[bytes] = 0;
