@@ -28,21 +28,24 @@ namespace perfetto {
 
 class RecordReader {
  public:
-  RecordReader(std::function<void(size_t, std::unique_ptr<uint8_t[]>)>
-                   callback_function);
-  void Read(ipc::UnixSocket* fd);
+  struct ReceiveBuffer {
+    void* data;
+    size_t size;
+  };
+
+  struct Record {
+    std::unique_ptr<uint8_t[]> data;
+    size_t size;
+  };
+
+  ReceiveBuffer BeginReceive();
+  bool EndReceive(size_t recv_size, Record* record) PERFETTO_WARN_UNUSED_RESULT;
 
  private:
-  void MaybeFinishAndReset();
   void Reset();
-  bool done();
-  size_t read_idx();
-  size_t ReadRecordSize(ipc::UnixSocket* fd);
-  size_t ReadRecord(ipc::UnixSocket* fd);
 
-  std::function<void(size_t, std::unique_ptr<uint8_t[]>)> callback_function_;
-  size_t read_idx_;
-  uint64_t record_size_;
+  size_t read_idx_ = 0;
+  uint64_t record_size_ = 0;
   std::unique_ptr<uint8_t[]> buf_;
 };
 
