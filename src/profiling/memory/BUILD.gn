@@ -46,7 +46,6 @@ source_set("unittests") {
     ":record_reader",
     ":string_interner",
     "../../../gn:gtest_deps",
-    "../../../src/base:test_support",
     "../../base",
   ]
   sources = [
