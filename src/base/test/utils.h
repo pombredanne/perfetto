@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
-#define INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
+#ifndef SRC_BASE_TEST_UTILS_H_
+#define SRC_BASE_TEST_UTILS_H_
 
 #include <string>
 
 namespace perfetto {
 namespace base {
-namespace test_utils {
 
 std::string GetTestDataPath(const std::string& path);
 
-}  // namespace test_utils
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // INCLUDE_PERFETTO_BASE_TEST_UTILS_H_
+#endif  // SRC_BASE_TEST_UTILS_H_

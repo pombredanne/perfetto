@@ -18,8 +18,8 @@
 #include <string>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/test_utils.h"
 #include "src/base/test/test_task_runner.h"
+#include "src/base/test/utils.h"
 #include "src/trace_processor/file_reader.h"
 #include "src/trace_processor/trace_processor.h"
 
@@ -38,7 +38,7 @@ class TraceProcessorIntegrationTest : public ::testing::Test {
   TraceProcessorIntegrationTest() : processor(&task_runner) {}
 
   void LoadTrace(const char* name) {
-    FileReader reader(base::test_utils::GetTestDataPath(name).c_str());
+    FileReader reader(base::GetTestDataPath(name).c_str());
     auto loading_done = task_runner.CreateCheckpoint("loading_done");
     processor.LoadTrace(&reader, [loading_done]() { loading_done(); });
     task_runner.RunUntilCheckpoint("loading_done");

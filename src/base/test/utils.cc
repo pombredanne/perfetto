@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
+#include "src/base/test/utils.h"
+
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/test_utils.h"
 
 namespace perfetto {
 namespace base {
-namespace test_utils {
 
 namespace {
 constexpr size_t kPathMax = 128;
@@ -53,6 +53,5 @@ std::string GetTestDataPath(const std::string& path) {
 #endif
 }
 
-}  // namespace test_utils
 }  // namespace base
 }  // namespace perfetto

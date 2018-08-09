@@ -29,7 +29,6 @@ source_set("base") {
     "page_allocator.cc",
     "string_splitter.cc",
     "string_utils.cc",
-    "test_utils.cc",
     "thread_checker.cc",
     "time.cc",
     "virtual_destructors.cc",
@@ -97,6 +96,8 @@ source_set("test_support") {
     "../../gn:gtest_deps",
   ]
   sources = [
+    "test/utils.cc",
+    "test/utils.h",
     "test/vm_test_utils.cc",
     "test/vm_test_utils.h",
   ]

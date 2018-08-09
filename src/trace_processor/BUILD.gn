@@ -129,5 +129,6 @@ source_set("integrationtests") {
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace:lite",
     "../base",
+    "../base:test_support",
   ]
 }
