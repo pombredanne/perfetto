@@ -85,8 +85,16 @@ export class FlameGraphPanel implements Panel {
     ctx.beginPath();
     ctx.fillStyle = '#000';
     ctx.textAlign = 'center';
-    ctx.fillText(node.name, startPx + width / 2, y + 15);
-    ctx.fill();
+    let label = node.name;
+    let labelWidth = ctx.measureText(label).width;
+    while (labelWidth >= width && label !== '..') {
+      label = label.substr(0, label.length - 3) + '..';
+      labelWidth = ctx.measureText(label).width;
+    }
+    if (labelWidth < width) {
+      ctx.fillText(label, startPx + width / 2, y + 15);
+      ctx.fill();
+    }
 
     let x = startPx;
 
