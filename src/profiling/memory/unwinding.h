@@ -18,6 +18,7 @@
 #define SRC_PROFILING_MEMORY_UNWINDING_H_
 
 #include <unwindstack/Maps.h>
+#include <unwindstack/Unwinder.h>
 #include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
@@ -57,7 +58,10 @@ class StackMemory : public unwindstack::Memory {
   size_t size_;
 };
 
-void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata);
+bool DoUnwind(void* mem,
+              size_t sz,
+              ProcessMetadata* metadata,
+              std::vector<unwindstack::FrameData>* out);
 
 }  // namespace perfetto
 

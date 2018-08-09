@@ -44,6 +44,25 @@ namespace {
 
 size_t kMaxFrames = 1000;
 
+size_t RegSize(unwindstack::ArchEnum arch) {
+  switch (arch) {
+    case unwindstack::ARCH_X86:
+      return sizeof(unwindstack::x86_user_regs);
+    case unwindstack::ARCH_X86_64:
+      return sizeof(unwindstack::x86_64_user_regs);
+    case unwindstack::ARCH_ARM:
+      return sizeof(unwindstack::arm_user_regs);
+    case unwindstack::ARCH_ARM64:
+      return sizeof(unwindstack::arm64_user_regs);
+    case unwindstack::ARCH_MIPS:
+      return sizeof(unwindstack::mips_user_regs);
+    case unwindstack::ARCH_MIPS64:
+      return sizeof(unwindstack::mips64_user_regs);
+    case unwindstack::ARCH_UNKNOWN:
+      return 0;
+  }
+}
+
 unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
                                      void* raw_data) {
   switch (arch) {
@@ -119,30 +138,43 @@ void FileDescriptorMaps::Reset() {
   maps_.clear();
 }
 
-void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
+bool DoUnwind(void* mem,
+              size_t sz,
+              ProcessMetadata* metadata,
+              std::vector<unwindstack::FrameData>* out) {
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
-    return;
+    return false;
   }
+
   AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
-  unwindstack::Regs* regs =
-      CreateFromRawData(alloc_metadata->arch, alloc_metadata->reg_data);
+
+  if (sizeof(AllocMetadata) + RegSize(alloc_metadata->arch) > sz)
+    return false;
+
+  void* reg_data = static_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
+  unwindstack::Regs* regs = CreateFromRawData(alloc_metadata->arch, reg_data);
+
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
-    return;
+    return false;
   }
+
   if (alloc_metadata->stack_pointer_offset < sizeof(AllocMetadata) ||
       alloc_metadata->stack_pointer_offset > sz) {
     PERFETTO_ELOG("out-of-bound stack_pointer_offset");
-    return;
+    return false;
   }
+
   uint8_t* stack =
       reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
-  int error_code;
+  // Surpress incorrect "variable may be uninitialized" error for if condition
+  // after this loop. error_code = LastErrorCode gets run at least once.
+  int error_code = 0;
   for (int attempt = 0; attempt < 2; ++attempt) {
     unwinder.Unwind();
     error_code = unwinder.LastErrorCode();
@@ -157,6 +189,9 @@ void DoUnwind(void* mem, size_t sz, ProcessMetadata* metadata) {
       break;
     }
   }
+  if (error_code == 0)
+    *out = unwinder.frames();
+  return error_code == 0;
 }
 
 }  // namespace perfetto
