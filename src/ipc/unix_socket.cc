@@ -122,17 +122,6 @@ std::unique_ptr<UnixSocket> UnixSocket::Listen(base::ScopedFile socket_fd,
 }
 
 // static
-std::unique_ptr<UnixSocket> UnixSocket::AdoptForTesting(
-    base::ScopedFile socket_fd,
-    State adopt_state,
-    EventListener* event_listener,
-    base::TaskRunner* task_runner) {
-  std::unique_ptr<UnixSocket> sock(new UnixSocket(
-      event_listener, task_runner, std::move(socket_fd), adopt_state));
-  return sock;
-}
-
-// static
 std::unique_ptr<UnixSocket> UnixSocket::Connect(const std::string& socket_name,
                                                 EventListener* event_listener,
                                                 base::TaskRunner* task_runner) {
