@@ -52,12 +52,12 @@ class ChromeSliceTrack extends Track {
   private trackData: ChromeSliceTrackData|undefined;
   private hoveredSlice: ChromeSlice|null = null;
   // TODO: Should this be in the controller?
-  private catToColorMap: Map<string, string>;
+  private titleToColorMap: Map<string, string>;
   private lastPickedColor = 0;
 
   constructor(trackState: TrackState) {
     super(trackState);
-    this.catToColorMap = new Map();
+    this.titleToColorMap = new Map();
   }
 
   consumeData(trackData: ChromeSliceTrackData) {
@@ -81,11 +81,11 @@ class ChromeSliceTrack extends Track {
       if (slice === this.hoveredSlice) {
         ctx.fillStyle = '#b35846';
       } else {
-        let color = this.catToColorMap.get(slice.category);
+        let color = this.titleToColorMap.get(slice.title);
         if (color === undefined) {
           this.lastPickedColor = (this.lastPickedColor + 1) % COLORS.length;
           color = COLORS[this.lastPickedColor];
-          this.catToColorMap.set(slice.category, color);
+          this.titleToColorMap.set(slice.title, color);
         }
         ctx.fillStyle = color;
       }
