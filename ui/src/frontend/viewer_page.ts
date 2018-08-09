@@ -15,7 +15,9 @@
 
 import * as m from 'mithril';
 
+import {executeQuery} from '../common/actions';
 import {QueryResponse} from '../common/queries';
+import {EngineConfig} from '../common/state';
 
 import {globals} from './globals';
 import {OverviewTimeline} from './overview_timeline';
@@ -57,6 +59,8 @@ const QueryTable: m.Component<{}, {}> = {
             m('table.query-table', m('thead', header), m('tbody', rows)));
   },
 };
+
+export const OVERVIEW_QUERY_ID = 'overview_query';
 
 /**
  * Top-most level component for the viewer page. Holds tracks, brush timeline,
@@ -134,6 +138,52 @@ const TraceViewer = {
       m.redraw();
     };
 
+    const engine: EngineConfig = globals.state.engines['0'];
+    if (engine) {
+      const sourceEqual =
+          (!this.engineSource || typeof this.engineSource === 'string') ?
+          engine.source === this.engineSource :
+          typeof engine.source !== 'string' &&
+              engine.source.name === this.engineSource.name;
+
+      if (engine && engine.ready && !sourceEqual) {
+        this.engineSource = engine.source;
+        console.log('File loaded. Executing query..');
+        globals.dispatch(executeQuery(
+            engine.id,
+            OVERVIEW_QUERY_ID,
+            'select round(ts/1e5) as rts, sum(dur)/1e5 as load, upid, ' +
+                'thread.name from slices inner join thread using(utid) where ' +
+                'depth = 0 group by rts, upid limit 100'));
+      }
+    }
+    const resp = globals.queryResults.get(OVERVIEW_QUERY_ID) as QueryResponse;
+    if (resp !== this.overviewQueryResponse) {
+      console.log('Query Executed.');
+      this.overviewQueryResponse = resp;
+
+      const times = resp.rows.map(processLoad => processLoad.rts as number);
+      const minTime = Math.min(...times);
+      const duration = (Math.max(...times) - minTime) * 1000;
+
+      const previousDuration =
+          this.maxVisibleWindowMs.end - this.maxVisibleWindowMs.start;
+      const startPercent =
+          (this.visibleWindowMs.start - this.maxVisibleWindowMs.start) /
+          previousDuration;
+      const endPercent =
+          (this.visibleWindowMs.end - this.maxVisibleWindowMs.start) /
+          previousDuration;
+
+      this.maxVisibleWindowMs.start = 0;
+      this.maxVisibleWindowMs.end = duration;
+
+      this.visibleWindowMs.start = duration * startPercent;
+      this.visibleWindowMs.end = duration * endPercent;
+
+      // TODO: Add tracks.
+    }
+
     return m(
         '.page',
         {
@@ -174,6 +224,8 @@ const TraceViewer = {
   timeScale: TimeScale,
   width: number,
   zoomContent: PanAndZoomHandler,
+  engineSource: string | File,
+  overviewQueryResponse: QueryResponse,
 }>;
 
 export const ViewerPage = createPage({
