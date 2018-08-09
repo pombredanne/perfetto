@@ -75,6 +75,8 @@ TEST(RecordReaderTest, TwoRecords) {
   memcpy(buf.data, "2", 1);
   ASSERT_TRUE(record_reader.EndReceive(1, &record));
   ASSERT_EQ(record.size, 2);
+  ASSERT_EQ(record.data[0], '1');
+  ASSERT_EQ(record.data[1], '2');
 }
 
 }  // namespace
