@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_view.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -166,7 +167,7 @@ class TraceStorage {
 
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
-  StringId InternString(const char* data, size_t length);
+  StringId InternString(base::StringView);
 
   Process* GetMutableProcess(UniquePid upid) {
     PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());
@@ -216,7 +217,7 @@ class TraceStorage {
  private:
   TraceStorage& operator=(const TraceStorage&) = default;
 
-  using StringHash = uint32_t;
+  using StringHash = uint64_t;
 
   // Metadata counters for events being added.
   Stats stats_;
