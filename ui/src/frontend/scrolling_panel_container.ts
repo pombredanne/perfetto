@@ -209,24 +209,24 @@ export const ScrollingPanelContainer = {
         globals.state.displayedTrackIds.map(id => 'track-' + id);
 
     // Show a fake flame graph if there is at least one track.
-    if (globals.state.displayedTrackIds.length > 0) {
-      if (!this.keyToPanelAttrs.has('flamegraph')) {
-        const flameGraphPanelStruct = {
-          panel: new FlameGraphPanel(),
-          height: 500,
-          key: 'flamegraph',
-        };
-        this.keyToPanelAttrs.set('flamegraph', flameGraphPanelStruct);
+    // if (globals.state.displayedTrackIds.length > 0) {
+    if (!this.keyToPanelAttrs.has('flamegraph')) {
+      const flameGraphPanelStruct = {
+        panel: new FlameGraphPanel(),
+        height: 500,
+        key: 'flamegraph',
+      };
+      this.keyToPanelAttrs.set('flamegraph', flameGraphPanelStruct);
       }
       this.panelDisplayOrder.push('flamegraph');
-    }
+      //}
 
-    const panelComponents: m.Children[] = [];
-    let yStart = 0;
-    for (const key of this.panelDisplayOrder) {
-      const panelAttrs = assertExists(this.keyToPanelAttrs.get(key));
-      panelComponents.push(m(PanelComponent, {panelAttrs, yStart, key}));
-      yStart += panelAttrs.height;
+      const panelComponents: m.Children[] = [];
+      let yStart = 0;
+      for (const key of this.panelDisplayOrder) {
+        const panelAttrs = assertExists(this.keyToPanelAttrs.get(key));
+        panelComponents.push(m(PanelComponent, {panelAttrs, yStart, key}));
+        yStart += panelAttrs.height;
     }
 
     let totalContentHeight = 0;

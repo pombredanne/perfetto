@@ -54,6 +54,9 @@ export const OverviewTimeline = {
       const heightPerProcess = this.contentRect.height / processes.length;
       const index = Math.floor(y / heightPerProcess);
       this.hoveredProcess = processes[index];
+      if (!this.hoveredProcess) {
+        return;
+      }
       const hoveredMs = this.timeScale.pxToMs(e.layerX);
 
       const loadTimesMs = Object.keys(this.hoveredProcess.loadByTime)
