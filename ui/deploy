@@ -55,7 +55,7 @@ ln -s ../ui $UI_DIST_DIR/static
 
 (
   cd "$UI_DIST_DIR";
-  gcloud app deploy app.yaml --project perfetto-ui -v testing
+  gcloud app deploy app.yaml --project perfetto-ui -v hjd --no-promote 
 )
 
 if [ "$1" != "--no-clean" ]; then

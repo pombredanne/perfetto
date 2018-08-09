@@ -156,7 +156,7 @@ const TraceViewer = {
               height: 'calc(100% - 145px)',
             }
           },
-          m('header.tracks-content', 'Tracks'),
+          m('header', 'Tracks'),
           m(TimeAxis, {
             timeScale: this.timeScale,
             contentOffset: TRACK_SHELL_WIDTH,

@@ -29,9 +29,12 @@ import {QueryResponse} from '../common/queries';
 import {
   createEmptyState,
   EngineConfig,
+  PermalinkConfig,
   QueryConfig,
+  saveState,
+  saveTrace,
   State,
-  TrackState
+  TrackState,
 } from '../common/state';
 
 import {Engine} from './engine';
@@ -170,12 +173,43 @@ class QueryController {
   }
 }
 
+async function createPermalink(
+    config: PermalinkConfig, controller: Controller) {
+  const state = {...config.state};
+  state.engines = {...state.engines};
+  state.permalinks = {};
+  for (const engine of Object.values<EngineConfig>(state.engines)) {
+    if (typeof engine.source === 'string') {
+      continue;
+    }
+    const url = await saveTrace(engine.source);
+    // TODO(hjd): Post to controller.
+    engine.source = url;
+  }
+  const url = await saveState(state);
+  controller.publishTrackData(config.id, {
+    url,
+  });
+}
+
+class PermalinkController {
+  private readonly config: PermalinkConfig;
+  private readonly controller: Controller;
+
+  constructor(config: PermalinkConfig, controller: Controller) {
+    this.config = config;
+    this.controller = controller;
+    createPermalink(this.config, this.controller);
+  }
+}
+
 class Controller {
   private state: State;
-  private frontend: FrontendProxy;
+  private readonly frontend: FrontendProxy;
   private readonly engines: Map<string, EngineController>;
   private readonly tracks: Map<string, TrackControllerWrapper>;
   private readonly queries: Map<string, QueryController>;
+  private readonly permalinks: Map<string, PermalinkController>;
 
   constructor(frontend: FrontendProxy) {
     this.state = createEmptyState();
@@ -183,6 +217,7 @@ class Controller {
     this.engines = new Map();
     this.tracks = new Map();
     this.queries = new Map();
+    this.permalinks = new Map();
   }
 
   dispatch(action: Action): void {
@@ -192,6 +227,12 @@ class Controller {
   dispatchMultiple(actions: Action[]): void {
     for (const action of actions) {
       this.state = rootReducer(this.state, action);
+    }
+
+    for (const config of Object.values<PermalinkConfig>(
+             this.state.permalinks)) {
+      if (this.permalinks.has(config.id)) continue;
+      this.permalinks.set(config.id, new PermalinkController(config, this));
     }
 
     // TODO(hjd): Handle teardown.
