@@ -22,6 +22,8 @@
 
 #include <stdint.h>
 
+#include "perfetto/base/utils.h"
+
 namespace perfetto {
 
 class RecordReader {
