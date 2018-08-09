@@ -61,9 +61,9 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
                   std::move(fds[1]));
       entry.recv_fds = true;
     } else if (fds[0] || fds[1]) {
-      PERFETTO_ELOG("Received partial FDs.");
+      PERFETTO_DLOG("Received partial FDs.");
     } else {
-      PERFETTO_ELOG("Received no FDs.");
+      PERFETTO_DLOG("Received no FDs.");
     }
   }
 }
