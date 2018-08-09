@@ -22,8 +22,6 @@
 
 #include <stdint.h>
 
-#include "src/ipc/unix_socket.h"
-
 namespace perfetto {
 
 class RecordReader {
