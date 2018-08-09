@@ -42,6 +42,7 @@ export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
     this.padding = {top: 0, right: 20, bottom: 0, left: 20};
+    this.hoveredLoad = null;
 
     this.onmousemove = e => {
       if (!this.processesById || !e.target ||
@@ -53,7 +54,19 @@ export const OverviewTimeline = {
       const heightPerProcess = this.contentHeight / processes.length;
       const index = Math.floor(y / heightPerProcess);
       this.hoveredProcess = processes[index];
-      this.hoveredMs = this.timeScale.pxToMs(e.layerX);
+      const hoveredMs = this.timeScale.pxToMs(e.layerX);
+
+      const loadTimes = Object.keys(this.hoveredProcess.loadByTime)
+                            .map(stringTime => Number(stringTime));
+      this.hoveredLoad = null;
+      for (const loadTime of loadTimes) {
+        if (Math.abs(loadTime - hoveredMs) <= 500) {
+          this.hoveredLoad = {
+            time: loadTime,
+            load: this.hoveredProcess.loadByTime[loadTime]
+          };
+        }
+      }
     };
   },
   oncreate(vnode) {
@@ -106,8 +119,7 @@ export const OverviewTimeline = {
             };
           }
           const time = (processLoad.rts as number - minTime) * 1000;
-          this.processesById[upid].loadByTime[time] =
-              processLoad.load as number;
+          this.processesById[upid].loadByTime[time] = Number(processLoad.load);
         }
       }
 
@@ -142,12 +154,13 @@ export const OverviewTimeline = {
                                                    }%)`;
           this.context.fillRect(
               startPx, startY, endPx - startPx, roundedHeightPerProcess);
-
-          // TODO: Add tooltip to the slice neat this.hoveredMs.
         }
       }
       this.context.fill();
     }
+
+    const processes =
+        !this.processesById ? [] : Object.values(this.processesById);
 
     return m(
         '.overview-timeline',
@@ -156,10 +169,31 @@ export const OverviewTimeline = {
           contentOffset: 0,
           visibleWindowMs: attrs.maxVisibleWindowMs,
         }),
+        m('.tooltip',
+          {
+            style: {
+              display: this.hoveredLoad === null ? 'none' : 'block',
+              left: `${
+                       this.hoveredLoad === null ?
+                           0 :
+                           this.timeScale.msToPx(this.hoveredLoad.time) - 90
+                     }px`,
+              top: `${
+                      this.hoveredProcess === null ?
+                          0 :
+                          processes.indexOf(this.hoveredProcess) *
+                                  this.contentHeight / processes.length -
+                              10
+                    }px`,
+            }
+          },
+          m('b', `${this.hoveredProcess ? this.hoveredProcess.name : ''}`),
+          m('br'),
+          m('span', `${this.hoveredLoad ? this.hoveredLoad.load : 0}%`)),
         m('.timeline-content',
           {
             onmousemove: this.onmousemove,
-            onmouseout: () => this.hoveredProcess = undefined,
+            onmouseout: () => this.hoveredProcess = null,
             style: {
               position: 'absolute',
               left: `${this.padding.left}px`,
@@ -208,8 +242,8 @@ export const OverviewTimeline = {
           contentHeight: number,
           queryResponse: QueryResponse,
           processesById: {[upid: number]: ProcessSummaryData},
-          hoveredProcess: ProcessSummaryData | undefined,
-          hoveredMs: number,
+          hoveredProcess: ProcessSummaryData | null,
+          hoveredLoad: {time: number, load: number} | null,
           onmousemove: (e: MouseEvent) => void,
         }>;
 
