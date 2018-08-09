@@ -117,7 +117,7 @@ export class TrackPanel implements Panel {
   }
 
   updateDom(dom: Element): void {
-    // TOOD: Let tracks render DOM in the content area.
+    // TODO: Let tracks render DOM in the content area.
     m.render(
         dom,
         m(TrackComponent, {trackState: this.trackState, track: this.track}));
