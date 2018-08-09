@@ -69,6 +69,7 @@ const TraceViewer = {
   oninit() {
     this.width = 0;
     this.maxVisibleWindowMs = {start: 0, end: 10000000};
+    this.overviewQueryExecuted = false;
   },
   oncreate(vnode) {
     const frontendLocalState = globals.frontendLocalState;
@@ -143,48 +144,39 @@ const TraceViewer = {
     };
 
     const engine: EngineConfig = globals.state.engines['0'];
-    if (engine) {
-      const sourceEqual =
-          (!this.engineSource || typeof this.engineSource === 'string') ?
-          engine.source === this.engineSource :
-          typeof engine.source !== 'string' &&
-              engine.source.name === this.engineSource.name;
-
-      if (engine && engine.ready && !sourceEqual) {
-        this.engineSource = engine.source;
-        console.log('File loaded. Executing query..');
-        globals.dispatch(executeQuery(
-            engine.id,
-            OVERVIEW_QUERY_ID,
-            'select round(ts/1e5) as rts, sum(dur)/1e5 as load, upid, ' +
-                'thread.name from slices inner join thread using(utid) where ' +
-                'depth = 0 group by rts, upid limit 100'));
-      }
+    if (engine && engine.ready && !this.overviewQueryExecuted) {
+      this.overviewQueryExecuted = true;
+      globals.dispatch(executeQuery(
+          engine.id,
+          OVERVIEW_QUERY_ID,
+          'select round(ts/1e5) as rts, sum(dur)/1e5 as load, upid, ' +
+              'thread.name from slices inner join thread using(utid) where ' +
+              'depth = 0 group by rts, upid limit 100'));
+      // TODO: Check and uniform the time units, e.g. 1e5.
     }
     const resp = globals.queryResults.get(OVERVIEW_QUERY_ID) as QueryResponse;
     if (resp !== this.overviewQueryResponse) {
-      console.log('Query Executed.');
       this.overviewQueryResponse = resp;
 
-      const times = resp.rows.map(processLoad => processLoad.rts as number);
-      const minTime = Math.min(...times);
-      const duration = (Math.max(...times) - minTime) * 1000;
+      const timesMs =
+          resp.rows.map(processLoad => (processLoad.rts as number) * 1000);
+      const minTimeMs = Math.min(...timesMs);
+      const durationMs = Math.max(...timesMs) - minTimeMs;
 
-      const previousDuration =
+      const previousDurationMs =
           this.maxVisibleWindowMs.end - this.maxVisibleWindowMs.start;
       const startPercent =
           (visibleWindowMs.start - this.maxVisibleWindowMs.start) /
-          previousDuration;
+          previousDurationMs;
       const endPercent = (visibleWindowMs.end - this.maxVisibleWindowMs.start) /
-          previousDuration;
+          previousDurationMs;
 
       this.maxVisibleWindowMs.start = 0;
-      this.maxVisibleWindowMs.end = duration;
+      this.maxVisibleWindowMs.end = durationMs;
 
-      visibleWindowMs.start = duration * startPercent;
-      visibleWindowMs.end = duration * endPercent;
-
-      // TODO: Add tracks.
+      visibleWindowMs.start = durationMs * startPercent;
+      visibleWindowMs.end = durationMs * endPercent;
+      // TODO: Update the local and remote state.
     }
 
     return m(
@@ -228,7 +220,7 @@ const TraceViewer = {
   onResize: () => void,
   width: number,
   zoomContent: PanAndZoomHandler,
-  engineSource: string | File,
+  overviewQueryExecuted: boolean,
   overviewQueryResponse: QueryResponse,
 }>;
 

@@ -26,7 +26,7 @@ import {OVERVIEW_QUERY_ID} from './viewer_page';
 interface ProcessSummaryData {
   upid: number;
   name: string;
-  loadByTime: {[time: number]: number};
+  loadByTime: {[timeMs: number]: number};
   hue: number;
 }
 
@@ -41,41 +41,38 @@ const LIGHTNESS_MAX_LOAD = 20;
 export const OverviewTimeline = {
   oninit() {
     this.timeScale = new TimeScale([0, 1], [0, 0]);
-    this.padding = {top: 0, right: 20, bottom: 0, left: 20};
     this.hoveredLoad = null;
+    this.contentRect =
+        {top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0};
 
     this.onmousemove = e => {
-      if (!this.processesById || !e.target ||
-          (e.target as Element).className !== 'brushes') {
+      if (!this.processesById) {
         return;
       }
-      const y = e.layerY;
+      const y = e.clientY - this.contentRect.top;
       const processes = Object.values(this.processesById);
-      const heightPerProcess = this.contentHeight / processes.length;
+      const heightPerProcess = this.contentRect.height / processes.length;
       const index = Math.floor(y / heightPerProcess);
       this.hoveredProcess = processes[index];
       const hoveredMs = this.timeScale.pxToMs(e.layerX);
 
-      const loadTimes = Object.keys(this.hoveredProcess.loadByTime)
-                            .map(stringTime => Number(stringTime));
+      const loadTimesMs = Object.keys(this.hoveredProcess.loadByTime)
+                              .map(stringTime => Number(stringTime));
       this.hoveredLoad = null;
-      for (const loadTime of loadTimes) {
-        if (Math.abs(loadTime - hoveredMs) <= 500) {
+      for (const loadTimeMs of loadTimesMs) {
+        if (Math.abs(loadTimeMs - hoveredMs) <= 500) {
           this.hoveredLoad = {
-            time: loadTime,
-            load: this.hoveredProcess.loadByTime[loadTime]
+            timeMs: loadTimeMs,
+            load: this.hoveredProcess.loadByTime[loadTimeMs]
           };
         }
       }
     };
   },
   oncreate(vnode) {
-    const rect = vnode.dom.getBoundingClientRect();
-
-    this.contentWidth = rect.width - this.padding.left - this.padding.right;
-    this.contentHeight = rect.height - 41;
-
-    this.timeScale.setLimitsPx(0, this.contentWidth);
+    this.contentRect = vnode.dom.getElementsByClassName('timeline-content')[0]
+                           .getBoundingClientRect();
+    this.timeScale.setLimitsPx(0, this.contentRect.width);
 
     const context =
         vnode.dom.getElementsByTagName('canvas')[0].getContext('2d');
@@ -85,12 +82,9 @@ export const OverviewTimeline = {
     this.context = context;
   },
   onupdate(vnode) {
-    const rect = vnode.dom.getBoundingClientRect();
-
-    this.contentWidth = rect.width - this.padding.left - this.padding.right;
-    this.contentHeight = rect.height - 41;
-
-    this.timeScale.setLimitsPx(0, this.contentWidth);
+    this.contentRect = vnode.dom.getElementsByClassName('timeline-content')[0]
+                           .getBoundingClientRect();
+    this.timeScale.setLimitsPx(0, this.contentRect.width);
   },
   view({attrs}) {
     this.timeScale.setLimitsMs(
@@ -98,35 +92,32 @@ export const OverviewTimeline = {
 
     const resp = globals.queryResults.get(OVERVIEW_QUERY_ID) as QueryResponse;
 
-    if (this.context && (resp || this.queryResponse)) {
-      // Render canvas
-
-      if (!this.processesById || resp !== this.queryResponse) {
-        // Update data
+    if (this.context && resp) {
+      // Update data
+      if (!this.processesById) {
         this.processesById = {};
-        this.queryResponse = resp;
+      }
+      const data = resp.rows;
+      const times = data.map(processLoad => processLoad.rts as number);
+      const minTimeMs = Math.min(...times);
 
-        const data = resp.rows;
-        const times = data.map(processLoad => processLoad.rts as number);
-        const minTime = Math.min(...times);
-
-        for (const processLoad of data) {
-          const upid = processLoad.upid as number;
-          if (!this.processesById[upid]) {
-            this.processesById[upid] = {
-              upid,
-              name: processLoad.name as string,
-              loadByTime: {},
-              hue: Math.random() * 360,
-            };
-          }
-          const time = (processLoad.rts as number - minTime) * 1000;
-          this.processesById[upid].loadByTime[time] = Number(processLoad.load);
+      for (const processLoad of data) {
+        const upid = processLoad.upid as number;
+        if (!this.processesById[upid]) {
+          this.processesById[upid] = {
+            upid,
+            name: processLoad.name as string,
+            loadByTime: {},
+            hue: Math.random() * 360,
+          };
         }
+        const timeMs = (processLoad.rts as number - minTimeMs) * 1000;
+        this.processesById[upid].loadByTime[timeMs] = Number(processLoad.load);
       }
 
+      // Render canvas
       const processes = Object.values(this.processesById);
-      const heightPerProcess = this.contentHeight / processes.length;
+      const heightPerProcess = this.contentRect.height / processes.length;
       const roundedHeightPerProcess = Math.round(heightPerProcess);
 
       for (let i = 0; i < processes.length; i++) {
@@ -137,7 +128,7 @@ export const OverviewTimeline = {
         this.context.fillStyle =
             process === this.hoveredProcess ? '#eee' : '#fff';
         this.context.fillRect(
-            0, startY, this.contentWidth, roundedHeightPerProcess);
+            0, startY, this.contentRect.width, roundedHeightPerProcess);
 
         const loadTimes = Object.keys(process.loadByTime)
                               .map(stringTime => Number(stringTime));
@@ -166,12 +157,6 @@ export const OverviewTimeline = {
 
     return m(
         '.overview-timeline',
-        {
-          style: {
-            padding: `0 0 0 ${this.padding.left}px`,
-            overflow: 'visible',
-          }
-        },
         m(TimeAxis, {
           timeScale: this.timeScale,
           contentOffset: 0,
@@ -183,30 +168,23 @@ export const OverviewTimeline = {
             onmouseout: () => {
               this.hoveredProcess = null;
               this.hoveredLoad = null;
-            },
-            style: {
-              position: 'absolute',
-              left: `${this.padding.left}px`,
-              top: '41px',
-              width: `${this.contentWidth}px`,
-              height: `${this.contentHeight}px`,
-              overflow: 'visible',  // For tooltip
             }
           },
           m('.tooltip',
             {
               style: {
                 display: this.hoveredLoad === null ? 'none' : 'block',
-                left: `${
-                         this.hoveredLoad === null ?
-                             0 :
-                             this.timeScale.msToPx(this.hoveredLoad.time) - 100
-                       }px`,
+                left:
+                    `${
+                       this.hoveredLoad === null ?
+                           0 :
+                           this.timeScale.msToPx(this.hoveredLoad.timeMs) - 100
+                     }px`,
                 top: `${
                         this.hoveredProcess === null ?
                             0 :
                             processes.indexOf(this.hoveredProcess) *
-                                this.contentHeight / processes.length
+                                this.contentRect.height / processes.length
                       }px`,
               }
             },
@@ -214,8 +192,8 @@ export const OverviewTimeline = {
             m('br'),
             m('span', `${this.hoveredLoad ? this.hoveredLoad.load : 0}%`)),
           m('canvas.visualization', {
-            width: this.contentWidth,
-            height: this.contentHeight,
+            width: this.contentRect.width,
+            height: this.contentRect.height,
           }),
           m('.brushes',
             {
@@ -247,14 +225,11 @@ export const OverviewTimeline = {
         },
         {
           timeScale: TimeScale,
-          padding: {top: number, right: number, bottom: number, left: number},
           context: CanvasRenderingContext2D | undefined,
-          contentWidth: number,
-          contentHeight: number,
-          queryResponse: QueryResponse,
+          contentRect: ClientRect,
           processesById: {[upid: number]: ProcessSummaryData},
           hoveredProcess: ProcessSummaryData | null,
-          hoveredLoad: {time: number, load: number} | null,
+          hoveredLoad: {timeMs: number, load: number} | null,
           onmousemove: (e: MouseEvent) => void,
         }>;
 
@@ -434,6 +409,7 @@ const BrushHandle = {
     return m(
         `.brush-handle.${attrs.className}`,
         {
+          onmousemove: (e: MouseEvent) => e.stopPropagation(),
           style: {
             left: `${attrs.left - 6}px`,
           }
