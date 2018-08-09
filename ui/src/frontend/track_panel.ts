@@ -32,7 +32,10 @@ const TrackShell = {
         '.track-shell',
         {
           style: {
+            position: 'absolute',
+            left: '0px',
             width: `${TRACK_SHELL_WIDTH}px`,
+            'box-sizing': 'border-box',
           }
         },
         m('h1', attrs.trackState.name),
@@ -56,13 +59,19 @@ const TrackContent = {
       style: {
         position: 'absolute',
         left: `${TRACK_SHELL_WIDTH}px`,
+        // TODO: We can use flex-box here and not do this manual
+        // calculation.
+        width: `calc(100% - ${TRACK_SHELL_WIDTH}px)`,
+        height: '100%',
       },
       onmousemove: (e: MouseEvent) => {
         // TODO(hjd): Trigger a repaint here not a full m.redraw.
         attrs.track.onMouseMove({x: e.layerX, y: e.layerY});
+        m.redraw();
       },
       onmouseout: () => {
         attrs.track.onMouseOut();
+        m.redraw();
       },
     }, );
   }

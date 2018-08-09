@@ -199,7 +199,7 @@ const HorizontalBrushSelection = {
     return m(
         '.brushes',
         {
-          // onwheel: this.onWheel,
+          onwheel: this.onWheel,
           onmousemove: this.onMouseMove,
           style: {
             width: '100%',
