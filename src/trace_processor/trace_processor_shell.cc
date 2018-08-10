@@ -85,6 +85,15 @@ void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
   printf("\nQuery executed in %.3f ms\n\n", (t_end - t_start).count() / 1E6);
 }
 
+void Query(TraceProcessor* tp, const char* line) {
+  protos::RawQueryArgs query;
+  query.set_sql_query(line);
+  base::TimeNanos t_start = base::GetWallTimeNs();
+  tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
+    OnQueryResult(t_start, res);
+  });
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -96,13 +105,19 @@ int main(int argc, char** argv) {
   base::UnixTaskRunner task_runner;
   FileReader reader(argv[1]);
   TraceProcessor tp(&task_runner);
+  const char* query = (argc == 3) ? argv[2] : nullptr;
 
-  task_runner.PostTask([&tp, &reader]() {
+  task_runner.PostTask([&tp, &reader, query, &task_runner]() {
     auto t_start = base::GetWallTimeMs();
-    auto on_trace_loaded = [t_start, &reader] {
+    auto on_trace_loaded = [t_start, &reader, &tp, query, &task_runner] {
       double s = (base::GetWallTimeMs() - t_start).count() / 1000.0;
       double size_mb = reader.file_size() / 1000000.0;
       PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
+      if (query) {
+        Query(&tp, query);
+        task_runner.Quit();
+        return;
+      }
       PrintPrompt();
     };
     tp.LoadTrace(&reader, on_trace_loaded);
@@ -114,12 +129,7 @@ int main(int argc, char** argv) {
       task_runner.Quit();
       return;
     }
-    protos::RawQueryArgs query;
-    query.set_sql_query(line);
-    base::TimeNanos t_start = base::GetWallTimeNs();
-    tp.ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
-      OnQueryResult(t_start, res);
-    });
+    Query(&tp, line);
     PrintPrompt();
   });
 

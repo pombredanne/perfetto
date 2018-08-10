@@ -29,30 +29,54 @@
 namespace perfetto {
 namespace trace_processor {
 
-// StringId is an offset into |string_pool_|.
-using StringId = uint32_t;
+// StringId is actually just the actual pointer to the beginning of the string.
+using StringId = uintptr_t;
 
 // An append-only pool of string that efficiently handles indexing and
 // deduplication. Note that an empty pool has a non-negligible cost of ~96KB.
 class StringPool {
  public:
+  struct Ref {
+    Ref() : block_id(0), offset(0) {}
+    Ref(uint16_t b, uint16_t o) : block_id(b), offset(o) {}
+    uint16_t block_id;
+    uint16_t offset;
+  };
+
   StringPool();
 
   StringId Insert(base::StringView);
 
-  base::StringView Get(StringId string_id) const {
-    size_t block_id = string_id >> kOffsetBits;
-    size_t offset = string_id & kMaxOffset;
-    PERFETTO_CHECK(block_id < num_blocks_);
-    const Block& block = *blocks_[block_id];
-
-    PERFETTO_CHECK(offset < sizeof(block.data) - sizeof(Length) - 1);
+  Ref GetNext(Ref ref) const {
+    PERFETTO_DCHECK(ref.block_id < num_blocks_);
+    const Block& block = *blocks_[ref.block_id];
     Length len;
-    const char* data = &block.data[offset];
-    memcpy(&len, data, sizeof(Length));
-    data += sizeof(Length);
-    PERFETTO_CHECK(data + len < &block.data[sizeof(block.data)]);
-    return base::StringView(data, len);
+    memcpy(&len, &block.data[ref.offset], sizeof(Length));
+    size_t next_offset =
+        static_cast<size_t>(ref.offset) + sizeof(Length) + len + 1;
+    if (next_offset < block.offset)
+      return Ref(ref.block_id, static_cast<uint16_t>(next_offset));
+    if (next_offset == block.offset)
+      return Ref(ref.block_id + 1, 0);
+    PERFETTO_CHECK(false);
+  }
+
+  StringId GetStringId(Ref ref) const {
+    PERFETTO_DCHECK(ref.block_id < num_blocks_);
+    const Block& block = *blocks_[ref.block_id];
+    PERFETTO_DCHECK(ref.offset < block.offset - 2);
+    return reinterpret_cast<StringId>(&block.data[ref.offset + 2]);
+  }
+
+  const char* GetCStr(StringId string_id) const {
+    return reinterpret_cast<const char*>(string_id);
+  }
+
+  base::StringView GetStringView(StringId string_id) const {
+    const char* raw = reinterpret_cast<const char*>(string_id);
+    Length len;
+    memcpy(&len, raw - sizeof(Length), sizeof(Length));
+    return base::StringView(raw, len);
   }
 
   size_t size() const { return num_strings_; }
@@ -61,13 +85,9 @@ class StringPool {
   // Each string in the pool stored in |data| is prefixed with its len.
   using Length = uint16_t;
   static constexpr unsigned kNumBlocks = 4096;  // ~ 256 MB of strings.
-  static constexpr unsigned kOffsetBits = 16;
-  static constexpr unsigned kMaxOffset = (1ul << kOffsetBits) - 1;
-  static constexpr unsigned kBlockIdBits = sizeof(StringId) * 8 - kOffsetBits;
-  static constexpr unsigned kMaxBlockId = (1ul << kBlockIdBits) - 1;
 
   struct Block {
-    Block() = default;
+    Block();
     Block(const Block&) = delete;
     Block& operator=(const Block&) = delete;
 

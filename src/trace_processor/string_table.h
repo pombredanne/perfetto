@@ -20,6 +20,7 @@
 #include <limits>
 #include <memory>
 
+#include "src/trace_processor/string_pool.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -48,7 +49,7 @@ class StringTable : public Table {
   // Implementation of the SQLite cursor interface.
   class Cursor : public Table::Cursor {
    public:
-    Cursor(const TraceStorage* storage);
+    Cursor(const StringPool*);
     ~Cursor() override;
 
     // Implementation of Table::Cursor.
@@ -58,12 +59,13 @@ class StringTable : public Table {
     int Column(sqlite3_context*, int N) override;
 
    private:
-    size_t row_ = 0;
+    StringPool::Ref ref_;
     size_t num_rows_ = 0;
-    const TraceStorage* const storage_;
+    size_t row_ = 0;
+    const StringPool* const string_pool_;
   };
 
-  const TraceStorage* const storage_;
+  const StringPool* const string_pool_;
 };
 
 }  // namespace trace_processor

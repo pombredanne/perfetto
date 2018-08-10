@@ -40,6 +40,7 @@ void TraceStorage::AddSliceToCpu(uint32_t cpu,
   cpu_events_[cpu].AddSlice(start_ns, duration_ns, utid);
 };
 
+
 void TraceStorage::ResetStorage() {
   *this = TraceStorage();
 }

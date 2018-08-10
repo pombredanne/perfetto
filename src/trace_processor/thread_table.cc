@@ -60,27 +60,22 @@ ThreadTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {}
 int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
   const auto& thread = storage_->GetThread(utid_filter_.current);
   switch (N) {
-    case Column::kUtid: {
+    case Column::kUtid:
       sqlite3_result_int64(context, utid_filter_.current);
       break;
-    }
-    case Column::kUpid: {
+    case Column::kUpid:
       sqlite3_result_int64(context, thread.upid);
       break;
-    }
-    case Column::kName: {
-      base::StringView sv = storage_->GetString(thread.name_id);
-      sqlite3_result_text(context, sv.data(), sv.int_size(), nullptr);
+    case Column::kName:
+      sqlite3_result_text(context, storage_->GetString(thread.name_id), -1,
+                          nullptr);
       break;
-    }
-    case Column::kTid: {
+    case Column::kTid:
       sqlite3_result_int64(context, thread.tid);
       break;
-    }
-    default: {
+    default:
       PERFETTO_FATAL("Unknown column %d", N);
       break;
-    }
   }
   return SQLITE_OK;
 }

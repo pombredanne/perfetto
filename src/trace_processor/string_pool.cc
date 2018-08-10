@@ -26,11 +26,6 @@ StringPool::StringPool() {
   blocks_[0].reset(new Block());
   num_blocks_ = 1;
 
-  // Reserve 0 for the empty string.
-  StringId id = Insert("");
-  PERFETTO_DCHECK(id == 0);
-
-  static_assert(kNumBlocks <= kMaxBlockId + 1, "kNumBlocks too big");
   static_assert(std::is_trivially_destructible<Block>::value,
                 "Block must be trivially destructible");
 }
@@ -39,7 +34,7 @@ StringId StringPool::Insert(base::StringView str) {
   auto hash = str.Hash();
   auto it = index_.find(hash);
   if (it != index_.end()) {
-    PERFETTO_DCHECK(Get(it->second) == str);
+    PERFETTO_DCHECK(GetStringView(it->second) == str);
     return it->second;
   }
 
@@ -56,22 +51,21 @@ StringId StringPool::Insert(base::StringView str) {
     }
     auto len = static_cast<Length>(str.size());
     char* data = &block.data[block.offset];
+    const char* str_start;
 
     // Write first the length of the string.
     memcpy(data, &len, sizeof(Length));
     data += sizeof(Length);
 
     // Then the actual string itself.
+    str_start = data;
     memcpy(data, str.data(), str.size());
     data += str.size();
 
     // Then the null terminator.
     *(data++) = '\0';
 
-    static_assert(kMaxOffset >= sizeof(block.data), "kOffsetBits too small");
-
-    StringId string_id = static_cast<StringId>(
-        block.offset | ((num_blocks_ - 1) << kOffsetBits));
+    StringId string_id = reinterpret_cast<StringId>(str_start);
 
     PERFETTO_DCHECK(static_cast<size_t>(data - &block.data[block.offset]) ==
                     size_required);
@@ -81,6 +75,10 @@ StringId StringPool::Insert(base::StringView str) {
     num_strings_++;
     return string_id;
   }
+}
+
+StringPool::Block::Block() {
+  memset(data, 0, sizeof(data));
 }
 
 }  // namespace trace_processor

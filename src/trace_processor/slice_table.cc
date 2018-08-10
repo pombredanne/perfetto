@@ -91,16 +91,14 @@ int SliceTable::Cursor::Column(sqlite3_context* context, int col) {
       sqlite3_result_int64(context,
                            static_cast<sqlite3_int64>(slices.utids()[row_]));
       break;
-    case Column::kCategory: {
-      base::StringView sv = storage_->GetString(slices.cats()[row_]);
-      sqlite3_result_text(context, sv.data(), sv.int_size(), nullptr);
+    case Column::kCategory:
+      sqlite3_result_text(context, storage_->GetString(slices.cats()[row_]), -1,
+                          nullptr);
       break;
-    }
-    case Column::kName: {
-      base::StringView sv = storage_->GetString(slices.names()[row_]);
-      sqlite3_result_text(context, sv.data(), sv.int_size(), nullptr);
+    case Column::kName:
+      sqlite3_result_text(context, storage_->GetString(slices.names()[row_]),
+                          -1, nullptr);
       break;
-    }
     case Column::kDepth:
       sqlite3_result_int64(context,
                            static_cast<sqlite3_int64>(slices.depths()[row_]));

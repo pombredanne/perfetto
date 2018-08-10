@@ -28,7 +28,8 @@
 namespace perfetto {
 namespace trace_processor {
 
-StringTable::StringTable(const TraceStorage* storage) : storage_(storage) {}
+StringTable::StringTable(const TraceStorage* storage)
+    : string_pool_(storage->string_pool()) {}
 
 void StringTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<StringTable>(db, storage,
@@ -40,17 +41,19 @@ void StringTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::unique_ptr<Table::Cursor> StringTable::CreateCursor() {
-  return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
+  return std::unique_ptr<Table::Cursor>(new Cursor(string_pool_));
 }
 
 int StringTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
   info->order_by_consumed = false;  // Delegate sorting to SQLite.
-  info->estimated_cost = static_cast<uint32_t>(storage_->string_count());
+  info->estimated_cost = static_cast<uint32_t>(string_pool_->size());
   return SQLITE_OK;
 }
 
-StringTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-  num_rows_ = storage->string_count();
+StringTable::Cursor::Cursor(const StringPool* sp) : string_pool_(sp) {
+  ref_ = StringPool::Ref();
+  row_ = 0;
+  num_rows_ = string_pool_->size();
 }
 
 StringTable::Cursor::~Cursor() = default;
@@ -62,6 +65,7 @@ int StringTable::Cursor::Filter(const QueryConstraints&,
 
 int StringTable::Cursor::Next() {
   row_++;
+  ref_ = string_pool_->GetNext(ref_);
   return SQLITE_OK;
 }
 
@@ -70,16 +74,14 @@ int StringTable::Cursor::Eof() {
 }
 
 int StringTable::Cursor::Column(sqlite3_context* context, int col) {
-  StringId string_id = static_cast<StringId>(row_);
+  StringId str_id = string_pool_->GetStringId(ref_);
   switch (col) {
     case Column::kStringId:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(row_));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(str_id));
       break;
-    case Column::kString: {
-      base::StringView sv = storage_->GetString(string_id);
-      sqlite3_result_text(context, sv.data(), sv.int_size(), nullptr);
+    case Column::kString:
+      sqlite3_result_text(context, string_pool_->GetCStr(str_id), -1, nullptr);
       break;
-    }
   }
   return SQLITE_OK;
 }

@@ -36,14 +36,17 @@ class StringView {
   // Creates a StringView from a null-terminated C string.
   // Deliberately not "explicit".
   StringView(const char* cstr) : data_(cstr), size_(strlen(cstr)) {}
-  StringView(const std::string& str) : data_(str.data()), size_(str.size()) {}
+
+  // This instead has to be explicit, as creating a StringView out of a
+  // std::string can be subtle.
+  explicit StringView(const std::string& str)
+      : data_(str.data()), size_(str.size()) {}
 
   bool empty() const { return size_ == 0; }
   size_t size() const { return size_; }
-  int int_size() const { return static_cast<int>(size_); }
   const char* data() const { return data_; }
 
-  std::string ToStdString() { return std::string(data_, size_); }
+  std::string ToStdString() const { return std::string(data_, size_); }
 
   uint64_t Hash() const {
     if (size_ == 0)

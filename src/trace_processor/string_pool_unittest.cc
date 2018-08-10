@@ -26,12 +26,12 @@ TEST(StringPoolTest, Deduplication) {
   StringPool sp;
 
   StringId id1 = sp.Insert("");
-  EXPECT_EQ(sp.Get(id1), "");
+  EXPECT_EQ(sp.GetStringView(id1), "");
   EXPECT_EQ(sp.size(), 1);
 
   StringId id2 = sp.Insert("x");
   EXPECT_NE(id1, id2);
-  EXPECT_EQ(sp.Get(id2), "x");
+  EXPECT_STREQ(sp.GetCStr(id2), "x");
 
   EXPECT_EQ(sp.Insert(""), id1);
   EXPECT_EQ(sp.size(), 2);
@@ -52,7 +52,7 @@ TEST(StringPoolTest, Deduplication) {
     str.assign(i, '!');
     StringId id = sp.Insert(base::StringView(str));
     ASSERT_LE(id, last_id);
-    ASSERT_EQ(sp.Get(id), str);
+    ASSERT_EQ(sp.GetStringView(id), base::StringView(str));
   }
 
   EXPECT_EQ(sp.size(), 1024 + 2);
