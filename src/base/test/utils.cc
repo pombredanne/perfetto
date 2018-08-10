@@ -17,10 +17,16 @@
 #include "src/base/test/utils.h"
 
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#include <limits.h>
+#include <unistd.h>
+#endif
 
 namespace perfetto {
 namespace base {
@@ -33,9 +39,8 @@ std::string GetTestDataPath(const std::string& path) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  constexpr size_t kPathMax = 128;
-  char buf[kPathMax];
-  ssize_t bytes = readlink("/proc/self/exe", buf, kPathMax);
+  char buf[PATH_MAX];
+  ssize_t bytes = readlink("/proc/self/exe", buf, sizeof(buf));
   PERFETTO_CHECK(bytes != -1);
   // readlink does not null terminate.
   buf[bytes] = 0;
@@ -44,7 +49,7 @@ std::string GetTestDataPath(const std::string& path) {
   self_path = self_path.substr(0, self_path.find_last_of("/"));
   return self_path + "/../../test/data/" + path;
 #else
-  // TODO(hjd): Implement on macOS
+  // TODO(hjd): Implement on MacOS/Windows
   // Fall back to relative to root dir.
   return "test/data/" + path;
 #endif

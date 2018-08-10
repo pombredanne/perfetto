@@ -20,7 +20,11 @@ export class FlameGraphPanel implements Panel {
   updateDom(dom: Element) {
     if (this.renderedDom) return;
     dom.innerHTML = `<header>Flame Graph</Header>
-        <embed type="image/svg+xml" src="/assets/assets/flamegraph.svg">`;
+        <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
     this.renderedDom = true;
+  }
+
+  getHeight() {
+    return 500;
   }
 }

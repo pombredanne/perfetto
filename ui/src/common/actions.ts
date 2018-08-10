@@ -39,6 +39,25 @@ export function addTrack(engineId: string, trackKind: string, cpu: number) {
   };
 }
 
+// TODO: There should be merged with addTrack above.
+export function addChromeSliceTrack(
+    engineId: string,
+    trackKind: string,
+    upid: number,
+    utid: number,
+    threadName: string,
+    maxDepth: number) {
+  return {
+    type: 'ADD_CHROME_TRACK',
+    engineId,
+    trackKind,
+    upid,
+    utid,
+    threadName,
+    maxDepth,
+  };
+}
+
 export function executeQuery(engineId: string, queryId: string, query: string) {
   return {
     type: 'EXECUTE_QUERY',
