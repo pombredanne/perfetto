@@ -39,7 +39,7 @@ bool RecordReader::EndReceive(size_t recv_size, Record* record) {
 
   if (read_idx_ == record_size_ + sizeof(record_size_)) {
     std::unique_ptr<uint8_t[]> ret = std::move(buf_);
-    size_t size = record_size_;
+    size_t size = static_cast<size_t>(record_size_);
     Reset();
     record->data = std::move(ret);
     record->size = size;
