@@ -30,17 +30,34 @@ interface FlameNode {
 }
 
 const FLAME_CHART_QUERY_ID = 'flame_chart_query';
-const height = 475;
 const paddingTop = 25;
 
 export class FlameGraphPanel implements Panel {
-  private renderedDom = false;
   private root: FlameNode|null = null;
-  private status: 'waitingForData'|'queryExecuted'|'dataParsed' =
+  private domStatus: 'notRendered'|'rendered'|'listenersAdded' = 'notRendered';
+  private dataStatus: 'waitingForData'|'queryExecuted'|'dataParsed' =
       'waitingForData';
   private queryResponse: QueryResponse|null = null;
+  private flameNodePositions: Array<{
+    node: FlameNode,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  }> = [];
+  private contentRect: ClientRect = {
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
+    right: 0,
+    bottom: 0,
+  };
+  private hoveredNode: FlameNode|null = null;
+  private ctx: CanvasRenderingContext2D|null = null;
 
   renderCanvas(ctx: CanvasRenderingContext2D) {
+    this.ctx = ctx;
     this.loadData();
     this.parseData();
 
@@ -48,15 +65,16 @@ export class FlameGraphPanel implements Panel {
       return;
     }
 
-    this.renderNode(ctx, this.root, 0, 900);
+    this.flameNodePositions = [];
+    this.renderNode(ctx, this.root, 0, this.contentRect.width);
   }
 
   private loadData() {
     const engine: EngineConfig = globals.state.engines['0'];
-    if (engine && engine.ready && this.status === 'waitingForData') {
+    if (engine && engine.ready && this.dataStatus === 'waitingForData') {
       const query = 'select * from slices limit 1000';
       globals.dispatch(executeQuery(engine.id, FLAME_CHART_QUERY_ID, query));
-      this.status = 'queryExecuted';
+      this.dataStatus = 'queryExecuted';
     }
     const resp =
         globals.queryResults.get(FLAME_CHART_QUERY_ID) as QueryResponse;
@@ -66,19 +84,23 @@ export class FlameGraphPanel implements Panel {
   }
 
   private renderNode(
-      ctx: CanvasRenderingContext2D, node: FlameNode, startPx: number,
+      ctx: CanvasRenderingContext2D, node: FlameNode, x: number,
       width: number) {
     if (!this.queryResponse) {
       return;
     }
     const maxDepth =
         Math.max(...this.queryResponse.rows.map(r => Number(r.depth))) + 1;
-    const heightPerLevel = (height - paddingTop) / (maxDepth + 1);
-    const y = height - Math.round((node.depth + 2) * heightPerLevel);
+    const heightPerLevel = this.contentRect.height / (maxDepth + 1);
+    const y = this.contentRect.height + paddingTop -
+        Math.round((node.depth + 2) * heightPerLevel);
+    this.flameNodePositions.push(
+        {node, x, y: y - paddingTop, width, height: heightPerLevel});
 
-    ctx.fillStyle = `hsl(${node.hue}, 100%, 55%)`;
+    const hue = node === this.hoveredNode ? '120' : node.hue;
+    ctx.fillStyle = `hsl(${hue}, 100%, 55%)`;
     ctx.strokeStyle = '#999';
-    ctx.rect(startPx, y, width, heightPerLevel);
+    ctx.rect(x, y, width, heightPerLevel);
     ctx.fill();
     ctx.stroke();
 
@@ -92,26 +114,41 @@ export class FlameGraphPanel implements Panel {
       labelWidth = ctx.measureText(label).width;
     }
     if (labelWidth < width) {
-      ctx.fillText(label, startPx + width / 2, y + 15);
+      ctx.fillText(label, x + width / 2, y + 15);
       ctx.fill();
     }
 
-    let x = startPx;
+    let childX = x;
 
     for (const child of node.children) {
       const percentage = child.totalTimeMs / node.totalTimeMs;
       const childWidth = percentage * width;
-      this.renderNode(ctx, child, x, childWidth);
+      this.renderNode(ctx, child, childX, childWidth);
 
-      x += childWidth;
+      childX += childWidth;
     }
   }
 
-  private parseData() {
-    if (!this.queryResponse || this.status === 'dataParsed') {
+  private onMouseMove(e: MouseEvent) {
+    if (!this.ctx) {
       return;
     }
-    this.status = 'dataParsed';
+    const x = e.clientX - this.contentRect.left;
+    const y = e.clientY - this.contentRect.top;
+
+    const match = this.flameNodePositions.filter(position => {
+      return position.x <= x && position.x + position.width >= x &&
+          position.y <= y && position.y + position.height >= y;
+    });
+    this.hoveredNode = match.length !== 1 ? null : match[0].node;
+    this.renderCanvas(this.ctx);
+  }
+
+  private parseData() {
+    if (!this.queryResponse || this.dataStatus === 'dataParsed') {
+      return;
+    }
+    this.dataStatus = 'dataParsed';
 
     this.root = {
       name: 'All',
@@ -161,12 +198,27 @@ export class FlameGraphPanel implements Panel {
         }
       }
     }
-    console.log(this.root);
   }
 
   updateDom(dom: Element) {
-    if (this.renderedDom) return;
-    dom.innerHTML = `<header>Flame Graph</Header>`;
-    this.renderedDom = true;
+    if (this.domStatus === 'rendered') {
+      this.domStatus = 'listenersAdded';
+
+      // TODO detach event listeners on destroy.
+      const content = dom.getElementsByClassName('flame-graph-content')[0];
+      if (!content) {
+        throw new Error('Could not find flame graph elements.');
+      }
+      this.contentRect = content.getBoundingClientRect();
+      content.addEventListener('mousemove', this.onMouseMove.bind(this));
+      return;
+    }
+
+    dom.innerHTML = `<div class="flame-graph-wrap">
+        <header>Flame Graph</Header>
+        <div class="flame-graph-content"></div>
+        <div class="tooltip"></div>
+      </div>`;
+    this.domStatus = 'rendered';
   }
 }
