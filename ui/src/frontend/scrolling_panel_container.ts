@@ -43,7 +43,6 @@ function updateDimensionsFromDom(
     dom: Element, vnode: CanvasScrollingContainerVnode) {
   const rect = dom.getBoundingClientRect();
   vnode.state.domWidth = rect.width;
-  console.log(rect.width);
   vnode.state.domHeight = rect.height;
   const dpr = window.devicePixelRatio;
   const ctx = assertExists(vnode.state.ctx);
