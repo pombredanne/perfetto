@@ -221,4 +221,8 @@ export class FlameGraphPanel implements Panel {
       </div>`;
     this.domStatus = 'rendered';
   }
+
+  getHeight() {
+    return 500;
+  }
 }

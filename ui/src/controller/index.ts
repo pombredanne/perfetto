@@ -19,6 +19,7 @@ import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
 import {
   Action,
+  addChromeSliceTrack,
   addTrack,
   deleteQuery,
   navigate,
@@ -89,9 +90,34 @@ class EngineController {
       case 'ready':
         const engine = assertExists<Engine>(this.engine);
         const numberOfCpus = await engine.getNumberOfCpus();
-        const addToTrackActions = [];
-        for (let i = 0; i < numberOfCpus; i++) {
-          addToTrackActions.push(addTrack(this.config.id, 'CpuSliceTrack', i));
+        const addToTrackActions: Action[] = [];
+        if (numberOfCpus > 0) {
+          // This is a sched slice trace.
+          for (let i = 0; i < numberOfCpus; i++) {
+            addToTrackActions.push(
+                addTrack(this.config.id, 'CpuSliceTrack', i));
+          }
+        } else if ((await engine.getNumberOfProcesses()) > 0) {
+          const threadQuery = await engine.rawQuery({
+            sqlQuery:
+                'select upid, utid, tid, thread.name, max(slices.depth) ' +
+                'from thread inner join slices using(utid) group by utid'
+          });
+          for (let i = 0; i < threadQuery.numRecords; i++) {
+            const upid = threadQuery.columns[0].longValues![i];
+            const utid = threadQuery.columns[1].longValues![i];
+            const threadId = threadQuery.columns[2].longValues![i];
+            let threadName = threadQuery.columns[3].stringValues![i];
+            threadName += `[${threadId}]`;
+            const maxDepth = threadQuery.columns[4].longValues![i];
+            addToTrackActions.push(addChromeSliceTrack(
+                this.config.id,
+                'ChromeSliceTrack',
+                upid as number,
+                utid as number,
+                threadName,
+                maxDepth as number));
+          }
         }
         this.controller.dispatchMultiple(addToTrackActions);
         this.deferredOnReady.forEach(d => d.resolve(engine));
@@ -156,7 +182,7 @@ class QueryController {
       const rawResult = await engine.rawQuery({sqlQuery: config.query});
       const end = performance.now();
       const columns = rawQueryResultColumns(rawResult);
-      const rows = firstN<Row>(100, rawQueryResultIter(rawResult));
+      const rows = firstN<Row>(10000, rawQueryResultIter(rawResult));
       const result: QueryResponse = {
         id: config.id,
         query: config.query,

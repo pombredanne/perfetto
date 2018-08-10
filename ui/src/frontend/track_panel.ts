@@ -24,7 +24,7 @@ import {Panel} from './panel';
 import {Track} from './track';
 import {trackRegistry} from './track_registry';
 
-export const TRACK_SHELL_WIDTH = 200;
+export const TRACK_SHELL_WIDTH = 300;
 
 const TrackShell = {
   view({attrs}) {
@@ -116,6 +116,10 @@ export class TrackPanel implements Panel {
     this.track = trackCreator.create(this.trackState);
   }
 
+  getHeight(): number {
+    return this.track.getHeight();
+  }
+
   updateDom(dom: Element): void {
     // TODO: Let tracks render DOM in the content area.
     m.render(
@@ -130,8 +134,7 @@ export class TrackPanel implements Panel {
         ctx,
         globals.frontendLocalState.timeScale,
         [visibleWindowMs.start, visibleWindowMs.end],
-        // TODO: Height should be a property of panel.
-        this.trackState.height);
+        this.track.getHeight());
 
     const trackData = globals.trackDataStore.get(this.trackState.id);
     if (trackData !== undefined) this.track.consumeData(trackData);
