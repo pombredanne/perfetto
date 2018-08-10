@@ -25,24 +25,24 @@
 namespace perfetto {
 
 RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
-  if (read_idx_ < sizeof(record_size_))
-    return {&record_size_, sizeof(record_size_) - read_idx_};
-  return {
-      buf_.get() + read_idx_ - sizeof(record_size_),
-      (static_cast<size_t>(record_size_) + sizeof(record_size_) - read_idx_)};
+  if (read_idx_ < sizeof(record_size_buf_))
+    return {&record_size_buf_[0] + read_idx_,
+            sizeof(record_size_buf_) - read_idx_};
+  return {record_.data.get() + read_idx_ - sizeof(record_size_buf_),
+          (static_cast<size_t>(record_.size) + sizeof(record_size_buf_) -
+           read_idx_)};
 }
 
 bool RecordReader::EndReceive(size_t recv_size, Record* record) {
   read_idx_ += recv_size;
-  if (read_idx_ == sizeof(record_size_))
-    buf_.reset(new uint8_t[record_size_]);
+  if (read_idx_ == sizeof(record_size_buf_)) {
+    memcpy(&record_.size, record_size_buf_, sizeof(record_size_buf_));
+    record_.data.reset(new uint8_t[record_.size]);
+  }
 
-  if (read_idx_ == record_size_ + sizeof(record_size_)) {
-    std::unique_ptr<uint8_t[]> ret = std::move(buf_);
-    size_t size = static_cast<size_t>(record_size_);
+  if (read_idx_ == record_.size + sizeof(record_size_buf_)) {
+    *record = std::move(record_);
     Reset();
-    record->data = std::move(ret);
-    record->size = size;
     return true;
   }
   return false;
@@ -50,7 +50,7 @@ bool RecordReader::EndReceive(size_t recv_size, Record* record) {
 
 void RecordReader::Reset() {
   read_idx_ = 0;
-  record_size_ = 0;
+  record_.size = 0;
 }
 
 }  // namespace perfetto
