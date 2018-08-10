@@ -165,12 +165,11 @@ export const OverviewTimeline = {
             {
               style: {
                 display: this.hoveredLoad === null ? 'none' : 'block',
-                left:
-                    `${
-                       this.hoveredLoad === null ?
-                           0 :
-                           this.timeScale.msToPx(this.hoveredLoad.timeMs) - 100
-                     }px`,
+                left: `${
+                         this.hoveredLoad === null ?
+                             0 :
+                             this.timeScale.msToPx(this.hoveredLoad.timeMs)
+                       }px`,
                 top: `${
                         this.hoveredProcess === null ?
                             0 :

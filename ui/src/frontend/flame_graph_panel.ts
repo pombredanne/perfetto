@@ -23,7 +23,8 @@ import {Panel} from './panel';
 
 interface FlameNode {
   name: string;
-  totalTimeMs: number;
+  totalSelfTimeNs: number;
+  totalTimeNs: number;
   calls: number;
   children: FlameNode[];
   parent: FlameNode|null;
@@ -48,6 +49,7 @@ export class FlameGraphPanel implements Panel {
     width: number,
     height: number,
   }> = [];
+  private tooltipElement: HTMLElement|null = null;
   private contentElement: Element|null = null;
   private contentRect: ClientRect = {
     left: 0,
@@ -88,7 +90,7 @@ export class FlameGraphPanel implements Panel {
     if (!this.queryResponse || width === 0) return;
 
     const maxVisibleDepth =
-        Math.max(...this.nodes.filter(node => node.totalTimeMs > 0)
+        Math.max(...this.nodes.filter(node => node.totalTimeNs > 0)
                      .map(node => node.depth)) +
         1;
 
@@ -122,7 +124,7 @@ export class FlameGraphPanel implements Panel {
     let childX = x;
 
     for (const child of node.children) {
-      const percentage = child.totalTimeMs / node.totalTimeMs;
+      const percentage = child.totalTimeNs / node.totalTimeNs;
       const childWidth = percentage * width;
       this.renderNode(ctx, child, childX, childWidth);
       childX += childWidth;
@@ -152,7 +154,8 @@ export class FlameGraphPanel implements Panel {
 
     this.root = {
       name: 'All',
-      totalTimeMs: 0,
+      totalSelfTimeNs: 0,
+      totalTimeNs: 0,
       calls: 0,
       children: [],
       parent: null,
@@ -180,7 +183,8 @@ export class FlameGraphPanel implements Panel {
 
           node = {
             name: String(slice.name),
-            totalTimeMs: 0,
+            totalSelfTimeNs: 0,
+            totalTimeNs: 0,
             calls: 0,
             children: [],
             parent,
@@ -192,17 +196,36 @@ export class FlameGraphPanel implements Panel {
           stackToNode.set(slice.stack_id, node);
           this.nodes.push(node);
         }
+        node.totalSelfTimeNs += Number(slice.dur);
 
         while (node) {
           node.calls++;
-          node.totalTimeMs += Number(slice.dur);
+          node.totalTimeNs += Number(slice.dur);
           node = node.parent;
         }
       }
     }
   }
 
+  private updateTooltip() {
+    if (!this.tooltipElement) return;
+    this.tooltipElement.style.display =
+        this.hoveredNode === null ? 'none' : 'block';
+    if (!this.hoveredNode) return;
+
+    this.tooltipElement.innerHTML = `${this.hoveredNode.name}<br />
+      Total: ${Math.round(this.hoveredNode.totalTimeNs / 100000) / 10}s, 
+      Self: ${Math.round(this.hoveredNode.totalSelfTimeNs / 100000) / 10}s`;
+
+    const position =
+        this.flameNodePositions.filter(pos => pos.node === this.hoveredNode)[0];
+    this.tooltipElement.style.left = `${position.x + position.width / 2}px`;
+    this.tooltipElement.style.top = `${position.y + 25}px`;
+  }
+
   updateDom(dom: Element) {
+    this.updateTooltip();
+
     if (this.domStatus === 'listenersAdded') return;
     if (this.domStatus === 'rendered') {
       this.domStatus = 'listenersAdded';
@@ -214,6 +237,8 @@ export class FlameGraphPanel implements Panel {
         throw new Error('Could not find flame graph elements.');
       }
       this.contentRect = this.contentElement.getBoundingClientRect();
+      this.tooltipElement =
+          dom.getElementsByClassName('tooltip')[0] as HTMLElement;
       this.contentElement.addEventListener(
           'mousemove', this.onMouseMove.bind(this));
       return;
