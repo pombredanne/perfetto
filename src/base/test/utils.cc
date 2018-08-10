@@ -17,14 +17,16 @@
 #include "src/base/test/utils.h"
 
 #include <stdlib.h>
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)  \
-        PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-#include <unistd.h>
-#endif
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#include <limits.h>
+#include <unistd.h>
+#endif
 
 namespace perfetto {
 namespace base {
@@ -37,7 +39,7 @@ std::string GetTestDataPath(const std::string& path) {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  char buf[128];
+  char buf[PATH_MAX];
   ssize_t bytes = readlink("/proc/self/exe", buf, sizeof(buf));
   PERFETTO_CHECK(bytes != -1);
   // readlink does not null terminate.
