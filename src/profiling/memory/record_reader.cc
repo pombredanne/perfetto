@@ -34,6 +34,11 @@ RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
 }
 
 bool RecordReader::EndReceive(size_t recv_size, Record* record) {
+  if (record_.size == 0)
+    PERFETTO_DCHECK(recv_size <= sizeof(uint64_t));
+  else
+    PERFETTO_DCHECK(record_.data);
+
   read_idx_ += recv_size;
   if (read_idx_ == sizeof(record_size_buf_)) {
     memcpy(&record_.size, record_size_buf_, sizeof(record_size_buf_));
