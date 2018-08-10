@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as m from 'mithril';
+
 import {executeQuery} from '../common/actions';
 import {QueryResponse} from '../common/queries';
 import {EngineConfig} from '../common/state';
@@ -29,11 +31,12 @@ interface FlameNode {
   hue: number;
 }
 
-const FLAME_CHART_QUERY_ID = 'flame_chart_query';
+const FLAME_QUERY_ID = 'flame_chart_query';
 const paddingTop = 25;
 
 export class FlameGraphPanel implements Panel {
   private root: FlameNode|null = null;
+  private nodes: FlameNode[] = [];
   private domStatus: 'notRendered'|'rendered'|'listenersAdded' = 'notRendered';
   private dataStatus: 'waitingForData'|'queryExecuted'|'dataParsed' =
       'waitingForData';
@@ -45,6 +48,7 @@ export class FlameGraphPanel implements Panel {
     width: number,
     height: number,
   }> = [];
+  private contentElement: Element|null = null;
   private contentRect: ClientRect = {
     left: 0,
     top: 0,
@@ -54,16 +58,12 @@ export class FlameGraphPanel implements Panel {
     bottom: 0,
   };
   private hoveredNode: FlameNode|null = null;
-  private ctx: CanvasRenderingContext2D|null = null;
 
   renderCanvas(ctx: CanvasRenderingContext2D) {
-    this.ctx = ctx;
     this.loadData();
     this.parseData();
 
-    if (!this.root) {
-      return;
-    }
+    if (!this.root) return;
 
     this.flameNodePositions = [];
     this.renderNode(ctx, this.root, 0, this.contentRect.width);
@@ -73,11 +73,10 @@ export class FlameGraphPanel implements Panel {
     const engine: EngineConfig = globals.state.engines['0'];
     if (engine && engine.ready && this.dataStatus === 'waitingForData') {
       const query = 'select * from slices limit 1000';
-      globals.dispatch(executeQuery(engine.id, FLAME_CHART_QUERY_ID, query));
+      globals.dispatch(executeQuery(engine.id, FLAME_QUERY_ID, query));
       this.dataStatus = 'queryExecuted';
     }
-    const resp =
-        globals.queryResults.get(FLAME_CHART_QUERY_ID) as QueryResponse;
+    const resp = globals.queryResults.get(FLAME_QUERY_ID) as QueryResponse;
     if (resp !== this.queryResponse) {
       this.queryResponse = resp;
     }
@@ -86,20 +85,22 @@ export class FlameGraphPanel implements Panel {
   private renderNode(
       ctx: CanvasRenderingContext2D, node: FlameNode, x: number,
       width: number) {
-    if (!this.queryResponse) {
-      return;
-    }
-    const maxDepth =
-        Math.max(...this.queryResponse.rows.map(r => Number(r.depth))) + 1;
-    const heightPerLevel = this.contentRect.height / (maxDepth + 1);
+    if (!this.queryResponse || width === 0) return;
+
+    const maxVisibleDepth =
+        Math.max(...this.nodes.filter(node => node.totalTimeMs > 0)
+                     .map(node => node.depth)) +
+        1;
+
+    const heightPerLevel = this.contentRect.height / (maxVisibleDepth + 1);
     const y = this.contentRect.height + paddingTop -
         Math.round((node.depth + 2) * heightPerLevel);
     this.flameNodePositions.push(
         {node, x, y: y - paddingTop, width, height: heightPerLevel});
 
-    const hue = node === this.hoveredNode ? '120' : node.hue;
-    ctx.fillStyle = `hsl(${hue}, 100%, 55%)`;
-    ctx.strokeStyle = '#999';
+    const lightness = node === this.hoveredNode ? 70 : 55;
+    ctx.fillStyle = `hsl(${node.hue}, 100%, ${lightness}%)`;
+    ctx.strokeStyle = '#fff';
     ctx.rect(x, y, width, heightPerLevel);
     ctx.fill();
     ctx.stroke();
@@ -124,15 +125,14 @@ export class FlameGraphPanel implements Panel {
       const percentage = child.totalTimeMs / node.totalTimeMs;
       const childWidth = percentage * width;
       this.renderNode(ctx, child, childX, childWidth);
-
       childX += childWidth;
     }
   }
 
   private onMouseMove(e: MouseEvent) {
-    if (!this.ctx) {
-      return;
-    }
+    if (this.contentElement === null) return;
+
+    this.contentRect = this.contentElement.getBoundingClientRect();
     const x = e.clientX - this.contentRect.left;
     const y = e.clientY - this.contentRect.top;
 
@@ -141,7 +141,7 @@ export class FlameGraphPanel implements Panel {
           position.y <= y && position.y + position.height >= y;
     });
     this.hoveredNode = match.length !== 1 ? null : match[0].node;
-    this.renderCanvas(this.ctx);
+    m.redraw();
   }
 
   private parseData() {
@@ -157,10 +157,11 @@ export class FlameGraphPanel implements Panel {
       children: [],
       parent: null,
       depth: -1,
-      hue: 23 + Math.random() * 23,
+      hue: 23 + Math.random() * 30,
     };
     const stackToNode = new Map<string|number, FlameNode>();
     stackToNode.set(0, this.root);
+    this.nodes = [this.root];
 
     const maxDepth =
         Math.max(...this.queryResponse.rows.map(r => Number(r.depth))) + 1;
@@ -189,6 +190,7 @@ export class FlameGraphPanel implements Panel {
 
           parent.children.push(node);
           stackToNode.set(slice.stack_id, node);
+          this.nodes.push(node);
         }
 
         while (node) {
@@ -201,16 +203,19 @@ export class FlameGraphPanel implements Panel {
   }
 
   updateDom(dom: Element) {
+    if (this.domStatus === 'listenersAdded') return;
     if (this.domStatus === 'rendered') {
       this.domStatus = 'listenersAdded';
 
       // TODO detach event listeners on destroy.
-      const content = dom.getElementsByClassName('flame-graph-content')[0];
-      if (!content) {
+      this.contentElement =
+          dom.getElementsByClassName('flame-graph-content')[0];
+      if (!this.contentElement) {
         throw new Error('Could not find flame graph elements.');
       }
-      this.contentRect = content.getBoundingClientRect();
-      content.addEventListener('mousemove', this.onMouseMove.bind(this));
+      this.contentRect = this.contentElement.getBoundingClientRect();
+      this.contentElement.addEventListener(
+          'mousemove', this.onMouseMove.bind(this));
       return;
     }
 
