@@ -39,9 +39,11 @@ function getCanvasYStart(visibleHeight: number, containerScrollTop: number) {
 type CanvasScrollingContainerVnode =
     m.VnodeDOM<{}, ScrollingPanelContainerState>;
 
-function updateDimensionsFromDom(vnode: CanvasScrollingContainerVnode) {
-  const rect = vnode.dom.getBoundingClientRect();
+function updateDimensionsFromDom(
+    dom: Element, vnode: CanvasScrollingContainerVnode) {
+  const rect = dom.getBoundingClientRect();
   vnode.state.domWidth = rect.width;
+  console.log(rect.width);
   vnode.state.domHeight = rect.height;
   const dpr = window.devicePixelRatio;
   const ctx = assertExists(vnode.state.ctx);
@@ -157,22 +159,31 @@ export const ScrollingPanelContainer = {
     }
     this.ctx = ctx;
 
+    const contentContainer =
+        vnode.dom.querySelector('.scrolling-panel-content');
+    if (!contentContainer) {
+      throw new Error('Scrolling content container not found.');
+    }
+
     // updateDimensionsFromDom calls m.redraw, but calling m.redraw during a
     // lifecycle method results in undefined behavior. Use setTimeout to do it
     // asyncronously at the end of the current redraw.
     setTimeout(() => {
-      updateDimensionsFromDom(vnode);
+      updateDimensionsFromDom(contentContainer, vnode);
       m.redraw();
     });
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
     this.onResize = () => {
-      updateDimensionsFromDom(vnode);
+      updateDimensionsFromDom(contentContainer, vnode);
       m.redraw();
     };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
+    // TODO (dproy): Update dimensions when the height of the content has
+    // changed, since it can cause the scroll bar to appear or disappear
+    // and that needs to change the canvas width.
     window.addEventListener('resize', this.onResize);
 
     vnode.dom.addEventListener('scroll', () => {
@@ -241,27 +252,39 @@ export const ScrollingPanelContainer = {
 
     return m(
         '.scrolling-panel-container',
-        // Since the canvas is overdrawn and continuously repositioned, we need
-        // the canvas to be in a div with overflow hidden and height equaling
-        // the height of the content to prevent scrolling height from growing.
-        m('.scroll-limiter',
+        // scrolling-panel-content container respects the possible scrollbar of
+        // its parent element, the scrolling-panel-container.
+        m('.scrolling-panel-content',
           {
             style: {
-              height: `${totalContentHeight}px`,
-              overflow: 'hidden',
-              position: 'absolute',
-              top: '0px',
               width: '100%',
+              height: '100%',
             }
           },
-          m('canvas.main-canvas', {
-            style: {
-              height: `${canvasHeight}px`,
-              top: `${canvasYStart}px`,
-              width: '100%',
-              position: 'absolute',
-            }
-          }),
-          ...panelComponents));
+          // Since the canvas is overdrawn and continuously repositioned, we
+          // need the canvas to be in a div with overflow hidden and height
+          // equaling the height of the content to prevent scrolling height from
+          // growing.
+          m('.scroll-limiter',
+            {
+              style: {
+                height: `${totalContentHeight}px`,
+                overflow: 'hidden',
+                position: 'absolute',
+                top: '0px',
+                width: '100%',
+              }
+            },
+            m('canvas.main-canvas', {
+              style: {
+                height: `${canvasHeight}px`,
+                top: `${canvasYStart}px`,
+                width: '100%',
+                position: 'absolute',
+              }
+            }),
+            ...panelComponents))
+
+            );
   },
 } as m.Component<{}, ScrollingPanelContainerState>;
