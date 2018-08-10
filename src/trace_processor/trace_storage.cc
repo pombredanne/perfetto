@@ -43,7 +43,7 @@ StringId TraceStorage::InternString(base::StringView str) {
   auto hash = str.Hash();
   auto id_it = string_index_.find(hash);
   if (id_it != string_index_.end()) {
-    PERFETTO_DCHECK(string_pool_[id_it->second] == str);
+    PERFETTO_DCHECK(base::StringView(string_pool_[id_it->second]) == str);
     return id_it->second;
   }
   string_pool_.emplace_back(str.ToStdString());
