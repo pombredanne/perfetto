@@ -38,6 +38,7 @@ struct ProcessMetadata {
   ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
       : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
     PERFETTO_CHECK(maps.Parse());
+    maps.Sort();
   }
   pid_t pid;
   FileDescriptorMaps maps;

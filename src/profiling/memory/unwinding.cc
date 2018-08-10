@@ -121,8 +121,6 @@ bool FileDescriptorMaps::Parse() {
   if (!base::ReadFileDescriptor(*fd_, &content))
     return false;
   PERFETTO_DLOG("%s", content.c_str());
-  // Add a trailing \0.
-  content.resize(content.size() + 1);
   return android::procinfo::ReadMapFileContent(
       &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
                        uint64_t pgoff, const char* name) {
@@ -131,6 +129,7 @@ bool FileDescriptorMaps::Parse() {
             strncmp(name + 5, "ashmem/", 7) != 0) {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
+        printf("%" PRIu64 " - %" PRIu64 " %s\n", start, end, name);
         maps_.push_back(
             new unwindstack::MapInfo(start, end, pgoff, flags, name));
       });
@@ -174,6 +173,7 @@ bool DoUnwind(void* mem,
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
+  unwinder.SetResolveNames(true);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
   int error_code = 0;
@@ -181,10 +181,12 @@ bool DoUnwind(void* mem,
     unwinder.Unwind();
     error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
+      PERFETTO_DCHECK(false);
       PERFETTO_DLOG("Error: %d", error_code);
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
         metadata->maps.Reset();
         metadata->maps.Parse();
+        metadata->maps.Sort();
       } else {
         break;
       }

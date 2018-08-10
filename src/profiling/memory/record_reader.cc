@@ -27,8 +27,9 @@ namespace perfetto {
 RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
   if (read_idx_ < sizeof(record_size_))
     return {&record_size_, sizeof(record_size_) - read_idx_};
-  return {buf_.get(), (static_cast<size_t>(record_size_) +
-                       sizeof(record_size_) - read_idx_)};
+  return {
+      buf_.get() + read_idx_ - sizeof(record_size_),
+      (static_cast<size_t>(record_size_) + sizeof(record_size_) - read_idx_)};
 }
 
 bool RecordReader::EndReceive(size_t recv_size, Record* record) {

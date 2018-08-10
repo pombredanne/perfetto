@@ -79,18 +79,19 @@ uint8_t* GetStackBase() {
 }
 
 std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
-  uint8_t* stackbase = GetStackBase();
+  const uint8_t* stackbase = GetStackBase();
   PERFETTO_CHECK(stackbase != nullptr);
 
-  uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
+  const uint8_t* stacktop =
+      reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
   PERFETTO_CHECK(stacktop != nullptr);
   PERFETTO_CHECK(stacktop < stackbase);
 
-  size_t stack_size = static_cast<size_t>(stackbase - stacktop);
+  const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
 
   unwindstack::Regs* regs = unwindstack::Regs::CreateFromLocal();
-  size_t reg_size = RegSize(regs->CurrentArch());
-  size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
+  const size_t reg_size = RegSize(regs->CurrentArch());
+  const size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
 
   std::unique_ptr<uint8_t[]> buf(new uint8_t[total_size]);
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(buf.get());
@@ -101,11 +102,13 @@ std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
   metadata->arch = regs->CurrentArch();
 
   unwindstack::RegsGetLocal(regs);
+  // Make sure nothing above has changed the stack pointer, just for extra
+  // paranoia.
   PERFETTO_CHECK(stacktop ==
                  reinterpret_cast<uint8_t*>(__builtin_frame_address(0)));
 
-  memcpy(&buf[sizeof(AllocMetadata)], regs->RawData(), reg_size);
-  memcpy(&buf[sizeof(AllocMetadata) + reg_size], stacktop, stack_size);
+  memcpy(buf.get() + sizeof(AllocMetadata), regs->RawData(), reg_size);
+  memcpy(buf.get() + sizeof(AllocMetadata) + reg_size, stacktop, stack_size);
   return {std::move(buf), total_size};
 }
 
@@ -118,7 +121,8 @@ TEST(UnwindingTest, DoUnwind) {
   std::vector<unwindstack::FrameData> out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   PERFETTO_LOG("%s %" PRIu64, out[0].map_name.c_str(), out[0].pc);
-  ASSERT_EQ(out[0].function_name, "GetRecord");
+  PERFETTO_LOG("%s", metadata.maps.Find(out[0].pc)->name.c_str());
+  ASSERT_EQ(out[1].function_name, "GetRecord");
 }
 
 }  // namespace

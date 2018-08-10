@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 
-#include "src/ipc/unix_socket.h"
+#include "perfetto/base/utils.h"
 
 namespace perfetto {
 

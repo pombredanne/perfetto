@@ -29,6 +29,22 @@ source_set("record_reader") {
   ]
 }
 
+source_set("unwinding") {
+  public_configs = [
+    "../../../gn:default_config",
+    "../../../buildtools:libunwindstack_config",
+  ]
+  deps = [
+    "../../../buildtools:libunwindstack",
+    "../../../gn:default_deps",
+    "../../../src/base",
+  ]
+  sources = [
+    "unwinding.cc",
+    "unwinding.h",
+  ]
+}
+
 source_set("socket_listener") {
   public_configs = [
     "../../../gn:default_config",
@@ -36,6 +52,7 @@ source_set("socket_listener") {
   ]
   deps = [
     ":record_reader",
+    ":unwinding",
     "../../../gn:default_deps",
     "../../../src/base",
     "../../../src/ipc",
@@ -70,6 +87,7 @@ source_set("unittests") {
     ":string_interner",
     ":unwinding",
     "../../../gn:gtest_deps",
+    "../../../src/base:test_support",
     "../../base",
   ]
   sources = [
@@ -77,22 +95,6 @@ source_set("unittests") {
     "socket_listener_unittest.cc",
     "string_interner_unittest.cc",
     "unwinding_unittest.cc",
-  ]
-}
-
-source_set("unwinding") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
-  deps = [
-    "../../../buildtools:libunwindstack",
-    "../../../gn:default_deps",
-    "../../../src/base",
-  ]
-  sources = [
-    "unwinding.cc",
-    "unwinding.h",
   ]
 }
 
