@@ -12,8 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_counters/frontend';
-import './cpu_slices/frontend';
-import './chrome_slices/frontend';
+import {TimeScale} from './time_scale';
+
+/**
+ * State that is shared between several frontend components, but not the
+ * controller. This state is updated at 60fps.
+ */
+export interface FrontendLocalState {
+  timeScale: TimeScale;
+  visibleWindowMs: {start: number; end: number;};
+}
+
+export function createEmptyFrontendState(): FrontendLocalState {
+  return {
+    timeScale: new TimeScale([0, 0], [0, 0]),
+    visibleWindowMs: {start: 0, end: 1000000},
+  };
+}

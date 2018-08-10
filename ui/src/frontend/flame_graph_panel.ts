@@ -12,8 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Import all currently implemented tracks. After implemeting a new track, an
-// import statement for it needs to be added here.
-import './cpu_counters/frontend';
-import './cpu_slices/frontend';
-import './chrome_slices/frontend';
+import {Panel} from './panel';
+
+export class FlameGraphPanel implements Panel {
+  private renderedDom = false;
+  renderCanvas() {}
+  updateDom(dom: Element) {
+    if (this.renderedDom) return;
+    dom.innerHTML = `<header>Flame Graph</Header>
+        <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
+    this.renderedDom = true;
+  }
+
+  getHeight() {
+    return 500;
+  }
+}
