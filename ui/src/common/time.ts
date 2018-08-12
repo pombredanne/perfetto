@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { assertTrue } from '../base/logging';
+import {assertTrue} from '../base/logging';
 
 export function timeToString(sec: number) {
   const units = ['ms', 'us', 'ns'];
@@ -34,7 +34,7 @@ export class TimeSpan {
   readonly start: number;
   readonly end: number;
 
-  constructor(start:number, end:number) {
+  constructor(start: number, end: number) {
     assertTrue(start <= end);
     this.start = start;
     this.end = end;
@@ -44,7 +44,7 @@ export class TimeSpan {
     return this.end - this.start;
   }
 
-  add(sec: number) : TimeSpan {
+  add(sec: number): TimeSpan {
     return new TimeSpan(this.start + sec, this.end + sec);
   }
 }

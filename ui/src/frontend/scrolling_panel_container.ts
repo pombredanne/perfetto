@@ -262,7 +262,8 @@ export const ScrollingPanelContainer = {
       totalContentHeight += panelAttrs.height;
     }
 
-    const canvasYStart = this.scrollTop - getCanvasOverdrawHeightPerSide(this.domHeight);
+    const canvasYStart =
+        this.scrollTop - getCanvasOverdrawHeightPerSide(this.domHeight);
     const canvasHeight = this.domHeight * CANVAS_OVERDRAW_FACTOR;
 
     return m(

@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {TimeSpan} from '../common/time';
+
+import {globals} from './globals';
 import {TimeScale} from './time_scale';
-import { TimeSpan } from '../common/time';
-import { globals } from './globals';
 
 /**
  * State that is shared between several frontend components, but not the
@@ -25,7 +26,7 @@ export class FrontendLocalState {
   timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
 
   updateVisibleTime(ts: TimeSpan) {
-    const startSec =  Math.max(ts.start, globals.state.traceTime.startSec);
+    const startSec = Math.max(ts.start, globals.state.traceTime.startSec);
     const endSec = Math.min(ts.end, globals.state.traceTime.endSec);
     this.visibleWindowTime = new TimeSpan(startSec, endSec);
     this.timeScale.setTimeBounds(this.visibleWindowTime);

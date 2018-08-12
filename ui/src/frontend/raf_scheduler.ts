@@ -25,7 +25,7 @@ export type RedrawCallback = (nowMs: number) => void;
 // all action callbacks.
 export class RafScheduler {
   private actionCallbacks = new Set<ActionCallback>();
-  private redrawCallbacks= new Set<RedrawCallback>();
+  private redrawCallbacks = new Set<RedrawCallback>();
   private hasScheduledNextFrame = false;
   private isRedrawing = false;
 

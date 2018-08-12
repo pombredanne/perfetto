@@ -1,4 +1,4 @@
-import { globals } from './globals';
+import {globals} from './globals';
 
 // Copyright (C) 2018 The Android Open Source Project
 //

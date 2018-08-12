@@ -16,10 +16,11 @@ export class DragGestureHandler {
   private readonly boundOnMouseDown = this.onMouseDown.bind(this);
   private readonly boundOnMouseMove = this.onMouseMove.bind(this);
   private readonly boundOnMouseUp = this.onMouseUp.bind(this);
-  private clientRect? : DOMRect;
+  private clientRect?: DOMRect;
 
   constructor(
-      private element: HTMLElement, private onDrag: (x: number, y: number) => void,
+      private element: HTMLElement,
+      private onDrag: (x: number, y: number) => void,
       private onDragStarted: (x: number, y: number) => void = () => {},
       private onDragFinished = () => {}) {
     element.addEventListener('mousedown', this.boundOnMouseDown);
@@ -29,14 +30,16 @@ export class DragGestureHandler {
     document.body.addEventListener('mousemove', this.boundOnMouseMove);
     document.body.addEventListener('mouseup', this.boundOnMouseUp);
     this.clientRect = this.element.getBoundingClientRect() as DOMRect;
-    this.onDragStarted(e.clientX - this.clientRect!.left, e.clientY - this.clientRect!.top);
+    this.onDragStarted(
+        e.clientX - this.clientRect.left, e.clientY - this.clientRect.top);
 
     // Prevent interactions with other DragGestureHandlers and event listeners
     e.stopPropagation();
   }
 
   private onMouseMove(e: MouseEvent) {
-    this.onDrag(e.clientX - this.clientRect!.left, e.clientY - this.clientRect!.top);
+    this.onDrag(
+        e.clientX - this.clientRect!.left, e.clientY - this.clientRect!.top);
     e.stopPropagation();
   }
 

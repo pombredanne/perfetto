@@ -47,7 +47,10 @@ export interface QueryConfig {
 
 export interface PermalinkConfig { state: State; }
 
-export interface TraceTime { startSec: number; endSec: number; }
+export interface TraceTime {
+  startSec: number;
+  endSec: number;
+}
 
 export interface State {
   route: string|null;

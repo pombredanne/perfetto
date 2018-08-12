@@ -25,7 +25,7 @@ export function drawGridLines(
     height: number): void {
   const width = x.timeToPx(timeSpan.duration);
   const desiredSteps = width / DESIRED_PX_PER_STEP;
-  const step = getGridStepSize(timeSpan, desiredSteps);
+  const step = getGridStepSize(timeSpan.duration, desiredSteps);
   const start = Math.round(timeSpan.start / step) * step;
 
   ctx.strokeStyle = '#999999';
@@ -50,12 +50,12 @@ export function drawGridLines(
  * (2) The number steps in |range| produced by |stepSize| is as close as
  *     possible to |desiredSteps|.
  */
-export function getGridStepSize(range: TimeSpan, desiredSteps: number): number {
+export function getGridStepSize(range: number, desiredSteps: number): number {
   // First, get the largest possible power of 10 that is smaller than the
   // desired step size, and set it to the current step size.
   // For example, if the range is 2345ms and the desired steps is 10, then the
   // desired step size is 234.5 and the step size will be set to 100.
-  const desiredStepSize = range.duration / desiredSteps;
+  const desiredStepSize = range / desiredSteps;
   const zeros = Math.floor(Math.log10(desiredStepSize));
   const initialStepSize = Math.pow(10, zeros);
 
@@ -63,7 +63,7 @@ export function getGridStepSize(range: TimeSpan, desiredSteps: number): number {
   // stepSize will produce, and returns the difference between that and
   // desiredSteps.
   const distToDesired = (evaluatedStepSize: number) =>
-      Math.abs(range.duration / evaluatedStepSize - desiredSteps);
+      Math.abs(range / evaluatedStepSize - desiredSteps);
 
   // We know that |initialStepSize| is a power of 10, and
   // initialStepSize <= desiredStepSize <= 10 * initialStepSize. There are four

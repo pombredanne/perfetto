@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {timeToString} from '../common/time';
+
 import {globals} from './globals';
 import {DESIRED_PX_PER_STEP, getGridStepSize} from './gridline_helper';
 import {Panel} from './panel';
 import {TRACK_SHELL_WIDTH} from './track_panel';
-import { timeToString } from '../common/time';
 
 export class TimeAxisPanel implements Panel {
   private width = 200;
@@ -39,7 +40,7 @@ export class TimeAxisPanel implements Panel {
 
     const range = globals.frontendLocalState.visibleWindowTime;
     const desiredSteps = this.width / DESIRED_PX_PER_STEP;
-    const step = getGridStepSize(range, desiredSteps);
+    const step = getGridStepSize(range.duration, desiredSteps);
     const start = Math.round(range.start / step) * step;
 
     for (let s = start; s < range.end; s += step) {

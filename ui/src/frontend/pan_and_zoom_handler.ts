@@ -15,7 +15,7 @@
 import {Animation} from './animation';
 import Timer = NodeJS.Timer;
 import {DragGestureHandler} from './drag_gesture_handler';
-import { globals } from './globals';
+import {globals} from './globals';
 
 const ZOOM_RATIO_PER_FRAME = 0.008;
 const KEYBOARD_PAN_PX_PER_FRAME = 8;
@@ -31,15 +31,23 @@ const ANIMATION_AUTO_END_AFTER_KEYPRESS_MS = 80;
 // This defines the step size for an individual pan or zoom keyboard tap.
 const TAP_ANIMATION_TIME = 200;
 
-enum Pan { None = 0, Left = -1, Right = 1}
-function keyToPan(e: KeyboardEvent) : Pan {
+enum Pan {
+  None = 0,
+  Left = -1,
+  Right = 1
+}
+function keyToPan(e: KeyboardEvent): Pan {
   if (['a'].includes(e.key)) return Pan.Left;
   if (['d'].includes(e.key)) return Pan.Right;
   return Pan.None;
 }
 
-enum Zoom { None = 0, In = 1, Out = -1}
-function keyToZoom(e: KeyboardEvent) : Zoom {
+enum Zoom {
+  None = 0,
+  In = 1,
+  Out = -1
+}
+function keyToZoom(e: KeyboardEvent): Zoom {
   if (['w'].includes(e.key)) return Zoom.In;
   if (['s'].includes(e.key)) return Zoom.Out;
   return Zoom.None;
@@ -118,8 +126,7 @@ export class PanAndZoomHandler {
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
       this.onPanned(e.deltaX * HORIZONTAL_WHEEL_PAN_SPEED);
       globals.rafScheduler.scheduleOneRedraw();
-    }
-    else if (e.ctrlKey && this.mousePositionX) {
+    } else if (e.ctrlKey && this.mousePositionX) {
       const sign = e.deltaY < 0 ? -1 : 1;
       const deltaY = sign * Math.log2(1 + Math.abs(e.deltaY));
       this.onZoomed(this.mousePositionX, deltaY * WHEEL_ZOOM_SPEED);
@@ -159,5 +166,4 @@ export class PanAndZoomHandler {
       this.cancelZoomTimeout = setTimeout(() => this.zoomAnimation.stop(), t);
     }
   }
-
 }
