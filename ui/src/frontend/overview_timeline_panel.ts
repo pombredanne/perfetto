@@ -51,9 +51,10 @@ export class OverviewTimelinePanel implements Panel {
   renderCanvas(ctx: CanvasRenderingContext2D) {
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
+    const headerHeight = 25;
+    const tracksHeight = this.getHeight() - headerHeight;
 
     // Draw time labels on the top header.
-    const headerHeight = 25;
     ctx.font = '10px Google Sans';
     ctx.fillStyle = '#999';
     for (let i = 0; i < 100; i++) {
@@ -76,7 +77,7 @@ export class OverviewTimelinePanel implements Panel {
       const numProcs = Object.keys(res).length;
       const hueStep = Math.floor(255 / numProcs);
       let y = 0;
-      const trackHeight = (this.getHeight() - headerHeight - 2) / numProcs;
+      const trackHeight = (tracksHeight - 2) / numProcs;
       for (const upid of Object.keys(res)) {
         const loads = res[upid].load;
         const px = this.width / loads.length;
@@ -98,19 +99,19 @@ export class OverviewTimelinePanel implements Panel {
     const vizStartPx = this.timeScale.timeToPx(vizTime.start);
     const vizEndPx = this.timeScale.timeToPx(vizTime.end);
 
-    ctx.fillStyle = 'rgba(150, 150, 150, 0.3)';
-    ctx.fillRect(0, 0, vizStartPx, this.getHeight());
-    ctx.fillRect(vizEndPx, 0, this.width - vizEndPx, this.getHeight());
+    ctx.fillStyle = 'rgba(240, 240, 240, 0.7)';
+    ctx.fillRect(0, headerHeight, vizStartPx, tracksHeight);
+    ctx.fillRect(vizEndPx, headerHeight, this.width - vizEndPx, tracksHeight);
 
     // Draw brushes.
     ctx.fillStyle = '#999';
-    ctx.fillRect(vizStartPx, 0, 1, this.getHeight());
-    ctx.fillRect(vizEndPx, 0, 1, this.getHeight());
-    const HANDLE_WIDTH = 3;
-    const HANDLE_HEIGHT = 30;
-    const y = (this.getHeight() - HANDLE_HEIGHT) / 2;
-    ctx.fillRect(vizStartPx - HANDLE_WIDTH, y, HANDLE_WIDTH, HANDLE_HEIGHT);
-    ctx.fillRect(vizEndPx + 1, y, HANDLE_WIDTH, HANDLE_HEIGHT);
+    ctx.fillRect(vizStartPx, headerHeight, 1, tracksHeight);
+    ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
+    const handleWidth = 3;
+    const handleHeight = 25;
+    const y = headerHeight + (tracksHeight - handleHeight) / 2;
+    ctx.fillRect(vizStartPx - handleWidth, y, handleWidth, handleHeight);
+    ctx.fillRect(vizEndPx + 1, y, handleWidth, handleHeight);
   }
 
   onDrag(x: number) {
