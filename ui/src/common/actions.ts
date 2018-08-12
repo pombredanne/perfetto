@@ -108,3 +108,11 @@ export function setState(newState: State) {
     newState,
   };
 }
+
+export function setTraceTime(startSec: number, endSec: number) {
+  return {
+    type: 'SET_TRACE_TIME',
+    startSec,
+    endSec
+  };
+}

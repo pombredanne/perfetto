@@ -13,19 +13,21 @@
 // limitations under the License.
 
 import {TimeScale} from './time_scale';
+import { TimeSpan } from '../common/time';
+import { globals } from './globals';
 
 /**
  * State that is shared between several frontend components, but not the
  * controller. This state is updated at 60fps.
  */
-export interface FrontendLocalState {
-  timeScale: TimeScale;
-  visibleWindowMs: {start: number; end: number;};
-}
+export class FrontendLocalState {
+  visibleWindowTime = new TimeSpan(0, 10);
+  timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
 
-export function createEmptyFrontendState(): FrontendLocalState {
-  return {
-    timeScale: new TimeScale([0, 0], [0, 0]),
-    visibleWindowMs: {start: 0, end: 1000000},
-  };
+  updateVisibleTime(ts: TimeSpan) {
+    const startSec =  Math.max(ts.start, globals.state.traceTime.startSec);
+    const endSec = Math.min(ts.end, globals.state.traceTime.endSec);
+    this.visibleWindowTime = new TimeSpan(startSec, endSec);
+    this.timeScale.setTimeBounds(this.visibleWindowTime);
+  }
 }

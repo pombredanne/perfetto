@@ -23,7 +23,8 @@ import {
   addTrack,
   deleteQuery,
   navigate,
-  setEngineReady
+  setEngineReady,
+  setTraceTime
 } from '../common/actions';
 import {PERMALINK_ID, saveState, saveTrace} from '../common/permalinks';
 import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
@@ -91,6 +92,10 @@ class EngineController {
         const engine = assertExists<Engine>(this.engine);
         const numberOfCpus = await engine.getNumberOfCpus();
         const addToTrackActions: Action[] = [];
+        const traceBounds = await engine.getTraceTimeBounds();
+        addToTrackActions.push(
+            setTraceTime(traceBounds.start, traceBounds.end));
+
         if (numberOfCpus > 0) {
           // This is a sched slice trace.
           for (let i = 0; i < numberOfCpus; i++) {
@@ -98,6 +103,24 @@ class EngineController {
                 addTrack(this.config.id, 'CpuSliceTrack', i));
           }
         } else if ((await engine.getNumberOfProcesses()) > 0) {
+          //          OVERVIEW_QUERY_ID,
+          // const stepNs = Math.round(traceBounds.duration * 1e9 / 100);
+          // const overviewQuery = await engine.rawQuery({
+          //   sqlQuery:
+          //       `select round(ts/${stepNs})*${stepNs} as rts, `
+          //       + ' sum(dur)/1e8 as load, upid, process.name'
+          //       + 'from slices inner join thread using(utid) '
+          //       + 'inner join  process using(upid) where depth = 0 '
+          //       + 'group by rts, upid  order by upid limit 10000'
+          // });
+
+          // for (let i = 0; i < overviewQuery.numRecords; i++) {
+          //   const rts = overviewQuery.columns[0].longValues![i];
+          //   const load = overviewQuery.columns[1].longValues![i];
+          //   const upid = overviewQuery.columns[2].longValues![i];
+
+          // }
+
           const threadQuery = await engine.rawQuery({
             sqlQuery:
                 'select upid, utid, tid, thread.name, max(slices.depth) ' +
@@ -192,6 +215,7 @@ class QueryController {
         columns,
         rows,
       };
+      console.log(`Query ${config.query} took ${result.durationMs} ms`);
       controller.publishQueryResult(config.id, result);
       controller.dispatch(deleteQuery(config.id));
     });

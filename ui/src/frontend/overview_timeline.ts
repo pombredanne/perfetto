@@ -15,18 +15,20 @@
 import * as m from 'mithril';
 
 import {QueryResponse} from '../common/queries';
+import {TimeSpan} from '../common/time';
 
 import {Animation} from './animation';
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {TimeAxis} from './time_axis';
 import {TimeScale} from './time_scale';
 import {OVERVIEW_QUERY_ID} from './viewer_page';
+
+const QUANTUM = 0.1;
 
 interface ProcessSummaryData {
   upid: number;
   name: string;
-  loadByTime: {[timeMs: number]: number};
+  loadByTimeQuantum: {[q: number]: number};
   hue: number;
 }
 
@@ -35,33 +37,33 @@ interface ProcessSummaryData {
  */
 export const OverviewTimeline = {
   oninit() {
-    this.timeScale = new TimeScale([0, 1], [0, 0]);
+    this.timeScale = new TimeScale(new TimeSpan(0, 1), [0, 0]);
     this.hoveredLoad = null;
     this.contentRect =
         {top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0};
 
-    this.onmousemove = e => {
-      if (!this.processesById) return;
-      const y = e.clientY - this.contentRect.top;
-      const processes = Object.values(this.processesById);
-      if (processes.length === 0) return;
-      const heightPerProcess = this.contentRect.height / processes.length;
-      const index = Math.floor(y / heightPerProcess);
-      this.hoveredProcess = processes[index];
-      const hoveredMs = this.timeScale.pxToMs(e.layerX);
+    // this.onmousemove = e => {
+    //   if (!this.processesById) return;
+    //   const y = e.clientY - this.contentRect.top;
+    //   const processes = Object.values(this.processesById);
+    //   if (processes.length === 0) return;
+    //   const heightPerProcess = this.contentRect.height / processes.length;
+    //   const index = Math.floor(y / heightPerProcess);
+    //   this.hoveredProcess = processes[index];
+    //   const hoveredTime = this.timeScale.pxToTime(e.layerX);
 
-      const loadTimesMs = Object.keys(this.hoveredProcess.loadByTime)
-                              .map(stringTime => Number(stringTime));
-      this.hoveredLoad = null;
-      for (const loadTimeMs of loadTimesMs) {
-        if (Math.abs(loadTimeMs - hoveredMs) <= 100) {
-          this.hoveredLoad = {
-            timeMs: loadTimeMs,
-            load: this.hoveredProcess.loadByTime[loadTimeMs]
-          };
-        }
-      }
-    };
+    //   const loadTimes = Object.keys(this.hoveredProcess.loadByTimeQuantum)
+    //                         .map(idx => Number(idx * QUANTUM));
+    //   this.hoveredLoad = null;
+    //   for (const loadTime of loadTimes) {
+    //     if (Math.abs(loadTime - hoveredTime) <= 0.1) {
+    //       this.hoveredLoad = {
+    //         time: loadTime,
+    //         load: this.hoveredProcess.loadByTime[loadTime.toKey()],
+    //       };
+    //     }
+    //   }
+    // };
   },
   oncreate(vnode) {
     this.contentRect = vnode.dom.getElementsByClassName('timeline-content')[0]
@@ -81,9 +83,7 @@ export const OverviewTimeline = {
     this.timeScale.setLimitsPx(0, this.contentRect.width);
   },
   view({attrs}) {
-    this.timeScale.setLimitsMs(
-        attrs.maxVisibleWindowMs.start, attrs.maxVisibleWindowMs.end);
-
+    // this.timeScale.setTimeBounds(attrs.maxVisibleWindowTime);
     const resp = globals.queryResults.get(OVERVIEW_QUERY_ID) as QueryResponse;
 
     if (this.context && resp) {
@@ -91,8 +91,8 @@ export const OverviewTimeline = {
       if (!this.processesById) {
         this.processesById = {};
         const data = resp.rows;
-        const timesMs = data.map(row => row.rts as number * 1000);
-        const minTimeMs = Math.min(...timesMs);
+        const timesS = data.map(row => row.rts as number);
+        const minTimeS = Math.min(...timesS);
 
         for (const processLoad of data) {
           const upid = processLoad.upid as number;
@@ -100,12 +100,13 @@ export const OverviewTimeline = {
             this.processesById[upid] = {
               upid,
               name: processLoad.name as string,
-              loadByTime: {},
+              loadByTimeQuantum: {},
               hue: Math.random() * 360,
             };
           }
-          const timeMs = ((processLoad.rts as number) * 1000 - minTimeMs);
-          this.processesById[upid].loadByTime[timeMs] =
+          const idx =
+              Math.round(((processLoad.rts as number) - minTimeS) / QUANTUM);
+          this.processesById[upid].loadByTimeQuantum[idx] =
               Number(processLoad.load);
         }
       }
@@ -125,12 +126,13 @@ export const OverviewTimeline = {
         this.context.fillRect(
             0, startY, this.contentRect.width, roundedHeightPerProcess);
 
-        const loadTimes = Object.keys(process.loadByTime)
-                              .map(stringTime => Number(stringTime));
-        for (const loadTime of loadTimes) {
-          const load = process.loadByTime[loadTime] * 100;
-          const startPx = this.timeScale.msToPx(loadTime);
-          const endPx = this.timeScale.msToPx(loadTime + 100);
+        const loadIndexes =
+            Object.keys(process.loadByTimeQuantum).map(s => Number(s));
+        for (const loadIdx of loadIndexes) {
+          const load = process.loadByTimeQuantum[loadIdx] * 100;
+          const tStart = loadIdx * QUANTUM;
+          const startPx = this.timeScale.timeToPx(tStart);
+          const endPx = this.timeScale.timeToPx(tStart + QUANTUM);
           const lightness = Math.round(Math.max(100 - 2 * load, 30));
           this.context.fillStyle = `hsl(${process.hue}, 40%, ${lightness}%)`;
           this.context.fillRect(
@@ -145,11 +147,9 @@ export const OverviewTimeline = {
 
     return m(
         '.overview-timeline',
-        m(TimeAxis, {
-          timeScale: this.timeScale,
-          contentOffset: 0,
-          visibleWindowMs: attrs.maxVisibleWindowMs,
-        }),
+        // m(TimeAxis, {
+        // contentOffset: 0,
+        // }),
         m('.timeline-content',
           {
             onmousemove: this.onmousemove,
@@ -166,7 +166,7 @@ export const OverviewTimeline = {
                     `${
                        this.hoveredLoad === null ?
                            0 :
-                           this.timeScale.msToPx(this.hoveredLoad.timeMs) - 100
+                           this.timeScale.timeToPx(this.hoveredLoad.time) - 100
                      }px`,
                 top: `${
                         this.hoveredProcess === null ?
@@ -194,22 +194,23 @@ export const OverviewTimeline = {
             },
             m(HorizontalBrushSelection, {
               onBrushedPx: (startPx: number, endPx: number) => {
-                attrs.onBrushedMs(
-                    this.timeScale.pxToMs(startPx),
-                    this.timeScale.pxToMs(endPx));
+                attrs.onBrushed(new TimeSpan(
+                    this.timeScale.pxToTime(startPx),
+                    this.timeScale.pxToTime(endPx)));
               },
               selectionPx: {
-                start: this.timeScale.msToPx(attrs.visibleWindowMs.start),
-                end: this.timeScale.msToPx(attrs.visibleWindowMs.end)
+                start: this.timeScale.timeToPx(
+                    globals.frontendLocalState.visibleWindowTime.start),
+                end: this.timeScale.timeToPx(
+                    globals.frontendLocalState.visibleWindowTime.end)
               },
             }))));
   },
 } as
     m.Component<
         {
-          visibleWindowMs: {start: number, end: number},
-          maxVisibleWindowMs: {start: number, end: number},
-          onBrushedMs: (start: number, end: number) => void,
+          maxVisibleWindowTime: TimeSpan,
+          onBrushed: (timSpan: TimeSpan) => void,
         },
         {
           timeScale: TimeScale,
@@ -217,7 +218,7 @@ export const OverviewTimeline = {
           contentRect: ClientRect,
           processesById: {[upid: number]: ProcessSummaryData},
           hoveredProcess: ProcessSummaryData | null,
-          hoveredLoad: {timeMs: number, load: number} | null,
+          hoveredLoad: {time: number, load: number} | null,
           onmousemove: (e: MouseEvent) => void,
         }>;
 
