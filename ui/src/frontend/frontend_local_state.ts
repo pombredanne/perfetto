@@ -25,6 +25,9 @@ export class FrontendLocalState {
   visibleWindowTime = new TimeSpan(0, 10);
   timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
 
+  // TODO: there is some redundancy in the fact that both |visibleWindowTime|
+  // and a |timeScale| have a notion of time range. That should live in one
+  // place only.
   updateVisibleTime(ts: TimeSpan) {
     const startSec = Math.max(ts.start, globals.state.traceTime.startSec);
     const endSec = Math.min(ts.end, globals.state.traceTime.endSec);

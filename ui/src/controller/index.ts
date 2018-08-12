@@ -98,6 +98,10 @@ class EngineController {
 
         const numSteps = 100;
         const stepNs = Math.round(traceBounds.duration * 1e9 / numSteps);
+
+        // TODO: the interface for this object should be put in a common file
+        // and shared with the frontend. We need some better solution for the
+        // published track / query data, right now is too free form.
         const overviewData: {[key: string]:
                                  {name: string, load: Uint8Array}} = {};
 
@@ -107,6 +111,8 @@ class EngineController {
             addToTrackActions.push(
                 addTrack(this.config.id, 'CpuSliceTrack', i));
           }
+          // TODO: this query and the one below should be more uniforms. Perhaps
+          // the concepts of "sched" and "slices" tables are redundant.
           const overviewQuery = await engine.rawQuery({
             sqlQuery: `select round(ts/${stepNs})*${stepNs} as quantized_ts, ` +
                 'sum(dur) as load, cpu from sched ' +

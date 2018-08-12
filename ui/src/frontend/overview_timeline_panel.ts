@@ -52,8 +52,8 @@ export class OverviewTimelinePanel implements Panel {
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
 
-    // Draw time labels.
-    const timeHeaderHeight = 25;
+    // Draw time labels on the top header.
+    const headerHeight = 25;
     ctx.font = '10px Google Sans';
     ctx.fillStyle = '#999';
     for (let i = 0; i < 100; i++) {
@@ -62,32 +62,30 @@ export class OverviewTimelinePanel implements Panel {
       if (xPos < 0) continue;
       if (xPos > this.width) break;
       if (i % 10 === 0) {
-        ctx.fillRect(xPos, 0, 1, timeHeaderHeight - 5);
+        ctx.fillRect(xPos, 0, 1, headerHeight - 5);
         ctx.fillText(timeToString(t), xPos + 5, 18);
       } else {
         ctx.fillRect(xPos, 0, 1, 5);
       }
     }
 
-    // Draw quantized density mini-tracks for each process.
+    // Draw mini-tracks with quanitzed density for each process.
     if (globals.queryResults.has(OVERVIEW_QUERY_ID)) {
       const res: {[key: string]: {name: string, load: Uint8Array}} =
           globals.queryResults.get(OVERVIEW_QUERY_ID)!;
       const numProcs = Object.keys(res).length;
+      const hueStep = Math.floor(255 / numProcs);
       let y = 0;
-      let hue = 0;
-      const py = (this.getHeight() - timeHeaderHeight - 2) / numProcs;
+      const trackHeight = (this.getHeight() - headerHeight - 2) / numProcs;
       for (const upid of Object.keys(res)) {
-        console.log(upid, res[upid].name);
         const loads = res[upid].load;
         const px = this.width / loads.length;
         for (let i = 0; i < loads.length; i++) {
-          const lightness = Math.ceil((1 - loads[i] / 255 * 0.7) * 100);
-          ctx.fillStyle = `hsl(${255 - hue}, 50%, ${lightness}%)`;
-          ctx.fillRect(i * px, timeHeaderHeight + y * py, px, py);
+          const lightness = Math.ceil((1 - loads[i] / 0xff * 0.7) * 100);
+          ctx.fillStyle = `hsl(${255 - y * hueStep}, 50%, ${lightness}%)`;
+          ctx.fillRect(i * px, headerHeight + y * trackHeight, px, trackHeight);
         }
         y++;
-        hue += Math.floor(255 / numProcs);
       }
     }
 
@@ -95,7 +93,7 @@ export class OverviewTimelinePanel implements Panel {
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
     ctx.fillRect(0, this.getHeight() - 2, this.width, 2);
 
-    // Draw visible time.
+    // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;
     const vizStartPx = this.timeScale.timeToPx(vizTime.start);
     const vizEndPx = this.timeScale.timeToPx(vizTime.end);

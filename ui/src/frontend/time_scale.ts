@@ -48,14 +48,6 @@ export class TimeScale {
     return px * this.secPerPx;
   }
 
-  getTimeBounds() {
-    return this.timeBounds;
-  }
-
-  getPxBounds() {
-    return `${this.startPx} - ${this.endPx}`;
-  }
-
   setTimeBounds(timeBounds: TimeSpan) {
     this.timeBounds = timeBounds;
     this.updateSlope();

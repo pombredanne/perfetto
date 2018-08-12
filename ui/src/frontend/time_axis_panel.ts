@@ -29,7 +29,6 @@ export class TimeAxisPanel implements Panel {
   }
 
   updateDom(dom: HTMLElement) {
-    // TODO remove this hack.
     this.width = dom.getBoundingClientRect().width;
   }
 

@@ -50,7 +50,6 @@ export class RafScheduler {
     this.maybeScheduleAnimationFrame(true);
   }
 
-  // TODO: this is a hack and should go away.
   syncRedraw() {
     if (this.isRedrawing) return;
     this.isRedrawing = true;
