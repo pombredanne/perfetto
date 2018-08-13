@@ -29,8 +29,7 @@ namespace trace_processor {
 class BlobReader;
 class TraceProcessorContext;
 
-// Reads a protobuf trace in chunks and parses it into a form which is
-// efficient to query.
+// Reads a protobuf trace in chunks and extracts the timestamp.
 class ProtoTraceTokenizer : public ChunkReader {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
@@ -38,7 +37,7 @@ class ProtoTraceTokenizer : public ChunkReader {
   ProtoTraceTokenizer(BlobReader*, TraceProcessorContext*);
   ~ProtoTraceTokenizer() override;
 
-  // TraceParser implementation.
+  // ChunkReader implementation.
 
   // Parses the next chunk of TracePackets from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.
@@ -62,6 +61,9 @@ class ProtoTraceTokenizer : public ChunkReader {
 
   BlobReader* const reader_;
   TraceProcessorContext* context_;
+
+  // Temporary - currently trace packets do not have a timestamp, so the
+  // timestamp given is last_timestamp + 1.
   uint64_t last_timestamp = 0;
   uint32_t chunk_size_ = kTraceChunkSize;
   uint64_t offset_ = 0;

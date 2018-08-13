@@ -22,6 +22,9 @@
 namespace perfetto {
 namespace trace_processor {
 
+// A view of the trace. The buffer is in a shared_ptr so it will be freed
+// when all of the TraceBlobViews have passed through the pipeline and been
+// parsed.
 struct TraceBlobView {
   bool operator==(const TraceBlobView& rhs) const {
     return (buffer == rhs.buffer) && (offset == rhs.offset) &&

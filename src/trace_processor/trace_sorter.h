@@ -51,7 +51,7 @@ class TraceSorter {
   TraceProcessorContext* context_;
   uint64_t window_size_ms_;
 
-  // The most recent is at the beginning
+  // All events, with the most recent at the beginning.
   std::
       map<uint64_t /*timestamp*/, TimestampedTracePiece, std::greater<uint64_t>>
           events_;
