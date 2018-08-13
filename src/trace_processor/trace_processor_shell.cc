@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
   }
 
   base::UnixTaskRunner task_runner;
-  FileReader reader(argv[1]);
+  FileReader reader(argv[1], /*print_progress=*/true);
   TraceProcessor tp(&task_runner);
 
   task_runner.PostTask([&tp, &reader]() {
