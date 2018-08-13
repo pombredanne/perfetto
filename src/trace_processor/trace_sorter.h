@@ -31,30 +31,32 @@ class TraceSorter {
  public:
   TraceSorter(TraceProcessorContext*, uint64_t window_size_ms);
 
-  struct TimestampedTracePiece {
-    TraceBlobView blob_view;
-    bool is_ftrace;
-    uint32_t cpu;
-  };
-
   void PushTracePacket(uint64_t timestamp, TraceBlobView);
   void PushFtracePacket(uint32_t cpu, uint64_t timestamp, TraceBlobView);
 
   // When the file is fully parsed, all remaining events will be flushed.
   void NotifyEOF();
 
+  // For testing.
   void set_window_ms(uint64_t window_size_ms) {
     window_size_ms_ = window_size_ms;
   }
 
  private:
+  struct TimestampedTracePiece {
+    TraceBlobView blob_view;
+    bool is_ftrace;
+    uint32_t cpu;
+  };
+
   TraceProcessorContext* context_;
   uint64_t window_size_ms_;
 
   // All events, with the most recent at the beginning.
-  std::
-      map<uint64_t /*timestamp*/, TimestampedTracePiece, std::greater<uint64_t>>
-          events_;
+  std::map<uint64_t /* timestamp */,
+           TimestampedTracePiece,
+           std::greater<uint64_t>>
+      events_;
 
   // This method passes any events older than window_size_ms to the
   // parser to be parsed and then stored.

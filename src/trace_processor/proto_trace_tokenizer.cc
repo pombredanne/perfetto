@@ -71,32 +71,31 @@ bool ProtoTraceTokenizer::ParseNextChunk() {
     if (fld.id != protos::Trace::kPacketFieldNumber) {
       continue;
     }
-    ParsePacket(fld.data(), fld.size(), buffer);
+    uint64_t offset = static_cast<uint64_t>(fld.data() - buffer.get());
+    TraceBlobView packet_view = {buffer, offset, fld.size()};
+    ParsePacket(packet_view);
   }
 
   offset_ += decoder.offset();
   return true;
 }
 
-void ProtoTraceTokenizer::ParsePacket(const uint8_t* data,
-                                      size_t length,
-                                      std::shared_ptr<uint8_t> buffer) {
-  ProtoDecoder decoder(data, length);
+void ProtoTraceTokenizer::ParsePacket(const TraceBlobView& view) {
+  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
 
   // TODO(taylori): Add a timestamp to TracePacket and read it here.
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kFtraceEventsFieldNumber: {
-        ParseFtraceEventBundle(fld.data(), fld.size(), buffer);
+        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
+        TraceBlobView ftrace_view = {view.buffer, offset, fld.size()};
+        ParseFtraceEventBundle(ftrace_view);
         break;
       }
       default: {
         // Use parent data and length because we want to parse this bit again
-        // to get the exact type of the packet.
-        TraceBlobView view = {
-            buffer, static_cast<uint64_t>(data - buffer.get()) /*offset*/,
-            length};
+        // later to get the exact type of the packet.
         context_->sorter->PushTracePacket(last_timestamp + 1, view);
         break;
       }
@@ -105,11 +104,8 @@ void ProtoTraceTokenizer::ParsePacket(const uint8_t* data,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceTokenizer::ParseFtraceEventBundle(
-    const uint8_t* data,
-    size_t length,
-    std::shared_ptr<uint8_t> buffer) {
-  ProtoDecoder decoder(data, length);
+void ProtoTraceTokenizer::ParseFtraceEventBundle(const TraceBlobView& view) {
+  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
 
   uint64_t cpu = 0;
   if (!FindIntField(&decoder, protos::FtraceEventBundle::kCpuFieldNumber,
@@ -122,8 +118,9 @@ void ProtoTraceTokenizer::ParseFtraceEventBundle(
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEventBundle::kEventFieldNumber: {
-        ParseFtraceEvent(static_cast<uint32_t>(cpu), fld.data(), fld.size(),
-                         buffer);
+        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
+        TraceBlobView ftrace_view = {view.buffer, offset, fld.size()};
+        ParseFtraceEvent(static_cast<uint32_t>(cpu), ftrace_view);
         break;
       }
       default:
@@ -134,10 +131,8 @@ void ProtoTraceTokenizer::ParseFtraceEventBundle(
 }
 
 void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu,
-                                           const uint8_t* data,
-                                           size_t length,
-                                           std::shared_ptr<uint8_t> buffer) {
-  ProtoDecoder decoder(data, length);
+                                           const TraceBlobView& view) {
+  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
 
   uint64_t timestamp = 0;
   if (!FindIntField(&decoder, protos::FtraceEvent::kTimestampFieldNumber,
@@ -149,9 +144,7 @@ void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu,
 
   // We don't need to parse this packet, just push it to be sorted with
   // the timestamp.
-  uint64_t offset = static_cast<uint64_t>(data - buffer.get());
-  TraceBlobView trace_event_view = {buffer, offset, length};
-  context_->sorter->PushFtracePacket(cpu, timestamp, trace_event_view);
+  context_->sorter->PushFtracePacket(cpu, timestamp, view);
 }
 
 }  // namespace trace_processor

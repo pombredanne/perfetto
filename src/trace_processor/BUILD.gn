@@ -63,7 +63,7 @@ source_set("lib") {
     "table.h",
     "thread_table.cc",
     "thread_table.h",
-    "trace_blob_view",
+    "trace_blob_view.h",
     "trace_processor.cc",
     "trace_processor.h",
     "trace_processor_context.cc",

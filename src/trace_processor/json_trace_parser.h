@@ -41,7 +41,7 @@ class JsonTraceParser : public ChunkReader {
   JsonTraceParser(BlobReader*, TraceProcessorContext*);
   ~JsonTraceParser() override;
 
-  // TraceParser implementation.
+  // ChunkReader implementation.
 
   // Parses a batch of JSON events from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.

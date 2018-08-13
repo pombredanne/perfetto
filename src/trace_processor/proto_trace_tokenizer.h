@@ -48,16 +48,9 @@ class ProtoTraceTokenizer : public ChunkReader {
  private:
   static constexpr uint32_t kTraceChunkSize = 16 * 1024 * 1024;  // 16 MB
 
-  void ParsePacket(const uint8_t* data,
-                   size_t length,
-                   std::shared_ptr<uint8_t> buffer);
-  void ParseFtraceEventBundle(const uint8_t* data,
-                              size_t length,
-                              std::shared_ptr<uint8_t> buffer);
-  void ParseFtraceEvent(uint32_t cpu,
-                        const uint8_t* data,
-                        size_t length,
-                        std::shared_ptr<uint8_t> buffer);
+  void ParsePacket(const TraceBlobView&);
+  void ParseFtraceEventBundle(const TraceBlobView&);
+  void ParseFtraceEvent(uint32_t cpu, const TraceBlobView&);
 
   BlobReader* const reader_;
   TraceProcessorContext* context_;
