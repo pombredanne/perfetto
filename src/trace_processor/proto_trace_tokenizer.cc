@@ -94,7 +94,7 @@ void ProtoTraceTokenizer::ParsePacket(const TraceBlobView& view) {
         break;
       }
       default: {
-        // Use parent data and length because we want to parse this bit again
+        // Use parent data and length because we want to parse this again
         // later to get the exact type of the packet.
         context_->sorter->PushTracePacket(last_timestamp + 1, view);
         break;

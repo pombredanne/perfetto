@@ -25,9 +25,9 @@ TraceSorter::TraceSorter(TraceProcessorContext* context,
 
 void TraceSorter::PushTracePacket(uint64_t timestamp,
                                   TraceBlobView trace_view) {
-  TimestampedTracePiece ttp;
-  ttp.is_ftrace = false;
-  ttp.blob_view = trace_view;
+  TimestampedTracePiece ttp = {
+      trace_view, false /* is_ftrace */,
+      0 /* cpu - this field should never be used for non-ftrace packets */};
   events_.emplace(timestamp, ttp);
   FlushEvents();
 }
@@ -35,27 +35,35 @@ void TraceSorter::PushTracePacket(uint64_t timestamp,
 void TraceSorter::PushFtracePacket(uint32_t cpu,
                                    uint64_t timestamp,
                                    TraceBlobView trace_view) {
-  TimestampedTracePiece ttp;
-  ttp.is_ftrace = true;
-  ttp.cpu = cpu;
-  ttp.blob_view = trace_view;
+  TimestampedTracePiece ttp = {trace_view, true /* is_ftrace */, cpu};
   events_.emplace(timestamp, ttp);
   FlushEvents();
 }
 
 void TraceSorter::FlushEvents() {
-  auto it = events_.begin();
-  while (it != events_.end() &&
-         it->first - (events_.rbegin()->first) >= (window_size_ms_ * 1000000)) {
-    if (it->second.is_ftrace) {
-      context_->parser->ParseFtracePacket(
-          it->second.cpu, it->first /*timestamp*/, it->second.blob_view);
+  auto oldest = events_.begin();
+  while (EventReadyToFlush()) {
+    if (oldest->second.is_ftrace) {
+      context_->parser->ParseFtracePacket(oldest->second.cpu,
+                                          oldest->first /*timestamp*/,
+                                          oldest->second.blob_view);
     } else {
-      context_->parser->ParseTracePacket(it->second.blob_view);
+      context_->parser->ParseTracePacket(oldest->second.blob_view);
     }
-    events_.erase(it);
-    it = events_.begin();
+    // This event has now been flushed so remove it.
+    events_.erase(oldest);
+    oldest = events_.begin();
   }
+}
+
+bool TraceSorter::EventReadyToFlush() {
+  if (events_.begin() != events_.end()) {
+    uint64_t oldest_timestamp = events_.begin()->first;
+    uint64_t most_recent_timestamp = events_.rbegin()->first;
+    uint64_t window_size_ns = window_size_ms_ * 1000000;
+    return most_recent_timestamp - oldest_timestamp >= window_size_ns;
+  };
+  return false;
 }
 
 void TraceSorter::NotifyEOF() {

@@ -70,10 +70,12 @@ TEST_F(TraceSorterTest, Ordering) {
   TraceBlobView view_length_2;
   view_length_5.length = 2;
 
-  EXPECT_CALL(*parser_, ParseFtracePacket(2, 1200000000, view));
-  EXPECT_CALL(*parser_, ParseTracePacket(view_length_2));
-  EXPECT_CALL(*parser_, ParseTracePacket(view_length_5));
+  InSequence s;
+
   EXPECT_CALL(*parser_, ParseFtracePacket(0, 1000000000, view));
+  EXPECT_CALL(*parser_, ParseTracePacket(view_length_5));
+  EXPECT_CALL(*parser_, ParseTracePacket(view_length_2));
+  EXPECT_CALL(*parser_, ParseFtracePacket(2, 1200000000, view));
 
   context_.sorter->set_window_ms(200);
   context_.sorter->PushFtracePacket(2 /*cpu*/, 1200000000 /*timestamp*/, view);

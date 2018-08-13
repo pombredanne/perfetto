@@ -52,15 +52,17 @@ class TraceSorter {
   TraceProcessorContext* context_;
   uint64_t window_size_ms_;
 
-  // All events, with the most recent at the beginning.
-  std::map<uint64_t /* timestamp */,
-           TimestampedTracePiece,
-           std::greater<uint64_t>>
-      events_;
+  // All events, with the oldest at the beginning.
+  std::map<uint64_t /* timestamp */, TimestampedTracePiece> events_;
 
   // This method passes any events older than window_size_ms to the
   // parser to be parsed and then stored.
   void FlushEvents();
+
+  // Returns true if the difference between the timestamp of the oldest and
+  // most recent events is larger than the window size. This means the oldest
+  // event should be flushed.
+  bool EventReadyToFlush();
 };
 
 }  // namespace trace_processor
