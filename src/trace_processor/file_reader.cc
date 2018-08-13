@@ -42,6 +42,9 @@ uint32_t FileReader::Read(uint64_t offset, uint32_t len, uint8_t* dst) {
     double progress = size_read * 100.0 / file_size_;
     fprintf(stderr, "\rReading trace: %.2f%% %.1f MB / %.1f MB", progress,
             size_read / 1E6, file_size_ / 1E6);
+    fflush(stderr);
+    if (size_read == file_size_)
+      fprintf(stderr, "\r%80s\r", "");
   }
   return res > 0 ? static_cast<uint32_t>(res) : 0;
 }
