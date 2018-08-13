@@ -15,13 +15,13 @@
  */
 
 #include "src/trace_processor/blob_reader.h"
-#include "src/trace_processor/trace_parser.h"
+#include "src/trace_processor/chunk_reader.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 BlobReader::~BlobReader() {}
-TraceParser::~TraceParser() {}
+ChunkReader::~ChunkReader() {}
 
 }  // namespace trace_processor
 }  // namespace perfetto

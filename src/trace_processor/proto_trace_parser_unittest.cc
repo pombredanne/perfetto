@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/proto_trace_parser.h"
+#include "src/trace_processor/proto_trace_tokenizer.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/trace_sorter.h"
 
 #include "perfetto/trace/trace.pb.h"
 #include "perfetto/trace/trace_packet.pb.h"
@@ -99,12 +101,14 @@ TEST(ProtoTraceParser, LoadSingleEvent) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.ParseNextChunk();
 }
 
 TEST(ProtoTraceParser, LoadMultipleEvents) {
@@ -136,6 +140,8 @@ TEST(ProtoTraceParser, LoadMultipleEvents) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
@@ -143,8 +149,8 @@ TEST(ProtoTraceParser, LoadMultipleEvents) {
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.ParseNextChunk();
 }
 
 TEST(ProtoTraceParser, LoadMultiplePackets) {
@@ -178,6 +184,8 @@ TEST(ProtoTraceParser, LoadMultiplePackets) {
 
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   context.sched_tracker.reset(sched);
   EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
@@ -186,8 +194,8 @@ TEST(ProtoTraceParser, LoadMultiplePackets) {
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.ParseNextChunk();
 }
 
 TEST(ProtoTraceParser, RepeatedLoadSinglePacket) {
@@ -225,18 +233,20 @@ TEST(ProtoTraceParser, RepeatedLoadSinglePacket) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
       .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.set_chunk_size_for_testing(chunk_size);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.set_chunk_size_for_testing(chunk_size);
+  tokenizer.ParseNextChunk();
 
   EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
       .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
-  parser.ParseNextChunk();
+  tokenizer.ParseNextChunk();
 }
 
 TEST(ProtoTraceParserTest, LoadProcessPacket) {
@@ -253,11 +263,13 @@ TEST(ProtoTraceParserTest, LoadProcessPacket) {
   TraceProcessorContext context;
   MockProcessTracker* process_tracker = new MockProcessTracker(&context);
   context.process_tracker.reset(process_tracker);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*process_tracker, UpdateProcess(1, _, _))
       .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.ParseNextChunk();
 }
 
 TEST(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
@@ -276,10 +288,12 @@ TEST(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   TraceProcessorContext context;
   MockProcessTracker* process_tracker = new MockProcessTracker(&context);
   context.process_tracker.reset(process_tracker);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*process_tracker, UpdateProcess(1, _, _))
       .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
+  ProtoTraceTokenizer parser(&reader, &context);
   parser.ParseNextChunk();
 }
 
@@ -294,10 +308,12 @@ TEST(ProtoTraceParserTest, LoadThreadPacket) {
   TraceProcessorContext context;
   MockProcessTracker* process_tracker = new MockProcessTracker(&context);
   context.process_tracker.reset(process_tracker);
+  context.sorter.reset(new TraceSorter(&context, 0 /*window size*/));
+  context.parser.reset(new ProtoTraceParser(&context));
   EXPECT_CALL(*process_tracker, UpdateThread(1, 2));
   FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceParser parser(&reader, &context);
-  parser.ParseNextChunk();
+  ProtoTraceTokenizer tokenizer(&reader, &context);
+  tokenizer.ParseNextChunk();
 }
 
 }  // namespace

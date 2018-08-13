@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_processor_context.h"
-#include "src/trace_processor/chunk_reader.h"
-#include "src/trace_processor/json_trace_parser.h"
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/proto_trace_parser.h"
-#include "src/trace_processor/sched_tracker.h"
-#include "src/trace_processor/trace_sorter.h"
+#ifndef SRC_TRACE_PROCESSOR_TRACE_BLOB_VIEW_H_
+#define SRC_TRACE_PROCESSOR_TRACE_BLOB_VIEW_H_
+
+#include <memory>
 
 namespace perfetto {
 namespace trace_processor {
 
-TraceProcessorContext::TraceProcessorContext() = default;
-TraceProcessorContext::~TraceProcessorContext() = default;
-
+struct TraceBlobView {
+  bool operator==(const TraceBlobView& rhs) const {
+    return (buffer == rhs.buffer) && (offset == rhs.offset) &&
+           (length == rhs.length);
+  }
+  std::shared_ptr<uint8_t> buffer;
+  uint64_t offset;
+  size_t length;
+};
 }  // namespace trace_processor
 }  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_TRACE_BLOB_VIEW_H_
