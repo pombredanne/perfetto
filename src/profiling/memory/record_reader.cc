@@ -26,6 +26,8 @@ namespace perfetto {
 
 namespace {
 constexpr size_t kMaxRecordSize = 8 * 1024 * 1024;  // 8 MiB
+static_assert(kMaxRecordSize <= std::numeric_limits<size_t>::max(),
+              "kMaxRecordSize must fit into size_t");
 }
 
 RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
@@ -34,7 +36,8 @@ RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
             sizeof(record_size_buf_) - read_idx_};
   PERFETTO_DCHECK(read_idx_ < record_.size + sizeof(record_size_buf_));
   const size_t buf_off = read_idx_ - sizeof(record_size_buf_);
-  return {record_.data.get() + buf_off, record_.size - buf_off};
+  return {record_.data.get() + buf_off,
+          static_cast<size_t>(record_.size) - buf_off};
 }
 
 RecordReader::Result RecordReader::EndReceive(size_t recv_size,
@@ -51,7 +54,9 @@ RecordReader::Result RecordReader::EndReceive(size_t recv_size,
     memcpy(&record_.size, record_size_buf_, sizeof(record_size_buf_));
     if (record_.size > kMaxRecordSize)
       return Result::KillConnection;
-    record_.data.reset(new uint8_t[record_.size]);
+    record_.data.reset(new (std::nothrow) uint8_t[record_.size]);
+    if (!record_.data)
+      return Result::KillConnection;
   }
 
   if (read_idx_ == record_.size + sizeof(record_size_buf_)) {
