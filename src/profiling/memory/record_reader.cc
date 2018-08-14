@@ -53,7 +53,9 @@ RecordReader::Result RecordReader::EndReceive(size_t recv_size,
     memcpy(&record_.size, record_size_buf_, sizeof(record_size_buf_));
     if (record_.size > kMaxRecordSize)
       return Result::KillConnection;
-    record_.data.reset(new uint8_t[record_.size]);
+    record_.data.reset(new (std::nothrow) uint8_t[record_.size]);
+    if (!record_.data)
+      return Result::KillConnection;
   }
 
   if (read_idx_ == record_.size + sizeof(record_size_buf_)) {
