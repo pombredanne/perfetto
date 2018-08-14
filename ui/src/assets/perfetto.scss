@@ -223,12 +223,18 @@ button.close {
     }
 }
 
+.panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
 .track {
-    border-bottom: 1px solid #c7d0db;
-    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: 1fr;
+    border-top: 1px solid #c7d0db;
     .track-shell {
-        height: 100%;
-        position: absolute;
         padding: 0 20px;
         display: grid;
         grid-template-areas:
@@ -260,13 +266,6 @@ button.close {
             border: none;
             outline: none;
         }
-    }
-    .track-content {
-      position: absolute;
-      left: 300px;
-      /* TODO(hjd): Remove this calc. */
-      width: calc(100% - 300px);
-      height: 100%;
     }
 }
 
