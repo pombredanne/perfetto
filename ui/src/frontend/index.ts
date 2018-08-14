@@ -17,15 +17,18 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
-import {State} from '../common/state';
-import {createEmptyState} from '../common/state';
+import {setState} from '../common/actions';
+import {loadState} from '../common/permalinks';
+import {createEmptyState, State} from '../common/state';
 import {
   takeWasmEngineWorkerPort,
-  warmupWasmEngineWorker
+  warmupWasmEngineWorker,
 } from '../controller/wasm_engine_proxy';
 
+import {FrontendLocalState} from './frontend_local_state';
 import {globals} from './globals';
 import {HomePage} from './home_page';
+import {RafScheduler} from './raf_scheduler';
 import {ViewerPage} from './viewer_page';
 
 function createController(): Worker {
@@ -80,10 +83,16 @@ async function main() {
   const channel = new MessageChannel();
   forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
-  globals.state = createEmptyState();
-  globals.dispatch = controller.postMessage.bind(controller);
-  globals.trackDataStore = new Map<string, {}>();
-  globals.queryResults = new Map<string, {}>();
+
+  globals.initialize(
+      controller.postMessage.bind(controller),  // dispatch
+      createEmptyState(),                       // state
+      new Map<string, {}>(),                    // trackDataStore
+      new Map<string, {}>(),                    // queryResults
+      new FrontendLocalState(),                 // frontendState
+      new RafScheduler(),                       // rafSheduler
+      );
+
   warmupWasmEngineWorker();
 
   m.route(document.body, '/', {
@@ -91,10 +100,20 @@ async function main() {
     '/viewer': ViewerPage,
   });
 
-  // tslint:disable-next-line no-any
-  (window as any).m = m;
-  // tslint:disable-next-line no-any
-  (window as any).globals = globals;
+  // Put these variables in the global scope for better debugging.
+  (window as {} as {m: {}}).m = m;
+  (window as {} as {globals: {}}).globals = globals;
+
+  const stateHash = m.route.param('s');
+  if (stateHash) {
+    const state = await loadState(stateHash);
+    globals.dispatch(setState(state));
+  }
+
+  // Prevent pinch zoom.
+  document.body.addEventListener('wheel', (e: MouseEvent) => {
+    if (e.ctrlKey) e.preventDefault();
+  });
 }
 
 main();

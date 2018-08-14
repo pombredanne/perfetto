@@ -60,8 +60,17 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
     }
   }
   RecordReader::Record record;
-  if (entry.record_reader.EndReceive(rd, &record))
-    RecordReceived(self, record.size, std::move(record.data));
+  auto status = entry.record_reader.EndReceive(rd, &record);
+  switch (status) {
+    case (RecordReader::Result::Noop):
+      break;
+    case (RecordReader::Result::RecordReceived):
+      RecordReceived(self, record.size, std::move(record.data));
+      break;
+    case (RecordReader::Result::KillConnection):
+      self->Shutdown(true);
+      break;
+  }
 }
 
 void SocketListener::InitProcess(Entry* entry,

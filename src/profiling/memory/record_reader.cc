@@ -24,33 +24,52 @@
 
 namespace perfetto {
 
-RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
-  if (read_idx_ < sizeof(record_size_))
-    return {&record_size_, sizeof(record_size_) - read_idx_};
-  return {
-      buf_.get() + read_idx_ - sizeof(record_size_),
-      (static_cast<size_t>(record_size_) + sizeof(record_size_) - read_idx_)};
+namespace {
+constexpr size_t kMaxRecordSize = 8 * 1024 * 1024;  // 8 MiB
+static_assert(kMaxRecordSize <= std::numeric_limits<size_t>::max(),
+              "kMaxRecordSize must fit into size_t");
 }
 
-bool RecordReader::EndReceive(size_t recv_size, Record* record) {
-  read_idx_ += recv_size;
-  if (read_idx_ == sizeof(record_size_))
-    buf_.reset(new uint8_t[record_size_]);
+RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
+  if (read_idx_ < sizeof(record_size_buf_))
+    return {&record_size_buf_[0] + read_idx_,
+            sizeof(record_size_buf_) - read_idx_};
+  PERFETTO_DCHECK(read_idx_ < record_.size + sizeof(record_size_buf_));
+  const size_t buf_off = read_idx_ - sizeof(record_size_buf_);
+  return {record_.data.get() + buf_off,
+          static_cast<size_t>(record_.size) - buf_off};
+}
 
-  if (read_idx_ == record_size_ + sizeof(record_size_)) {
-    std::unique_ptr<uint8_t[]> ret = std::move(buf_);
-    size_t size = record_size_;
-    Reset();
-    record->data = std::move(ret);
-    record->size = size;
-    return true;
+RecordReader::Result RecordReader::EndReceive(size_t recv_size,
+                                              Record* record) {
+  if (record_.size == 0)
+    // Still receiving header.
+    PERFETTO_DCHECK(recv_size <= sizeof(uint64_t) - read_idx_);
+  else
+    // Receiving payload.
+    PERFETTO_DCHECK(record_.data && recv_size <= record_.size);
+
+  read_idx_ += recv_size;
+  if (read_idx_ == sizeof(record_size_buf_)) {
+    memcpy(&record_.size, record_size_buf_, sizeof(record_size_buf_));
+    if (record_.size > kMaxRecordSize)
+      return Result::KillConnection;
+    record_.data.reset(new (std::nothrow) uint8_t[record_.size]);
+    if (!record_.data)
+      return Result::KillConnection;
   }
-  return false;
+
+  if (read_idx_ == record_.size + sizeof(record_size_buf_)) {
+    *record = std::move(record_);
+    Reset();
+    return Result::RecordReceived;
+  }
+  return Result::Noop;
 }
 
 void RecordReader::Reset() {
   read_idx_ = 0;
-  record_size_ = 0;
+  record_.size = 0;
 }
 
 }  // namespace perfetto

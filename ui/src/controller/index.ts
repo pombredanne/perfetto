@@ -19,19 +19,23 @@ import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
 import {
   Action,
+  addChromeSliceTrack,
   addTrack,
   deleteQuery,
   navigate,
-  setEngineReady
+  setEngineReady,
+  setTraceTime
 } from '../common/actions';
+import {PERMALINK_ID, saveState, saveTrace} from '../common/permalinks';
 import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
 import {QueryResponse} from '../common/queries';
 import {
   createEmptyState,
   EngineConfig,
+  PermalinkConfig,
   QueryConfig,
   State,
-  TrackState
+  TrackState,
 } from '../common/state';
 
 import {Engine} from './engine';
@@ -87,10 +91,95 @@ class EngineController {
       case 'ready':
         const engine = assertExists<Engine>(this.engine);
         const numberOfCpus = await engine.getNumberOfCpus();
-        const addToTrackActions = [];
-        for (let i = 0; i < numberOfCpus; i++) {
-          addToTrackActions.push(addTrack(this.config.id, 'CpuSliceTrack', i));
+        const addToTrackActions: Action[] = [];
+        const traceBounds = await engine.getTraceTimeBounds();
+        addToTrackActions.push(
+            setTraceTime(traceBounds.start, traceBounds.end));
+
+        const numSteps = 100;
+        const stepNs = Math.round(traceBounds.duration * 1e9 / numSteps);
+
+        // TODO: the interface for this object should be put in a common file
+        // and shared with the frontend. We need some better solution for the
+        // published track / query data, right now is too free form.
+        const overviewData: {[key: string]:
+                                 {name: string, load: Uint8Array}} = {};
+
+        if (numberOfCpus > 0) {
+          // This is a sched slice trace.
+          for (let i = 0; i < numberOfCpus; i++) {
+            addToTrackActions.push(
+                addTrack(this.config.id, 'CpuSliceTrack', i));
+          }
+          // TODO: this query and the one below should be more uniforms. Perhaps
+          // the concepts of "sched" and "slices" tables are redundant.
+          const overviewQuery = await engine.rawQuery({
+            sqlQuery: `select round(ts/${stepNs})*${stepNs} as quantized_ts, ` +
+                'sum(dur) as load, cpu from sched ' +
+                'group by quantized_ts, cpu order by cpu limit 10000'
+          });
+          let lastCpu = -1;
+          let loadIdx = 0;
+          for (let i = 0; i < overviewQuery.numRecords; i++) {
+            const load = overviewQuery.columns[1].longValues![i] as number;
+            const cpu = overviewQuery.columns[2].longValues![i] as number;
+            if (cpu !== lastCpu) {
+              overviewData[cpu] = {
+                name: `CPU${cpu}`,
+                load: new Uint8Array(numSteps)
+              };
+              lastCpu = cpu;
+              loadIdx = 0;
+            }
+            overviewData[cpu].load[loadIdx++] = (load / stepNs) * 255;
+          }
+        } else if ((await engine.getNumberOfProcesses()) > 0) {
+          const overviewQuery = await engine.rawQuery({
+            sqlQuery: `select round(ts/${stepNs})*${stepNs} as quantized_ts, ` +
+                `sum(dur) as load, upid, process.name ` +
+                'from slices inner join thread using(utid) ' +
+                'inner join  process using(upid) where depth = 0 ' +
+                'group by quantized_ts, upid  order by upid limit 10000'
+          });
+          let lastUpid = -1;
+          let loadIdx = 0;
+          for (let i = 0; i < overviewQuery.numRecords; i++) {
+            const load = overviewQuery.columns[1].longValues![i] as number;
+            const upid = overviewQuery.columns[2].longValues![i] as number;
+            const procName = overviewQuery.columns[3].stringValues![i];
+            if (upid !== lastUpid) {
+              overviewData[upid] = {
+                name: procName,
+                load: new Uint8Array(numSteps)
+              };
+              lastUpid = upid;
+              loadIdx = 0;
+            }
+            overviewData[upid].load[loadIdx++] = (load / stepNs) * 255;
+          }
+
+          const threadQuery = await engine.rawQuery({
+            sqlQuery:
+                'select upid, utid, tid, thread.name, max(slices.depth) ' +
+                'from thread inner join slices using(utid) group by utid'
+          });
+          for (let i = 0; i < threadQuery.numRecords; i++) {
+            const upid = threadQuery.columns[0].longValues![i];
+            const utid = threadQuery.columns[1].longValues![i];
+            const threadId = threadQuery.columns[2].longValues![i];
+            let threadName = threadQuery.columns[3].stringValues![i];
+            threadName += `[${threadId}]`;
+            const maxDepth = threadQuery.columns[4].longValues![i];
+            addToTrackActions.push(addChromeSliceTrack(
+                this.config.id,
+                'ChromeSliceTrack',
+                upid as number,
+                utid as number,
+                threadName,
+                maxDepth as number));
+          }
         }
+        this.controller.publishQueryResult('overview_query', overviewData);
         this.controller.dispatchMultiple(addToTrackActions);
         this.deferredOnReady.forEach(d => d.resolve(engine));
         this.deferredOnReady.clear();
@@ -154,7 +243,7 @@ class QueryController {
       const rawResult = await engine.rawQuery({sqlQuery: config.query});
       const end = performance.now();
       const columns = rawQueryResultColumns(rawResult);
-      const rows = firstN<Row>(100, rawQueryResultIter(rawResult));
+      const rows = firstN<Row>(10000, rawQueryResultIter(rawResult));
       const result: QueryResponse = {
         id: config.id,
         query: config.query,
@@ -164,18 +253,59 @@ class QueryController {
         columns,
         rows,
       };
+      console.log(`Query ${config.query} took ${result.durationMs} ms`);
       controller.publishQueryResult(config.id, result);
       controller.dispatch(deleteQuery(config.id));
     });
   }
 }
 
+async function createPermalink(
+    config: PermalinkConfig, controller: Controller) {
+  const state = {...config.state};
+  state.engines = {...state.engines};
+  state.permalink = null;
+  for (const engine of Object.values<EngineConfig>(state.engines)) {
+    if (typeof engine.source === 'string') {
+      continue;
+    }
+    const url = await saveTrace(engine.source);
+    // TODO(hjd): Post to controller.
+    engine.source = url;
+  }
+  const url = await saveState(state);
+  controller.publishTrackData(PERMALINK_ID, {
+    url,
+  });
+}
+
+class PermalinkController {
+  private readonly controller: Controller;
+  private config: PermalinkConfig|null;
+
+  constructor(controller: Controller) {
+    this.controller = controller;
+    this.config = null;
+  }
+
+  updateConfig(config: PermalinkConfig|null) {
+    if (this.config === config) {
+      return;
+    }
+    this.config = config;
+    if (this.config) {
+      createPermalink(this.config, this.controller);
+    }
+  }
+}
+
 class Controller {
   private state: State;
-  private frontend: FrontendProxy;
+  private readonly frontend: FrontendProxy;
   private readonly engines: Map<string, EngineController>;
   private readonly tracks: Map<string, TrackControllerWrapper>;
   private readonly queries: Map<string, QueryController>;
+  private readonly permalink: PermalinkController;
 
   constructor(frontend: FrontendProxy) {
     this.state = createEmptyState();
@@ -183,6 +313,7 @@ class Controller {
     this.engines = new Map();
     this.tracks = new Map();
     this.queries = new Map();
+    this.permalink = new PermalinkController(this);
   }
 
   dispatch(action: Action): void {
@@ -193,6 +324,8 @@ class Controller {
     for (const action of actions) {
       this.state = rootReducer(this.state, action);
     }
+
+    this.permalink.updateConfig(this.state.permalink);
 
     // TODO(hjd): Handle teardown.
     for (const config of Object.values<EngineConfig>(this.state.engines)) {

@@ -78,6 +78,17 @@ uint8_t* GetStackBase() {
   return x + s;
 }
 
+// This is needed because ASAN thinks copying the whole stack is a buffer
+// underrun.
+void __attribute__((noinline))
+UnsafeMemcpy(void* dst, const void* src, size_t n)
+    __attribute__((no_sanitize("address"))) {
+  const uint8_t* from = reinterpret_cast<const uint8_t*>(src);
+  uint8_t* to = reinterpret_cast<uint8_t*>(dst);
+  for (size_t i = 0; i < n; ++i)
+    to[i] = from[i];
+}
+
 std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
   const uint8_t* stackbase = GetStackBase();
   PERFETTO_CHECK(stackbase != nullptr);
@@ -89,9 +100,13 @@ std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
 
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
 
-  unwindstack::Regs* regs = unwindstack::Regs::CreateFromLocal();
-  const size_t reg_size = RegSize(regs->CurrentArch());
+  std::unique_ptr<unwindstack::Regs> regs(unwindstack::Regs::CreateFromLocal());
+  const unwindstack::ArchEnum arch = regs->CurrentArch();
+
+  const size_t reg_size = RegSize(arch);
   const size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
+  PERFETTO_LOG("reg_size: %zd, total_size: %zu, stack_size: %zd", reg_size,
+               total_size, stack_size);
 
   std::unique_ptr<uint8_t[]> buf(new uint8_t[total_size]);
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(buf.get());
@@ -99,16 +114,17 @@ std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
   metadata->alloc_address = 0;
   metadata->stack_pointer = reinterpret_cast<uint64_t>(stacktop);
   metadata->stack_pointer_offset = sizeof(AllocMetadata) + reg_size;
-  metadata->arch = regs->CurrentArch();
+  metadata->arch = arch;
 
-  unwindstack::RegsGetLocal(regs);
+  unwindstack::RegsGetLocal(regs.get());
   // Make sure nothing above has changed the stack pointer, just for extra
   // paranoia.
   PERFETTO_CHECK(stacktop ==
                  reinterpret_cast<uint8_t*>(__builtin_frame_address(0)));
 
   memcpy(buf.get() + sizeof(AllocMetadata), regs->RawData(), reg_size);
-  memcpy(buf.get() + sizeof(AllocMetadata) + reg_size, stacktop, stack_size);
+  UnsafeMemcpy(buf.get() + sizeof(AllocMetadata) + reg_size, stacktop,
+               stack_size);
   return {std::move(buf), total_size};
 }
 
@@ -121,7 +137,7 @@ TEST(UnwindingTest, DoUnwind) {
   std::vector<unwindstack::FrameData> out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   PERFETTO_LOG("%s %" PRIu64, out[0].map_name.c_str(), out[0].pc);
-  PERFETTO_LOG("%s", metadata.maps.Find(out[0].pc)->name.c_str());
+  //  PERFETTO_LOG("%s", metadata.maps.Find(out[0].pc)->name.c_str());
   ASSERT_EQ(out[1].function_name, "GetRecord");
 }
 

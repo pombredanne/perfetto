@@ -28,7 +28,8 @@ TEST(RecordReaderTest, ZeroLengthRecord) {
   ASSERT_EQ(buf.size, sizeof(uint64_t));
   memcpy(buf.data, &size, sizeof(size));
   RecordReader::Record record;
-  ASSERT_TRUE(record_reader.EndReceive(sizeof(size), &record));
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size), &record),
+            RecordReader::Result::RecordReceived);
   ASSERT_EQ(record.size, 0);
 }
 
@@ -39,11 +40,36 @@ TEST(RecordReaderTest, OneRecord) {
   ASSERT_EQ(buf.size, sizeof(uint64_t));
   memcpy(buf.data, &size, sizeof(size));
   RecordReader::Record record;
-  ASSERT_FALSE(record_reader.EndReceive(sizeof(size), &record));
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size), &record),
+            RecordReader::Result::Noop);
   buf = record_reader.BeginReceive();
   ASSERT_EQ(buf.size, 1);
   memcpy(buf.data, "1", 1);
-  ASSERT_TRUE(record_reader.EndReceive(1, &record));
+  ASSERT_EQ(record_reader.EndReceive(1, &record),
+            RecordReader::Result::RecordReceived);
+  ASSERT_EQ(record.size, 1);
+}
+
+TEST(RecordReaderTest, OneRecordPartialSize) {
+  RecordReader record_reader;
+  uint64_t size = 1;
+  RecordReader::ReceiveBuffer buf = record_reader.BeginReceive();
+  ASSERT_EQ(buf.size, sizeof(uint64_t));
+  memcpy(buf.data, &size, sizeof(size) / 2);
+  RecordReader::Record record;
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size) / 2, &record),
+            RecordReader::Result::Noop);
+  buf = record_reader.BeginReceive();
+  ASSERT_EQ(buf.size, sizeof(uint64_t) / 2);
+  memcpy(buf.data, reinterpret_cast<uint8_t*>(&size) + sizeof(size) / 2,
+         sizeof(size) / 2);
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size) / 2, &record),
+            RecordReader::Result::Noop);
+  buf = record_reader.BeginReceive();
+  ASSERT_EQ(buf.size, 1);
+  memcpy(buf.data, "1", 1);
+  ASSERT_EQ(record_reader.EndReceive(1, &record),
+            RecordReader::Result::RecordReceived);
   ASSERT_EQ(record.size, 1);
 }
 
@@ -54,26 +80,30 @@ TEST(RecordReaderTest, TwoRecords) {
   ASSERT_EQ(buf.size, sizeof(uint64_t));
   memcpy(buf.data, &size, sizeof(size));
   RecordReader::Record record;
-  ASSERT_FALSE(record_reader.EndReceive(sizeof(size), &record));
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size), &record),
+            RecordReader::Result::Noop);
   buf = record_reader.BeginReceive();
   ASSERT_EQ(buf.size, 1);
   memcpy(buf.data, "1", 1);
-  ASSERT_TRUE(record_reader.EndReceive(1, &record));
+  ASSERT_EQ(record_reader.EndReceive(1, &record),
+            RecordReader::Result::RecordReceived);
   ASSERT_EQ(record.size, 1);
 
   size = 2;
   buf = record_reader.BeginReceive();
   ASSERT_EQ(buf.size, sizeof(uint64_t));
   memcpy(buf.data, &size, sizeof(size));
-  ASSERT_FALSE(record_reader.EndReceive(sizeof(size), &record));
+  ASSERT_EQ(record_reader.EndReceive(sizeof(size), &record),
+            RecordReader::Result::Noop);
   buf = record_reader.BeginReceive();
   ASSERT_EQ(buf.size, 2);
   memcpy(buf.data, "1", 1);
-  ASSERT_FALSE(record_reader.EndReceive(1, &record));
+  ASSERT_EQ(record_reader.EndReceive(1, &record), RecordReader::Result::Noop);
   buf = record_reader.BeginReceive();
   ASSERT_EQ(buf.size, 1);
   memcpy(buf.data, "2", 1);
-  ASSERT_TRUE(record_reader.EndReceive(1, &record));
+  ASSERT_EQ(record_reader.EndReceive(1, &record),
+            RecordReader::Result::RecordReceived);
   ASSERT_EQ(record.size, 2);
   ASSERT_EQ(record.data[0], '1');
   ASSERT_EQ(record.data[1], '2');

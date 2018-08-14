@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+#include <unwindstack/MachineArm.h>
+#include <unwindstack/MachineArm64.h>
+#include <unwindstack/MachineMips.h>
+#include <unwindstack/MachineMips64.h>
+#include <unwindstack/MachineX86.h>
+#include <unwindstack/MachineX86_64.h>
 #include <unwindstack/Memory.h>
 #include <unwindstack/Regs.h>
 #include <unwindstack/RegsArm.h>
@@ -69,31 +75,27 @@ unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
 size_t RegSize(unwindstack::ArchEnum arch) {
   switch (arch) {
     case unwindstack::ARCH_X86:
-      return sizeof(unwindstack::x86_user_regs);
+      return unwindstack::X86_REG_LAST * sizeof(uint32_t);
     case unwindstack::ARCH_X86_64:
-      return sizeof(unwindstack::x86_64_user_regs);
+      return unwindstack::X86_64_REG_LAST * sizeof(uint64_t);
     case unwindstack::ARCH_ARM:
-      return sizeof(unwindstack::arm_user_regs);
+      return unwindstack::ARM_REG_LAST * sizeof(uint32_t);
     case unwindstack::ARCH_ARM64:
-      return sizeof(unwindstack::arm64_user_regs);
+      return unwindstack::ARM64_REG_LAST * sizeof(uint64_t);
     case unwindstack::ARCH_MIPS:
-      return sizeof(unwindstack::mips_user_regs);
+      return unwindstack::MIPS_REG_LAST * sizeof(uint32_t);
     case unwindstack::ARCH_MIPS64:
-      return sizeof(unwindstack::mips64_user_regs);
+      return unwindstack::MIPS64_REG_LAST * sizeof(uint64_t);
     case unwindstack::ARCH_UNKNOWN:
       return 0;
   }
 }
 
 StackMemory::StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
-    : mem_fd_(mem_fd),
-      sp_(sp),
-      stack_end_(sp + size),
-      stack_(stack),
-      size_(size) {}
+    : mem_fd_(mem_fd), sp_(sp), stack_end_(sp + size), stack_(stack) {}
 
 size_t StackMemory::Read(uint64_t addr, void* dst, size_t size) {
-  if (addr >= sp_ && addr + size_ <= stack_end_) {
+  if (addr >= sp_ && addr + size <= stack_end_ && addr + size > sp_) {
     size_t offset = addr - sp_;
     memcpy(dst, stack_ + offset, size);
     return size;
@@ -129,7 +131,6 @@ bool FileDescriptorMaps::Parse() {
             strncmp(name + 5, "ashmem/", 7) != 0) {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
-        printf("%" PRIu64 " - %" PRIu64 " %s\n", start, end, name);
         maps_.push_back(
             new unwindstack::MapInfo(start, end, pgoff, flags, name));
       });
@@ -154,7 +155,8 @@ bool DoUnwind(void* mem,
     return false;
 
   void* reg_data = static_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
-  unwindstack::Regs* regs = CreateFromRawData(alloc_metadata->arch, reg_data);
+  std::unique_ptr<unwindstack::Regs> regs(
+      CreateFromRawData(alloc_metadata->arch, reg_data));
 
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
@@ -172,21 +174,19 @@ bool DoUnwind(void* mem,
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
-  unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs, mems);
+  unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
   unwinder.SetResolveNames(true);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
-  int error_code = 0;
+  uint8_t error_code = 0;
   for (int attempt = 0; attempt < 2; ++attempt) {
     unwinder.Unwind();
     error_code = unwinder.LastErrorCode();
     if (error_code != 0) {
-      PERFETTO_DCHECK(false);
-      PERFETTO_DLOG("Error: %d", error_code);
+      //      PERFETTO_DCHECK(false);
       if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
         metadata->maps.Reset();
         metadata->maps.Parse();
-        metadata->maps.Sort();
       } else {
         break;
       }
@@ -196,6 +196,8 @@ bool DoUnwind(void* mem,
   }
   if (error_code == 0)
     *out = unwinder.frames();
+  else
+    PERFETTO_ELOG("unwinding failed %" PRIu8, error_code);
   return error_code == 0;
 }
 
