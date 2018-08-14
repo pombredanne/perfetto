@@ -36,7 +36,8 @@ RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
             sizeof(record_size_buf_) - read_idx_};
   PERFETTO_DCHECK(read_idx_ < record_.size + sizeof(record_size_buf_));
   const size_t buf_off = read_idx_ - sizeof(record_size_buf_);
-  return {record_.data.get() + buf_off, record_.size - buf_off};
+  return {record_.data.get() + buf_off,
+          static_cast<size_t>(record_.size) - buf_off};
 }
 
 RecordReader::Result RecordReader::EndReceive(size_t recv_size,

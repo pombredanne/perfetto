@@ -30,9 +30,7 @@ class RecordReader {
  public:
   struct ReceiveBuffer {
     uint8_t* data;
-    // This is not size_t so we can directly copy the received uint64_t
-    // into it.
-    uint64_t size;
+    size_t size;
   };
 
   enum class Result {
@@ -43,7 +41,9 @@ class RecordReader {
 
   struct Record {
     std::unique_ptr<uint8_t[]> data;
-    size_t size = 0;
+    // This is not size_t so we can directly copy the received uint64_t
+    // into it.
+    uint64_t size = 0;
   };
 
   ReceiveBuffer BeginReceive();
