@@ -225,24 +225,29 @@ button.close {
 
 .track {
     border-bottom: 1px solid #c7d0db;
-    left: 0;
     width: 100%;
     .track-shell {
-        background: #fff;
-        padding: 20px;
-        border-right: 1px solid #c7d0db;
         height: 100%;
+        position: absolute;
+        padding: 0 20px;
+        display: grid;
+        grid-template-areas:
+          "title up"
+          "title down";
+        align-items: center;
+        width: 300px;
+        background: #fff;
+        border-right: 1px solid #c7d0db;
         h1 {
+            grid-area: title;
             margin: 0;
             font-size: 1em;
             text-overflow: ellipsis;
             font-family: 'Google Sans';
             color: hsl(213, 22%, 30%);
-            width: 90%;
         }
         .track-move-icons {
-            position: absolute;
-            right: 10px;
+            justify-self: end;
             color: #fff;
             font-weight: bold;
             text-align: center;
@@ -255,6 +260,13 @@ button.close {
             border: none;
             outline: none;
         }
+    }
+    .track-content {
+      position: absolute;
+      left: 300px;
+      /* TODO(hjd): Remove this calc. */
+      width: calc(100% - 300px);
+      height: 100%;
     }
 }
 
