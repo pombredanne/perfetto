@@ -316,11 +316,13 @@ SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu,
   PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
 
   auto min_it = std::lower_bound(start_ns.begin(), start_ns.end(), min_ts);
-  auto max_it = std::upper_bound(start_ns.begin(), start_ns.end(), max_ts);
+  auto max_it = std::upper_bound(min_it, start_ns.end(), max_ts);
   ptrdiff_t dist = std::distance(min_it, max_it);
   PERFETTO_CHECK(dist >= 0 && static_cast<size_t>(dist) <= start_ns.size());
 
   std::vector<uint32_t> indices(static_cast<size_t>(dist));
+
+  // Fill |indices| with the consecutive row numbers affected by the filtering.
   std::iota(indices.begin(), indices.end(),
             std::distance(start_ns.begin(), min_it));
 
