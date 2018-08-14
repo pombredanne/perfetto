@@ -21,7 +21,6 @@ import {
   Action,
   addChromeSliceTrack,
   addTrack,
-  deleteQuery,
   navigate,
   setEngineReady,
   setTraceTime
@@ -38,6 +37,7 @@ import {
   TrackState,
 } from '../common/state';
 
+import {CreateUpdateDestroy} from './controller';
 import {Engine} from './engine';
 import {rootReducer} from './reducer';
 import {TrackController} from './track_controller';
@@ -235,28 +235,68 @@ function firstN<T>(n: number, iter: IterableIterator<T>): T[] {
 }
 
 class QueryController {
+  private readonly controller: Controller;
+  private readonly engineController: EngineController;
+  private config: QueryConfig;
+  private query: null|Promise<QueryResponse>;
+
   constructor(
       config: QueryConfig, controller: Controller,
       engineController: EngineController) {
-    engineController.waitForReady().then(async engine => {
-      const start = performance.now();
-      const rawResult = await engine.rawQuery({sqlQuery: config.query});
-      const end = performance.now();
-      const columns = rawQueryResultColumns(rawResult);
-      const rows = firstN<Row>(10000, rawQueryResultIter(rawResult));
-      const result: QueryResponse = {
-        id: config.id,
-        query: config.query,
-        durationMs: Math.round(end - start),
-        error: rawResult.error,
-        totalRowCount: +rawResult.numRecords,
-        columns,
-        rows,
-      };
-      console.log(`Query ${config.query} took ${result.durationMs} ms`);
-      controller.publishQueryResult(config.id, result);
-      controller.dispatch(deleteQuery(config.id));
+    this.config = config;
+    this.controller = controller;
+    this.engineController = engineController;
+    this.query = null;
+    this.doQuery();
+  }
+
+  update(config: QueryConfig): void {
+    if (this.config === config) {
+      return;
+    }
+    this.config = config;
+    // TODO(hjd): Maybe cancel query here?
+    this.query = null;
+    this.doQuery();
+  }
+
+  destroy(): void {
+    // TODO(hjd): Maybe cancel query here?
+    this.query = null;
+  }
+
+  doQuery(): void {
+    const localConfig = this.config;
+    const query =
+        QueryController.issueQuery(localConfig, this.engineController);
+    this.query = query;
+    query.then(result => {
+      // If the query has updated in the mean time don't publish the result:
+      if (this.query === query) return;
+      this.controller.publishQueryResult(result.id, result);
     });
+  }
+
+  static async issueQuery(
+      config: QueryConfig,
+      engineController: EngineController): Promise<QueryResponse> {
+    const engine = await engineController.waitForReady();
+    const start = performance.now();
+    const rawResult = await engine.rawQuery({sqlQuery: config.query});
+    const end = performance.now();
+    const columns = rawQueryResultColumns(rawResult);
+    const rows = firstN<Row>(10000, rawQueryResultIter(rawResult));
+    const result: QueryResponse = {
+      id: config.id,
+      query: config.query,
+      durationMs: Math.round(end - start),
+      error: rawResult.error,
+      totalRowCount: +rawResult.numRecords,
+      columns,
+      rows,
+    };
+    console.log(`Query ${config.query} took ${result.durationMs} ms`);
+    return result;
   }
 }
 
@@ -304,7 +344,7 @@ class Controller {
   private readonly frontend: FrontendProxy;
   private readonly engines: Map<string, EngineController>;
   private readonly tracks: Map<string, TrackControllerWrapper>;
-  private readonly queries: Map<string, QueryController>;
+  private readonly queries: CreateUpdateDestroy<QueryConfig, QueryController>;
   private readonly permalink: PermalinkController;
 
   constructor(frontend: FrontendProxy) {
@@ -312,7 +352,11 @@ class Controller {
     this.frontend = frontend;
     this.engines = new Map();
     this.tracks = new Map();
-    this.queries = new Map();
+    this.queries = new CreateUpdateDestroy(config => {
+      const engine = this.engines.get(config.engineId)!;
+      if (engine === undefined) return null;
+      return new QueryController(config, this, engine);
+    });
     this.permalink = new PermalinkController(this);
   }
 
@@ -341,18 +385,7 @@ class Controller {
           config.id, new TrackControllerWrapper(config, this, engine));
     }
 
-    // Delete queries that aren't in the state anymore.
-    for (const id of this.queries.keys()) {
-      if (this.state.queries[id] === undefined) {
-        this.queries.delete(id);
-      }
-    }
-    for (const config of Object.values<QueryConfig>(this.state.queries)) {
-      if (this.queries.has(config.id)) continue;
-      const engine = this.engines.get(config.engineId)!;
-      if (engine === undefined) continue;
-      this.queries.set(config.id, new QueryController(config, this, engine));
-    }
+    this.queries.update(this.state.queries);
 
     this.frontend.updateState(this.state);
   }
