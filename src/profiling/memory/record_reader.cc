@@ -26,6 +26,8 @@ namespace perfetto {
 
 namespace {
 constexpr size_t kMaxRecordSize = 8 * 1024 * 1024;  // 8 MiB
+static_assert(kMaxRecordSize <= std::numeric_limits<size_t>::max(),
+              "kMaxRecordSize must fit into size_t");
 }
 
 RecordReader::ReceiveBuffer RecordReader::BeginReceive() {

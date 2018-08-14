@@ -30,7 +30,7 @@ class RecordReader {
  public:
   struct ReceiveBuffer {
     uint8_t* data;
-    size_t size;
+    uint64_t size;
   };
 
   enum class Result {
