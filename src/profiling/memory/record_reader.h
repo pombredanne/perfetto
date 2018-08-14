@@ -44,11 +44,14 @@ class RecordReader {
  private:
   void Reset();
 
-  // if < sizeof(uint64_t) we are still filling the record_size_,
-  // otherwise we are filling |buf_|
+  // if < sizeof(uint64_t) we are still filling the record_size_buf_,
+  // otherwise we are filling |record_.data|
   size_t read_idx_ = 0;
   alignas(uint64_t) uint8_t record_size_buf_[sizeof(uint64_t)];
   Record record_;
+
+  static_assert(sizeof(record_size_buf_) == sizeof(record_.size),
+                "sizes mismatch");
 };
 
 }  // namespace perfetto

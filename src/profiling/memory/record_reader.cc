@@ -28,16 +28,18 @@ RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
   if (read_idx_ < sizeof(record_size_buf_))
     return {&record_size_buf_[0] + read_idx_,
             sizeof(record_size_buf_) - read_idx_};
-  return {record_.data.get() + read_idx_ - sizeof(record_size_buf_),
-          (static_cast<size_t>(record_.size) + sizeof(record_size_buf_) -
-           read_idx_)};
+  PERFETTO_DCHECK(read_idx_ < record_.size + sizeof(record_size_buf_));
+  const size_t buf_off = read_idx_ - sizeof(record_size_buf_);
+  return {record_.data.get() + buf_off, record_.size - buf_off};
 }
 
 bool RecordReader::EndReceive(size_t recv_size, Record* record) {
   if (record_.size == 0)
-    PERFETTO_DCHECK(recv_size <= sizeof(uint64_t));
+    // Still receiving header.
+    PERFETTO_DCHECK(recv_size <= sizeof(uint64_t) - read_idx_);
   else
-    PERFETTO_DCHECK(record_.data);
+    // Receiving payload.
+    PERFETTO_DCHECK(record_.data && recv_size <= record_.size);
 
   read_idx_ += recv_size;
   if (read_idx_ == sizeof(record_size_buf_)) {
