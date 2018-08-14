@@ -18,7 +18,6 @@
 
 #include <functional>
 
-#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
@@ -27,24 +26,10 @@
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) ||   \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID) || \
-    PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
-#define PERFETTO_HAS_SIGNAL_H() 1
-#else
-#define PERFETTO_HAS_SIGNAL_H() 0
-#endif
-
-#if PERFETTO_HAS_SIGNAL_H()
-#include <signal.h>
-#endif
-
 using namespace perfetto;
 using namespace perfetto::trace_processor;
 
 namespace {
-TraceProcessor* g_tp;
-
 void PrintPrompt() {
   printf("\r%80s\r> ", "");
   fflush(stdout);
@@ -109,34 +94,30 @@ int main(int argc, char** argv) {
   }
 
   base::UnixTaskRunner task_runner;
-  FileReader reader(argv[1], /*print_progress=*/true);
+  FileReader reader(argv[1]);
   TraceProcessor tp(&task_runner);
-  g_tp = &tp;
 
-  task_runner.PostTask([&reader]() {
+  task_runner.PostTask([&tp, &reader]() {
     auto t_start = base::GetWallTimeMs();
     auto on_trace_loaded = [t_start, &reader] {
-#if PERFETTO_HAS_SIGNAL_H()
-      signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
-#endif
       double s = (base::GetWallTimeMs() - t_start).count() / 1000.0;
       double size_mb = reader.file_size() / 1000000.0;
       PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
       PrintPrompt();
     };
-    g_tp->LoadTrace(&reader, on_trace_loaded);
+    tp.LoadTrace(&reader, on_trace_loaded);
   });
 
-  task_runner.AddFileDescriptorWatch(STDIN_FILENO, [&task_runner] {
+  task_runner.AddFileDescriptorWatch(STDIN_FILENO, [&tp, &task_runner] {
     char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0) {
+    if (!fgets(line, sizeof(line) - 1, stdin)) {
       task_runner.Quit();
       return;
     }
     protos::RawQueryArgs query;
     query.set_sql_query(line);
     base::TimeNanos t_start = base::GetWallTimeNs();
-    g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
+    tp.ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
       OnQueryResult(t_start, res);
     });
     PrintPrompt();

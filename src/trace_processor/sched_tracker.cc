@@ -15,7 +15,6 @@
  */
 
 #include "src/trace_processor/sched_tracker.h"
-#include "perfetto/base/utils.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
@@ -31,15 +30,17 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
                                    uint64_t timestamp,
                                    uint32_t prev_pid,
                                    uint32_t prev_state,
-                                   base::StringView prev_comm,
+                                   const char* prev_comm,
+                                   size_t prev_comm_len,
                                    uint32_t next_pid) {
-  PERFETTO_DCHECK(cpu < base::kMaxCpus);
+  PERFETTO_DCHECK(cpu < TraceStorage::kMaxCpus);
   SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
   // If we had a valid previous event, then inform the storage about the
   // slice.
   if (prev->valid() && prev->next_pid != 0 /* Idle process (swapper/N) */) {
     uint64_t duration = timestamp - prev->timestamp;
-    StringId prev_thread_name_id = context_->storage->InternString(prev_comm);
+    StringId prev_thread_name_id =
+        context_->storage->InternString(prev_comm, prev_comm_len);
     UniqueTid utid = context_->process_tracker->UpdateThread(
         prev->timestamp, prev->next_pid /* == prev_pid */, prev_thread_name_id);
     context_->storage->AddSliceToCpu(cpu, prev->timestamp, duration, utid);

@@ -21,7 +21,6 @@
 #include <limits>
 #include <memory>
 
-#include "perfetto/base/utils.h"
 #include "src/trace_processor/query_constraints.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
@@ -118,9 +117,7 @@ class SchedSliceTable : public Table {
    private:
     // Creates a vector of indices into the slices for the given |cpu| sorted
     // by the order by criteria.
-    std::vector<uint32_t> CreateSortedIndexVectorForCpu(uint32_t cpu,
-                                                        uint64_t min_ts,
-                                                        uint64_t max_ts);
+    std::vector<uint32_t> CreateSortedIndexVectorForCpu(uint32_t cpu);
 
     // Compares the next slice of the given |cpu| with the next slice of the
     // |next_cpu_|. Return <0 if |cpu| is ordered before, >0 if ordered after,
@@ -145,7 +142,7 @@ class SchedSliceTable : public Table {
                               const QueryConstraints::OrderBy& order_by);
 
     // One entry for each cpu which is used in filtering.
-    std::array<PerCpuState, base::kMaxCpus> per_cpu_state_;
+    std::array<PerCpuState, TraceStorage::kMaxCpus> per_cpu_state_;
 
     // The next CPU which should be returned to the user.
     uint32_t next_cpu_ = 0;

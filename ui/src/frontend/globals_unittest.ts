@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const TRACK_KIND = 'ChromeSliceTrack';
+import {createEmptyState} from '../common/state';
+import {globals} from './globals';
 
-export interface ChromeSlice {
-  start: number;
-  end: number;
-  title: string;
-  depth: number;
-  category: string;
-}
+beforeEach(() => {
+  globals.resetForTesting();
+});
 
-export interface ChromeSliceTrackData { slices: ChromeSlice[]; }
+test('globals state', () => {
+  expect(() => globals.state).toThrow();
+  const state = globals.state = createEmptyState();
+  expect(globals.state).toBe(state);
+  globals.resetForTesting();
+  expect(() => globals.state).toThrow();
+});

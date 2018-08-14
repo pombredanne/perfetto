@@ -29,11 +29,11 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
-using ::testing::_;
 using ::testing::Args;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
+using ::testing::_;
 
 class FakeStringBlobReader : public BlobReader {
  public:
@@ -57,12 +57,13 @@ class MockSchedTracker : public SchedTracker {
   MockSchedTracker(TraceProcessorContext* context) : SchedTracker(context) {}
   virtual ~MockSchedTracker() = default;
 
-  MOCK_METHOD6(PushSchedSwitch,
+  MOCK_METHOD7(PushSchedSwitch,
                void(uint32_t cpu,
                     uint64_t timestamp,
                     uint32_t prev_pid,
                     uint32_t prev_state,
-                    base::StringView prev_comm,
+                    const char* prev_comm,
+                    size_t prev_comm_len,
                     uint32_t next_pid));
 };
 
@@ -71,8 +72,10 @@ class MockProcessTracker : public ProcessTracker {
   MockProcessTracker(TraceProcessorContext* context)
       : ProcessTracker(context) {}
 
-  MOCK_METHOD2(UpdateProcess,
-               UniquePid(uint32_t pid, base::StringView process_name));
+  MOCK_METHOD3(UpdateProcess,
+               UniquePid(uint32_t pid,
+                         const char* process_name,
+                         size_t process_name_len));
 
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
@@ -96,8 +99,8 @@ TEST(ProtoTraceParser, LoadSingleEvent) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32,
-                                      base::StringView(kProcName), 100));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName, sizeof(kProcName) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
@@ -133,11 +136,11 @@ TEST(ProtoTraceParser, LoadMultipleEvents) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32,
-                                      base::StringView(kProcName1), 100));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32,
-                                      base::StringView(kProcName2), 10));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
@@ -176,11 +179,11 @@ TEST(ProtoTraceParser, LoadMultiplePackets) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32,
-                                      base::StringView(kProcName1), 100));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32,
-                                      base::StringView(kProcName2), 10));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
@@ -222,16 +225,16 @@ TEST(ProtoTraceParser, RepeatedLoadSinglePacket) {
   TraceProcessorContext context;
   MockSchedTracker* sched = new MockSchedTracker(&context);
   context.sched_tracker.reset(sched);
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32,
-                                      base::StringView(kProcName1), 100));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1000, 10, 32, _, _, 100))
+      .With(Args<4, 5>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
 
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
   parser.set_chunk_size_for_testing(chunk_size);
   parser.ParseNextChunk();
 
-  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32,
-                                      base::StringView(kProcName2), 10));
+  EXPECT_CALL(*sched, PushSchedSwitch(10, 1001, 100, 32, _, _, 10))
+      .With(Args<4, 5>(ElementsAreArray(kProcName2, sizeof(kProcName2) - 1)));
 
   parser.ParseNextChunk();
 }
@@ -250,7 +253,8 @@ TEST(ProtoTraceParserTest, LoadProcessPacket) {
   TraceProcessorContext context;
   MockProcessTracker* process_tracker = new MockProcessTracker(&context);
   context.process_tracker.reset(process_tracker);
-  EXPECT_CALL(*process_tracker, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_tracker, UpdateProcess(1, _, _))
+      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
   parser.ParseNextChunk();
@@ -272,7 +276,8 @@ TEST(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   TraceProcessorContext context;
   MockProcessTracker* process_tracker = new MockProcessTracker(&context);
   context.process_tracker.reset(process_tracker);
-  EXPECT_CALL(*process_tracker, UpdateProcess(1, base::StringView(kProcName1)));
+  EXPECT_CALL(*process_tracker, UpdateProcess(1, _, _))
+      .With(Args<1, 2>(ElementsAreArray(kProcName1, sizeof(kProcName1) - 1)));
   FakeStringBlobReader reader(trace.SerializeAsString());
   ProtoTraceParser parser(&reader, &context);
   parser.ParseNextChunk();

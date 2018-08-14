@@ -14,7 +14,7 @@
 
 export const TRACK_KIND = 'CpuSliceTrack';
 
-export interface CpuSlice {
+interface CpuSlice {
   start: number;
   end: number;
   title: string;

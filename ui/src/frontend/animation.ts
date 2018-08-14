@@ -1,5 +1,3 @@
-import {globals} from './globals';
-
 // Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +15,10 @@ import {globals} from './globals';
 export class Animation {
   private startMs = 0;
   private endMs = 0;
-  private boundOnAnimationFrame = this.onAnimationFrame.bind(this);
+  private lastFrameMs = 0;
+  private rafId = 0;
 
-  constructor(private onAnimationStep: (timeSinceStartMs: number) => void) {}
+  constructor(private onAnimationStep: (timeSinceLastMs: number) => void) {}
 
   start(durationMs: number) {
     const nowMs = performance.now();
@@ -29,14 +28,15 @@ export class Animation {
       this.endMs = nowMs + durationMs;
       return;
     }
+    this.lastFrameMs = 0;
     this.startMs = nowMs;
     this.endMs = nowMs + durationMs;
-    globals.rafScheduler.start(this.boundOnAnimationFrame);
+    this.rafId = requestAnimationFrame(this.onAnimationFrame.bind(this));
   }
 
   stop() {
     this.endMs = 0;
-    globals.rafScheduler.stop(this.boundOnAnimationFrame);
+    cancelAnimationFrame(this.rafId);
   }
 
   get startTimeMs(): number {
@@ -44,10 +44,10 @@ export class Animation {
   }
 
   private onAnimationFrame(nowMs: number) {
-    if (nowMs >= this.endMs) {
-      globals.rafScheduler.stop(this.boundOnAnimationFrame);
-      return;
+    if (nowMs < this.endMs) {
+      this.rafId = requestAnimationFrame(this.onAnimationFrame.bind(this));
     }
-    this.onAnimationStep(Math.max(Math.round(nowMs - this.startMs), 0));
+    this.onAnimationStep(nowMs - (this.lastFrameMs || nowMs));
+    this.lastFrameMs = nowMs;
   }
 }

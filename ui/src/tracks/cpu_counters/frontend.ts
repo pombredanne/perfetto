@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {TrackState} from '../../common/state';
-import {globals} from '../../frontend/globals';
+import {TimeScale} from '../../frontend/time_scale';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
@@ -35,12 +35,12 @@ class CpuCounterTrack extends Track {
     super(trackState);
   }
 
-  renderCanvas(ctx: CanvasRenderingContext2D): void {
-    const {timeScale, visibleWindowTime} = globals.frontendLocalState;
-
+  renderCanvas(
+      ctx: CanvasRenderingContext2D, timeScale: TimeScale,
+      visibleWindowMs: {start: number, end: number}): void {
     // It is possible to get width of track from visibleWindowMs.
-    const visibleStartPx = timeScale.timeToPx(visibleWindowTime.start);
-    const visibleEndPx = timeScale.timeToPx(visibleWindowTime.end);
+    const visibleStartPx = timeScale.msToPx(visibleWindowMs.start);
+    const visibleEndPx = timeScale.msToPx(visibleWindowMs.end);
     const visibleWidthPx = visibleEndPx - visibleStartPx;
 
     ctx.fillStyle = '#eee';
@@ -48,7 +48,7 @@ class CpuCounterTrack extends Track {
         Math.round(0.25 * visibleWidthPx),
         0,
         Math.round(0.5 * visibleWidthPx),
-        this.getHeight());
+        this.trackState.height);
     ctx.font = '16px Arial';
     ctx.fillStyle = '#000';
     ctx.fillText(

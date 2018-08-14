@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {State} from './state';
 export interface Action { type: string; }
 
 export function openTraceFromUrl(url: string) {
@@ -36,25 +35,6 @@ export function addTrack(engineId: string, trackKind: string, cpu: number) {
     engineId,
     trackKind,
     cpu,
-  };
-}
-
-// TODO: There should be merged with addTrack above.
-export function addChromeSliceTrack(
-    engineId: string,
-    trackKind: string,
-    upid: number,
-    utid: number,
-    threadName: string,
-    maxDepth: number) {
-  return {
-    type: 'ADD_CHROME_TRACK',
-    engineId,
-    trackKind,
-    upid,
-    utid,
-    threadName,
-    maxDepth,
   };
 }
 
@@ -94,21 +74,4 @@ export function setEngineReady(engineId: string) {
     type: 'SET_ENGINE_READY',
     engineId,
   };
-}
-
-export function createPermalink() {
-  return {
-    type: 'CREATE_PERMALINK',
-  };
-}
-
-export function setState(newState: State) {
-  return {
-    type: 'SET_STATE',
-    newState,
-  };
-}
-
-export function setTraceTime(startSec: number, endSec: number) {
-  return {type: 'SET_TRACE_TIME', startSec, endSec};
 }

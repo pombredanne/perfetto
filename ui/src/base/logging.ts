@@ -18,10 +18,3 @@ export function assertExists<A>(value: A | null | undefined): A {
   }
   return value;
 }
-
-export function assertTrue(value: boolean): boolean {
-  if (value !== true) {
-    throw new Error('Failed assertion');
-  }
-  return value;
-}

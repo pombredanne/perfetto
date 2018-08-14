@@ -14,6 +14,8 @@
 
 import {TrackState} from '../common/state';
 
+import {TimeScale} from './time_scale';
+
 /**
  * This interface forces track implementations to have some static properties.
  * Typescript does not have abstract static members, which is why this needs to
@@ -40,10 +42,7 @@ export abstract class Track {
    */
   abstract consumeData(trackData: {}): void;
   constructor(protected trackState: TrackState) {}
-  abstract renderCanvas(ctx: CanvasRenderingContext2D): void;
-  getHeight(): number {
-    return 70;
-  }
-  onMouseMove(_position: {x: number, y: number}) {}
-  onMouseOut() {}
+  abstract renderCanvas(
+      ctx: CanvasRenderingContext2D, timeScale: TimeScale,
+      visibleWindowMs: {start: number, end: number}): void;
 }

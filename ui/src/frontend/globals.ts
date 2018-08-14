@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {assertExists} from '../base/logging';
 import {Action} from '../common/actions';
 import {State} from '../common/state';
-
-import {FrontendLocalState} from './frontend_local_state';
-import {RafScheduler} from './raf_scheduler';
 
 type Dispatch = (action: Action) => void;
 type TrackDataStore = Map<string, {}>;
@@ -27,56 +23,52 @@ type QueryResultsStore = Map<string, {}>;
  * Global accessors for state/dispatch in the frontend.
  */
 class Globals {
-  private _dispatch?: Dispatch = undefined;
-  private _state?: State = undefined;
-  private _trackDataStore?: TrackDataStore = undefined;
-  private _queryResults?: QueryResultsStore = undefined;
-  private _frontendLocalState?: FrontendLocalState = undefined;
-  private _rafScheduler?: RafScheduler = undefined;
-
-  initialize(
-      dispatch?: Dispatch, state?: State, trackDataStore?: TrackDataStore,
-      queryResults?: QueryResultsStore, frontendLocalState?: FrontendLocalState,
-      rafScheduler?: RafScheduler) {
-    this._dispatch = dispatch;
-    this._state = state;
-    this._trackDataStore = trackDataStore;
-    this._queryResults = queryResults;
-    this._frontendLocalState = frontendLocalState;
-    this._rafScheduler = rafScheduler;
-  }
+  _dispatch?: Dispatch = undefined;
+  _state?: State = undefined;
+  _trackDataStore?: TrackDataStore = undefined;
+  _queryResults?: QueryResultsStore = undefined;
 
   get state(): State {
-    return assertExists(this._state);
+    if (this._state === undefined) throw new Error('Global not set');
+    return this._state;
   }
 
-  set state(state: State) {
-    this._state = assertExists(state);
+  set state(value: State) {
+    this._state = value;
   }
 
   get dispatch(): Dispatch {
-    return assertExists(this._dispatch);
+    if (this._dispatch === undefined) throw new Error('Global not set');
+    return this._dispatch;
+  }
+
+  set dispatch(value: Dispatch) {
+    this._dispatch = value;
   }
 
   get trackDataStore(): TrackDataStore {
-    return assertExists(this._trackDataStore);
+    if (this._trackDataStore === undefined) throw new Error('Global not set');
+    return this._trackDataStore;
+  }
+
+  set trackDataStore(value: TrackDataStore) {
+    this._trackDataStore = value;
   }
 
   get queryResults(): QueryResultsStore {
-    return assertExists(this._queryResults);
+    if (this._queryResults === undefined) throw new Error('Global not set');
+    return this._queryResults;
   }
 
-  get frontendLocalState() {
-    return assertExists(this._frontendLocalState);
-  }
-
-  get rafScheduler() {
-    return assertExists(this._rafScheduler);
+  set queryResults(value: QueryResultsStore) {
+    this._queryResults = value;
   }
 
   resetForTesting() {
-    this.initialize(
-        undefined, undefined, undefined, undefined, undefined, undefined);
+    this._state = undefined;
+    this._dispatch = undefined;
+    this._trackDataStore = undefined;
+    this._queryResults = undefined;
   }
 }
 

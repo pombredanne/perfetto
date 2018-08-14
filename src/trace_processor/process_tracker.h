@@ -17,9 +17,6 @@
 #ifndef SRC_TRACE_PROCESSOR_PROCESS_TRACKER_H_
 #define SRC_TRACE_PROCESSOR_PROCESS_TRACKER_H_
 
-#include <tuple>
-
-#include "perfetto/base/string_view.h"
 #include "src/trace_processor/trace_processor_context.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -60,12 +57,17 @@ class ProcessTracker {
   virtual UniqueTid UpdateThread(uint32_t tid, uint32_t tgid);
 
   // Sets the name of the thread identified by the tuple (tid,pid).
-  void UpdateThreadName(uint32_t tid, uint32_t pid, base::StringView name);
+  void UpdateThreadName(uint32_t tid,
+                        uint32_t pid,
+                        const char* name,
+                        size_t name_len);
 
   // Called when a process is seen in a process tree. Retrieves the UniquePid
   // for that pid or assigns a new one.
   // Virtual for testing.
-  virtual UniquePid UpdateProcess(uint32_t pid, base::StringView name);
+  virtual UniquePid UpdateProcess(uint32_t pid,
+                                  const char* process_name,
+                                  size_t process_name_len);
 
   // Returns the bounds of a range that includes all UniquePids that have the
   // requested pid.
@@ -79,9 +81,7 @@ class ProcessTracker {
     return tids_.equal_range(tid);
   }
 
-  std::tuple<UniquePid, TraceStorage::Process*> GetOrCreateProcess(
-      uint32_t pid,
-      uint64_t start_ns);
+  UniquePid GetOrCreateProcess(uint32_t pid, uint64_t start_ns);
 
  private:
   TraceProcessorContext* const context_;

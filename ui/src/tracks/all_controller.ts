@@ -16,4 +16,3 @@
 // import statement for it needs to be added here.
 import './cpu_counters/controller';
 import './cpu_slices/controller';
-import './chrome_slices/controller';

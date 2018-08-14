@@ -27,7 +27,7 @@ namespace trace_processor {
 
 class FileReader : public BlobReader {
  public:
-  explicit FileReader(const char* path, bool print_progress = false);
+  explicit FileReader(const char* path);
   ~FileReader() override;
 
   uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override;
@@ -39,8 +39,6 @@ class FileReader : public BlobReader {
 
   base::ScopedFile fd_;
   uint64_t file_size_ = 0;
-  bool print_progress_ = false;
-  uint64_t last_progress_bytes_ = 0;
 };
 
 }  // namespace trace_processor

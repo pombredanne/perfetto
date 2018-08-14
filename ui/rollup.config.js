@@ -2,9 +2,11 @@ import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
 
 export default {
-  output: {name: 'perfetto'},
+  output: {
+    name: 'perfetto'
+  },
   plugins: [
-    nodeResolve({browser: true}),
+    nodeResolve(),
 
     // emscripten conditionally executes require('fs') and require('path'),
     // when running under node, rollup can't find a library named 'fs' or
@@ -13,7 +15,7 @@ export default {
     commonjs({
       ignore: [
         'fs',
-        'path',
+        'path'
       ]
     })
   ]

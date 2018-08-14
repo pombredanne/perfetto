@@ -22,7 +22,6 @@
 #include <numeric>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/utils.h"
 #include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
@@ -32,7 +31,7 @@ namespace {
 
 using namespace sqlite_utils;
 
-template <size_t N = base::kMaxCpus>
+template <size_t N = TraceStorage::kMaxCpus>
 bool PopulateFilterBitmap(int op,
                           sqlite3_value* value,
                           std::bitset<N>* filter) {
@@ -239,11 +238,8 @@ SchedSliceTable::FilterState::FilterState(
     const QueryConstraints& query_constraints,
     sqlite3_value** argv)
     : order_by_(query_constraints.order_by()), storage_(storage) {
-  std::bitset<base::kMaxCpus> cpu_filter;
+  std::bitset<TraceStorage::kMaxCpus> cpu_filter;
   cpu_filter.set();
-
-  uint64_t min_ts = 0;
-  uint64_t max_ts = std::numeric_limits<uint64_t>::max();
 
   for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
     const auto& cs = query_constraints.constraints()[i];
@@ -254,25 +250,15 @@ SchedSliceTable::FilterState::FilterState(
       case Column::kQuantum:
         quantum_ = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
         break;
-      case Column::kTimestamp: {
-        auto ts = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
-        if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-          min_ts = IsOpGe(cs.op) ? ts : ts + 1;
-        } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-          max_ts = IsOpLe(cs.op) ? ts : ts - 1;
-        }
-        break;
-      }
     }
   }
 
   // First setup CPU filtering because the trace storage is indexed by CPU.
-  for (uint32_t cpu = 0; cpu < base::kMaxCpus; cpu++) {
+  for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
     if (!cpu_filter.test(cpu))
       continue;
-    StateForCpu(cpu)->Initialize(
-        cpu, storage_, quantum_,
-        CreateSortedIndexVectorForCpu(cpu, min_ts, max_ts));
+    StateForCpu(cpu)->Initialize(cpu, storage_, quantum_,
+                                 CreateSortedIndexVectorForCpu(cpu));
   }
 
   // Set the cpu index to be the first item to look at.
@@ -280,15 +266,15 @@ SchedSliceTable::FilterState::FilterState(
 }
 
 void SchedSliceTable::FilterState::FindCpuWithNextSlice() {
-  next_cpu_ = base::kMaxCpus;
+  next_cpu_ = TraceStorage::kMaxCpus;
 
-  for (uint32_t cpu = 0; cpu < base::kMaxCpus; cpu++) {
+  for (uint32_t cpu = 0; cpu < TraceStorage::kMaxCpus; cpu++) {
     const auto& cpu_state = per_cpu_state_[cpu];
     if (!cpu_state.IsNextRowIdIndexValid())
       continue;
 
     // The first CPU with a valid slice can be set to the next CPU.
-    if (next_cpu_ == base::kMaxCpus) {
+    if (next_cpu_ == TraceStorage::kMaxCpus) {
       next_cpu_ = cpu;
       continue;
     }
@@ -308,23 +294,12 @@ int SchedSliceTable::FilterState::CompareCpuToNextCpu(uint32_t cpu) {
 }
 
 std::vector<uint32_t>
-SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu,
-                                                            uint64_t min_ts,
-                                                            uint64_t max_ts) {
+SchedSliceTable::FilterState::CreateSortedIndexVectorForCpu(uint32_t cpu) {
   const auto& slices = storage_->SlicesForCpu(cpu);
-  const auto& start_ns = slices.start_ns();
   PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
 
-  auto min_it = std::lower_bound(start_ns.begin(), start_ns.end(), min_ts);
-  auto max_it = std::upper_bound(min_it, start_ns.end(), max_ts);
-  ptrdiff_t dist = std::distance(min_it, max_it);
-  PERFETTO_CHECK(dist >= 0 && static_cast<size_t>(dist) <= start_ns.size());
-
-  std::vector<uint32_t> indices(static_cast<size_t>(dist));
-
-  // Fill |indices| with the consecutive row numbers affected by the filtering.
-  std::iota(indices.begin(), indices.end(),
-            std::distance(start_ns.begin(), min_it));
+  std::vector<uint32_t> indices(slices.slice_count());
+  std::iota(indices.begin(), indices.end(), 0u);
 
   // In other cases, sort by the given criteria.
   std::sort(indices.begin(), indices.end(),
