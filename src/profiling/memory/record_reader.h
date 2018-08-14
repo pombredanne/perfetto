@@ -33,13 +33,20 @@ class RecordReader {
     size_t size;
   };
 
+  enum class Result {
+    Noop = 0,
+    RecordReceived,
+    KillConnection,
+  };
+
   struct Record {
     std::unique_ptr<uint8_t[]> data;
     size_t size = 0;
   };
 
   ReceiveBuffer BeginReceive();
-  bool EndReceive(size_t recv_size, Record* record) PERFETTO_WARN_UNUSED_RESULT;
+  Result EndReceive(size_t recv_size,
+                    Record* record) PERFETTO_WARN_UNUSED_RESULT;
 
  private:
   void Reset();
