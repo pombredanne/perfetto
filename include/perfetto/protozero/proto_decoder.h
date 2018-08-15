@@ -88,6 +88,10 @@ class ProtoDecoder {
   // Resets the current position to the start of the buffer.
   void Reset();
 
+  // Finds and returns an int field with the specified id. Resets the current
+  // position after the field has been found.
+  Field FindIntField(uint32_t field_id);
+
   // Return's offset inside the buffer.
   uint64_t offset() const {
     return static_cast<uint64_t>(current_position_ - buffer_);

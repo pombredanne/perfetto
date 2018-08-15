@@ -25,11 +25,13 @@
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
+#include "src/trace_processor/proto_trace_tokenizer.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/thread_table.h"
+#include "src/trace_processor/trace_sorter.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
@@ -44,13 +46,16 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
+  context_.sorter.reset(
+      new TraceSorter(&context_, static_cast<uint64_t>(5 * 1e9)));
+  context_.parser.reset(new ProtoTraceParser(&context_));
   context_.storage.reset(new TraceStorage());
 
-  ProcessTable::RegisterTable(*db_, context_.storage.get());
-  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
-  SliceTable::RegisterTable(*db_, context_.storage.get());
-  StringTable::RegisterTable(*db_, context_.storage.get());
-  ThreadTable::RegisterTable(*db_, context_.storage.get());
+  ProcessTable::RegisterTable(db_.get(), context_.storage.get());
+  SchedSliceTable::RegisterTable(db_.get(), context_.storage.get());
+  SliceTable::RegisterTable(db_.get(), context_.storage.get());
+  SliceTable::RegisterTable(db_.get(), context_.storage.get());
+  ThreadTable::RegisterTable(db_.get(), context_.storage.get());
 }
 
 TraceProcessor::~TraceProcessor() = default;
@@ -65,9 +70,9 @@ void TraceProcessor::LoadTrace(BlobReader* reader,
   reader->Read(0, kPreambleLen, reinterpret_cast<uint8_t*>(buf));
   if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
     PERFETTO_DLOG("Legacy JSON trace detected");
-    context_.parser.reset(new JsonTraceParser(reader, &context_));
+    context_.chunk_reader.reset(new JsonTraceParser(reader, &context_));
   } else {
-    context_.parser.reset(new ProtoTraceParser(reader, &context_));
+    context_.chunk_reader.reset(new ProtoTraceTokenizer(reader, &context_));
   }
 
   // Kick off the parsing task chain.
@@ -150,8 +155,9 @@ void TraceProcessor::ExecuteQuery(
 }
 
 void TraceProcessor::LoadTraceChunk(std::function<void()> callback) {
-  bool has_more = context_.parser->ParseNextChunk();
+  bool has_more = context_.chunk_reader->ParseNextChunk();
   if (!has_more) {
+    context_.sorter->MaybeFlushEvents(true);
     callback();
     return;
   }

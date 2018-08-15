@@ -130,6 +130,19 @@ bool ProtoDecoder::IsEndOfBuffer() {
   return length_ == static_cast<uint64_t>(current_position_ - buffer_);
 }
 
+ProtoDecoder::Field ProtoDecoder::FindIntField(uint32_t field_id) {
+  for (auto f = ReadField(); f.id != 0; f = ReadField()) {
+    if (f.id == field_id) {
+      Reset();
+      return f;
+    }
+  }
+  // No matching field found so return an invalid field.
+  Field field{};
+  Reset();
+  return field;
+}
+
 void ProtoDecoder::Reset() {
   current_position_ = buffer_;
 }
