@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import {assertExists} from '../../base/logging';
-import {RawQueryResult} from '../../common/protos';
 import {
   Engine,
   PublishFn,
@@ -56,10 +55,8 @@ class ChromeSliceTrackController extends TrackController {
 
   async init() {
     const query =
-        `select ts, dur, name, cat, depth from slices where utid = ${
-                                                                     this.utid
-                                                                   };`;
-    const rawResult = (await this.engine.rawQuery({'sqlQuery': query})) as RawQueryResult;
+        `select ts,dur,name,cat,depth from slices where utid = ${this.utid};`;
+    const rawResult = await this.engine.rawQuery({'sqlQuery': query});
     const slices: ChromeSlice[] = [];
 
     for (let row = 0; row < rawResult.numRecords; row++) {
@@ -78,7 +75,7 @@ class ChromeSliceTrackController extends TrackController {
     this.publish({slices});
   }
 
-  onBoundsChange(_start: number, _end: number): void {
+  onBoundsChange(): void {
     // TODO: Implement.
   }
 }

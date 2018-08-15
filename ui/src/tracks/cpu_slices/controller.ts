@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {fromNs} from '../../common/time';
 import {
   Engine,
   PublishFn,
@@ -22,8 +23,7 @@ import {
   trackControllerRegistry
 } from '../../controller/track_controller_registry';
 
-import {TRACK_KIND} from './common';
-import { fromNs } from '../../common/time';
+import {CpuSliceTrackData, TRACK_KIND} from './common';
 
 // TODO(hjd): Too much bolierplate here. Prehaps TrackController/Track
 // should be an interface and we provide a TrackControllerBase/TrackBase
@@ -41,36 +41,66 @@ class CpuSliceTrackController extends TrackController {
   // TODO: This publish function should be better typed to only accept
   // CpuSliceTrackData. Perhaps we can do PublishFn<T>.
   private publish: PublishFn;
+  private busy = false;
 
   constructor(cpu: number, engine: Engine, publish: PublishFn) {
     super();
     this.cpu = cpu;
     this.engine = engine;
     this.publish = publish;
-    this.init();
   }
 
-  async init() {
-    const query = `select ts, dur, utid from sched where cpu = ${this.cpu} limit 10000;`;
-    const rawResult = await this.engine.rawQuery({'sqlQuery': query});
-    const slices = [];
+  onBoundsChange(start: number, end: number, resolution: number) {
+    // TODO: we should really call TraceProcessor.Interrupt() at this point.
+    if (this.busy) return;
+    const LIMIT = 5000;
 
-    for (let row = 0; row < rawResult.numRecords; row++) {
-      const cols = rawResult.columns;
-      const start = fromNs(+cols[0].longValues![row]);
-      const end = start + fromNs(+cols[1].longValues![row]);
-      const utid = +cols[2].longValues![row];
-      slices.push({
+    // TODO: "ts >= start - dur" needs to be optimized, right now it causes a
+    // full table scan.
+    const query = 'select ts,dur,utid from sched ' +
+        `where cpu = ${this.cpu} ` +
+        `and ts >= ${Math.round(start * 1e9)} - dur ` +
+        `and ts <= ${Math.round(end * 1e9)} ` +
+        `and dur >= ${Math.round(resolution * 1e9)} ` +
+        `order by ts ` +
+        `limit ${LIMIT};`;
+
+    if (this.cpu === 0) console.log('QUERY', query);
+
+    this.busy = true;
+    const promise = this.engine.rawQuery({'sqlQuery': query});
+
+    promise.then(rawResult => {
+      this.busy = false;
+      if (rawResult.error) {
+        throw new Error(`Query error "${query}": ${rawResult.error}`);
+      }
+      if (this.cpu === 0) console.log('QUERY DONE', query);
+
+      const numRows = +rawResult.numRecords;
+
+      const slices: CpuSliceTrackData = {
         start,
         end,
-        utid,
-      });
-    }
-    this.publish({slices});
-  }
+        resolution,
+        starts: new Float64Array(numRows),
+        ends: new Float64Array(numRows),
+        utids: new Uint32Array(numRows),
+      };
 
-  onBoundsChange(_start: number, _end: number): void {
-    // TODO: Implement.
+      for (let row = 0; row < numRows; row++) {
+        const cols = rawResult.columns;
+        const startSec = fromNs(+cols[0].longValues![row]);
+        slices.starts[row] = startSec;
+        slices.ends[row] = startSec + fromNs(+cols[1].longValues![row]);
+        slices.utids[row] = +cols[2].longValues![row];
+      }
+      if (numRows === LIMIT) {
+        slices.end = slices.ends[slices.ends.length - 1];
+      }
+
+      this.publish(slices);
+    });
   }
 }
 

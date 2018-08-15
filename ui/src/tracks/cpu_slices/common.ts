@@ -14,10 +14,13 @@
 
 export const TRACK_KIND = 'CpuSliceTrack';
 
-export interface CpuSlice {
+export interface CpuSliceTrackData {
   start: number;
   end: number;
-  utid: number;
-}
+  resolution: number;
 
-export interface CpuSliceTrackData { slices: CpuSlice[]; }
+  // Slices are stored in a columnar fashion. All fields have the same length.
+  starts: Float64Array;
+  ends: Float64Array;
+  utids: Uint32Array;
+}

@@ -32,7 +32,7 @@ export interface TrackControllerCreator {
 
 export abstract class TrackController {
   // TODO(hjd): Maybe this should be optional?
-  abstract onBoundsChange(start: number, end: number): void;
+  abstract onBoundsChange(start: number, end: number, resolution: number): void;
 }
 
 // Re-export these so track implementors don't have to import from several

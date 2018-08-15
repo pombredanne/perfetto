@@ -12,24 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {assertTrue} from '../../base/logging';
+import {requestTrackData} from '../../common/actions';
 import {TrackState} from '../../common/state';
-import {TimeSpan} from '../../common/time';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {CpuSlice, CpuSliceTrackData, TRACK_KIND} from './common';
+import {CpuSliceTrackData, TRACK_KIND} from './common';
 
 const MARGIN_TOP = 20;
 const RECT_HEIGHT = 30;
 
-function sliceIsVisible(
-    slice: {start: number, end: number}, visibleWindowTime: TimeSpan) {
-  return slice.end > visibleWindowTime.start &&
-      slice.start < visibleWindowTime.end;
-}
-
-function cropText(str:string, charWidth: number, rectWidth: number) {
+function cropText(str: string, charWidth: number, rectWidth: number) {
   const maxTextWidth = rectWidth - 15;
   let displayText = '';
   const nameLength = str.length * charWidth;
@@ -45,48 +40,111 @@ function cropText(str:string, charWidth: number, rectWidth: number) {
   return displayText;
 }
 
+function getCurResolution() {
+  // Truncate the resolution to the closest power of 10.
+  const resolution = globals.frontendLocalState.timeScale.deltaPxToDuration(1);
+  return Math.pow(10, Math.floor(Math.log10(resolution)));
+}
+
 class CpuSliceTrack extends Track {
   static readonly kind = TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
     return new CpuSliceTrack(trackState);
   }
 
-  private trackData: CpuSliceTrackData|undefined;
-  private hoveredSlice: CpuSlice|null = null;
+  private hoveredUtid = -1;
+  private mouseXpos?: number;
+  private reqPending = false;
 
   constructor(trackState: TrackState) {
     super(trackState);
   }
 
-  consumeData(trackData: CpuSliceTrackData) {
-    this.trackData = trackData;
+  consumeData() {}
+
+  reqDataDeferred() {
+    const {visibleWindowTime} = globals.frontendLocalState;
+    const reqStart = visibleWindowTime.start - visibleWindowTime.duration;
+    const reqEnd = visibleWindowTime.end + visibleWindowTime.duration;
+    const reqRes = getCurResolution();
+    this.reqPending = false;
+    globals.dispatch(
+        requestTrackData(this.trackState.id, reqStart, reqEnd, reqRes));
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D): void {
-    if (!this.trackData) return;
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
+    const trackData = this.trackData;
+
+    // If there isn't enough cached slices data in |trackData| request more to
+    // the controller.
+    const inRange = trackData !== undefined &&
+        (visibleWindowTime.start >= trackData.start &&
+         visibleWindowTime.end <= trackData.end);
+    if (!inRange || trackData.resolution > getCurResolution()) {
+      if (!this.reqPending) {
+        this.reqPending = true;
+        if (this.trackState.id === '1') console.log('Posting delayed');
+        setTimeout(() => this.reqDataDeferred(), 50);
+      }
+      if (trackData === undefined) return;  // Can't possibly draw anything.
+    }
     ctx.textAlign = 'center';
     const charWidth = ctx.measureText('abcdefghij').width / 10;
 
     // TODO: this needs to be kept in sync with the hue generation algorithm
     // of overview_timeline_panel.ts
-    let hue = (128 + (32 * this.trackState.cpu)) % 256;
+    const hue = (128 + (32 * this.trackState.cpu)) % 256;
 
-    for (const slice of this.trackData.slices) {
-      if (!sliceIsVisible(slice, visibleWindowTime)) continue;
-      const rectStart = timeScale.timeToPx(slice.start);
-      const rectEnd = timeScale.timeToPx(slice.end);
+    // If the cached trace slices don't fully cover the visible time range,
+    // show a gray rectangle with a "Loading..." label.
+    ctx.font = '12px Google Sans';
+    if (trackData.start > visibleWindowTime.start) {
+      const rectWidth =
+          timeScale.timeToPx(Math.min(trackData.start, visibleWindowTime.end));
+      ctx.fillStyle = '#eee';
+      ctx.fillRect(0, MARGIN_TOP, rectWidth, RECT_HEIGHT);
+      ctx.fillStyle = '#666';
+      ctx.fillText(
+          'loading...', rectWidth / 2, MARGIN_TOP + RECT_HEIGHT / 2, rectWidth);
+    }
+    if (trackData.end < visibleWindowTime.end) {
+      const rectX =
+          timeScale.timeToPx(Math.max(trackData.end, visibleWindowTime.start));
+      const rectWidth = timeScale.timeToPx(visibleWindowTime.end) - rectX;
+      ctx.fillStyle = '#eee';
+      ctx.fillRect(rectX, MARGIN_TOP, rectWidth, RECT_HEIGHT);
+      ctx.fillStyle = '#666';
+      ctx.fillText(
+          'loading...',
+          rectX + rectWidth / 2,
+          MARGIN_TOP + RECT_HEIGHT / 2,
+          rectWidth);
+    }
+
+    assertTrue(trackData.starts.length === trackData.ends.length);
+    assertTrue(trackData.starts.length === trackData.utids.length);
+    for (let i = 0; i < trackData.starts.length; i++) {
+      const tStart = trackData.starts[i];
+      const tEnd = trackData.ends[i];
+      const utid = trackData.utids[i];
+      if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
+        continue;
+      }
+      const rectStart = timeScale.timeToPx(tStart);
+      const rectEnd = timeScale.timeToPx(tEnd);
       const rectWidth = rectEnd - rectStart;
       if (rectWidth < 0.1) continue;
 
-      ctx.fillStyle = `hsl(${hue}, 50%, ${slice === this.hoveredSlice ? 70 : 50}%`;
+      const hovered = this.hoveredUtid === utid;
+      ctx.fillStyle = `hsl(${hue}, 50%, ${hovered ? 25 : 60}%`;
       ctx.fillRect(rectStart, MARGIN_TOP, rectEnd - rectStart, RECT_HEIGHT);
 
       // TODO: consider de-duplicating this code with the copied one from
       // chrome_slices/frontend.ts.
-      let title = `[utid:${slice.utid}]`;
+      let title = `[utid:${utid}]`;
       let subTitle = '';
-      const threadInfo = globals.threads.get(slice.utid);
+      const threadInfo = globals.threads.get(utid);
       if (threadInfo !== undefined) {
         title = `${threadInfo.procName} [${threadInfo.pid}]`;
         subTitle = `${threadInfo.threadName} [${threadInfo.tid}]`;
@@ -101,27 +159,51 @@ class CpuSliceTrack extends Track {
       ctx.font = '10px Google Sans';
       ctx.fillText(subTitle, rectXCenter, MARGIN_TOP + RECT_HEIGHT / 2 + 11);
     }
+
+    const hoveredThread = globals.threads.get(this.hoveredUtid);
+    if (hoveredThread !== undefined) {
+      ctx.fillStyle = 'hsl(200, 50%, 40%)';
+      ctx.textAlign = 'left';
+      const procTitle = `P: ${hoveredThread.procName} [${hoveredThread.pid}]`;
+      const threadTitle =
+          `T: ${hoveredThread.threadName} [${hoveredThread.tid}]`;
+      ctx.font = '10px Google Sans';
+      ctx.fillText(procTitle, this.mouseXpos! + 5, 8);
+      ctx.font = '10px Google Sans';
+      ctx.fillText(threadTitle, this.mouseXpos! + 5, 18);
+    }
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
-    if (!this.trackData) return;
+    const trackData = this.trackData;
+    this.mouseXpos = x;
+    if (trackData === undefined) return;
     const {timeScale} = globals.frontendLocalState;
     if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
-      this.hoveredSlice = null;
+      this.hoveredUtid = -1;
       return;
     }
     const t = timeScale.pxToTime(x);
-    this.hoveredSlice = null;
+    this.hoveredUtid = -1;
 
-    for (const slice of this.trackData.slices) {
-      if (slice.start <= t && slice.end >= t) {
-        this.hoveredSlice = slice;
+    for (let i = 0; i < trackData.starts.length; i++) {
+      const tStart = trackData.starts[i];
+      const tEnd = trackData.ends[i];
+      const utid = trackData.utids[i];
+      if (tStart <= t && t <= tEnd) {
+        this.hoveredUtid = utid;
+        break;
       }
     }
   }
 
   onMouseOut() {
-    this.hoveredSlice = null;
+    this.hoveredUtid = -1;
+    this.mouseXpos = 0;
+  }
+
+  private get trackData(): CpuSliceTrackData {
+    return globals.trackDataStore.get(this.trackState.id) as CpuSliceTrackData;
   }
 }
 

@@ -25,7 +25,8 @@ import {
   deleteQuery,
   navigate,
   setEngineReady,
-  setTraceTime
+  setTraceTime,
+  updateStatus
 } from '../common/actions';
 import {PERMALINK_ID, saveState, saveTrace} from '../common/permalinks';
 import {rawQueryResultColumns, rawQueryResultIter, Row} from '../common/protos';
@@ -77,6 +78,9 @@ class EngineController {
     this.config = config;
     this._state = 'init';
     this.deferredOnReady = new Set();
+  }
+
+  initialize() {
     this.transition('waiting_for_file');
   }
 
@@ -87,16 +91,19 @@ class EngineController {
   private async transition(newState: EngineControllerState) {
     switch (newState) {
       case 'waiting_for_file':
+        this.controller.dispatch(updateStatus('Loading trace file'));
         this.blob = await fetchTrace(this.config.source);
         this.transition('loading');
         break;
       case 'loading':
         const blob = assertExists<Blob>(this.blob);
+        this.controller.dispatch(updateStatus('Initializing trace processor'));
         this.engine = await this.controller.createEngine(blob);
         this.transition('ready');
         break;
       case 'ready': {
         const engine = assertExists<Engine>(this.engine);
+        this.controller.dispatch(updateStatus('Getting time bounds'));
         this.traceTime = await engine.getTraceTimeBounds();
         this.controller.dispatch(setTraceTime(this.traceTime));
         this.deferredOnReady.forEach(d => d.resolve(engine));
@@ -112,6 +119,8 @@ class EngineController {
         const traceTime = assertExists(this.traceTime);
         const stepSec = traceTime.duration / numSteps;
         for (let step = 0; step < numSteps; step++) {
+          this.controller.dispatch(updateStatus(
+              `Loading overview ${Math.round(step / numSteps * 1000) / 10}%`));
           const startSec = traceTime.start + step * stepSec;
           const startNs = Math.floor(startSec * 1e9);
           const endSec = startSec + stepSec;
@@ -129,7 +138,7 @@ class EngineController {
           // for the published track / query data, right now is too free form.
           const schedData: {[key: string]: QuantizedLoad} = {};
           for (let i = 0; i < schedRows.numRecords; i++) {
-            const load = schedRows.columns[0].doubleValues![i] as number;
+            const load = schedRows.columns[0].doubleValues![i];
             const cpu = schedRows.columns[1].longValues![i] as number;
             schedData[cpu] = {startSec, endSec, load};
           }  // for (record ...)
@@ -148,7 +157,7 @@ class EngineController {
           });
           const slicesData: {[key: string]: QuantizedLoad} = {};
           for (let i = 0; i < slicesRows.numRecords; i++) {
-            const load = slicesRows.columns[0].doubleValues![i] as number;
+            const load = slicesRows.columns[0].doubleValues![i];
             let procName = slicesRows.columns[1].stringValues![i];
             const pid = slicesRows.columns[2].longValues![i];
             procName += ` [${pid}]`;
@@ -158,6 +167,7 @@ class EngineController {
         }  // for (step ...)
 
         // Send thread map
+        this.controller.dispatch(updateStatus('Reading thread list'));
         const threadRows = await engine.rawQuery({
           sqlQuery: 'select utid, tid, pid, thread.name, process.name ' +
               'from thread inner join process using(upid)'
@@ -177,6 +187,7 @@ class EngineController {
         break;
       }
       case 'load_tracks': {
+        this.controller.dispatch(updateStatus('Loading tracks'));
         const engine = assertExists<Engine>(this.engine);
         const addToTrackActions: Action[] = [];
         const numCpus = await engine.getNumberOfCpus();
@@ -239,9 +250,9 @@ class TrackControllerWrapper {
     });
   }
 
-  onBoundsChange(start: number, end: number): void {
+  onBoundsChange(start: number, end: number, resolution: number): void {
     if (!this.trackController) return;
-    this.trackController.onBoundsChange(start, end);
+    this.trackController.onBoundsChange(start, end, resolution);
   }
 }
 
@@ -351,15 +362,27 @@ class Controller {
     // TODO(hjd): Handle teardown.
     for (const config of Object.values<EngineConfig>(this.state.engines)) {
       if (this.engines.has(config.id)) continue;
-      this.engines.set(config.id, new EngineController(config, this));
+      const engine = new EngineController(config, this);
+      this.engines.set(config.id, engine);
+      engine.initialize();
     }
 
     // TODO(hjd): Handle teardown.
     for (const config of Object.values<TrackState>(this.state.tracks)) {
-      if (this.tracks.has(config.id)) continue;
-      const engine = this.engines.get(config.engineId)!;
-      this.tracks.set(
-          config.id, new TrackControllerWrapper(config, this, engine));
+      let track = this.tracks.get(config.id);
+      if (track === undefined) {
+        const engine = this.engines.get(config.engineId)!;
+        track = new TrackControllerWrapper(config, this, engine);
+        this.tracks.set(config.id, track);
+      }
+      if (config.reqTimeStart !== undefined &&
+          config.reqTimeEnd !== undefined && config.reqTimeRes !== undefined) {
+        const {reqTimeStart, reqTimeEnd, reqTimeRes} = config;
+        config.reqTimeStart = undefined;
+        config.reqTimeEnd = undefined;
+        config.reqTimeRes = undefined;
+        track.onBoundsChange(reqTimeStart, reqTimeEnd, reqTimeRes);
+      }
     }
 
     // Delete queries that aren't in the state anymore.

@@ -97,6 +97,14 @@ const Omnibox: m.Component = {
     txt.addEventListener('keyup', onKeyUp);
   },
   view() {
+    const msgTTL = globals.state.status.timestamp + 6 - Date.now() / 1e3;
+    if (msgTTL > 0) {
+      setTimeout(() => m.redraw(), msgTTL * 1000);
+      return m(
+          `.omnibox.message-mode`,
+          m(`input[placeholder=${globals.state.status.msg}][readonly]`));
+    }
+
     // TODO(primiano): handle query results here.
     const results = [];
     const resp = globals.queryResults.get(QUERY_ID) as QueryResponse;
@@ -111,10 +119,11 @@ const Omnibox: m.Component = {
       search: 'Search or type : to enter command mode',
       command: 'e.g., select * from sched left join thread using(utid) limit 10'
     };
+
     const commandMode = mode === 'command';
     return m(
         `.omnibox${commandMode ? '.command-mode' : ''}`,
-        m(`input[type=text][placeholder=${placeholder[mode]}]`),
+        m(`input[placeholder=${placeholder[mode]}]`),
         m('.omnibox-results', results));
   },
 };

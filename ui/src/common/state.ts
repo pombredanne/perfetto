@@ -31,6 +31,11 @@ export interface TrackState {
   // chrome slice state:
   upid?: number;
   utid?: number;
+
+  // For track data requests.
+  reqTimeStart?: number;
+  reqTimeEnd?: number;
+  reqTimeRes?: number;
 }
 
 export interface EngineConfig {
@@ -52,6 +57,11 @@ export interface TraceTime {
   endSec: number;
 }
 
+export interface Status {
+  msg: string;
+  timestamp: number;  // Epoch in seconds (Date.now() / 1000).
+}
+
 export interface State {
   route: string|null;
   nextId: number;
@@ -65,6 +75,7 @@ export interface State {
   displayedTrackIds: string[];
   queries: ObjectById<QueryConfig>;
   permalink: null|PermalinkConfig;
+  status: Status;
 }
 
 export function createEmptyState(): State {
@@ -77,5 +88,6 @@ export function createEmptyState(): State {
     displayedTrackIds: [],
     queries: {},
     permalink: null,
+    status: {msg: '', timestamp: 0},
   };
 }

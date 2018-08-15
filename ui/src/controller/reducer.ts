@@ -67,6 +67,15 @@ export function rootReducer(state: State, action: any): State {
       return nextState;
     }
 
+    case 'REQ_TRACK_DATA': {
+      const nextState = {...state};
+      nextState.tracks = {...state.tracks};
+      nextState.tracks[action.trackId].reqTimeStart = action.start;
+      nextState.tracks[action.trackId].reqTimeEnd = action.end;
+      nextState.tracks[action.trackId].reqTimeRes = action.resolution;
+      return nextState;
+    }
+
     // TODO: 'ADD_CHROME_TRACK' string should be a shared const.
     case 'ADD_CHROME_TRACK': {
       const nextState = {...state};
@@ -151,6 +160,12 @@ export function rootReducer(state: State, action: any): State {
       const nextState = {...state};
       nextState.traceTime.startSec = action.startSec;
       nextState.traceTime.endSec = action.endSec;
+      return nextState;
+    }
+
+    case 'UPDATE_STATUS': {
+      const nextState = {...state};
+      nextState.status = { msg:action.msg, timestamp:action.timestamp };
       return nextState;
     }
 

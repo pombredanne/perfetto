@@ -40,6 +40,11 @@ export function addTrack(engineId: string, trackKind: string, cpu: number) {
   };
 }
 
+export function requestTrackData(
+    trackId: string, start: number, end: number, resolution: number) {
+  return {type: 'REQ_TRACK_DATA', trackId, start, end, resolution};
+}
+
 // TODO: There should be merged with addTrack above.
 export function addChromeSliceTrack(
     engineId: string,
@@ -112,4 +117,8 @@ export function setState(newState: State) {
 
 export function setTraceTime(ts: TimeSpan) {
   return {type: 'SET_TRACE_TIME', startSec: ts.start, endSec: ts.end};
+}
+
+export function updateStatus(msg: string) {
+  return {type: 'UPDATE_STATUS', msg, timestamp: Date.now() / 1000};
 }

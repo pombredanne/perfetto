@@ -36,7 +36,7 @@ class CpuCounterTrackController extends TrackController {
   }
 
 
-  onBoundsChange(_start: number, _end: number): void {}
+  onBoundsChange(): void {}
 }
 
 trackControllerRegistry.register(CpuCounterTrackController);
