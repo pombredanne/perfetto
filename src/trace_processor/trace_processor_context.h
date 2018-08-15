@@ -28,7 +28,7 @@ class SchedTracker;
 class TraceParser;
 class TraceSorter;
 class ProtoTraceParser;
-class ChunkReader;
+class ChunkedTraceReader;
 
 class TraceProcessorContext {
  public:
@@ -40,7 +40,7 @@ class TraceProcessorContext {
   std::unique_ptr<TraceStorage> storage;
   std::unique_ptr<ProtoTraceParser> parser;
   std::unique_ptr<TraceSorter> sorter;
-  std::unique_ptr<ChunkReader> chunk_reader;
+  std::unique_ptr<ChunkedTraceReader> chunk_reader;
 };
 
 }  // namespace trace_processor

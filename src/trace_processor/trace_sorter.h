@@ -25,44 +25,39 @@ namespace perfetto {
 namespace trace_processor {
 
 // Events from the trace come into this class ordered per cpu. This class stores
-// the events for |window_size_ms| ms and then outputs all the collected events
+// the events for |window_size_ns| ns and then outputs all the collected events
 // in the correct global order.
 class TraceSorter {
  public:
-  TraceSorter(TraceProcessorContext*, uint64_t window_size_ms);
+  TraceSorter(TraceProcessorContext*, uint64_t window_size_ns);
 
   void PushTracePacket(uint64_t timestamp, TraceBlobView);
   void PushFtracePacket(uint32_t cpu, uint64_t timestamp, TraceBlobView);
 
-  // When the file is fully parsed, all remaining events will be flushed.
-  void NotifyEOF();
+  // This method passes any events older than window_size_ns to the
+  // parser to be parsed and then stored. If force flush is true all events
+  // will be flushed, regardless of timestamp.
+  void MaybeFlushEvents(bool force_flush);
 
-  // For testing.
-  void set_window_ms(uint64_t window_size_ms) {
-    window_size_ms_ = window_size_ms;
+  void set_window_ns_for_testing(uint64_t window_size_ns) {
+    window_size_ns_ = window_size_ns;
   }
 
  private:
   struct TimestampedTracePiece {
+    TimestampedTracePiece(TraceBlobView bv, bool is_f, uint32_t c)
+        : blob_view(std::move(bv)), is_ftrace(is_f), cpu(c) {}
+
     TraceBlobView blob_view;
     bool is_ftrace;
     uint32_t cpu;
   };
 
   TraceProcessorContext* context_;
-  uint64_t window_size_ms_;
+  uint64_t window_size_ns_;
 
   // All events, with the oldest at the beginning.
   std::map<uint64_t /* timestamp */, TimestampedTracePiece> events_;
-
-  // This method passes any events older than window_size_ms to the
-  // parser to be parsed and then stored.
-  void FlushEvents();
-
-  // Returns true if the difference between the timestamp of the oldest and
-  // most recent events is larger than the window size. This means the oldest
-  // event should be flushed.
-  bool EventReadyToFlush();
 };
 
 }  // namespace trace_processor

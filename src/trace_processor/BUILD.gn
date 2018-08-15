@@ -36,7 +36,7 @@ wasm_lib("trace_processor") {
 source_set("lib") {
   sources = [
     "blob_reader.h",
-    "chunk_reader.h",
+    "chunked_trace_reader.h",
     "file_reader.cc",
     "file_reader.h",
     "process_table.cc",

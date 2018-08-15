@@ -44,46 +44,48 @@ class TraceSorterTest : public ::testing::Test {
     context_.sorter.reset(new TraceSorter(&context_, 0 /*window_size*/));
     parser_ = new MockTraceParser(&context_);
     context_.parser.reset(parser_);
+    test_buffer_ = std::shared_ptr<uint8_t>(new uint8_t[8],
+                                            std::default_delete<uint8_t[]>());
   }
 
  protected:
   TraceProcessorContext context_;
   MockTraceParser* parser_;
+  std::shared_ptr<uint8_t> test_buffer_;
 };
 
 TEST_F(TraceSorterTest, TestFtrace) {
-  TraceBlobView view;
+  TraceBlobView view(test_buffer_, 0, 1);
   EXPECT_CALL(*parser_, ParseFtracePacket(0, 1000, view));
-  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/, view);
+  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
+                                    std::move(view));
 }
 
 TEST_F(TraceSorterTest, TestTracePacket) {
-  TraceBlobView view;
+  TraceBlobView view(test_buffer_, 0, 1);
   EXPECT_CALL(*parser_, ParseTracePacket(view));
-  context_.sorter->PushTracePacket(1000, view);
+  context_.sorter->PushTracePacket(1000, std::move(view));
 }
 
 TEST_F(TraceSorterTest, Ordering) {
-  TraceBlobView view;
-  TraceBlobView view_length_5;
-  view_length_5.length = 5;
-  TraceBlobView view_length_2;
-  view_length_5.length = 2;
+  TraceBlobView view(test_buffer_, 0, 1);
+  TraceBlobView view_length_5(test_buffer_, 0, 5);
+  TraceBlobView view_length_2(test_buffer_, 0, 2);
 
   InSequence s;
 
-  EXPECT_CALL(*parser_, ParseFtracePacket(0, 1000000000, view));
+  EXPECT_CALL(*parser_, ParseFtracePacket(0, 1000, view));
   EXPECT_CALL(*parser_, ParseTracePacket(view_length_5));
   EXPECT_CALL(*parser_, ParseTracePacket(view_length_2));
-  EXPECT_CALL(*parser_, ParseFtracePacket(2, 1200000000, view));
+  EXPECT_CALL(*parser_, ParseFtracePacket(2, 1200, view));
 
-  context_.sorter->set_window_ms(200);
-  context_.sorter->PushFtracePacket(2 /*cpu*/, 1200000000 /*timestamp*/, view);
-  context_.sorter->PushTracePacket(1000000001, view_length_5);
-  context_.sorter->PushTracePacket(1100000000, view_length_2);
-  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000000000 /*timestamp*/, view);
+  context_.sorter->set_window_ns_for_testing(200);
+  context_.sorter->PushFtracePacket(2 /*cpu*/, 1200 /*timestamp*/, view);
+  context_.sorter->PushTracePacket(1001, view_length_5);
+  context_.sorter->PushTracePacket(1100, view_length_2);
+  context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/, view);
 
-  context_.sorter->NotifyEOF();
+  context_.sorter->MaybeFlushEvents(true);
 }
 
 }  // namespace

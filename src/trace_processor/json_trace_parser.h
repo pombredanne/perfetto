@@ -23,7 +23,7 @@
 #include <tuple>
 #include <unordered_map>
 
-#include "src/trace_processor/chunk_reader.h"
+#include "src/trace_processor/chunked_trace_reader.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
@@ -34,14 +34,14 @@ class TraceProcessorContext;
 
 // Parses legacy chrome JSON traces. The support for now is extremely rough
 // and supports only explicit TRACE_EVENT_BEGIN/END events.
-class JsonTraceParser : public ChunkReader {
+class JsonTraceParser : public ChunkedTraceReader {
  public:
   static constexpr char kPreamble[] = "{\"traceEvents\":[";
 
   JsonTraceParser(BlobReader*, TraceProcessorContext*);
   ~JsonTraceParser() override;
 
-  // ChunkReader implementation.
+  // ChunkedTraceReader implementation.
 
   // Parses a batch of JSON events from the BlobReader. Returns true
   // if there are more chunks which can be read and false otherwise.

@@ -13,36 +13,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "src/trace_processor/trace_sorter.h"
+#include <utility>
+
 #include "src/trace_processor/proto_trace_parser.h"
+#include "src/trace_processor/trace_sorter.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 TraceSorter::TraceSorter(TraceProcessorContext* context,
-                         uint64_t window_size_ms)
-    : context_(context), window_size_ms_(window_size_ms){};
+                         uint64_t window_size_ns)
+    : context_(context), window_size_ns_(window_size_ns){};
 
 void TraceSorter::PushTracePacket(uint64_t timestamp,
                                   TraceBlobView trace_view) {
-  TimestampedTracePiece ttp = {
-      trace_view, false /* is_ftrace */,
-      0 /* cpu - this field should never be used for non-ftrace packets */};
+  TimestampedTracePiece ttp(
+      std::move(trace_view), false /* is_ftrace */,
+      0 /* cpu - this field should never be used for non-ftrace packets */);
   events_.emplace(timestamp, ttp);
-  FlushEvents();
+  MaybeFlushEvents(false);
 }
 
 void TraceSorter::PushFtracePacket(uint32_t cpu,
                                    uint64_t timestamp,
                                    TraceBlobView trace_view) {
-  TimestampedTracePiece ttp = {trace_view, true /* is_ftrace */, cpu};
+  TimestampedTracePiece ttp(std::move(trace_view), true /* is_ftrace */, cpu);
   events_.emplace(timestamp, ttp);
-  FlushEvents();
+  MaybeFlushEvents(false);
 }
 
-void TraceSorter::FlushEvents() {
-  auto oldest = events_.begin();
-  while (EventReadyToFlush()) {
+void TraceSorter::MaybeFlushEvents(bool force_flush) {
+  while (!events_.empty()) {
+    uint64_t oldest_timestamp = events_.begin()->first;
+    uint64_t most_recent_timestamp = events_.rbegin()->first;
+
+    // Only flush if there is an event older than the window size or
+    // if we are force flushing.
+    if (most_recent_timestamp - oldest_timestamp < window_size_ns_ &&
+        !force_flush)
+      break;
+
+    auto oldest = events_.begin();
     if (oldest->second.is_ftrace) {
       context_->parser->ParseFtracePacket(oldest->second.cpu,
                                           oldest->first /*timestamp*/,
@@ -50,32 +61,8 @@ void TraceSorter::FlushEvents() {
     } else {
       context_->parser->ParseTracePacket(oldest->second.blob_view);
     }
-    // This event has now been flushed so remove it.
     events_.erase(oldest);
-    oldest = events_.begin();
   }
-}
-
-bool TraceSorter::EventReadyToFlush() {
-  if (events_.begin() != events_.end()) {
-    uint64_t oldest_timestamp = events_.begin()->first;
-    uint64_t most_recent_timestamp = events_.rbegin()->first;
-    uint64_t window_size_ns = window_size_ms_ * 1000000;
-    return most_recent_timestamp - oldest_timestamp >= window_size_ns;
-  };
-  return false;
-}
-
-void TraceSorter::NotifyEOF() {
-  for (auto it = events_.begin(); it != events_.end(); ++it) {
-    if (it->second.is_ftrace) {
-      context_->parser->ParseFtracePacket(
-          it->second.cpu, it->first /*timestamp*/, it->second.blob_view);
-    } else {
-      context_->parser->ParseTracePacket(it->second.blob_view);
-    }
-  }
-  events_.clear();
 }
 
 }  // namespace trace_processor

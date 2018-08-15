@@ -41,13 +41,13 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 ProtoTraceParser::~ProtoTraceParser() = default;
 
 void ProtoTraceParser::ParseTracePacket(const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kProcessTreeFieldNumber: {
-        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
-        TraceBlobView process_tree_view = {view.buffer, offset, fld.size()};
+        TraceBlobView process_tree_view(view.buffer(),
+                                        view.offset_of(fld.data()), fld.size());
         ParseProcessTree(process_tree_view);
         break;
       }
@@ -59,19 +59,19 @@ void ProtoTraceParser::ParseTracePacket(const TraceBlobView& view) {
 }
 
 void ProtoTraceParser::ParseProcessTree(const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber: {
-        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
-        TraceBlobView process_view = {view.buffer, offset, fld.size()};
+        TraceBlobView process_view(view.buffer(), view.offset_of(fld.data()),
+                                   fld.size());
         ParseProcess(process_view);
         break;
       }
       case protos::ProcessTree::kThreadsFieldNumber: {
-        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
-        TraceBlobView thread_view = {view.buffer, offset, fld.size()};
+        TraceBlobView thread_view(view.buffer(), view.offset_of(fld.data()),
+                                  fld.size());
         ParseThread(thread_view);
         break;
       }
@@ -83,7 +83,7 @@ void ProtoTraceParser::ParseProcessTree(const TraceBlobView& view) {
 }
 
 void ProtoTraceParser::ParseThread(const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
   uint32_t tid = 0;
   uint32_t tgid = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -104,7 +104,7 @@ void ProtoTraceParser::ParseThread(const TraceBlobView& view) {
 }
 
 void ProtoTraceParser::ParseProcess(const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
 
   uint32_t pid = 0;
   base::StringView process_name;
@@ -129,14 +129,14 @@ void ProtoTraceParser::ParseProcess(const TraceBlobView& view) {
 void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                                          uint64_t timestamp,
                                          const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
         PERFETTO_DCHECK(timestamp > 0);
-        uint64_t offset = static_cast<uint64_t>(fld.data() - view.buffer.get());
-        TraceBlobView sched_view = {view.buffer, offset, fld.size()};
+        TraceBlobView sched_view(view.buffer(), view.offset_of(fld.data()),
+                                 fld.size());
         ParseSchedSwitch(cpu, timestamp, sched_view);
         break;
       }
@@ -151,7 +151,7 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
                                         uint64_t timestamp,
 
                                         const TraceBlobView& view) {
-  ProtoDecoder decoder(view.buffer.get() + view.offset, view.length);
+  ProtoDecoder decoder(view.data(), view.length());
 
   uint32_t prev_pid = 0;
   uint32_t prev_state = 0;

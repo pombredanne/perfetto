@@ -17,6 +17,8 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_BLOB_VIEW_H_
 #define SRC_TRACE_PROCESSOR_TRACE_BLOB_VIEW_H_
 
+#include <stddef.h>
+#include <stdint.h>
 #include <memory>
 
 namespace perfetto {
@@ -25,14 +27,35 @@ namespace trace_processor {
 // A view of the trace. The buffer is in a shared_ptr so it will be freed
 // when all of the TraceBlobViews have passed through the pipeline and been
 // parsed.
-struct TraceBlobView {
+class TraceBlobView {
+ public:
+  TraceBlobView(std::shared_ptr<uint8_t> buffer, size_t offset, size_t length)
+      : buffer_(buffer), offset_(offset), length_(length) {}
+
+  TraceBlobView(TraceBlobView&&) = default;
+  TraceBlobView& operator=(TraceBlobView&&) = default;
+  TraceBlobView(TraceBlobView const&) = default;
+  TraceBlobView& operator=(TraceBlobView const&) = default;
+
   bool operator==(const TraceBlobView& rhs) const {
-    return (buffer == rhs.buffer) && (offset == rhs.offset) &&
-           (length == rhs.length);
+    return (buffer_ == rhs.buffer_) && (offset_ == rhs.offset_) &&
+           (length_ == rhs.length_);
   }
-  std::shared_ptr<uint8_t> buffer;
-  uint64_t offset;
-  size_t length;
+
+  const uint8_t* data() const { return buffer_.get() + offset_; }
+
+  size_t offset_of(const uint8_t* data) const {
+    return static_cast<size_t>(data - buffer_.get());
+  }
+
+  const std::shared_ptr<uint8_t>& buffer() const { return buffer_; }
+
+  size_t length() const { return length_; }
+
+ private:
+  std::shared_ptr<uint8_t> buffer_;
+  size_t offset_;
+  size_t length_;
 };
 }  // namespace trace_processor
 }  // namespace perfetto

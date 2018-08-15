@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <memory>
 
-#include "src/trace_processor/chunk_reader.h"
+#include "src/trace_processor/chunked_trace_reader.h"
 #include "src/trace_processor/trace_blob_view.h"
 
 namespace perfetto {
@@ -29,8 +29,9 @@ namespace trace_processor {
 class BlobReader;
 class TraceProcessorContext;
 
-// Reads a protobuf trace in chunks and extracts the timestamp.
-class ProtoTraceTokenizer : public ChunkReader {
+// Reads a protobuf trace in chunks and extracts boundaries of trace packets
+// (or subfields, for the case of ftrace) with their timestamps.
+class ProtoTraceTokenizer : public ChunkedTraceReader {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
@@ -48,12 +49,12 @@ class ProtoTraceTokenizer : public ChunkReader {
  private:
   static constexpr uint32_t kTraceChunkSize = 16 * 1024 * 1024;  // 16 MB
 
-  void ParsePacket(const TraceBlobView&);
+  void ParsePacket(TraceBlobView);
   void ParseFtraceEventBundle(const TraceBlobView&);
-  void ParseFtraceEvent(uint32_t cpu, const TraceBlobView&);
+  void ParseFtraceEvent(uint32_t cpu, TraceBlobView);
 
   BlobReader* const reader_;
-  TraceProcessorContext* context_;
+  TraceProcessorContext* const context_;
 
   // Temporary - currently trace packets do not have a timestamp, so the
   // timestamp given is last_timestamp + 1.
