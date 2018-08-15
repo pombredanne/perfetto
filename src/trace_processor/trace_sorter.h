@@ -27,6 +27,8 @@ namespace trace_processor {
 // Events from the trace come into this class ordered per cpu. This class stores
 // the events for |window_size_ns| ns and then outputs all the collected events
 // in the correct global order.
+// When |window_size_ns| == 0 this class will push packets directly to be parsed
+// and stored. This means no ordering can occur.
 class TraceSorter {
  public:
   TraceSorter(TraceProcessorContext*, uint64_t window_size_ns);

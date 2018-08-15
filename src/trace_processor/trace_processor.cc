@@ -46,7 +46,8 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
-  context_.sorter.reset(new TraceSorter(&context_, 0));
+  context_.sorter.reset(
+      new TraceSorter(&context_, static_cast<uint64_t>(5 * 1e9)));
   context_.parser.reset(new ProtoTraceParser(&context_));
   context_.storage.reset(new TraceStorage());
 
