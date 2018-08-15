@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {rawQueryResultIter} from '../../common/protos';
 import {
   Engine,
   PublishFn,
@@ -24,12 +23,7 @@ import {
 } from '../../controller/track_controller_registry';
 
 import {TRACK_KIND} from './common';
-
-// Need this because some values in query result is string|number.
-function convertToNumber(x: string|number): number {
-  // tslint:disable-next-line:ban Temporary. parseInt banned by style guide.
-  return typeof x === 'number' ? x : parseInt(x, 10);
-}
+import { fromNs } from '../../common/time';
 
 // TODO(hjd): Too much bolierplate here. Prehaps TrackController/Track
 // should be an interface and we provide a TrackControllerBase/TrackBase
@@ -57,23 +51,20 @@ class CpuSliceTrackController extends TrackController {
   }
 
   async init() {
-    const query = `select * from sched where cpu = ${this.cpu} limit 1000;`;
+    const query = `select ts, dur, utid from sched where cpu = ${this.cpu} limit 10000;`;
     const rawResult = await this.engine.rawQuery({'sqlQuery': query});
-    // TODO(hjd): Remove.
-    const result = [...rawQueryResultIter(rawResult)];
     const slices = [];
 
-    // Hacking time for now. http://bit.ly/2LNElLB
-    // TODO: We're currently not setting the maxVisible window anywhere. Should
-    // there even be a max visible window? Should it be the job of track
-    // controllers to tell us what the max visible window is?
-    if (result.length === 0) return;
-    const firstTimestamp = convertToNumber(result[0].ts);
-
-    for (const row of result) {
-      const start = convertToNumber(row.ts) - firstTimestamp;
-      const end = start + convertToNumber(row.dur);
-      slices.push({start, end, title: 'Placeholder'});
+    for (let row = 0; row < rawResult.numRecords; row++) {
+      const cols = rawResult.columns;
+      const start = fromNs(+cols[0].longValues![row]);
+      const end = start + fromNs(+cols[1].longValues![row]);
+      const utid = +cols[2].longValues![row];
+      slices.push({
+        start,
+        end,
+        utid,
+      });
     }
     this.publish({slices});
   }

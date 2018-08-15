@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {State} from './state';
+import {TimeSpan} from './time';
 export interface Action { type: string; }
 
 export function openTraceFromUrl(url: string) {
@@ -109,6 +110,6 @@ export function setState(newState: State) {
   };
 }
 
-export function setTraceTime(startSec: number, endSec: number) {
-  return {type: 'SET_TRACE_TIME', startSec, endSec};
+export function setTraceTime(ts: TimeSpan) {
+  return {type: 'SET_TRACE_TIME', startSec: ts.start, endSec: ts.end};
 }

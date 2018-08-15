@@ -13,17 +13,36 @@
 // limitations under the License.
 
 import {TrackState} from '../../common/state';
-import {fromNs, TimeSpan} from '../../common/time';
+import {TimeSpan} from '../../common/time';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
 import {CpuSlice, CpuSliceTrackData, TRACK_KIND} from './common';
 
+const MARGIN_TOP = 20;
+const RECT_HEIGHT = 30;
+
 function sliceIsVisible(
     slice: {start: number, end: number}, visibleWindowTime: TimeSpan) {
-  return fromNs(slice.end) > visibleWindowTime.start &&
-      fromNs(slice.start) < visibleWindowTime.end;
+  return slice.end > visibleWindowTime.start &&
+      slice.start < visibleWindowTime.end;
+}
+
+function cropText(str:string, charWidth: number, rectWidth: number) {
+  const maxTextWidth = rectWidth - 15;
+  let displayText = '';
+  const nameLength = str.length * charWidth;
+  if (nameLength < maxTextWidth) {
+    displayText = str;
+  } else {
+    // -3 for the 3 ellipsis.
+    const displayedChars = Math.floor(maxTextWidth / charWidth) - 3;
+    if (displayedChars > 3) {
+      displayText = str.substring(0, displayedChars) + '...';
+    }
+  }
+  return displayText;
 }
 
 class CpuSliceTrack extends Track {
@@ -46,19 +65,48 @@ class CpuSliceTrack extends Track {
   renderCanvas(ctx: CanvasRenderingContext2D): void {
     if (!this.trackData) return;
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
+    ctx.textAlign = 'center';
+    const charWidth = ctx.measureText('abcdefghij').width / 10;
+
+    // TODO: this needs to be kept in sync with the hue generation algorithm
+    // of overview_timeline_panel.ts
+    let hue = (128 + (32 * this.trackState.cpu)) % 256;
+
     for (const slice of this.trackData.slices) {
       if (!sliceIsVisible(slice, visibleWindowTime)) continue;
-      const rectStart = timeScale.timeToPx(fromNs(slice.start));
-      const rectEnd = timeScale.timeToPx(fromNs(slice.end));
-      ctx.fillStyle = slice === this.hoveredSlice ? '#b35846' : '#4682b4';
-      ctx.fillRect(rectStart, 40, rectEnd - rectStart, 30);
+      const rectStart = timeScale.timeToPx(slice.start);
+      const rectEnd = timeScale.timeToPx(slice.end);
+      const rectWidth = rectEnd - rectStart;
+      if (rectWidth < 0.1) continue;
+
+      ctx.fillStyle = `hsl(${hue}, 50%, ${slice === this.hoveredSlice ? 70 : 50}%`;
+      ctx.fillRect(rectStart, MARGIN_TOP, rectEnd - rectStart, RECT_HEIGHT);
+
+      // TODO: consider de-duplicating this code with the copied one from
+      // chrome_slices/frontend.ts.
+      let title = `[utid:${slice.utid}]`;
+      let subTitle = '';
+      const threadInfo = globals.threads.get(slice.utid);
+      if (threadInfo !== undefined) {
+        title = `${threadInfo.procName} [${threadInfo.pid}]`;
+        subTitle = `${threadInfo.threadName} [${threadInfo.tid}]`;
+      }
+      title = cropText(title, charWidth, rectWidth);
+      subTitle = cropText(subTitle, charWidth, rectWidth);
+      const rectXCenter = rectStart + rectWidth / 2;
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px Google Sans';
+      ctx.fillText(title, rectXCenter, MARGIN_TOP + RECT_HEIGHT / 2 - 3);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.font = '10px Google Sans';
+      ctx.fillText(subTitle, rectXCenter, MARGIN_TOP + RECT_HEIGHT / 2 + 11);
     }
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
     if (!this.trackData) return;
     const {timeScale} = globals.frontendLocalState;
-    if (y < 40 || y > 70) {
+    if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
       this.hoveredSlice = null;
       return;
     }
@@ -66,7 +114,7 @@ class CpuSliceTrack extends Track {
     this.hoveredSlice = null;
 
     for (const slice of this.trackData.slices) {
-      if (fromNs(slice.start) <= t && fromNs(slice.end) >= t) {
+      if (slice.start <= t && slice.end >= t) {
         this.hoveredSlice = slice;
       }
     }

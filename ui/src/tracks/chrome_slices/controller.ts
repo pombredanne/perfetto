@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {assertExists} from '../../base/logging';
-import {rawQueryResultIter} from '../../common/protos';
+import {RawQueryResult} from '../../common/protos';
 import {
   Engine,
   PublishFn,
@@ -25,12 +25,7 @@ import {
 } from '../../controller/track_controller_registry';
 
 import {ChromeSlice, TRACK_KIND} from './common';
-
-// Need this because some values in query result is string|number.
-function convertToNumber(x: string|number): number {
-  // tslint:disable-next-line:ban Temporary. parseInt banned by style guide.
-  return typeof x === 'number' ? x : parseInt(x, 10);
-}
+import { fromNs } from '../../common/time';
 
 // TODO(hjd): Too much bolierplate here. Prehaps TrackController/Track
 // should be an interface and we provide a TrackControllerBase/TrackBase
@@ -64,24 +59,19 @@ class ChromeSliceTrackController extends TrackController {
         `select ts, dur, name, cat, depth from slices where utid = ${
                                                                      this.utid
                                                                    };`;
-    const rawResult = await this.engine.rawQuery({'sqlQuery': query});
-    // TODO(dproy): Remove.
-    const result = [...rawQueryResultIter(rawResult)];
+    const rawResult = (await this.engine.rawQuery({'sqlQuery': query})) as RawQueryResult;
     const slices: ChromeSlice[] = [];
 
-    // TODO: We need better time origin handling.
-    if (result.length === 0) return;
-    const firstTimestamp = convertToNumber(result[0].ts);
-
-    for (const row of result) {
-      const start = convertToNumber(row.ts) - firstTimestamp;
-      const end = start + convertToNumber(row.dur);
+    for (let row = 0; row < rawResult.numRecords; row++) {
+      const cols = rawResult.columns;
+      const start = fromNs(+cols[0].longValues![row]);
+      const end = start + fromNs(+cols[1].longValues![row]);
       slices.push({
         start,
         end,
-        title: (row.name as string),
-        category: (row.cat as string),
-        depth: convertToNumber(row.depth)
+        title: cols[2].stringValues![row],
+        category: cols[3].stringValues![row],
+        depth: +cols[4].longValues![row]
       });
     }
 

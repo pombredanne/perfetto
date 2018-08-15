@@ -19,16 +19,14 @@ import * as m from 'mithril';
 import {forwardRemoteCalls} from '../base/remote';
 import {setState} from '../common/actions';
 import {loadState} from '../common/permalinks';
-import {createEmptyState, State} from '../common/state';
+import {State} from '../common/state';
 import {
   takeWasmEngineWorkerPort,
   warmupWasmEngineWorker,
 } from '../controller/wasm_engine_proxy';
 
-import {FrontendLocalState} from './frontend_local_state';
-import {globals} from './globals';
+import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
-import {RafScheduler} from './raf_scheduler';
 import {ViewerPage} from './viewer_page';
 
 function createController(): Worker {
@@ -48,6 +46,16 @@ class FrontendApi {
     this.redraw();
   }
 
+  publishOverviewData(data: {[key:string]: QuantizedLoad}) {
+    for (const key of Object.keys(data)) {
+      if (!globals.overviewStore.has(key)) {
+        globals.overviewStore.set(key, []);
+      }
+      globals.overviewStore.get(key)!.push(data[key]);
+    }
+    globals.rafScheduler.scheduleOneRedraw();
+  }
+
   publishTrackData(id: string, data: {}) {
     globals.trackDataStore.set(id, data);
     this.redraw();
@@ -55,6 +63,14 @@ class FrontendApi {
 
   publishQueryResult(id: string, data: {}) {
     globals.queryResults.set(id, data);
+    this.redraw();
+  }
+
+  publishThreads(data: ThreadDesc[]) {
+    globals.threads.clear();
+    data.forEach(thread => {
+      globals.threads.set(thread.utid, thread);
+    });
     this.redraw();
   }
 
@@ -84,14 +100,7 @@ async function main() {
   forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
 
-  globals.initialize(
-      controller.postMessage.bind(controller),  // dispatch
-      createEmptyState(),                       // state
-      new Map<string, {}>(),                    // trackDataStore
-      new Map<string, {}>(),                    // queryResults
-      new FrontendLocalState(),                 // frontendState
-      new RafScheduler(),                       // rafSheduler
-      );
+  globals.initialize(controller.postMessage.bind(controller));
 
   warmupWasmEngineWorker();
 

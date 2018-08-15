@@ -23,8 +23,6 @@ import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingPanelContainer} from './scrolling_panel_container';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 
-export const OVERVIEW_QUERY_ID = 'overview_query';
-
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 
 const QueryTable: m.Component<{}, {}> = {

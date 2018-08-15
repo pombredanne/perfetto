@@ -21,6 +21,7 @@ import {
   Action,
   addChromeSliceTrack,
   addTrack,
+  // addTrack,
   deleteQuery,
   navigate,
   setEngineReady,
@@ -37,6 +38,10 @@ import {
   State,
   TrackState,
 } from '../common/state';
+import {TimeSpan} from '../common/time';
+import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
+import {TRACK_KIND as SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
+import {TRACK_KIND as SCHED_TRACK_KIND} from '../tracks/cpu_slices/common';
 
 import {Engine} from './engine';
 import {rootReducer} from './reducer';
@@ -56,7 +61,8 @@ async function fetchTrace(source: string|File): Promise<Blob> {
   return response.blob();
 }
 
-type EngineControllerState = 'init'|'waiting_for_file'|'loading'|'ready';
+type EngineControllerState =
+    'init'|'waiting_for_file'|'loading'|'ready'|'load_overview'|'load_tracks';
 class EngineController {
   private readonly config: EngineConfig;
   private readonly controller: Controller;
@@ -64,6 +70,7 @@ class EngineController {
   private _state: EngineControllerState;
   private blob?: Blob;
   private engine?: Engine;
+  private traceTime?: TimeSpan;
 
   constructor(config: EngineConfig, controller: Controller) {
     this.controller = controller;
@@ -88,104 +95,118 @@ class EngineController {
         this.engine = await this.controller.createEngine(blob);
         this.transition('ready');
         break;
-      case 'ready':
+      case 'ready': {
         const engine = assertExists<Engine>(this.engine);
-        const numberOfCpus = await engine.getNumberOfCpus();
-        const addToTrackActions: Action[] = [];
-        const traceBounds = await engine.getTraceTimeBounds();
-        addToTrackActions.push(
-            setTraceTime(traceBounds.start, traceBounds.end));
-
-        const numSteps = 100;
-        const stepNs = Math.round(traceBounds.duration * 1e9 / numSteps);
-
-        // TODO: the interface for this object should be put in a common file
-        // and shared with the frontend. We need some better solution for the
-        // published track / query data, right now is too free form.
-        const overviewData: {[key: string]:
-                                 {name: string, load: Uint8Array}} = {};
-
-        if (numberOfCpus > 0) {
-          // This is a sched slice trace.
-          for (let i = 0; i < numberOfCpus; i++) {
-            addToTrackActions.push(
-                addTrack(this.config.id, 'CpuSliceTrack', i));
-          }
-          // TODO: this query and the one below should be more uniforms. Perhaps
-          // the concepts of "sched" and "slices" tables are redundant.
-          const overviewQuery = await engine.rawQuery({
-            sqlQuery: `select round(ts/${stepNs})*${stepNs} as quantized_ts, ` +
-                'sum(dur) as load, cpu from sched ' +
-                'group by quantized_ts, cpu order by cpu limit 10000'
-          });
-          let lastCpu = -1;
-          let loadIdx = 0;
-          for (let i = 0; i < overviewQuery.numRecords; i++) {
-            const load = overviewQuery.columns[1].longValues![i] as number;
-            const cpu = overviewQuery.columns[2].longValues![i] as number;
-            if (cpu !== lastCpu) {
-              overviewData[cpu] = {
-                name: `CPU${cpu}`,
-                load: new Uint8Array(numSteps)
-              };
-              lastCpu = cpu;
-              loadIdx = 0;
-            }
-            overviewData[cpu].load[loadIdx++] = (load / stepNs) * 255;
-          }
-        } else if ((await engine.getNumberOfProcesses()) > 0) {
-          const overviewQuery = await engine.rawQuery({
-            sqlQuery: `select round(ts/${stepNs})*${stepNs} as quantized_ts, ` +
-                `sum(dur) as load, upid, process.name ` +
-                'from slices inner join thread using(utid) ' +
-                'inner join  process using(upid) where depth = 0 ' +
-                'group by quantized_ts, upid  order by upid limit 10000'
-          });
-          let lastUpid = -1;
-          let loadIdx = 0;
-          for (let i = 0; i < overviewQuery.numRecords; i++) {
-            const load = overviewQuery.columns[1].longValues![i] as number;
-            const upid = overviewQuery.columns[2].longValues![i] as number;
-            const procName = overviewQuery.columns[3].stringValues![i];
-            if (upid !== lastUpid) {
-              overviewData[upid] = {
-                name: procName,
-                load: new Uint8Array(numSteps)
-              };
-              lastUpid = upid;
-              loadIdx = 0;
-            }
-            overviewData[upid].load[loadIdx++] = (load / stepNs) * 255;
-          }
-
-          const threadQuery = await engine.rawQuery({
-            sqlQuery:
-                'select upid, utid, tid, thread.name, max(slices.depth) ' +
-                'from thread inner join slices using(utid) group by utid'
-          });
-          for (let i = 0; i < threadQuery.numRecords; i++) {
-            const upid = threadQuery.columns[0].longValues![i];
-            const utid = threadQuery.columns[1].longValues![i];
-            const threadId = threadQuery.columns[2].longValues![i];
-            let threadName = threadQuery.columns[3].stringValues![i];
-            threadName += `[${threadId}]`;
-            const maxDepth = threadQuery.columns[4].longValues![i];
-            addToTrackActions.push(addChromeSliceTrack(
-                this.config.id,
-                'ChromeSliceTrack',
-                upid as number,
-                utid as number,
-                threadName,
-                maxDepth as number));
-          }
-        }
-        this.controller.publishQueryResult('overview_query', overviewData);
-        this.controller.dispatchMultiple(addToTrackActions);
+        this.traceTime = await engine.getTraceTimeBounds();
+        this.controller.dispatch(setTraceTime(this.traceTime));
         this.deferredOnReady.forEach(d => d.resolve(engine));
         this.deferredOnReady.clear();
         this.controller.dispatch(setEngineReady(this.config.id));
         this.controller.dispatch(navigate('/viewer'));
+        this.transition('load_overview');
         break;
+      }
+      case 'load_overview': {
+        const engine = assertExists<Engine>(this.engine);
+        const numSteps = 100;
+        const traceTime = assertExists(this.traceTime);
+        const stepSec = traceTime.duration / numSteps;
+        for (let step = 0; step < numSteps; step++) {
+          const startSec = traceTime.start + step * stepSec;
+          const startNs = Math.floor(startSec * 1e9);
+          const endSec = startSec + stepSec;
+          const endNs = Math.ceil(endSec * 1e9);
+
+          // Sched overview.
+          const schedRows = await engine.rawQuery({
+            sqlQuery: `select sum(dur)/${stepSec}/1e9, cpu from sched ` +
+                `where ts >= ${startNs} and ts < ${endNs} ` +
+                'group by cpu order by cpu'
+          });
+
+          // TODO: the interface for this object should be put in a common
+          // file and shared with the frontend. We need some better solution
+          // for the published track / query data, right now is too free form.
+          const schedData: {[key: string]: QuantizedLoad} = {};
+          for (let i = 0; i < schedRows.numRecords; i++) {
+            const load = schedRows.columns[0].doubleValues![i] as number;
+            const cpu = schedRows.columns[1].longValues![i] as number;
+            schedData[cpu] = {startSec, endSec, load};
+          }  // for (record ...)
+          this.controller.publishOverviewData(schedData);
+
+          // Slices overview.
+          const slicesRows = await engine.rawQuery({
+            sqlQuery:
+                `select sum(dur)/${
+                                   stepSec
+                                 }/1e9, process.name, process.pid, upid ` +
+                'from slices inner join thread using(utid) ' +
+                'inner join process using(upid) where depth = 0 ' +
+                `and ts >= ${startNs} and ts < ${endNs} ` +
+                'group by upid'
+          });
+          const slicesData: {[key: string]: QuantizedLoad} = {};
+          for (let i = 0; i < slicesRows.numRecords; i++) {
+            const load = slicesRows.columns[0].doubleValues![i] as number;
+            let procName = slicesRows.columns[1].stringValues![i];
+            const pid = slicesRows.columns[2].longValues![i];
+            procName += ` [${pid}]`;
+            slicesData[procName] = {startSec, endSec, load};
+          }
+          this.controller.publishOverviewData(slicesData);
+        }  // for (step ...)
+
+        // Send thread map
+        const threadRows = await engine.rawQuery({
+          sqlQuery: 'select utid, tid, pid, thread.name, process.name ' +
+              'from thread inner join process using(upid)'
+        });
+        const threads: ThreadDesc[] = [];
+        for (let i = 0; i < threadRows.numRecords; i++) {
+          const utid = threadRows.columns[0].longValues![i] as number;
+          const tid = threadRows.columns[1].longValues![i] as number;
+          const pid = threadRows.columns[2].longValues![i] as number;
+          const threadName = threadRows.columns[3].stringValues![i];
+          const procName = threadRows.columns[4].stringValues![i];
+          threads.push({utid, tid, threadName, pid, procName});
+        }  // for (record ...)
+        this.controller.publishThreads(threads);
+
+        this.transition('load_tracks');
+        break;
+      }
+      case 'load_tracks': {
+        const engine = assertExists<Engine>(this.engine);
+        const addToTrackActions: Action[] = [];
+        const numCpus = await engine.getNumberOfCpus();
+        for (let cpu = 0; cpu < numCpus; cpu++) {
+          addToTrackActions.push(
+              addTrack(this.config.id, SCHED_TRACK_KIND, cpu));
+        }
+
+        const threadQuery = await engine.rawQuery({
+          sqlQuery: 'select upid, utid, tid, thread.name, max(slices.depth) ' +
+              'from thread inner join slices using(utid) group by utid'
+        });
+        for (let i = 0; i < threadQuery.numRecords; i++) {
+          const upid = threadQuery.columns[0].longValues![i];
+          const utid = threadQuery.columns[1].longValues![i];
+          const threadId = threadQuery.columns[2].longValues![i];
+          let threadName = threadQuery.columns[3].stringValues![i];
+          threadName += `[${threadId}]`;
+          const maxDepth = threadQuery.columns[4].longValues![i];
+          addToTrackActions.push(addChromeSliceTrack(
+              this.config.id,
+              SLICE_TRACK_KIND,
+              upid as number,
+              utid as number,
+              threadName,
+              maxDepth as number));
+        }
+        this.controller.dispatchMultiple(addToTrackActions);
+        break;
+      }
       default:
         throw new Error(`No such state ${newState}`);
     }
@@ -357,13 +378,20 @@ class Controller {
     this.frontend.updateState(this.state);
   }
 
+  publishOverviewData(data: {[key: string]: QuantizedLoad}) {
+    this.frontend.publishOverviewData(data);
+  }
+
   publishTrackData(id: string, data: {}) {
     this.frontend.publishTrackData(id, data);
   }
 
-
   publishQueryResult(id: string, data: {}) {
     this.frontend.publishQueryResult(id, data);
+  }
+
+  publishThreads(data: ThreadDesc[]) {
+    this.frontend.publishThreads(data);
   }
 
   async createEngine(blob: Blob): Promise<Engine> {
@@ -391,8 +419,16 @@ class FrontendProxy {
     return this.remote.send<MessagePort>('createWasmEnginePort', []);
   }
 
+  publishOverviewData(data: {[key: string]: QuantizedLoad}) {
+    return this.remote.send<void>('publishOverviewData', [data]);
+  }
+
   publishTrackData(id: string, data: {}) {
     return this.remote.send<void>('publishTrackData', [id, data]);
+  }
+
+  publishThreads(data: ThreadDesc[]) {
+    return this.remote.send<void>('publishThreads', [data]);
   }
 
   publishQueryResult(id: string, data: {}) {

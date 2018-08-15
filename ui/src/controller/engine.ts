@@ -63,24 +63,25 @@ export abstract class Engine {
 
   async getTraceTimeBounds(): Promise<TimeSpan> {
     const numSlices =
-        (await this.rawQueryOneRow('select count(ts) from slices'))[0];
+        (await this.rawQueryOneRow('select count(ts) from slices limit 1'))[0];
     const numSched =
-        (await this.rawQueryOneRow('select count(ts) from sched'))[0];
+        (await this.rawQueryOneRow('select count(ts) from sched limit 1'))[0];
     let start = Infinity;
-    let end = 0;
+    let end = -Infinity;
     if (numSlices > 0) {
-      [start, end] =
-          await this.rawQueryOneRow('select min(ts), max(ts) from slices');
+      start = (await this.rawQueryOneRow(
+          'select ts from slices order by ts limit 1'))[0];
+      end = (await this.rawQueryOneRow(
+          'select ts from slices order by ts desc limit 1'))[0];
     }
-    if (numSched) {
-      let start2, end2;
-      [start2, end2] =
-          await this.rawQueryOneRow('select min(ts), max(ts) from sched');
+    if (numSched > 0) {
+      const start2 = (await this.rawQueryOneRow(
+          'select ts from sched order by ts limit 1'))[0];
+      const end2 = (await this.rawQueryOneRow(
+          'select ts from sched order by ts desc limit 1'))[0];
       start = Math.min(start, start2);
       end = Math.max(end, end2);
     }
-    // TODO: I am not sure we should shift-to-zero times, but right now
-    // everything seems to assume so.
-    return new TimeSpan(0, (end - start) / 1e9);
+    return new TimeSpan(start / 1e9, end / 1e9);
   }
 }

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {TrackState} from '../../common/state';
-import {fromNs, TimeSpan} from '../../common/time';
+import {TimeSpan} from '../../common/time';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
@@ -29,8 +29,8 @@ const TRACK_PADDING = 5;
 
 function sliceIsVisible(
     slice: {start: number, end: number}, visibleWindowTime: TimeSpan) {
-  return fromNs(slice.end) > visibleWindowTime.start &&
-      fromNs(slice.start) < visibleWindowTime.end;
+  return slice.end > visibleWindowTime.start &&
+      slice.start < visibleWindowTime.end;
 }
 
 function hash(s: string): number {
@@ -71,8 +71,8 @@ class ChromeSliceTrack extends Track {
 
     for (const slice of this.trackData.slices) {
       if (!sliceIsVisible(slice, visibleWindowTime)) continue;
-      const rectXStart = Math.max(timeScale.timeToPx(fromNs(slice.start)), 0);
-      const rectXEnd = Math.min(timeScale.timeToPx(fromNs(slice.end)), pxEnd);
+      const rectXStart = Math.max(timeScale.timeToPx(slice.start), 0);
+      const rectXEnd = Math.min(timeScale.timeToPx(slice.end), pxEnd);
       const rectWidth = rectXEnd - rectXStart;
       if (rectWidth < 0.1) continue;
       const rectYStart = TRACK_PADDING + slice.depth * SLICE_HEIGHT;
@@ -108,7 +108,7 @@ class ChromeSliceTrack extends Track {
   onMouseMove({x, y}: {x: number, y: number}) {
     if (!this.trackData) return;
     const {timeScale} = globals.frontendLocalState;
-    if (y < TRACK_PADDING || y > (SLICE_HEIGHT - TRACK_PADDING)) {
+    if (y < TRACK_PADDING) {
       this.hoveredSlice = null;
       return;
     }
@@ -117,8 +117,7 @@ class ChromeSliceTrack extends Track {
     this.hoveredSlice = null;
 
     for (const slice of this.trackData.slices) {
-      if (fromNs(slice.start) <= t && fromNs(slice.end) >= t &&
-          slice.depth === depth) {
+      if (slice.start <= t && slice.end >= t && slice.depth === depth) {
         this.hoveredSlice = slice;
       }
     }
