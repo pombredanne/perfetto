@@ -30,7 +30,7 @@ void TraceSorter::PushTracePacket(uint64_t timestamp,
   TimestampedTracePiece ttp(
       std::move(trace_view), false /* is_ftrace */,
       0 /* cpu - this field should never be used for non-ftrace packets */);
-  events_.emplace(timestamp, ttp);
+  events_.emplace(timestamp, std::move(ttp));
   MaybeFlushEvents(false);
 }
 
@@ -38,7 +38,7 @@ void TraceSorter::PushFtracePacket(uint32_t cpu,
                                    uint64_t timestamp,
                                    TraceBlobView trace_view) {
   TimestampedTracePiece ttp(std::move(trace_view), true /* is_ftrace */, cpu);
-  events_.emplace(timestamp, ttp);
+  events_.emplace(timestamp, std::move(ttp));
   MaybeFlushEvents(false);
 }
 
@@ -46,7 +46,7 @@ void TraceSorter::MaybeFlushEvents(bool force_flush) {
   while (!events_.empty()) {
     uint64_t oldest_timestamp = events_.begin()->first;
     uint64_t most_recent_timestamp = events_.rbegin()->first;
-
+    PERFETTO_DCHECK(oldest_timestamp <= most_recent_timestamp);
     // Only flush if there is an event older than the window size or
     // if we are force flushing.
     if (most_recent_timestamp - oldest_timestamp < window_size_ns_ &&
@@ -57,9 +57,9 @@ void TraceSorter::MaybeFlushEvents(bool force_flush) {
     if (oldest->second.is_ftrace) {
       context_->parser->ParseFtracePacket(oldest->second.cpu,
                                           oldest->first /*timestamp*/,
-                                          oldest->second.blob_view);
+                                          std::move(oldest->second.blob_view));
     } else {
-      context_->parser->ParseTracePacket(oldest->second.blob_view);
+      context_->parser->ParseTracePacket(std::move(oldest->second.blob_view));
     }
     events_.erase(oldest);
   }

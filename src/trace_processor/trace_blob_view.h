@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include <memory>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -29,22 +31,24 @@ namespace trace_processor {
 // parsed.
 class TraceBlobView {
  public:
-  TraceBlobView(std::shared_ptr<uint8_t> buffer, size_t offset, size_t length)
+  TraceBlobView(const std::shared_ptr<uint8_t>& buffer,
+                size_t offset,
+                size_t length)
       : buffer_(buffer), offset_(offset), length_(length) {}
 
   TraceBlobView(TraceBlobView&&) = default;
   TraceBlobView& operator=(TraceBlobView&&) = default;
-  TraceBlobView(TraceBlobView const&) = default;
-  TraceBlobView& operator=(TraceBlobView const&) = default;
 
   bool operator==(const TraceBlobView& rhs) const {
     return (buffer_ == rhs.buffer_) && (offset_ == rhs.offset_) &&
            (length_ == rhs.length_);
   }
+  bool operator!=(const TraceBlobView& rhs) const { return !(*this == rhs); }
 
   const uint8_t* data() const { return buffer_.get() + offset_; }
 
   size_t offset_of(const uint8_t* data) const {
+    PERFETTO_DCHECK(data >= buffer_.get() && data < buffer_.get() + length_);
     return static_cast<size_t>(data - buffer_.get());
   }
 

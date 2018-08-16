@@ -138,9 +138,8 @@ ProtoDecoder::Field ProtoDecoder::FindIntField(uint32_t field_id) {
     }
   }
   // No matching field found so return an invalid field.
-  Field field{};
   Reset();
-  return field;
+  return Field();
 }
 
 void ProtoDecoder::Reset() {

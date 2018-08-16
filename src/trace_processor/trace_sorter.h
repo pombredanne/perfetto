@@ -55,7 +55,7 @@ class TraceSorter {
     uint32_t cpu;
   };
 
-  TraceProcessorContext* context_;
+  TraceProcessorContext* const context_;
   uint64_t window_size_ns_;
 
   // All events, with the oldest at the beginning.

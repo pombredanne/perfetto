@@ -50,14 +50,14 @@ class ProtoTraceTokenizer : public ChunkedTraceReader {
   static constexpr uint32_t kTraceChunkSize = 16 * 1024 * 1024;  // 16 MB
 
   void ParsePacket(TraceBlobView);
-  void ParseFtraceEventBundle(const TraceBlobView&);
+  void ParseFtraceEventBundle(TraceBlobView);
   void ParseFtraceEvent(uint32_t cpu, TraceBlobView);
 
   BlobReader* const reader_;
   TraceProcessorContext* const context_;
 
   // Temporary - currently trace packets do not have a timestamp, so the
-  // timestamp given is last_timestamp + 1.
+  // timestamp given is last_timestamp.
   uint64_t last_timestamp = 0;
   uint32_t chunk_size_ = kTraceChunkSize;
   uint64_t offset_ = 0;
