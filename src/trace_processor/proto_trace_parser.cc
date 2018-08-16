@@ -140,6 +140,12 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseSchedSwitch(cpu, timestamp, sched_view);
         break;
       }
+      case protos::FtraceEvent::kCpuFrequency: {
+        TraceBlobView cpu_freq_view(view.buffer(), view.offset_of(fld.data()),
+                                    fld.size());
+        ParseCpuFreq(timestamp, cpu_freq_view);
+        break;
+      }
       default:
         break;
     }
@@ -147,9 +153,30 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
+void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp,
+                                    const TraceBlobView& view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  uint32_t cpu = 0;
+  uint32_t new_freq = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::CpuFrequencyFtraceEvent::kCpuIdFieldNumber:
+        cpu = fld.as_uint32();
+        break;
+      case protos::CpuFrequencyFtraceEvent::kStateFieldNumber:
+        new_freq = fld.as_uint32();
+        break;
+    }
+  }
+
+  context_->storage->PushCpuFreq(timestamp, cpu, new_freq);
+
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
 void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
                                         uint64_t timestamp,
-
                                         const TraceBlobView& view) {
   ProtoDecoder decoder(view.data(), view.length());
 
