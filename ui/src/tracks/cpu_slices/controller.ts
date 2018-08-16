@@ -59,7 +59,7 @@ class CpuSliceTrackController extends TrackController {
     // full table scan.
     const query = 'select ts,dur,utid from sched ' +
         `where cpu = ${this.cpu} ` +
-        `and ts >= ${Math.round(start * 1e9)} - dur ` +
+        `and ts >= ${Math.round(start * 1e9)} - 1e9 ` +  // - dur
         `and ts <= ${Math.round(end * 1e9)} ` +
         `and dur >= ${Math.round(resolution * 1e9)} ` +
         `order by ts ` +
@@ -68,9 +68,7 @@ class CpuSliceTrackController extends TrackController {
     if (this.cpu === 0) console.log('QUERY', query);
 
     this.busy = true;
-    const promise = this.engine.rawQuery({'sqlQuery': query});
-
-    promise.then(rawResult => {
+    this.engine.rawQuery({'sqlQuery': query}).then(rawResult => {
       this.busy = false;
       if (rawResult.error) {
         throw new Error(`Query error "${query}": ${rawResult.error}`);

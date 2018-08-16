@@ -15,11 +15,11 @@
 import {assertTrue} from '../base/logging';
 
 export function timeToString(sec: number) {
-  const units = ['ms', 'us', 'ns'];
+  const units = ['s', 'ms', 'us', 'ns'];
   const sign = Math.sign(sec);
-  let n = Math.abs(sec) * 1000;
+  let n = Math.abs(sec);
   let u = 0;
-  while (n < 1 && u !== 0 && u < units.length - 1) {
+  while (n < 1 && u < units.length - 1) {
     n *= 1000;
     u++;
   }
