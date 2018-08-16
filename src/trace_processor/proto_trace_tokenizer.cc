@@ -54,11 +54,17 @@ bool ProtoTraceTokenizer::ParseNextChunk() {
   ProtoDecoder decoder(buf, read);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     if (fld.id != protos::Trace::kPacketFieldNumber) {
+      PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
       continue;
     }
     size_t offset = static_cast<size_t>(fld.data() - buf);
     TraceBlobView packet_view(shared_buf, offset, fld.size());
     ParsePacket(std::move(packet_view));
+  }
+
+  if (decoder.offset() == 0) {
+    PERFETTO_ELOG("The trace file seems truncated, interrupting parsing");
+    return false;
   }
 
   offset_ += decoder.offset();
