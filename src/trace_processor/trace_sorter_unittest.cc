@@ -27,9 +27,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::InSequence;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ByMove;
 
 class MockTraceParser : public ProtoTraceParser {
  public:
@@ -92,28 +89,28 @@ TEST_F(TraceSorterTest, TestTracePacket) {
 
 TEST_F(TraceSorterTest, Ordering) {
   TraceBlobView view_1(test_buffer_, 0, 1);
-  TraceBlobView view_length_5(test_buffer_, 0, 5);
-  TraceBlobView view_length_2(test_buffer_, 0, 2);
-  TraceBlobView view_3(test_buffer_, 0, 1);
+  TraceBlobView view_2(test_buffer_, 0, 2);
+  TraceBlobView view_3(test_buffer_, 0, 3);
+  TraceBlobView view_4(test_buffer_, 0, 4);
 
   InSequence s;
 
   EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(0, 1000, view_1.buffer(), 1,
                                                view_1.buffer().get()));
-  EXPECT_CALL(*parser_, MOCK_ParseTracePacket(view_length_5.buffer(), 5,
-                                              view_length_5.buffer().get()));
-  EXPECT_CALL(*parser_, MOCK_ParseTracePacket(view_length_2.buffer(), 2,
-                                              view_length_2.buffer().get()));
-  EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(2, 1200, view_3.buffer(), 1,
-                                               view_3.buffer().get()));
+  EXPECT_CALL(*parser_,
+              MOCK_ParseTracePacket(view_2.buffer(), 2, view_2.buffer().get()));
+  EXPECT_CALL(*parser_,
+              MOCK_ParseTracePacket(view_3.buffer(), 3, view_3.buffer().get()));
+  EXPECT_CALL(*parser_, MOCK_ParseFtracePacket(2, 1200, view_4.buffer(), 4,
+                                               view_4.buffer().get()));
 
   context_.sorter->set_window_ns_for_testing(200);
   context_.sorter->PushFtracePacket(2 /*cpu*/, 1200 /*timestamp*/,
-                                    std::move(view_1));
-  context_.sorter->PushTracePacket(1001, std::move(view_length_5));
-  context_.sorter->PushTracePacket(1100, std::move(view_length_2));
+                                    std::move(view_4));
+  context_.sorter->PushTracePacket(1001, std::move(view_2));
+  context_.sorter->PushTracePacket(1100, std::move(view_3));
   context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
-                                    std::move(view_3));
+                                    std::move(view_1));
 
   context_.sorter->MaybeFlushEvents(true);
 }
