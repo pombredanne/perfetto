@@ -58,6 +58,8 @@ class TraceSorter {
   TraceProcessorContext* const context_;
   uint64_t window_size_ns_;
 
+  // TODO(taylori): Make this a multimap because we can't guarantee the
+  // timestamps are unique.
   // All events, with the oldest at the beginning.
   std::map<uint64_t /* timestamp */, TimestampedTracePiece> events_;
 };

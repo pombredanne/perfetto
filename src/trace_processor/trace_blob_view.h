@@ -38,6 +38,8 @@ class TraceBlobView {
 
   TraceBlobView(TraceBlobView&&) = default;
   TraceBlobView& operator=(TraceBlobView&&) = default;
+  TraceBlobView(TraceBlobView const&) = delete;
+  TraceBlobView& operator=(TraceBlobView const&) = delete;
 
   bool operator==(const TraceBlobView& rhs) const {
     return (buffer_ == rhs.buffer_) && (offset_ == rhs.offset_) &&
