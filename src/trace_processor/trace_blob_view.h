@@ -50,7 +50,8 @@ class TraceBlobView {
   const uint8_t* data() const { return buffer_.get() + offset_; }
 
   size_t offset_of(const uint8_t* data) const {
-    PERFETTO_DCHECK(data >= buffer_.get() && data < buffer_.get() + length_);
+    PERFETTO_DCHECK(data >= buffer_.get() &&
+                    data < (buffer_.get() + offset_ + length_));
     return static_cast<size_t>(data - buffer_.get());
   }
 
@@ -61,6 +62,7 @@ class TraceBlobView {
  private:
   std::shared_ptr<uint8_t> buffer_;
   size_t offset_;
+  // Length of the particular field (not the whole buffer)
   size_t length_;
 };
 }  // namespace trace_processor
