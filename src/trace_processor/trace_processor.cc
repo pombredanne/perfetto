@@ -54,7 +54,7 @@ TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
   ProcessTable::RegisterTable(db_.get(), context_.storage.get());
   SchedSliceTable::RegisterTable(db_.get(), context_.storage.get());
   SliceTable::RegisterTable(db_.get(), context_.storage.get());
-  SliceTable::RegisterTable(db_.get(), context_.storage.get());
+  StringTable::RegisterTable(db_.get(), context_.storage.get());
   ThreadTable::RegisterTable(db_.get(), context_.storage.get());
 }
 
