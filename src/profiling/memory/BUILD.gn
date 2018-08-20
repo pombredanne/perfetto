@@ -15,7 +15,7 @@
 import("../../../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
-assert(!build_with_chromium)
+assert(!build_with_chromium && is_clang)
 
 source_set("record_reader") {
   public_configs = [ "../../../gn:default_config" ]

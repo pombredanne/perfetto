@@ -107,13 +107,17 @@ executable("perfetto_unittests") {
     deps += [
       "src/ipc:unittests",
       "src/perfetto_cmd:unittests",
-      "src/profiling/memory:unittests",
       "src/traced/probes:unittests",
       "src/traced/probes/filesystem:unittests",
       "src/traced/probes/ftrace:unittests",
       "tools/ftrace_proto_gen:unittests",
       "tools/sanitizers_unittests",
     ]
+  }
+  if (!build_with_chromium && is_clang) {
+    # Restrict to clang, as libunwindstack and its dependencies is never
+    # built using GCC in the Android tree.
+    deps += [ "src/profiling/memory:unittests" ]
   }
   if (build_standalone) {
     deps += [ "src/trace_processor:unittests" ]
