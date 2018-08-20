@@ -14,10 +14,11 @@ the target file (or stdout) by using some flags in the
 [`TraceConfig`](/protos/perfetto/config/trace_config.proto), specifically:
 
 `bool write_into_file`  
-When true drains periodically (see below) the trace buffers into the output
+When true drains periodically the trace buffers into the output
 file. When this option is enabled, the userspace buffers need to be just
-big enough to hold tracing data between two periods.
-The buffer sizing depends on the 
+big enough to hold tracing data between two periods.  
+The buffer sizing depends on the activity of the device. A reasonable estimation
+is ~5-20 MB per second.
 
 `uint32 file_write_period_ms`  
 Overrides the default drain period. Shorter periods require a smaller userspace
@@ -33,20 +34,21 @@ For a complete example of a working trace config in long-tracing mode see
 
 ## Instructions
 These instructions assume you have a working standalone checkout (see
-[instructions here](docs/build-instructions.md)).  
+[instructions here](/docs/build-instructions.md)).  
 These instructions have been tested as non-root. Many of the steps below can be
 simplified when running as root and are required due to SELinux when running as
 `shell` rather than `root`.
 
-```
+``` bash
 $ cd perfetto
 
 # Compiles the textual protobuf into binary format 
 # for /test/configs/long_trace.cfg.
-$ tools/ninja -C out/mac_debug/ long_trace.cfg.protobuf
+$ tools/gn gen out/mac_release --args="is_debug=false"
+$ tools/ninja -C out/mac_release/ long_trace.cfg.protobuf
 
 # Alternatively, the more verbose variant:
-$ protoc=$(pwd)/out/mac_debug/gcc_like_host/protoc
+$ protoc=$(pwd)/out/mac_release/gcc_like_host/protoc
 $ protoc --encode=perfetto.protos.TraceConfig \
         -I$(pwd)/protos \
         $(pwd)/protos/perfetto/config/perfetto_config.proto \
@@ -54,7 +56,7 @@ $ protoc --encode=perfetto.protos.TraceConfig \
         > /tmp/long_trace.cfg.protobuf
 
 # Push the config onto the device.
-$ adb push out/mac_debug/long_trace.cfg.protobuf /data/local/tmp/long_trace.cfg.protobuf
+$ adb push out/mac_release/long_trace.cfg.protobuf /data/local/tmp/long_trace.cfg.protobuf
 
 # Run perfetto.
 # Note: Unless running as root, the output folder must be under
@@ -71,7 +73,6 @@ shell        23705     1 2166232  12344 do_sys_poll 7796ef2700 S perfetto
 
 # At the end of the trace, the process will be gone. At this point it is
 # possible to pull the trace.
-
 $ adb shell gzip -c /data/misc/perfetto-traces/trace -3 | gzip -dc - > ~/trace
 
 # Verify that the trace has not been corrupted by the adb transfer
@@ -95,10 +96,10 @@ and `chunks_overwritten` (userspace buffer).
 to systrace textual version (see `trace_to_text --help`).
 
 
-```
-$ ninja -C out/mac_debug trace_to_text
+``` bash
+$ ninja -C out/mac_release trace_to_text
 
-$ out/mac_debug/trace_to_text summary < ~/trace
+$ out/mac_release/trace_to_text summary < ~/trace
 Ftrace duration: 29737ms
 Boottime duration: 21000ms
 -------------------- ftrace --------------------
@@ -123,20 +124,18 @@ Buffer 0
 ### Load the trace in the UI
 
 *** note
-**The UI and trace processor are WIP and is trageting end of Q3-18**.
+**The UI and trace processor are WIP, targeting end of Q3-18**.
 <!-- TODO(primiano): update this doc. -->
 ***
 
 Open https://ui.perfetto.dev and load the trace there.
 
 ### Load the trace in the trace processor
-```
-$ ninja -C out/mac_debug trace_processor
-$ out/mac_debug/trace_processor_shell ~/trace
+``` bash
+$ ninja -C out/mac_release trace_processor
+$ out/mac_release/trace_processor_shell ~/trace
 
 trace_processor_shell.cc Trace loaded: 1048.58 MB (197.1 MB/s)
-
-> select tdur/1e9 as runtime_sec, name from (select sum(dur) as tdur, utid from sched group by utid) inner join thread using(utid) order by tdur desc limit 20
 
 > select tdur/1e9 as runtime_sec, name from (select sum(dur) as tdur, utid from sched group by utid) inner join thread using(utid) order by tdur desc limit 20
          runtime_sec                 name
