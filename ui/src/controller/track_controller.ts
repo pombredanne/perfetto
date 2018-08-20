@@ -51,13 +51,9 @@ export abstract class TrackController extends Controller<States> {
   }
 
   run() {
-    if (this.trackState.reqTimeStart === undefined ||
-        this.trackState.reqTimeEnd === undefined ||
-        this.trackState.reqTimeRes === undefined) {
-      return;
-    }
-    const {reqTimeStart, reqTimeEnd, reqTimeRes} = this.trackState;
+    const dataReq = this.trackState.dataReq;
+    if (dataReq === undefined) return;
     globals.dispatch(clearTrackDataRequest(this.trackId));
-    this.onBoundsChange(reqTimeStart, reqTimeEnd, reqTimeRes);
+    this.onBoundsChange(dataReq.start, dataReq.end, dataReq.resolution);
   }
 }

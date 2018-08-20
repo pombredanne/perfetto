@@ -99,17 +99,17 @@ export class OverviewTimelinePanel implements Panel {
     const vizStartPx = this.timeScale.timeToPx(vizTime.start);
     const vizEndPx = this.timeScale.timeToPx(vizTime.end);
 
-    ctx.fillStyle = 'rgba(240, 240, 240, 0.7)';
+    ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
     ctx.fillRect(0, headerHeight, vizStartPx, tracksHeight);
     ctx.fillRect(vizEndPx, headerHeight, this.width - vizEndPx, tracksHeight);
 
     // Draw brushes.
-    ctx.fillStyle = '#999';
-    ctx.fillRect(vizStartPx, headerHeight, 1, tracksHeight);
-    ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
     const handleWidth = 3;
     const handleHeight = 25;
     const y = headerHeight + (tracksHeight - handleHeight) / 2;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(vizStartPx, headerHeight, 1, tracksHeight);
+    ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
     ctx.fillRect(vizStartPx - handleWidth, y, handleWidth, handleHeight);
     ctx.fillRect(vizEndPx + 1, y, handleWidth, handleHeight);
   }

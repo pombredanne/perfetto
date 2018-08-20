@@ -25,6 +25,7 @@ import {TimeScale} from './time_scale';
 export class FrontendLocalState {
   visibleWindowTime = new TimeSpan(0, 10);
   timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
+  private _visibleTimeLastUpdate = 0;
   private pendingGlobalTimeUpdate?: TimeSpan;
 
   // TODO: restore the visible time somewhere for the permalink case.
@@ -37,6 +38,7 @@ export class FrontendLocalState {
     const endSec = Math.min(ts.end, globals.state.traceTime.endSec);
     this.visibleWindowTime = new TimeSpan(startSec, endSec);
     this.timeScale.setTimeBounds(this.visibleWindowTime);
+    this._visibleTimeLastUpdate = Date.now() / 1000;
 
     // Post a delayed update to the controler.
     const alreadyPosted = this.pendingGlobalTimeUpdate !== undefined;
@@ -44,7 +46,12 @@ export class FrontendLocalState {
     if (alreadyPosted) return;
     setTimeout(() => {
       globals.dispatch(setVisibleTraceTime(this.pendingGlobalTimeUpdate!));
+      this._visibleTimeLastUpdate = Date.now() / 1000;
       this.pendingGlobalTimeUpdate = undefined;
     }, 500);
+  }
+
+  get visibleTimeLastUpdate() {
+    return this._visibleTimeLastUpdate;
   }
 }

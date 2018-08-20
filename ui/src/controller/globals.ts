@@ -56,10 +56,9 @@ class Globals {
     if (this._didPostStateUpdate) return;
     this._didPostStateUpdate = true;
     setTimeout(() => {
-      console.log('Sending state update controller -> frontend');
       this._didPostStateUpdate = false;
       assertExists(this._frontend).send<void>('updateState', [this.state]);
-    });
+    }, 32);
   }
 
   runControllers() {
@@ -74,7 +73,6 @@ class Globals {
     }
 
     this._runningControllers = true;
-    console.log('Running controllers tree');
     runControllerTree(assertExists(this._rootController));
     this._runningControllers = false;
   }

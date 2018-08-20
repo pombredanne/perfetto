@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {State} from '../common/state';
+import {State, createEmptyState} from '../common/state';
+
+import * as uuidv4 from 'uuid/v4';
 
 // TODO(hjd): Type check this better.
 // tslint:disable-next-line no-any
@@ -25,9 +27,8 @@ export function rootReducer(state: State, action: any): State {
     }
 
     case 'OPEN_TRACE_FROM_FILE': {
-      const nextState = {...state};
-      nextState.engines = {...state.engines};
-      const id = `${nextState.nextId++}`;
+      const nextState = createEmptyState();
+      const id = uuidv4();
       nextState.engines[id] = {
         id,
         ready: false,
@@ -39,9 +40,8 @@ export function rootReducer(state: State, action: any): State {
     }
 
     case 'OPEN_TRACE_FROM_URL': {
-      const nextState = {...state};
-      nextState.engines = {...state.engines};
-      const id = `${nextState.nextId++}`;
+      const nextState = createEmptyState();
+      const id = uuidv4();
       nextState.engines[id] = {
         id,
         ready: false,
@@ -70,18 +70,18 @@ export function rootReducer(state: State, action: any): State {
     case 'REQ_TRACK_DATA': {
       const nextState = {...state};
       nextState.tracks = {...state.tracks};
-      nextState.tracks[action.trackId].reqTimeStart = action.start;
-      nextState.tracks[action.trackId].reqTimeEnd = action.end;
-      nextState.tracks[action.trackId].reqTimeRes = action.resolution;
+      nextState.tracks[action.trackId].dataReq = {
+        start: action.start,
+        end: action.end,
+        resolution: action.resolution
+      };
       return nextState;
     }
 
     case 'CLEAR_TRACK_DATA_REQ': {
       const nextState = {...state};
       nextState.tracks = {...state.tracks};
-      nextState.tracks[action.trackId].reqTimeStart = action.start;
-      nextState.tracks[action.trackId].reqTimeEnd = action.end;
-      nextState.tracks[action.trackId].reqTimeRes = action.resolution;
+      nextState.tracks[action.trackId].dataReq = undefined;
       return nextState;
     }
 
@@ -179,6 +179,7 @@ export function rootReducer(state: State, action: any): State {
       const nextState = {...state};
       nextState.traceTime.startSec = action.startSec;
       nextState.traceTime.endSec = action.endSec;
+      nextState.traceTime.lastUpdate = action.lastUpdate;
       return nextState;
     }
 
@@ -186,6 +187,7 @@ export function rootReducer(state: State, action: any): State {
       const nextState = {...state};
       nextState.visibleTraceTime.startSec = action.startSec;
       nextState.visibleTraceTime.endSec = action.endSec;
+      nextState.visibleTraceTime.lastUpdate = action.lastUpdate;
       return nextState;
     }
 

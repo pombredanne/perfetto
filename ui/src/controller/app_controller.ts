@@ -14,10 +14,7 @@
 
 import {globals} from '../controller/globals';
 
-import {
-  Child,
-  Controller,
-} from './controller';
+import {Child, Controller} from './controller';
 import {PermalinkController} from './permalink_controller';
 import {TraceController} from './trace_controller';
 

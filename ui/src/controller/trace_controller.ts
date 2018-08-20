@@ -22,7 +22,8 @@ import {
   navigate,
   setEngineReady,
   setTraceTime,
-  updateStatus
+  updateStatus,
+  setVisibleTraceTime
 } from '../common/actions';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
@@ -53,6 +54,7 @@ export class TraceController extends Controller<States> {
         this.loadTrace().then(() => {
           globals.dispatch(setEngineReady(this.engineId, true));
         });
+        globals.dispatch(updateStatus('Opening trace'));
         this.setState('loading_trace');
         break;
 
@@ -100,13 +102,19 @@ export class TraceController extends Controller<States> {
       blob = await(await fetch(engineCfg.source)).blob();
     }
 
-    globals.dispatch(updateStatus('Creating trace processor (WASM)'));
+    globals.dispatch(updateStatus('Parsing trace'));
     this.engine = await globals.createEngine(blob);
     const traceTime = await this.engine.getTraceTimeBounds();
-    globals.dispatchMultiple([
+    const actions = [
       setTraceTime(traceTime),
       navigate('/viewer'),
-    ]);
+    ];
+
+    if (globals.state.visibleTraceTime.lastUpdate === 0) {
+      actions.push(setVisibleTraceTime(traceTime));
+    }
+
+    globals.dispatchMultiple(actions);
 
     await this.listTracks();
     await this.listThreads();

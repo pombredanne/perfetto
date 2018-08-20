@@ -20,6 +20,7 @@ import {forwardRemoteCalls} from '../base/remote';
 import {setState} from '../common/actions';
 import {loadState} from '../common/permalinks';
 import {State} from '../common/state';
+import {TimeSpan} from '../common/time';
 import {
   takeWasmEngineWorkerPort,
   warmupWasmEngineWorker,
@@ -35,6 +36,17 @@ import {ViewerPage} from './viewer_page';
 class FrontendApi {
   updateState(state: State) {
     globals.state = state;
+
+    // If the visible time in the global state has been updated more recently
+    // than the visible time handled by the frontend @ 60fps, update it. This
+    // typically happens when restoring the state from a permalink.
+    const vizTraceTime = globals.state.visibleTraceTime;
+    if (vizTraceTime.lastUpdate >
+        globals.frontendLocalState.visibleTimeLastUpdate) {
+      globals.frontendLocalState.updateVisibleTime(
+          new TimeSpan(vizTraceTime.startSec, vizTraceTime.endSec));
+    }
+
     this.redraw();
   }
 

@@ -121,11 +121,21 @@ export function setState(newState: State) {
 }
 
 export function setTraceTime(ts: TimeSpan) {
-  return {type: 'SET_TRACE_TIME', startSec: ts.start, endSec: ts.end};
+  return {
+    type: 'SET_TRACE_TIME',
+    startSec: ts.start,
+    endSec: ts.end,
+    lastUpdate: Date.now() / 1000,
+  };
 }
 
 export function setVisibleTraceTime(ts: TimeSpan) {
-  return {type: 'SET_VISIBLE_TRACE_TIME', startSec: ts.start, endSec: ts.end};
+  return {
+    type: 'SET_VISIBLE_TRACE_TIME',
+    startSec: ts.start,
+    endSec: ts.end,
+    lastUpdate: Date.now() / 1000,
+  };
 }
 
 export function updateStatus(msg: string) {
