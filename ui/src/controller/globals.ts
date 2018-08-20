@@ -84,7 +84,7 @@ class Globals {
   }
 
   // TODO: this needs to be cleaned up.
-  publish(what: 'OverviewData'|'TrackData'|'Threads'|'QueryResults', data: {}) {
+  publish(what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult', data: {}) {
     assertExists(this._frontend)
         .send<void>(`publish${what}`, [data])
         .then(() => {});

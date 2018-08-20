@@ -48,7 +48,7 @@ const QueryTable: m.Component<{}, {}> = {
     return m(
         'div',
         m('header.overview',
-          `Query result - ${resp.durationMs} ms`,
+          `Query result - ${Math.round(resp.durationMs)} ms`,
           m('span.code', resp.query)),
         resp.error ?
             m('.query-error', `SQL error: ${resp.error}`) :

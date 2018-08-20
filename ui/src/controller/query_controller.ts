@@ -37,7 +37,7 @@ export class QueryController extends Controller<'init'|'querying'> {
         this.runQuery(config.query).then(result => {
           console.log(`Query ${config.query} took ${result.durationMs} ms`);
           globals.publish(
-              'QueryResults', {id: this.args.queryId, data: result});
+              'QueryResult', {id: this.args.queryId, data: result});
           globals.dispatch(deleteQuery(this.args.queryId));
         });
         this.setState('querying');

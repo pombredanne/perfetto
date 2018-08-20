@@ -13,8 +13,7 @@
 // limitations under the License.
 
 import {globals} from '../controller/globals';
-
-import {Child, Controller} from './controller';
+import {Child, Controller, ControllerInitializerAny} from './controller';
 import {PermalinkController} from './permalink_controller';
 import {TraceController} from './trace_controller';
 
@@ -33,11 +32,13 @@ export class AppController extends Controller<'init'> {
   //   re-triggering the controllers.
   run() {
     const engineKeys = Object.keys(globals.state.engines);
-    if (engineKeys.length === 0) return;
-    const cfg = globals.state.engines[engineKeys[0]];
-    return [
-      Child(cfg.id, TraceController, cfg.id),
+    const childControllers: ControllerInitializerAny[] = [
       Child('permalink', PermalinkController, {}),
     ];
+    if (engineKeys.length > 0) {
+      const cfg = globals.state.engines[engineKeys[0]];
+      childControllers.push(Child(cfg.id, TraceController, cfg.id));
+    }
+    return childControllers;
   }
 }

@@ -176,7 +176,8 @@ export class TraceController extends Controller<States> {
     const stepSec = traceTime.duration / numSteps;
     for (let step = 0; step < numSteps; step++) {
       globals.dispatch(updateStatus(
-          `Loading overview ${Math.round(step / numSteps * 1000) / 10}%`));
+          'Loading overview ' +
+          `${Math.round((step + 1) / numSteps * 1000) / 10}%`));
       const startSec = traceTime.start + step * stepSec;
       const startNs = Math.floor(startSec * 1e9);
       const endSec = startSec + stepSec;

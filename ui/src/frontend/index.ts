@@ -17,8 +17,7 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
-import {setState} from '../common/actions';
-import {loadState} from '../common/permalinks';
+import {navigate} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {
@@ -125,10 +124,7 @@ function main() {
     if (e.ctrlKey) e.preventDefault();
   });
 
-  const stateHash = m.route.param('s');
-  if (stateHash) {
-    loadState(stateHash).then(state => globals.dispatch(setState(state)));
-  }
+  globals.dispatch(navigate(m.route.get()));
 }
 
 main();

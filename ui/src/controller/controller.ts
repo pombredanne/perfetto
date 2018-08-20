@@ -26,7 +26,7 @@ interface ControllerInitializer<ConstructorArgs> {
 }
 
 // tslint:disable-next-line no-any
-type ControllerInitializerAny = ControllerInitializer<any>;
+export type ControllerInitializerAny = ControllerInitializer<any>;
 
 export function Child<ConstructorArgs>(
     id: string,

@@ -97,7 +97,7 @@ const Omnibox: m.Component = {
     txt.addEventListener('keyup', onKeyUp);
   },
   view() {
-    const msgTTL = globals.state.status.timestamp + 6 - Date.now() / 1e3;
+    const msgTTL = globals.state.status.timestamp + 3 - Date.now() / 1e3;
     let enginesAreBusy = false;
     for (const engine of Object.values(globals.state.engines)) {
       enginesAreBusy = enginesAreBusy || !engine.ready;

@@ -84,7 +84,6 @@ class CpuSliceTrack extends Track {
     if (!inRange || trackData.resolution > getCurResolution()) {
       if (!this.reqPending) {
         this.reqPending = true;
-        if (this.trackState.id === '1') console.log('Posting delayed');
         setTimeout(() => this.reqDataDeferred(), 50);
       }
       if (trackData === undefined) return;  // Can't possibly draw anything.

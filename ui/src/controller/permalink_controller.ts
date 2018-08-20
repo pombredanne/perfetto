@@ -13,16 +13,13 @@
 // limitations under the License.
 
 import * as uuidv4 from 'uuid/v4';
-
 import {assertExists, assertTrue} from '../base/logging';
-import {setPermalink} from '../common/actions';
-import {BUCKET_NAME, toSha256} from '../common/permalinks';
+import {setPermalink, setState, navigate} from '../common/actions';
 import {EngineConfig, State} from '../common/state';
-
 import {Controller} from './controller';
 import {globals} from './globals';
 
-// TODO: move common/permalinks into here.
+export const BUCKET_NAME = 'perfetto-ui-data';
 
 export class PermalinkController extends Controller<'init'> {
   private lastRequestId?: string;
@@ -31,6 +28,13 @@ export class PermalinkController extends Controller<'init'> {
   }
 
   run() {
+    if (globals.state.route && globals.state.route.startsWith('/?s=')) {
+      const hash = globals.state.route.split('/?s=')[1];
+      globals.dispatch(navigate('/viewer'));
+      PermalinkController.loadState(hash).then(
+          state => globals.dispatch(setState(state)));
+    }
+
     if (globals.state.permalink.requestId === this.lastRequestId) return;
     const requestId = assertExists(globals.state.permalink.requestId);
     assertTrue(globals.state.permalink.link === undefined);
@@ -47,18 +51,18 @@ export class PermalinkController extends Controller<'init'> {
       // If the trace was opened from a local file, upload it and store the
       // url of the uploaded trace instead.
       if (engine.source instanceof File) {
-        const url = await PermalinkController.saveTrace(engine.source);
+        const url = await this.saveTrace(engine.source);
         engine.source = url;
       }
     }
-    const url = await PermalinkController.saveState(state);
+    const url = await this.saveState(state);
     return url;
   }
 
 
   private static async saveState(state: State): Promise<string> {
     const text = JSON.stringify(state);
-    const name = await toSha256(text);
+    const name = await this.toSha256(text);
     const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
         `${BUCKET_NAME}/o?uploadType=media` +
         `&name=${name}&predefinedAcl=publicRead`;
@@ -88,5 +92,26 @@ export class PermalinkController extends Controller<'init'> {
     });
     await response.json();
     return `https://storage.googleapis.com/${BUCKET_NAME}/${name}`;
+  }
+
+
+  private static async loadState(id: string): Promise<State> {
+    const url = `https://storage.googleapis.com/${BUCKET_NAME}/${id}`;
+    const response = await fetch(url);
+    const text = await response.text();
+    const stateHash = await this.toSha256(text);
+    const state = JSON.parse(text);
+    if (stateHash !== id) {
+      throw new Error(`State hash does not match ${id} vs. ${stateHash}`);
+    }
+    return state;
+  }
+
+  private static async toSha256(str: string): Promise<string> {
+    // TODO(hjd): TypeScript bug with definition of TextEncoder.
+    // tslint:disable-next-line no-any
+    const buffer = new (TextEncoder as any)('utf-8').encode(str);
+    const digest = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(digest)).map(x => x.toString(16)).join('');
   }
 }
