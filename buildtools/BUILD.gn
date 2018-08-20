@@ -52,6 +52,10 @@ config("libunwindstack_config") {
     # in our own code.
     "-isystem",
     rebase_path("android-core/libunwindstack/include", root_build_dir),
+    "-isystem",
+    rebase_path("android-core/libprocinfo/include", root_build_dir),
+    "-isystem",
+    rebase_path("android-core/base/include", root_build_dir),
   ]
 }
 
