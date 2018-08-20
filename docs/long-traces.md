@@ -42,9 +42,12 @@ simplified when running as root and are required due to SELinux when running as
 ``` bash
 $ cd perfetto
 
+# Prepare for the build (as per instructions linked above).
+$ tools/install-build-deps --no-android
+$ tools/gn gen out/mac_release --args="is_debug=false"
+
 # Compiles the textual protobuf into binary format 
 # for /test/configs/long_trace.cfg.
-$ tools/gn gen out/mac_release --args="is_debug=false"
 $ tools/ninja -C out/mac_release/ long_trace.cfg.protobuf
 
 # Alternatively, the more verbose variant:
@@ -64,8 +67,7 @@ $ adb push out/mac_release/long_trace.cfg.protobuf /data/local/tmp/long_trace.cf
 $ adb shell 'cat /data/local/tmp/long_trace.cfg.protobuf | perfetto -c - -o /data/misc/perfetto-traces/trace --background'
 
 # At this point the trace will start in background. It is possible to detach the
-# usb cable. In order to verify if the trace is still ongoing, just run
-
+# usb cable. In order to verify if the trace is still ongoing, just run:
 $ adb shell ps -A | grep perfetto
 
 # While it's running, you should see an entry like this:
@@ -83,7 +85,7 @@ $ shasum  ~/trace
 b9f7a7e3d62638b5d9e880db30f68787c458bb3c  /Users/primiano/trace
 ```
 
-At this point it is possible to load / process the trace.
+At this point it is possible to load / process the trace as explained below.
 
 ### Get high-level trace stats
 Use the `trace_to_text` binary in `summary` mode. This allows to detect whether
