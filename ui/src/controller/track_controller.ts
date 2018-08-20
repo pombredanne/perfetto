@@ -12,32 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {TrackState} from '../common/state';
+import {assertExists} from '../base/logging';
+import {clearTrackDataRequest} from '../common/actions';
+import {Registry} from '../common/registry';
+import {Controller} from './controller';
+import {ControllerFactory} from './controller';
 import {Engine} from './engine';
+import {globals} from './globals';
 
-export interface PublishFn { (data: {}): void; }
+type States = 'init';
 
-/**
- * This interface forces track implementations to have two static properties:
- * kind and a create function.
- */
-export interface TrackControllerCreator {
-  // Store the kind explicitly as a string as opposed to using class.name in
-  // case we ever minify our code.
-  readonly kind: string;
-
-  create(config: TrackState, engine: Engine, publish: PublishFn):
-      TrackController;
+export interface TrackControllerArgs {
+  trackId: string;
+  engine: Engine;
 }
 
-export abstract class TrackController {
-  // TODO(hjd): Maybe this should be optional?
+export interface TrackControllerFactory extends
+    ControllerFactory<TrackControllerArgs> {
+  kind: string;
+}
+
+export const trackControllerRegistry = new Registry<TrackControllerFactory>();
+
+export abstract class TrackController extends Controller<States> {
+  readonly trackId: string;
+  readonly engine: Engine;
+
+  constructor(args: TrackControllerArgs) {
+    super('init');
+    this.trackId = args.trackId;
+    this.engine = args.engine;
+  }
+
   abstract onBoundsChange(start: number, end: number, resolution: number): void;
-}
 
-// Re-export these so track implementors don't have to import from several
-// files.
-export {
-  TrackState,
-  Engine,
-};
+  get trackState() {
+    return assertExists(globals.state.tracks[this.trackId]);
+  }
+
+  run() {
+    if (this.trackState.reqTimeStart === undefined ||
+        this.trackState.reqTimeEnd === undefined ||
+        this.trackState.reqTimeRes === undefined) {
+      return;
+    }
+    const {reqTimeStart, reqTimeEnd, reqTimeRes} = this.trackState;
+    globals.dispatch(clearTrackDataRequest(this.trackId));
+    this.onBoundsChange(reqTimeStart, reqTimeEnd, reqTimeRes);
+  }
+}

@@ -98,7 +98,12 @@ const Omnibox: m.Component = {
   },
   view() {
     const msgTTL = globals.state.status.timestamp + 6 - Date.now() / 1e3;
-    if (msgTTL > 0) {
+    let enginesAreBusy = false;
+    for (const engine of Object.values(globals.state.engines)) {
+      enginesAreBusy = enginesAreBusy || !engine.ready;
+    }
+
+    if (msgTTL > 0 || enginesAreBusy) {
       setTimeout(() => m.redraw(), msgTTL * 1000);
       return m(
           `.omnibox.message-mode`,

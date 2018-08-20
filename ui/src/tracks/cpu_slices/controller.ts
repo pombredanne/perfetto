@@ -13,59 +13,31 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
+import {globals} from '../../controller/globals';
 import {
-  Engine,
-  PublishFn,
   TrackController,
-  TrackState
-} from '../../controller/track_controller';
-import {
   trackControllerRegistry
-} from '../../controller/track_controller_registry';
+} from '../../controller/track_controller';
 
-import {CpuSliceTrackData, TRACK_KIND} from './common';
+import {CPU_SLICE_TRACK_KIND, CpuSliceTrackData} from './common';
 
-// TODO(hjd): Too much bolierplate here. Prehaps TrackController/Track
-// should be an interface and we provide a TrackControllerBase/TrackBase
-// you can inherit from which does the basic things.
 class CpuSliceTrackController extends TrackController {
-  static readonly kind = TRACK_KIND;
-
-  static create(config: TrackState, engine: Engine, publish: PublishFn):
-      TrackController {
-    return new CpuSliceTrackController(config.cpu, engine, publish);
-  }
-
-  private cpu: number;
-  private engine: Engine;
-  // TODO: This publish function should be better typed to only accept
-  // CpuSliceTrackData. Perhaps we can do PublishFn<T>.
-  private publish: PublishFn;
+  static readonly kind = CPU_SLICE_TRACK_KIND;
   private busy = false;
-
-  constructor(cpu: number, engine: Engine, publish: PublishFn) {
-    super();
-    this.cpu = cpu;
-    this.engine = engine;
-    this.publish = publish;
-  }
 
   onBoundsChange(start: number, end: number, resolution: number) {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
     if (this.busy) return;
     const LIMIT = 5000;
-
-    // TODO: "ts >= start - dur" needs to be optimized, right now it causes a
-    // full table scan.
     const query = 'select ts,dur,utid from sched ' +
-        `where cpu = ${this.cpu} ` +
-        `and ts >= ${Math.round(start * 1e9)} - 1e9 ` +  // - dur
+        `where cpu = ${this.trackState.cpu} ` +
+        `and ts_lower_bound = ${Math.round(start * 1e9)} ` +
         `and ts <= ${Math.round(end * 1e9)} ` +
         `and dur >= ${Math.round(resolution * 1e9)} ` +
         `order by ts ` +
         `limit ${LIMIT};`;
 
-    if (this.cpu === 0) console.log('QUERY', query);
+    if (this.trackState.cpu === 0) console.log('QUERY', query);
 
     this.busy = true;
     this.engine.rawQuery({'sqlQuery': query}).then(rawResult => {
@@ -73,7 +45,7 @@ class CpuSliceTrackController extends TrackController {
       if (rawResult.error) {
         throw new Error(`Query error "${query}": ${rawResult.error}`);
       }
-      if (this.cpu === 0) console.log('QUERY DONE', query);
+      if (this.trackState.cpu === 0) console.log('QUERY DONE', query);
 
       const numRows = +rawResult.numRecords;
 
@@ -96,8 +68,7 @@ class CpuSliceTrackController extends TrackController {
       if (numRows === LIMIT) {
         slices.end = slices.ends[slices.ends.length - 1];
       }
-
-      this.publish(slices);
+      globals.publish('TrackData', {id: this.trackId, data: slices});
     });
   }
 }

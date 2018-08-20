@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const TRACK_KIND = 'CpuSliceTrack';
+export const CPU_SLICE_TRACK_KIND = 'CpuSliceTrack';
 
 export interface CpuSliceTrackData {
   start: number;

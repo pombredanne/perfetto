@@ -12,46 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {assertExists} from '../../base/logging';
 import {fromNs} from '../../common/time';
+import {globals} from '../../controller/globals';
 import {
-  Engine,
-  PublishFn,
   TrackController,
-  TrackState
-} from '../../controller/track_controller';
-import {
   trackControllerRegistry
-} from '../../controller/track_controller_registry';
+} from '../../controller/track_controller';
 
-import {ChromeSliceTrackData, TRACK_KIND} from './common';
+import {ChromeSliceTrackData, SLICE_TRACK_KIND} from './common';
 
-// TODO(hjd): Too much bolierplate here. Prehaps TrackController/Track
-// should be an interface and we provide a TrackControllerBase/TrackBase
-// you can inherit from which does the basic things.
 class ChromeSliceTrackController extends TrackController {
-  static readonly kind = TRACK_KIND;
-
-  static create(config: TrackState, engine: Engine, publish: PublishFn):
-      TrackController {
-    return new ChromeSliceTrackController(
-        engine,
-        // TODO: Remove assertExists once we have typecheked kind specific
-        // state.
-        assertExists(config.utid),
-        publish);
-  }
-
-  // TODO: This publish function should be better typed to only accept
-  // CpuSliceTrackData. Perhaps we can do PublishFn<T>.
-  private publish: PublishFn;
+  static readonly kind = SLICE_TRACK_KIND;
   private busy = false;
-
-  constructor(
-      private engine: Engine, private utid: number, publish: PublishFn) {
-    super();
-    this.publish = publish;
-  }
 
   onBoundsChange(start: number, end: number, resolution: number) {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
@@ -59,7 +31,7 @@ class ChromeSliceTrackController extends TrackController {
     const LIMIT = 10000;
 
     const query = `select ts,dur,depth,cat,name from slices ` +
-        `where utid = ${this.utid} ` +
+        `where utid = ${this.trackState.utid} ` +
         `and ts >= ${Math.round(start * 1e9)} - dur ` +
         `and ts <= ${Math.round(end * 1e9)} ` +
         `and dur >= ${Math.round(resolution * 1e9)} ` +
@@ -75,7 +47,6 @@ class ChromeSliceTrackController extends TrackController {
       }
 
       const numRows = +rawResult.numRecords;
-      console.log('RES', numRows);
 
       const slices: ChromeSliceTrackData = {
         start,
@@ -111,7 +82,7 @@ class ChromeSliceTrackController extends TrackController {
       if (numRows === LIMIT) {
         slices.end = slices.ends[slices.ends.length - 1];
       }
-      this.publish(slices);
+      globals.publish('TrackData', {id: this.trackId, data: slices});
     });
   }
 }

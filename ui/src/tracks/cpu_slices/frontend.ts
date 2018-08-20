@@ -19,13 +19,13 @@ import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {CpuSliceTrackData, TRACK_KIND} from './common';
+import {CPU_SLICE_TRACK_KIND, CpuSliceTrackData} from './common';
 
 const MARGIN_TOP = 20;
 const RECT_HEIGHT = 30;
 
 function cropText(str: string, charWidth: number, rectWidth: number) {
-  const maxTextWidth = rectWidth - 15;
+  const maxTextWidth = rectWidth - 4;
   let displayText = '';
   const nameLength = str.length * charWidth;
   if (nameLength < maxTextWidth) {
@@ -47,7 +47,7 @@ function getCurResolution() {
 }
 
 class CpuSliceTrack extends Track {
-  static readonly kind = TRACK_KIND;
+  static readonly kind = CPU_SLICE_TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
     return new CpuSliceTrack(trackState);
   }
@@ -76,7 +76,7 @@ class CpuSliceTrack extends Track {
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
     const trackData = this.trackData;
 
-    // If there isn't enough cached slices data in |trackData| request more to
+    // If there aren't enough cached slices data in |trackData| request more to
     // the controller.
     const inRange = trackData !== undefined &&
         (visibleWindowTime.start >= trackData.start &&
@@ -90,7 +90,8 @@ class CpuSliceTrack extends Track {
       if (trackData === undefined) return;  // Can't possibly draw anything.
     }
     ctx.textAlign = 'center';
-    const charWidth = ctx.measureText('abcdefghij').width / 10;
+    ctx.font = '12px Google Sans';
+    const charWidth = ctx.measureText('dbpqaouk').width / 8;
 
     // TODO: this needs to be kept in sync with the hue generation algorithm
     // of overview_timeline_panel.ts

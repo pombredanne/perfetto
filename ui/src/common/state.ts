@@ -50,7 +50,10 @@ export interface QueryConfig {
   query: string;
 }
 
-export interface PermalinkConfig { state: State; }
+export interface PermalinkConfig {
+  requestId?: string;  // Set by the frontend to request a new permalink.
+  link?: string;       // Set by the controller when the link has been created.
+}
 
 export interface TraceTime {
   startSec: number;
@@ -71,10 +74,11 @@ export interface State {
    */
   engines: ObjectById<EngineConfig>;
   traceTime: TraceTime;
+  visibleTraceTime: TraceTime;
   tracks: ObjectById<TrackState>;
   displayedTrackIds: string[];
   queries: ObjectById<QueryConfig>;
-  permalink: null|PermalinkConfig;
+  permalink: PermalinkConfig;
   status: Status;
 }
 
@@ -84,10 +88,11 @@ export function createEmptyState(): State {
     nextId: 0,
     engines: {},
     traceTime: {startSec: 0, endSec: 10},
+    visibleTraceTime: {startSec: 0, endSec: 10},
     tracks: {},
     displayedTrackIds: [],
     queries: {},
-    permalink: null,
+    permalink: {},
     status: {msg: '', timestamp: 0},
   };
 }

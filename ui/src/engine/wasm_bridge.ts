@@ -83,7 +83,7 @@ export class WasmBridge {
     if (this.blob === null) {
       throw new Error('No blob set');
     }
-    console.log('Loading', (offset+length) / this.blob.size);
+    console.log('Loading', (offset + length) / this.blob.size);
     const slice = this.blob.slice(offset, offset + length);
     const buf: ArrayBuffer = this.fileReader.readAsArrayBuffer(slice);
     const buf8 = new Uint8Array(buf);

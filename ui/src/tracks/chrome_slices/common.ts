@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export const TRACK_KIND = 'ChromeSliceTrack';
+export const SLICE_TRACK_KIND = 'ChromeSliceTrack';
 
 export interface ChromeSliceTrackData {
   start: number;

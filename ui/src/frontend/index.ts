@@ -29,14 +29,6 @@ import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
 import {ViewerPage} from './viewer_page';
 
-function createController(): Worker {
-  const worker = new Worker('controller_bundle.js');
-  worker.onerror = e => {
-    console.error(e);
-  };
-  return worker;
-}
-
 /**
  * The API the main thread exposes to the controller.
  */
@@ -46,7 +38,7 @@ class FrontendApi {
     this.redraw();
   }
 
-  publishOverviewData(data: {[key:string]: QuantizedLoad}) {
+  publishOverviewData(data: {[key: string]: QuantizedLoad}) {
     for (const key of Object.keys(data)) {
       if (!globals.overviewStore.has(key)) {
         globals.overviewStore.set(key, []);
@@ -56,13 +48,13 @@ class FrontendApi {
     globals.rafScheduler.scheduleOneRedraw();
   }
 
-  publishTrackData(id: string, data: {}) {
-    globals.trackDataStore.set(id, data);
-    this.redraw();
+  publishTrackData(args: {id: string, data: {}}) {
+    globals.trackDataStore.set(args.id, args.data);
+    globals.rafScheduler.scheduleOneRedraw();
   }
 
-  publishQueryResult(id: string, data: {}) {
-    globals.queryResults.set(id, data);
+  publishQueryResult(args: {id: string, data: {}}) {
+    globals.queryResults.set(args.id, args.data);
     this.redraw();
   }
 
@@ -94,8 +86,11 @@ class FrontendApi {
   }
 }
 
-async function main() {
-  const controller = createController();
+function main() {
+  const controller = new Worker('controller_bundle.js');
+  controller.onerror = e => {
+    console.error(e);
+  };
   const channel = new MessageChannel();
   forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
@@ -113,16 +108,15 @@ async function main() {
   (window as {} as {m: {}}).m = m;
   (window as {} as {globals: {}}).globals = globals;
 
-  const stateHash = m.route.param('s');
-  if (stateHash) {
-    const state = await loadState(stateHash);
-    globals.dispatch(setState(state));
-  }
-
   // Prevent pinch zoom.
   document.body.addEventListener('wheel', (e: MouseEvent) => {
     if (e.ctrlKey) e.preventDefault();
   });
+
+  const stateHash = m.route.param('s');
+  if (stateHash) {
+    loadState(stateHash).then(state => globals.dispatch(setState(state)));
+  }
 }
 
 main();

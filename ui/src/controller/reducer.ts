@@ -76,6 +76,15 @@ export function rootReducer(state: State, action: any): State {
       return nextState;
     }
 
+    case 'CLEAR_TRACK_DATA_REQ': {
+      const nextState = {...state};
+      nextState.tracks = {...state.tracks};
+      nextState.tracks[action.trackId].reqTimeStart = action.start;
+      nextState.tracks[action.trackId].reqTimeEnd = action.end;
+      nextState.tracks[action.trackId].reqTimeRes = action.resolution;
+      return nextState;
+    }
+
     // TODO: 'ADD_CHROME_TRACK' string should be a shared const.
     case 'ADD_CHROME_TRACK': {
       const nextState = {...state};
@@ -140,15 +149,25 @@ export function rootReducer(state: State, action: any): State {
     case 'SET_ENGINE_READY': {
       const nextState = {...state};  // Creates a shallow copy.
       nextState.engines = {...state.engines};
-      nextState.engines[action.engineId].ready = true;
+      nextState.engines[action.engineId].ready = action.ready;
       return nextState;
     }
 
     case 'CREATE_PERMALINK': {
       const nextState = {...state};
       nextState.permalink = {
-        state,
+        requestId: new Date().toISOString(),
+        link: undefined
       };
+      return nextState;
+    }
+
+    case 'SET_PERMALINK': {
+      // Drop any links for old requests.
+      if (state.permalink.requestId !== action.requestId) return state;
+
+      const nextState = {...state};
+      nextState.permalink = {requestId: action.requestId, link: action.link};
       return nextState;
     }
 
@@ -163,9 +182,16 @@ export function rootReducer(state: State, action: any): State {
       return nextState;
     }
 
+    case 'SET_VISIBLE_TRACE_TIME': {
+      const nextState = {...state};
+      nextState.visibleTraceTime.startSec = action.startSec;
+      nextState.visibleTraceTime.endSec = action.endSec;
+      return nextState;
+    }
+
     case 'UPDATE_STATUS': {
       const nextState = {...state};
-      nextState.status = { msg:action.msg, timestamp:action.timestamp };
+      nextState.status = {msg: action.msg, timestamp: action.timestamp};
       return nextState;
     }
 

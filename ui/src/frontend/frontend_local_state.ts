@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {setVisibleTraceTime} from '../common/actions';
 import {TimeSpan} from '../common/time';
 
 import {globals} from './globals';
@@ -24,6 +25,9 @@ import {TimeScale} from './time_scale';
 export class FrontendLocalState {
   visibleWindowTime = new TimeSpan(0, 10);
   timeScale = new TimeScale(this.visibleWindowTime, [0, 0]);
+  private pendingGlobalTimeUpdate?: TimeSpan;
+
+  // TODO: restore the visible time somewhere for the permalink case.
 
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one
@@ -33,5 +37,14 @@ export class FrontendLocalState {
     const endSec = Math.min(ts.end, globals.state.traceTime.endSec);
     this.visibleWindowTime = new TimeSpan(startSec, endSec);
     this.timeScale.setTimeBounds(this.visibleWindowTime);
+
+    // Post a delayed update to the controler.
+    const alreadyPosted = this.pendingGlobalTimeUpdate !== undefined;
+    this.pendingGlobalTimeUpdate = this.visibleWindowTime;
+    if (alreadyPosted) return;
+    setTimeout(() => {
+      globals.dispatch(setVisibleTraceTime(this.pendingGlobalTimeUpdate!));
+      this.pendingGlobalTimeUpdate = undefined;
+    }, 500);
   }
 }

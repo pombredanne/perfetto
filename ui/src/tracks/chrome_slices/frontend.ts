@@ -20,7 +20,7 @@ import {trackRegistry} from '../../frontend/track_registry';
 
 import {
   ChromeSliceTrackData,
-  TRACK_KIND,
+  SLICE_TRACK_KIND,
 } from './common';
 
 const SLICE_HEIGHT = 30;
@@ -42,7 +42,7 @@ function getCurResolution() {
 }
 
 class ChromeSliceTrack extends Track {
-  static readonly kind = TRACK_KIND;
+  static readonly kind = SLICE_TRACK_KIND;
   static create(trackState: TrackState): ChromeSliceTrack {
     return new ChromeSliceTrack(trackState);
   }

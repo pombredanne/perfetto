@@ -45,6 +45,10 @@ export function requestTrackData(
   return {type: 'REQ_TRACK_DATA', trackId, start, end, resolution};
 }
 
+export function clearTrackDataRequest(trackId: string) {
+  return {type: 'CLEAR_TRACK_DATA_REQ', trackId};
+}
+
 // TODO: There should be merged with addTrack above.
 export function addChromeSliceTrack(
     engineId: string,
@@ -95,17 +99,18 @@ export function moveTrack(trackId: string, direction: 'up'|'down') {
   };
 }
 
-export function setEngineReady(engineId: string) {
-  return {
-    type: 'SET_ENGINE_READY',
-    engineId,
-  };
+export function setEngineReady(engineId: string, ready = true) {
+  return {type: 'SET_ENGINE_READY', engineId, ready};
 }
 
 export function createPermalink() {
   return {
     type: 'CREATE_PERMALINK',
   };
+}
+
+export function setPermalink(requestId: string, link: string) {
+  return {type: 'SET_PERMALINK', requestId, link};
 }
 
 export function setState(newState: State) {
@@ -117,6 +122,10 @@ export function setState(newState: State) {
 
 export function setTraceTime(ts: TimeSpan) {
   return {type: 'SET_TRACE_TIME', startSec: ts.start, endSec: ts.end};
+}
+
+export function setVisibleTraceTime(ts: TimeSpan) {
+  return {type: 'SET_VISIBLE_TRACE_TIME', startSec: ts.start, endSec: ts.end};
 }
 
 export function updateStatus(msg: string) {

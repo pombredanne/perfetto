@@ -96,11 +96,3 @@ test('set state', async () => {
   });
   expect(after).toBe(newState);
 });
-
-test('create permalink', async () => {
-  const before = createEmptyState();
-  const after = rootReducer(before, {
-    type: 'CREATE_PERMALINK',
-  });
-  expect(after.permalink!.state).toBe(before);
-});

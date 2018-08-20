@@ -80,7 +80,7 @@ handlers:
   upload: static/(.*)
 EOF
 
-echo_and_do ln -s ../ui $UI_DIST_DIR/static
+echo_and_do ln -fs ../ui $UI_DIST_DIR/static
 
 (
   echo_and_do cd "$UI_DIST_DIR";
