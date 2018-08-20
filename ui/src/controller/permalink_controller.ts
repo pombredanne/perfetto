@@ -60,9 +60,8 @@ export class PermalinkController extends Controller<'init'> {
     const text = JSON.stringify(state);
     const name = await toSha256(text);
     const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-        `${BUCKET_NAME}/o?uploadType=media&name=${
-                                                  name
-                                                }&predefinedAcl=publicRead`;
+        `${BUCKET_NAME}/o?uploadType=media` +
+        `&name=${name}&predefinedAcl=publicRead`;
     const response = await fetch(url, {
       method: 'post',
       headers: {
@@ -80,14 +79,11 @@ export class PermalinkController extends Controller<'init'> {
     // trace processor support.
     const name = uuidv4();
     const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
-        `${BUCKET_NAME}/o?uploadType=media&name=${
-                                                  name
-                                                }&predefinedAcl=publicRead`;
+        `${BUCKET_NAME}/o?uploadType=media` +
+        `&name=${name}&predefinedAcl=publicRead`;
     const response = await fetch(url, {
       method: 'post',
-      headers: {
-        'Content-Type': 'application/octet-stream;',
-      },
+      headers: {'Content-Type': 'application/octet-stream;'},
       body: trace,
     });
     await response.json();

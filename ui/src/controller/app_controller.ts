@@ -21,6 +21,9 @@ import {
 import {PermalinkController} from './permalink_controller';
 import {TraceController} from './trace_controller';
 
+// The root controller for the entire app. It handles the lifetime of all
+// the other controllers (e.g., track and query controllers) according to the
+// global state.
 export class AppController extends Controller<'init'> {
   constructor() {
     super('init');
