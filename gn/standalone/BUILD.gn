@@ -134,6 +134,10 @@ config("default") {
       "-I$android_ndk_root/sources/cxx-stl/llvm-libc++/include",
       "-I$android_ndk_root/sources/android/support/include",
       "-I$android_ndk_root/sources/cxx-stl/llvm-libc++abi/include",
+
+      # This is needed for NDK libc++. Using -isystem instead of -I above
+      # results in build breakage related to cmath.h.
+      "-Wno-format-nonliteral",
     ]
     ldflags += [
       "-Wl,-z,nocopyreloc",
