@@ -82,8 +82,9 @@ test('open trace', async () => {
     type: 'OPEN_TRACE_FROM_URL',
     url: 'https://example.com/bar',
   });
-  expect(after.engines[0].source).toBe('https://example.com/bar');
-  expect(after.nextId).toBe(1);
+  const engineKeys = Object.keys(after.engines);
+  expect(engineKeys.length).toBe(1);
+  expect(after.engines[engineKeys[0]].source).toBe('https://example.com/bar');
   expect(after.route).toBe('/viewer');
 });
 

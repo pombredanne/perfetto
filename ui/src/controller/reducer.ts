@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {State, createEmptyState} from '../common/state';
-
 import * as uuidv4 from 'uuid/v4';
+
+import {createEmptyState, State} from '../common/state';
 
 // TODO(hjd): Type check this better.
 // tslint:disable-next-line no-any

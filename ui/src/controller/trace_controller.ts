@@ -22,8 +22,8 @@ import {
   navigate,
   setEngineReady,
   setTraceTime,
-  updateStatus,
-  setVisibleTraceTime
+  setVisibleTraceTime,
+  updateStatus
 } from '../common/actions';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
@@ -37,6 +37,12 @@ import {QueryController, QueryControllerArgs} from './query_controller';
 import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
 
 type States = 'init'|'loading_trace'|'ready';
+
+
+// TraceController handles handshakes with the frontend for everything that
+// concerns a single trace. It owns the WASM trace processor engine, handles
+// tracks data and SQL queries. There is one TraceController instance for each
+// trace opened in the UI (for now only one trace is supported).
 export class TraceController extends Controller<States> {
   private readonly engineId: string;
   private engine?: Engine;
@@ -59,6 +65,8 @@ export class TraceController extends Controller<States> {
         break;
 
       case 'loading_trace':
+        // Stay in this state until loadTrace() returns and marks the engine as
+        // ready.
         if (this.engine === undefined || !engineCfg.ready) return;
         this.setState('ready');
         break;
@@ -72,6 +80,7 @@ export class TraceController extends Controller<States> {
         // Create a TrackController for each track.
         for (const trackId of Object.keys(globals.state.tracks)) {
           const trackCfg = globals.state.tracks[trackId];
+          if (trackCfg.engineId !== this.engineId) continue;
           if (!trackControllerRegistry.has(trackCfg.kind)) continue;
           const trackCtlFactory = trackControllerRegistry.get(trackCfg.kind);
           const trackArgs: TrackControllerArgs = {trackId, engine};

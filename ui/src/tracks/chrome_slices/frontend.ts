@@ -66,6 +66,8 @@ class ChromeSliceTrack extends Track {
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D): void {
+    // TODO: fonts and colors should come from the CSS and not hardcoded here.
+
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
     const trackData = this.trackData;
 
@@ -161,7 +163,6 @@ class ChromeSliceTrack extends Track {
 
   onMouseMove({x, y}: {x: number, y: number}) {
     const trackData = this.trackData;
-    // this.mouseXpos = x;
     this.hoveredTitleId = -1;
     if (trackData === undefined) return;
     const {timeScale} = globals.frontendLocalState;

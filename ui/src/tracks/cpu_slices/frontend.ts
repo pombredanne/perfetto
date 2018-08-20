@@ -73,6 +73,8 @@ class CpuSliceTrack extends Track {
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D): void {
+    // TODO: fonts and colors should come from the CSS and not hardcoded here.
+
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
     const trackData = this.trackData;
 

@@ -102,6 +102,7 @@ test('nestedControllers', () => {
   // Transition the root controller to state1. This will create the first child
   // and re-run both (because of the idle -> state1 transition).
   _run.mockClear();
+  _onCreate.mockClear();
   nextState = 'state1';
   runControllerTree(rootCtl);
   expect(_onCreate).toHaveBeenCalledWith('child1');

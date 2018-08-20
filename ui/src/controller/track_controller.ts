@@ -22,18 +22,8 @@ import {globals} from './globals';
 
 type States = 'init';
 
-export interface TrackControllerArgs {
-  trackId: string;
-  engine: Engine;
-}
-
-export interface TrackControllerFactory extends
-    ControllerFactory<TrackControllerArgs> {
-  kind: string;
-}
-
-export const trackControllerRegistry = new Registry<TrackControllerFactory>();
-
+// TrackController is a base class overridden by track implementations (e.g.,
+// sched slices, nestable slices, counters).
 export abstract class TrackController extends Controller<States> {
   readonly trackId: string;
   readonly engine: Engine;
@@ -44,6 +34,9 @@ export abstract class TrackController extends Controller<States> {
     this.engine = args.engine;
   }
 
+  // Must be overridden by the track implementation. Is invoked when the track
+  // frontend runs out of cached data. The derived track controller is expected
+  // to publish new track data in response to this call.
   abstract onBoundsChange(start: number, end: number, resolution: number): void;
 
   get trackState() {
@@ -57,3 +50,15 @@ export abstract class TrackController extends Controller<States> {
     this.onBoundsChange(dataReq.start, dataReq.end, dataReq.resolution);
   }
 }
+
+export interface TrackControllerArgs {
+  trackId: string;
+  engine: Engine;
+}
+
+export interface TrackControllerFactory extends
+    ControllerFactory<TrackControllerArgs> {
+  kind: string;
+}
+
+export const trackControllerRegistry = new Registry<TrackControllerFactory>();

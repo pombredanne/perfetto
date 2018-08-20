@@ -91,7 +91,7 @@ echo_and_do ln -fs ../ui $UI_DIST_DIR/static
 (
   echo_and_do cd "$UI_DIST_DIR";
   if [ "$DEPLOY_PROD" = true ]; then
-    echo_and_do gcloud app deploy app.yaml --project perfetto-ui -v testing
+    echo_and_do gcloud app deploy app.yaml --project perfetto-ui -v prod
   elif [ "$DEPLOY_STAGING" = true ]; then
     echo_and_do gcloud app deploy app.yaml --project perfetto-ui \
         -v staging --no-promote --stop-previous-version

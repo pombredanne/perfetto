@@ -28,8 +28,6 @@ export class FrontendLocalState {
   private _visibleTimeLastUpdate = 0;
   private pendingGlobalTimeUpdate?: TimeSpan;
 
-  // TODO: restore the visible time somewhere for the permalink case.
-
   // TODO: there is some redundancy in the fact that both |visibleWindowTime|
   // and a |timeScale| have a notion of time range. That should live in one
   // place only.
@@ -40,7 +38,7 @@ export class FrontendLocalState {
     this.timeScale.setTimeBounds(this.visibleWindowTime);
     this._visibleTimeLastUpdate = Date.now() / 1000;
 
-    // Post a delayed update to the controler.
+    // Post a delayed update to the controller.
     const alreadyPosted = this.pendingGlobalTimeUpdate !== undefined;
     this.pendingGlobalTimeUpdate = this.visibleWindowTime;
     if (alreadyPosted) return;

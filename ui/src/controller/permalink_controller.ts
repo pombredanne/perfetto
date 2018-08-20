@@ -13,9 +13,11 @@
 // limitations under the License.
 
 import * as uuidv4 from 'uuid/v4';
+
 import {assertExists, assertTrue} from '../base/logging';
-import {setPermalink, setState, navigate} from '../common/actions';
+import {navigate, setPermalink, setState} from '../common/actions';
 import {EngineConfig, State} from '../common/state';
+
 import {Controller} from './controller';
 import {globals} from './globals';
 

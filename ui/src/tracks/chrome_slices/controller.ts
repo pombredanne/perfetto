@@ -30,6 +30,9 @@ class ChromeSliceTrackController extends TrackController {
     if (this.busy) return;
     const LIMIT = 10000;
 
+    // TODO: "ts >= x - dur" below is inefficient because doesn't allow to use
+    // any index. We need to introduce ts_lower_bound also for the slices table
+    // (see sched table).
     const query = `select ts,dur,depth,cat,name from slices ` +
         `where utid = ${this.trackState.utid} ` +
         `and ts >= ${Math.round(start * 1e9)} - dur ` +
