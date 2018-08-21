@@ -163,8 +163,12 @@ config("default") {
       "gcc",
       "c++_static",
       "c++abi",
-      "android_support",
     ]
+
+    if (current_cpu == "arm") {
+      # New NDKs don't have libandroid_support for arm64.
+      libs += [ "android_support" ]
+    }
   }
 }
 
