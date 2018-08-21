@@ -28,7 +28,7 @@ class CpuSliceTrackController extends TrackController {
   onBoundsChange(start: number, end: number, resolution: number) {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
     if (this.busy) return;
-    const LIMIT = 5000;
+    const LIMIT = 10000;
     const query = 'select ts,dur,utid from sched ' +
         `where cpu = ${this.trackState.cpu} ` +
         `and ts_lower_bound = ${Math.round(start * 1e9)} ` +

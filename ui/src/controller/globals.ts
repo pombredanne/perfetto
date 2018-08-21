@@ -57,7 +57,8 @@ class Globals {
 
     // Run controllers locally until all state machines reach quiescence.
     let runAgain = false;
-    console.groupCollapsed('Running controllers loop');
+    const summary = this._queuedActions.map(action => action.type).join(', ');
+    console.groupCollapsed(`Running controllers loop (${summary})`);
     console.time('full controllers loop');
     for (let iter = 0; runAgain || this._queuedActions.length > 0; iter++) {
       if (iter > 100) throw new Error('Controllers are stuck in a livelock');
