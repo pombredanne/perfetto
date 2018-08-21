@@ -15,6 +15,8 @@ Supported input formats:
  * Chrome .json trace events [WIP]
  * [NOT IMPLEMENTED YET] ftrace format as per `/sys/kernel/debug/tracing/trace`.
 
+![Trace Processor](https://storage.googleapis.com/perfetto/markdown_img/trace-processor.png)
+
 Rationale
 ---------
 Traces are raw because they are optimized for fast & low overhead writing.
