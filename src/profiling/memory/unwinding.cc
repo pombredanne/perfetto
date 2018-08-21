@@ -32,7 +32,7 @@ StackMemory::StackMemory(int mem_fd, uint64_t sp, uint8_t* stack, size_t size)
 
 size_t StackMemory::Read(uint64_t addr, void* dst, size_t size) {
   if (addr >= sp_ && addr + size <= stack_end_ && addr + size > sp_) {
-    size_t offset = addr - sp_;
+    size_t offset = static_cast<size_t>(addr - sp_);
     memcpy(dst, stack_ + offset, size);
     return size;
   }

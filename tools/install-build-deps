@@ -166,6 +166,12 @@ BUILD_DEPS_HOST = [
    'all'
   ),
 
+  ('buildtools/bionic',
+   'https://android.googlesource.com/platform/bionic.git',
+   '3fd45bba4857fdbf320b6e89d2ae0569d9463bf5',
+   'all'
+  ),
+
   # Example traces for regression tests.
   ('buildtools/test_data.zip',
    'https://storage.googleapis.com/perfetto/test-data-20180808.zip',

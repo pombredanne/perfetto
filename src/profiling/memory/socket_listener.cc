@@ -65,7 +65,8 @@ void SocketListener::OnDataAvailable(ipc::UnixSocket* self) {
     case (RecordReader::Result::Noop):
       break;
     case (RecordReader::Result::RecordReceived):
-      RecordReceived(self, record.size, std::move(record.data));
+      RecordReceived(self, static_cast<size_t>(record.size),
+                     std::move(record.data));
       break;
     case (RecordReader::Result::KillConnection):
       self->Shutdown(true);

@@ -49,8 +49,8 @@ config("c++11") {
 }
 
 # This is needed to compile libunwindstack.
-config("c++17") {
-  cflags_cc = [ "-std=c++17" ]
+config("c++14") {
+  cflags_cc = [ "-std=c++14" ]
 }
 
 config("visibility_hidden") {
@@ -126,14 +126,20 @@ config("default") {
       "--sysroot=$android_compile_sysroot",
       "-isystem$android_compile_sysroot/$android_compile_sysroot_subdir",
       "-isystem$android_compile_sysroot",
-      "-DANDROID",
-      "-D__ANDROID_API__=21",
       "--target=$android_abi_target",
+    ]
+    defines = [
+      "ANDROID",
+      "__ANDROID_API__=26",
     ]
     cflags_cc += [
       "-I$android_ndk_root/sources/cxx-stl/llvm-libc++/include",
       "-I$android_ndk_root/sources/android/support/include",
       "-I$android_ndk_root/sources/cxx-stl/llvm-libc++abi/include",
+
+      # This is needed for NDK libc++. Using -isystem instead of -I above
+      # results in build breakage related to cmath.h.
+      "-Wno-format-nonliteral",
     ]
     ldflags += [
       "-Wl,-z,nocopyreloc",
@@ -159,8 +165,12 @@ config("default") {
       "gcc",
       "c++_static",
       "c++abi",
-      "android_support",
     ]
+
+    if (current_cpu == "arm") {
+      # New NDKs don't have libandroid_support for arm64.
+      libs += [ "android_support" ]
+    }
   }
 }
 
