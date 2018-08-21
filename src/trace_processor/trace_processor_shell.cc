@@ -23,7 +23,6 @@
 #include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "src/trace_processor/file_reader.h"
-#include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
@@ -111,7 +110,7 @@ int main(int argc, char** argv) {
   const char* trace_file_path = nullptr;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-d") == 0) {
-      Table::debug = true;
+      EnableSQLiteVtableDebugging();
       continue;
     }
     trace_file_path = argv[i];
