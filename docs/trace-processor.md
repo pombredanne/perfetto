@@ -15,7 +15,7 @@ Supported input formats:
  * Chrome .json trace events [WIP]
  * [NOT IMPLEMENTED YET] ftrace format as per `/sys/kernel/debug/tracing/trace`.
 
-![Trace Processor](https://storage.googleapis.com/perfetto/markdown_img/trace-processor.png)
+![Trace Processor](https://storage.googleapis.com/perfetto/markdown_img/trace-processor-small.png)
 
 Rationale
 ---------
