@@ -46,7 +46,7 @@ export class FrontendLocalState {
       globals.dispatch(setVisibleTraceTime(this.pendingGlobalTimeUpdate!));
       this._visibleTimeLastUpdate = Date.now() / 1000;
       this.pendingGlobalTimeUpdate = undefined;
-    }, 500);
+    }, 100);
   }
 
   get visibleTimeLastUpdate() {
