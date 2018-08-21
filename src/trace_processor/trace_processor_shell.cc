@@ -23,6 +23,7 @@
 #include "perfetto/base/time.h"
 #include "perfetto/base/unix_task_runner.h"
 #include "src/trace_processor/file_reader.h"
+#include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
@@ -104,12 +105,20 @@ void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    PERFETTO_ELOG("Usage: %s trace_file.proto", argv[0]);
+    PERFETTO_ELOG("Usage: %s [-d] trace_file.proto", argv[0]);
     return 1;
+  }
+  const char* trace_file_path = nullptr;
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-d") == 0) {
+      Table::debug = true;
+      continue;
+    }
+    trace_file_path = argv[i];
   }
 
   base::UnixTaskRunner task_runner;
-  FileReader reader(argv[1], /*print_progress=*/true);
+  FileReader reader(trace_file_path, /*print_progress=*/true);
   TraceProcessor tp(&task_runner);
   g_tp = &tp;
 
