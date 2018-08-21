@@ -78,8 +78,10 @@ void Table::RegisterInternal(sqlite3* db,
     int res = sqlite3_declare_vtab(xdb, xdesc->create_statement.c_str());
     if (res != SQLITE_OK)
       return res;
+
     // Freed in xDisconnect().
     *tab = xdesc->factory(xdesc->storage, xdesc->name).release();
+
     return SQLITE_OK;
   };
 
