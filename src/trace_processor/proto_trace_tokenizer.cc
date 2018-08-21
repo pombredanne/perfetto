@@ -88,7 +88,7 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView view) {
         // Use parent data and length because we want to parse this again
         // later to get the exact type of the packet.
         context_->sorter->PushTracePacket(last_timestamp, std::move(view));
-        break;
+        return;
       }
     }
   }
