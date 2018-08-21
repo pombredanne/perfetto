@@ -71,7 +71,8 @@ The UNIX pid (also known as Thread Group ID in Linux). This also matches the
 tid of the process' main thread.
 
 
-Example:
+Example:  
+
 | upid              |               name |                pid |
 |-------------------|--------------------|--------------------|
 |                 1 | /system/bin/logd   |                601 |
@@ -96,7 +97,8 @@ Threaf name, as per /proc/pid/task/tid/comm.
 The Linux thread id (confusingly named "pid" in the Linux-world).
 For the process' main thread `tid` == `tgid` == `pid`.
 
-Example:
+Example:  
+
 | utid   | upid  | name             | tid  |
 |--------|-------|------------------|------|
 |      1 |     1 | logd.klogd       |  632 |
