@@ -134,7 +134,7 @@ select process.name, pid from process limit 100
 select process.name as proc_name, pid, thread.name as thread_name, tid from thread left join process using(upid) limit 100
 ```
 
-### CPU time for top #100 threads
+### CPU time for top 100 threads
 ``` sql
 select thread.name as thread_name, tid, cpu_sec from (select utid, sum(dur)/1e9 as cpu_sec from sched group by utid order by dur desc limit 100) inner join thread using(utid)
 ```
@@ -144,12 +144,12 @@ With matching process names
 select thread.name as thread_name, process.name as proc_name, tid, pid, cpu_sec from (select utid, sum(dur)/1e9 as cpu_sec from sched group by utid order by dur desc limit 100) left outer join thread using(utid) left outer join process using(upid)
 ```
 
-### CPU time for top #100 processes
+### CPU time for top 100 processes
 ``` sql
 select proc_name, cpu_sec from (select process.name as proc_name, upid, cpu_sec from (select utid, sum(dur)/1e9 as cpu_sec from sched group by utid) left join thread using(utid) left join process using(upid)) group by upid order by cpu_sec desc limit 100
 ```
 
-### CPU time for top #100 processes broken down by cpu
+### CPU time for top 100 processes broken down by cpu
 ``` sql
 select proc_name, cpu, cpu_sec from (select process.name as proc_name, upid, cpu, cpu_sec from (select cpu, utid, sum(dur)/1e9 as cpu_sec from sched group by utid) left join thread using(utid) left join process using(upid)) group by upid, cpu order by cpu_sec desc limit 100
 ```
