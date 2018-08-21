@@ -16,11 +16,7 @@ import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
 import {Action} from '../common/actions';
 import {createEmptyState, State} from '../common/state';
-
-import {
-  ControllerAny,
-  runControllerTree,
-} from './controller';
+import {ControllerAny} from './controller';
 import {Engine} from './engine';
 import {rootReducer} from './reducer';
 import {WasmEngineProxy} from './wasm_engine_proxy';
@@ -33,8 +29,7 @@ class Globals {
   private _rootController?: ControllerAny;
   private _frontend?: Remote;
   private _runningControllers = false;
-  private _didPostControllersRun = false;
-  private _didPostStateUpdate = false;
+  private _queuedActions = new Array<Action>();
 
   initialize(rootController: ControllerAny, frontendProxy: Remote) {
     this._state = createEmptyState();
@@ -47,34 +42,40 @@ class Globals {
   }
 
   dispatchMultiple(actions: Action[]): void {
-    for (const action of actions) {
-      this._state = rootReducer(this.state, action);
-    }
+    this._queuedActions = this._queuedActions.concat(actions);
+
+    // If we are in the middle of running the controllers, queue the actions
+    // and run them at the end of the run, so the state is atomically updated
+    // only at the end and all controllers see the same state.
+    if (this._runningControllers) return;
 
     this.runControllers();
-
-    if (this._didPostStateUpdate) return;
-    this._didPostStateUpdate = true;
-    setTimeout(() => {
-      this._didPostStateUpdate = false;
-      assertExists(this._frontend).send<void>('updateState', [this.state]);
-    }, 32);
   }
 
-  runControllers() {
-    if (this._runningControllers) {
-      if (this._didPostControllersRun) return;
-      this._didPostControllersRun = true;
-      setTimeout(() => {
-        this._didPostControllersRun = false;
-        this.runControllers();
-      });
-      return;
-    }
+  private runControllers() {
+    if (this._runningControllers) throw new Error('Re-entrant call detected');
 
-    this._runningControllers = true;
-    runControllerTree(assertExists(this._rootController));
-    this._runningControllers = false;
+    // Run controllers locally until all state machines reach quiescence.
+    let runAgain = false;
+    console.groupCollapsed('Running controllers loop');
+    console.time('full controllers loop');
+    for (let iter = 0; runAgain || this._queuedActions.length > 0; iter++) {
+      if (iter > 100) throw new Error('Controllers are stuck in a livelock');
+      const actions = this._queuedActions;
+      this._queuedActions = new Array<Action>();
+      for (const action of actions) {
+        console.log('Applying action', action);
+        this._state = rootReducer(this.state, action);
+      }
+      this._runningControllers = true;
+      console.time('controllers tree');
+      runAgain = assertExists(this._rootController).invoke();
+      console.timeEnd('controllers tree');
+      this._runningControllers = false;
+    }
+    assertExists(this._frontend).send<void>('updateState', [this.state]);
+    console.timeEnd('full controllers loop');
+    console.groupEnd();
   }
 
   async createEngine(blob: Blob): Promise<Engine> {

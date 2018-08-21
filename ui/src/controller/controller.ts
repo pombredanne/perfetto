@@ -35,18 +35,11 @@ export function Child<ConstructorArgs>(
   return {id, factory, args};
 }
 
-export function runControllerTree(rootController: ControllerAny) {
-  for (let runAgain = true, i = 0; runAgain; i++) {
-    if (i >= 1000) {
-      throw new Error('Controller livelock');
-    }
-    runAgain = rootController.runner();
-  }
-}
-
 export type Children = ControllerInitializerAny[];
 
 export abstract class Controller<StateType> {
+  // This is about the local FSM state, has nothing to do with the global
+  // app state.
   private _stateChanged = false;
   private _inRunner = false;
   private _state: StateType;
@@ -59,7 +52,11 @@ export abstract class Controller<StateType> {
   abstract run(): Children|void;
   onDestroy(): void {}
 
-  runner(): boolean {
+  // Invokes the current controller subtree, recursing into children.
+  // While doing so handles lifecycle of child controllers.
+  // This method should be called only by the runControllers() method in
+  // globals.ts. Exposed publicly for testing.
+  invoke(): boolean {
     if (this._inRunner) throw new Error('Reentrancy in Controller');
     this._stateChanged = false;
     this._inRunner = true;
@@ -90,7 +87,7 @@ export abstract class Controller<StateType> {
         this._children.set(nextChild.id, instance);
       }
       const instance = this._children.get(nextChild.id)!;
-      runners.push(() => instance.runner());
+      runners.push(() => instance.invoke());
     }
 
     for (const dtor of dtors) dtor();  // Invoke all onDestroy()s.

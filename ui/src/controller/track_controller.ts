@@ -20,16 +20,14 @@ import {ControllerFactory} from './controller';
 import {Engine} from './engine';
 import {globals} from './globals';
 
-type States = 'init';
-
 // TrackController is a base class overridden by track implementations (e.g.,
 // sched slices, nestable slices, counters).
-export abstract class TrackController extends Controller<States> {
+export abstract class TrackController extends Controller<'main'> {
   readonly trackId: string;
   readonly engine: Engine;
 
   constructor(args: TrackControllerArgs) {
-    super('init');
+    super('main');
     this.trackId = args.trackId;
     this.engine = args.engine;
   }

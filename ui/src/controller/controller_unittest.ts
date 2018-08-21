@@ -15,7 +15,6 @@
 import {
   Child,
   Controller,
-  runControllerTree,
 } from './controller';
 
 const _onCreate = jest.fn();
@@ -35,6 +34,13 @@ class MockController extends Controller<MockStates> {
 
   onDestroy() {
     return _onDestroy(this.type);
+  }
+}
+
+function runControllerTree(rootController: MockController): void {
+  for (let runAgain = true, i = 0; runAgain; i++) {
+    if (i >= 100) throw new Error('Controller livelock');
+    runAgain = rootController.invoke();
   }
 }
 

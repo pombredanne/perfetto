@@ -20,9 +20,9 @@ import {TraceController} from './trace_controller';
 // The root controller for the entire app. It handles the lifetime of all
 // the other controllers (e.g., track and query controllers) according to the
 // global state.
-export class AppController extends Controller<'init'> {
+export class AppController extends Controller<'main'> {
   constructor() {
-    super('init');
+    super('main');
   }
 
   // This is the root method that is called every time the controller tree is
