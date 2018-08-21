@@ -19,6 +19,7 @@ export interface Action { type: string; }
 export function openTraceFromUrl(url: string) {
   return {
     type: 'OPEN_TRACE_FROM_URL',
+    id: new Date().toISOString(),
     url,
   };
 }
@@ -26,6 +27,7 @@ export function openTraceFromUrl(url: string) {
 export function openTraceFromFile(file: File) {
   return {
     type: 'OPEN_TRACE_FROM_FILE',
+    id: new Date().toISOString(),
     file,
   };
 }
@@ -104,13 +106,15 @@ export function setEngineReady(engineId: string, ready = true) {
 }
 
 export function createPermalink() {
-  return {
-    type: 'CREATE_PERMALINK',
-  };
+  return {type: 'CREATE_PERMALINK', requestId: new Date().toISOString()};
 }
 
-export function setPermalink(requestId: string, link: string) {
-  return {type: 'SET_PERMALINK', requestId, link};
+export function setPermalink(requestId: string, hash: string) {
+  return {type: 'SET_PERMALINK', requestId, hash};
+}
+
+export function loadPermalink(hash: string) {
+  return {type: 'LOAD_PERMALINK', requestId: new Date().toISOString(), hash};
 }
 
 export function setState(newState: State) {

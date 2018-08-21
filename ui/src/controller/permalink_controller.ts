@@ -14,8 +14,8 @@
 
 import * as uuidv4 from 'uuid/v4';
 
-import {assertExists, assertTrue} from '../base/logging';
-import {navigate, setPermalink, setState} from '../common/actions';
+import {assertExists} from '../base/logging';
+import {setPermalink, setState} from '../common/actions';
 import {EngineConfig, State} from '../common/state';
 
 import {Controller} from './controller';
@@ -23,26 +23,32 @@ import {globals} from './globals';
 
 export const BUCKET_NAME = 'perfetto-ui-data';
 
-export class PermalinkController extends Controller<'init'> {
+export class PermalinkController extends Controller<'main'> {
   private lastRequestId?: string;
   constructor() {
-    super('init');
+    super('main');
   }
 
   run() {
-    if (globals.state.route && globals.state.route.startsWith('/?s=')) {
-      const hash = globals.state.route.split('/?s=')[1];
-      globals.dispatch(navigate('/viewer'));
-      PermalinkController.loadState(hash).then(
-          state => globals.dispatch(setState(state)));
+    if (globals.state.permalink.requestId === undefined ||
+        globals.state.permalink.requestId === this.lastRequestId) {
+      return;
+    }
+    const requestId = assertExists(globals.state.permalink.requestId);
+    this.lastRequestId = requestId;
+
+    // if the |link| is not set, this is a request to create a permalink.
+    if (globals.state.permalink.hash === undefined) {
+      PermalinkController.createPermalink().then(hash => {
+        globals.dispatch(setPermalink(requestId, hash));
+      });
+      return;
     }
 
-    if (globals.state.permalink.requestId === this.lastRequestId) return;
-    const requestId = assertExists(globals.state.permalink.requestId);
-    assertTrue(globals.state.permalink.link === undefined);
-    this.lastRequestId = requestId;
-    PermalinkController.createPermalink().then(url => {
-      globals.dispatch(setPermalink(requestId, url));
+    // Otherwise, this is a request to load the permalink.
+    PermalinkController.loadState(globals.state.permalink.hash).then(state => {
+      globals.dispatch(setState(state));
+      this.lastRequestId = state.permalink.requestId;
     });
   }
 
@@ -57,17 +63,17 @@ export class PermalinkController extends Controller<'init'> {
         engine.source = url;
       }
     }
-    const url = await this.saveState(state);
-    return url;
+    const hash = await this.saveState(state);
+    return hash;
   }
 
 
   private static async saveState(state: State): Promise<string> {
     const text = JSON.stringify(state);
-    const name = await this.toSha256(text);
+    const hash = await this.toSha256(text);
     const url = 'https://www.googleapis.com/upload/storage/v1/b/' +
         `${BUCKET_NAME}/o?uploadType=media` +
-        `&name=${name}&predefinedAcl=publicRead`;
+        `&name=${hash}&predefinedAcl=publicRead`;
     const response = await fetch(url, {
       method: 'post',
       headers: {
@@ -77,7 +83,7 @@ export class PermalinkController extends Controller<'init'> {
     });
     await response.json();
 
-    return `${self.location.origin}#!/?s=${name}`;
+    return hash;
   }
 
   private static async saveTrace(trace: File): Promise<string> {

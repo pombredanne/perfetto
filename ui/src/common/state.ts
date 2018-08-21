@@ -54,7 +54,7 @@ export interface QueryConfig {
 
 export interface PermalinkConfig {
   requestId?: string;  // Set by the frontend to request a new permalink.
-  link?: string;       // Set by the controller when the link has been created.
+  hash?: string;       // Set by the controller when the link has been created.
 }
 
 export interface TraceTime {

@@ -17,7 +17,7 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
-import {navigate} from '../common/actions';
+import {loadPermalink, navigate} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {
@@ -48,6 +48,10 @@ class FrontendApi {
 
     this.redraw();
   }
+
+  // TODO: we can't have a publish method for each batch of data that we don't
+  // want to keep in the global state. Figure out a more generic and type-safe
+  // mechanism to achieve this.
 
   publishOverviewData(data: {[key: string]: QuantizedLoad}) {
     for (const key of Object.keys(data)) {
@@ -118,6 +122,12 @@ function main() {
   // Put these variables in the global scope for better debugging.
   (window as {} as {m: {}}).m = m;
   (window as {} as {globals: {}}).globals = globals;
+
+  // /?s=xxxx for permalinks.
+  const stateHash = m.route.param('s');
+  if (stateHash) {
+    globals.dispatch(loadPermalink(stateHash));
+  }
 
   // Prevent pinch zoom.
   document.body.addEventListener('wheel', (e: MouseEvent) => {

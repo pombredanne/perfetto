@@ -20,10 +20,11 @@ import {Topbar} from './topbar';
 
 function renderPermalink(): m.Children {
   if (!globals.state.permalink.requestId) return null;
-  const url = globals.state.permalink.link;
+  const hash = globals.state.permalink.hash;
+  const url = `${self.location.origin}#!/?s=${hash}`;
   return m(
       '.alert-permalink',
-      url ? ['Permalink: ', m(`a[href=${url}]`, url)] : 'Uploading...');
+      hash ? ['Permalink: ', m(`a[href=${url}]`, url)] : 'Uploading...');
 }
 
 const Alerts: m.Component = {

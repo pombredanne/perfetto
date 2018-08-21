@@ -58,21 +58,22 @@ class Globals {
     // Run controllers locally until all state machines reach quiescence.
     let runAgain = false;
     const summary = this._queuedActions.map(action => action.type).join(', ');
-    console.groupCollapsed(`Running controllers loop (${summary})`);
+    console.group(`Running controllers loop (${summary})`);
     console.time('full controllers loop');
     for (let iter = 0; runAgain || this._queuedActions.length > 0; iter++) {
       if (iter > 100) throw new Error('Controllers are stuck in a livelock');
       const actions = this._queuedActions;
       this._queuedActions = new Array<Action>();
       for (const action of actions) {
-        console.log('Applying action', action);
+        console.debug('Applying action', action);
         this._state = rootReducer(this.state, action);
       }
       this._runningControllers = true;
-      console.time('controllers tree');
-      runAgain = assertExists(this._rootController).invoke();
-      console.timeEnd('controllers tree');
-      this._runningControllers = false;
+      try {
+        runAgain = assertExists(this._rootController).invoke();
+      } finally {
+        this._runningControllers = false;
+      }
     }
     assertExists(this._frontend).send<void>('updateState', [this.state]);
     console.timeEnd('full controllers loop');
@@ -87,9 +88,7 @@ class Globals {
 
   // TODO: this needs to be cleaned up.
   publish(what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult', data: {}) {
-    assertExists(this._frontend)
-        .send<void>(`publish${what}`, [data])
-        .then(() => {});
+    assertExists(this._frontend).send<void>(`publish${what}`, [data]);
   }
 
   get state(): State {

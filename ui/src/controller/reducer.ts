@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as uuidv4 from 'uuid/v4';
-
 import {createEmptyState, State} from '../common/state';
 
 // TODO(hjd): Type check this better.
@@ -28,9 +26,8 @@ export function rootReducer(state: State, action: any): State {
 
     case 'OPEN_TRACE_FROM_FILE': {
       const nextState = createEmptyState();
-      const id = uuidv4();
-      nextState.engines[id] = {
-        id,
+      nextState.engines[action.id] = {
+        id: action.id,
         ready: false,
         source: action.file,
       };
@@ -41,9 +38,8 @@ export function rootReducer(state: State, action: any): State {
 
     case 'OPEN_TRACE_FROM_URL': {
       const nextState = createEmptyState();
-      const id = uuidv4();
-      nextState.engines[id] = {
-        id,
+      nextState.engines[action.id] = {
+        id: action.id,
         ready: false,
         source: action.url,
       };
@@ -155,10 +151,7 @@ export function rootReducer(state: State, action: any): State {
 
     case 'CREATE_PERMALINK': {
       const nextState = {...state};
-      nextState.permalink = {
-        requestId: new Date().toISOString(),
-        link: undefined
-      };
+      nextState.permalink = {requestId: action.requestId, hash: undefined};
       return nextState;
     }
 
@@ -167,7 +160,13 @@ export function rootReducer(state: State, action: any): State {
       if (state.permalink.requestId !== action.requestId) return state;
 
       const nextState = {...state};
-      nextState.permalink = {requestId: action.requestId, link: action.link};
+      nextState.permalink = {requestId: action.requestId, hash: action.hash};
+      return nextState;
+    }
+
+    case 'LOAD_PERMALINK': {
+      const nextState = {...state};
+      nextState.permalink = {requestId: action.requestId, hash: action.hash};
       return nextState;
     }
 

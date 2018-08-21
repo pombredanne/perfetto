@@ -62,26 +62,12 @@ export abstract class Engine {
   }
 
   async getTraceTimeBounds(): Promise<TimeSpan> {
-    const numSlices =
-        (await this.rawQueryOneRow('select count(ts) from slices limit 1'))[0];
-    const numSched =
-        (await this.rawQueryOneRow('select count(ts) from sched limit 1'))[0];
-    let start = Infinity;
-    let end = -Infinity;
-    if (numSlices > 0) {
-      start = (await this.rawQueryOneRow(
-          'select ts from slices order by ts limit 1'))[0];
-      end = (await this.rawQueryOneRow(
-          'select ts from slices order by ts desc limit 1'))[0];
-    }
-    if (numSched > 0) {
-      const start2 = (await this.rawQueryOneRow(
-          'select ts from sched order by ts limit 1'))[0];
-      const end2 = (await this.rawQueryOneRow(
-          'select ts from sched order by ts desc limit 1'))[0];
-      start = Math.min(start, start2);
-      end = Math.max(end, end2);
-    }
+    const maxQuery = 'select max(ts) from (select max(ts) as ts from sched ' +
+        'union all select max(ts) as ts from slices)';
+    const minQuery = 'select min(ts) from (select min(ts) as ts from sched ' +
+        'union all select min(ts) as ts from slices)';
+    const start = (await this.rawQueryOneRow(minQuery))[0];
+    const end = (await this.rawQueryOneRow(maxQuery))[0];
     return new TimeSpan(start / 1e9, end / 1e9);
   }
 }
