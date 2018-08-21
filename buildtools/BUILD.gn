@@ -722,7 +722,7 @@ source_set("libunwindstack") {
     "//gn/standalone:extra_warnings",
     "//gn/standalone:c++11",
   ]
-  configs += [ "//gn/standalone:c++14" ]
+  configs += [ "//gn/standalone:c++17" ]
   public_configs = [ ":libunwindstack_config" ]
 }
 

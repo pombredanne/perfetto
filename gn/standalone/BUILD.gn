@@ -49,8 +49,8 @@ config("c++11") {
 }
 
 # This is needed to compile libunwindstack.
-config("c++14") {
-  cflags_cc = [ "-std=c++14" ]
+config("c++17") {
+  cflags_cc = [ "-std=c++17" ]
 }
 
 config("visibility_hidden") {
