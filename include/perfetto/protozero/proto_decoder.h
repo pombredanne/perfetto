@@ -92,6 +92,7 @@ class ProtoDecoder {
   // Resets the current position to the start of the buffer.
   inline void Reset() { current_position_ = buffer_; }
 
+  // Resets to the given position (must be within the buffer).
   inline void Reset(const uint8_t* pos) {
     PERFETTO_DCHECK(pos >= buffer_ && pos < buffer_ + length_);
     current_position_ = pos;
