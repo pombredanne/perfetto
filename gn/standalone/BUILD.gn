@@ -126,11 +126,9 @@ config("default") {
       "--sysroot=$android_compile_sysroot",
       "-isystem$android_compile_sysroot/$android_compile_sysroot_subdir",
       "-isystem$android_compile_sysroot",
+      "-DANDROID",
+      "-D__ANDROID_API__=${android_api_level}",
       "--target=$android_abi_target",
-    ]
-    defines = [
-      "ANDROID",
-      "__ANDROID_API__=26",
     ]
     cflags_cc += [
       "-I$android_ndk_root/sources/cxx-stl/llvm-libc++/include",
