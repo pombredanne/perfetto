@@ -12,19 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Panel} from './panel';
-
-export class FlameGraphPanel extends Panel {
-  private renderedDom = false;
-  renderCanvas() {}
-  updateDom(dom: HTMLElement) {
-    if (this.renderedDom) return;
-    dom.innerHTML = `<header>Flame Graph</Header>
-        <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
-    this.renderedDom = true;
-  }
-
-  getHeight() {
-    return 500;
-  }
+function sum(arr: number[]): number {
+  return arr.reduce((acc, curr) => acc + curr, 0);
 }
+
+export const math = {
+  sum,
+};

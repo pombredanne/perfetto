@@ -223,12 +223,6 @@ button.close {
     }
 }
 
-.panel {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-}
-
 .track {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -270,10 +264,46 @@ button.close {
 }
 
 .scrolling-panel-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    will-change: transform;  // Force layer creation.
+  position: relative;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  will-change: transform;  // Force layer creation.
+}
+
+.top-panel-container {
+  position: relative;
+  width: 100%;
+  overflow: visible;  // Flex element. Height will be content height.
+}
+
+// If you introduce margins or paddings here, you need to also update the
+// PanelContainer canvas rendering code.
+.panel {
+  width: 100%;
+    // Static positioned elements are always rendered under non-static
+    // positioned elements. Since the panel canvas is absolutely positioned, the
+    // panels need to have non-static positioning too. Also, Making the panel
+    // div positioned means the contents of the panel can be positioned relative
+    // to the panel.
+  position: relative;
+
+  // Make any direct children automatically take up full height.
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+}
+
+.panel-flex-container {
+  display: flex;
+  flex-flow: column nowrap;
+  height: 100%;
+  position: relative;
+}
+
+.pan-and-zoom-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
