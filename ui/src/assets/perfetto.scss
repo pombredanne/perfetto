@@ -275,18 +275,15 @@ button.close {
 .top-panel-container {
   position: relative;
   width: 100%;
-  overflow: visible;  // Flex element. Height will be content height.
+  // Override top level overflow: hidden so height of this flex item can be
+  // its content height.
+  overflow: visible;
 }
 
 // If you introduce margins or paddings here, you need to also update the
 // PanelContainer canvas rendering code.
 .panel {
   width: 100%;
-    // Static positioned elements are always rendered under non-static
-    // positioned elements. Since the panel canvas is absolutely positioned, the
-    // panels need to have non-static positioning too. Also, Making the panel
-    // div positioned means the contents of the panel can be positioned relative
-    // to the panel.
   position: relative;
 
   // Make any direct children automatically take up full height.

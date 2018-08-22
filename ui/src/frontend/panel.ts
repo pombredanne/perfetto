@@ -16,7 +16,7 @@ let nextPanelId = 0;
 
 export abstract class Panel {
   // Each panel has a unique string id. This is suitable for use as a mithril
-  // key component.
+  // component key.
   readonly id: string;
 
   constructor() {
