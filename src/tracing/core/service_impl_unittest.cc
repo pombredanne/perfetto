@@ -576,7 +576,9 @@ TEST_F(TracingServiceImplTest, OnTracingDisabledWaitsForDataSourceStopAcks) {
 
 // Creates a tracing session where a second data source
 // is added while the service is waiting for DisableTracing
-// acks.
+// acks; the service should not enable the new datasource
+// and should not hit any asserts when the consumer is
+// subsequently destroyed.
 TEST_F(TracingServiceImplTest, OnDataSourceAddedWhilePendingDisableAcks) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
