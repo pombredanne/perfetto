@@ -148,7 +148,7 @@ export const ScrollingPanelContainer = {
     this.ctx = null;
     this.keyToPanelAttrs = new Map<string, PanelAttrs>();
     this.canvasRedrawer = () => redrawAllPanelCavases(state);
-    globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
+    globals.rafScheduler.addCanvasRedrawCallback(this.canvasRedrawer);
   },
 
   oncreate(vnode) {
@@ -165,14 +165,14 @@ export const ScrollingPanelContainer = {
     // asyncronously at the end of the current redraw.
     setTimeout(() => {
       updateDimensionsFromDom(vnode);
-      m.redraw();
+      globals.rafScheduler.scheduleFullRedraw();
     });
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
     this.onResize = () => {
       updateDimensionsFromDom(vnode);
-      m.redraw();
+      globals.rafScheduler.scheduleFullRedraw();
     };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
@@ -180,13 +180,13 @@ export const ScrollingPanelContainer = {
 
     vnode.dom.addEventListener('scroll', () => {
       vnode.state.scrollTop = vnode.dom.scrollTop;
-      m.redraw();
+      globals.rafScheduler.scheduleFullRedraw();
     }, {passive: true});
   },
 
   onremove() {
     window.removeEventListener('resize', this.onResize);
-    globals.rafScheduler.removeRedrawCallback(this.canvasRedrawer);
+    globals.rafScheduler.removeCanvasRedrawCallback(this.canvasRedrawer);
   },
 
   view() {

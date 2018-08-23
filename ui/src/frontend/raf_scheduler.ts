@@ -25,8 +25,11 @@ export type RedrawCallback = (nowMs: number) => void;
 // all action callbacks.
 export class RafScheduler {
   private actionCallbacks = new Set<ActionCallback>();
-  private redrawCallbacks = new Set<RedrawCallback>();
+  private canvasRedrawCallbacks = new Set<RedrawCallback>();
+  private domRedrawCallback: RedrawCallback|undefined;
   private hasScheduledNextFrame = false;
+  private requestedCanvasRedraw = false;
+  private requestedFullRedraw = false;
   private isRedrawing = false;
 
   start(cb: ActionCallback) {
@@ -38,36 +41,61 @@ export class RafScheduler {
     this.actionCallbacks.delete(cb);
   }
 
-  addRedrawCallback(cb: RedrawCallback) {
-    this.redrawCallbacks.add(cb);
+  addCanvasRedrawCallback(cb: RedrawCallback) {
+    this.canvasRedrawCallbacks.add(cb);
   }
 
-  removeRedrawCallback(cb: RedrawCallback) {
-    this.redrawCallbacks.delete(cb);
+  removeCanvasRedrawCallback(cb: RedrawCallback) {
+    this.canvasRedrawCallbacks.delete(cb);
   }
 
-  scheduleOneRedraw() {
-    this.maybeScheduleAnimationFrame(true);
+  scheduleCanvasRedraw() {
+    this.requestedCanvasRedraw = true;
+    this.maybeScheduleAnimationFrame();
   }
 
-  syncRedraw() {
+  setDomRedrawCallback(cb: RedrawCallback) {
+    this.domRedrawCallback = cb;
+  }
+
+  unsetDomRedrawCallback() {
+    this.domRedrawCallback = undefined;
+  }
+
+  scheduleFullRedraw() {
+    this.requestedFullRedraw = true;
+    this.maybeScheduleAnimationFrame();
+  }
+
+  canvasRedraw(nowMs: number) {
     if (this.isRedrawing) return;
     this.isRedrawing = true;
-    for (const redraw of this.redrawCallbacks) redraw(performance.now());
+    for (const redraw of this.canvasRedrawCallbacks) redraw(nowMs);
     this.isRedrawing = false;
   }
 
-  private maybeScheduleAnimationFrame(force = false) {
+  private maybeScheduleAnimationFrame() {
     if (this.hasScheduledNextFrame) return;
-    if (this.actionCallbacks.size === 0 && !force) return;
-    this.hasScheduledNextFrame = true;
-    window.requestAnimationFrame(this.onAnimationFrame.bind(this));
+    if (this.actionCallbacks.size !== 0 || this.requestedCanvasRedraw ||
+        this.requestedFullRedraw) {
+      this.hasScheduledNextFrame = true;
+      window.requestAnimationFrame(this.onAnimationFrame.bind(this));
+    }
   }
 
   private onAnimationFrame(nowMs: number) {
     this.hasScheduledNextFrame = false;
+    this.requestedCanvasRedraw = false;
+
+    const doFullRedraw = this.requestedFullRedraw;
+    this.requestedFullRedraw = false;
+
     for (const action of this.actionCallbacks) action(nowMs);
-    this.syncRedraw();
+    if (doFullRedraw && this.domRedrawCallback) {
+      this.domRedrawCallback(nowMs);
+    }
+    this.canvasRedraw(nowMs);
+
     this.maybeScheduleAnimationFrame();
   }
 }
