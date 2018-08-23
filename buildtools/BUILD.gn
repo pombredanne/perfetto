@@ -669,6 +669,8 @@ source_set("lzma") {
 }
 source_set("libunwindstack") {
   include_dirs = [
+    # This is to override an include that is done in Memory.cpp of
+    # libunwindstack and declare process_vm_readv for old API levels.
     "libunwindstack_overrides",
     "android-core/libunwindstack/include",
     "android-core/libunwindstack",
