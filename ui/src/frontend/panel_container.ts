@@ -15,7 +15,6 @@
 import * as m from 'mithril';
 
 import {assertExists} from '../base/logging';
-import {math} from '../base/math';
 
 import {globals} from './globals';
 import {Panel} from './panel';
@@ -167,9 +166,8 @@ export const PanelContainer = {
     }
     this.ctx = ctx;
 
-    // updateDimensionsFromDom calls m.redraw, but calling m.redraw during a
-    // lifecycle method results in undefined behavior. Use setTimeout to do it
-    // asyncronously at the end of the current redraw.
+    // Calling m.redraw during a lifecycle method results in undefined behavior.
+    // Use setTimeout to do it asyncronously at the end of the current redraw.
     setTimeout(() => {
       updateDimensionsFromDom(vnodeDom);
       m.redraw();
@@ -206,11 +204,12 @@ export const PanelContainer = {
 
   view({attrs}) {
     const panelComponents: m.Children[] = [];
+    let totalHeight = 0;
     for (const panel of attrs.panels) {
       panelComponents.push(m(PanelComponent, {panel, key: panel.id}));
+      totalHeight += panel.getHeight();
     }
 
-    const totalHeight = math.sum(attrs.panels.map(p => p.getHeight()));
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
 
     // In the scrolling case, since the canvas is overdrawn and continuously
