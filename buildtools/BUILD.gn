@@ -669,6 +669,7 @@ source_set("lzma") {
 }
 source_set("libunwindstack") {
   include_dirs = [
+    "libunwindstack_overrides",
     "android-core/libunwindstack/include",
     "android-core/libunwindstack",
     "android-core/base/include",
