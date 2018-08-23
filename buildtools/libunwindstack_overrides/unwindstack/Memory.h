@@ -8,7 +8,7 @@
 #include "../../android-core/libunwindstack/include/unwindstack/Memory.h"
 
 #if __ANDROID_API__ < 26
-// Android API level 21, which Perfetto builds as currently, does not
+// Android API levels less than 26, which Perfetto builds as currently, do not
 // expose this function. libunwindstack depends on it, but we do not
 // use that functionality.
 extern ssize_t process_vm_readv(pid_t pid,
