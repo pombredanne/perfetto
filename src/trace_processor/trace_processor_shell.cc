@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#include <aio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <functional>
@@ -21,8 +25,6 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
-#include "perfetto/base/unix_task_runner.h"
-#include "src/trace_processor/file_reader.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
@@ -116,31 +118,52 @@ int main(int argc, char** argv) {
     trace_file_path = argv[i];
   }
 
-  base::UnixTaskRunner task_runner;
-  FileReader reader(trace_file_path, /*print_progress=*/true);
-  TraceProcessor tp(&task_runner);
+  TraceProcessor tp;
+  base::ScopedFile fd(open(trace_file_path, O_RDONLY));
+  struct stat stat_buf {};
+  PERFETTO_CHECK(fstat(*fd, &stat_buf) == 0);
+  size_t file_size = static_cast<size_t>(stat_buf.st_size);
+  auto t_load_start = base::GetWallTimeMs();
+  constexpr size_t kChunkSize = 4 * 1024 * 1024;
+  struct aiocb cb {};
+  cb.aio_fildes = *fd;
+  cb.aio_buf = new uint8_t[kChunkSize];
+  cb.aio_nbytes = kChunkSize;
+  struct aiocb* aio_list[1] = {&cb};
+  PERFETTO_CHECK(aio_read(&cb) == 0);
+  off_t off = 0;
+
+  for (;;) {
+    PERFETTO_CHECK(aio_suspend(aio_list, 1, nullptr) == 0);
+    auto rsize = aio_return(&cb);
+    std::unique_ptr<uint8_t[]> buf(
+        reinterpret_cast<uint8_t*>(const_cast<void*>(cb.aio_buf)));
+    cb.aio_buf = nullptr;
+    if (rsize <= 0)
+      break;
+    off += rsize;
+    cb.aio_offset = off;
+    cb.aio_buf = new uint8_t[kChunkSize];
+    PERFETTO_CHECK(aio_read(&cb) == 0);
+    tp.Parse(std::move(buf), static_cast<size_t>(rsize));
+    if (static_cast<size_t>(rsize) < kChunkSize)
+      break;
+  }
+  double s = (base::GetWallTimeMs() - t_load_start).count() / 1000.0;
+  double size_mb = file_size / 1E6;
+  PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
   g_tp = &tp;
-
-  task_runner.PostTask([&reader]() {
-    auto t_start = base::GetWallTimeMs();
-    auto on_trace_loaded = [t_start, &reader] {
 #if PERFETTO_HAS_SIGNAL_H()
-      signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
+  signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
-      double s = (base::GetWallTimeMs() - t_start).count() / 1000.0;
-      double size_mb = reader.file_size() / 1000000.0;
-      PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
-      PrintPrompt();
-    };
-    g_tp->LoadTrace(&reader, on_trace_loaded);
-  });
 
-  task_runner.AddFileDescriptorWatch(STDIN_FILENO, [&task_runner] {
+  PrintPrompt();
+  for (;;) {
     char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0) {
-      task_runner.Quit();
-      return;
-    }
+    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
+      return 0;
+    if (strcmp(line, "\n") == 0)
+      continue;
     protos::RawQueryArgs query;
     query.set_sql_query(line);
     base::TimeNanos t_start = base::GetWallTimeNs();
@@ -148,8 +171,5 @@ int main(int argc, char** argv) {
       OnQueryResult(t_start, res);
     });
     PrintPrompt();
-  });
-
-  task_runner.Run();
-  return 0;
+  }
 }

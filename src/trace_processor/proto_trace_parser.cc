@@ -18,11 +18,10 @@
 
 #include <string>
 
-#include "perfetto/base/logging.h"
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_decoder.h"
-#include "src/trace_processor/blob_reader.h"
+#include "perfetto/protozero/proto_utils.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -37,6 +36,7 @@ using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
 using protozero::proto_utils::ParseVarInt;
 using protozero::proto_utils::MakeTagVarInt;
+using protozero::proto_utils::MakeTagLengthDelimited;
 
 namespace {
 
@@ -56,21 +56,70 @@ inline bool FindIntField(ProtoDecoder* decoder, uint64_t* field_value) {
 
 }  // namespace
 
-ProtoTraceParser::ProtoTraceParser(BlobReader* reader,
-                                   TraceProcessorContext* context)
-    : reader_(reader), context_(context) {}
+ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
+    : context_(context) {}
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
-bool ProtoTraceParser::ParseNextChunk() {
-  if (!buffer_)
-    buffer_.reset(new uint8_t[chunk_size_]);
+bool ProtoTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
+  // PERFETTO_ILOG("------------------");
+  // PERFETTO_ILOG("Push %zu", size);
+  size_t off = 0;
+  // PERFETTO_LOG("  Has partial %d %zu", !!partial_buf_, partial_buf_.size);
+  if (partial_buf_) {
+    // It takes ~5 bytes for a proto preamble + the varint size.
+    const size_t kHeaderBytes = 5;
+    if (partial_buf_.size < kHeaderBytes) {
+      off = std::min(kHeaderBytes - partial_buf_.size, size);
+      partial_buf_.Append(data.get(), off);
+      if (partial_buf_.size < kHeaderBytes)
+        return true;
+    }
+    constexpr uint8_t kTracePacketTag =
+        MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber);
+    const uint8_t* buf = partial_buf_.buf.get();
+    uint8_t tag = *buf;
+    uint64_t field_size = 0;
+    const uint8_t* next =
+        ParseVarInt(buf + 1, buf + partial_buf_.size, &field_size);
+    bool parse_failed = next == buf + 1;
+    if (tag != kTracePacketTag || field_size == 0 || parse_failed) {
+      PERFETTO_ELOG("Failed parsing a TracePacket from the partial buffer");
+      return false;  // Unrecoverable error, stop parsing.
+    }
 
-  uint32_t read = reader_->Read(offset_, chunk_size_, buffer_.get());
-  if (read == 0)
-    return false;
+    // At this point we know how big the TracePacket is. There is a good chance
+    // that this new buffer has enough data to complete it. Move the remaining
+    // data into the |partial_buf_| and, if we have enough data, parse it.
+    size_t hdr_size = static_cast<size_t>(next - buf);
+    size_t size_incl_header = static_cast<size_t>(field_size + hdr_size);
+    PERFETTO_DCHECK(size_incl_header > partial_buf_.size);
+    size_t size_missing = size_incl_header - partial_buf_.size;
+    size_t size_copy = std::min(size_missing, size - off);
+    partial_buf_.Append(data.get() + off, size_copy);
+    off += size_copy;
 
-  ProtoDecoder decoder(buffer_.get(), read);
+    // Unlucky case: we consumed all |data| but it wasn't enough for a
+    // full packet.
+    // PERFETTO_LOG("Partial buf %zu, ful %zu",partial_buf_.size ,
+    // size_incl_header);
+    if (partial_buf_.size < size_incl_header)
+      return true;
+    PERFETTO_DCHECK(partial_buf_.size == size_incl_header);
+    ParseInternal(partial_buf_.take(), 0, size_incl_header);
+  }
+  // PERFETTO_LOG("  outer call");
+  ParseInternal(std::move(data), off, size - off);
+  return true;
+}
+
+void ProtoTraceParser::ParseInternal(std::unique_ptr<uint8_t[]> data,
+                                     size_t off,
+                                     size_t size) {
+  // PERFETTO_LOG("ParseInternal off:%zu s:%zu, %x %x %x %x", off, size,
+  // data.get()[0], data.get()[1], data.get()[2], data.get()[3]);
+
+  ProtoDecoder decoder(data.get() + off, size);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     if (fld.id != protos::Trace::kPacketFieldNumber) {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
@@ -79,12 +128,12 @@ bool ProtoTraceParser::ParseNextChunk() {
     ParsePacket(fld.data(), fld.size());
   }
 
-  if (decoder.offset() == 0) {
-    PERFETTO_ELOG("The trace file seems truncated, interrupting parsing");
-    return false;
+  const size_t leftover = static_cast<size_t>(size - decoder.offset());
+  if (leftover > 0) {
+    PERFETTO_DCHECK(!partial_buf_);
+    partial_buf_.reset(1024 * 1024);  // TODO here.
+    partial_buf_.Append(data.get() + off + decoder.offset(), leftover);
   }
-  offset_ += decoder.offset();
-  return true;
 }
 
 void ProtoTraceParser::ParsePacket(const uint8_t* data, size_t length) {
@@ -196,13 +245,13 @@ void ProtoTraceParser::ParseFtraceEventBundle(const uint8_t* data,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-PERFETTO_ALWAYS_INLINE void ProtoTraceParser::ParseFtraceEvent(
-    uint32_t cpu,
-    const uint8_t* data,
-    size_t length) {
-  ProtoDecoder decoder(data, length);
+// PERFETTO_ALWAYS_INLINE
+void ProtoTraceParser::ParseFtraceEvent(uint32_t cpu,
+                                        const uint8_t* data,
+                                        size_t length) {
   constexpr auto kTimestampFieldNumber =
       protos::FtraceEvent::kTimestampFieldNumber;
+  ProtoDecoder decoder(data, length);
   uint64_t timestamp;
   bool timestamp_found = false;
 
@@ -237,11 +286,11 @@ PERFETTO_ALWAYS_INLINE void ProtoTraceParser::ParseFtraceEvent(
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-PERFETTO_ALWAYS_INLINE void ProtoTraceParser::ParseSchedSwitch(
-    uint32_t cpu,
-    uint64_t timestamp,
-    const uint8_t* data,
-    size_t length) {
+// PERFETTO_ALWAYS_INLINE
+void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
+                                        uint64_t timestamp,
+                                        const uint8_t* data,
+                                        size_t length) {
   ProtoDecoder decoder(data, length);
   uint32_t prev_pid = 0;
   uint32_t prev_state = 0;

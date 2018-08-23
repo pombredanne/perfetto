@@ -27,13 +27,19 @@ import {TimeSpan} from '../common/time';
  * (e.g. rawQuery).
  */
 export abstract class Engine {
-  abstract get traceProcessor(): TraceProcessor;
+  abstract get rpc(): TraceProcessor;
+
+  /**
+   * Push trace data into the engine. The engine is supposed to automatically
+   * figure out the type of the trace (JSON vs Protobuf).
+   */
+  abstract parse(data: Uint8Array): void;
 
   /**
    * Send a raw SQL query to the engine.
    */
   rawQuery(args: IRawQueryArgs): Promise<RawQueryResult> {
-    return this.traceProcessor.rawQuery(args);
+    return this.rpc.rawQuery(args);
   }
 
   async rawQueryOneRow(sqlQuery: string): Promise<number[]> {

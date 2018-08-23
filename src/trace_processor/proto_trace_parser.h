@@ -20,12 +20,12 @@
 #include <stdint.h>
 #include <memory>
 
+#include "perfetto/base/logging.h"
 #include "src/trace_processor/trace_parser.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class BlobReader;
 class TraceProcessorContext;
 
 // Reads a protobuf trace in chunks and parses it into a form which is
@@ -34,19 +34,45 @@ class ProtoTraceParser : public TraceParser {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
-  ProtoTraceParser(BlobReader*, TraceProcessorContext*);
+  explicit ProtoTraceParser(TraceProcessorContext*);
   ~ProtoTraceParser() override;
 
   // TraceParser implementation.
-
-  // Parses the next chunk of TracePackets from the BlobReader. Returns true
-  // if there are more chunks which can be read and false otherwise.
-  bool ParseNextChunk() override;
-
-  void set_chunk_size_for_testing(uint32_t n) { chunk_size_ = n; }
+  bool Parse(std::unique_ptr<uint8_t[]>, size_t size) override;
 
  private:
-  static constexpr uint32_t kTraceChunkSize = 16 * 1024 * 1024;  // 16 MB
+  // Quite similar to a std::vector<uint8_t> but:
+  // - allows to move the std::unique_ptr<uint8_t[]> at the end.
+  // - doesn't support re-expansion.
+  struct IncrementalBuffer {
+    IncrementalBuffer() = default;
+
+    void reset(size_t cap) {
+      size = 0;
+      capacity = cap;
+      buf.reset(new uint8_t[capacity]);
+    }
+
+    explicit operator bool() const { return !!buf; }
+
+    void Append(const uint8_t* data, size_t len) {
+      PERFETTO_CHECK(size + len <= capacity);
+      memcpy(buf.get() + size, data, len);
+      size += len;
+    }
+
+    std::unique_ptr<uint8_t[]> take() {
+      capacity = 0;
+      size = 0;
+      return std::move(buf);
+    }
+
+    std::unique_ptr<uint8_t[]> buf;
+    size_t capacity = 0;
+    size_t size = 0;
+  };
+
+  void ParseInternal(std::unique_ptr<uint8_t[]>, size_t off, size_t size);
 
   void ParsePacket(const uint8_t* data, size_t length);
   void ParseFtraceEventBundle(const uint8_t* data, size_t length);
@@ -59,11 +85,10 @@ class ProtoTraceParser : public TraceParser {
   void ParseProcess(const uint8_t* data, size_t length);
   void ParseThread(const uint8_t* data, size_t length);
 
-  BlobReader* const reader_;
   TraceProcessorContext* context_;
-  uint32_t chunk_size_ = kTraceChunkSize;
-  uint64_t offset_ = 0;
   std::unique_ptr<uint8_t[]> buffer_;
+
+  IncrementalBuffer partial_buf_;
 };
 
 }  // namespace trace_processor

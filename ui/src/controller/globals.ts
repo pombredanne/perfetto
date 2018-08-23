@@ -80,10 +80,10 @@ class Globals {
     console.groupEnd();
   }
 
-  async createEngine(blob: Blob): Promise<Engine> {
+  async createEngine(): Promise<Engine> {
     const port = await assertExists(this._frontend)
                      .send<MessagePort>('createWasmEnginePort', []);
-    return WasmEngineProxy.create(port, blob);
+    return WasmEngineProxy.create(port);
   }
 
   // TODO: this needs to be cleaned up.

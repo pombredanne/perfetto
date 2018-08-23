@@ -25,7 +25,6 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
-#include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
@@ -38,7 +37,6 @@ namespace perfetto {
 namespace trace_processor {
 
 namespace {
-const uint32_t kChunkSize = 1024 * 512;
 
 // Parses at most one JSON dictionary and returns a pointer to the end of it,
 // or nullptr if no dict could be detected.
@@ -82,22 +80,16 @@ const char* ReadOneJsonDict(const char* start,
 // static
 constexpr char JsonTraceParser::kPreamble[];
 
-JsonTraceParser::JsonTraceParser(BlobReader* reader,
-                                 TraceProcessorContext* context)
-    : reader_(reader), context_(context) {}
+JsonTraceParser::JsonTraceParser(TraceProcessorContext* context)
+    : context_(context) {}
 
 JsonTraceParser::~JsonTraceParser() = default;
 
-bool JsonTraceParser::ParseNextChunk() {
-  if (!buffer_)
-    buffer_.reset(new char[kChunkSize]);
-  char* buf = buffer_.get();
+bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
+  buffer_.insert(buffer_.end(), data.get(), data.get() + size);
+  char* buf = &buffer_[0];
   const char* next = buf;
-
-  uint32_t rsize =
-      reader_->Read(offset_, kChunkSize, reinterpret_cast<uint8_t*>(buf));
-  if (rsize == 0)
-    return false;
+  const char* end = &buffer_[buffer_.size()];
 
   if (offset_ == 0) {
     if (strncmp(buf, kPreamble, strlen(kPreamble))) {
@@ -112,9 +104,9 @@ bool JsonTraceParser::ParseNextChunk() {
   TraceStorage* storage = context_->storage.get();
   TraceStorage::NestableSlices* slices = storage->mutable_nestable_slices();
 
-  while (next < &buf[rsize]) {
+  while (next < end) {
     Json::Value value;
-    const char* res = ReadOneJsonDict(next, buf + rsize, &value);
+    const char* res = ReadOneJsonDict(next, end, &value);
     if (!res)
       break;
     next = res;
@@ -184,7 +176,8 @@ bool JsonTraceParser::ParseNextChunk() {
     // TODO(primiano): auto-close B slices left open at the end.
   }
   offset_ += static_cast<uint64_t>(next - buf);
-  return next > buf;
+  buffer_.erase(buffer_.begin(), buffer_.begin() + (next - buf));
+  return true;
 }
 
 void JsonTraceParser::MaybeCloseStack(uint64_t ts, SlicesStack& stack) {
