@@ -42,6 +42,12 @@ class TraceProcessor {
   TraceProcessor();
   ~TraceProcessor();
 
+  // The entry point to push trace data into the processor. The trace format
+  // will be automatically discovered on the first push call. It is possible
+  // to make queries between two pushes.
+  // Returns true if parsing has been succeeding so far, false if some
+  // unrecoverable error happened. If this happens, the TraceProcessor will
+  // ignore the following Parse() requests and drop data on the floor.
   bool Parse(std::unique_ptr<uint8_t[]>, size_t);
 
   // Executes a SQLite query on the loaded portion of the trace. |result| will

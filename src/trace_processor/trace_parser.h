@@ -27,9 +27,9 @@ class TraceParser {
  public:
   virtual ~TraceParser();
 
-  // Pushes more data into th trace parser. The pushed data doesn't need to
-  // match any line/protos boundaries. The parser class has to deal with
-  // lines/protos that span across several chunks.
+  // Pushes more data into the trace parser. There is no requirement for the
+  // caller to match line/protos boundaries. The parser class has to deal with
+  // intermediate buffering lines/protos that span across different chunks.
   // The buffer size is guaranteed to be > 0.
   // Returns true if the data has been succesfully parsed, false if some
   // unrecoverable parsing error happened and no more chunks should be pushed.

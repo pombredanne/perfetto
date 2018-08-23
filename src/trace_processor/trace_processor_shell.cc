@@ -16,7 +16,6 @@
 
 #include <aio.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -118,47 +117,64 @@ int main(int argc, char** argv) {
     trace_file_path = argv[i];
   }
 
+  // Load the trace file into the trace processor.
   TraceProcessor tp;
-  base::ScopedFile fd(open(trace_file_path, O_RDONLY));
+  base::ScopedFile fd;
+  if (strcmp(trace_file_path, "-") == 0) {
+    fd.reset(STDIN_FILENO);
+  } else {
+    fd.reset(open(trace_file_path, O_RDONLY));
+  }
+  PERFETTO_CHECK(fd);
+
   struct stat stat_buf {};
   PERFETTO_CHECK(fstat(*fd, &stat_buf) == 0);
   size_t file_size = static_cast<size_t>(stat_buf.st_size);
-  auto t_load_start = base::GetWallTimeMs();
+
+  // Load the trace in chunks using async IO. We create a simple pipeline where,
+  // at each iteration, we parse the current chunk and asynchronously start
+  // reading the next chunk.
   constexpr size_t kChunkSize = 4 * 1024 * 1024;
   struct aiocb cb {};
-  cb.aio_fildes = *fd;
-  cb.aio_buf = new uint8_t[kChunkSize];
   cb.aio_nbytes = kChunkSize;
-  struct aiocb* aio_list[1] = {&cb};
-  PERFETTO_CHECK(aio_read(&cb) == 0);
-  off_t off = 0;
+  cb.aio_fildes = *fd;
 
+  // The control block has ownership of the buffer while the read is in-flight.
+  cb.aio_buf = new uint8_t[kChunkSize];
+
+  PERFETTO_CHECK(aio_read(&cb) == 0);
+  struct aiocb* aio_list[1] = {&cb};
+
+  auto t_load_start = base::GetWallTimeMs();
   for (;;) {
+    // Block waiting for the pending read to complete.
     PERFETTO_CHECK(aio_suspend(aio_list, 1, nullptr) == 0);
     auto rsize = aio_return(&cb);
-    std::unique_ptr<uint8_t[]> buf(
-        reinterpret_cast<uint8_t*>(const_cast<void*>(cb.aio_buf)));
-    cb.aio_buf = nullptr;
     if (rsize <= 0)
       break;
-    off += rsize;
-    cb.aio_offset = off;
+
+    // Take ownership of the completed buffer and enqueue a new async read
+    // with a fresh buffer.
+    std::unique_ptr<uint8_t[]> buf(
+        reinterpret_cast<uint8_t*>(const_cast<void*>(cb.aio_buf)));
     cb.aio_buf = new uint8_t[kChunkSize];
+    cb.aio_offset += rsize;
     PERFETTO_CHECK(aio_read(&cb) == 0);
+
+    // Parse the completed buffer while the async read is in-flight.
     tp.Parse(std::move(buf), static_cast<size_t>(rsize));
-    if (static_cast<size_t>(rsize) < kChunkSize)
-      break;
   }
-  double s = (base::GetWallTimeMs() - t_load_start).count() / 1000.0;
+  double t_load = (base::GetWallTimeMs() - t_load_start).count() / 1E3;
   double size_mb = file_size / 1E6;
-  PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / s);
+  PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / t_load);
   g_tp = &tp;
+
 #if PERFETTO_HAS_SIGNAL_H()
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  PrintPrompt();
   for (;;) {
+    PrintPrompt();
     char line[1024];
     if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
       return 0;
@@ -170,6 +186,5 @@ int main(int argc, char** argv) {
     g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
       OnQueryResult(t_start, res);
     });
-    PrintPrompt();
   }
 }

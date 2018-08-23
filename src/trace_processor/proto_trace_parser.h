@@ -18,7 +18,9 @@
 #define SRC_TRACE_PROCESSOR_PROTO_TRACE_PARSER_H_
 
 #include <stdint.h>
+
 #include <memory>
+#include <vector>
 
 #include "perfetto/base/logging.h"
 #include "src/trace_processor/trace_parser.h"
@@ -41,37 +43,6 @@ class ProtoTraceParser : public TraceParser {
   bool Parse(std::unique_ptr<uint8_t[]>, size_t size) override;
 
  private:
-  // Quite similar to a std::vector<uint8_t> but:
-  // - allows to move the std::unique_ptr<uint8_t[]> at the end.
-  // - doesn't support re-expansion.
-  struct IncrementalBuffer {
-    IncrementalBuffer() = default;
-
-    void reset(size_t cap) {
-      size = 0;
-      capacity = cap;
-      buf.reset(new uint8_t[capacity]);
-    }
-
-    explicit operator bool() const { return !!buf; }
-
-    void Append(const uint8_t* data, size_t len) {
-      PERFETTO_CHECK(size + len <= capacity);
-      memcpy(buf.get() + size, data, len);
-      size += len;
-    }
-
-    std::unique_ptr<uint8_t[]> take() {
-      capacity = 0;
-      size = 0;
-      return std::move(buf);
-    }
-
-    std::unique_ptr<uint8_t[]> buf;
-    size_t capacity = 0;
-    size_t size = 0;
-  };
-
   void ParseInternal(std::unique_ptr<uint8_t[]>, size_t off, size_t size);
 
   void ParsePacket(const uint8_t* data, size_t length);
@@ -86,9 +57,10 @@ class ProtoTraceParser : public TraceParser {
   void ParseThread(const uint8_t* data, size_t length);
 
   TraceProcessorContext* context_;
-  std::unique_ptr<uint8_t[]> buffer_;
 
-  IncrementalBuffer partial_buf_;
+  // Used to glue together trace packets that span across two (or more)
+  // Parse() boundaries.
+  std::vector<uint8_t> partial_buf_;
 };
 
 }  // namespace trace_processor

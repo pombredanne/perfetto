@@ -72,7 +72,6 @@ test('wasm bridge early calls are delayed', async () => {
   const readyPromise = bridge.initialize();
 
   m.onRuntimeInitialized();
-  bridge.onReply(0, true, 0, 0);
 
   await readyPromise;
   bridge.onReply(100, true, 0, 1);
@@ -90,7 +89,6 @@ test('wasm bridge aborts all calls on failure', async () => {
   const readyPromise = bridge.initialize();
 
   m.onRuntimeInitialized();
-  bridge.onReply(0, true, 0, 0);
 
   bridge.callWasm({
     id: 100,

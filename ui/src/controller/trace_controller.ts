@@ -57,6 +57,10 @@ export class TraceController extends Controller<States> {
     this.engineId = engineId;
   }
 
+  onDestroy() {
+    if (this.engine !== undefined) globals.destroyEngine(this.engine.id);
+  }
+
   run() {
     const engineCfg = assertExists(globals.state.engines[this.engineId]);
     switch (this.state) {
@@ -111,6 +115,7 @@ export class TraceController extends Controller<States> {
     const engineCfg = assertExists(globals.state.engines[this.engineId]);
     this.engine = await globals.createEngine();
 
+    const statusHeader = 'Opening trace';
     if (engineCfg.source instanceof File) {
       const blob = engineCfg.source as Blob;
       const reader = new FileReaderSync();
@@ -120,11 +125,9 @@ export class TraceController extends Controller<States> {
         const arrBuf = reader.readAsArrayBuffer(slice);
         await this.engine.parse(new Uint8Array(arrBuf));
         const progress = Math.round((off + slice.size) / blob.size * 100);
-        globals.dispatch(updateStatus(`Opening trace ${progress} %`));
+        globals.dispatch(updateStatus(`${statusHeader} ${progress} %`));
       }
     } else {
-      const statusHeader = 'Fetching trace from network';
-      globals.dispatch(updateStatus(statusHeader));
       const resp = await fetch(engineCfg.source);
       if (resp.status !== 200) {
         globals.dispatch(updateStatus(`HTTP error ${resp.status}`));
@@ -132,6 +135,8 @@ export class TraceController extends Controller<States> {
       }
       // tslint:disable-next-line no-any
       const rd = (resp.body as any).getReader() as ReadableStreamReader;
+      const tStartMs = performance.now();
+      let tLastUpdateMs = 0;
       for (let off = 0;;) {
         const readRes = await rd.read() as {value: Uint8Array, done: boolean};
         if (readRes.value !== undefined) {
@@ -141,8 +146,15 @@ export class TraceController extends Controller<States> {
         // For traces loaded from the network there doesn't seem to be a
         // reliable way to compute the %. The content-length exposed by GCS is
         // before compression (which is handled transparently by the browser).
-        const status = `${statusHeader} ${Math.round(off / 1e6 * 10) / 10} MB `;
-        globals.dispatch(updateStatus(status));
+        const nowMs = performance.now();
+        if (nowMs - tLastUpdateMs > 100) {
+          tLastUpdateMs = nowMs;
+          const mb = off / 1e6;
+          const tElapsed = (nowMs - tStartMs) / 1e3;
+          let status = `${statusHeader} ${mb.toFixed(1)} MB `;
+          status += `(${(mb / tElapsed).toFixed(1)} MB/s)`;
+          globals.dispatch(updateStatus(status));
+        }
         if (readRes.done) break;
       }
     }

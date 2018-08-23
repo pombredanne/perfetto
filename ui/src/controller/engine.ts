@@ -27,13 +27,18 @@ import {TimeSpan} from '../common/time';
  * (e.g. rawQuery).
  */
 export abstract class Engine {
-  abstract get rpc(): TraceProcessor;
+  abstract readonly id: string;
 
   /**
    * Push trace data into the engine. The engine is supposed to automatically
    * figure out the type of the trace (JSON vs Protobuf).
    */
   abstract parse(data: Uint8Array): void;
+
+  /*
+   * The RCP interface to call service methods defined in trace_processor.proto.
+   */
+  abstract get rpc(): TraceProcessor;
 
   /**
    * Send a raw SQL query to the engine.
@@ -76,4 +81,9 @@ export abstract class Engine {
     const end = (await this.rawQueryOneRow(maxQuery))[0];
     return new TimeSpan(start / 1e9, end / 1e9);
   }
+}
+
+export interface EnginePortAndId {
+  id: string;
+  port: MessagePort;
 }

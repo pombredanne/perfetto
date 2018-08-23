@@ -18,14 +18,14 @@ import {defer} from '../base/deferred';
 import {TraceProcessor} from '../common/protos';
 import {WasmBridgeRequest, WasmBridgeResponse} from '../engine/wasm_bridge';
 
-import {Engine} from './engine';
+import {Engine, EnginePortAndId} from './engine';
 
 interface WorkerAndPort {
   worker: Worker;
   port: MessagePort;
 }
 
-let activeWorker: null|WorkerAndPort = null;
+const activeWorkers = new Map<string, WorkerAndPort>();
 let warmWorker: null|WorkerAndPort = null;
 
 function createWorker(): WorkerAndPort {
@@ -36,19 +36,27 @@ function createWorker(): WorkerAndPort {
   return {worker, port: channel.port2};
 }
 
-// Take warm engine and start creating a new WASM engine in the background
-// for the next person.
-export function takeWasmEngineWorkerPort(): MessagePort {
+// Take the warm engine and start creating a new WASM engine in the background
+// for the next call.
+export function createWasmEngine(id: string): MessagePort {
   if (warmWorker === null) {
     throw new Error('warmupWasmEngineWorker not called');
   }
-
-  // Terminate the active worker, if any.
-  if (activeWorker !== null) activeWorker.worker.terminate();
-
-  activeWorker = warmWorker;
+  if (activeWorkers.has(id)) {
+    throw new Error(`Duplicate worker ID ${id}`);
+  }
+  const activeWorker = warmWorker;
   warmWorker = createWorker();
+  activeWorkers.set(id, activeWorker);
   return activeWorker.port;
+}
+
+export function destroyWasmEngine(id: string) {
+  if (!activeWorkers.has(id)) {
+    throw new Error(`Cannot find worker ID ${id}`);
+  }
+  activeWorkers.get(id)!.worker.terminate();
+  activeWorkers.delete(id);
 }
 
 /**
@@ -59,7 +67,7 @@ export function takeWasmEngineWorkerPort(): MessagePort {
  * warmupWasmEngineWorker (together with getWasmEngineWorker)
  * implement this behaviour.
  */
-export function warmupWasmEngineWorker(): void {
+export function warmupWasmEngine(): void {
   if (warmWorker !== null) {
     throw new Error('warmWasmEngineWorker already called');
   }
@@ -75,16 +83,18 @@ export class WasmEngineProxy extends Engine {
   private readonly traceProcessor_: TraceProcessor;
   private pendingCallbacks: Map<number, protobufjs.RPCImplCallback>;
   private nextRequestId: number;
+  readonly id: string;
 
-  static create(port: MessagePort): Engine {
-    return new WasmEngineProxy(port);
+  static create(args: EnginePortAndId): Engine {
+    return new WasmEngineProxy(args);
   }
 
-  constructor(port: MessagePort) {
+  constructor(args: EnginePortAndId) {
     super();
     this.nextRequestId = 0;
     this.pendingCallbacks = new Map();
-    this.port = port;
+    this.port = args.port;
+    this.id = args.id;
     this.port.onmessage = this.onMessage.bind(this);
     this.traceProcessor_ =
         TraceProcessor.create(this.rpcImpl.bind(this, 'trace_processor'));

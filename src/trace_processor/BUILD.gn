@@ -17,8 +17,6 @@ import("../../gn/wasm.gni")
 
 wasm_lib("trace_processor") {
   sources = [
-    "emscripten_task_runner.cc",
-    "emscripten_task_runner.h",
     "wasm_bridge.cc",
   ]
 
@@ -57,7 +55,6 @@ source_set("lib") {
     "table.h",
     "thread_table.cc",
     "thread_table.h",
-    "trace_blob_view.h",
     "trace_parser.h",
     "trace_processor.cc",
     "trace_processor.h",

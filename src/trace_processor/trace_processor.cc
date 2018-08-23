@@ -59,8 +59,9 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   if (unrecoverable_parse_error_)
     return false;
 
-  if (!context_.parser) {  // First chunk.
-    // Guess the trace type (JSON vs proto).
+  // If this is the first Parse() call, guess the trace type and create the
+  // appropriate parser.
+  if (!context_.parser) {
     char buf[32] = "";
     strncpy(buf, reinterpret_cast<char*>(data.get()),
             std::min(size, sizeof(buf)));
@@ -74,7 +75,7 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   }
 
   bool res = context_.parser->Parse(std::move(data), size);
-  unrecoverable_parse_error_ = !res;
+  unrecoverable_parse_error_ |= !res;
   return res;
 }
 
