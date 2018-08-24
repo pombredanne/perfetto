@@ -59,7 +59,7 @@ PerfettoChild SpawnPerfetto() {
   close(stdout_pipe[kPipeWriteEnd]);
   for (int i = 0; i < 1024; i++) {
     if (i != STDIN_FILENO && i != STDOUT_FILENO && i != STDERR_FILENO)
-      close(i);
+      close(i);  // TODO: This is silly, just use fcntl(SETCLOEXEC).
   }
 
   char tstamp[32];
