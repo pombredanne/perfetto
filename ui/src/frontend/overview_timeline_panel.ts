@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as m from 'mithril';
+
 import {TimeSpan, timeToString} from '../common/time';
 
 import {DragGestureHandler} from './drag_gesture_handler';
@@ -19,18 +21,52 @@ import {globals} from './globals';
 import {Panel} from './panel';
 import {TimeScale} from './time_scale';
 
-export class OverviewTimelinePanel extends Panel {
-  private width?: number;
-  private dragStartPx = 0;
-  private gesture?: DragGestureHandler;
-  private timeScale?: TimeScale;
-  private totTime = new TimeSpan(0, 0);
+interface OverviewTimelinePanelState {
+  width?: number;
+  dragStartPx: number;
+  gesture?: DragGestureHandler;
+  timeScale?: TimeScale;
+  totTime: TimeSpan;
 
+  onDrag: (x: number) => void;
+  onDragStart: (x: number) => void;
+  onDragEnd: (x: number) => void;
+}
+
+function onDrag(this: OverviewTimelinePanelState, x: number) {
+  // Set visible time limits from selection.
+  if (this.timeScale === undefined) return;
+  let tStart = this.timeScale.pxToTime(this.dragStartPx);
+  let tEnd = this.timeScale.pxToTime(x);
+  if (tStart > tEnd) [tStart, tEnd] = [tEnd, tStart];
+  const vizTime = new TimeSpan(tStart, tEnd);
+  globals.frontendLocalState.updateVisibleTime(vizTime);
+  globals.rafScheduler.scheduleOneRedraw();
+}
+
+function onDragStart(this: OverviewTimelinePanelState, x: number) {
+  this.dragStartPx = x;
+}
+
+function onDragEnd(this: OverviewTimelinePanelState) {
+  this.dragStartPx = 0;
+}
+
+export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
   getHeight(): number {
     return 100;
-  }
+  },
 
-  updateDom(dom: HTMLElement) {
+  oninit() {
+    this.width = 0;
+    this.dragStartPx = 0;
+    this.totTime = new TimeSpan(0, 0);
+    this.onDrag = onDrag.bind(this);
+    this.onDragStart = onDragStart.bind(this);
+    this.onDragEnd = onDragEnd.bind(this);
+  },
+
+  onupdate({dom}) {
     this.width = dom.getBoundingClientRect().width;
     this.totTime = new TimeSpan(
         globals.state.traceTime.startSec, globals.state.traceTime.endSec);
@@ -38,18 +74,25 @@ export class OverviewTimelinePanel extends Panel {
 
     if (this.gesture === undefined) {
       this.gesture = new DragGestureHandler(
-          dom,
+          dom as HTMLElement,
           this.onDrag.bind(this),
           this.onDragStart.bind(this),
           this.onDragEnd.bind(this));
     }
-  }
+  },
 
-  renderCanvas(ctx: CanvasRenderingContext2D) {
+  view(vnode) {
+    return m('.panel', {
+      style: {height: `${OverviewTimelinePanel.getHeight(vnode)}px`},
+    });
+  },
+
+  renderCanvas(vnode, ctx) {
+    console.log('Rendering canvas here!');
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight = this.getHeight() - headerHeight;
+    const tracksHeight = OverviewTimelinePanel.getHeight(vnode) - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';
@@ -90,7 +133,7 @@ export class OverviewTimelinePanel extends Panel {
 
     // Draw bottom border.
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
-    ctx.fillRect(0, this.getHeight() - 2, this.width, 2);
+    ctx.fillRect(0, OverviewTimelinePanel.getHeight(vnode) - 2, this.width, 2);
 
     // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;
@@ -110,24 +153,5 @@ export class OverviewTimelinePanel extends Panel {
     ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
     ctx.fillRect(vizStartPx - handleWidth, y, handleWidth, handleHeight);
     ctx.fillRect(vizEndPx + 1, y, handleWidth, handleHeight);
-  }
-
-  onDrag(x: number) {
-    // Set visible time limits from selection.
-    if (this.timeScale === undefined) return;
-    let tStart = this.timeScale.pxToTime(this.dragStartPx);
-    let tEnd = this.timeScale.pxToTime(x);
-    if (tStart > tEnd) [tStart, tEnd] = [tEnd, tStart];
-    const vizTime = new TimeSpan(tStart, tEnd);
-    globals.frontendLocalState.updateVisibleTime(vizTime);
-    globals.rafScheduler.scheduleOneRedraw();
-  }
-
-  onDragStart(x: number) {
-    this.dragStartPx = x;
-  }
-
-  onDragEnd() {
-    this.dragStartPx = 0;
-  }
-}
+  },
+};

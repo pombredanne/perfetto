@@ -12,41 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {timeToString} from '../common/time';
+// import {timeToString} from '../common/time';
 
-import {globals} from './globals';
-import {DESIRED_PX_PER_STEP, getGridStepSize} from './gridline_helper';
-import {Panel} from './panel';
-import {TRACK_SHELL_WIDTH} from './track_panel';
+// import {globals} from './globals';
+// import {DESIRED_PX_PER_STEP, getGridStepSize} from './gridline_helper';
+// import {Panel} from './panel';
+// import {TRACK_SHELL_WIDTH} from './track_panel';
 
-export class TimeAxisPanel extends Panel {
-  private width = 200;
+// export class TimeAxisPanel extends Panel {
+//   private width = 200;
 
-  getHeight(): number {
-    return 30;
-  }
+//   getHeight(): number {
+//     return 30;
+//   }
 
-  updateDom(dom: HTMLElement) {
-    this.width = dom.getBoundingClientRect().width;
-  }
+//   updateDom(dom: HTMLElement) {
+//     this.width = dom.getBoundingClientRect().width;
+//   }
 
-  renderCanvas(ctx: CanvasRenderingContext2D) {
-    const timeScale = globals.frontendLocalState.timeScale;
-    ctx.font = '10px Google Sans';
-    ctx.fillStyle = '#999';
+//   renderCanvas(ctx: CanvasRenderingContext2D) {
+//     const timeScale = globals.frontendLocalState.timeScale;
+//     ctx.font = '10px Google Sans';
+//     ctx.fillStyle = '#999';
 
-    const range = globals.frontendLocalState.visibleWindowTime;
-    const desiredSteps = this.width / DESIRED_PX_PER_STEP;
-    const step = getGridStepSize(range.duration, desiredSteps);
-    const start = Math.round(range.start / step) * step;
+//     const range = globals.frontendLocalState.visibleWindowTime;
+//     const desiredSteps = this.width / DESIRED_PX_PER_STEP;
+//     const step = getGridStepSize(range.duration, desiredSteps);
+//     const start = Math.round(range.start / step) * step;
 
-    for (let s = start; s < range.end; s += step) {
-      let xPos = TRACK_SHELL_WIDTH;
-      xPos += Math.floor(timeScale.timeToPx(s));
-      if (xPos < 0) continue;
-      if (xPos > this.width) break;
-      ctx.fillRect(xPos, 0, 1, this.getHeight());
-      ctx.fillText(timeToString(s - range.start), xPos + 5, 10);
-    }
-  }
-}
+//     for (let s = start; s < range.end; s += step) {
+//       let xPos = TRACK_SHELL_WIDTH;
+//       xPos += Math.floor(timeScale.timeToPx(s));
+//       if (xPos < 0) continue;
+//       if (xPos > this.width) break;
+//       ctx.fillRect(xPos, 0, 1, this.getHeight());
+//       ctx.fillText(timeToString(s - range.start), xPos + 5, 10);
+//     }
+//   }
+// }

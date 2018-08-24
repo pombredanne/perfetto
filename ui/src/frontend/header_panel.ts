@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import * as m from 'mithril';
-import {Panel} from './panel';
+// import * as m from 'mithril';
+// import {Panel} from './panel';
 
-export class HeaderPanel extends Panel {
-  constructor(private text: string) {
-    super();
-  }
+// export class HeaderPanel extends Panel {
+//   constructor(private text: string) {
+//     super();
+//   }
 
-  renderCanvas() {}
-  updateDom(dom: HTMLElement) {
-    m.render(dom, m('header', this.text));
-  }
+//   renderCanvas() {}
+//   updateDom(dom: HTMLElement) {
+//     m.render(dom, m('header', this.text));
+//   }
 
-  getHeight() {
-    return 25;
-  }
-}
+//   getHeight() {
+//     return 25;
+//   }
+// }

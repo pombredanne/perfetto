@@ -20,7 +20,7 @@ import {TimeSpan} from '../common/time';
 import {globals} from './globals';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
-import {ScrollingPanelContainer} from './scrolling_panel_container';
+// import {ScrollingPanelContainer} from './scrolling_panel_container';
 import {TopPanelContainer} from './top_panel_container';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 
@@ -157,9 +157,9 @@ const TraceViewer = {
         m(QueryTable),
         // TODO: Pan and zoom logic should be in its own mithril component.
         m('.pan-and-zoom-content',
-          m('.panel-flex-container',
-            m(TopPanelContainer),
-            m(ScrollingPanelContainer), ), ),
+          m('.panel-flex-container', m(TopPanelContainer),
+            // m(ScrollingPanelContainer),
+            ), ),
         m(CanvasRedrawTrigger), );
   },
 
