@@ -62,9 +62,10 @@ PerfettoChild SpawnPerfetto() {
       close(i);
   }
 
-  // This needs to be /data/local/tmp
   char tstamp[32];
   sprintf(tstamp, "%llu", GetWallTimeNs().count());
+  // This needs to be /system/bin/perfetto.
+  // alert-id is a hack to propagate the timestamp.
   execl("/data/local/tmp/perfetto", "perfetto", "--config", "-", "--out", "-",
         "--alert-id", tstamp, nullptr);
 
@@ -164,7 +165,7 @@ int main() {
     }
   }
 
-  PERFETTO_ILOG("exec latency: %.3f ms", (t_exec - t_start) / 1e6);
+  PERFETTO_ILOG("fork latency: %.3f ms", (t_exec - t_start) / 1e6);
   PERFETTO_ILOG("end-to-end latency: %.3f ms", (first_marker - t_start) / 1e6);
   thd.join();
 }
