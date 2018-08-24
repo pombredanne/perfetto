@@ -22,6 +22,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
 #include "src/base/test/utils.h"
+#include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
@@ -69,7 +70,7 @@ TEST_F(TraceProcessorIntegrationTest, AndroidSchedAndPs) {
 }
 
 TEST_F(TraceProcessorIntegrationTest, Sfgate) {
-  ASSERT_TRUE(LoadTrace("sfgate.json", /*min_chunk_size=*/7));
+  ASSERT_TRUE(LoadTrace("sfgate.json", strlen(JsonTraceParser::kPreamble)));
   protos::RawQueryResult res;
   Query("select count(*), max(ts) - min(ts) from slices", &res);
   ASSERT_EQ(res.num_records(), 1);
