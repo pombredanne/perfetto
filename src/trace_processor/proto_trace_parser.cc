@@ -61,23 +61,26 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
-bool ProtoTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
-  size_t data_off = 0;
+bool ProtoTraceParser::Parse(std::unique_ptr<uint8_t[]> owned_buf,
+                             size_t size) {
+  uint8_t* data = &owned_buf[0];
   if (!partial_buf_.empty()) {
     // It takes ~5 bytes for a proto preamble + the varint size.
     const size_t kHeaderBytes = 5;
     if (PERFETTO_UNLIKELY(partial_buf_.size() < kHeaderBytes)) {
-      data_off = std::min(kHeaderBytes - partial_buf_.size(), size);
-      partial_buf_.insert(partial_buf_.end(), &data[0], &data[0] + data_off);
+      size_t missing_len = std::min(kHeaderBytes - partial_buf_.size(), size);
+      partial_buf_.insert(partial_buf_.end(), &data[0], &data[missing_len]);
       if (partial_buf_.size() < kHeaderBytes)
         return true;
+      data += missing_len;
+      size -= missing_len;
     }
 
     // At this point we have enough data in partial_buf_ to read at least the
     // field header and know the size of the next TracePacket.
     constexpr uint8_t kTracePacketTag =
         MakeTagLengthDelimited(protos::Trace::kPacketFieldNumber);
-    const uint8_t* pos = &*partial_buf_.begin();
+    const uint8_t* pos = &partial_buf_[0];
     uint8_t proto_field_tag = *pos;
     uint64_t field_size = 0;
     const uint8_t* next = ParseVarInt(++pos, &*partial_buf_.end(), &field_size);
@@ -89,13 +92,13 @@ bool ProtoTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     }
 
     // At this point we know how big the TracePacket is.
-    size_t hdr_size = static_cast<size_t>(pos - &*partial_buf_.begin());
+    size_t hdr_size = static_cast<size_t>(pos - &partial_buf_[0]);
     size_t size_incl_header = static_cast<size_t>(field_size + hdr_size);
     PERFETTO_DCHECK(size_incl_header > partial_buf_.size());
 
     // There is a good chance that between the |partial_buf_| and the new |data|
     // of the current call we have enough bytes to parse a TracePacket.
-    if (partial_buf_.size() + size - data_off >= size_incl_header) {
+    if (partial_buf_.size() + size >= size_incl_header) {
       // Create a new buffer for the whole TracePacket and copy into that:
       // 1) The beginning of the TracePacket (including the proto header) from
       //    the partial buffer.
@@ -107,24 +110,26 @@ bool ProtoTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
       // |size_missing| is the number of bytes for the rest of the TracePacket
       // in |data|.
       size_t size_missing = size_incl_header - partial_buf_.size();
-      memcpy(&buf[partial_buf_.size()], &data[data_off], size_missing);
-      data_off += size_missing;
+      memcpy(&buf[partial_buf_.size()], &data[0], size_missing);
+      data += size_missing;
+      size -= size_missing;
       partial_buf_.clear();
-      ParseInternal(std::move(buf), 0, size_incl_header);
+      uint8_t* buf_start = &buf[0];
+      ParseInternal(std::move(buf), buf_start, size_incl_header);
     } else {
-      partial_buf_.insert(partial_buf_.end(), &data[data_off],
-                          &data[size - data_off]);
+      partial_buf_.insert(partial_buf_.end(), data, &data[size]);
       return true;
     }
   }
-  ParseInternal(std::move(data), data_off, size - data_off);
+  ParseInternal(std::move(owned_buf), data, size);
   return true;
 }
 
-void ProtoTraceParser::ParseInternal(std::unique_ptr<uint8_t[]> data,
-                                     size_t off,
+void ProtoTraceParser::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
+                                     uint8_t* data,
                                      size_t size) {
-  ProtoDecoder decoder(data.get() + off, size);
+  PERFETTO_DCHECK(data >= &owned_buf[0]);
+  ProtoDecoder decoder(data, size);
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     if (fld.id != protos::Trace::kPacketFieldNumber) {
       PERFETTO_ELOG("Non-trace packet field found in root Trace proto");
@@ -136,9 +141,8 @@ void ProtoTraceParser::ParseInternal(std::unique_ptr<uint8_t[]> data,
   const size_t leftover = static_cast<size_t>(size - decoder.offset());
   if (leftover > 0) {
     PERFETTO_DCHECK(partial_buf_.empty());
-    partial_buf_.clear();
-    partial_buf_.insert(partial_buf_.end(), data.get() + off + decoder.offset(),
-                        data.get() + off + decoder.offset() + leftover);
+    partial_buf_.insert(partial_buf_.end(), &data[decoder.offset()],
+                        &data[decoder.offset() + leftover]);
   }
 }
 

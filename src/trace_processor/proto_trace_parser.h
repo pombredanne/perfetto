@@ -43,7 +43,7 @@ class ProtoTraceParser : public TraceParser {
   bool Parse(std::unique_ptr<uint8_t[]>, size_t size) override;
 
  private:
-  void ParseInternal(std::unique_ptr<uint8_t[]>, size_t off, size_t size);
+  void ParseInternal(std::unique_ptr<uint8_t[]>, uint8_t* data, size_t size);
 
   void ParsePacket(const uint8_t* data, size_t length);
   void ParseFtraceEventBundle(const uint8_t* data, size_t length);

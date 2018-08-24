@@ -38,14 +38,17 @@ namespace trace_processor {
 
 namespace {
 
+enum ReadDictRes { kFoundDict, kNeedsMoreData, kEndOfTrace, kFatalError };
+
 // Parses at most one JSON dictionary and returns a pointer to the end of it,
 // or nullptr if no dict could be detected.
 // This is to avoid decoding the full trace in memory and reduce heap traffic.
 // E.g.  input:  { a:1 b:{ c:2, d:{ e:3 } } } , { a:4, ... },
 //       output: [   only this is parsed    ] ^return value points here.
-const char* ReadOneJsonDict(const char* start,
+ReadDictRes ReadOneJsonDict(const char* start,
                             const char* end,
-                            Json::Value* value) {
+                            Json::Value* value,
+                            const char** next) {
   int braces = 0;
   const char* dict_begin = nullptr;
   for (const char* s = start; s < end; s++) {
@@ -58,23 +61,22 @@ const char* ReadOneJsonDict(const char* start,
       continue;
     }
     if (*s == '}') {
-      if (braces <= 0) {
-        PERFETTO_ELOG("Unbalanced '}' found");
-        return nullptr;
-      }
+      if (braces <= 0)
+        return kEndOfTrace;
       if (--braces > 0)
         continue;
       Json::Reader reader;
       if (!reader.parse(dict_begin, s + 1, *value, /*collectComments=*/false)) {
         PERFETTO_ELOG("JSON error: %s",
                       reader.getFormattedErrorMessages().c_str());
-        return nullptr;
+        return kFatalError;
       }
-      return s + 1;
+      *next = s + 1;
+      return kFoundDict;
     }
     // TODO(primiano): skip braces in quoted strings, e.g.: {"foo": "ba{z" }
   }
-  return start;
+  return kNeedsMoreData;
 }
 
 }  // namespace
@@ -108,12 +110,11 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 
   while (next < end) {
     Json::Value value;
-    const char* res = ReadOneJsonDict(next, end, &value);
-    if (res == nullptr)
+    const auto res = ReadOneJsonDict(next, end, &value, &next);
+    if (res == kFatalError)
       return false;
-    if (res == next)
+    if (res == kEndOfTrace || res == kNeedsMoreData)
       break;
-    next = res;
     auto& ph = value["ph"];
     if (!ph.isString())
       continue;

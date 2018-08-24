@@ -63,7 +63,7 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   // appropriate parser.
   if (!context_.parser) {
     char buf[32];
-    memcpy(buf, data.get(), std::min(size, sizeof(buf)));
+    memcpy(buf, &data[0], std::min(size, sizeof(buf)));
     buf[sizeof(buf) - 1] = '\0';
     const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
     if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {

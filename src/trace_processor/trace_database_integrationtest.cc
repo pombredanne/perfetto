@@ -35,10 +35,10 @@ class TraceProcessorIntegrationTest : public ::testing::Test {
   TraceProcessor processor;
 
  protected:
-  bool LoadTrace(const char* name) {
+  bool LoadTrace(const char* name, int min_chunk_size = 1) {
     base::ScopedFstream f(fopen(base::GetTestDataPath(name).c_str(), "rb"));
     std::minstd_rand0 rnd_engine(0);
-    std::uniform_int_distribution<> dist(1, 1024);
+    std::uniform_int_distribution<> dist(min_chunk_size, 1024);
     while (!feof(*f)) {
       size_t chunk_size = static_cast<size_t>(dist(rnd_engine));
       std::unique_ptr<uint8_t[]> buf(new uint8_t[chunk_size]);
@@ -69,7 +69,7 @@ TEST_F(TraceProcessorIntegrationTest, AndroidSchedAndPs) {
 }
 
 TEST_F(TraceProcessorIntegrationTest, Sfgate) {
-  ASSERT_TRUE(LoadTrace("sfgate.json"));
+  ASSERT_TRUE(LoadTrace("sfgate.json", /*min_chunk_size=*/7));
   protos::RawQueryResult res;
   Query("select count(*), max(ts) - min(ts) from slices", &res);
   ASSERT_EQ(res.num_records(), 1);

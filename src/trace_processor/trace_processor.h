@@ -33,8 +33,6 @@ class RawQueryResult;
 
 namespace trace_processor {
 
-class BlobReader;
-
 // Coordinates the loading of traces from an arbitrary source and allows
 // execution of SQL queries on the events in these traces.
 class TraceProcessor {
