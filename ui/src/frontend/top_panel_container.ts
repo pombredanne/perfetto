@@ -26,7 +26,7 @@ export const TopPanelContainer = {
 
   view() {
     return m(
-        '.top-panel-container',
+        '.pinned-panel-container',
         m(PanelContainer, {panels: this.panels, doesScroll: false}));
   },
 } as m.Component<{}, {panels: Panel[]}>;

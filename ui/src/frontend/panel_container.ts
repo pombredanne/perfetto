@@ -203,13 +203,8 @@ export const PanelContainer = {
   },
 
   view({attrs}) {
-    const panelComponents: m.Children[] = [];
-    let totalHeight = 0;
-    for (const panel of attrs.panels) {
-      panelComponents.push(m(PanelComponent, {panel, key: panel.id}));
-      totalHeight += panel.getHeight();
-    }
-
+    const totalHeight =
+        attrs.panels.reduce((sum, panel) => sum + panel.getHeight(), 0);
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
 
     // In the scrolling case, since the canvas is overdrawn and continuously
@@ -234,7 +229,7 @@ export const PanelContainer = {
             position: 'absolute',
           }
         }),
-        ...panelComponents);
+        attrs.panels.map(panel => m(PanelComponent, {panel, key: panel.id})));
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {

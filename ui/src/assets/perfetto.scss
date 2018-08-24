@@ -265,16 +265,14 @@ button.close {
 
 .scrolling-panel-container {
   position: relative;
-  width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   flex: 1 1 auto;
   will-change: transform;  // Force layer creation.
 }
 
-.top-panel-container {
+.pinned-panel-container {
   position: relative;
-  width: 100%;
   // Override top level overflow: hidden so height of this flex item can be
   // its content height.
   overflow: visible;
