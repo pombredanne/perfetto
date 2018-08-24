@@ -97,11 +97,12 @@ else
   DIR=$(mktemp -p $TMPDIR -d perfetto.XXXXXX)
 fi
 
-tools/ninja -C $OUT traced traced_probes perfetto trace_to_text test/configs
+tools/ninja -C $OUT traced traced_probes perfetto trace_to_text iorap_example test/configs
 
 push $OUT/traced
 push $OUT/traced_probes
 push $OUT/perfetto
+push $OUT/iorap_example
 reset_tracing
 
 if is_android $OUT; then
@@ -181,7 +182,7 @@ tmux select-pane -t 0
 tmux send-keys "$PREFIX $DIR/traced_probes $POSTFIX" Enter
 
 tmux select-pane -t 2
-tmux send-keys "$PREFIX $DIR/perfetto -c $CONFIG_DEVICE_PATH -o $DIR/trace $POSTFIX"
+tmux send-keys "$PREFIX $DIR/iorap_example"
 
 # Select consumer pane.
 tmux select-pane -t 2

@@ -51,6 +51,7 @@ group("all") {
     ]
     if (!build_with_android) {
       deps += [
+        ":iorap_example",
         ":trace_processor",
         "tools/trace_to_text",
       ]
@@ -78,6 +79,17 @@ group("default") {
 }
 
 if (build_standalone) {
+  executable("iorap_example") {
+    sources = [
+      "iorap_example.cc",
+    ]
+    deps = [
+      "gn:default_deps",
+      "include/perfetto/base",
+      "protos/perfetto/trace:lite",
+    ]
+  }
+
   group("ui") {
     deps = [
       "ui",

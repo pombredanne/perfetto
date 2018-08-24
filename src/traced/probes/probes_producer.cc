@@ -167,7 +167,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
     }
 
     ftrace_->DisableAllEvents();
-    ftrace_->ClearTrace();
+    // ftrace_->ClearTrace();
   }
 
   PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
