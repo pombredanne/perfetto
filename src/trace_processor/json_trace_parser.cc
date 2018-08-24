@@ -58,8 +58,10 @@ const char* ReadOneJsonDict(const char* start,
       continue;
     }
     if (*s == '}') {
-      if (braces <= 0)
+      if (braces <= 0) {
+        PERFETTO_ELOG("Unbalanced '}' found");
         return nullptr;
+      }
       if (--braces > 0)
         continue;
       Json::Reader reader;
@@ -72,7 +74,7 @@ const char* ReadOneJsonDict(const char* start,
     }
     // TODO(primiano): skip braces in quoted strings, e.g.: {"foo": "ba{z" }
   }
-  return nullptr;
+  return start;
 }
 
 }  // namespace
@@ -107,7 +109,9 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   while (next < end) {
     Json::Value value;
     const char* res = ReadOneJsonDict(next, end, &value);
-    if (!res)
+    if (res == nullptr)
+      return false;
+    if (res == next)
       break;
     next = res;
     auto& ph = value["ph"];

@@ -40,7 +40,7 @@ function createWorker(): WorkerAndPort {
 // for the next call.
 export function createWasmEngine(id: string): MessagePort {
   if (warmWorker === null) {
-    throw new Error('warmupWasmEngineWorker not called');
+    throw new Error('warmupWasmEngine() not called');
   }
   if (activeWorkers.has(id)) {
     throw new Error(`Duplicate worker ID ${id}`);
@@ -69,7 +69,7 @@ export function destroyWasmEngine(id: string) {
  */
 export function warmupWasmEngine(): void {
   if (warmWorker !== null) {
-    throw new Error('warmWasmEngineWorker already called');
+    throw new Error('warmupWasmEngine() already called');
   }
   warmWorker = createWorker();
 }

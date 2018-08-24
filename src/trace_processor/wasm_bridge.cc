@@ -62,6 +62,10 @@ void EMSCRIPTEN_KEEPALIVE trace_processor_parse(RequestID,
                                                 const uint8_t*,
                                                 uint32_t);
 void trace_processor_parse(RequestID id, const uint8_t* data, size_t size) {
+  // TODO(primiano): This copy is extremely unfortunate. Ideally there should be
+  // a way to take the Blob coming from JS (either from FileReader or from th
+  // fetch() stream) and move into WASM.
+  // See https://github.com/WebAssembly/design/issues/1162.
   std::unique_ptr<uint8_t[]> buf(new uint8_t[size]);
   memcpy(buf.get(), data, size);
   g_trace_processor->Parse(std::move(buf), size);

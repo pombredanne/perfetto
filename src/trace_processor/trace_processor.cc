@@ -62,9 +62,9 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   // If this is the first Parse() call, guess the trace type and create the
   // appropriate parser.
   if (!context_.parser) {
-    char buf[32] = "";
-    strncpy(buf, reinterpret_cast<char*>(data.get()),
-            std::min(size, sizeof(buf)));
+    char buf[32];
+    memcpy(buf, data.get(), std::min(size, sizeof(buf)));
+    buf[sizeof(buf) - 1] = '\0';
     const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
     if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
       PERFETTO_DLOG("Legacy JSON trace detected");

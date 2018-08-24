@@ -120,21 +120,15 @@ int main(int argc, char** argv) {
   // Load the trace file into the trace processor.
   TraceProcessor tp;
   base::ScopedFile fd;
-  if (strcmp(trace_file_path, "-") == 0) {
-    fd.reset(STDIN_FILENO);
-  } else {
-    fd.reset(open(trace_file_path, O_RDONLY));
-  }
+  fd.reset(open(trace_file_path, O_RDONLY));
   PERFETTO_CHECK(fd);
-
-  struct stat stat_buf {};
-  PERFETTO_CHECK(fstat(*fd, &stat_buf) == 0);
-  size_t file_size = static_cast<size_t>(stat_buf.st_size);
 
   // Load the trace in chunks using async IO. We create a simple pipeline where,
   // at each iteration, we parse the current chunk and asynchronously start
   // reading the next chunk.
-  constexpr size_t kChunkSize = 4 * 1024 * 1024;
+
+  // 1MB chunk size seems the best tradeoff on a MacBook Pro 2013 - i7 2.8 GHz.
+  constexpr size_t kChunkSize = 1024 * 1024;
   struct aiocb cb {};
   cb.aio_nbytes = kChunkSize;
   cb.aio_fildes = *fd;
@@ -145,13 +139,18 @@ int main(int argc, char** argv) {
   PERFETTO_CHECK(aio_read(&cb) == 0);
   struct aiocb* aio_list[1] = {&cb};
 
+  uint64_t file_size = 0;
   auto t_load_start = base::GetWallTimeMs();
-  for (;;) {
+  for (int i = 0;; i++) {
+    if (i % 128 == 0)
+      fprintf(stderr, "\rLoading trace: %.2f MB\r", file_size / 1E6);
+
     // Block waiting for the pending read to complete.
     PERFETTO_CHECK(aio_suspend(aio_list, 1, nullptr) == 0);
     auto rsize = aio_return(&cb);
     if (rsize <= 0)
       break;
+    file_size += static_cast<uint64_t>(rsize);
 
     // Take ownership of the completed buffer and enqueue a new async read
     // with a fresh buffer.
