@@ -17,7 +17,7 @@ import * as m from 'mithril';
 import {assertExists} from '../base/logging';
 
 import {globals} from './globals';
-import {PanelVNode} from './panel';
+import {assertPanel, PanelVNode} from './panel';
 
 /**
  * If the panel container scrolls, the backing canvas height is
@@ -75,7 +75,7 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
   const canvasYStart = state.scrollTop - getCanvasOverdrawHeightPerSide(vnode);
 
   let panelYStart = 0;
-  for (const panel of vnode.attrs.panels) {
+  for (const panel of vnode.state.panels) {
     const yStartOnCanvas = panelYStart - canvasYStart;
     // .bind makes variable of type 'any' :(
     // https://basarat.gitbooks.io/typescript/docs/tips/bind.html
@@ -109,6 +109,7 @@ interface PanelContainerState {
   scrollTop: number;
   canvasOverdrawFactor: number;
   ctx: CanvasRenderingContext2D|null;
+  panels: PanelVNode[];
 
   // We store these functions so we can remove them.
   onResize: () => void;
@@ -117,7 +118,7 @@ interface PanelContainerState {
 }
 
 interface PanelContainerAttrs {
-  panels: PanelVNode[];
+  panels: m.Vnode[];
   doesScroll: boolean;
 }
 
@@ -135,6 +136,7 @@ export const PanelContainer = {
     this.canvasOverdrawFactor =
         vnode.attrs.doesScroll ? SCROLLING_CANVAS_OVERDRAW_FACTOR : 1;
     this.ctx = null;
+    this.panels = [];
     this.canvasRedrawer = () => redrawAllPanelCavases(vnode);
     globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
   },
@@ -187,7 +189,8 @@ export const PanelContainer = {
 
   view({attrs}) {
     let totalHeight = 0;
-    for (const panel of attrs.panels) {
+    this.panels = attrs.panels.map(p => assertPanel(p));
+    for (const panel of this.panels) {
       totalHeight += panel.tag.getHeight.bind(panel.state)(panel);
     }
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
@@ -214,7 +217,7 @@ export const PanelContainer = {
             position: 'absolute',
           }
         }),
-        attrs.panels);
+        this.panels);
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {
