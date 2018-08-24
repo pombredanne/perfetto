@@ -77,7 +77,9 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
   let panelYStart = 0;
   for (const panel of vnode.attrs.panels) {
     const yStartOnCanvas = panelYStart - canvasYStart;
-    const panelHeight = panel.tag.getHeight(panel);
+    // .bind makes variable of type 'any' :(
+    // https://basarat.gitbooks.io/typescript/docs/tips/bind.html
+    const panelHeight: number = (panel.tag.getHeight.bind(panel.state))(panel);
     const panelYBoundsOnCanvas = {
       start: yStartOnCanvas,
       end: yStartOnCanvas + panelHeight,
@@ -87,7 +89,6 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
       continue;
     }
 
-    // TODO: panel.state - this is ugly.
     renderPanelCanvas(state.ctx, state.parentWidth, yStartOnCanvas, panel);
     panelYStart += panelHeight;
   }
@@ -101,23 +102,6 @@ function repositionCanvas(vnodeDom: PanelContainerVnodeDom) {
       vnodeDom.state.scrollTop - getCanvasOverdrawHeightPerSide(vnodeDom);
   canvas.style.transform = `translateY(${canvasYStart}px)`;
 }
-
-// const PanelComponent = {
-//   view({attrs}) {
-//     return m('.panel', {
-//       style: {height: `${attrs.panel.getHeight()}px`},
-//     });
-//   },
-
-//   oncreate({dom, attrs}) {
-//     attrs.panel.updateDom(dom as HTMLElement);
-//   },
-
-//   onupdate({dom, attrs}) {
-//     attrs.panel.updateDom(dom as HTMLElement);
-//   }
-
-// } as m.Component<{panel: Panel}>;
 
 interface PanelContainerState {
   parentWidth: number;
@@ -204,8 +188,7 @@ export const PanelContainer = {
   view({attrs}) {
     let totalHeight = 0;
     for (const panel of attrs.panels) {
-      // TODO: Can we do better with the types?
-      totalHeight += panel.tag.getHeight(panel as {} as m.Vnode);
+      totalHeight += panel.tag.getHeight.bind(panel.state)(panel);
     }
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
 
@@ -231,11 +214,10 @@ export const PanelContainer = {
             position: 'absolute',
           }
         }),
-        attrs.panels, );
+        attrs.panels);
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {
     repositionCanvas(vnodeDom);
   }
-
 } as m.Component<PanelContainerAttrs, PanelContainerState>;

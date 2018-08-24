@@ -83,7 +83,9 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
 
   view(vnode) {
     return m('.panel', {
-      style: {height: `${OverviewTimelinePanel.getHeight(vnode)}px`},
+      style: {
+        height: `${OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode)}px`
+      },
     });
   },
 
@@ -92,7 +94,8 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight = OverviewTimelinePanel.getHeight(vnode) - headerHeight;
+    const tracksHeight =
+        OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode) - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';
@@ -133,7 +136,11 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
 
     // Draw bottom border.
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
-    ctx.fillRect(0, OverviewTimelinePanel.getHeight(vnode) - 2, this.width, 2);
+    ctx.fillRect(
+        0,
+        OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode) - 2,
+        this.width,
+        2);
 
     // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;

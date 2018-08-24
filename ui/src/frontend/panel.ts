@@ -17,7 +17,9 @@ import * as m from 'mithril';
 export interface Panel<Attrs = {}, State extends m.Lifecycle<Attrs, State> =
                                                      m.Lifecycle<Attrs, State>>
     extends m.Component<Attrs, State> {
-  getHeight(vnode: m.Vnode<Attrs, State>): number;
+  // getHeight should take vnode as an arg, because height can depend on
+  // vnode.attrs if the panel has any attrs.
+  getHeight(this: State, vnode: m.Vnode<Attrs, State>): number;
   renderCanvas(
       this: State, vnode: m.Vnode<Attrs, State>,
       ctx: CanvasRenderingContext2D): void;
