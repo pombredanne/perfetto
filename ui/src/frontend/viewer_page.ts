@@ -22,6 +22,7 @@ import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingPanelContainer} from './scrolling_panel_container';
 import {TRACK_SHELL_WIDTH} from './track_panel';
+import { TimeAxisPanel2 } from './time_axis_panel';
 
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 
@@ -163,7 +164,7 @@ const TraceViewer = {
             }
           },
           m('header', 'Tracks'),
-          m(ScrollingPanelContainer), ),
+          m(ScrollingPanelContainer, m(TimeAxisPanel2)), ),
         m(CanvasRedrawTrigger), );
   },
 

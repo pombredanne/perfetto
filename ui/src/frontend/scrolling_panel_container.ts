@@ -19,7 +19,7 @@ import {assertExists} from '../base/logging';
 import {FlameGraphPanel} from './flame_graph_panel';
 import {globals} from './globals';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
-import {Panel} from './panel';
+import {Panel, PanelPlusMithrilComponent} from './panel';
 import {TimeAxisPanel} from './time_axis_panel';
 import {TrackPanel} from './track_panel';
 
@@ -101,28 +101,44 @@ function renderPanelCanvas(
   ctx.restore();
 }
 
-function redrawAllPanelCavases(state: ScrollingPanelContainerState) {
+function redrawAllPanelCavases(vnode: CanvasScrollingContainerVnode) {
+  const state = vnode.state;
   if (!state.ctx) return;
+
   const canvasHeight = state.domHeight * CANVAS_OVERDRAW_FACTOR;
   state.ctx.clearRect(0, 0, state.domWidth, canvasHeight);
+
   const canvasYStart =
       state.scrollTop - getCanvasOverdrawHeightPerSide(state.domHeight);
 
-  let panelYStart = 0;
-  for (const key of state.panelDisplayOrder) {
-    const panelAttrs = assertExists(state.keyToPanelAttrs.get(key));
-    const yStartOnCanvas = panelYStart - canvasYStart;
-    const panelYBoundsOnCanvas = {
-      start: yStartOnCanvas,
-      end: yStartOnCanvas + panelAttrs.height
-    };
-    if (!panelIsOnCanvas(panelYBoundsOnCanvas, canvasHeight)) {
-      panelYStart += panelAttrs.height;
-      continue;
-    }
 
-    renderPanelCanvas(state.ctx, state.domWidth, yStartOnCanvas, panelAttrs);
-    panelYStart += panelAttrs.height;
+  // TODO here  do the proper math like it was below.
+  for (const child of (vnode.children as m.ChildArray)) {
+    const panelComponent = (child as m.Vnode<{}, {}>).tag as PanelPlusMithrilComponent;
+    state.ctx.save();
+    state.ctx.translate(0, -canvasYStart);
+    panelComponent.renderCanvas(state.ctx);
+    state.ctx.restore();
+  }
+
+  // HACK, disable old stuff.
+  if (performance.now() === 0) {
+    let panelYStart = 0;
+    for (const key of state.panelDisplayOrder) {
+      const panelAttrs = assertExists(state.keyToPanelAttrs.get(key));
+      const yStartOnCanvas = panelYStart - canvasYStart;
+      const panelYBoundsOnCanvas = {
+        start: yStartOnCanvas,
+        end: yStartOnCanvas + panelAttrs.height
+      };
+      if (!panelIsOnCanvas(panelYBoundsOnCanvas, canvasHeight)) {
+        panelYStart += panelAttrs.height;
+        continue;
+      }
+
+      renderPanelCanvas(state.ctx, state.domWidth, yStartOnCanvas, panelAttrs);
+      panelYStart += panelAttrs.height;
+    }
   }
 }
 
@@ -140,18 +156,19 @@ interface ScrollingPanelContainerState {
 }
 
 export const ScrollingPanelContainer = {
-  oninit({state}) {
+  oninit() {
     // These values are updated with proper values in oncreate.
     this.domWidth = 0;
     this.domHeight = 0;
     this.scrollTop = 0;
     this.ctx = null;
     this.keyToPanelAttrs = new Map<string, PanelAttrs>();
-    this.canvasRedrawer = () => redrawAllPanelCavases(state);
-    globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
   },
 
   oncreate(vnode) {
+    this.canvasRedrawer = () => redrawAllPanelCavases(vnode);
+    globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
+
     // Save the canvas context in the state.
     const canvas = vnode.dom.querySelector('.main-canvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
@@ -250,6 +267,7 @@ export const ScrollingPanelContainer = {
 
     const panelComponents: m.Children[] = [];
     let yStart = 0;
+
     for (const key of this.panelDisplayOrder) {
       const panelAttrs = assertExists(this.keyToPanelAttrs.get(key));
       panelComponents.push(m(PanelComponent, {panelAttrs, yStart, key}));

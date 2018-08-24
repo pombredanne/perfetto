@@ -12,8 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as m from 'mithril';
+
 export interface Panel {
   renderCanvas(ctx: CanvasRenderingContext2D): void;
   updateDom(dom: HTMLElement): void;
   getHeight(): number;
+}
+
+
+export interface PanelPlusMithrilComponent<Attrs = {}, State extends m.Lifecycle<Attrs, State> =
+                                                      m.Lifecycle<Attrs, State>>
+    extends m.Component<Attrs, State> {
+  renderCanvas(ctx: CanvasRenderingContext2D): void;
 }
