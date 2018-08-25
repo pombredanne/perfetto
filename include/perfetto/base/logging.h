@@ -22,8 +22,6 @@
 #include <stdlib.h>
 #include <string.h>  // For strerror.
 
-#include <chrono>
-
 #if defined(NDEBUG)
 #define PERFETTO_DCHECK_IS_ON() 0
 #else
@@ -32,6 +30,7 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/utils.h"
+#include "perfetto/base/time.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #include <android/log.h>
@@ -43,8 +42,6 @@
 
 namespace perfetto {
 namespace base {
-
-std::chrono::milliseconds GetWallTimeMs();
 
 // Constexpr functions to extract basename(__FILE__), e.g.: ../foo/f.c -> f.c .
 constexpr const char* StrEnd(const char* s) {
@@ -79,9 +76,9 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
                                    "\x1b[31m"};
 
 #define PERFETTO_XLOG_STDERR(level, fmt, ...)                         \
-  fprintf(stderr, "\x1b[90m%-24.24s %.3f\x1b[0m %s" fmt "\x1b[0m\n",  \
+  fprintf(stderr, "\x1b[90m%-24.24s %.3f\x1b[0m %s" fmt "\x1b[0m\n",       \
           ::perfetto::base::Basename(__FILE__ ":" PERFETTO_LOG_LINE), \
-          ((::perfetto::base::GetWallTimeMs().count() / 1000.0)),     \
+          (::perfetto::base::GetWallTimeMs().count() / 1000.0), \
           ::perfetto::base::kLogFmt[::perfetto::base::LogLev::level], \
           ##__VA_ARGS__)
 #endif

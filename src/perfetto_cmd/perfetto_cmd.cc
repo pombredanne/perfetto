@@ -58,7 +58,7 @@ namespace {
 constexpr char kDefaultDropBoxTag[] = "perfetto";
 
 perfetto::PerfettoCmd* g_consumer_cmd;
-
+int64_t t_start;
 }  // namespace
 
 // Temporary directory for DropBox traces. Note that this is automatically
@@ -220,6 +220,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     PERFETTO_ELOG("Could not parse TraceConfig proto from stdin");
     return 1;
   }
+  statsd_metadata.set_triggering_config_id(t_start);
   *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
   trace_config_.reset(new TraceConfig());
   trace_config_->FromProto(trace_config_proto);
@@ -409,6 +410,7 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
 
 int __attribute__((visibility("default")))
 PerfettoCmdMain(int argc, char** argv) {
+  t_start = base::GetWallTimeNs().count();
   g_consumer_cmd = new perfetto::PerfettoCmd();
   return g_consumer_cmd->Main(argc, argv);
 }

@@ -59,7 +59,7 @@ PerfettoChild SpawnPerfetto() {
   close(stdout_pipe[kPipeWriteEnd]);
   for (int i = 0; i < 1024; i++) {
     if (i != STDIN_FILENO && i != STDOUT_FILENO && i != STDERR_FILENO)
-      close(i);  // TODO: This is silly, just use fcntl(SETCLOEXEC).
+      fcntl(i, F_SETFD, FD_CLOEXEC);
   }
 
   char tstamp[32];
@@ -77,7 +77,7 @@ PerfettoChild SpawnPerfetto() {
 void dump_time_into_trace() {
   perfetto::base::ScopedFile fd(open("/d/tracing/trace_marker", O_WRONLY));
   PERFETTO_CHECK(fd);
-  for (int i = 0; i < 3000; i++) {
+  for (int i = 0; i < 1000; i++) {
     char buf[32];
     sprintf(buf, "%llu", GetWallTimeNs().count());
     write(*fd, buf, strlen(buf));
@@ -99,7 +99,7 @@ int main() {
     auto* ftrace_config = ds_config->mutable_ftrace_config();
 
     // These should be configurable via Phenotype.
-    ftrace_config->set_buffer_size_kb(8192);  // in-kernel ftrace buffer.
+    ftrace_config->set_buffer_size_kb(1024);  // in-kernel ftrace buffer.
     ftrace_config->set_drain_period_ms(200);
     ftrace_config->add_ftrace_events("print");
   }
@@ -115,15 +115,6 @@ int main() {
   fwrite(config_raw.data(), 1, config_raw.size(), *child.cfg_in);
   child.cfg_in.reset();
 
-  int childStatus = 0;
-  waitpid(child.pid, &childStatus, 0);
-  if (!WIFEXITED(childStatus) || WEXITSTATUS(childStatus) != 0) {
-    PERFETTO_FATAL(
-        "Child process failed (0x%x) while calling the Perfetto client",
-        childStatus);
-  }
-  PERFETTO_LOG("Perfetto done, reading trace from stdout");
-
   std::vector<char> raw_trace;
   size_t raw_trace_size = 0;
   while (true) {
@@ -136,17 +127,27 @@ int main() {
     raw_trace_size += rsize;
     raw_trace.resize(raw_trace_size);
   }
-
   child.trace_out.reset();
+
+
+  int childStatus = 0;
+  waitpid(child.pid, &childStatus, 0);
+  if (!WIFEXITED(childStatus) || WEXITSTATUS(childStatus) != 0) {
+    PERFETTO_FATAL(
+        "Child process failed (0x%x) while calling the Perfetto client",
+        childStatus);
+  }
 
   perfetto::protos::Trace trace;
   PERFETTO_CHECK(
       trace.ParseFromArray(raw_trace.data(), static_cast<int>(raw_trace_size)));
+  int64_t t_fork = 0;
   int64_t t_exec = 0;
   int64_t first_marker = 0;
   for (const auto& packet : trace.packet()) {
     if (packet.has_trace_config()) {
-      t_exec = packet.trace_config().statsd_metadata().triggering_alert_id();
+      t_fork = packet.trace_config().statsd_metadata().triggering_alert_id();
+      t_exec = packet.trace_config().statsd_metadata().triggering_config_id();
     }
     if (packet.has_ftrace_events()) {
       const auto& ftrace_bundle = packet.ftrace_events();
@@ -165,7 +166,8 @@ int main() {
     }
   }
 
-  PERFETTO_ILOG("fork latency: %.3f ms", (t_exec - t_start) / 1e6);
+  PERFETTO_ILOG("fork latency: %.3f ms", (t_fork - t_start) / 1e6);
+  PERFETTO_ILOG("fork+exec latency: %.3f ms", (t_exec - t_start) / 1e6);
   PERFETTO_ILOG("end-to-end latency: %.3f ms", (first_marker - t_start) / 1e6);
   thd.join();
 }

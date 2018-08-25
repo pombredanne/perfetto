@@ -22,7 +22,7 @@
 #include <chrono>
 
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/logging.h"
+// #include "perfetto/base/logging.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 #include <mach/mach_init.h>
@@ -76,7 +76,7 @@ inline TimeNanos GetThreadCPUTimeNs() {
   mach_port_deallocate(mach_task_self(), this_thread);
 
   if (kr != KERN_SUCCESS) {
-    PERFETTO_DCHECK(false);
+    // PERFETTO_DCHECK(false);
     return TimeNanos(0);
   }
   return TimeNanos(info.user_time.seconds * 1000000000LL +
@@ -101,7 +101,7 @@ constexpr clockid_t kWallTimeClockSource = CLOCK_MONOTONIC;
 
 inline TimeNanos GetTimeInternalNs(clockid_t clk_id) {
   struct timespec ts = {};
-  PERFETTO_CHECK(clock_gettime(clk_id, &ts) == 0);
+  clock_gettime(clk_id, &ts);
   return FromPosixTimespec(ts);
 }
 
