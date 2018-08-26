@@ -255,8 +255,8 @@ class TracingServiceImpl : public TracingService {
     // many entries as |config.buffers_size()|.
     std::vector<BufferID> buffers_index;
 
-    // When the last snapshot (clock, stats, etc) were emitted into the output
-    // stream.
+    // When the last snapshots (clock, stats, sync marker) were emitted into
+    // the output stream.
     base::TimeMillis last_snapshot_time = {};
 
     // Whether we mirrored the trace config back to the trace output yet.

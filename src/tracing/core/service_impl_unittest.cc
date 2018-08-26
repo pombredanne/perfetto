@@ -769,7 +769,7 @@ TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
     end = pos == std::string::npos ? trace_raw.size() : pos - kMarkerOffset;
     int size = static_cast<int>(end - start);
     if (end == 0)
-      continue;  // very first packet.
+      continue;  // First packet.
     ASSERT_GT(size, 0);
     protos::Trace trace_partition;
     ASSERT_TRUE(trace_partition.ParseFromArray(trace_raw.data() + start, size));
