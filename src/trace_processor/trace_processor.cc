@@ -22,13 +22,14 @@
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/proto_trace_parser.h"
+#include "src/trace_processor/proto_trace_tokenizer.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/thread_table.h"
+#include "src/trace_processor/trace_sorter.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
@@ -42,6 +43,8 @@ TraceProcessor::TraceProcessor() {
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
+  context_.sorter.reset(
+      new TraceSorter(&context_, static_cast<uint64_t>(5 * 1e9)));
   context_.storage.reset(new TraceStorage());
 
   ProcessTable::RegisterTable(*db_, context_.storage.get());
@@ -68,13 +71,13 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
     if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
       PERFETTO_DLOG("Legacy JSON trace detected");
-      context_.parser.reset(new JsonTraceParser(&context_));
+      context_.chunk_reader.reset(new JsonTraceParser(&context_));
     } else {
-      context_.parser.reset(new ProtoTraceParser(&context_));
+      context_.chunk_reader.reset(new ProtoTraceTokenizer(&context_));
     }
   }
 
-  bool res = context_.parser->Parse(std::move(data), size);
+  bool res = context_.chunk_reader->Parse(std::move(data), size);
   unrecoverable_parse_error_ |= !res;
   return res;
 }
