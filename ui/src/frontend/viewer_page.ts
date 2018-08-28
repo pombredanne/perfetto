@@ -130,7 +130,7 @@ const TraceViewer = {
         // TODO: Pan and zoom logic should be in its own mithril component.
         m('.pan-and-zoom-content',
           m(TopPanelContainer),
-          m(ScrollingPanelContainer)), );
+          m(ScrollingPanelContainer)));
   },
 
 } as m.Component<{}, {

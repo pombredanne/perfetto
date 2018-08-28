@@ -58,7 +58,7 @@ export class RafScheduler {
 
   scheduleFullRedraw() {
     this.requestedFullRedraw = true;
-    this.maybeScheduleAnimationFrame();
+    this.maybeScheduleAnimationFrame(true);
   }
 
   private syncCanvasRedraw(nowMs: number) {
@@ -70,7 +70,7 @@ export class RafScheduler {
 
   private maybeScheduleAnimationFrame(force = false) {
     if (this.hasScheduledNextFrame) return;
-    if (this.actionCallbacks.size !== 0 || force || this.requestedFullRedraw) {
+    if (this.actionCallbacks.size !== 0 || force) {
       this.hasScheduledNextFrame = true;
       window.requestAnimationFrame(this.onAnimationFrame.bind(this));
     }
