@@ -81,11 +81,10 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
     }
   },
 
-  view(vnode) {
-    return m('.panel', {
-      style: {
-        height: `${OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode)}px`
-      },
+  view() {
+    // Rendering empty div to measure width.
+    return m('.overview-timeline', {
+      style: {width: '100%'},
     });
   },
 

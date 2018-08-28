@@ -209,7 +209,13 @@ export const PanelContainer = {
             height: `${canvasHeight}px`,
           }
         }),
-        this.panels);
+        this.panels.map(
+            panel =>
+                m('.panel',
+                  {
+                    style: {height: `${getPanelHeight(panel)}px`},
+                  },
+                  panel)));
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {
