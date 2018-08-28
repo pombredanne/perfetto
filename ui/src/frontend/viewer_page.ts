@@ -157,9 +157,8 @@ const TraceViewer = {
         m(QueryTable),
         // TODO: Pan and zoom logic should be in its own mithril component.
         m('.pan-and-zoom-content',
-          m('.panel-flex-container',
-            m(TopPanelContainer),
-            m(ScrollingPanelContainer))),
+          m(TopPanelContainer),
+          m(ScrollingPanelContainer)),
         m(CanvasRedrawTrigger));
   },
 

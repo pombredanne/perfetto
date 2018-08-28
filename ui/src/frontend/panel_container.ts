@@ -216,17 +216,11 @@ export const PanelContainer = {
         {
           style: {
             height: `${totalHeight}px`,
-            overflow: 'hidden',
-            position: 'relative',
-            width: '100%',
           }
         },
         m('canvas.main-canvas', {
           style: {
             height: `${canvasHeight}px`,
-            top: '0px',
-            width: '100%',
-            position: 'absolute',
           }
         }),
         attrs.panels.map(panel => m(PanelComponent, {panel, key: panel.id})));
