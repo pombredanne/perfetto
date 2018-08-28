@@ -39,12 +39,12 @@ class TraceBlobView {
         length_(length) {}
 
   // Allow std::move().
-  TraceBlobView(TraceBlobView&&) = default;
+  TraceBlobView(TraceBlobView&&) noexcept = default;
   TraceBlobView& operator=(TraceBlobView&&) = default;
 
   // Disable implicit copy.
-  TraceBlobView(TraceBlobView const&) = delete;
-  TraceBlobView& operator=(TraceBlobView const&) = delete;
+  TraceBlobView(const TraceBlobView&) = delete;
+  TraceBlobView& operator=(const TraceBlobView&) = delete;
 
   TraceBlobView slice(size_t offset, size_t length) {
     PERFETTO_DCHECK(offset + length <= offset_ + length_);
@@ -96,6 +96,14 @@ class TraceBlobView {
     SharedBuf(SharedBuf&& other) noexcept {
       rcbuf_ = other.rcbuf_;
       other.rcbuf_ = nullptr;
+    }
+
+    SharedBuf& operator=(SharedBuf&& other) {
+      if (this != &other) {
+        this->~SharedBuf();
+        new (this) SharedBuf(std::move(other));
+      }
+      return *this;
     }
 
     bool operator==(const SharedBuf& x) const { return x.rcbuf_ == rcbuf_; }
