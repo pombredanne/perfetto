@@ -84,6 +84,10 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   return res;
 }
 
+void TraceProcessor::NotifyEndOfFile() {
+  context_.sorter->FlushEventsForced();
+}
+
 void TraceProcessor::ExecuteQuery(
     const protos::RawQueryArgs& args,
     std::function<void(const protos::RawQueryResult&)> callback) {

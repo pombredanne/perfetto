@@ -132,7 +132,6 @@ void ProtoTraceTokenizer::ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
   }
 }
 
-// TODO PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
   ProtoDecoder decoder(packet.data(), packet.length());
 
@@ -156,6 +155,7 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
+PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceBundle(TraceBlobView bundle) {
   constexpr auto kCpuFieldNumber = protos::FtraceEventBundle::kCpuFieldNumber;
   constexpr auto kCpuFieldTag = MakeTagVarInt(kCpuFieldNumber);
@@ -194,6 +194,7 @@ void ProtoTraceTokenizer::ParseFtraceBundle(TraceBlobView bundle) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
+PERFETTO_ALWAYS_INLINE
 void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
   constexpr auto kTimestampFieldNumber =
       protos::FtraceEvent::kTimestampFieldNumber;
