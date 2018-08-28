@@ -667,7 +667,7 @@ source_set("lzma") {
     "-Wno-enum-conversion",
   ]
 }
-source_set("libunwindstack") {
+shared_library("libunwindstack") {
   include_dirs = [
     "android-core/libunwindstack/include",
     "android-core/libunwindstack",
@@ -721,6 +721,7 @@ source_set("libunwindstack") {
   configs -= [
     "//gn/standalone:extra_warnings",
     "//gn/standalone:c++11",
+    "//gn/standalone:visibility_hidden",
   ]
   configs += [ "//gn/standalone:c++17" ]
   public_configs = [ ":libunwindstack_config" ]

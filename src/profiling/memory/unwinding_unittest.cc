@@ -87,6 +87,7 @@ UnsafeMemcpy(void* dst, const void* src, size_t n)
   for (size_t i = 0; i < n; ++i)
     to[i] = from[i];
 }
+
 std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
   const uint8_t* stackbase = GetStackBase();
   PERFETTO_CHECK(stackbase != nullptr);
@@ -118,6 +119,7 @@ std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
                stack_size);
   return {std::move(buf), total_size};
 }
+
 TEST(UnwindingTest, DoUnwind) {
   base::ScopedFile proc_maps(open("/proc/self/maps", O_RDONLY));
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
@@ -127,7 +129,7 @@ TEST(UnwindingTest, DoUnwind) {
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   PERFETTO_LOG("%s %" PRIu64, out[0].map_name.c_str(), out[0].pc);
   //  PERFETTO_LOG("%s", metadata.maps.Find(out[0].pc)->name.c_str());
-  ASSERT_EQ(out[1].function_name, "GetRecord");
+  ASSERT_EQ(out[0].function_name, "GetRecord");
 }
 
 }  // namespace
