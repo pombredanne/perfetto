@@ -21,6 +21,7 @@ import {globals} from './globals';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingPanelContainer} from './scrolling_panel_container';
+import {TopPanelContainer} from './top_panel_container';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
@@ -67,12 +68,12 @@ const TraceViewer = {
 
   oncreate(vnode) {
     const frontendLocalState = globals.frontendLocalState;
+    // TODO: This is probably not needed. Figure out resizing.
     this.onResize = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
           0, this.width - TRACK_SHELL_WIDTH);
-      globals.rafScheduler.scheduleFullRedraw();
     };
 
     // Have to redraw after initialization to provide dimensions to view().
@@ -82,7 +83,7 @@ const TraceViewer = {
     window.addEventListener('resize', this.onResize);
 
     const panZoomEl =
-        vnode.dom.getElementsByClassName('tracks-content')[0] as HTMLElement;
+        vnode.dom.querySelector('.pan-and-zoom-content') as HTMLElement;
 
     this.zoomContent = new PanAndZoomHandler({
       element: panZoomEl,
@@ -126,16 +127,10 @@ const TraceViewer = {
     return m(
         '.page',
         m(QueryTable),
-        m('.tracks-content',
-          {
-            style: {
-              width: '100%',
-              height: '100%',
-              position: 'relative',
-            }
-          },
-          m('header', 'Tracks'),
-          m(ScrollingPanelContainer), ), );
+        // TODO: Pan and zoom logic should be in its own mithril component.
+        m('.pan-and-zoom-content',
+          m(TopPanelContainer),
+          m(ScrollingPanelContainer)), );
   },
 
 } as m.Component<{}, {

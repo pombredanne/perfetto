@@ -62,12 +62,12 @@ class FrontendApi {
       }
       globals.overviewStore.get(key)!.push(data[key]);
     }
-    globals.rafScheduler.scheduleCanvasRedraw();
+    globals.rafScheduler.scheduleRedraw();
   }
 
   publishTrackData(args: {id: string, data: {}}) {
     globals.trackDataStore.set(args.id, args.data);
-    globals.rafScheduler.scheduleCanvasRedraw();
+    globals.rafScheduler.scheduleRedraw();
   }
 
   publishQueryResult(args: {id: string, data: {}}) {
