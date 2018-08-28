@@ -22,6 +22,7 @@
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
+#include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/proto_trace_tokenizer.h"
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
@@ -42,6 +43,7 @@ TraceProcessor::TraceProcessor() {
   db_.reset(std::move(db));
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
+  context_.proto_parser.reset(new ProtoTraceParser(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
   context_.sorter.reset(
       new TraceSorter(&context_, static_cast<uint64_t>(5 * 1e9)));
@@ -64,7 +66,7 @@ bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
 
   // If this is the first Parse() call, guess the trace type and create the
   // appropriate parser.
-  if (!context_.parser) {
+  if (!context_.chunk_reader) {
     char buf[32];
     memcpy(buf, &data[0], std::min(size, sizeof(buf)));
     buf[sizeof(buf) - 1] = '\0';

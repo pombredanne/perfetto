@@ -55,11 +55,12 @@ void TraceSorter::MaybeFlushEvents(bool force_flush) {
 
     auto oldest = events_.begin();
     if (oldest->second.is_ftrace) {
-      context_->parser->ParseFtracePacket(oldest->second.cpu,
-                                          oldest->first /*timestamp*/,
-                                          std::move(oldest->second.blob_view));
+      context_->proto_parser->ParseFtracePacket(
+          oldest->second.cpu, oldest->first /*timestamp*/,
+          std::move(oldest->second.blob_view));
     } else {
-      context_->parser->ParseTracePacket(std::move(oldest->second.blob_view));
+      context_->proto_parser->ParseTracePacket(
+          std::move(oldest->second.blob_view));
     }
     events_.erase(oldest);
   }
