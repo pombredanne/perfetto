@@ -120,7 +120,9 @@ def enable_protoc_lib(module):
 
 
 def enable_libunwindstack(module):
-    module.shared_libs.append('unwindstack')
+    module.shared_libs.append('libunwindstack')
+    module.shared_libs.append('libprocinfo')
+    module.shared_libs.append('libbase')
 
 def enable_libunwind(module):
     # libunwind is disabled on Darwin so we cannot depend on it.

@@ -3803,10 +3803,12 @@ cc_test {
   ],
   shared_libs: [
     "libandroid",
+    "libbase",
     "liblog",
+    "libprocinfo",
     "libprotobuf-cpp-full",
     "libprotobuf-cpp-lite",
-    "unwindstack",
+    "libunwindstack",
   ],
   static_libs: [
     "libgmock",
