@@ -17,7 +17,7 @@ import * as m from 'mithril';
 import {assertExists} from '../base/logging';
 
 import {globals} from './globals';
-import {assertPanel, PanelVNode} from './panel';
+import {assertIsPanel, getPanelHeight, PanelVNode} from './panel';
 
 /**
  * If the panel container scrolls, the backing canvas height is
@@ -62,7 +62,7 @@ function renderPanelCanvas(
   clipRect.rect(0, 0, width, panel.tag.getHeight(panel));
   ctx.clip(clipRect);
 
-  panel.tag.renderCanvas.bind(panel.state)(panel, ctx);
+  panel.tag.renderCanvas.bind(panel.state)(ctx, panel);
 
   ctx.restore();
 }
@@ -188,11 +188,9 @@ export const PanelContainer = {
   },
 
   view({attrs}) {
-    let totalHeight = 0;
-    this.panels = attrs.panels.map(p => assertPanel(p));
-    for (const panel of this.panels) {
-      totalHeight += panel.tag.getHeight.bind(panel.state)(panel);
-    }
+    this.panels = attrs.panels.map(vnode => assertIsPanel(vnode));
+    const totalHeight =
+        this.panels.reduce((sum, panel) => sum + getPanelHeight(panel), 0);
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
 
     // In the scrolling case, since the canvas is overdrawn and continuously
@@ -204,17 +202,11 @@ export const PanelContainer = {
         {
           style: {
             height: `${totalHeight}px`,
-            overflow: 'hidden',
-            position: 'relative',
-            width: '100%',
           }
         },
         m('canvas.main-canvas', {
           style: {
             height: `${canvasHeight}px`,
-            top: '0px',
-            width: '100%',
-            position: 'absolute',
           }
         }),
         this.panels);

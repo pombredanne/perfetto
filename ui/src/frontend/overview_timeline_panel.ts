@@ -18,7 +18,7 @@ import {TimeSpan, timeToString} from '../common/time';
 
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {Panel} from './panel';
+import {getPanelHeight, Panel} from './panel';
 import {TimeScale} from './time_scale';
 
 interface OverviewTimelinePanelState {
@@ -89,13 +89,12 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
     });
   },
 
-  renderCanvas(vnode, ctx) {
+  renderCanvas(ctx, vnode) {
     console.log('Rendering canvas here!');
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight =
-        OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode) - headerHeight;
+    const tracksHeight = getPanelHeight(vnode) - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';

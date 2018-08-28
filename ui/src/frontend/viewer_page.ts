@@ -110,8 +110,8 @@ const TraceViewer = {
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
 
-    const panZoomEl = vnode.dom.getElementsByClassName(
-                          'pan-and-zoom-content')[0] as HTMLElement;
+    const panZoomEl =
+        vnode.dom.querySelector('.pan-and-zoom-content') as HTMLElement;
 
     this.zoomContent = new PanAndZoomHandler({
       element: panZoomEl,
@@ -157,10 +157,9 @@ const TraceViewer = {
         m(QueryTable),
         // TODO: Pan and zoom logic should be in its own mithril component.
         m('.pan-and-zoom-content',
-          m('.panel-flex-container', m(TopPanelContainer),
-            // m(ScrollingPanelContainer),
-            ), ),
-        m(CanvasRedrawTrigger), );
+          m(TopPanelContainer),
+          // m(ScrollingPanelContainer)),
+          m(CanvasRedrawTrigger)));
   },
 
 } as m.Component<{}, {

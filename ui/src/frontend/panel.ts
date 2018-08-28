@@ -21,8 +21,8 @@ export interface Panel<Attrs = {}, State extends m.Lifecycle<Attrs, State> =
   // vnode.attrs if the panel has any attrs.
   getHeight(this: State, vnode: m.Vnode<Attrs, State>): number;
   renderCanvas(
-      this: State, vnode: m.Vnode<Attrs, State>,
-      ctx: CanvasRenderingContext2D): void;
+      this: State, ctx: CanvasRenderingContext2D,
+      vnode: PanelVNode<Attrs, State>): void;
 }
 
 export interface PanelVNode<Attrs = {},
@@ -32,7 +32,11 @@ export interface PanelVNode<Attrs = {},
   tag: Panel<Attrs, State>;
 }
 
-export function assertPanel<Attrs, State>(vnode: m.Vnode<Attrs, State>):
+export function getPanelHeight(vnode: PanelVNode): number {
+  return vnode.tag.getHeight.bind(vnode.state)(vnode);
+}
+
+export function assertIsPanel<Attrs, State>(vnode: m.Vnode<Attrs, State>):
     PanelVNode<Attrs, State> {
   const tag = vnode.tag;
   if (typeof tag === 'object' && 'getHeight' in tag && 'renderCanvas' in tag) {

@@ -22,7 +22,7 @@ import {PanelContainer} from './panel_container';
 
 export const TopPanelContainer = {
   view() {
-    return m('.top-panel-container', m(PanelContainer, {
+    return m('.pinned-panel-container', m(PanelContainer, {
                doesScroll: false,
                panels: [
                  m(OverviewTimelinePanel),
