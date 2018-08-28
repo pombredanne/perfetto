@@ -100,7 +100,7 @@ TEST_F(TraceSorterTest, Ordering) {
   context_.sorter->PushFtracePacket(0 /*cpu*/, 1000 /*timestamp*/,
                                     std::move(view_1));
 
-  context_.sorter->MaybeFlushEvents(true);
+  context_.sorter->FlushEventsForced();
 }
 
 }  // namespace
