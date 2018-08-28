@@ -124,7 +124,7 @@ executable("perfetto_unittests") {
     # built using GCC in the Android tree.
     deps += [ "src/profiling/memory:unittests" ]
   }
-  if (build_standalone && current_toolchain == host_toolchain) {
+  if (build_standalone) {
     deps += [ "src/trace_processor:unittests" ]
   }
 }
