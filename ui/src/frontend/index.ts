@@ -20,9 +20,11 @@ import {forwardRemoteCalls} from '../base/remote';
 import {loadPermalink, navigate} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
+import {EnginePortAndId} from '../controller/engine';
 import {
-  takeWasmEngineWorkerPort,
-  warmupWasmEngineWorker,
+  createWasmEngine,
+  destroyWasmEngine,
+  warmupWasmEngine,
 } from '../controller/wasm_engine_proxy';
 
 import {globals, QuantizedLoad, ThreadDesc} from './globals';
@@ -60,12 +62,12 @@ class FrontendApi {
       }
       globals.overviewStore.get(key)!.push(data[key]);
     }
-    globals.rafScheduler.scheduleOneRedraw();
+    globals.rafScheduler.scheduleRedraw();
   }
 
   publishTrackData(args: {id: string, data: {}}) {
     globals.trackDataStore.set(args.id, args.data);
-    globals.rafScheduler.scheduleOneRedraw();
+    globals.rafScheduler.scheduleRedraw();
   }
 
   publishQueryResult(args: {id: string, data: {}}) {
@@ -88,15 +90,20 @@ class FrontendApi {
    * Chrome which is tracked at: crbug.com/31666
    * TODO(hjd): Remove this once the fix has landed.
    */
-  createWasmEnginePort(): MessagePort {
-    return takeWasmEngineWorkerPort();
+  createEngine(): EnginePortAndId {
+    const id = new Date().toUTCString();
+    return {id, port: createWasmEngine(id)};
+  }
+
+  destroyEngine(id: string) {
+    destroyWasmEngine(id);
   }
 
   private redraw(): void {
     if (globals.state.route && globals.state.route !== m.route.get()) {
       m.route.set(globals.state.route);
     } else {
-      m.redraw();
+      globals.rafScheduler.scheduleFullRedraw();
     }
   }
 }
@@ -112,7 +119,7 @@ function main() {
 
   globals.initialize(controller.postMessage.bind(controller));
 
-  warmupWasmEngineWorker();
+  warmupWasmEngine();
 
   m.route(document.body, '/', {
     '/': HomePage,
