@@ -21,6 +21,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include <cxxabi.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -88,7 +89,8 @@ UnsafeMemcpy(void* dst, const void* src, size_t n)
     to[i] = from[i];
 }
 
-std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
+std::pair<std::unique_ptr<uint8_t[]>, size_t> __attribute__((noinline))
+GetRecord() {
   const uint8_t* stackbase = GetStackBase();
   PERFETTO_CHECK(stackbase != nullptr);
   const uint8_t* stacktop =
@@ -100,8 +102,6 @@ std::pair<std::unique_ptr<uint8_t[]>, size_t> GetRecord() {
   const unwindstack::ArchEnum arch = regs->CurrentArch();
   const size_t reg_size = RegSize(arch);
   const size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
-  PERFETTO_LOG("reg_size: %zd, total_size: %zu, stack_size: %zd", reg_size,
-               total_size, stack_size);
   std::unique_ptr<uint8_t[]> buf(new uint8_t[total_size]);
   AllocMetadata* metadata = reinterpret_cast<AllocMetadata*>(buf.get());
   metadata->alloc_size = 0;
@@ -127,9 +127,15 @@ TEST(UnwindingTest, DoUnwind) {
   auto record = GetRecord();
   std::vector<unwindstack::FrameData> out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
-  PERFETTO_LOG("%s %" PRIu64, out[0].map_name.c_str(), out[0].pc);
-  //  PERFETTO_LOG("%s", metadata.maps.Find(out[0].pc)->name.c_str());
-  ASSERT_EQ(out[0].function_name, "GetRecord");
+  size_t demangled_size = 128;
+  std::string demangled(demangled_size, ' ');
+  int st;
+  abi::__cxa_demangle(out[0].function_name.c_str(), &demangled[0],
+                      &demangled_size, &st);
+  ASSERT_EQ(st, 0);
+  // Remove null byte.
+  demangled.resize(demangled_size - 1);
+  ASSERT_EQ(demangled, "perfetto::(anonymous namespace)::GetRecord()");
 }
 
 }  // namespace
