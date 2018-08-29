@@ -19,8 +19,6 @@
 #include <sqlite3.h>
 #include <functional>
 
-#include "perfetto/base/task_runner.h"
-#include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -39,45 +37,55 @@
 namespace perfetto {
 namespace trace_processor {
 
-TraceProcessor::TraceProcessor(base::TaskRunner* task_runner)
-    : task_runner_(task_runner), weak_factory_(this) {
+TraceProcessor::TraceProcessor() {
   sqlite3* db = nullptr;
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   db_.reset(std::move(db));
 
   context_.sched_tracker.reset(new SchedTracker(&context_));
+  context_.proto_parser.reset(new ProtoTraceParser(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
   context_.sorter.reset(
       new TraceSorter(&context_, static_cast<uint64_t>(5 * 1e9)));
-  context_.parser.reset(new ProtoTraceParser(&context_));
   context_.storage.reset(new TraceStorage());
 
-  ProcessTable::RegisterTable(db_.get(), context_.storage.get());
-  SchedSliceTable::RegisterTable(db_.get(), context_.storage.get());
-  SliceTable::RegisterTable(db_.get(), context_.storage.get());
-  StringTable::RegisterTable(db_.get(), context_.storage.get());
-  ThreadTable::RegisterTable(db_.get(), context_.storage.get());
+  ProcessTable::RegisterTable(*db_, context_.storage.get());
+  SchedSliceTable::RegisterTable(*db_, context_.storage.get());
+  SliceTable::RegisterTable(*db_, context_.storage.get());
+  StringTable::RegisterTable(*db_, context_.storage.get());
+  ThreadTable::RegisterTable(*db_, context_.storage.get());
 }
 
 TraceProcessor::~TraceProcessor() = default;
 
-void TraceProcessor::LoadTrace(BlobReader* reader,
-                               std::function<void()> callback) {
-  context_.storage->ResetStorage();
+bool TraceProcessor::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
+  if (size == 0)
+    return true;
+  if (unrecoverable_parse_error_)
+    return false;
 
-  // Guess the trace type (JSON vs proto).
-  char buf[32] = "";
-  const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
-  reader->Read(0, kPreambleLen, reinterpret_cast<uint8_t*>(buf));
-  if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
-    PERFETTO_DLOG("Legacy JSON trace detected");
-    context_.chunk_reader.reset(new JsonTraceParser(reader, &context_));
-  } else {
-    context_.chunk_reader.reset(new ProtoTraceTokenizer(reader, &context_));
+  // If this is the first Parse() call, guess the trace type and create the
+  // appropriate parser.
+  if (!context_.chunk_reader) {
+    char buf[32];
+    memcpy(buf, &data[0], std::min(size, sizeof(buf)));
+    buf[sizeof(buf) - 1] = '\0';
+    const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
+    if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
+      PERFETTO_DLOG("Legacy JSON trace detected");
+      context_.chunk_reader.reset(new JsonTraceParser(&context_));
+    } else {
+      context_.chunk_reader.reset(new ProtoTraceTokenizer(&context_));
+    }
   }
 
-  // Kick off the parsing task chain.
-  LoadTraceChunk(callback);
+  bool res = context_.chunk_reader->Parse(std::move(data), size);
+  unrecoverable_parse_error_ |= !res;
+  return res;
+}
+
+void TraceProcessor::NotifyEndOfFile() {
+  context_.sorter->FlushEventsForced();
 }
 
 void TraceProcessor::ExecuteQuery(
@@ -160,23 +168,6 @@ void TraceProcessor::ExecuteQuery(
   }
 
   callback(proto);
-}
-
-void TraceProcessor::LoadTraceChunk(std::function<void()> callback) {
-  bool has_more = context_.chunk_reader->ParseNextChunk();
-  if (!has_more) {
-    context_.sorter->MaybeFlushEvents(true);
-    callback();
-    return;
-  }
-
-  auto weak_this = weak_factory_.GetWeakPtr();
-  task_runner_->PostTask([weak_this, callback] {
-    if (!weak_this)
-      return;
-
-    weak_this->LoadTraceChunk(callback);
-  });
 }
 
 void TraceProcessor::InterruptQuery() {

@@ -18,16 +18,18 @@
 #define SRC_TRACE_PROCESSOR_PROTO_TRACE_TOKENIZER_H_
 
 #include <stdint.h>
+
 #include <memory>
+#include <vector>
 
 #include "src/trace_processor/chunked_trace_reader.h"
-#include "src/trace_processor/trace_blob_view.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-class BlobReader;
 class TraceProcessorContext;
+class TraceBlobView;
+class TraceSorter;
 
 // Reads a protobuf trace in chunks and extracts boundaries of trace packets
 // (or subfields, for the case of ftrace) with their timestamps.
@@ -35,32 +37,29 @@ class ProtoTraceTokenizer : public ChunkedTraceReader {
  public:
   // |reader| is the abstract method of getting chunks of size |chunk_size_b|
   // from a trace file with these chunks parsed into |trace|.
-  ProtoTraceTokenizer(BlobReader*, TraceProcessorContext*);
+  explicit ProtoTraceTokenizer(TraceProcessorContext*);
   ~ProtoTraceTokenizer() override;
 
-  // ChunkReader implementation.
-
-  // Parses the next chunk of TracePackets from the BlobReader. Returns true
-  // if there are more chunks which can be read and false otherwise.
-  bool ParseNextChunk() override;
-
-  void set_chunk_size_for_testing(uint32_t n) { chunk_size_ = n; }
+  // ChunkedTraceReader implementation.
+  bool Parse(std::unique_ptr<uint8_t[]>, size_t size) override;
 
  private:
-  static constexpr uint32_t kTraceChunkSize = 16 * 1024 * 1024;  // 16 MB
-
+  void ParseInternal(std::unique_ptr<uint8_t[]> owned_buf,
+                     uint8_t* data,
+                     size_t size);
   void ParsePacket(TraceBlobView);
-  void ParseFtraceEventBundle(TraceBlobView);
+  void ParseFtraceBundle(TraceBlobView);
   void ParseFtraceEvent(uint32_t cpu, TraceBlobView);
 
-  BlobReader* const reader_;
-  TraceProcessorContext* const context_;
+  TraceSorter* const trace_sorter_;
 
-  // Temporary - currently trace packets do not have a timestamp, so the
+  // Used to glue together trace packets that span across two (or more)
+  // Parse() boundaries.
+  std::vector<uint8_t> partial_buf_;
+
+  // Temporary. Currently trace packets do not have a timestamp, so the
   // timestamp given is last_timestamp.
-  uint64_t last_timestamp = 0;
-  uint32_t chunk_size_ = kTraceChunkSize;
-  uint64_t offset_ = 0;
+  uint64_t last_timestamp_ = 0;
 };
 
 }  // namespace trace_processor

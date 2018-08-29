@@ -40,15 +40,14 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
-void ProtoTraceParser::ParseTracePacket(TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
+void ProtoTraceParser::ParseTracePacket(TraceBlobView packet) {
+  ProtoDecoder decoder(packet.data(), packet.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::TracePacket::kProcessTreeFieldNumber: {
-        TraceBlobView process_tree_view(view.buffer(),
-                                        view.offset_of(fld.data()), fld.size());
-        ParseProcessTree(std::move(process_tree_view));
+        const size_t fld_off = packet.offset_of(fld.data());
+        ParseProcessTree(packet.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -58,21 +57,18 @@ void ProtoTraceParser::ParseTracePacket(TraceBlobView view) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseProcessTree(TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
+void ProtoTraceParser::ParseProcessTree(TraceBlobView pstree) {
+  ProtoDecoder decoder(pstree.data(), pstree.length());
 
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    const size_t fld_off = pstree.offset_of(fld.data());
     switch (fld.id) {
       case protos::ProcessTree::kProcessesFieldNumber: {
-        TraceBlobView process_view(view.buffer(), view.offset_of(fld.data()),
-                                   fld.size());
-        ParseProcess(std::move(process_view));
+        ParseProcess(pstree.slice(fld_off, fld.size()));
         break;
       }
       case protos::ProcessTree::kThreadsFieldNumber: {
-        TraceBlobView thread_view(view.buffer(), view.offset_of(fld.data()),
-                                  fld.size());
-        ParseThread(std::move(thread_view));
+        ParseThread(pstree.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -82,8 +78,8 @@ void ProtoTraceParser::ParseProcessTree(TraceBlobView view) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseThread(TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
+void ProtoTraceParser::ParseThread(TraceBlobView thread) {
+  ProtoDecoder decoder(thread.data(), thread.length());
   uint32_t tid = 0;
   uint32_t tgid = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
@@ -103,8 +99,8 @@ void ProtoTraceParser::ParseThread(TraceBlobView view) {
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-void ProtoTraceParser::ParseProcess(TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
+void ProtoTraceParser::ParseProcess(TraceBlobView process) {
+  ProtoDecoder decoder(process.data(), process.length());
 
   uint32_t pid = 0;
   base::StringView process_name;
@@ -128,16 +124,14 @@ void ProtoTraceParser::ParseProcess(TraceBlobView view) {
 
 void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
                                          uint64_t timestamp,
-                                         TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
-
+                                         TraceBlobView ftrace) {
+  ProtoDecoder decoder(ftrace.data(), ftrace.length());
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::FtraceEvent::kSchedSwitchFieldNumber: {
         PERFETTO_DCHECK(timestamp > 0);
-        TraceBlobView sched_view(view.buffer(), view.offset_of(fld.data()),
-                                 fld.size());
-        ParseSchedSwitch(cpu, timestamp, std::move(sched_view));
+        const size_t fld_off = ftrace.offset_of(fld.data());
+        ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
       default:
@@ -149,8 +143,8 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
 
 void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
                                         uint64_t timestamp,
-                                        TraceBlobView view) {
-  ProtoDecoder decoder(view.data(), view.length());
+                                        TraceBlobView sswitch) {
+  ProtoDecoder decoder(sswitch.data(), sswitch.length());
 
   uint32_t prev_pid = 0;
   uint32_t prev_state = 0;
