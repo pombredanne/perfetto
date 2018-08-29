@@ -49,11 +49,11 @@ export const TRACK_SHELL_WIDTH = 300;
 //     return m('.track-content', {
 //       onmousemove: (e: MouseEvent) => {
 //         attrs.track.onMouseMove({x: e.layerX, y: e.layerY});
-//         globals.rafScheduler.scheduleOneRedraw();
+//         globals.rafScheduler.scheduleRedraw();
 //       },
 //       onmouseout: () => {
 //         attrs.track.onMouseOut();
-//         globals.rafScheduler.scheduleOneRedraw();
+//         globals.rafScheduler.scheduleRedraw();
 //       },
 //     }, );
 //   }

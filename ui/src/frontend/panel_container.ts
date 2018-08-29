@@ -17,7 +17,8 @@ import * as m from 'mithril';
 import {assertExists} from '../base/logging';
 
 import {globals} from './globals';
-import {assertIsPanel, getPanelHeight, PanelVNode} from './panel';
+import {assertIsPanel, PanelVNode} from './panel';
+
 
 /**
  * If the panel container scrolls, the backing canvas height is
@@ -59,10 +60,9 @@ function renderPanelCanvas(
   ctx.save();
   ctx.translate(0, yStartOnCanvas);
   const clipRect = new Path2D();
-  clipRect.rect(0, 0, width, panel.tag.getHeight(panel));
+  clipRect.rect(0, 0, width, panel.state.getHeight(panel));
   ctx.clip(clipRect);
-
-  panel.tag.renderCanvas.bind(panel.state)(ctx, panel);
+  panel.state.renderCanvas(ctx, panel);
 
   ctx.restore();
 }
@@ -77,9 +77,7 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
   let panelYStart = 0;
   for (const panel of vnode.state.panels) {
     const yStartOnCanvas = panelYStart - canvasYStart;
-    // .bind makes variable of type 'any' :(
-    // https://basarat.gitbooks.io/typescript/docs/tips/bind.html
-    const panelHeight: number = (panel.tag.getHeight.bind(panel.state))(panel);
+    const panelHeight: number = panel.state.getHeight(panel);
     const panelYBoundsOnCanvas = {
       start: yStartOnCanvas,
       end: yStartOnCanvas + panelHeight,
@@ -172,7 +170,7 @@ export const PanelContainer = {
       this.parentOnScroll = () => {
         vnodeDom.state.scrollTop = vnodeDom.dom.parentElement!.scrollTop;
         repositionCanvas(vnodeDom);
-        globals.rafScheduler.scheduleOneRedraw();
+        globals.rafScheduler.scheduleRedraw();
       };
       vnodeDom.dom.parentElement!.addEventListener(
           'scroll', this.parentOnScroll, {passive: true});
@@ -189,6 +187,10 @@ export const PanelContainer = {
 
   view({attrs}) {
     this.panels = attrs.panels.map(vnode => assertIsPanel(vnode));
+
+    // TODO: How do you get real panel height? vnode.state is undefined here.
+    const getPanelHeight = (_: {}) => 100;
+
     const totalHeight =
         this.panels.reduce((sum, panel) => sum + getPanelHeight(panel), 0);
     const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;

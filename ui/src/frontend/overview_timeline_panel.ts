@@ -14,63 +14,43 @@
 
 import * as m from 'mithril';
 
+import {assertExists} from '../base/logging';
 import {TimeSpan, timeToString} from '../common/time';
 
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {getPanelHeight, Panel} from './panel';
+import {Panel} from './panel';
 import {TimeScale} from './time_scale';
 
-interface OverviewTimelinePanelState {
-  width?: number;
-  dragStartPx: number;
-  gesture?: DragGestureHandler;
-  timeScale?: TimeScale;
-  totTime: TimeSpan;
 
-  onDrag: (x: number) => void;
-  onDragStart: (x: number) => void;
-  onDragEnd: (x: number) => void;
-}
+export class OverviewTimelinePanel extends Panel<{}> {
+  private width?: number;
+  private dragStartPx: number;
+  private gesture?: DragGestureHandler;
+  private timeScale?: TimeScale;
+  private totTime: TimeSpan;
 
-function onDrag(this: OverviewTimelinePanelState, x: number) {
-  // Set visible time limits from selection.
-  if (this.timeScale === undefined) return;
-  let tStart = this.timeScale.pxToTime(this.dragStartPx);
-  let tEnd = this.timeScale.pxToTime(x);
-  if (tStart > tEnd) [tStart, tEnd] = [tEnd, tStart];
-  const vizTime = new TimeSpan(tStart, tEnd);
-  globals.frontendLocalState.updateVisibleTime(vizTime);
-  globals.rafScheduler.scheduleOneRedraw();
-}
-
-function onDragStart(this: OverviewTimelinePanelState, x: number) {
-  this.dragStartPx = x;
-}
-
-function onDragEnd(this: OverviewTimelinePanelState) {
-  this.dragStartPx = 0;
-}
-
-export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
   getHeight(): number {
     return 100;
-  },
+  }
 
-  oninit() {
+  constructor() {
+    super();
     this.width = 0;
     this.dragStartPx = 0;
     this.totTime = new TimeSpan(0, 0);
-    this.onDrag = onDrag.bind(this);
-    this.onDragStart = onDragStart.bind(this);
-    this.onDragEnd = onDragEnd.bind(this);
-  },
+  }
 
-  onupdate({dom}) {
+  // This can be used to initialize members that depends on attrs.
+  oninit() {}
+
+  // Must explicitly type now; arguments types are no longer auto-inferred.
+  // https://github.com/Microsoft/TypeScript/issues/1373
+  onupdate({dom}: m.CVnodeDOM) {
     this.width = dom.getBoundingClientRect().width;
     this.totTime = new TimeSpan(
         globals.state.traceTime.startSec, globals.state.traceTime.endSec);
-    this.timeScale = new TimeScale(this.totTime, [0, this.width]);
+    this.timeScale = new TimeScale(this.totTime, [0, assertExists(this.width)]);
 
     if (this.gesture === undefined) {
       this.gesture = new DragGestureHandler(
@@ -79,21 +59,20 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
           this.onDragStart.bind(this),
           this.onDragEnd.bind(this));
     }
-  },
+  }
 
   view() {
     // Rendering empty div to measure width.
     return m('.overview-timeline', {
       style: {width: '100%'},
     });
-  },
+  }
 
-  renderCanvas(ctx, vnode) {
-    console.log('Rendering canvas here!');
+  renderCanvas(ctx: CanvasRenderingContext2D) {
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight = getPanelHeight(vnode) - headerHeight;
+    const tracksHeight = this.getHeight() - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';
@@ -134,11 +113,7 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
 
     // Draw bottom border.
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
-    ctx.fillRect(
-        0,
-        OverviewTimelinePanel.getHeight.bind(vnode.state)(vnode) - 2,
-        this.width,
-        2);
+    ctx.fillRect(0, this.getHeight() - 2, this.width, 2);
 
     // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;
@@ -158,5 +133,24 @@ export const OverviewTimelinePanel: Panel<{}, OverviewTimelinePanelState> = {
     ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
     ctx.fillRect(vizStartPx - handleWidth, y, handleWidth, handleHeight);
     ctx.fillRect(vizEndPx + 1, y, handleWidth, handleHeight);
-  },
-};
+  }
+
+  onDrag(x: number) {
+    // Set visible time limits from selection.
+    if (this.timeScale === undefined) return;
+    let tStart = this.timeScale.pxToTime(this.dragStartPx);
+    let tEnd = this.timeScale.pxToTime(x);
+    if (tStart > tEnd) [tStart, tEnd] = [tEnd, tStart];
+    const vizTime = new TimeSpan(tStart, tEnd);
+    globals.frontendLocalState.updateVisibleTime(vizTime);
+    globals.rafScheduler.scheduleRedraw();
+  }
+
+  onDragStart(x: number) {
+    this.dragStartPx = x;
+  }
+
+  onDragEnd() {
+    this.dragStartPx = 0;
+  }
+}
