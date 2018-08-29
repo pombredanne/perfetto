@@ -47,7 +47,7 @@ class PerfettoCtsTest : public ::testing::Test {
     base::ScopedResource<FILE*, pclose, nullptr> output(popen("uname -m", "r"));
     fgets(arch, sizeof(arch), output.get());
     bool is_64bit = strstr(arch, "64");
-    if (sizeof(int) == 4 && is_64bit) {
+    if (sizeof(void*) == 4 && is_64bit) {
       return;
     }
 
