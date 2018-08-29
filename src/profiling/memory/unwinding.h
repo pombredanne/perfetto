@@ -24,6 +24,7 @@
 namespace perfetto {
 
 // Read /proc/[pid]/maps from an open file descriptor.
+// TODO(fmayer): Figure out deduplication to other maps.
 class FileDescriptorMaps : public unwindstack::Maps {
  public:
   FileDescriptorMaps(base::ScopedFile fd);
