@@ -91,6 +91,14 @@ if (build_standalone) {
       "src/trace_processor:trace_processor_shell",
     ]
   }
+
+  # The library which eases processing of Perfetto traces by exposing reading
+  # friendly APIs.
+  static_library("libtrace_processor") {
+    deps = [
+      "src/trace_processor:lib",
+    ]
+  }
 }
 
 executable("perfetto_unittests") {
