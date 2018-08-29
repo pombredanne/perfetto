@@ -3842,6 +3842,31 @@ cc_test {
   },
 }
 
+// GN target: //test:ftrace_tester
+cc_test {
+  name: "test_ftrace_tester",
+  srcs: [
+    "src/base/file_utils.cc",
+    "src/base/metatrace.cc",
+    "src/base/page_allocator.cc",
+    "src/base/string_splitter.cc",
+    "src/base/string_utils.cc",
+    "src/base/temp_file.cc",
+    "src/base/thread_checker.cc",
+    "src/base/time.cc",
+    "src/base/unix_task_runner.cc",
+    "src/base/virtual_destructors.cc",
+    "src/base/watchdog_posix.cc",
+    "test/ftrace_tester.cc",
+  ],
+  shared_libs: [
+    "liblog",
+  ],
+  defaults: [
+    "perfetto_defaults",
+  ],
+}
+
 // GN target: //:trace_to_text
 cc_binary_host {
   name: "trace_to_text",

@@ -122,6 +122,17 @@ source_set("test_helper") {
 }
 
 if (!build_with_chromium) {
+  executable("ftrace_tester") {
+    testonly = true
+    deps = [
+      "../gn:default_deps",
+      "../src/base",
+    ]
+    sources = [
+      "ftrace_tester.cc",
+    ]
+  }
+
   source_set("end_to_end_benchmarks") {
     testonly = true
     deps = [

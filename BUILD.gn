@@ -45,6 +45,7 @@ group("all") {
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
       "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
       "test/configs",
+      "test:ftrace_tester",
       "tools:protoc_helper",
       "tools/ftrace_proto_gen:ftrace_proto_gen",
       "tools/proto_to_cpp",
