@@ -29,11 +29,6 @@
 #include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
-namespace {
-int ClosePopen(FILE* f) {
-  return pclose(f);
-}
-}  // namespace
 
 class PerfettoCtsTest : public ::testing::Test {
  protected:
@@ -49,8 +44,7 @@ class PerfettoCtsTest : public ::testing::Test {
     }
 
     char arch[100];
-    base::ScopedResource<FILE*, ClosePopen, nullptr> output(
-        popen("uname -m", "r"));
+    base::ScopedResource<FILE*, pclose, nullptr> output(popen("uname -m", "r"));
     fgets(arch, sizeof(arch), output.get());
     bool is_64bit = strstr(arch, "64");
     if (sizeof(int) == 4 && is_64bit) {
