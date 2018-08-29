@@ -14,16 +14,6 @@
 namespace perfetto {
 namespace {
 
-//static void dump_time_into_trace() {
-//  for (int i = 0; i < 100; i++) {
-//    base::ScopedFile fd(open("/sys/kernel/debug/tracing/trace_marker", O_WRONLY));
-//    char buf[32];
-//    sprintf(buf, "%llu\n", base::GetWallTimeNs().count());
-//    write(fd.get(), buf, strlen(buf));
-//    usleep(1000);
-//  }
-//}
-
 const char kTracing[] = "/sys/kernel/debug/tracing/";
 
 void ClearFile(const std::string& suffix) {
@@ -49,7 +39,7 @@ void WriteToFile(const std::string& suffix, const std::string& str) {
 static void DumpTimeIntoTrace() {
   std::string path = std::string(kTracing) + "trace_marker";
   perfetto::base::ScopedFile fd;
-  
+
   for (int i = 0; i < 100; i++) {
     char buf[32];
     if (!fd)
@@ -184,6 +174,5 @@ void FtraceTester(int argc, char** argv) {
 
 int main(int argc, char** argv) {
   perfetto::FtraceTester(argc, argv);
-
   return 0;
 }
