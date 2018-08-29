@@ -14,28 +14,22 @@
 
 import * as m from 'mithril';
 
-export abstract class Panel<Attrs = {}> implements m.ClassComponent<Attrs> {
+export abstract class Panel<Attrs = {}> implements
+    m.Component<Attrs, Panel<Attrs>> {
   // getHeight should take vnode as an arg, because height can depend on
   // vnode.attrs if the panel has any attrs.
   abstract getHeight(vnode: PanelVNode<Attrs>): number;
   abstract renderCanvas(
       ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
-  // TODO: Can this be better?
   abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
 }
 
-export interface PanelVNode<Attrs = {}> extends m.CVnode<Attrs> {
-  tag: {new(vnode: m.CVnode<Attrs>): Panel<Attrs>};
-  state: Panel<Attrs>;
-}
+export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {}
 
 export function assertIsPanel<Attrs>(vnode: m.Vnode<Attrs>): PanelVNode<Attrs> {
   const tag = vnode.tag as {};
-  if (typeof tag !== 'function' || !('prototype' in tag)) {
-    throw Error('This is not a panel vnode.');
-  }
-
-  if (tag.prototype instanceof Panel) {
+  if (typeof tag === 'function' && 'prototype' in tag &&
+      tag.prototype instanceof Panel) {
     return vnode as PanelVNode<Attrs>;
   }
 

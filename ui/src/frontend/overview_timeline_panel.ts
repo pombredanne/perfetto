@@ -23,7 +23,7 @@ import {Panel} from './panel';
 import {TimeScale} from './time_scale';
 
 
-export class OverviewTimelinePanel extends Panel<{}> {
+export class OverviewTimelinePanel extends Panel {
   private width?: number;
   private dragStartPx: number;
   private gesture?: DragGestureHandler;
