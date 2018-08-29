@@ -127,15 +127,11 @@ TEST(UnwindingTest, DoUnwind) {
   auto record = GetRecord();
   std::vector<unwindstack::FrameData> out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
-  size_t demangled_size = 128;
-  std::string demangled(demangled_size, ' ');
   int st;
-  abi::__cxa_demangle(out[0].function_name.c_str(), &demangled[0],
-                      &demangled_size, &st);
+  std::unique_ptr<char> demangled(
+      abi::__cxa_demangle(out[0].function_name.c_str(), nullptr, nullptr, &st));
   ASSERT_EQ(st, 0);
-  // Remove null byte.
-  demangled.resize(demangled_size - 1);
-  ASSERT_EQ(demangled, "perfetto::(anonymous namespace)::GetRecord()");
+  ASSERT_STREQ(demangled.get(), "perfetto::(anonymous namespace)::GetRecord()");
 }
 
 }  // namespace

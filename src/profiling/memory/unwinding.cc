@@ -123,7 +123,6 @@ bool FileDescriptorMaps::Parse() {
   std::string content;
   if (!base::ReadFileDescriptor(*fd_, &content))
     return false;
-  PERFETTO_DLOG("%s", content.c_str());
   return android::procinfo::ReadMapFileContent(
       &content[0], [&](uint64_t start, uint64_t end, uint16_t flags,
                        uint64_t pgoff, const char* name) {
