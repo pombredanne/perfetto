@@ -97,7 +97,7 @@ export class WasmEngineProxy extends Engine {
     this.id = args.id;
     this.port.onmessage = this.onMessage.bind(this);
     this.traceProcessor_ =
-        TraceProcessor.create(this.rpcImpl.bind(this, 'trace_processor_wasm'));
+        TraceProcessor.create(this.rpcImpl.bind(this, 'trace_processor'));
   }
 
   get rpc(): TraceProcessor {
@@ -107,7 +107,7 @@ export class WasmEngineProxy extends Engine {
   parse(data: Uint8Array): Promise<void> {
     const id = this.nextRequestId++;
     const request: WasmBridgeRequest =
-        {id, serviceName: 'trace_processor_wasm', methodName: 'parse', data};
+        {id, serviceName: 'trace_processor', methodName: 'parse', data};
     const promise = defer<void>();
     this.pendingCallbacks.set(id, () => promise.resolve());
     this.port.postMessage(request);
