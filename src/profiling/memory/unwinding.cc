@@ -52,6 +52,8 @@ FileDescriptorMaps::FileDescriptorMaps(base::ScopedFile fd)
     : fd_(std::move(fd)) {}
 
 bool FileDescriptorMaps::Parse() {
+  // If the process has already exited, lseek or ReadFileDescriptor will
+  // return false.
   if (lseek(*fd_, 0, SEEK_SET) == -1)
     return false;
 
@@ -73,6 +75,8 @@ bool FileDescriptorMaps::Parse() {
 }
 
 void FileDescriptorMaps::Reset() {
+  for (unwindstack::MapInfo* info : maps_)
+    delete info;
   maps_.clear();
 }
 

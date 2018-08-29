@@ -32,7 +32,7 @@ int HeapprofdMain(int argc, char** argv) {
       [](size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>) {
         // TODO(fmayer): Wire this up to a worker thread that does the
         // unwinding.
-        printf("Record received.\n");
+        PERFETTO_LOG("Record received.");
       });
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {
