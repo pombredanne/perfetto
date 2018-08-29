@@ -55,6 +55,16 @@ namespace perfetto {
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
 TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
+  // Parsing ftrace is broken in Android Pie when running a 64 bit kernel
+  // and a 32 bit userland. Exclude those.
+  char arch[100];
+  base::ScopedResource<FILE*, pclose, nullptr> output(popen("uname -m", "r"));
+  fgets(arch, sizeof(arch), output.get());
+  bool is_64bit = strstr(arch, "64");
+  if (sizeof(void*) == 4 && is_64bit) {
+    return;
+  }
+
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
