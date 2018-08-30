@@ -36,6 +36,10 @@
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <sys/utsname.h>
+#endif
+
 namespace perfetto {
 
 // If we're building on Android and starting the daemons ourselves,
@@ -55,15 +59,17 @@ namespace perfetto {
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
 TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   // Parsing ftrace is broken in Android Pie when running a 64 bit kernel
-  // and a 32 bit userland. Exclude those.
-  char arch[100];
-  base::ScopedResource<FILE*, pclose, nullptr> output(popen("uname -m", "r"));
-  fgets(arch, sizeof(arch), output.get());
-  bool is_64bit = strstr(arch, "64");
-  if (sizeof(void*) == 4 && is_64bit) {
+  // and a 32 bit userland or other way round. Exclude those.
+  struct utsname un;
+  PERFETTO_CHECK(uname(&un) != -1);
+  size_t kernel_size = strstr(un.machine, "64") ? 8 : 4;
+  if (sizeof(void*) != kernel_sizboole) {
+    // Kernel is 64bit and userspace is 32bit or other way round.
     return;
   }
+#endif
 
   base::TestTaskRunner task_runner;
 
