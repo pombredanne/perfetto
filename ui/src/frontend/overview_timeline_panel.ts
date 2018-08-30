@@ -34,7 +34,6 @@ export class OverviewTimelinePanel extends Panel {
     this.width = 0;
     this.dragStartPx = 0;
     this.totTime = new TimeSpan(0, 0);
-    console.log('Constructor done');
   }
 
   getHeight() {
@@ -60,14 +59,10 @@ export class OverviewTimelinePanel extends Panel {
 
   view() {
     // Rendering empty div to measure width.
-    console.log('Panel: overview view');
-    return m('.overview-timeline', {
-      style: {width: '100%'},
-    });
+    return m('.overview-timeline', {});
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D) {
-    console.log('Panel: Overview canvas render');
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
