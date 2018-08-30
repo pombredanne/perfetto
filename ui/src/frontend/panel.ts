@@ -13,26 +13,50 @@
 // limitations under the License.
 
 import * as m from 'mithril';
+import {globals} from './globals';
 
 export abstract class Panel<Attrs = {}> implements
     m.Component<Attrs, Panel<Attrs>> {
-  // TODO: Height should be kept at the panel container level to ensure we
-  // do a full redraw if a panel's height changes. Otherwise DOM and canvas
-  // won't be in sync.
-  abstract getHeight(vnode: PanelVNode<Attrs>): number;
+  private height = 0;
+  private isRenderingCanvas = false;
+
+  getHeight() {
+    return this.height;
+  }
+
+  setHeight(height: number) {
+    if (this.isRenderingCanvas) {
+      throw Error(
+          'Cannot change height while rendering canvas. ' +
+          'Consider setting height in the view method.');
+    }
+    this.height = height;
+    // Do a full redraw after changing height to keep DOM and canvas in sync.
+    globals.rafScheduler.scheduleFullRedraw();
+  }
+
+  renderCanvasInternal(
+      ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>) {
+    this.isRenderingCanvas = true;
+    this.renderCanvas(ctx, vnode);
+    this.isRenderingCanvas = false;
+  }
   abstract renderCanvas(
       ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
   abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
 }
 
 
-export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {}
+export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {
+  tag: {getInitialHeight?: (vnode: PanelVNode<Attrs>) => number}&
+      m.Vnode<Attrs, Panel<Attrs>>['tag'];
+}
 
-export function assertIsPanel<Attrs>(vnode: m.Vnode<Attrs>): PanelVNode<Attrs> {
+export function assertIsPanel(vnode: m.Vnode): PanelVNode {
   const tag = vnode.tag as {};
   if (typeof tag === 'function' && 'prototype' in tag &&
       tag.prototype instanceof Panel) {
-    return vnode as PanelVNode<Attrs>;
+    return vnode as PanelVNode;
   }
 
   throw Error('This is not a panel vnode.');

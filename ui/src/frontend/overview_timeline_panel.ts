@@ -36,7 +36,7 @@ export class OverviewTimelinePanel extends Panel {
     this.totTime = new TimeSpan(0, 0);
   }
 
-  getHeight() {
+  static getInitialHeight() {
     return 100;
   }
 
