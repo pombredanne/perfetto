@@ -278,6 +278,10 @@ button.close {
   overflow: visible;
 }
 
+// In the scrolling case, since the canvas is overdrawn and continuously
+// repositioned, we need the canvas to be in a div with overflow hidden and
+// height equaling the total height of the content to prevent scrolling
+// height from growing.
 .scroll-limiter {
   overflow: hidden;
   position: relative;

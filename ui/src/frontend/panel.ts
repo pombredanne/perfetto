@@ -16,13 +16,15 @@ import * as m from 'mithril';
 
 export abstract class Panel<Attrs = {}> implements
     m.Component<Attrs, Panel<Attrs>> {
-  // getHeight should take vnode as an arg, because height can depend on
-  // vnode.attrs if the panel has any attrs.
+  // TODO: Height should be kept at the panel container level to ensure we
+  // do a full redraw if a panel's height changes. Otherwise DOM and canvas
+  // won't be in sync.
   abstract getHeight(vnode: PanelVNode<Attrs>): number;
   abstract renderCanvas(
       ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
   abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
 }
+
 
 export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {}
 

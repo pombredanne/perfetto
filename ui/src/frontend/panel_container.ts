@@ -32,16 +32,15 @@ function getCanvasOverdrawHeightPerSide(vnode: PanelContainerVnode) {
   return overdrawHeight / 2;
 }
 
-function updateDimensionsFromDom(vnodeDom: PanelContainerVnodeDom) {
-  // Get height fron the parent element.
-  const rect = vnodeDom.dom.parentElement!.getBoundingClientRect();
-  vnodeDom.state.parentWidth = rect.width;
-  vnodeDom.state.parentHeight = rect.height;
-  const dpr = window.devicePixelRatio;
+function updateCanvasDimensions(vnodeDom: PanelContainerVnodeDom) {
+  const canvas =
+      assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
+      HTMLCanvasElement;
   const ctx = assertExists(vnodeDom.state.ctx);
+  canvas.style.height = `${vnodeDom.state.canvasHeight}px`;
+  const dpr = window.devicePixelRatio;
   ctx.canvas.width = vnodeDom.state.parentWidth * dpr;
-  ctx.canvas.height =
-      vnodeDom.state.parentHeight * vnodeDom.state.canvasOverdrawFactor * dpr;
+  ctx.canvas.height = vnodeDom.state.canvasHeight * dpr;
   ctx.scale(dpr, dpr);
 }
 
@@ -70,7 +69,10 @@ function renderPanelCanvas(
 function redrawAllPanelCavases(vnode: PanelContainerVnode) {
   const state = vnode.state;
   if (!state.ctx) return;
-  const canvasHeight = state.parentHeight * state.canvasOverdrawFactor;
+  // const canvasHeight = state.parentHeight * state.canvasOverdrawFactor;
+  const totalHeight = vnode.state.panels.reduce(
+      (sum, panel) => sum + panel.state.getHeight(panel), 0);
+  const canvasHeight = totalHeight;
   state.ctx.clearRect(0, 0, state.parentWidth, canvasHeight);
   const canvasYStart = state.scrollTop - getCanvasOverdrawHeightPerSide(vnode);
 
@@ -95,10 +97,21 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
 function repositionCanvas(vnodeDom: PanelContainerVnodeDom) {
   const canvas =
       assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
-      HTMLElement;
+      HTMLCanvasElement;
   const canvasYStart =
       vnodeDom.state.scrollTop - getCanvasOverdrawHeightPerSide(vnodeDom);
   canvas.style.transform = `translateY(${canvasYStart}px)`;
+}
+
+function sumPanelHeight(vnode: PanelContainerVnode) {
+  return vnode.state.panels.reduce(
+      (sum, panel) => sum + panel.state.getHeight(panel), 0);
+}
+
+function getCanvasHeight(vnode: PanelContainerVnode) {
+  return vnode.attrs.doesScroll ?
+      vnode.state.parentHeight * vnode.state.canvasOverdrawFactor :
+      vnode.state.totalPanelHeight;
 }
 
 interface PanelContainerState {
@@ -108,6 +121,8 @@ interface PanelContainerState {
   canvasOverdrawFactor: number;
   ctx: CanvasRenderingContext2D|null;
   panels: PanelVNode[];
+  totalPanelHeight: number;
+  canvasHeight: number;
 
   // We store these functions so we can remove them.
   onResize: () => void;
@@ -124,6 +139,17 @@ interface PanelContainerAttrs {
 type PanelContainerVnode = m.Vnode<PanelContainerAttrs, PanelContainerState>;
 type PanelContainerVnodeDom =
     m.VnodeDOM<PanelContainerAttrs, PanelContainerState>;
+
+const PanelWrapper: m.Component<{panel: PanelVNode}> = {
+  view({attrs}) {
+    return m('.panel', attrs.panel);
+  },
+
+  onupdate({attrs, dom}) {
+    (dom as HTMLElement).style.height =
+        `${attrs.panel.state.getHeight(attrs.panel)}px`;
+  }
+};
 
 export const PanelContainer = {
   oninit(vnode: PanelContainerVnode) {
@@ -149,18 +175,27 @@ export const PanelContainer = {
     }
     this.ctx = ctx;
 
-    // Calling m.redraw during a lifecycle method results in undefined behavior.
-    // Use setTimeout to do it asyncronously at the end of the current redraw.
-    setTimeout(() => {
-      updateDimensionsFromDom(vnodeDom);
-      m.redraw();
-    });
+    const clientRect =
+        assertExists(vnodeDom.dom.parentElement).getBoundingClientRect();
+    this.parentWidth = clientRect.width;
+    this.parentHeight = clientRect.height;
+
+    this.totalPanelHeight = sumPanelHeight(vnodeDom);
+    (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
+
+    this.canvasHeight = getCanvasHeight(vnodeDom);
+    updateCanvasDimensions(vnodeDom);
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
     this.onResize = () => {
-      updateDimensionsFromDom(vnodeDom);
-      m.redraw();
+      const clientRect =
+          assertExists(vnodeDom.dom.parentElement).getBoundingClientRect();
+      this.parentWidth = clientRect.width;
+      this.parentHeight = clientRect.height;
+      this.canvasHeight = getCanvasHeight(vnodeDom);
+      updateCanvasDimensions(vnodeDom);
+      globals.rafScheduler.scheduleFullRedraw();
     };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
@@ -186,41 +221,29 @@ export const PanelContainer = {
   },
 
   view({attrs}) {
+    // Cache panels vnodes in state for canvas rendering code can access them.
     this.panels = attrs.panels.map(vnode => assertIsPanel(vnode));
 
-    // TODO: How do you get real panel height? vnode.state is undefined here.
-    const getPanelHeight = (_: {}) => 100;
-
-    const totalHeight =
-        this.panels.reduce((sum, panel) => sum + getPanelHeight(panel), 0);
-    const canvasHeight = this.parentHeight * this.canvasOverdrawFactor;
-
-    // In the scrolling case, since the canvas is overdrawn and continuously
-    // repositioned, we need the canvas to be in a div with overflow hidden and
-    // height equaling the total height of the content to prevent scrolling
-    // height from growing.
     return m(
         '.scroll-limiter',
-        {
-          style: {
-            height: `${totalHeight}px`,
-          }
-        },
-        m('canvas.main-canvas', {
-          style: {
-            height: `${canvasHeight}px`,
-          }
-        }),
-        this.panels.map(
-            panel =>
-                m('.panel',
-                  {
-                    style: {height: `${getPanelHeight(panel)}px`},
-                  },
-                  panel)));
+        m('canvas.main-canvas'),
+        this.panels.map(panel => m(PanelWrapper, {panel})));
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {
     repositionCanvas(vnodeDom);
+
+    const totalPanelHeight = sumPanelHeight(vnodeDom);
+    if (this.totalPanelHeight !== totalPanelHeight) {
+      this.totalPanelHeight = totalPanelHeight;
+      (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
+    }
+
+    // In non-scrolling case, canvas height can change if panel heights changed.
+    const canvasHeight = getCanvasHeight(vnodeDom);
+    if (this.canvasHeight !== canvasHeight) {
+      this.canvasHeight = canvasHeight;
+      updateCanvasDimensions(vnodeDom);
+    }
   }
 } as m.Component<PanelContainerAttrs, PanelContainerState>;

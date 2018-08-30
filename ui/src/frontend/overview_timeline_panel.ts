@@ -22,7 +22,6 @@ import {globals} from './globals';
 import {Panel} from './panel';
 import {TimeScale} from './time_scale';
 
-
 export class OverviewTimelinePanel extends Panel {
   private width?: number;
   private dragStartPx: number;
@@ -30,19 +29,17 @@ export class OverviewTimelinePanel extends Panel {
   private timeScale?: TimeScale;
   private totTime: TimeSpan;
 
-  getHeight(): number {
-    return 100;
-  }
-
   constructor() {
     super();
     this.width = 0;
     this.dragStartPx = 0;
     this.totTime = new TimeSpan(0, 0);
+    console.log('Constructor done');
   }
 
-  // This can be used to initialize members that depends on attrs.
-  oninit() {}
+  getHeight() {
+    return 100;
+  }
 
   // Must explicitly type now; arguments types are no longer auto-inferred.
   // https://github.com/Microsoft/TypeScript/issues/1373
@@ -63,12 +60,14 @@ export class OverviewTimelinePanel extends Panel {
 
   view() {
     // Rendering empty div to measure width.
+    console.log('Panel: overview view');
     return m('.overview-timeline', {
       style: {width: '100%'},
     });
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D) {
+    console.log('Panel: Overview canvas render');
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
