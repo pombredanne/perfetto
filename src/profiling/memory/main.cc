@@ -39,7 +39,7 @@ int HeapprofdMain(int argc, char** argv) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
     sock = ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
-  } else {
+  } else if (argc == 1) {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
     // variable.
@@ -55,6 +55,8 @@ int HeapprofdMain(int argc, char** argv) {
           "Invalid ANDROID_SOCKET_heapprofd. Expected decimal integer.");
     sock = ipc::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
                                    &read_task_runner);
+  } else {
+    PERFETTO_FATAL("Invalid number of arguments. %s [SOCKET]", argv[0]);
   }
 
   if (sock->last_error() != 0)
