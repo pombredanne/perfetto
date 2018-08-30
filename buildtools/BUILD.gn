@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import("//gn/standalone/libc++/libc++.gni")
+import("../gn/perfetto.gni")
 
 # Used to suppress warnings coming from googletest macros expansions.
 config("test_warning_suppressions") {
@@ -667,7 +668,14 @@ source_set("lzma") {
     "-Wno-enum-conversion",
   ]
 }
-shared_library("libunwindstack") {
+
+if (build_standalone) {
+  libunwindstack_type = "source_set"
+} else {
+  libunwindstack_type = "shared_library"
+}
+
+target(libunwindstack_type, "libunwindstack") {
   include_dirs = [
     "android-core/libunwindstack/include",
     "android-core/libunwindstack",
