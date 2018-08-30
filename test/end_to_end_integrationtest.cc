@@ -59,17 +59,15 @@ namespace perfetto {
 #define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
 #endif
 TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
   // Parsing ftrace is broken in Android Pie when running a 64 bit kernel
   // and a 32 bit userland or other way round. Exclude those.
   struct utsname un;
   PERFETTO_CHECK(uname(&un) != -1);
   size_t kernel_size = strstr(un.machine, "64") ? 8 : 4;
-  if (sizeof(void*) != kernel_sizboole) {
+  if (sizeof(void*) != kernel_size) {
     // Kernel is 64bit and userspace is 32bit or other way round.
     return;
   }
-#endif
 
   base::TestTaskRunner task_runner;
 
