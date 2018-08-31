@@ -184,7 +184,6 @@ bool DoUnwind(void* mem,
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
       sz - alloc_metadata->stack_pointer_offset);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
-  unwinder.SetResolveNames(true);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
   uint8_t error_code = 0;
@@ -201,7 +200,7 @@ bool DoUnwind(void* mem,
   if (error_code == 0)
     *out = unwinder.frames();
   else
-    PERFETTO_ELOG("unwinding failed %" PRIu8, error_code);
+    PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
   return error_code == 0;
 }
 
