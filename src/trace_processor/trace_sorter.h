@@ -81,11 +81,6 @@ class TraceSorter {
 
     bool is_ftrace() const { return cpu != kNoCpu; }
 
-    // IMPORTANT: don't add any non-POD fields here beyond blob_view.
-    // The code in SortAndFlushEventsBeyondWindow() assumes that this struct
-    // is trivially moveable and becomes trivially destructible after the
-    // blob_view is moved out.
-
     uint64_t timestamp;
     TraceBlobView blob_view;
     uint32_t cpu;
@@ -151,11 +146,12 @@ class TraceSorter {
 
     // If we are optimizing for high-bandwidth, wait before we accumulate a
     // bunch of events before processing them. There are two cpu-intensive
-    // things happening here:
-    // 1. Sorting the tail of |events_|.
-    // 2. Erasing the head of |events_| and shifting them left.
-    // Both operations become way faster if done in large batches (~1M events)
-    // that take advantage of cpu caches with temporal locality.
+    // things happening here: (1) Sorting the tail of |events_|; (2) Erasing the
+    // head of |events_| and shifting them left. Both operations become way
+    // faster if done in large batches (~1M events), where we end up erasing
+    // 90% or more of |events_| and the erase-front becomes mainly a memmove of
+    // the remaining tail elements. Capping at 1M objectis to avoid holding
+    // too many events in the staging area.
     if (optimization_ == OptimizationMode::kMaxBandwidth &&
         latest_timestamp_ - earliest_timestamp_ < window_size_ns_ * 10 &&
         events_.size() < 1e6) {
