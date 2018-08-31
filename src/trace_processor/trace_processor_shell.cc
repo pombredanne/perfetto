@@ -118,7 +118,9 @@ int main(int argc, char** argv) {
   }
 
   // Load the trace file into the trace processor.
-  TraceProcessor tp;
+  TraceProcessor::Config config;
+  config.optimization_mode = OptimizationMode::kMaxBandwidth;
+  TraceProcessor tp(config);
   base::ScopedFile fd;
   fd.reset(open(trace_file_path, O_RDONLY));
   PERFETTO_CHECK(fd);
@@ -168,6 +170,9 @@ int main(int argc, char** argv) {
   double size_mb = file_size / 1E6;
   PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / t_load);
   g_tp = &tp;
+
+  if (size_mb > 0)
+    return 0;
 
 #if PERFETTO_HAS_SIGNAL_H()
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
