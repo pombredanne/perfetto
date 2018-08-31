@@ -48,6 +48,8 @@ class TraceProcessor {
   // ignore the following Parse() requests and drop data on the floor.
   bool Parse(std::unique_ptr<uint8_t[]>, size_t);
 
+  void NotifyEndOfFile();
+
   // Executes a SQLite query on the loaded portion of the trace. |result| will
   // be invoked once after the result of the query is available.
   void ExecuteQuery(const protos::RawQueryArgs&,
