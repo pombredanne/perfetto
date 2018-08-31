@@ -39,11 +39,21 @@ class ProtoTraceParser {
                                  TraceBlobView);
   void ParseProcessTree(TraceBlobView);
   void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, TraceBlobView);
+  void ParsePrint(uint32_t cpu, uint64_t timestamp, TraceBlobView);
   void ParseThread(TraceBlobView);
   void ParseProcess(TraceBlobView);
 
  private:
+  struct Slice {
+    StringId cat_id;
+    StringId name_id;
+
+    uint64_t start_ts;
+  };
+  using SlicesStack = std::vector<Slice>;
+
   TraceProcessorContext* context_;
+  std::unordered_map<UniquePid, SlicesStack> process_slice_stack_;
 };
 
 }  // namespace trace_processor

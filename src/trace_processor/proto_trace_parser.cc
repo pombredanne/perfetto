@@ -32,6 +32,62 @@
 namespace perfetto {
 namespace trace_processor {
 
+namespace {
+
+struct PrintEvent {
+  char phase;
+  uint32_t pid;
+
+  // For phase = 'B' and phase = 'C'
+  base::StringView name;
+
+  // For phase = 'C' only.
+  int64_t value;
+};
+
+bool ParsePrintEvent(base::StringView str, PrintEvent* evt_out) {
+  // B|1636|pokeUserActivity
+  // E|1636
+  // C|1636|wq:monitor|0
+ 
+  // THIS char* IS NOT NULL TERMINATED.
+  const char* s = str.data();
+  size_t len = str.size();
+ 
+  // Check str matches '[BEC]\|[0-9]+'
+  if (len < 3 || s[1] != '|')
+    return false;
+  size_t pid_length;
+  for (size_t i=2;; i++) {
+    if (i >= len)
+      return false;
+    if (s[i] == '|' || s[i] == '\n') {
+      pid_length = i - 2;
+      break;
+    }
+    if (s[i] < '0' || s[i] > '9')
+      return false;
+  }
+
+  std::string pid_str(s+2, pid_length);
+  evt_out->pid = static_cast<uint32_t>(std::stoi(pid_str.c_str()));
+
+  evt_out->phase = s[0];
+  switch (s[0]) {
+    case 'B':
+      evt_out->name = base::StringView(s+2+pid_length+1, len-2-pid_length-1);
+      return true;
+    case 'E':
+      return true;
+    case 'C':
+      return true;
+    default:
+      return false;
+  }
+}
+
+} // namespace
+
 using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
 
@@ -134,6 +190,12 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
+      case protos::FtraceEvent::kPrintFieldNumber: {
+        PERFETTO_DCHECK(timestamp > 0);
+        const size_t fld_off = ftrace.offset_of(fld.data());
+        ParsePrint(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
       default:
         break;
     }
@@ -170,6 +232,47 @@ void ProtoTraceParser::ParseSchedSwitch(uint32_t cpu,
   }
   context_->sched_tracker->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state,
                                            prev_comm, next_pid);
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParsePrint(uint32_t, uint64_t timestamp,
+                                        TraceBlobView print) {
+  ProtoDecoder decoder(print.data(), print.length());
+
+  base::StringView buf;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::PrintFtraceEvent::kBufFieldNumber:
+        buf = fld.as_string();
+        break;
+      default:
+        break;
+    }
+  }
+
+  ParsePrintEvent(buf, &evt);
+  ProcessTracker* procs = context_->process_tracker.get();
+  TraceStorage* storage = context_->storage.get();
+  TraceStorage::NestableSlices* slices = storage->mutable_nestable_slices();
+
+  PrintEvent evt{};
+  switch (evt.phase) {
+    case 'B':
+      PERFETTO_LOG("%c %u %s", evt.phase, evt.pid, evt.name.ToStdString().c_str());
+      StringId name_id = storage->InternString(evt.name);
+      UniquePid upid = procs->UpdateProcess(pid);
+      break;
+    case 'E':
+      PERFETTO_LOG("%c %u", evt.phase, evt.pid);
+
+      context_->slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts, utid,
+                       cat_id, name_id, depth, stack_id, parent_stack_id);
+      break;
+  }
+
+  
+  //context_->sched_tracker->PushSchedSwitch(cpu, timestamp, prev_pid, prev_state,
+  //                                         prev_comm, next_pid);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
