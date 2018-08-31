@@ -51,24 +51,34 @@ namespace {
 
 size_t kMaxFrames = 1000;
 
-unwindstack::Regs* CreateFromRawData(unwindstack::ArchEnum arch,
-                                     void* raw_data) {
+std::unique_ptr<unwindstack::Regs> CreateFromRawData(unwindstack::ArchEnum arch,
+                                                     void* raw_data) {
+  std::unique_ptr<unwindstack::Regs> ret;
+  // unwindstack::RegsX::Read returns a raw ptr which we are expected to free.
   switch (arch) {
     case unwindstack::ARCH_X86:
-      return unwindstack::RegsX86::Read(raw_data);
+      ret.reset(unwindstack::RegsX86::Read(raw_data));
+      break;
     case unwindstack::ARCH_X86_64:
-      return unwindstack::RegsX86_64::Read(raw_data);
+      ret.reset(unwindstack::RegsX86_64::Read(raw_data));
+      break;
     case unwindstack::ARCH_ARM:
-      return unwindstack::RegsArm::Read(raw_data);
+      ret.reset(unwindstack::RegsArm::Read(raw_data));
+      break;
     case unwindstack::ARCH_ARM64:
-      return unwindstack::RegsArm64::Read(raw_data);
+      ret.reset(unwindstack::RegsArm64::Read(raw_data));
+      break;
     case unwindstack::ARCH_MIPS:
-      return unwindstack::RegsMips::Read(raw_data);
+      ret.reset(unwindstack::RegsMips::Read(raw_data));
+      break;
     case unwindstack::ARCH_MIPS64:
-      return unwindstack::RegsMips64::Read(raw_data);
+      ret.reset(unwindstack::RegsMips64::Read(raw_data));
+      break;
     case unwindstack::ARCH_UNKNOWN:
-      return nullptr;
+      ret.reset(nullptr);
+      break;
   }
+  return ret;
 }
 
 }  // namespace
@@ -88,6 +98,7 @@ size_t RegSize(unwindstack::ArchEnum arch) {
     case unwindstack::ARCH_MIPS64:
       return unwindstack::MIPS64_REG_LAST * sizeof(uint64_t);
     case unwindstack::ARCH_UNKNOWN:
+      PERFETTO_DCHECK(false);
       return 0;
   }
 }
@@ -178,19 +189,14 @@ bool DoUnwind(void* mem,
   // after this loop. error_code = LastErrorCode gets run at least once.
   uint8_t error_code = 0;
   for (int attempt = 0; attempt < 2; ++attempt) {
+    if (attempt > 0) {
+      metadata->maps.Reset();
+      metadata->maps.Parse();
+    }
     unwinder.Unwind();
     error_code = unwinder.LastErrorCode();
-    if (error_code != 0) {
-      //      PERFETTO_DCHECK(false);
-      if (error_code == unwindstack::ERROR_INVALID_MAP && attempt == 0) {
-        metadata->maps.Reset();
-        metadata->maps.Parse();
-      } else {
-        break;
-      }
-    } else {
+    if (error_code != unwindstack::ERROR_INVALID_MAP)
       break;
-    }
   }
   if (error_code == 0)
     *out = unwinder.frames();

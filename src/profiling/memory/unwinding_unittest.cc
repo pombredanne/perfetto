@@ -64,7 +64,11 @@ TEST(UnwindingTest, FileDescriptorMapsParse) {
   ASSERT_EQ(map_info->name, "[stack]");
 }
 
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_DoUnwind DoUnwind
+#else
+#define MAYBE_DoUnwind DISABLED_DoUnwind
+#endif
 
 uint8_t* GetStackBase() {
   pthread_t t = pthread_self();
@@ -123,7 +127,7 @@ GetRecord() {
 }
 
 // TODO(fmayer): Investigate why this fails out of tree.
-TEST(UnwindingTest, DoUnwind) {
+TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_maps(open("/proc/self/maps", O_RDONLY));
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
   ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem));
@@ -136,8 +140,6 @@ TEST(UnwindingTest, DoUnwind) {
   ASSERT_EQ(st, 0);
   ASSERT_STREQ(demangled.get(), "perfetto::(anonymous namespace)::GetRecord()");
 }
-
-#endif  // PERFETTO_BUILD_WITH_ANDROID
 
 }  // namespace
 }  // namespace perfetto

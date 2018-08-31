@@ -118,7 +118,6 @@ def enable_protobuf_lite(module):
 def enable_protoc_lib(module):
     module.shared_libs.append('libprotoc')
 
-
 def enable_libunwindstack(module):
     module.shared_libs.append('libunwindstack')
     module.shared_libs.append('libprocinfo')

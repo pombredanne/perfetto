@@ -669,13 +669,7 @@ source_set("lzma") {
   ]
 }
 
-if (build_standalone) {
-  libunwindstack_type = "source_set"
-} else {
-  libunwindstack_type = "shared_library"
-}
-
-target(libunwindstack_type, "libunwindstack") {
+source_set("libunwindstack") {
   include_dirs = [
     "android-core/libunwindstack/include",
     "android-core/libunwindstack",
