@@ -17,7 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_TRACE_SORTER_H_
 #define SRC_TRACE_PROCESSOR_TRACE_SORTER_H_
 
-#include <deque>
+#include <vector>
 
 #include "src/trace_processor/basic_types.h"
 #include "src/trace_processor/trace_blob_view.h"
@@ -61,25 +61,30 @@ namespace trace_processor {
 class TraceSorter {
  public:
   struct TimestampedTracePiece {
-    static constexpr inline uint32_t kInvalidCpu() {
-      return std::numeric_limits<uint32_t>::max();
-    }
-    TimestampedTracePiece(uint64_t ts, TraceBlobView bv, uint32_t c)
-        : timestamp(ts), blob_view(std::move(bv)), cpu(c) {}
+    static constexpr uint32_t kNoCpu = std::numeric_limits<uint32_t>::max();
+
+    TimestampedTracePiece(uint64_t a, TraceBlobView b, uint32_t c)
+        : timestamp(a), blob_view(std::move(b)), cpu(c) {}
 
     TimestampedTracePiece(TimestampedTracePiece&&) noexcept = default;
     TimestampedTracePiece& operator=(TimestampedTracePiece&&) = default;
 
-    static bool Compare(const TimestampedTracePiece& x, uint64_t ts) {
+    // For std::lower_bound().
+    static inline bool Compare(const TimestampedTracePiece& x, uint64_t ts) {
       return x.timestamp < ts;
     }
 
-    // For std::sort.
-    bool operator<(const TimestampedTracePiece& o) const {
+    // For std::sort().
+    inline bool operator<(const TimestampedTracePiece& o) const {
       return timestamp < o.timestamp;
     }
 
-    bool is_ftrace() const { return cpu != kInvalidCpu(); }
+    bool is_ftrace() const { return cpu != kNoCpu; }
+
+    // IMPORTANT: don't add any non-POD fields here beyond blob_view.
+    // The code in SortAndFlushEventsBeyondWindow() assumes that this struct
+    // is trivially moveable and becomes trivially destructible after the
+    // blob_view is moved out.
 
     uint64_t timestamp;
     TraceBlobView blob_view;
@@ -90,7 +95,33 @@ class TraceSorter {
               OptimizationMode,
               uint64_t window_size_ns);
 
-  inline void InsertTTP(TimestampedTracePiece ttp) {
+  inline void PushTracePacket(uint64_t timestamp, TraceBlobView packet) {
+    AppendAndMaybeFlushEvents(TimestampedTracePiece(
+        timestamp, std::move(packet), TimestampedTracePiece::kNoCpu));
+  }
+
+  inline void PushFtracePacket(uint32_t cpu,
+                               uint64_t timestamp,
+                               TraceBlobView packet) {
+    AppendAndMaybeFlushEvents(
+        TimestampedTracePiece(timestamp, std::move(packet), cpu));
+  }
+
+  // This method passes any events older than window_size_ns to the
+  // parser to be parsed and then stored.
+  void SortAndFlushEventsBeyondWindow(uint64_t windows_size_ns);
+
+  // Flush all events ignorinig the window.
+  void FlushEventsForced() {
+    SortAndFlushEventsBeyondWindow(/*window_size_ns=*/0);
+  }
+
+  void set_window_ns_for_testing(uint64_t window_size_ns) {
+    window_size_ns_ = window_size_ns;
+  }
+
+ private:
+  inline void AppendAndMaybeFlushEvents(TimestampedTracePiece ttp) {
     const uint64_t timestamp = ttp.timestamp;
     events_.emplace_back(std::move(ttp));
     earliest_timestamp_ = std::min(earliest_timestamp_, timestamp);
@@ -119,9 +150,14 @@ class TraceSorter {
       return;
 
     // If we are optimizing for high-bandwidth, wait before we accumulate a
-    // bunch of events before processing them. The sorting is way faster if done
-    // on larger chunks.
+    // bunch of events before processing them. There are two cpu-intensive
+    // things happening here:
+    // 1. Sorting the tail of |events_|.
+    // 2. Erasing the head of |events_| and shifting them left.
+    // Both operations become way faster if done in large batches (~1M events)
+    // that take advantage of cpu caches with temporal locality.
     if (optimization_ == OptimizationMode::kMaxBandwidth &&
+        latest_timestamp_ - earliest_timestamp_ < window_size_ns_ * 10 &&
         events_.size() < 1e6) {
       return;
     }
@@ -129,34 +165,21 @@ class TraceSorter {
     SortAndFlushEventsBeyondWindow(window_size_ns_);
   }
 
-  void PushTracePacket(uint64_t timestamp, TraceBlobView packet) {
-    InsertTTP(TimestampedTracePiece(timestamp, std::move(packet),
-                                    TimestampedTracePiece::kInvalidCpu()));
-  }
-
-  void PushFtracePacket(uint32_t cpu,
-                        uint64_t timestamp,
-                        TraceBlobView packet) {
-    InsertTTP(TimestampedTracePiece(timestamp, std::move(packet), cpu));
-  }
-
-  // This method passes any events older than window_size_ns to the
-  // parser to be parsed and then stored.
-  void SortAndFlushEventsBeyondWindow(uint64_t windows_size_ns);
-
-  // Flush all events ignorinig the window.
-  void FlushEventsForced() {
-    SortAndFlushEventsBeyondWindow(/*window_size_ns=*/0);
-  }
-
-  void set_window_ns_for_testing(uint64_t window_size_ns) {
-    window_size_ns_ = window_size_ns;
-  }
-
- private:
+  // std::deque makes erase-front potentially faster but std::sort slower.
+  // Overall seems slower than a vector (350 MB/s vs 400 MB/s) without counting
+  // next pipeline stages.
+  std::vector<TimestampedTracePiece> events_;
   TraceProcessorContext* const context_;
+  OptimizationMode optimization_;
+
+  // Events are propagated to the next stage only after (max - min) timestamp
+  // is larger than this value.
   uint64_t window_size_ns_;
+
+  // max(e.timestamp for e in events_).
   uint64_t latest_timestamp_ = 0;
+
+  // min(e.timestamp for e in events_).
   uint64_t earliest_timestamp_ = std::numeric_limits<uint64_t>::max();
 
   // Contains the index (< events_.size()) of the last sorted event. In essence,
@@ -169,10 +192,6 @@ class TraceSorter {
   // |events_| we need to sort entries from (the index corresponding to) that
   // timestamp.
   uint64_t sort_min_ts_ = 0;
-
-  OptimizationMode optimization_;
-
-  std::vector<TimestampedTracePiece> events_;
 };
 
 }  // namespace trace_processor

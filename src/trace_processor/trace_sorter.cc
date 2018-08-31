@@ -23,28 +23,18 @@
 namespace perfetto {
 namespace trace_processor {
 
-namespace {
-
-inline void MoveToTraceParser(ProtoTraceParser* proto_parser,
-                              TraceSorter::TimestampedTracePiece* ttp) {
-  TraceBlobView tbv = std::move(ttp->blob_view);
-  if (ttp->is_ftrace()) {
-    proto_parser->ParseFtracePacket(ttp->cpu, ttp->timestamp, std::move(tbv));
-  } else {
-    proto_parser->ParseTracePacket(std::move(tbv));
-  }
-}
-
-}  // namespace
+// static
+constexpr uint32_t TraceSorter::TimestampedTracePiece::kNoCpu;
 
 TraceSorter::TraceSorter(TraceProcessorContext* context,
                          OptimizationMode optimization,
                          uint64_t window_size_ns)
     : context_(context),
-      window_size_ns_(window_size_ns),
-      optimization_(optimization) {}
+      optimization_(optimization),
+      window_size_ns_(window_size_ns) {}
 
 void TraceSorter::SortAndFlushEventsBeyondWindow(uint64_t window_size_ns) {
+  // First check if any sorting is needed.
   if (sort_start_idx_ > 0) {
     PERFETTO_DCHECK(sort_start_idx_ < events_.size());
     PERFETTO_DCHECK(sort_min_ts_ > 0 && sort_min_ts_ < latest_timestamp_);
@@ -52,37 +42,41 @@ void TraceSorter::SortAndFlushEventsBeyondWindow(uint64_t window_size_ns) {
     // We know that all events between [0, sort_start_idx_] are sorted. Witin
     // this range, perform a bound search and find the iterator for the min
     // timestamp that broke the monotonicity. Re-sort from there to the end.
-    PERFETTO_DCHECK(std::is_sorted(
-        events_.begin(),
-        events_.begin() + static_cast<ssize_t>(sort_start_idx_)));
-    auto sort_from = std::lower_bound(
-        events_.begin(),
-        events_.begin() + static_cast<ssize_t>(sort_start_idx_), sort_min_ts_,
-        &TimestampedTracePiece::Compare);
+    auto sorted_end = events_.begin() + static_cast<ssize_t>(sort_start_idx_);
+    PERFETTO_DCHECK(std::is_sorted(events_.begin(), sorted_end));
+    auto sort_from = std::lower_bound(events_.begin(), sorted_end, sort_min_ts_,
+                                      &TimestampedTracePiece::Compare);
     std::sort(sort_from, events_.end());
     sort_start_idx_ = 0;
     sort_min_ts_ = 0;
   }
 
-  // At this point |events_| is fully sorted again.
+  // At this point |events_| musr be fully sorted.
   PERFETTO_DCHECK(std::is_sorted(events_.begin(), events_.end()));
 
   if (PERFETTO_UNLIKELY(latest_timestamp_ < window_size_ns))
     return;
 
-  // Now that all events are sorted, flush all events in the range
-  // [earlierst_timestamp .. latest_timestamp - window_size_ns].
-  auto flush_end_it = std::lower_bound(events_.begin(), events_.end(),
-                                       1 + latest_timestamp_ - window_size_ns,
-                                       &TimestampedTracePiece::Compare);
+  // Now that all events are sorted, flush all events beyond the window, that is
+  // all events in [begin .. latest_timestamp - window_size_ns].
+  auto flush_end = std::lower_bound(events_.begin(), events_.end(),
+                                    1 + latest_timestamp_ - window_size_ns,
+                                    &TimestampedTracePiece::Compare);
 
-  for (auto it = events_.begin(); it != flush_end_it; it++) {
-    uint64_t cur_timestamp = it->timestamp;
-    PERFETTO_DCHECK(latest_timestamp_ - cur_timestamp >= window_size_ns);
-    MoveToTraceParser(context_->proto_parser.get(), &*it);
+  auto* next_stage = context_->proto_parser.get();
+  for (auto it = events_.begin(); it != flush_end; it++) {
+    PERFETTO_DCHECK(latest_timestamp_ - it->timestamp >= window_size_ns);
+    if (it->is_ftrace()) {
+      next_stage->ParseFtracePacket(it->cpu, it->timestamp,
+                                    std::move(it->blob_view));
+    } else {
+      next_stage->ParseTracePacket(std::move(it->blob_view));
+    }
   }
 
-  events_.erase(events_.begin(), flush_end_it);
+  // Now erase-front all the expired events that have been pushed by the
+  // previous loop.
+  events_.erase(events_.begin(), flush_end);
 
   if (events_.size() > 0) {
     earliest_timestamp_ = events_.front().timestamp;
