@@ -25,7 +25,7 @@
 #include <vector>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/set_map.h"
+#include "perfetto/base/lookup_set.h"
 
 namespace perfetto {
 
@@ -70,7 +70,7 @@ class PrefixFinder {
 
     const std::string name_;
     const Node* parent_;
-    perfetto::SetMap<Node, const std::string, &Node::name_> children_;
+    perfetto::LookupSet<Node, const std::string, &Node::name_> children_;
   };
 
   PrefixFinder(size_t limit);
