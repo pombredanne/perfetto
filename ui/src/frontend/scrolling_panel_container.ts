@@ -14,43 +14,11 @@
 
 import * as m from 'mithril';
 
-import {TrackState} from '../common/state';
-
 import {FlameGraphPanel} from './flame_graph_panel';
 import {globals} from './globals';
 import {HeaderPanel} from './header_panel';
 import {Panel} from './panel';
-import {PanelContainer} from './panel_container';
-import {TrackPanel} from './track_panel';
-
-class TrackPanelById {
-  private idToTrackPanel: Map<string, TrackPanel>;
-  constructor() {
-    this.idToTrackPanel = new Map();
-  }
-
-  getOrCreateTrack(trackState: TrackState): TrackPanel {
-    let trackPanel = this.idToTrackPanel.get(trackState.id);
-    if (trackPanel === undefined) {
-      trackPanel = new TrackPanel(trackState);
-      this.idToTrackPanel.set(trackState.id, trackPanel);
-    }
-    return trackPanel;
-  }
-
-  clearObsoleteTracks(currentTrackIds: string[]) {
-    const currentTrackIdSet = new Set(currentTrackIds);
-    for (const id of this.idToTrackPanel.keys()) {
-      if (!currentTrackIdSet.has(id)) {
-        this.idToTrackPanel.delete(id);
-      }
-    }
-  }
-
-  clearAll() {
-    this.idToTrackPanel.clear();
-  }
-}
+import {PanelContainer, TrackPanelById} from './panel_container';
 
 interface ScrollingPanelContainerState {
   trackHeaderPanel?: Panel;
@@ -64,7 +32,7 @@ export const ScrollingPanelContainer = {
   },
 
   view() {
-    if (globals.state.displayedTrackIds.length === 0) {
+    if (globals.state.scrollingTracks.length === 0) {
       this.trackHeaderPanel = undefined;
       this.flameGraphPanel = undefined;
       this.trackPanelById.clearAll();
@@ -81,7 +49,7 @@ export const ScrollingPanelContainer = {
     }
     panels.push(this.trackHeaderPanel);
 
-    const displayedTrackIds = globals.state.displayedTrackIds;
+    const displayedTrackIds = globals.state.scrollingTracks;
     this.trackPanelById.clearObsoleteTracks(displayedTrackIds);
     for (const id of displayedTrackIds) {
       const trackState = globals.state.tracks[id];

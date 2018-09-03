@@ -14,19 +14,40 @@
 
 import * as m from 'mithril';
 
+import {globals} from './globals';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
 import {Panel} from './panel';
-import {PanelContainer} from './panel_container';
+import {PanelContainer, TrackPanelById} from './panel_container';
 import {TimeAxisPanel} from './time_axis_panel';
 
 export const TopPanelContainer = {
   oninit() {
-    this.panels = [new OverviewTimelinePanel(), new TimeAxisPanel()];
+    this.constantPanels = [];
+    this.pinnedPanels = [];
+    this.trackPanelById = new TrackPanelById();
   },
 
   view() {
+    if (this.constantPanels.length === 0) {
+      this.constantPanels.push(new OverviewTimelinePanel());
+      this.constantPanels.push(new TimeAxisPanel());
+    }
+
+    const displayedTrackIds = globals.state.pinnedTracks;
+    this.trackPanelById.clearObsoleteTracks(displayedTrackIds);
+    const panels = this.constantPanels.slice();
+    for (const id of displayedTrackIds) {
+      const trackState = globals.state.tracks[id];
+      const trackPanel = this.trackPanelById.getOrCreateTrack(trackState);
+      panels.push(trackPanel);
+    }
+
     return m(
         '.pinned-panel-container',
-        m(PanelContainer, {panels: this.panels, doesScroll: false}));
+        m(PanelContainer, {panels, doesScroll: false}));
   },
-} as m.Component<{}, {panels: Panel[]}>;
+} as m.Component<{}, {
+  constantPanels: Panel[],
+  pinnedPanels: Panel[],
+  trackPanelById: TrackPanelById,
+}>;

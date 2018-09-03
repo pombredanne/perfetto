@@ -16,8 +16,11 @@ import * as m from 'mithril';
 
 import {assertExists} from '../base/logging';
 
+import {TrackState} from '../common/state';
+
 import {globals} from './globals';
 import {Panel} from './panel';
+import {TrackPanel} from './track_panel';
 
 /**
  * If the panel container scrolls, the backing canvas height is
@@ -49,7 +52,6 @@ function panelIsOnCanvas(
   return panelYBoundsOnCanvas.end > 0 &&
       panelYBoundsOnCanvas.start < canvasHeight;
 }
-
 
 function renderPanelCanvas(
     ctx: CanvasRenderingContext2D,
@@ -230,3 +232,32 @@ export const PanelContainer = {
     repositionCanvas(vnodeDom);
   }
 } as m.Component<PanelContainerAttrs, PanelContainerState>;
+
+export class TrackPanelById {
+  private idToTrackPanel: Map<string, TrackPanel>;
+  constructor() {
+    this.idToTrackPanel = new Map();
+  }
+
+  getOrCreateTrack(trackState: TrackState): TrackPanel {
+    let trackPanel = this.idToTrackPanel.get(trackState.id);
+    if (trackPanel === undefined) {
+      trackPanel = new TrackPanel(trackState);
+      this.idToTrackPanel.set(trackState.id, trackPanel);
+    }
+    return trackPanel;
+  }
+
+  clearObsoleteTracks(currentTrackIds: string[]) {
+    const currentTrackIdSet = new Set(currentTrackIds);
+    for (const id of this.idToTrackPanel.keys()) {
+      if (!currentTrackIdSet.has(id)) {
+        this.idToTrackPanel.delete(id);
+      }
+    }
+  }
+
+  clearAll() {
+    this.idToTrackPanel.clear();
+  }
+}
