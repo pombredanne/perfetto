@@ -96,7 +96,7 @@ bool ProtoTraceTokenizer::Parse(std::unique_ptr<uint8_t[]> owned_buf,
       data += size_missing;
       size -= size_missing;
       partial_buf_.clear();
-      uint8_t* buf_start = &buf[0];
+      uint8_t* buf_start = &buf[0];  // Note that buf is std::moved below.
       ParseInternal(std::move(buf), buf_start, size_incl_header);
     } else {
       partial_buf_.insert(partial_buf_.end(), data, &data[size]);
@@ -209,7 +209,7 @@ void ProtoTraceTokenizer::ParseFtraceEvent(uint32_t cpu, TraceBlobView event) {
   constexpr auto timestampFieldTag = MakeTagVarInt(kTimestampFieldNumber);
   if (PERFETTO_LIKELY(length > 10 && data[0] == timestampFieldTag)) {
     // Fastpath.
-    const uint8_t* next = ParseVarInt(data + 1, data + 10, &timestamp);
+    const uint8_t* next = ParseVarInt(data + 1, data + 11, &timestamp);
     timestamp_found = next != data + 1;
     decoder.Reset(next);
   } else {

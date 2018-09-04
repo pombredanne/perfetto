@@ -103,6 +103,9 @@ class TraceBlobView {
 
     SharedBuf& operator=(SharedBuf&& other) {
       if (this != &other) {
+        // A bit of a ugly but pragmatic pattern to implement move assignment.
+        // First invoke the distructor and then invoke the move constructor
+        // inline via placement-new.
         this->~SharedBuf();
         new (this) SharedBuf(std::move(other));
       }
