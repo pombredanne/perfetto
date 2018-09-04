@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as m from 'mithril';
+
+import {assertExists} from '../base/logging';
 import {TimeSpan, timeToString} from '../common/time';
 
 import {DragGestureHandler} from './drag_gesture_handler';
@@ -21,28 +24,38 @@ import {TimeScale} from './time_scale';
 
 export class OverviewTimelinePanel extends Panel {
   private width?: number;
-  private dragStartPx = 0;
+  private dragStartPx: number;
   private gesture?: DragGestureHandler;
   private timeScale?: TimeScale;
-  private totTime = new TimeSpan(0, 0);
+  private totTime: TimeSpan;
 
-  getHeight(): number {
-    return 100;
+  constructor() {
+    super();
+    this.width = 0;
+    this.dragStartPx = 0;
+    this.totTime = new TimeSpan(0, 0);
   }
 
-  updateDom(dom: HTMLElement) {
+  // Must explicitly type now; arguments types are no longer auto-inferred.
+  // https://github.com/Microsoft/TypeScript/issues/1373
+  onupdate({dom}: m.CVnodeDOM) {
     this.width = dom.getBoundingClientRect().width;
     this.totTime = new TimeSpan(
         globals.state.traceTime.startSec, globals.state.traceTime.endSec);
-    this.timeScale = new TimeScale(this.totTime, [0, this.width]);
+    this.timeScale = new TimeScale(this.totTime, [0, assertExists(this.width)]);
 
     if (this.gesture === undefined) {
       this.gesture = new DragGestureHandler(
-          dom,
+          dom as HTMLElement,
           this.onDrag.bind(this),
           this.onDragStart.bind(this),
           this.onDragEnd.bind(this));
     }
+  }
+
+  view() {
+    // Rendering empty div to measure width.
+    return m('.overview-timeline');
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D) {

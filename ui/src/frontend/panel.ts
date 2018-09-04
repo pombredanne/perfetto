@@ -12,22 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-let nextPanelId = 0;
+import * as m from 'mithril';
+// import {globals} from './globals';
 
-export abstract class Panel {
-  // Each panel has a unique string id. This is suitable for use as a mithril
-  // component key.
-  readonly id: string;
+export abstract class Panel<Attrs = {}> implements
+    m.Component<Attrs, Panel<Attrs>> {
+  private _height: number|undefined;
 
-  constructor() {
-    this.id = 'panel-id-' + (nextPanelId++).toString();
+  getHeight(): number {
+    if (this._height === undefined) {
+      throw Error('Attempting to access height before it is computed.');
+    }
+    return this._height;
   }
 
-  abstract renderCanvas(ctx: CanvasRenderingContext2D): void;
-  abstract updateDom(dom: HTMLElement): void;
+  // This method is only for use by the PanelContainer. Panels should not
+  // use this.
+  _setHeight(height: number) {
+    this._height = height;
+  }
 
-  // TODO: If a panel changes its height, we need to call m.redraw. Instead of
-  // getHeight, we can have an setHeight method in the abstract class that does
-  // that redraw call.
-  abstract getHeight(): number;
+  abstract renderCanvas(
+      ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
+  abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
+}
+
+
+export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {
+  tag: {getInitialHeight?: (vnode: PanelVNode<Attrs>) => number}&
+      m.Vnode<Attrs, Panel<Attrs>>['tag'];
+}
+
+export function assertIsPanel(vnode: m.Vnode): PanelVNode {
+  const tag = vnode.tag as {};
+  if (typeof tag === 'function' && 'prototype' in tag &&
+      tag.prototype instanceof Panel) {
+    return vnode as PanelVNode;
+  }
+
+  throw Error('This is not a panel vnode.');
 }

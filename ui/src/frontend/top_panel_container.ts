@@ -16,17 +16,17 @@ import * as m from 'mithril';
 
 import {OverviewTimelinePanel} from './overview_timeline_panel';
 import {Panel} from './panel';
+// import {TimeAxisPanel} from './time_axis_panel';
+
 import {PanelContainer} from './panel_container';
-import {TimeAxisPanel} from './time_axis_panel';
 
 export const TopPanelContainer = {
-  oninit() {
-    this.panels = [new OverviewTimelinePanel(), new TimeAxisPanel()];
-  },
-
   view() {
-    return m(
-        '.pinned-panel-container',
-        m(PanelContainer, {panels: this.panels, doesScroll: false}));
+    return m('.pinned-panel-container', m(PanelContainer, {
+               doesScroll: false,
+               panels: [
+                 m(OverviewTimelinePanel),
+               ]
+             }, ));
   },
 } as m.Component<{}, {panels: Panel[]}>;
