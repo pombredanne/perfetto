@@ -30,7 +30,8 @@ export class Router {
       throw Error('routes must define a component for defaultRoute.');
     }
 
-    window.onhashchange = () => this.onhashchange();
+    // TODO: Handle case when new route has a permalink.
+    window.onhashchange = () => this.navigate(this.getRouteFromHash());
   }
 
   getRouteFromHash(): string {
@@ -51,7 +52,7 @@ export class Router {
   currentRootComponent(): m.Component {
     const route = globals.state.route || this.defaultRoute;
     if (!(route in this.routes)) throw Error('State has invalid route');
-    return this.routes[globals.state.route || this.defaultRoute];
+    return this.routes[route];
   }
 
   param(key: string) {
@@ -61,15 +62,10 @@ export class Router {
     return m.parseQueryString(hash.substring(paramStart))[key];
   }
 
-  private onhashchange() {
-    const routeOnHash = this.getRouteFromHash();
-    const nextRoute =
-        routeOnHash in this.routes ? routeOnHash : this.defaultRoute;
+  navigate(route: string) {
+    const nextRoute = route in this.routes ? route : this.defaultRoute;
     if (globals.state.route !== nextRoute) {
-      // The route hash was changed before the state was updated, possibly
-      // through manual user update of the URL. Inform the controller.
       globals.dispatch(navigate(nextRoute));
     }
-    // TODO: Handle case when new route has a new permalink.
   }
 }

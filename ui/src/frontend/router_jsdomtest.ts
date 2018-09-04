@@ -31,6 +31,15 @@ test('Default route must be defined', () => {
   expect(() => new Router('/a', {'/b': mockComponent})).toThrow();
 });
 
+test('Returns default component for empty state route', () => {
+  globals.initialize({});
+  const router = new Router('/a', {'/a': mockComponent});
+  globals.state.route = '';
+  expect(router.currentRootComponent()).toBe(mockComponent);
+  globals.state.route = null;
+  expect(router.currentRootComponent()).toBe(mockComponent);
+});
+
 test('Returns component based on route in state', () => {
   globals.initialize({});
   const comp1 = {id: '1', view() {}};
@@ -53,6 +62,9 @@ test('Parse route from hash', () => {
   const router = new Router('/', {'/': mockComponent});
   window.location.hash = ROUTE_PREFIX + '/foobar?s=42';
   expect(router.getRouteFromHash()).toBe('/foobar');
+
+  window.location.hash = '/foobar';  // Invalid prefix.
+  expect(router.getRouteFromHash()).toBe('');
 });
 
 test('Cannot set invalid route', () => {

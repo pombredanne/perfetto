@@ -17,7 +17,7 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
-import {loadPermalink, navigate} from '../common/actions';
+import {loadPermalink} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {EnginePortAndId} from '../controller/engine';
@@ -147,7 +147,7 @@ function main() {
     if (e.ctrlKey) e.preventDefault();
   });
 
-  globals.dispatch(navigate(globals.router.getRouteFromHash()));
+  globals.router.navigate(globals.router.getRouteFromHash());
 }
 
 main();
