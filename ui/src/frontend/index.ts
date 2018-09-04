@@ -29,6 +29,7 @@ import {
 
 import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
+import {Router} from './router';
 import {ViewerPage} from './viewer_page';
 
 /**
@@ -100,11 +101,12 @@ class FrontendApi {
   }
 
   private redraw(): void {
-    if (globals.state.route && globals.state.route !== m.route.get()) {
-      m.route.set(globals.state.route);
-    } else {
-      globals.rafScheduler.scheduleFullRedraw();
+    if (globals.state.route &&
+        globals.state.route !== globals.router.getRouteFromHash()) {
+      globals.router.setRouteOnHash(globals.state.route);
     }
+
+    globals.rafScheduler.scheduleFullRedraw();
   }
 }
 
@@ -117,21 +119,25 @@ function main() {
   forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
 
-  globals.initialize(controller.postMessage.bind(controller));
+  globals.initialize({
+    dispatch: controller.postMessage.bind(controller),
+    router: new Router('/', {
+      '/': HomePage,
+      '/viewer': ViewerPage,
+    }),
+  });
+
+  globals.rafScheduler.domRedraw = () =>
+      m.render(document.body, m(globals.router.currentRootComponent()));
 
   warmupWasmEngine();
-
-  m.route(document.body, '/', {
-    '/': HomePage,
-    '/viewer': ViewerPage,
-  });
 
   // Put these variables in the global scope for better debugging.
   (window as {} as {m: {}}).m = m;
   (window as {} as {globals: {}}).globals = globals;
 
   // /?s=xxxx for permalinks.
-  const stateHash = m.route.param('s');
+  const stateHash = globals.router.param('s');
   if (stateHash) {
     globals.dispatch(loadPermalink(stateHash));
   }
@@ -141,7 +147,7 @@ function main() {
     if (e.ctrlKey) e.preventDefault();
   });
 
-  globals.dispatch(navigate(m.route.get()));
+  globals.dispatch(navigate(globals.router.getRouteFromHash()));
 }
 
 main();
