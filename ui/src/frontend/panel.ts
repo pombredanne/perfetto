@@ -13,34 +13,25 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-import {globals} from './globals';
+// import {globals} from './globals';
 
 export abstract class Panel<Attrs = {}> implements
     m.Component<Attrs, Panel<Attrs>> {
-  private height = 0;
-  private isRenderingCanvas = false;
+  private _height: number|undefined;
 
-  getHeight() {
-    return this.height;
-  }
-
-  setHeight(height: number) {
-    if (this.isRenderingCanvas) {
-      throw Error(
-          'Cannot change height while rendering canvas. ' +
-          'Consider setting height in the view method.');
+  getHeight(): number {
+    if (this._height === undefined) {
+      throw Error('Attempting to access height before it is computed.');
     }
-    this.height = height;
-    // Do a full redraw after changing height to keep DOM and canvas in sync.
-    globals.rafScheduler.scheduleFullRedraw();
+    return this._height;
   }
 
-  renderCanvasInternal(
-      ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>) {
-    this.isRenderingCanvas = true;
-    this.renderCanvas(ctx, vnode);
-    this.isRenderingCanvas = false;
+  // This method is only for use by the PanelContainer. Panels should not
+  // use this.
+  _setHeight(height: number) {
+    this._height = height;
   }
+
   abstract renderCanvas(
       ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
   abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;

@@ -36,10 +36,6 @@ export class OverviewTimelinePanel extends Panel {
     this.totTime = new TimeSpan(0, 0);
   }
 
-  static getInitialHeight() {
-    return 100;
-  }
-
   // Must explicitly type now; arguments types are no longer auto-inferred.
   // https://github.com/Microsoft/TypeScript/issues/1373
   onupdate({dom}: m.CVnodeDOM) {
@@ -59,7 +55,7 @@ export class OverviewTimelinePanel extends Panel {
 
   view() {
     // Rendering empty div to measure width.
-    return m('.overview-timeline', {});
+    return m('.overview-timeline');
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D) {

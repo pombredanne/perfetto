@@ -61,7 +61,7 @@ function renderPanelCanvas(
   const clipRect = new Path2D();
   clipRect.rect(0, 0, width, panel.state.getHeight());
   ctx.clip(clipRect);
-  panel.state.renderCanvasInternal(ctx, panel);
+  panel.state.renderCanvas(ctx, panel);
 
   ctx.restore();
 }
@@ -69,8 +69,7 @@ function renderPanelCanvas(
 function redrawAllPanelCavases(vnode: PanelContainerVnode) {
   const state = vnode.state;
   if (!state.ctx) return;
-  const totalHeight = vnode.state.panels.reduce(
-      (sum, panel) => sum + panel.state.getHeight(), 0);
+  const totalHeight = sumPanelHeight(vnode);
   const canvasHeight = totalHeight;
   state.ctx.clearRect(0, 0, state.parentWidth, canvasHeight);
   const canvasYStart = state.scrollTop - getCanvasOverdrawHeightPerSide(vnode);
@@ -113,13 +112,22 @@ function getCanvasHeight(vnode: PanelContainerVnode) {
       vnode.state.totalPanelHeight;
 }
 
+function updatePanelHeightsFromDom(vnode: PanelContainerVnode) {
+  for (const panel of vnode.state.panels) {
+    // At this points panelVnodes should have dom.
+    const panelDom = assertExists(panel.dom);
+    const height = panelDom.getBoundingClientRect().height;
+    panel.state._setHeight(height);
+  }
+}
+
 interface PanelContainerState {
   parentWidth: number;
   parentHeight: number;
   scrollTop: number;
   canvasOverdrawFactor: number;
   ctx: CanvasRenderingContext2D|null;
-  panels: PanelVNode[];
+  panels: Array<PanelVNode&{dom?: Element}>;
   totalPanelHeight: number;
   canvasHeight: number;
 
@@ -139,19 +147,6 @@ type PanelContainerVnode = m.Vnode<PanelContainerAttrs, PanelContainerState>;
 type PanelContainerVnodeDom =
     m.VnodeDOM<PanelContainerAttrs, PanelContainerState>;
 
-const PanelWrapper: m.Component<{panel: PanelVNode}> = {
-  view({attrs}) {
-    return m('.panel', attrs.panel);
-  },
-
-  oncreate({attrs, dom}) {
-    (dom as HTMLElement).style.height = `${attrs.panel.state.getHeight()}px`;
-  },
-
-  onupdate({attrs, dom}) {
-    (dom as HTMLElement).style.height = `${attrs.panel.state.getHeight()}px`;
-  }
-};
 
 export const PanelContainer = {
   oninit(vnode: PanelContainerVnode) {
@@ -182,12 +177,7 @@ export const PanelContainer = {
     this.parentWidth = clientRect.width;
     this.parentHeight = clientRect.height;
 
-    // Initialize panel heights.
-    for (const panel of this.panels) {
-      const height =
-          panel.tag.getInitialHeight ? panel.tag.getInitialHeight(panel) : 0;
-      panel.state.setHeight(height);
-    }
+    updatePanelHeightsFromDom(vnodeDom);
 
     this.totalPanelHeight = sumPanelHeight(vnodeDom);
     (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
@@ -236,12 +226,13 @@ export const PanelContainer = {
     return m(
         '.scroll-limiter',
         m('canvas.main-canvas'),
-        this.panels.map(panel => m(PanelWrapper, {panel})));
+        this.panels.map(panel => m('.panel', panel)));
   },
 
   onupdate(vnodeDom: PanelContainerVnodeDom) {
     repositionCanvas(vnodeDom);
 
+    updatePanelHeightsFromDom(vnodeDom);
     const totalPanelHeight = sumPanelHeight(vnodeDom);
     if (this.totalPanelHeight !== totalPanelHeight) {
       this.totalPanelHeight = totalPanelHeight;
@@ -254,5 +245,5 @@ export const PanelContainer = {
       this.canvasHeight = canvasHeight;
       updateCanvasDimensions(vnodeDom);
     }
-  }
+  },
 } as m.Component<PanelContainerAttrs, PanelContainerState>;

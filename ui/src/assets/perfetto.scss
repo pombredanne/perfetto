@@ -292,15 +292,8 @@ canvas.main-canvas {
   position: absolute;
 }
 
-// If you introduce margins or paddings here, you need to also update the
-// PanelContainer canvas rendering code.
 .panel {
-  position: relative;
-
-  // Make any direct children automatically take up full height.
-  display: grid;
-  grid-template-rows: 1fr;
-  grid-template-columns: 1fr;
+  position: relative;  // Otherwise canvas covers panel dom.
 }
 
 .pan-and-zoom-content {
@@ -308,4 +301,8 @@ canvas.main-canvas {
   position: relative;
   display: flex;
   flex-flow: column nowrap;
+}
+
+.overview-timeline {
+  height: 100px;
 }
