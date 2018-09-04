@@ -95,6 +95,7 @@ cc_library_shared {
   shared_libs: [
     "liblog",
     "libprotobuf-cpp-lite",
+    "libcutils",
   ],
   static_libs: [
     "libgtest_prod",

@@ -23,6 +23,7 @@
 #include <queue>
 #include <string>
 #include <utility>
+#include <sys/utsname.h>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
@@ -285,8 +286,16 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &page_header.timestamp))
     return 0;
 
+  struct utsname info;
+  uint32_t is_64 = 0;
+  uname(&info);
+  std::string arch(info.machine);
+
+  if (arch == "armv8l")
+    is_64 = 1;
+
   // Temporary workaroud to make this work on ARM32 and ARM64 devices.
-  if (sizeof(void*) == 8) {
+  if (sizeof(void*) == 8 || is_64) {
     uint64_t overwrite_and_size;
     if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &overwrite_and_size))
       return 0;
