@@ -116,7 +116,6 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid) {
   UniquePid upid;
   TraceStorage::Process* process;
   std::tie(upid, process) = GetOrCreateProcess(pid, 0 /* start_ns */);
-  process->name_id = proc_name_id;
   UpdateThread(/*tid=*/pid, pid);  // Create an entry for the main thread.
   return upid;
 }

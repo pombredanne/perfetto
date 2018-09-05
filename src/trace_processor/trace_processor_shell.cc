@@ -171,8 +171,8 @@ int main(int argc, char** argv) {
   PERFETTO_ILOG("Trace loaded: %.2f MB (%.1f MB/s)", size_mb, size_mb / t_load);
   g_tp = &tp;
 
-  if (size_mb > 0)
-    return 0;
+// if (size_mb > 0)
+//  return 0;
 
 #if PERFETTO_HAS_SIGNAL_H()
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
