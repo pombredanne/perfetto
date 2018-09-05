@@ -13,42 +13,35 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-// import {globals} from './globals';
 
-export abstract class Panel<Attrs = {}> implements
-    m.Component<Attrs, Panel<Attrs>> {
-  private _height: number|undefined;
+export interface PanelSize {
+  width: number;
+  height: number;
+}
 
-  getHeight(): number {
-    if (this._height === undefined) {
-      throw Error('Attempting to access height before it is computed.');
-    }
-    return this._height;
-  }
+export interface PanelLifecycle<Attrs, State> extends
+    m.Lifecycle<Attrs, State> {
+  renderCanvas?(this: State, ctx: CanvasRenderingContext2D, size: PanelSize):
+      void;
+}
 
-  // This method is only for use by the PanelContainer. Panels should not
-  // use this.
-  _setHeight(height: number) {
-    this._height = height;
-  }
-
-  abstract renderCanvas(
-      ctx: CanvasRenderingContext2D, vnode: PanelVNode<Attrs>): void;
-  abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
+export interface Panel<Attrs = {},
+                       State extends PanelLifecycle<Attrs, State> =
+                                         PanelLifecycle<Attrs, State>> extends
+    m.Component<Attrs, State> {
 }
 
 
-export interface PanelVNode<Attrs = {}> extends m.Vnode<Attrs, Panel<Attrs>> {
-  tag: {getInitialHeight?: (vnode: PanelVNode<Attrs>) => number}&
-      m.Vnode<Attrs, Panel<Attrs>>['tag'];
-}
+export interface PanelVNode<Attrs = {},
+                            State extends PanelLifecycle<Attrs, State> =
+                                              PanelLifecycle<Attrs, State>>
+    extends m.Vnode<Attrs, State> {}
 
 export function assertIsPanel(vnode: m.Vnode): PanelVNode {
   const tag = vnode.tag as {};
   if (typeof tag === 'function' && 'prototype' in tag &&
-      tag.prototype instanceof Panel) {
+      tag.prototype.renderCanvas !== undefined) {
     return vnode as PanelVNode;
   }
-
   throw Error('This is not a panel vnode.');
 }

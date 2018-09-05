@@ -14,36 +14,29 @@
 
 import * as m from 'mithril';
 
-import {assertExists} from '../base/logging';
 import {TimeSpan, timeToString} from '../common/time';
-
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {Panel} from './panel';
+import {Panel, PanelSize} from './panel';
 import {TimeScale} from './time_scale';
 
-export class OverviewTimelinePanel extends Panel {
-  private width?: number;
-  private dragStartPx: number;
-  private gesture?: DragGestureHandler;
-  private timeScale?: TimeScale;
-  private totTime: TimeSpan;
+interface State {
+  dragStartPx: number;
+  gesture: DragGestureHandler;
+  timeScale: TimeScale;
+  totTime: TimeSpan;
 
-  constructor() {
-    super();
-    this.width = 0;
-    this.dragStartPx = 0;
-    this.totTime = new TimeSpan(0, 0);
-  }
+  onDrag(this: State, x: number): void;
+  onDragStart(this: State, x: number): void;
+  onDragEnd(this: State): void;
+}
 
-  // Must explicitly type now; arguments types are no longer auto-inferred.
-  // https://github.com/Microsoft/TypeScript/issues/1373
-  onupdate({dom}: m.CVnodeDOM) {
-    this.width = dom.getBoundingClientRect().width;
+export const OverviewTimelinePanel = {
+  onupdate({dom}) {
     this.totTime = new TimeSpan(
         globals.state.traceTime.startSec, globals.state.traceTime.endSec);
-    this.timeScale = new TimeScale(this.totTime, [0, assertExists(this.width)]);
-
+    const width = dom.getBoundingClientRect().width;
+    this.timeScale = new TimeScale(this.totTime, [0, width]);
     if (this.gesture === undefined) {
       this.gesture = new DragGestureHandler(
           dom as HTMLElement,
@@ -51,27 +44,26 @@ export class OverviewTimelinePanel extends Panel {
           this.onDragStart.bind(this),
           this.onDragEnd.bind(this));
     }
-  }
+  },
 
   view() {
     // Rendering empty div to measure width.
     return m('.overview-timeline');
-  }
+  },
 
-  renderCanvas(ctx: CanvasRenderingContext2D) {
-    if (this.width === undefined) return;
+  renderCanvas(this: State, ctx: CanvasRenderingContext2D, size: PanelSize) {
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight = this.getHeight() - headerHeight;
+    const tracksHeight = size.height - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';
     ctx.fillStyle = '#999';
     for (let i = 0; i < 100; i++) {
-      const xPos = i * this.width / 100;
+      const xPos = i * size.width / 100;
       const t = this.timeScale.pxToTime(xPos);
       if (xPos < 0) continue;
-      if (xPos > this.width) break;
+      if (xPos > size.width) break;
       if (i % 10 === 0) {
         ctx.fillRect(xPos, 0, 1, headerHeight - 5);
         ctx.fillText(timeToString(t - this.totTime.start), xPos + 5, 18);
@@ -103,7 +95,7 @@ export class OverviewTimelinePanel extends Panel {
 
     // Draw bottom border.
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
-    ctx.fillRect(0, this.getHeight() - 2, this.width, 2);
+    ctx.fillRect(0, size.height - 2, size.width, 2);
 
     // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;
@@ -112,7 +104,7 @@ export class OverviewTimelinePanel extends Panel {
 
     ctx.fillStyle = 'rgba(200, 200, 200, 0.8)';
     ctx.fillRect(0, headerHeight, vizStartPx, tracksHeight);
-    ctx.fillRect(vizEndPx, headerHeight, this.width - vizEndPx, tracksHeight);
+    ctx.fillRect(vizEndPx, headerHeight, size.width - vizEndPx, tracksHeight);
 
     // Draw brushes.
     const handleWidth = 3;
@@ -123,9 +115,9 @@ export class OverviewTimelinePanel extends Panel {
     ctx.fillRect(vizEndPx, headerHeight, 1, tracksHeight);
     ctx.fillRect(vizStartPx - handleWidth, y, handleWidth, handleHeight);
     ctx.fillRect(vizEndPx + 1, y, handleWidth, handleHeight);
-  }
+  },
 
-  onDrag(x: number) {
+  onDrag(this: State, x: number) {
     // Set visible time limits from selection.
     if (this.timeScale === undefined) return;
     let tStart = this.timeScale.pxToTime(this.dragStartPx);
@@ -134,13 +126,13 @@ export class OverviewTimelinePanel extends Panel {
     const vizTime = new TimeSpan(tStart, tEnd);
     globals.frontendLocalState.updateVisibleTime(vizTime);
     globals.rafScheduler.scheduleRedraw();
-  }
+  },
 
-  onDragStart(x: number) {
+  onDragStart(this: State, x: number) {
     this.dragStartPx = x;
-  }
+  },
 
-  onDragEnd() {
+  onDragEnd(this: State) {
     this.dragStartPx = 0;
   }
-}
+} as Panel<{}, State>;
