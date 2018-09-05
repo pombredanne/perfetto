@@ -59,6 +59,22 @@ class MemoryBookkeeping {
             interner_.Intern(loc.function_name)};
   }
 
+  // Node in a tree of function traces that resulted in an allocation. For
+  // instance, if alloc_buf is called from foo and bar, which are called from
+  // main, the tree looks as following.
+  //
+  //            alloc_buf    alloc_buf
+  //                   |      |
+  //                  foo    bar
+  //                    \    /
+  //                      main
+  //                       |
+  //                   libc_init
+  //                       |
+  //                    [root_]
+  //
+  // allocations_ will hold a map from the pointers returned from malloc to
+  // alloc_buf to the leafs of this tree.
   class Node {
    public:
     Node(InternedCodeLocation location) : Node(std::move(location), nullptr) {}

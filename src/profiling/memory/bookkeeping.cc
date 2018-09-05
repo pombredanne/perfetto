@@ -36,12 +36,12 @@ void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
     node->cum_size_ += size;
   }
 
-  nodes_.emplace(address, std::make_pair(size, node));
+  allocations_.emplace(address, std::make_pair(size, node));
 }
 
 void MemoryBookkeeping::RecordFree(uint64_t address) {
-  auto leaf_it = nodes_.find(address);
-  if (leaf_it == nodes_.end())
+  auto leaf_it = allocations_.find(address);
+  if (leaf_it == allocations_.end())
     return;
 
   std::pair<uint64_t, Node*> value = leaf_it->second;
@@ -59,7 +59,7 @@ void MemoryBookkeeping::RecordFree(uint64_t address) {
     node = node->parent_;
   }
 
-  nodes_.erase(leaf_it);
+  allocations_.erase(leaf_it);
 }
 
 uint64_t MemoryBookkeeping::GetCumSizeForTesting(
