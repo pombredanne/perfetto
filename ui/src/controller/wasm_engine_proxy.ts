@@ -114,11 +114,11 @@ export class WasmEngineProxy extends Engine {
     return promise;
   }
 
-  eof(): Promise<void> {
+  notifyEof(): Promise<void> {
     const id = this.nextRequestId++;
     const data = Uint8Array.from([]);
     const request: WasmBridgeRequest =
-        {id, serviceName: 'trace_processor', methodName: 'eof', data};
+        {id, serviceName: 'trace_processor', methodName: 'notifyEof', data};
     const promise = defer<void>();
     this.pendingCallbacks.set(id, () => promise.resolve());
     this.port.postMessage(request);

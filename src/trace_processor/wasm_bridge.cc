@@ -76,10 +76,10 @@ void trace_processor_parse(RequestID id, const uint8_t* data, size_t size) {
 
 // We keep the same signature as other methods even though we don't take input
 // arguments for simplicity.
-void EMSCRIPTEN_KEEPALIVE trace_processor_eof(RequestID,
-                                              const uint8_t*,
-                                              uint32_t);
-void trace_processor_eof(RequestID id, const uint8_t*, uint32_t size) {
+void EMSCRIPTEN_KEEPALIVE trace_processor_notifyEof(RequestID,
+                                                    const uint8_t*,
+                                                    uint32_t);
+void trace_processor_notifyEof(RequestID id, const uint8_t*, uint32_t size) {
   PERFETTO_DCHECK(!size);
   g_trace_processor->NotifyEndOfFile();
   g_reply(id, true, "", 0);

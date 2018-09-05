@@ -159,7 +159,7 @@ export class TraceController extends Controller<States> {
       }
     }
 
-    await this.engine.eof();
+    await this.engine.notifyEof();
 
     const traceTime = await this.engine.getTraceTimeBounds();
     const actions = [

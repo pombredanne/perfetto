@@ -38,7 +38,7 @@ export abstract class Engine {
   /**
    * Notify the engine no more data is coming.
    */
-  abstract eof(): void;
+  abstract notifyEof(): void;
 
   /*
    * The RCP interface to call service methods defined in trace_processor.proto.
