@@ -72,15 +72,16 @@ function redrawAllPanelCavases(vnode: PanelContainerVnode) {
     }
 
     // Render the canvas.
-    state.ctx.save();
-    state.ctx.translate(0, yStartOnCanvas);
-    const clipRect = new Path2D();
-    const size = {width: state.parentWidth, height: panelHeight};
-    clipRect.rect(0, 0, size.width, size.height);
-    state.ctx.clip(clipRect);
-
-    panel.state.renderCanvas!(state.ctx, size);
-    state.ctx.restore();
+    if (panel.state.renderCanvas !== undefined) {
+      state.ctx.save();
+      state.ctx.translate(0, yStartOnCanvas);
+      const clipRect = new Path2D();
+      const size = {width: state.parentWidth, height: panelHeight};
+      clipRect.rect(0, 0, size.width, size.height);
+      state.ctx.clip(clipRect);
+      panel.state.renderCanvas(state.ctx, size);
+      state.ctx.restore();
+    }
     panelYStart += panelHeight;
   }
 }
