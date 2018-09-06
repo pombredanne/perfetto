@@ -25,7 +25,6 @@
 #include "perfetto/base/scoped_file.h"
 
 static const MallocDispatch* g_dispatch;
-constexpr const char* kHeapprofdSocket = "/dev/socket/heapprofd";
 
 __BEGIN_DECLS
 
