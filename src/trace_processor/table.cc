@@ -20,7 +20,6 @@
 #include <string.h>
 
 #include "perfetto/base/logging.h"
-#include "src/trace_processor/query_constraints.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -28,6 +27,7 @@ namespace trace_processor {
 namespace {
 
 struct TableDescriptor {
+  std::string name;
   std::string create_statement;
   Table::Factory factory;
   const TraceStorage* storage = nullptr;
@@ -43,6 +43,9 @@ Table::Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
 }
 
 }  // namespace
+
+// static
+bool Table::debug = false;
 
 Table::Table() = default;
 Table::~Table() = default;
@@ -61,6 +64,7 @@ void Table::RegisterInternal(sqlite3* db,
                  isalnum(table_name.back()));
 
   std::unique_ptr<TableDescriptor> desc(new TableDescriptor());
+  desc->name = table_name;
   desc->create_statement = create_statement;
   desc->storage = storage;
   desc->factory = factory;
@@ -73,7 +77,10 @@ void Table::RegisterInternal(sqlite3* db,
     int res = sqlite3_declare_vtab(xdb, xdesc->create_statement.c_str());
     if (res != SQLITE_OK)
       return res;
-    *tab = xdesc->factory(xdesc->storage).release();  // Freed in xDisconnect().
+
+    // Freed in xDisconnect().
+    *tab = xdesc->factory(xdesc->storage, xdesc->name).release();
+
     return SQLITE_OK;
   };
 
@@ -150,6 +157,14 @@ int Table::BestIndexInternal(sqlite3_index_info* idx) {
   info.omit.resize(query_constraints.constraints().size());
 
   int ret = BestIndex(query_constraints, &info);
+
+  if (Table::debug) {
+    PERFETTO_LOG(
+        "[%s::BestIndex] constraints=%s orderByConsumed=%d estimatedCost=%d",
+        name_.c_str(), query_constraints.ToNewSqlite3String().get(),
+        info.order_by_consumed, info.estimated_cost);
+  }
+
   if (ret != SQLITE_OK)
     return ret;
 
@@ -168,6 +183,7 @@ int Table::BestIndexInternal(sqlite3_index_info* idx) {
 
   idx->idxStr = query_constraints.ToNewSqlite3String().release();
   idx->needToFreeIdxStr = true;
+  idx->idxNum = ++best_index_num_;
 
   return SQLITE_OK;
 }
@@ -178,13 +194,24 @@ int Table::FindFunction(const char*, FindFunctionFn, void**) {
 
 Table::Cursor::~Cursor() = default;
 
-int Table::Cursor::FilterInternal(int,
+int Table::Cursor::FilterInternal(int idxNum,
                                   const char* idxStr,
                                   int argc,
                                   sqlite3_value** argv) {
-  QueryConstraints qc = QueryConstraints::FromString(idxStr);
-  PERFETTO_DCHECK(qc.constraints().size() == static_cast<size_t>(argc));
-  return Filter(qc, argv);
+  auto* table = ToTable(this->pVtab);
+  bool cache_hit = true;
+  if (idxNum != table->qc_hash_) {
+    table->qc_cache_ = QueryConstraints::FromString(idxStr);
+    table->qc_hash_ = idxNum;
+    cache_hit = false;
+  }
+  if (Table::debug) {
+    PERFETTO_LOG("[%s::Filter] constraints=%s argc=%d cache_hit=%d",
+                 table->name_.c_str(), idxStr, argc, cache_hit);
+  }
+  PERFETTO_DCHECK(table->qc_cache_.constraints().size() ==
+                  static_cast<size_t>(argc));
+  return Filter(table->qc_cache_, argv);
 }
 
 }  // namespace trace_processor

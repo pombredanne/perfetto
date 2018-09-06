@@ -15,10 +15,9 @@
 import("../../gn/perfetto.gni")
 import("../../gn/wasm.gni")
 
-wasm_lib("trace_processor") {
+wasm_lib("trace_processor_wasm") {
+  name = "trace_processor"
   sources = [
-    "emscripten_task_runner.cc",
-    "emscripten_task_runner.h",
     "wasm_bridge.cc",
   ]
 
@@ -33,12 +32,17 @@ wasm_lib("trace_processor") {
   ]
 }
 
+# The library which eases processing of Perfetto traces by exposing reading
+# friendly APIs.
+static_library("trace_processor") {
+  deps = [
+    ":lib",
+  ]
+}
+
 source_set("lib") {
   sources = [
-    "blob_reader.h",
     "chunked_trace_reader.h",
-    "file_reader.cc",
-    "file_reader.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
@@ -91,15 +95,31 @@ source_set("lib") {
   }
 }
 
-executable("trace_processor_shell") {
+if (current_toolchain == host_toolchain) {
+  executable("trace_processor_shell_host") {
+    deps = [
+      ":lib",
+      "../../gn:default_deps",
+      "../../protos/perfetto/trace_processor:lite",
+      "../base",
+    ]
+    sources = [
+      "trace_processor_shell.cc",
+    ]
+  }
+}
+
+copy("trace_processor_shell") {
+  host_out_dir_ = get_label_info(":trace_processor_shell_host($host_toolchain)",
+                                 "root_out_dir")
   deps = [
-    ":lib",
-    "../../gn:default_deps",
-    "../../protos/perfetto/trace_processor:lite",
-    "../base",
+    ":trace_processor_shell_host($host_toolchain)",
   ]
   sources = [
-    "trace_processor_shell.cc",
+    "${host_out_dir_}/trace_processor_shell_host",
+  ]
+  outputs = [
+    "${root_out_dir}/trace_processor_shell",
   ]
 }
 
@@ -136,6 +156,7 @@ source_set("integrationtests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../protos/perfetto/trace:lite",
+    "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../base:test_support",
   ]

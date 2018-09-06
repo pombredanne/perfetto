@@ -18,7 +18,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "src/trace_processor/blob_reader.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_tracker.h"
@@ -36,23 +35,6 @@ using ::testing::Args;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
-
-class FakeStringBlobReader : public BlobReader {
- public:
-  FakeStringBlobReader(const std::string& data) : data_(data) {}
-  ~FakeStringBlobReader() override {}
-
-  uint32_t Read(uint64_t offset, uint32_t len, uint8_t* dst) override {
-    PERFETTO_CHECK(offset <= data_.size());
-    uint32_t rsize =
-        std::min(static_cast<uint32_t>(data_.size() - offset), len);
-    memcpy(dst, data_.c_str() + offset, rsize);
-    return rsize;
-  }
-
- private:
-  std::string data_;
-};
 
 class MockSchedTracker : public SchedTracker {
  public:
@@ -79,6 +61,14 @@ class MockProcessTracker : public ProcessTracker {
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
 
+class MockTraceStorage : public TraceStorage {
+ public:
+  MockTraceStorage() : TraceStorage() {}
+
+  MOCK_METHOD3(PushCpuFreq,
+               void(uint64_t timestamp, uint32_t cpu, uint32_t new_freq));
+};
+
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
@@ -86,14 +76,26 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.sched_tracker.reset(sched_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
+    storage_ = new MockTraceStorage();
+    context_.storage.reset(storage_);
     context_.sorter.reset(new TraceSorter(&context_, 0 /*window size*/));
-    context_.parser.reset(new ProtoTraceParser(&context_));
+    context_.proto_parser.reset(new ProtoTraceParser(&context_));
+    context_.storage.reset(new MockTraceStorage());
+  }
+
+  void Tokenize(const protos::Trace& trace) {
+    std::unique_ptr<uint8_t[]> raw_trace(new uint8_t[trace.ByteSize()]);
+    trace.SerializeToArray(raw_trace.get(), trace.ByteSize());
+    ProtoTraceTokenizer tokenizer(&context_);
+    tokenizer.Parse(std::move(raw_trace),
+                    static_cast<size_t>(trace.ByteSize()));
   }
 
  protected:
   TraceProcessorContext context_;
   MockSchedTracker* sched_;
   MockProcessTracker* process_;
+  MockTraceStorage* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
@@ -114,10 +116,7 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
 
   EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
                                        base::StringView(kProcName), 100));
-
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace);
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
@@ -152,9 +151,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
                                        base::StringView(kProcName2), 10));
 
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace);
 }
 
 TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
@@ -191,21 +188,15 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
 
   EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
                                        base::StringView(kProcName2), 10));
-
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace);
 }
 
 TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
-  protos::Trace trace;
-
-  auto* bundle = trace.add_packet()->mutable_ftrace_events();
+  protos::Trace trace_1;
+  auto* bundle = trace_1.add_packet()->mutable_ftrace_events();
   bundle->set_cpu(10);
-
   auto* event = bundle->add_event();
   event->set_timestamp(1000);
-
   static const char kProcName1[] = "proc1";
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
@@ -213,15 +204,11 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_prev_comm(kProcName1);
   sched_switch->set_next_pid(100);
 
-  // Make the chunk size the size of the first packet.
-  uint32_t chunk_size = static_cast<uint32_t>(trace.ByteSize());
-
-  bundle = trace.add_packet()->mutable_ftrace_events();
+  protos::Trace trace_2;
+  bundle = trace_2.add_packet()->mutable_ftrace_events();
   bundle->set_cpu(10);
-
   event = bundle->add_event();
   event->set_timestamp(1001);
-
   static const char kProcName2[] = "proc2";
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
@@ -231,16 +218,25 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
 
   EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
                                        base::StringView(kProcName1), 100));
-
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.set_chunk_size_for_testing(chunk_size);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace_1);
 
   EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
                                        base::StringView(kProcName2), 10));
+  Tokenize(trace_2);
+}
 
-  tokenizer.ParseNextChunk();
+TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
+  protos::Trace trace_1;
+  auto* bundle = trace_1.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(12);
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+  auto* cpu_freq = event->mutable_cpu_frequency();
+  cpu_freq->set_cpu_id(10);
+  cpu_freq->set_state(2000);
+
+  EXPECT_CALL(*storage_, PushCpuFreq(1000, 10, 2000));
+  Tokenize(trace_1);
 }
 
 TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
@@ -255,10 +251,7 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
   process->set_ppid(2);
 
   EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
-
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace);
 }
 
 TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
@@ -275,9 +268,7 @@ TEST_F(ProtoTraceParserTest, LoadProcessPacket_FirstCmdline) {
   process->set_ppid(2);
 
   EXPECT_CALL(*process_, UpdateProcess(1, base::StringView(kProcName1)));
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer parser(&reader, &context_);
-  parser.ParseNextChunk();
+  Tokenize(trace);
 }
 
 TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
@@ -289,9 +280,7 @@ TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
   thread->set_tgid(2);
 
   EXPECT_CALL(*process_, UpdateThread(1, 2));
-  FakeStringBlobReader reader(trace.SerializeAsString());
-  ProtoTraceTokenizer tokenizer(&reader, &context_);
-  tokenizer.ParseNextChunk();
+  Tokenize(trace);
 }
 
 }  // namespace

@@ -29,19 +29,19 @@ class TraceProcessorContext;
 
 class ProtoTraceParser {
  public:
-  ProtoTraceParser(TraceProcessorContext*);
+  explicit ProtoTraceParser(TraceProcessorContext*);
   virtual ~ProtoTraceParser();
 
   // virtual for testing.
-  virtual void ParseTracePacket(const TraceBlobView&);
+  virtual void ParseTracePacket(TraceBlobView);
   virtual void ParseFtracePacket(uint32_t cpu,
                                  uint64_t timestamp,
-                                 const TraceBlobView&);
-  void ParseProcessTree(const TraceBlobView&);
-  void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, const TraceBlobView&);
-  void ParseCpuFreq(uint64_t timestamp, const TraceBlobView&);
-  void ParseThread(const TraceBlobView&);
-  void ParseProcess(const TraceBlobView&);
+                                 TraceBlobView);
+  void ParseProcessTree(TraceBlobView);
+  void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, TraceBlobView);
+  void ParseCpuFreq(uint64_t timestamp, TraceBlobView);
+  void ParseThread(TraceBlobView);
+  void ParseProcess(TraceBlobView);
 
  private:
   TraceProcessorContext* context_;

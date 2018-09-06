@@ -14,7 +14,7 @@
 
 import {Panel} from './panel';
 
-export class FlameGraphPanel implements Panel {
+export class FlameGraphPanel extends Panel {
   private renderedDom = false;
   renderCanvas() {}
   updateDom(dom: HTMLElement) {

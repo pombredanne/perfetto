@@ -17,6 +17,11 @@
 #ifndef SRC_TRACE_PROCESSOR_CHUNKED_TRACE_READER_H_
 #define SRC_TRACE_PROCESSOR_CHUNKED_TRACE_READER_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
+#include <memory>
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -26,9 +31,13 @@ class ChunkedTraceReader {
  public:
   virtual ~ChunkedTraceReader();
 
-  // Parses the next chunk of trace from the BlobReader. Returns true
-  // if there are more chunks which can be read and false otherwise.
-  virtual bool ParseNextChunk() = 0;
+  // Pushes more data into the trace parser. There is no requirement for the
+  // caller to match line/protos boundaries. The parser class has to deal with
+  // intermediate buffering lines/protos that span across different chunks.
+  // The buffer size is guaranteed to be > 0.
+  // Returns true if the data has been succesfully parsed, false if some
+  // unrecoverable parsing error happened and no more chunks should be pushed.
+  virtual bool Parse(std::unique_ptr<uint8_t[]>, size_t) = 0;
 };
 
 }  // namespace trace_processor

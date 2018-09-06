@@ -31,21 +31,6 @@ namespace trace_processor {
 // and stored. This means no ordering can occur.
 class TraceSorter {
  public:
-  TraceSorter(TraceProcessorContext*, uint64_t window_size_ns);
-
-  void PushTracePacket(uint64_t timestamp, TraceBlobView);
-  void PushFtracePacket(uint32_t cpu, uint64_t timestamp, TraceBlobView);
-
-  // This method passes any events older than window_size_ns to the
-  // parser to be parsed and then stored. If force flush is true all events
-  // will be flushed, regardless of timestamp.
-  void MaybeFlushEvents(bool force_flush);
-
-  void set_window_ns_for_testing(uint64_t window_size_ns) {
-    window_size_ns_ = window_size_ns;
-  }
-
- private:
   struct TimestampedTracePiece {
     TimestampedTracePiece(TraceBlobView bv, bool is_f, uint32_t c)
         : blob_view(std::move(bv)), is_ftrace(is_f), cpu(c) {}
@@ -54,12 +39,28 @@ class TraceSorter {
     bool is_ftrace;
     uint32_t cpu;
   };
+  using EventsMap = std::multimap<uint64_t /*ts*/, TimestampedTracePiece>;
 
-  TraceProcessorContext* context_;
+  TraceSorter(TraceProcessorContext*, uint64_t window_size_ns);
+
+  void PushTracePacket(uint64_t timestamp, TraceBlobView);
+  void PushFtracePacket(uint32_t cpu, uint64_t timestamp, TraceBlobView);
+
+  // This method passes any events older than window_size_ns to the
+  // parser to be parsed and then stored.
+  void MaybeFlushEvents();
+
+  // Flush all events ignorinig the window.
+  void FlushEventsForced();
+
+  void set_window_ns_for_testing(uint64_t window_size_ns) {
+    window_size_ns_ = window_size_ns;
+  }
+
+ private:
+  TraceProcessorContext* const context_;
   uint64_t window_size_ns_;
-
-  // All events, with the oldest at the beginning.
-  std::map<uint64_t /* timestamp */, TimestampedTracePiece> events_;
+  EventsMap events_;
 };
 
 }  // namespace trace_processor

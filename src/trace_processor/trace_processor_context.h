@@ -38,7 +38,7 @@ class TraceProcessorContext {
   std::unique_ptr<ProcessTracker> process_tracker;
   std::unique_ptr<SchedTracker> sched_tracker;
   std::unique_ptr<TraceStorage> storage;
-  std::unique_ptr<ProtoTraceParser> parser;
+  std::unique_ptr<ProtoTraceParser> proto_parser;
   std::unique_ptr<TraceSorter> sorter;
   std::unique_ptr<ChunkedTraceReader> chunk_reader;
 };

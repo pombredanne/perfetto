@@ -21,9 +21,8 @@ import {globals} from './globals';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
 import {ScrollingPanelContainer} from './scrolling_panel_container';
+import {TopPanelContainer} from './top_panel_container';
 import {TRACK_SHELL_WIDTH} from './track_panel';
-
-export const OVERVIEW_QUERY_ID = 'overview_query';
 
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 
@@ -50,39 +49,11 @@ const QueryTable: m.Component<{}, {}> = {
     return m(
         'div',
         m('header.overview',
-          `Query result - ${resp.durationMs} ms`,
+          `Query result - ${Math.round(resp.durationMs)} ms`,
           m('span.code', resp.query)),
         resp.error ?
             m('.query-error', `SQL error: ${resp.error}`) :
             m('table.query-table', m('thead', header), m('tbody', rows)));
-  },
-};
-
-
-/**
- * CanvasRedrawTrigger hooks our canvas redraw into the Mithril redraw cycle.
- * Everytime the Mithril redraws (and CanvasRedrawTrigger is in the tree)
- * it calls either oncreate/onupdate from there we call syncRedraw().
- *
- * Ideally the canvas redraw should be:
- * a) synchronous
- * b) the very last thing that happens in the Mithril redraw raf
- * Since oncreate/onupdate is called in pre-order (in terms of the dom:
- * least-nested to most-nested, top to bottom) so the CanvasRedrawTrigger
- * should be placed last on the page.
- */
-const CanvasRedrawTrigger: m.Component = {
-
-  oncreate() {
-    globals.rafScheduler.syncRedraw();
-  },
-
-  onupdate() {
-    globals.rafScheduler.syncRedraw();
-  },
-
-  view() {
-    return null;
   },
 };
 
@@ -97,12 +68,12 @@ const TraceViewer = {
 
   oncreate(vnode) {
     const frontendLocalState = globals.frontendLocalState;
+    // TODO: This is probably not needed. Figure out resizing.
     this.onResize = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
           0, this.width - TRACK_SHELL_WIDTH);
-      // m.redraw();
     };
 
     // Have to redraw after initialization to provide dimensions to view().
@@ -112,23 +83,26 @@ const TraceViewer = {
     window.addEventListener('resize', this.onResize);
 
     const panZoomEl =
-        vnode.dom.getElementsByClassName('tracks-content')[0] as HTMLElement;
+        vnode.dom.querySelector('.pan-and-zoom-content') as HTMLElement;
 
     this.zoomContent = new PanAndZoomHandler({
       element: panZoomEl,
       contentOffsetX: TRACK_SHELL_WIDTH,
       onPanned: (pannedPx: number) => {
-        let vizTime = globals.frontendLocalState.visibleWindowTime;
-        let tDelta = frontendLocalState.timeScale.deltaPxToDuration(pannedPx);
-        const maxTime = globals.state.traceTime;
-        tDelta -= Math.max(vizTime.end + tDelta - maxTime.endSec, 0);
-        if (vizTime.start + tDelta < maxTime.startSec) {
-          tDelta +=
-              Math.abs(tDelta) - Math.abs(vizTime.start - maxTime.startSec);
+        const traceTime = globals.state.traceTime;
+        const vizTime = globals.frontendLocalState.visibleWindowTime;
+        const origDelta = vizTime.duration;
+        const tDelta = frontendLocalState.timeScale.deltaPxToDuration(pannedPx);
+        let tStart = vizTime.start + tDelta;
+        let tEnd = vizTime.end + tDelta;
+        if (tStart < traceTime.startSec) {
+          tStart = traceTime.startSec;
+          tEnd = tStart + origDelta;
+        } else if (tEnd > traceTime.endSec) {
+          tEnd = traceTime.endSec;
+          tStart = tEnd - origDelta;
         }
-        // tDelta += Math.min(maxTime.startSec + tDelta + vizTime.start, 0);
-        vizTime = vizTime.add(tDelta);
-        frontendLocalState.updateVisibleTime(vizTime);
+        frontendLocalState.updateVisibleTime(new TimeSpan(tStart, tEnd));
       },
       onZoomed: (_: number, zoomRatio: number) => {
         const vizTime = frontendLocalState.visibleWindowTime;
@@ -153,17 +127,10 @@ const TraceViewer = {
     return m(
         '.page',
         m(QueryTable),
-        m('.tracks-content',
-          {
-            style: {
-              width: '100%',
-              height: '100%',
-              position: 'relative',
-            }
-          },
-          m('header', 'Tracks'),
-          m(ScrollingPanelContainer), ),
-        m(CanvasRedrawTrigger), );
+        // TODO: Pan and zoom logic should be in its own mithril component.
+        m('.pan-and-zoom-content',
+          m(TopPanelContainer),
+          m(ScrollingPanelContainer)));
   },
 
 } as m.Component<{}, {

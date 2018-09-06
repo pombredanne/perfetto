@@ -44,19 +44,19 @@ function onKeyDown(e: Event) {
   const txt = (e.target as HTMLInputElement);
   if (key === ':' && txt.value === '') {
     mode = 'command';
-    m.redraw();
+    globals.rafScheduler.scheduleFullRedraw();
     e.preventDefault();
     return;
   }
   if (key === 'Escape' && mode === 'command') {
     txt.value = '';
     mode = 'search';
-    m.redraw();
+    globals.rafScheduler.scheduleFullRedraw();
     return;
   }
   if (key === 'Backspace' && txt.value.length === 0 && mode === 'command') {
     mode = 'search';
-    m.redraw();
+    globals.rafScheduler.scheduleFullRedraw();
     return;
   }
 }
@@ -70,12 +70,12 @@ function onKeyUp(e: Event) {
     selResult = Math.max(selResult, 0);
     selResult = Math.min(selResult, numResults - 1);
     e.preventDefault();
-    m.redraw();
+    globals.rafScheduler.scheduleFullRedraw();
     return;
   }
   if (txt.value.length <= 0 || key === 'Escape') {
     clearOmniboxResults();
-    m.redraw();
+    globals.rafScheduler.scheduleFullRedraw();
     return;
   }
   if (mode === 'search') {
@@ -97,6 +97,20 @@ const Omnibox: m.Component = {
     txt.addEventListener('keyup', onKeyUp);
   },
   view() {
+    const msgTTL = globals.state.status.timestamp + 3 - Date.now() / 1e3;
+    let enginesAreBusy = false;
+    for (const engine of Object.values(globals.state.engines)) {
+      enginesAreBusy = enginesAreBusy || !engine.ready;
+    }
+
+    if (msgTTL > 0 || enginesAreBusy) {
+      setTimeout(
+          () => globals.rafScheduler.scheduleFullRedraw(), msgTTL * 1000);
+      return m(
+          `.omnibox.message-mode`,
+          m(`input[placeholder=${globals.state.status.msg}][readonly]`));
+    }
+
     // TODO(primiano): handle query results here.
     const results = [];
     const resp = globals.queryResults.get(QUERY_ID) as QueryResponse;
@@ -111,10 +125,11 @@ const Omnibox: m.Component = {
       search: 'Search or type : to enter command mode',
       command: 'e.g., select * from sched left join thread using(utid) limit 10'
     };
+
     const commandMode = mode === 'command';
     return m(
         `.omnibox${commandMode ? '.command-mode' : ''}`,
-        m(`input[type=text][placeholder=${placeholder[mode]}]`),
+        m(`input[placeholder=${placeholder[mode]}]`),
         m('.omnibox-results', results));
   },
 };

@@ -21,42 +21,119 @@
 #include <stdint.h>
 #include <memory>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace trace_processor {
 
-// A view of the trace. The buffer is in a shared_ptr so it will be freed
-// when all of the TraceBlobViews have passed through the pipeline and been
-// parsed.
+// This class is an equivalent of std::string_view for trace binary data.
+// The main difference is that this class has also shared ownership of a portion
+// of the raw trace.
+// The underlying buffer will be freed once all the TraceBlobViews that refer
+// to the same buffer have passed through the pipeline and been parsed.
 class TraceBlobView {
  public:
-  TraceBlobView(std::shared_ptr<uint8_t> buffer, size_t offset, size_t length)
-      : buffer_(buffer), offset_(offset), length_(length) {}
+  TraceBlobView(std::unique_ptr<uint8_t[]> buffer, size_t offset, size_t length)
+      : shbuf_(SharedBuf(std::move(buffer))),
+        offset_(offset),
+        length_(length) {}
 
-  TraceBlobView(TraceBlobView&&) = default;
+  // Allow std::move().
+  TraceBlobView(TraceBlobView&&) noexcept = default;
   TraceBlobView& operator=(TraceBlobView&&) = default;
-  TraceBlobView(TraceBlobView const&) = default;
-  TraceBlobView& operator=(TraceBlobView const&) = default;
+
+  // Disable implicit copy.
+  TraceBlobView(const TraceBlobView&) = delete;
+  TraceBlobView& operator=(const TraceBlobView&) = delete;
+
+  TraceBlobView slice(size_t offset, size_t length) {
+    PERFETTO_DCHECK(offset + length <= offset_ + length_);
+    return TraceBlobView(shbuf_, offset, length);
+  }
 
   bool operator==(const TraceBlobView& rhs) const {
-    return (buffer_ == rhs.buffer_) && (offset_ == rhs.offset_) &&
+    return (shbuf_ == rhs.shbuf_) && (offset_ == rhs.offset_) &&
            (length_ == rhs.length_);
   }
+  bool operator!=(const TraceBlobView& rhs) const { return !(*this == rhs); }
 
-  const uint8_t* data() const { return buffer_.get() + offset_; }
+  inline const uint8_t* data() const { return start() + offset_; }
 
   size_t offset_of(const uint8_t* data) const {
-    return static_cast<size_t>(data - buffer_.get());
+    PERFETTO_DCHECK(data >= start() && data < (start() + offset_ + length_));
+    return static_cast<size_t>(data - start());
   }
 
-  const std::shared_ptr<uint8_t>& buffer() const { return buffer_; }
-
+  // const std::shared_ptr<uint8_t[]>& buffer() const { return shbuf_; }
   size_t length() const { return length_; }
 
  private:
-  std::shared_ptr<uint8_t> buffer_;
+  // An equivalent to std::shared_ptr<uint8_t>, with the differnce that:
+  // - Supports array types, available for shared_ptr only in C++17.
+  // - Is not thread safe, which is not needed for our purposes.
+  class SharedBuf {
+   public:
+    explicit SharedBuf(std::unique_ptr<uint8_t[]> mem) {
+      rcbuf_ = new RefCountedBuf(std::move(mem));
+    }
+
+    SharedBuf(const SharedBuf& copy) : rcbuf_(copy.rcbuf_) {
+      PERFETTO_DCHECK(rcbuf_->refcount > 0);
+      rcbuf_->refcount++;
+    }
+
+    ~SharedBuf() {
+      if (!rcbuf_)
+        return;
+      PERFETTO_DCHECK(rcbuf_->refcount > 0);
+      if (--rcbuf_->refcount == 0) {
+        RefCountedBuf* rcbuf = rcbuf_;
+        rcbuf_ = nullptr;
+        delete rcbuf;
+      }
+    }
+
+    SharedBuf(SharedBuf&& other) noexcept {
+      rcbuf_ = other.rcbuf_;
+      other.rcbuf_ = nullptr;
+    }
+
+    SharedBuf& operator=(SharedBuf&& other) {
+      if (this != &other) {
+        // A bit of a ugly but pragmatic pattern to implement move assignment.
+        // First invoke the distructor and then invoke the move constructor
+        // inline via placement-new.
+        this->~SharedBuf();
+        new (this) SharedBuf(std::move(other));
+      }
+      return *this;
+    }
+
+    bool operator==(const SharedBuf& x) const { return x.rcbuf_ == rcbuf_; }
+    bool operator!=(const SharedBuf& x) const { return !(x == *this); }
+    const uint8_t* data() const { return rcbuf_->mem.get(); }
+
+   private:
+    struct RefCountedBuf {
+      explicit RefCountedBuf(std::unique_ptr<uint8_t[]> buf)
+          : refcount(1), mem(std::move(buf)) {}
+      int refcount;
+      std::unique_ptr<uint8_t[]> mem;
+    };
+
+    RefCountedBuf* rcbuf_ = nullptr;
+  };
+
+  inline const uint8_t* start() const { return shbuf_.data(); }
+
+  TraceBlobView(SharedBuf b, size_t o, size_t l)
+      : shbuf_(b), offset_(o), length_(l) {}
+
+  SharedBuf shbuf_;
   size_t offset_;
-  size_t length_;
+  size_t length_;  // Measured from |offset_|, not from |data()|.
 };
+
 }  // namespace trace_processor
 }  // namespace perfetto
 

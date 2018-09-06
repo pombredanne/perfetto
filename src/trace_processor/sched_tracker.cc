@@ -69,7 +69,10 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
   }
   long double cycles = 0;
   uint64_t time_last_processed = start_ns;
-  uint64_t prev_freq = std::prev(frequencies.lower_bound(start_ns))->second;
+  uint64_t prev_freq = 0;
+  if (frequencies.lower_bound(start_ns) != frequencies.begin()) {
+    prev_freq = std::prev(frequencies.lower_bound(start_ns))->second;
+  }
   // For each frequency change within |start_ns| and |end_ns| multiply the
   // prev frequency by the time that has passed.
   for (auto it = frequencies.lower_bound(start_ns);

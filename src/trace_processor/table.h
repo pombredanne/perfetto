@@ -18,15 +18,17 @@
 #define SRC_TRACE_PROCESSOR_TABLE_H_
 
 #include <sqlite3.h>
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "src/trace_processor/query_constraints.h"
+
 namespace perfetto {
 namespace trace_processor {
 
-class QueryConstraints;
 class TraceStorage;
 
 // Abstract base class representing a SQLite virtual table. Implements the
@@ -34,7 +36,12 @@ class TraceStorage;
 // implement a friendlier API than that required by SQLite.
 class Table : public sqlite3_vtab {
  public:
-  using Factory = std::function<std::unique_ptr<Table>(const void*)>;
+  using Factory =
+      std::function<std::unique_ptr<Table>(const TraceStorage*,
+                                           const std::string& name)>;
+
+  // When set it logs all BestIndex and Filter actions on the console.
+  static bool debug;
 
   // Public for unique_ptr destructor calls.
   virtual ~Table();
@@ -88,9 +95,10 @@ class Table : public sqlite3_vtab {
  private:
   template <typename TableType>
   static Factory GetFactory() {
-    return [](const void* arg) {
-      return std::unique_ptr<Table>(
-          new TableType(static_cast<const TraceStorage*>(arg)));
+    return [](const TraceStorage* storage, const std::string& name) {
+      auto table = std::unique_ptr<Table>(new TableType(storage));
+      table->name_ = name;
+      return table;
     };
   }
 
@@ -105,6 +113,11 @@ class Table : public sqlite3_vtab {
 
   Table(const Table&) = delete;
   Table& operator=(const Table&) = delete;
+
+  std::string name_;
+  QueryConstraints qc_cache_;
+  int qc_hash_ = 0;
+  int best_index_num_ = 0;
 };
 
 }  // namespace trace_processor

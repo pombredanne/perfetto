@@ -188,7 +188,7 @@ TEST_F(SchedSliceTableTest, QuanitsiationCpuNativeOrder) {
                                           prev_state, kCommProc2, pid_1);
 
   PrepareValidStatement(
-      "SELECT dur, ts, cpu FROM sched WHERE _quantum MATCH 5 ORDER BY cpu");
+      "SELECT dur, ts, cpu FROM sched WHERE quantum = 5 ORDER BY cpu");
 
   // Event at ts + 3 sliced off at quantum boundary (105).
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
@@ -230,7 +230,7 @@ TEST_F(SchedSliceTableTest, QuantizationSqliteDurationOrder) {
                                           prev_state, kCommProc2, pid_1);
 
   PrepareValidStatement(
-      "SELECT dur, ts, cpu FROM sched WHERE _quantum match 5 ORDER BY dur");
+      "SELECT dur, ts, cpu FROM sched WHERE quantum = 5 ORDER BY dur");
 
   // Event at ts + 3 sliced off at quantum boundary (105).
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
@@ -274,7 +274,7 @@ TEST_F(SchedSliceTableTest, QuantizationGroupAndSum) {
   PrepareValidStatement(
       "SELECT SUM(dur) as sum_dur "
       "FROM sched "
-      "WHERE _quantum match 5 "
+      "WHERE quantum = 5 "
       "GROUP BY quantized_group "
       "ORDER BY sum_dur");
 
@@ -334,8 +334,8 @@ TEST_F(SchedSliceTableTest, TimestampFiltering) {
                                             "pid_2", pid_2);
   }
 
-  auto query_timestamps = [this](const char* query) {
-    PrepareValidStatement(query);
+  auto query = [this](const std::string& where_clauses) {
+    PrepareValidStatement("SELECT ts from sched WHERE " + where_clauses);
     std::vector<int> res;
     while (sqlite3_step(*stmt_) == SQLITE_ROW) {
       res.push_back(sqlite3_column_int(*stmt_, 0));
@@ -343,18 +343,61 @@ TEST_F(SchedSliceTableTest, TimestampFiltering) {
     return res;
   };
 
-  ASSERT_THAT(
-      query_timestamps("SELECT ts FROM sched WHERE ts > 55 and ts <= 60"),
-      ElementsAre(56, 57, 58, 59, 60));
-  ASSERT_THAT(
-      query_timestamps("SELECT ts FROM sched WHERE ts >= 55 and ts < 52"),
-      IsEmpty());
-  ASSERT_THAT(
-      query_timestamps("SELECT ts FROM sched WHERE ts >= 70 and ts < 71"),
-      ElementsAre(70));
-  ASSERT_THAT(
-      query_timestamps("SELECT ts FROM sched WHERE ts >= 59 and ts < 73"),
-      ElementsAre(59, 60, 70, 71, 72));
+  ASSERT_THAT(query("ts > 55 and ts <= 60"), ElementsAre(56, 57, 58, 59, 60));
+  ASSERT_THAT(query("ts >= 55 and ts < 52"), IsEmpty());
+  ASSERT_THAT(query("ts >= 70 and ts < 71"), ElementsAre(70));
+  ASSERT_THAT(query("ts >= 59 and ts < 73"), ElementsAre(59, 60, 70, 71, 72));
+
+  // Test the special ts_lower_bound column.
+  ASSERT_THAT(query("ts_lower_bound = 1 and ts < 10"), IsEmpty());
+  ASSERT_THAT(query("ts_lower_bound = 50 and ts <= 50"), ElementsAre(50));
+  ASSERT_THAT(query("ts_lower_bound = 100"), ElementsAre(80));
+  ASSERT_THAT(query("ts_lower_bound = 100 and cpu = 5"), ElementsAre(60));
+  ASSERT_THAT(query("ts_lower_bound = 100 and cpu = 7"), ElementsAre(80));
+  ASSERT_THAT(query("ts_lower_bound = 1 and ts <= 52"),
+              ElementsAre(50, 51, 52));
+  ASSERT_THAT(query("ts_lower_bound = 70 and ts <= 71"),
+              ElementsAre(60, 70, 71));
+  ASSERT_THAT(query("ts_lower_bound = 60 and ts > 58 and ts <= 71"),
+              ElementsAre(59, 60, 70, 71));
+  ASSERT_THAT(query("ts_lower_bound = 70 and ts > 70 and ts <= 71"),
+              ElementsAre(71));
+}
+
+TEST_F(SchedSliceTableTest, CyclesOrdering) {
+  uint32_t cpu = 3;
+  uint64_t timestamp = 100;
+  uint32_t pid_1 = 2;
+  uint32_t prev_state = 32;
+  static const char kCommProc1[] = "process1";
+  static const char kCommProc2[] = "process2";
+  uint32_t pid_2 = 4;
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
+                                          kCommProc1, pid_2);
+  context_.storage->PushCpuFreq(timestamp + 1, cpu, 1e9);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 2, pid_2, prev_state,
+                                          kCommProc2, pid_1);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state,
+                                          kCommProc1, pid_2);
+  context_.storage->PushCpuFreq(timestamp + 5, cpu, 2e9);
+  context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 7, pid_2, prev_state,
+                                          kCommProc2, pid_1);
+
+  PrepareValidStatement("SELECT cycles, ts FROM sched ORDER BY cycles desc");
+
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 5 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp + 4);
+
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 2 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp + 2);
+
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 1 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp);
+
+  ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);
 }
 
 }  // namespace

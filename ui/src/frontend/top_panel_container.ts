@@ -12,12 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO(hjd): Merge this with track_controller?
-import {Registry} from '../common/registry';
+import * as m from 'mithril';
 
-import {TrackControllerCreator} from './track_controller';
+import {OverviewTimelinePanel} from './overview_timeline_panel';
+import {Panel} from './panel';
+import {PanelContainer} from './panel_container';
+import {TimeAxisPanel} from './time_axis_panel';
 
-/**
- * Global registry that maps names to TrackControllerCreator.
- */
-export const trackControllerRegistry = new Registry<TrackControllerCreator>();
+export const TopPanelContainer = {
+  oninit() {
+    this.panels = [new OverviewTimelinePanel(), new TimeAxisPanel()];
+  },
+
+  view() {
+    return m(
+        '.pinned-panel-container',
+        m(PanelContainer, {panels: this.panels, doesScroll: false}));
+  },
+} as m.Component<{}, {panels: Panel[]}>;
