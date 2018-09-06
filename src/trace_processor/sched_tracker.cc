@@ -87,7 +87,7 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
     if (i + 1 < frequencies.size())
       cycle_end = frequencies[i + 1].first;
 
-    cycles += ((cycle_end - cycle_start) / 1E9L) * frequencies[i].second;
+    cycles += ((cycle_end - cycle_start) / 1E6L) * frequencies[i].second;
   }
 
   lower_index_per_cpu_[cpu] = upper_index;
