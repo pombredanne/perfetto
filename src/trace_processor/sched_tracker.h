@@ -62,6 +62,10 @@ class SchedTracker {
   // Store the previous sched event to calculate the duration before storing it.
   std::array<SchedSwitchEvent, base::kMaxCpus> last_sched_per_cpu_;
 
+  uint64_t prev_timestamp_ = 0;
+
+  size_t lower_index = 0;
+
   TraceProcessorContext* const context_;
 };
 }  // namespace trace_processor

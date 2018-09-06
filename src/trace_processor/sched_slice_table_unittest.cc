@@ -330,6 +330,8 @@ TEST_F(SchedSliceTableTest, TimestampFiltering) {
   for (uint64_t i = 0; i <= 11; i++) {
     context_.sched_tracker->PushSchedSwitch(cpu_5, 50 + i, pid_1, prev_state,
                                             "pid_1", pid_1);
+  }
+  for (uint64_t i = 0; i <= 11; i++) {
     context_.sched_tracker->PushSchedSwitch(cpu_7, 70 + i, pid_2, prev_state,
                                             "pid_2", pid_2);
   }

@@ -44,7 +44,8 @@ using UniqueTid = uint32_t;
 using StringId = size_t;
 
 // A map containing timestamps and the cpu frequency set at that time.
-using CpuFreqMap = std::map<uint64_t, uint32_t>;
+using CpuFreq =
+    std::deque<std::pair<uint64_t /*timestamp*/, uint32_t /*freq*/>>;
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -212,10 +213,10 @@ class TraceStorage {
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
   void PushCpuFreq(uint64_t timestamp, uint32_t cpu, uint32_t new_freq) {
-    cpu_freq_[cpu].emplace_hint(cpu_freq_[cpu].end(), timestamp, new_freq);
+    cpu_freq_[cpu].emplace_back(timestamp, new_freq);
   }
 
-  const CpuFreqMap& GetFreqForCpu(uint32_t cpu) { return cpu_freq_[cpu]; }
+  const CpuFreq& GetFreqForCpu(uint32_t cpu) { return cpu_freq_[cpu]; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
@@ -241,7 +242,7 @@ class TraceStorage {
 
   // One map containing frequencies for every CPU in the trace. The map contains
   // timestamps and the cpu frequency value at that time.
-  std::array<CpuFreqMap, base::kMaxCpus> cpu_freq_;
+  std::array<CpuFreq, base::kMaxCpus> cpu_freq_;
 
   // One entry for each unique string in the trace.
   std::deque<std::string> string_pool_;

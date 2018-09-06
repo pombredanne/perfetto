@@ -33,6 +33,9 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
                                    uint32_t prev_state,
                                    base::StringView prev_comm,
                                    uint32_t next_pid) {
+  // At this stage all events should be globally timestamp ordered.
+  PERFETTO_DCHECK(prev_timestamp_ <= timestamp);
+  prev_timestamp_ = timestamp;
   PERFETTO_DCHECK(cpu < base::kMaxCpus);
   SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
   // If we had a valid previous event, then inform the storage about the
@@ -64,22 +67,36 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
                                        uint64_t start_ns,
                                        uint64_t end_ns) {
   auto frequencies = context_->storage->GetFreqForCpu(cpu);
-  if (frequencies.empty()) {
+  if (frequencies.empty())
     return 0;
-  }
+
   long double cycles = 0;
   uint64_t time_last_processed = start_ns;
   uint64_t prev_freq = 0;
-  if (frequencies.lower_bound(start_ns) != frequencies.begin()) {
-    prev_freq = std::prev(frequencies.lower_bound(start_ns))->second;
+
+  // Find the index of the first pair with a timestamp >= to start_ns.
+  while (lower_index < frequencies.size() &&
+         frequencies[lower_index].first < start_ns) {
+    ++lower_index;
+  };
+
+  // Find the index of the first pair with timestamp > end_ns.
+  size_t upper_index = lower_index;
+  while (upper_index < frequencies.size() &&
+         frequencies[upper_index].first <= end_ns) {
+    ++upper_index;
+  };
+
+  if (lower_index != 0) {
+    prev_freq = frequencies[lower_index - 1].second;
   }
+
   // For each frequency change within |start_ns| and |end_ns| multiply the
   // prev frequency by the time that has passed.
-  for (auto it = frequencies.lower_bound(start_ns);
-       it != frequencies.upper_bound(end_ns); ++it) {
-    cycles += ((it->first - time_last_processed) / 1E9L) * prev_freq;
-    prev_freq = it->second;
-    time_last_processed = it->first;
+  for (size_t i = lower_index; i != upper_index; ++i) {
+    cycles += ((frequencies[i].first - time_last_processed) / 1E9L) * prev_freq;
+    prev_freq = frequencies[i].second;
+    time_last_processed = frequencies[i].first;
   }
   cycles += ((end_ns - time_last_processed) / 1E9L) * prev_freq;
   return static_cast<uint64_t>(std::round(cycles));
