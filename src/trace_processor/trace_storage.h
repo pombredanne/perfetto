@@ -213,7 +213,9 @@ class TraceStorage {
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
   void PushCpuFreq(uint64_t timestamp, uint32_t cpu, uint32_t new_freq) {
-    cpu_freq_[cpu].emplace_back(timestamp, new_freq);
+    auto& freqs = cpu_freq_[cpu];
+    PERFETTO_DCHECK(freqs.empty() || timestamp > freqs.back().first);
+    freqs.emplace_back(timestamp, new_freq);
   }
 
   const CpuFreq& GetFreqForCpu(uint32_t cpu) { return cpu_freq_[cpu]; }

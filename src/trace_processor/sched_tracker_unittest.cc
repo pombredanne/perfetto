@@ -34,7 +34,6 @@ class SchedTrackerTest : public ::testing::Test {
     context.process_tracker.reset(new ProcessTracker(&context));
     context.sched_tracker.reset(new SchedTracker(&context));
     context.storage.reset(new TraceStorage());
-    PERFETTO_LOG("MAKE thing");
   }
 
  protected:

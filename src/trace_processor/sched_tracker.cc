@@ -66,7 +66,7 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
 uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
                                        uint64_t start_ns,
                                        uint64_t end_ns) {
-  auto frequencies = context_->storage->GetFreqForCpu(cpu);
+  const auto& frequencies = context_->storage->GetFreqForCpu(cpu);
   auto lower_index = lower_index_per_cpu_[cpu];
   if (frequencies.empty())
     return 0;
