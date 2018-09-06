@@ -24,44 +24,44 @@
 #include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
-namespace {
 
-std::atomic<uint64_t> global_sequence_number(0);
-constexpr size_t kFreePageBytes = 4096;
-constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
+BorrowedSocket::BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool)
+    : fd_(std::move(fd)), socket_pool_(socket_pool) {}
 
-}  // namespace
-
-FreePage::FreePage() : free_page_(kFreePageSize) {
-  free_page_[0] = static_cast<uint64_t>(kFreePageBytes);
-  free_page_[1] = static_cast<uint64_t>(RecordType::Free);
-  offset_ = 2;
-  // Code in Add assumes that offset is aligned to 2.
-  PERFETTO_DCHECK(offset_ % 2 == 0);
+int BorrowedSocket::operator*() {
+  return get();
 }
 
-void FreePage::Add(const void* addr, int fd) {
-  std::lock_guard<std::mutex> l(mtx_);
-  if (offset_ == kFreePageSize)
-    Flush(fd);
-  static_assert(kFreePageSize % 2 == 0,
-                "free page size needs to be divisible by two");
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(++global_sequence_number);
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(addr);
+int BorrowedSocket::get() {
+  return *fd_;
 }
 
-bool FreePage::Flush(int fd) {
-  size_t written = 0;
-  do {
-    ssize_t wr = PERFETTO_EINTR(send(fd, &free_page_[0] + written,
-                                     kFreePageBytes - written, MSG_NOSIGNAL));
-    if (wr == -1 && errno != EINTR) {
-      return false;
-    }
-    written += static_cast<size_t>(wr);
-  } while (written < kFreePageBytes);
-  offset_ = 3;
-  return true;
+void BorrowedSocket::close() {
+  fd_.reset();
+}
+
+BorrowedSocket::~BorrowedSocket() {
+  if (socket_pool_ != nullptr)
+    socket_pool_->Return(std::move(fd_));
+}
+
+SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
+    : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
+
+BorrowedSocket SocketPool::Borrow() {
+  std::unique_lock<std::mutex> lck_(mtx_);
+  if (available_sockets_ == 0)
+    cv_.wait(lck_, [this] { return available_sockets_ > 0; });
+  PERFETTO_CHECK(available_sockets_ > 0);
+  return {std::move(sockets_[--available_sockets_]), this};
+}
+
+void SocketPool::Return(base::ScopedFile sock) {
+  std::unique_lock<std::mutex> lck_(mtx_);
+  PERFETTO_CHECK(available_sockets_ < sockets_.size());
+  sockets_[available_sockets_++] = std::move(sock);
+  if (available_sockets_ == 1)
+    cv_.notify_one();
 }
 
 }  // namespace perfetto

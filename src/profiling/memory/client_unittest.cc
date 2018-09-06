@@ -18,6 +18,54 @@
 
 #include "gtest/gtest.h"
 
+#include <thread>
+
 namespace perfetto {
-namespace {}  // namespace
+namespace {
+
+TEST(SocketPoolTest, Basic) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(open("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+}
+
+TEST(SocketPoolTest, Multiple) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(open("/dev/null", O_RDONLY));
+  files.emplace_back(open("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  BorrowedSocket sock_2 = pool.Borrow();
+}
+
+TEST(SocketPoolTest, Blocked) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(open("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  std::thread t([&pool] { pool.Borrow(); });
+  {
+    // Return fd to unblock thread.
+    BorrowedSocket temp = std::move(sock);
+  }
+  t.join();
+}
+
+TEST(SocketPoolTest, MultipleBlocked) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(open("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  std::thread t([&pool] { pool.Borrow(); });
+  std::thread t2([&pool] { pool.Borrow(); });
+  {
+    // Return fd to unblock thread.
+    BorrowedSocket temp = std::move(sock);
+  }
+  t.join();
+  t2.join();
+}
+
+}  // namespace
 }  // namespace perfetto

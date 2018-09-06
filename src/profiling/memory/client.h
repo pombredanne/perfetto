@@ -21,28 +21,46 @@
 #include <mutex>
 #include <vector>
 
+#include "perfetto/base/scoped_file.h"
+
 namespace perfetto {
 
-class FreePage {
- public:
-  FreePage();
+class SocketPool;
 
-  void Add(const void* addr, int fd);
-  bool Flush(int fd);
+class BorrowedSocket {
+ public:
+  BorrowedSocket(const BorrowedSocket&) = delete;
+  BorrowedSocket& operator=(const BorrowedSocket&) = delete;
+  BorrowedSocket(BorrowedSocket&& other) {
+    fd_ = std::move(other.fd_);
+    socket_pool_ = other.socket_pool_;
+    other.socket_pool_ = nullptr;
+  }
+
+  BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool);
+  int operator*();
+  int get();
+  void close();
+  ~BorrowedSocket();
 
  private:
-  std::vector<uint64_t> free_page_;
-  std::mutex mtx_;
-  size_t offset_;
+  base::ScopedFile fd_;
+  SocketPool* socket_pool_ = nullptr;
 };
 
-class Client {
+class SocketPool {
  public:
-  void LogMalloc(const void* pointer, size_t size);
-  void LogFree(const void* pointer);
+  friend class BorrowedSocket;
+  SocketPool(std::vector<base::ScopedFile> sockets);
+
+  BorrowedSocket Borrow();
 
  private:
-  FreePage free_page;
+  void Return(base::ScopedFile fd);
+  std::mutex mtx_;
+  std::condition_variable cv_;
+  std::vector<base::ScopedFile> sockets_;
+  size_t available_sockets_;
 };
 
 }  // namespace perfetto
