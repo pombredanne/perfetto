@@ -127,3 +127,19 @@ executable("heapprofd") {
     "main.cc",
   ]
 }
+
+shared_library("heapprofd_client") {
+  public_configs = [ "../../../gn:default_config" ]
+  deps = [
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  cflags = [
+    # TODO(fmayer): Fix this.
+    "-isystem",
+    rebase_path("../../../buildtools/bionic/libc", root_build_dir),
+  ]
+  sources = [
+    "malloc_hooks.cc",
+  ]
+}
