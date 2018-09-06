@@ -16,6 +16,7 @@ import '../tracks/all_frontend';
 
 import * as m from 'mithril';
 
+import {assertExists} from '../base/logging';
 import {forwardRemoteCalls} from '../base/remote';
 import {loadPermalink} from '../common/actions';
 import {State} from '../common/state';
@@ -31,6 +32,9 @@ import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
 import {Router} from './router';
 import {ViewerPage} from './viewer_page';
+
+// Module local.
+let maybeRouter: Router|null = null;
 
 /**
  * The API the main thread exposes to the controller.
@@ -101,9 +105,10 @@ class FrontendApi {
   }
 
   private redraw(): void {
+    const router = assertExists(maybeRouter);
     if (globals.state.route &&
-        globals.state.route !== globals.router.getRouteFromHash()) {
-      globals.router.setRouteOnHash(globals.state.route);
+        globals.state.route !== router.getRouteFromHash()) {
+      router.setRouteOnHash(globals.state.route);
     }
 
     globals.rafScheduler.scheduleFullRedraw();
@@ -118,17 +123,18 @@ function main() {
   const channel = new MessageChannel();
   forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
-
-  globals.initialize({
-    dispatch: controller.postMessage.bind(controller),
-    router: new Router('/', {
-      '/': HomePage,
-      '/viewer': ViewerPage,
-    }),
-  });
+  const dispatch = controller.postMessage.bind(controller);
+  const router = maybeRouter = new Router(
+      '/',
+      {
+        '/': HomePage,
+        '/viewer': ViewerPage,
+      },
+      dispatch);
+  globals.initialize(dispatch);
 
   globals.rafScheduler.domRedraw = () =>
-      m.render(document.body, m(globals.router.currentRootComponent()));
+      m.render(document.body, m(router.resolve(globals.state.route)));
 
   warmupWasmEngine();
 
@@ -137,7 +143,7 @@ function main() {
   (window as {} as {globals: {}}).globals = globals;
 
   // /?s=xxxx for permalinks.
-  const stateHash = globals.router.param('s');
+  const stateHash = router.param('s');
   if (stateHash) {
     globals.dispatch(loadPermalink(stateHash));
   }
@@ -147,7 +153,7 @@ function main() {
     if (e.ctrlKey) e.preventDefault();
   });
 
-  globals.router.navigate(globals.router.getRouteFromHash());
+  router.navigateToCurrentHash();
 }
 
 main();

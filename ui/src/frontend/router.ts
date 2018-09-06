@@ -14,9 +14,7 @@
 
 import * as m from 'mithril';
 
-import {navigate} from '../common/actions';
-
-import {globals} from './globals';
+import {Action, navigate} from '../common/actions';
 
 interface RouteMap {
   [route: string]: m.Component;
@@ -25,15 +23,20 @@ interface RouteMap {
 export const ROUTE_PREFIX = '#!';
 
 export class Router {
-  constructor(private defaultRoute: string, private routes: RouteMap) {
+  constructor(
+      private defaultRoute: string, private routes: RouteMap,
+      private dispatch: (a: Action) => void) {
     if (!(defaultRoute in routes)) {
       throw Error('routes must define a component for defaultRoute.');
     }
 
-    // TODO: Handle case when new route has a permalink.
-    window.onhashchange = () => this.navigate(this.getRouteFromHash());
+    window.onhashchange = () => this.navigateToCurrentHash();
   }
 
+  /**
+   * Parses and returns the current route string from |window.location.hash|.
+   * May return routes that are not defined in |this.routes|.
+   */
   getRouteFromHash(): string {
     const prefixLength = ROUTE_PREFIX.length;
     const hash = window.location.hash;
@@ -44,14 +47,38 @@ export class Router {
     return hash.split('?')[0].substring(prefixLength);
   }
 
+  /**
+   * Sets |route| on |window.location.hash|. If |route| if not defined in
+   * |this.routes|, dispatches a navigation to |this.defaultRoute|.
+   */
   setRouteOnHash(route: string) {
-    if (!(route in this.routes)) throw Error('Invalid route.');
-    window.location.hash = ROUTE_PREFIX + route;
+    history.pushState(undefined, undefined, ROUTE_PREFIX + route);
+
+    if (!(route in this.routes)) {
+      // Redirect to default route.
+      this.dispatch(navigate(this.defaultRoute));
+    }
   }
 
-  currentRootComponent(): m.Component {
-    const route = globals.state.route || this.defaultRoute;
-    if (!(route in this.routes)) throw Error('State has invalid route');
+  /**
+   * Dispatches navigation action to |this.getRouteFromHash()| if that is
+   * defined in |this.routes|, otherwise to |this.defaultRoute|.
+   */
+  navigateToCurrentHash() {
+    const hashRoute = this.getRouteFromHash();
+    const newRoute = hashRoute in this.routes ? hashRoute : this.defaultRoute;
+    this.dispatch(navigate(newRoute));
+    // TODO(dproy): Handle case when new route has a permalink.
+  }
+
+  /**
+   * Returns the component for given |route|. If |route| is not defined, returns
+   * component of |this.defaultRoute|.
+   */
+  resolve(route: string|null): m.Component {
+    if (!route || !(route in this.routes)) {
+      return this.routes[this.defaultRoute];
+    }
     return this.routes[route];
   }
 
@@ -60,12 +87,5 @@ export class Router {
     const paramStart = hash.indexOf('?');
     if (paramStart === -1) return undefined;
     return m.parseQueryString(hash.substring(paramStart))[key];
-  }
-
-  navigate(route: string) {
-    const nextRoute = route in this.routes ? route : this.defaultRoute;
-    if (globals.state.route !== nextRoute) {
-      globals.dispatch(navigate(nextRoute));
-    }
   }
 }

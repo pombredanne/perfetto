@@ -12,96 +12,124 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Action, navigate} from '../common/actions';
+// import {Action, navigate} from '../common/actions';
 
-import {globals} from './globals';
-import {ROUTE_PREFIX, Router} from './router';
+import {Action, navigate} from '../common/actions';
+import {dingus} from '../test/dingus';
+
+import {Router} from './router';
 
 const mockComponent = {
   view() {}
 };
 
+const fakeDispatch = () => {};
+
 beforeEach(() => {
-  globals.resetForTesting();
   window.onhashchange = null;
   window.location.hash = '';
 });
 
 test('Default route must be defined', () => {
-  expect(() => new Router('/a', {'/b': mockComponent})).toThrow();
+  expect(() => new Router('/a', {'/b': mockComponent}, fakeDispatch)).toThrow();
 });
 
-test('Returns default component for empty state route', () => {
-  globals.initialize({});
-  const router = new Router('/a', {'/a': mockComponent});
-  globals.state.route = '';
-  expect(router.currentRootComponent()).toBe(mockComponent);
-  globals.state.route = null;
-  expect(router.currentRootComponent()).toBe(mockComponent);
-});
-
-test('Returns component based on route in state', () => {
-  globals.initialize({});
-  const comp1 = {id: '1', view() {}};
-  const comp2 = {id: '2', view() {}};
-  const router = new Router('/1', {'/1': comp1, '/2': comp2});
-  globals.state.route = '/1';
-  expect(router.currentRootComponent()).toBe(comp1);
-  globals.state.route = '/2';
-  expect(router.currentRootComponent()).toBe(comp2);
-});
-
-test('Throws if state has invalid route', () => {
-  globals.initialize({});
-  const router = new Router('/1', {'/1': mockComponent});
-  globals.state.route = '/2';
-  expect(() => router.currentRootComponent()).toThrow();
+test('Resolves empty route to default component', () => {
+  const router = new Router('/a', {'/a': mockComponent}, fakeDispatch);
+  expect(router.resolve('')).toBe(mockComponent);
+  expect(router.resolve(null)).toBe(mockComponent);
 });
 
 test('Parse route from hash', () => {
-  const router = new Router('/', {'/': mockComponent});
-  window.location.hash = ROUTE_PREFIX + '/foobar?s=42';
+  const router = new Router('/', {'/': mockComponent}, fakeDispatch);
+  window.location.hash = '#!/foobar?s=42';
   expect(router.getRouteFromHash()).toBe('/foobar');
 
   window.location.hash = '/foobar';  // Invalid prefix.
   expect(router.getRouteFromHash()).toBe('');
 });
 
-test('Cannot set invalid route', () => {
-  const router = new Router('/', {'/': mockComponent});
-  expect(() => router.setRouteOnHash('foo')).toThrow();
+test('Set valid route on hash', () => {
+  const dispatch = dingus<(a: Action) => void>();
+  const router = new Router(
+      '/',
+      {
+        '/': mockComponent,
+        '/a': mockComponent,
+      },
+      dispatch);
+  const prevHistoryLength = window.history.length;
+
+  router.setRouteOnHash('/a');
+  expect(window.location.hash).toBe('#!/a');
+  expect(window.history.length).toBe(prevHistoryLength + 1);
+  // No navigation action should be dispatched.
+  expect(dispatch.calls.length).toBe(0);
 });
 
-test('Set route on hash', () => {
-  const router = new Router('/', {
-    '/': mockComponent,
-    '/a': mockComponent,
-  });
-  router.setRouteOnHash('/a');
-  expect(window.location.hash).toBe(ROUTE_PREFIX + '/a');
+test('Redirects to default for invalid route in setRouteOnHash ', () => {
+  const dispatch = dingus<(a: Action) => void>();
+  // const dispatch = () => {console.log("action received")};
+
+  const router = new Router('/', {'/': mockComponent}, dispatch);
+  router.setRouteOnHash('foo');
+  expect(dispatch.calls.length).toBe(1);
+  expect(dispatch.calls[0][1].length).toBeGreaterThanOrEqual(1);
+  expect(dispatch.calls[0][1][0]).toEqual(navigate('/'));
 });
 
 test('Navigate on hash change', done => {
-  const navigateAction = navigate('/viewer');
   const mockDispatch = (a: Action) => {
-    expect(a).toEqual(navigateAction);
+    expect(a).toEqual(navigate('/viewer'));
+    done();
+  };
+  new Router(
+      '/',
+      {
+        '/': mockComponent,
+        '/viewer': mockComponent,
+      },
+      mockDispatch);
+  window.location.hash = '#!/viewer';
+});
+
+test('Redirects to default when invalid route set in window location', done => {
+  const mockDispatch = (a: Action) => {
+    expect(a).toEqual(navigate('/'));
     done();
   };
 
-  globals.initialize({
-    dispatch: mockDispatch,
-    router: new Router('/', {
-      '/': mockComponent,
-      '/viewer': mockComponent,
-    })
-  });
-  globals.state.route = '/';
-  window.location.hash = ROUTE_PREFIX + '/viewer';
+  new Router(
+      '/',
+      {
+        '/': mockComponent,
+        '/viewer': mockComponent,
+      },
+      mockDispatch);
+
+  window.location.hash = '#invalid';
+});
+
+test('navigateToCurrentHash with valid current route', () => {
+  const dispatch = dingus<(a: Action) => void>();
+  window.location.hash = '#!/b';
+  const router =
+      new Router('/', {'/': mockComponent, '/b': mockComponent}, dispatch);
+  router.navigateToCurrentHash();
+  expect(dispatch.calls[0][1][0]).toEqual(navigate('/b'));
+});
+
+test('navigateToCurrentHash with invalid current route', () => {
+  const dispatch = dingus<(a: Action) => void>();
+  window.location.hash = '#!/invalid';
+  const router = new Router('/', {'/': mockComponent}, dispatch);
+  router.navigateToCurrentHash();
+  expect(dispatch.calls[0][1][0]).toEqual(navigate('/'));
 });
 
 test('Params parsing', () => {
   window.location.hash = '#!/foo?a=123&b=42&c=a?b?c';
-  const router = new Router('/', {'/': mockComponent});
+  const router = new Router('/', {'/': mockComponent}, fakeDispatch);
   expect(router.param('a')).toBe('123');
   expect(router.param('b')).toBe('42');
   expect(router.param('c')).toBe('a?b?c');

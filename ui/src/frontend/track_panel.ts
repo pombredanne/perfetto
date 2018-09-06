@@ -72,7 +72,8 @@ const TrackMoveButton = {
     return m(
         'i.material-icons.track-move-icons',
         {
-          onclick: globals.dispatch(moveTrack(attrs.trackId, attrs.direction)),
+          onclick: () =>
+              globals.dispatch(moveTrack(attrs.trackId, attrs.direction)),
         },
         attrs.direction === 'up' ? 'arrow_upward_alt' : 'arrow_downward_alt');
   }

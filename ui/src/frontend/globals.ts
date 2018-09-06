@@ -18,7 +18,6 @@ import {createEmptyState, State} from '../common/state';
 
 import {FrontendLocalState} from './frontend_local_state';
 import {RafScheduler} from './raf_scheduler';
-import {Router} from './router';
 
 type Dispatch = (action: Action) => void;
 type TrackDataStore = Map<string, {}>;
@@ -52,11 +51,9 @@ class Globals {
   private _rafScheduler?: RafScheduler = undefined;
   private _overviewStore?: OverviewStore = undefined;
   private _threadMap?: ThreadMap = undefined;
-  private _router?: Router = undefined;
 
-  initialize({dispatch, router}: {dispatch?: Dispatch, router?: Router}) {
+  initialize(dispatch?: Dispatch) {
     this._dispatch = dispatch;
-    this._router = router;
     this._state = createEmptyState();
     this._trackDataStore = new Map<string, {}>();
     this._queryResults = new Map<string, {}>();
@@ -102,13 +99,8 @@ class Globals {
     return assertExists(this._threadMap);
   }
 
-  get router(): Router {
-    return assertExists(this._router);
-  }
-
   resetForTesting() {
     this._dispatch = undefined;
-    this._router = undefined;
     this._state = undefined;
     this._trackDataStore = undefined;
     this._queryResults = undefined;

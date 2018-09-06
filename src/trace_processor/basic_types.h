@@ -14,12 +14,17 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/chunked_trace_reader.h"
+#ifndef SRC_TRACE_PROCESSOR_BASIC_TYPES_H_
+#define SRC_TRACE_PROCESSOR_BASIC_TYPES_H_
+
+#include <memory>
 
 namespace perfetto {
 namespace trace_processor {
 
-ChunkedTraceReader::~ChunkedTraceReader() {}
+enum class OptimizationMode { kMaxBandwidth = 0, kMinLatency };
 
 }  // namespace trace_processor
 }  // namespace perfetto
+
+#endif  // SRC_TRACE_PROCESSOR_BASIC_TYPES_H_

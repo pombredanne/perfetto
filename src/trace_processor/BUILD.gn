@@ -16,6 +16,7 @@ import("../../gn/perfetto.gni")
 import("../../gn/wasm.gni")
 
 wasm_lib("trace_processor_wasm") {
+  name = "trace_processor"
   sources = [
     "wasm_bridge.cc",
   ]
@@ -41,12 +42,16 @@ static_library("trace_processor") {
 
 source_set("lib") {
   sources = [
+    "basic_types.h",
+    "chunked_trace_reader.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
     "process_tracker.h",
     "proto_trace_parser.cc",
     "proto_trace_parser.h",
+    "proto_trace_tokenizer.cc",
+    "proto_trace_tokenizer.h",
     "query_constraints.cc",
     "query_constraints.h",
     "sched_slice_table.cc",
@@ -63,11 +68,13 @@ source_set("lib") {
     "table.h",
     "thread_table.cc",
     "thread_table.h",
-    "trace_parser.h",
+    "trace_blob_view.h",
     "trace_processor.cc",
     "trace_processor.h",
     "trace_processor_context.cc",
     "trace_processor_context.h",
+    "trace_sorter.cc",
+    "trace_sorter.h",
     "trace_storage.cc",
     "trace_storage.h",
     "virtual_destructors.cc",
@@ -127,6 +134,7 @@ source_set("unittests") {
     "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
     "thread_table_unittest.cc",
+    "trace_sorter_unittest.cc",
   ]
   deps = [
     ":lib",
