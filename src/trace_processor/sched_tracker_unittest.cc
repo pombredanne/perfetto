@@ -34,6 +34,7 @@ class SchedTrackerTest : public ::testing::Test {
     context.process_tracker.reset(new ProcessTracker(&context));
     context.sched_tracker.reset(new SchedTracker(&context));
     context.storage.reset(new TraceStorage());
+    PERFETTO_LOG("MAKE thing");
   }
 
  protected:
@@ -104,10 +105,6 @@ TEST_F(SchedTrackerTest, TestCyclesCalculation) {
   uint32_t cpu = 3;
   uint64_t timestamp = 1e9;
   context.storage->PushCpuFreq(timestamp, cpu, 1e6);
-  context.storage->PushCpuFreq(static_cast<uint64_t>(timestamp + 1e8L), cpu,
-                               2e6);
-  context.storage->PushCpuFreq(static_cast<uint64_t>(timestamp + 2e8L), cpu,
-                               3e6);
 
   uint32_t prev_state = 32;
   static const char kCommProc1[] = "process1";
@@ -117,6 +114,11 @@ TEST_F(SchedTrackerTest, TestCyclesCalculation) {
       cpu, static_cast<uint64_t>(timestamp + 1e7L), /*tid=*/2, prev_state,
       kCommProc1,
       /*tid=*/4);
+
+  context.storage->PushCpuFreq(static_cast<uint64_t>(timestamp + 1e8L), cpu,
+                               2e6);
+  context.storage->PushCpuFreq(static_cast<uint64_t>(timestamp + 2e8L), cpu,
+                               3e6);
   context.sched_tracker->PushSchedSwitch(
       cpu, static_cast<uint64_t>(timestamp + 3e8L), /*tid=*/4, prev_state,
       kCommProc2,

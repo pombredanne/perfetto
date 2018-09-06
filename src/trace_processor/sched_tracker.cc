@@ -67,38 +67,30 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
                                        uint64_t start_ns,
                                        uint64_t end_ns) {
   auto frequencies = context_->storage->GetFreqForCpu(cpu);
+  auto lower_index = lower_index_per_cpu_[cpu];
   if (frequencies.empty())
     return 0;
 
   long double cycles = 0;
-  uint64_t time_last_processed = start_ns;
-  uint64_t prev_freq = 0;
 
-  // Find the index of the first pair with a timestamp >= to start_ns.
-  while (lower_index < frequencies.size() &&
-         frequencies[lower_index].first < start_ns) {
+  while (lower_index + 1 < frequencies.size()) {
+    if (frequencies[lower_index + 1].first >= start_ns)
+      break;
     ++lower_index;
   };
 
-  // Find the index of the first pair with timestamp > end_ns.
-  size_t upper_index = lower_index;
-  while (upper_index < frequencies.size() &&
-         frequencies[upper_index].first <= end_ns) {
-    ++upper_index;
-  };
+  size_t upper_index = frequencies.size() - 1;
 
-  if (lower_index != 0) {
-    prev_freq = frequencies[lower_index - 1].second;
+  for (size_t i = lower_index; i < frequencies.size(); ++i) {
+    uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
+    uint64_t cycle_end = end_ns;
+    if (i + 1 < frequencies.size())
+      cycle_end = frequencies[i + 1].first;
+
+    cycles += ((cycle_end - cycle_start) / 1E9L) * frequencies[i].second;
   }
 
-  // For each frequency change within |start_ns| and |end_ns| multiply the
-  // prev frequency by the time that has passed.
-  for (size_t i = lower_index; i != upper_index; ++i) {
-    cycles += ((frequencies[i].first - time_last_processed) / 1E9L) * prev_freq;
-    prev_freq = frequencies[i].second;
-    time_last_processed = frequencies[i].first;
-  }
-  cycles += ((end_ns - time_last_processed) / 1E9L) * prev_freq;
+  lower_index_per_cpu_[cpu] = upper_index;
   return static_cast<uint64_t>(std::round(cycles));
 }
 
