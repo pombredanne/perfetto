@@ -27,6 +27,21 @@ namespace perfetto {
 
 class SocketPool;
 
+class FreePage {
+ public:
+  FreePage();
+
+  // thread-safe
+  void Add(const void* addr, SocketPool* pool);
+
+ private:
+  void Flush(SocketPool* pool);
+
+  std::vector<uint64_t> free_page_;
+  std::mutex mtx_;
+  size_t offset_;
+};
+
 class BorrowedSocket {
  public:
   BorrowedSocket(const BorrowedSocket&) = delete;
