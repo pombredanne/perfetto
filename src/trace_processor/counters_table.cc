@@ -32,7 +32,6 @@ using namespace sqlite_utils;
 CountersTable::CountersTable(const TraceStorage* storage) : storage_(storage) {}
 
 void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  PERFETTO_LOG("REGistering table");
   Table::Register<CountersTable>(db, storage,
                                  "CREATE TABLE counters("
                                  "ts UNSIGNED BIG INT, "
@@ -61,24 +60,29 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-CountersTable::Cursor::Cursor(const TraceStorage* storage)
-    : storage_(storage) {}
+CountersTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
+  // Find the first cpu with freq_events.
+  while (current_cpu_ != storage_->GetMaxCpu() &&
+         storage_->GetFreqForCpu(current_cpu_).size() == 0) {
+    ++current_cpu_;
+  }
+}
 
 int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
     case Column::kTimestamp: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu);
+      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
       sqlite3_result_int64(context,
-                           static_cast<int64_t>(freq[index_in_cpu].first));
+                           static_cast<int64_t>(freq[index_in_cpu_].first));
       break;
     }
     case Column::kValue: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu);
-      sqlite3_result_int64(context, freq[index_in_cpu].second);
+      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
+      sqlite3_result_int64(context, freq[index_in_cpu_].second);
       break;
     }
     case Column::kRef: {
-      sqlite3_result_int64(context, current_cpu);
+      sqlite3_result_int64(context, current_cpu_);
       break;
     }
     case Column::kRefType: {
@@ -88,12 +92,10 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kDuration: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu);
+      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
       uint64_t duration = 0;
-      if (index_in_cpu != 0) {
-        if (freq[index_in_cpu].first > freq[index_in_cpu - 1].first) {
-          duration = freq[index_in_cpu].first - freq[index_in_cpu - 1].first;
-        }
+      if (index_in_cpu_ != freq.size() - 1) {
+        duration = freq[index_in_cpu_ + 1].first - freq[index_in_cpu_].first;
       }
       sqlite3_result_int64(context, static_cast<int64_t>(duration));
       break;
@@ -112,8 +114,8 @@ int CountersTable::Cursor::Filter(const QueryConstraints& qc,
     if (cs.iColumn == Column::kRef) {
       auto constraint_cpu = static_cast<uint32_t>(sqlite3_value_int(argv[j]));
       if (IsOpEq(cs.op)) {
-        filter_by_cpu = true;
-        filter_cpu = constraint_cpu;
+        filter_by_cpu_ = true;
+        filter_cpu_ = constraint_cpu;
       }
     }
   }
@@ -122,30 +124,30 @@ int CountersTable::Cursor::Filter(const QueryConstraints& qc,
 }
 
 int CountersTable::Cursor::Next() {
-  if (filter_by_cpu) {
-    current_cpu = filter_cpu;
-    ++index_in_cpu;
+  if (filter_by_cpu_) {
+    current_cpu_ = filter_cpu_;
+    ++index_in_cpu_;
   } else {
-    if (index_in_cpu < storage_->GetFreqForCpu(current_cpu).size() - 1) {
-      index_in_cpu++;
-    } else if (current_cpu < storage_->GetMaxCpu()) {
-      ++current_cpu;
-      index_in_cpu = 0;
+    if (index_in_cpu_ < storage_->GetFreqForCpu(current_cpu_).size() - 1) {
+      index_in_cpu_++;
+    } else if (current_cpu_ < storage_->GetMaxCpu()) {
+      ++current_cpu_;
+      index_in_cpu_ = 0;
     }
     // If the cpu is has no freq events, move to the next one.
-    while (current_cpu != storage_->GetMaxCpu() &&
-           storage_->GetFreqForCpu(current_cpu).size() == 0) {
-      ++current_cpu;
+    while (current_cpu_ != storage_->GetMaxCpu() &&
+           storage_->GetFreqForCpu(current_cpu_).size() == 0) {
+      ++current_cpu_;
     }
   }
   return SQLITE_OK;
 }
 
 int CountersTable::Cursor::Eof() {
-  if (filter_by_cpu) {
-    return index_in_cpu == storage_->GetFreqForCpu(current_cpu).size();
+  if (filter_by_cpu_) {
+    return index_in_cpu_ == storage_->GetFreqForCpu(current_cpu_).size();
   }
-  return current_cpu == storage_->GetMaxCpu();
+  return current_cpu_ == storage_->GetMaxCpu();
 }
 
 }  // namespace trace_processor
