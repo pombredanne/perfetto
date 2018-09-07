@@ -79,8 +79,6 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
     ++lower_index;
   };
 
-  size_t upper_index = frequencies.size() - 1;
-
   for (size_t i = lower_index; i < frequencies.size(); ++i) {
     uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
     uint64_t cycle_end = end_ns;
@@ -90,7 +88,7 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
     cycles += ((cycle_end - cycle_start) / 1E6L) * frequencies[i].second;
   }
 
-  lower_index_per_cpu_[cpu] = upper_index;
+  lower_index_per_cpu_[cpu] = frequencies.size() - 1;
   return static_cast<uint64_t>(std::round(cycles));
 }
 
