@@ -19,7 +19,7 @@ import {TimeSpan, timeToString} from '../common/time';
 
 import {DragGestureHandler} from './drag_gesture_handler';
 import {globals} from './globals';
-import {Panel} from './panel';
+import {Panel, PanelSize} from './panel';
 import {TimeScale} from './time_scale';
 
 export class OverviewTimelinePanel extends Panel {
@@ -58,11 +58,11 @@ export class OverviewTimelinePanel extends Panel {
     return m('.overview-timeline');
   }
 
-  renderCanvas(ctx: CanvasRenderingContext2D) {
+  renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {
     if (this.width === undefined) return;
     if (this.timeScale === undefined) return;
     const headerHeight = 25;
-    const tracksHeight = this.getHeight() - headerHeight;
+    const tracksHeight = size.height - headerHeight;
 
     // Draw time labels on the top header.
     ctx.font = '10px Google Sans';
@@ -103,7 +103,7 @@ export class OverviewTimelinePanel extends Panel {
 
     // Draw bottom border.
     ctx.fillStyle = 'hsl(219, 40%, 50%)';
-    ctx.fillRect(0, this.getHeight() - 2, this.width, 2);
+    ctx.fillRect(0, size.height - 2, this.width, 2);
 
     // Draw semi-opaque rects that occlude the non-visible time range.
     const vizTime = globals.frontendLocalState.visibleWindowTime;
