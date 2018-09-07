@@ -17,7 +17,6 @@ import("../../gn/perfetto.gni")
 import("../../gn/wasm.gni")
 
 source_set("base") {
-  public_configs = [ "../../gn:default_config" ]
   deps = [
     "../../gn:default_deps",
   ]

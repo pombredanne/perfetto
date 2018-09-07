@@ -78,6 +78,10 @@ bool ReadFile(const std::string& path, std::string* out) {
   return ReadFileDescriptor(*fd, out);
 }
 
+// The CMSG_* macros use NULL instead of nullptr.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+
 ssize_t Send(int fd,
              const void* msg,
              size_t len,
@@ -162,5 +166,8 @@ ssize_t Receive(int fd,
 
   return sz;
 }
+
+#pragma GCC diagnostic pop
+
 }  // namespace base
 }  // namespace perfetto
