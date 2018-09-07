@@ -19,6 +19,8 @@
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
+#include <math.h>
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -87,8 +89,7 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
   for (size_t i = lower_index; i < frequencies.size(); ++i) {
     // Using max handles the special case for the first cpu_freq event.
     uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
-    // Handles the special case for computing the cycles after the last cpu_freq
-    // event until end_ns.
+    // If there are no more freq_events we compute cycles until |end_ns|.
     uint64_t cycle_end = end_ns;
     if (i + 1 < frequencies.size())
       cycle_end = frequencies[i + 1].first;
@@ -98,7 +99,7 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
   }
 
   lower_index_per_cpu_[cpu] = frequencies.size() - 1;
-  return static_cast<uint64_t>(std::round(cycles));
+  return static_cast<uint64_t>(round(cycles));
 }
 
 }  // namespace trace_processor
