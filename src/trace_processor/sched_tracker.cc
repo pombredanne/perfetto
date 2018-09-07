@@ -73,19 +73,28 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
 
   long double cycles = 0;
 
+  // Move the lower index up to the first cpu_freq event before start_ns.
   while (lower_index + 1 < frequencies.size()) {
     if (frequencies[lower_index + 1].first >= start_ns)
       break;
     ++lower_index;
   };
 
+  // Since events are processed in timestamp order, we don't have any cpu_freq
+  // events with a timestamp larger than end_ns. Therefore we care about all
+  // freq events from lower_index (first event before start_ns) to the last
+  // cpu_freq event.
   for (size_t i = lower_index; i < frequencies.size(); ++i) {
+    // Using max handles the special case for the first cpu_freq event.
     uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
+    // Handles the special case for computing the cycles after the last cpu_freq
+    // event until end_ns.
     uint64_t cycle_end = end_ns;
     if (i + 1 < frequencies.size())
       cycle_end = frequencies[i + 1].first;
 
-    cycles += ((cycle_end - cycle_start) / 1E6L) * frequencies[i].second;
+    uint32_t freq_khz = frequencies[i].second;
+    cycles += ((cycle_end - cycle_start) / 1E6L) * freq_khz;
   }
 
   lower_index_per_cpu_[cpu] = frequencies.size() - 1;
