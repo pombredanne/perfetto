@@ -388,15 +388,15 @@ TEST_F(SchedSliceTableTest, CyclesOrdering) {
   PrepareValidStatement("SELECT cycles, ts FROM sched ORDER BY cycles desc");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 5 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 5000 /* cycles */);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp + 4);
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 2 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 2000 /* cycles */);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp + 2);
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
-  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 1 /* cycles */);
+  ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 1000 /* cycles */);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 1), timestamp);
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_DONE);

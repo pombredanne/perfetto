@@ -81,7 +81,6 @@ class ProtoTraceParserTest : public ::testing::Test {
     const auto optim = OptimizationMode::kMinLatency;
     context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
-    context_.storage.reset(new MockTraceStorage());
   }
 
   void Tokenize(const protos::Trace& trace) {

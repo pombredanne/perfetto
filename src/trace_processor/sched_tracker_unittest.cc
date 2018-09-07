@@ -122,7 +122,7 @@ TEST_F(SchedTrackerTest, TestCyclesCalculation) {
       cpu, static_cast<uint64_t>(timestamp + 3e8L), /*tid=*/4, prev_state,
       kCommProc2,
       /*tid=*/2);
-  ASSERT_EQ(context.storage->SlicesForCpu(cpu).cycles().at(0), 590000);
+  ASSERT_EQ(context.storage->SlicesForCpu(cpu).cycles().at(0), 590000000);
 }
 
 }  // namespace
