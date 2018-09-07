@@ -44,6 +44,8 @@ source_set("lib") {
   sources = [
     "basic_types.h",
     "chunked_trace_reader.h",
+    "counters_table.cc",
+    "counters_table.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
