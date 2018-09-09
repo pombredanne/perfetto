@@ -35,11 +35,12 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<CountersTable>(db, storage,
                                  "CREATE TABLE counters("
                                  "ts UNSIGNED BIG INT, "
+                                 "name text, "
                                  "value UNSIGNED BIG INT, "
+                                 "dur UNSIGNED BIG INT, "
                                  "ref UNSIGNED INT, "
                                  "reftype TEXT, "
-                                 "dur UNSIGNED BIG INT, "
-                                 "PRIMARY KEY(ts, ref)"
+                                 "PRIMARY KEY(name, ts, ref)"
                                  ") WITHOUT ROWID;");
 }
 
@@ -60,13 +61,8 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-CountersTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-  // Find the first cpu with freq_events.
-  while (current_cpu_ != storage_->GetMaxCpu() &&
-         storage_->GetFreqForCpu(current_cpu_).size() == 0) {
-    ++current_cpu_;
-  }
-}
+CountersTable::Cursor::Cursor(const TraceStorage* storage)
+    : storage_(storage) {}
 
 int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
@@ -81,20 +77,22 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
       sqlite3_result_int64(context, freq[index_in_cpu_].second);
       break;
     }
+    case Column::kName: {
+      sqlite3_result_text(context, "cpufreq", -1, nullptr);
+      break;
+    }
     case Column::kRef: {
       sqlite3_result_int64(context, current_cpu_);
       break;
     }
     case Column::kRefType: {
-      std::string id = "cpu_id";
-      sqlite3_result_text(context, id.c_str(), static_cast<int>(id.length()),
-                          nullptr);
+      sqlite3_result_text(context, "cpu", -1, nullptr);
       break;
     }
     case Column::kDuration: {
       const auto& freq = storage_->GetFreqForCpu(current_cpu_);
       uint64_t duration = 0;
-      if (index_in_cpu_ != freq.size() - 1) {
+      if (index_in_cpu_ + 1 < freq.size()) {
         duration = freq[index_in_cpu_ + 1].first - freq[index_in_cpu_].first;
       }
       sqlite3_result_int64(context, static_cast<int64_t>(duration));

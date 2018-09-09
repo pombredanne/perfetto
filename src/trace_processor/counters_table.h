@@ -30,10 +30,11 @@ class CountersTable : public Table {
  public:
   enum Column {
     kTimestamp = 0,
-    kValue = 1,
-    kRef = 2,
-    kRefType = 3,
-    kDuration = 4
+    kName = 1,
+    kValue = 2,
+    kDuration = 3,
+    kRef = 4,
+    kRefType = 5,
   };
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
@@ -59,7 +60,7 @@ class CountersTable : public Table {
     bool filter_by_cpu_ = false;
     uint32_t current_cpu_ = 0;
     size_t index_in_cpu_ = 0;
-    uint32_t filter_cpu_;
+    uint32_t filter_cpu_ = 0;
 
     const TraceStorage* const storage_;
   };
