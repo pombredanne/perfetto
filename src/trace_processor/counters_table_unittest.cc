@@ -87,8 +87,8 @@ TEST_F(CountersTableUnittest, GroupByFreq) {
   context_.storage->PushCpuFreq(timestamp + 3, 1 /* cpu */, freq);
 
   PrepareValidStatement(
-      "SELECT value, sum(dur) as dur_sum FROM counters group by value order by "
-      "dur_sum desc");
+      "SELECT value, sum(dur) as dur_sum FROM counters where value > 0 group "
+      "by value order by dur_sum desc");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), freq + 1000);
