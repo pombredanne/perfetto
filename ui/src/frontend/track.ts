@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import {TrackState} from '../common/state';
-import {globals} from './globals';
 
 /**
  * This interface forces track implementations to have some static properties.
@@ -41,10 +40,6 @@ export abstract class Track {
   abstract renderCanvas(ctx: CanvasRenderingContext2D): void;
   getHeight(): number {
     return 70;
-  }
-  // This method must be called if a track changes its height.
-  onHeightChanged() {
-    globals.rafScheduler.scheduleFullRedraw();
   }
   onMouseMove(_position: {x: number, y: number}) {}
   onMouseOut() {}

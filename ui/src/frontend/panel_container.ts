@@ -41,8 +41,7 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
   private totalPanelHeight = 0;
   private canvasHeight = 0;
 
-  // Canvas redrawer can only access state, not attrs. We therefore cache the
-  // most recently seen attrs in the state.
+  // attrs received in the most recent mithril redraw.
   private attrs?: Attrs;
 
   private canvasOverdrawFactor: number;
@@ -117,8 +116,8 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
   }
 
   view({attrs}: m.CVnode<Attrs>) {
-    // Cache attrs in state, because redrawAllPanelCavases only has access to
-    // the state.
+    // We receive a new vnode object with new attrs on every mithril redraw. We
+    // store the latest attrs so redrawCanvas can use it.
     this.attrs = attrs;
     return m(
         '.scroll-limiter',

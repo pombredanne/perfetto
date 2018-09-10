@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import * as m from 'mithril';
-// import {globals} from './globals';
+
 export interface PanelSize {
   width: number;
   height: number;
