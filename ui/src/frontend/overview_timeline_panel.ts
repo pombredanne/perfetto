@@ -46,6 +46,10 @@ export class OverviewTimelinePanel extends Panel {
     }
   }
 
+  oncreate(vnode: m.CVnodeDOM) {
+    this.onupdate(vnode);
+  }
+
   view() {
     return m('.overview-timeline');
   }

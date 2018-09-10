@@ -72,16 +72,20 @@ const TraceViewer = {
 
   oncreate(vnode) {
     const frontendLocalState = globals.frontendLocalState;
-    // TODO: This is probably not needed. Figure out resizing.
-    this.onResize = () => {
+    const updateDimensions = () => {
       const rect = vnode.dom.getBoundingClientRect();
       this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
           0, this.width - TRACK_SHELL_WIDTH);
     };
 
-    // Have to redraw after initialization to provide dimensions to view().
-    setTimeout(() => this.onResize());
+    updateDimensions();
+
+    // TODO: Do resize handling better.
+    this.onResize = () => {
+      updateDimensions();
+      globals.rafScheduler.scheduleFullRedraw();
+    };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
