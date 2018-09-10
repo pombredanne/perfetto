@@ -23,18 +23,11 @@ import {Panel, PanelSize} from './panel';
 import {TimeScale} from './time_scale';
 
 export class OverviewTimelinePanel extends Panel {
-  private width?: number;
-  private dragStartPx: number;
+  private width = 0;
+  private dragStartPx = 0;
   private gesture?: DragGestureHandler;
   private timeScale?: TimeScale;
-  private totTime: TimeSpan;
-
-  constructor() {
-    super();
-    this.width = 0;
-    this.dragStartPx = 0;
-    this.totTime = new TimeSpan(0, 0);
-  }
+  private totTime = new TimeSpan(0, 0);
 
   // Must explicitly type now; arguments types are no longer auto-inferred.
   // https://github.com/Microsoft/TypeScript/issues/1373
