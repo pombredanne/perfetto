@@ -67,7 +67,8 @@ class FrontendApi {
 
   publishTrackData(args: {id: string, data: {}}) {
     globals.trackDataStore.set(args.id, args.data);
-    globals.rafScheduler.scheduleRedraw();
+    // globals.rafScheduler.scheduleRedraw();
+    this.redraw();
   }
 
   publishQueryResult(args: {id: string, data: {}}) {

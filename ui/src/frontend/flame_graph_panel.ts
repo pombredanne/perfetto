@@ -12,19 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// import {Panel} from './panel';
+import * as m from 'mithril';
 
-// export class FlameGraphPanel extends Panel {
-//   private renderedDom = false;
-//   renderCanvas() {}
-//   updateDom(dom: HTMLElement) {
-//     if (this.renderedDom) return;
-//     dom.innerHTML = `<header>Flame Graph</Header>
-//         <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
-//     this.renderedDom = true;
-//   }
+import {Panel} from './panel';
 
-//   getHeight() {
-//     return 500;
-//   }
-// }
+export class FlameGraphPanel extends Panel {
+  renderCanvas() {}
+  view() {
+    return [
+      m('header', 'Flame Graph'),
+      m('embed.flame-graph-panel',
+        {type: 'image/svg+xml', src: '/assets/flamegraph.svg'})
+    ];
+    // if (this.renderedDom) return;
+    // dom.innerHTML = `<header>Flame Graph</Header>
+    //     <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
+    // this.renderedDom = true;
+  }
+}

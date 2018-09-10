@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {TrackState} from '../common/state';
+import {globals} from './globals';
 
 /**
  * This interface forces track implementations to have some static properties.
@@ -33,16 +34,17 @@ export interface TrackCreator {
  * The abstract class that needs to be implemented by all tracks.
  */
 export abstract class Track {
-  // TODO: Typecheck that arg of consumeData and published data for a Track has
-  // the same type.
   /**
    * Receive data published by the TrackController of this track.
    */
-  abstract consumeData(trackData: {}): void;
   constructor(protected trackState: TrackState) {}
   abstract renderCanvas(ctx: CanvasRenderingContext2D): void;
   getHeight(): number {
     return 70;
+  }
+  // This method must be called if a track changes its height.
+  onHeightChanged() {
+    globals.rafScheduler.scheduleFullRedraw();
   }
   onMouseMove(_position: {x: number, y: number}) {}
   onMouseOut() {}

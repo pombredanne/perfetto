@@ -19,12 +19,11 @@ export interface PanelSize {
   height: number;
 }
 
-export abstract class Panel<Attrs = {}> implements
-    m.Component<Attrs, Panel<Attrs>> {
+export abstract class Panel<Attrs = {}> implements m.ClassComponent<Attrs> {
   abstract renderCanvas(
       ctx: CanvasRenderingContext2D, size: PanelSize,
       vnode: PanelVNode<Attrs>): void;
-  abstract view(vnode: m.Vnode<Attrs, this>): m.Children|null|void;
+  abstract view(vnode: m.CVnode<Attrs>): m.Children|null|void;
 }
 
 

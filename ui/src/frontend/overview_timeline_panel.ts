@@ -54,7 +54,6 @@ export class OverviewTimelinePanel extends Panel {
   }
 
   view() {
-    // Rendering empty div to measure width.
     return m('.overview-timeline');
   }
 

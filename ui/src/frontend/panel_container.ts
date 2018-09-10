@@ -25,143 +25,42 @@ import {isPanelVNode} from './panel';
  */
 const SCROLLING_CANVAS_OVERDRAW_FACTOR = 2;
 
-function getCanvasOverdrawHeightPerSide(vnode: PanelContainerVnode) {
-  const overdrawHeight =
-      (vnode.state.canvasOverdrawFactor - 1) * vnode.state.parentHeight;
-  return overdrawHeight / 2;
-}
-
-function updateCanvasDimensions(vnodeDom: PanelContainerVnodeDom) {
-  const canvas =
-      assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
-      HTMLCanvasElement;
-  const ctx = assertExists(vnodeDom.state.ctx);
-  canvas.style.height = `${vnodeDom.state.canvasHeight}px`;
-  const dpr = window.devicePixelRatio;
-  ctx.canvas.width = vnodeDom.state.parentWidth * dpr;
-  ctx.canvas.height = vnodeDom.state.canvasHeight * dpr;
-  ctx.scale(dpr, dpr);
-}
-
-function panelIsOnCanvas(
-    panelYBoundsOnCanvas: {start: number, end: number}, canvasHeight: number) {
-  return panelYBoundsOnCanvas.end > 0 &&
-      panelYBoundsOnCanvas.start < canvasHeight;
-}
-
-function redrawAllPanelCavases(vnode: PanelContainerVnode) {
-  const state = vnode.state;
-  if (!state.ctx) return;
-  const canvasHeight = vnode.state.totalPanelHeight;
-  state.ctx.clearRect(0, 0, state.parentWidth, canvasHeight);
-  const canvasYStart = state.scrollTop - getCanvasOverdrawHeightPerSide(vnode);
-
-  let panelYStart = 0;
-  assertTrue(vnode.attrs.panels.length === vnode.state.panelHeights.length);
-  for (let i = 0; i < vnode.attrs.panels.length; i++) {
-    const panel = vnode.attrs.panels[i];
-    const panelHeight = vnode.state.panelHeights[i];
-    const yStartOnCanvas = panelYStart - canvasYStart;
-    const panelYBoundsOnCanvas = {
-      start: yStartOnCanvas,
-      end: yStartOnCanvas + panelHeight,
-    };
-
-    if (!panelIsOnCanvas(panelYBoundsOnCanvas, canvasHeight)) {
-      panelYStart += panelHeight;
-      continue;
-    }
-
-    if (!isPanelVNode(panel)) {
-      throw Error('Vnode passed to panel container is not a panel');
-    }
-
-    state.ctx.save();
-    state.ctx.translate(0, yStartOnCanvas);
-    const clipRect = new Path2D();
-    const size = {width: state.parentWidth, height: panelHeight};
-    clipRect.rect(0, 0, size.width, size.height);
-    state.ctx.clip(clipRect);
-    panel.state.renderCanvas(state.ctx, size, panel);
-    state.ctx.restore();
-    panelYStart += panelHeight;
-  }
-}
-
-function repositionCanvas(vnodeDom: PanelContainerVnodeDom) {
-  const canvas =
-      assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
-      HTMLCanvasElement;
-  const canvasYStart =
-      vnodeDom.state.scrollTop - getCanvasOverdrawHeightPerSide(vnodeDom);
-  canvas.style.transform = `translateY(${canvasYStart}px)`;
-}
-
-function getCanvasHeight(vnode: PanelContainerVnode) {
-  return vnode.attrs.doesScroll ?
-      vnode.state.parentHeight * vnode.state.canvasOverdrawFactor :
-      vnode.state.totalPanelHeight;
-}
-
-function updatePanelHeightsFromDom(vnodeDom: PanelContainerVnodeDom): boolean {
-  const prevHeight = vnodeDom.state.totalPanelHeight;
-  const panelHeights = [];
-  let totalPanelHeight = 0;
-
-  const panels = vnodeDom.dom.querySelectorAll('.panel');
-  for (let i = 0; i < panels.length; i++) {
-    const height = panels[i].getBoundingClientRect().height;
-    panelHeights[i] = height;
-    totalPanelHeight += height;
-  }
-
-  // TODO: Inline.
-  vnodeDom.state.panelHeights = panelHeights;
-  vnodeDom.state.totalPanelHeight = totalPanelHeight;
-  return totalPanelHeight !== prevHeight;
-}
-
-interface PanelContainerState {
-  parentWidth: number;
-  parentHeight: number;
-  scrollTop: number;
-  canvasOverdrawFactor: number;
-  ctx: CanvasRenderingContext2D|null;
-  panelHeights: number[];
-  totalPanelHeight: number;
-  canvasHeight: number;
-
-  // We store these functions so we can remove them.
-  onResize: () => void;
-  canvasRedrawer: () => void;
-  parentOnScroll: () => void;
-}
-
-interface PanelContainerAttrs {
-  panels: m.Vnode[];
+interface Attrs {
+  // Panels with non-empty attrs does not work without any.
+  // tslint:disable-next-line:no-any
+  panels: Array<m.Vnode<any, {}>>;
   doesScroll: boolean;
 }
 
-// Vnode contains state + attrs. VnodeDom contains state + attrs + dom.
-type PanelContainerVnode = m.Vnode<PanelContainerAttrs, PanelContainerState>;
-type PanelContainerVnodeDom =
-    m.VnodeDOM<PanelContainerAttrs, PanelContainerState>;
+export class PanelContainer implements m.ClassComponent<Attrs> {
+  // These values are updated with proper values in oncreate.
+  private parentWidth = 0;
+  private parentHeight = 0;
+  private scrollTop = 0;
+  private panelHeights: number[] = [];
+  private totalPanelHeight = 0;
+  private canvasHeight = 0;
 
+  // Canvas redrawer can only access state, not attrs. We therefore cache the
+  // most recently seen attrs in the state.
+  private attrs?: Attrs;
 
-export const PanelContainer = {
-  oninit(vnode: PanelContainerVnode) {
-    // These values are updated with proper values in oncreate.
-    this.parentWidth = 0;
-    this.parentHeight = 0;
-    this.scrollTop = 0;
+  private canvasOverdrawFactor: number;
+  private ctx?: CanvasRenderingContext2D;
+
+  private onResize: () => void = () => {};
+  private parentOnScroll: () => void = () => {};
+  private canvasRedrawer: () => void;
+
+  constructor(vnode: m.CVnode<Attrs>) {
     this.canvasOverdrawFactor =
         vnode.attrs.doesScroll ? SCROLLING_CANVAS_OVERDRAW_FACTOR : 1;
-    this.ctx = null;
-    this.canvasRedrawer = () => redrawAllPanelCavases(vnode);
+    this.canvasRedrawer = () => this.redrawCanvas();
     globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
-  },
+  }
 
-  oncreate(vnodeDom: PanelContainerVnodeDom) {
+  oncreate(vnodeDom: m.CVnodeDOM<Attrs>) {
+    const attrs = vnodeDom.attrs;
     // Save the canvas context in the state.
     const canvas =
         vnodeDom.dom.querySelector('.main-canvas') as HTMLCanvasElement;
@@ -176,11 +75,11 @@ export const PanelContainer = {
     this.parentWidth = clientRect.width;
     this.parentHeight = clientRect.height;
 
-    updatePanelHeightsFromDom(vnodeDom);
+    this.updatePanelHeightsFromDom(vnodeDom);
     (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
 
-    this.canvasHeight = getCanvasHeight(vnodeDom);
-    updateCanvasDimensions(vnodeDom);
+    this.canvasHeight = this.getCanvasHeight(attrs.doesScroll);
+    this.updateCanvasDimensions(vnodeDom);
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
@@ -189,53 +88,140 @@ export const PanelContainer = {
           assertExists(vnodeDom.dom.parentElement).getBoundingClientRect();
       this.parentWidth = clientRect.width;
       this.parentHeight = clientRect.height;
-      this.canvasHeight = getCanvasHeight(vnodeDom);
-      updateCanvasDimensions(vnodeDom);
+      this.canvasHeight = this.getCanvasHeight(attrs.doesScroll);
+      this.updateCanvasDimensions(vnodeDom);
       globals.rafScheduler.scheduleFullRedraw();
     };
 
     // Once ResizeObservers are out, we can stop accessing the window here.
     window.addEventListener('resize', this.onResize);
 
+    // TODO(dproy): Handle change in doesScroll attribute.
     if (vnodeDom.attrs.doesScroll) {
       this.parentOnScroll = () => {
-        vnodeDom.state.scrollTop = vnodeDom.dom.parentElement!.scrollTop;
-        repositionCanvas(vnodeDom);
+        this.scrollTop = vnodeDom.dom.parentElement!.scrollTop;
+        this.repositionCanvas(vnodeDom);
         globals.rafScheduler.scheduleRedraw();
       };
       vnodeDom.dom.parentElement!.addEventListener(
           'scroll', this.parentOnScroll, {passive: true});
     }
-  },
+  }
 
-  onremove({attrs, dom}) {
+  onremove({attrs, dom}: m.CVnodeDOM<Attrs>) {
     window.removeEventListener('resize', this.onResize);
     globals.rafScheduler.removeRedrawCallback(this.canvasRedrawer);
     if (attrs.doesScroll) {
       dom.parentElement!.removeEventListener('scroll', this.parentOnScroll);
     }
-  },
+  }
 
-  view({attrs}) {
-
+  view({attrs}: m.CVnode<Attrs>) {
+    // Cache attrs in state, because redrawAllPanelCavases only has access to
+    // the state.
+    this.attrs = attrs;
     return m(
         '.scroll-limiter',
         m('canvas.main-canvas'),
         attrs.panels.map(panel => m('.panel', panel)));
-  },
+  }
 
-  onupdate(vnodeDom: PanelContainerVnodeDom) {
-    repositionCanvas(vnodeDom);
+  onupdate(vnodeDom: m.CVnodeDOM<Attrs>) {
+    this.repositionCanvas(vnodeDom);
 
-    if (updatePanelHeightsFromDom(vnodeDom)) {
+    if (this.updatePanelHeightsFromDom(vnodeDom)) {
       (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
     }
 
     // In non-scrolling case, canvas height can change if panel heights changed.
-    const canvasHeight = getCanvasHeight(vnodeDom);
+    const canvasHeight = this.getCanvasHeight(vnodeDom.attrs.doesScroll);
     if (this.canvasHeight !== canvasHeight) {
       this.canvasHeight = canvasHeight;
-      updateCanvasDimensions(vnodeDom);
+      this.updateCanvasDimensions(vnodeDom);
     }
-  },
-} as m.Component<PanelContainerAttrs, PanelContainerState>;
+  }
+
+  private updateCanvasDimensions(vnodeDom: m.CVnodeDOM<Attrs>) {
+    const canvas =
+        assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
+        HTMLCanvasElement;
+    const ctx = assertExists(this.ctx);
+    canvas.style.height = `${this.canvasHeight}px`;
+    const dpr = window.devicePixelRatio;
+    ctx.canvas.width = this.parentWidth * dpr;
+    ctx.canvas.height = this.canvasHeight * dpr;
+    ctx.scale(dpr, dpr);
+  }
+
+  private updatePanelHeightsFromDom(vnodeDom: m.CVnodeDOM<Attrs>): boolean {
+    const prevHeight = this.totalPanelHeight;
+    this.panelHeights = [];
+    this.totalPanelHeight = 0;
+
+    const panels = vnodeDom.dom.querySelectorAll('.panel');
+    assertTrue(panels.length === vnodeDom.attrs.panels.length);
+    for (let i = 0; i < panels.length; i++) {
+      const height = panels[i].getBoundingClientRect().height;
+      this.panelHeights[i] = height;
+      this.totalPanelHeight += height;
+    }
+
+    return this.totalPanelHeight !== prevHeight;
+  }
+
+  private getCanvasHeight(doesScroll: boolean) {
+    return doesScroll ? this.parentHeight * this.canvasOverdrawFactor :
+                        this.totalPanelHeight;
+  }
+
+  private repositionCanvas(vnodeDom: m.CVnodeDOM<Attrs>) {
+    const canvas =
+        assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
+        HTMLCanvasElement;
+    const canvasYStart = this.scrollTop - this.getCanvasOverdrawHeightPerSide();
+    canvas.style.transform = `translateY(${canvasYStart}px)`;
+  }
+
+  private overlapsCanvas(yStart: number, yEnd: number) {
+    return yEnd > 0 && yStart < this.canvasHeight;
+  }
+
+  private redrawCanvas() {
+    if (!this.ctx) return;
+    this.ctx.clearRect(0, 0, this.parentWidth, this.canvasHeight);
+    const canvasYStart = this.scrollTop - this.getCanvasOverdrawHeightPerSide();
+
+    let panelYStart = 0;
+    const panels = assertExists(this.attrs).panels;
+    assertTrue(panels.length === this.panelHeights.length);
+    for (let i = 0; i < panels.length; i++) {
+      const panel = panels[i];
+      const panelHeight = this.panelHeights[i];
+      const yStartOnCanvas = panelYStart - canvasYStart;
+
+      if (!this.overlapsCanvas(yStartOnCanvas, yStartOnCanvas + panelHeight)) {
+        panelYStart += panelHeight;
+        continue;
+      }
+
+      if (!isPanelVNode(panel)) {
+        throw Error('Vnode passed to panel container is not a panel');
+      }
+
+      this.ctx.save();
+      this.ctx.translate(0, yStartOnCanvas);
+      const clipRect = new Path2D();
+      const size = {width: this.parentWidth, height: panelHeight};
+      clipRect.rect(0, 0, size.width, size.height);
+      this.ctx.clip(clipRect);
+      panel.state.renderCanvas(this.ctx, size, panel);
+      this.ctx.restore();
+      panelYStart += panelHeight;
+    }
+  }
+
+  private getCanvasOverdrawHeightPerSide() {
+    const overdrawHeight = (this.canvasOverdrawFactor - 1) * this.parentHeight;
+    return overdrawHeight / 2;
+  }
+}
