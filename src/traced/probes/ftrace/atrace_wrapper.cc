@@ -37,6 +37,13 @@ RunAtraceFunction g_run_atrace_for_testing = nullptr;
 bool ExecvAtrace(const std::vector<std::string>& args) {
   int status = 1;
 
+  std::string s = "";
+  for (const auto& arg : args) {
+    s += " ";
+    s += arg;
+  }
+  PERFETTO_LOG("!!! %s", s.c_str());
+
   std::vector<char*> argv;
   // args, and then a null.
   argv.reserve(1 + args.size());
@@ -49,8 +56,8 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   if (pid == 0) {
     // Close stdin/out/err + any file descriptor that we might have mistakenly
     // not marked as FD_CLOEXEC.
-    for (int i = 0; i < 128; i++)
-      close(i);
+    //for (int i = 0; i < 128; i++)
+    //  close(i);
     execv("/system/bin/atrace", &argv[0]);
     // Reached only if execv fails.
     _exit(1);
