@@ -16,7 +16,6 @@ import '../tracks/all_frontend';
 
 import * as m from 'mithril';
 
-import {assertExists} from '../base/logging';
 import {forwardRemoteCalls} from '../base/remote';
 import {loadPermalink} from '../common/actions';
 import {State} from '../common/state';
@@ -33,13 +32,12 @@ import {HomePage} from './home_page';
 import {Router} from './router';
 import {ViewerPage} from './viewer_page';
 
-// Module local.
-let maybeRouter: Router|null = null;
-
 /**
  * The API the main thread exposes to the controller.
  */
 class FrontendApi {
+  constructor(private router: Router) {}
+
   updateState(state: State) {
     globals.state = state;
 
@@ -105,10 +103,9 @@ class FrontendApi {
   }
 
   private redraw(): void {
-    const router = assertExists(maybeRouter);
     if (globals.state.route &&
-        globals.state.route !== router.getRouteFromHash()) {
-      router.setRouteOnHash(globals.state.route);
+        globals.state.route !== this.router.getRouteFromHash()) {
+      this.router.setRouteOnHash(globals.state.route);
     }
 
     globals.rafScheduler.scheduleFullRedraw();
@@ -121,16 +118,16 @@ function main() {
     console.error(e);
   };
   const channel = new MessageChannel();
-  forwardRemoteCalls(channel.port2, new FrontendApi());
   controller.postMessage(channel.port1, [channel.port1]);
   const dispatch = controller.postMessage.bind(controller);
-  const router = maybeRouter = new Router(
+  const router = new Router(
       '/',
       {
         '/': HomePage,
         '/viewer': ViewerPage,
       },
       dispatch);
+  forwardRemoteCalls(channel.port2, new FrontendApi(router));
   globals.initialize(dispatch);
 
   globals.rafScheduler.domRedraw = () =>
