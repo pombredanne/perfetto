@@ -176,22 +176,6 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   return SQLITE_OK;
 }
 
-int SchedSliceTable::FindFunction(const char* name,
-                                  FindFunctionFn fn,
-                                  void** args) {
-  // Add an identity match function to prevent throwing an exception when
-  // matching on the quantum column.
-  if (strcmp(name, "match") == 0) {
-    *fn = [](sqlite3_context* ctx, int n, sqlite3_value** v) {
-      PERFETTO_DCHECK(n == 2 && sqlite3_value_type(v[0]) == SQLITE_INTEGER);
-      sqlite3_result_int64(ctx, sqlite3_value_int64(v[0]));
-    };
-    *args = nullptr;
-    return 1;
-  }
-  return 0;
-}
-
 SchedSliceTable::Cursor::Cursor(const TraceStorage* storage)
     : storage_(storage) {}
 

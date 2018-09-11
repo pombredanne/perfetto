@@ -54,7 +54,6 @@ class SchedSliceTable : public Table {
   // Table implementation.
   std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
-  int FindFunction(const char* name, FindFunctionFn fn, void** args) override;
 
  private:
   // Transient state for a filter operation on a Cursor.
@@ -77,20 +76,19 @@ class SchedSliceTable : public Table {
     uint64_t ts_clip_max() const { return ts_clip_max_; }
 
    private:
-    // Creates a vector of indices into the slices for the given |cpu| sorted
-    // by the order by criteria.
+    // Creates a vector of indices into the slices sorted by the order by
+    // criteria.
     std::vector<uint32_t> CreateSortedIndexVector(uint64_t min_ts,
                                                   uint64_t max_ts);
 
-    // Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
-    // slice at index |s| in |s_slices| for CPU |s_cpu| on all columns.
+    // Compares the slice at index |f| with the slice at index |s|on all
+    // columns.
     // Returns -1 if the first slice is before the second in the ordering, 1 if
     // the first slice is after the second and 0 if they are equal.
     int CompareSlices(size_t f, size_t s);
 
-    // Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
-    // slice at index |s| in |s_slices| for CPU |s_cpu| on the criteria in
-    // |order_by|.
+    // Compares the slice at index |f| with the slice at index |s| on the
+    // criteria in |order_by|.
     // Returns -1 if the first slice is before the second in the ordering, 1 if
     // the first slice is after the second and 0 if they are equal.
     int CompareSlicesOnColumn(size_t f,
