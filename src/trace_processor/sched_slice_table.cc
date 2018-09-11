@@ -137,13 +137,12 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
 
   info->estimated_cost = is_time_constrained ? 10 : 10000;
 
-  bool is_quantized_group_order_desc = false;
+  bool is_quantized_group_order = false;
   bool is_duration_timestamp_order = false;
   for (const auto& ob : qc.order_by()) {
     switch (ob.iColumn) {
       case Column::kQuantizedGroup:
-        if (ob.desc)
-          is_quantized_group_order_desc = true;
+        is_quantized_group_order = true;
         break;
       case Column::kTimestamp:
       case Column::kDuration:
@@ -167,10 +166,10 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   }
 
   // If a quantum constraint is present, we don't support native ordering by
-  // time related parameters or by quantized group in descending order.
+  // time related parameters or by quantized group.
   bool needs_sqlite_orderby =
       has_quantum_constraint &&
-      (is_duration_timestamp_order || is_quantized_group_order_desc);
+      (is_duration_timestamp_order || is_quantized_group_order);
 
   info->order_by_consumed = !needs_sqlite_orderby;
 
@@ -427,9 +426,9 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(
     case SchedSliceTable::Column::kCycles:
       return Compare(sl.cycles()[f_idx], sl.cycles()[s_idx], ob.desc);
     case SchedSliceTable::Column::kQuantizedGroup: {
-      // We don't support sorting in descending order on quantized group when
-      // we have a non-zero quantum.
-      PERFETTO_CHECK(!ob.desc || quantum_ == 0);
+      // We don't support sorting on quantized group when we have a non-zero
+      // quantum.
+      PERFETTO_CHECK(quantum_ == 0);
 
       // Just compare timestamps as a proxy for quantized groups.
       return Compare(sl.start_ns()[f_idx], sl.start_ns()[s_idx], ob.desc);
