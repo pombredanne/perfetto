@@ -66,20 +66,7 @@ class ProtoTraceParser {
   void ParseProcess(TraceBlobView);
 
  private:
-  struct Slice {
-    StringId name_id;
-    uint64_t start_ts;
-    uint64_t end_ts;
-  };
-  using SlicesStack = std::vector<Slice>;
-
-  // static inline void MaybeCloseStack(uint64_t end_ts, SlicesStack&);
-  static inline std::tuple<uint64_t, uint64_t> GetStackHashes(
-      const SlicesStack&);
-
   TraceProcessorContext* context_;
-
-  std::unordered_map<UniquePid, SlicesStack> process_slice_stack_;
 };
 
 }  // namespace trace_processor
