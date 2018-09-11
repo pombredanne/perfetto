@@ -24,9 +24,5 @@ export class FlameGraphPanel extends Panel {
       m('embed.flame-graph-panel',
         {type: 'image/svg+xml', src: '/assets/flamegraph.svg'})
     ];
-    // if (this.renderedDom) return;
-    // dom.innerHTML = `<header>Flame Graph</Header>
-    //     <embed type="image/svg+xml" src="/assets/flamegraph.svg">`;
-    // this.renderedDom = true;
   }
 }
