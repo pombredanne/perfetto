@@ -288,25 +288,5 @@ void ProtoTraceParser::ParsePrint(uint32_t,
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
-// Returns <parent_stack_id, stack_id>, where
-// |parent_stack_id| == hash(stack_id - last slice).
-std::tuple<uint64_t, uint64_t> ProtoTraceParser::GetStackHashes(
-    const SlicesStack& stack) {
-  PERFETTO_DCHECK(!stack.empty());
-  std::string s;
-  s.reserve(stack.size() * sizeof(uint64_t) * 2);
-  constexpr uint64_t kMask = uint64_t(-1) >> 1;
-  uint64_t parent_stack_id = 0;
-  for (size_t i = 0; i < stack.size(); i++) {
-    if (i == stack.size() - 1)
-      parent_stack_id = i > 0 ? (std::hash<std::string>{}(s)) & kMask : 0;
-    const Slice& slice = stack[i];
-    s.append(reinterpret_cast<const char*>(&slice.name_id),
-             sizeof(slice.name_id));
-  }
-  uint64_t stack_id = (std::hash<std::string>{}(s)) & kMask;
-  return std::make_tuple(parent_stack_id, stack_id);
-}
-
 }  // namespace trace_processor
 }  // namespace perfetto
