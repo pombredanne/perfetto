@@ -37,6 +37,7 @@ class ProcessTable : public Table {
   ProcessTable(const TraceStorage*);
 
   // Table implementation.
+  std::string CreateTableStmt(int argc, const char* const* argv) override;
   std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
