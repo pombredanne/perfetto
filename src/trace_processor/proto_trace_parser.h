@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <memory>
 
+#include "perfetto/base/string_view.h"
 #include "src/trace_processor/trace_blob_view.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -27,6 +28,25 @@ namespace perfetto {
 namespace trace_processor {
 
 class TraceProcessorContext;
+
+struct SystraceTracePoint {
+  char phase;
+  uint32_t pid;
+
+  // For phase = 'B' and phase = 'C' only.
+  base::StringView name;
+
+  // For phase = 'C' only.
+  int64_t value;
+};
+
+inline bool operator==(const SystraceTracePoint& x,
+                       const SystraceTracePoint& y) {
+  return std::tie(x.phase, x.pid, x.name, x.value) ==
+         std::tie(y.phase, y.pid, y.name, y.value);
+}
+
+bool ParseSystraceTracePoint(base::StringView, SystraceTracePoint* out);
 
 class ProtoTraceParser {
  public:
@@ -40,6 +60,7 @@ class ProtoTraceParser {
                                  TraceBlobView);
   void ParseProcessTree(TraceBlobView);
   void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, TraceBlobView);
+  void ParseCpuFreq(uint64_t timestamp, TraceBlobView);
   void ParsePrint(uint32_t cpu, uint64_t timestamp, TraceBlobView);
   void ParseThread(TraceBlobView);
   void ParseProcess(TraceBlobView);
@@ -57,6 +78,7 @@ class ProtoTraceParser {
       const SlicesStack&);
 
   TraceProcessorContext* context_;
+
   std::unordered_map<UniquePid, SlicesStack> process_slice_stack_;
 };
 

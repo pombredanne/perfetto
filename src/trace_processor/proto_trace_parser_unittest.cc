@@ -18,6 +18,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/string_view.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_tracker.h"
@@ -61,6 +62,14 @@ class MockProcessTracker : public ProcessTracker {
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
 
+class MockTraceStorage : public TraceStorage {
+ public:
+  MockTraceStorage() : TraceStorage() {}
+
+  MOCK_METHOD3(PushCpuFreq,
+               void(uint64_t timestamp, uint32_t cpu, uint32_t new_freq));
+};
+
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
@@ -68,6 +77,8 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.sched_tracker.reset(sched_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
+    storage_ = new MockTraceStorage();
+    context_.storage.reset(storage_);
     const auto optim = OptimizationMode::kMinLatency;
     context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
@@ -85,6 +96,7 @@ class ProtoTraceParserTest : public ::testing::Test {
   TraceProcessorContext context_;
   MockSchedTracker* sched_;
   MockProcessTracker* process_;
+  MockTraceStorage* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
@@ -214,6 +226,20 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   Tokenize(trace_2);
 }
 
+TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
+  protos::Trace trace_1;
+  auto* bundle = trace_1.add_packet()->mutable_ftrace_events();
+  bundle->set_cpu(12);
+  auto* event = bundle->add_event();
+  event->set_timestamp(1000);
+  auto* cpu_freq = event->mutable_cpu_frequency();
+  cpu_freq->set_cpu_id(10);
+  cpu_freq->set_state(2000);
+
+  EXPECT_CALL(*storage_, PushCpuFreq(1000, 10, 2000));
+  Tokenize(trace_1);
+}
+
 TEST_F(ProtoTraceParserTest, LoadProcessPacket) {
   protos::Trace trace;
 
@@ -256,6 +282,15 @@ TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
 
   EXPECT_CALL(*process_, UpdateThread(1, 2));
   Tokenize(trace);
+}
+
+TEST(SystraceParserTest, SystraceEvent) {
+  SystraceTracePoint result{};
+  ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|1|foo"), &result));
+  EXPECT_EQ(result, (SystraceTracePoint{'B', 1, base::StringView("foo"), 0}));
+
+  ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|42|Bar"), &result));
+  EXPECT_EQ(result, (SystraceTracePoint{'B', 42, base::StringView("Bar"), 0}));
 }
 
 }  // namespace

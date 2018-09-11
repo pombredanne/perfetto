@@ -44,6 +44,8 @@ source_set("lib") {
   sources = [
     "basic_types.h",
     "chunked_trace_reader.h",
+    "counters_table.cc",
+    "counters_table.h",
     "process_table.cc",
     "process_table.h",
     "process_tracker.cc",
@@ -61,6 +63,8 @@ source_set("lib") {
     "scoped_db.h",
     "slice_table.cc",
     "slice_table.h",
+    "slice_tracker.cc",
+    "slice_tracker.h",
     "sqlite_utils.h",
     "string_table.cc",
     "string_table.h",
@@ -127,12 +131,14 @@ copy("trace_processor_shell") {
 source_set("unittests") {
   testonly = true
   sources = [
+    "counters_table_unittest.cc",
     "process_table_unittest.cc",
     "process_tracker_unittest.cc",
     "proto_trace_parser_unittest.cc",
     "query_constraints_unittest.cc",
     "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
+    "slice_tracker_unittest.cc",
     "thread_table_unittest.cc",
     "trace_sorter_unittest.cc",
   ]

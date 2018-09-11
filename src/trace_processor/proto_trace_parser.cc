@@ -24,6 +24,7 @@
 #include "perfetto/protozero/proto_decoder.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -32,25 +33,12 @@
 namespace perfetto {
 namespace trace_processor {
 
-namespace {
-
-struct PrintEvent {
-  char phase;
-  uint32_t pid;
-
-  // For phase = 'B' and phase = 'C'
-  base::StringView name;
-
-  // For phase = 'C' only.
-  int64_t value;
-};
-
 // We have to handle trace_marker events of a few different types:
 // 1. some random text
 // 2. B|1636|pokeUserActivity
 // 3. E|1636
 // 4. C|1636|wq:monitor|0
-bool ParsePrintEvent(base::StringView str, PrintEvent* evt_out) {
+bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
   // THIS char* IS NOT NULL TERMINATED.
   const char* s = str.data();
   size_t len = str.size();
@@ -74,13 +62,13 @@ bool ParsePrintEvent(base::StringView str, PrintEvent* evt_out) {
   }
 
   std::string pid_str(s + 2, pid_length);
-  evt_out->pid = static_cast<uint32_t>(std::stoi(pid_str.c_str()));
+  out->pid = static_cast<uint32_t>(std::stoi(pid_str.c_str()));
 
-  evt_out->phase = s[0];
+  out->phase = s[0];
   switch (s[0]) {
     case 'B': {
       size_t name_index = 2 + pid_length + 1;
-      evt_out->name = base::StringView(s + name_index, len - name_index);
+      out->name = base::StringView(s + name_index, len - name_index);
       return true;
     }
     case 'E':
@@ -91,8 +79,6 @@ bool ParsePrintEvent(base::StringView str, PrintEvent* evt_out) {
       return false;
   }
 }
-
-}  // namespace
 
 using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
@@ -196,6 +182,12 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         ParseSchedSwitch(cpu, timestamp, ftrace.slice(fld_off, fld.size()));
         break;
       }
+      case protos::FtraceEvent::kCpuFrequency: {
+        PERFETTO_DCHECK(timestamp > 0);
+        const size_t fld_off = ftrace.offset_of(fld.data());
+        ParseCpuFreq(timestamp, ftrace.slice(fld_off, fld.size()));
+        break;
+      }
       case protos::FtraceEvent::kPrintFieldNumber: {
         PERFETTO_DCHECK(timestamp > 0);
         const size_t fld_off = ftrace.offset_of(fld.data());
@@ -206,6 +198,27 @@ void ProtoTraceParser::ParseFtracePacket(uint32_t cpu,
         break;
     }
   }
+  PERFETTO_DCHECK(decoder.IsEndOfBuffer());
+}
+
+void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
+  ProtoDecoder decoder(view.data(), view.length());
+
+  uint32_t cpu = 0;
+  uint32_t new_freq = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::CpuFrequencyFtraceEvent::kCpuIdFieldNumber:
+        cpu = fld.as_uint32();
+        break;
+      case protos::CpuFrequencyFtraceEvent::kStateFieldNumber:
+        new_freq = fld.as_uint32();
+        break;
+    }
+  }
+
+  context_->storage->PushCpuFreq(timestamp, cpu, new_freq);
+
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
@@ -246,59 +259,32 @@ void ProtoTraceParser::ParsePrint(uint32_t,
                                   TraceBlobView print) {
   ProtoDecoder decoder(print.data(), print.length());
 
-  base::StringView buf;
+  base::StringView buf{};
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::PrintFtraceEvent::kBufFieldNumber:
-        buf = fld.as_string();
-        break;
-      default:
-        break;
+    if (fld.id == protos::PrintFtraceEvent::kBufFieldNumber) {
+      buf = fld.as_string();
+      break;
     }
   }
 
-  PrintEvent evt{};
-  ParsePrintEvent(buf, &evt);
-  ProcessTracker* procs = context_->process_tracker.get();
-  TraceStorage* storage = context_->storage.get();
-  TraceStorage::NestableSlices* slices = storage->mutable_nestable_slices();
+  SystraceTracePoint point{};
+  if (!ParseSystraceTracePoint(buf, &point))
+    return;
 
-  UniquePid upid = procs->UpdateProcess(evt.pid);
-  SlicesStack& stack = process_slice_stack_[upid];
+  UniquePid upid = context_->process_tracker->UpdateProcess(point.pid);
 
-  auto add_slice = [slices, &stack, upid](const Slice& slice) {
-    PERFETTO_DCHECK(slice.start_ts <= slice.end_ts);
-    if (stack.size() >= std::numeric_limits<uint8_t>::max())
-      return;
-    const uint8_t depth = static_cast<uint8_t>(stack.size()) - 1;
-    uint64_t parent_stack_id, stack_id;
-    std::tie(parent_stack_id, stack_id) = GetStackHashes(stack);
-    slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts, upid, 0,
-                     slice.name_id, depth, stack_id, parent_stack_id);
-  };
-
-  switch (evt.phase) {
+  switch (point.phase) {
     case 'B': {
-      // TODO(hjd): MaybeCloseStack
-      StringId name_id = storage->InternString(evt.name);
-      stack.emplace_back(Slice{name_id, timestamp, 0});
+      StringId name_id = context_->storage->InternString(point.name);
+      context_->slice_tracker->Begin(timestamp, upid, 0 /*cat_id*/, name_id);
       break;
     }
 
     case 'E': {
-      // TODO(hjd): Not clear how to correctly handle this case for systrace.
-      if (stack.empty())
-        break;
-      PERFETTO_CHECK(!stack.empty());
-      // TODO(hjd): MaybeCloseStack
-      Slice& slice = stack.back();
-      slice.end_ts = timestamp;
-      add_slice(slice);
-      stack.pop_back();
+      context_->slice_tracker->End(timestamp, upid);
       break;
     }
   }
-
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
 
