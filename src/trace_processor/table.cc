@@ -63,17 +63,18 @@ void Table::RegisterInternal(sqlite3* db,
   module->xConnect = [](sqlite3* xdb, void* arg, int argc,
                         const char* const* argv, sqlite3_vtab** tab, char**) {
     const TableDescriptor* xdesc = static_cast<const TableDescriptor*>(arg);
-    auto table = xdesc->factory(xdesc->storage);
+    auto table = xdesc->factory(xdb, xdesc->storage);
+
     auto create_stmt = table->CreateTableStmt(argc, argv);
+    if (create_stmt.empty())
+      return SQLITE_ERROR;
 
     int res = sqlite3_declare_vtab(xdb, create_stmt.c_str());
     if (res != SQLITE_OK)
       return res;
 
-    // Set the table name based on the create statement,
-    table->name_ = xdesc->name;
-
     // Freed in xDisconnect().
+    table->name_ = xdesc->name;
     *tab = table.release();
 
     return SQLITE_OK;
