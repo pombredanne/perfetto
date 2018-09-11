@@ -962,15 +962,3 @@ message SchedWakeupFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/sched_wakeup.proto
-
-// Begin of protos/perfetto/trace/ftrace/sched_wakeup.proto
-
-message SchedWakeupFtraceEvent {
-  optional string comm = 1;
-  optional int32 pid = 2;
-  optional int32 prio = 3;
-  optional int32 success = 4;
-  optional int32 target_cpu = 5;
-}
-
-// End of protos/perfetto/trace/ftrace/sched_wakeup.proto

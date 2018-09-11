@@ -96,7 +96,6 @@ TRACE_PROTOS = (
   'protos/perfetto/trace/ftrace/sched_cpu_hotplug.proto',
   'protos/perfetto/trace/ftrace/sched_switch.proto',
   'protos/perfetto/trace/ftrace/sched_wakeup.proto',
-  'protos/perfetto/trace/ftrace/sched_wakeup.proto',
 )
 
 MERGED_TRACE_PROTO = 'protos/perfetto/trace/perfetto_trace.proto'
