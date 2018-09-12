@@ -47,65 +47,44 @@ class SchedSliceTable : public Table {
     kClipTimestamp = 8,
   };
 
-  SchedSliceTable(sqlite3*, const TraceStorage* storage);
+  SchedSliceTable(const TraceStorage* storage);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   // Table implementation.
-  std::string CreateTableStmt(int argc, const char* const* argv) override;
   std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
+  int FindFunction(const char* name, FindFunctionFn fn, void** args) override;
 
  private:
-  // Transient state for a filter operation on a Cursor.
-  class FilterState {
+  // Transient filter state for each CPU of this trace.
+  class PerCpuState {
    public:
-    FilterState(const TraceStorage* storage,
-                const QueryConstraints& query_constraints,
-                sqlite3_value** argv);
-
+    void Initialize(uint32_t cpu,
+                    const TraceStorage* storage,
+                    uint64_t quantum,
+                    uint64_t ts_clip_min,
+                    uint64_t ts_clip_max,
+                    std::vector<uint32_t> sorted_row_ids);
     void FindNextSlice();
-
-    inline bool IsNextRowIdIndexValid() const {
-      return next_row_id_index_ < sorted_row_ids_size_;
+    bool IsNextRowIdIndexValid() const {
+      return next_row_id_index_ < sorted_row_ids_.size();
     }
 
     size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
     uint64_t next_timestamp() const { return next_timestamp_; }
-    uint64_t quantum() const { return quantum_; }
     uint64_t ts_clip_min() const { return ts_clip_min_; }
     uint64_t ts_clip_max() const { return ts_clip_max_; }
 
    private:
-    // Creates a vector of indices into the slices sorted by the order by
-    // criteria.
-    std::vector<uint32_t> CreateSortedIndexVector(uint64_t min_ts,
-                                                  uint64_t max_ts);
+    const TraceStorage::SlicesPerCpu& Slices() {
+      return storage_->SlicesForCpu(cpu_);
+    }
 
-    // Compares the slice at index |f| with the slice at index |s|on all
-    // columns.
-    // Returns -1 if the first slice is before the second in the ordering, 1 if
-    // the first slice is after the second and 0 if they are equal.
-    int CompareSlices(size_t f, size_t s);
-
-    // Compares the slice at index |f| with the slice at index |s| on the
-    // criteria in |order_by|.
-    // Returns -1 if the first slice is before the second in the ordering, 1 if
-    // the first slice is after the second and 0 if they are equal.
-    int CompareSlicesOnColumn(size_t f,
-                              size_t s,
-                              const QueryConstraints::OrderBy& order_by);
-
-    void FindNextRowAndTimestamp();
+    void UpdateNextTimestampForNextRow();
 
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
-
-    // Size of the sorted row ids (inlined for performance).
-    size_t sorted_row_ids_size_ = 0;
-
-    // Bitset for filtering slices.
-    std::vector<bool> row_filter_;
 
     // An offset into |sorted_row_ids_| indicating the next row to return.
     uint32_t next_row_id_index_ = 0;
@@ -115,6 +94,9 @@ class SchedSliceTable : public Table {
     // group boundary.
     uint64_t next_timestamp_ = 0;
 
+    // The CPU this state is associated with.
+    uint32_t cpu_ = 0;
+
     // The quantum the output slices should fall within.
     uint64_t quantum_ = 0;
 
@@ -122,6 +104,68 @@ class SchedSliceTable : public Table {
     // cut and shrunk around the min-max boundaries to fit in the clip window.
     uint64_t ts_clip_min_ = 0;
     uint64_t ts_clip_max_ = std::numeric_limits<uint64_t>::max();
+
+    const TraceStorage* storage_ = nullptr;
+  };
+
+  // Transient state for a filter operation on a Cursor.
+  class FilterState {
+   public:
+    FilterState(const TraceStorage* storage,
+                const QueryConstraints& query_constraints,
+                sqlite3_value** argv);
+
+    // Chooses the next CPU which should be returned according to the sorting
+    // criteria specified by |order_by_|.
+    void FindCpuWithNextSlice();
+
+    // Returns whether the next CPU to be returned by this filter operation is
+    // valid.
+    bool IsNextCpuValid() const { return next_cpu_ < per_cpu_state_.size(); }
+
+    // Returns the transient state associated with a single CPU.
+    PerCpuState* StateForCpu(uint32_t cpu) { return &per_cpu_state_[cpu]; }
+
+    uint32_t next_cpu() const { return next_cpu_; }
+    uint64_t quantum() const { return quantum_; }
+
+   private:
+    // Creates a vector of indices into the slices for the given |cpu| sorted
+    // by the order by criteria.
+    std::vector<uint32_t> CreateSortedIndexVectorForCpu(uint32_t cpu,
+                                                        uint64_t min_ts,
+                                                        uint64_t max_ts);
+
+    // Compares the next slice of the given |cpu| with the next slice of the
+    // |next_cpu_|. Return <0 if |cpu| is ordered before, >0 if ordered after,
+    // and 0 if they are equal.
+    int CompareCpuToNextCpu(uint32_t cpu);
+
+    // Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
+    // slice at index |s| in |s_slices| for CPU |s_cpu| on all columns.
+    // Returns -1 if the first slice is before the second in the ordering, 1 if
+    // the first slice is after the second and 0 if they are equal.
+    int CompareSlices(uint32_t f_cpu, size_t f, uint32_t s_cpu, size_t s);
+
+    // Compares the slice at index |f| in |f_slices| for CPU |f_cpu| with the
+    // slice at index |s| in |s_slices| for CPU |s_cpu| on the criteria in
+    // |order_by|.
+    // Returns -1 if the first slice is before the second in the ordering, 1 if
+    // the first slice is after the second and 0 if they are equal.
+    int CompareSlicesOnColumn(uint32_t f_cpu,
+                              size_t f,
+                              uint32_t s_cpu,
+                              size_t s,
+                              const QueryConstraints::OrderBy& order_by);
+
+    // One entry for each cpu which is used in filtering.
+    std::array<PerCpuState, base::kMaxCpus> per_cpu_state_;
+
+    // The next CPU which should be returned to the user.
+    uint32_t next_cpu_ = 0;
+
+    // The quantum the output slices should fall within.
+    uint64_t quantum_ = 0;
 
     // The sorting criteria for this filter operation.
     std::vector<QueryConstraints::OrderBy> order_by_;

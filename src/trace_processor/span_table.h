@@ -27,6 +27,11 @@ namespace trace_processor {
 
 class SpanTable : public Table {
  public:
+  struct Column {
+    std::string name;
+    std::string type;
+  };
+
   SpanTable(sqlite3*, const TraceStorage*);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
@@ -48,7 +53,9 @@ class SpanTable : public Table {
     int Column(sqlite3_context* context, int N) override;
   };
 
-  sqlite3* db_;
+  std::vector<Column> t1_cols_;
+  std::vector<Column> t2_cols_;
+  sqlite3* const db_;
 };
 
 }  // namespace trace_processor

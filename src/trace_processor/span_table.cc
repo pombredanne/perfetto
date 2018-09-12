@@ -28,26 +28,31 @@ namespace trace_processor {
 
 namespace {
 
-std::set<std::string> GetColumnNamesForTable(sqlite3* db,
-                                             const std::string& table_name) {
+bool ColumnCompare(const SpanTable::Column& first,
+                   const SpanTable::Column& second) {
+  return first.name < second.name;
+}
+
+std::vector<SpanTable::Column> GetColumnsForTable(
+    sqlite3* db,
+    const std::string& table_name) {
   char sql[100];
-  const char kRawSql[] = "SELECT name from pragma_table_info(\"%s\")";
+  const char kRawSql[] = "SELECT name, type from pragma_table_info(\"%s\")";
 
   int n = snprintf(sql, sizeof(sql), kRawSql, table_name.c_str());
-  if (n < 0 || static_cast<size_t>(n) >= sizeof(sql)) {
+  if (n < 0 || static_cast<size_t>(n) >= sizeof(sql))
     return {};
-  }
 
   sqlite3_stmt* raw_stmt;
   int err = sqlite3_prepare_v2(db, sql, n, &raw_stmt, nullptr);
   ScopedStmt stmt(raw_stmt);
 
   int col_count = sqlite3_column_count(*stmt);
-  if (col_count != 1) {
+  if (col_count != 2) {
     return {};
   }
 
-  std::set<std::string> column_names;
+  std::vector<SpanTable::Column> columns;
   while (!err) {
     err = sqlite3_step(raw_stmt);
     if (err == SQLITE_DONE)
@@ -55,18 +60,18 @@ std::set<std::string> GetColumnNamesForTable(sqlite3* db,
     if (err != SQLITE_ROW)
       return {};
 
-    const auto* name = sqlite3_column_text(*stmt, 0);
-    if (!name)
-      return {};
-    column_names.emplace(name);
-  }
-  return column_names;
-}
+    auto* name = sqlite3_column_text(*stmt, 0);
+    auto* type = sqlite3_column_text(*stmt, 1);
 
-bool HasColumn(const std::string& name,
-               const std::set<std::string>& first,
-               const std::set<std::string>& second) {
-  return first.find(name) != first.end() && second.find(name) != second.end();
+    if (!name || !type)
+      return {};
+    SpanTable::Column column;
+    column.name = reinterpret_cast<const char*>(name);
+    column.type = reinterpret_cast<const char*>(type);
+    columns.emplace_back(column);
+  }
+  std::sort(columns.begin(), columns.end(), &ColumnCompare);
+  return columns;
 }
 
 }  // namespace
@@ -78,25 +83,34 @@ void SpanTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::string SpanTable::CreateTableStmt(int argc, const char* const* argv) {
-  if (argc < 3) {
+  if (argc < 3)
     return "";
-  }
 
-  const char* table_one = argv[0];
-  const char* table_two = argv[1];
-  const char* merge_col = argv[2];
+  t1_cols_ = GetColumnsForTable(db_, argv[0]);
+  t2_cols_ = GetColumnsForTable(db_, argv[1]);
 
-  auto cols_table_one = GetColumnNamesForTable(db_, table_one);
-  auto cols_table_two = GetColumnNamesForTable(db_, table_two);
+  std::vector<std::string> intersection;
+  std::set_intersection(t1_cols_.begin(), t1_cols_.end(), t2_cols_.begin(),
+                        t2_cols_.end(), std::back_inserter(intersection),
+                        &ColumnCompare);
 
-  if (!HasColumn(merge_col, cols_table_one, cols_table_two)) {
+  std::string merge_col = argv[2];
+
+  // TODO(tilal6991): check that dur, ts and merge_col are all present in
+  // the tables and have the same type.
+  bool is_valid = intersection.size() == 3;
+  if (!is_valid)
     return "";
-  } else if (!HasColumn("ts", cols_table_one, cols_table_two)) {
-    return "";
-  } else if (!HasColumn("dur", cols_table_one, cols_table_two)) {
-    return "";
-  }
+
+  return "CREATE TABLE x(ts UNSIGNED BIG INT, dur UNSIGNED BIG INT, cpu "
+         "UNSIGNED INT)";
 }
+
+std::unique_ptr<Table::Cursor> SpanTable::CreateCursor() {
+  return std::unique_ptr<SpanTable::Cursor>(new SpanTable::Cursor());
+}
+
+int SpanTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {}
 
 }  // namespace trace_processor
 }  // namespace perfetto
