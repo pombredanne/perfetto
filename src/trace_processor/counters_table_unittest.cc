@@ -34,7 +34,7 @@ class CountersTableUnittest : public ::testing::Test {
 
     context_.storage.reset(new TraceStorage());
 
-    CountersTable::RegisterTable(db_.get(), context_.storage.get());
+    CountersTable::RegisterTable(db_.get(), context_.storage.get(), "cpufreq");
   }
 
   void PrepareValidStatement(const std::string& sql) {
@@ -64,7 +64,7 @@ TEST_F(CountersTableUnittest, SelectWhereCpu) {
   context_.storage->PushCpuFreq(timestamp + 1, 1 /* cpu */, freq + 1000);
   context_.storage->PushCpuFreq(timestamp + 2, 2 /* cpu */, freq + 2000);
 
-  PrepareValidStatement("SELECT ts, dur, value FROM counters where ref = 1");
+  PrepareValidStatement("SELECT ts, dur, freq FROM cpufreq where cpu = 1");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), timestamp);
@@ -87,8 +87,8 @@ TEST_F(CountersTableUnittest, GroupByFreq) {
   context_.storage->PushCpuFreq(timestamp + 3, 1 /* cpu */, freq);
 
   PrepareValidStatement(
-      "SELECT value, sum(dur) as dur_sum FROM counters where value > 0 group "
-      "by value order by dur_sum desc");
+      "SELECT freq, sum(dur) as dur_sum FROM cpufreq where freq > 0 group "
+      "by freq order by dur_sum desc");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int(*stmt_, 0), freq + 1000);

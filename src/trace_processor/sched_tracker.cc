@@ -74,14 +74,14 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
                                        uint64_t end_ns) {
   const auto& frequencies = context_->storage->GetFreqForCpu(cpu);
   auto lower_index = lower_index_per_cpu_[cpu];
-  if (frequencies.empty())
+  if (frequencies.size() == 0)
     return 0;
 
   long double cycles = 0;
 
   // Move the lower index up to the first cpu_freq event before start_ns.
   while (lower_index + 1 < frequencies.size()) {
-    if (frequencies[lower_index + 1].first >= start_ns)
+    if (frequencies.timestamps[lower_index + 1] >= start_ns)
       break;
     ++lower_index;
   };
@@ -92,14 +92,15 @@ uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
   // cpu_freq event.
   for (size_t i = lower_index; i < frequencies.size(); ++i) {
     // Using max handles the special case for the first cpu_freq event.
-    uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
+    uint64_t cycle_start = std::max(frequencies.timestamps[i], start_ns);
     // If there are no more freq_events we compute cycles until |end_ns|.
     uint64_t cycle_end = end_ns;
     if (i + 1 < frequencies.size())
-      cycle_end = frequencies[i + 1].first;
+      cycle_end = frequencies.timestamps[i + 1];
 
-    uint32_t freq_khz = frequencies[i].second;
-    cycles += ((cycle_end - cycle_start) / 1E6L) * freq_khz;
+    double freq_khz = frequencies.values[i];
+    cycles +=
+        ((cycle_end - cycle_start) / 1E6L) * static_cast<long double>(freq_khz);
   }
 
   lower_index_per_cpu_[cpu] = frequencies.size() - 1;

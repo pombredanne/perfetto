@@ -30,8 +30,9 @@ TraceStorage::TraceStorage() {
   InternString("");
 
   // Initialize all CPUs @ freq 0Hz.
-  for (size_t cpu = 0; cpu < base::kMaxCpus; cpu++)
-    cpu_freq_[cpu].emplace_back(0, 0);
+  for (size_t cpu = 0; cpu < base::kMaxCpus; cpu++) {
+    InitalizeCounterValue(static_cast<int64_t>(cpu), CounterType::CPU_ID);
+  }
 }
 
 TraceStorage::~TraceStorage() {}
@@ -55,6 +56,21 @@ StringId TraceStorage::InternString(base::StringView str) {
   StringId string_id = string_pool_.size() - 1;
   string_index_.emplace(hash, string_id);
   return string_id;
+}
+
+void TraceStorage::PushCounterValue(uint64_t timestamp,
+                                    uint32_t value,
+                                    uint32_t ref,
+                                    CounterType type) {
+  CounterContext context = {ref, type};
+  auto& vals = counters_[context];
+  if (!(vals.size() == 0) && timestamp < vals.timestamps.back()) {
+    PERFETTO_ELOG("counter out of order by %.4f ms, skipping",
+                  (vals.timestamps.back() - timestamp) / 1e6);
+    return;
+  }
+  vals.timestamps.emplace_back(timestamp);
+  vals.values.emplace_back(value);
 }
 
 void TraceStorage::ResetStorage() {

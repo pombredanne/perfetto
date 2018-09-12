@@ -43,9 +43,44 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = size_t;
 
-// A map containing timestamps and the cpu frequency set at that time.
-using CpuFreq =
-    std::deque<std::pair<uint64_t /*timestamp*/, uint32_t /*freq*/>>;
+enum CounterType { UPID = 0, CPU_ID = 1 };
+
+struct CounterContext {
+  int64_t num;
+  CounterType type;
+
+  bool operator==(const CounterContext& other) const {
+    return (num == other.num && type == other.type);
+  }
+};
+
+struct CounterValues {
+  StringId counter_name_id;
+  std::deque<uint64_t> timestamps;
+  std::deque<double> values;
+
+  size_t size() const { return timestamps.size(); }
+};
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+// The hash function needs to be defined after CounterContext and before the
+// unordered map is declared.
+namespace std {
+
+template <>
+struct hash<::perfetto::trace_processor::CounterContext> {
+  std::size_t operator()(
+      const ::perfetto::trace_processor::CounterContext& cc) const {
+    return (hash<int64_t>()(cc.num) ^ (hash<int>()(cc.type)) << 1);
+  }
+};
+
+}  // namespace std
+
+namespace perfetto {
+namespace trace_processor {
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -216,19 +251,31 @@ class TraceStorage {
   virtual void PushCpuFreq(uint64_t timestamp,
                            uint32_t cpu,
                            uint32_t new_freq) {
-    auto& freqs = cpu_freq_[cpu];
-    if (!freqs.empty() && timestamp < freqs.back().first) {
-      PERFETTO_ELOG("cpufreq out of order by %.4f ms, skipping",
-                    (freqs.back().first - timestamp) / 1e6);
-      return;
-    }
-    freqs.emplace_back(timestamp, new_freq);
+    PERFETTO_DCHECK(cpu <= base::kMaxCpus);
+    CounterContext context = {cpu, CounterType::CPU_ID};
+    auto& vals = counters_[context];
+    vals.counter_name_id = InternString("CpuFreq");
+    PushCounterValue(timestamp, new_freq, cpu, CounterType::CPU_ID);
   }
 
-  const CpuFreq& GetFreqForCpu(uint32_t cpu) const { return cpu_freq_[cpu]; }
+  const CounterValues& GetFreqForCpu(uint32_t cpu) const {
+    PERFETTO_DCHECK(cpu <= base::kMaxCpus);
+    return GetCounterValues(cpu, CounterType::CPU_ID);
+  }
 
-  uint32_t GetMaxCpu() const {
-    return static_cast<uint32_t>(cpu_freq_.size() - 1);
+  void PushCounterValue(uint64_t timestamp,
+                        uint32_t value,
+                        uint32_t ref,
+                        CounterType type);
+
+  const CounterValues& GetCounterValues(int64_t ref, CounterType type) const {
+    CounterContext context = {ref, type};
+    return counters_.at(context);
+  }
+
+  void InitalizeCounterValue(int64_t ref, CounterType type) {
+    CounterContext context = {ref, type};
+    counters_[context];
   }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -253,9 +300,8 @@ class TraceStorage {
   // One entry for each CPU in the trace.
   std::array<SlicesPerCpu, base::kMaxCpus> cpu_events_;
 
-  // One map containing frequencies for every CPU in the trace. The map contains
-  // timestamps and the cpu frequency value at that time.
-  std::array<CpuFreq, base::kMaxCpus> cpu_freq_;
+  // A map containing counters for events in the trace.
+  std::unordered_map<CounterContext, CounterValues> counters_;
 
   // One entry for each unique string in the trace.
   std::deque<std::string> string_pool_;

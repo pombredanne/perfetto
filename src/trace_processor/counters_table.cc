@@ -31,21 +31,34 @@ using namespace sqlite_utils;
 
 CountersTable::CountersTable(const TraceStorage* storage) : storage_(storage) {}
 
-void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  Table::Register<CountersTable>(db, storage,
-                                 "CREATE TABLE counters("
-                                 "ts UNSIGNED BIG INT, "
-                                 "name text, "
-                                 "value UNSIGNED BIG INT, "
-                                 "dur UNSIGNED BIG INT, "
-                                 "ref UNSIGNED INT, "
-                                 "reftype TEXT, "
-                                 "PRIMARY KEY(name, ts, ref)"
-                                 ") WITHOUT ROWID;");
+void CountersTable::RegisterTable(sqlite3* db,
+                                  const TraceStorage* storage,
+                                  std::string name) {
+  if (name == "cpufreq") {
+    Table::Register<CountersTable>(db, storage,
+                                   "CREATE TABLE cpufreq("
+                                   "ts UNSIGNED BIG INT, "
+                                   "name text, "
+                                   "freq UNSIGNED BIG INT, "
+                                   "dur UNSIGNED BIG INT, "
+                                   "cpu UNSIGNED INT, "
+                                   "PRIMARY KEY(name, ts, cpu)"
+                                   ") WITHOUT ROWID;");
+  } else {
+    Table::Register<CountersTable>(db, storage,
+                                   "CREATE TABLE counters("
+                                   "ts UNSIGNED BIG INT, "
+                                   "name text, "
+                                   "value UNSIGNED BIG INT, "
+                                   "dur UNSIGNED BIG INT, "
+                                   "upid UNSIGNED INT, "
+                                   "PRIMARY KEY(name, ts, upid)"
+                                   ") WITHOUT ROWID;");
+  }
 }
 
 std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {
-  return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
+  return std::unique_ptr<Table::Cursor>(new Cursor(storage_, GetName()));
 }
 
 int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
@@ -61,39 +74,44 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-CountersTable::Cursor::Cursor(const TraceStorage* storage)
-    : storage_(storage) {}
+CountersTable::Cursor::Cursor(const TraceStorage* storage, std::string name)
+    : storage_(storage) {
+  if (name == "cpufreq") {
+    type_ = CounterType::CPU_ID;
+  } else {
+    type_ = CounterType::UPID;
+  }
+}
 
 int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
     case Column::kTimestamp: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
+      const auto& val = storage_->GetCounterValues(ref_filter_.current, type_);
       sqlite3_result_int64(context,
-                           static_cast<int64_t>(freq[index_in_cpu_].first));
+                           static_cast<int64_t>(val.timestamps[index_]));
       break;
     }
     case Column::kValue: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
-      sqlite3_result_int64(context, freq[index_in_cpu_].second);
+      const auto& val = storage_->GetCounterValues(ref_filter_.current, type_);
+      sqlite3_result_int64(context, static_cast<int64_t>(val.values[index_]));
       break;
     }
     case Column::kName: {
-      sqlite3_result_text(context, "cpufreq", -1, nullptr);
+      const auto& val = storage_->GetCounterValues(ref_filter_.current, type_);
+      sqlite3_result_text(context,
+                          storage_->GetString(val.counter_name_id).c_str(), -1,
+                          nullptr);
       break;
     }
     case Column::kRef: {
-      sqlite3_result_int64(context, current_cpu_);
-      break;
-    }
-    case Column::kRefType: {
-      sqlite3_result_text(context, "cpu", -1, nullptr);
+      sqlite3_result_int64(context, ref_filter_.current);
       break;
     }
     case Column::kDuration: {
-      const auto& freq = storage_->GetFreqForCpu(current_cpu_);
+      const auto& val = storage_->GetCounterValues(ref_filter_.current, type_);
       uint64_t duration = 0;
-      if (index_in_cpu_ + 1 < freq.size()) {
-        duration = freq[index_in_cpu_ + 1].first - freq[index_in_cpu_].first;
+      if (index_ + 1 < val.size()) {
+        duration = val.timestamps[index_ + 1] - val.timestamps[index_];
       }
       sqlite3_result_int64(context, static_cast<int64_t>(duration));
       break;
@@ -107,45 +125,56 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
 
 int CountersTable::Cursor::Filter(const QueryConstraints& qc,
                                   sqlite3_value** argv) {
+  if (type_ == CounterType::UPID) {
+    ref_filter_.min = 1;
+    ref_filter_.max = static_cast<uint32_t>(storage_->process_count());
+  } else {
+    ref_filter_.min = 0;
+    ref_filter_.max = base::kMaxCpus - 1;
+  }
+
   for (size_t j = 0; j < qc.constraints().size(); j++) {
     const auto& cs = qc.constraints()[j];
     if (cs.iColumn == Column::kRef) {
-      auto constraint_cpu = static_cast<uint32_t>(sqlite3_value_int(argv[j]));
+      auto constraint = static_cast<uint32_t>(sqlite3_value_int(argv[j]));
       if (IsOpEq(cs.op)) {
-        filter_by_cpu_ = true;
-        filter_cpu_ = constraint_cpu;
+        ref_filter_.min = constraint;
+        ref_filter_.max = constraint;
+      } else if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
+        ref_filter_.min = IsOpGt(cs.op) ? constraint + 1 : constraint;
+      } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
+        ref_filter_.max = IsOpLt(cs.op) ? constraint - 1 : constraint;
       }
     }
+  }
+  ref_filter_.current = ref_filter_.min;
+  while (ref_filter_.current != ref_filter_.max &&
+         storage_->GetCounterValues(ref_filter_.current, type_).size() == 0) {
+    ++ref_filter_.current;
   }
 
   return SQLITE_OK;
 }
 
 int CountersTable::Cursor::Next() {
-  if (filter_by_cpu_) {
-    current_cpu_ = filter_cpu_;
-    ++index_in_cpu_;
-  } else {
-    if (index_in_cpu_ < storage_->GetFreqForCpu(current_cpu_).size() - 1) {
-      index_in_cpu_++;
-    } else if (current_cpu_ < storage_->GetMaxCpu()) {
-      ++current_cpu_;
-      index_in_cpu_ = 0;
-    }
-    // If the cpu is has no freq events, move to the next one.
-    while (current_cpu_ != storage_->GetMaxCpu() &&
-           storage_->GetFreqForCpu(current_cpu_).size() == 0) {
-      ++current_cpu_;
+  if (index_ < storage_->GetCounterValues(ref_filter_.current, type_).size()) {
+    ++index_;
+  } else if (ref_filter_.current < ref_filter_.max) {
+    ++ref_filter_.current;
+    index_ = 0;
+    while (ref_filter_.current != ref_filter_.max &&
+           storage_->GetCounterValues(ref_filter_.current, type_).size() == 0) {
+      ++ref_filter_.current;
     }
   }
   return SQLITE_OK;
 }
 
 int CountersTable::Cursor::Eof() {
-  if (filter_by_cpu_) {
-    return index_in_cpu_ == storage_->GetFreqForCpu(current_cpu_).size();
-  }
-  return current_cpu_ == storage_->GetMaxCpu();
+  return ref_filter_.max == ref_filter_.current &&
+         (storage_->GetCounterValues(ref_filter_.current, type_).size() == 0 ||
+          index_ ==
+              storage_->GetCounterValues(ref_filter_.current, type_).size());
 }
 
 }  // namespace trace_processor

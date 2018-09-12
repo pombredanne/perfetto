@@ -55,7 +55,7 @@ TraceProcessor::TraceProcessor(const Config& cfg) {
   SliceTable::RegisterTable(*db_, context_.storage.get());
   StringTable::RegisterTable(*db_, context_.storage.get());
   ThreadTable::RegisterTable(*db_, context_.storage.get());
-  CountersTable::RegisterTable(*db_, context_.storage.get());
+  CountersTable::RegisterTable(*db_, context_.storage.get(), "cpufreq");
 }
 
 TraceProcessor::~TraceProcessor() = default;

@@ -65,6 +65,8 @@ class Table : public sqlite3_vtab {
     int FilterInternal(int num, const char* idxStr, int argc, sqlite3_value**);
   };
 
+  const std::string& GetName() const { return name_; }
+
  protected:
   // Populated by a BestIndex call to allow subclasses to tweak SQLite's
   // handling of sets of constraints.
