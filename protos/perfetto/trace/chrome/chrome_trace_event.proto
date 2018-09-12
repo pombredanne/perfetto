@@ -60,6 +60,8 @@ message ChromeTraceEvent {
 
   repeated Arg args = 14;
 
+  // Partial contents of a string table that's valid for
+  // the whole ChromeEventBundle entry.
   repeated ChromeStringTableEntry string_table_part = 15;
 
   // Takes precedence over respectively |name| and
