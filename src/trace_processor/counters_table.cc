@@ -33,7 +33,7 @@ CountersTable::CountersTable(const TraceStorage* storage) : storage_(storage) {}
 
 void CountersTable::RegisterTable(sqlite3* db,
                                   const TraceStorage* storage,
-                                  std::string name) {
+                                  const std::string& name) {
   if (name == "cpufreq") {
     Table::Register<CountersTable>(db, storage,
                                    "CREATE TABLE cpufreq("

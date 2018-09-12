@@ -38,7 +38,7 @@ class CountersTable : public Table {
 
   static void RegisterTable(sqlite3* db,
                             const TraceStorage* storage,
-                            std::string name);
+                            const std::string& name);
 
   CountersTable(const TraceStorage*);
 
