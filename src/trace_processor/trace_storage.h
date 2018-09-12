@@ -248,15 +248,7 @@ class TraceStorage {
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
   // Virtual for testing.
-  virtual void PushCpuFreq(uint64_t timestamp,
-                           uint32_t cpu,
-                           uint32_t new_freq) {
-    PERFETTO_DCHECK(cpu <= base::kMaxCpus);
-    CounterContext context = {cpu, CounterType::CPU_ID};
-    auto& vals = counters_[context];
-    vals.counter_name_id = InternString("CpuFreq");
-    PushCounterValue(timestamp, new_freq, cpu, CounterType::CPU_ID);
-  }
+  virtual void PushCpuFreq(uint64_t timestamp, uint32_t cpu, uint32_t new_freq);
 
   const CounterValues& GetFreqForCpu(uint32_t cpu) const {
     PERFETTO_DCHECK(cpu <= base::kMaxCpus);
@@ -269,14 +261,11 @@ class TraceStorage {
                         CounterType type);
 
   const CounterValues& GetCounterValues(int64_t ref, CounterType type) const {
-    CounterContext context = {ref, type};
-    return counters_.at(context);
+    return counters_.at({ref, type});
   }
 
-  void InitalizeCounterValue(int64_t ref, CounterType type) {
-    CounterContext context = {ref, type};
-    counters_[context];
-  }
+  // Initialize an empty counter value.
+  void InitalizeCounterValue(int64_t ref, CounterType type);
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.

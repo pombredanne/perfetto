@@ -68,13 +68,14 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   // because we can do that filter efficiently.
   const auto& constraints = qc.constraints();
   if (constraints.size() == 1 && constraints.front().iColumn == Column::kRef) {
-    info->estimated_cost = IsOpEq(constraints.front().op) ? 1 : 10;
+    info->estimated_cost = 1;
   }
 
   return SQLITE_OK;
 }
 
-CountersTable::Cursor::Cursor(const TraceStorage* storage, std::string name)
+CountersTable::Cursor::Cursor(const TraceStorage* storage,
+                              const std::string& name)
     : storage_(storage) {
   if (name == "cpufreq") {
     type_ = CounterType::CPU_ID;

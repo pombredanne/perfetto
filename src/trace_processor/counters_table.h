@@ -49,7 +49,7 @@ class CountersTable : public Table {
  private:
   class Cursor : public Table::Cursor {
    public:
-    Cursor(const TraceStorage*, std::string name);
+    Cursor(const TraceStorage*, const std::string& name);
 
     // Implementation of Table::Cursor.
     int Filter(const QueryConstraints&, sqlite3_value**) override;
@@ -62,11 +62,12 @@ class CountersTable : public Table {
       uint32_t min;
       uint32_t max;
       uint32_t current;
-      bool desc;
     };
 
     RefFilter ref_filter_;
     CounterType type_;
+
+    // The index within the current ref.
     size_t index_ = 0;
 
     const TraceStorage* const storage_;

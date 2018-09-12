@@ -29,7 +29,7 @@ TraceStorage::TraceStorage() {
   // Reserve string ID 0 for the empty string.
   InternString("");
 
-  // Initialize all CPUs @ freq 0Hz.
+  // Initialize all CPUs
   for (size_t cpu = 0; cpu < base::kMaxCpus; cpu++) {
     InitalizeCounterValue(static_cast<int64_t>(cpu), CounterType::CPU_ID);
   }
@@ -71,6 +71,19 @@ void TraceStorage::PushCounterValue(uint64_t timestamp,
   }
   vals.timestamps.emplace_back(timestamp);
   vals.values.emplace_back(value);
+}
+
+void TraceStorage::InitalizeCounterValue(int64_t ref, CounterType type) {
+  counters_[{ref, type}];
+}
+
+void TraceStorage::PushCpuFreq(uint64_t timestamp,
+                               uint32_t cpu,
+                               uint32_t new_freq) {
+  PERFETTO_DCHECK(cpu <= base::kMaxCpus);
+  auto& vals = counters_[{cpu, CounterType::CPU_ID}];
+  vals.counter_name_id = InternString("CpuFreq");
+  PushCounterValue(timestamp, new_freq, cpu, CounterType::CPU_ID);
 }
 
 void TraceStorage::ResetStorage() {
