@@ -17,7 +17,9 @@
 #ifndef SRC_PROFILING_MEMORY_BOUNDED_QUEUE_H_
 #define SRC_PROFILING_MEMORY_BOUNDED_QUEUE_H_
 
+#include <condition_variable>
 #include <deque>
+#include <mutex>
 
 template <typename T>
 class BoundedQueue {
