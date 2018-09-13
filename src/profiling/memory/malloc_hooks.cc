@@ -68,23 +68,6 @@ void* heapprofd_valloc(size_t size);
 __END_DECLS
 namespace perfetto {
 namespace {
-std::atomic<uint64_t> sequence_number(0);
-
-base::ScopedFile Connect() {
-  int sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (sock == -1) {
-    return base::ScopedFile();
-  }
-  struct sockaddr_un name;
-  name.sun_family = AF_UNIX;
-  strncpy(name.sun_path, kHeapprofdSocket, sizeof(name.sun_path) - 1);
-  if (connect(sock, reinterpret_cast<const struct sockaddr*>(&name),
-              sizeof(name)) == -1) {
-    close(sock);
-    return base::ScopedFile();
-  }
-  return base::ScopedFile(sock);
-}
 
 void* FindStackBase() {
   FILE* maps = fopen("/proc/self/maps", "r");
