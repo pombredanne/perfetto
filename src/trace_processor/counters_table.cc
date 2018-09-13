@@ -62,6 +62,18 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
     info->estimated_cost = IsOpEq(constraints.front().op) ? 1 : 10;
   }
 
+  // Order by is consumed if we sort by cpu, (cpu and ts) or ts.
+  size_t ob_size = qc.order_by().size();
+  if (ob_size == 1) {
+    const auto& f = qc.order_by()[0];
+    info->order_by_consumed = (f.iColumn == Column::kRef && !f.desc) ||
+                              (f.iColumn == Column::kTimestamp && !f.desc);
+  } else if (ob_size == 2) {
+    const auto& f = qc.order_by()[0];
+    const auto& s = qc.order_by()[1];
+    info->order_by_consumed = (f.iColumn == Column::kRef && !f.desc) &&
+                              (s.iColumn == Column::kTimestamp && !s.desc);
+  }
   return SQLITE_OK;
 }
 
@@ -122,6 +134,28 @@ int CountersTable::Cursor::Filter(const QueryConstraints& qc,
     }
   }
 
+  if (qc.order_by().size() == 1 &&
+      qc.order_by()[0].iColumn == Column::kTimestamp &&
+      !qc.order_by()[0].desc) {
+    sort_by_ts_ = true;
+
+    uint32_t min_cpu = storage_->GetMaxCpu();
+    uint64_t min_ts = std::numeric_limits<uint64_t>::max();
+    for (uint32_t i = 0; i < storage_->GetMaxCpu(); i++) {
+      const auto& freqs = storage_->GetFreqForCpu(i);
+      if (index_in_cpus_[i] >= freqs.size()) {
+        continue;
+      }
+
+      if (freqs[index_in_cpus_[i]].first < min_ts) {
+        min_cpu = i;
+        min_ts = freqs[index_in_cpus_[i]].first;
+      }
+    }
+    current_cpu_ = min_cpu;
+    index_in_cpu_ =
+        min_cpu == storage_->GetMaxCpu() ? 0 : index_in_cpus_[min_cpu];
+  }
   return SQLITE_OK;
 }
 
@@ -129,6 +163,25 @@ int CountersTable::Cursor::Next() {
   if (filter_by_cpu_) {
     current_cpu_ = filter_cpu_;
     ++index_in_cpu_;
+  } else if (sort_by_ts_) {
+    index_in_cpus_[current_cpu_]++;
+
+    uint32_t min_cpu = storage_->GetMaxCpu();
+    uint64_t min_ts = std::numeric_limits<uint64_t>::max();
+    for (uint32_t i = 0; i < storage_->GetMaxCpu(); i++) {
+      const auto& freqs = storage_->GetFreqForCpu(i);
+      if (index_in_cpus_[i] >= freqs.size()) {
+        continue;
+      }
+
+      if (freqs[index_in_cpus_[i]].first < min_ts) {
+        min_cpu = i;
+        min_ts = freqs[index_in_cpus_[i]].first;
+      }
+    }
+    current_cpu_ = min_cpu;
+    index_in_cpu_ =
+        min_cpu == storage_->GetMaxCpu() ? 0 : index_in_cpus_[min_cpu];
   } else {
     if (index_in_cpu_ < storage_->GetFreqForCpu(current_cpu_).size() - 1) {
       index_in_cpu_++;

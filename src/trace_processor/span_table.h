@@ -45,34 +45,46 @@ class SpanTable : public Table {
   int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
 
  private:
+  static constexpr uint8_t kReservedColumns = 3;
+  struct Value {
+    enum Type {
+      kText = 0,
+      kULong = 1,
+      kUInt = 2,
+    };
+
+    Type type;
+    std::string text_value;
+    uint64_t ulong_value;
+    uint32_t uint_value;
+  };
+
   class FilterState {
    public:
-    FilterState(sqlite3_stmt* t1_stmt, sqlite3_stmt* t2_stmt);
+    FilterState(SpanTable*, sqlite3_stmt* t1_stmt, sqlite3_stmt* t2_stmt);
 
     int Next();
     int Eof();
     int Column(sqlite3_context* context, int N);
 
    private:
-    struct Freq {
+    struct TableRow {
       uint64_t ts = 0;
       uint64_t dur = 0;
-      uint64_t freq = 0;
+      std::vector<Value> values;
     };
-    struct Sched {
-      uint64_t ts = 0;
-      uint64_t dur = 0;
-      uint64_t utid = 0;
-    };
+
+    int ExtractNext(bool pull_t1);
+    void ReportSqliteResult(sqlite3_context* context, SpanTable::Value value);
 
     uint64_t ts_ = 0;
     uint64_t dur_ = 0;
     uint32_t cpu_ = 0;
-    Freq freq_to_ret_;
-    Sched sched_to_ret_;
+    TableRow t1_to_ret_;
+    TableRow t2_to_ret_;
 
-    std::array<Freq, base::kMaxCpus> freq_;
-    std::array<Sched, base::kMaxCpus> sched_;
+    std::array<TableRow, base::kMaxCpus> t1_;
+    std::array<TableRow, base::kMaxCpus> t2_;
 
     uint64_t latest_t1_ts_ = 0;
     uint64_t latest_t2_ts_ = 0;
@@ -80,12 +92,12 @@ class SpanTable : public Table {
     ScopedStmt t1_stmt_;
     ScopedStmt t2_stmt_;
 
-    int i_ = 0;
+    SpanTable* const table_;
   };
 
   class Cursor : public Table::Cursor {
    public:
-    Cursor(sqlite3* db);
+    Cursor(SpanTable*, sqlite3* db);
     ~Cursor() override;
 
     // Methods to be implemented by derived table classes.
@@ -97,6 +109,7 @@ class SpanTable : public Table {
    private:
     sqlite3* const db_;
     std::unique_ptr<FilterState> filter_state_;
+    SpanTable* const table_;
   };
 
   struct TableDefenition {

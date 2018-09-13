@@ -70,7 +70,6 @@ void Table::RegisterInternal(sqlite3* db,
       return SQLITE_ERROR;
 
     int res = sqlite3_declare_vtab(xdb, create_stmt.c_str());
-    PERFETTO_LOG("%s", create_stmt.c_str());
     if (res != SQLITE_OK)
       return res;
 
@@ -122,7 +121,6 @@ void Table::RegisterInternal(sqlite3* db,
          void (**fn)(sqlite3_context*, int, sqlite3_value**),
          void** args) { return ToTable(t)->FindFunction(name, fn, args); };
 
-  PERFETTO_LOG("%s", table_name.c_str());
   int res = sqlite3_create_module_v2(
       db, table_name.c_str(), module, desc.release(),
       [](void* arg) { delete static_cast<TableDescriptor*>(arg); });
