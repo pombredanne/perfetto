@@ -14,18 +14,26 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
-#define INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
+#ifndef INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
+#define INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
 
-#include <string>
+#include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
 namespace base {
 
-bool ReadFileDescriptor(int fd, std::string* out);
-bool ReadFile(const std::string& path, std::string* out);
+ssize_t Send(int fd,
+             const void* msg,
+             size_t len,
+             const int* send_fds,
+             size_t num_fds);
 
+ssize_t Receive(int fd,
+                void* msg,
+                size_t len,
+                base::ScopedFile* fd_vec,
+                size_t max_files);
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
+#endif  // INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_

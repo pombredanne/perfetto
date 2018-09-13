@@ -30,8 +30,8 @@
 #include <memory>
 
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/sock_utils.h"
 #include "perfetto/base/task_runner.h"
 #include "perfetto/base/utils.h"
 
