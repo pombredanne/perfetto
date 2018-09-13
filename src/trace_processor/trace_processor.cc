@@ -28,6 +28,7 @@
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/slice_table.h"
+#include "src/trace_processor/span_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/thread_table.h"
@@ -56,6 +57,7 @@ TraceProcessor::TraceProcessor(const Config& cfg) {
   StringTable::RegisterTable(*db_, context_.storage.get());
   ThreadTable::RegisterTable(*db_, context_.storage.get());
   CountersTable::RegisterTable(*db_, context_.storage.get());
+  SpanTable::RegisterTable(*db_, context_.storage.get());
 }
 
 TraceProcessor::~TraceProcessor() = default;

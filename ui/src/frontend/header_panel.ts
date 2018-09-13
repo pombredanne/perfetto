@@ -15,13 +15,17 @@
 import * as m from 'mithril';
 import {Panel} from './panel';
 
-interface Attrs {
-  title: string;
-}
+export class HeaderPanel extends Panel {
+  constructor(private text: string) {
+    super();
+  }
 
-export class HeaderPanel extends Panel<Attrs> {
   renderCanvas() {}
-  view({attrs}: m.CVnode<Attrs>) {
-    return m('header', attrs.title);
+  updateDom(dom: HTMLElement) {
+    m.render(dom, m('header', this.text));
+  }
+
+  getHeight() {
+    return 25;
   }
 }

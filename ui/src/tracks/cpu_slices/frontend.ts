@@ -60,6 +60,8 @@ class CpuSliceTrack extends Track {
     super(trackState);
   }
 
+  consumeData() {}
+
   reqDataDeferred() {
     const {visibleWindowTime} = globals.frontendLocalState;
     const reqStart = visibleWindowTime.start - visibleWindowTime.duration;

@@ -192,6 +192,8 @@ class ChromeSliceTrack extends Track {
     return globals.trackDataStore.get(this.trackState.id) as
         ChromeSliceTrackData;
   }
+
+  consumeData() {}
 }
 
 trackRegistry.register(ChromeSliceTrack);

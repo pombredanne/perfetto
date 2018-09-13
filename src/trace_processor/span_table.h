@@ -18,8 +18,11 @@
 #define SRC_TRACE_PROCESSOR_SPAN_TABLE_H_
 
 #include <sqlite3.h>
+#include <array>
+#include <deque>
 #include <memory>
 
+#include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -42,8 +45,47 @@ class SpanTable : public Table {
   int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
 
  private:
+  class FilterState {
+   public:
+    FilterState(sqlite3_stmt* t1_stmt, sqlite3_stmt* t2_stmt);
+
+    int Next();
+    int Eof();
+    int Column(sqlite3_context* context, int N);
+
+   private:
+    struct Freq {
+      uint64_t ts = 0;
+      uint64_t dur = 0;
+      uint64_t freq = 0;
+    };
+    struct Sched {
+      uint64_t ts = 0;
+      uint64_t dur = 0;
+      uint64_t utid = 0;
+    };
+
+    uint64_t ts_ = 0;
+    uint64_t dur_ = 0;
+    uint32_t cpu_ = 0;
+    Freq freq_to_ret_;
+    Sched sched_to_ret_;
+
+    std::array<Freq, base::kMaxCpus> freq_;
+    std::array<Sched, base::kMaxCpus> sched_;
+
+    uint64_t latest_t1_ts_ = 0;
+    uint64_t latest_t2_ts_ = 0;
+
+    ScopedStmt t1_stmt_;
+    ScopedStmt t2_stmt_;
+
+    int i_ = 0;
+  };
+
   class Cursor : public Table::Cursor {
    public:
+    Cursor(sqlite3* db);
     ~Cursor() override;
 
     // Methods to be implemented by derived table classes.
@@ -51,10 +93,19 @@ class SpanTable : public Table {
     int Next() override;
     int Eof() override;
     int Column(sqlite3_context* context, int N) override;
+
+   private:
+    sqlite3* const db_;
+    std::unique_ptr<FilterState> filter_state_;
   };
 
-  std::vector<Column> t1_cols_;
-  std::vector<Column> t2_cols_;
+  struct TableDefenition {
+    std::string name;
+    std::vector<Column> cols;
+  };
+
+  TableDefenition t1_;
+  TableDefenition t2_;
   sqlite3* const db_;
 };
 
