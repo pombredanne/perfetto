@@ -88,6 +88,7 @@ if (is_debug && build_standalone && !is_wasm) {
   }
 }
 
+# This cannot be in :base as it does not build on WASM.
 source_set("sock_utils") {
   deps = [
     "../../gn:default_deps",
