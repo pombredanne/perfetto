@@ -108,7 +108,7 @@ void SocketListener::RecordReceived(ipc::UnixSocket* self,
   // PID might reuse incorrect metadata.
   // 2) it is a waste to unwind for a process that had already gone away.
   std::weak_ptr<ProcessMetadata> weak_metadata(entry.process_metadata);
-  callback_function_(size, std::move(buf), std::move(weak_metadata));
+  callback_function_({size, std::move(buf), std::move(weak_metadata)});
 }
 
 }  // namespace perfetto

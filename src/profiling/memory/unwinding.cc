@@ -204,4 +204,16 @@ bool DoUnwind(void* mem,
   return error_code == 0;
 }
 
+__attribute__((noreturn)) void UnwindingMainLoop(
+    BoundedQueue<UnwindingRecord>* input_queue,
+    BoundedQueue<UnwoundRecord>* output_queue) {
+  for (;;) {
+    UnwindingRecord rec = input_queue->Get();
+    std::vector<unwindstack::FrameData> out;
+    std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
+    if (DoUnwind(rec.data.get(), rec.size, metadata.get(), &out))
+      output_queue->Add({std::move(out)});
+  }
+}
+
 }  // namespace perfetto

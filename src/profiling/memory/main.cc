@@ -18,6 +18,7 @@
 #include <memory>
 
 #include "src/ipc/unix_socket.h"
+#include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
 
 #include "perfetto/base/unix_task_runner.h"
@@ -25,15 +26,27 @@
 namespace perfetto {
 namespace {
 
+constexpr size_t kUnwinderQueueSize = 1000;
+constexpr size_t kBookkeepingQueueSize = 1000;
+constexpr size_t kUnwinderThreads = 5;
+
 int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<ipc::UnixSocket> sock;
+  BoundedQueue<UnwindingRecord> unwinder_queue(kUnwinderQueueSize, true);
+  BoundedQueue<UnwoundRecord> bookkeeping_queue(kBookkeepingQueueSize, true);
 
-  SocketListener listener(
-      [](size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>) {
-        // TODO(fmayer): Wire this up to a worker thread that does the
-        // unwinding.
-        PERFETTO_LOG("Record received.");
-      });
+  std::vector<std::thread> unwinding_threads;
+  unwinding_threads.reserve(kUnwinderThreads);
+  for (size_t i = 0; i < kUnwinderThreads; ++i) {
+    unwinding_threads.emplace_back([&unwinder_queue, &bookkeeping_queue] {
+      UnwindingMainLoop(&unwinder_queue, &bookkeeping_queue);
+    });
+  }
+
+  SocketListener listener([&unwinder_queue](UnwindingRecord r) {
+    unwinder_queue.Add(std::move(r));
+  });
+
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on

@@ -20,6 +20,7 @@
 #include <unwindstack/Maps.h>
 #include <unwindstack/Unwinder.h>
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/bounded_queue.h"
 
 namespace perfetto {
 
@@ -66,6 +67,19 @@ bool DoUnwind(void* mem,
               size_t sz,
               ProcessMetadata* metadata,
               std::vector<unwindstack::FrameData>* out);
+
+struct UnwindingRecord {
+  size_t size;
+  std::unique_ptr<uint8_t[]> data;
+  std::weak_ptr<ProcessMetadata> metadata;
+};
+
+struct UnwoundRecord {
+  std::vector<unwindstack::FrameData> frames;
+};
+
+void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
+                       BoundedQueue<UnwoundRecord>* output_queue);
 
 }  // namespace perfetto
 
