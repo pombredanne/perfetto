@@ -211,6 +211,9 @@ __attribute__((noreturn)) void UnwindingMainLoop(
     UnwindingRecord rec = input_queue->Get();
     std::vector<unwindstack::FrameData> out;
     std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
+    if (!metadata)
+      // Process has already gone away.
+      continue;
     if (DoUnwind(rec.data.get(), rec.size, metadata.get(), &out))
       output_queue->Add({std::move(out)});
   }
