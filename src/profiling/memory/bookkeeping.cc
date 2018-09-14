@@ -26,10 +26,10 @@ MemoryBookkeeping::Node* MemoryBookkeeping::Node::GetOrCreateChild(
   return child;
 }
 
-void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
-                                     uint64_t address,
-                                     uint64_t size,
-                                     uint64_t sequence_number) {
+void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
+                            uint64_t address,
+                            uint64_t size,
+                            uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
     if (it->second.sequence_number > sequence_number)
@@ -39,10 +39,10 @@ void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
       ApplyFree(it->second.sequence_number + 1, address);
   }
 
-  Node* node = &root_;
+  MemoryBookkeeping::Node* node = &bookkeeper_->root_;
   node->cum_size_ += size;
-  for (const MemoryBookkeeping::CodeLocation& loc : locs) {
-    node = node->GetOrCreateChild(InternCodeLocation(loc));
+  for (const CodeLocation& loc : locs) {
+    node = node->GetOrCreateChild(bookkeeper_->InternCodeLocation(loc));
     node->cum_size_ += size;
   }
 
@@ -50,11 +50,11 @@ void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
   AddPending(sequence_number, 0);
 }
 
-void MemoryBookkeeping::RecordFree(uint64_t address, uint64_t sequence_number) {
+void HeapDump::RecordFree(uint64_t address, uint64_t sequence_number) {
   AddPending(sequence_number, address);
 }
 
-void MemoryBookkeeping::ApplyFree(uint64_t sequence_number, uint64_t address) {
+void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
@@ -63,10 +63,10 @@ void MemoryBookkeeping::ApplyFree(uint64_t sequence_number, uint64_t address) {
   if (value.sequence_number > sequence_number)
     return;
   uint64_t size = value.alloc_size;
-  Node* node = value.node;
+  MemoryBookkeeping::Node* node = value.node;
 
   bool delete_prev = false;
-  Node* prev = nullptr;
+  MemoryBookkeeping::Node* prev = nullptr;
   while (node != nullptr) {
     if (delete_prev)
       node->children_.Remove(*prev);
@@ -79,7 +79,7 @@ void MemoryBookkeeping::ApplyFree(uint64_t sequence_number, uint64_t address) {
   allocations_.erase(leaf_it);
 }
 
-void MemoryBookkeeping::AddPending(uint64_t sequence_number, uint64_t address) {
+void HeapDump::AddPending(uint64_t sequence_number, uint64_t address) {
   if (sequence_number != consistent_sequence_number_ + 1) {
     pending_.emplace(sequence_number, address);
     return;
@@ -101,7 +101,7 @@ void MemoryBookkeeping::AddPending(uint64_t sequence_number, uint64_t address) {
 uint64_t MemoryBookkeeping::GetCumSizeForTesting(
     const std::vector<CodeLocation>& locs) {
   Node* node = &root_;
-  for (const MemoryBookkeeping::CodeLocation& loc : locs) {
+  for (const CodeLocation& loc : locs) {
     node = node->children_.Get(InternCodeLocation(loc));
     if (node == nullptr)
       return 0;

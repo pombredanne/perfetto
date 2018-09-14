@@ -234,25 +234,30 @@ __attribute__((noreturn)) void UnwindingMainLoop(
 }
 
 __attribute__((noreturn)) void BookkeepingMainLoop(
-    MemoryBookkeeping* bookkeeping,
     BoundedQueue<BookkeepingRecord>* input_queue) {
   for (;;) {
     BookkeepingRecord rec = input_queue->Get();
+    std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
+    if (!metadata)
+      // Process has already gone away.
+      continue;
+
     if (rec.free_record.free_data) {
       FreeRecord& free_rec = rec.free_record;
-      PERFETTO_DCHECK(free_rec.size % 2 == sizeof(uint64_t));
       uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
+      PERFETTO_DCHECK(free_rec.size % (2 * sizeof(uint64_t)) ==
+                      sizeof(uint64_t));
       for (size_t i = 1; i < free_rec.size / sizeof(uint64_t); i += 2)
-        bookkeeping->RecordFree(data[i + 1], data[i]);
+        metadata->heap_dump.RecordFree(data[i + 1], data[i]);
     } else {
       AllocRecord& alloc_rec = rec.alloc_record;
-      std::vector<MemoryBookkeeping::CodeLocation> code_locations;
+      std::vector<CodeLocation> code_locations;
       for (unwindstack::FrameData& frame : alloc_rec.frames)
         code_locations.emplace_back(frame.map_name, frame.function_name);
-      bookkeeping->RecordMalloc(code_locations,
-                                alloc_rec.alloc_metadata.alloc_address,
-                                alloc_rec.alloc_metadata.alloc_size,
-                                alloc_rec.alloc_metadata.sequence_number);
+      metadata->heap_dump.RecordMalloc(
+          code_locations, alloc_rec.alloc_metadata.alloc_address,
+          alloc_rec.alloc_metadata.alloc_size,
+          alloc_rec.alloc_metadata.sequence_number);
     }
   }
 }

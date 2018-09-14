@@ -39,9 +39,8 @@ int HeapprofdMain(int argc, char** argv) {
   for (size_t i = 0; i < kUnwinderThreads; ++i)
     unwinder_queues[i].SetSize(kUnwinderQueueSize);
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
-  std::thread bookkeeping_thread([&bookkeeping, &bookkeeping_queue] {
-    BookkeepingMainLoop(&bookkeeping, &bookkeeping_queue);
-  });
+  std::thread bookkeeping_thread(
+      [&bookkeeping_queue] { BookkeepingMainLoop(&bookkeeping_queue); });
 
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
@@ -51,10 +50,12 @@ int HeapprofdMain(int argc, char** argv) {
     });
   }
 
-  SocketListener listener([&unwinder_queues](UnwindingRecord r) {
-    unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
-        std::move(r));
-  });
+  SocketListener listener(
+      [&unwinder_queues](UnwindingRecord r) {
+        unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()]
+            .Add(std::move(r));
+      },
+      &bookkeeping);
 
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {

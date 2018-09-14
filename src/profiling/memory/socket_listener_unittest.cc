@@ -53,7 +53,8 @@ TEST_F(SocketListenerTest, ReceiveRecord) {
     callback_called();
   };
 
-  SocketListener listener(std::move(callback_fn));
+  MemoryBookkeeping bookkeeping;
+  SocketListener listener(std::move(callback_fn), &bookkeeping);
   MockEventListener client_listener;
   EXPECT_CALL(client_listener, OnConnect(_, _))
       .WillOnce(InvokeWithoutArgs(connected));

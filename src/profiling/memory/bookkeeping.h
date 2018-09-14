@@ -26,21 +26,20 @@
 
 namespace perfetto {
 
+class HeapDump;
+
+struct CodeLocation {
+  CodeLocation(std::string map_n, std::string function_n)
+      : map_name(std::move(map_n)), function_name(std::move(function_n)) {}
+
+  std::string map_name;
+  std::string function_name;
+};
+
 class MemoryBookkeeping {
  public:
-  struct CodeLocation {
-    CodeLocation(std::string map_n, std::string function_n)
-        : map_name(std::move(map_n)), function_name(std::move(function_n)) {}
+  friend class HeapDump;
 
-    std::string map_name;
-    std::string function_name;
-  };
-
-  void RecordMalloc(const std::vector<CodeLocation>& stack,
-                    uint64_t address,
-                    uint64_t size,
-                    uint64_t sequence_number);
-  void RecordFree(uint64_t address, uint64_t sequence_number);
   uint64_t GetCumSizeForTesting(const std::vector<CodeLocation>& stack);
 
  private:
@@ -91,13 +90,28 @@ class MemoryBookkeeping {
         children_;
   };
 
+  StringInterner interner_;
+  Node root_{{interner_.Intern(""), interner_.Intern("")}};
+};
+
+class HeapDump {
+ public:
+  HeapDump(MemoryBookkeeping* bookkeeper) : bookkeeper_(bookkeeper) {}
+
+  void RecordMalloc(const std::vector<CodeLocation>& stack,
+                    uint64_t address,
+                    uint64_t size,
+                    uint64_t sequence_number);
+  void RecordFree(uint64_t address, uint64_t sequence_number);
+
+ private:
   struct Allocation {
-    Allocation(uint64_t size, uint64_t seq, Node* n)
+    Allocation(uint64_t size, uint64_t seq, MemoryBookkeeping::Node* n)
         : alloc_size(size), sequence_number(seq), node(n) {}
 
     uint64_t alloc_size;
     uint64_t sequence_number;
-    Node* node;
+    MemoryBookkeeping::Node* node;
   };
 
   void AddPending(uint64_t sequence_number, uint64_t address);
@@ -105,12 +119,10 @@ class MemoryBookkeeping {
 
   // Address -> (size, sequence_number, code location)
   std::map<uint64_t, Allocation> allocations_;
-  StringInterner interner_;
-  Node root_{{interner_.Intern(""), interner_.Intern("")}};
-
   uint64_t consistent_sequence_number_ = 0;
   // sequence number -> (allocation to free || 0 for malloc)
   std::map<uint64_t, uint64_t> pending_;
+  MemoryBookkeeping* bookkeeper_;
 };
 
 }  // namespace perfetto

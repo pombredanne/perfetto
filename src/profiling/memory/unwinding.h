@@ -39,13 +39,20 @@ class FileDescriptorMaps : public unwindstack::Maps {
 };
 
 struct ProcessMetadata {
-  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
-      : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
+  ProcessMetadata(pid_t p,
+                  base::ScopedFile maps_fd,
+                  base::ScopedFile mem,
+                  MemoryBookkeeping* bookkeeping)
+      : pid(p),
+        maps(std::move(maps_fd)),
+        mem_fd(std::move(mem)),
+        heap_dump(bookkeeping) {
     PERFETTO_CHECK(maps.Parse());
   }
   pid_t pid;
   FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
+  HeapDump heap_dump;
 };
 
 // Overlays size bytes pointed to by stack for addresses in [sp, sp + size).
@@ -83,6 +90,7 @@ struct AllocRecord {
 };
 
 struct BookkeepingRecord {
+  std::weak_ptr<ProcessMetadata> metadata;
   AllocRecord alloc_record;
   FreeRecord free_record;
 };
@@ -95,8 +103,7 @@ bool DoUnwind(void* mem,
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
 
-void BookkeepingMainLoop(MemoryBookkeeping* bookkeeping,
-                         BoundedQueue<BookkeepingRecord>* input_queue);
+void BookkeepingMainLoop(BoundedQueue<BookkeepingRecord>* input_queue);
 
 }  // namespace perfetto
 

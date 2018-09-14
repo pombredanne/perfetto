@@ -82,7 +82,7 @@ void SocketListener::InitProcess(Entry* entry,
   if (it == process_metadata_.end() || it->second.expired()) {
     // We have not seen the PID yet or the PID is being recycled.
     entry->process_metadata = std::make_shared<ProcessMetadata>(
-        peer_pid, std::move(maps_fd), std::move(mem_fd));
+        peer_pid, std::move(maps_fd), std::move(mem_fd), bookkeeping_);
     process_metadata_[peer_pid] = entry->process_metadata;
   } else {
     // If the process already has metadata, this is an additional socket for

@@ -22,13 +22,13 @@
 namespace perfetto {
 namespace {
 
-std::vector<MemoryBookkeeping::CodeLocation> stack() {
+std::vector<CodeLocation> stack() {
   return {
       {"map1", "fun1"}, {"map2", "fun2"},
   };
 }
 
-std::vector<MemoryBookkeeping::CodeLocation> stack2() {
+std::vector<CodeLocation> stack2() {
   return {
       {"map1", "fun1"}, {"map3", "fun3"},
   };
@@ -37,28 +37,34 @@ std::vector<MemoryBookkeeping::CodeLocation> stack2() {
 TEST(BookkeepingTest, Basic) {
   uint64_t sequence_number = 1;
   MemoryBookkeeping mb;
-  mb.RecordMalloc(stack(), 1, 5, sequence_number++);
-  mb.RecordMalloc(stack2(), 2, 2, sequence_number++);
+  HeapDump hd(&mb);
+
+  hd.RecordMalloc(stack(), 1, 5, sequence_number++);
+  hd.RecordMalloc(stack2(), 2, 2, sequence_number++);
   ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
-  mb.RecordFree(2, sequence_number++);
+  hd.RecordFree(2, sequence_number++);
   ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
-  mb.RecordFree(1, sequence_number++);
+  hd.RecordFree(1, sequence_number++);
   ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 0);
 }
 
 TEST(BookkeepingTest, ReplaceAlloc) {
   uint64_t sequence_number = 1;
   MemoryBookkeeping mb;
-  mb.RecordMalloc(stack(), 1, 5, sequence_number++);
-  mb.RecordMalloc(stack2(), 1, 2, sequence_number++);
+  HeapDump hd(&mb);
+
+  hd.RecordMalloc(stack(), 1, 5, sequence_number++);
+  hd.RecordMalloc(stack2(), 1, 2, sequence_number++);
   EXPECT_EQ(mb.GetCumSizeForTesting(stack()), 0);
   EXPECT_EQ(mb.GetCumSizeForTesting(stack2()), 2);
 }
 
 TEST(BookkeepingTest, OutOfOrder) {
   MemoryBookkeeping mb;
-  mb.RecordMalloc(stack(), 1, 5, 1);
-  mb.RecordMalloc(stack2(), 1, 2, 0);
+  HeapDump hd(&mb);
+
+  hd.RecordMalloc(stack(), 1, 5, 1);
+  hd.RecordMalloc(stack2(), 1, 2, 0);
   EXPECT_EQ(mb.GetCumSizeForTesting(stack()), 5);
   EXPECT_EQ(mb.GetCumSizeForTesting(stack2()), 0);
 }
