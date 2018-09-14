@@ -146,7 +146,7 @@ int SpanTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   for (const auto& col : table_->t1_.cols) {
     ss_t1 << ", " << col.name;
   }
-  ss_t1 << " FROM " << table_->t1_.name << " ORDER BY ts;";
+  ss_t1 << " FROM " << table_->t1_.name << ";";
 
   std::string t1_sql = ss_t1.str();
   int t1_size = static_cast<int>(t1_sql.size());
