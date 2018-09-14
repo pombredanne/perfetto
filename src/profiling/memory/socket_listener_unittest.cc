@@ -46,7 +46,7 @@ TEST_F(SocketListenerTest, ReceiveRecord) {
   base::TestTaskRunner task_runner;
   auto callback_called = task_runner.CreateCheckpoint("callback.called");
   auto connected = task_runner.CreateCheckpoint("connected");
-  auto callback_fn = [&callback_called](SocketListener::Record r) {
+  auto callback_fn = [&callback_called](UnwindingRecord r) {
     ASSERT_EQ(r.size, 1u);
     ASSERT_EQ(r.data[0], '1');
     ASSERT_FALSE(r.metadata.expired());

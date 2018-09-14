@@ -69,6 +69,7 @@ bool DoUnwind(void* mem,
               std::vector<unwindstack::FrameData>* out);
 
 struct UnwindingRecord {
+  pid_t pid;
   size_t size;
   std::unique_ptr<uint8_t[]> data;
   std::weak_ptr<ProcessMetadata> metadata;

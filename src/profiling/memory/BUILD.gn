@@ -106,6 +106,7 @@ source_set("unittests") {
     "../../base:test_support",
   ]
   sources = [
+    "bounded_queue_unittest.cc",
     "client_unittest.cc",
     "record_reader_unittest.cc",
     "socket_listener_unittest.cc",

@@ -24,16 +24,13 @@
 template <typename T>
 class BoundedQueue {
  public:
-  BoundedQueue(size_t size, bool block) : size_(size), block_(block) {}
+  BoundedQueue() : BoundedQueue(1) {}
+  BoundedQueue(size_t size) : size_(size) {}
 
   bool Add(T item) {
     std::unique_lock<std::mutex> l(mtx_);
-    if (deque_.size() == size_) {
-      if (!block_)
-        return false;
-
+    if (deque_.size() == size_)
       full_cv_.wait(l, [this] { return deque_.size() < size_; });
-    }
     deque_.emplace_back(std::move(item));
     if (deque_.size() == 1)
       empty_cv_.notify_one();
@@ -51,9 +48,13 @@ class BoundedQueue {
     return item;
   }
 
+  void SetSize(size_t size) {
+    std::lock_guard<std::mutex> l(mtx_);
+    size_ = size;
+  }
+
  private:
   size_t size_;
-  bool block_;
 
   size_t elements_ = 0;
   std::mutex mtx_;

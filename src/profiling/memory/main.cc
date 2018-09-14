@@ -15,7 +15,9 @@
  */
 
 #include <stdlib.h>
+#include <array>
 #include <memory>
+#include <vector>
 
 #include "src/ipc/unix_socket.h"
 #include "src/profiling/memory/bounded_queue.h"
@@ -32,19 +34,22 @@ constexpr size_t kUnwinderThreads = 5;
 
 int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<ipc::UnixSocket> sock;
-  BoundedQueue<UnwindingRecord> unwinder_queue(kUnwinderQueueSize, true);
-  BoundedQueue<UnwoundRecord> bookkeeping_queue(kBookkeepingQueueSize, true);
+  std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
+  for (size_t i = 0; i < kUnwinderThreads; ++i)
+    unwinder_queues[i].SetSize(kUnwinderQueueSize);
+  BoundedQueue<UnwoundRecord> bookkeeping_queue(kBookkeepingQueueSize);
 
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
   for (size_t i = 0; i < kUnwinderThreads; ++i) {
-    unwinding_threads.emplace_back([&unwinder_queue, &bookkeeping_queue] {
-      UnwindingMainLoop(&unwinder_queue, &bookkeeping_queue);
+    unwinding_threads.emplace_back([&unwinder_queues, &bookkeeping_queue, i] {
+      UnwindingMainLoop(&unwinder_queues[i], &bookkeeping_queue);
     });
   }
 
-  SocketListener listener([&unwinder_queue](UnwindingRecord r) {
-    unwinder_queue.Add(std::move(r));
+  SocketListener listener([&unwinder_queues](UnwindingRecord r) {
+    unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
+        std::move(r));
   });
 
   base::UnixTaskRunner read_task_runner;
