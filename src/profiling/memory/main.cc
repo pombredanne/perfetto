@@ -33,11 +33,15 @@ constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 
 int HeapprofdMain(int argc, char** argv) {
+  MemoryBookkeeping bookkeeping;
   std::unique_ptr<ipc::UnixSocket> sock;
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
     unwinder_queues[i].SetSize(kUnwinderQueueSize);
   BoundedQueue<UnwoundRecord> bookkeeping_queue(kBookkeepingQueueSize);
+  std::thread bookkeeping_thread([&bookkeeping] {
+    BookkeepingMainLoop(&bookkeeping, &bookkeeping_queue);
+  });
 
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
