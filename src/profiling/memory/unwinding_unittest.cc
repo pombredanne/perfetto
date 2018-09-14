@@ -132,7 +132,7 @@ TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
   ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem));
   auto record = GetRecord();
-  BookkeepingRecord out;
+  AllocRecord out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   int st;
   std::unique_ptr<char> demangled(abi::__cxa_demangle(

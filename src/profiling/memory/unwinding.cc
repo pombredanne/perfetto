@@ -158,7 +158,7 @@ void FileDescriptorMaps::Reset() {
 bool DoUnwind(void* mem,
               size_t sz,
               ProcessMetadata* metadata,
-              BookkeepingRecord* out) {
+              AllocRecord* out) {
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
     return false;
@@ -218,12 +218,17 @@ __attribute__((noreturn)) void UnwindingMainLoop(
           // Process has already gone away.
           continue;
         BookkeepingRecord out;
-        if (DoUnwind(data, rec.size, metadata.get(), &out))
+        if (DoUnwind(data, rec.size, metadata.get(), &out.alloc_record))
           output_queue->Add(std::move(out));
         break;
       }
-      case RecordType::Free:
+      case RecordType::Free: {
+        BookkeepingRecord out;
+        out.free_record.free_data = std::move(rec.data);
+        out.free_record.size = rec.size;
+        output_queue->Add(std::move(out));
         break;
+      }
     }
   }
 }
@@ -233,12 +238,22 @@ __attribute__((noreturn)) void BookkeepingMainLoop(
     BoundedQueue<BookkeepingRecord>* input_queue) {
   for (;;) {
     BookkeepingRecord rec = input_queue->Get();
-    std::vector<MemoryBookkeeping::CodeLocation> code_locations;
-    for (unwindstack::FrameData& frame : rec.frames)
-      code_locations.emplace_back(frame.map_name, frame.function_name);
-    bookkeeping->RecordMalloc(code_locations, rec.alloc_metadata.alloc_address,
-                              rec.alloc_metadata.alloc_size,
-                              rec.alloc_metadata.sequence_number);
+    if (rec.free_record.free_data) {
+      FreeRecord& free_rec = rec.free_record;
+      PERFETTO_DCHECK(free_rec.size % 2 == sizeof(uint64_t));
+      uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
+      for (size_t i = 1; i < free_rec.size / sizeof(uint64_t); i += 2)
+        bookkeeping->RecordFree(data[i + 1], data[i]);
+    } else {
+      AllocRecord& alloc_rec = rec.alloc_record;
+      std::vector<MemoryBookkeeping::CodeLocation> code_locations;
+      for (unwindstack::FrameData& frame : alloc_rec.frames)
+        code_locations.emplace_back(frame.map_name, frame.function_name);
+      bookkeeping->RecordMalloc(code_locations,
+                                alloc_rec.alloc_metadata.alloc_address,
+                                alloc_rec.alloc_metadata.alloc_size,
+                                alloc_rec.alloc_metadata.sequence_number);
+    }
   }
 }
 

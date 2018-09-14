@@ -72,15 +72,25 @@ struct UnwindingRecord {
   std::weak_ptr<ProcessMetadata> metadata;
 };
 
-struct BookkeepingRecord {
+struct FreeRecord {
+  size_t size;
+  std::unique_ptr<uint8_t[]> free_data;
+};
+
+struct AllocRecord {
   AllocMetadata alloc_metadata;
   std::vector<unwindstack::FrameData> frames;
+};
+
+struct BookkeepingRecord {
+  AllocRecord alloc_record;
+  FreeRecord free_record;
 };
 
 bool DoUnwind(void* mem,
               size_t sz,
               ProcessMetadata* metadata,
-              BookkeepingRecord* out);
+              AllocRecord* out);
 
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
