@@ -38,8 +38,9 @@ class MemoryBookkeeping {
 
   void RecordMalloc(const std::vector<CodeLocation>& stack,
                     uint64_t address,
-                    uint64_t size);
-  void RecordFree(uint64_t address);
+                    uint64_t size,
+                    uint64_t sequence_number);
+  void RecordFree(uint64_t address, uint64_t sequence_number);
   uint64_t GetCumSizeForTesting(const std::vector<CodeLocation>& stack);
 
  private:
@@ -90,10 +91,26 @@ class MemoryBookkeeping {
         children_;
   };
 
-  // Address -> (size, code location)
-  std::map<uint64_t, std::pair<uint64_t, Node*>> allocations_;
+  struct Allocation {
+    Allocation(uint64_t size, uint64_t seq, Node* n)
+        : alloc_size(size), sequence_number(seq), node(n) {}
+
+    uint64_t alloc_size;
+    uint64_t sequence_number;
+    Node* node;
+  };
+
+  void AddPending(uint64_t sequence_number, uint64_t address);
+  void ApplyFree(uint64_t sequence_number, uint64_t address);
+
+  // Address -> (size, sequence_number, code location)
+  std::map<uint64_t, Allocation> allocations_;
   StringInterner interner_;
   Node root_{{interner_.Intern(""), interner_.Intern("")}};
+
+  uint64_t consistent_sequence_number_ = 0;
+  // sequence number -> (allocation to free || 0 for malloc)
+  std::map<uint64_t, uint64_t> pending_;
 };
 
 }  // namespace perfetto

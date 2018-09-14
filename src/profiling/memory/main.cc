@@ -38,7 +38,7 @@ int HeapprofdMain(int argc, char** argv) {
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
     unwinder_queues[i].SetSize(kUnwinderQueueSize);
-  BoundedQueue<UnwoundRecord> bookkeeping_queue(kBookkeepingQueueSize);
+  BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
   std::thread bookkeeping_thread([&bookkeeping] {
     BookkeepingMainLoop(&bookkeeping, &bookkeeping_queue);
   });

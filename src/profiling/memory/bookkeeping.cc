@@ -28,7 +28,17 @@ MemoryBookkeeping::Node* MemoryBookkeeping::Node::GetOrCreateChild(
 
 void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
                                      uint64_t address,
-                                     uint64_t size) {
+                                     uint64_t size,
+                                     uint64_t sequence_number) {
+  auto it = allocations_.find(address);
+  if (it != allocations_.end()) {
+    if (it->second.sequence_number > sequence_number)
+      return;
+    else
+      // Clean up previous allocation.
+      ApplyFree(it->second.sequence_number + 1, address);
+  }
+
   Node* node = &root_;
   node->cum_size_ += size;
   for (const MemoryBookkeeping::CodeLocation& loc : locs) {
@@ -36,17 +46,24 @@ void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
     node->cum_size_ += size;
   }
 
-  allocations_.emplace(address, std::make_pair(size, node));
+  allocations_.emplace(address, Allocation(size, sequence_number, node));
+  AddPending(sequence_number, 0);
 }
 
-void MemoryBookkeeping::RecordFree(uint64_t address) {
+void MemoryBookkeeping::RecordFree(uint64_t address, uint64_t sequence_number) {
+  AddPending(sequence_number, address);
+}
+
+void MemoryBookkeeping::ApplyFree(uint64_t sequence_number, uint64_t address) {
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
 
-  std::pair<uint64_t, Node*> value = leaf_it->second;
-  uint64_t size = value.first;
-  Node* node = value.second;
+  const Allocation& value = leaf_it->second;
+  if (value.sequence_number > sequence_number)
+    return;
+  uint64_t size = value.alloc_size;
+  Node* node = value.node;
 
   bool delete_prev = false;
   Node* prev = nullptr;
@@ -60,6 +77,25 @@ void MemoryBookkeeping::RecordFree(uint64_t address) {
   }
 
   allocations_.erase(leaf_it);
+}
+
+void MemoryBookkeeping::AddPending(uint64_t sequence_number, uint64_t address) {
+  if (sequence_number != consistent_sequence_number_ + 1) {
+    pending_.emplace(sequence_number, address);
+    return;
+  }
+
+  if (address)
+    ApplyFree(sequence_number, address);
+  consistent_sequence_number_++;
+
+  auto it = pending_.upper_bound(0);
+  while (it != pending_.end() && it->first == consistent_sequence_number_ + 1) {
+    if (it->second)
+      ApplyFree(it->first, it->second);
+    consistent_sequence_number_++;
+    it = pending_.erase(it);
+  }
 }
 
 uint64_t MemoryBookkeeping::GetCumSizeForTesting(

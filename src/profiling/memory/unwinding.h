@@ -20,7 +20,9 @@
 #include <unwindstack/Maps.h>
 #include <unwindstack/Unwinder.h>
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/bookkeeping.h"
 #include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
 
@@ -63,11 +65,6 @@ class StackMemory : public unwindstack::Memory {
 
 size_t RegSize(unwindstack::ArchEnum arch);
 
-bool DoUnwind(void* mem,
-              size_t sz,
-              ProcessMetadata* metadata,
-              std::vector<unwindstack::FrameData>* out);
-
 struct UnwindingRecord {
   pid_t pid;
   size_t size;
@@ -75,12 +72,21 @@ struct UnwindingRecord {
   std::weak_ptr<ProcessMetadata> metadata;
 };
 
-struct UnwoundRecord {
+struct BookkeepingRecord {
+  AllocMetadata alloc_metadata;
   std::vector<unwindstack::FrameData> frames;
 };
 
+bool DoUnwind(void* mem,
+              size_t sz,
+              ProcessMetadata* metadata,
+              BookkeepingRecord* out);
+
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
-                       BoundedQueue<UnwoundRecord>* output_queue);
+                       BoundedQueue<BookkeepingRecord>* output_queue);
+
+void BookkeepingMainLoop(MemoryBookkeeping* bookkeeping,
+                         BoundedQueue<BookkeepingRecord>* input_queue);
 
 }  // namespace perfetto
 

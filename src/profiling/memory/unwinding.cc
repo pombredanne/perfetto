@@ -158,7 +158,7 @@ void FileDescriptorMaps::Reset() {
 bool DoUnwind(void* mem,
               size_t sz,
               ProcessMetadata* metadata,
-              std::vector<unwindstack::FrameData>* out) {
+              BookkeepingRecord* out) {
   if (sz < sizeof(AllocMetadata)) {
     PERFETTO_ELOG("size");
     return false;
@@ -178,6 +178,7 @@ bool DoUnwind(void* mem,
     PERFETTO_ELOG("out-of-bound stack_pointer_offset");
     return false;
   }
+  out->alloc_metadata = *alloc_metadata;
   uint8_t* stack =
       reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
@@ -198,7 +199,7 @@ bool DoUnwind(void* mem,
       break;
   }
   if (error_code == 0)
-    *out = unwinder.frames();
+    out->frames = unwinder.frames();
   else
     PERFETTO_DLOG("unwinding failed %" PRIu8, error_code);
   return error_code == 0;
@@ -206,16 +207,38 @@ bool DoUnwind(void* mem,
 
 __attribute__((noreturn)) void UnwindingMainLoop(
     BoundedQueue<UnwindingRecord>* input_queue,
-    BoundedQueue<UnwoundRecord>* output_queue) {
+    BoundedQueue<BookkeepingRecord>* output_queue) {
   for (;;) {
     UnwindingRecord rec = input_queue->Get();
-    std::vector<unwindstack::FrameData> out;
-    std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
-    if (!metadata)
-      // Process has already gone away.
-      continue;
-    if (DoUnwind(rec.data.get(), rec.size, metadata.get(), &out))
-      output_queue->Add({std::move(out)});
+    void* data = reinterpret_cast<uint64_t*>(rec.data.get()) + 1;
+    switch (*reinterpret_cast<RecordType*>(rec.data.get())) {
+      case RecordType::Malloc: {
+        std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
+        if (!metadata)
+          // Process has already gone away.
+          continue;
+        BookkeepingRecord out;
+        if (DoUnwind(data, rec.size, metadata.get(), &out))
+          output_queue->Add(std::move(out));
+        break;
+      }
+      case RecordType::Free:
+        break;
+    }
+  }
+}
+
+__attribute__((noreturn)) void BookkeepingMainLoop(
+    MemoryBookkeeping* bookkeeping,
+    BoundedQueue<BookkeepingRecord>* input_queue) {
+  for (;;) {
+    BookkeepingRecord rec = input_queue->Get();
+    std::vector<MemoryBookkeeping::CodeLocation> code_locations;
+    for (unwindstack::FrameData& frame : rec.frames)
+      code_locations.emplace_back(frame.map_name, frame.function_name);
+    bookkeeping->RecordMalloc(code_locations, rec.alloc_metadata.alloc_address,
+                              rec.alloc_metadata.alloc_size,
+                              rec.alloc_metadata.sequence_number);
   }
 }
 

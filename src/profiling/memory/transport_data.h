@@ -43,6 +43,7 @@ struct AllocMetadata {
   uint64_t stack_pointer_offset;
   // CPU architecture of the client. This determines the size of the
   // register data that follows this struct.
+  uint64_t sequence_number;
   unwindstack::ArchEnum arch;
 };
 

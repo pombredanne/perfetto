@@ -132,11 +132,11 @@ TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
   ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem));
   auto record = GetRecord();
-  std::vector<unwindstack::FrameData> out;
+  BookkeepingRecord out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   int st;
-  std::unique_ptr<char> demangled(
-      abi::__cxa_demangle(out[0].function_name.c_str(), nullptr, nullptr, &st));
+  std::unique_ptr<char> demangled(abi::__cxa_demangle(
+      out.frames[0].function_name.c_str(), nullptr, nullptr, &st));
   ASSERT_EQ(st, 0);
   ASSERT_STREQ(demangled.get(), "perfetto::(anonymous namespace)::GetRecord()");
 }

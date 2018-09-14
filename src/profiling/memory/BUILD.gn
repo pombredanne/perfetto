@@ -33,6 +33,7 @@ source_set("unwinding") {
     "../../../buildtools:libunwindstack_config",
   ]
   deps = [
+    ":bookkeeping",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
