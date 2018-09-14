@@ -48,6 +48,20 @@ TEST(BookkeepingTest, Basic) {
   ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 0);
 }
 
+TEST(BookkeepingTest, TwoHeapDumps) {
+  uint64_t sequence_number = 1;
+  MemoryBookkeeping mb;
+  HeapDump hd(&mb);
+  {
+    HeapDump hd2(&mb);
+
+    hd.RecordMalloc(stack(), 1, 5, sequence_number++);
+    hd2.RecordMalloc(stack2(), 2, 2, sequence_number++);
+    ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
+  }
+  ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
+}
+
 TEST(BookkeepingTest, ReplaceAlloc) {
   uint64_t sequence_number = 1;
   MemoryBookkeeping mb;

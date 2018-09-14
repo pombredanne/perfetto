@@ -90,6 +90,8 @@ class MemoryBookkeeping {
         children_;
   };
 
+  void DecrementNode(Node* node, uint64_t size);
+
   StringInterner interner_;
   Node root_{{interner_.Intern(""), interner_.Intern("")}};
 };
@@ -103,6 +105,7 @@ class HeapDump {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
+  ~HeapDump();
 
  private:
   struct Allocation {

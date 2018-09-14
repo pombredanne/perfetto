@@ -62,20 +62,7 @@ void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   const Allocation& value = leaf_it->second;
   if (value.sequence_number > sequence_number)
     return;
-  uint64_t size = value.alloc_size;
-  MemoryBookkeeping::Node* node = value.node;
-
-  bool delete_prev = false;
-  MemoryBookkeeping::Node* prev = nullptr;
-  while (node != nullptr) {
-    if (delete_prev)
-      node->children_.Remove(*prev);
-    node->cum_size_ -= size;
-    delete_prev = node->cum_size_ == 0;
-    prev = node;
-    node = node->parent_;
-  }
-
+  bookkeeper_->DecrementNode(value.node, value.alloc_size);
   allocations_.erase(leaf_it);
 }
 
@@ -98,6 +85,14 @@ void HeapDump::AddPending(uint64_t sequence_number, uint64_t address) {
   }
 }
 
+HeapDump::~HeapDump() {
+  auto it = allocations_.begin();
+  while (it != allocations_.end()) {
+    bookkeeper_->DecrementNode(it->second.node, it->second.alloc_size);
+    it = allocations_.erase(it);
+  }
+}
+
 uint64_t MemoryBookkeeping::GetCumSizeForTesting(
     const std::vector<CodeLocation>& locs) {
   Node* node = &root_;
@@ -107,6 +102,19 @@ uint64_t MemoryBookkeeping::GetCumSizeForTesting(
       return 0;
   }
   return node->cum_size_;
+}
+
+void MemoryBookkeeping::DecrementNode(Node* node, uint64_t size) {
+  bool delete_prev = false;
+  Node* prev = nullptr;
+  while (node != nullptr) {
+    if (delete_prev)
+      node->children_.Remove(*prev);
+    node->cum_size_ -= size;
+    delete_prev = node->cum_size_ == 0;
+    prev = node;
+    node = node->parent_;
+  }
 }
 
 }  // namespace perfetto
