@@ -704,7 +704,7 @@ TEST_F(TracingServiceImplTest, SessionId) {
   }
 }
 
-// Writes a long trace adn then tests that the trace parsed in partitions
+// Writes a long trace and then tests that the trace parsed in partitions
 // derived by the synchronization markers is identical to the whole trace parsed
 // in one go.
 TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
@@ -746,30 +746,23 @@ TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
   std::string trace_raw;
   ASSERT_TRUE(base::ReadFile(tmp_file.path().c_str(), &trace_raw));
 
-  // Offset of the marker from the beginning of the trace packet. This is due:
-  // 1 byte for the TracePacket tag.
-  // 1 byte for the TracePacket size (given that it will be < 0x80 bytes).
-  // 2 bytes for the synchronization_marker tag (the tag has an id >= 32).
-  // 1 byte for the synchronization_marker size.
-  const size_t kMarkerOffset = 5;
-
+  const auto kMarkerSize = sizeof(TracingServiceImpl::kSyncMarker);
   const std::string kSyncMarkerStr(
       reinterpret_cast<const char*>(TracingServiceImpl::kSyncMarker),
-      sizeof(TracingServiceImpl::kSyncMarker));
+      kMarkerSize);
 
   // Read back the trace in partitions derived from the marker.
+  // The trace should look like this:
+  // [uid, marker] [event] [event] [uid, marker] [event] [event]
   size_t num_markers = 0;
   size_t start = 0;
   size_t end = 0;
   protos::Trace merged_trace;
   for (size_t pos = 0; pos != std::string::npos; start = end) {
     pos = trace_raw.find(kSyncMarkerStr, pos + 1);
-    ASSERT_GE(pos, kMarkerOffset);
     num_markers++;
-    end = pos == std::string::npos ? trace_raw.size() : pos - kMarkerOffset;
+    end = (pos == std::string::npos) ? trace_raw.size() : pos + kMarkerSize;
     int size = static_cast<int>(end - start);
-    if (end == 0)
-      continue;  // First packet.
     ASSERT_GT(size, 0);
     protos::Trace trace_partition;
     ASSERT_TRUE(trace_partition.ParseFromArray(trace_raw.data() + start, size));

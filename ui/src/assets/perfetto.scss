@@ -223,12 +223,6 @@ button.close {
     }
 }
 
-.panel {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr;
-}
-
 .track {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -237,9 +231,8 @@ button.close {
     .track-shell {
         padding: 0 20px;
         display: grid;
-        grid-template-areas:
-          "title up"
-          "title down";
+        grid-template-areas: "title up down";
+        grid-template-columns: 1fr auto auto;
         align-items: center;
         width: 300px;
         background: #fff;
@@ -254,6 +247,7 @@ button.close {
         }
         .track-move-icons {
             justify-self: end;
+            margin: 0 5px;
             color: #fff;
             font-weight: bold;
             text-align: center;
@@ -270,10 +264,57 @@ button.close {
 }
 
 .scrolling-panel-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    will-change: transform;  // Force layer creation.
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  will-change: transform;  // Force layer creation.
+}
+
+.pinned-panel-container {
+  position: relative;
+  // Override top level overflow: hidden so height of this flex item can be
+  // its content height.
+  overflow: visible;
+}
+
+// In the scrolling case, since the canvas is overdrawn and continuously
+// repositioned, we need the canvas to be in a div with overflow hidden and
+// height equaling the total height of the content to prevent scrolling
+// height from growing.
+.scroll-limiter {
+  overflow: hidden;
+  position: relative;
+}
+
+canvas.main-canvas {
+  top: 0px;
+  position: absolute;
+}
+
+.panel {
+  position: relative;  // Otherwise canvas covers panel dom.
+}
+
+.pan-and-zoom-content {
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-flow: column nowrap;
+}
+
+.overview-timeline {
+  height: 100px;
+}
+
+.time-axis-panel {
+  height: 30px;
+}
+
+.flame-graph-panel {
+  height: 500px;
+}
+
+header {
+  height: 25px;
 }

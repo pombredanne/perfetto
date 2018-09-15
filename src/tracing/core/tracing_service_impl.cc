@@ -1145,25 +1145,26 @@ void TracingServiceImpl::UpdateMemoryGuardrail() {
 void TracingServiceImpl::SnapshotSyncMarker(std::vector<TracePacket>* packets) {
   // The sync markes is used to tokenize large traces efficiently.
   // See description in trace_packet.proto.
-  auto gen_once = [](uid_t uid, uint8_t* dst, int max_size) {
-    protos::TrustedPacket packet;
-    packet.set_synchronization_marker(kSyncMarker, sizeof(kSyncMarker));
-    PERFETTO_CHECK(packet.SerializeToArray(dst, max_size));
-    int size = packet.ByteSize();
-
+  if (sync_marker_packet_size_ == 0) {
     // Serialize the marker and the uid separately to guarantee that the marker
-    // is at a constant offset from the start of the packet.
+    // is serialzied at the end and is adjacent to the start of the next packet.
+    int size_left = static_cast<int>(sizeof(sync_marker_packet_));
+    uint8_t* dst = &sync_marker_packet_[0];
+    protos::TrustedPacket packet;
+    packet.set_trusted_uid(static_cast<int32_t>(uid_));
+    PERFETTO_CHECK(packet.SerializeToArray(dst, size_left));
+    size_left -= packet.ByteSize();
+    sync_marker_packet_size_ += static_cast<size_t>(packet.ByteSize());
+    dst += sync_marker_packet_size_;
+
     packet.Clear();
-    packet.set_trusted_uid(static_cast<int32_t>(uid));
-    PERFETTO_CHECK(packet.SerializeToArray(dst + size, max_size - size));
-    size += packet.ByteSize();
-    PERFETTO_CHECK(size <= max_size);
-    return static_cast<size_t>(size);
+    packet.set_synchronization_marker(kSyncMarker, sizeof(kSyncMarker));
+    PERFETTO_CHECK(packet.SerializeToArray(dst, size_left));
+    sync_marker_packet_size_ += static_cast<size_t>(packet.ByteSize());
+    PERFETTO_CHECK(sync_marker_packet_size_ <= sizeof(sync_marker_packet_));
   };
-  static uint8_t raw_packet[32];
-  static auto raw_packet_size = gen_once(uid_, raw_packet, sizeof(raw_packet));
   packets->emplace_back();
-  packets->back().AddSlice(raw_packet, raw_packet_size);
+  packets->back().AddSlice(&sync_marker_packet_[0], sync_marker_packet_size_);
 }
 
 void TracingServiceImpl::SnapshotClocks(std::vector<TracePacket>* packets) {
