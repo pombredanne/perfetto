@@ -179,9 +179,9 @@ class PERFETTO_EXPORT SysStatsConfig {
   };
   enum StatCounters {
     CPU_TIMES = 1,
-    IRQ_TIMES = 2,
-    SOFTIRQ_TIMES = 3,
-    NUM_FORKS = 4,
+    IRQ_COUNTS = 2,
+    SOFTIRQ_COUNTS = 3,
+    FORK_COUNT = 4,
   };
   SysStatsConfig();
   ~SysStatsConfig();

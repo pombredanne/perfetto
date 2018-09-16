@@ -11,6 +11,142 @@ syntax = "proto2";
 
 package perfetto.protos;
 
+// Begin of protos/perfetto/common/sys_stats_counters.proto
+
+// Counter definitions for Linux's /proc/meminfo.
+enum MeminfoCounters {
+  MEM_TOTAL = 1;
+  MEM_FREE = 2;
+  MEM_AVAILABLE = 3;
+  BUFFERS = 4;
+  CACHED = 5;
+  SWAP_CACHED = 6;
+  ACTIVE = 7;
+  INACTIVE = 8;
+  ACTIVE_ANON = 9;
+  INACTIVE_ANON = 10;
+  ACTIVE_FILE = 11;
+  INACTIVE_FILE = 12;
+  UNEVICTABLE = 13;
+  MLOCKED = 14;
+  SWAP_TOTAL = 15;
+  SWAP_FREE = 16;
+  DIRTY = 17;
+  WRITEBACK = 18;
+  ANON_PAGES = 19;
+  MAPPED = 20;
+  SHMEM = 21;
+  SLAB = 22;
+  SLAB_RECLAIMABLE = 23;
+  SLAB_UNRECLAIMABLE = 24;
+  KERNEL_STACK = 25;
+  PAGE_TABLES = 26;
+  COMMIT_LIMIT = 27;
+  COMMITED_AS = 28;
+  VMALLOC_TOTAL = 29;
+  VMALLOC_USED = 30;
+  VMALLOC_CHUNK = 31;
+  CMA_TOTAL = 32;
+  CMA_FREE = 33;
+}
+
+// Counter definitions for Linux's /proc/vmstat.
+enum VmstatCounters {
+  NR_FREE_PAGES = 1;
+  NR_ALLOC_BATCH = 2;
+  NR_INACTIVE_ANON = 3;
+  NR_ACTIVE_ANON = 4;
+  NR_INACTIVE_FILE = 5;
+  NR_ACTIVE_FILE = 6;
+  NR_UNEVICTABLE = 7;
+  NR_MLOCK = 8;
+  NR_ANON_PAGES = 9;
+  NR_MAPPED = 10;
+  NR_FILE_PAGES = 11;
+  NR_DIRTY = 12;
+  NR_WRITEBACK = 13;
+  NR_SLAB_RECLAIMABLE = 14;
+  NR_SLAB_UNRECLAIMABLE = 15;
+  NR_PAGE_TABLE_PAGES = 16;
+  NR_KERNEL_STACK = 17;
+  NR_OVERHEAD = 18;
+  NR_UNSTABLE = 19;
+  NR_BOUNCE = 20;
+  NR_VMSCAN_WRITE = 21;
+  NR_VMSCAN_IMMEDIATE_RECLAIM = 22;
+  NR_WRITEBACK_TEMP = 23;
+  NR_ISOLATED_ANON = 24;
+  NR_ISOLATED_FILE = 25;
+  NR_SHMEM = 26;
+  NR_DIRTIED = 27;
+  NR_WRITTEN = 28;
+  NR_PAGES_SCANNED = 29;
+  WORKINGSET_REFAULT = 30;
+  WORKINGSET_ACTIVATE = 31;
+  WORKINGSET_NODERECLAIM = 32;
+  NR_ANON_TRANSPARENT_HUGEPAGES = 33;
+  NR_FREE_CMA = 34;
+  NR_SWAPCACHE = 35;
+  NR_DIRTY_THRESHOLD = 36;
+  NR_DIRTY_BACKGROUND_THRESHOLD = 37;
+  PGPGIN = 38;
+  PGPGOUT = 39;
+  PGPGOUTCLEAN = 40;
+  PSWPIN = 41;
+  PSWPOUT = 42;
+  PGALLOC_DMA = 43;
+  PGALLOC_NORMAL = 44;
+  PGALLOC_MOVABLE = 45;
+  PGFREE = 46;
+  PGACTIVATE = 47;
+  PGDEACTIVATE = 48;
+  PGFAULT = 49;
+  PGMAJFAULT = 50;
+  PGREFILL_DMA = 51;
+  PGREFILL_NORMAL = 52;
+  PGREFILL_MOVABLE = 53;
+  PGSTEAL_KSWAPD_DMA = 54;
+  PGSTEAL_KSWAPD_NORMAL = 55;
+  PGSTEAL_KSWAPD_MOVABLE = 56;
+  PGSTEAL_DIRECT_DMA = 57;
+  PGSTEAL_DIRECT_NORMAL = 58;
+  PGSTEAL_DIRECT_MOVABLE = 59;
+  PGSCAN_KSWAPD_DMA = 60;
+  PGSCAN_KSWAPD_NORMAL = 61;
+  PGSCAN_KSWAPD_MOVABLE = 62;
+  PGSCAN_DIRECT_DMA = 63;
+  PGSCAN_DIRECT_NORMAL = 64;
+  PGSCAN_DIRECT_MOVABLE = 65;
+  PGSCAN_DIRECT_THROTTLE = 66;
+  PGINODESTEAL = 67;
+  SLABS_SCANNED = 68;
+  KSWAPD_INODESTEAL = 69;
+  KSWAPD_LOW_WMARK_HIT_QUICKLY = 70;
+  KSWAPD_HIGH_WMARK_HIT_QUICKLY = 71;
+  PAGEOUTRUN = 72;
+  ALLOCSTALL = 73;
+  PGROTATED = 74;
+  DROP_PAGECACHE = 75;
+  DROP_SLAB = 76;
+  PGMIGRATE_SUCCESS = 77;
+  PGMIGRATE_FAIL = 78;
+  COMPACT_MIGRATE_SCANNED = 79;
+  COMPACT_FREE_SCANNED = 80;
+  COMPACT_ISOLATED = 81;
+  COMPACT_STALL = 82;
+  COMPACT_FAIL = 83;
+  COMPACT_SUCCESS = 84;
+  COMPACT_DAEMON_WAKE = 85;
+  UNEVICTABLE_PGS_CULLED = 86;
+  UNEVICTABLE_PGS_SCANNED = 87;
+  UNEVICTABLE_PGS_RESCUED = 88;
+  UNEVICTABLE_PGS_MLOCKED = 89;
+  UNEVICTABLE_PGS_MUNLOCKED = 90;
+  UNEVICTABLE_PGS_CLEARED = 91;
+  UNEVICTABLE_PGS_STRANDED = 92;
+}
+// End of protos/perfetto/common/sys_stats_counters.proto
+
 // Begin of protos/perfetto/config/chrome/chrome_config.proto
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
@@ -22,70 +158,8 @@ message ChromeConfig {
 
 // End of protos/perfetto/config/chrome/chrome_config.proto
 
-// Begin of protos/perfetto/config/inode_file/inode_file_config.proto
-
-// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
-// to reflect changes in the corresponding C++ headers.
-
-message InodeFileConfig {
-  message MountPointMappingEntry {
-    optional string mountpoint = 1;
-    repeated string scan_roots = 2;
-  }
-
-  // How long to pause between batches.
-  optional uint32 scan_interval_ms = 1;
-
-  // How long to wait before the first scan in order to accumulate inodes.
-  optional uint32 scan_delay_ms = 2;
-
-  // How many inodes to scan in one batch.
-  optional uint32 scan_batch_size = 3;
-
-  // Do not scan for inodes not found in the static map.
-  optional bool do_not_scan = 4;
-
-  // If non-empty, only scan inodes corresponding to block devices named in
-  // this list.
-  repeated string scan_mount_points = 5;
-
-  // When encountering an inode belonging to a block device corresponding
-  // to one of the mount points in this map, scan its scan_roots instead.
-  repeated MountPointMappingEntry mount_point_mapping = 6;
-}
-
-// End of protos/perfetto/config/inode_file/inode_file_config.proto
-
-// Begin of protos/perfetto/config/process_stats/process_stats_config.proto
-
-// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
-// to reflect changes in the corresponding C++ headers.
-
-message ProcessStatsConfig {
-  enum Quirks {
-    QUIRKS_UNSPECIFIED = 0;
-
-    // This has been deprecated and ignored as per 2018-05-01. Full scan at
-    // startup is now disabled by default and can be re-enabled using the
-    // |scan_all_processes_on_start| arg.
-    DISABLE_INITIAL_DUMP = 1 [deprecated = true];
-
-    DISABLE_ON_DEMAND = 2;
-  }
-
-  repeated Quirks quirks = 1;
-
-  // If enabled all processes will be scanned and dumped when the trace starts.
-  optional bool scan_all_processes_on_start = 2;
-
-  // If enabled thread names are also recoded (this is redundant if sched_switch
-  // is enabled).
-  optional bool record_thread_names = 3;
-}
-
-// End of protos/perfetto/config/process_stats/process_stats_config.proto
-
 // Begin of protos/perfetto/config/data_source_config.proto
+
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
 // to reflect changes in the corresponding C++ headers.
@@ -156,6 +230,103 @@ message FtraceConfig {
 }
 
 // End of protos/perfetto/config/ftrace/ftrace_config.proto
+
+// Begin of protos/perfetto/config/inode_file/inode_file_config.proto
+
+// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
+// to reflect changes in the corresponding C++ headers.
+
+message InodeFileConfig {
+  message MountPointMappingEntry {
+    optional string mountpoint = 1;
+    repeated string scan_roots = 2;
+  }
+
+  // How long to pause between batches.
+  optional uint32 scan_interval_ms = 1;
+
+  // How long to wait before the first scan in order to accumulate inodes.
+  optional uint32 scan_delay_ms = 2;
+
+  // How many inodes to scan in one batch.
+  optional uint32 scan_batch_size = 3;
+
+  // Do not scan for inodes not found in the static map.
+  optional bool do_not_scan = 4;
+
+  // If non-empty, only scan inodes corresponding to block devices named in
+  // this list.
+  repeated string scan_mount_points = 5;
+
+  // When encountering an inode belonging to a block device corresponding
+  // to one of the mount points in this map, scan its scan_roots instead.
+  repeated MountPointMappingEntry mount_point_mapping = 6;
+}
+
+// End of protos/perfetto/config/inode_file/inode_file_config.proto
+
+// Begin of protos/perfetto/config/process_stats/process_stats_config.proto
+
+// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
+// to reflect changes in the corresponding C++ headers.
+
+message ProcessStatsConfig {
+  enum Quirks {
+    QUIRKS_UNSPECIFIED = 0;
+
+    // This has been deprecated and ignored as per 2018-05-01. Full scan at
+    // startup is now disabled by default and can be re-enabled using the
+    // |scan_all_processes_on_start| arg.
+    DISABLE_INITIAL_DUMP = 1 [deprecated = true];
+
+    DISABLE_ON_DEMAND = 2;
+  }
+
+  repeated Quirks quirks = 1;
+
+  // If enabled all processes will be scanned and dumped when the trace starts.
+  optional bool scan_all_processes_on_start = 2;
+
+  // If enabled thread names are also recoded (this is redundant if sched_switch
+  // is enabled).
+  optional bool record_thread_names = 3;
+}
+
+// End of protos/perfetto/config/process_stats/process_stats_config.proto
+
+// Begin of protos/perfetto/config/sys_stats/sys_stats_config.proto
+
+
+// When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
+// to reflect changes in the corresponding C++ headers.
+
+// Periods for meminfo/vmstat/stat need to be integer multiples of each other.
+// OK:     [10ms, 10ms, 10ms],  [10ms, 20ms, 10ms],  [10ms, 20ms, 50ms]
+// Not OK: [10ms, 10ms, 11ms],  [10ms, 15ms, 20ms]
+message SysStatsConfig {
+  // Polls /proc/meminfo every X ms, if non-zero.
+  optional uint32 meminfo_period_ms = 1;
+
+  // If not-empty reports only the given counters.
+  // If empty all known counters are reported.
+  repeated MeminfoCounters meminfo_counters = 2;
+
+  // Polls /proc/vmstat every X ms, if non-zero.
+  optional uint32 vmstat_period_ms = 3;
+  repeated VmstatCounters vmstat_counters = 4;
+
+  // Pols /proc/stat every X ms, if non-zero.
+  optional uint32 stat_period_ms = 5;
+  enum StatCounters {
+    CPU_TIMES = 1;
+    IRQ_COUNTS = 2;
+    SOFTIRQ_COUNTS = 3;
+    FORK_COUNT = 4;
+  }
+  repeated StatCounters stat_counters = 6;
+}
+
+// End of protos/perfetto/config/sys_stats/sys_stats_config.proto
 
 // Begin of protos/perfetto/config/test_config.proto
 

@@ -33,8 +33,12 @@ package perfetto.protos;
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 8.
+// Next id: 9.
 message TracePacket {
+  // TODO(primiano): in future we should add a timestamp_clock_domain field to
+  // allow mixing timestamps from different clock domains.
+  optional uint64 timestamp = 8;  // Timestamp [ns].
+
   oneof data {
     FtraceEventBundle ftrace_events = 1;
     ProcessTree process_tree = 2;
@@ -53,6 +57,7 @@ message TracePacket {
     // This field is only used for testing.
     TestEvent for_testing = 536870911;  // 2^29 - 1, max field id for protos.
   }
+
   // Trusted user id of the producer which generated this packet. Keep in sync
   // with TrustedPacket.trusted_uid.
   oneof optional_trusted_uid { int32 trusted_uid = 3; };
