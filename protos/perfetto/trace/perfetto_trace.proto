@@ -30,7 +30,7 @@ message Trace {
 // The root object emitted by Perfetto. A perfetto trace is just a stream of
 // TracePacket(s).
 //
-// Next id: 7.
+// Next id: 8.
 message TracePacket {
   oneof data {
     FtraceEventBundle ftrace_events = 1;
@@ -38,6 +38,7 @@ message TracePacket {
     InodeFileMap inode_file_map = 4;
     // removed field with id 5
     // removed field with id 6
+    // removed field with id 7
 
     // IDs up to 32 are reserved for events that are quite frequent because they
     // take only one byte to encode their preamble.

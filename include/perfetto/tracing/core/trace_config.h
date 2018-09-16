@@ -49,6 +49,7 @@ class ChromeConfig;
 class InodeFileConfig;
 class InodeFileConfig_MountPointMappingEntry;
 class ProcessStatsConfig;
+class SysStatsConfig;
 class TestConfig;
 class TraceConfig_ProducerConfig;
 class TraceConfig_StatsdMetadata;
