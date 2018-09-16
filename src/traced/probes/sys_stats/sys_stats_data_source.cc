@@ -280,7 +280,7 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
         sys_stats->set_num_forks(
             static_cast<uint64_t>(strtoll(words.cur_token(), nullptr, 10)));
       }
-    }  // if ("processes")
+    }
 
   }  // for (line)
 }
