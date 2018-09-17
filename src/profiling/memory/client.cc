@@ -169,6 +169,7 @@ uint8_t* GetThreadStackBase() {
 // Bionic currently does not cache the addresses of the stack for the main
 // thread.
 // https://android.googlesource.com/platform/bionic/+/32bc0fcf69dfccb3726fe572833a38b01179580e/libc/bionic/pthread_attr.cpp#254
+// TODO(fmayer): Figure out with bionic if caching in bionic makes sense.
 uint8_t* GetMainThreadStackBase() {
   FILE* maps = fopen("/proc/self/maps", "r");
   if (maps == nullptr) {
