@@ -40,7 +40,7 @@ class BorrowedSocket {
   BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool);
   int operator*();
   int get();
-  void close();
+  void Close();
   ~BorrowedSocket();
 
  private:

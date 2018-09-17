@@ -18,7 +18,9 @@
 
 #include <inttypes.h>
 #include <sys/socket.h>
+
 #include <atomic>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
@@ -36,7 +38,7 @@ int BorrowedSocket::get() {
   return *fd_;
 }
 
-void BorrowedSocket::close() {
+void BorrowedSocket::Close() {
   fd_.reset();
 }
 
@@ -60,8 +62,10 @@ void SocketPool::Return(base::ScopedFile sock) {
   std::unique_lock<std::mutex> lck_(mtx_);
   PERFETTO_CHECK(available_sockets_ < sockets_.size());
   sockets_[available_sockets_++] = std::move(sock);
-  if (available_sockets_ == 1)
+  if (available_sockets_ == 1) {
+    lck_.unlock();
     cv_.notify_one();
+  }
 }
 
 }  // namespace perfetto
