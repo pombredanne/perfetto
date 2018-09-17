@@ -245,7 +245,6 @@ void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
   uint64_t total_size = sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
 
-  BorrowedSocket sockfd = socket_pool_.Borrow();
   struct iovec iov[3];
   iov[0].iov_base = &total_size;
   iov[0].iov_len = sizeof(uint64_t);
@@ -256,6 +255,7 @@ void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   struct msghdr hdr;
   hdr.msg_iov = iov;
   hdr.msg_iovlen = base::ArraySize(iov);
+  BorrowedSocket sockfd = socket_pool_.Borrow();
   PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
                  static_cast<ssize_t>(total_size + sizeof(uint64_t)));
 }
