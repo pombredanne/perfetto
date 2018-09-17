@@ -100,14 +100,14 @@ FreePage::FreePage() : free_page_(kFreePageSize) {
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
-void FreePage::Add(const void* addr, SocketPool* pool) {
+void FreePage::Add(const uint64_t addr, SocketPool* pool) {
   std::lock_guard<std::mutex> l(mtx_);
   if (offset_ == kFreePageSize)
     Flush(pool);
   static_assert(kFreePageSize % 2 == 0,
                 "free page size needs to be divisible by two");
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(++global_sequence_number);
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(addr);
+  free_page_[offset_++] = ++global_sequence_number;
+  free_page_[offset_++] = addr;
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
@@ -159,8 +159,12 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
-  if (!sock)
+  if (!sock) {
+    // TODO(fmayer): Handle reconnect or similar.
+    // This is just to prevent a deadlock.
+    PERFETTO_CHECK(++dead_sockets_ != sockets_.size());
     return;
+  }
   std::unique_lock<std::mutex> lck_(mtx_);
   PERFETTO_CHECK(available_sockets_ < sockets_.size());
   sockets_[available_sockets_++] = std::move(sock);
@@ -211,9 +215,12 @@ uint8_t* GetMainThreadStackBase() {
   return nullptr;
 }
 
-Client::Client(const std::string& sock_name, size_t conns)
-    : socket_pool_(MultipleConnect(sock_name, conns)),
+Client::Client(std::vector<base::ScopedFile> socks)
+    : socket_pool_(std::move(socks)),
       main_thread_stack_base_(GetMainThreadStackBase()) {}
+
+Client::Client(const std::string& sock_name, size_t conns)
+    : Client(MultipleConnect(sock_name, conns)) {}
 
 uint8_t* Client::GetStackBase() {
   if (gettid() == getpid())
@@ -221,7 +228,7 @@ uint8_t* Client::GetStackBase() {
   return GetThreadStackBase();
 }
 
-void Client::SendStack(uint64_t alloc_size, uint64_t alloc_address) {
+void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
   uint8_t* stackbase = GetStackBase();
   uint8_t reg_buffer[kRegisterDataSize];
@@ -251,6 +258,10 @@ void Client::SendStack(uint64_t alloc_size, uint64_t alloc_address) {
   hdr.msg_iovlen = base::ArraySize(iov);
   PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
                  static_cast<ssize_t>(total_size + sizeof(uint64_t)));
+}
+
+void Client::Free(uint64_t alloc_address) {
+  free_page_.Add(alloc_address, &socket_pool_);
 }
 
 }  // namespace perfetto
