@@ -16,12 +16,38 @@ import * as m from 'mithril';
 
 import {
   createPermalink,
+  executeQuery,
   navigate,
   openTraceFromFile,
   openTraceFromUrl
 } from '../common/actions';
 
 import {globals} from './globals';
+
+const ALL_PROCESSES_QUERY = 'select name, pid from process order by name;';
+const CPU_TIME_FOR_PROCESSES = `
+select
+  process.name,
+  tot_proc/1e9 as cpu_sec
+from
+  (select
+    upid,
+    sum(tot_thd) as tot_proc
+  from
+    (select
+      utid,
+      sum(dur) as tot_thd
+    from sched group by utid)
+  join thread using(utid) group by upid)
+join process using(upid)
+order by cpu_sec desc limit 100;`;
+
+function createCannedQuery(query: string): (_: Event) => void {
+  return (e: Event) => {
+    e.preventDefault();
+    globals.dispatch(executeQuery('0', 'command', query));
+  };
+}
 
 const EXAMPLE_TRACE_URL =
     'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
@@ -63,8 +89,16 @@ const SECTIONS = [
     title: 'Metrics and auditors',
     summary: 'Add new tracks to the workspace',
     items: [
-      {t: 'CPU Usage breakdown', a: navigateHome, i: 'table_chart'},
-      {t: 'Memory breakdown', a: navigateHome, i: 'memory'},
+      {
+        t: 'All Processes',
+        a: createCannedQuery(ALL_PROCESSES_QUERY),
+        i: 'search',
+      },
+      {
+        t: 'CPU Time by process',
+        a: createCannedQuery(CPU_TIME_FOR_PROCESSES),
+        i: 'search',
+      },
     ],
   },
 ];
