@@ -39,6 +39,7 @@ protozero_library("zero") {
     "filesystem:zero",
     "ftrace:zero",
     "ps:zero",
+    "sys_stats:zero",
   ]
   sources = proto_sources_minimal + proto_sources
   proto_in_dir = "$perfetto_root_path/protos"

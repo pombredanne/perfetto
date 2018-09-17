@@ -247,7 +247,6 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
           irq_stat->set_count(v);
         }
       }
-      continue;
     }
     // Softirq counters.
     else if ((stat_enabled_fields_ &
