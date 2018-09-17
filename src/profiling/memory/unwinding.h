@@ -42,11 +42,11 @@ struct ProcessMetadata {
   ProcessMetadata(pid_t p,
                   base::ScopedFile maps_fd,
                   base::ScopedFile mem,
-                  Callsites* bookkeeping)
+                  Callsites* callsites)
       : pid(p),
         maps(std::move(maps_fd)),
         mem_fd(std::move(mem)),
-        heap_dump(bookkeeping) {
+        heap_dump(callsites) {
     PERFETTO_CHECK(maps.Parse());
   }
   pid_t pid;

@@ -18,7 +18,9 @@
 
 #include <inttypes.h>
 #include <sys/socket.h>
+
 #include <atomic>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
@@ -27,7 +29,7 @@ namespace perfetto {
 namespace {
 
 std::atomic<uint64_t> global_sequence_number(0);
-constexpr size_t kFreePageBytes = 4096;
+constexpr size_t kFreePageBytes = base::kPageSize;
 constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
 
 }  // namespace
@@ -48,6 +50,7 @@ void FreePage::Add(const void* addr, SocketPool* pool) {
                 "free page size needs to be divisible by two");
   free_page_[offset_++] = reinterpret_cast<uint64_t>(++global_sequence_number);
   free_page_[offset_++] = reinterpret_cast<uint64_t>(addr);
+  PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
 void FreePage::Flush(SocketPool* pool) {
@@ -57,12 +60,13 @@ void FreePage::Flush(SocketPool* pool) {
     ssize_t wr = PERFETTO_EINTR(send(*fd, &free_page_[0] + written,
                                      kFreePageBytes - written, MSG_NOSIGNAL));
     if (wr == -1) {
-      fd.close();
+      fd.Close();
       return;
     }
     written += static_cast<size_t>(wr);
   } while (written < kFreePageBytes);
-  offset_ = 3;
+  // Now that we have flushed, reset to after the header.
+  offset_ = 2;
 }
 
 BorrowedSocket::BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool)
@@ -76,7 +80,7 @@ int BorrowedSocket::get() {
   return *fd_;
 }
 
-void BorrowedSocket::close() {
+void BorrowedSocket::Close() {
   fd_.reset();
 }
 
@@ -97,11 +101,54 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
+  if (!sock)
+    return;
   std::unique_lock<std::mutex> lck_(mtx_);
   PERFETTO_CHECK(available_sockets_ < sockets_.size());
   sockets_[available_sockets_++] = std::move(sock);
-  if (available_sockets_ == 1)
+  if (available_sockets_ == 1) {
+    lck_.unlock();
     cv_.notify_one();
+  }
 }
+
+uint8_t* GetThreadStackBase() {
+  pthread_t t = pthread_self();
+  pthread_attr_t attr;
+  if (pthread_getattr_np(t, &attr) != 0) {
+    return nullptr;
+  }
+  uint8_t* x;
+  size_t s;
+  if (pthread_attr_getstack(&attr, reinterpret_cast<void**>(&x), &s) != 0)
+    return nullptr;
+  pthread_attr_destroy(&attr);
+  return x + s;
+}
+
+uint8_t* GetMainThreadStackBase() {
+  FILE* maps = fopen("/proc/self/maps", "r");
+  if (maps == nullptr) {
+    PERFETTO_ELOG("heapprofd fopen failed %d", errno);
+    return nullptr;
+  }
+  while (!feof(maps)) {
+    char line[1024];
+    char* data = fgets(line, sizeof(line), maps);
+    if (data != nullptr && strstr(data, "[stack]")) {
+      char* sep = strstr(data, "-");
+      if (sep == nullptr)
+        continue;
+      sep++;
+      fclose(maps);
+      return reinterpret_cast<uint8_t*>(strtoll(sep, nullptr, 16));
+    }
+  }
+  fclose(maps);
+  PERFETTO_ELOG("heapprofd reading stack failed");
+  return nullptr;
+}
+
+Client::Client() : main_thread_stack_base_(GetMainThreadStackBase()) {}
 
 }  // namespace perfetto
