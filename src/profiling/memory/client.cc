@@ -238,6 +238,8 @@ uint8_t* Client::GetStackBase() {
 void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
   uint8_t* stackbase = GetStackBase();
+  char reg_data[kRegisterDataSize];
+  unwindstack::AsmGetRegs(reg_data);
 
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
   const uint64_t total_size = sizeof(RecordType) + sizeof(AllocMetadata) +
@@ -258,8 +260,8 @@ void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.arch = unwindstack::Regs::CurrentArch();
   metadata.sequence_number = ++sequence_number_;
 
-  unwindstack::AsmGetRegs(data + sizeof(uint64_t) + sizeof(RecordType) +
-                          sizeof(AllocMetadata));
+  memcpy(data + sizeof(uint64_t) + sizeof(RecordType) + sizeof(AllocMetadata),
+         reg_data, sizeof(reg_data));
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
   PERFETTO_DLOG("offset: %" PRIu64, metadata.stack_pointer_offset);
