@@ -33,7 +33,7 @@ class FreePage {
   FreePage();
 
   // Can be called from any thread. Must not hold mtx_.`
-  void Add(const void* addr, SocketPool* pool);
+  void Add(const uint64_t addr, SocketPool* pool);
 
  private:
   // Needs to be called holding mtx_.
@@ -78,6 +78,7 @@ class SocketPool {
   std::condition_variable cv_;
   std::vector<base::ScopedFile> sockets_;
   size_t available_sockets_;
+  size_t dead_sockets_ = 0;
 };
 
 }  // namespace perfetto

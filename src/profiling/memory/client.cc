@@ -42,14 +42,14 @@ FreePage::FreePage() : free_page_(kFreePageSize) {
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
-void FreePage::Add(const void* addr, SocketPool* pool) {
+void FreePage::Add(const uint64_t addr, SocketPool* pool) {
   std::lock_guard<std::mutex> l(mtx_);
   if (offset_ == kFreePageSize)
     Flush(pool);
   static_assert(kFreePageSize % 2 == 0,
                 "free page size needs to be divisible by two");
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(++global_sequence_number);
-  free_page_[offset_++] = reinterpret_cast<uint64_t>(addr);
+  free_page_[offset_++] = ++global_sequence_number;
+  free_page_[offset_++] = addr;
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
@@ -101,8 +101,12 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
-  if (!sock)
+  if (!sock) {
+    // TODO(fmayer): Handle reconnect or similar.
+    // This is just to prevent a deadlock.
+    PERFETTO_CHECK(++dead_sockets_ != sockets_.size());
     return;
+  }
   std::unique_lock<std::mutex> lck_(mtx_);
   PERFETTO_CHECK(available_sockets_ < sockets_.size());
   sockets_[available_sockets_++] = std::move(sock);
