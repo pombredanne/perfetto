@@ -33,7 +33,7 @@ class FreePage {
   FreePage();
 
   // Can be called from any thread. Must not hold mtx_.`
-  void Add(const uint64_t addr, SocketPool* pool);
+  void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
   // Needs to be called holding mtx_.
@@ -97,6 +97,7 @@ class Client {
   SocketPool socket_pool_;
   FreePage free_page_;
   uint8_t* const main_thread_stack_base_;
+  std::atomic<uint64_t> sequence_number_;
 };
 
 }  // namespace perfetto

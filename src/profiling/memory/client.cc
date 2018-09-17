@@ -41,7 +41,6 @@
 namespace perfetto {
 namespace {
 
-std::atomic<uint64_t> global_sequence_number(0);
 constexpr size_t kFreePageBytes = base::kPageSize;
 constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
 
@@ -100,13 +99,15 @@ FreePage::FreePage() : free_page_(kFreePageSize) {
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
-void FreePage::Add(const uint64_t addr, SocketPool* pool) {
+void FreePage::Add(const uint64_t addr,
+                   const uint64_t sequence_number,
+                   SocketPool* pool) {
   std::lock_guard<std::mutex> l(mtx_);
   if (offset_ == kFreePageSize)
     Flush(pool);
   static_assert(kFreePageSize % 2 == 0,
                 "free page size needs to be divisible by two");
-  free_page_[offset_++] = ++global_sequence_number;
+  free_page_[offset_++] = sequence_number;
   free_page_[offset_++] = addr;
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
@@ -240,7 +241,7 @@ void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
   metadata.stack_pointer_offset = sizeof(AllocMetadata) + kRegisterDataSize;
   metadata.arch = unwindstack::Regs::CurrentArch();
-  metadata.sequence_number = ++global_sequence_number;
+  metadata.sequence_number = ++sequence_number_;
 
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
   uint64_t total_size = sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
@@ -261,7 +262,7 @@ void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
 }
 
 void Client::Free(uint64_t alloc_address) {
-  free_page_.Add(alloc_address, &socket_pool_);
+  free_page_.Add(alloc_address, ++sequence_number_, &socket_pool_);
 }
 
 }  // namespace perfetto
