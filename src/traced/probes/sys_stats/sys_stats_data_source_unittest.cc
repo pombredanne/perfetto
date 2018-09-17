@@ -216,7 +216,8 @@ class SysStatsDataSourceTest : public ::testing::Test {
     if (ds->tick_for_testing())
       checkpoint();
     else
-      task_runner_.PostDelayedTask([&] { Poller(ds, checkpoint); }, 1);
+      task_runner_.PostDelayedTask(
+          [ds, checkpoint, this] { Poller(ds, checkpoint); }, 1);
   }
 
   void WaitTick(SysStatsDataSource* data_source) {
@@ -233,11 +234,13 @@ TEST_F(SysStatsDataSourceTest, Meminfo) {
   using C = protos::MeminfoCounters;
   protos::DataSourceConfig config;
   config.mutable_sys_stats_config()->set_meminfo_period_ms(1);
-  config.mutable_sys_stats_config()->add_meminfo_counters(C::MEM_TOTAL);
-  config.mutable_sys_stats_config()->add_meminfo_counters(C::MEM_FREE);
-  config.mutable_sys_stats_config()->add_meminfo_counters(C::ACTIVE_ANON);
-  config.mutable_sys_stats_config()->add_meminfo_counters(C::INACTIVE_FILE);
-  config.mutable_sys_stats_config()->add_meminfo_counters(C::CMA_FREE);
+  config.mutable_sys_stats_config()->add_meminfo_counters(C::MEMINFO_MEM_TOTAL);
+  config.mutable_sys_stats_config()->add_meminfo_counters(C::MEMINFO_MEM_FREE);
+  config.mutable_sys_stats_config()->add_meminfo_counters(
+      C::MEMINFO_ACTIVE_ANON);
+  config.mutable_sys_stats_config()->add_meminfo_counters(
+      C::MEMINFO_INACTIVE_FILE);
+  config.mutable_sys_stats_config()->add_meminfo_counters(C::MEMINFO_CMA_FREE);
   DataSourceConfig config_obj;
   config_obj.FromProto(config);
   auto data_source = GetSysStatsDataSource(config_obj);
@@ -255,20 +258,23 @@ TEST_F(SysStatsDataSourceTest, Meminfo) {
   for (const auto& kv : sys_stats.meminfo())
     kvs.push_back({kv.key(), kv.value()});
 
-  EXPECT_THAT(kvs, UnorderedElementsAre(KV{C::MEM_TOTAL, 3744240},     //
-                                        KV{C::MEM_FREE, 73328},        //
-                                        KV{C::ACTIVE_ANON, 1322636},   //
-                                        KV{C::INACTIVE_FILE, 296320},  //
-                                        KV{C::CMA_FREE, 60}));
+  EXPECT_THAT(kvs,
+              UnorderedElementsAre(KV{C::MEMINFO_MEM_TOTAL, 3744240},     //
+                                   KV{C::MEMINFO_MEM_FREE, 73328},        //
+                                   KV{C::MEMINFO_ACTIVE_ANON, 1322636},   //
+                                   KV{C::MEMINFO_INACTIVE_FILE, 296320},  //
+                                   KV{C::MEMINFO_CMA_FREE, 60}));
 }
 
 TEST_F(SysStatsDataSourceTest, Vmstat) {
   using C = protos::VmstatCounters;
   protos::DataSourceConfig config;
   config.mutable_sys_stats_config()->set_vmstat_period_ms(1);
-  config.mutable_sys_stats_config()->add_vmstat_counters(C::NR_FREE_PAGES);
-  config.mutable_sys_stats_config()->add_vmstat_counters(C::PGACTIVATE);
-  config.mutable_sys_stats_config()->add_vmstat_counters(C::PGMIGRATE_FAIL);
+  config.mutable_sys_stats_config()->add_vmstat_counters(
+      C::VMSTAT_NR_FREE_PAGES);
+  config.mutable_sys_stats_config()->add_vmstat_counters(C::VMSTAT_PGACTIVATE);
+  config.mutable_sys_stats_config()->add_vmstat_counters(
+      C::VMSTAT_PGMIGRATE_FAIL);
   DataSourceConfig config_obj;
   config_obj.FromProto(config);
   auto data_source = GetSysStatsDataSource(config_obj);
@@ -286,19 +292,19 @@ TEST_F(SysStatsDataSourceTest, Vmstat) {
   for (const auto& kv : sys_stats.vmstat())
     kvs.push_back({kv.key(), kv.value()});
 
-  EXPECT_THAT(kvs, UnorderedElementsAre(KV{C::NR_FREE_PAGES, 16449},  //
-                                        KV{C::PGACTIVATE, 11897892},  //
-                                        KV{C::PGMIGRATE_FAIL, 3439}));
+  EXPECT_THAT(kvs, UnorderedElementsAre(KV{C::VMSTAT_NR_FREE_PAGES, 16449},  //
+                                        KV{C::VMSTAT_PGACTIVATE, 11897892},  //
+                                        KV{C::VMSTAT_PGMIGRATE_FAIL, 3439}));
 }
 
 TEST_F(SysStatsDataSourceTest, StatAll) {
   using C = protos::SysStatsConfig;
   protos::DataSourceConfig config;
   config.mutable_sys_stats_config()->set_stat_period_ms(1);
-  config.mutable_sys_stats_config()->add_stat_counters(C::CPU_TIMES);
-  config.mutable_sys_stats_config()->add_stat_counters(C::IRQ_COUNTS);
-  config.mutable_sys_stats_config()->add_stat_counters(C::SOFTIRQ_COUNTS);
-  config.mutable_sys_stats_config()->add_stat_counters(C::FORK_COUNT);
+  config.mutable_sys_stats_config()->add_stat_counters(C::STAT_CPU_TIMES);
+  config.mutable_sys_stats_config()->add_stat_counters(C::STAT_IRQ_COUNTS);
+  config.mutable_sys_stats_config()->add_stat_counters(C::STAT_SOFTIRQ_COUNTS);
+  config.mutable_sys_stats_config()->add_stat_counters(C::STAT_FORK_COUNT);
   DataSourceConfig config_obj;
   config_obj.FromProto(config);
   auto data_source = GetSysStatsDataSource(config_obj);
@@ -306,6 +312,7 @@ TEST_F(SysStatsDataSourceTest, StatAll) {
   WaitTick(data_source.get());
 
   std::unique_ptr<protos::TracePacket> packet = writer_raw_->ParseProto();
+  ASSERT_TRUE(packet);
   ASSERT_TRUE(packet->has_sys_stats());
   const auto& sys_stats = packet->sys_stats();
   EXPECT_EQ(sys_stats.meminfo_size(), 0);
@@ -339,7 +346,7 @@ TEST_F(SysStatsDataSourceTest, StatForksOnly) {
   using C = protos::SysStatsConfig;
   protos::DataSourceConfig config;
   config.mutable_sys_stats_config()->set_stat_period_ms(1);
-  config.mutable_sys_stats_config()->add_stat_counters(C::FORK_COUNT);
+  config.mutable_sys_stats_config()->add_stat_counters(C::STAT_FORK_COUNT);
   DataSourceConfig config_obj;
   config_obj.FromProto(config);
   auto data_source = GetSysStatsDataSource(config_obj);

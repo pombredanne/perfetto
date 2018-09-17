@@ -320,4 +320,5 @@ class PERFETTO_EXPORT TraceConfig {
 };
 
 }  // namespace perfetto
+
 #endif  // INCLUDE_PERFETTO_TRACING_CORE_TRACE_CONFIG_H_

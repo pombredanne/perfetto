@@ -39,8 +39,6 @@
 #include "perfetto/trace/sys_stats/sys_stats.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
-// TODO: add timestmaps before landing.
-
 namespace perfetto {
 
 namespace {
@@ -162,20 +160,6 @@ void SysStatsDataSource::ReadSysStats() {
   tick_++;
 }
 
-size_t SysStatsDataSource::ReadFile(base::ScopedFile* fd, const char* path) {
-  if (!*fd)
-    return 0;
-  ssize_t res = pread(**fd, read_buf_.get(), kReadBufSize - 1, 0);
-  if (res <= 0) {
-    PERFETTO_PLOG("Failed reading %s", path);
-    fd->reset();
-    return 0;
-  }
-  size_t rsize = static_cast<size_t>(res);
-  static_cast<char*>(read_buf_.get())[rsize] = '\0';
-  return rsize + 1;  // Include null terminator in the count.
-}
-
 void SysStatsDataSource::ReadMeminfo(protos::pbzero::SysStats* sys_stats) {
   size_t rsize = ReadFile(&meminfo_fd_, "/proc/meminfo");
   if (!rsize)
@@ -232,8 +216,8 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
       continue;
 
     // Per-CPU stats.
-    if (words.cur_token_size() > 3 && !strncmp(words.cur_token(), "cpu", 3) &&
-        (stat_enabled_fields_ & (1 << SysStatsConfig::CPU_TIMES))) {
+    if ((stat_enabled_fields_ & (1 << SysStatsConfig::STAT_CPU_TIMES)) &&
+        words.cur_token_size() > 3 && !strncmp(words.cur_token(), "cpu", 3)) {
       long cpu_id = strtol(words.cur_token() + 3, nullptr, 10);
       std::array<uint64_t, 7> cpu_times{};
       for (size_t i = 0; i < cpu_times.size() && words.Next(); i++) {
@@ -249,8 +233,10 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
       cpu_stat->set_io_wait_ns(cpu_times[4] * ns_per_user_hz_);
       cpu_stat->set_irq_ns(cpu_times[5] * ns_per_user_hz_);
       cpu_stat->set_softirq_ns(cpu_times[6] * ns_per_user_hz_);
-    } else if (!strcmp(words.cur_token(), "intr") &&
-               (stat_enabled_fields_ & (1 << SysStatsConfig::IRQ_COUNTS))) {
+    }
+    // IRQ counters
+    else if ((stat_enabled_fields_ & (1 << SysStatsConfig::STAT_IRQ_COUNTS)) &&
+             !strcmp(words.cur_token(), "intr")) {
       for (size_t i = 0; words.Next(); i++) {
         auto v = static_cast<uint64_t>(strtoll(words.cur_token(), nullptr, 10));
         if (i == 0) {
@@ -262,8 +248,11 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
         }
       }
       continue;
-    } else if (!strcmp(words.cur_token(), "softirq") &&
-               (stat_enabled_fields_ & (1 << SysStatsConfig::SOFTIRQ_COUNTS))) {
+    }
+    // Softirq counters.
+    else if ((stat_enabled_fields_ &
+              (1 << SysStatsConfig::STAT_SOFTIRQ_COUNTS)) &&
+             !strcmp(words.cur_token(), "softirq")) {
       for (size_t i = 0; words.Next(); i++) {
         auto v = static_cast<uint64_t>(strtoll(words.cur_token(), nullptr, 10));
         if (i == 0) {
@@ -274,8 +263,10 @@ void SysStatsDataSource::ReadStat(protos::pbzero::SysStats* sys_stats) {
           softirq_stat->set_count(v);
         }
       }
-    } else if (!strcmp(words.cur_token(), "processes") &&
-               (stat_enabled_fields_ & (1 << SysStatsConfig::FORK_COUNT))) {
+    }
+    // Number of forked processes since boot.
+    else if ((stat_enabled_fields_ & (1 << SysStatsConfig::STAT_FORK_COUNT)) &&
+             !strcmp(words.cur_token(), "processes")) {
       if (words.Next()) {
         sys_stats->set_num_forks(
             static_cast<uint64_t>(strtoll(words.cur_token(), nullptr, 10)));
@@ -291,6 +282,20 @@ base::WeakPtr<SysStatsDataSource> SysStatsDataSource::GetWeakPtr() const {
 
 void SysStatsDataSource::Flush() {
   writer_->Flush();
+}
+
+size_t SysStatsDataSource::ReadFile(base::ScopedFile* fd, const char* path) {
+  if (!*fd)
+    return 0;
+  ssize_t res = pread(**fd, read_buf_.get(), kReadBufSize - 1, 0);
+  if (res <= 0) {
+    PERFETTO_PLOG("Failed reading %s", path);
+    fd->reset();
+    return 0;
+  }
+  size_t rsize = static_cast<size_t>(res);
+  static_cast<char*>(read_buf_.get())[rsize] = '\0';
+  return rsize + 1;  // Include null terminator in the count.
 }
 
 }  // namespace perfetto

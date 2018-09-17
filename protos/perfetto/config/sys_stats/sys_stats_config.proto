@@ -31,8 +31,7 @@ message SysStatsConfig {
   // Polls /proc/meminfo every X ms, if non-zero.
   optional uint32 meminfo_period_ms = 1;
 
-  // If not-empty reports only the given counters.
-  // If empty all known counters are reported.
+  // Only the counters specified below are reported.
   repeated MeminfoCounters meminfo_counters = 2;
 
   // Polls /proc/vmstat every X ms, if non-zero.
@@ -42,10 +41,11 @@ message SysStatsConfig {
   // Pols /proc/stat every X ms, if non-zero.
   optional uint32 stat_period_ms = 5;
   enum StatCounters {
-    CPU_TIMES = 1;
-    IRQ_COUNTS = 2;
-    SOFTIRQ_COUNTS = 3;
-    FORK_COUNT = 4;
+    STAT_UNSPECIFIED = 0;
+    STAT_CPU_TIMES = 1;
+    STAT_IRQ_COUNTS = 2;
+    STAT_SOFTIRQ_COUNTS = 3;
+    STAT_FORK_COUNT = 4;
   }
   repeated StatCounters stat_counters = 6;
 }

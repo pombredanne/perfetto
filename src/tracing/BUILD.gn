@@ -27,7 +27,7 @@ source_set("tracing") {
   deps = [
     "../../gn:default_deps",
     "../../gn:gtest_prod_config",
-    "../../protos/perfetto/config",
+    "../../protos/perfetto/config:lite",
     "../base",
     "../protozero",
   ]
@@ -72,7 +72,7 @@ source_set("unittests") {
     ":tracing",
     "../../gn:default_deps",
     "../../gn:gtest_deps",
-    "../../protos/perfetto/config",
+    "../../protos/perfetto/config:lite",
     "../../protos/perfetto/trace:lite",
     "../../protos/perfetto/trace:zero",
     "../base",

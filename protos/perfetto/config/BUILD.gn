@@ -16,10 +16,13 @@ import("../../../gn/perfetto.gni")
 import("../../../gn/proto_library.gni")
 import("../../../src/protozero/protozero_library.gni")
 
-proto_library("config") {
+proto_library("lite") {
   generate_python = false
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
+  deps = [
+    "../common:lite",
+  ]
   sources = [
     "chrome/chrome_config.proto",
     "data_source_config.proto",
@@ -33,9 +36,12 @@ proto_library("config") {
   ]
 }
 
-protozero_library("config_zero") {
+protozero_library("zero") {
   proto_in_dir = "$perfetto_root_path/protos"
   proto_out_dir = "$perfetto_root_path/protos"
+  deps = [
+    "../common:zero",
+  ]
   sources = [
     "chrome/chrome_config.proto",
     "data_source_config.proto",

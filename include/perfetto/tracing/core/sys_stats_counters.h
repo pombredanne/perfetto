@@ -41,4 +41,5 @@ namespace protos {}
 }  // namespace perfetto
 
 namespace perfetto {}  // namespace perfetto
+
 #endif  // INCLUDE_PERFETTO_TRACING_CORE_SYS_STATS_COUNTERS_H_
