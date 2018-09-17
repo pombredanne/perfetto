@@ -19,6 +19,7 @@
 #include <inttypes.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -33,6 +34,7 @@
 #include <unwindstack/RegsGetLocal.h>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/sock_utils.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
 
@@ -71,6 +73,22 @@ constexpr size_t kRegisterDataSize =
 #else
 #error "Could not determine register data size"
 #endif
+
+std::vector<base::ScopedFile> MultipleConnect(const std::string& sock_name,
+                                              size_t n) {
+  sockaddr_un addr;
+  socklen_t addr_size;
+  if (!base::MakeSockAddr(sock_name, &addr, &addr_size))
+    return {};
+
+  std::vector<base::ScopedFile> res(n);
+  for (size_t i = 0; i < n; ++i) {
+    res[i] = base::CreateSocket();
+    if (connect(*res[i], reinterpret_cast<sockaddr*>(&addr), addr_size) != -1)
+      PERFETTO_ELOG("Failed to connect to %s", sock_name.c_str());
+  }
+  return res;
+}
 
 }  // namespace
 
@@ -193,7 +211,9 @@ uint8_t* GetMainThreadStackBase() {
   return nullptr;
 }
 
-Client::Client() : main_thread_stack_base_(GetMainThreadStackBase()) {}
+Client::Client(const std::string& sock_name, size_t conns)
+    : socket_pool_(MultipleConnect(sock_name, conns)),
+      main_thread_stack_base_(GetMainThreadStackBase()) {}
 
 uint8_t* Client::GetStackBase() {
   if (gettid() == getpid())
@@ -229,7 +249,7 @@ void Client::SendStack(uint64_t alloc_size, uint64_t alloc_address) {
   struct msghdr hdr;
   hdr.msg_iov = iov;
   hdr.msg_iovlen = base::ArraySize(iov);
-  PERFETTO_CHECK(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL) ==
+  PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
                  static_cast<ssize_t>(total_size + sizeof(uint64_t)));
 }
 

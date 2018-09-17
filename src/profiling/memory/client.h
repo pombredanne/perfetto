@@ -85,7 +85,7 @@ uint8_t* GetThreadStackBase();
 
 class Client {
  public:
-  Client();
+  Client(const std::string& sock_name, size_t conns);
   void SendStack(uint64_t alloc_size, uint64_t alloc_address);
 
  private:
