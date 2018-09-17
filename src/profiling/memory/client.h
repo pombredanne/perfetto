@@ -86,7 +86,7 @@ uint8_t* GetThreadStackBase();
 class Client {
  public:
   Client();
-  void SendStack();
+  void SendStack(uint64_t alloc_size, uint64_t alloc_address);
 
  private:
   uint8_t* GetStackBase();

@@ -23,6 +23,15 @@
 
 #include <atomic>
 
+#include <unwindstack/MachineArm.h>
+#include <unwindstack/MachineArm64.h>
+#include <unwindstack/MachineMips.h>
+#include <unwindstack/MachineMips64.h>
+#include <unwindstack/MachineX86.h>
+#include <unwindstack/MachineX86_64.h>
+#include <unwindstack/Regs.h>
+#include <unwindstack/RegsGetLocal.h>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
@@ -62,7 +71,6 @@ constexpr size_t kRegisterDataSize =
 #else
 #error "Could not determine register data size"
 #endif
-}  // namespace
 
 }  // namespace
 
@@ -193,25 +201,35 @@ uint8_t* Client::GetStackBase() {
 }
 
 void Client::SendStack(uint64_t alloc_size, uint64_t alloc_address) {
-  uint8_t* stacktop = __builtin_frame_address(0);
+  uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
   uint8_t* stackbase = GetStackBase();
   uint8_t reg_buffer[kRegisterDataSize];
   unwindstack::AsmGetRegs(reg_buffer);
+
   AllocMetadata metadata;
+  metadata.alloc_size = alloc_size;
+  metadata.alloc_address = alloc_address;
+  metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
+  metadata.stack_pointer_offset = sizeof(AllocMetadata) + kRegisterDataSize;
+  metadata.arch = unwindstack::Regs::CurrentArch();
+  metadata.sequence_number = ++global_sequence_number;
+
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
-  const uint64_t total_size =
-      sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
+  uint64_t total_size = sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
+
+  BorrowedSocket sockfd = socket_pool_.Borrow();
   struct iovec iov[3];
   iov[0].iov_base = &total_size;
-  iov[0].iov_size = sizeof(uint64_t);
+  iov[0].iov_len = sizeof(uint64_t);
   iov[1].iov_base = &metadata;
-  iov[1].iov_size = sizeof(metadata);
+  iov[1].iov_len = sizeof(metadata);
   iov[2].iov_base = stacktop;
-  iov[2].iov_size = stack_size;
+  iov[2].iov_len = stack_size;
   struct msghdr hdr;
   hdr.msg_iov = iov;
   hdr.msg_iovlen = base::ArraySize(iov);
-  PERFETTO_CHECK(sendmsg(
+  PERFETTO_CHECK(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL) ==
+                 static_cast<ssize_t>(total_size + sizeof(uint64_t)));
 }
 
 }  // namespace perfetto
