@@ -67,7 +67,7 @@ class Callsites {
   // alloc_buf to the leafs of this tree.
   class Node {
    public:
-    // This should be opaque except to Callsites.
+    // This is opaque except to Callsites.
     friend class Callsites;
 
     Node(InternedCodeLocation location) : Node(std::move(location), nullptr) {}
