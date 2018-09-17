@@ -49,8 +49,6 @@ struct InternedCodeLocation {
 
 class Callsites {
  public:
-  friend class HeapDump;
-
   // Node in a tree of function traces that resulted in an allocation. For
   // instance, if alloc_buf is called from foo and bar, which are called from
   // main, the tree looks as following.
@@ -69,6 +67,7 @@ class Callsites {
   // alloc_buf to the leafs of this tree.
   class Node {
    public:
+    // This should be opaque except to Callsites.
     friend class Callsites;
 
     Node(InternedCodeLocation location) : Node(std::move(location), nullptr) {}
@@ -101,7 +100,7 @@ class Callsites {
 
 class HeapDump {
  public:
-  HeapDump(Callsites* bookkeeper) : callsites_(bookkeeper) {}
+  explicit HeapDump(Callsites* bookkeeper) : callsites_(bookkeeper) {}
 
   void RecordMalloc(const std::vector<CodeLocation>& stack,
                     uint64_t address,
