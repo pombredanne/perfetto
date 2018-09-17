@@ -49,7 +49,6 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
-  info->order_by_consumed = false;  // Delegate sorting to SQLite.
   info->estimated_cost =
       static_cast<uint32_t>(storage_->counters().counter_count());
   return SQLITE_OK;

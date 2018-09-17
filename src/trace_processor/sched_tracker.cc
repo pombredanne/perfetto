@@ -24,8 +24,9 @@
 namespace perfetto {
 namespace trace_processor {
 
-SchedTracker::SchedTracker(TraceProcessorContext* context)
-    : context_(context){};
+SchedTracker::SchedTracker(TraceProcessorContext* context) : context_(context) {
+  cpu_freq_string_id_ = context_->storage->InternString("CpuFreq");
+};
 
 SchedTracker::~SchedTracker() = default;
 
@@ -78,13 +79,13 @@ void SchedTracker::PushCounter(uint64_t timestamp,
   }
   if (last_counter_per_cpu_[ref].timestamp != 0) {
     uint64_t duration = 0;
-    // Currently non cpu freq counter events will have a duration of 0.
+    // Currently non cpu freq counter events will have a duration of 0 and will
+    // not be stored.
     if (ref_type == RefType::CPU_ID) {
       duration = timestamp - last_counter_per_cpu_[ref].timestamp;
     }
     context_->storage->mutable_counters()->AddCounter(
-        last_counter_per_cpu_[ref].timestamp, duration,
-        context_->storage->InternString("CpuFreq"),
+        last_counter_per_cpu_[ref].timestamp, duration, cpu_freq_string_id_,
         last_counter_per_cpu_[ref].value, static_cast<int64_t>(ref),
         RefType::CPU_ID);
   }

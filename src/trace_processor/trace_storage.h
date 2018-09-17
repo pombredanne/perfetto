@@ -240,11 +240,11 @@ class TraceStorage {
     return unique_threads_[utid];
   }
 
-  const Counters& counters() const { return counters_; }
-  Counters* mutable_counters() { return &counters_; }
-
   const NestableSlices& nestable_slices() const { return nestable_slices_; }
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
+
+  const Counters& counters() const { return counters_; }
+  Counters* mutable_counters() { return &counters_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
@@ -283,6 +283,8 @@ class TraceStorage {
   // Slices coming from userspace events (e.g. Chromium TRACE_EVENT macros).
   NestableSlices nestable_slices_;
 
+  // Counter events from the trace. This includes CPU frequency events as well
+  // systrace trace_marker counter events.
   Counters counters_;
 };
 
