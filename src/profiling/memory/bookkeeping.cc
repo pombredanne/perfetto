@@ -19,7 +19,7 @@
 namespace perfetto {
 
 Callsites::Node* Callsites::Node::GetOrCreateChild(
-    const Callsites::InternedCodeLocation& loc) {
+    const InternedCodeLocation& loc) {
   Node* child = children_.Get(loc);
   if (!child)
     child = children_.Emplace(loc, this);
@@ -39,13 +39,7 @@ void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
       ApplyFree(it->second.sequence_number + 1, address);
   }
 
-  Callsites::Node* node = &callsites_->root_;
-  node->cum_size_ += size;
-  for (const CodeLocation& loc : locs) {
-    node = node->GetOrCreateChild(callsites_->InternCodeLocation(loc));
-    node->cum_size_ += size;
-  }
-
+  Callsites::Node* node = callsites_->IncrementCallsite(locs, size);
   allocations_.emplace(address, Allocation(size, sequence_number, node));
   AddPending(sequence_number, 0);
 }
@@ -102,6 +96,18 @@ uint64_t Callsites::GetCumSizeForTesting(
       return 0;
   }
   return node->cum_size_;
+}
+
+Callsites::Node* Callsites::IncrementCallsite(
+    const std::vector<CodeLocation>& locs,
+    uint64_t size) {
+  Node* node = &root_;
+  node->cum_size_ += size;
+  for (const CodeLocation& loc : locs) {
+    node = node->GetOrCreateChild(InternCodeLocation(loc));
+    node->cum_size_ += size;
+  }
+  return node;
 }
 
 void Callsites::DecrementNode(Node* node, uint64_t size) {

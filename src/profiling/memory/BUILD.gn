@@ -50,6 +50,7 @@ source_set("socket_listener") {
     "../../../buildtools:libunwindstack_config",
   ]
   deps = [
+    ":bookkeeping",
     ":record_reader",
     ":unwinding",
     "../../../gn:default_deps",

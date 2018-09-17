@@ -36,28 +36,20 @@ struct CodeLocation {
   std::string function_name;
 };
 
+struct InternedCodeLocation {
+  StringInterner::InternedString map_name;
+  StringInterner::InternedString function_name;
+
+  bool operator<(const InternedCodeLocation& other) const {
+    if (map_name.id() == other.map_name.id())
+      return function_name.id() < other.function_name.id();
+    return map_name.id() < other.map_name.id();
+  }
+};
+
 class Callsites {
  public:
   friend class HeapDump;
-
-  uint64_t GetCumSizeForTesting(const std::vector<CodeLocation>& stack);
-
- private:
-  struct InternedCodeLocation {
-    StringInterner::InternedString map_name;
-    StringInterner::InternedString function_name;
-
-    bool operator<(const InternedCodeLocation& other) const {
-      if (map_name.id() == other.map_name.id())
-        return function_name.id() < other.function_name.id();
-      return map_name.id() < other.map_name.id();
-    }
-  };
-
-  InternedCodeLocation InternCodeLocation(const CodeLocation& loc) {
-    return {interner_.Intern(loc.map_name),
-            interner_.Intern(loc.function_name)};
-  }
 
   // Node in a tree of function traces that resulted in an allocation. For
   // instance, if alloc_buf is called from foo and bar, which are called from
@@ -77,10 +69,13 @@ class Callsites {
   // alloc_buf to the leafs of this tree.
   class Node {
    public:
+    friend class Callsites;
+
     Node(InternedCodeLocation location) : Node(std::move(location), nullptr) {}
     Node(InternedCodeLocation location, Node* parent)
         : parent_(parent), location_(std::move(location)) {}
 
+   private:
     Node* GetOrCreateChild(const InternedCodeLocation& loc);
 
     uint64_t cum_size_ = 0;
@@ -90,7 +85,15 @@ class Callsites {
         children_;
   };
 
+  uint64_t GetCumSizeForTesting(const std::vector<CodeLocation>& stack);
+  Node* IncrementCallsite(const std::vector<CodeLocation>& locs, uint64_t size);
   void DecrementNode(Node* node, uint64_t size);
+
+ private:
+  InternedCodeLocation InternCodeLocation(const CodeLocation& loc) {
+    return {interner_.Intern(loc.map_name),
+            interner_.Intern(loc.function_name)};
+  }
 
   StringInterner interner_;
   Node root_{{interner_.Intern(""), interner_.Intern("")}};
