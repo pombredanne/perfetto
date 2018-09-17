@@ -54,8 +54,6 @@ class SysStatsDataSource : public ProbesDataSource {
                      OpenFunction = nullptr);
   ~SysStatsDataSource() override;
 
-  // const DataSourceConfig& config() const { return config_; }
-
   // ProbesDataSource implementation.
   void Flush() override;
 
@@ -87,7 +85,6 @@ class SysStatsDataSource : public ProbesDataSource {
   base::ScopedFile vmstat_fd_;
   base::ScopedFile stat_fd_;
   base::PageAllocator::UniquePtr read_buf_;
-  // const DataSourceConfig config_;
   TraceWriter::TracePacketHandle cur_packet_;
   std::map<const char*, int, CStrCmp> meminfo_counters_;
   std::map<const char*, int, CStrCmp> vmstat_counters_;
