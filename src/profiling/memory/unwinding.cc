@@ -205,31 +205,58 @@ bool DoUnwind(void* mem,
   return error_code == 0;
 }
 
+bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
+  if (rec->size < sizeof(RecordType))
+    return false;
+  switch (*reinterpret_cast<RecordType*>(rec->data.get())) {
+    case RecordType::Malloc: {
+      std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
+      if (!metadata)
+        // Process has already gone away.
+        return false;
+      void* data = reinterpret_cast<uint64_t*>(rec->data.get()) + 1;
+      return DoUnwind(data, rec->size, metadata.get(), &out->alloc_record);
+    }
+    case RecordType::Free: {
+      out->free_record.free_data = std::move(rec->data);
+      out->free_record.size = rec->size;
+      return true;
+    }
+  }
+}
+
 __attribute__((noreturn)) void UnwindingMainLoop(
     BoundedQueue<UnwindingRecord>* input_queue,
     BoundedQueue<BookkeepingRecord>* output_queue) {
   for (;;) {
     UnwindingRecord rec = input_queue->Get();
-    void* data = reinterpret_cast<uint64_t*>(rec.data.get()) + 1;
-    switch (*reinterpret_cast<RecordType*>(rec.data.get())) {
-      case RecordType::Malloc: {
-        std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
-        if (!metadata)
-          // Process has already gone away.
-          continue;
-        BookkeepingRecord out;
-        if (DoUnwind(data, rec.size, metadata.get(), &out.alloc_record))
-          output_queue->Add(std::move(out));
-        break;
-      }
-      case RecordType::Free: {
-        BookkeepingRecord out;
-        out.free_record.free_data = std::move(rec.data);
-        out.free_record.size = rec.size;
-        output_queue->Add(std::move(out));
-        break;
-      }
-    }
+    BookkeepingRecord out;
+    if (HandleUnwindingRecord(&rec, &out))
+      output_queue->Add(std::move(out));
+  }
+}
+
+void HandleBookkeepingRecord(BookkeepingRecord* rec) {
+  std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
+  if (!metadata)
+    // Process has already gone away.
+    return;
+
+  if (rec->free_record.free_data) {
+    FreeRecord& free_rec = rec->free_record;
+    uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
+    PERFETTO_DCHECK(free_rec.size % (2 * sizeof(uint64_t)) == sizeof(uint64_t));
+    for (size_t i = 1; i < free_rec.size / sizeof(uint64_t); i += 2)
+      metadata->heap_dump.RecordFree(data[i + 1], data[i]);
+  } else {
+    AllocRecord& alloc_rec = rec->alloc_record;
+    std::vector<CodeLocation> code_locations;
+    for (unwindstack::FrameData& frame : alloc_rec.frames)
+      code_locations.emplace_back(frame.map_name, frame.function_name);
+    metadata->heap_dump.RecordMalloc(code_locations,
+                                     alloc_rec.alloc_metadata.alloc_address,
+                                     alloc_rec.alloc_metadata.alloc_size,
+                                     alloc_rec.alloc_metadata.sequence_number);
   }
 }
 
@@ -237,28 +264,7 @@ __attribute__((noreturn)) void BookkeepingMainLoop(
     BoundedQueue<BookkeepingRecord>* input_queue) {
   for (;;) {
     BookkeepingRecord rec = input_queue->Get();
-    std::shared_ptr<ProcessMetadata> metadata = rec.metadata.lock();
-    if (!metadata)
-      // Process has already gone away.
-      continue;
-
-    if (rec.free_record.free_data) {
-      FreeRecord& free_rec = rec.free_record;
-      uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
-      PERFETTO_DCHECK(free_rec.size % (2 * sizeof(uint64_t)) ==
-                      sizeof(uint64_t));
-      for (size_t i = 1; i < free_rec.size / sizeof(uint64_t); i += 2)
-        metadata->heap_dump.RecordFree(data[i + 1], data[i]);
-    } else {
-      AllocRecord& alloc_rec = rec.alloc_record;
-      std::vector<CodeLocation> code_locations;
-      for (unwindstack::FrameData& frame : alloc_rec.frames)
-        code_locations.emplace_back(frame.map_name, frame.function_name);
-      metadata->heap_dump.RecordMalloc(
-          code_locations, alloc_rec.alloc_metadata.alloc_address,
-          alloc_rec.alloc_metadata.alloc_size,
-          alloc_rec.alloc_metadata.sequence_number);
-    }
+    HandleBookkeepingRecord(&rec);
   }
 }
 

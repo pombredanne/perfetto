@@ -83,7 +83,7 @@ std::vector<base::ScopedFile> MultipleConnect(const std::string& sock_name,
   std::vector<base::ScopedFile> res(n);
   for (size_t i = 0; i < n; ++i) {
     res[i] = base::CreateSocket();
-    if (connect(*res[i], reinterpret_cast<sockaddr*>(&addr), addr_size) != -1)
+    if (connect(*res[i], reinterpret_cast<sockaddr*>(&addr), addr_size) == -1)
       PERFETTO_ELOG("Failed to connect to %s", sock_name.c_str());
   }
   return res;
@@ -218,7 +218,13 @@ uint8_t* GetMainThreadStackBase() {
 
 Client::Client(std::vector<base::ScopedFile> socks)
     : socket_pool_(std::move(socks)),
-      main_thread_stack_base_(GetMainThreadStackBase()) {}
+      main_thread_stack_base_(GetMainThreadStackBase()) {
+  uint64_t size = 0;
+  int fds[2];
+  fds[0] = open("/proc/self/maps", O_RDONLY);
+  fds[1] = open("/proc/self/mem", O_RDONLY);
+  base::Send(*socket_pool_.Borrow(), &size, sizeof(size), fds, 2);
+}
 
 Client::Client(const std::string& sock_name, size_t conns)
     : Client(MultipleConnect(sock_name, conns)) {}
@@ -232,33 +238,36 @@ uint8_t* Client::GetStackBase() {
 void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
   uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
   uint8_t* stackbase = GetStackBase();
-  uint8_t reg_buffer[kRegisterDataSize];
-  unwindstack::AsmGetRegs(reg_buffer);
 
-  AllocMetadata metadata;
+  const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
+  const uint64_t total_size = sizeof(RecordType) + sizeof(AllocMetadata) +
+                              kRegisterDataSize + stack_size;
+  uint8_t* data = reinterpret_cast<uint8_t*>(
+      alloca(sizeof(uint64_t) + sizeof(RecordType) + sizeof(AllocMetadata) +
+             kRegisterDataSize));
+
+  *reinterpret_cast<uint64_t*>(data) = total_size;
+  *reinterpret_cast<RecordType*>(data + sizeof(uint64_t)) = RecordType::Malloc;
+  AllocMetadata& metadata = *reinterpret_cast<AllocMetadata*>(
+      data + sizeof(uint64_t) + sizeof(RecordType));
   metadata.alloc_size = alloc_size;
   metadata.alloc_address = alloc_address;
   metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
-  metadata.stack_pointer_offset = sizeof(AllocMetadata) + kRegisterDataSize;
+  PERFETTO_DCHECK(stacktop > data);
+  metadata.stack_pointer_offset = static_cast<uint64_t>(stacktop - data);
   metadata.arch = unwindstack::Regs::CurrentArch();
   metadata.sequence_number = ++sequence_number_;
 
-  const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
-  uint64_t total_size = sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
+  unwindstack::AsmGetRegs(data + sizeof(uint64_t) + sizeof(RecordType) +
+                          sizeof(AllocMetadata));
 
-  struct iovec iov[3];
-  iov[0].iov_base = &total_size;
-  iov[0].iov_len = sizeof(uint64_t);
-  iov[1].iov_base = &metadata;
-  iov[1].iov_len = sizeof(metadata);
-  iov[2].iov_base = stacktop;
-  iov[2].iov_len = stack_size;
-  struct msghdr hdr;
-  hdr.msg_iov = iov;
-  hdr.msg_iovlen = base::ArraySize(iov);
   BorrowedSocket sockfd = socket_pool_.Borrow();
-  PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
-                 static_cast<ssize_t>(total_size + sizeof(uint64_t)));
+  PERFETTO_DLOG("offset: %" PRIu64, metadata.stack_pointer_offset);
+  PERFETTO_DLOG("total size: %" PRIu64, total_size);
+  PERFETTO_CHECK(
+      PERFETTO_EINTR(
+          send(*sockfd, data, total_size + sizeof(uint64_t), MSG_NOSIGNAL)) ==
+      static_cast<ssize_t>(total_size + sizeof(uint64_t)));
 }
 
 void Client::Free(uint64_t alloc_address) {

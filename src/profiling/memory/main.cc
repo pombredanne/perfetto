@@ -33,7 +33,7 @@ constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 
 int HeapprofdMain(int argc, char** argv) {
-  Callsites bookkeeping;
+  Callsites callsites;
   std::unique_ptr<ipc::UnixSocket> sock;
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
@@ -55,7 +55,7 @@ int HeapprofdMain(int argc, char** argv) {
         unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()]
             .Add(std::move(r));
       },
-      &bookkeeping);
+      &callsites);
 
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {

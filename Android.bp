@@ -3698,6 +3698,7 @@ cc_test {
     "src/profiling/memory/bounded_queue_unittest.cc",
     "src/profiling/memory/client.cc",
     "src/profiling/memory/client_unittest.cc",
+    "src/profiling/memory/heapprofd_integrationtest.cc",
     "src/profiling/memory/record_reader.cc",
     "src/profiling/memory/record_reader_unittest.cc",
     "src/profiling/memory/socket_listener.cc",

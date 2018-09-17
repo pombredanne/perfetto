@@ -100,6 +100,9 @@ bool DoUnwind(void* mem,
               ProcessMetadata* metadata,
               AllocRecord* out);
 
+bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
+void HandleBookkeepingRecord(BookkeepingRecord* rec);
+
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
 
