@@ -124,9 +124,10 @@ class HeapDump {
 
   // Address -> (size, sequence_number, code location)
   std::map<uint64_t, Allocation> allocations_;
-  uint64_t consistent_sequence_number_ = 0;
   // sequence number -> (allocation to free || 0 for malloc)
   std::map<uint64_t, uint64_t> pending_;
+  // The sequence number all mallocs and frees have been handled up to.
+  uint64_t consistent_sequence_number_ = 0;
   Callsites* callsites_;
 };
 
