@@ -26,6 +26,10 @@ TraceStorage::TraceStorage() {
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
 
+  // Upid/utid 1 is reserved for idle processes/threads.
+  unique_processes_.emplace_back(1);
+  unique_threads_.emplace_back(1);
+
   // Reserve string ID 0 for the empty string.
   InternString("");
 

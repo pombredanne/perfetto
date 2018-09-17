@@ -46,7 +46,7 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
   // If we had a valid previous event, then inform the storage about the
   // slice.
-  if (prev->valid() && prev->next_pid != 0 /* Idle process (swapper/N) */) {
+  if (prev->valid()) {
     uint64_t duration = timestamp - prev->timestamp;
     StringId prev_thread_name_id = context_->storage->InternString(prev_comm);
     UniqueTid utid = context_->process_tracker->UpdateThread(
