@@ -452,7 +452,9 @@ void SchedSliceTable::FilterState::FindNextSlice() {
 }
 
 void SchedSliceTable::FilterState::FindNextRowAndTimestamp() {
-  auto start = row_filter_.begin() + next_row_id_index_;
+  auto start =
+      row_filter_.begin() +
+      static_cast<decltype(row_filter_)::difference_type>(next_row_id_index_);
   auto next_it = std::find(start, row_filter_.end(), true);
   next_row_id_index_ =
       static_cast<uint32_t>(std::distance(row_filter_.begin(), next_it));
