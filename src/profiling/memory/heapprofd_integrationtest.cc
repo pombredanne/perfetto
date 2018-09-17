@@ -49,9 +49,6 @@ TEST_F(HeapprofdIntegrationTest, SendStack) {
   auto done = task_runner.CreateCheckpoint("done");
   SocketListener listener(
       [&done](UnwindingRecord r) {
-        if (r.size == 0)
-          // This is a dummy handshake packet.
-          return;
         BookkeepingRecord bookkeeping_record;
         ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
         HandleBookkeepingRecord(&bookkeeping_record);

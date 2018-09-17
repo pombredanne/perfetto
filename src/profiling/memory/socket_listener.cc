@@ -106,6 +106,11 @@ void SocketListener::RecordReceived(ipc::UnixSocket* self,
     PERFETTO_DLOG("Received record without process metadata.");
     return;
   }
+
+  if (size == 0) {
+    PERFETTO_DLOG("Dropping empty record.");
+    return;
+  }
   // This needs to be a weak_ptr for two reasons:
   // 1) most importantly, the weak_ptr in process_metadata_ should expire as
   // soon as the last socket for a process goes away. Otherwise, a recycled
