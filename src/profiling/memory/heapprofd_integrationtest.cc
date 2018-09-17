@@ -42,13 +42,20 @@ class HeapprofdIntegrationTest : public ::testing::Test {
   void TearDown() override { DESTROY_TEST_SOCK(kSocketName); }
 };
 
-TEST_F(HeapprofdIntegrationTest, SendStack) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_EndToEnd EndToEnd
+#else
+#define MAYBE_EndToEnd DISABLED_EndToEnd
+#endif
+
+TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
   Callsites callsites;
 
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");
   SocketListener listener(
       [&done](UnwindingRecord r) {
+        // TODO(fmayer): Test symbolization and result of unwinding.
         BookkeepingRecord bookkeeping_record;
         ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
         HandleBookkeepingRecord(&bookkeeping_record);

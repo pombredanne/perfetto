@@ -42,5 +42,16 @@ TEST(BoundedQueueTest, Blocking) {
   th.join();
 }
 
+TEST(BoundedQueueTest, Resize) {
+  BoundedQueue<int> q(2);
+  q.Add(1);
+  q.Add(2);
+  q.SetSize(3);
+  q.Add(3);
+  EXPECT_EQ(q.Get(), 1);
+  EXPECT_EQ(q.Get(), 2);
+  EXPECT_EQ(q.Get(), 3);
+}
+
 }  // namespace
 }  // namespace perfetto
