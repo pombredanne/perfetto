@@ -18,6 +18,8 @@
 
 #include <inttypes.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include <atomic>
 
@@ -31,6 +33,36 @@ namespace {
 std::atomic<uint64_t> global_sequence_number(0);
 constexpr size_t kFreePageBytes = base::kPageSize;
 constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
+
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+// glibc does not define a wrapper around gettid, bionic does.
+pid_t gettid() {
+  return static_cast<pid_t>(syscall(__NR_gettid));
+}
+#endif
+
+#if defined(__arm__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::ARM_REG_LAST * sizeof(uint32_t);
+#elif defined(__aarch64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::ARM64_REG_LAST * sizeof(uint64_t);
+#elif defined(__i386__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::X86_REG_LAST * sizeof(uint32_t);
+#elif defined(__x86_64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::X86_64_REG_LAST * sizeof(uint64_t);
+#elif defined(__mips__) && !defined(__LP64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::MIPS_REG_LAST * sizeof(uint32_t);
+#elif defined(__mips__) && defined(__LP64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::MIPS64_REG_LAST * sizeof(uint64_t);
+#else
+#error "Could not determine register data size"
+#endif
+}  // namespace
 
 }  // namespace
 
@@ -126,6 +158,9 @@ uint8_t* GetThreadStackBase() {
   return x + s;
 }
 
+// Bionic currently does not cache the addresses of the stack for the main
+// thread.
+// https://android.googlesource.com/platform/bionic/+/32bc0fcf69dfccb3726fe572833a38b01179580e/libc/bionic/pthread_attr.cpp#254
 uint8_t* GetMainThreadStackBase() {
   FILE* maps = fopen("/proc/self/maps", "r");
   if (maps == nullptr) {
@@ -150,5 +185,33 @@ uint8_t* GetMainThreadStackBase() {
 }
 
 Client::Client() : main_thread_stack_base_(GetMainThreadStackBase()) {}
+
+uint8_t* Client::GetStackBase() {
+  if (gettid() == getpid())
+    return main_thread_stack_base_;
+  return GetThreadStackBase();
+}
+
+void Client::SendStack(uint64_t alloc_size, uint64_t alloc_address) {
+  uint8_t* stacktop = __builtin_frame_address(0);
+  uint8_t* stackbase = GetStackBase();
+  uint8_t reg_buffer[kRegisterDataSize];
+  unwindstack::AsmGetRegs(reg_buffer);
+  AllocMetadata metadata;
+  const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
+  const uint64_t total_size =
+      sizeof(AllocMetadata) + kRegisterDataSize + stack_size;
+  struct iovec iov[3];
+  iov[0].iov_base = &total_size;
+  iov[0].iov_size = sizeof(uint64_t);
+  iov[1].iov_base = &metadata;
+  iov[1].iov_size = sizeof(metadata);
+  iov[2].iov_base = stacktop;
+  iov[2].iov_size = stack_size;
+  struct msghdr hdr;
+  hdr.msg_iov = iov;
+  hdr.msg_iovlen = base::ArraySize(iov);
+  PERFETTO_CHECK(sendmsg(
+}
 
 }  // namespace perfetto

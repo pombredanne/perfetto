@@ -104,8 +104,7 @@ GetRecord() {
   PERFETTO_CHECK(stacktop != nullptr);
   PERFETTO_CHECK(stacktop < stackbase);
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
-  std::unique_ptr<unwindstack::Regs> regs(unwindstack::Regs::CreateFromLocal());
-  const unwindstack::ArchEnum arch = regs->CurrentArch();
+  const unwindstack::ArchEnum arch = unwindstack::Regs::CurrentArch();
   const size_t reg_size = RegSize(arch);
   const size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
   std::unique_ptr<uint8_t[]> buf(new uint8_t[total_size]);
@@ -115,14 +114,12 @@ GetRecord() {
   metadata->stack_pointer = reinterpret_cast<uint64_t>(stacktop);
   metadata->stack_pointer_offset = sizeof(AllocMetadata) + reg_size;
   metadata->arch = arch;
-  unwindstack::RegsGetLocal(regs.get());
+  unwindstack::AsmGetRegs(buf.get() + sizeof(AllocMetadata));
   // Make sure nothing above has changed the stack pointer, just for extra
   // paranoia.
   PERFETTO_CHECK(stacktop ==
                  reinterpret_cast<uint8_t*>(__builtin_frame_address(0)));
-  memcpy(buf.get() + sizeof(AllocMetadata), regs->RawData(), reg_size);
-  UnsafeMemcpy(buf.get() + sizeof(AllocMetadata) + reg_size, stacktop,
-               stack_size);
+  UnsafeMemcpy(buf.get() + sizeof(AllocMetadata), stacktop, stack_size);
   return {std::move(buf), total_size};
 }
 

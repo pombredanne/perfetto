@@ -86,9 +86,13 @@ uint8_t* GetThreadStackBase();
 class Client {
  public:
   Client();
+  void SendStack();
 
  private:
-  const uint8_t* main_thread_stack_base_;
+  uint8_t* GetStackBase();
+
+  SocketPool socket_pool_;
+  uint8_t* const main_thread_stack_base_;
 };
 
 }  // namespace perfetto
