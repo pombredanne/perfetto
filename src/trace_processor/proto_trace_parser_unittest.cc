@@ -48,6 +48,10 @@ class MockSchedTracker : public SchedTracker {
                     uint32_t prev_state,
                     base::StringView prev_comm,
                     uint32_t next_pid));
+
+  MOCK_METHOD4(
+      PushCounter,
+      void(uint64_t timestamp, double value, uint64_t ref, RefType ref_type));
 };
 
 class MockProcessTracker : public ProcessTracker {
@@ -61,13 +65,6 @@ class MockProcessTracker : public ProcessTracker {
   MOCK_METHOD2(UpdateThread, UniqueTid(uint32_t tid, uint32_t tgid));
 };
 
-class MockTraceStorage : public TraceStorage {
- public:
-  MockTraceStorage() : TraceStorage() {}
-
-  MOCK_METHOD3(PushCpuFreq,
-               void(uint64_t timestamp, uint32_t cpu, uint32_t new_freq));
-};
 
 class ProtoTraceParserTest : public ::testing::Test {
  public:
@@ -76,8 +73,6 @@ class ProtoTraceParserTest : public ::testing::Test {
     context_.sched_tracker.reset(sched_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
-    storage_ = new MockTraceStorage();
-    context_.storage.reset(storage_);
     const auto optim = OptimizationMode::kMinLatency;
     context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
@@ -95,7 +90,6 @@ class ProtoTraceParserTest : public ::testing::Test {
   TraceProcessorContext context_;
   MockSchedTracker* sched_;
   MockProcessTracker* process_;
-  MockTraceStorage* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
@@ -235,7 +229,7 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);
 
-  EXPECT_CALL(*storage_, PushCpuFreq(1000, 10, 2000));
+  EXPECT_CALL(*sched_, PushCounter(1000, 2000, 10, RefType::CPU_ID));
   Tokenize(trace_1);
 }
 

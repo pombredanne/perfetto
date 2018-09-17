@@ -138,6 +138,7 @@ source_set("unittests") {
     "query_constraints_unittest.cc",
     "sched_slice_table_unittest.cc",
     "sched_tracker_unittest.cc",
+    "span_table_unittest.cc",
     "thread_table_unittest.cc",
     "trace_sorter_unittest.cc",
   ]

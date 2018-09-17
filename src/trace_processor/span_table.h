@@ -63,6 +63,7 @@ class SpanTable : public Table {
    public:
     FilterState(SpanTable*, sqlite3_stmt* t1_stmt, sqlite3_stmt* t2_stmt);
 
+    int Initialize();
     int Next();
     int Eof();
     int Column(sqlite3_context* context, int N);
@@ -86,8 +87,9 @@ class SpanTable : public Table {
     std::array<TableRow, base::kMaxCpus> t1_;
     std::array<TableRow, base::kMaxCpus> t2_;
 
-    uint64_t latest_t1_ts_ = 0;
-    uint64_t latest_t2_ts_ = 0;
+    bool is_eof_ = true;
+    uint64_t latest_t1_ts_ = std::numeric_limits<uint64_t>::max();
+    uint64_t latest_t2_ts_ = std::numeric_limits<uint64_t>::max();
 
     ScopedStmt t1_stmt_;
     ScopedStmt t2_stmt_;

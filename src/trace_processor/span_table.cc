@@ -151,8 +151,6 @@ int SpanTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   std::string t1_sql = ss_t1.str();
   int t1_size = static_cast<int>(t1_sql.size());
 
-  PERFETTO_LOG("%s", t1_sql.c_str());
-
   sqlite3_stmt* t1_stmt;
   int err = sqlite3_prepare_v2(db_, t1_sql.c_str(), t1_size, &t1_stmt, nullptr);
   if (err != SQLITE_OK)
@@ -170,14 +168,16 @@ int SpanTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   std::string t2_sql = ss_t2.str();
   int t2_size = static_cast<int>(t2_sql.size());
 
-  PERFETTO_LOG("%s", t2_sql.c_str());
-
   sqlite3_stmt* t2_stmt;
   err = sqlite3_prepare_v2(db_, t2_sql.c_str(), t2_size, &t2_stmt, nullptr);
   if (err != SQLITE_OK)
     return err;
 
   filter_state_.reset(new FilterState(table_, t1_stmt, t2_stmt));
+
+  err = filter_state_->Initialize();
+  if (err != SQLITE_OK)
+    return err;
   return filter_state_->Next();
 }
 
@@ -198,34 +198,37 @@ SpanTable::FilterState::FilterState(SpanTable* table,
                                     sqlite3_stmt* t2_stmt)
     : t1_stmt_(t1_stmt), t2_stmt_(t2_stmt), table_(table) {}
 
-int SpanTable::FilterState::Next() {
-  if (PERFETTO_UNLIKELY(latest_t1_ts_ == 0)) {
-    int err = sqlite3_step(t1_stmt_.get());
-    if (err == SQLITE_DONE)
-      return SQLITE_OK;
+int SpanTable::FilterState::Initialize() {
+  int err = sqlite3_step(t1_stmt_.get());
+  if (err != SQLITE_DONE) {
     if (err != SQLITE_ROW)
       return SQLITE_ERROR;
     int64_t ts = sqlite3_column_int64(t1_stmt_.get(), 0);
     latest_t1_ts_ = static_cast<uint64_t>(ts);
-
-    err = sqlite3_step(t2_stmt_.get());
-    if (err == SQLITE_DONE)
-      return SQLITE_OK;
-    if (err != SQLITE_ROW)
-      return SQLITE_ERROR;
-    ts = sqlite3_column_int64(t2_stmt_.get(), 0);
-    latest_t2_ts_ = static_cast<uint64_t>(ts);
   }
 
+  err = sqlite3_step(t2_stmt_.get());
+  if (err != SQLITE_DONE) {
+    if (err != SQLITE_ROW)
+      return SQLITE_ERROR;
+    int64_t ts = sqlite3_column_int64(t2_stmt_.get(), 0);
+    latest_t2_ts_ = static_cast<uint64_t>(ts);
+  }
+  return SQLITE_OK;
+}
+
+int SpanTable::FilterState::Next() {
   constexpr uint64_t max = std::numeric_limits<uint64_t>::max();
   while (latest_t1_ts_ < max || latest_t2_ts_ < max) {
     int err = ExtractNext(latest_t1_ts_ <= latest_t2_ts_);
     if (err == SQLITE_ROW) {
+      is_eof_ = false;
       return SQLITE_OK;
     } else if (err != SQLITE_DONE) {
       return err;
     }
   }
+  is_eof_ = true;
   return SQLITE_OK;
 }
 
@@ -235,8 +238,6 @@ int SpanTable::FilterState::ExtractNext(bool pull_t1) {
   int64_t ts = sqlite3_column_int64(stmt, 0);
   int64_t dur = sqlite3_column_int64(stmt, 1);
   int32_t cpu = sqlite3_column_int(stmt, 2);
-
-  latest_t1_ts_ = static_cast<uint64_t>(ts);
 
   auto* prev_t1 = &t1_[static_cast<size_t>(cpu)];
   auto* prev_t2 = &t2_[static_cast<size_t>(cpu)];
@@ -313,8 +314,7 @@ int SpanTable::FilterState::ExtractNext(bool pull_t1) {
 }
 
 int SpanTable::FilterState::Eof() {
-  constexpr uint64_t max = std::numeric_limits<uint64_t>::max();
-  return latest_t1_ts_ == max && latest_t2_ts_ == max;
+  return is_eof_;
 }
 
 int SpanTable::FilterState::Column(sqlite3_context* context, int N) {
