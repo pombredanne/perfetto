@@ -18,8 +18,8 @@
 
 namespace perfetto {
 
-MemoryBookkeeping::Node* MemoryBookkeeping::Node::GetOrCreateChild(
-    const MemoryBookkeeping::InternedCodeLocation& loc) {
+Callsites::Node* Callsites::Node::GetOrCreateChild(
+    const Callsites::InternedCodeLocation& loc) {
   Node* child = children_.Get(loc);
   if (!child)
     child = children_.Emplace(loc, this);
@@ -39,10 +39,10 @@ void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
       ApplyFree(it->second.sequence_number + 1, address);
   }
 
-  MemoryBookkeeping::Node* node = &bookkeeper_->root_;
+  Callsites::Node* node = &callsites_->root_;
   node->cum_size_ += size;
   for (const CodeLocation& loc : locs) {
-    node = node->GetOrCreateChild(bookkeeper_->InternCodeLocation(loc));
+    node = node->GetOrCreateChild(callsites_->InternCodeLocation(loc));
     node->cum_size_ += size;
   }
 
@@ -62,7 +62,7 @@ void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   const Allocation& value = leaf_it->second;
   if (value.sequence_number > sequence_number)
     return;
-  bookkeeper_->DecrementNode(value.node, value.alloc_size);
+  callsites_->DecrementNode(value.node, value.alloc_size);
   allocations_.erase(leaf_it);
 }
 
@@ -88,12 +88,12 @@ void HeapDump::AddPending(uint64_t sequence_number, uint64_t address) {
 HeapDump::~HeapDump() {
   auto it = allocations_.begin();
   while (it != allocations_.end()) {
-    bookkeeper_->DecrementNode(it->second.node, it->second.alloc_size);
+    callsites_->DecrementNode(it->second.node, it->second.alloc_size);
     it = allocations_.erase(it);
   }
 }
 
-uint64_t MemoryBookkeeping::GetCumSizeForTesting(
+uint64_t Callsites::GetCumSizeForTesting(
     const std::vector<CodeLocation>& locs) {
   Node* node = &root_;
   for (const CodeLocation& loc : locs) {
@@ -104,7 +104,7 @@ uint64_t MemoryBookkeeping::GetCumSizeForTesting(
   return node->cum_size_;
 }
 
-void MemoryBookkeeping::DecrementNode(Node* node, uint64_t size) {
+void Callsites::DecrementNode(Node* node, uint64_t size) {
   bool delete_prev = false;
   Node* prev = nullptr;
   while (node != nullptr) {

@@ -36,7 +36,7 @@ struct CodeLocation {
   std::string function_name;
 };
 
-class MemoryBookkeeping {
+class Callsites {
  public:
   friend class HeapDump;
 
@@ -98,7 +98,7 @@ class MemoryBookkeeping {
 
 class HeapDump {
  public:
-  HeapDump(MemoryBookkeeping* bookkeeper) : bookkeeper_(bookkeeper) {}
+  HeapDump(Callsites* bookkeeper) : callsites_(bookkeeper) {}
 
   void RecordMalloc(const std::vector<CodeLocation>& stack,
                     uint64_t address,
@@ -109,12 +109,12 @@ class HeapDump {
 
  private:
   struct Allocation {
-    Allocation(uint64_t size, uint64_t seq, MemoryBookkeeping::Node* n)
+    Allocation(uint64_t size, uint64_t seq, Callsites::Node* n)
         : alloc_size(size), sequence_number(seq), node(n) {}
 
     uint64_t alloc_size;
     uint64_t sequence_number;
-    MemoryBookkeeping::Node* node;
+    Callsites::Node* node;
   };
 
   void AddPending(uint64_t sequence_number, uint64_t address);
@@ -125,7 +125,7 @@ class HeapDump {
   uint64_t consistent_sequence_number_ = 0;
   // sequence number -> (allocation to free || 0 for malloc)
   std::map<uint64_t, uint64_t> pending_;
-  MemoryBookkeeping* bookkeeper_;
+  Callsites* callsites_;
 };
 
 }  // namespace perfetto

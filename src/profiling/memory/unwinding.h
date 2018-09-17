@@ -42,7 +42,7 @@ struct ProcessMetadata {
   ProcessMetadata(pid_t p,
                   base::ScopedFile maps_fd,
                   base::ScopedFile mem,
-                  MemoryBookkeeping* bookkeeping)
+                  Callsites* bookkeeping)
       : pid(p),
         maps(std::move(maps_fd)),
         mem_fd(std::move(mem)),

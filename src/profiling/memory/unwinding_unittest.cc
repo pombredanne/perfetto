@@ -130,9 +130,9 @@ GetRecord() {
 TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_maps(open("/proc/self/maps", O_RDONLY));
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
-  MemoryBookkeeping bookkeeping;
+  Callsites callsites;
   ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem),
-                           &bookkeeping);
+                           &callsites);
   auto record = GetRecord();
   AllocRecord out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));

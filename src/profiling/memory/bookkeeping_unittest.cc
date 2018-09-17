@@ -36,51 +36,51 @@ std::vector<CodeLocation> stack2() {
 
 TEST(BookkeepingTest, Basic) {
   uint64_t sequence_number = 1;
-  MemoryBookkeeping mb;
-  HeapDump hd(&mb);
+  Callsites c;
+  HeapDump hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, sequence_number++);
   hd.RecordMalloc(stack2(), 2, 2, sequence_number++);
-  ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
+  ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
   hd.RecordFree(2, sequence_number++);
-  ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
+  ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
   hd.RecordFree(1, sequence_number++);
-  ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 0);
+  ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 0);
 }
 
 TEST(BookkeepingTest, TwoHeapDumps) {
   uint64_t sequence_number = 1;
-  MemoryBookkeeping mb;
-  HeapDump hd(&mb);
+  Callsites c;
+  HeapDump hd(&c);
   {
-    HeapDump hd2(&mb);
+    HeapDump hd2(&c);
 
     hd.RecordMalloc(stack(), 1, 5, sequence_number++);
     hd2.RecordMalloc(stack2(), 2, 2, sequence_number++);
-    ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
+    ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 7);
   }
-  ASSERT_EQ(mb.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
+  ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 5);
 }
 
 TEST(BookkeepingTest, ReplaceAlloc) {
   uint64_t sequence_number = 1;
-  MemoryBookkeeping mb;
-  HeapDump hd(&mb);
+  Callsites c;
+  HeapDump hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, sequence_number++);
   hd.RecordMalloc(stack2(), 1, 2, sequence_number++);
-  EXPECT_EQ(mb.GetCumSizeForTesting(stack()), 0);
-  EXPECT_EQ(mb.GetCumSizeForTesting(stack2()), 2);
+  EXPECT_EQ(c.GetCumSizeForTesting(stack()), 0);
+  EXPECT_EQ(c.GetCumSizeForTesting(stack2()), 2);
 }
 
 TEST(BookkeepingTest, OutOfOrder) {
-  MemoryBookkeeping mb;
-  HeapDump hd(&mb);
+  Callsites c;
+  HeapDump hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, 1);
   hd.RecordMalloc(stack2(), 1, 2, 0);
-  EXPECT_EQ(mb.GetCumSizeForTesting(stack()), 5);
-  EXPECT_EQ(mb.GetCumSizeForTesting(stack2()), 0);
+  EXPECT_EQ(c.GetCumSizeForTesting(stack()), 5);
+  EXPECT_EQ(c.GetCumSizeForTesting(stack2()), 0);
 }
 
 }  // namespace
