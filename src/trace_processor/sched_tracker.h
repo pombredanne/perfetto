@@ -46,6 +46,11 @@ class SchedTracker {
     bool valid() const { return timestamp != 0; }
   };
 
+  struct Counter {
+    uint64_t timestamp = 0;
+    double value = 0;
+  };
+
   // This method is called when a sched switch event is seen in the trace.
   virtual void PushSchedSwitch(uint32_t cpu,
                                uint64_t timestamp,
@@ -54,15 +59,16 @@ class SchedTracker {
                                base::StringView prev_comm,
                                uint32_t next_pid);
 
- private:
-  // Based on the cpu frequencies stored in trace_storage, the number of cycles
-  // between start_ns and end_ns on |cpu| is calculated.
-  uint64_t CalculateCycles(uint32_t cpu, uint64_t start_ns, uint64_t end_ns);
+  virtual void PushCounter(uint64_t timestamp,
+                           double value,
+                           uint64_t ref,
+                           RefType ref_type);
 
+ private:
   // Store the previous sched event to calculate the duration before storing it.
   std::array<SchedSwitchEvent, base::kMaxCpus> last_sched_per_cpu_;
 
-  std::array<size_t, base::kMaxCpus> lower_index_per_cpu_{};
+  std::array<Counter, base::kMaxCpus> last_counter_per_cpu_;
 
   uint64_t prev_timestamp_ = 0;
 

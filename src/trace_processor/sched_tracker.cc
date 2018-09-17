@@ -51,9 +51,7 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
     StringId prev_thread_name_id = context_->storage->InternString(prev_comm);
     UniqueTid utid = context_->process_tracker->UpdateThread(
         prev->timestamp, prev->next_pid /* == prev_pid */, prev_thread_name_id);
-    uint64_t cycles = CalculateCycles(cpu, prev->timestamp, timestamp);
-    context_->storage->AddSliceToCpu(cpu, prev->timestamp, duration, utid,
-                                     cycles);
+    context_->storage->AddSliceToCpu(cpu, prev->timestamp, duration, utid);
   }
 
   // If the this events previous pid does not match the previous event's next
@@ -69,42 +67,31 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   prev->next_pid = next_pid;
 };
 
-uint64_t SchedTracker::CalculateCycles(uint32_t cpu,
-                                       uint64_t start_ns,
-                                       uint64_t end_ns) {
-  const auto& frequencies = context_->storage->GetFreqForCpu(cpu);
-  auto lower_index = lower_index_per_cpu_[cpu];
-  if (frequencies.empty())
-    return 0;
-
-  long double cycles = 0;
-
-  // Move the lower index up to the first cpu_freq event before start_ns.
-  while (lower_index + 1 < frequencies.size()) {
-    if (frequencies[lower_index + 1].first >= start_ns)
-      break;
-    ++lower_index;
-  };
-
-  // Since events are processed in timestamp order, we don't have any cpu_freq
-  // events with a timestamp larger than end_ns. Therefore we care about all
-  // freq events from lower_index (first event before start_ns) to the last
-  // cpu_freq event.
-  for (size_t i = lower_index; i < frequencies.size(); ++i) {
-    // Using max handles the special case for the first cpu_freq event.
-    uint64_t cycle_start = std::max(frequencies[i].first, start_ns);
-    // If there are no more freq_events we compute cycles until |end_ns|.
-    uint64_t cycle_end = end_ns;
-    if (i + 1 < frequencies.size())
-      cycle_end = frequencies[i + 1].first;
-
-    uint32_t freq_khz = frequencies[i].second;
-    cycles += ((cycle_end - cycle_start) / 1E6L) * freq_khz;
+void SchedTracker::PushCounter(uint64_t timestamp,
+                               double value,
+                               uint64_t ref,
+                               RefType ref_type) {
+  if (timestamp < prev_timestamp_) {
+    PERFETTO_ELOG("counter event out of order by %.4f ms, skipping",
+                  (prev_timestamp_ - timestamp) / 1e6);
+    return;
+  }
+  if (last_counter_per_cpu_[ref].timestamp != 0) {
+    uint64_t duration = 0;
+    // Currently non cpu freq counter events will have a duration of 0.
+    if (ref_type == RefType::CPU_ID) {
+      duration = timestamp - last_counter_per_cpu_[ref].timestamp;
+    }
+    context_->storage->mutable_counters()->AddCounter(
+        last_counter_per_cpu_[ref].timestamp, duration,
+        context_->storage->InternString("CpuFreq"),
+        last_counter_per_cpu_[ref].value, static_cast<int64_t>(ref),
+        RefType::CPU_ID);
   }
 
-  lower_index_per_cpu_[cpu] = frequencies.size() - 1;
-  return static_cast<uint64_t>(round(cycles));
-}
+  last_counter_per_cpu_[ref].timestamp = timestamp;
+  last_counter_per_cpu_[ref].value = value;
+};
 
 }  // namespace trace_processor
 }  // namespace perfetto
