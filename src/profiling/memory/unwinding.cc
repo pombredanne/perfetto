@@ -214,7 +214,10 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
       if (!metadata)
         // Process has already gone away.
         return false;
+
       void* data = reinterpret_cast<uint64_t*>(rec->data.get()) + 1;
+      out->metadata = std::move(metadata);
+      out->free_record = {};
       return DoUnwind(data, rec->size, metadata.get(), &out->alloc_record);
     }
     case RecordType::Free: {
