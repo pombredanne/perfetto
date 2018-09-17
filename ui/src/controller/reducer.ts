@@ -50,6 +50,7 @@ export function rootReducer(state: State, action: any): State {
     case 'ADD_TRACK': {
       const nextState = {...state};
       nextState.tracks = {...state.tracks};
+      nextState.scrollingTracks = [...state.scrollingTracks];
       const id = `${nextState.nextId++}`;
       nextState.tracks[id] = {
         id,
