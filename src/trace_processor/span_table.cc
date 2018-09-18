@@ -33,12 +33,21 @@ bool ColumnCompare(const SpanTable::Column& first,
   return first.name < second.name;
 }
 
+std::string ExtractTableBasename(const std::string& raw_table_name) {
+  size_t index = raw_table_name.find('(');
+  if (index == std::string::npos)
+    return raw_table_name;
+  return raw_table_name.substr(0, index);
+}
+
 std::vector<SpanTable::Column> GetColumnsForTable(
     sqlite3* db,
-    const std::string& table_name) {
+    const std::string& raw_table_name) {
   char sql[100];
-  const char kRawSql[] = "SELECT name, type from pragma_table_info(%s)";
+  const char kRawSql[] = "SELECT name, type from pragma_table_info(\"%s\")";
 
+  // Support names which are table valued functions with arguments.
+  std::string table_name = ExtractTableBasename(raw_table_name);
   int n = snprintf(sql, sizeof(sql), kRawSql, table_name.c_str());
   PERFETTO_DCHECK(n >= 0 || static_cast<size_t>(n) < sizeof(sql));
 
