@@ -22,16 +22,15 @@ export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 export interface TrackState {
   id: string;
   engineId: string;
-  maxDepth: number;
   kind: string;
   name: string;
-  // TODO: These need to be nested into track kind spesific state.
-  // cpu slice state:
-  cpu: number;
-  // chrome slice state:
-  upid?: number;
-  utid?: number;
+
   dataReq?: TrackDataRequest;
+  config: {};
+
+  //// TODO: These need to be nested into track kind spesific state.
+  //// cpu slice state:
+  // cpu: number;
 }
 
 export interface TrackDataRequest {
