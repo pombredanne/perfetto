@@ -51,4 +51,8 @@ size_t ShouldSample(pthread_key_t key, size_t sz, double rate) {
   return GetSpecific(key)->ShouldSample(sz, rate);
 }
 
+void KeyDestructor(void* ptr) {
+  delete reinterpret_cast<ThreadLocalSamplingData*>(ptr);
+}
+
 }  // namespace perfetto

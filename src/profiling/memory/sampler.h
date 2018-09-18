@@ -34,6 +34,7 @@ class ThreadLocalSamplingData {
 };
 
 size_t ShouldSample(pthread_key_t key, size_t sz, double rate);
+void KeyDestructor(void* ptr);
 
 }  // namespace perfetto
 
