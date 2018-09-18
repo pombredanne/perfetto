@@ -80,6 +80,7 @@ void SchedTracker::PushCounter(uint64_t timestamp,
                   (prev_timestamp_ - timestamp) / 1e6);
     return;
   }
+  prev_timestamp_ = timestamp;
   Counter& prev = last_counter_per_cpu_[static_cast<size_t>(ref)];
   if (prev.timestamp != 0) {
     uint64_t duration = 0;
