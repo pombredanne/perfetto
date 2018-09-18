@@ -104,8 +104,7 @@ GetRecord() {
   PERFETTO_CHECK(stacktop != nullptr);
   PERFETTO_CHECK(stacktop < stackbase);
   const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
-  std::unique_ptr<unwindstack::Regs> regs(unwindstack::Regs::CreateFromLocal());
-  const unwindstack::ArchEnum arch = regs->CurrentArch();
+  const unwindstack::ArchEnum arch = unwindstack::Regs::CurrentArch();
   const size_t reg_size = RegSize(arch);
   const size_t total_size = sizeof(AllocMetadata) + reg_size + stack_size;
   std::unique_ptr<uint8_t[]> buf(new uint8_t[total_size]);
@@ -115,14 +114,12 @@ GetRecord() {
   metadata->stack_pointer = reinterpret_cast<uint64_t>(stacktop);
   metadata->stack_pointer_offset = sizeof(AllocMetadata) + reg_size;
   metadata->arch = arch;
-  unwindstack::RegsGetLocal(regs.get());
+  unwindstack::AsmGetRegs(buf.get() + sizeof(AllocMetadata));
   // Make sure nothing above has changed the stack pointer, just for extra
   // paranoia.
   PERFETTO_CHECK(stacktop ==
                  reinterpret_cast<uint8_t*>(__builtin_frame_address(0)));
-  memcpy(buf.get() + sizeof(AllocMetadata), regs->RawData(), reg_size);
-  UnsafeMemcpy(buf.get() + sizeof(AllocMetadata) + reg_size, stacktop,
-               stack_size);
+  UnsafeMemcpy(buf.get() + sizeof(AllocMetadata), stacktop, stack_size);
   return {std::move(buf), total_size};
 }
 
@@ -130,13 +127,15 @@ GetRecord() {
 TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_maps(open("/proc/self/maps", O_RDONLY));
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
-  ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem));
+  Callsites callsites;
+  ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem),
+                           &callsites);
   auto record = GetRecord();
-  std::vector<unwindstack::FrameData> out;
+  AllocRecord out;
   ASSERT_TRUE(DoUnwind(record.first.get(), record.second, &metadata, &out));
   int st;
-  std::unique_ptr<char> demangled(
-      abi::__cxa_demangle(out[0].function_name.c_str(), nullptr, nullptr, &st));
+  std::unique_ptr<char> demangled(abi::__cxa_demangle(
+      out.frames[0].function_name.c_str(), nullptr, nullptr, &st));
   ASSERT_EQ(st, 0);
   ASSERT_STREQ(demangled.get(), "perfetto::(anonymous namespace)::GetRecord()");
 }

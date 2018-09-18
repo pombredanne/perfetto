@@ -44,6 +44,7 @@ struct AllocMetadata {
   // CPU architecture of the client. This determines the size of the
   // register data that follows this struct.
   unwindstack::ArchEnum arch;
+  uint64_t sequence_number;
 };
 
 }  // namespace perfetto

@@ -18,19 +18,76 @@
 
 #include <inttypes.h>
 #include <sys/socket.h>
+#include <sys/syscall.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <atomic>
 
+#include <unwindstack/MachineArm.h>
+#include <unwindstack/MachineArm64.h>
+#include <unwindstack/MachineMips.h>
+#include <unwindstack/MachineMips64.h>
+#include <unwindstack/MachineX86.h>
+#include <unwindstack/MachineX86_64.h>
+#include <unwindstack/Regs.h>
+#include <unwindstack/RegsGetLocal.h>
+
 #include "perfetto/base/logging.h"
+#include "perfetto/base/sock_utils.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
 namespace {
 
-std::atomic<uint64_t> global_sequence_number(0);
 constexpr size_t kFreePageBytes = base::kPageSize;
 constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
+
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+// glibc does not define a wrapper around gettid, bionic does.
+pid_t gettid() {
+  return static_cast<pid_t>(syscall(__NR_gettid));
+}
+#endif
+
+#if defined(__arm__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::ARM_REG_LAST * sizeof(uint32_t);
+#elif defined(__aarch64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::ARM64_REG_LAST * sizeof(uint64_t);
+#elif defined(__i386__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::X86_REG_LAST * sizeof(uint32_t);
+#elif defined(__x86_64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::X86_64_REG_LAST * sizeof(uint64_t);
+#elif defined(__mips__) && !defined(__LP64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::MIPS_REG_LAST * sizeof(uint32_t);
+#elif defined(__mips__) && defined(__LP64__)
+constexpr size_t kRegisterDataSize =
+    unwindstack::MIPS64_REG_LAST * sizeof(uint64_t);
+#else
+#error "Could not determine register data size"
+#endif
+
+std::vector<base::ScopedFile> MultipleConnect(const std::string& sock_name,
+                                              size_t n) {
+  sockaddr_un addr;
+  socklen_t addr_size;
+  if (!base::MakeSockAddr(sock_name, &addr, &addr_size))
+    return {};
+
+  std::vector<base::ScopedFile> res(n);
+  for (size_t i = 0; i < n; ++i) {
+    res[i] = base::CreateSocket();
+    if (connect(*res[i], reinterpret_cast<sockaddr*>(&addr), addr_size) == -1)
+      PERFETTO_ELOG("Failed to connect to %s", sock_name.c_str());
+  }
+  return res;
+}
 
 }  // namespace
 
@@ -42,13 +99,15 @@ FreePage::FreePage() : free_page_(kFreePageSize) {
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
 
-void FreePage::Add(const uint64_t addr, SocketPool* pool) {
+void FreePage::Add(const uint64_t addr,
+                   const uint64_t sequence_number,
+                   SocketPool* pool) {
   std::lock_guard<std::mutex> l(mtx_);
   if (offset_ == kFreePageSize)
     Flush(pool);
   static_assert(kFreePageSize % 2 == 0,
                 "free page size needs to be divisible by two");
-  free_page_[offset_++] = ++global_sequence_number;
+  free_page_[offset_++] = sequence_number;
   free_page_[offset_++] = addr;
   PERFETTO_DCHECK(offset_ % 2 == 0);
 }
@@ -114,6 +173,107 @@ void SocketPool::Return(base::ScopedFile sock) {
     lck_.unlock();
     cv_.notify_one();
   }
+}
+
+uint8_t* GetThreadStackBase() {
+  pthread_t t = pthread_self();
+  pthread_attr_t attr;
+  if (pthread_getattr_np(t, &attr) != 0) {
+    return nullptr;
+  }
+  uint8_t* x;
+  size_t s;
+  if (pthread_attr_getstack(&attr, reinterpret_cast<void**>(&x), &s) != 0)
+    return nullptr;
+  pthread_attr_destroy(&attr);
+  return x + s;
+}
+
+// Bionic currently does not cache the addresses of the stack for the main
+// thread.
+// https://android.googlesource.com/platform/bionic/+/32bc0fcf69dfccb3726fe572833a38b01179580e/libc/bionic/pthread_attr.cpp#254
+// TODO(fmayer): Figure out with bionic if caching in bionic makes sense.
+uint8_t* GetMainThreadStackBase() {
+  FILE* maps = fopen("/proc/self/maps", "r");
+  if (maps == nullptr) {
+    PERFETTO_ELOG("heapprofd fopen failed %d", errno);
+    return nullptr;
+  }
+  while (!feof(maps)) {
+    char line[1024];
+    char* data = fgets(line, sizeof(line), maps);
+    if (data != nullptr && strstr(data, "[stack]")) {
+      char* sep = strstr(data, "-");
+      if (sep == nullptr)
+        continue;
+      sep++;
+      fclose(maps);
+      return reinterpret_cast<uint8_t*>(strtoll(sep, nullptr, 16));
+    }
+  }
+  fclose(maps);
+  PERFETTO_ELOG("heapprofd reading stack failed");
+  return nullptr;
+}
+
+Client::Client(std::vector<base::ScopedFile> socks)
+    : socket_pool_(std::move(socks)),
+      main_thread_stack_base_(GetMainThreadStackBase()) {
+  uint64_t size = 0;
+  int fds[2];
+  fds[0] = open("/proc/self/maps", O_RDONLY);
+  fds[1] = open("/proc/self/mem", O_RDONLY);
+  base::Send(*socket_pool_.Borrow(), &size, sizeof(size), fds, 2);
+}
+
+Client::Client(const std::string& sock_name, size_t conns)
+    : Client(MultipleConnect(sock_name, conns)) {}
+
+uint8_t* Client::GetStackBase() {
+  if (gettid() == getpid())
+    return main_thread_stack_base_;
+  return GetThreadStackBase();
+}
+
+void Client::Malloc(uint64_t alloc_size, uint64_t alloc_address) {
+  uint8_t* stacktop = reinterpret_cast<uint8_t*>(__builtin_frame_address(0));
+  uint8_t* stackbase = GetStackBase();
+  char reg_data[kRegisterDataSize];
+  unwindstack::AsmGetRegs(reg_data);
+
+  const size_t stack_size = static_cast<size_t>(stackbase - stacktop);
+  const uint64_t total_size = sizeof(RecordType) + sizeof(AllocMetadata) +
+                              kRegisterDataSize + stack_size;
+  uint8_t* data = reinterpret_cast<uint8_t*>(
+      alloca(sizeof(uint64_t) + sizeof(RecordType) + sizeof(AllocMetadata) +
+             kRegisterDataSize));
+
+  *reinterpret_cast<uint64_t*>(data) = total_size;
+  *reinterpret_cast<RecordType*>(data + sizeof(uint64_t)) = RecordType::Malloc;
+  AllocMetadata& metadata = *reinterpret_cast<AllocMetadata*>(
+      data + sizeof(uint64_t) + sizeof(RecordType));
+  metadata.alloc_size = alloc_size;
+  metadata.alloc_address = alloc_address;
+  metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
+  PERFETTO_DCHECK(stacktop > data);
+  metadata.stack_pointer_offset = static_cast<uint64_t>(stacktop - data);
+  metadata.arch = unwindstack::Regs::CurrentArch();
+  metadata.sequence_number = ++sequence_number_;
+
+  memcpy(data + sizeof(uint64_t) + sizeof(RecordType) + sizeof(AllocMetadata),
+         reg_data, sizeof(reg_data));
+
+  BorrowedSocket sockfd = socket_pool_.Borrow();
+  PERFETTO_DLOG("offset: %" PRIu64, metadata.stack_pointer_offset);
+  PERFETTO_DLOG("total size: %" PRIu64, total_size);
+  PERFETTO_CHECK(
+      PERFETTO_EINTR(
+          send(*sockfd, data, total_size + sizeof(uint64_t), MSG_NOSIGNAL)) ==
+      static_cast<ssize_t>(total_size + sizeof(uint64_t)));
+}
+
+void Client::Free(uint64_t alloc_address) {
+  free_page_.Add(alloc_address, ++sequence_number_, &socket_pool_);
 }
 
 }  // namespace perfetto
