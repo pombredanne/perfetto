@@ -22,7 +22,7 @@ namespace perfetto {
 namespace trace_processor {
 
 TraceStorage::TraceStorage() {
-  // Upid/utid 0 is reserved for invalid processes/threads.
+  // Upid/utid 0 is reserved for idle processes/threads.
   unique_processes_.emplace_back(0);
   unique_threads_.emplace_back(0);
 
@@ -41,8 +41,8 @@ void TraceStorage::AddSliceToCpu(uint32_t cpu,
                                  uint64_t duration_ns,
                                  UniqueTid utid,
                                  uint64_t cycles) {
-  cpu_events_[cpu].AddSlice(start_ns, duration_ns, utid, cycles);
-};
+  slices_.AddSlice(cpu, start_ns, duration_ns, utid, cycles);
+}
 
 StringId TraceStorage::InternString(base::StringView str) {
   auto hash = str.Hash();
