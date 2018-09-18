@@ -34,6 +34,8 @@ class ThreadLocalSamplingData {
   std::default_random_engine random_engine_;
 };
 
+// Returns how often to sample the given sample. In some circumstances,
+// a sample should be recorded twice.
 size_t ShouldSample(pthread_key_t key, size_t sz, double rate);
 void KeyDestructor(void* ptr);
 
