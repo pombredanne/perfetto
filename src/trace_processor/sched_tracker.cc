@@ -77,21 +77,21 @@ void SchedTracker::PushCounter(uint64_t timestamp,
                   (prev_timestamp_ - timestamp) / 1e6);
     return;
   }
-  if (last_counter_per_cpu_[ref].timestamp != 0) {
+  Counter& prev = last_counter_per_cpu_[static_cast<size_t>(ref)];
+  if (prev.timestamp != 0) {
     uint64_t duration = 0;
     // TODO(taylori): Add handling of events other than cpu freq.
     if (ref_type == RefType::kCPU_ID) {
-      duration = timestamp - last_counter_per_cpu_[ref].timestamp;
+      duration = timestamp - prev.timestamp;
     }
     context_->storage->mutable_counters()->AddCounter(
-        last_counter_per_cpu_[ref].timestamp, duration, name_id,
-        last_counter_per_cpu_[ref].value, static_cast<int64_t>(ref),
-        RefType::kCPU_ID);
+        prev.timestamp, duration, name_id, prev.value,
+        static_cast<int64_t>(ref), RefType::kCPU_ID);
   }
 
-  last_counter_per_cpu_[ref].timestamp = timestamp;
-  last_counter_per_cpu_[ref].value = value;
-  last_counter_per_cpu_[ref].name_id = name_id;
+  prev.timestamp = timestamp;
+  prev.value = value;
+  prev.name_id = name_id;
 };
 
 }  // namespace trace_processor
