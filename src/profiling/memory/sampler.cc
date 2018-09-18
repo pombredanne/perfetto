@@ -30,6 +30,10 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key) {
 }
 }  // namespace
 
+// The algorithm below is a re-implementation of the Chromium sampling
+// algorithm at
+// https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
+
 size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
   std::exponential_distribution<double> dist(1 / rate);
   interval_to_next_sample_ -= sz;
