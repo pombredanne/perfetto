@@ -90,6 +90,7 @@ struct AllocRecord {
 };
 
 struct BookkeepingRecord {
+  // TODO(fmayer): Use a union.
   std::weak_ptr<ProcessMetadata> metadata;
   AllocRecord alloc_record;
   FreeRecord free_record;
