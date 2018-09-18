@@ -37,14 +37,8 @@ class SchedSliceTable : public Table {
     kTimestamp = 0,
     kCpu = 1,
     kDuration = 2,
-    kQuantizedGroup = 3,
-    kUtid = 4,
-    kCycles = 5,
-
-    // Hidden columns.
-    kQuantum = 6,
-    kTimestampLowerBound = 7,
-    kClipTimestamp = 8,
+    kUtid = 3,
+    kCycles = 4,
   };
 
   SchedSliceTable(const TraceStorage* storage);
@@ -62,9 +56,6 @@ class SchedSliceTable : public Table {
    public:
     void Initialize(uint32_t cpu,
                     const TraceStorage* storage,
-                    uint64_t quantum,
-                    uint64_t ts_clip_min,
-                    uint64_t ts_clip_max,
                     std::vector<uint32_t> sorted_row_ids);
     void FindNextSlice();
     bool IsNextRowIdIndexValid() const {
@@ -72,16 +63,11 @@ class SchedSliceTable : public Table {
     }
 
     size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
-    uint64_t next_timestamp() const { return next_timestamp_; }
-    uint64_t ts_clip_min() const { return ts_clip_min_; }
-    uint64_t ts_clip_max() const { return ts_clip_max_; }
 
    private:
     const TraceStorage::SlicesPerCpu& Slices() {
       return storage_->SlicesForCpu(cpu_);
     }
-
-    void UpdateNextTimestampForNextRow();
 
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
@@ -89,21 +75,8 @@ class SchedSliceTable : public Table {
     // An offset into |sorted_row_ids_| indicating the next row to return.
     uint32_t next_row_id_index_ = 0;
 
-    // The timestamp of the row to index. This is either the timestamp of
-    // the slice at |next_row_id_index_| or the timestamp of the next quantized
-    // group boundary.
-    uint64_t next_timestamp_ = 0;
-
     // The CPU this state is associated with.
     uint32_t cpu_ = 0;
-
-    // The quantum the output slices should fall within.
-    uint64_t quantum_ = 0;
-
-    // When clipping is applied (i.e. WHERE ts_clip between X and Y), slices are
-    // cut and shrunk around the min-max boundaries to fit in the clip window.
-    uint64_t ts_clip_min_ = 0;
-    uint64_t ts_clip_max_ = std::numeric_limits<uint64_t>::max();
 
     const TraceStorage* storage_ = nullptr;
   };
@@ -127,7 +100,6 @@ class SchedSliceTable : public Table {
     PerCpuState* StateForCpu(uint32_t cpu) { return &per_cpu_state_[cpu]; }
 
     uint32_t next_cpu() const { return next_cpu_; }
-    uint64_t quantum() const { return quantum_; }
 
    private:
     // Creates a vector of indices into the slices for the given |cpu| sorted
@@ -163,9 +135,6 @@ class SchedSliceTable : public Table {
 
     // The next CPU which should be returned to the user.
     uint32_t next_cpu_ = 0;
-
-    // The quantum the output slices should fall within.
-    uint64_t quantum_ = 0;
 
     // The sorting criteria for this filter operation.
     std::vector<QueryConstraints::OrderBy> order_by_;
