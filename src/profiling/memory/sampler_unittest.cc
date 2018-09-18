@@ -18,6 +18,8 @@
 
 #include "gtest/gtest.h"
 
+#include <thread>
+
 namespace perfetto {
 namespace {
 
@@ -34,6 +36,18 @@ TEST(SamplerTest, TestSmall) {
   // As we initialize interval_to_next_sample_ with 0, the first sample
   // should always get sampled.
   EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+  pthread_key_delete(key);
+}
+
+TEST(SamplerTest, TestSmallFromThread) {
+  pthread_key_t key;
+  ASSERT_EQ(pthread_key_create(&key, nullptr), 0);
+  std::thread th([key] {
+    // As we initialize interval_to_next_sample_ with 0, the first sample
+    // should always get sampled.
+    EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+  });
+  th.join();
   pthread_key_delete(key);
 }
 
