@@ -22,7 +22,9 @@
 #include <functional>
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/temp_file.h"
 #include "perfetto/base/time.h"
 #include "src/trace_processor/trace_processor.h"
 
@@ -49,6 +51,39 @@ TraceProcessor* g_tp;
 void PrintPrompt() {
   printf("\r%80s\r> ", "");
   fflush(stdout);
+}
+
+std::string GetQuery() {
+  static char old_line[1024] = "";
+  char line[1024];
+  for (;;) {
+    PrintPrompt();
+    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
+      _exit(0);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
+    PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+    if (strcmp(line, "!\n") == 0) {
+      const char* editor = getenv("EDITOR");
+      if (!editor)
+        editor = "nano";
+      perfetto::base::TempFile tmp = perfetto::base::TempFile::Create();
+      perfetto::base::WriteFileDescriptor(tmp.fd(), old_line);
+      lseek(tmp.fd(), 0, SEEK_SET);
+      std::string cmdline = std::string("") + editor + " " + tmp.path();
+      if (system(cmdline.c_str()) != 0)
+        continue;
+      std::string query;
+      perfetto::base::ReadFileDescriptor(tmp.fd(), &query);
+      strncpy(line, query.c_str(), sizeof(line));
+      printf("%s", line);
+#endif
+    }
+    if (strcmp(line, "\n") == 0)
+      continue;
+    break;
+  }
+  strncpy(old_line, line, sizeof(old_line));
+  return std::string(line);
 }
 
 void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
@@ -176,14 +211,8 @@ int main(int argc, char** argv) {
 #endif
 
   for (;;) {
-    PrintPrompt();
-    char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
-      return 0;
-    if (strcmp(line, "\n") == 0)
-      continue;
     protos::RawQueryArgs query;
-    query.set_sql_query(line);
+    query.set_sql_query(GetQuery());
     base::TimeNanos t_start = base::GetWallTimeNs();
     g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
       OnQueryResult(t_start, res);

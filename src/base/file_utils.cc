@@ -27,6 +27,14 @@ namespace {
 constexpr size_t kBufSize = 2048;
 }
 
+bool WriteFileDescriptor(int fd, const std::string& str) {
+  ssize_t written = PERFETTO_EINTR(write(fd, str.c_str(), str.length()));
+  ssize_t length = static_cast<ssize_t>(str.length());
+  // This should either fail or write fully.
+  PERFETTO_CHECK(written == length || written == -1);
+  return written == length;
+}
+
 bool ReadFileDescriptor(int fd, std::string* out) {
   // Do not override existing data in string.
   size_t i = out->size();

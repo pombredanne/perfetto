@@ -22,6 +22,7 @@
 namespace perfetto {
 namespace base {
 
+bool WriteFileDescriptor(int fd, const std::string& in);
 bool ReadFileDescriptor(int fd, std::string* out);
 bool ReadFile(const std::string& path, std::string* out);
 
