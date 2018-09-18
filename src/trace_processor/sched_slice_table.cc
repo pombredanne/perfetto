@@ -98,12 +98,8 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
                                    "ts UNSIGNED BIG INT, "
                                    "cpu UNSIGNED INT, "
                                    "dur UNSIGNED BIG INT, "
-                                   "quantized_group UNSIGNED BIG INT, "
                                    "utid UNSIGNED INT, "
                                    "cycles UNSIGNED BIG INT, "
-                                   "quantum HIDDEN BIG INT, "
-                                   "ts_lower_bound HIDDEN BIG INT, "
-                                   "ts_clip HIDDEN BOOLEAN, "
                                    "PRIMARY KEY(cpu, ts)"
                                    ") WITHOUT ROWID;");
 }
@@ -117,61 +113,12 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   bool is_time_constrained = false;
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     const auto& cs = qc.constraints()[i];
-
-    // Omit SQLite constraint checks on the hidden columns, so the client can
-    // write queries of the form "quantum=x" "ts_lower_bound=x" "ts_clip=true".
-    // Disallow any other constraint on these columns.
-    if (cs.iColumn == Column::kTimestampLowerBound ||
-        cs.iColumn == Column::kQuantizedGroup ||
-        cs.iColumn == Column::kClipTimestamp) {
-      if (!IsOpEq(cs.op))
-        return SQLITE_CONSTRAINT_FUNCTION;
-      info->omit[i] = true;
-    }
-
-    if (cs.iColumn == Column::kTimestampLowerBound ||
-        cs.iColumn == Column::kTimestamp) {
+    if (cs.iColumn == Column::kTimestamp)
       is_time_constrained = true;
-    }
   }
 
   info->estimated_cost = is_time_constrained ? 10 : 10000;
-
-  bool is_quantized_group_order = false;
-  bool is_duration_timestamp_order = false;
-  for (const auto& ob : qc.order_by()) {
-    switch (ob.iColumn) {
-      case Column::kQuantizedGroup:
-        is_quantized_group_order = true;
-        break;
-      case Column::kTimestamp:
-      case Column::kDuration:
-        is_duration_timestamp_order = true;
-        break;
-      case Column::kCpu:
-        break;
-
-      // Can't order on hidden columns.
-      case Column::kQuantum:
-      case Column::kTimestampLowerBound:
-      case Column::kClipTimestamp:
-        return SQLITE_CONSTRAINT_FUNCTION;
-    }
-  }
-
-  bool has_quantum_constraint = false;
-  for (const auto& cs : qc.constraints()) {
-    if (cs.iColumn == Column::kQuantum)
-      has_quantum_constraint = true;
-  }
-
-  // If a quantum constraint is present, we don't support native ordering by
-  // time related parameters or by quantized group.
-  bool needs_sqlite_orderby =
-      has_quantum_constraint &&
-      (is_duration_timestamp_order || is_quantized_group_order);
-
-  info->order_by_consumed = !needs_sqlite_orderby;
+  info->order_by_consumed = true;
 
   return SQLITE_OK;
 }
@@ -195,17 +142,14 @@ int SchedSliceTable::Cursor::Eof() {
 }
 
 int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
-  if (!filter_state_->IsNextRowIdIndexValid())
-    return SQLITE_ERROR;
+  PERFETTO_DCHECK(filter_state_->IsNextRowIdIndexValid());
 
-  uint64_t quantum = filter_state_->quantum();
   size_t row = filter_state_->next_row_id();
   const auto& slices = storage_->slices();
   switch (N) {
     case Column::kTimestamp: {
-      uint64_t timestamp = filter_state_->next_timestamp();
-      timestamp = std::max(timestamp, filter_state_->ts_clip_min());
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(timestamp));
+      uint64_t ts = slices.start_ns()[row];
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ts));
       break;
     }
     case Column::kCpu: {
@@ -213,38 +157,8 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
       break;
     }
     case Column::kDuration: {
-      uint64_t duration;
-      uint64_t start_ns = filter_state_->next_timestamp();
-      if (quantum == 0) {
-        duration = slices.durations()[row];
-        uint64_t end_ns = start_ns + duration;
-        uint64_t clip_trim_ns = 0;
-        if (filter_state_->ts_clip_min() > start_ns)
-          clip_trim_ns += filter_state_->ts_clip_min() - start_ns;
-        if (end_ns > filter_state_->ts_clip_max())
-          clip_trim_ns += end_ns - filter_state_->ts_clip_min();
-        duration -= std::min(clip_trim_ns, duration);
-      } else {
-        uint64_t start_quantised_group = start_ns / quantum;
-        uint64_t end = slices.start_ns()[row] + slices.durations()[row];
-        uint64_t next_group_start = (start_quantised_group + 1) * quantum;
-
-        // Compute the minimum of the start of the next group boundary and the
-        // end of this slice.
-        uint64_t min_slice_end = std::min<uint64_t>(end, next_group_start);
-        duration = min_slice_end - start_ns;
-      }
+      uint64_t duration = slices.durations()[row];
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(duration));
-      break;
-    }
-    case Column::kQuantizedGroup: {
-      auto group = quantum == 0 ? filter_state_->next_timestamp()
-                                : filter_state_->next_timestamp() / quantum;
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(group));
-      break;
-    }
-    case Column::kQuantum: {
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(quantum));
       break;
     }
     case Column::kUtid: {
@@ -270,23 +184,12 @@ SchedSliceTable::FilterState::FilterState(
 
   uint64_t min_ts = 0;
   uint64_t max_ts = kUint64Max;
-  uint64_t ts_lower_bound = 0;
-  bool ts_clip = false;
 
   for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
     const auto& cs = query_constraints.constraints()[i];
     switch (cs.iColumn) {
       case Column::kCpu:
         PopulateFilterBitmap(cs.op, argv[i], &cpu_filter);
-        break;
-      case Column::kQuantum:
-        quantum_ = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
-        break;
-      case Column::kTimestampLowerBound:
-        ts_lower_bound = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
-        break;
-      case Column::kClipTimestamp:
-        ts_clip = sqlite3_value_int(argv[i]) ? true : false;
         break;
       case Column::kTimestamp: {
         auto ts = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
@@ -300,66 +203,19 @@ SchedSliceTable::FilterState::FilterState(
     }
   }
 
-  if (ts_clip) {
-    PERFETTO_DCHECK(ts_lower_bound == 0);
-    if (ts_lower_bound)
-      PERFETTO_ELOG("Cannot use ts_lower_bound and ts_clip together");
-    ts_lower_bound = min_ts;
-    min_ts = 0;
-  }
-
-  // If the query specifies a lower bound on ts, find that bound and turn that
-  // into a min_ts constraint. ts_lower_bound is defined as the largest
-  // timestamp < X, or if none, the smallest timestamp >= X.
-  const auto& slices = storage_->slices();
-  if (ts_lower_bound > 0) {
-    uint64_t largest_ts_before = 0;
-    uint64_t smallest_ts_after = kUint64Max;
-    const auto& start_ns = slices.start_ns();
-    // std::lower_bound will find the first timestamp >= |ts_lower_bound|.
-    // From there we need to move back until we hit a slice with an allowed CPU.
-    auto it =
-        std::lower_bound(start_ns.begin(), start_ns.end(), ts_lower_bound);
-    size_t diff = static_cast<size_t>(std::distance(start_ns.begin(), it));
-    if (diff > 0) {
-      // std::lower_bound will find the first timestamp >= |ts_lower_bound|.
-      // From there we need to move one back, allowing for constraints on CPUs.
-      do {
-        it--;
-        diff--;
-      } while (diff > 0 && !cpu_filter.test(slices.cpus()[diff]));
-    }
-    // Only compute |largest_ts_before| and |smallest_ts_after| if the CPU
-    // is a valid one.
-    if (cpu_filter.test(slices.cpus()[diff])) {
-      if (*it < ts_lower_bound) {
-        largest_ts_before = std::max(largest_ts_before, *it);
-      } else {
-        smallest_ts_after = std::min(smallest_ts_after, *it);
-      }
-    }
-    uint64_t lower_bound = std::min(largest_ts_before, smallest_ts_after);
-    min_ts = std::max(min_ts, lower_bound);
-  }  // if (ts_lower_bound)
-
-  ts_clip_min_ = ts_clip ? min_ts : 0;
-  ts_clip_max_ = ts_clip ? max_ts : kUint64Max;
-  sorted_row_ids_ = CreateSortedIndexVector(min_ts, max_ts);
-  sorted_row_ids_size_ = sorted_row_ids_.size();
-
   // Filter rows on CPUs if any CPUs need to be excluded.
-  row_filter_.resize(sorted_row_ids_size_, true);
+  const auto& slices = storage_->slices();
+  row_filter_.resize(sorted_row_ids_.size(), true);
   if (cpu_filter.count() < cpu_filter.size()) {
-    for (size_t i = 0; i < sorted_row_ids_size_; i++) {
+    for (size_t i = 0; i < sorted_row_ids_.size(); i++) {
       row_filter_[i] = cpu_filter.test(slices.cpus()[sorted_row_ids_[i]]);
     }
   }
   FindNextRowAndTimestamp();
 }
 
-std::vector<uint32_t> SchedSliceTable::FilterState::CreateSortedIndexVector(
-    uint64_t min_ts,
-    uint64_t max_ts) {
+void SchedSliceTable::FilterState::SetupSortedRowIds(uint64_t min_ts,
+                                                     uint64_t max_ts) {
   const auto& slices = storage_->slices();
   const auto& start_ns = slices.start_ns();
   PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
@@ -369,19 +225,17 @@ std::vector<uint32_t> SchedSliceTable::FilterState::CreateSortedIndexVector(
   ptrdiff_t dist = std::distance(min_it, max_it);
   PERFETTO_CHECK(dist >= 0 && static_cast<size_t>(dist) <= start_ns.size());
 
-  std::vector<uint32_t> indices(static_cast<size_t>(dist));
-
   // Fill |indices| with the consecutive row numbers affected by the filtering.
-  std::iota(indices.begin(), indices.end(),
+  sorted_row_ids_.resize(static_cast<size_t>(dist));
+  std::iota(sorted_row_ids_.begin(), sorted_row_ids_.end(),
             std::distance(start_ns.begin(), min_it));
 
   // Sort if there is any order by constraints.
   if (!order_by_.empty()) {
-    std::sort(indices.begin(), indices.end(), [this](uint32_t f, uint32_t s) {
-      return CompareSlices(f, s) < 0;
-    });
+    std::sort(
+        sorted_row_ids_.begin(), sorted_row_ids_.end(),
+        [this](uint32_t f, uint32_t s) { return CompareSlices(f, s) < 0; });
   }
-  return indices;
 }
 
 int SchedSliceTable::FilterState::CompareSlices(size_t f_idx, size_t s_idx) {
@@ -409,43 +263,13 @@ int SchedSliceTable::FilterState::CompareSlicesOnColumn(
       return Compare(sl.utids()[f_idx], sl.utids()[s_idx], ob.desc);
     case SchedSliceTable::Column::kCycles:
       return Compare(sl.cycles()[f_idx], sl.cycles()[s_idx], ob.desc);
-    case SchedSliceTable::Column::kQuantizedGroup: {
-      // We don't support sorting on quantized group when we have a non-zero
-      // quantum.
-      PERFETTO_CHECK(quantum_ == 0);
-
-      // Just compare timestamps as a proxy for quantized groups.
-      return Compare(sl.start_ns()[f_idx], sl.start_ns()[s_idx], ob.desc);
-    }
-    case SchedSliceTable::Column::kQuantum:
-    case SchedSliceTable::Column::kTimestampLowerBound:
-    case SchedSliceTable::Column::kClipTimestamp:
-      PERFETTO_CHECK(false);
   }
   PERFETTO_FATAL("Unexpected column %d", ob.iColumn);
 }
 
 void SchedSliceTable::FilterState::FindNextSlice() {
-  PERFETTO_DCHECK(next_timestamp_ != 0);
-
-  if (quantum_ == 0) {
-    next_row_id_index_++;
-    FindNextRowAndTimestamp();
-    return;
-  }
-
-  const auto& slices = storage_->slices();
-  uint64_t start_group = next_timestamp_ / quantum_;
-  uint64_t end_slice =
-      slices.start_ns()[next_row_id()] + slices.durations()[next_row_id()];
-  uint64_t next_group_start = (start_group + 1) * quantum_;
-
-  if (next_group_start >= end_slice) {
-    next_row_id_index_++;
-    FindNextRowAndTimestamp();
-  } else {
-    next_timestamp_ = next_group_start;
-  }
+  next_row_id_index_++;
+  FindNextRowAndTimestamp();
 }
 
 void SchedSliceTable::FilterState::FindNextRowAndTimestamp() {
@@ -455,10 +279,6 @@ void SchedSliceTable::FilterState::FindNextRowAndTimestamp() {
   auto next_it = std::find(start, row_filter_.end(), true);
   next_row_id_index_ =
       static_cast<uint32_t>(std::distance(row_filter_.begin(), next_it));
-
-  const auto& slices = storage_->slices();
-  next_timestamp_ =
-      IsNextRowIdIndexValid() ? slices.start_ns()[next_row_id()] : 0;
 }
 
 }  // namespace trace_processor

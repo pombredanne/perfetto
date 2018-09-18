@@ -37,14 +37,8 @@ class SchedSliceTable : public Table {
     kTimestamp = 0,
     kCpu = 1,
     kDuration = 2,
-    kQuantizedGroup = 3,
-    kUtid = 4,
-    kCycles = 5,
-
-    // Hidden columns.
-    kQuantum = 6,
-    kTimestampLowerBound = 7,
-    kClipTimestamp = 8,
+    kUtid = 3,
+    kCycles = 4,
   };
 
   SchedSliceTable(const TraceStorage* storage);
@@ -66,20 +60,15 @@ class SchedSliceTable : public Table {
     void FindNextSlice();
 
     inline bool IsNextRowIdIndexValid() const {
-      return next_row_id_index_ < sorted_row_ids_size_;
+      return next_row_id_index_ < sorted_row_ids_.size();
     }
 
     size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
-    uint64_t next_timestamp() const { return next_timestamp_; }
-    uint64_t quantum() const { return quantum_; }
-    uint64_t ts_clip_min() const { return ts_clip_min_; }
-    uint64_t ts_clip_max() const { return ts_clip_max_; }
 
    private:
-    // Creates a vector of indices into the slices sorted by the order by
-    // criteria.
-    std::vector<uint32_t> CreateSortedIndexVector(uint64_t min_ts,
-                                                  uint64_t max_ts);
+    // Updates |sorted_row_ids_| with the indices into the slices sorted by the
+    // order by criteria.
+    void SetupSortedRowIds(uint64_t min_ts, uint64_t max_ts);
 
     // Compares the slice at index |f| with the slice at index |s|on all
     // columns.
@@ -100,27 +89,11 @@ class SchedSliceTable : public Table {
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
 
-    // Size of the sorted row ids (inlined for performance).
-    size_t sorted_row_ids_size_ = 0;
-
     // Bitset for filtering slices.
     std::vector<bool> row_filter_;
 
     // An offset into |sorted_row_ids_| indicating the next row to return.
     uint32_t next_row_id_index_ = 0;
-
-    // The timestamp of the row to index. This is either the timestamp of
-    // the slice at |next_row_id_index_| or the timestamp of the next quantized
-    // group boundary.
-    uint64_t next_timestamp_ = 0;
-
-    // The quantum the output slices should fall within.
-    uint64_t quantum_ = 0;
-
-    // When clipping is applied (i.e. WHERE ts_clip between X and Y), slices are
-    // cut and shrunk around the min-max boundaries to fit in the clip window.
-    uint64_t ts_clip_min_ = 0;
-    uint64_t ts_clip_max_ = std::numeric_limits<uint64_t>::max();
 
     // The sorting criteria for this filter operation.
     std::vector<QueryConstraints::OrderBy> order_by_;
