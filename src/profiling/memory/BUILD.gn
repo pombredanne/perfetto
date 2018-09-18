@@ -104,6 +104,17 @@ source_set("client") {
   ]
 }
 
+source_set("sampler") {
+  deps = [
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  sources = [
+    "sampler.cc",
+    "sampler.h",
+  ]
+}
+
 source_set("unittests") {
   public_configs = [
     "../../../gn:default_config",
@@ -114,6 +125,7 @@ source_set("unittests") {
     ":bookkeeping",
     ":client",
     ":record_reader",
+    ":sampler",
     ":socket_listener",
     ":string_interner",
     ":unwinding",
@@ -127,6 +139,7 @@ source_set("unittests") {
     "client_unittest.cc",
     "heapprofd_integrationtest.cc",
     "record_reader_unittest.cc",
+    "sampler_unittest.cc",
     "socket_listener_unittest.cc",
     "string_interner_unittest.cc",
     "unwinding_unittest.cc",
