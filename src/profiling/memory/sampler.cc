@@ -34,12 +34,17 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key) {
 // algorithm at
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
-size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
+int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
   std::exponential_distribution<double> dist(1 / rate);
+  int64_t next = static_cast<int64_t>(dist(random_engine_));
+  return next < 1 ? 1 : next;
+}
+
+size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
   interval_to_next_sample_ -= sz;
   size_t sz_multiplier = 0;
   while (PERFETTO_UNLIKELY(interval_to_next_sample_ <= 0)) {
-    interval_to_next_sample_ += dist(random_engine_);
+    interval_to_next_sample_ += NextSampleInterval(rate);
     ++sz_multiplier;
   }
   return sz_multiplier;

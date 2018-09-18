@@ -29,6 +29,7 @@ class ThreadLocalSamplingData {
   size_t ShouldSample(size_t sz, double rate);
 
  private:
+  int64_t NextSampleInterval(double rate);
   int64_t interval_to_next_sample_ = 0;
   std::default_random_engine random_engine_;
 };
