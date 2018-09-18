@@ -23,6 +23,20 @@
 #include "perfetto/base/utils.h"
 #include "src/trace_processor/trace_storage.h"
 
+// custom specialization of std::hash for std::pair
+namespace std {
+template <>
+struct hash<std::pair<uint64_t, ::perfetto::trace_processor::StringId>> {
+  size_t operator()(
+      std::pair<uint64_t, ::perfetto::trace_processor::StringId> const& s) const
+      noexcept {
+    size_t const h1(std::hash<uint64_t>{}(s.first));
+    size_t const h2(std::hash<size_t>{}(s.second));
+    return h1 ^ (h2 << 1);
+  }
+};
+}  // namespace std
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -52,7 +66,6 @@ class SchedTracker {
   struct Counter {
     uint64_t timestamp = 0;
     double value = 0;
-    StringId name_id = 0;
   };
 
   // This method is called when a sched switch event is seen in the trace.
@@ -64,7 +77,6 @@ class SchedTracker {
                                uint32_t next_pid);
 
   // This method is called when a cpu freq event is seen in the trace.
-  // In the future it will be called for all counters.
   // TODO(taylori): Move to a more appropriate class or rename class.
   virtual void PushCounter(uint64_t timestamp,
                            double value,
@@ -76,9 +88,10 @@ class SchedTracker {
   // Store the previous sched event to calculate the duration before storing it.
   std::array<SchedSwitchEvent, base::kMaxCpus> last_sched_per_cpu_;
 
-  // Store the previous counter event to calculate the duration before storing
-  // in trace storage.
-  std::array<Counter, base::kMaxCpus> last_counter_per_cpu_;
+  // Store the previous counter event to calculate the duration and value delta
+  // before storing it in trace storage.
+  std::unordered_map<std::pair<uint64_t, StringId>, Counter>
+      last_counter_per_id_;
 
   // Timestamp of the previous event. Used to discard events arriving out
   // of order.
