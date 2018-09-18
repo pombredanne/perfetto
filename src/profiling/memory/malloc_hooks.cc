@@ -66,31 +66,6 @@ void* heapprofd_valloc(size_t size);
 #endif
 
 __END_DECLS
-namespace perfetto {
-namespace {
-
-void* FindStackBase() {
-  FILE* maps = fopen("/proc/self/maps", "r");
-  if (maps == nullptr) {
-    return nullptr;
-  }
-  while (!feof(maps)) {
-    char line[1024];
-    char* data = fgets(line, sizeof(line), maps);
-    if (data != nullptr && strstr(data, "[stack]")) {
-      char* sep = strstr(data, "-");
-      if (sep == nullptr)
-        continue;
-      sep++;
-      fclose(maps);
-      return reinterpret_cast<void*>(strtoll(sep, nullptr, 16));
-    }
-  }
-  fclose(maps);
-  return nullptr;
-}
-}  // namespace
-}  // namespace perfetto
 
 bool heapprofd_initialize(const MallocDispatch* malloc_dispatch,
                           int*,
