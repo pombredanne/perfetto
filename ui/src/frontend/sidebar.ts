@@ -25,6 +25,7 @@ import {
 import {globals} from './globals';
 
 const ALL_PROCESSES_QUERY = 'select name, pid from process order by name;';
+
 const CPU_TIME_FOR_PROCESSES = `
 select
   process.name,
@@ -41,6 +42,20 @@ from
   join thread using(utid) group by upid)
 join process using(upid)
 order by cpu_sec desc limit 100;`;
+
+const CYCLES_PER_P_STATE_PER_CPU = `
+select ref as cpu, value as freq, sum(dur * value)/1e6 as mcycles
+from counters group by cpu, freq order by mcycles desc limit 20;`;
+
+const CPU_TIME_BY_CLUSTER_BY_PROCESS = `
+select
+thread.name as comm,
+case when cpug = 0 then 'big' else 'little' end as core,
+cpu_sec from
+  (select cpu/4 cpug, utid, sum(dur)/1e9 as cpu_sec
+  from sched group by utid, cpug order by cpu_sec desc)
+left join thread using(utid)
+limit 20;`;
 
 function createCannedQuery(query: string): (_: Event) => void {
   return (e: Event) => {
@@ -97,6 +112,16 @@ const SECTIONS = [
       {
         t: 'CPU Time by process',
         a: createCannedQuery(CPU_TIME_FOR_PROCESSES),
+        i: 'search',
+      },
+      {
+        t: 'Cycles by p-state by CPU',
+        a: createCannedQuery(CYCLES_PER_P_STATE_PER_CPU),
+        i: 'search',
+      },
+      {
+        t: 'CPU Time by cluster by process',
+        a: createCannedQuery(CPU_TIME_BY_CLUSTER_BY_PROCESS),
         i: 'search',
       },
     ],
