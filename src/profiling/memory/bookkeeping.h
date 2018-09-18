@@ -36,6 +36,8 @@ struct CodeLocation {
   std::string function_name;
 };
 
+// Internal data-structure for Callsites to safe memory if the same function
+// is named multiple times.
 struct InternedCodeLocation {
   StringInterner::InternedString map_name;
   StringInterner::InternedString function_name;
@@ -47,6 +49,11 @@ struct InternedCodeLocation {
   }
 };
 
+// Graph of function callsites. This is shared between heap dumps for
+// different processes. Each call sites is represented by a Callsites::Node
+// that is owned by the parent (i.e. calling) callsite. It has a pointer
+// to its parent, which means the function call-graph can be reconstructed
+// from a Callsites::Node by walking down the pointers to the parents.
 class Callsites {
  public:
   // Node in a tree of function traces that resulted in an allocation. For
@@ -119,7 +126,13 @@ class HeapDump {
     Callsites::Node* node;
   };
 
+  // If address is 0, record that an alloc was recorded at sequence_number.
+  // Otherwise, record that a free of address occured at sequence_number.
+  // This free will be delayed until all operations up to sequence_number
+  // have been observed.
   void AddPending(uint64_t sequence_number, uint64_t address);
+  // This must be  called after all operations up to sequence_number have been
+  // applied.
   void ApplyFree(uint64_t sequence_number, uint64_t address);
 
   // Address -> (size, sequence_number, code location)

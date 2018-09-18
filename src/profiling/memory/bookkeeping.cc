@@ -35,7 +35,8 @@ void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
     if (it->second.sequence_number > sequence_number)
       return;
     else
-      // Clean up previous allocation.
+      // Clean up previous allocation by pretending a free happened just after
+      // it.
       ApplyFree(it->second.sequence_number + 1, address);
   }
 
@@ -70,7 +71,7 @@ void HeapDump::AddPending(uint64_t sequence_number, uint64_t address) {
     ApplyFree(sequence_number, address);
   consistent_sequence_number_++;
 
-  auto it = pending_.upper_bound(0);
+  auto it = pending_.begin();
   while (it != pending_.end() && it->first == consistent_sequence_number_ + 1) {
     if (it->second)
       ApplyFree(it->first, it->second);
@@ -111,6 +112,8 @@ Callsites::Node* Callsites::IncrementCallsite(
 }
 
 void Callsites::DecrementNode(Node* node, uint64_t size) {
+  PERFETTO_DCHECK(node->cum_size_ >= size);
+
   bool delete_prev = false;
   Node* prev = nullptr;
   while (node != nullptr) {
