@@ -16,6 +16,8 @@
 
 #include "src/profiling/memory/bookkeeping.h"
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 
 Callsites::Node* Callsites::Node::GetOrCreateChild(
