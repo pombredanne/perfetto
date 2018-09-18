@@ -14,20 +14,26 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/trace_processor_context.h"
-#include "src/trace_processor/chunked_trace_reader.h"
-#include "src/trace_processor/json_trace_parser.h"
-#include "src/trace_processor/process_tracker.h"
-#include "src/trace_processor/proto_trace_parser.h"
-#include "src/trace_processor/sched_tracker.h"
-#include "src/trace_processor/slice_tracker.h"
-#include "src/trace_processor/trace_sorter.h"
+#ifndef INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
+#define INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
+
+#include "perfetto/base/scoped_file.h"
 
 namespace perfetto {
-namespace trace_processor {
+namespace base {
 
-TraceProcessorContext::TraceProcessorContext() = default;
-TraceProcessorContext::~TraceProcessorContext() = default;
+ssize_t Send(int fd,
+             const void* msg,
+             size_t len,
+             const int* send_fds,
+             size_t num_fds);
 
-}  // namespace trace_processor
+ssize_t Receive(int fd,
+                void* msg,
+                size_t len,
+                base::ScopedFile* fd_vec,
+                size_t max_files);
+}  // namespace base
 }  // namespace perfetto
+
+#endif  // INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_

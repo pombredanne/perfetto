@@ -24,9 +24,8 @@
 namespace perfetto {
 namespace trace_processor {
 
-SchedTracker::SchedTracker(TraceProcessorContext* context) : context_(context) {
-  cpu_freq_string_id_ = context_->storage->InternString("CpuFreq");
-};
+SchedTracker::SchedTracker(TraceProcessorContext* context)
+    : context_(context){};
 
 SchedTracker::~SchedTracker() = default;
 
@@ -70,6 +69,7 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
 
 void SchedTracker::PushCounter(uint64_t timestamp,
                                double value,
+                               StringId name_id,
                                uint64_t ref,
                                RefType ref_type) {
   if (timestamp < prev_timestamp_) {
@@ -79,19 +79,19 @@ void SchedTracker::PushCounter(uint64_t timestamp,
   }
   if (last_counter_per_cpu_[ref].timestamp != 0) {
     uint64_t duration = 0;
-    // Currently non cpu freq counter events will have a duration of 0 and will
-    // not be stored.
-    if (ref_type == RefType::CPU_ID) {
+    // TODO(taylori): Add handling of events other than cpu freq.
+    if (ref_type == RefType::kCPU_ID) {
       duration = timestamp - last_counter_per_cpu_[ref].timestamp;
     }
     context_->storage->mutable_counters()->AddCounter(
-        last_counter_per_cpu_[ref].timestamp, duration, cpu_freq_string_id_,
+        last_counter_per_cpu_[ref].timestamp, duration, name_id,
         last_counter_per_cpu_[ref].value, static_cast<int64_t>(ref),
-        RefType::CPU_ID);
+        RefType::kCPU_ID);
   }
 
   last_counter_per_cpu_[ref].timestamp = timestamp;
   last_counter_per_cpu_[ref].value = value;
+  last_counter_per_cpu_[ref].name_id = name_id;
 };
 
 }  // namespace trace_processor

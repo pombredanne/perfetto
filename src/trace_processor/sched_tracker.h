@@ -52,6 +52,7 @@ class SchedTracker {
   struct Counter {
     uint64_t timestamp = 0;
     double value = 0;
+    StringId name_id = 0;
   };
 
   // This method is called when a sched switch event is seen in the trace.
@@ -64,8 +65,10 @@ class SchedTracker {
 
   // This method is called when a cpu freq event is seen in the trace.
   // In the future it will be called for all counters.
+  // TODO(taylori): Move to a more appropriate class or rename class.
   virtual void PushCounter(uint64_t timestamp,
                            double value,
+                           StringId name_id,
                            uint64_t ref,
                            RefType ref_type);
 
@@ -80,10 +83,6 @@ class SchedTracker {
   // Timestamp of the previous event. Used to discard events arriving out
   // of order.
   uint64_t prev_timestamp_ = 0;
-
-  // The string id for cpu freq to prevent interning it on every PushCounter
-  // call.
-  StringId cpu_freq_string_id_ = 0;
 
   TraceProcessorContext* const context_;
 };

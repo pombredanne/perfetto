@@ -102,10 +102,15 @@ TEST_F(SchedTrackerTest, InsertThirdSched_SameThread) {
 TEST_F(SchedTrackerTest, CounterDuration) {
   uint32_t cpu = 3;
   uint64_t timestamp = 100;
-  context.sched_tracker->PushCounter(timestamp, 1000, cpu, RefType::CPU_ID);
-  context.sched_tracker->PushCounter(timestamp + 1, 4000, cpu, RefType::CPU_ID);
-  context.sched_tracker->PushCounter(timestamp + 3, 5000, cpu, RefType::CPU_ID);
-  context.sched_tracker->PushCounter(timestamp + 9, 1000, cpu, RefType::CPU_ID);
+  StringId name_id = 0;
+  context.sched_tracker->PushCounter(timestamp, 1000, name_id, cpu,
+                                     RefType::kCPU_ID);
+  context.sched_tracker->PushCounter(timestamp + 1, 4000, name_id, cpu,
+                                     RefType::kCPU_ID);
+  context.sched_tracker->PushCounter(timestamp + 3, 5000, name_id, cpu,
+                                     RefType::kCPU_ID);
+  context.sched_tracker->PushCounter(timestamp + 9, 1000, name_id, cpu,
+                                     RefType::kCPU_ID);
 
   ASSERT_EQ(context.storage->counters().counter_count(), 3ul);
   ASSERT_EQ(context.storage->counters().timestamps().at(0), timestamp);

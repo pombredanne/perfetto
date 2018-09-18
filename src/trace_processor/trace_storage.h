@@ -43,7 +43,7 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = size_t;
 
-enum RefType { UPID = 0, CPU_ID = 1 };
+enum RefType { kUPID = 0, kCPU_ID = 1 };
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -97,7 +97,7 @@ class TraceStorage {
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
    private:
-    // Each vector below has the same number of entries (the number of slices
+    // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
@@ -207,7 +207,8 @@ class TraceStorage {
 
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
-  StringId InternString(base::StringView);
+  // Virtual for testing.
+  virtual StringId InternString(base::StringView);
 
   Process* GetMutableProcess(UniquePid upid) {
     PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());

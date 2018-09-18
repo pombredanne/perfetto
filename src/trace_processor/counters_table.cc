@@ -49,6 +49,7 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
+  // TODO(taylori): Work out cost dependant on constraints.
   info->estimated_cost =
       static_cast<uint32_t>(storage_->counters().counter_count());
   return SQLITE_OK;
@@ -85,11 +86,11 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kRefType: {
       switch (storage_->counters().types()[row_]) {
-        case RefType::CPU_ID: {
+        case RefType::kCPU_ID: {
           sqlite3_result_text(context, "cpu", -1, nullptr);
           break;
         }
-        case RefType::UPID: {
+        case RefType::kUPID: {
           sqlite3_result_text(context, "upid", -1, nullptr);
           break;
         }
