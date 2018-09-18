@@ -25,7 +25,8 @@ namespace perfetto {
 namespace trace_processor {
 
 SchedTracker::SchedTracker(TraceProcessorContext* context)
-    : context_(context){};
+    : idle_string_id_(context->storage->InternString("idle")),
+      context_(context) {}
 
 SchedTracker::~SchedTracker() = default;
 
@@ -48,7 +49,9 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   // slice.
   if (prev->valid()) {
     uint64_t duration = timestamp - prev->timestamp;
-    StringId prev_thread_name_id = context_->storage->InternString(prev_comm);
+    StringId prev_thread_name_id =
+        prev->next_pid == 0 ? idle_string_id_
+                            : context_->storage->InternString(prev_comm);
     UniqueTid utid = context_->process_tracker->UpdateThread(
         prev->timestamp, prev->next_pid /* == prev_pid */, prev_thread_name_id);
     uint64_t cycles = CalculateCycles(cpu, prev->timestamp, timestamp);

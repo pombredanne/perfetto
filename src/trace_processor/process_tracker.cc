@@ -24,19 +24,17 @@ namespace perfetto {
 namespace trace_processor {
 
 ProcessTracker::ProcessTracker(TraceProcessorContext* context)
-    : context_(context){};
+    : context_(context) {
+  // Setup process/thread names for the idle process.
+  UpdateThreadName(0, 0, "idle");
+  UpdateProcess(0, "idle");
+}
 
 ProcessTracker::~ProcessTracker() = default;
 
 UniqueTid ProcessTracker::UpdateThread(uint64_t timestamp,
                                        uint32_t tid,
                                        StringId thread_name_id) {
-  // tid == 0 indiciates the idle process. Simply return the utid 1 without
-  // doing any bookeeping.
-  if (tid == 0) {
-    return 1;
-  }
-
   auto pair_it = tids_.equal_range(tid);
 
   // If a utid exists for the tid, find it and update the name.
