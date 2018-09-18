@@ -29,7 +29,8 @@ using namespace sqlite_utils;
 
 }  // namespace
 
-ProcessTable::ProcessTable(const TraceStorage* storage) : storage_(storage) {}
+ProcessTable::ProcessTable(sqlite3*, const TraceStorage* storage)
+    : storage_(storage) {}
 
 void ProcessTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ProcessTable>(db, storage, "process");
