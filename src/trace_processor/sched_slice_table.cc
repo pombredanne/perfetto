@@ -202,6 +202,7 @@ SchedSliceTable::FilterState::FilterState(
       }
     }
   }
+  SetupSortedRowIds(min_ts, max_ts);
 
   // Filter rows on CPUs if any CPUs need to be excluded.
   const auto& slices = storage_->slices();
