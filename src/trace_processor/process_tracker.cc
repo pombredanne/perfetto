@@ -25,9 +25,9 @@ namespace trace_processor {
 
 ProcessTracker::ProcessTracker(TraceProcessorContext* context)
     : context_(context) {
-  // Setup process/thread names for the idle process.
-  UpdateThreadName(0, 0, "idle");
-  UpdateProcess(0, "idle");
+  // Create a mapping from (t|p)id 0 -> u(t|p)id 0 for the idle process.
+  tids_.emplace(0, 0);
+  pids_.emplace(0, 0);
 }
 
 ProcessTracker::~ProcessTracker() = default;
