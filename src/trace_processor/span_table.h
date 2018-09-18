@@ -80,10 +80,11 @@ class SpanTable : public Table {
 
     uint64_t ts_ = 0;
     uint64_t dur_ = 0;
-    uint32_t cpu_ = 0;
+    uint32_t join_val_ = 0;
     TableRow t1_to_ret_;
     TableRow t2_to_ret_;
 
+    // TODO(lalitm): change this from being an arrray to a map.
     std::array<TableRow, base::kMaxCpus> t1_;
     std::array<TableRow, base::kMaxCpus> t2_;
 
@@ -117,10 +118,13 @@ class SpanTable : public Table {
   struct TableDefenition {
     std::string name;
     std::vector<Column> cols;
+    std::string join_col_name;
   };
 
   TableDefenition t1_;
   TableDefenition t2_;
+  std::string join_col_;
+
   sqlite3* const db_;
 };
 

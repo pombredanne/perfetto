@@ -62,8 +62,8 @@ TEST_F(SpanTableTest, Smoke) {
   RunStatement(
       "CREATE TEMP TABLE f(ts INTEGER PRIMARY KEY, dur INTEGER, cpu INTEGER);");
   RunStatement(
-      "CREATE TEMP TABLE s(ts INTEGER PRIMARY KEY, dur INTEGER, ref INTEGER);");
-  RunStatement("CREATE VIRTUAL TABLE sp USING span(\"f\", \"s\", \"cpu\");");
+      "CREATE TEMP TABLE s(ts INTEGER PRIMARY KEY, dur INTEGER, cpu INTEGER);");
+  RunStatement("CREATE VIRTUAL TABLE sp USING span(f, s, cpu);");
 
   RunStatement("INSERT INTO f VALUES(100, 10, 5);");
   RunStatement("INSERT INTO f VALUES(110, 50, 5);");

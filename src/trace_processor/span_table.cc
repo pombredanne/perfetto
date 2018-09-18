@@ -86,44 +86,55 @@ void SpanTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::string SpanTable::CreateTableStmt(int argc, const char* const* argv) {
+  // argv[0] - argv[2] are SQLite populated fields which are always present.
   if (argc < 6)
     return "";
 
+  // The order arguments is (t1_name, t2_name, join_col).
   t1_.name = reinterpret_cast<const char*>(argv[3]);
   t1_.cols = GetColumnsForTable(db_, t1_.name);
 
   t2_.name = reinterpret_cast<const char*>(argv[4]);
   t2_.cols = GetColumnsForTable(db_, t2_.name);
 
-  // TODO(tilal6991): check that dur, ts and merge_col are all present in
-  // the tables and have the same type.
-  // std::string merge_col = argv[2];
+  join_col_ = reinterpret_cast<const char*>(argv[5]);
 
-  auto t1_remove_it =
-      std::remove_if(t1_.cols.begin(), t1_.cols.end(), [](const Column& it) {
-        return it.name == "ts" || it.name == "dur" || it.name == "cpu";
+  // TODO(lalitm): add logic to ensure that the tables that are being joined
+  // are actually valid to be joined i.e. they have the ts and dur columns and
+  // have the join column.
+
+  auto t1_remove_it = std::remove_if(
+      t1_.cols.begin(), t1_.cols.end(), [this](const Column& it) {
+        return it.name == "ts" || it.name == "dur" || it.name == join_col_;
       });
   t1_.cols.erase(t1_remove_it, t1_.cols.end());
-  auto t2_remove_it =
-      std::remove_if(t2_.cols.begin(), t2_.cols.end(), [](const Column& it) {
-        return it.name == "ts" || it.name == "dur" || it.name == "cpu";
+  auto t2_remove_it = std::remove_if(
+      t2_.cols.begin(), t2_.cols.end(), [this](const Column& it) {
+        return it.name == "ts" || it.name == "dur" || it.name == join_col_;
       });
   t2_.cols.erase(t2_remove_it, t2_.cols.end());
 
+  // Create the statement as the combination of the unique columns of the two
+  // tables.
   std::stringstream ss;
   ss << "CREATE TABLE x("
         "ts UNSIGNED BIG INT, "
-        "dur UNSIGNED BIG INT, "
-        "cpu UNSIGNED INT, ";
+        "dur UNSIGNED BIG INT, ";
+
+  // TODO(lalitm): stop hardcoding that the join column is an unsigned int.
+  ss << join_col_ << " UNSIGNED INT, ";
+
   for (const auto& col : t1_.cols) {
     ss << col.name << " " << col.type << ", ";
   }
   for (const auto& col : t2_.cols) {
     ss << col.name << " " << col.type << ", ";
   }
-  ss << "PRIMARY KEY(ts, cpu)"
+  ss << "PRIMARY KEY(ts, " << join_col_
+     << ")"
         ") WITHOUT ROWID;";
 
+  PERFETTO_LOG("%s", ss.str().c_str());
   return ss.str();
 }
 
@@ -142,11 +153,11 @@ SpanTable::Cursor::~Cursor() {}
 
 int SpanTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   std::stringstream ss_t1;
-  ss_t1 << "SELECT ts, dur, cpu";
+  ss_t1 << "SELECT ts, dur, " << table_->join_col_;
   for (const auto& col : table_->t1_.cols) {
     ss_t1 << ", " << col.name;
   }
-  ss_t1 << " FROM " << table_->t1_.name << ";";
+  ss_t1 << " FROM " << table_->t1_.name << " ORDER BY ts;";
 
   std::string t1_sql = ss_t1.str();
   int t1_size = static_cast<int>(t1_sql.size());
@@ -156,14 +167,12 @@ int SpanTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   if (err != SQLITE_OK)
     return err;
 
-  // TODO(tilal6991): remove ts > 0 hack when we figure out why we're seeing
-  // those.
   std::stringstream ss_t2;
-  ss_t2 << "SELECT ts, dur, ref as cpu";
+  ss_t2 << "SELECT ts, dur, " << table_->join_col_;
   for (const auto& col : table_->t2_.cols) {
     ss_t2 << ", " << col.name;
   }
-  ss_t2 << " FROM " << table_->t2_.name << " WHERE ts > 0 ORDER BY ts;";
+  ss_t2 << " FROM " << table_->t2_.name << " ORDER BY ts;";
 
   std::string t2_sql = ss_t2.str();
   int t2_size = static_cast<int>(t2_sql.size());
@@ -237,10 +246,10 @@ int SpanTable::FilterState::ExtractNext(bool pull_t1) {
 
   int64_t ts = sqlite3_column_int64(stmt, 0);
   int64_t dur = sqlite3_column_int64(stmt, 1);
-  int32_t cpu = sqlite3_column_int(stmt, 2);
+  int32_t join_val = sqlite3_column_int(stmt, 2);
 
-  auto* prev_t1 = &t1_[static_cast<size_t>(cpu)];
-  auto* prev_t2 = &t2_[static_cast<size_t>(cpu)];
+  auto* prev_t1 = &t1_[static_cast<size_t>(join_val)];
+  auto* prev_t2 = &t2_[static_cast<size_t>(join_val)];
   auto* prev_pull = pull_t1 ? prev_t1 : prev_t2;
   auto* prev_other = pull_t1 ? prev_t2 : prev_t1;
 
@@ -303,7 +312,7 @@ int SpanTable::FilterState::ExtractNext(bool pull_t1) {
       ts_ = std::max(other_start, prev_start);
       dur_ = span_end - ts_;
 
-      cpu_ = static_cast<uint32_t>(cpu);
+      join_val_ = static_cast<uint32_t>(join_val);
       t1_to_ret_ = pull_t1 ? prev : *prev_other;
       t2_to_ret_ = pull_t1 ? *prev_other : prev;
 
@@ -326,7 +335,7 @@ int SpanTable::FilterState::Column(sqlite3_context* context, int N) {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur_));
       break;
     case 2:
-      sqlite3_result_int(context, static_cast<int>(cpu_));
+      sqlite3_result_int(context, static_cast<int>(join_val_));
       break;
     default: {
       size_t table_1_col = static_cast<size_t>(N - kReservedColumns);
