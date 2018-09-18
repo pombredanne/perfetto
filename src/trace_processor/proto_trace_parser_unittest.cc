@@ -18,6 +18,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/string_view.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
 #include "src/trace_processor/sched_tracker.h"
@@ -72,12 +73,12 @@ class MockTraceStorage : public TraceStorage {
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
+    storage_ = new MockTraceStorage();
+    context_.storage.reset(storage_);
     sched_ = new MockSchedTracker(&context_);
     context_.sched_tracker.reset(sched_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
-    storage_ = new MockTraceStorage();
-    context_.storage.reset(storage_);
     const auto optim = OptimizationMode::kMinLatency;
     context_.sorter.reset(new TraceSorter(&context_, optim, 0 /*window size*/));
     context_.proto_parser.reset(new ProtoTraceParser(&context_));
@@ -281,6 +282,15 @@ TEST_F(ProtoTraceParserTest, LoadThreadPacket) {
 
   EXPECT_CALL(*process_, UpdateThread(1, 2));
   Tokenize(trace);
+}
+
+TEST(SystraceParserTest, SystraceEvent) {
+  SystraceTracePoint result{};
+  ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|1|foo"), &result));
+  EXPECT_EQ(result, (SystraceTracePoint{'B', 1, base::StringView("foo"), 0}));
+
+  ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|42|Bar"), &result));
+  EXPECT_EQ(result, (SystraceTracePoint{'B', 42, base::StringView("Bar"), 0}));
 }
 
 }  // namespace

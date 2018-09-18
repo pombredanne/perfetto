@@ -24,7 +24,11 @@ namespace perfetto {
 namespace trace_processor {
 
 ProcessTracker::ProcessTracker(TraceProcessorContext* context)
-    : context_(context){};
+    : context_(context) {
+  // Create a mapping from (t|p)id 0 -> u(t|p)id 0 for the idle process.
+  tids_.emplace(0, 0);
+  pids_.emplace(0, 0);
+}
 
 ProcessTracker::~ProcessTracker() = default;
 
@@ -108,6 +112,14 @@ UniquePid ProcessTracker::UpdateProcess(uint32_t pid, base::StringView name) {
   TraceStorage::Process* process;
   std::tie(upid, process) = GetOrCreateProcess(pid, 0 /* start_ns */);
   process->name_id = proc_name_id;
+  UpdateThread(/*tid=*/pid, pid);  // Create an entry for the main thread.
+  return upid;
+}
+
+UniquePid ProcessTracker::UpdateProcess(uint32_t pid) {
+  UniquePid upid;
+  TraceStorage::Process* process;
+  std::tie(upid, process) = GetOrCreateProcess(pid, 0 /* start_ns */);
   UpdateThread(/*tid=*/pid, pid);  // Create an entry for the main thread.
   return upid;
 }
