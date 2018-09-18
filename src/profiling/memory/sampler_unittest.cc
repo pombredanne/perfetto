@@ -47,7 +47,13 @@ TEST(SamplerTest, TestSmallFromThread) {
     // should always get sampled.
     EXPECT_EQ(ShouldSample(key, 1, 512), 1);
   });
+  std::thread th2([key] {
+    // As we initialize interval_to_next_sample_ with 0, the first sample
+    // should always get sampled. The threads should have separate state.
+    EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+  });
   th.join();
+  th2.join();
   pthread_key_delete(key);
 }
 
