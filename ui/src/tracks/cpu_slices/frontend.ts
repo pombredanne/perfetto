@@ -124,6 +124,37 @@ class CpuSliceTrack extends Track {
 
     assertTrue(trackData.starts.length === trackData.ends.length);
     assertTrue(trackData.starts.length === trackData.utids.length);
+
+    if (getCurResolution() >= 0.001) {
+      const start = visibleWindowTime.start;
+      const end = visibleWindowTime.end;
+      const bucketCount = 1000;
+      const delta = (end-start)/bucketCount;
+      for (let i=0; i<bucketCount; i++) {
+        const bucketStart = start + delta * i;
+        const bucketEnd = bucketStart + delta;
+        let cpuTime = 0;
+        for (let j=0; j<trackData.starts.length; j++) {
+          const sliceStart = trackData.starts[j];
+          const sliceEnd = trackData.ends[j];
+          const overlapStart = Math.max(bucketStart, sliceStart);
+          const overlapEnd = Math.min(bucketEnd, sliceEnd);
+          const overlapDelta = overlapEnd - overlapStart;
+          cpuTime += Math.max(overlapDelta, 0);
+        }
+        const utilization = cpuTime/delta;
+        const rectStart = timeScale.timeToPx(bucketStart);
+        const rectEnd = timeScale.timeToPx(bucketEnd);
+        //if (this.trackState.cpu === 0) {
+        //  console.log(`start ${rectStart} end ${rectEnd} util ${utilization}`);
+
+        //}
+        const height = RECT_HEIGHT * utilization;
+        ctx.fillRect(rectStart, MARGIN_TOP+RECT_HEIGHT-height, rectEnd - rectStart, height);
+      }
+      return;
+    }
+
     for (let i = 0; i < trackData.starts.length; i++) {
       const tStart = trackData.starts[i];
       const tEnd = trackData.ends[i];
