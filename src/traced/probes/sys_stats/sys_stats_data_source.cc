@@ -67,7 +67,6 @@ SysStatsDataSource::SysStatsDataSource(base::TaskRunner* task_runner,
       writer_(std::move(writer)),
       weak_factory_(this) {
   const auto& config = ds_config.sys_stats_config();
-  base::ignore_result(task_runner_);
 
   ns_per_user_hz_ = 1000000000ull / static_cast<uint64_t>(sysconf(_SC_CLK_TCK));
 
@@ -78,6 +77,9 @@ SysStatsDataSource::SysStatsDataSource(base::TaskRunner* task_runner,
 
   read_buf_ = base::PageAllocator::Allocate(kReadBufSize);
 
+  // Build a lookup map that allows to quickly translate strings like "MemTotal"
+  // into the corresponding enum value, only for the counters enabled in the
+  // config.
   for (const auto& counter_id : config.meminfo_counters()) {
     for (size_t i = 0; i < base::ArraySize(kMeminfoKeys); i++) {
       const auto& k = kMeminfoKeys[i];
@@ -104,16 +106,17 @@ SysStatsDataSource::SysStatsDataSource(base::TaskRunner* task_runner,
   periods_ms[0] = config.meminfo_period_ms();
   periods_ms[1] = config.vmstat_period_ms();
   periods_ms[2] = config.stat_period_ms();
-  tick_period_ms_ = std::numeric_limits<uint32_t>::max();
+  tick_period_ms_ = 0;
   for (uint32_t ms : periods_ms) {
-    if (ms && ms < tick_period_ms_)
+    if (ms && (ms < tick_period_ms_ || tick_period_ms_ == 0))
       tick_period_ms_ = ms;
   }
   if (tick_period_ms_ == 0)
     return;  // No polling configured.
+
   for (size_t i = 0; i < periods_ms.size(); i++) {
     auto ms = periods_ms[i];
-    if (ms && (ms % tick_period_ms_) != 0) {
+    if (ms && ms % tick_period_ms_ != 0) {
       PERFETTO_ELOG("SysStat periods are not integer multiples of each other");
       return;
     }
@@ -132,10 +135,10 @@ void SysStatsDataSource::Tick(base::WeakPtr<SysStatsDataSource> weak_this) {
     return;
   SysStatsDataSource& thiz = *weak_this;
 
-  // TODO(primiano): this is prone to jitter. We should either introduce a
-  // PostDelayedTaskAt() or do the jitter compensation math ourselves.
+  uint32_t period_ms = thiz.tick_period_ms_;
+  uint32_t delay_ms = period_ms - (base::GetWallTimeMs().count() % period_ms);
   thiz.task_runner_->PostDelayedTask(
-      std::bind(&SysStatsDataSource::Tick, weak_this), thiz.tick_period_ms_);
+      std::bind(&SysStatsDataSource::Tick, weak_this), delay_ms);
   thiz.ReadSysStats();
 }
 
@@ -169,7 +172,8 @@ void SysStatsDataSource::ReadMeminfo(protos::pbzero::SysStats* sys_stats) {
     base::StringSplitter words(&lines, ' ');
     if (!words.Next())
       continue;
-    words.cur_token()[words.cur_token_size() - 1] = '\0';  // Drop trailing ':'.
+    // Extract the meminfo key, dropping trailing ':' (e.g., "MemTotal: NN KB").
+    words.cur_token()[words.cur_token_size() - 1] = '\0';
     auto it = meminfo_counters_.find(words.cur_token());
     if (it == meminfo_counters_.end())
       continue;
