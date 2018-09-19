@@ -33,6 +33,13 @@ const Alerts: m.Component = {
   },
 };
 
+const PerfStatsDisplay: m.Component = {
+  view() {
+    return globals.frontendLocalState.perfDebug ? m('.perf-stats-display') :
+                                                  null;
+  }
+};
+
 /**
  * Wrap component with common UI elements (nav bar etc).
  */
@@ -44,7 +51,7 @@ export function createPage(component: m.Component): m.Component {
         m(Topbar),
         m(component),
         m(Alerts),
-        m('.perf-monitor'),
+        m(PerfStatsDisplay),
       ];
     },
   };

@@ -331,16 +331,7 @@ header {
     pointer-events: none;
 }
 
-.container-perf-pane {
-   position: absolute;
-   top: 5px;
-   left: 5px;
-   width: 300px;
-   height: 200px;
-   background-color: hsla(220, 50%, 78%, .8);
-}
-
-.perf-monitor {
+.perf-stats-display {
     --stroke-color: hsl(217, 39%, 94%);
     position: fixed;
     width: 600px;
