@@ -36,7 +36,7 @@ std::string ExtractTableBasename(const std::string& raw_table_name) {
   return raw_table_name.substr(0, index);
 }
 
-std::vector<SpanOperatorTable::TableColumn> GetColumnsForTable(
+std::vector<SpanOperatorTable::ColumnDefinition> GetColumnsForTable(
     sqlite3* db,
     const std::string& raw_table_name) {
   char sql[1024];
@@ -53,7 +53,7 @@ std::vector<SpanOperatorTable::TableColumn> GetColumnsForTable(
   ScopedStmt stmt(raw_stmt);
   PERFETTO_DCHECK(sqlite3_column_count(*stmt) == 2);
 
-  std::vector<SpanOperatorTable::TableColumn> columns;
+  std::vector<SpanOperatorTable::ColumnDefinition> columns;
   while (true) {
     err = sqlite3_step(raw_stmt);
     if (err == SQLITE_DONE)
@@ -72,7 +72,7 @@ std::vector<SpanOperatorTable::TableColumn> GetColumnsForTable(
       return {};
     }
 
-    SpanOperatorTable::TableColumn column;
+    SpanOperatorTable::ColumnDefinition column;
     column.name = name;
     column.type_name = type;
 
@@ -125,12 +125,12 @@ std::string SpanOperatorTable::CreateTableStmt(int argc,
   // have the join column.
 
   auto t1_remove_it = std::remove_if(
-      t1_.cols.begin(), t1_.cols.end(), [this](const TableColumn& it) {
+      t1_.cols.begin(), t1_.cols.end(), [this](const ColumnDefinition& it) {
         return it.name == "ts" || it.name == "dur" || it.name == join_col_;
       });
   t1_.cols.erase(t1_remove_it, t1_.cols.end());
   auto t2_remove_it = std::remove_if(
-      t2_.cols.begin(), t2_.cols.end(), [this](const TableColumn& it) {
+      t2_.cols.begin(), t2_.cols.end(), [this](const ColumnDefinition& it) {
         return it.name == "ts" || it.name == "dur" || it.name == join_col_;
       });
   t2_.cols.erase(t2_remove_it, t2_.cols.end());
