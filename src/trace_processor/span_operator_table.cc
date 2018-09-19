@@ -259,12 +259,9 @@ int SpanOperatorTable::FilterState::Next() {
   for (; cleanup_join_val_ < base::kMaxCpus; cleanup_join_val_++) {
     const auto& t1_row = t1_.rows[cleanup_join_val_];
     const auto& t2_row = t2_.rows[cleanup_join_val_];
-    int err = SetupReturnForJoinValue(cleanup_join_val_, t1_row, t2_row);
-    if (err == SQLITE_ROW) {
+    if (SetupReturnForJoinValue(cleanup_join_val_, t1_row, t2_row)) {
       cleanup_join_val_++;
       return SQLITE_OK;
-    } else if (err != SQLITE_DONE) {
-      return err;
     }
   }
 
@@ -335,33 +332,32 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
   // Figure out the values of the rows we want to return and return them.
   const auto& t1_row = pull_t1 ? saved_row : t1_.rows[join_val];
   const auto& t2_row = pull_t1 ? t2_.rows[join_val] : saved_row;
-  return SetupReturnForJoinValue(join_val, t1_row, t2_row);
+  bool has_row = SetupReturnForJoinValue(join_val, t1_row, t2_row);
+  return has_row ? SQLITE_ROW : SQLITE_DONE;
 }
 
-int SpanOperatorTable::FilterState::SetupReturnForJoinValue(
+bool SpanOperatorTable::FilterState::SetupReturnForJoinValue(
     uint32_t join_value,
     const TableRow& t1_row,
     const TableRow& t2_row) {
-  if (t1_row.ts != 0 && t2_row.ts != 0) {
-    uint64_t t1_start = t1_row.ts;
-    uint64_t t1_end = t1_row.ts + t1_row.dur;
+  // If either row doesn't have anything to return, don't return anything.
+  if (t1_row.ts == 0 || t2_row.ts == 0)
+    return false;
 
-    uint64_t t2_start = t2_row.ts;
-    uint64_t t2_end = t2_row.ts + t2_row.dur;
+  uint64_t t1_end = t1_row.ts + t1_row.dur;
+  uint64_t t2_end = t2_row.ts + t2_row.dur;
 
-    if (t2_end >= t1_start && t1_end >= t2_start) {
-      uint64_t span_end = std::min(t1_end, t2_end);
-      ts_ = std::max(t1_start, t2_start);
-      dur_ = span_end - ts_;
+  // If there is no overlap between the two spans, don't return anything.
+  if (t2_end < t1_row.ts && t1_end < t2_row.ts)
+    return false;
 
-      join_val_ = static_cast<uint32_t>(join_value);
-      t1_to_ret_ = t1_row;
-      t2_to_ret_ = t2_row;
+  ts_ = std::max(t1_row.ts, t2_row.ts);
+  dur_ = std::min(t1_end, t2_end) - ts_;
+  join_val_ = static_cast<uint32_t>(join_value);
+  t1_ret_row_ = t1_row;
+  t2_ret_row_ = t2_row;
 
-      return SQLITE_ROW;
-    }
-  }
-  return SQLITE_DONE;
+  return true;
 }
 
 int SpanOperatorTable::FilterState::Eof() {
@@ -382,11 +378,11 @@ int SpanOperatorTable::FilterState::Column(sqlite3_context* context, int N) {
     default: {
       size_t table_1_col = static_cast<size_t>(N - kReservedColumns);
       if (table_1_col < table_->t1_.cols.size()) {
-        ReportSqliteResult(context, t1_to_ret_.values[table_1_col]);
+        ReportSqliteResult(context, t1_ret_row_.values[table_1_col]);
       } else {
         size_t table_2_col = table_1_col - table_->t1_.cols.size();
         PERFETTO_CHECK(table_2_col < table_->t2_.cols.size());
-        ReportSqliteResult(context, t2_to_ret_.values[table_2_col]);
+        ReportSqliteResult(context, t2_ret_row_.values[table_2_col]);
       }
     }
   }

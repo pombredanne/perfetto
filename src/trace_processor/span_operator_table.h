@@ -135,9 +135,10 @@ class SpanOperatorTable : public Table {
     int ExtractNext(bool pull_t1);
 
     // Sets the return values for the given rows from table 1 and 2 if valid.
-    int SetupReturnForJoinValue(uint32_t join_value,
-                                const TableRow& t1_row,
-                                const TableRow& t2_row);
+    // Returns true if anything should returned, false otherwise.
+    bool SetupReturnForJoinValue(uint32_t join_value,
+                                 const TableRow& t1_row,
+                                 const TableRow& t2_row);
 
     // Reports to SQLite the value given by |value| based on its type.
     void ReportSqliteResult(sqlite3_context* context,
@@ -146,8 +147,8 @@ class SpanOperatorTable : public Table {
     uint64_t ts_ = 0;
     uint64_t dur_ = 0;
     uint32_t join_val_ = 0;
-    TableRow t1_to_ret_;
-    TableRow t2_to_ret_;
+    TableRow t1_ret_row_;
+    TableRow t2_ret_row_;
 
     TableState t1_;
     TableState t2_;
