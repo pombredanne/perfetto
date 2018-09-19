@@ -20,10 +20,12 @@
 
 namespace perfetto {
 namespace {
-ThreadLocalSamplingData* GetSpecific(pthread_key_t key) {
+ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
+                                     void* (*malloc)(size_t)) {
   void* specific = pthread_getspecific(key);
   if (specific == nullptr) {
-    specific = new ThreadLocalSamplingData;
+    specific = malloc(sizeof(ThreadLocalSamplingData));
+    new (specific) ThreadLocalSamplingData;
     pthread_setspecific(key, specific);
   }
   return reinterpret_cast<ThreadLocalSamplingData*>(specific);
@@ -50,14 +52,18 @@ size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
   return sz_multiplier;
 }
 
-size_t ShouldSample(pthread_key_t key, size_t sz, double rate) {
+size_t ShouldSample(pthread_key_t key,
+                    size_t sz,
+                    double rate,
+                    void* (*malloc)(size_t)) {
   if (PERFETTO_UNLIKELY(sz >= rate))
     return 1;
-  return GetSpecific(key)->ShouldSample(sz, rate);
+  return GetSpecific(key, malloc)->ShouldSample(sz, rate);
 }
 
 void KeyDestructor(void* ptr) {
-  delete reinterpret_cast<ThreadLocalSamplingData*>(ptr);
+  reinterpret_cast<ThreadLocalSamplingData*>(ptr)->~ThreadLocalSamplingData();
+  free(ptr);
 }
 
 }  // namespace perfetto

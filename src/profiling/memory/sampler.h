@@ -36,7 +36,11 @@ class ThreadLocalSamplingData {
 
 // Returns how often to sample the given sample. In some circumstances,
 // a sample should be recorded twice.
-size_t ShouldSample(pthread_key_t key, size_t sz, double rate);
+// We have to pass through the real malloc in order to allocate the TLS.
+size_t ShouldSample(pthread_key_t key,
+                    size_t sz,
+                    double rate,
+                    void* (*malloc)(size_t));
 void KeyDestructor(void* ptr);
 
 }  // namespace perfetto

@@ -26,7 +26,7 @@ namespace {
 TEST(SamplerTest, TestLarge) {
   pthread_key_t key;
   ASSERT_EQ(pthread_key_create(&key, KeyDestructor), 0);
-  EXPECT_EQ(ShouldSample(key, 1024, 512), 1);
+  EXPECT_EQ(ShouldSample(key, 1024, 512, malloc), 1);
   pthread_key_delete(key);
 }
 
@@ -35,7 +35,7 @@ TEST(SamplerTest, TestSmall) {
   ASSERT_EQ(pthread_key_create(&key, KeyDestructor), 0);
   // As we initialize interval_to_next_sample_ with 0, the first sample
   // should always get sampled.
-  EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+  EXPECT_EQ(ShouldSample(key, 1, 512, malloc), 1);
   pthread_key_delete(key);
 }
 
@@ -45,11 +45,11 @@ TEST(SamplerTest, TestSmallFromThread) {
   std::thread th([key] {
     // As we initialize interval_to_next_sample_ with 0, the first sample
     // should always get sampled.
-    EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+    EXPECT_EQ(ShouldSample(key, 1, 512, malloc), 1);
   });
   std::thread th2([key] {
     // The threads should have separate state.
-    EXPECT_EQ(ShouldSample(key, 1, 512), 1);
+    EXPECT_EQ(ShouldSample(key, 1, 512, malloc), 1);
   });
   th.join();
   th2.join();
