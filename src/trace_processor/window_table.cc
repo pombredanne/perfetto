@@ -32,9 +32,6 @@ void WindowTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 }
 
 std::string WindowTable::CreateTableStmt(int, const char* const*) {
-  // Note: ts is not strictly a primary key since multiple CPUs can have the
-  // same ts. However, SQL would prevent us from having xUpdate method if we
-  // specified more than one column on a WITHOUT ROWID table.
   return "CREATE TABLE x("
          "quantum HIDDEN UNSIGNED BIG INT, "
          "window_start HIDDEN UNSIGNED BIG INT, "
