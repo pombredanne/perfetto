@@ -263,8 +263,7 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.arch = unwindstack::Regs::CurrentArch();
   metadata.sequence_number = ++sequence_number_;
 
-  memcpy(data + sizeof(uint64_t) + sizeof(RecordType) + sizeof(AllocMetadata),
-         reg_data, sizeof(reg_data));
+  memcpy(&stack_header->register_data, reg_data, sizeof(reg_data));
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
   PERFETTO_CHECK(
