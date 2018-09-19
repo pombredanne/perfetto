@@ -23,12 +23,13 @@
 #include <limits>
 
 namespace perfetto {
+namespace profiling {
 
 namespace {
 constexpr size_t kMaxRecordSize = 8 * 1024 * 1024;  // 8 MiB
 static_assert(kMaxRecordSize <= std::numeric_limits<size_t>::max(),
               "kMaxRecordSize must fit into size_t");
-}
+}  // namespace
 
 RecordReader::ReceiveBuffer RecordReader::BeginReceive() {
   if (read_idx_ < sizeof(record_size_buf_))
@@ -72,4 +73,5 @@ void RecordReader::Reset() {
   record_.size = 0;
 }
 
+}  // namespace profiling
 }  // namespace perfetto

@@ -28,21 +28,9 @@ TraceStorage::TraceStorage() {
 
   // Reserve string ID 0 for the empty string.
   InternString("");
-
-  // Initialize all CPUs @ freq 0Hz.
-  for (size_t cpu = 0; cpu < base::kMaxCpus; cpu++)
-    cpu_freq_[cpu].emplace_back(0, 0);
 }
 
 TraceStorage::~TraceStorage() {}
-
-void TraceStorage::AddSliceToCpu(uint32_t cpu,
-                                 uint64_t start_ns,
-                                 uint64_t duration_ns,
-                                 UniqueTid utid,
-                                 uint64_t cycles) {
-  cpu_events_[cpu].AddSlice(start_ns, duration_ns, utid, cycles);
-};
 
 StringId TraceStorage::InternString(base::StringView str) {
   auto hash = str.Hash();
@@ -59,6 +47,27 @@ StringId TraceStorage::InternString(base::StringView str) {
 
 void TraceStorage::ResetStorage() {
   *this = TraceStorage();
+}
+
+void TraceStorage::SqlStats::RecordQueryBegin(const std::string& query,
+                                              uint64_t time_queued,
+                                              uint64_t time_started) {
+  if (queries_.size() >= kMaxLogEntries) {
+    queries_.pop_front();
+    times_queued_.pop_front();
+    times_started_.pop_front();
+    times_ended_.pop_front();
+  }
+  queries_.push_back(query);
+  times_queued_.push_back(time_queued);
+  times_started_.push_back(time_started);
+  times_ended_.push_back(0);
+}
+
+void TraceStorage::SqlStats::RecordQueryEnd(uint64_t time_ended) {
+  PERFETTO_DCHECK(!times_ended_.empty());
+  PERFETTO_DCHECK(times_ended_.back() == 0);
+  times_ended_.back() = time_ended;
 }
 
 }  // namespace trace_processor

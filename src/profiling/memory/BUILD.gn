@@ -13,132 +13,130 @@
 # limitations under the License.
 
 import("../../../gn/perfetto.gni")
+import("../../../gn/fuzzer.gni")
 import("//build_overrides/build.gni")
 
-source_set("record_reader") {
-  public_configs = [ "../../../gn:default_config" ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "record_reader.cc",
-    "record_reader.h",
-  ]
+# For use_libfuzzer.
+if (!build_with_chromium) {
+  import("//gn/standalone/sanitizers/vars.gni")
+} else {
+  import("//build/config/sanitizers/sanitizers.gni")
 }
 
-source_set("unwinding") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
+source_set("wire_protocol") {
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   sources = [
+    "wire_protocol.cc",
+    "wire_protocol.h",
+  ]
+}
+
+source_set("daemon") {
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
+  deps = [
+    ":wire_protocol",
+    "../../../buildtools:libunwindstack",
+    "../../../gn:default_deps",
+    "../../base",
+    "../../base:unix_socket",
+    "../../tracing",
+    "../../tracing:ipc",
+  ]
+  public_deps = [
+    "../../../protos/perfetto/trace:zero",
+    "../../../protos/perfetto/trace/profiling:zero",
+  ]
+  sources = [
+    "bookkeeping.cc",
+    "bookkeeping.h",
+    "heapprofd_producer.cc",
+    "heapprofd_producer.h",
+    "interner.h",
+    "queue_messages.h",
+    "record_reader.cc",
+    "record_reader.h",
+    "socket_listener.cc",
+    "socket_listener.h",
     "unwinding.cc",
     "unwinding.h",
   ]
 }
 
-source_set("socket_listener") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
-  deps = [
-    ":record_reader",
-    ":unwinding",
-    "../../../gn:default_deps",
-    "../../base",
-    "../../ipc",
-  ]
-  sources = [
-    "socket_listener.cc",
-    "socket_listener.h",
-  ]
-}
-
-source_set("string_interner") {
-  public_configs = [ "../../../gn:default_config" ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "string_interner.cc",
-    "string_interner.h",
-  ]
-}
-
-source_set("bookkeeping") {
-  public_configs = [ "../../../gn:default_config" ]
-  deps = [
-    ":string_interner",
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "bookkeeping.cc",
-    "bookkeeping.h",
-  ]
-}
-
 source_set("client") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":wire_protocol",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   sources = [
     "client.cc",
     "client.h",
+    "sampler.cc",
+    "sampler.h",
   ]
 }
 
 source_set("unittests") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   testonly = true
   deps = [
-    ":bookkeeping",
     ":client",
-    ":record_reader",
-    ":socket_listener",
-    ":string_interner",
-    ":unwinding",
+    ":daemon",
+    ":wire_protocol",
+    "../../../gn:default_deps",
     "../../../gn:gtest_deps",
     "../../base",
     "../../base:test_support",
   ]
   sources = [
     "bookkeeping_unittest.cc",
+    "bounded_queue_unittest.cc",
     "client_unittest.cc",
+    "heapprofd_integrationtest.cc",
+    "interner_unittest.cc",
     "record_reader_unittest.cc",
+    "sampler_unittest.cc",
     "socket_listener_unittest.cc",
-    "string_interner_unittest.cc",
     "unwinding_unittest.cc",
+    "wire_protocol_unittest.cc",
   ]
 }
 
-executable("heapprofd") {
-  public_configs = [ "../../../gn:default_config" ]
+# This will export publicly visibile symbols for the malloc_hooks.
+source_set("malloc_hooks") {
   deps = [
-    ":socket_listener",
-    ":unwinding",
+    ":client",
+    ":wire_protocol",
     "../../../gn:default_deps",
     "../../base",
-    "../../ipc",
+    "../../base:unix_socket",
+  ]
+  cflags = [
+    "-isystem",
+    rebase_path("../../../buildtools/bionic/libc", root_build_dir),
   ]
   sources = [
-    "main.cc",
+    "malloc_hooks.cc",
+  ]
+}
+
+perfetto_fuzzer_test("unwinding_fuzzer") {
+  sources = [
+    "unwinding_fuzzer.cc",
+  ]
+  deps = [
+    ":daemon",
+    ":wire_protocol",
+    "../../../gn:default_deps",
+    "../../../src/base",
   ]
 }

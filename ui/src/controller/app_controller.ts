@@ -13,8 +13,10 @@
 // limitations under the License.
 
 import {globals} from '../controller/globals';
+
 import {Child, Controller, ControllerInitializerAny} from './controller';
 import {PermalinkController} from './permalink_controller';
+import {RecordController} from './record_controller';
 import {TraceController} from './trace_controller';
 
 // The root controller for the entire app. It handles the lifetime of all
@@ -31,13 +33,12 @@ export class AppController extends Controller<'main'> {
   // - An internal promise of a nested controller being resolved and manually
   //   re-triggering the controllers.
   run() {
-    const engineKeys = Object.keys(globals.state.engines);
     const childControllers: ControllerInitializerAny[] = [
       Child('permalink', PermalinkController, {}),
+      Child('record', RecordController, {app: globals}),
     ];
-    if (engineKeys.length > 0) {
-      const cfg = globals.state.engines[engineKeys[0]];
-      childControllers.push(Child(cfg.id, TraceController, cfg.id));
+    for (const engineCfg of Object.values(globals.state.engines)) {
+      childControllers.push(Child(engineCfg.id, TraceController, engineCfg.id));
     }
     return childControllers;
   }

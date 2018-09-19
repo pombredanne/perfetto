@@ -14,8 +14,7 @@
 
 import * as m from 'mithril';
 
-import {moveTrack, toggleTrackPinned} from '../common/actions';
-import {Action} from '../common/actions';
+import {Actions, DeferredAction} from '../common/actions';
 import {TrackState} from '../common/state';
 
 import {globals} from './globals';
@@ -26,34 +25,102 @@ import {trackRegistry} from './track_registry';
 
 // TODO(hjd): We should remove the constant where possible.
 // If any uses can't be removed we should read this constant from CSS.
-export const TRACK_SHELL_WIDTH = 300;
+export const TRACK_SHELL_WIDTH = 250;
 
 function isPinned(id: string) {
   return globals.state.pinnedTracks.indexOf(id) !== -1;
 }
 
-const TrackShell = {
-  view({attrs}) {
+interface TrackShellAttrs {
+  trackState: TrackState;
+}
+
+class TrackShell implements m.ClassComponent<TrackShellAttrs> {
+  // Set to true when we click down and drag the
+  private dragging = false;
+  private dropping: 'before'|'after'|undefined = undefined;
+  private attrs?: TrackShellAttrs;
+
+  oninit(vnode: m.Vnode<TrackShellAttrs>) {
+    this.attrs = vnode.attrs;
+  }
+
+  view({attrs}: m.CVnode<TrackShellAttrs>) {
+    const dragClass = this.dragging ? `.drag` : '';
+    const dropClass = this.dropping ? `.drop-${this.dropping}` : '';
     return m(
-        '.track-shell',
+        `.track-shell${dragClass}${dropClass}[draggable=true]`,
+        {
+          onmousedown: this.onmousedown.bind(this),
+          ondragstart: this.ondragstart.bind(this),
+          ondragend: this.ondragend.bind(this),
+          ondragover: this.ondragover.bind(this),
+          ondragleave: this.ondragleave.bind(this),
+          ondrop: this.ondrop.bind(this),
+        },
         m('h1', attrs.trackState.name),
         m(TrackButton, {
-          action: moveTrack(attrs.trackState.id, 'up'),
-          i: 'arrow_upward_alt',
-        }),
-        m(TrackButton, {
-          action: moveTrack(attrs.trackState.id, 'down'),
-          i: 'arrow_downward_alt',
-        }),
-        m(TrackButton, {
-          action: toggleTrackPinned(attrs.trackState.id),
+          action: Actions.toggleTrackPinned({trackId: attrs.trackState.id}),
           i: isPinned(attrs.trackState.id) ? 'star' : 'star_border',
         }));
-  },
-} as m.Component<{trackState: TrackState}>;
+  }
 
-const TrackContent = {
-  view({attrs}) {
+  onmousedown(e: MouseEvent) {
+    // Prevent that the click is intercepted by the PanAndZoomHandler and that
+    // we start panning while dragging.
+    e.stopPropagation();
+  }
+
+  ondragstart(e: DragEvent) {
+    this.dragging = true;
+    globals.rafScheduler.scheduleFullRedraw();
+    e.dataTransfer.setData('perfetto/track', `${this.attrs!.trackState.id}`);
+    e.dataTransfer.setDragImage(new Image(), 0, 0);
+    e.stopImmediatePropagation();
+  }
+
+  ondragend() {
+    this.dragging = false;
+    globals.rafScheduler.scheduleFullRedraw();
+  }
+
+  ondragover(e: DragEvent) {
+    if (this.dragging) return;
+    if (!(e.target instanceof HTMLElement)) return;
+    if (!e.dataTransfer.types.includes('perfetto/track')) return;
+    e.dataTransfer.dropEffect = 'move';
+    e.preventDefault();
+
+    // Apply some hysteresis to the drop logic so that the lightened border
+    // changes only when we get close enough to the border.
+    if (e.offsetY < e.target.scrollHeight / 3) {
+      this.dropping = 'before';
+    } else if (e.offsetY > e.target.scrollHeight / 3 * 2) {
+      this.dropping = 'after';
+    }
+    globals.rafScheduler.scheduleFullRedraw();
+  }
+
+  ondragleave() {
+    this.dropping = undefined;
+    globals.rafScheduler.scheduleFullRedraw();
+  }
+
+  ondrop(e: DragEvent) {
+    if (this.dropping === undefined) return;
+    globals.rafScheduler.scheduleFullRedraw();
+    const srcId = e.dataTransfer.getData('perfetto/track');
+    const dstId = this.attrs!.trackState.id;
+    globals.dispatch(Actions.moveTrack({srcId, op: this.dropping, dstId}));
+    this.dropping = undefined;
+  }
+}
+
+interface TrackContentAttrs {
+  track: Track;
+}
+class TrackContent implements m.ClassComponent<TrackContentAttrs> {
+  view({attrs}: m.CVnode<TrackContentAttrs>) {
     return m('.track-content', {
       onmousemove: (e: MouseEvent) => {
         attrs.track.onMouseMove({x: e.layerX, y: e.layerY});
@@ -65,19 +132,27 @@ const TrackContent = {
       },
     }, );
   }
-} as m.Component<{track: Track}>;
+}
 
-const TrackComponent = {
-  view({attrs}) {
+interface TrackComponentAttrs {
+  trackState: TrackState;
+  track: Track;
+}
+class TrackComponent implements m.ClassComponent<TrackComponentAttrs> {
+  view({attrs}: m.CVnode<TrackComponentAttrs>) {
     return m('.track', [
       m(TrackShell, {trackState: attrs.trackState}),
       m(TrackContent, {track: attrs.track})
     ]);
   }
-} as m.Component<{trackState: TrackState, track: Track}>;
+}
 
-const TrackButton = {
-  view({attrs}) {
+interface TrackButtonAttrs {
+  action: DeferredAction;
+  i: string;
+}
+class TrackButton implements m.ClassComponent<TrackButtonAttrs> {
+  view({attrs}: m.CVnode<TrackButtonAttrs>) {
     return m(
         'i.material-icons.track-button',
         {
@@ -85,11 +160,7 @@ const TrackButton = {
         },
         attrs.i);
   }
-} as m.Component<{
-  action: Action,
-  i: string,
-},
-                    {}>;
+}
 
 interface TrackPanelAttrs {
   id: string;
@@ -121,6 +192,7 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {
+    ctx.save();
     ctx.translate(TRACK_SHELL_WIDTH, 0);
     drawGridLines(
         ctx,
@@ -129,5 +201,6 @@ export class TrackPanel extends Panel<TrackPanelAttrs> {
         size.height);
 
     this.track.renderCanvas(ctx);
+    ctx.restore();
   }
 }

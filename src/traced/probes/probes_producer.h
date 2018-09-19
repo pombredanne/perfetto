@@ -31,6 +31,7 @@
 #include "src/traced/probes/ftrace/ftrace_controller.h"
 #include "src/traced/probes/ftrace/ftrace_metadata.h"
 #include "src/traced/probes/ps/process_stats_data_source.h"
+#include "src/traced/probes/sys_stats/sys_stats_data_source.h"
 
 #include "perfetto/trace/filesystem/inode_file_map.pbzero.h"
 
@@ -48,9 +49,9 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   // Producer Impl:
   void OnConnect() override;
   void OnDisconnect() override;
-  void CreateDataSourceInstance(DataSourceInstanceID,
-                                const DataSourceConfig&) override;
-  void TearDownDataSourceInstance(DataSourceInstanceID) override;
+  void SetupDataSource(DataSourceInstanceID, const DataSourceConfig&) override;
+  void StartDataSource(DataSourceInstanceID, const DataSourceConfig&) override;
+  void StopDataSource(DataSourceInstanceID) override;
   void OnTracingSetup() override;
   void Flush(FlushRequestID,
              const DataSourceInstanceID* data_source_ids,
@@ -74,6 +75,10 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
       TracingSessionID session_id,
       DataSourceInstanceID id,
       DataSourceConfig config);
+  std::unique_ptr<SysStatsDataSource> CreateSysStatsDataSource(
+      TracingSessionID session_id,
+      DataSourceInstanceID id,
+      const DataSourceConfig& config);
 
  private:
   enum State {
@@ -90,6 +95,8 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   void Restart();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
+  void OnDataSourceFlushComplete(FlushRequestID, DataSourceInstanceID);
+  void OnFlushTimeout(FlushRequestID);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_ = nullptr;
@@ -106,6 +113,9 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   // Keeps (pointers to) data sources ordered by session id.
   std::unordered_multimap<TracingSessionID, ProbesDataSource*>
       session_data_sources_;
+
+  std::unordered_multimap<FlushRequestID, DataSourceInstanceID>
+      pending_flushes_;
 
   std::unordered_map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   LRUInodeCache cache_{kLRUInodeCacheSize};

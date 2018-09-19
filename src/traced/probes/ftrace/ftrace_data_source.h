@@ -62,9 +62,12 @@ class FtraceDataSource : public ProbesDataSource {
   // source, to inject ftrace dependencies.
   void Initialize(FtraceConfigId, std::unique_ptr<EventFilter>);
 
+  // ProbesDataSource implementation.
+  void Start() override;
+
   // Flushes the ftrace buffers into the userspace trace buffers and writes
   // also ftrace stats.
-  void Flush() override;
+  void Flush(FlushRequestID, std::function<void()> callback) override;
 
   FtraceConfigId config_id() const { return config_id_; }
   const FtraceConfig& config() const { return config_; }

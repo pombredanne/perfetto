@@ -55,6 +55,15 @@ void AddEventGroup(const ProtoTranslationTable* table,
     to->insert(event->name);
 }
 
+std::pair<std::string, std::string> EventToGroupAndName(
+    const std::string& event) {
+  auto slash_pos = event.find("/");
+  if (slash_pos == std::string::npos)
+    return std::make_pair("", event);
+  return std::make_pair(event.substr(0, slash_pos),
+                        event.substr(slash_pos + 1));
+}
+
 }  // namespace
 
 std::set<std::string> GetFtraceEvents(const FtraceConfig& request,
@@ -224,27 +233,28 @@ size_t ComputeCpuBufferSizeInPages(size_t requested_buffer_size_kb) {
 }
 
 FtraceConfigMuxer::FtraceConfigMuxer(FtraceProcfs* ftrace,
-                                     const ProtoTranslationTable* table)
+                                     ProtoTranslationTable* table)
     : ftrace_(ftrace), table_(table), current_state_(), configs_() {}
 FtraceConfigMuxer::~FtraceConfigMuxer() = default;
 
-FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
+FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
   FtraceConfig actual;
-
   bool is_ftrace_enabled = ftrace_->IsTracingEnabled();
   if (configs_.empty()) {
+    PERFETTO_DCHECK(active_configs_.empty());
     PERFETTO_DCHECK(!current_state_.tracing_on);
 
     // If someone outside of perfetto is using ftrace give up now.
     if (is_ftrace_enabled)
       return 0;
 
-    // If we're about to turn tracing on use this opportunity do some setup:
+    // Setup ftrace, without starting it. Setting buffers can be quite slow
+    // (up to hundreds of ms).
     SetupClock(request);
     SetupBufferSize(request);
   } else {
     // Did someone turn ftrace off behind our back? If so give up.
-    if (!is_ftrace_enabled)
+    if (!active_configs_.empty() && !is_ftrace_enabled)
       return 0;
   }
 
@@ -254,33 +264,54 @@ FtraceConfigId FtraceConfigMuxer::RequestConfig(const FtraceConfig& request) {
     UpdateAtrace(request);
 
   for (auto& name : events) {
-    const Event* event = table_->GetEventByName(name);
+    std::string group;
+    std::string event_name;
+    std::tie(group, event_name) = EventToGroupAndName(name);
+    // TODO(taylori): Add all events for group if name is * e.g sched/*
+    const Event* event = table_->GetOrCreateEvent(group, event_name);
     if (!event) {
       PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
       continue;
     }
-    if (current_state_.ftrace_events.count(name) ||
+    if (current_state_.ftrace_events.count(event->name) ||
         std::string("ftrace") == event->group) {
       *actual.add_ftrace_events() = name;
       continue;
     }
     if (ftrace_->EnableEvent(event->group, event->name)) {
-      current_state_.ftrace_events.insert(name);
-      *actual.add_ftrace_events() = name;
+      current_state_.ftrace_events.insert(event->name);
+      *actual.add_ftrace_events() = event->name;
     } else {
       PERFETTO_DPLOG("Failed to enable %s.", name.c_str());
     }
   }
 
-  if (configs_.empty()) {
-    PERFETTO_DCHECK(!current_state_.tracing_on);
-    ftrace_->EnableTracing();
-    current_state_.tracing_on = true;
-  }
-
   FtraceConfigId id = ++last_id_;
   configs_.emplace(id, std::move(actual));
   return id;
+}
+
+bool FtraceConfigMuxer::ActivateConfig(FtraceConfigId id) {
+  if (!id || configs_.count(id) == 0) {
+    PERFETTO_DFATAL("Config not found");
+    return false;
+  }
+
+  active_configs_.insert(id);
+  if (active_configs_.size() > 1) {
+    PERFETTO_DCHECK(current_state_.tracing_on);
+    return true;  // We are not the first, ftrace is already enabled. All done.
+  }
+
+  PERFETTO_DCHECK(!current_state_.tracing_on);
+  if (ftrace_->IsTracingEnabled()) {
+    // If someone outside of perfetto is using ftrace give up now.
+    return false;
+  }
+
+  ftrace_->EnableTracing();
+  current_state_.tracing_on = true;
+  return true;
 }
 
 bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
@@ -305,13 +336,25 @@ bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
       current_state_.ftrace_events.erase(name);
   }
 
-  if (configs_.empty()) {
+  // If there aren't any more active configs, disable ftrace.
+  auto active_it = active_configs_.find(id);
+  if (active_it != active_configs_.end()) {
     PERFETTO_DCHECK(current_state_.tracing_on);
-    ftrace_->DisableTracing();
+    active_configs_.erase(active_it);
+    if (active_configs_.empty()) {
+      // This was the last active config, disable ftrace.
+      ftrace_->DisableTracing();
+      current_state_.tracing_on = false;
+    }
+  }
+
+  // Even if we don't have any other active configs, we might still have idle
+  // configs around. Tear down the rest of the ftrace config only if all
+  // configs are removed.
+  if (configs_.empty()) {
     ftrace_->SetCpuBufferSizeInPages(0);
     ftrace_->DisableAllEvents();
     ftrace_->ClearTrace();
-    current_state_.tracing_on = false;
     if (current_state_.atrace_on)
       DisableAtrace();
   }

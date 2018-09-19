@@ -22,7 +22,7 @@
  * by
  * ../../tools/proto_to_cpp/proto_to_cpp.cc.
  * If you need to make changes here, change the .proto file and then run
- * ./tools/gen_tracing_cpp_headers_from_protos.py
+ * ./tools/gen_tracing_cpp_headers_from_protos
  */
 
 #include "perfetto/tracing/core/trace_config.h"
@@ -92,6 +92,11 @@ void TraceConfig::FromProto(const perfetto::protos::TraceConfig& proto) {
       static_cast<decltype(max_file_size_bytes_)>(proto.max_file_size_bytes());
 
   guardrail_overrides_.FromProto(proto.guardrail_overrides());
+
+  static_assert(sizeof(deferred_start_) == sizeof(proto.deferred_start()),
+                "size mismatch");
+  deferred_start_ =
+      static_cast<decltype(deferred_start_)>(proto.deferred_start());
   unknown_fields_ = proto.unknown_fields();
 }
 
@@ -152,6 +157,11 @@ void TraceConfig::ToProto(perfetto::protos::TraceConfig* proto) const {
           max_file_size_bytes_));
 
   guardrail_overrides_.ToProto(proto->mutable_guardrail_overrides());
+
+  static_assert(sizeof(deferred_start_) == sizeof(proto->deferred_start()),
+                "size mismatch");
+  proto->set_deferred_start(
+      static_cast<decltype(proto->deferred_start())>(deferred_start_));
   *(proto->mutable_unknown_fields()) = unknown_fields_;
 }
 

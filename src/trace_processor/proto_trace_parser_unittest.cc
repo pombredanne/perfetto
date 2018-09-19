@@ -19,9 +19,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/string_view.h"
+#include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
-#include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/trace_sorter.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -36,19 +36,27 @@ using ::testing::Args;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
+using ::testing::NiceMock;
 
-class MockSchedTracker : public SchedTracker {
+class MockEventTracker : public EventTracker {
  public:
-  MockSchedTracker(TraceProcessorContext* context) : SchedTracker(context) {}
-  virtual ~MockSchedTracker() = default;
+  MockEventTracker(TraceProcessorContext* context) : EventTracker(context) {}
+  virtual ~MockEventTracker() = default;
 
   MOCK_METHOD6(PushSchedSwitch,
                void(uint32_t cpu,
                     uint64_t timestamp,
                     uint32_t prev_pid,
                     uint32_t prev_state,
-                    base::StringView prev_comm,
-                    uint32_t next_pid));
+                    uint32_t next_pid,
+                    base::StringView next_comm));
+
+  MOCK_METHOD5(PushCounter,
+               void(uint64_t timestamp,
+                    double value,
+                    StringId name_id,
+                    uint64_t ref,
+                    RefType ref_type));
 };
 
 class MockProcessTracker : public ProcessTracker {
@@ -66,17 +74,16 @@ class MockTraceStorage : public TraceStorage {
  public:
   MockTraceStorage() : TraceStorage() {}
 
-  MOCK_METHOD3(PushCpuFreq,
-               void(uint64_t timestamp, uint32_t cpu, uint32_t new_freq));
+  MOCK_METHOD1(InternString, StringId(base::StringView));
 };
 
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
-    storage_ = new MockTraceStorage();
+    storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(storage_);
-    sched_ = new MockSchedTracker(&context_);
-    context_.sched_tracker.reset(sched_);
+    event_ = new MockEventTracker(&context_);
+    context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
     const auto optim = OptimizationMode::kMinLatency;
@@ -94,9 +101,9 @@ class ProtoTraceParserTest : public ::testing::Test {
 
  protected:
   TraceProcessorContext context_;
-  MockSchedTracker* sched_;
+  MockEventTracker* event_;
   MockProcessTracker* process_;
-  MockTraceStorage* storage_;
+  NiceMock<MockTraceStorage>* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
@@ -112,11 +119,11 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName);
+  sched_switch->set_next_comm(kProcName);
   sched_switch->set_next_pid(100);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
-                                       base::StringView(kProcName), 100));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
+                                       base::StringView(kProcName)));
   Tokenize(trace);
 }
 
@@ -133,7 +140,7 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
 
   event = bundle->add_event();
@@ -143,14 +150,14 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
-                                       base::StringView(kProcName1), 100));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
+                                       base::StringView(kProcName1)));
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
-                                       base::StringView(kProcName2), 10));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
+                                       base::StringView(kProcName2)));
 
   Tokenize(trace);
 }
@@ -168,7 +175,7 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
 
   bundle = trace.add_packet()->mutable_ftrace_events();
@@ -181,14 +188,14 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
-                                       base::StringView(kProcName1), 100));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
+                                       base::StringView(kProcName1)));
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
-                                       base::StringView(kProcName2), 10));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
+                                       base::StringView(kProcName2)));
   Tokenize(trace);
 }
 
@@ -202,7 +209,7 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   auto* sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(10);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName1);
+  sched_switch->set_next_comm(kProcName1);
   sched_switch->set_next_pid(100);
 
   protos::Trace trace_2;
@@ -214,16 +221,46 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch = event->mutable_sched_switch();
   sched_switch->set_prev_pid(100);
   sched_switch->set_prev_state(32);
-  sched_switch->set_prev_comm(kProcName2);
+  sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32,
-                                       base::StringView(kProcName1), 100));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
+                                       base::StringView(kProcName1)));
   Tokenize(trace_1);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32,
-                                       base::StringView(kProcName2), 10));
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
+                                       base::StringView(kProcName2)));
   Tokenize(trace_2);
+}
+
+TEST_F(ProtoTraceParserTest, LoadMemInfo) {
+  protos::Trace trace_1;
+  auto* packet = trace_1.add_packet();
+  uint64_t ts = 1000;
+  packet->set_timestamp(ts);
+  auto* bundle = packet->mutable_sys_stats();
+  auto* meminfo = bundle->add_meminfo();
+  meminfo->set_key(perfetto::protos::MEMINFO_MEM_TOTAL);
+  uint32_t value = 10;
+  meminfo->set_value(value);
+
+  EXPECT_CALL(*event_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  Tokenize(trace_1);
+}
+
+TEST_F(ProtoTraceParserTest, LoadVmStats) {
+  protos::Trace trace_1;
+  auto* packet = trace_1.add_packet();
+  uint64_t ts = 1000;
+  packet->set_timestamp(ts);
+  auto* bundle = packet->mutable_sys_stats();
+  auto* meminfo = bundle->add_vmstat();
+  meminfo->set_key(perfetto::protos::VMSTAT_COMPACT_SUCCESS);
+  uint32_t value = 10;
+  meminfo->set_value(value);
+
+  EXPECT_CALL(*event_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  Tokenize(trace_1);
 }
 
 TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
@@ -236,7 +273,7 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);
 
-  EXPECT_CALL(*storage_, PushCpuFreq(1000, 10, 2000));
+  EXPECT_CALL(*event_, PushCounter(1000, 2000, 0, 10, RefType::kCpuId));
   Tokenize(trace_1);
 }
 
@@ -291,6 +328,10 @@ TEST(SystraceParserTest, SystraceEvent) {
 
   ASSERT_TRUE(ParseSystraceTracePoint(base::StringView("B|42|Bar"), &result));
   EXPECT_EQ(result, (SystraceTracePoint{'B', 42, base::StringView("Bar"), 0}));
+
+  ASSERT_TRUE(
+      ParseSystraceTracePoint(base::StringView("C|543|foo|8"), &result));
+  EXPECT_EQ(result, (SystraceTracePoint{'C', 543, base::StringView("foo"), 8}));
 }
 
 }  // namespace

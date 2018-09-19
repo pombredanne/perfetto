@@ -20,8 +20,13 @@
 #include <unwindstack/Maps.h>
 #include <unwindstack/Unwinder.h>
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/bookkeeping.h"
+#include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/queue_messages.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
+namespace profiling {
 
 // Read /proc/[pid]/maps from an open file descriptor.
 // TODO(fmayer): Figure out deduplication to other maps.
@@ -35,8 +40,8 @@ class FileDescriptorMaps : public unwindstack::Maps {
   base::ScopedFile fd_;
 };
 
-struct ProcessMetadata {
-  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
+struct UnwindingMetadata {
+  UnwindingMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
       : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
     PERFETTO_CHECK(maps.Parse());
   }
@@ -60,13 +65,14 @@ class StackMemory : public unwindstack::Memory {
   uint8_t* stack_;
 };
 
-size_t RegSize(unwindstack::ArchEnum arch);
+bool DoUnwind(WireMessage*, UnwindingMetadata* metadata, AllocRecord* out);
 
-bool DoUnwind(void* mem,
-              size_t sz,
-              ProcessMetadata* metadata,
-              std::vector<unwindstack::FrameData>* out);
+bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
 
+void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
+                       BoundedQueue<BookkeepingRecord>* output_queue);
+
+}  // namespace profiling
 }  // namespace perfetto
 
 #endif  // SRC_PROFILING_MEMORY_UNWINDING_H_

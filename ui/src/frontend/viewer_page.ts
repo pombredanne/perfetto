@@ -17,20 +17,23 @@ import * as m from 'mithril';
 import {QueryResponse} from '../common/queries';
 import {TimeSpan} from '../common/time';
 
-import {FlameGraphPanel} from './flame_graph_panel';
+import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
 import {HeaderPanel} from './header_panel';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
 import {createPage} from './pages';
 import {PanAndZoomHandler} from './pan_and_zoom_handler';
-import {PanelContainer} from './panel_container';
+import {Panel} from './panel';
+import {AnyAttrsVnode, PanelContainer} from './panel_container';
 import {TimeAxisPanel} from './time_axis_panel';
+import {TrackGroupPanel} from './track_group_panel';
 import {TRACK_SHELL_WIDTH} from './track_panel';
 import {TrackPanel} from './track_panel';
 
+
 const MAX_ZOOM_SPAN_SEC = 1e-4;  // 0.1 ms.
 
-const QueryTable: m.Component<{}, {}> = {
+class QueryTable extends Panel {
   view() {
     const resp = globals.queryResults.get('command') as QueryResponse;
     if (resp === undefined) {
@@ -53,30 +56,49 @@ const QueryTable: m.Component<{}, {}> = {
     return m(
         'div',
         m('header.overview',
-          `Query result - ${Math.round(resp.durationMs)} ms`,
-          m('span.code', resp.query)),
+          m('span',
+            `Query result - ${Math.round(resp.durationMs)} ms`,
+            m('span.code', resp.query)),
+          resp.error ? null :
+                       m('button.query-copy',
+                         {
+                           onclick: () => {
+                             const lines: string[][] = [];
+                             lines.push(resp.columns);
+                             for (const row of resp.rows) {
+                               const line = [];
+                               for (const col of resp.columns) {
+                                 line.push(row[col].toString());
+                               }
+                               lines.push(line);
+                             }
+                             copyToClipboard(
+                                 lines.map(line => line.join('\t')).join('\n'));
+                           },
+                         },
+                         'Copy as .tsv')),
         resp.error ?
             m('.query-error', `SQL error: ${resp.error}`) :
             m('table.query-table', m('thead', header), m('tbody', rows)));
-  },
-};
+  }
+
+  renderCanvas() {}
+}
 
 /**
  * Top-most level component for the viewer page. Holds tracks, brush timeline,
  * panels, and everything else that's part of the main trace viewer page.
  */
-const TraceViewer = {
-  oninit() {
-    this.width = 0;
-  },
+class TraceViewer implements m.ClassComponent {
+  private onResize: () => void = () => {};
+  private zoomContent?: PanAndZoomHandler;
 
-  oncreate(vnode) {
+  oncreate(vnode: m.CVnodeDOM) {
     const frontendLocalState = globals.frontendLocalState;
     const updateDimensions = () => {
       const rect = vnode.dom.getBoundingClientRect();
-      this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
-          0, this.width - TRACK_SHELL_WIDTH);
+          0, rect.width - TRACK_SHELL_WIDTH);
     };
 
     updateDimensions();
@@ -111,6 +133,7 @@ const TraceViewer = {
           tStart = tEnd - origDelta;
         }
         frontendLocalState.updateVisibleTime(new TimeSpan(tStart, tEnd));
+        globals.rafScheduler.scheduleRedraw();
       },
       onZoomed: (_: number, zoomRatio: number) => {
         const vizTime = frontendLocalState.visibleWindowTime;
@@ -124,26 +147,40 @@ const TraceViewer = {
             new TimeSpan(newStartSec, newEndSec));
       }
     });
-  },
+  }
 
   onremove() {
     window.removeEventListener('resize', this.onResize);
-    this.zoomContent.shutdown();
-  },
+    if (this.zoomContent) this.zoomContent.shutdown();
+  }
 
   view() {
-    const scrollingPanels = globals.state.scrollingTracks.length > 0 ?
+    const scrollingPanels: AnyAttrsVnode[] =
+        globals.state.scrollingTracks.length > 0 ?
         [
           m(HeaderPanel, {title: 'Tracks', key: 'tracksheader'}),
           ...globals.state.scrollingTracks.map(
               id => m(TrackPanel, {key: id, id})),
-          m(FlameGraphPanel, {key: 'flamegraph'}),
         ] :
         [];
+
+    for (const group of Object.values(globals.state.trackGroups)) {
+      scrollingPanels.push(m(TrackGroupPanel, {
+        trackGroupId: group.id,
+        key: `trackgroup-${group.id}`,
+      }));
+      if (group.collapsed) continue;
+      for (const trackId of group.tracks) {
+        scrollingPanels.push(m(TrackPanel, {
+          key: `track-${group.id}-${trackId}`,
+          id: trackId,
+        }));
+      }
+    }
+    scrollingPanels.unshift(m(QueryTable));
+
     return m(
         '.page',
-        m(QueryTable),
-        // TODO: Pan and zoom logic should be in its own mithril component.
         m('.pan-and-zoom-content',
           m('.pinned-panel-container', m(PanelContainer, {
               doesScroll: false,
@@ -158,15 +195,8 @@ const TraceViewer = {
               doesScroll: true,
               panels: scrollingPanels,
             }))));
-  },
-
-} as m.Component<{}, {
-  onResize: () => void,
-  width: number,
-  zoomContent: PanAndZoomHandler,
-  overviewQueryExecuted: boolean,
-  overviewQueryResponse: QueryResponse,
-}>;
+  }
+}
 
 export const ViewerPage = createPage({
   view() {

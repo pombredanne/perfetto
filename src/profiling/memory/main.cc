@@ -15,60 +15,39 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
+#include <array>
 #include <memory>
+#include <vector>
 
-#include "src/ipc/unix_socket.h"
+#include <signal.h>
+
+#include "perfetto/base/event.h"
+#include "perfetto/base/unix_socket.h"
+#include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/heapprofd_producer.h"
 #include "src/profiling/memory/socket_listener.h"
+#include "src/profiling/memory/wire_protocol.h"
+#include "src/tracing/ipc/default_socket.h"
 
 #include "perfetto/base/unix_task_runner.h"
 
 namespace perfetto {
+namespace profiling {
 namespace {
 
-int HeapprofdMain(int argc, char** argv) {
-  std::unique_ptr<ipc::UnixSocket> sock;
-
-  SocketListener listener(
-      [](size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>) {
-        // TODO(fmayer): Wire this up to a worker thread that does the
-        // unwinding.
-        PERFETTO_LOG("Record received.");
-      });
-  base::UnixTaskRunner read_task_runner;
-  if (argc == 2) {
-    // Allow to be able to manually specify the socket to listen on
-    // for testing and sideloading purposes.
-    sock = ipc::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
-  } else if (argc == 1) {
-    // When running as a service launched by init on Android, the socket
-    // is created by init and passed to the application using an environment
-    // variable.
-    const char* sock_fd = getenv("ANDROID_SOCKET_heapprofd");
-    if (sock_fd == nullptr)
-      PERFETTO_FATAL(
-          "No argument given and environment variable ANDROID_SOCKET_heapprof "
-          "is unset.");
-    char* end;
-    int raw_fd = static_cast<int>(strtol(sock_fd, &end, 10));
-    if (*end != '\0')
-      PERFETTO_FATAL(
-          "Invalid ANDROID_SOCKET_heapprofd. Expected decimal integer.");
-    sock = ipc::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
-                                   &read_task_runner);
-  } else {
-    PERFETTO_FATAL("Invalid number of arguments. %s [SOCKET]", argv[0]);
-  }
-
-  if (sock->last_error() != 0)
-    PERFETTO_FATAL("Failed to initialize socket: %s",
-                   strerror(sock->last_error()));
-
-  read_task_runner.Run();
+int HeapprofdMain(int, char**) {
+  base::UnixTaskRunner task_runner;
+  HeapprofdProducer producer(&task_runner);
+  producer.ConnectWithRetries(GetProducerSocket());
+  task_runner.Run();
   return 0;
 }
+
 }  // namespace
+}  // namespace profiling
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
-  return perfetto::HeapprofdMain(argc, argv);
+  return perfetto::profiling::HeapprofdMain(argc, argv);
 }

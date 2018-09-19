@@ -17,18 +17,14 @@ import '../tracks/all_frontend';
 import * as m from 'mithril';
 
 import {forwardRemoteCalls} from '../base/remote';
-import {loadPermalink} from '../common/actions';
+import {Actions} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
-import {EnginePortAndId} from '../controller/engine';
-import {
-  createWasmEngine,
-  destroyWasmEngine,
-  warmupWasmEngine,
-} from '../controller/wasm_engine_proxy';
 
 import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
+import {openBufferWithLegacyTraceViewer} from './legacy_trace_viewer';
+import {RecordPage} from './record_page';
 import {Router} from './router';
 import {ViewerPage} from './viewer_page';
 
@@ -50,7 +46,6 @@ class FrontendApi {
       globals.frontendLocalState.updateVisibleTime(
           new TimeSpan(vizTraceTime.startSec, vizTraceTime.endSec));
     }
-
     this.redraw();
   }
 
@@ -58,12 +53,16 @@ class FrontendApi {
   // want to keep in the global state. Figure out a more generic and type-safe
   // mechanism to achieve this.
 
-  publishOverviewData(data: {[key: string]: QuantizedLoad}) {
-    for (const key of Object.keys(data)) {
+  publishOverviewData(data: {[key: string]: QuantizedLoad | QuantizedLoad[]}) {
+    for (const [key, value] of Object.entries(data)) {
       if (!globals.overviewStore.has(key)) {
         globals.overviewStore.set(key, []);
       }
-      globals.overviewStore.get(key)!.push(data[key]);
+      if (value instanceof Array) {
+        globals.overviewStore.get(key)!.push(...value);
+      } else {
+        globals.overviewStore.get(key)!.push(value);
+      }
     }
     globals.rafScheduler.scheduleRedraw();
   }
@@ -86,20 +85,11 @@ class FrontendApi {
     this.redraw();
   }
 
-  /**
-   * Creates a new trace processor wasm engine (backed by a worker running
-   * engine_bundle.js) and returns a MessagePort for talking to it.
-   * This indirection is due to workers not being able create workers in
-   * Chrome which is tracked at: crbug.com/31666
-   * TODO(hjd): Remove this once the fix has landed.
-   */
-  createEngine(): EnginePortAndId {
-    const id = new Date().toUTCString();
-    return {id, port: createWasmEngine(id)};
-  }
-
-  destroyEngine(id: string) {
-    destroyWasmEngine(id);
+  // For opening JSON/HTML traces with the legacy catapult viewer.
+  publishLegacyTrace(args: {data: ArrayBuffer, size: number}) {
+    const arr = new Uint8Array(args.data, 0, args.size);
+    const str = (new TextDecoder('utf-8')).decode(arr);
+    openBufferWithLegacyTraceViewer('trace.json', str, 0);
   }
 
   private redraw(): void {
@@ -125,15 +115,15 @@ function main() {
       {
         '/': HomePage,
         '/viewer': ViewerPage,
+        '/record': RecordPage,
       },
       dispatch);
   forwardRemoteCalls(channel.port2, new FrontendApi(router));
-  globals.initialize(dispatch);
+  globals.initialize(dispatch, controller);
 
   globals.rafScheduler.domRedraw = () =>
       m.render(document.body, m(router.resolve(globals.state.route)));
 
-  warmupWasmEngine();
 
   // Put these variables in the global scope for better debugging.
   (window as {} as {m: {}}).m = m;
@@ -142,7 +132,9 @@ function main() {
   // /?s=xxxx for permalinks.
   const stateHash = router.param('s');
   if (stateHash) {
-    globals.dispatch(loadPermalink(stateHash));
+    globals.dispatch(Actions.loadPermalink({
+      hash: stateHash,
+    }));
   }
 
   // Prevent pinch zoom.

@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/time.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -34,7 +35,7 @@ int MaybeOpenTraceFile() {
   static const char* tracing_path = getenv("PERFETTO_METATRACE_FILE");
   if (tracing_path == nullptr)
     return -1;
-  static int fd = open(tracing_path, O_WRONLY | O_CREAT | O_TRUNC, 0755);
+  static int fd = open(tracing_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
   return fd;
 }
 }  // namespace
@@ -49,7 +50,7 @@ void MetaTrace::WriteEvent(char type, const char* evt_name, size_t cpu) {
                     "{\"ts\": %f, \"cat\": \"PERF\", \"ph\": \"%c\", \"name\": "
                     "\"%s\", \"pid\": %zu},\n",
                     GetWallTimeNs().count() / 1000.0, type, evt_name, cpu);
-  ignore_result(write(fd, json, static_cast<size_t>(len)));
+  ignore_result(WriteAll(fd, json, static_cast<size_t>(len)));
 }
 
 }  // namespace base

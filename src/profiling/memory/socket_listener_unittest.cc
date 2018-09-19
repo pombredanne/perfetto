@@ -24,6 +24,7 @@
 #include "gtest/gtest.h"
 
 namespace perfetto {
+namespace profiling {
 namespace {
 
 using ::testing::_;
@@ -37,46 +38,50 @@ class SocketListenerTest : public ::testing::Test {
   void TearDown() override { DESTROY_TEST_SOCK(kSocketName); }
 };
 
-class MockEventListener : public ipc::UnixSocket::EventListener {
+class MockEventListener : public base::UnixSocket::EventListener {
  public:
-  MOCK_METHOD2(OnConnect, void(ipc::UnixSocket*, bool));
+  MOCK_METHOD2(OnConnect, void(base::UnixSocket*, bool));
 };
 
 TEST_F(SocketListenerTest, ReceiveRecord) {
   base::TestTaskRunner task_runner;
   auto callback_called = task_runner.CreateCheckpoint("callback.called");
   auto connected = task_runner.CreateCheckpoint("connected");
-  auto callback_fn = [&callback_called](
-                         size_t size, std::unique_ptr<uint8_t[]> buf,
-                         std::weak_ptr<ProcessMetadata> metadata) {
-    ASSERT_EQ(size, 1u);
-    ASSERT_EQ(buf[0], '1');
-    ASSERT_FALSE(metadata.expired());
+  auto callback_fn = [&callback_called](UnwindingRecord r) {
+    ASSERT_EQ(r.size, 1u);
+    ASSERT_EQ(r.data[0], '1');
+    ASSERT_FALSE(r.metadata.expired());
     callback_called();
   };
 
-  SocketListener listener(std::move(callback_fn));
+  BookkeepingThread bookkeeping_thread;
+  SocketListener listener(std::move(callback_fn), &bookkeeping_thread);
+  auto handle = listener.ExpectPID(getpid(), {});
   MockEventListener client_listener;
   EXPECT_CALL(client_listener, OnConnect(_, _))
       .WillOnce(InvokeWithoutArgs(connected));
 
-  std::unique_ptr<ipc::UnixSocket> recv_socket =
-      ipc::UnixSocket::Listen(kSocketName, &listener, &task_runner);
+  std::unique_ptr<base::UnixSocket> recv_socket =
+      base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
 
-  std::unique_ptr<ipc::UnixSocket> client_socket =
-      ipc::UnixSocket::Connect(kSocketName, &client_listener, &task_runner);
+  std::unique_ptr<base::UnixSocket> client_socket =
+      base::UnixSocket::Connect(kSocketName, &client_listener, &task_runner);
 
   task_runner.RunUntilCheckpoint("connected");
   uint64_t size = 1;
-  base::ScopedFile fds[2] = {base::ScopedFile(open("/dev/null", O_RDONLY)),
-                             base::ScopedFile(open("/dev/null", O_RDONLY))};
+  base::ScopedFile fds[2] = {
+      base::ScopedFile(base::OpenFile("/dev/null", O_RDONLY)),
+      base::ScopedFile(base::OpenFile("/dev/null", O_RDONLY))};
   int raw_fds[2] = {*fds[0], *fds[1]};
   ASSERT_TRUE(client_socket->Send(&size, sizeof(size), raw_fds,
-                                  base::ArraySize(raw_fds)));
-  ASSERT_TRUE(client_socket->Send("1", 1));
+                                  base::ArraySize(raw_fds),
+                                  base::UnixSocket::BlockingMode::kBlocking));
+  ASSERT_TRUE(client_socket->Send("1", 1, -1,
+                                  base::UnixSocket::BlockingMode::kBlocking));
 
   task_runner.RunUntilCheckpoint("callback.called");
 }
 
 }  // namespace
+}  // namespace profiling
 }  // namespace perfetto

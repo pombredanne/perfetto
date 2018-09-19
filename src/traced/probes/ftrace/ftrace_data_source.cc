@@ -45,8 +45,18 @@ FtraceDataSource::~FtraceDataSource() {
 
 void FtraceDataSource::Initialize(FtraceConfigId config_id,
                                   std::unique_ptr<EventFilter> event_filter) {
+  PERFETTO_CHECK(config_id);
   config_id_ = config_id;
   event_filter_ = std::move(event_filter);
+}
+
+void FtraceDataSource::Start() {
+  FtraceController* ftrace = controller_weak_.get();
+  if (!ftrace)
+    return;
+  PERFETTO_CHECK(config_id_);  // Must be initialized at this point.
+  if (!ftrace->StartDataSource(this))
+    return;
   DumpFtraceStats(&stats_before_);
 }
 
@@ -55,7 +65,7 @@ void FtraceDataSource::DumpFtraceStats(FtraceStats* stats) {
     controller_weak_->DumpFtraceStats(stats);
 }
 
-void FtraceDataSource::Flush() {
+void FtraceDataSource::Flush(FlushRequestID, std::function<void()> callback) {
   // TODO(primiano): this still doesn't flush data from the kernel ftrace
   // buffers (see b/73886018). We should do that and delay the
   // NotifyFlushComplete() until the ftrace data has been drained from the
@@ -63,7 +73,7 @@ void FtraceDataSource::Flush() {
   if (!writer_)
     return;
   WriteStats();
-  writer_->Flush();
+  writer_->Flush(callback);
 }
 
 void FtraceDataSource::WriteStats() {

@@ -21,19 +21,27 @@
 #include <thread>
 
 namespace perfetto {
+namespace profiling {
 namespace {
 
 TEST(SocketPoolTest, Basic) {
   std::vector<base::ScopedFile> files;
-  files.emplace_back(open("/dev/null", O_RDONLY));
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
   SocketPool pool(std::move(files));
   BorrowedSocket sock = pool.Borrow();
+}
+TEST(SocketPoolTest, Close) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  sock.Close();
 }
 
 TEST(SocketPoolTest, Multiple) {
   std::vector<base::ScopedFile> files;
-  files.emplace_back(open("/dev/null", O_RDONLY));
-  files.emplace_back(open("/dev/null", O_RDONLY));
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
   SocketPool pool(std::move(files));
   BorrowedSocket sock = pool.Borrow();
   BorrowedSocket sock_2 = pool.Borrow();
@@ -41,7 +49,7 @@ TEST(SocketPoolTest, Multiple) {
 
 TEST(SocketPoolTest, Blocked) {
   std::vector<base::ScopedFile> files;
-  files.emplace_back(open("/dev/null", O_RDONLY));
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
   SocketPool pool(std::move(files));
   BorrowedSocket sock = pool.Borrow();
   std::thread t([&pool] { pool.Borrow(); });
@@ -52,9 +60,23 @@ TEST(SocketPoolTest, Blocked) {
   t.join();
 }
 
+TEST(SocketPoolTest, BlockedClose) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  std::thread t([&pool] { pool.Borrow(); });
+  {
+    // Return fd to unblock thread.
+    BorrowedSocket temp = std::move(sock);
+    temp.Close();
+  }
+  t.join();
+}
+
 TEST(SocketPoolTest, MultipleBlocked) {
   std::vector<base::ScopedFile> files;
-  files.emplace_back(open("/dev/null", O_RDONLY));
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
   SocketPool pool(std::move(files));
   BorrowedSocket sock = pool.Borrow();
   std::thread t([&pool] { pool.Borrow(); });
@@ -67,5 +89,34 @@ TEST(SocketPoolTest, MultipleBlocked) {
   t2.join();
 }
 
+TEST(SocketPoolTest, MultipleBlockedClose) {
+  std::vector<base::ScopedFile> files;
+  files.emplace_back(base::OpenFile("/dev/null", O_RDONLY));
+  SocketPool pool(std::move(files));
+  BorrowedSocket sock = pool.Borrow();
+  std::thread t([&pool] { pool.Borrow(); });
+  std::thread t2([&pool] { pool.Borrow(); });
+  {
+    // Return fd to unblock thread.
+    BorrowedSocket temp = std::move(sock);
+    temp.Close();
+  }
+  t.join();
+  t2.join();
+}
+
+TEST(ClientTest, GetThreadStackBase) {
+  std::thread th([] {
+    const char* stackbase = GetThreadStackBase();
+    ASSERT_NE(stackbase, nullptr);
+    // The implementation assumes the stack grows from higher addresses to
+    // lower. We will need to rework once we encounter architectures where the
+    // stack grows the other way.
+    EXPECT_GT(stackbase, __builtin_frame_address(0));
+  });
+  th.join();
+}
+
 }  // namespace
+}  // namespace profiling
 }  // namespace perfetto

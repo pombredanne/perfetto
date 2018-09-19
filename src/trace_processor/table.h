@@ -39,6 +39,33 @@ class Table : public sqlite3_vtab {
   using Factory =
       std::function<std::unique_ptr<Table>(sqlite3*, const TraceStorage*)>;
 
+  // Allowed types for columns in a table.
+  enum ColumnType {
+    kString = 1,
+    kUlong = 2,
+    kUint = 3,
+    kLong = 4,
+    kInt = 5,
+    kDouble = 6,
+  };
+
+  // Describes a column of this table.
+  class Column {
+   public:
+    Column(size_t idx, std::string name, ColumnType type, bool hidden = false);
+
+    size_t index() const { return index_; }
+    const std::string& name() const { return name_; }
+    ColumnType type() const { return type_; }
+    bool hidden() const { return hidden_; }
+
+   private:
+    size_t index_ = 0;
+    std::string name_;
+    ColumnType type_ = ColumnType::kString;
+    bool hidden_ = false;
+  };
+
   // When set it logs all BestIndex and Filter actions on the console.
   static bool debug;
 
@@ -52,16 +79,51 @@ class Table : public sqlite3_vtab {
     virtual ~Cursor();
 
     // Methods to be implemented by derived table classes.
-    virtual int Filter(const QueryConstraints& qc, sqlite3_value** argv) = 0;
     virtual int Next() = 0;
     virtual int Eof() = 0;
     virtual int Column(sqlite3_context* context, int N) = 0;
 
+    // Optional methods to implement.
+    virtual int RowId(sqlite3_int64*);
+  };
+
+  // The raw cursor class which interfaces with SQLite to manage lifecycle.
+  class RawCursor : public sqlite3_vtab_cursor {
+   public:
+    explicit RawCursor(Table* table);
+
+    int Filter(int num, const char* idxStr, int argc, sqlite3_value**);
+    Cursor* cursor() { return cursor_.get(); }
+
    private:
     friend class Table;
 
-    // Overriden functions from sqlite3_vtab_cursor.
-    int FilterInternal(int num, const char* idxStr, int argc, sqlite3_value**);
+    Table* const table_;
+    std::unique_ptr<Cursor> cursor_;
+  };
+
+  // The schema of the table. Created by subclasses to allow the table class to
+  // do filtering and inform SQLite about the CREATE table statement.
+  class Schema {
+   public:
+    Schema();
+    Schema(std::vector<Column>, std::vector<size_t> primary_keys);
+
+    // This class is explicitly copiable.
+    Schema(const Schema&);
+    Schema& operator=(const Schema& t);
+
+    std::string ToCreateTableStmt();
+
+    const std::vector<Column>& columns() const { return columns_; }
+    const std::vector<size_t> primary_keys() { return primary_keys_; }
+
+   private:
+    // The names and types of the columns of the table.
+    std::vector<Column> columns_;
+
+    // The primary keys of the table given by an offset into |columns|.
+    std::vector<size_t> primary_keys_;
   };
 
  protected:
@@ -76,21 +138,38 @@ class Table : public sqlite3_vtab {
   Table();
 
   // Called by derived classes to register themselves with the SQLite db.
+  // |read_write| specifies whether the table can also be written to.
+  // |requires_args| should be true if the table requires arguments in order to
+  // be instantiated.
   template <typename T>
   static void Register(sqlite3* db,
                        const TraceStorage* storage,
-                       const std::string& name) {
-    RegisterInternal(db, storage, name, GetFactory<T>());
+                       const std::string& name,
+                       bool read_write = false,
+                       bool requires_args = false) {
+    RegisterInternal(db, storage, name, read_write, requires_args,
+                     GetFactory<T>());
   }
 
   // Methods to be implemented by derived table classes.
-  virtual std::string CreateTableStmt(int argc, const char* const* argv) = 0;
-  virtual std::unique_ptr<Cursor> CreateCursor() = 0;
+  virtual Schema CreateSchema(int argc, const char* const* argv) = 0;
+  virtual std::unique_ptr<Cursor> CreateCursor(const QueryConstraints& qc,
+                                               sqlite3_value** argv) = 0;
   virtual int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) = 0;
 
   // Optional metods to implement.
   using FindFunctionFn = void (**)(sqlite3_context*, int, sqlite3_value**);
   virtual int FindFunction(const char* name, FindFunctionFn fn, void** args);
+
+  // At registration time, the function should also pass true for |read_write|.
+  virtual int Update(int, sqlite3_value**, sqlite3_int64*);
+
+  void SetErrorMessage(char* error) {
+    sqlite3_free(zErrMsg);
+    zErrMsg = error;
+  }
+
+  const Schema& schema() { return schema_; }
 
  private:
   template <typename TableType>
@@ -103,6 +182,8 @@ class Table : public sqlite3_vtab {
   static void RegisterInternal(sqlite3* db,
                                const TraceStorage*,
                                const std::string& name,
+                               bool read_write,
+                               bool requires_args,
                                Factory);
 
   // Overriden functions from sqlite3_vtab.
@@ -113,6 +194,8 @@ class Table : public sqlite3_vtab {
   Table& operator=(const Table&) = delete;
 
   std::string name_;
+  Schema schema_;
+
   QueryConstraints qc_cache_;
   int qc_hash_ = 0;
   int best_index_num_ = 0;

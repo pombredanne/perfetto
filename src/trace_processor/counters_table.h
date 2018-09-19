@@ -17,9 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 
-#include <limits>
-#include <memory>
-
+#include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -28,44 +26,43 @@ namespace trace_processor {
 
 class CountersTable : public Table {
  public:
-  enum Column {
-    kTimestamp = 0,
-    kName = 1,
-    kValue = 2,
-    kDuration = 3,
-    kRef = 4,
-    kRefType = 5,
-  };
-
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   CountersTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
-  std::string CreateTableStmt(int argc, const char* const* argv) override;
-  std::unique_ptr<Table::Cursor> CreateCursor() override;
+  Table::Schema CreateSchema(int argc, const char* const* argv) override;
+  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
+                                              sqlite3_value**) override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class Cursor : public Table::Cursor {
+  class RefColumn final : public StorageSchema::Column {
    public:
-    Cursor(const TraceStorage*);
+    RefColumn(std::string col_name, const TraceStorage* storage);
 
-    // Implementation of Table::Cursor.
-    int Filter(const QueryConstraints&, sqlite3_value**) override;
-    int Next() override;
-    int Eof() override;
-    int Column(sqlite3_context*, int N) override;
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
+
+    Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
+
+    Predicate Filter(int op, sqlite3_value* value) const override;
+
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
+
+    bool IsNaturallyOrdered() const override { return false; }
+
+    Table::ColumnType GetType() const override {
+      return Table::ColumnType::kLong;
+    }
 
    private:
-    bool filter_by_cpu_ = false;
-    uint32_t current_cpu_ = 0;
-    size_t index_in_cpu_ = 0;
-    uint32_t filter_cpu_ = 0;
+    int CompareRefsAsc(uint32_t f, uint32_t s) const;
 
-    const TraceStorage* const storage_;
+    const TraceStorage* storage_ = nullptr;
   };
 
+  std::deque<std::string> ref_types_;
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

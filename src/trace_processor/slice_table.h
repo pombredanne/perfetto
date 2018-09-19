@@ -17,9 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SLICE_TABLE_H_
 
-#include <limits>
-#include <memory>
-
+#include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -36,45 +34,18 @@ class TraceStorage;
 // the SQLite query engine.
 class SliceTable : public Table {
  public:
-  enum Column {
-    kTimestamp = 0,
-    kDuration = 1,
-    kUtid = 2,
-    kCategory = 3,
-    kName = 4,
-    kDepth = 5,
-    kStackId = 6,
-    kParentStackId = 7,
-  };
-
   SliceTable(sqlite3*, const TraceStorage* storage);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   // Table implementation.
-  std::string CreateTableStmt(int argc, const char* const* argv) override;
-  std::unique_ptr<Table::Cursor> CreateCursor() override;
+  Table::Schema CreateSchema(int argc, const char* const* argv) override;
+  std::unique_ptr<Table::Cursor> CreateCursor(const QueryConstraints&,
+                                              sqlite3_value**) override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  // Implementation of the SQLite cursor interface.
-  class Cursor : public Table::Cursor {
-   public:
-    Cursor(const TraceStorage* storage);
-    ~Cursor() override;
-
-    // Implementation of Table::Cursor.
-    int Filter(const QueryConstraints&, sqlite3_value**) override;
-    int Next() override;
-    int Eof() override;
-    int Column(sqlite3_context*, int N) override;
-
-   private:
-    size_t row_ = 0;
-    size_t num_rows_ = 0;
-    const TraceStorage* const storage_;
-  };
-
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 

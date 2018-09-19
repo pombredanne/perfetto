@@ -35,15 +35,18 @@ void StringTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<StringTable>(db, storage, "strings");
 }
 
-std::string StringTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE x("
-         "id UNSIGNED BIG INT, "
-         "str STRING,"
-         "PRIMARY KEY(id)"
-         ") WITHOUT ROWID;";
+Table::Schema StringTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column(Column::kStringId, "id", ColumnType::kUlong),
+          Table::Column(Column::kString, "str", ColumnType::kString),
+      },
+      {Column::kStringId});
 }
 
-std::unique_ptr<Table::Cursor> StringTable::CreateCursor() {
+std::unique_ptr<Table::Cursor> StringTable::CreateCursor(
+    const QueryConstraints&,
+    sqlite3_value**) {
   return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
 }
 
@@ -58,11 +61,6 @@ StringTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
 }
 
 StringTable::Cursor::~Cursor() = default;
-
-int StringTable::Cursor::Filter(const QueryConstraints&,
-                                sqlite3_value** /*argv*/) {
-  return SQLITE_OK;
-}
 
 int StringTable::Cursor::Next() {
   row_++;

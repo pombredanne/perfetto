@@ -154,7 +154,12 @@ TEST_F(TracingServiceImplTest, EnableAndDisableTracing) {
   consumer->EnableTracing(trace_config);
 
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
+
+  // Calling StartTracing() should be a noop (% a DLOG statement) because the
+  // trace config didn't have the |deferred_start| flag set.
+  consumer->StartTracing();
 
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
@@ -178,6 +183,7 @@ TEST_F(TracingServiceImplTest, LockdownMode) {
   consumer->EnableTracing(trace_config);
 
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid = CreateMockProducer();
@@ -195,6 +201,7 @@ TEST_F(TracingServiceImplTest, LockdownMode) {
   trace_config.set_lockdown_mode(
       TraceConfig::LockdownModeOperation::LOCKDOWN_CLEAR);
   consumer->EnableTracing(trace_config);
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<MockProducer> producer_otheruid2 = CreateMockProducer();
@@ -220,6 +227,7 @@ TEST_F(TracingServiceImplTest, DisconnectConsumerWhileTracing) {
   consumer->EnableTracing(trace_config);
 
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting the consumer while tracing should trigger data source
@@ -243,6 +251,7 @@ TEST_F(TracingServiceImplTest, ReconnectProducerWhileTracing) {
   consumer->EnableTracing(trace_config);
 
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   // Disconnecting and reconnecting a producer with a matching data source.
@@ -252,6 +261,7 @@ TEST_F(TracingServiceImplTest, ReconnectProducerWhileTracing) {
   producer->Connect(svc.get(), "mock_producer_2");
   producer->RegisterDataSource("data_source");
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 }
 
@@ -282,6 +292,10 @@ TEST_F(TracingServiceImplTest, ProducerIDWrapping) {
   ASSERT_EQ(6u, connect_producer_and_get_id("6"));
 }
 
+// Note: file_write_period_ms is set to a large enough to have exactly one flush
+// of the tracing buffers (and therefore at most one synchronization section),
+// unless the test runs unrealistically slowly, or the implementation of the
+// tracing snapshot packets changes.
 TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
@@ -296,22 +310,26 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   ds_config->set_name("data_source");
   ds_config->set_target_buffer(0);
   trace_config.set_write_into_file(true);
-  trace_config.set_file_write_period_ms(1);
-  const uint64_t kMaxFileSize = 512;
+  trace_config.set_file_write_period_ms(100000);  // 100s
+  const uint64_t kMaxFileSize = 1024;
   trace_config.set_max_file_size_bytes(kMaxFileSize);
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
 
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
+  static const int kNumPreamblePackets = 4;
+  static const int kNumTestPackets = 10;
   static const char kPayload[] = "1234567890abcdef-";
-  static const int kNumPackets = 10;
 
   std::unique_ptr<TraceWriter> writer =
       producer->CreateTraceWriter("data_source");
-  // All these packets should fit within kMaxFileSize.
-  for (int i = 0; i < kNumPackets; i++) {
+  // Tracing service will emit a preamble of packets (a synchronization section,
+  // followed by a tracing config packet). The preamble and these test packets
+  // should fit within kMaxFileSize.
+  for (int i = 0; i < kNumTestPackets; i++) {
     auto tp = writer->NewTracePacket();
     std::string payload(kPayload);
     payload.append(std::to_string(i));
@@ -337,14 +355,11 @@ TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
   ASSERT_TRUE(base::ReadFile(tmp_file.path().c_str(), &trace_raw));
   protos::Trace trace;
   ASSERT_TRUE(trace.ParseFromString(trace_raw));
-  ASSERT_GE(trace.packet_size(), kNumPackets);
-  int num_testing_packet = 0;
-  for (int i = 0; i < trace.packet_size(); i++) {
-    const protos::TracePacket& tp = trace.packet(i);
-    if (!tp.has_for_testing())
-      continue;
-    ASSERT_EQ(kPayload + std::to_string(num_testing_packet++),
-              tp.for_testing().str());
+
+  ASSERT_EQ(trace.packet_size(), kNumPreamblePackets + kNumTestPackets);
+  for (int i = 0; i < kNumTestPackets; i++) {
+    const protos::TracePacket& tp = trace.packet(kNumPreamblePackets + i);
+    ASSERT_EQ(kPayload + std::to_string(i++), tp.for_testing().str());
   }
 }
 
@@ -397,11 +412,14 @@ TEST_F(TracingServiceImplTest, ProducerShmAndPageSizeOverriddenByTraceConfig) {
   size_t actual_page_sizes_kb[kNumProducers]{};
   for (size_t i = 0; i < kNumProducers; i++) {
     producer[i]->WaitForTracingSetup();
-    producer[i]->WaitForDataSourceStart("data_source");
+    producer[i]->WaitForDataSourceSetup("data_source");
     actual_shm_sizes_kb[i] =
         producer[i]->endpoint()->shared_memory()->size() / 1024;
     actual_page_sizes_kb[i] =
         producer[i]->endpoint()->shared_buffer_page_size_kb();
+  }
+  for (size_t i = 0; i < kNumProducers; i++) {
+    producer[i]->WaitForDataSourceStart("data_source");
   }
   ASSERT_THAT(actual_page_sizes_kb, ElementsAreArray(kExpectedPageSizesKb));
   ASSERT_THAT(actual_shm_sizes_kb, ElementsAreArray(kExpectedSizesKb));
@@ -422,6 +440,7 @@ TEST_F(TracingServiceImplTest, ExplicitFlush) {
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -460,6 +479,7 @@ TEST_F(TracingServiceImplTest, ImplicitFlushOnTimedTraces) {
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -498,6 +518,7 @@ TEST_F(TracingServiceImplTest, BatchFlushes) {
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -564,6 +585,11 @@ TEST_F(TracingServiceImplTest, OnTracingDisabledWaitsForDataSourceStopAcks) {
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
+
+  producer->WaitForDataSourceSetup("ds_will_ack_1");
+  producer->WaitForDataSourceSetup("ds_wont_ack");
+  producer->WaitForDataSourceSetup("ds_will_ack_2");
+
   producer->WaitForDataSourceStart("ds_will_ack_1");
   producer->WaitForDataSourceStart("ds_wont_ack");
   producer->WaitForDataSourceStart("ds_will_ack_2");
@@ -636,6 +662,7 @@ TEST_F(TracingServiceImplTest, OnTracingDisabledCalledAnywaysInCaseOfTimeout) {
 
   consumer->EnableTracing(trace_config);
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   std::unique_ptr<TraceWriter> writer =
@@ -675,11 +702,15 @@ TEST_F(TracingServiceImplTest, SessionId) {
 
     if (i == 0)
       producer1->WaitForTracingSetup();
-    producer1->WaitForDataSourceStart("ds_1A");
-    producer1->WaitForDataSourceStart("ds_1B");
 
+    producer1->WaitForDataSourceSetup("ds_1A");
+    producer1->WaitForDataSourceSetup("ds_1B");
     if (i == 0)
       producer2->WaitForTracingSetup();
+    producer2->WaitForDataSourceSetup("ds_2A");
+
+    producer1->WaitForDataSourceStart("ds_1A");
+    producer1->WaitForDataSourceStart("ds_1B");
     producer2->WaitForDataSourceStart("ds_2A");
 
     auto* ds1 = producer1->GetDataSourceInstance("ds_1A");
@@ -723,6 +754,7 @@ TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
   base::TempFile tmp_file = base::TempFile::Create();
   consumer->EnableTracing(trace_config, base::ScopedFile(dup(tmp_file.fd())));
   producer->WaitForTracingSetup();
+  producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
   // Write some variable length payload, waiting for sync markers every now
@@ -775,6 +807,44 @@ TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
 
   ASSERT_EQ(whole_trace.packet_size(), merged_trace.packet_size());
   EXPECT_EQ(whole_trace.SerializeAsString(), merged_trace.SerializeAsString());
+}
+
+// Creates a tracing session with |deferred_start| and checks that data sources
+// are started only after calling StartTracing().
+TEST_F(TracingServiceImplTest, DeferredStart) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  std::unique_ptr<MockProducer> producer = CreateMockProducer();
+  producer->Connect(svc.get(), "mock_producer");
+
+  // Create two data sources but enable only one of them.
+  producer->RegisterDataSource("ds_1");
+  producer->RegisterDataSource("ds_2");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  trace_config.add_data_sources()->mutable_config()->set_name("ds_1");
+  trace_config.set_deferred_start(true);
+  trace_config.set_duration_ms(1);
+
+  consumer->EnableTracing(trace_config);
+  producer->WaitForTracingSetup();
+
+  producer->WaitForDataSourceSetup("ds_1");
+
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  task_runner.RunUntilIdle();
+
+  consumer->StartTracing();
+
+  producer->WaitForDataSourceStart("ds_1");
+
+  auto writer1 = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer1.get());
+
+  producer->WaitForDataSourceStop("ds_1");
+  consumer->WaitForTracingDisabled();
 }
 
 }  // namespace perfetto

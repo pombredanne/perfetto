@@ -12,36 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {produce} from 'immer';
+
 import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
-import {Action} from '../common/actions';
+import {DeferredAction, StateActions} from '../common/actions';
 import {createEmptyState, State} from '../common/state';
+
 import {ControllerAny} from './controller';
-import {Engine, EnginePortAndId} from './engine';
-import {rootReducer} from './reducer';
+import {Engine} from './engine';
 import {WasmEngineProxy} from './wasm_engine_proxy';
+import {
+  createWasmEngine,
+  destroyWasmEngine,
+} from './wasm_engine_proxy';
+
+
+export interface App {
+  state: State;
+  dispatch(action: DeferredAction): void;
+  publish(
+      what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult'|'LegacyTrace',
+      data: {}, transferList?: Array<{}>): void;
+}
 
 /**
  * Global accessors for state/dispatch in the controller.
  */
-class Globals {
+class Globals implements App {
   private _state?: State;
   private _rootController?: ControllerAny;
   private _frontend?: Remote;
   private _runningControllers = false;
-  private _queuedActions = new Array<Action>();
+  private _queuedActions = new Array<DeferredAction>();
 
   initialize(rootController: ControllerAny, frontendProxy: Remote) {
-    this._state = createEmptyState();
     this._rootController = rootController;
     this._frontend = frontendProxy;
+    this._state = createEmptyState();
   }
 
-  dispatch(action: Action): void {
+  dispatch(action: DeferredAction): void {
     this.dispatchMultiple([action]);
   }
 
-  dispatchMultiple(actions: Action[]): void {
+  dispatchMultiple(actions: DeferredAction[]): void {
     this._queuedActions = this._queuedActions.concat(actions);
 
     // If we are in the middle of running the controllers, queue the actions
@@ -59,14 +74,12 @@ class Globals {
     let runAgain = false;
     let summary = this._queuedActions.map(action => action.type).join(', ');
     summary = `Controllers loop (${summary})`;
-    console.time(summary);
     for (let iter = 0; runAgain || this._queuedActions.length > 0; iter++) {
       if (iter > 100) throw new Error('Controllers are stuck in a livelock');
       const actions = this._queuedActions;
-      this._queuedActions = new Array<Action>();
+      this._queuedActions = new Array<DeferredAction>();
       for (const action of actions) {
-        console.debug('Applying action', action);
-        this._state = rootReducer(this.state, action);
+        this.applyAction(action);
       }
       this._runningControllers = true;
       try {
@@ -76,30 +89,45 @@ class Globals {
       }
     }
     assertExists(this._frontend).send<void>('updateState', [this.state]);
-    console.timeEnd(summary);
   }
 
-  async createEngine(): Promise<Engine> {
-    const portAndId = await assertExists(this._frontend)
-                          .send<EnginePortAndId>('createEngine', []);
-    return WasmEngineProxy.create(portAndId);
+  createEngine(): Engine {
+    const id = new Date().toUTCString();
+    const portAndId = {id, worker: createWasmEngine(id)};
+    return new WasmEngineProxy(portAndId);
   }
 
-  async destroyEngine(id: string): Promise<void> {
-    await assertExists(this._frontend).send<void>('destroyEngine', [id]);
+  destroyEngine(id: string): void {
+    destroyWasmEngine(id);
   }
 
   // TODO: this needs to be cleaned up.
-  publish(what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult', data: {}) {
-    assertExists(this._frontend).send<void>(`publish${what}`, [data]);
+  publish(
+      what: 'OverviewData'|'TrackData'|'Threads'|'QueryResult'|'LegacyTrace',
+      data: {}, transferList?: Array<{}>) {
+    assertExists(this._frontend)
+        .send<void>(`publish${what}`, [data], transferList);
   }
 
   get state(): State {
     return assertExists(this._state);
   }
 
-  set state(state: State) {
-    this._state = state;
+  applyAction(action: DeferredAction): void {
+    assertExists(this._state);
+    // We need a special case for when we want to replace the whole tree.
+    if (action.type === 'setState') {
+      const args = (action as DeferredAction<{newState: State}>).args;
+      this._state = args.newState;
+      return;
+    }
+    // 'produce' creates a immer proxy which wraps the current state turning
+    // all imperative mutations of the state done in the callback into
+    // immutable changes to the returned state.
+    this._state = produce(this.state, draft => {
+      // tslint:disable-next-line no-any
+      (StateActions as any)[action.type](draft, action.args);
+    });
   }
 
   resetForTesting() {
