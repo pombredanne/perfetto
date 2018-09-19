@@ -29,7 +29,7 @@ namespace {
 constexpr char kSocketName[] = TEST_SOCK_NAME("heapprofd_integrationtest");
 
 void __attribute__((noinline)) OtherFunction(Client* client) {
-  client->Malloc(10, 0xf00);
+  client->RecordMalloc(10, 0xf00);
 }
 
 void __attribute__((noinline)) SomeFunction(Client* client) {
