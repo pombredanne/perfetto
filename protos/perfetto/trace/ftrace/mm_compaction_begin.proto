@@ -12,6 +12,4 @@ message MmCompactionBeginFtraceEvent {
   optional uint64 free_pfn = 3;
   optional uint64 zone_end = 4;
   optional uint32 sync = 5;
-  optional uint64 free_start = 6;
-  optional uint64 migrate_start = 7;
 }

@@ -13,5 +13,4 @@ message F2fsSetPageDirtyFtraceEvent {
   optional int32 dir = 4;
   optional uint64 index = 5;
   optional int32 dirty = 6;
-  optional int32 uptodate = 7;
 }

@@ -12,5 +12,4 @@ message Ext4EsShrinkFtraceEvent {
   optional uint64 scan_time = 3;
   optional int32 nr_skipped = 4;
   optional int32 retried = 5;
-  optional int32 skip_precached = 6;
 }

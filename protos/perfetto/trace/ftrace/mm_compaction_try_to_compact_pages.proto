@@ -10,5 +10,4 @@ message MmCompactionTryToCompactPagesFtraceEvent {
   optional int32 order = 1;
   optional uint32 gfp_mask = 2;
   optional uint32 mode = 3;
-  optional int32 prio = 4;
 }

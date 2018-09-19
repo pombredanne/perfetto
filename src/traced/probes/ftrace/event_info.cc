@@ -515,7 +515,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("order", 1, kProtoInt32));
     event->fields.push_back(MakeField("may_writepage", 2, kProtoInt32));
     event->fields.push_back(MakeField("gfp_flags", 3, kProtoUint32));
-    event->fields.push_back(MakeField("classzone_idx", 4, kProtoInt32));
   }
 
   {
@@ -535,7 +534,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->proto_field_id = 48;
     event->fields.push_back(MakeField("nid", 1, kProtoInt32));
     event->fields.push_back(MakeField("order", 2, kProtoInt32));
-    event->fields.push_back(MakeField("zid", 3, kProtoInt32));
   }
 
   {
@@ -729,8 +727,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("pid", 3, kProtoInt32));
     event->fields.push_back(MakeField("comm", 4, kProtoString));
     event->fields.push_back(MakeField("cname", 5, kProtoString));
-    event->fields.push_back(MakeField("dst_level", 6, kProtoInt32));
-    event->fields.push_back(MakeField("dst_path", 7, kProtoString));
   }
 
   {
@@ -742,8 +738,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("root", 1, kProtoInt32));
     event->fields.push_back(MakeField("id", 2, kProtoInt32));
     event->fields.push_back(MakeField("cname", 3, kProtoString));
-    event->fields.push_back(MakeField("level", 4, kProtoInt32));
-    event->fields.push_back(MakeField("path", 5, kProtoString));
   }
 
   {
@@ -766,8 +760,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("root", 1, kProtoInt32));
     event->fields.push_back(MakeField("id", 2, kProtoInt32));
     event->fields.push_back(MakeField("cname", 3, kProtoString));
-    event->fields.push_back(MakeField("level", 4, kProtoInt32));
-    event->fields.push_back(MakeField("path", 5, kProtoString));
   }
 
   {
@@ -781,8 +773,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("pid", 3, kProtoInt32));
     event->fields.push_back(MakeField("comm", 4, kProtoString));
     event->fields.push_back(MakeField("cname", 5, kProtoString));
-    event->fields.push_back(MakeField("dst_level", 6, kProtoInt32));
-    event->fields.push_back(MakeField("dst_path", 7, kProtoString));
   }
 
   {
@@ -805,8 +795,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("root", 1, kProtoInt32));
     event->fields.push_back(MakeField("id", 2, kProtoInt32));
     event->fields.push_back(MakeField("cname", 3, kProtoString));
-    event->fields.push_back(MakeField("level", 4, kProtoInt32));
-    event->fields.push_back(MakeField("path", 5, kProtoString));
   }
 
   {
@@ -818,8 +806,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("root", 1, kProtoInt32));
     event->fields.push_back(MakeField("id", 2, kProtoInt32));
     event->fields.push_back(MakeField("cname", 3, kProtoString));
-    event->fields.push_back(MakeField("level", 4, kProtoInt32));
-    event->fields.push_back(MakeField("path", 5, kProtoString));
   }
 
   {
@@ -1143,8 +1129,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("free_pfn", 3, kProtoUint64));
     event->fields.push_back(MakeField("zone_end", 4, kProtoUint64));
     event->fields.push_back(MakeField("sync", 5, kProtoUint32));
-    event->fields.push_back(MakeField("free_start", 6, kProtoUint64));
-    event->fields.push_back(MakeField("migrate_start", 7, kProtoUint64));
   }
 
   {
@@ -1290,7 +1274,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("order", 1, kProtoInt32));
     event->fields.push_back(MakeField("gfp_mask", 2, kProtoUint32));
     event->fields.push_back(MakeField("mode", 3, kProtoUint32));
-    event->fields.push_back(MakeField("prio", 4, kProtoInt32));
   }
 
   {
@@ -1774,7 +1757,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoInt64));
+    event->fields.push_back(MakeField("status", 6, kProtoUint32));
   }
 
   {
@@ -1799,7 +1782,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoInt64));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
   }
 
   {
@@ -1813,7 +1796,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoInt64));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
   }
 
   {
@@ -1838,7 +1821,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("lblk", 3, kProtoUint32));
     event->fields.push_back(MakeField("len", 4, kProtoUint32));
     event->fields.push_back(MakeField("pblk", 5, kProtoUint64));
-    event->fields.push_back(MakeField("status", 6, kProtoInt64));
+    event->fields.push_back(MakeField("status", 6, kProtoUint64));
     event->fields.push_back(MakeField("found", 7, kProtoInt32));
   }
 
@@ -1865,7 +1848,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("scan_time", 3, kProtoUint64));
     event->fields.push_back(MakeField("nr_skipped", 4, kProtoInt32));
     event->fields.push_back(MakeField("retried", 5, kProtoInt32));
-    event->fields.push_back(MakeField("skip_precached", 6, kProtoInt32));
   }
 
   {
@@ -2725,8 +2707,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("range_end", 6, kProtoInt64));
     event->fields.push_back(MakeField("writeback_index", 7, kProtoUint64));
     event->fields.push_back(MakeField("sync_mode", 8, kProtoInt32));
-    event->fields.push_back(MakeField("for_kupdate", 9, kProtoInt64));
-    event->fields.push_back(MakeField("range_cyclic", 10, kProtoInt64));
+    event->fields.push_back(MakeField("for_kupdate", 9, kProtoUint32));
+    event->fields.push_back(MakeField("range_cyclic", 10, kProtoUint32));
   }
 
   {
@@ -2923,7 +2905,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("pre_victim", 8, kProtoUint32));
     event->fields.push_back(MakeField("prefree", 9, kProtoUint32));
     event->fields.push_back(MakeField("free", 10, kProtoUint32));
-    event->fields.push_back(MakeField("cost", 11, kProtoUint32));
   }
 
   {
@@ -2975,9 +2956,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("index", 3, kProtoUint64));
     event->fields.push_back(MakeField("blkaddr", 4, kProtoUint64));
     event->fields.push_back(MakeField("type", 5, kProtoInt32));
-    event->fields.push_back(MakeField("dir", 6, kProtoInt32));
-    event->fields.push_back(MakeField("dirty", 7, kProtoInt32));
-    event->fields.push_back(MakeField("uptodate", 8, kProtoInt32));
   }
 
   {
@@ -3003,7 +2981,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("dir", 4, kProtoInt32));
     event->fields.push_back(MakeField("index", 5, kProtoUint64));
     event->fields.push_back(MakeField("dirty", 6, kProtoInt32));
-    event->fields.push_back(MakeField("uptodate", 7, kProtoInt32));
   }
 
   {
@@ -3046,7 +3023,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("need_cp", 3, kProtoUint32));
     event->fields.push_back(MakeField("datasync", 4, kProtoInt32));
     event->fields.push_back(MakeField("ret", 5, kProtoInt32));
-    event->fields.push_back(MakeField("cp_reason", 6, kProtoInt32));
   }
 
   {
@@ -3221,7 +3197,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("dir", 4, kProtoInt32));
     event->fields.push_back(MakeField("index", 5, kProtoUint64));
     event->fields.push_back(MakeField("dirty", 6, kProtoInt32));
-    event->fields.push_back(MakeField("uptodate", 7, kProtoInt32));
   }
 
   {
@@ -3246,7 +3221,6 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("dev", 1, kProtoUint64));
     event->fields.push_back(MakeField("is_umount", 2, kProtoUint32));
     event->fields.push_back(MakeField("msg", 3, kProtoString));
-    event->fields.push_back(MakeField("reason", 4, kProtoInt32));
   }
 
   {
