@@ -21,46 +21,58 @@
 #include <deque>
 #include <mutex>
 
+#include "perfetto/base/logging.h"
+
+// Transport messages between threads. Multiple-producer / multiple-consumer.
+//
+// This has to outlive both the consumer and the producer who have to
+// negotiate termination separately, if needed. This is currently only used
+// in a scenario where the producer and consumer both are loops that never
+// terminate.
 template <typename T>
 class BoundedQueue {
  public:
   BoundedQueue() : BoundedQueue(1) {}
-  BoundedQueue(size_t size) : size_(size) {}
+  BoundedQueue(size_t capacity) : capacity_(capacity) {
+    PERFETTO_CHECK(capacity > 0);
+  }
 
-  bool Add(T item) {
+  void Add(T item) {
     std::unique_lock<std::mutex> l(mtx_);
-    if (deque_.size() == size_)
-      full_cv_.wait(l, [this] { return deque_.size() < size_; });
+    if (deque_.size() == capacity_)
+      full_cv_.wait(l, [this] { return deque_.size() < capacity_; });
     deque_.emplace_back(std::move(item));
     if (deque_.size() == 1)
       empty_cv_.notify_one();
-    return true;
   }
 
   T Get() {
     std::unique_lock<std::mutex> l(mtx_);
     if (elements_ == 0)
-      empty_cv_.wait(l, [this] { return deque_.size() > 0; });
+      empty_cv_.wait(l, [this] { return !deque_.empty(); });
     T item(std::move(deque_.front()));
     deque_.pop_front();
-    if (deque_.size() == size_ - 1)
+    if (deque_.size() == capacity_ - 1) {
+      l.unlock();
       full_cv_.notify_one();
+    }
     return item;
   }
 
-  void SetSize(size_t size) {
+  void SetCapacity(size_t capacity) {
+    PERFETTO_CHECK(capacity > 0);
     std::lock_guard<std::mutex> l(mtx_);
-    size_ = size;
+    capacity_ = capacity;
   }
 
  private:
-  size_t size_;
+  size_t capacity_;
 
   size_t elements_ = 0;
-  std::mutex mtx_;
+  std::deque<T> deque_;
   std::condition_variable full_cv_;
   std::condition_variable empty_cv_;
-  std::deque<T> deque_;
+  std::mutex mtx_;
 };
 
 #endif  // SRC_PROFILING_MEMORY_BOUNDED_QUEUE_H_

@@ -46,7 +46,7 @@ TEST(BoundedQueueTest, Resize) {
   BoundedQueue<int> q(2);
   q.Add(1);
   q.Add(2);
-  q.SetSize(3);
+  q.SetCapacity(3);
   q.Add(3);
   EXPECT_EQ(q.Get(), 1);
   EXPECT_EQ(q.Get(), 2);

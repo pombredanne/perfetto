@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <memory>
 
 #define PERFETTO_EINTR(x)                                   \
   ({                                                        \
@@ -93,6 +94,34 @@ template <size_t alignment>
 constexpr size_t AlignUp(size_t size) {
   static_assert((alignment & (alignment - 1)) == 0, "alignment must be a pow2");
   return (size + alignment - 1) & ~(alignment - 1);
+}
+
+template <typename F>
+class Cleanup {
+ public:
+  Cleanup(const Cleanup&) = delete;
+  Cleanup& operator=(const Cleanup&) = delete;
+  Cleanup(Cleanup&& other) : f_(std::move(other.f_)) {
+    other.should_run_ = false;
+  }
+
+  Cleanup(F f) : f_(std::move(f)) {}
+
+  ~Cleanup() {
+    if (should_run_)
+      f_();
+  }
+
+ private:
+  F f_;
+  bool should_run_ = true;
+};
+
+// Generate RAII object to clean up C resources that do not have a natural
+// sentinel value so base::ScopedResource is hard to use.
+template <typename F>
+Cleanup<F> MakeCleanup(F f) {
+  return {std::move(f)};
 }
 
 }  // namespace base

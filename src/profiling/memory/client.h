@@ -28,10 +28,14 @@ namespace perfetto {
 
 class SocketPool;
 
+// Cache for frees that have been observed. It is infeasible to send every
+// free separately, so we batch and send the whole buffer once it is full.
 class FreePage {
  public:
   FreePage();
 
+  // Add address to buffer. Flush if necessary using a socket borrowed from
+  // pool.
   // Can be called from any thread. Must not hold mtx_.`
   void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
@@ -44,17 +48,19 @@ class FreePage {
   size_t offset_;
 };
 
+// Socket borrowed from a SocketPool. Gets returned once it goes out of scope.
 class BorrowedSocket {
  public:
   BorrowedSocket(const BorrowedSocket&) = delete;
   BorrowedSocket& operator=(const BorrowedSocket&) = delete;
-  BorrowedSocket(BorrowedSocket&& other) {
+  BorrowedSocket(BorrowedSocket&& other) noexcept {
     fd_ = std::move(other.fd_);
     socket_pool_ = other.socket_pool_;
     other.socket_pool_ = nullptr;
   }
 
-  BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool);
+  BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool)
+      : fd_(std::move(fd)), socket_pool_(socket_pool) {}
   int operator*();
   int get();
   void Close();
@@ -81,23 +87,23 @@ class SocketPool {
   size_t dead_sockets_ = 0;
 };
 
-uint8_t* GetMainThreadStackBase();
-uint8_t* GetThreadStackBase();
+char* GetMainThreadStackBase();
+char* GetThreadStackBase();
 
 class Client {
  public:
   Client(std::vector<base::ScopedFile> sockets);
   Client(const std::string& sock_name, size_t conns);
-  void Malloc(uint64_t alloc_size, uint64_t alloc_address);
-  void Free(uint64_t alloc_address);
+  void RecordMalloc(uint64_t alloc_size, uint64_t alloc_address);
+  void RecordFree(uint64_t alloc_address);
 
  private:
-  uint8_t* GetStackBase();
+  char* GetStackBase();
 
   SocketPool socket_pool_;
   FreePage free_page_;
-  uint8_t* const main_thread_stack_base_;
-  std::atomic<uint64_t> sequence_number_;
+  char* const main_thread_stack_base_;
+  std::atomic<uint64_t> sequence_number_{0};
 };
 
 }  // namespace perfetto

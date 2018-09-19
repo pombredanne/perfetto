@@ -50,12 +50,11 @@ int HeapprofdMain(int argc, char** argv) {
     });
   }
 
-  SocketListener listener(
-      [&unwinder_queues](UnwindingRecord r) {
-        unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()]
-            .Add(std::move(r));
-      },
-      &callsites);
+  auto on_record_received = [&unwinder_queues](UnwindingRecord r) {
+    unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
+        std::move(r));
+  };
+  SocketListener listener(std::move(on_record_received), &callsites);
 
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {

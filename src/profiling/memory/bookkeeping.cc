@@ -44,11 +44,11 @@ void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
 
   Callsites::Node* node = callsites_->IncrementCallsite(locs, size);
   allocations_.emplace(address, Allocation(size, sequence_number, node));
-  AddPending(sequence_number, 0);
+  AddPendingNoop(sequence_number);
 }
 
 void HeapDump::RecordFree(uint64_t address, uint64_t sequence_number) {
-  AddPending(sequence_number, address);
+  AddPendingFree(sequence_number, address);
 }
 
 void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
@@ -59,34 +59,25 @@ void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   const Allocation& value = leaf_it->second;
   if (value.sequence_number > sequence_number)
     return;
-  callsites_->DecrementNode(value.node, value.alloc_size);
   allocations_.erase(leaf_it);
 }
 
-void HeapDump::AddPending(uint64_t sequence_number, uint64_t address) {
-  if (sequence_number != consistent_sequence_number_ + 1) {
+void HeapDump::AddPendingFree(uint64_t sequence_number, uint64_t address) {
+  if (sequence_number != sequence_number_ + 1) {
     pending_.emplace(sequence_number, address);
     return;
   }
 
   if (address)
     ApplyFree(sequence_number, address);
-  consistent_sequence_number_++;
+  sequence_number_++;
 
   auto it = pending_.begin();
-  while (it != pending_.end() && it->first == consistent_sequence_number_ + 1) {
+  while (it != pending_.end() && it->first == sequence_number_ + 1) {
     if (it->second)
       ApplyFree(it->first, it->second);
-    consistent_sequence_number_++;
+    sequence_number_++;
     it = pending_.erase(it);
-  }
-}
-
-HeapDump::~HeapDump() {
-  auto it = allocations_.begin();
-  while (it != allocations_.end()) {
-    callsites_->DecrementNode(it->second.node, it->second.alloc_size);
-    it = allocations_.erase(it);
   }
 }
 

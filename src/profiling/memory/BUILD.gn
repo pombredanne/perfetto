@@ -15,84 +15,31 @@
 import("../../../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
-source_set("record_reader") {
-  public_configs = [ "../../../gn:default_config" ]
+source_set("daemon") {
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "record_reader.cc",
-    "record_reader.h",
-  ]
-}
-
-source_set("unwinding") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
-  deps = [
-    ":bookkeeping",
     "../../../buildtools:libunwindstack",
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "unwinding.cc",
-    "unwinding.h",
-  ]
-}
-
-source_set("socket_listener") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
-  deps = [
-    ":bookkeeping",
-    ":record_reader",
-    ":unwinding",
-    "../../../gn:default_deps",
-    "../../base",
-    "../../ipc",
-  ]
-  sources = [
-    "socket_listener.cc",
-    "socket_listener.h",
-  ]
-}
-
-source_set("string_interner") {
-  public_configs = [ "../../../gn:default_config" ]
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "string_interner.cc",
-    "string_interner.h",
-  ]
-}
-
-source_set("bookkeeping") {
-  public_configs = [ "../../../gn:default_config" ]
-  deps = [
-    ":string_interner",
     "../../../gn:default_deps",
     "../../base",
   ]
   sources = [
     "bookkeeping.cc",
     "bookkeeping.h",
+    "record_reader.cc",
+    "record_reader.h",
+    "sampler.cc",
+    "sampler.h",
+    "socket_listener.cc",
+    "socket_listener.h",
+    "string_interner.cc",
+    "string_interner.h",
+    "unwinding.cc",
+    "unwinding.h",
   ]
 }
 
 source_set("client") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
@@ -104,31 +51,13 @@ source_set("client") {
   ]
 }
 
-source_set("sampler") {
-  deps = [
-    "../../../gn:default_deps",
-    "../../base",
-  ]
-  sources = [
-    "sampler.cc",
-    "sampler.h",
-  ]
-}
-
 source_set("unittests") {
-  public_configs = [
-    "../../../gn:default_config",
-    "../../../buildtools:libunwindstack_config",
-  ]
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
   testonly = true
   deps = [
-    ":bookkeeping",
     ":client",
-    ":record_reader",
-    ":sampler",
-    ":socket_listener",
-    ":string_interner",
-    ":unwinding",
+    ":daemon",
+    "../../../gn:default_deps",
     "../../../gn:gtest_deps",
     "../../base",
     "../../base:test_support",
@@ -147,10 +76,8 @@ source_set("unittests") {
 }
 
 executable("heapprofd") {
-  public_configs = [ "../../../gn:default_config" ]
   deps = [
-    ":socket_listener",
-    ":unwinding",
+    ":daemon",
     "../../../gn:default_deps",
     "../../base",
     "../../ipc",
