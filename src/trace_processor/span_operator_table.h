@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_SPAN_TABLE_H_
-#define SRC_TRACE_PROCESSOR_SPAN_TABLE_H_
+#ifndef SRC_TRACE_PROCESSOR_SPAN_OPERATOR_TABLE_H_
+#define SRC_TRACE_PROCESSOR_SPAN_OPERATOR_TABLE_H_
 
 #include <sqlite3.h>
 #include <array>
@@ -28,24 +28,15 @@
 namespace perfetto {
 namespace trace_processor {
 
-class SpanTable : public Table {
+//
+class SpanOperatorTable : public Table {
  public:
-  struct Column {
-    std::string name;
-    std::string type;
+  enum Column {
+    kTimestamp = 0,
+    kDuration = 1,
+    kJoinValue = 2,
+    // All other columns are dynamic depending on the joined tables.
   };
-
-  SpanTable(sqlite3*, const TraceStorage*);
-
-  static void RegisterTable(sqlite3* db, const TraceStorage* storage);
-
-  // Table implementation.
-  std::string CreateTableStmt(int argc, const char* const* argv) override;
-  std::unique_ptr<Table::Cursor> CreateCursor() override;
-  int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
-
- private:
-  static constexpr uint8_t kReservedColumns = 3;
   struct Value {
     enum Type {
       kText = 0,
@@ -58,10 +49,27 @@ class SpanTable : public Table {
     uint64_t ulong_value;
     uint32_t uint_value;
   };
+  struct TableColumn {
+    std::string name;
+    std::string type_name;
+    Value::Type type = Value::Type::kText;
+  };
+
+  SpanOperatorTable(sqlite3*, const TraceStorage*);
+
+  static void RegisterTable(sqlite3* db, const TraceStorage* storage);
+
+  // Table implementation.
+  std::string CreateTableStmt(int argc, const char* const* argv) override;
+  std::unique_ptr<Table::Cursor> CreateCursor() override;
+  int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
+
+ private:
+  static constexpr uint8_t kReservedColumns = Column::kJoinValue + 1;
 
   class FilterState {
    public:
-    FilterState(SpanTable*, sqlite3_stmt* t1_stmt, sqlite3_stmt* t2_stmt);
+    FilterState(SpanOperatorTable*, ScopedStmt t1_stmt, ScopedStmt t2_stmt);
 
     int Initialize();
     int Next();
@@ -72,11 +80,23 @@ class SpanTable : public Table {
     struct TableRow {
       uint64_t ts = 0;
       uint64_t dur = 0;
-      std::vector<Value> values;
+      std::vector<Value> values;  // One for each column.
+    };
+    struct TableState {
+      uint64_t latest_ts = std::numeric_limits<uint64_t>::max();
+      size_t col_count = 0;
+      ScopedStmt stmt;
+
+      // TODO(lalitm): change this from being an arrray to a map.
+      std::array<TableRow, base::kMaxCpus> rows;
     };
 
     int ExtractNext(bool pull_t1);
-    void ReportSqliteResult(sqlite3_context* context, SpanTable::Value value);
+    int SetupReturnForJoinValue(uint32_t join_value,
+                                const TableRow& t1_row,
+                                const TableRow& t2_row);
+    void ReportSqliteResult(sqlite3_context* context,
+                            SpanOperatorTable::Value value);
 
     uint64_t ts_ = 0;
     uint64_t dur_ = 0;
@@ -84,23 +104,19 @@ class SpanTable : public Table {
     TableRow t1_to_ret_;
     TableRow t2_to_ret_;
 
-    // TODO(lalitm): change this from being an arrray to a map.
-    std::array<TableRow, base::kMaxCpus> t1_;
-    std::array<TableRow, base::kMaxCpus> t2_;
+    TableState t1_;
+    TableState t2_;
 
+    // TODO(lalitm): change this to be a iterator into t1's rows.
+    uint32_t cleanup_join_val_;
     bool is_eof_ = true;
-    uint64_t latest_t1_ts_ = std::numeric_limits<uint64_t>::max();
-    uint64_t latest_t2_ts_ = std::numeric_limits<uint64_t>::max();
 
-    ScopedStmt t1_stmt_;
-    ScopedStmt t2_stmt_;
-
-    SpanTable* const table_;
+    SpanOperatorTable* const table_;
   };
 
   class Cursor : public Table::Cursor {
    public:
-    Cursor(SpanTable*, sqlite3* db);
+    Cursor(SpanOperatorTable*, sqlite3* db);
     ~Cursor() override;
 
     // Methods to be implemented by derived table classes.
@@ -111,18 +127,18 @@ class SpanTable : public Table {
 
    private:
     sqlite3* const db_;
+    SpanOperatorTable* const table_;
     std::unique_ptr<FilterState> filter_state_;
-    SpanTable* const table_;
   };
 
-  struct TableDefenition {
+  struct TableDefinition {
     std::string name;
-    std::vector<Column> cols;
+    std::vector<TableColumn> cols;
     std::string join_col_name;
   };
 
-  TableDefenition t1_;
-  TableDefenition t2_;
+  TableDefinition t1_;
+  TableDefinition t2_;
   std::string join_col_;
 
   sqlite3* const db_;
@@ -131,4 +147,4 @@ class SpanTable : public Table {
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_SPAN_TABLE_H_
+#endif  // SRC_TRACE_PROCESSOR_SPAN_OPERATOR_TABLE_H_
