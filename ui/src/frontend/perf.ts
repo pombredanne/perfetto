@@ -34,9 +34,9 @@ export const debugNow = () => perfDebug() ? performance.now() : 0;
  * Returns execution time of |fn| if perf debug mode is on. Returns 0 otherwise.
  */
 export function measure(fn: () => void): number {
-  const before = debugNow();
+  const start = debugNow();
   fn();
-  return perfDebug() ? debugNow() - before : 0;
+  return debugNow() - start;
 }
 
 /**
