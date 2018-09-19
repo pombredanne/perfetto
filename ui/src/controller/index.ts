@@ -26,12 +26,13 @@ function main(port: MessagePort) {
   port.onmessage = ({data}) => {
     if (receivedFrontendPort) {
       globals.dispatch(data);
-    } else {
-      const frontendPort = data as MessagePort;
-      const frontend = new Remote(frontendPort);
-      globals.initialize(new AppController(), frontend);
-      receivedFrontendPort = true;
+      return;
     }
+
+    const frontendPort = data as MessagePort;
+    const frontend = new Remote(frontendPort);
+    globals.initialize(new AppController(), frontend);
+    receivedFrontendPort = true;
   };
 }
 
