@@ -84,7 +84,8 @@ using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
 
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
-    : context_(context) {}
+    : context_(context),
+      cpu_freq_name_id_(context->storage->InternString("cpufreq")) {}
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
@@ -216,9 +217,8 @@ void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
         break;
     }
   }
-  context_->sched_tracker->PushCounter(
-      timestamp, new_freq, context_->storage->InternString("cpufreq"),
-      cpu_affected, RefType::kCPU_ID);
+  context_->sched_tracker->PushCounter(timestamp, new_freq, cpu_freq_name_id_,
+                                       cpu_affected, RefType::kCPU_ID);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
