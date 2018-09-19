@@ -242,7 +242,6 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);
 
-  EXPECT_CALL(*storage_, InternString(_)).Times(1).WillOnce(testing::Return(0));
   EXPECT_CALL(*sched_, PushCounter(1000, 2000, 0, 10, RefType::kCPU_ID));
   Tokenize(trace_1);
 }

@@ -83,7 +83,7 @@ void SchedTracker::PushCounter(uint64_t timestamp,
   prev_timestamp_ = timestamp;
 
   // The previous counter with the same ref and name_id.
-  Counter& prev = last_counter_per_id_[std::make_pair(ref, name_id)];
+  Counter& prev = prev_counters_[CounterKey{ref, name_id}];
 
   uint64_t duration = 0;
   double value_delta = 0;

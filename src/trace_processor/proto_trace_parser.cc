@@ -77,7 +77,7 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
     case 'C': {
       size_t name_index = 2 + pid_length + 1;
       size_t name_length = 0;
-      for (size_t i = name_index;; i++) {
+      for (size_t i = name_index; i < len; i++) {
         if (s[i] == '|' || s[i] == '\n') {
           name_length = i - name_index;
           break;
@@ -85,8 +85,9 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
       }
       out->name = base::StringView(s + name_index, name_length);
       size_t value_index = name_index + name_length + 1;
-      std::string value_str(s + value_index, len - value_index);
-      out->value = static_cast<uint32_t>(std::stoi(value_str.c_str()));
+      char value_str[32];
+      std::strcpy(value_str, s + value_index);
+      out->value = std::stod(value_str);
       return true;
     }
     default:
@@ -98,7 +99,8 @@ using protozero::ProtoDecoder;
 using protozero::proto_utils::kFieldTypeLengthDelimited;
 
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
-    : context_(context) {}
+    : context_(context),
+      cpu_freq_name_id_(context->storage->InternString("cpufreq")) {}
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
@@ -230,9 +232,8 @@ void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
         break;
     }
   }
-  context_->sched_tracker->PushCounter(
-      timestamp, new_freq, context_->storage->InternString("cpufreq"),
-      cpu_affected, RefType::kCPU_ID);
+  context_->sched_tracker->PushCounter(timestamp, new_freq, cpu_freq_name_id_,
+                                       cpu_affected, RefType::kCPU_ID);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
