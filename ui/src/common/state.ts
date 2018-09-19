@@ -24,13 +24,8 @@ export interface TrackState {
   engineId: string;
   kind: string;
   name: string;
-
   dataReq?: TrackDataRequest;
   config: {};
-
-  //// TODO: These need to be nested into track kind spesific state.
-  //// cpu slice state:
-  // cpu: number;
 }
 
 export interface TrackDataRequest {
