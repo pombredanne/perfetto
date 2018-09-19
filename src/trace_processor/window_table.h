@@ -31,14 +31,14 @@ namespace trace_processor {
 class WindowTable : public Table {
  public:
   enum Column {
-    kQuantum = 0,
-    kWindowStart = 1,
-    kWindowDur = 2,
-    kTs = 3,
-    kDuration = 4,
-    kCpu = 5,
-    kQuantizedGroup = 6,
-    kRowId = 7
+    kRowId = 0,
+    kQuantum = 1,
+    kWindowStart = 2,
+    kWindowDur = 3,
+    kTs = 4,
+    kDuration = 5,
+    kCpu = 6,
+    kQuantizedGroup = 7
   };
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);

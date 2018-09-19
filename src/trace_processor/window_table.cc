@@ -33,6 +33,7 @@ void WindowTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 
 std::string WindowTable::CreateTableStmt(int, const char* const*) {
   return "CREATE TABLE x("
+         "rowid HIDDEN UNSIGNED BIG INT, "
          "quantum HIDDEN UNSIGNED BIG INT, "
          "window_start HIDDEN UNSIGNED BIG INT, "
          "window_dur HIDDEN UNSIGNED BIG INT, "
@@ -40,7 +41,6 @@ std::string WindowTable::CreateTableStmt(int, const char* const*) {
          "dur UNSIGNED BIG INT, "
          "cpu UNSIGNED INT, "
          "quantized_group UNSIGNED BIG INT, "
-         "rowid UNSIGNED BIG INT, "
          "PRIMARY KEY(rowid)"
          ") WITHOUT ROWID;";
 }
