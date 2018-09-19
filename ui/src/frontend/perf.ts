@@ -116,7 +116,7 @@ class PerfDisplay {
   }
 
   getPerfDisplayEl() {
-    return document.querySelector('.perf-stats-display');
+    return document.querySelector('.perf-stats-content');
   }
 }
 
