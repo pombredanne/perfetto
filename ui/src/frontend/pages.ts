@@ -44,6 +44,7 @@ export function createPage(component: m.Component): m.Component {
         m(Topbar),
         m(component),
         m(Alerts),
+        m('.perf-monitor'),
       ];
     },
   };

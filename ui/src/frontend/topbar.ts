@@ -134,6 +134,22 @@ const Omnibox: m.Component = {
   },
 };
 
+const TogglePerfDebugButton = {
+  view() {
+    return m(
+        '.perf-monitor-button',
+        m('button',
+          {
+            onclick: () => globals.frontendLocalState.togglePerfDebug(),
+          },
+          m('i.material-icons',
+            {
+              title: 'Toggle Perf Debug Mode',
+            },
+            'assessment')));
+  }
+};
+
 export const Topbar: m.Component = {
   view() {
     const progBar = [];
@@ -143,6 +159,6 @@ export const Topbar: m.Component = {
       progBar.push(m('.progress'));
     }
 
-    return m('.topbar', m(Omnibox), ...progBar);
+    return m('.topbar', m(TogglePerfDebugButton), m(Omnibox), ...progBar, );
   },
 };

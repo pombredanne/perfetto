@@ -321,3 +321,56 @@ header {
   user-select: text;
   word-break: break-word;
 }
+
+.debug-panel-border {
+    position: absolute;
+    top: 0px;
+    height: 100%;
+    width: 100%;
+    border: 1px solid rgba(69, 187, 73, 0.5);
+    pointer-events: none;
+}
+
+.container-perf-pane {
+   position: absolute;
+   top: 5px;
+   left: 5px;
+   width: 300px;
+   height: 200px;
+   background-color: hsla(220, 50%, 78%, .8);
+}
+
+.perf-monitor {
+    --stroke-color: hsl(217, 39%, 94%);
+    position: fixed;
+    width: 600px;
+    bottom: 0;
+    background-color: rgba(27, 28, 29, 0.95);
+    color: var(--stroke-color);
+    font-family: monospace;
+    padding: 10px;
+    z-index: 100;
+    div {
+        margin: 2px 0px;
+    }
+    button {
+        color: orange;
+        text-decoration: underline;
+        &:hover {
+            color: red;
+        }
+    }
+    table, td, th {
+        border: 1px solid var(--stroke-color);
+        text-align: center;
+        padding: 4px;
+        margin: 4px 0px;
+    }
+    table {
+        border-collapse: collapse;
+    }
+    & > section {
+        padding: 5px;
+        border-bottom: 1px solid var(--stroke-color);
+    }
+}
