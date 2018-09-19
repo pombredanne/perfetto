@@ -418,7 +418,7 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
 
     // "    " (indent) + TypeName + " " + field_name + " = " + 123 + ";"
     if (4 + typeName.size() + 1 + event.name().size() + 3 + 3 + 1 <= 80) {
-      // Everything fits one line:
+      // Everything fits in one line:
       *fout << "    " << typeName << " " << event.name() << " = " << i << ";\n";
     } else if (4 + typeName.size() + 1 + event.name().size() + 2 <= 80) {
       // Everything fits except the field id:
