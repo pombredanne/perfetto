@@ -533,6 +533,8 @@ message CgroupAttachTaskFtraceEvent {
   optional int32 pid = 3;
   optional string comm = 4;
   optional string cname = 5;
+  optional int32 dst_level = 6;
+  optional string dst_path = 7;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_attach_task.proto
@@ -553,6 +555,8 @@ message CgroupMkdirFtraceEvent {
   optional int32 root = 1;
   optional int32 id = 2;
   optional string cname = 3;
+  optional int32 level = 4;
+  optional string path = 5;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_mkdir.proto
@@ -563,6 +567,8 @@ message CgroupReleaseFtraceEvent {
   optional int32 root = 1;
   optional int32 id = 2;
   optional string cname = 3;
+  optional int32 level = 4;
+  optional string path = 5;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_release.proto
@@ -583,6 +589,8 @@ message CgroupRenameFtraceEvent {
   optional int32 root = 1;
   optional int32 id = 2;
   optional string cname = 3;
+  optional int32 level = 4;
+  optional string path = 5;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_rename.proto
@@ -593,6 +601,8 @@ message CgroupRmdirFtraceEvent {
   optional int32 root = 1;
   optional int32 id = 2;
   optional string cname = 3;
+  optional int32 level = 4;
+  optional string path = 5;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_rmdir.proto
@@ -615,6 +625,8 @@ message CgroupTransferTasksFtraceEvent {
   optional int32 pid = 3;
   optional string comm = 4;
   optional string cname = 5;
+  optional int32 dst_level = 6;
+  optional string dst_path = 7;
 }
 
 // End of protos/perfetto/trace/ftrace/cgroup_transfer_tasks.proto
@@ -761,7 +773,7 @@ message Ext4EsLookupExtentExitFtraceEvent {
   optional uint32 lblk = 3;
   optional uint32 len = 4;
   optional uint64 pblk = 5;
-  optional uint64 status = 6;
+  optional int64 status = 6;
   optional int32 found = 7;
 }
 
@@ -848,6 +860,7 @@ message F2fsSyncFileExitFtraceEvent {
   optional uint32 need_cp = 3;
   optional int32 datasync = 4;
   optional int32 ret = 5;
+  optional int32 cp_reason = 6;
 }
 
 // End of protos/perfetto/trace/ftrace/f2fs_sync_file_exit.proto
@@ -894,6 +907,7 @@ message MmVmscanDirectReclaimBeginFtraceEvent {
   optional int32 order = 1;
   optional int32 may_writepage = 2;
   optional uint32 gfp_flags = 3;
+  optional int32 classzone_idx = 4;
 }
 
 // End of protos/perfetto/trace/ftrace/mm_vmscan_direct_reclaim_begin.proto
@@ -919,6 +933,7 @@ message MmVmscanKswapdSleepFtraceEvent {
 message MmVmscanKswapdWakeFtraceEvent {
   optional int32 nid = 1;
   optional int32 order = 2;
+  optional int32 zid = 3;
 }
 
 // End of protos/perfetto/trace/ftrace/mm_vmscan_kswapd_wake.proto

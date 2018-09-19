@@ -10,4 +10,5 @@ message MmVmscanDirectReclaimBeginFtraceEvent {
   optional int32 order = 1;
   optional int32 may_writepage = 2;
   optional uint32 gfp_flags = 3;
+  optional int32 classzone_idx = 4;
 }

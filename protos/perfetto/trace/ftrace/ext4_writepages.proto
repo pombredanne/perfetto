@@ -15,6 +15,6 @@ message Ext4WritepagesFtraceEvent {
   optional int64 range_end = 6;
   optional uint64 writeback_index = 7;
   optional int32 sync_mode = 8;
-  optional uint32 for_kupdate = 9;
-  optional uint32 range_cyclic = 10;
+  optional int64 for_kupdate = 9;
+  optional int64 range_cyclic = 10;
 }
