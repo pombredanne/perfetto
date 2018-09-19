@@ -254,7 +254,6 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   StackHeader* stack_header = new (data) StackHeader;
   stack_header->record_size = total_size - sizeof(stack_header->record_size);
   stack_header->type = RecordType::Malloc;
-  *reinterpret_cast<RecordType*>(data + sizeof(uint64_t)) = RecordType::Malloc;
   AllocMetadata& metadata = stack_header->alloc_metadata;
   metadata.alloc_size = alloc_size;
   metadata.alloc_address = alloc_address;
