@@ -120,6 +120,8 @@ class Client {
   void RecordFree(uint64_t alloc_address);
   bool ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t));
 
+  ClientConfiguration client_config_for_testing() { return client_config_; }
+
  private:
   char* GetStackBase();
 
