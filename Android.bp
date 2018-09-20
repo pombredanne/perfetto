@@ -21,6 +21,7 @@ cc_library_shared {
     "src/base/file_utils.cc",
     "src/base/metatrace.cc",
     "src/base/page_allocator.cc",
+    "src/base/sock_utils.cc",
     "src/base/string_splitter.cc",
     "src/base/string_utils.cc",
     "src/base/temp_file.cc",
@@ -30,6 +31,7 @@ cc_library_shared {
     "src/base/virtual_destructors.cc",
     "src/base/watchdog_posix.cc",
     "src/profiling/memory/client.cc",
+    "src/profiling/memory/malloc_hooks.cc",
     "src/profiling/memory/sampler.cc",
   ],
   shared_libs: [

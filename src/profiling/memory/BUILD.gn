@@ -21,6 +21,7 @@ source_set("daemon") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:sock_utils",
     "../../ipc",
   ]
   sources = [
@@ -43,6 +44,7 @@ source_set("client") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:sock_utils",
   ]
   sources = [
     "client.cc",
@@ -85,5 +87,21 @@ executable("heapprofd") {
   ]
   sources = [
     "main.cc",
+  ]
+}
+
+source_set("malloc_hooks") {
+  deps = [
+    ":client",
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  cflags = [
+    # TODO(fmayer): Fix this.
+    "-isystem",
+    rebase_path("../../../buildtools/bionic/libc", root_build_dir),
+  ]
+  sources = [
+    "malloc_hooks.cc",
   ]
 }

@@ -275,19 +275,8 @@ if (use_libfuzzer && !build_with_chromium) {
 
 if (!build_with_chromium) {
   shared_library("heapprofd_client") {
-    public_configs = [ "buildtools:libunwindstack_config" ]
     deps = [
-      "gn:default_deps",
-      "src/base",
-      "src/profiling/memory:client",
-    ]
-    cflags = [
-      # TODO(fmayer): Fix this.
-      "-isystem",
-      rebase_path("buildtools/bionic/libc", root_build_dir),
-    ]
-    sources = [
-      "src/profiling/memory/malloc_hooks.cc",
+      "src/profiling/memory:malloc_hooks",
     ]
   }
 }
