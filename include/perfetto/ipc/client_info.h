@@ -19,8 +19,8 @@
 
 #include <unistd.h>
 
-#include "perfetto/base/basic_types.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/unix_socket.h"
 
 namespace perfetto {
 namespace ipc {
