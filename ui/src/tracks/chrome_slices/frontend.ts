@@ -18,11 +18,7 @@ import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {
-  ChromeSliceTrackConfig,
-  ChromeSliceTrackData,
-  SLICE_TRACK_KIND,
-} from './common';
+import {Config, Data, SLICE_TRACK_KIND} from './common';
 
 const SLICE_HEIGHT = 30;
 const TRACK_PADDING = 5;
@@ -42,7 +38,7 @@ function getCurResolution() {
   return Math.pow(10, Math.floor(Math.log10(resolution)));
 }
 
-class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
+class ChromeSliceTrack extends Track<Config, Data> {
   static readonly kind = SLICE_TRACK_KIND;
   static create(trackState: TrackState): ChromeSliceTrack {
     return new ChromeSliceTrack(trackState);
@@ -69,27 +65,26 @@ class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
     // TODO: fonts and colors should come from the CSS and not hardcoded here.
 
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
-    const trackData = this.trackData;
 
-    // If there aren't enough cached slices data in |trackData| request more to
+    // If there aren't enough cached slices data in |this.data| request more to
     // the controller.
-    const inRange = trackData !== undefined &&
-        (visibleWindowTime.start >= trackData.start &&
-         visibleWindowTime.end <= trackData.end);
-    if (!inRange || trackData.resolution > getCurResolution()) {
+    const inRange = this.data !== undefined &&
+        (visibleWindowTime.start >= this.data.start &&
+         visibleWindowTime.end <= this.data.end);
+    if (!inRange || this.data.resolution > getCurResolution()) {
       if (!this.reqPending) {
         this.reqPending = true;
         setTimeout(() => this.reqDataDeferred(), 50);
       }
-      if (trackData === undefined) return;  // Can't possibly draw anything.
+      if (this.data === undefined) return;  // Can't possibly draw anything.
     }
 
     // If the cached trace slices don't fully cover the visible time range,
     // show a gray rectangle with a "Loading..." label.
     ctx.font = '12px Google Sans';
-    if (trackData.start > visibleWindowTime.start) {
+    if (this.data.start > visibleWindowTime.start) {
       const rectWidth =
-          timeScale.timeToPx(Math.min(trackData.start, visibleWindowTime.end));
+          timeScale.timeToPx(Math.min(this.data.start, visibleWindowTime.end));
       ctx.fillStyle = '#eee';
       ctx.fillRect(0, TRACK_PADDING, rectWidth, SLICE_HEIGHT);
       ctx.fillStyle = '#666';
@@ -99,9 +94,9 @@ class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
           TRACK_PADDING + SLICE_HEIGHT / 2,
           rectWidth);
     }
-    if (trackData.end < visibleWindowTime.end) {
+    if (this.data.end < visibleWindowTime.end) {
       const rectX =
-          timeScale.timeToPx(Math.max(trackData.end, visibleWindowTime.start));
+          timeScale.timeToPx(Math.max(this.data.end, visibleWindowTime.start));
       const rectWidth = timeScale.timeToPx(visibleWindowTime.end) - rectX;
       ctx.fillStyle = '#eee';
       ctx.fillRect(rectX, TRACK_PADDING, rectWidth, SLICE_HEIGHT);
@@ -120,13 +115,13 @@ class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
     const charWidth = ctx.measureText('abcdefghij').width / 10;
     const pxEnd = timeScale.timeToPx(visibleWindowTime.end);
 
-    for (let i = 0; i < trackData.starts.length; i++) {
-      const tStart = trackData.starts[i];
-      const tEnd = trackData.ends[i];
-      const depth = trackData.depths[i];
-      const cat = trackData.strings[trackData.categories[i]];
-      const titleId = trackData.titles[i];
-      const title = trackData.strings[titleId];
+    for (let i = 0; i < this.data.starts.length; i++) {
+      const tStart = this.data.starts[i];
+      const tEnd = this.data.ends[i];
+      const depth = this.data.depths[i];
+      const cat = this.data.strings[this.data.categories[i]];
+      const titleId = this.data.titles[i];
+      const title = this.data.strings[titleId];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
@@ -162,18 +157,17 @@ class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
-    const trackData = this.trackData;
     this.hoveredTitleId = -1;
-    if (trackData === undefined) return;
+    if (this.data === undefined) return;
     const {timeScale} = globals.frontendLocalState;
     if (y < TRACK_PADDING) return;
     const t = timeScale.pxToTime(x);
     const depth = Math.floor(y / SLICE_HEIGHT);
-    for (let i = 0; i < trackData.starts.length; i++) {
-      const tStart = trackData.starts[i];
-      const tEnd = trackData.ends[i];
-      const titleId = trackData.titles[i];
-      if (tStart <= t && t <= tEnd && depth === trackData.depths[i]) {
+    for (let i = 0; i < this.data.starts.length; i++) {
+      const tStart = this.data.starts[i];
+      const tEnd = this.data.ends[i];
+      const titleId = this.data.titles[i];
+      if (tStart <= t && t <= tEnd && depth === this.data.depths[i]) {
         this.hoveredTitleId = titleId;
         break;
       }
@@ -186,11 +180,6 @@ class ChromeSliceTrack extends Track<ChromeSliceTrackConfig> {
 
   getHeight() {
     return SLICE_HEIGHT * (this.config.maxDepth + 1) + 2 * TRACK_PADDING;
-  }
-
-  private get trackData(): ChromeSliceTrackData {
-    return globals.trackDataStore.get(this.trackState.id) as
-        ChromeSliceTrackData;
   }
 }
 

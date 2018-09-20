@@ -19,11 +19,7 @@ import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {
-  CPU_SLICE_TRACK_KIND,
-  CpuSliceTrackConfig,
-  CpuSliceTrackData
-} from './common';
+import {Config, CPU_SLICE_TRACK_KIND, Data} from './common';
 
 const MARGIN_TOP = 5;
 const RECT_HEIGHT = 30;
@@ -50,7 +46,7 @@ function getCurResolution() {
   return Math.pow(10, Math.floor(Math.log10(resolution)));
 }
 
-class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
+class CpuSliceTrack extends Track<Config, Data> {
   static readonly kind = CPU_SLICE_TRACK_KIND;
   static create(trackState: TrackState): CpuSliceTrack {
     return new CpuSliceTrack(trackState);
@@ -78,19 +74,18 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
     // TODO: fonts and colors should come from the CSS and not hardcoded here.
 
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
-    const trackData = this.trackData;
 
-    // If there aren't enough cached slices data in |trackData| request more to
+    // If there aren't enough cached slices data in |data| request more to
     // the controller.
-    const inRange = trackData !== undefined &&
-        (visibleWindowTime.start >= trackData.start &&
-         visibleWindowTime.end <= trackData.end);
-    if (!inRange || trackData.resolution > getCurResolution()) {
+    const inRange = this.data !== undefined &&
+        (visibleWindowTime.start >= this.data.start &&
+         visibleWindowTime.end <= this.data.end);
+    if (!inRange || this.data.resolution > getCurResolution()) {
       if (!this.reqPending) {
         this.reqPending = true;
         setTimeout(() => this.reqDataDeferred(), 50);
       }
-      if (trackData === undefined) return;  // Can't possibly draw anything.
+      if (this.data === undefined) return;  // Can't possibly draw anything.
     }
     ctx.textAlign = 'center';
     ctx.font = '12px Google Sans';
@@ -103,18 +98,18 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
     // If the cached trace slices don't fully cover the visible time range,
     // show a gray rectangle with a "Loading..." label.
     ctx.font = '12px Google Sans';
-    if (trackData.start > visibleWindowTime.start) {
+    if (this.data.start > visibleWindowTime.start) {
       const rectWidth =
-          timeScale.timeToPx(Math.min(trackData.start, visibleWindowTime.end));
+          timeScale.timeToPx(Math.min(this.data.start, visibleWindowTime.end));
       ctx.fillStyle = '#eee';
       ctx.fillRect(0, MARGIN_TOP, rectWidth, RECT_HEIGHT);
       ctx.fillStyle = '#666';
       ctx.fillText(
           'loading...', rectWidth / 2, MARGIN_TOP + RECT_HEIGHT / 2, rectWidth);
     }
-    if (trackData.end < visibleWindowTime.end) {
+    if (this.data.end < visibleWindowTime.end) {
       const rectX =
-          timeScale.timeToPx(Math.max(trackData.end, visibleWindowTime.start));
+          timeScale.timeToPx(Math.max(this.data.end, visibleWindowTime.start));
       const rectWidth = timeScale.timeToPx(visibleWindowTime.end) - rectX;
       ctx.fillStyle = '#eee';
       ctx.fillRect(rectX, MARGIN_TOP, rectWidth, RECT_HEIGHT);
@@ -126,12 +121,12 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
           rectWidth);
     }
 
-    assertTrue(trackData.starts.length === trackData.ends.length);
-    assertTrue(trackData.starts.length === trackData.utids.length);
-    for (let i = 0; i < trackData.starts.length; i++) {
-      const tStart = trackData.starts[i];
-      const tEnd = trackData.ends[i];
-      const utid = trackData.utids[i];
+    assertTrue(this.data.starts.length === this.data.ends.length);
+    assertTrue(this.data.starts.length === this.data.utids.length);
+    for (let i = 0; i < this.data.starts.length; i++) {
+      const tStart = this.data.starts[i];
+      const tEnd = this.data.ends[i];
+      const utid = this.data.utids[i];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
@@ -189,9 +184,8 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
-    const trackData = this.trackData;
     this.mouseXpos = x;
-    if (trackData === undefined) return;
+    if (this.data === undefined) return;
     const {timeScale} = globals.frontendLocalState;
     if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
       this.hoveredUtid = -1;
@@ -200,10 +194,10 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
     const t = timeScale.pxToTime(x);
     this.hoveredUtid = -1;
 
-    for (let i = 0; i < trackData.starts.length; i++) {
-      const tStart = trackData.starts[i];
-      const tEnd = trackData.ends[i];
-      const utid = trackData.utids[i];
+    for (let i = 0; i < this.data.starts.length; i++) {
+      const tStart = this.data.starts[i];
+      const tEnd = this.data.ends[i];
+      const utid = this.data.utids[i];
       if (tStart <= t && t <= tEnd) {
         this.hoveredUtid = utid;
         break;
@@ -214,10 +208,6 @@ class CpuSliceTrack extends Track<CpuSliceTrackConfig> {
   onMouseOut() {
     this.hoveredUtid = -1;
     this.mouseXpos = 0;
-  }
-
-  private get trackData(): CpuSliceTrackData {
-    return globals.trackDataStore.get(this.trackState.id) as CpuSliceTrackData;
   }
 }
 
