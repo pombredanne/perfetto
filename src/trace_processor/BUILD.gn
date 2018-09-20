@@ -104,6 +104,7 @@ if (current_toolchain == host_toolchain) {
   executable("trace_processor_shell_host") {
     deps = [
       ":lib",
+      "../../buildtools:linenoise",
       "../../gn:default_deps",
       "../../protos/perfetto/trace_processor:lite",
       "../base",

@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <linenoise.h>
 #include <functional>
 
 #include "perfetto/base/build_config.h"
@@ -45,11 +46,6 @@ using namespace perfetto::trace_processor;
 
 namespace {
 TraceProcessor* g_tp;
-
-void PrintPrompt() {
-  printf("\r%80s\r> ", "");
-  fflush(stdout);
-}
 
 void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
   if (res.has_error()) {
@@ -175,12 +171,14 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
+  linenoiseSetMultiLine(true);
+  linenoiseHistorySetMaxLen(1000);
+
   for (;;) {
-    PrintPrompt();
-    char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
-      return 0;
-    if (strcmp(line, "\n") == 0)
+    char* line = linenoise("> ");
+    if (!line || strcmp(line, "q\n") == 0)
+      break;
+    if (strcmp(line, "") == 0)
       continue;
     protos::RawQueryArgs query;
     query.set_sql_query(line);
@@ -188,5 +186,9 @@ int main(int argc, char** argv) {
     g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
       OnQueryResult(t_start, res);
     });
+    linenoiseHistoryAdd(line);
+    linenoiseFree(line);
   }
+
+  return 0;
 }
