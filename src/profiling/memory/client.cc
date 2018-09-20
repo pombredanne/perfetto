@@ -94,6 +94,10 @@ struct StackHeader {
   char register_data[kRegisterDataSize];
 };
 
+inline bool IsMainThread() {
+  return getpid() == gettid();
+}
+
 }  // namespace
 
 FreePage::FreePage() : free_page_(kFreePageSize) {
@@ -179,12 +183,13 @@ void SocketPool::Return(base::ScopedFile sock) {
 
 char* GetThreadStackBase() {
   // Not called from main thread.
-  PERFETTO_DCHECK(gettid() != getpid());
+  PERFETTO_DCHECK(!IsMainThread());
   pthread_t t = pthread_self();
   pthread_attr_t attr;
   if (pthread_getattr_np(t, &attr) != 0)
     return nullptr;
-  auto cleanup = base::MakeCleanup([&attr] { pthread_attr_destroy(&attr); });
+  base::ScopedResource<pthread_attr_t*, pthread_attr_destroy, nullptr> cleanup(
+      &attr);
 
   char* stackaddr;
   size_t stacksize;
@@ -233,7 +238,7 @@ Client::Client(const std::string& sock_name, size_t conns)
     : Client(MultipleConnect(sock_name, conns)) {}
 
 char* Client::GetStackBase() {
-  if (gettid() == getpid())
+  if (IsMainThread())
     return main_thread_stack_base_;
   return GetThreadStackBase();
 }
