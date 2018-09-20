@@ -112,7 +112,7 @@ class PerfDisplay {
     m.render(perfDisplayEl, [
       m('section', globals.rafScheduler.renderPerfStats()),
       this.containers.map((c, i) => m('section', c.renderPerfStats(i)))
-    ], );
+    ]);
   }
 
   getPerfDisplayEl() {
