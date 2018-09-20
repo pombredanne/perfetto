@@ -39,19 +39,19 @@ class SchedSliceTable : public Table {
     kDuration = 2,
     kQuantizedGroup = 3,
     kUtid = 4,
-    kCycles = 5,
 
     // Hidden columns.
-    kQuantum = 6,
-    kTimestampLowerBound = 7,
-    kClipTimestamp = 8,
+    kQuantum = 5,
+    kTimestampLowerBound = 6,
+    kClipTimestamp = 7,
   };
 
-  SchedSliceTable(const TraceStorage* storage);
+  SchedSliceTable(sqlite3*, const TraceStorage* storage);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   // Table implementation.
+  std::string CreateTableStmt(int argc, const char* const* argv) override;
   std::unique_ptr<Table::Cursor> CreateCursor() override;
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
   int FindFunction(const char* name, FindFunctionFn fn, void** args) override;
