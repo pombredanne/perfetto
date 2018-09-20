@@ -18,7 +18,9 @@
 #define SRC_PROFILING_MEMORY_SOCKET_LISTENER_H_
 
 #include "src/ipc/unix_socket.h"
+#include "src/profiling/memory/bookkeeping.h"
 #include "src/profiling/memory/record_reader.h"
+#include "src/profiling/memory/transport_data.h"
 #include "src/profiling/memory/unwinding.h"
 
 #include <map>
@@ -28,10 +30,12 @@ namespace perfetto {
 
 class SocketListener : public ipc::UnixSocket::EventListener {
  public:
-  SocketListener(std::function<void(size_t,
-                                    std::unique_ptr<uint8_t[]>,
-                                    std::weak_ptr<ProcessMetadata>)> fn)
-      : callback_function_(std::move(fn)) {}
+  SocketListener(ClientConfiguration client_config,
+                 std::function<void(UnwindingRecord)> fn,
+                 Callsites* bookkeeping)
+      : client_config_(client_config),
+        callback_function_(std::move(fn)),
+        callsites_(bookkeeping) {}
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnNewIncomingConnection(
       ipc::UnixSocket* self,
@@ -61,11 +65,11 @@ class SocketListener : public ipc::UnixSocket::EventListener {
                    base::ScopedFile maps_fd,
                    base::ScopedFile mem_fd);
 
+  ClientConfiguration client_config_;
   std::map<ipc::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
-  std::function<
-      void(size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>)>
-      callback_function_;
+  std::function<void(UnwindingRecord)> callback_function_;
+  Callsites* callsites_;
 };
 
 }  // namespace perfetto

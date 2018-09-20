@@ -22,9 +22,12 @@
 #include <sys/un.h>
 
 #include <private/bionic_malloc_dispatch.h>
-#include "perfetto/base/scoped_file.h"
+
+#include "src/profiling/memory/client.h"
+#include "src/profiling/memory/sampler.h"
 
 static const MallocDispatch* g_dispatch;
+pthread_key_t g_thread_local_key;
 
 __BEGIN_DECLS
 
@@ -71,6 +74,7 @@ bool heapprofd_initialize(const MallocDispatch* malloc_dispatch,
                           int*,
                           const char*) {
   g_dispatch = malloc_dispatch;
+  pthread_create_key(&g_thread_local_key);
   return true;
 }
 

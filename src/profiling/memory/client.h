@@ -22,18 +22,25 @@
 #include <mutex>
 #include <vector>
 
+#include <pthread.h>
+
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
 
 class SocketPool;
 
+// Cache for frees that have been observed. It is infeasible to send every
+// free separately, so we batch and send the whole buffer once it is full.
 class FreePage {
  public:
   FreePage();
 
+  // Add address to buffer. Flush if necessary using a socket borrowed from
+  // pool.
   // Can be called from any thread. Must not hold mtx_.`
-  void Add(const uint64_t addr, SocketPool* pool);
+  void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
   // Needs to be called holding mtx_.
@@ -44,17 +51,19 @@ class FreePage {
   size_t offset_;
 };
 
+// Socket borrowed from a SocketPool. Gets returned once it goes out of scope.
 class BorrowedSocket {
  public:
   BorrowedSocket(const BorrowedSocket&) = delete;
   BorrowedSocket& operator=(const BorrowedSocket&) = delete;
-  BorrowedSocket(BorrowedSocket&& other) {
+  BorrowedSocket(BorrowedSocket&& other) noexcept {
     fd_ = std::move(other.fd_);
     socket_pool_ = other.socket_pool_;
     other.socket_pool_ = nullptr;
   }
 
-  BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool);
+  BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool)
+      : fd_(std::move(fd)), socket_pool_(socket_pool) {}
   int operator*();
   int get();
   void Close();
@@ -79,6 +88,47 @@ class SocketPool {
   std::vector<base::ScopedFile> sockets_;
   size_t available_sockets_;
   size_t dead_sockets_ = 0;
+};
+
+char* GetMainThreadStackBase();
+char* GetThreadStackBase();
+
+class PThreadKey {
+ public:
+  PThreadKey(const PThreadKey&) = delete;
+  PThreadKey& operator=(const PThreadKey&) = delete;
+
+  PThreadKey(void (*destructor)(void*))
+      : valid_(pthread_key_create(&key_, destructor) == 0) {}
+  ~PThreadKey() {
+    if (valid_)
+      pthread_key_delete(key_);
+  }
+  bool valid() { return valid_; }
+  pthread_key_t get() { return key_; }
+
+ private:
+  pthread_key_t key_;
+  bool valid_;
+};
+
+class Client {
+ public:
+  Client(std::vector<base::ScopedFile> sockets);
+  Client(const std::string& sock_name, size_t conns);
+  void RecordMalloc(uint64_t alloc_size, uint64_t alloc_address);
+  void RecordFree(uint64_t alloc_address);
+  bool ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t));
+
+ private:
+  char* GetStackBase();
+
+  ClientConfiguration client_config_;
+  PThreadKey pthread_key_;
+  SocketPool socket_pool_;
+  FreePage free_page_;
+  char* const main_thread_stack_base_;
+  std::atomic<uint64_t> sequence_number_{0};
 };
 
 }  // namespace perfetto
