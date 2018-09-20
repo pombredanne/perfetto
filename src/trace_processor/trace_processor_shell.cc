@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <histedit.h>
+
 #include <functional>
 
 #include "perfetto/base/build_config.h"
@@ -46,9 +48,8 @@ using namespace perfetto::trace_processor;
 namespace {
 TraceProcessor* g_tp;
 
-void PrintPrompt() {
-  printf("\r%80s\r> ", "");
-  fflush(stdout);
+const char* Prompt() {
+  return "> ";
 }
 
 void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
@@ -175,13 +176,26 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
+  HistEvent history_event;
+  History* the_history = history_init();
+  PERFETTO_CHECK(the_history);
+  PERFETTO_CHECK(history(the_history, &history_event, H_SETSIZE, 800) != -1);
+
+  EditLine* el = el_init(argv[0], stdin, stdout, stderr);
+  el_set(el, EL_PROMPT, &Prompt);
+  el_set(el, EL_EDITOR, "emacs");
+  el_set(el, EL_HIST, history, the_history);
+
   for (;;) {
-    PrintPrompt();
-    char line[1024];
-    if (!fgets(line, sizeof(line) - 1, stdin) || strcmp(line, "q\n") == 0)
-      return 0;
+    int count = 0;
+    const char* line = el_gets(el, &count);
+    if (count == 0)
+      break;
     if (strcmp(line, "\n") == 0)
       continue;
+    if (strcmp(line, "q\n") == 0)
+      break;
+    PERFETTO_CHECK(history(the_history, &history_event, H_ENTER, line) != -1);
     protos::RawQueryArgs query;
     query.set_sql_query(line);
     base::TimeNanos t_start = base::GetWallTimeNs();
@@ -189,4 +203,9 @@ int main(int argc, char** argv) {
       OnQueryResult(t_start, res);
     });
   }
+
+  history_end(the_history);
+  el_end(el);
+
+  return 0;
 }

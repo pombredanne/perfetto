@@ -108,6 +108,10 @@ if (current_toolchain == host_toolchain) {
       "../../protos/perfetto/trace_processor:lite",
       "../base",
     ]
+    libs = [
+      "edit",
+      "termcap",
+    ]
     sources = [
       "trace_processor_shell.cc",
     ]
