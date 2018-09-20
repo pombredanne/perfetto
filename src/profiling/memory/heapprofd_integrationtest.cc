@@ -66,7 +66,7 @@ TEST_F(HeapprofdIntegrationTest, EndToEnd) {
     PERFETTO_ELOG("Socket not listening.");
     PERFETTO_CHECK(false);
   }
-  std::thread th([] {
+  std::thread th([kSamplingRate] {
     Client client(kSocketName, 1);
     SomeFunction(&client);
     EXPECT_EQ(client.client_config_for_testing().rate, kSamplingRate);
