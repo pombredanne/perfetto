@@ -27,7 +27,9 @@
 #include "src/profiling/memory/sampler.h"
 
 static const MallocDispatch* g_dispatch;
-pthread_key_t g_thread_local_key;
+static perfetto::Client* g_client;
+constexpr const char* kHeapprofdSock = "/dev/socket/heapprofd";
+constexpr size_t kNumConnections = 2;
 
 __BEGIN_DECLS
 
@@ -74,7 +76,7 @@ bool heapprofd_initialize(const MallocDispatch* malloc_dispatch,
                           int*,
                           const char*) {
   g_dispatch = malloc_dispatch;
-  pthread_create_key(&g_thread_local_key);
+  g_client = new perfetto::Client(kHeapprofdSock, kNumConnections);
   return true;
 }
 
@@ -103,27 +105,44 @@ size_t heapprofd_malloc_usable_size(void* pointer) {
 }
 
 void* heapprofd_malloc(size_t size) {
-  return g_dispatch->malloc(size);
+  void* addr = g_dispatch->malloc(size);
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+    g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  return addr;
 }
 
 void heapprofd_free(void* pointer) {
+  g_client->RecordFree(reinterpret_cast<uint64_t>(pointer));
   return g_dispatch->free(pointer);
 }
 
 void* heapprofd_aligned_alloc(size_t alignment, size_t size) {
-  return g_dispatch->aligned_alloc(alignment, size);
+  void* addr = g_dispatch->aligned_alloc(alignment, size);
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+    g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  return addr;
 }
 
-void* heapprofd_memalign(size_t alignment, size_t bytes) {
-  return g_dispatch->memalign(alignment, bytes);
+void* heapprofd_memalign(size_t alignment, size_t size) {
+  void* addr = g_dispatch->memalign(alignment, size);
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+    g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  return addr;
 }
 
-void* heapprofd_realloc(void* pointer, size_t bytes) {
-  return g_dispatch->realloc(pointer, bytes);
+void* heapprofd_realloc(void* pointer, size_t size) {
+  g_client->RecordFree(reinterpret_cast<uint64_t>(pointer));
+  void* addr = g_dispatch->realloc(pointer, size);
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+    g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  return addr;
 }
 
-void* heapprofd_calloc(size_t nmemb, size_t bytes) {
-  return g_dispatch->calloc(nmemb, bytes);
+void* heapprofd_calloc(size_t nmemb, size_t size) {
+  void* addr = g_dispatch->calloc(nmemb, size);
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+    g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  return addr;
 }
 
 struct mallinfo heapprofd_mallinfo() {
