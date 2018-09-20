@@ -35,7 +35,7 @@
 #include <unwindstack/RegsGetLocal.h>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/sock_utils.h"
+#include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/transport_data.h"
 

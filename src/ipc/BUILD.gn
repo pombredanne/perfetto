@@ -29,12 +29,12 @@ source_set("ipc") {
   public_configs = [ "../../gn:default_config" ]
   public_deps = [
     "../../include/perfetto/ipc",
+    "../base:unix_socket",
   ]
   deps = [
     ":wire_protocol",
     "../../gn:default_deps",
     "../base",
-    "../base:sock_utils",
   ]
   sources = [
     "buffered_frame_deserializer.cc",
@@ -43,8 +43,6 @@ source_set("ipc") {
     "host_impl.cc",
     "host_impl.h",
     "service_proxy.cc",
-    "unix_socket.cc",
-    "unix_socket.h",
     "virtual_destructors.cc",
   ]
 }
@@ -80,7 +78,6 @@ source_set("unittests") {
     "deferred_unittest.cc",
     "host_impl_unittest.cc",
     "test/ipc_integrationtest.cc",
-    "unix_socket_unittest.cc",
   ]
 }
 
