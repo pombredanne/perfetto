@@ -65,26 +65,27 @@ class ChromeSliceTrack extends Track<Config, Data> {
     // TODO: fonts and colors should come from the CSS and not hardcoded here.
 
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
+    const data = this.data();
 
-    // If there aren't enough cached slices data in |this.data| request more to
+    // If there aren't enough cached slices data in |data| request more to
     // the controller.
-    const inRange = this.data !== undefined &&
-        (visibleWindowTime.start >= this.data.start &&
-         visibleWindowTime.end <= this.data.end);
-    if (!inRange || this.data.resolution > getCurResolution()) {
+    const inRange = data !== undefined &&
+        (visibleWindowTime.start >= data.start &&
+         visibleWindowTime.end <= data.end);
+    if (!inRange || data.resolution > getCurResolution()) {
       if (!this.reqPending) {
         this.reqPending = true;
         setTimeout(() => this.reqDataDeferred(), 50);
       }
-      if (this.data === undefined) return;  // Can't possibly draw anything.
+      if (data === undefined) return;  // Can't possibly draw anything.
     }
 
     // If the cached trace slices don't fully cover the visible time range,
     // show a gray rectangle with a "Loading..." label.
     ctx.font = '12px Google Sans';
-    if (this.data.start > visibleWindowTime.start) {
+    if (data.start > visibleWindowTime.start) {
       const rectWidth =
-          timeScale.timeToPx(Math.min(this.data.start, visibleWindowTime.end));
+          timeScale.timeToPx(Math.min(data.start, visibleWindowTime.end));
       ctx.fillStyle = '#eee';
       ctx.fillRect(0, TRACK_PADDING, rectWidth, SLICE_HEIGHT);
       ctx.fillStyle = '#666';
@@ -94,9 +95,9 @@ class ChromeSliceTrack extends Track<Config, Data> {
           TRACK_PADDING + SLICE_HEIGHT / 2,
           rectWidth);
     }
-    if (this.data.end < visibleWindowTime.end) {
+    if (data.end < visibleWindowTime.end) {
       const rectX =
-          timeScale.timeToPx(Math.max(this.data.end, visibleWindowTime.start));
+          timeScale.timeToPx(Math.max(data.end, visibleWindowTime.start));
       const rectWidth = timeScale.timeToPx(visibleWindowTime.end) - rectX;
       ctx.fillStyle = '#eee';
       ctx.fillRect(rectX, TRACK_PADDING, rectWidth, SLICE_HEIGHT);
@@ -115,13 +116,13 @@ class ChromeSliceTrack extends Track<Config, Data> {
     const charWidth = ctx.measureText('abcdefghij').width / 10;
     const pxEnd = timeScale.timeToPx(visibleWindowTime.end);
 
-    for (let i = 0; i < this.data.starts.length; i++) {
-      const tStart = this.data.starts[i];
-      const tEnd = this.data.ends[i];
-      const depth = this.data.depths[i];
-      const cat = this.data.strings[this.data.categories[i]];
-      const titleId = this.data.titles[i];
-      const title = this.data.strings[titleId];
+    for (let i = 0; i < data.starts.length; i++) {
+      const tStart = data.starts[i];
+      const tEnd = data.ends[i];
+      const depth = data.depths[i];
+      const cat = data.strings[data.categories[i]];
+      const titleId = data.titles[i];
+      const title = data.strings[titleId];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
@@ -157,17 +158,18 @@ class ChromeSliceTrack extends Track<Config, Data> {
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
+    const data = this.data();
     this.hoveredTitleId = -1;
-    if (this.data === undefined) return;
+    if (data === undefined) return;
     const {timeScale} = globals.frontendLocalState;
     if (y < TRACK_PADDING) return;
     const t = timeScale.pxToTime(x);
     const depth = Math.floor(y / SLICE_HEIGHT);
-    for (let i = 0; i < this.data.starts.length; i++) {
-      const tStart = this.data.starts[i];
-      const tEnd = this.data.ends[i];
-      const titleId = this.data.titles[i];
-      if (tStart <= t && t <= tEnd && depth === this.data.depths[i]) {
+    for (let i = 0; i < data.starts.length; i++) {
+      const tStart = data.starts[i];
+      const tEnd = data.ends[i];
+      const titleId = data.titles[i];
+      if (tStart <= t && t <= tEnd && depth === data.depths[i]) {
         this.hoveredTitleId = titleId;
         break;
       }

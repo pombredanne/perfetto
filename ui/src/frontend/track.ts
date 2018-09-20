@@ -44,7 +44,7 @@ export abstract class Track<Config = {}, Data = {}> {
     return this.trackState.config as Config;
   }
 
-  get data(): Data {
+  data(): Data {
     return globals.trackDataStore.get(this.trackState.id) as Data;
   }
 

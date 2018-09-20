@@ -74,18 +74,19 @@ class CpuSliceTrack extends Track<Config, Data> {
     // TODO: fonts and colors should come from the CSS and not hardcoded here.
 
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
+    const data = this.data();
 
     // If there aren't enough cached slices data in |data| request more to
     // the controller.
-    const inRange = this.data !== undefined &&
-        (visibleWindowTime.start >= this.data.start &&
-         visibleWindowTime.end <= this.data.end);
-    if (!inRange || this.data.resolution > getCurResolution()) {
+    const inRange = data !== undefined &&
+        (visibleWindowTime.start >= data.start &&
+         visibleWindowTime.end <= data.end);
+    if (!inRange || data.resolution > getCurResolution()) {
       if (!this.reqPending) {
         this.reqPending = true;
         setTimeout(() => this.reqDataDeferred(), 50);
       }
-      if (this.data === undefined) return;  // Can't possibly draw anything.
+      if (data === undefined) return;  // Can't possibly draw anything.
     }
     ctx.textAlign = 'center';
     ctx.font = '12px Google Sans';
@@ -98,18 +99,18 @@ class CpuSliceTrack extends Track<Config, Data> {
     // If the cached trace slices don't fully cover the visible time range,
     // show a gray rectangle with a "Loading..." label.
     ctx.font = '12px Google Sans';
-    if (this.data.start > visibleWindowTime.start) {
+    if (data.start > visibleWindowTime.start) {
       const rectWidth =
-          timeScale.timeToPx(Math.min(this.data.start, visibleWindowTime.end));
+          timeScale.timeToPx(Math.min(data.start, visibleWindowTime.end));
       ctx.fillStyle = '#eee';
       ctx.fillRect(0, MARGIN_TOP, rectWidth, RECT_HEIGHT);
       ctx.fillStyle = '#666';
       ctx.fillText(
           'loading...', rectWidth / 2, MARGIN_TOP + RECT_HEIGHT / 2, rectWidth);
     }
-    if (this.data.end < visibleWindowTime.end) {
+    if (data.end < visibleWindowTime.end) {
       const rectX =
-          timeScale.timeToPx(Math.max(this.data.end, visibleWindowTime.start));
+          timeScale.timeToPx(Math.max(data.end, visibleWindowTime.start));
       const rectWidth = timeScale.timeToPx(visibleWindowTime.end) - rectX;
       ctx.fillStyle = '#eee';
       ctx.fillRect(rectX, MARGIN_TOP, rectWidth, RECT_HEIGHT);
@@ -121,12 +122,12 @@ class CpuSliceTrack extends Track<Config, Data> {
           rectWidth);
     }
 
-    assertTrue(this.data.starts.length === this.data.ends.length);
-    assertTrue(this.data.starts.length === this.data.utids.length);
-    for (let i = 0; i < this.data.starts.length; i++) {
-      const tStart = this.data.starts[i];
-      const tEnd = this.data.ends[i];
-      const utid = this.data.utids[i];
+    assertTrue(data.starts.length === data.ends.length);
+    assertTrue(data.starts.length === data.utids.length);
+    for (let i = 0; i < data.starts.length; i++) {
+      const tStart = data.starts[i];
+      const tEnd = data.ends[i];
+      const utid = data.utids[i];
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
@@ -184,8 +185,9 @@ class CpuSliceTrack extends Track<Config, Data> {
   }
 
   onMouseMove({x, y}: {x: number, y: number}) {
+    const data = this.data();
     this.mouseXpos = x;
-    if (this.data === undefined) return;
+    if (data === undefined) return;
     const {timeScale} = globals.frontendLocalState;
     if (y < MARGIN_TOP || y > MARGIN_TOP + RECT_HEIGHT) {
       this.hoveredUtid = -1;
@@ -194,10 +196,10 @@ class CpuSliceTrack extends Track<Config, Data> {
     const t = timeScale.pxToTime(x);
     this.hoveredUtid = -1;
 
-    for (let i = 0; i < this.data.starts.length; i++) {
-      const tStart = this.data.starts[i];
-      const tEnd = this.data.ends[i];
-      const utid = this.data.utids[i];
+    for (let i = 0; i < data.starts.length; i++) {
+      const tStart = data.starts[i];
+      const tEnd = data.ends[i];
+      const utid = data.utids[i];
       if (tStart <= t && t <= tEnd) {
         this.hoveredUtid = utid;
         break;
