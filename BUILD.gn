@@ -272,3 +272,11 @@ if (use_libfuzzer && !build_with_chromium) {
     ]
   }
 }
+
+if (!build_with_chromium) {
+  shared_library("heapprofd_client") {
+    deps = [
+      "src/profiling/memory:malloc_hooks",
+    ]
+  }
+}

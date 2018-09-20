@@ -31,6 +31,7 @@ namespace {
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
+constexpr double kSamplingRate = 512e3;
 
 int HeapprofdMain(int argc, char** argv) {
   Callsites callsites;
@@ -54,7 +55,8 @@ int HeapprofdMain(int argc, char** argv) {
     unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
         std::move(r));
   };
-  SocketListener listener(std::move(on_record_received), &callsites);
+  SocketListener listener({kSamplingRate}, std::move(on_record_received),
+                          &callsites);
 
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {

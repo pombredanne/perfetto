@@ -22,7 +22,10 @@
 #include <mutex>
 #include <vector>
 
+#include <pthread.h>
+
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
 
@@ -90,16 +93,40 @@ class SocketPool {
 char* GetMainThreadStackBase();
 char* GetThreadStackBase();
 
+class PThreadKey {
+ public:
+  PThreadKey(const PThreadKey&) = delete;
+  PThreadKey& operator=(const PThreadKey&) = delete;
+
+  PThreadKey(void (*destructor)(void*))
+      : valid_(pthread_key_create(&key_, destructor) == 0) {}
+  ~PThreadKey() {
+    if (valid_)
+      pthread_key_delete(key_);
+  }
+  bool valid() { return valid_; }
+  pthread_key_t get() { return key_; }
+
+ private:
+  pthread_key_t key_;
+  bool valid_;
+};
+
 class Client {
  public:
   Client(std::vector<base::ScopedFile> sockets);
   Client(const std::string& sock_name, size_t conns);
   void RecordMalloc(uint64_t alloc_size, uint64_t alloc_address);
   void RecordFree(uint64_t alloc_address);
+  bool ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t));
+
+  ClientConfiguration client_config_for_testing() { return client_config_; }
 
  private:
   char* GetStackBase();
 
+  ClientConfiguration client_config_;
+  PThreadKey pthread_key_;
   SocketPool socket_pool_;
   FreePage free_page_;
   char* const main_thread_stack_base_;

@@ -37,7 +37,8 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/sock_utils.h"
 #include "perfetto/base/utils.h"
-#include "src/profiling/memory/transport_data.h"
+
+#include "src/profiling/memory/sampler.h"
 
 namespace perfetto {
 namespace {
@@ -225,13 +226,17 @@ char* GetMainThreadStackBase() {
 }
 
 Client::Client(std::vector<base::ScopedFile> socks)
-    : socket_pool_(std::move(socks)),
+    : pthread_key_(KeyDestructor),
+      socket_pool_(std::move(socks)),
       main_thread_stack_base_(GetMainThreadStackBase()) {
   uint64_t size = 0;
   int fds[2];
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
   fds[1] = open("/proc/self/mem", O_RDONLY | O_CLOEXEC);
-  base::Send(*socket_pool_.Borrow(), &size, sizeof(size), fds, 2);
+  auto fd = socket_pool_.Borrow();
+  base::Send(*fd, &size, sizeof(size), fds, 2);
+  PERFETTO_DCHECK(recv(*fd, &client_config_, sizeof(client_config_), 0) ==
+                  sizeof(client_config_));
 }
 
 Client::Client(const std::string& sock_name, size_t conns)
@@ -278,6 +283,11 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
 
 void Client::RecordFree(uint64_t alloc_address) {
   free_page_.Add(alloc_address, ++sequence_number_, &socket_pool_);
+}
+
+bool Client::ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t)) {
+  return ShouldSample(pthread_key_.get(), alloc_size, client_config_.rate,
+                      malloc);
 }
 
 }  // namespace perfetto
