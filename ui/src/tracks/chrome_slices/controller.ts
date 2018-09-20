@@ -41,7 +41,7 @@ class ChromeSliceTrackController extends TrackController<Config, Data> {
         `limit ${LIMIT};`;
 
     this.busy = true;
-    this.engine.rawQuery({'sqlQuery': query}).then(rawResult => {
+    this.engine.query(query).then(rawResult => {
       this.busy = false;
       if (rawResult.error) {
         throw new Error(`Query error "${query}": ${rawResult.error}`);
