@@ -16,10 +16,9 @@
 
 #include <aio.h>
 #include <fcntl.h>
+#include <histedit.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include <histedit.h>
 
 #include <functional>
 
