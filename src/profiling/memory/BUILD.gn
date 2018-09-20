@@ -28,8 +28,6 @@ source_set("daemon") {
     "bookkeeping.h",
     "record_reader.cc",
     "record_reader.h",
-    "sampler.cc",
-    "sampler.h",
     "socket_listener.cc",
     "socket_listener.h",
     "string_interner.cc",
@@ -49,6 +47,8 @@ source_set("client") {
   sources = [
     "client.cc",
     "client.h",
+    "sampler.cc",
+    "sampler.h",
   ]
 }
 
