@@ -42,18 +42,20 @@ class HeapprofdIntegrationTest : public ::testing::Test {
   void TearDown() override { DESTROY_TEST_SOCK(kSocketName); }
 };
 
-TEST_F(HeapprofdIntegrationTest, EndToEnd) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#define MAYBE_EndToEnd EndToEnd
+#else
+#define MAYBE_EndToEnd DISABLED_EndToEnd
+#endif
+
+TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
   Callsites callsites;
 
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");
-  constexpr double kSamplingRate = 123;
   SocketListener listener(
-      {kSamplingRate},
       [&done](UnwindingRecord r) {
         // TODO(fmayer): Test symbolization and result of unwinding.
-        // This check will only work on in-tree builds as out-of-tree
-        // libunwindstack is behaving a bit weirdly.
         BookkeepingRecord bookkeeping_record;
         ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
         HandleBookkeepingRecord(&bookkeeping_record);
@@ -66,14 +68,9 @@ TEST_F(HeapprofdIntegrationTest, EndToEnd) {
     PERFETTO_ELOG("Socket not listening.");
     PERFETTO_CHECK(false);
   }
-  std::thread th([kSamplingRate] {
-    Client client(kSocketName, 1);
-    SomeFunction(&client);
-    EXPECT_EQ(client.client_config_for_testing().rate, kSamplingRate);
-  });
-
+  Client client(kSocketName, 1);
+  SomeFunction(&client);
   task_runner.RunUntilCheckpoint("done");
-  th.join();
 }
 
 }  // namespace
