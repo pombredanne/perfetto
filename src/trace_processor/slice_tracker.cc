@@ -56,7 +56,11 @@ void SliceTracker::End(uint64_t timestamp,
                        StringId name) {
   auto& stack = threads_[utid];
   MaybeCloseStack(timestamp, stack);
-  PERFETTO_CHECK(!stack.empty());
+
+  // If we see an end even without a beginning, ignore it.
+  if (stack.empty()) {
+    return;
+  }
 
   PERFETTO_CHECK(cat == 0 || stack.back().cat_id == cat);
   PERFETTO_CHECK(name == 0 || stack.back().name_id == name);

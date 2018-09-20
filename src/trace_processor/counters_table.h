@@ -48,6 +48,57 @@ class CountersTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
+  // Transient state for a filter operation on a Cursor.
+  class FilterState {
+   public:
+    FilterState(const TraceStorage* storage,
+                const QueryConstraints& query_constraints,
+                sqlite3_value** argv);
+
+    void FindNextCounter();
+
+    inline bool IsNextRowIdIndexValid() const {
+      return next_row_id_index_ < sorted_row_ids_.size();
+    }
+
+    size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
+
+   private:
+    // Updates |sorted_row_ids_| with the indices into the slices sorted by the
+    // order by criteria.
+    void SetupSortedRowIds(uint64_t min_ts, uint64_t max_ts);
+
+    // Compares the slice at index |f| with the slice at index |s|on all
+    // columns.
+    // Returns -1 if the first slice is before the second in the ordering, 1 if
+    // the first slice is after the second and 0 if they are equal.
+    int CompareSlices(size_t f_idx, size_t s_idx);
+
+    // Compares the slice at index |f| with the slice at index |s| on the
+    // criteria in |order_by|.
+    // Returns -1 if the first slice is before the second in the ordering, 1 if
+    // the first slice is after the second and 0 if they are equal.
+    int CompareSlicesOnColumn(size_t f_idx,
+                              size_t s_idx,
+                              const QueryConstraints::OrderBy& ob);
+
+    void FindNextRowAndTimestamp();
+
+    // Vector of row ids sorted by the the given order by constraints.
+    std::vector<uint32_t> sorted_row_ids_;
+
+    // Bitset for filtering slices.
+    std::vector<bool> row_filter_;
+
+    // An offset into |sorted_row_ids_| indicating the next row to return.
+    uint32_t next_row_id_index_ = 0;
+
+    // The sorting criteria for this filter operation.
+    std::vector<QueryConstraints::OrderBy> order_by_;
+
+    const TraceStorage* const storage_;
+  };
+
   class Cursor : public Table::Cursor {
    public:
     Cursor(const TraceStorage*);
@@ -59,13 +110,18 @@ class CountersTable : public Table {
     int Column(sqlite3_context*, int N) override;
 
    private:
-    size_t num_rows_;
-    size_t row_ = 0;
+    std::unique_ptr<FilterState> filter_state_;
 
     const TraceStorage* const storage_;
   };
 
   const TraceStorage* const storage_;
+
+  // Vector of row ids sorted by the the given order by constraints.
+  std::vector<uint32_t> sorted_row_ids_;
+
+  // Bitset for filtering slices.
+  std::vector<bool> row_filter_;
 };
 }  // namespace trace_processor
 }  // namespace perfetto
