@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {
   createPermalink,
+  executeQuery,
   navigate,
   openTraceFromFile,
   openTraceFromUrl
@@ -23,8 +24,51 @@ import {
 
 import {globals} from './globals';
 
-const EXAMPLE_TRACE_URL =
+const ALL_PROCESSES_QUERY = 'select name, pid from process order by name;';
+
+const CPU_TIME_FOR_PROCESSES = `
+select
+  process.name,
+  tot_proc/1e9 as cpu_sec
+from
+  (select
+    upid,
+    sum(tot_thd) as tot_proc
+  from
+    (select
+      utid,
+      sum(dur) as tot_thd
+    from sched group by utid)
+  join thread using(utid) group by upid)
+join process using(upid)
+order by cpu_sec desc limit 100;`;
+
+const CYCLES_PER_P_STATE_PER_CPU = `
+select ref as cpu, value as freq, sum(dur * value)/1e6 as mcycles
+from counters group by cpu, freq order by mcycles desc limit 20;`;
+
+const CPU_TIME_BY_CLUSTER_BY_PROCESS = `
+select
+thread.name as comm,
+case when cpug = 0 then 'big' else 'little' end as core,
+cpu_sec from
+  (select cpu/4 cpug, utid, sum(dur)/1e9 as cpu_sec
+  from sched group by utid, cpug order by cpu_sec desc)
+left join thread using(utid)
+limit 20;`;
+
+function createCannedQuery(query: string): (_: Event) => void {
+  return (e: Event) => {
+    e.preventDefault();
+    globals.dispatch(executeQuery('0', 'command', query));
+  };
+}
+
+const EXAMPLE_ANDROID_TRACE_URL =
     'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
+
+const EXAMPLE_CHROME_TRACE_URL =
+    'https://storage.googleapis.com/perfetto-misc/example_chrome_trace_10s.json';
 
 const SECTIONS = [
   {
@@ -33,8 +77,17 @@ const SECTIONS = [
     expanded: true,
     items: [
       {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
-      {t: 'Open example trace', a: handleOpenTraceUrl, i: 'description'},
-      {t: 'Record new trace', a: navigateHome, i: 'fiber_smart_record'},
+      {
+        t: 'Open Android example',
+        a: openTraceUrl(EXAMPLE_ANDROID_TRACE_URL),
+        i: 'description'
+      },
+      {
+        t: 'Open Chrome example',
+        a: openTraceUrl(EXAMPLE_CHROME_TRACE_URL),
+        i: 'description'
+      },
+      {t: 'Record new trace', a: navigateRecord, i: 'fiber_smart_record'},
       {t: 'Share current trace', a: dispatchCreatePermalink, i: 'share'},
     ],
   },
@@ -63,8 +116,26 @@ const SECTIONS = [
     title: 'Metrics and auditors',
     summary: 'Add new tracks to the workspace',
     items: [
-      {t: 'CPU Usage breakdown', a: navigateHome, i: 'table_chart'},
-      {t: 'Memory breakdown', a: navigateHome, i: 'memory'},
+      {
+        t: 'All Processes',
+        a: createCannedQuery(ALL_PROCESSES_QUERY),
+        i: 'search',
+      },
+      {
+        t: 'CPU Time by process',
+        a: createCannedQuery(CPU_TIME_FOR_PROCESSES),
+        i: 'search',
+      },
+      {
+        t: 'Cycles by p-state by CPU',
+        a: createCannedQuery(CYCLES_PER_P_STATE_PER_CPU),
+        i: 'search',
+      },
+      {
+        t: 'CPU Time by cluster by process',
+        a: createCannedQuery(CPU_TIME_BY_CLUSTER_BY_PROCESS),
+        i: 'search',
+      },
     ],
   },
 ];
@@ -74,9 +145,11 @@ function popupFileSelectionDialog(e: Event) {
   (document.querySelector('input[type=file]')! as HTMLInputElement).click();
 }
 
-function handleOpenTraceUrl(e: Event) {
-  e.preventDefault();
-  globals.dispatch(openTraceFromUrl(EXAMPLE_TRACE_URL));
+function openTraceUrl(url: string): (e: Event) => void {
+  return e => {
+    e.preventDefault();
+    globals.dispatch(openTraceFromUrl(url));
+  };
 }
 
 function onInputElementFileSelectionChanged(e: Event) {
@@ -87,8 +160,14 @@ function onInputElementFileSelectionChanged(e: Event) {
   globals.dispatch(openTraceFromFile(e.target.files[0]));
 }
 
-function navigateHome(_: Event) {
+function navigateHome(e: Event) {
+  e.preventDefault();
   globals.dispatch(navigate('/'));
+}
+
+function navigateRecord(e: Event) {
+  e.preventDefault();
+  globals.dispatch(navigate('/record'));
 }
 
 function dispatchCreatePermalink(e: Event) {
