@@ -21,6 +21,7 @@ source_set("daemon") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../ipc",
   ]
   sources = [
     "bookkeeping.cc",
