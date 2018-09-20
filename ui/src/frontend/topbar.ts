@@ -143,7 +143,6 @@ export class Topbar implements m.ClassComponent {
         (engine !== undefined && !engine.ready)) {
       progBar.push(m('.progress'));
     }
-
     return m('.topbar', m(Omnibox), ...progBar);
   }
 }

@@ -66,8 +66,6 @@ class QueryTable implements m.ClassComponent {
  * panels, and everything else that's part of the main trace viewer page.
  */
 class TraceViewer implements m.ClassComponent {
-  private width = 0;
-
   private onResize: () => void = () => {};
   private zoomContent?: PanAndZoomHandler;
 
@@ -75,9 +73,8 @@ class TraceViewer implements m.ClassComponent {
     const frontendLocalState = globals.frontendLocalState;
     const updateDimensions = () => {
       const rect = vnode.dom.getBoundingClientRect();
-      this.width = rect.width;
       frontendLocalState.timeScale.setLimitsPx(
-          0, this.width - TRACK_SHELL_WIDTH);
+          0, rect.width - TRACK_SHELL_WIDTH);
     };
 
     updateDimensions();
