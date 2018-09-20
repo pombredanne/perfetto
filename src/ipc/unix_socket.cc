@@ -44,9 +44,6 @@ namespace ipc {
 
 // TODO(primiano): Add ThreadChecker to methods of this class.
 
-namespace {
-}  // namespace
-
 // static
 base::ScopedFile UnixSocket::CreateAndBind(const std::string& socket_name) {
   base::ScopedFile fd = base::CreateSocket();
