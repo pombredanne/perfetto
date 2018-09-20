@@ -14,36 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
-#define INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
+#ifndef INCLUDE_PERFETTO_BASE_BASIC_TYPES_H_
+#define INCLUDE_PERFETTO_BASE_BASIC_TYPES_H_
 
-#include "perfetto/base/scoped_file.h"
-
-#include <sys/socket.h>
-#include <sys/un.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 namespace perfetto {
 namespace base {
-
-ssize_t Send(int fd,
-             const void* msg,
-             size_t len,
-             const int* send_fds,
-             size_t num_fds);
-
-ssize_t Receive(int fd,
-                void* msg,
-                size_t len,
-                base::ScopedFile* fd_vec,
-                size_t max_files);
-
-bool MakeSockAddr(const std::string& socket_name,
-                  sockaddr_un* addr,
-                  socklen_t* addr_size);
-
-base::ScopedFile CreateSocket();
-
+constexpr uid_t kInvalidUid = static_cast<uid_t>(-1);
+constexpr pid_t kInvalidPid = static_cast<pid_t>(-1);
 }  // namespace base
 }  // namespace perfetto
 
-#endif  // INCLUDE_PERFETTO_BASE_SOCK_UTILS_H_
+#endif  // INCLUDE_PERFETTO_BASE_BASIC_TYPES_H_

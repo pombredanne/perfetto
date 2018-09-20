@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/ipc/basic_types.h"
+#include "perfetto/base/unix_socket.h"
 
 namespace perfetto {
 namespace ipc {
@@ -53,7 +53,7 @@ class ClientInfo {
 
  private:
   ClientID client_id_ = 0;
-  uid_t uid_ = kInvalidUid;
+  uid_t uid_ = base::kInvalidUid;
 };
 
 }  // namespace ipc
