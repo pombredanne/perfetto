@@ -184,7 +184,8 @@ char* GetThreadStackBase() {
   pthread_attr_t attr;
   if (pthread_getattr_np(t, &attr) != 0)
     return nullptr;
-  auto cleanup = base::MakeCleanup([&attr] { pthread_attr_destroy(&attr); });
+  base::ScopedResource<pthread_attr_t*, pthread_attr_destroy, nullptr> cleanup(
+      &attr);
 
   char* stackaddr;
   size_t stacksize;
