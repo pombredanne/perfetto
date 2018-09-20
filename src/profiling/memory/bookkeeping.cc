@@ -16,37 +16,96 @@
 
 #include "src/profiling/memory/bookkeeping.h"
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 
-MemoryBookkeeping::Node* MemoryBookkeeping::Node::GetOrCreateChild(
-    const MemoryBookkeeping::InternedCodeLocation& loc) {
+Callsites::Node* Callsites::Node::GetOrCreateChild(
+    const InternedCodeLocation& loc) {
   Node* child = children_.Get(loc);
   if (!child)
     child = children_.Emplace(loc, this);
   return child;
 }
 
-void MemoryBookkeeping::RecordMalloc(const std::vector<CodeLocation>& locs,
-                                     uint64_t address,
-                                     uint64_t size) {
-  Node* node = &root_;
-  node->cum_size_ += size;
-  for (const MemoryBookkeeping::CodeLocation& loc : locs) {
-    node = node->GetOrCreateChild(InternCodeLocation(loc));
-    node->cum_size_ += size;
+void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
+                            uint64_t address,
+                            uint64_t size,
+                            uint64_t sequence_number) {
+  auto it = allocations_.find(address);
+  if (it != allocations_.end()) {
+    if (it->second.sequence_number > sequence_number)
+      return;
+    else
+      // Clean up previous allocation by pretending a free happened just after
+      // it.
+      ApplyFree(it->second.sequence_number + 1, address);
   }
 
-  allocations_.emplace(address, std::make_pair(size, node));
+  Callsites::Node* node = callsites_->IncrementCallsite(locs, size);
+  allocations_.emplace(address, Allocation(size, sequence_number, node));
+  AddPendingNoop(sequence_number);
 }
 
-void MemoryBookkeeping::RecordFree(uint64_t address) {
+void HeapDump::RecordFree(uint64_t address, uint64_t sequence_number) {
+  AddPendingFree(sequence_number, address);
+}
+
+void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
 
-  std::pair<uint64_t, Node*> value = leaf_it->second;
-  uint64_t size = value.first;
-  Node* node = value.second;
+  const Allocation& value = leaf_it->second;
+  if (value.sequence_number > sequence_number)
+    return;
+  allocations_.erase(leaf_it);
+}
+
+void HeapDump::AddPendingFree(uint64_t sequence_number, uint64_t address) {
+  if (sequence_number != sequence_number_ + 1) {
+    pending_.emplace(sequence_number, address);
+    return;
+  }
+
+  if (address)
+    ApplyFree(sequence_number, address);
+  sequence_number_++;
+
+  auto it = pending_.begin();
+  while (it != pending_.end() && it->first == sequence_number_ + 1) {
+    if (it->second)
+      ApplyFree(it->first, it->second);
+    sequence_number_++;
+    it = pending_.erase(it);
+  }
+}
+
+uint64_t Callsites::GetCumSizeForTesting(
+    const std::vector<CodeLocation>& locs) {
+  Node* node = &root_;
+  for (const CodeLocation& loc : locs) {
+    node = node->children_.Get(InternCodeLocation(loc));
+    if (node == nullptr)
+      return 0;
+  }
+  return node->cum_size_;
+}
+
+Callsites::Node* Callsites::IncrementCallsite(
+    const std::vector<CodeLocation>& locs,
+    uint64_t size) {
+  Node* node = &root_;
+  node->cum_size_ += size;
+  for (const CodeLocation& loc : locs) {
+    node = node->GetOrCreateChild(InternCodeLocation(loc));
+    node->cum_size_ += size;
+  }
+  return node;
+}
+
+void Callsites::DecrementNode(Node* node, uint64_t size) {
+  PERFETTO_DCHECK(node->cum_size_ >= size);
 
   bool delete_prev = false;
   Node* prev = nullptr;
@@ -58,19 +117,6 @@ void MemoryBookkeeping::RecordFree(uint64_t address) {
     prev = node;
     node = node->parent_;
   }
-
-  allocations_.erase(leaf_it);
-}
-
-uint64_t MemoryBookkeeping::GetCumSizeForTesting(
-    const std::vector<CodeLocation>& locs) {
-  Node* node = &root_;
-  for (const MemoryBookkeeping::CodeLocation& loc : locs) {
-    node = node->children_.Get(InternCodeLocation(loc));
-    if (node == nullptr)
-      return 0;
-  }
-  return node->cum_size_;
 }
 
 }  // namespace perfetto

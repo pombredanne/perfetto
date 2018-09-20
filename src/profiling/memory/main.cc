@@ -15,9 +15,12 @@
  */
 
 #include <stdlib.h>
+#include <array>
 #include <memory>
+#include <vector>
 
 #include "src/ipc/unix_socket.h"
+#include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
 
 #include "perfetto/base/unix_task_runner.h"
@@ -25,15 +28,34 @@
 namespace perfetto {
 namespace {
 
-int HeapprofdMain(int argc, char** argv) {
-  std::unique_ptr<ipc::UnixSocket> sock;
+constexpr size_t kUnwinderQueueSize = 1000;
+constexpr size_t kBookkeepingQueueSize = 1000;
+constexpr size_t kUnwinderThreads = 5;
 
-  SocketListener listener(
-      [](size_t, std::unique_ptr<uint8_t[]>, std::weak_ptr<ProcessMetadata>) {
-        // TODO(fmayer): Wire this up to a worker thread that does the
-        // unwinding.
-        PERFETTO_LOG("Record received.");
-      });
+int HeapprofdMain(int argc, char** argv) {
+  Callsites callsites;
+  std::unique_ptr<ipc::UnixSocket> sock;
+  std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
+  for (size_t i = 0; i < kUnwinderThreads; ++i)
+    unwinder_queues[i].SetSize(kUnwinderQueueSize);
+  BoundedQueue<BookkeepingRecord> callsites_queue(kBookkeepingQueueSize);
+  std::thread callsites_thread(
+      [&callsites_queue] { BookkeepingMainLoop(&callsites_queue); });
+
+  std::vector<std::thread> unwinding_threads;
+  unwinding_threads.reserve(kUnwinderThreads);
+  for (size_t i = 0; i < kUnwinderThreads; ++i) {
+    unwinding_threads.emplace_back([&unwinder_queues, &callsites_queue, i] {
+      UnwindingMainLoop(&unwinder_queues[i], &callsites_queue);
+    });
+  }
+
+  auto on_record_received = [&unwinder_queues](UnwindingRecord r) {
+    unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
+        std::move(r));
+  };
+  SocketListener listener(std::move(on_record_received), &callsites);
+
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on
