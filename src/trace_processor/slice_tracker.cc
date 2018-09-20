@@ -36,7 +36,6 @@ void SliceTracker::Begin(uint64_t timestamp,
                          StringId name) {
   auto& stack = threads_[utid];
   MaybeCloseStack(timestamp, stack);
-
   stack.emplace_back(Slice{cat, name, timestamp, 0});
 }
 
