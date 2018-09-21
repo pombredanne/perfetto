@@ -357,7 +357,7 @@ bool SpanOperatorTable::FilterState::SetupReturnForJoinValue(
   value.join_val = join_value;
   value.t1_row = std::move(t1_row);
   value.t2_row = std::move(t2_row);
-  return_values_.emplace_back(value);
+  return_values_.emplace_back(std::move(value));
 
   return true;
 }
