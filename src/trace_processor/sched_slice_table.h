@@ -38,7 +38,6 @@ class SchedSliceTable : public Table {
     kCpu = 1,
     kDuration = 2,
     kUtid = 3,
-    kCycles = 4,
   };
 
   SchedSliceTable(sqlite3*, const TraceStorage* storage);
