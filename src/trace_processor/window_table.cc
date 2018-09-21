@@ -62,9 +62,9 @@ int WindowTable::Update(int argc, sqlite3_value** argv, sqlite3_int64*) {
   if (argc < 2 || sqlite3_value_type(argv[0]) == SQLITE_NULL)
     return SQLITE_READONLY;
 
-  quantum_ = static_cast<uint64_t>(sqlite3_value_int64(argv[2]));
-  window_start_ = static_cast<uint64_t>(sqlite3_value_int64(argv[3]));
-  window_dur_ = static_cast<uint64_t>(sqlite3_value_int64(argv[4]));
+  quantum_ = static_cast<uint64_t>(sqlite3_value_int64(argv[3]));
+  window_start_ = static_cast<uint64_t>(sqlite3_value_int64(argv[4]));
+  window_dur_ = static_cast<uint64_t>(sqlite3_value_int64(argv[5]));
 
   return SQLITE_OK;
 }

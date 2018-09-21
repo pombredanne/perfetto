@@ -80,7 +80,10 @@ class WindowTable : public Table {
 
   uint64_t quantum_ = 0;
   uint64_t window_start_ = 0;
-  uint64_t window_dur_ = std::numeric_limits<uint64_t>::max();
+
+  // max of int64_t because SQLite technically only supports int64s and not
+  // uint64s.
+  uint64_t window_dur_ = std::numeric_limits<int64_t>::max();
 };
 }  // namespace trace_processor
 }  // namespace perfetto

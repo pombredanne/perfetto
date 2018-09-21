@@ -348,7 +348,7 @@ bool SpanOperatorTable::FilterState::SetupReturnForJoinValue(
   uint64_t t2_end = t2_row.ts + t2_row.dur;
 
   // If there is no overlap between the two spans, don't return anything.
-  if (t2_end < t1_row.ts && t1_end < t2_row.ts)
+  if (t2_end < t1_row.ts || t1_end < t2_row.ts)
     return false;
 
   ts_ = std::max(t1_row.ts, t2_row.ts);
