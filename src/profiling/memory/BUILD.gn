@@ -97,7 +97,6 @@ source_set("malloc_hooks") {
     "../../base",
   ]
   cflags = [
-    # TODO(fmayer): Fix this.
     "-isystem",
     rebase_path("../../../buildtools/bionic/libc", root_build_dir),
   ]
