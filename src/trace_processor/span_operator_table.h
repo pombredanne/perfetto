@@ -20,6 +20,7 @@
 #include <sqlite3.h>
 #include <array>
 #include <deque>
+#include <limits>
 #include <memory>
 
 #include "src/trace_processor/scoped_db.h"
