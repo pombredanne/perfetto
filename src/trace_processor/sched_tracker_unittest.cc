@@ -104,13 +104,13 @@ TEST_F(SchedTrackerTest, CounterDuration) {
   uint64_t timestamp = 100;
   StringId name_id = 0;
   context.sched_tracker->PushCounter(timestamp, 1000, name_id, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
   context.sched_tracker->PushCounter(timestamp + 1, 4000, name_id, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
   context.sched_tracker->PushCounter(timestamp + 3, 5000, name_id, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
   context.sched_tracker->PushCounter(timestamp + 9, 1000, name_id, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
 
   ASSERT_EQ(context.storage->counters().counter_count(), 3ul);
   ASSERT_EQ(context.storage->counters().timestamps().at(0), timestamp);
@@ -133,13 +133,13 @@ TEST_F(SchedTrackerTest, MixedEventsValueDelta) {
   StringId name_id_upid = 0;
   UniquePid upid = 12;
   context.sched_tracker->PushCounter(timestamp, 1000, name_id_cpu, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
   context.sched_tracker->PushCounter(timestamp + 1, 0, name_id_upid, upid,
-                                     RefType::kUPID);
+                                     RefType::kUpid);
   context.sched_tracker->PushCounter(timestamp + 3, 5000, name_id_cpu, cpu,
-                                     RefType::kCPU_ID);
+                                     RefType::kCpuId);
   context.sched_tracker->PushCounter(timestamp + 9, 1, name_id_upid, upid,
-                                     RefType::kUPID);
+                                     RefType::kUpid);
 
   ASSERT_EQ(context.storage->counters().counter_count(), 2ul);
   ASSERT_EQ(context.storage->counters().timestamps().at(0), timestamp);

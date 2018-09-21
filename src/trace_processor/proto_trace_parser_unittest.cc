@@ -242,7 +242,7 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);
 
-  EXPECT_CALL(*sched_, PushCounter(1000, 2000, 0, 10, RefType::kCPU_ID));
+  EXPECT_CALL(*sched_, PushCounter(1000, 2000, 0, 10, RefType::kCpuId));
   Tokenize(trace_1);
 }
 

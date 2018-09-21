@@ -36,6 +36,8 @@ class CountersTable : public Table {
     kValueDelta = 4,
     kRef = 5,
     kRefType = 6,
+
+    kNumColumns = 7,
   };
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
@@ -55,13 +57,18 @@ class CountersTable : public Table {
                 const QueryConstraints& query_constraints,
                 sqlite3_value** argv);
 
-    void FindNextCounter();
-
-    inline bool IsNextRowIdIndexValid() const {
-      return next_row_id_index_ < sorted_row_ids_.size();
+    inline void FindNextCounter() {
+      next_row_id_index_++;
+      FindNextRow();
     }
 
-    size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
+    inline bool IsNextRowIdIndexValid() const {
+      return static_cast<size_t>(next_row_id_index_) < sorted_row_ids_.size();
+    }
+
+    size_t next_row_id() const {
+      return sorted_row_ids_[static_cast<size_t>(next_row_id_index_)];
+    }
 
    private:
     // Updates |sorted_row_ids_| with the indices into the slices sorted by the
@@ -82,7 +89,9 @@ class CountersTable : public Table {
                               size_t s_idx,
                               const QueryConstraints::OrderBy& ob);
 
-    void FindNextRowAndTimestamp();
+    // Finds the next element in |row_filter| that is true and sets
+    // |next_row_id_index| to the index of it.
+    void FindNextRow();
 
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
@@ -91,7 +100,7 @@ class CountersTable : public Table {
     std::vector<bool> row_filter_;
 
     // An offset into |sorted_row_ids_| indicating the next row to return.
-    uint32_t next_row_id_index_ = 0;
+    ptrdiff_t next_row_id_index_ = 0;
 
     // The sorting criteria for this filter operation.
     std::vector<QueryConstraints::OrderBy> order_by_;
@@ -116,12 +125,6 @@ class CountersTable : public Table {
   };
 
   const TraceStorage* const storage_;
-
-  // Vector of row ids sorted by the the given order by constraints.
-  std::vector<uint32_t> sorted_row_ids_;
-
-  // Bitset for filtering slices.
-  std::vector<bool> row_filter_;
 };
 }  // namespace trace_processor
 }  // namespace perfetto

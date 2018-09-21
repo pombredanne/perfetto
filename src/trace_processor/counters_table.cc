@@ -31,7 +31,8 @@ namespace {
 using namespace sqlite_utils;
 
 constexpr uint64_t kUint64Max = std::numeric_limits<uint64_t>::max();
-constexpr uint64_t kInt64Max = std::numeric_limits<int64_t>::max();
+constexpr int64_t kInt64Max = std::numeric_limits<int64_t>::max();
+constexpr int64_t kInt64Min = std::numeric_limits<int64_t>::min();
 
 template <class T>
 inline int Compare(T first, T second, bool desc) {
@@ -110,11 +111,11 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kRefType: {
       switch (counters.types()[row]) {
-        case RefType::kCPU_ID: {
+        case RefType::kCpuId: {
           sqlite3_result_text(context, "cpu", -1, nullptr);
           break;
         }
-        case RefType::kUPID: {
+        case RefType::kUpid: {
           sqlite3_result_text(context, "upid", -1, nullptr);
           break;
         }
@@ -145,11 +146,11 @@ CountersTable::FilterState::FilterState(
     : order_by_(query_constraints.order_by()), storage_(storage) {
   uint64_t min_ts = 0;
   uint64_t max_ts = kUint64Max;
-  int64_t min_ref = 0;
+  int64_t min_ref = kInt64Min;
   int64_t max_ref = kInt64Max;
-  RefType ref_type_filter = RefType::kCPU_ID;
+  RefType ref_type_filter = RefType::kCpuId;
   // Set if we need to filter on that column.
-  std::bitset<7> filter_column;  // TODO(taylori): Avoid hardcoding # of cols
+  std::bitset<Column::kNumColumns> filter_column;
 
   for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
     const auto& cs = query_constraints.constraints()[i];
@@ -157,12 +158,12 @@ CountersTable::FilterState::FilterState(
       case Column::kRefType: {
         if (IsOpEq(cs.op)) {
           filter_column.set(Column::kRefType);
-          std::string type(
-              reinterpret_cast<const char*>(sqlite3_value_text(argv[i])));
-          if (type == "cpu") {
-            ref_type_filter = RefType::kCPU_ID;
-          } else if (type == "upid") {
-            ref_type_filter = RefType::kUPID;
+          auto* type =
+              reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
+          if (!strcmp(type, "cpu")) {
+            ref_type_filter = RefType::kCpuId;
+          } else if (!strcmp(type, "upid")) {
+            ref_type_filter = RefType::kUpid;
           }
         }
         break;
@@ -194,6 +195,7 @@ CountersTable::FilterState::FilterState(
   SetupSortedRowIds(min_ts, max_ts);
 
   const auto& counters = storage_->counters();
+  PERFETTO_DCHECK(row_filter_.empty());
   row_filter_.resize(sorted_row_ids_.size(), true);
   if (filter_column.test(Column::kRefType)) {
     for (size_t i = 0; i < sorted_row_ids_.size(); i++) {
@@ -202,13 +204,12 @@ CountersTable::FilterState::FilterState(
   }
   if (filter_column.test(Column::kRef)) {
     for (size_t i = 0; i < sorted_row_ids_.size(); i++) {
-      if (row_filter_[i]) {
-        const auto& ref_to_check = counters.refs()[sorted_row_ids_[i]];
-        row_filter_[i] = ref_to_check >= min_ref && ref_to_check <= max_ref;
-      }
+      const auto& ref_to_check = counters.refs()[sorted_row_ids_[i]];
+      row_filter_[i] =
+          row_filter_[i] && ref_to_check >= min_ref && ref_to_check <= max_ref;
     }
   }
-  FindNextRowAndTimestamp();
+  FindNextRow();
 }
 
 int CountersTable::FilterState::CompareSlicesOnColumn(
@@ -271,18 +272,13 @@ int CountersTable::FilterState::CompareSlices(size_t f_idx, size_t s_idx) {
   return 0;
 }
 
-void CountersTable::FilterState::FindNextCounter() {
-  next_row_id_index_++;
-  FindNextRowAndTimestamp();
-}
-
-void CountersTable::FilterState::FindNextRowAndTimestamp() {
-  auto start =
-      row_filter_.begin() +
-      static_cast<decltype(row_filter_)::difference_type>(next_row_id_index_);
+void CountersTable::FilterState::FindNextRow() {
+  // Get an interator to the current row index.
+  auto start = row_filter_.begin() + next_row_id_index_;
+  // Get an iterator to the first element from start that is true.
   auto next_it = std::find(start, row_filter_.end(), true);
-  next_row_id_index_ =
-      static_cast<uint32_t>(std::distance(row_filter_.begin(), next_it));
+  // Set next_row_id_index to the index of the first true element.
+  next_row_id_index_ = std::distance(row_filter_.begin(), next_it);
 }
 
 int CountersTable::Cursor::Filter(const QueryConstraints& qc,

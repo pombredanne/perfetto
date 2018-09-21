@@ -16,6 +16,8 @@
 
 #include "src/trace_processor/proto_trace_parser.h"
 
+#include <string.h>
+
 #include <string>
 
 #include "perfetto/base/logging.h"
@@ -86,7 +88,7 @@ bool ParseSystraceTracePoint(base::StringView str, SystraceTracePoint* out) {
       out->name = base::StringView(s + name_index, name_length);
       size_t value_index = name_index + name_length + 1;
       char value_str[32];
-      std::strcpy(value_str, s + value_index);
+      strcpy(value_str, s + value_index);
       out->value = std::stod(value_str);
       return true;
     }
@@ -233,7 +235,7 @@ void ProtoTraceParser::ParseCpuFreq(uint64_t timestamp, TraceBlobView view) {
     }
   }
   context_->sched_tracker->PushCounter(timestamp, new_freq, cpu_freq_name_id_,
-                                       cpu_affected, RefType::kCPU_ID);
+                                       cpu_affected, RefType::kCpuId);
 
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
 }
@@ -304,7 +306,7 @@ void ProtoTraceParser::ParsePrint(uint32_t,
     case 'C': {
       StringId name_id = context_->storage->InternString(point.name);
       context_->sched_tracker->PushCounter(timestamp, point.value, name_id,
-                                           upid, RefType::kUPID);
+                                           upid, RefType::kUpid);
     }
   }
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
