@@ -13,15 +13,14 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
-import {globals} from '../../controller/globals';
 import {
   TrackController,
   trackControllerRegistry
 } from '../../controller/track_controller';
 
-import {CPU_SLICE_TRACK_KIND, CpuSliceTrackData} from './common';
+import {Config, CPU_SLICE_TRACK_KIND, Data} from './common';
 
-class CpuSliceTrackController extends TrackController {
+class CpuSliceTrackController extends TrackController<Config, Data> {
   static readonly kind = CPU_SLICE_TRACK_KIND;
   private busy = false;
 
@@ -30,7 +29,7 @@ class CpuSliceTrackController extends TrackController {
     if (this.busy) return;
     const LIMIT = 10000;
     const query = 'select ts,dur,utid from sched ' +
-        `where cpu = ${this.trackState.cpu} ` +
+        `where cpu = ${this.config.cpu} ` +
         `and ts_lower_bound = ${Math.round(start * 1e9)} ` +
         `and ts <= ${Math.round(end * 1e9)} ` +
         `and dur >= ${Math.round(resolution * 1e9)} ` +
@@ -38,19 +37,15 @@ class CpuSliceTrackController extends TrackController {
         `order by ts ` +
         `limit ${LIMIT};`;
 
-    if (this.trackState.cpu === 0) console.log('QUERY', query);
-
     this.busy = true;
-    this.engine.rawQuery({'sqlQuery': query}).then(rawResult => {
+    this.engine.query(query).then(rawResult => {
       this.busy = false;
       if (rawResult.error) {
         throw new Error(`Query error "${query}": ${rawResult.error}`);
       }
-      if (this.trackState.cpu === 0) console.log('QUERY DONE', query);
-
       const numRows = +rawResult.numRecords;
 
-      const slices: CpuSliceTrackData = {
+      const slices: Data = {
         start,
         end,
         resolution,
@@ -69,7 +64,7 @@ class CpuSliceTrackController extends TrackController {
       if (numRows === LIMIT) {
         slices.end = slices.ends[slices.ends.length - 1];
       }
-      globals.publish('TrackData', {id: this.trackId, data: slices});
+      this.publish(slices);
     });
   }
 }
