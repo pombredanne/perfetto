@@ -110,7 +110,7 @@ class Table : public sqlite3_vtab {
   static void RegisterInternal(sqlite3* db,
                                const TraceStorage*,
                                const std::string& name,
-                               bool read_only,
+                               bool read_write,
                                Factory);
 
   // Overriden functions from sqlite3_vtab.

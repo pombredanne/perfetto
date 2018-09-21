@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/window_table.h"
+#include "src/trace_processor/window_operator_table.h"
 
 #include "src/trace_processor/sqlite_utils.h"
 
@@ -25,38 +25,43 @@ namespace {
 using namespace sqlite_utils;
 }  // namespace
 
-WindowTable::WindowTable(sqlite3*, const TraceStorage*) {}
+WindowOperatorTable::WindowOperatorTable(sqlite3*, const TraceStorage*) {}
 
-void WindowTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  Table::Register<WindowTable>(db, storage, "window", true);
+void WindowOperatorTable::RegisterTable(sqlite3* db,
+                                        const TraceStorage* storage) {
+  Table::Register<WindowOperatorTable>(db, storage, "window", true);
 }
 
-std::string WindowTable::CreateTableStmt(int, const char* const*) {
+std::string WindowOperatorTable::CreateTableStmt(int, const char* const*) {
   return "CREATE TABLE x("
+         // These are the operator columns:
          "rowid HIDDEN UNSIGNED BIG INT, "
          "quantum HIDDEN UNSIGNED BIG INT, "
          "window_start HIDDEN UNSIGNED BIG INT, "
          "window_dur HIDDEN UNSIGNED BIG INT, "
+         // These are the ouput columns:
          "ts UNSIGNED BIG INT, "
          "dur UNSIGNED BIG INT, "
          "cpu UNSIGNED INT, "
-         "quantized_group UNSIGNED BIG INT, "
+         "quantum_ts UNSIGNED BIG INT, "
          "PRIMARY KEY(rowid)"
          ") WITHOUT ROWID;";
 }
 
-std::unique_ptr<Table::Cursor> WindowTable::CreateCursor() {
+std::unique_ptr<Table::Cursor> WindowOperatorTable::CreateCursor() {
   uint64_t window_end = window_start_ + window_dur_;
   uint64_t step_size = quantum_ == 0 ? window_dur_ : quantum_;
   return std::unique_ptr<Table::Cursor>(
       new Cursor(this, window_start_, window_end, step_size));
 }
 
-int WindowTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
+int WindowOperatorTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
   return SQLITE_OK;
 }
 
-int WindowTable::Update(int argc, sqlite3_value** argv, sqlite3_int64*) {
+int WindowOperatorTable::Update(int argc,
+                                sqlite3_value** argv,
+                                sqlite3_int64*) {
   // We only support updates to ts and dur. Disallow deletes (argc == 1) and
   // inserts (argv[0] == null).
   if (argc < 2 || sqlite3_value_type(argv[0]) == SQLITE_NULL)
@@ -69,16 +74,16 @@ int WindowTable::Update(int argc, sqlite3_value** argv, sqlite3_int64*) {
   return SQLITE_OK;
 }
 
-WindowTable::Cursor::Cursor(const WindowTable* table,
-                            uint64_t window_start,
-                            uint64_t window_end,
-                            uint64_t step_size)
+WindowOperatorTable::Cursor::Cursor(const WindowOperatorTable* table,
+                                    uint64_t window_start,
+                                    uint64_t window_end,
+                                    uint64_t step_size)
     : window_start_(window_start),
       window_end_(window_end),
       step_size_(step_size),
       table_(table) {}
 
-int WindowTable::Cursor::Column(sqlite3_context* context, int N) {
+int WindowOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
   switch (N) {
     case Column::kQuantum: {
       sqlite3_result_int64(context,
@@ -106,9 +111,8 @@ int WindowTable::Cursor::Column(sqlite3_context* context, int N) {
       sqlite3_result_int(context, static_cast<int>(current_cpu_));
       break;
     }
-    case Column::kQuantizedGroup: {
-      sqlite3_result_int64(context,
-                           static_cast<sqlite_int64>(quantized_group_));
+    case Column::kQuantumTs: {
+      sqlite3_result_int64(context, static_cast<sqlite_int64>(quantum_ts_));
       break;
     }
     case Column::kRowId: {
@@ -123,10 +127,11 @@ int WindowTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
-int WindowTable::Cursor::Filter(const QueryConstraints& qc, sqlite3_value** v) {
+int WindowOperatorTable::Cursor::Filter(const QueryConstraints& qc,
+                                        sqlite3_value** v) {
   current_ts_ = window_start_;
   current_cpu_ = 0;
-  quantized_group_ = 0;
+  quantum_ts_ = 0;
   row_id_ = 0;
   return_first = qc.constraints().size() == 1 &&
                  qc.constraints()[0].iColumn == Column::kRowId &&
@@ -134,7 +139,7 @@ int WindowTable::Cursor::Filter(const QueryConstraints& qc, sqlite3_value** v) {
   return SQLITE_OK;
 }
 
-int WindowTable::Cursor::Next() {
+int WindowOperatorTable::Cursor::Next() {
   // If we're only returning the first row, set the values to EOF.
   if (return_first) {
     current_cpu_ = base::kMaxCpus;
@@ -145,13 +150,13 @@ int WindowTable::Cursor::Next() {
   if (++current_cpu_ == base::kMaxCpus && current_ts_ < window_end_) {
     current_cpu_ = 0;
     current_ts_ += step_size_;
-    quantized_group_++;
+    quantum_ts_++;
   }
   row_id_++;
   return SQLITE_OK;
 }
 
-int WindowTable::Cursor::Eof() {
+int WindowOperatorTable::Cursor::Eof() {
   return current_cpu_ == base::kMaxCpus && current_ts_ >= window_end_;
 }
 

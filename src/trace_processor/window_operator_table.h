@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_WINDOW_TABLE_H_
-#define SRC_TRACE_PROCESSOR_WINDOW_TABLE_H_
+#ifndef SRC_TRACE_PROCESSOR_WINDOW_OPERATOR_TABLE_H_
+#define SRC_TRACE_PROCESSOR_WINDOW_OPERATOR_TABLE_H_
 
 #include <limits>
 #include <memory>
 
 #include "src/trace_processor/table.h"
-#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
-// The implementation of the SQLite table containing each unique process with
-// the metadata for those processes.
-class WindowTable : public Table {
+class TraceStorage;
+
+class WindowOperatorTable : public Table {
  public:
   enum Column {
     kRowId = 0,
@@ -38,12 +37,12 @@ class WindowTable : public Table {
     kTs = 4,
     kDuration = 5,
     kCpu = 6,
-    kQuantizedGroup = 7
+    kQuantumTs = 7
   };
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
-  WindowTable(sqlite3*, const TraceStorage*);
+  WindowOperatorTable(sqlite3*, const TraceStorage*);
 
   // Table implementation.
   std::string CreateTableStmt(int argc, const char* const* argv) override;
@@ -54,7 +53,7 @@ class WindowTable : public Table {
  private:
   class Cursor : public Table::Cursor {
    public:
-    Cursor(const WindowTable*,
+    Cursor(const WindowOperatorTable*,
            uint64_t window_start,
            uint64_t window_end,
            uint64_t step_size);
@@ -69,11 +68,11 @@ class WindowTable : public Table {
     uint64_t const window_start_;
     uint64_t const window_end_;
     uint64_t const step_size_;
-    const WindowTable* const table_;
+    const WindowOperatorTable* const table_;
 
     uint64_t current_ts_ = 0;
     uint32_t current_cpu_ = 0;
-    uint64_t quantized_group_ = 0;
+    uint64_t quantum_ts_ = 0;
     uint64_t row_id_ = 0;
     bool return_first = false;
   };
@@ -88,4 +87,4 @@ class WindowTable : public Table {
 }  // namespace trace_processor
 }  // namespace perfetto
 
-#endif  // SRC_TRACE_PROCESSOR_WINDOW_TABLE_H_
+#endif  // SRC_TRACE_PROCESSOR_WINDOW_OPERATOR_TABLE_H_
