@@ -723,7 +723,7 @@ source_set("libunwindstack") {
   }
   configs -= [
     "//gn/standalone:extra_warnings",
-    "//gn/standalone:c++11",
+    "//gn/standalone:c++14",
     "//gn/standalone:visibility_hidden",
   ]
   configs += [ "//gn/standalone:c++17" ]

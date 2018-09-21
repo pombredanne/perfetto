@@ -52,7 +52,7 @@ if (current_cpu == "") {
 default_configs = [
   "//gn/standalone:debug_symbols",
   "//gn/standalone:default",
-  "//gn/standalone:c++11",
+  "//gn/standalone:c++14",
   "//gn/standalone:extra_warnings",
   "//gn/standalone:no_exceptions",
   "//gn/standalone:no_rtti",

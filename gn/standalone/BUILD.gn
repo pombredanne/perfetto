@@ -44,8 +44,8 @@ config("no_rtti") {
   cflags_cc = [ "-fno-rtti" ]
 }
 
-config("c++11") {
-  cflags_cc = [ "-std=c++11" ]
+config("c++14") {
+  cflags_cc = [ "-std=c++14" ]
 }
 
 # This is needed to compile libunwindstack.
