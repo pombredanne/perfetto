@@ -52,7 +52,7 @@ TraceProcessor* g_tp;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 
-void Setup() {
+void SetupLineEditor() {
   linenoiseSetMultiLine(true);
   linenoiseHistorySetMaxLen(1000);
 }
@@ -68,7 +68,7 @@ char* GetLine(const char* prompt) {
 
 #else
 
-void Setup() {}
+void SetupLineEditor() {}
 
 void FreeLine(char* line) {
   free(line);
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  Setup();
+  SetupLineEditor();
 
   for (;;) {
     char* line = GetLine("> ");
