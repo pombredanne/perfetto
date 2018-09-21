@@ -62,11 +62,11 @@ using CBufLenType = socklen_t;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 
-ssize_t Send(int fd,
-             const void* msg,
-             size_t len,
-             const int* send_fds,
-             size_t num_fds) {
+ssize_t SockSend(int fd,
+                 const void* msg,
+                 size_t len,
+                 const int* send_fds,
+                 size_t num_fds) {
   msghdr msg_hdr = {};
   iovec iov = {const_cast<void*>(msg), len};
   msg_hdr.msg_iov = &iov;
@@ -91,11 +91,11 @@ ssize_t Send(int fd,
   return PERFETTO_EINTR(sendmsg(fd, &msg_hdr, kNoSigPipe));
 }
 
-ssize_t Receive(int fd,
-                void* msg,
-                size_t len,
-                base::ScopedFile* fd_vec,
-                size_t max_files) {
+ssize_t SockReceive(int fd,
+                    void* msg,
+                    size_t len,
+                    ScopedFile* fd_vec,
+                    size_t max_files) {
   msghdr msg_hdr = {};
   iovec iov = {msg, len};
   msg_hdr.msg_iov = &iov;
@@ -167,27 +167,27 @@ bool MakeSockAddr(const std::string& socket_name,
   return true;
 }
 
-base::ScopedFile CreateSocket() {
-  return base::ScopedFile(socket(AF_UNIX, SOCK_STREAM, 0));
+ScopedFile CreateSocket() {
+  return ScopedFile(socket(AF_UNIX, SOCK_STREAM, 0));
 }
 
 // TODO(primiano): Add ThreadChecker to methods of this class.
 
 // static
-base::ScopedFile UnixSocket::CreateAndBind(const std::string& socket_name) {
-  base::ScopedFile fd = base::CreateSocket();
+ScopedFile UnixSocket::CreateAndBind(const std::string& socket_name) {
+  ScopedFile fd = CreateSocket();
   if (!fd)
     return fd;
 
   sockaddr_un addr;
   socklen_t addr_size;
-  if (!base::MakeSockAddr(socket_name, &addr, &addr_size)) {
-    return base::ScopedFile();
+  if (!MakeSockAddr(socket_name, &addr, &addr_size)) {
+    return ScopedFile();
   }
 
   if (bind(*fd, reinterpret_cast<sockaddr*>(&addr), addr_size)) {
     PERFETTO_DPLOG("bind()");
-    return base::ScopedFile();
+    return ScopedFile();
   }
 
   return fd;
@@ -196,15 +196,15 @@ base::ScopedFile UnixSocket::CreateAndBind(const std::string& socket_name) {
 // static
 std::unique_ptr<UnixSocket> UnixSocket::Listen(const std::string& socket_name,
                                                EventListener* event_listener,
-                                               base::TaskRunner* task_runner) {
+                                               TaskRunner* task_runner) {
   // Forward the call to the Listen() overload below.
   return Listen(CreateAndBind(socket_name), event_listener, task_runner);
 }
 
 // static
-std::unique_ptr<UnixSocket> UnixSocket::Listen(base::ScopedFile socket_fd,
+std::unique_ptr<UnixSocket> UnixSocket::Listen(ScopedFile socket_fd,
                                                EventListener* event_listener,
-                                               base::TaskRunner* task_runner) {
+                                               TaskRunner* task_runner) {
   std::unique_ptr<UnixSocket> sock(new UnixSocket(
       event_listener, task_runner, std::move(socket_fd), State::kListening));
   return sock;
@@ -213,22 +213,21 @@ std::unique_ptr<UnixSocket> UnixSocket::Listen(base::ScopedFile socket_fd,
 // static
 std::unique_ptr<UnixSocket> UnixSocket::Connect(const std::string& socket_name,
                                                 EventListener* event_listener,
-                                                base::TaskRunner* task_runner) {
+                                                TaskRunner* task_runner) {
   std::unique_ptr<UnixSocket> sock(new UnixSocket(event_listener, task_runner));
   sock->DoConnect(socket_name);
   return sock;
 }
 
-UnixSocket::UnixSocket(EventListener* event_listener,
-                       base::TaskRunner* task_runner)
+UnixSocket::UnixSocket(EventListener* event_listener, TaskRunner* task_runner)
     : UnixSocket(event_listener,
                  task_runner,
-                 base::ScopedFile(),
+                 ScopedFile(),
                  State::kDisconnected) {}
 
 UnixSocket::UnixSocket(EventListener* event_listener,
-                       base::TaskRunner* task_runner,
-                       base::ScopedFile adopt_fd,
+                       TaskRunner* task_runner,
+                       ScopedFile adopt_fd,
                        State adopt_state)
     : event_listener_(event_listener),
       task_runner_(task_runner),
@@ -237,7 +236,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
   if (adopt_state == State::kDisconnected) {
     // We get here from the default ctor().
     PERFETTO_DCHECK(!adopt_fd);
-    fd_ = base::CreateSocket();
+    fd_ = CreateSocket();
     if (!fd_) {
       last_error_ = errno;
       return;
@@ -282,7 +281,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
 
   SetBlockingIO(false);
 
-  base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
+  WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->AddFileDescriptorWatch(*fd_, [weak_ptr]() {
     if (weak_ptr)
       weak_ptr->OnEvent();
@@ -304,7 +303,7 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
 
   sockaddr_un addr;
   socklen_t addr_size;
-  if (!base::MakeSockAddr(socket_name, &addr, &addr_size)) {
+  if (!MakeSockAddr(socket_name, &addr, &addr_size)) {
     last_error_ = errno;
     return NotifyConnectionState(false);
   }
@@ -326,7 +325,7 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
   // just trigger an OnEvent without waiting for the FD watch. That will poll
   // the SO_ERROR and evolve the state into either kConnected or kDisconnected.
   if (res == 0) {
-    base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
+    WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
     task_runner_->PostTask([weak_ptr]() {
       if (weak_ptr)
         weak_ptr->OnEvent();
@@ -384,7 +383,7 @@ void UnixSocket::OnEvent() {
     for (;;) {
       sockaddr_un cli_addr = {};
       socklen_t size = sizeof(cli_addr);
-      base::ScopedFile new_fd(PERFETTO_EINTR(
+      ScopedFile new_fd(PERFETTO_EINTR(
           accept(*fd_, reinterpret_cast<sockaddr*>(&cli_addr), &size)));
       if (!new_fd)
         return;
@@ -420,7 +419,7 @@ bool UnixSocket::Send(const void* msg,
 
   if (blocking_mode == BlockingMode::kBlocking)
     SetBlockingIO(true);
-  const ssize_t sz = base::Send(*fd_, msg, len, send_fds, num_fds);
+  const ssize_t sz = SockSend(*fd_, msg, len, send_fds, num_fds);
   if (blocking_mode == BlockingMode::kBlocking)
     SetBlockingIO(false);
 
@@ -450,7 +449,7 @@ bool UnixSocket::Send(const void* msg,
 }
 
 void UnixSocket::Shutdown(bool notify) {
-  base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
+  WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   if (notify) {
     if (state_ == State::kConnected) {
       task_runner_->PostTask([weak_ptr]() {
@@ -479,14 +478,14 @@ size_t UnixSocket::Receive(void* msg, size_t len) {
 
 size_t UnixSocket::Receive(void* msg,
                            size_t len,
-                           base::ScopedFile* fd_vec,
+                           ScopedFile* fd_vec,
                            size_t max_files) {
   if (state_ != State::kConnected) {
     last_error_ = ENOTCONN;
     return 0;
   }
 
-  const ssize_t sz = base::Receive(*fd_, msg, len, fd_vec, max_files);
+  const ssize_t sz = SockReceive(*fd_, msg, len, fd_vec, max_files);
   if (sz < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
     last_error_ = EAGAIN;
     return 0;
@@ -512,7 +511,7 @@ void UnixSocket::NotifyConnectionState(bool success) {
   if (!success)
     Shutdown(false);
 
-  base::WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
+  WeakPtr<UnixSocket> weak_ptr = weak_ptr_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_ptr, success]() {
     if (weak_ptr)
       weak_ptr->event_listener_->OnConnect(weak_ptr.get(), success);

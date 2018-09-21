@@ -23,9 +23,9 @@
 #include <memory>
 #include <string>
 
-#include "perfetto/base/basic_types.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/utils.h"
 #include "perfetto/base/weak_ptr.h"
 
 #include <sys/socket.h>
@@ -36,17 +36,17 @@ namespace base {
 
 class TaskRunner;
 
-ssize_t Send(int fd,
-             const void* msg,
-             size_t len,
-             const int* send_fds,
-             size_t num_fds);
+ssize_t SockSend(int fd,
+                 const void* msg,
+                 size_t len,
+                 const int* send_fds,
+                 size_t num_fds);
 
-ssize_t Receive(int fd,
-                void* msg,
-                size_t len,
-                base::ScopedFile* fd_vec,
-                size_t max_files);
+ssize_t SockReceive(int fd,
+                    void* msg,
+                    size_t len,
+                    base::ScopedFile* fd_vec,
+                    size_t max_files);
 
 bool MakeSockAddr(const std::string& socket_name,
                   sockaddr_un* addr,

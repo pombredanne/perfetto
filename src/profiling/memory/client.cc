@@ -231,7 +231,7 @@ Client::Client(std::vector<base::ScopedFile> socks)
   int fds[2];
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
   fds[1] = open("/proc/self/mem", O_RDONLY | O_CLOEXEC);
-  base::Send(*socket_pool_.Borrow(), &size, sizeof(size), fds, 2);
+  base::SockSend(*socket_pool_.Borrow(), &size, sizeof(size), fds, 2);
 }
 
 Client::Client(const std::string& sock_name, size_t conns)
