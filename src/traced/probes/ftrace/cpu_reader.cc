@@ -330,8 +330,8 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   uint32_t overwrite_and_size;
   // On little endian, we can just read a uint32_t and reject the rest of the
   // number later.
-  if (!base::AssumeLittleEndian(
-          ReadAndAdvance<uint32_t>(&ptr, end_of_page, &overwrite_and_size)))
+  if (!ReadAndAdvance<uint32_t>(&ptr, end_of_page,
+                                base::AssumeLittleEndian(&overwrite_and_size)))
     return 0;
 
   page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
