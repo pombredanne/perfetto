@@ -43,6 +43,9 @@ cc_library_shared {
   defaults: [
     "perfetto_defaults",
   ],
+  include_dirs: [
+    "bionic/libc",
+  ],
 }
 
 // GN target: //:libtraced_shared
