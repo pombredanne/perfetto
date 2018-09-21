@@ -157,7 +157,7 @@ int WindowOperatorTable::Cursor::Next() {
 }
 
 int WindowOperatorTable::Cursor::Eof() {
-  return current_cpu_ == base::kMaxCpus && current_ts_ >= window_end_;
+  return current_ts_ >= window_end_;
 }
 
 }  // namespace trace_processor

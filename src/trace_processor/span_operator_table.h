@@ -20,6 +20,7 @@
 #include <sqlite3.h>
 #include <array>
 #include <deque>
+#include <limits>
 #include <map>
 #include <memory>
 

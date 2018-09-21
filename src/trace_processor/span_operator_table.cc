@@ -260,9 +260,11 @@ int SpanOperatorTable::FilterState::Next() {
   // tables and return any final intersecting slices.
   for (auto it = t1_.rows.begin(); it != t1_.rows.end(); it++) {
     auto join_val = it->first;
-    if (t2_.rows.find(join_val) == t2_.rows.end())
+    auto t2_it = t2_.rows.find(join_val);
+    if (t2_it == t2_.rows.end())
       continue;
-    SetupReturnForJoinValue(join_val, t1_.rows[join_val], t2_.rows[join_val]);
+    SetupReturnForJoinValue(join_val, std::move(it->second),
+                            std::move(t2_it->second));
   }
 
   // We don't have any more items to yield.
