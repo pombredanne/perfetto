@@ -209,7 +209,10 @@ class Module(object):
         self._output_field(output, 'defaults')
         self._output_field(output, 'cflags')
         self._output_field(output, 'local_include_dirs')
-        for key, value in additional_args.get(self.name, {}).iteritems():
+        # We have to sort because there is no defined iteration order for
+        # dictionaries.
+        for key, value in sorted(
+            additional_args.get(self.name, {}).iteritems()):
           self._write_value(output, key, value)
 
         disable_pdk = any(name in library_not_in_pdk for name in self.shared_libs)
