@@ -35,75 +35,59 @@ constexpr size_t kNumConnections = 2;
 
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so
-/*
 #ifndef HEAPPROFD_PREFIX
 #define HEAPPROFD_PREFIX heapprofd
 #endif
+
 #define HEAPPROFD_ADD_PREFIX(name) \
   PERFETTO_BUILDFLAG_CAT(HEAPPROFD_PREFIX, name)
-*/
-#define HEAPPROFD_ADD_PREFIX(name) heapprofd##name
 
+#pragma GCC visibility push(default)
 __BEGIN_DECLS
 
-__attribute__((visibility("default"))) bool HEAPPROFD_ADD_PREFIX(_initialize)(
-    const MallocDispatch* malloc_dispatch,
-    int* malloc_zygote_child,
-    const char* options);
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(_finalize)();
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(_dump_heap)(
-    const char* file_name);
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(
-    _get_malloc_leak_info)(uint8_t** info,
-                           size_t* overall_size,
-                           size_t* info_size,
-                           size_t* total_memory,
-                           size_t* backtrace_size);
-__attribute__((visibility("default"))) bool HEAPPROFD_ADD_PREFIX(
-    _write_malloc_leak_info)(FILE* fp);
-__attribute__((visibility("default")))
+bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
+                                       int* malloc_zygote_child,
+                                       const char* options);
+void HEAPPROFD_ADD_PREFIX(_finalize)();
+void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char* file_name);
+void HEAPPROFD_ADD_PREFIX(_get_malloc_leak_info)(uint8_t** info,
+                                                 size_t* overall_size,
+                                                 size_t* info_size,
+                                                 size_t* total_memory,
+                                                 size_t* backtrace_size);
+bool HEAPPROFD_ADD_PREFIX(_write_malloc_leak_info)(FILE* fp);
 ssize_t HEAPPROFD_ADD_PREFIX(_malloc_backtrace)(void* pointer,
                                                 uintptr_t* frames,
                                                 size_t frame_count);
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(
-    _free_malloc_leak_info)(uint8_t* info);
-__attribute__((visibility("default")))
+void HEAPPROFD_ADD_PREFIX(_free_malloc_leak_info)(uint8_t* info);
 size_t HEAPPROFD_ADD_PREFIX(_malloc_usable_size)(void* pointer);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(_malloc)(
-    size_t size);
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(_free)(
-    void* pointer);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(
-    _aligned_alloc)(size_t alignment, size_t size);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(
-    _memalign)(size_t alignment, size_t bytes);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(
-    _realloc)(void* pointer, size_t bytes);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(
-    _calloc)(size_t nmemb, size_t bytes);
+void* HEAPPROFD_ADD_PREFIX(_malloc)(size_t size);
+void HEAPPROFD_ADD_PREFIX(_free)(void* pointer);
+void* HEAPPROFD_ADD_PREFIX(_aligned_alloc)(size_t alignment, size_t size);
+void* HEAPPROFD_ADD_PREFIX(_memalign)(size_t alignment, size_t bytes);
+void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t bytes);
+void* HEAPPROFD_ADD_PREFIX(_calloc)(size_t nmemb, size_t bytes);
 struct mallinfo HEAPPROFD_ADD_PREFIX(_mallinfo)();
-__attribute__((visibility("default"))) int HEAPPROFD_ADD_PREFIX(
-    _mallopt)(int param, int value);
-__attribute__((visibility("default"))) int HEAPPROFD_ADD_PREFIX(
-    _posix_memalign)(void** memptr, size_t alignment, size_t size);
-__attribute__((visibility("default"))) int HEAPPROFD_ADD_PREFIX(_iterate)(
-    uintptr_t base,
-    size_t size,
-    void (*callback)(uintptr_t base, size_t size, void* arg),
-    void* arg);
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(
-    _malloc_disable)();
-__attribute__((visibility("default"))) void HEAPPROFD_ADD_PREFIX(
-    _malloc_enable)();
+int HEAPPROFD_ADD_PREFIX(_mallopt)(int param, int value);
+int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
+                                          size_t alignment,
+                                          size_t size);
+int HEAPPROFD_ADD_PREFIX(_iterate)(uintptr_t base,
+                                   size_t size,
+                                   void (*callback)(uintptr_t base,
+                                                    size_t size,
+                                                    void* arg),
+                                   void* arg);
+void HEAPPROFD_ADD_PREFIX(_malloc_disable)();
+void HEAPPROFD_ADD_PREFIX(_malloc_enable)();
 
 #if defined(HAVE_DEPRECATED_MALLOC_FUNCS)
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(_pvalloc)(
-    size_t bytes);
-__attribute__((visibility("default"))) void* HEAPPROFD_ADD_PREFIX(_valloc)(
-    size_t size);
+void* HEAPPROFD_ADD_PREFIX(_pvalloc)(size_t bytes);
+void* HEAPPROFD_ADD_PREFIX(_valloc)(size_t size);
 #endif
 
 __END_DECLS
+#pragma GCC visibility pop
 
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int*,
@@ -113,7 +97,10 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
   return true;
 }
 
-void HEAPPROFD_ADD_PREFIX(_finalize)() {}
+void HEAPPROFD_ADD_PREFIX(_finalize)() {
+  delete g_client;
+  g_client = nullptr;
+}
 
 void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char*) {}
 
