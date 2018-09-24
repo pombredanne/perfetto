@@ -115,8 +115,8 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
           sqlite3_result_text(context, "cpu", -1, nullptr);
           break;
         }
-        case RefType::kUpid: {
-          sqlite3_result_text(context, "upid", -1, nullptr);
+        case RefType::kUtid: {
+          sqlite3_result_text(context, "utid", -1, nullptr);
           break;
         }
       }
@@ -162,8 +162,8 @@ CountersTable::FilterState::FilterState(
               reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
           if (!strcmp(type, "cpu")) {
             ref_type_filter = RefType::kCpuId;
-          } else if (!strcmp(type, "upid")) {
-            ref_type_filter = RefType::kUpid;
+          } else if (!strcmp(type, "utid")) {
+            ref_type_filter = RefType::kUtid;
           }
         }
         break;
