@@ -21,11 +21,14 @@
 #include <set>
 
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 namespace {
+
+using namespace sqlite_utils;
 
 constexpr uint64_t kU64Max = std::numeric_limits<uint64_t>::max();
 
@@ -99,34 +102,32 @@ std::string SpanOperatorTable::CreateTableStmt(int argc,
                                                const char* const* argv) {
   // argv[0] - argv[2] are SQLite populated fields which are always present.
   if (argc < 6) {
-    PERFETTO_ELOG("SPAN JOIN expected at least 6 args, received %d", argc);
+    PERFETTO_ELOG("SPAN JOIN expected at least 3 args, received %d", argc - 3);
     return "";
   }
 
   // The order arguments is (t1_name, t2_name, join_col).
-  t1_.name = reinterpret_cast<const char*>(argv[3]);
-  t1_.cols = GetColumnsForTable(db_, t1_.name);
+  t1_defn_.name = reinterpret_cast<const char*>(argv[3]);
+  t1_defn_.cols = GetColumnsForTable(db_, t1_defn_.name);
 
-  t2_.name = reinterpret_cast<const char*>(argv[4]);
-  t2_.cols = GetColumnsForTable(db_, t2_.name);
+  t2_defn_.name = reinterpret_cast<const char*>(argv[4]);
+  t2_defn_.cols = GetColumnsForTable(db_, t2_defn_.name);
 
   join_col_ = reinterpret_cast<const char*>(argv[5]);
-  PERFETTO_CHECK(join_col_ == "cpu");
 
   // TODO(lalitm): add logic to ensure that the tables that are being joined
   // are actually valid to be joined i.e. they have the ts and dur columns and
   // have the join column.
 
-  auto t1_remove_it = std::remove_if(
-      t1_.cols.begin(), t1_.cols.end(), [this](const ColumnDefinition& it) {
-        return it.name == "ts" || it.name == "dur" || it.name == join_col_;
-      });
-  t1_.cols.erase(t1_remove_it, t1_.cols.end());
-  auto t2_remove_it = std::remove_if(
-      t2_.cols.begin(), t2_.cols.end(), [this](const ColumnDefinition& it) {
-        return it.name == "ts" || it.name == "dur" || it.name == join_col_;
-      });
-  t2_.cols.erase(t2_remove_it, t2_.cols.end());
+  auto filter_fn = [this](const ColumnDefinition& it) {
+    return it.name == "ts" || it.name == "dur" || it.name == join_col_;
+  };
+  auto t1_remove_it =
+      std::remove_if(t1_defn_.cols.begin(), t1_defn_.cols.end(), filter_fn);
+  t1_defn_.cols.erase(t1_remove_it, t1_defn_.cols.end());
+  auto t2_remove_it =
+      std::remove_if(t2_defn_.cols.begin(), t2_defn_.cols.end(), filter_fn);
+  t2_defn_.cols.erase(t2_remove_it, t2_defn_.cols.end());
 
   // Create the statement as the combination of the unique columns of the two
   // tables.
@@ -136,10 +137,10 @@ std::string SpanOperatorTable::CreateTableStmt(int argc,
       "ts UNSIGNED BIG INT, "
       "dur UNSIGNED BIG INT, ";
   create_stmt += join_col_ + " UNSIGNED INT, ";
-  for (const auto& col : t1_.cols) {
+  for (const auto& col : t1_defn_.cols) {
     create_stmt += col.name + " " + col.type_name + ", ";
   }
-  for (const auto& col : t2_.cols) {
+  for (const auto& col : t2_defn_.cols) {
     create_stmt += col.name + " " + col.type_name + ", ";
   }
   create_stmt += "PRIMARY KEY(ts, " + join_col_ + ")) WITHOUT ROWID;";
@@ -157,38 +158,77 @@ int SpanOperatorTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
   return SQLITE_OK;
 }
 
+std::pair<bool, size_t> SpanOperatorTable::ExtractTableIndex(int raw_index) {
+  size_t table_1_col = static_cast<size_t>(raw_index - kReservedColumns);
+  if (table_1_col < t1_defn_.cols.size()) {
+    return std::make_pair(true, table_1_col);
+  }
+  size_t table_2_col = table_1_col - t1_defn_.cols.size();
+  PERFETTO_CHECK(table_2_col < t2_defn_.cols.size());
+  return std::make_pair(false, table_2_col);
+}
+
 SpanOperatorTable::Cursor::Cursor(SpanOperatorTable* table, sqlite3* db)
     : db_(db), table_(table) {}
 
 SpanOperatorTable::Cursor::~Cursor() {}
 
-int SpanOperatorTable::Cursor::Filter(const QueryConstraints&,
-                                      sqlite3_value**) {
+int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
+                                              sqlite3_value** argv,
+                                              const TableDefinition& def,
+                                              bool is_t1,
+                                              sqlite3_stmt** stmt) {
   // TODO(lalitm): pass through constraints on other tables to those tables.
-  std::string t1_sql;
-  t1_sql += "SELECT ts, dur, " + table_->join_col_;
-  for (const auto& col : table_->t1_.cols) {
-    t1_sql += ", " + col.name;
+  std::string sql;
+  sql += "SELECT ts, dur, " + table_->join_col_;
+  for (const auto& col : def.cols) {
+    sql += ", " + col.name;
   }
-  t1_sql += " FROM " + table_->t1_.name + " ORDER BY ts;";
-  int t1_size = static_cast<int>(t1_sql.size());
+  sql += " FROM " + def.name;
+  sql += " WHERE 1";
 
+  bool has_constraint = false;
+  for (size_t i = 0; i < qc.constraints().size(); i++) {
+    const auto& constraint = qc.constraints()[i];
+    int c = constraint.iColumn;
+    std::string col_name;
+    if (c == Column::kTimestamp) {
+      col_name = "ts";
+    } else if (c == Column::kDuration) {
+      col_name = "dur";
+    } else if (c == Column::kJoinValue) {
+      col_name = table_->join_col_;
+    } else {
+      auto index_pair = table_->ExtractTableIndex(c);
+      if (index_pair.first == is_t1) {
+        col_name = def.cols[index_pair.second].name;
+      }
+    }
+
+    if (!col_name.empty()) {
+      has_constraint = true;
+      sql += " AND " + col_name + OpToString(constraint.op) +
+             reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
+      continue;
+    }
+  }
+  sql += " ORDER BY ts;";
+
+  PERFETTO_DLOG("%s", sql.c_str());
+  int t1_size = static_cast<int>(sql.size());
+  return sqlite3_prepare_v2(db_, sql.c_str(), t1_size, stmt, nullptr);
+}
+
+int SpanOperatorTable::Cursor::Filter(const QueryConstraints& qc,
+                                      sqlite3_value** argv) {
   sqlite3_stmt* t1_raw = nullptr;
-  int err = sqlite3_prepare_v2(db_, t1_sql.c_str(), t1_size, &t1_raw, nullptr);
+  int err = PrepareRawStmt(qc, argv, table_->t1_defn_, true, &t1_raw);
   ScopedStmt t1_stmt(t1_raw);
   if (err != SQLITE_OK)
     return err;
 
-  std::string t2_sql;
-  t2_sql += "SELECT ts, dur, " + table_->join_col_;
-  for (const auto& col : table_->t2_.cols) {
-    t2_sql += ", " + col.name;
-  }
-  t2_sql += " FROM " + table_->t2_.name + " ORDER BY ts;";
-  int t2_size = static_cast<int>(t2_sql.size());
-
   sqlite3_stmt* t2_raw = nullptr;
-  err = sqlite3_prepare_v2(db_, t2_sql.c_str(), t2_size, &t2_raw, nullptr);
+  err = PrepareRawStmt(qc, argv, table_->t2_defn_, false, &t2_raw);
   ScopedStmt t2_stmt(t2_raw);
   if (err != SQLITE_OK)
     return err;
@@ -240,8 +280,16 @@ int SpanOperatorTable::FilterState::Initialize() {
 }
 
 int SpanOperatorTable::FilterState::Next() {
-  /// Assume there is another item unless told otherwise.
-  is_eof_ = false;
+  // If there are no more rows to be added from the child table, simply pop the
+  // the front of the queue and return.
+  if (!children_have_more_) {
+    return_values_.pop_front();
+    return SQLITE_OK;
+  }
+
+  // Remove the previously return row but also try and find more rows.
+  if (!return_values_.empty())
+    return_values_.pop_front();
 
   // Pull from whichever cursor has the earlier timestamp and return if there
   // is a valid row.
@@ -256,18 +304,17 @@ int SpanOperatorTable::FilterState::Next() {
 
   // Once both cursors are completely exhausted, do one last pass through the
   // tables and return any final intersecting slices.
-  for (; cleanup_join_val_ < base::kMaxCpus; cleanup_join_val_++) {
-    const auto& t1_row = t1_.rows[cleanup_join_val_];
-    const auto& t2_row = t2_.rows[cleanup_join_val_];
-    if (SetupReturnForJoinValue(cleanup_join_val_, t1_row, t2_row)) {
-      cleanup_join_val_++;
-      return SQLITE_OK;
-    }
+  for (auto it = t1_.rows.begin(); it != t1_.rows.end(); it++) {
+    auto join_val = it->first;
+    auto t2_it = t2_.rows.find(join_val);
+    if (t2_it == t2_.rows.end())
+      continue;
+    SetupReturnForJoinValue(join_val, std::move(it->second),
+                            std::move(t2_it->second));
   }
 
-  // All avenues of returning data have been exhausted. Set eof for retreival
-  // by SQLite.
-  is_eof_ = true;
+  // We don't have any more items to yield.
+  children_have_more_ = false;
   return SQLITE_OK;
 }
 
@@ -280,21 +327,21 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
   sqlite3_stmt* stmt = pull_table->stmt.get();
   int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
   int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
-  int32_t join_val_raw = sqlite3_column_int(stmt, Column::kJoinValue);
-  uint32_t join_val = static_cast<uint32_t>(join_val_raw);
+  int64_t join_val_raw = sqlite3_column_int64(stmt, Column::kJoinValue);
+  uint64_t join_val = static_cast<uint64_t>(join_val_raw);
 
   // Extract the actual row from the state.
   auto* pull_row = &pull_table->rows[join_val];
 
   // Save the old row (to allow us to return it) and then update the other
   // values of the row.
-  TableRow saved_row = *pull_row;
+  TableRow saved_row = std::move(*pull_row);
   pull_row->ts = static_cast<uint64_t>(ts);
   pull_row->dur = static_cast<uint64_t>(dur);
   pull_row->values.resize(pull_table->col_count - kReservedColumns);
 
   // Update all other columns.
-  const auto& table_desc = pull_t1 ? table_->t1_ : table_->t2_;
+  const auto& table_desc = pull_t1 ? table_->t1_defn_ : table_->t2_defn_;
   int col_count = static_cast<int>(pull_table->col_count);
   for (int i = kReservedColumns; i < col_count; i++) {
     size_t off = static_cast<size_t>(i - kReservedColumns);
@@ -318,28 +365,29 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
 
   // Get the next value from whichever table we just update.
   int err = sqlite3_step(stmt);
-  if (err != SQLITE_ROW && err != SQLITE_DONE)
-    return err;
-
-  // Update the latest timestamp of the table we just read from.
-  if (err == SQLITE_DONE) {
-    pull_table->latest_ts = kU64Max;
-  } else {
-    pull_table->latest_ts =
-        static_cast<uint64_t>(sqlite3_column_int64(stmt, Column::kTimestamp));
+  switch (err) {
+    case SQLITE_DONE:
+      pull_table->latest_ts = kU64Max;
+      break;
+    case SQLITE_ROW:
+      pull_table->latest_ts =
+          static_cast<uint64_t>(sqlite3_column_int64(stmt, Column::kTimestamp));
+      break;
+    default:
+      return err;
   }
 
   // Figure out the values of the rows we want to return and return them.
-  const auto& t1_row = pull_t1 ? saved_row : t1_.rows[join_val];
-  const auto& t2_row = pull_t1 ? t2_.rows[join_val] : saved_row;
+  auto t1_row = pull_t1 ? std::move(saved_row) : t1_.rows[join_val];
+  auto t2_row = pull_t1 ? t2_.rows[join_val] : std::move(saved_row);
   bool has_row = SetupReturnForJoinValue(join_val, t1_row, t2_row);
   return has_row ? SQLITE_ROW : SQLITE_DONE;
 }
 
 bool SpanOperatorTable::FilterState::SetupReturnForJoinValue(
-    uint32_t join_value,
-    const TableRow& t1_row,
-    const TableRow& t2_row) {
+    uint64_t join_value,
+    TableRow t1_row,
+    TableRow t2_row) {
   // If either row doesn't have anything to return, don't return anything.
   if (t1_row.ts == 0 || t2_row.ts == 0)
     return false;
@@ -351,39 +399,37 @@ bool SpanOperatorTable::FilterState::SetupReturnForJoinValue(
   if (t2_end < t1_row.ts || t1_end < t2_row.ts)
     return false;
 
-  ts_ = std::max(t1_row.ts, t2_row.ts);
-  dur_ = std::min(t1_end, t2_end) - ts_;
-  join_val_ = static_cast<uint32_t>(join_value);
-  t1_ret_row_ = t1_row;
-  t2_ret_row_ = t2_row;
+  ReturnValue value;
+  value.ts = std::max(t1_row.ts, t2_row.ts);
+  value.dur = std::min(t1_end, t2_end) - value.ts;
+  value.join_val = join_value;
+  value.t1_row = std::move(t1_row);
+  value.t2_row = std::move(t2_row);
+  return_values_.emplace_back(std::move(value));
 
   return true;
 }
 
 int SpanOperatorTable::FilterState::Eof() {
-  return is_eof_;
+  return return_values_.empty() && !children_have_more_;
 }
 
 int SpanOperatorTable::FilterState::Column(sqlite3_context* context, int N) {
+  const auto& ret = return_values_.front();
   switch (N) {
     case Column::kTimestamp:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ts_));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.ts));
       break;
     case Column::kDuration:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur_));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.dur));
       break;
     case Column::kJoinValue:
-      sqlite3_result_int(context, static_cast<int>(join_val_));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.join_val));
       break;
     default: {
-      size_t table_1_col = static_cast<size_t>(N - kReservedColumns);
-      if (table_1_col < table_->t1_.cols.size()) {
-        ReportSqliteResult(context, t1_ret_row_.values[table_1_col]);
-      } else {
-        size_t table_2_col = table_1_col - table_->t1_.cols.size();
-        PERFETTO_CHECK(table_2_col < table_->t2_.cols.size());
-        ReportSqliteResult(context, t2_ret_row_.values[table_2_col]);
-      }
+      auto index_pair = table_->ExtractTableIndex(N);
+      const auto& row = index_pair.first ? ret.t1_row : ret.t2_row;
+      ReportSqliteResult(context, row.values[index_pair.second]);
     }
   }
   return SQLITE_OK;

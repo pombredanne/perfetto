@@ -55,7 +55,14 @@ std::unique_ptr<Table::Cursor> WindowOperatorTable::CreateCursor() {
       new Cursor(this, window_start_, window_end, step_size));
 }
 
-int WindowOperatorTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
+int WindowOperatorTable::BestIndex(const QueryConstraints& qc,
+                                   BestIndexInfo* info) {
+  // Remove ordering on timestamp if it is the only ordering as we are already
+  // sorted on TS. This makes span joining significantly faster.
+  if (qc.order_by().size() == 1 && qc.order_by()[0].iColumn == Column::kTs &&
+      !qc.order_by()[0].desc) {
+    info->order_by_consumed = true;
+  }
   return SQLITE_OK;
 }
 
@@ -133,26 +140,42 @@ int WindowOperatorTable::Cursor::Filter(const QueryConstraints& qc,
   current_cpu_ = 0;
   quantum_ts_ = 0;
   row_id_ = 0;
-  return_first = qc.constraints().size() == 1 &&
-                 qc.constraints()[0].iColumn == Column::kRowId &&
-                 sqlite3_value_int(v[0]) == 0;
+
+  bool return_first = qc.constraints().size() == 1 &&
+                      qc.constraints()[0].iColumn == Column::kRowId &&
+                      sqlite3_value_int(v[0]) == 0;
+  bool return_cpu = qc.constraints().size() == 1 &&
+                    qc.constraints()[0].iColumn == Column::kCpu;
+  if (return_first) {
+    return_type_ = ReturnType::kReturnFirst;
+  } else if (return_cpu) {
+    return_type_ = ReturnType::kReturnCpu;
+    current_cpu_ = static_cast<uint32_t>(sqlite3_value_int(v[0]));
+  } else {
+    return_type_ = ReturnType::kReturnAll;
+  }
   return SQLITE_OK;
 }
 
 int WindowOperatorTable::Cursor::Next() {
-  // If we're only returning the first row, set the values to EOF.
-  if (return_first) {
-    current_cpu_ = base::kMaxCpus;
-    current_ts_ = window_end_;
-    return SQLITE_OK;
+  switch (return_type_) {
+    case ReturnType::kReturnFirst:
+      current_ts_ = window_end_;
+      break;
+    case ReturnType::kReturnCpu:
+      current_ts_ += step_size_;
+      quantum_ts_++;
+      row_id_++;
+      break;
+    case ReturnType::kReturnAll:
+      if (++current_cpu_ == base::kMaxCpus && current_ts_ < window_end_) {
+        current_cpu_ = 0;
+        current_ts_ += step_size_;
+        quantum_ts_++;
+      }
+      row_id_++;
+      break;
   }
-
-  if (++current_cpu_ == base::kMaxCpus && current_ts_ < window_end_) {
-    current_cpu_ = 0;
-    current_ts_ += step_size_;
-    quantum_ts_++;
-  }
-  row_id_++;
   return SQLITE_OK;
 }
 

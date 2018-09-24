@@ -65,6 +65,12 @@ class WindowOperatorTable : public Table {
     int Column(sqlite3_context*, int N) override;
 
    private:
+    enum ReturnType {
+      kReturnAll = 0,
+      kReturnFirst = 1,
+      kReturnCpu = 2,
+    };
+
     uint64_t const window_start_;
     uint64_t const window_end_;
     uint64_t const step_size_;
@@ -74,7 +80,8 @@ class WindowOperatorTable : public Table {
     uint32_t current_cpu_ = 0;
     uint64_t quantum_ts_ = 0;
     uint64_t row_id_ = 0;
-    bool return_first = false;
+
+    ReturnType return_type_ = ReturnType::kReturnAll;
   };
 
   uint64_t quantum_ = 0;
