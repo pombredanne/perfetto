@@ -25,6 +25,12 @@
 
 namespace perfetto {
 
+// Types needed for the wire format used for communication between the client
+// and heapprofd. The basic format of a record is
+// record size (uint64_t) | record type (RecordType = uint64_t) | record
+// If record type is malloc, the record format is AllocMetdata | raw stack.
+// If the record type is free, the record is a sequence of FreePageEntry.
+
 // Use uint64_t to make sure the following data is aligned as 64bit is the
 // strongest alignment requirement.
 enum class RecordType : uint64_t {
@@ -45,6 +51,11 @@ struct AllocMetadata {
   // register data that follows this struct.
   unwindstack::ArchEnum arch;
   uint64_t sequence_number;
+};
+
+struct FreePageEntry {
+  uint64_t sequence_number;
+  uint64_t addr;
 };
 
 }  // namespace perfetto

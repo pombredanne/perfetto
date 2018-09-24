@@ -42,7 +42,7 @@ struct ProcessMetadata {
   ProcessMetadata(pid_t p,
                   base::ScopedFile maps_fd,
                   base::ScopedFile mem,
-                  Callsites* callsites)
+                  GlobalCallstackTrie* callsites)
       : pid(p),
         maps(std::move(maps_fd)),
         mem_fd(std::move(mem)),
@@ -52,7 +52,7 @@ struct ProcessMetadata {
   pid_t pid;
   FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
-  HeapDump heap_dump;
+  HeapTracker heap_dump;
 };
 
 // Overlays size bytes pointed to by stack for addresses in [sp, sp + size).

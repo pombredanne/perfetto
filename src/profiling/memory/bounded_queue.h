@@ -38,7 +38,7 @@ class BoundedQueue {
   }
 
   void Add(T item) {
-    std::unique_lock<std::mutex> l(mtx_);
+    std::unique_lock<std::mutex> l(mutex_);
     if (deque_.size() == capacity_)
       full_cv_.wait(l, [this] { return deque_.size() < capacity_; });
     deque_.emplace_back(std::move(item));
@@ -47,7 +47,7 @@ class BoundedQueue {
   }
 
   T Get() {
-    std::unique_lock<std::mutex> l(mtx_);
+    std::unique_lock<std::mutex> l(mutex_);
     if (elements_ == 0)
       empty_cv_.wait(l, [this] { return !deque_.empty(); });
     T item(std::move(deque_.front()));
@@ -61,8 +61,9 @@ class BoundedQueue {
 
   void SetCapacity(size_t capacity) {
     PERFETTO_CHECK(capacity > 0);
-    std::lock_guard<std::mutex> l(mtx_);
+    std::lock_guard<std::mutex> l(mutex_);
     capacity_ = capacity;
+    full_cv_.notify_all();
   }
 
  private:
@@ -72,7 +73,7 @@ class BoundedQueue {
   std::deque<T> deque_;
   std::condition_variable full_cv_;
   std::condition_variable empty_cv_;
-  std::mutex mtx_;
+  std::mutex mutex_;
 };
 
 #endif  // SRC_PROFILING_MEMORY_BOUNDED_QUEUE_H_

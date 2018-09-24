@@ -127,7 +127,7 @@ GetRecord() {
 TEST(UnwindingTest, MAYBE_DoUnwind) {
   base::ScopedFile proc_maps(open("/proc/self/maps", O_RDONLY));
   base::ScopedFile proc_mem(open("/proc/self/mem", O_RDONLY));
-  Callsites callsites;
+  GlobalCallstackTrie callsites;
   ProcessMetadata metadata(getpid(), std::move(proc_maps), std::move(proc_mem),
                            &callsites);
   auto record = GetRecord();

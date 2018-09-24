@@ -20,7 +20,7 @@
 
 namespace perfetto {
 
-Callsites::Node* Callsites::Node::GetOrCreateChild(
+GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
     const InternedCodeLocation& loc) {
   Node* child = children_.Get(loc);
   if (!child)
@@ -28,10 +28,10 @@ Callsites::Node* Callsites::Node::GetOrCreateChild(
   return child;
 }
 
-void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
-                            uint64_t address,
-                            uint64_t size,
-                            uint64_t sequence_number) {
+void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
+                               uint64_t address,
+                               uint64_t size,
+                               uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
     if (it->second.sequence_number > sequence_number)
@@ -39,19 +39,39 @@ void HeapDump::RecordMalloc(const std::vector<CodeLocation>& locs,
     else
       // Clean up previous allocation by pretending a free happened just after
       // it.
-      ApplyFree(it->second.sequence_number + 1, address);
+      // CommitFree only uses the sequence number to check whether the
+      // currently active allocation is newer than the free, so we can make
+      // up a sequence_number here.
+      CommitFree(it->second.sequence_number + 1, address);
   }
 
-  Callsites::Node* node = callsites_->IncrementCallsite(locs, size);
+  GlobalCallstackTrie::Node* node =
+      callsites_->IncrementCallsite(callstack, size);
   allocations_.emplace(address, Allocation(size, sequence_number, node));
-  AddPendingNoop(sequence_number);
+  RecordFree(kNoopFree, sequence_number);
 }
 
-void HeapDump::RecordFree(uint64_t address, uint64_t sequence_number) {
-  AddPendingFree(sequence_number, address);
+void HeapTracker::RecordFree(uint64_t address, uint64_t sequence_number) {
+  if (sequence_number != sequence_number_ + 1) {
+    pending_frees_.emplace(sequence_number, address);
+    return;
+  }
+
+  if (address != kNoopFree)
+    CommitFree(sequence_number, address);
+  sequence_number_++;
+
+  // At this point some other pending frees might be eligible to be committed.
+  auto it = pending_frees_.begin();
+  while (it != pending_frees_.end() && it->first == sequence_number_ + 1) {
+    if (it->second != kNoopFree)
+      CommitFree(it->first, it->second);
+    sequence_number_++;
+    it = pending_frees_.erase(it);
+  }
 }
 
-void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
+void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   auto leaf_it = allocations_.find(address);
   if (leaf_it == allocations_.end())
     return;
@@ -62,29 +82,10 @@ void HeapDump::ApplyFree(uint64_t sequence_number, uint64_t address) {
   allocations_.erase(leaf_it);
 }
 
-void HeapDump::AddPendingFree(uint64_t sequence_number, uint64_t address) {
-  if (sequence_number != sequence_number_ + 1) {
-    pending_.emplace(sequence_number, address);
-    return;
-  }
-
-  if (address)
-    ApplyFree(sequence_number, address);
-  sequence_number_++;
-
-  auto it = pending_.begin();
-  while (it != pending_.end() && it->first == sequence_number_ + 1) {
-    if (it->second)
-      ApplyFree(it->first, it->second);
-    sequence_number_++;
-    it = pending_.erase(it);
-  }
-}
-
-uint64_t Callsites::GetCumSizeForTesting(
-    const std::vector<CodeLocation>& locs) {
+uint64_t GlobalCallstackTrie::GetCumSizeForTesting(
+    const std::vector<CodeLocation>& callstack) {
   Node* node = &root_;
-  for (const CodeLocation& loc : locs) {
+  for (const CodeLocation& loc : callstack) {
     node = node->children_.Get(InternCodeLocation(loc));
     if (node == nullptr)
       return 0;
@@ -92,19 +93,19 @@ uint64_t Callsites::GetCumSizeForTesting(
   return node->cum_size_;
 }
 
-Callsites::Node* Callsites::IncrementCallsite(
-    const std::vector<CodeLocation>& locs,
+GlobalCallstackTrie::Node* GlobalCallstackTrie::IncrementCallsite(
+    const std::vector<CodeLocation>& callstack,
     uint64_t size) {
   Node* node = &root_;
   node->cum_size_ += size;
-  for (const CodeLocation& loc : locs) {
+  for (const CodeLocation& loc : callstack) {
     node = node->GetOrCreateChild(InternCodeLocation(loc));
     node->cum_size_ += size;
   }
   return node;
 }
 
-void Callsites::DecrementNode(Node* node, uint64_t size) {
+void GlobalCallstackTrie::DecrementNode(Node* node, uint64_t size) {
   PERFETTO_DCHECK(node->cum_size_ >= size);
 
   bool delete_prev = false;
