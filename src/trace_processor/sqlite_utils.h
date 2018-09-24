@@ -47,6 +47,8 @@ inline std::string OpToString(int op) {
   switch (op) {
     case SQLITE_INDEX_CONSTRAINT_EQ:
       return "=";
+    case SQLITE_INDEX_CONSTRAINT_NE:
+      return "!=";
     case SQLITE_INDEX_CONSTRAINT_GE:
       return ">=";
     case SQLITE_INDEX_CONSTRAINT_GT:
