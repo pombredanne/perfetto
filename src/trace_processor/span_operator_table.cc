@@ -320,7 +320,7 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
     }
   }
 
-  // Get the next value from whichever table we just update.
+  // Get the next value from whichever table we just updated.
   int err = sqlite3_step(stmt);
   switch (err) {
     case SQLITE_DONE:
@@ -334,11 +334,11 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
       return err;
   }
 
-  // Figure out the values of the rows we want to return and return them.
+  // Create copies of the spans we want to intersect then perform the intersect.
   auto t1_span = pull_t1 ? std::move(saved_span) : t1_.spans[join_val];
   auto t2_span = pull_t1 ? t2_.spans[join_val] : std::move(saved_span);
-  bool has_row = MaybeAddIntersectingSpan(join_val, t1_span, t2_span);
-  return has_row ? SQLITE_ROW : SQLITE_DONE;
+  bool span_added = MaybeAddIntersectingSpan(join_val, t1_span, t2_span);
+  return span_added ? SQLITE_ROW : SQLITE_DONE;
 }
 
 bool SpanOperatorTable::FilterState::MaybeAddIntersectingSpan(
