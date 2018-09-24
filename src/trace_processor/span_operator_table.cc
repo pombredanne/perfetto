@@ -213,7 +213,6 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
     if (!col_name.empty()) {
       sql += " AND " + col_name + OpToString(constraint.op) +
              reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
-      continue;
     }
   }
   sql += " ORDER BY ts;";
