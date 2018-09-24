@@ -232,6 +232,36 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   Tokenize(trace_2);
 }
 
+TEST_F(ProtoTraceParserTest, LoadMemInfo) {
+  protos::Trace trace_1;
+  auto* packet = trace_1.add_packet();
+  uint64_t ts = 1000;
+  packet->set_timestamp(ts);
+  auto* bundle = packet->mutable_sys_stats();
+  auto* meminfo = bundle->add_meminfo();
+  meminfo->set_key(perfetto::protos::MEMINFO_MEM_TOTAL);
+  uint32_t value = 10;
+  meminfo->set_value(value);
+
+  EXPECT_CALL(*sched_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  Tokenize(trace_1);
+}
+
+TEST_F(ProtoTraceParserTest, LoadVmStats) {
+  protos::Trace trace_1;
+  auto* packet = trace_1.add_packet();
+  uint64_t ts = 1000;
+  packet->set_timestamp(ts);
+  auto* bundle = packet->mutable_sys_stats();
+  auto* meminfo = bundle->add_vmstat();
+  meminfo->set_key(perfetto::protos::VMSTAT_COMPACT_SUCCESS);
+  uint32_t value = 10;
+  meminfo->set_value(value);
+
+  EXPECT_CALL(*sched_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  Tokenize(trace_1);
+}
+
 TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   protos::Trace trace_1;
   auto* bundle = trace_1.add_packet()->mutable_ftrace_events();
