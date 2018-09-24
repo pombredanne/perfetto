@@ -182,6 +182,17 @@ export class TraceController extends Controller<States> {
     const engine = assertExists<Engine>(this.engine);
     const addToTrackActions: Action[] = [];
     const numCpus = await engine.getNumberOfCpus();
+
+    // TODO(hjd): Move this code out of TraceController.
+    const hasVsync =
+        !!(await engine.query(
+               `select ts from counters where name like "Vsync-sf%" limit 1`))
+              .numRecords;
+    if (hasVsync) {
+      addToTrackActions.push(
+          addTrack(this.engineId, 'VsyncTrack', 'Vsync', {}));
+    }
+
     for (let cpu = 0; cpu < numCpus; cpu++) {
       addToTrackActions.push(
           addTrack(this.engineId, CPU_SLICE_TRACK_KIND, `Cpu ${cpu}`, {

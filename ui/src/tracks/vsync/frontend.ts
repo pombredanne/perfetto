@@ -12,24 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {requestTrackData} from '../../common/actions';
 import {TrackState} from '../../common/state';
 import {globals} from '../../frontend/globals';
 import {Track} from '../../frontend/track';
 import {trackRegistry} from '../../frontend/track_registry';
 
-import {CPU_COUNTER_TRACK_KIND} from './common';
+import {Config, Data, KIND} from './common';
 
-/**
- * Demo track as so we can at least have two kinds of tracks.
- */
-class CpuCounterTrack extends Track {
-  static readonly kind = CPU_COUNTER_TRACK_KIND;
-  static create(trackState: TrackState): CpuCounterTrack {
-    return new CpuCounterTrack(trackState);
+// TODO(hjd): De-dupe this from ChromeSliceTrack, CpuSliceTrack and VsyncTrack.
+const MARGIN_TOP = 5;
+const RECT_HEIGHT = 30;
+
+class VsyncTrack extends Track<Config, Data> {
+  static readonly kind = KIND;
+  static create(trackState: TrackState): VsyncTrack {
+    return new VsyncTrack(trackState);
   }
-
-  // No-op
-  consumeData() {}
 
   constructor(trackState: TrackState) {
     super(trackState);
@@ -38,24 +37,22 @@ class CpuCounterTrack extends Track {
   renderCanvas(ctx: CanvasRenderingContext2D): void {
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
 
-    // It is possible to get width of track from visibleWindowMs.
-    const visibleStartPx = timeScale.timeToPx(visibleWindowTime.start);
-    const visibleEndPx = timeScale.timeToPx(visibleWindowTime.end);
-    const visibleWidthPx = visibleEndPx - visibleStartPx;
+    const data = this.data();
+    if (data === undefined) {
+      globals.dispatch(requestTrackData(this.trackState.id, 1, 1, 1));
+      return;
+    }
 
-    ctx.fillStyle = '#eee';
-    ctx.fillRect(
-        Math.round(0.25 * visibleWidthPx),
-        0,
-        Math.round(0.5 * visibleWidthPx),
-        this.getHeight());
-    ctx.font = '16px Arial';
-    ctx.fillStyle = '#000';
-    ctx.fillText(
-        'Drawing ' + CpuCounterTrack.kind,
-        Math.round(0.4 * visibleWidthPx),
-        20);
+    ctx.fillStyle = 'black';
+    for (let i = 0; i < data.starts.length; i++) {
+      if (data.ends[i] < visibleWindowTime.start) continue;
+      if (data.starts[i] > visibleWindowTime.end) break;
+      const startPx = timeScale.timeToPx(data.starts[i]);
+      const endPx = timeScale.timeToPx(data.ends[i]);
+      const widthPx = endPx - startPx;
+      ctx.fillRect(startPx, MARGIN_TOP, widthPx, RECT_HEIGHT);
+    }
   }
 }
 
-trackRegistry.register(CpuCounterTrack);
+trackRegistry.register(VsyncTrack);

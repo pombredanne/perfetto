@@ -21,6 +21,7 @@ import {trackRegistry} from '../../frontend/track_registry';
 
 import {Config, CPU_SLICE_TRACK_KIND, Data} from './common';
 
+// TODO(hjd): De-dupe this from ChromeSliceTrack, CpuSliceTrack and VsyncTrack.
 const MARGIN_TOP = 5;
 const RECT_HEIGHT = 30;
 
@@ -88,6 +89,7 @@ class CpuSliceTrack extends Track<Config, Data> {
       }
       if (data === undefined) return;  // Can't possibly draw anything.
     }
+
     ctx.textAlign = 'center';
     ctx.font = '12px Google Sans';
     const charWidth = ctx.measureText('dbpqaouk').width / 8;
