@@ -345,10 +345,6 @@ bool SpanOperatorTable::FilterState::MaybeAddIntersectingSpan(
     int64_t join_value,
     Span t1_span,
     Span t2_span) {
-  // If either row doesn't have anything to return, don't return anything.
-  if (t1_span.ts == 0 || t2_span.ts == 0)
-    return false;
-
   uint64_t t1_end = t1_span.ts + t1_span.dur;
   uint64_t t2_end = t2_span.ts + t2_span.dur;
 
