@@ -192,7 +192,6 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
   sql += " FROM " + def.name;
   sql += " WHERE 1";
 
-  bool has_constraint = false;
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     const auto& constraint = qc.constraints()[i];
     int c = constraint.iColumn;
@@ -212,7 +211,6 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
     }
 
     if (!col_name.empty()) {
-      has_constraint = true;
       sql += " AND " + col_name + OpToString(constraint.op) +
              reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
       continue;
