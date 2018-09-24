@@ -42,9 +42,6 @@
 namespace perfetto {
 namespace {
 
-constexpr size_t kFreePageBytes = base::kPageSize;
-constexpr size_t kFreePageSize = kFreePageBytes / sizeof(uint64_t);
-
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 // glibc does not define a wrapper around gettid, bionic does.
 pid_t gettid() {
@@ -68,8 +65,8 @@ constexpr size_t kRegisterDataSize =
 #error "Could not determine register data size"
 #endif
 
-std::vector<base::ScopedFile> MultipleConnect(const std::string& sock_name,
-                                              size_t n) {
+std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
+                                          size_t n) {
   sockaddr_un addr;
   socklen_t addr_size;
   if (!base::MakeSockAddr(sock_name, &addr, &addr_size))
@@ -80,7 +77,7 @@ std::vector<base::ScopedFile> MultipleConnect(const std::string& sock_name,
   for (size_t i = 0; i < n; ++i) {
     auto sock = base::CreateSocket();
     if (connect(*sock, reinterpret_cast<sockaddr*>(&addr), addr_size) == -1)
-      PERFETTO_ELOG("Failed to connect to %s", sock_name.c_str());
+      PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
     res.emplace_back(std::move(sock));
   }
   return res;
@@ -100,65 +97,49 @@ inline bool IsMainThread() {
 
 }  // namespace
 
-FreePage::FreePage() : free_page_(kFreePageSize) {
-  free_page_[0] = static_cast<uint64_t>(kFreePageBytes);
-  free_page_[1] = static_cast<uint64_t>(RecordType::Free);
-  offset_ = 2;
-  // Code in Add assumes that offset is aligned to 2.
-  PERFETTO_DCHECK(offset_ % 2 == 0);
+FreePage::FreePage() {
+  FreePageHeader* header = reinterpret_cast<FreePageHeader*>(&free_page_[0]);
+  header->size = sizeof(free_page_) - sizeof(uint64_t);
+  header->record_type = RecordType::Free;
+  offset_ = 1;
 }
 
 void FreePage::Add(const uint64_t addr,
                    const uint64_t sequence_number,
                    SocketPool* pool) {
-  std::lock_guard<std::mutex> l(mtx_);
+  std::lock_guard<std::mutex> l(mutex_);
   if (offset_ == kFreePageSize)
-    Flush(pool);
-  static_assert(kFreePageSize % 2 == 0,
-                "free page size needs to be divisible by two");
-  free_page_[offset_++] = sequence_number;
-  free_page_[offset_++] = addr;
-  PERFETTO_DCHECK(offset_ % 2 == 0);
+    FlushLocked(pool);
+  FreePageEntry& current_entry = free_page_[offset_++];
+  current_entry.sequence_number = sequence_number;
+  current_entry.addr = addr;
 }
 
-void FreePage::Flush(SocketPool* pool) {
+void FreePage::FlushLocked(SocketPool* pool) {
   BorrowedSocket fd(pool->Borrow());
   size_t written = 0;
+  // TODO(fmayer): Add timeout.
   do {
-    ssize_t wr = PERFETTO_EINTR(send(*fd, &free_page_[0] + written,
-                                     kFreePageBytes - written, MSG_NOSIGNAL));
+    ssize_t wr =
+        PERFETTO_EINTR(send(*fd, &free_page_[0] + written,
+                            sizeof(free_page_) - written, MSG_NOSIGNAL));
     if (wr == -1) {
       fd.Close();
       return;
     }
     written += static_cast<size_t>(wr);
-  } while (written < kFreePageBytes);
+  } while (written < sizeof(free_page_));
   // Now that we have flushed, reset to after the header.
-  offset_ = 2;
+  offset_ = 1;
 }
 
-int BorrowedSocket::operator*() {
-  return get();
-}
 
-int BorrowedSocket::get() {
-  return *fd_;
-}
-
-void BorrowedSocket::Close() {
-  fd_.reset();
-}
-
-BorrowedSocket::~BorrowedSocket() {
-  if (socket_pool_ != nullptr)
-    socket_pool_->Return(std::move(fd_));
-}
 
 SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
     : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
 
 BorrowedSocket SocketPool::Borrow() {
-  std::unique_lock<std::mutex> lck_(mtx_);
+  std::unique_lock<std::mutex> lck_(mutex_);
   if (available_sockets_ == 0)
     cv_.wait(lck_, [this] { return available_sockets_ > 0; });
   PERFETTO_CHECK(available_sockets_ > 0);
@@ -172,7 +153,7 @@ void SocketPool::Return(base::ScopedFile sock) {
     PERFETTO_CHECK(++dead_sockets_ != sockets_.size());
     return;
   }
-  std::unique_lock<std::mutex> lck_(mtx_);
+  std::unique_lock<std::mutex> lck_(mutex_);
   PERFETTO_CHECK(available_sockets_ < sockets_.size());
   sockets_[available_sockets_++] = std::move(sock);
   if (available_sockets_ == 1) {
@@ -181,9 +162,7 @@ void SocketPool::Return(base::ScopedFile sock) {
   }
 }
 
-char* GetThreadStackBase() {
-  // Not called from main thread.
-  PERFETTO_DCHECK(!IsMainThread());
+const char* GetThreadStackBase() {
   pthread_t t = pthread_self();
   pthread_attr_t attr;
   if (pthread_getattr_np(t, &attr) != 0)
@@ -199,34 +178,8 @@ char* GetThreadStackBase() {
   return stackaddr + stacksize;
 }
 
-// Bionic currently does not cache the addresses of the stack for the main
-// thread.
-// https://android.googlesource.com/platform/bionic/+/32bc0fcf69dfccb3726fe572833a38b01179580e/libc/bionic/pthread_attr.cpp#254
-// TODO(fmayer): Figure out with bionic if caching in bionic makes sense.
-char* GetMainThreadStackBase() {
-  base::ScopedFstream maps(fopen("/proc/self/maps", "r"));
-  if (!maps) {
-    PERFETTO_ELOG("heapprofd fopen failed %d", errno);
-    return nullptr;
-  }
-  while (!feof(*maps)) {
-    char line[1024];
-    char* data = fgets(line, sizeof(line), *maps);
-    if (data != nullptr && strstr(data, "[stack]")) {
-      char* sep = strstr(data, "-");
-      if (sep == nullptr)
-        continue;
-      sep++;
-      return reinterpret_cast<char*>(strtoll(sep, nullptr, 16));
-    }
-  }
-  PERFETTO_ELOG("heapprofd reading stack failed");
-  return nullptr;
-}
-
 Client::Client(std::vector<base::ScopedFile> socks)
-    : socket_pool_(std::move(socks)),
-      main_thread_stack_base_(GetMainThreadStackBase()) {
+    : socket_pool_(std::move(socks)) {
   uint64_t size = 0;
   int fds[2];
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
@@ -235,17 +188,22 @@ Client::Client(std::vector<base::ScopedFile> socks)
 }
 
 Client::Client(const std::string& sock_name, size_t conns)
-    : Client(MultipleConnect(sock_name, conns)) {}
+    : Client(ConnectPool(sock_name, conns)) {}
 
-char* Client::GetStackBase() {
-  if (IsMainThread())
+const char* Client::GetStackBase() {
+  if (IsMainThread()) {
+    if (!main_thread_stack_base_)
+      // Because pthread_attr_getstack reads and parses /proc/self/maps and
+      // /proc/self/stat, we have to cache the result here.
+      main_thread_stack_base_ = GetThreadStackBase();
     return main_thread_stack_base_;
+  }
   return GetThreadStackBase();
 }
 
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
-  char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
-  char* stackbase = GetStackBase();
+  const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
+  const char* stackbase = GetStackBase();
   char reg_data[kRegisterDataSize];
   unwindstack::AsmGetRegs(reg_data);
 

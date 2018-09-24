@@ -67,10 +67,6 @@ TEST(SocketPoolTest, MultipleBlocked) {
   t2.join();
 }
 
-TEST(ClientTest, GetMainThreadStackBase) {
-  ASSERT_NE(GetMainThreadStackBase(), nullptr);
-}
-
 TEST(ClientTest, GetThreadStackBase) {
   std::thread th([] { ASSERT_NE(GetThreadStackBase(), nullptr); });
   th.join();

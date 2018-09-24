@@ -26,7 +26,7 @@
 
 namespace perfetto {
 
-class HeapDump;
+class HeapTracker;
 
 struct CodeLocation {
   CodeLocation(std::string map_n, std::string function_n)
@@ -36,8 +36,8 @@ struct CodeLocation {
   std::string function_name;
 };
 
-// Internal data-structure for Callsites to save memory if the same function
-// is named multiple times.
+// Internal data-structure for GlobalCallstackTrie to save memory if the same
+// function is named multiple times.
 struct InternedCodeLocation {
   StringInterner::InternedString map_name;
   StringInterner::InternedString function_name;
@@ -50,11 +50,12 @@ struct InternedCodeLocation {
 };
 
 // Graph of function callsites. This is shared between heap dumps for
-// different processes. Each call site is represented by a Callsites::Node
-// that is owned by the parent (i.e. calling) callsite. It has a pointer
-// to its parent, which means the function call-graph can be reconstructed
-// from a Callsites::Node by walking down the pointers to the parents.
-class Callsites {
+// different processes. Each call site is represented by a
+// GlobalCallstackTrie::Node that is owned by the parent (i.e. calling)
+// callsite. It has a pointer to its parent, which means the function call-graph
+// can be reconstructed from a GlobalCallstackTrie::Node by walking down the
+// pointers to the parents.
+class GlobalCallstackTrie {
  public:
   // Node in a tree of function traces that resulted in an allocation. For
   // instance, if alloc_buf is called from foo and bar, which are called from
@@ -74,8 +75,8 @@ class Callsites {
   // alloc_buf to the leafs of this tree.
   class Node {
    public:
-    // This is opaque except to Callsites.
-    friend class Callsites;
+    // This is opaque except to GlobalCallstackTrie.
+    friend class GlobalCallstackTrie;
 
     Node(InternedCodeLocation location) : Node(std::move(location), nullptr) {}
     Node(InternedCodeLocation location, Node* parent)
@@ -91,9 +92,9 @@ class Callsites {
         children_;
   };
 
-  Callsites() = default;
-  Callsites(const Callsites&) = delete;
-  Callsites& operator=(const Callsites&) = delete;
+  GlobalCallstackTrie() = default;
+  GlobalCallstackTrie(const GlobalCallstackTrie&) = delete;
+  GlobalCallstackTrie& operator=(const GlobalCallstackTrie&) = delete;
 
   uint64_t GetCumSizeForTesting(const std::vector<CodeLocation>& stack);
   Node* IncrementCallsite(const std::vector<CodeLocation>& locs, uint64_t size);
@@ -109,9 +110,13 @@ class Callsites {
   Node root_{{interner_.Intern(""), interner_.Intern("")}};
 };
 
-class HeapDump {
+// Snapshot for memory allocations of a particular process. Shares callsites
+// with other processes.
+class HeapTracker {
  public:
-  explicit HeapDump(Callsites* callsites) : callsites_(callsites) {}
+  // Caller needs to ensure that callsites outlives the HeapTracker.
+  explicit HeapTracker(GlobalCallstackTrie* callsites)
+      : callsites_(callsites) {}
 
   void RecordMalloc(const std::vector<CodeLocation>& stack,
                     uint64_t address,
@@ -120,8 +125,9 @@ class HeapDump {
   void RecordFree(uint64_t address, uint64_t sequence_number);
 
  private:
+  static constexpr uint64_t kNoopFree = 0;
   struct Allocation {
-    Allocation(uint64_t size, uint64_t seq, Callsites::Node* n)
+    Allocation(uint64_t size, uint64_t seq, GlobalCallstackTrie::Node* n)
         : alloc_size(size), sequence_number(seq), node(n) {}
 
     Allocation() = default;
@@ -135,53 +141,51 @@ class HeapDump {
 
     ~Allocation() {
       if (node)
-        Callsites::DecrementNode(node, alloc_size);
+        GlobalCallstackTrie::DecrementNode(node, alloc_size);
     }
 
     uint64_t alloc_size;
     uint64_t sequence_number;
-    Callsites::Node* node;
+    GlobalCallstackTrie::Node* node;
   };
 
   // Sequencing logic works as following:
-  // * mallocs are immediately applied to the heapdump. They are rejected if
+  // * mallocs are immediately commited to |allocations_|. They are rejected if
   //   the current malloc for the address has a higher sequence number.
   //
   //   If all operations with sequence numbers lower than the malloc have been
-  //   applied, sequence_number_ is advanced and all unblocked
-  //   pending operations are applied.
-  //   Otherwise, a no-op record is added to the pending operations queue to
-  //   remember an operation has been applied for the sequence number.
+  //   commited to |allocations_|, sequence_number_ is advanced and all
+  //   unblocked pending operations after the current id are commited to
+  //   |allocations_|. Otherwise, a no-op record is added to the pending
+  //   operations queue to maintain the contiguity of the sequence.
 
   // * for frees:
   //   if all operations with sequence numbers lower than the free have
-  //     been applied (i.e sequence_number_ == sequence_number - 1)
-  //     the free is applied and sequence_number_ is advanced.
-  //     All unblocked pending operations are applied.
+  //     been commited to |allocations_| (i.e sequence_number_ ==
+  //     sequence_number - 1) the free is commited to |allocations_| and
+  //     sequence_number_ is advanced. All unblocked pending operations are
+  //     commited to |allocations_|.
   //   otherwise: the free is added to the queue of pending operations.
 
-  void AddPendingFree(uint64_t sequence_number, uint64_t address);
-  void AddPendingNoop(uint64_t sequence_number) {
-    AddPendingFree(sequence_number, 0);
-  }
-
+  // Commits a free operation into |allocations_|.
   // This must be  called after all operations up to sequence_number have been
-  // applied.
-  void ApplyFree(uint64_t sequence_number, uint64_t address);
+  // commited to |allocations_|.
+  void CommitFree(uint64_t sequence_number, uint64_t address);
 
   // Address -> (size, sequence_number, code location)
   std::map<uint64_t, Allocation> allocations_;
-  // sequence_number -> pending operation.
-  // pending operation is encoded as a integer, if != 0, the operation is a
-  // pending free of the address. if == 0, the pending operation is a no-op.
-  // No-op operations come from allocs that have already been applied to the
-  // heap dump. It is important to keep track of them in the list of pending
-  // operations in order to determine when all operations prior to a free have
-  // been applied.
-  std::map<uint64_t, uint64_t> pending_;
+
+  // if allocation address != 0, there is pending free of the address.
+  // if == 0, the pending operation is a no-op.
+  // No-op operations come from allocs that have already been commited to
+  // |allocations_|. It is important to keep track of them in the list of
+  // pending to maintain the contiguity of the sequence.
+  std::map<uint64_t /* seq_id */, uint64_t /* allocation address */>
+      pending_frees_;
+
   // The sequence number all mallocs and frees have been handled up to.
   uint64_t sequence_number_ = 0;
-  Callsites* const callsites_;
+  GlobalCallstackTrie* const callsites_;
 };
 
 }  // namespace perfetto

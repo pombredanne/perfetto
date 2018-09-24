@@ -49,7 +49,7 @@ class HeapprofdIntegrationTest : public ::testing::Test {
 #endif
 
 TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
-  Callsites callsites;
+  GlobalCallstackTrie callsites;
 
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");

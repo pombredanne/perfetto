@@ -47,6 +47,11 @@ struct AllocMetadata {
   uint64_t sequence_number;
 };
 
+struct FreePageEntry {
+  uint64_t sequence_number;
+  uint64_t addr;
+};
+
 }  // namespace perfetto
 
 #endif  // SRC_PROFILING_MEMORY_TRANSPORT_DATA_H_
