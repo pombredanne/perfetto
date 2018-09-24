@@ -21,11 +21,14 @@
 #include <set>
 
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
 namespace trace_processor {
 
 namespace {
+
+using namespace sqlite_utils;
 
 constexpr uint64_t kU64Max = std::numeric_limits<uint64_t>::max();
 
@@ -155,34 +158,77 @@ int SpanOperatorTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
   return SQLITE_OK;
 }
 
+std::pair<bool, size_t> SpanOperatorTable::ExtractTableIndex(int raw_index) {
+  size_t table_1_col = static_cast<size_t>(raw_index - kReservedColumns);
+  if (table_1_col < t1_defn_.cols.size()) {
+    return std::make_pair(true, table_1_col);
+  }
+  size_t table_2_col = table_1_col - t1_defn_.cols.size();
+  PERFETTO_CHECK(table_2_col < t2_defn_.cols.size());
+  return std::make_pair(false, table_2_col);
+}
+
 SpanOperatorTable::Cursor::Cursor(SpanOperatorTable* table, sqlite3* db)
     : db_(db), table_(table) {}
 
 SpanOperatorTable::Cursor::~Cursor() {}
 
-int SpanOperatorTable::Cursor::PrepareRawStmt(const TableDefinition& def,
+int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
+                                              sqlite3_value** argv,
+                                              const TableDefinition& def,
+                                              bool is_t1,
                                               sqlite3_stmt** stmt) {
   // TODO(lalitm): pass through constraints on other tables to those tables.
-  std::string t1_sql;
-  t1_sql += "SELECT ts, dur, " + table_->join_col_;
+  std::string sql;
+  sql += "SELECT ts, dur, " + table_->join_col_;
   for (const auto& col : def.cols) {
-    t1_sql += ", " + col.name;
+    sql += ", " + col.name;
   }
-  t1_sql += " FROM " + def.name + " ORDER BY ts;";
-  int t1_size = static_cast<int>(t1_sql.size());
-  return sqlite3_prepare_v2(db_, t1_sql.c_str(), t1_size, stmt, nullptr);
+  sql += " FROM " + def.name;
+  sql += " WHERE 1";
+
+  bool has_constraint = false;
+  for (size_t i = 0; i < qc.constraints().size(); i++) {
+    const auto& constraint = qc.constraints()[i];
+    int c = constraint.iColumn;
+    std::string col_name;
+    if (c == Column::kTimestamp) {
+      col_name = "ts";
+    } else if (c == Column::kDuration) {
+      col_name = "dur";
+    } else if (c == Column::kJoinValue) {
+      col_name = table_->join_col_;
+    } else {
+      auto index_pair = table_->ExtractTableIndex(c);
+      if (index_pair.first == is_t1) {
+        col_name = def.cols[index_pair.second].name;
+      }
+    }
+
+    if (!col_name.empty()) {
+      has_constraint = true;
+      sql += " AND " + col_name + OpToString(constraint.op) +
+             reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
+      continue;
+    }
+  }
+  sql += " ORDER BY ts;";
+
+  PERFETTO_DLOG("%s", sql.c_str());
+  int t1_size = static_cast<int>(sql.size());
+  return sqlite3_prepare_v2(db_, sql.c_str(), t1_size, stmt, nullptr);
 }
 
-int SpanOperatorTable::Cursor::Filter(const QueryConstraints&,
-                                      sqlite3_value**) {
+int SpanOperatorTable::Cursor::Filter(const QueryConstraints& qc,
+                                      sqlite3_value** argv) {
   sqlite3_stmt* t1_raw = nullptr;
-  int err = PrepareRawStmt(table_->t1_defn_, &t1_raw);
+  int err = PrepareRawStmt(qc, argv, table_->t1_defn_, true, &t1_raw);
   ScopedStmt t1_stmt(t1_raw);
   if (err != SQLITE_OK)
     return err;
 
   sqlite3_stmt* t2_raw = nullptr;
-  err = PrepareRawStmt(table_->t2_defn_, &t2_raw);
+  err = PrepareRawStmt(qc, argv, table_->t2_defn_, false, &t2_raw);
   ScopedStmt t2_stmt(t2_raw);
   if (err != SQLITE_OK)
     return err;
@@ -381,14 +427,9 @@ int SpanOperatorTable::FilterState::Column(sqlite3_context* context, int N) {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.join_val));
       break;
     default: {
-      size_t table_1_col = static_cast<size_t>(N - kReservedColumns);
-      if (table_1_col < table_->t1_defn_.cols.size()) {
-        ReportSqliteResult(context, ret.t1_row.values[table_1_col]);
-      } else {
-        size_t table_2_col = table_1_col - table_->t1_defn_.cols.size();
-        PERFETTO_CHECK(table_2_col < table_->t2_defn_.cols.size());
-        ReportSqliteResult(context, ret.t2_row.values[table_2_col]);
-      }
+      auto index_pair = table_->ExtractTableIndex(N);
+      const auto& row = index_pair.first ? ret.t1_row : ret.t2_row;
+      ReportSqliteResult(context, row.values[index_pair.second]);
     }
   }
   return SQLITE_OK;
