@@ -155,7 +155,7 @@ class SpanOperatorTable : public Table {
     TableState t2_;
 
     // TODO(lalitm): change this to be a iterator into t1's rows.
-    uint32_t cleanup_join_val_;
+    uint32_t cleanup_join_val_ = 0;
     bool is_eof_ = true;
 
     SpanOperatorTable* const table_;

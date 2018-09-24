@@ -217,7 +217,6 @@ SpanOperatorTable::FilterState::FilterState(SpanOperatorTable* table,
     : table_(table) {
   t1_.stmt = std::move(t1_stmt);
   t2_.stmt = std::move(t2_stmt);
-  cleanup_join_val_ = 0;
 }
 
 int SpanOperatorTable::FilterState::Initialize() {
