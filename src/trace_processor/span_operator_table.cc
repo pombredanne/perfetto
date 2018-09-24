@@ -285,8 +285,7 @@ PERFETTO_ALWAYS_INLINE int SpanOperatorTable::FilterState::ExtractNext(
   sqlite3_stmt* stmt = pull_table->stmt.get();
   int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
   int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
-  int64_t join_val_raw = sqlite3_column_int64(stmt, Column::kJoinValue);
-  uint64_t join_val = static_cast<uint64_t>(join_val_raw);
+  int64_t join_val = sqlite3_column_int64(stmt, Column::kJoinValue);
 
   // Extract the actual row from the state.
   auto* pull_span = &pull_table->spans[join_val];
