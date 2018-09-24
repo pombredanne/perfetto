@@ -54,7 +54,7 @@ class ProtoTraceParser {
   virtual ~ProtoTraceParser();
 
   // virtual for testing.
-  virtual void ParseTracePacket(TraceBlobView);
+  virtual void ParseTracePacket(uint64_t timestamp, TraceBlobView);
   virtual void ParseFtracePacket(uint32_t cpu,
                                  uint64_t timestamp,
                                  TraceBlobView);
@@ -64,10 +64,18 @@ class ProtoTraceParser {
   void ParsePrint(uint32_t cpu, uint64_t timestamp, TraceBlobView);
   void ParseThread(TraceBlobView);
   void ParseProcess(TraceBlobView);
+  void ParseSysStats(uint64_t ts, TraceBlobView);
+  void ParseMemInfo(uint64_t ts, TraceBlobView);
+  void ParseVmStat(uint64_t ts, TraceBlobView);
+  void ParseCpuTimes(uint64_t ts, TraceBlobView);
+  void ParseNumForks(uint64_t ts, TraceBlobView);
+  void ParseIrqCount(uint64_t ts, TraceBlobView, bool is_soft);
 
  private:
   TraceProcessorContext* context_;
   const StringId cpu_freq_name_id_;
+  std::vector<const char*> meminfo_strs_;
+  std::vector<const char*> vmstat_strs_;
 };
 
 }  // namespace trace_processor
