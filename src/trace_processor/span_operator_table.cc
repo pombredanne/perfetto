@@ -18,6 +18,7 @@
 
 #include <sqlite3.h>
 #include <string.h>
+#include <algorithm>
 #include <set>
 
 #include "perfetto/base/logging.h"
