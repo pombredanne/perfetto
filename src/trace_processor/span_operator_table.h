@@ -37,7 +37,7 @@ namespace trace_processor {
 // operations which run for a particular *span* of time.
 //
 // We draw spans like so (time on the x-axis):
-// start of span->[ time where opeation is running ]<- end of span
+// start of span->[ time where opertion is running ]<- end of span
 //
 // Multiple spans can happen in parallel:
 // [      ]
@@ -124,7 +124,7 @@ class SpanOperatorTable : public Table {
 
    private:
     // Details of a row of one of the child tables.
-    struct TableRow {
+    struct Span {
       uint64_t ts = 0;
       uint64_t dur = 0;
       std::vector<Value> values;  // One for each column.
@@ -135,27 +135,29 @@ class SpanOperatorTable : public Table {
       uint64_t latest_ts = std::numeric_limits<uint64_t>::max();
       size_t col_count = 0;
       ScopedStmt stmt;
+
+      // The rows of the table indexed by the values of join column.
       // TODO(lalitm): see how we can expand this past int64_t.
-      std::map<uint64_t, TableRow> rows;
+      std::map<int64_t, Span> spans;
     };
 
-    // A result to return to SQLite.
-    struct ReturnValue {
+    // A span which has data from both tables associated with it.
+    struct IntersectingSpan {
       uint64_t ts = 0;
       uint64_t dur = 0;
-      uint64_t join_val = 0;
-      TableRow t1_row;
-      TableRow t2_row;
+      int64_t join_val = 0;
+      Span t1_span;
+      Span t2_span;
     };
 
     // Computes the next value from the child tables.
     int ExtractNext(bool pull_t1);
 
-    // Sets the return values for the given rows from table 1 and 2 if valid.
-    // Returns true if anything should returned, false otherwise.
-    bool SetupReturnForJoinValue(uint64_t join_value,
-                                 TableRow t1_row,
-                                 TableRow t2_row);
+    // Add an intersecting span to the queue if the two child spans intersect
+    // at any point in time.
+    bool MaybeAddIntersectingSpan(int64_t join_value,
+                                  Span t1_span,
+                                  Span t2_span);
 
     // Reports to SQLite the value given by |value| based on its type.
     void ReportSqliteResult(sqlite3_context* context,
@@ -163,8 +165,9 @@ class SpanOperatorTable : public Table {
 
     TableState t1_;
     TableState t2_;
+
     bool children_have_more_ = true;
-    std::deque<ReturnValue> return_values_;
+    std::deque<IntersectingSpan> intersecting_spans_;
 
     SpanOperatorTable* const table_;
   };
@@ -193,7 +196,12 @@ class SpanOperatorTable : public Table {
     std::unique_ptr<FilterState> filter_state_;
   };
 
-  std::pair<bool, size_t> ExtractTableIndex(int raw_index);
+  // Converts a joined column index into an index on the columns of the child
+  // tables.
+  // Returns a (bool, index) pair with the bool indicating whether the index is
+  // into table 1 and the index being the offset into the relevant table's
+  // columns.
+  std::pair<bool, size_t> GetTableAndColumnIndex(int joined_column_idx);
 
   TableDefinition t1_defn_;
   TableDefinition t2_defn_;
