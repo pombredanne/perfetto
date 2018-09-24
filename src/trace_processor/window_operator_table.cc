@@ -134,41 +134,45 @@ int WindowOperatorTable::Cursor::Filter(const QueryConstraints& qc,
   quantum_ts_ = 0;
   row_id_ = 0;
 
+  // Set return first if there is a equals constraint on the row id asking to
+  // return the first row.
   bool return_first = qc.constraints().size() == 1 &&
                       qc.constraints()[0].iColumn == Column::kRowId &&
+                      IsOpEq(qc.constraints()[0].op) &&
                       sqlite3_value_int(v[0]) == 0;
+  // Set return CPU if there is an equals constraint on the CPU column.
   bool return_cpu = qc.constraints().size() == 1 &&
-                    qc.constraints()[0].iColumn == Column::kCpu;
+                    qc.constraints()[0].iColumn == Column::kCpu &&
+                    IsOpEq(qc.constraints()[0].op);
   if (return_first) {
-    return_type_ = ReturnType::kReturnFirst;
+    filter_type_ = FilterType::kReturnFirst;
   } else if (return_cpu) {
-    return_type_ = ReturnType::kReturnCpu;
+    filter_type_ = FilterType::kReturnCpu;
     current_cpu_ = static_cast<uint32_t>(sqlite3_value_int(v[0]));
   } else {
-    return_type_ = ReturnType::kReturnAll;
+    filter_type_ = FilterType::kReturnAll;
   }
   return SQLITE_OK;
 }
 
 int WindowOperatorTable::Cursor::Next() {
-  switch (return_type_) {
-    case ReturnType::kReturnFirst:
+  switch (filter_type_) {
+    case FilterType::kReturnFirst:
       current_ts_ = window_end_;
       break;
-    case ReturnType::kReturnCpu:
+    case FilterType::kReturnCpu:
       current_ts_ += step_size_;
       quantum_ts_++;
-      row_id_++;
       break;
-    case ReturnType::kReturnAll:
+    case FilterType::kReturnAll:
       if (++current_cpu_ == base::kMaxCpus && current_ts_ < window_end_) {
         current_cpu_ = 0;
         current_ts_ += step_size_;
         quantum_ts_++;
       }
-      row_id_++;
       break;
   }
+  row_id_++;
   return SQLITE_OK;
 }
 
