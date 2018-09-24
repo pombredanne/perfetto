@@ -349,7 +349,7 @@ bool SpanOperatorTable::FilterState::MaybeAddIntersectingSpan(
   uint64_t t2_end = t2_span.ts + t2_span.dur;
 
   // If there is no overlap between the two spans, don't return anything.
-  if (t2_end < t1_span.ts || t1_end < t2_span.ts)
+  if (t1_end == 0 || t2_end == 0 || t2_end < t1_span.ts || t1_end < t2_span.ts)
     return false;
 
   IntersectingSpan value;
