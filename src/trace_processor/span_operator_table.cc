@@ -204,7 +204,7 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
     } else if (c == Column::kJoinValue) {
       col_name = table_->join_col_;
     } else {
-      auto index_pair = table_->ExtractTableIndex(c);
+      auto index_pair = table_->GetTableAndColumnIndex(c);
       bool is_constraint_in_current_table = index_pair.first == is_t1;
       if (is_constraint_in_current_table) {
         col_name = def.cols[index_pair.second].name;
@@ -431,7 +431,7 @@ int SpanOperatorTable::FilterState::Column(sqlite3_context* context, int N) {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.join_val));
       break;
     default: {
-      auto index_pair = table_->ExtractTableIndex(N);
+      auto index_pair = table_->GetTableAndColumnIndex(N);
       const auto& row = index_pair.first ? ret.t1_span : ret.t2_span;
       ReportSqliteResult(context, row.values[index_pair.second]);
     }
