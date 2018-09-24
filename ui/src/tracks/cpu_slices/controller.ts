@@ -92,6 +92,14 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     }
     return result;
   }
+
+  onDestroy(): void {
+    if (this.setup) {
+      this.query(`drop table window_${this.trackState.id}`);
+      this.query(`drop table span_${this.trackState.id}`);
+      this.setup = false;
+    }
+  }
 }
 
 trackControllerRegistry.register(CpuSliceTrackController);
