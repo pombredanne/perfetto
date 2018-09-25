@@ -103,10 +103,15 @@ using protozero::proto_utils::kFieldTypeLengthDelimited;
 
 ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
     : context_(context),
-      cpu_freq_name_id_(context->storage->InternString("cpufreq")) {
-  meminfo_strs_ = BuildMeminfoCounterNames();
-  vmstat_strs_ = BuildVmstatCounterNames();
-};
+      cpu_freq_name_id_(context->storage->InternString("cpufreq")),
+      num_forks_name_id_(context->storage->InternString("num_forks")),
+      num_irq_total_name_id_(context->storage->InternString("num_irq_total")),
+      num_softirq_total_name_id_(
+          context->storage->InternString("num_softirq_total")),
+      num_irq_name_id_(context->storage->InternString("num_irq")),
+      num_softirq_name_id_(context->storage->InternString("num_softirq")),
+      meminfo_strs_(BuildMeminfoCounterNames()),
+      vmstat_strs_(BuildVmstatCounterNames()) {}
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
@@ -153,32 +158,30 @@ void ProtoTraceParser::ParseSysStats(uint64_t ts, TraceBlobView stats) {
       }
       case protos::SysStats::kNumIrqFieldNumber: {
         const size_t fld_off = stats.offset_of(fld.data());
-        ParseIrqCount(ts, stats.slice(fld_off, fld.size()), false);
+        ParseIrqCount(ts, stats.slice(fld_off, fld.size()),
+                      /*is_softirq=*/false);
         break;
       }
       case protos::SysStats::kNumSoftirqFieldNumber: {
         const size_t fld_off = stats.offset_of(fld.data());
-        ParseIrqCount(ts, stats.slice(fld_off, fld.size()), true);
+        ParseIrqCount(ts, stats.slice(fld_off, fld.size()),
+                      /*is_softirq=*/true);
         break;
       }
       case protos::SysStats::kNumForksFieldNumber: {
         context_->sched_tracker->PushCounter(
-            ts, fld.as_uint32(), context_->storage->InternString("num_forks"),
-            0, RefType::kNoRef);
+            ts, fld.as_uint32(), num_forks_name_id_, 0, RefType::kNoRef);
         break;
       }
       case protos::SysStats::kNumIrqTotalFieldNumber: {
         context_->sched_tracker->PushCounter(
-            ts, fld.as_uint32(),
-            context_->storage->InternString("num_iqr_total"), 0,
-            RefType::kNoRef);
+            ts, fld.as_uint32(), num_irq_total_name_id_, 0, RefType::kNoRef);
         break;
       }
       case protos::SysStats::kNumSoftirqTotalFieldNumber: {
-        context_->sched_tracker->PushCounter(
-            ts, fld.as_uint32(),
-            context_->storage->InternString("num_softirq_total"), 0,
-            RefType::kNoRef);
+        context_->sched_tracker->PushCounter(ts, fld.as_uint32(),
+                                             num_softirq_total_name_id_, 0,
+                                             RefType::kNoRef);
         break;
       }
       default:
@@ -203,28 +206,8 @@ void ProtoTraceParser::ParseIrqCount(uint64_t ts,
     }
   }
   RefType ref_type = is_soft ? RefType::kIrq : RefType::kSoftIrq;
-  const char* name = is_soft ? "num_irq" : "num_soft_irq";
-  context_->sched_tracker->PushCounter(
-      ts, value, context_->storage->InternString(name), key, ref_type);
-}
-
-void ProtoTraceParser::ParseNumForks(uint64_t ts, TraceBlobView forks) {
-  ProtoDecoder decoder(forks.data(), forks.length());
-  uint32_t key = 0;
-  uint32_t value = 0;
-  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
-    switch (fld.id) {
-      case protos::SysStats::MeminfoValue::kKeyFieldNumber:
-        key = fld.as_uint32();
-        break;
-      case protos::SysStats::MeminfoValue::kValueFieldNumber:
-        value = fld.as_uint32();
-        break;
-    }
-  }
-  context_->sched_tracker->PushCounter(
-      ts, value, context_->storage->InternString(meminfo_strs_[key]), 0,
-      RefType::kNoRef);
+  StringId name_id = is_soft ? num_irq_name_id_ : num_softirq_name_id_;
+  context_->sched_tracker->PushCounter(ts, value, name_id, key, ref_type);
 }
 
 void ProtoTraceParser::ParseMemInfo(uint64_t ts, TraceBlobView mem) {
@@ -289,50 +272,51 @@ void ProtoTraceParser::ParseCpuTimes(uint64_t ts, TraceBlobView cpu_times) {
       case protos::SysStats::CpuTimes::kUserNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("user_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, context_->storage->InternString("cpu.times.user_ns"),
+            cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kUserIceNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("user_ice_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, context_->storage->InternString("cpu.times.user_ice_ns"),
+            cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kSystemModeNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("system_mode_ns"), cpu,
+            ts, value,
+            context_->storage->InternString("cpu.times.system_mode_ns"), cpu,
             RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIdleNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("idle_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, context_->storage->InternString("cpu.times.idle_ns"),
+            cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIoWaitNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("io_wait_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, context_->storage->InternString("cpu.times.io_wait_ns"),
+            cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIrqNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("irq_ns"), cpu,
+            ts, value, context_->storage->InternString("cpu.times.irq_ns"), cpu,
             RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kSoftirqNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("softirq_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, context_->storage->InternString("cpu.times.softirq_ns"),
+            cpu, RefType::kCPU_ID);
         break;
       }
       default:

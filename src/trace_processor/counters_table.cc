@@ -100,7 +100,7 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
           break;
         }
         case RefType::kNoRef: {
-          sqlite3_result_text(context, "n/a", -1, nullptr);
+          sqlite3_result_null(context);
           break;
         }
         case RefType::kIrq: {

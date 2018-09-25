@@ -68,14 +68,18 @@ class ProtoTraceParser {
   void ParseMemInfo(uint64_t ts, TraceBlobView);
   void ParseVmStat(uint64_t ts, TraceBlobView);
   void ParseCpuTimes(uint64_t ts, TraceBlobView);
-  void ParseNumForks(uint64_t ts, TraceBlobView);
   void ParseIrqCount(uint64_t ts, TraceBlobView, bool is_soft);
 
  private:
   TraceProcessorContext* context_;
   const StringId cpu_freq_name_id_;
-  std::vector<const char*> meminfo_strs_;
-  std::vector<const char*> vmstat_strs_;
+  const StringId num_forks_name_id_;
+  const StringId num_irq_total_name_id_;
+  const StringId num_softirq_total_name_id_;
+  const StringId num_irq_name_id_;
+  const StringId num_softirq_name_id_;
+  const std::vector<const char*> meminfo_strs_;
+  const std::vector<const char*> vmstat_strs_;
 };
 
 }  // namespace trace_processor
