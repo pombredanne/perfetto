@@ -218,6 +218,46 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
 #endif
 }
 
+bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  TracingSession* tracing_session = GetTracingSession(tsid);
+  if (!tracing_session) {
+    PERFETTO_DLOG("StartTracing() failed, invalid session ID %" PRIu64, tsid);
+    return;
+  }
+
+  if (tracing_session->state != TracingSession::DISABLED) {
+    PERFETTO_DLOG("StartTracing() failed, tracing session is already started");
+    return;
+  }
+
+  // Start data sources.
+  TODO start.
+
+  // Trigger delayed task if the trace is time limited.
+  const uint32_t trace_duration_ms = cfg.duration_ms();
+  if (trace_duration_ms > 0) {
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_this, tsid] {
+          if (weak_this)
+            weak_this->FlushAndDisableTracing(tsid);
+        },
+        trace_duration_ms);
+  }
+
+  // Start the periodic drain tasks if we should to save the trace into a file.
+  if (cfg.write_into_file()) {
+    auto weak_this = weak_ptr_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_this, tsid] {
+          if (weak_this)
+            weak_this->ReadBuffers(tsid, nullptr);
+        },
+        tracing_session->delay_to_next_write_period_ms());
+  }
+}
+
 bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                                        const TraceConfig& cfg,
                                        base::ScopedFile fd) {
@@ -353,38 +393,15 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
           break;
         }
       }
-      StartDataSource(cfg_data_source, producer_config, it->second,
+      SetupDataSource(cfg_data_source, producer_config, it->second,
                       tracing_session);
     }
   }
 
-  // Trigger delayed task if the trace is time limited.
-  const uint32_t trace_duration_ms = cfg.duration_ms();
-  if (trace_duration_ms > 0) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(
-        [weak_this, tsid] {
-          if (weak_this)
-            weak_this->FlushAndDisableTracing(tsid);
-        },
-        trace_duration_ms);
-  }
-
-  // Start the periodic drain tasks if we should to save the trace into a file.
-  if (cfg.write_into_file()) {
-    auto weak_this = weak_ptr_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(
-        [weak_this, tsid] {
-          if (weak_this)
-            weak_this->ReadBuffers(tsid, nullptr);
-        },
-        tracing_session->delay_to_next_write_period_ms());
-  }
-
   tracing_session->pending_stop_acks.clear();
-  tracing_session->state = TracingSession::ENABLED;
+  tracing_session->state = TracingSession::CONFIGURED;
   PERFETTO_LOG(
-      "Enabled tracing, #sources:%zu, duration:%d ms, #buffers:%d, total "
+      "Configured tracing, #sources:%zu, duration:%d ms, #buffers:%d, total "
       "buffer size:%zu KB, total sessions:%zu",
       cfg.data_sources().size(), trace_duration_ms, cfg.buffers_size(),
       total_buf_size_kb, tracing_sessions_.size());
@@ -427,6 +444,13 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid,
         DisableTracingNotifyConsumerAndFlushFile(tracing_session);
       return;
 
+    // Continues below.
+    case TracingSession::CONFIGURED:
+      // If the session didn't even start there is no need to orchestrate a
+      // graceful stop of data sources.
+      disable_immediately = true;
+      break;
+
     // This is the nominal case, continues below.
     case TracingSession::ENABLED:
       break;
@@ -441,7 +465,7 @@ void TracingServiceImpl::DisableTracing(TracingSessionID tsid,
       tracing_session->pending_stop_acks.insert(
           std::make_pair(producer_id, ds_inst_id));
     }
-    producer->TearDownDataSource(ds_inst_id);
+    producer->StopDataSource(ds_inst_id);
   }
   tracing_session->data_source_instances.clear();
 
@@ -497,8 +521,9 @@ void TracingServiceImpl::OnDisableTracingTimeout(TracingSessionID tsid) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
   if (!tracing_session ||
-      tracing_session->state != TracingSession::DISABLING_WAITING_STOP_ACKS)
+      tracing_session->state != TracingSession::DISABLING_WAITING_STOP_ACKS) {
     return;  // Tracing session was successfully disabled.
+  }
 
   PERFETTO_ILOG("Timeout while waiting for ACKs for tracing session %" PRIu64,
                 tsid);
@@ -873,8 +898,10 @@ void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
 
   for (auto& iter : tracing_sessions_) {
     TracingSession& tracing_session = iter.second;
-    if (tracing_session.state != TracingSession::ENABLED)
+    if (tracing_session.state != TracingSession::ENABLED &&
+        tracing_session.state != TracingSession::CONFIGURED) {
       continue;
+    }
 
     TraceConfig::ProducerConfig producer_config;
     for (auto& config : tracing_session.config.producers()) {
@@ -886,8 +913,11 @@ void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
     for (const TraceConfig::DataSource& cfg_data_source :
          tracing_session.config.data_sources()) {
       if (cfg_data_source.config().name() == desc.name())
-        StartDataSource(cfg_data_source, producer_config, reg_ds->second,
+        SetupDataSource(cfg_data_source, producer_config, reg_ds->second,
                         &tracing_session);
+       if (tracing_session.state == TracingSession::ENABLED) {
+         TODO start data source.
+       }
     }
   }
 }
@@ -903,7 +933,7 @@ void TracingServiceImpl::UnregisterDataSource(ProducerID producer_id,
     for (auto it = ds_instances.begin(); it != ds_instances.end();) {
       if (it->first == producer_id && it->second.data_source_name == name) {
         DataSourceInstanceID ds_inst_id = it->second.instance_id;
-        producer->TearDownDataSource(ds_inst_id);
+        producer->StopDataSource(ds_inst_id);
         it = ds_instances.erase(it);
       } else {
         ++it;
@@ -926,7 +956,7 @@ void TracingServiceImpl::UnregisterDataSource(ProducerID producer_id,
   PERFETTO_DCHECK(false);
 }
 
-void TracingServiceImpl::StartDataSource(
+void TracingServiceImpl::SetupDataSource(
     const TraceConfig::DataSource& cfg_data_source,
     const TraceConfig::ProducerConfig& producer_config,
     const RegisteredDataSource& data_source,
@@ -1011,7 +1041,7 @@ void TracingServiceImpl::StartDataSource(
     producer->OnTracingSetup();
     UpdateMemoryGuardrail();
   }
-  producer->StartDataSource(inst_id, ds_config);
+  producer->SetupDataSource(inst_id, ds_config);
 }
 
 // Note: all the fields % *_trusted ones are untrusted, as in, the Producer
@@ -1311,6 +1341,15 @@ void TracingServiceImpl::ConsumerEndpointImpl::EnableTracing(
     NotifyOnTracingDisabled();
 }
 
+void TracingServiceImpl::ConsumerEndpointImpl::StartTracing() {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  if (!tracing_session_id_) {
+    PERFETTO_LOG("Consumer called StartTracing() but tracing was not active");
+    return;
+  }
+  service_->StartTracing(tracing_session_id_);
+}
+
 void TracingServiceImpl::ConsumerEndpointImpl::DisableTracing() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!tracing_session_id_) {
@@ -1473,7 +1512,7 @@ size_t TracingServiceImpl::ProducerEndpointImpl::shared_buffer_page_size_kb()
   return shared_buffer_page_size_kb_;
 }
 
-void TracingServiceImpl::ProducerEndpointImpl::TearDownDataSource(
+void TracingServiceImpl::ProducerEndpointImpl::StopDataSource(
     DataSourceInstanceID ds_inst_id) {
   // TODO(primiano): When we'll support tearing down the SMB, at this point we
   // should send the Producer a TearDownTracing if all its data sources have

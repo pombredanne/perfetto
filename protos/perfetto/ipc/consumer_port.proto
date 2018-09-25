@@ -30,10 +30,21 @@ service ConsumerPort {
   // previous tracing session.
   // rpc CreateBuffers(CreateBuffersRequest) returns (CreateBuffersResponse) {}
 
-  // Enables tracing for one or more data sources. At least one buffer must have
-  // been previously created. The EnableTracingResponse is sent when tracing is
-  // disabled (either explicitly or because of the |duration_ms| expired).
+  // Sets up tracing (allocate buffers, create data sources) without actually
+  // starting it* . Tracing is started in a second moment using the StartTracing
+  // method, which will in turn call StartDataSource() on all registered data
+  // sources. The method split (Enable vs Start) was introduced after Android P
+  // for fast triggering of traces, where we cannot afford to initialize all the
+  // tracing machinery upon start.
+  // The EnableTracingResponse is sent when tracing is disabled (either
+  // explicitly or because of the |duration_ms| expired).
+  // * The name is contraintuitive ("enable" but not "start"). Unfortunately
+  // the RPC method names are part of the ABI and cannot be changed for backward
+  // compat reasons.
   rpc EnableTracing(EnableTracingRequest) returns (EnableTracingResponse) {}
+
+  // Actually starts tracing.
+  rpc StartTracing(StartTracingRequest) returns (StartTracingResponse) {}
 
   // Disables tracing for one or more data sources.
   rpc DisableTracing(DisableTracingRequest) returns (DisableTracingResponse) {}
@@ -69,6 +80,11 @@ message EnableTracingRequest {
 message EnableTracingResponse {
   oneof state { bool disabled = 1; }
 }
+
+// Arguments for rpc StartTracing().
+message StartTracingRequest {}
+
+message StartTracingResponse {}
 
 // Arguments for rpc DisableTracing().
 message DisableTracingRequest {

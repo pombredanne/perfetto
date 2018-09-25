@@ -68,6 +68,8 @@ class MockProducer : public Producer {
   // Producer implementation.
   MOCK_METHOD0(OnConnect, void());
   MOCK_METHOD0(OnDisconnect, void());
+  MOCK_METHOD2(SetupDataSource,
+               void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD2(StartDataSource,
                void(DataSourceInstanceID, const DataSourceConfig&));
   MOCK_METHOD1(StopDataSource, void(DataSourceInstanceID));

@@ -83,8 +83,9 @@ class TracingServiceImpl : public TracingService {
     size_t shared_buffer_page_size_kb() const override;
 
     void OnTracingSetup();
+    void SetupDataSource(DataSourceInstanceID, const DataSourceConfig&);
     void StartDataSource(DataSourceInstanceID, const DataSourceConfig&);
-    void TearDownDataSource(DataSourceInstanceID);
+    void StopDataSource(DataSourceInstanceID);
     void Flush(FlushRequestID, const std::vector<DataSourceInstanceID>&);
 
    private:
@@ -122,6 +123,7 @@ class TracingServiceImpl : public TracingService {
 
     // TracingService::ConsumerEndpoint implementation.
     void EnableTracing(const TraceConfig&, base::ScopedFile) override;
+    void StartTracing() override;
     void DisableTracing() override;
     void ReadBuffers() override;
     void FreeBuffers() override;
@@ -215,7 +217,12 @@ class TracingServiceImpl : public TracingService {
   // Holds the state of a tracing session. A tracing session is uniquely bound
   // a specific Consumer. Each Consumer can own one or more sessions.
   struct TracingSession {
-    enum State { DISABLED = 0, ENABLED, DISABLING_WAITING_STOP_ACKS };
+    enum State {
+      DISABLED = 0,
+      CONFIGURED,
+      ENABLED,
+      DISABLING_WAITING_STOP_ACKS
+    };
 
     TracingSession(TracingSessionID, ConsumerEndpointImpl*, const TraceConfig&);
 
@@ -276,7 +283,7 @@ class TracingServiceImpl : public TracingService {
   TracingServiceImpl(const TracingServiceImpl&) = delete;
   TracingServiceImpl& operator=(const TracingServiceImpl&) = delete;
 
-  void StartDataSource(const TraceConfig::DataSource&,
+  void SetupDataSource(const TraceConfig::DataSource&,
                        const TraceConfig::ProducerConfig&,
                        const RegisteredDataSource&,
                        TracingSession*);
