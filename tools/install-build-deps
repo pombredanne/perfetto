@@ -178,6 +178,13 @@ BUILD_DEPS_HOST = [
    '4adec454b60a943dd58603d4be80d42b2db62cbd',
    'all',
   ),
+
+  # Linenoise, used only by trace_processor in standalone builds.
+  ('buildtools/linenoise',
+   'https://fuchsia.googlesource.com/third_party/linenoise.git',
+   'c894b9e59f02203dbe4e2be657572cf88c4230c3',
+   'all'
+  ),
 ]
 
 # Dependencies required to build Android code.
