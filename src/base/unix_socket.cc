@@ -60,7 +60,9 @@ using CBufLenType = socklen_t;
 
 // The CMSG_* macros use NULL instead of nullptr.
 #pragma GCC diagnostic push
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
 
 ssize_t SockSend(int fd,
                  const void* msg,
