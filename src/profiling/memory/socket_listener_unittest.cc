@@ -53,7 +53,7 @@ TEST_F(SocketListenerTest, ReceiveRecord) {
     callback_called();
   };
 
-  Callsites bookkeeping;
+  GlobalCallstackTrie bookkeeping;
   SocketListener listener(std::move(callback_fn), &bookkeeping);
   MockEventListener client_listener;
   EXPECT_CALL(client_listener, OnConnect(_, _))

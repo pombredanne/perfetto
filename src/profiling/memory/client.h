@@ -23,29 +23,26 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "src/profiling/memory/transport_data.h"
 
 namespace perfetto {
 
-class SocketPool;
+class BorrowedSocket;
 
-// Cache for frees that have been observed. It is infeasible to send every
-// free separately, so we batch and send the whole buffer once it is full.
-class FreePage {
+class SocketPool {
  public:
-  FreePage();
+  friend class BorrowedSocket;
+  SocketPool(std::vector<base::ScopedFile> sockets);
 
-  // Add address to buffer. Flush if necessary using a socket borrowed from
-  // pool.
-  // Can be called from any thread. Must not hold mtx_.`
-  void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
+  BorrowedSocket Borrow();
 
  private:
-  // Needs to be called holding mtx_.
-  void Flush(SocketPool* pool);
-
-  std::vector<uint64_t> free_page_;
-  std::mutex mtx_;
-  size_t offset_;
+  void Return(base::ScopedFile fd);
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::vector<base::ScopedFile> sockets_;
+  size_t available_sockets_;
+  size_t dead_sockets_ = 0;
 };
 
 // Socket borrowed from a SocketPool. Gets returned once it goes out of scope.
@@ -61,34 +58,57 @@ class BorrowedSocket {
 
   BorrowedSocket(base::ScopedFile fd, SocketPool* socket_pool)
       : fd_(std::move(fd)), socket_pool_(socket_pool) {}
-  int operator*();
-  int get();
-  void Close();
-  ~BorrowedSocket();
+
+  ~BorrowedSocket() {
+    if (socket_pool_ != nullptr)
+      socket_pool_->Return(std::move(fd_));
+  }
+
+  int operator*() { return get(); }
+
+  int get() { return *fd_; }
+
+  void Close() { fd_.reset(); }
 
  private:
   base::ScopedFile fd_;
   SocketPool* socket_pool_ = nullptr;
 };
 
-class SocketPool {
+// Cache for frees that have been observed. It is infeasible to send every
+// free separately, so we batch and send the whole buffer once it is full.
+class FreePage {
  public:
-  friend class BorrowedSocket;
-  SocketPool(std::vector<base::ScopedFile> sockets);
+  FreePage();
 
-  BorrowedSocket Borrow();
+  // Add address to buffer. Flush if necessary using a socket borrowed from
+  // pool.
+  // Can be called from any thread. Must not hold mutex_.`
+  void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
-  void Return(base::ScopedFile fd);
-  std::mutex mtx_;
-  std::condition_variable cv_;
-  std::vector<base::ScopedFile> sockets_;
-  size_t available_sockets_;
-  size_t dead_sockets_ = 0;
+  struct FreePageHeader {
+    uint64_t size;
+    RecordType record_type;
+  };
+
+  static constexpr size_t kFreePageSize =
+      (base::kPageSize - sizeof(FreePageHeader)) / sizeof(FreePageEntry);
+
+  struct FreePageData {
+    FreePageHeader header;
+    FreePageEntry entries[kFreePageSize];
+  };
+
+  // Needs to be called holding mutex_.
+  void FlushLocked(SocketPool* pool);
+
+  FreePageData free_page_;
+  std::mutex mutex_;
+  size_t offset_ = 0;
 };
 
-char* GetMainThreadStackBase();
-char* GetThreadStackBase();
+const char* GetThreadStackBase();
 
 class Client {
  public:
@@ -98,11 +118,11 @@ class Client {
   void RecordFree(uint64_t alloc_address);
 
  private:
-  char* GetStackBase();
+  const char* GetStackBase();
 
   SocketPool socket_pool_;
   FreePage free_page_;
-  char* const main_thread_stack_base_;
+  const char* main_thread_stack_base_ = nullptr;
   std::atomic<uint64_t> sequence_number_{0};
 };
 

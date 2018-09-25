@@ -33,7 +33,7 @@ constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 
 int HeapprofdMain(int argc, char** argv) {
-  Callsites callsites;
+  GlobalCallstackTrie callsites;
   std::unique_ptr<ipc::UnixSocket> sock;
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
