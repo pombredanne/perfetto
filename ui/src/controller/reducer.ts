@@ -28,11 +28,12 @@ export function rootReducer(state: State, action: any): State {
       const nextState = {...state};
       nextState.traceTime = {...defaultTraceTime};
       nextState.visibleTraceTime = {...defaultTraceTime};
+      const id = `${nextState.nextId++}`;
       // Reset displayed tracks.
       nextState.pinnedTracks = [];
       nextState.scrollingTracks = [];
-      nextState.engines[action.id] = {
-        id: action.id,
+      nextState.engines[id] = {
+        id,
         ready: false,
         source: action.file,
       };
@@ -45,11 +46,12 @@ export function rootReducer(state: State, action: any): State {
       const nextState = {...state};
       nextState.traceTime = {...defaultTraceTime};
       nextState.visibleTraceTime = {...defaultTraceTime};
+      const id = `${nextState.nextId++}`;
       // Reset displayed tracks.
       nextState.pinnedTracks = [];
       nextState.scrollingTracks = [];
-      nextState.engines[action.id] = {
-        id: action.id,
+      nextState.engines[id] = {
+        id,
         ready: false,
         source: action.url,
       };
