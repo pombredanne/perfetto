@@ -76,14 +76,15 @@ std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
   res.reserve(n);
   for (size_t i = 0; i < n; ++i) {
     auto sock = base::CreateSocket();
-    if (connect(*sock, reinterpret_cast<sockaddr*>(&addr), addr_size) == -1)
+    if (connect(*sock, reinterpret_cast<sockaddr*>(&addr), addr_size) == -1) {
       PERFETTO_PLOG("Failed to connect to %s", sock_name.c_str());
+      continue;
+    }
     res.emplace_back(std::move(sock));
   }
   return res;
 }
 
-#pragma pack(1)
 struct StackHeader {
   uint64_t record_size;
   RecordType type;
@@ -98,19 +99,20 @@ inline bool IsMainThread() {
 }  // namespace
 
 FreePage::FreePage() {
-  FreePageHeader* header = reinterpret_cast<FreePageHeader*>(&free_page_[0]);
-  header->size = sizeof(free_page_) - sizeof(uint64_t);
-  header->record_type = RecordType::Free;
-  offset_ = 1;
+  free_page_.header.size = sizeof(free_page_) - sizeof(uint64_t);
+  free_page_.header.record_type = RecordType::Free;
 }
 
 void FreePage::Add(const uint64_t addr,
                    const uint64_t sequence_number,
                    SocketPool* pool) {
   std::lock_guard<std::mutex> l(mutex_);
-  if (offset_ == kFreePageSize)
+  if (offset_ == kFreePageSize) {
     FlushLocked(pool);
-  FreePageEntry& current_entry = free_page_[offset_++];
+    // Now that we have flushed, reset to after the header.
+    offset_ = 0;
+  }
+  FreePageEntry& current_entry = free_page_.entries[offset_++];
   current_entry.sequence_number = sequence_number;
   current_entry.addr = addr;
 }
@@ -121,7 +123,7 @@ void FreePage::FlushLocked(SocketPool* pool) {
   // TODO(fmayer): Add timeout.
   do {
     ssize_t wr =
-        PERFETTO_EINTR(send(*fd, &free_page_[0] + written,
+        PERFETTO_EINTR(send(*fd, &free_page_ + written,
                             sizeof(free_page_) - written, MSG_NOSIGNAL));
     if (wr == -1) {
       fd.Close();
@@ -129,8 +131,6 @@ void FreePage::FlushLocked(SocketPool* pool) {
     }
     written += static_cast<size_t>(wr);
   } while (written < sizeof(free_page_));
-  // Now that we have flushed, reset to after the header.
-  offset_ = 1;
 }
 
 
@@ -163,9 +163,8 @@ void SocketPool::Return(base::ScopedFile sock) {
 }
 
 const char* GetThreadStackBase() {
-  pthread_t t = pthread_self();
   pthread_attr_t attr;
-  if (pthread_getattr_np(t, &attr) != 0)
+  if (pthread_getattr_np(pthread_self(), &attr) != 0)
     return nullptr;
   base::ScopedResource<pthread_attr_t*, pthread_attr_destroy, nullptr> cleanup(
       &attr);
@@ -202,36 +201,46 @@ const char* Client::GetStackBase() {
 }
 
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
-  const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
   const char* stackbase = GetStackBase();
-  char reg_data[kRegisterDataSize];
-  unwindstack::AsmGetRegs(reg_data);
+  StackHeader stack_header;
+
+  const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
+  unwindstack::AsmGetRegs(stack_header.register_data);
+
+  ptrdiff_t stack_size = stackbase - stacktop;
+  if (stack_size < 0) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+
+  uint64_t total_size = sizeof(StackHeader) + static_cast<uint64_t>(stack_size);
+  stack_header.record_size = total_size - sizeof(stack_header.record_size);
+  stack_header.type = RecordType::Malloc;
+  AllocMetadata& metadata = stack_header.alloc_metadata;
+  metadata.alloc_size = alloc_size;
+  metadata.alloc_address = alloc_address;
+  metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
+  metadata.stack_pointer_offset = sizeof(AllocMetadata);
+  metadata.arch = unwindstack::Regs::CurrentArch();
+  metadata.sequence_number = ++sequence_number_;
 
   if (stackbase < stacktop) {
     PERFETTO_DCHECK(false);
     return;
   }
-  char* data = reinterpret_cast<char*>(alloca(sizeof(StackHeader)));
-  size_t total_size = static_cast<size_t>(stackbase - data);
 
-  StackHeader* stack_header = new (data) StackHeader;
-  stack_header->record_size = total_size - sizeof(stack_header->record_size);
-  stack_header->type = RecordType::Malloc;
-  AllocMetadata& metadata = stack_header->alloc_metadata;
-  metadata.alloc_size = alloc_size;
-  metadata.alloc_address = alloc_address;
-  metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
-  PERFETTO_DCHECK(stacktop > data);
-  metadata.stack_pointer_offset = static_cast<uint64_t>(stacktop - data);
-  metadata.arch = unwindstack::Regs::CurrentArch();
-  metadata.sequence_number = ++sequence_number_;
-
-  memcpy(&stack_header->register_data, reg_data, sizeof(reg_data));
+  struct iovec iovecs[2];
+  iovecs[0].iov_base = &stack_header;
+  iovecs[0].iov_len = sizeof(stack_header);
+  iovecs[1].iov_base = const_cast<char*>(stacktop);
+  iovecs[1].iov_len = static_cast<size_t>(stack_size);
+  struct msghdr hdr = {};
+  hdr.msg_iov = iovecs;
+  hdr.msg_iovlen = base::ArraySize(iovecs);
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
-  PERFETTO_CHECK(
-      PERFETTO_EINTR(send(*sockfd, data, total_size, MSG_NOSIGNAL)) ==
-      static_cast<ssize_t>(total_size));
+  PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
+                 static_cast<ssize_t>(total_size));
 }
 
 void Client::RecordFree(uint64_t alloc_address) {

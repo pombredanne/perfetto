@@ -48,6 +48,8 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
   GlobalCallstackTrie::Node* node =
       callsites_->IncrementCallsite(callstack, size);
   allocations_.emplace(address, Allocation(size, sequence_number, node));
+
+  // Keep the sequence tracker consistent.
   RecordFree(kNoopFree, sequence_number);
 }
 

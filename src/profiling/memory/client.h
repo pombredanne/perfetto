@@ -79,8 +79,6 @@ class BorrowedSocket {
 // free separately, so we batch and send the whole buffer once it is full.
 class FreePage {
  public:
-  static constexpr size_t kFreePageSize = 1024;
-
   FreePage();
 
   // Add address to buffer. Flush if necessary using a socket borrowed from
@@ -94,15 +92,20 @@ class FreePage {
     RecordType record_type;
   };
 
-  static_assert(sizeof(FreePageEntry) == sizeof(FreePageHeader),
-                "FreePageEntry needs to be the same size as FreePageHeader.");
+  static constexpr size_t kFreePageSize =
+      (base::kPageSize - sizeof(FreePageHeader)) / sizeof(FreePageEntry);
+
+  struct FreePageData {
+    FreePageHeader header;
+    FreePageEntry entries[kFreePageSize];
+  };
 
   // Needs to be called holding mutex_.
   void FlushLocked(SocketPool* pool);
 
-  FreePageEntry free_page_[kFreePageSize];
+  FreePageData free_page_;
   std::mutex mutex_;
-  size_t offset_;
+  size_t offset_ = 0;
 };
 
 const char* GetThreadStackBase();

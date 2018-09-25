@@ -68,7 +68,14 @@ TEST(SocketPoolTest, MultipleBlocked) {
 }
 
 TEST(ClientTest, GetThreadStackBase) {
-  std::thread th([] { ASSERT_NE(GetThreadStackBase(), nullptr); });
+  std::thread th([] {
+    const char* stackbase = GetThreadStackBase();
+    ASSERT_NE(stackbase, nullptr);
+    // The implementation assumes the stack grows from higher addresses to
+    // lower. We will need to rework once we encounter architectures where the
+    // stack grows the other way.
+    EXPECT_GT(stackbase, __builtin_frame_address(0));
+  });
   th.join();
 }
 
