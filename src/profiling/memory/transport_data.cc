@@ -69,7 +69,6 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   }
 
   ssize_t sent = sendmsg(sock, &hdr, MSG_NOSIGNAL);
-  PERFETTO_LOG("Sent: %zd, total size: %" PRIu64, sent, total_size);
   return sent == static_cast<ssize_t>(total_size + sizeof(total_size));
 }
 
