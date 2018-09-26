@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // TODO(hjd): Dedupe these.
 const SLICE_HEIGHT = 30;
 const TRACK_PADDING = 5;
@@ -40,16 +39,18 @@ export function checkerboardExcept(
     endPx: number,
     leftPx: number,
     rightPx: number): void {
-  // Nothing is visible:
+  // [leftPx, rightPx] doesn't overlap [startPx, endPx] at all:
   if (rightPx <= startPx) {
     checkerboard(ctx, startPx, endPx);
     return;
   }
 
+  // Checkerboard [startPx, leftPx]:
   if (leftPx > startPx) {
     checkerboard(ctx, startPx, leftPx);
   }
 
+  // Checkerboard [rightPx, endPx]:
   if (rightPx < endPx) {
     checkerboard(ctx, rightPx, endPx);
   }
