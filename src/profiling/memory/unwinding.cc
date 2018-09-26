@@ -155,35 +155,19 @@ void FileDescriptorMaps::Reset() {
   maps_.clear();
 }
 
-bool DoUnwind(void* mem,
-              size_t sz,
-              ProcessMetadata* metadata,
-              AllocRecord* out) {
-  if (sz < sizeof(AllocMetadata)) {
-    PERFETTO_ELOG("size");
-    return false;
-  }
-  AllocMetadata* alloc_metadata = reinterpret_cast<AllocMetadata*>(mem);
-  if (sizeof(AllocMetadata) + RegSize(alloc_metadata->arch) > sz)
-    return false;
-  void* reg_data = static_cast<uint8_t*>(mem) + sizeof(AllocMetadata);
+bool DoUnwind(WireMessage* msg, ProcessMetadata* metadata, AllocRecord* out) {
+  AllocMetadata* alloc_metadata = msg->alloc_header;
   std::unique_ptr<unwindstack::Regs> regs(
-      CreateFromRawData(alloc_metadata->arch, reg_data));
+      CreateFromRawData(alloc_metadata->arch, alloc_metadata->register_data));
   if (regs == nullptr) {
     PERFETTO_ELOG("regs");
     return false;
   }
-  if (alloc_metadata->stack_pointer_offset < sizeof(AllocMetadata) ||
-      alloc_metadata->stack_pointer_offset > sz) {
-    PERFETTO_ELOG("out-of-bound stack_pointer_offset");
-    return false;
-  }
   out->alloc_metadata = *alloc_metadata;
-  uint8_t* stack =
-      reinterpret_cast<uint8_t*>(mem) + alloc_metadata->stack_pointer_offset;
+  uint8_t* stack = reinterpret_cast<uint8_t*>(msg->payload);
   std::shared_ptr<unwindstack::Memory> mems = std::make_shared<StackMemory>(
       *metadata->mem_fd, alloc_metadata->stack_pointer, stack,
-      sz - alloc_metadata->stack_pointer_offset);
+      msg->payload_size);
   unwindstack::Unwinder unwinder(kMaxFrames, &metadata->maps, regs.get(), mems);
   // Surpress incorrect "variable may be uninitialized" error for if condition
   // after this loop. error_code = LastErrorCode gets run at least once.
@@ -206,23 +190,27 @@ bool DoUnwind(void* mem,
 }
 
 bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
-  if (rec->size < sizeof(RecordType))
+  WireMessage msg;
+  if (!ReceiveWireMessage(reinterpret_cast<char*>(rec->data.get()), rec->size,
+                          &msg))
     return false;
-  switch (*reinterpret_cast<RecordType*>(rec->data.get())) {
+  switch (msg.record_type) {
     case RecordType::Malloc: {
       std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
       if (!metadata)
         // Process has already gone away.
         return false;
 
-      void* data = reinterpret_cast<uint64_t*>(rec->data.get()) + 1;
       out->metadata = std::move(metadata);
       out->free_record = {};
-      return DoUnwind(data, rec->size, metadata.get(), &out->alloc_record);
+      return DoUnwind(&msg, metadata.get(), &out->alloc_record);
     }
     case RecordType::Free: {
+      // We need to keep this alive, because msg.free_header is a pointer into
+      // this.
       out->free_record.free_data = std::move(rec->data);
-      out->free_record.size = rec->size;
+      out->free_record.metadata = msg.free_header;
+      out->alloc_record = {};
       return true;
     }
   }
@@ -247,10 +235,9 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
 
   if (rec->free_record.free_data) {
     FreeRecord& free_rec = rec->free_record;
-    uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
-    PERFETTO_DCHECK(free_rec.size % sizeof(FreePageEntry) == sizeof(uint64_t));
-    FreePageEntry* entries = reinterpret_cast<FreePageEntry*>(data + 1);
-    for (size_t i = 0; i < free_rec.size / sizeof(FreePageEntry); ++i) {
+    FreePageEntry* entries = free_rec.metadata->entries;
+    uint64_t num_entries = free_rec.metadata->num_entries;
+    for (size_t i = 0; i < num_entries; ++i) {
       const FreePageEntry& entry = entries[i];
       metadata->heap_dump.RecordFree(entry.addr, entry.sequence_number);
     }

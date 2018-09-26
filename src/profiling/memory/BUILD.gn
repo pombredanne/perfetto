@@ -15,9 +15,23 @@
 import("../../../gn/perfetto.gni")
 import("//build_overrides/build.gni")
 
+source_set("transport_data") {
+  public_configs = [ "../../../buildtools:libunwindstack_config" ]
+  deps = [
+    "../../../buildtools:libunwindstack",
+    "../../../gn:default_deps",
+    "../../base",
+  ]
+  sources = [
+    "transport_data.cc",
+    "transport_data.h",
+  ]
+}
+
 source_set("daemon") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":transport_data",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
@@ -40,6 +54,7 @@ source_set("daemon") {
 source_set("client") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
+    ":transport_data",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
@@ -56,6 +71,7 @@ source_set("unittests") {
   deps = [
     ":client",
     ":daemon",
+    ":transport_data",
     "../../../gn:default_deps",
     "../../../gn:gtest_deps",
     "../../base",

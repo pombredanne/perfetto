@@ -49,22 +49,6 @@ pid_t gettid() {
 }
 #endif
 
-#if defined(__arm__)
-constexpr size_t kRegisterDataSize =
-    unwindstack::ARM_REG_LAST * sizeof(uint32_t);
-#elif defined(__aarch64__)
-constexpr size_t kRegisterDataSize =
-    unwindstack::ARM64_REG_LAST * sizeof(uint64_t);
-#elif defined(__i386__)
-constexpr size_t kRegisterDataSize =
-    unwindstack::X86_REG_LAST * sizeof(uint32_t);
-#elif defined(__x86_64__)
-constexpr size_t kRegisterDataSize =
-    unwindstack::X86_64_REG_LAST * sizeof(uint64_t);
-#else
-#error "Could not determine register data size"
-#endif
-
 std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
                                           size_t n) {
   sockaddr_un addr;
@@ -84,13 +68,6 @@ std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
   }
   return res;
 }
-
-struct StackHeader {
-  uint64_t record_size;
-  RecordType type;
-  AllocMetadata alloc_metadata;
-  char register_data[kRegisterDataSize];
-};
 
 inline bool IsMainThread() {
   return getpid() == gettid();
@@ -201,22 +178,17 @@ const char* Client::GetStackBase() {
 }
 
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
+  AllocMetadata metadata;
   const char* stackbase = GetStackBase();
-  StackHeader stack_header;
-
   const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
-  unwindstack::AsmGetRegs(stack_header.register_data);
+  unwindstack::AsmGetRegs(metadata.register_data);
 
-  ptrdiff_t stack_size = stackbase - stacktop;
-  if (stack_size < 0) {
+  if (stackbase < stacktop) {
     PERFETTO_DCHECK(false);
     return;
   }
 
-  uint64_t total_size = sizeof(StackHeader) + static_cast<uint64_t>(stack_size);
-  stack_header.record_size = total_size - sizeof(stack_header.record_size);
-  stack_header.type = RecordType::Malloc;
-  AllocMetadata& metadata = stack_header.alloc_metadata;
+  uint64_t stack_size = static_cast<uint64_t>(stackbase - stacktop);
   metadata.alloc_size = alloc_size;
   metadata.alloc_address = alloc_address;
   metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
@@ -224,23 +196,14 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.arch = unwindstack::Regs::CurrentArch();
   metadata.sequence_number = ++sequence_number_;
 
-  if (stackbase < stacktop) {
-    PERFETTO_DCHECK(false);
-    return;
-  }
-
-  struct iovec iovecs[2];
-  iovecs[0].iov_base = &stack_header;
-  iovecs[0].iov_len = sizeof(stack_header);
-  iovecs[1].iov_base = const_cast<char*>(stacktop);
-  iovecs[1].iov_len = static_cast<size_t>(stack_size);
-  struct msghdr hdr = {};
-  hdr.msg_iov = iovecs;
-  hdr.msg_iovlen = base::ArraySize(iovecs);
+  WireMessage msg = {};
+  msg.alloc_header = &metadata;
+  msg.payload = const_cast<char*>(stacktop);
+  msg.payload_size = static_cast<size_t>(stack_size);
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
-  PERFETTO_CHECK(PERFETTO_EINTR(sendmsg(*sockfd, &hdr, MSG_NOSIGNAL)) ==
-                 static_cast<ssize_t>(total_size));
+  // TODO(fmayer): Handle failure.
+  PERFETTO_CHECK(SendWireMessage(*sockfd, msg));
 }
 
 void Client::RecordFree(uint64_t alloc_address) {
