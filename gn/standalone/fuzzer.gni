@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//gn/standalone/sanitizers/vars.gni")
+import("//gn/standalone/sanitizers/sanitizers.gni")
 
 template("perfetto_fuzzer_test") {
   forward_variables_from(invoker, "*")
@@ -20,8 +20,7 @@ template("perfetto_fuzzer_test") {
   if (use_libfuzzer) {
     executable(target_name) {
       deps += [ "//buildtools:libfuzzer" ]
-      # public_configs = [ ":fuzzer_config" ]
-    }  # source_set(target_name)
+    }
   } else {
     not_needed(invoker, "*")
     source_set(target_name) {
