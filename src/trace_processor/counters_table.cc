@@ -39,13 +39,13 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 Table::Schema CountersTable::CreateSchema(int, const char* const*) {
   return Schema(
       {
-          Table::Column("ts", ColumnType::kUlong),
-          Table::Column("name", ColumnType::kString),
-          Table::Column("value", ColumnType::kUlong),
-          Table::Column("dur", ColumnType::kUlong),
-          Table::Column("value_delta", ColumnType::kUlong),
-          Table::Column("ref", ColumnType::kUint),
-          Table::Column("ref_type", ColumnType::kString),
+          Table::Column(Column::kTimestamp, "ts", ColumnType::kUlong),
+          Table::Column(Column::kName, "name", ColumnType::kString),
+          Table::Column(Column::kValue, "value", ColumnType::kUlong),
+          Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
+          Table::Column(Column::kValueDelta, "value_delta", ColumnType::kUlong),
+          Table::Column(Column::kRef, "ref", ColumnType::kUint),
+          Table::Column(Column::kRefType, "ref_type", ColumnType::kString),
       },
       {Column::kName, Column::kTimestamp, Column::kRef});
 }

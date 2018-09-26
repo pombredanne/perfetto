@@ -50,13 +50,18 @@ class Table : public sqlite3_vtab {
   // Describes a column of this table.
   class Column {
    public:
-    Column(std::string name, ColumnType type, bool hidden = false);
+    Column(size_t index,
+           std::string name,
+           ColumnType type,
+           bool hidden = false);
 
+    size_t index() const { return index_; }
     const std::string& name() const { return name_; }
     ColumnType type() const { return type_; }
     bool hidden() const { return hidden_; }
 
    private:
+    size_t index_ = 0;
     std::string name_;
     ColumnType type_ = ColumnType::kString;
     bool hidden_ = false;
@@ -103,8 +108,12 @@ class Table : public sqlite3_vtab {
   // do filtering and inform SQLite about the CREATE table statement.
   class Schema {
    public:
-    Schema() = default;
+    Schema();
     Schema(std::vector<Column>, std::vector<size_t> primary_keys);
+
+    // This class is explicitly copiable.
+    Schema(const Schema&) noexcept;
+    Schema& operator=(const Schema& t);
 
     std::string ToCreateTableStmt();
 

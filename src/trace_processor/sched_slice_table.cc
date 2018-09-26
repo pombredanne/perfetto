@@ -99,10 +99,10 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
   return Schema(
       {
-          Table::Column("ts", ColumnType::kUlong),
-          Table::Column("cpu", ColumnType::kUint),
-          Table::Column("dur", ColumnType::kUlong),
-          Table::Column("utid", ColumnType::kUint),
+          Table::Column(Column::kTimestamp, "ts", ColumnType::kUlong),
+          Table::Column(Column::kCpu, "cpu", ColumnType::kUint),
+          Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
+          Table::Column(Column::kUtid, "utid", ColumnType::kUint),
       },
       {Column::kCpu, Column::kTimestamp});
 }

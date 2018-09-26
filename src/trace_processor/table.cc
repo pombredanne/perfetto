@@ -244,12 +244,26 @@ int Table::Cursor::FilterInternal(int idxNum,
   return Filter(table->qc_cache_, argv);
 }
 
-Table::Column::Column(std::string name, ColumnType type, bool hidden)
-    : name_(name), type_(type), hidden_(hidden) {}
+Table::Column::Column(size_t index,
+                      std::string name,
+                      ColumnType type,
+                      bool hidden)
+    : index_(index), name_(name), type_(type), hidden_(hidden) {}
 
 Table::Schema::Schema(std::vector<Column> columns,
                       std::vector<size_t> primary_keys)
-    : columns_(columns), primary_keys_(primary_keys) {}
+    : columns_(std::move(columns)), primary_keys_(std::move(primary_keys)) {
+  for (size_t i = 0; i < columns_.size(); i++) {
+    PERFETTO_CHECK(columns_[i].index() == i);
+  }
+  for (auto key : primary_keys_) {
+    PERFETTO_CHECK(key < columns_.size());
+  }
+}
+
+Table::Schema::Schema() = default;
+Table::Schema::Schema(const Schema&) = default;
+Table::Schema& Table::Schema::operator=(const Schema&) = default;
 
 std::string Table::Schema::ToCreateTableStmt() {
   std::string stmt = "CREATE TABLE x(";

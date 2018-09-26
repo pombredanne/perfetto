@@ -79,7 +79,7 @@ std::vector<Table::Column> GetColumnsForTable(
     } else {
       PERFETTO_FATAL("Unknown column type on table %s", raw_table_name.c_str());
     }
-    columns.emplace_back(name, type);
+    columns.emplace_back(columns.size(), name, type);
   }
   return columns;
 }
@@ -126,15 +126,16 @@ Table::Schema SpanOperatorTable::CreateSchema(int argc,
   t2_defn_.cols.erase(t2_remove_it, t2_defn_.cols.end());
 
   std::vector<Table::Column> columns = {
-      Table::Column("ts", ColumnType::kUlong),
-      Table::Column("dur", ColumnType::kUlong),
-      Table::Column(join_col_, ColumnType::kUlong),
+      Table::Column(Column::kTimestamp, "ts", ColumnType::kUlong),
+      Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
+      Table::Column(Column::kJoinValue, join_col_, ColumnType::kUlong),
   };
+  size_t index = kReservedColumns;
   for (const auto& col : t1_defn_.cols) {
-    columns.emplace_back(col.name(), col.type());
+    columns.emplace_back(index++, col.name(), col.type());
   }
   for (const auto& col : t2_defn_.cols) {
-    columns.emplace_back(col.name(), col.type());
+    columns.emplace_back(index++, col.name(), col.type());
   }
   return Schema(columns, {Column::kTimestamp, kJoinValue});
 }
