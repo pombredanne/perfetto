@@ -53,7 +53,7 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
       where rowid = 0;`);
 
     const LIMIT = 10000;
-    const query = `select ts,dur,utid from span_${this.trackState.id} 
+    const query = `select ts,dur,utid from span_${this.trackState.id}
         where cpu = ${this.config.cpu}
         and utid != 0
         and dur >= ${resolutionNs}

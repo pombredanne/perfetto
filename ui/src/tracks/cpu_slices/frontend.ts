@@ -89,7 +89,6 @@ class CpuSliceTrack extends Track<Config, Data> {
       }
       if (data === undefined) return;  // Can't possibly draw anything.
     }
-
     ctx.textAlign = 'center';
     ctx.font = '12px Google Sans';
     const charWidth = ctx.measureText('dbpqaouk').width / 8;
