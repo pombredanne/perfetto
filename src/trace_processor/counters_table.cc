@@ -36,17 +36,18 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<CountersTable>(db, storage, "counters");
 }
 
-std::string CountersTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE x("
-         "ts UNSIGNED BIG INT, "
-         "name text, "
-         "value UNSIGNED BIG INT, "
-         "dur UNSIGNED BIG INT, "
-         "value_delta UNSIGNED BIG INT, "
-         "ref UNSIGNED INT, "
-         "ref_type TEXT, "
-         "PRIMARY KEY(name, ts, ref)"
-         ") WITHOUT ROWID;";
+Table::Schema CountersTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column("ts", ColumnType::kUlong),
+          Table::Column("name", ColumnType::kString),
+          Table::Column("value", ColumnType::kUlong),
+          Table::Column("dur", ColumnType::kUlong),
+          Table::Column("value_delta", ColumnType::kUlong),
+          Table::Column("ref", ColumnType::kUint),
+          Table::Column("ref_type", ColumnType::kString),
+      },
+      {Column::kName, Column::kTimestamp, Column::kRef});
 }
 
 std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {

@@ -32,20 +32,21 @@ void WindowOperatorTable::RegisterTable(sqlite3* db,
   Table::Register<WindowOperatorTable>(db, storage, "window", true);
 }
 
-std::string WindowOperatorTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE x("
-         // These are the operator columns:
-         "rowid HIDDEN UNSIGNED BIG INT, "
-         "quantum HIDDEN UNSIGNED BIG INT, "
-         "window_start HIDDEN UNSIGNED BIG INT, "
-         "window_dur HIDDEN UNSIGNED BIG INT, "
-         // These are the ouput columns:
-         "ts UNSIGNED BIG INT, "
-         "dur UNSIGNED BIG INT, "
-         "cpu UNSIGNED INT, "
-         "quantum_ts UNSIGNED BIG INT, "
-         "PRIMARY KEY(rowid)"
-         ") WITHOUT ROWID;";
+Table::Schema WindowOperatorTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          // These are the operator columns:
+          Table::Column("rowid", ColumnType::kUlong, true),
+          Table::Column("quantum", ColumnType::kUlong, true),
+          Table::Column("window_start", ColumnType::kUlong, true),
+          Table::Column("window_dur", ColumnType::kUlong, true),
+          // These are the ouput columns:
+          Table::Column("ts", ColumnType::kUlong),
+          Table::Column("dur", ColumnType::kUlong),
+          Table::Column("cpu", ColumnType::kUint),
+          Table::Column("quantum_ts", ColumnType::kUlong),
+      },
+      {Column::kRowId});
 }
 
 std::unique_ptr<Table::Cursor> WindowOperatorTable::CreateCursor() {

@@ -35,20 +35,19 @@ void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SliceTable>(db, storage, "slices");
 }
 
-std::string SliceTable::CreateTableStmt(int, const char* const*) {
-  // TODO(primiano): add support for ts_lower_bound. It requires the guarantee
-  // that slices are pushed in the storage monotonically.
-  return "CREATE TABLE x("
-         "ts UNSIGNED BIG INT, "
-         "dur UNSIGNED BIG INT, "
-         "utid UNSIGNED INT,"
-         "cat STRING,"
-         "name STRING,"
-         "depth INT,"
-         "stack_id UNSIGNED BIG INT,"
-         "parent_stack_id UNSIGNED BIG INT,"
-         "PRIMARY KEY(utid, ts, depth)"
-         ") WITHOUT ROWID;";
+Table::Schema SliceTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column("ts", ColumnType::kUlong),
+          Table::Column("dur", ColumnType::kUlong),
+          Table::Column("utid", ColumnType::kUint),
+          Table::Column("cat", ColumnType::kString),
+          Table::Column("name", ColumnType::kString),
+          Table::Column("depth", ColumnType::kInt),
+          Table::Column("stack_id", ColumnType::kUlong),
+          Table::Column("parent_stack_id", ColumnType::kUlong),
+      },
+      {Column::kUtid, Column::kTimestamp, Column::kTimestamp});
 }
 
 std::unique_ptr<Table::Cursor> SliceTable::CreateCursor() {

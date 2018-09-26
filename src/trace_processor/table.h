@@ -39,6 +39,29 @@ class Table : public sqlite3_vtab {
   using Factory =
       std::function<std::unique_ptr<Table>(sqlite3*, const TraceStorage*)>;
 
+  // Allowed types for columns in a table.
+  enum ColumnType {
+    kString = 1,
+    kUlong = 2,
+    kUint = 3,
+    kInt = 4,
+  };
+
+  // Describes a column of this table.
+  class Column {
+   public:
+    Column(std::string name, ColumnType type, bool hidden = false);
+
+    const std::string& name() const { return name_; }
+    ColumnType type() const { return type_; }
+    bool hidden() const { return hidden_; }
+
+   private:
+    std::string name_;
+    ColumnType type_ = ColumnType::kString;
+    bool hidden_ = false;
+  };
+
   // When set it logs all BestIndex and Filter actions on the console.
   static bool debug;
 
@@ -76,6 +99,26 @@ class Table : public sqlite3_vtab {
     std::vector<bool> omit;
   };
 
+  // The schema of the table. Created by subclasses to allow the table class to
+  // do filtering and inform SQLite about the CREATE table statement.
+  class Schema {
+   public:
+    Schema() = default;
+    Schema(std::vector<Column>, std::vector<size_t> primary_keys);
+
+    std::string ToCreateTableStmt();
+
+    const std::vector<Column>& columns() { return columns_; }
+    const std::vector<size_t> primary_keys() { return primary_keys_; }
+
+   private:
+    // The names and types of the columns of the table.
+    std::vector<Column> columns_;
+
+    // The primary keys of the table given by an offset into |columns|.
+    std::vector<size_t> primary_keys_;
+  };
+
   Table();
 
   // Called by derived classes to register themselves with the SQLite db.
@@ -88,7 +131,7 @@ class Table : public sqlite3_vtab {
   }
 
   // Methods to be implemented by derived table classes.
-  virtual std::string CreateTableStmt(int argc, const char* const* argv) = 0;
+  virtual Schema CreateSchema(int argc, const char* const* argv) = 0;
   virtual std::unique_ptr<Cursor> CreateCursor() = 0;
   virtual int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) = 0;
 
@@ -121,6 +164,8 @@ class Table : public sqlite3_vtab {
   Table& operator=(const Table&) = delete;
 
   std::string name_;
+  Schema schema_;
+
   QueryConstraints qc_cache_;
   int qc_hash_ = 0;
   int best_index_num_ = 0;
