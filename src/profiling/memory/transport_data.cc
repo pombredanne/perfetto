@@ -61,11 +61,11 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   hdr.msg_iov = iovecs;
   if (msg.payload) {
     hdr.msg_iovlen = 4;
-    total_size = iovecs[1].iov_len + iovecs[2].iov_len;
+    total_size = iovecs[1].iov_len + iovecs[2].iov_len + iovecs[3].iov_len;
   } else {
     // If we are not sending payload, just ignore that iovec.
     hdr.msg_iovlen = 3;
-    total_size = iovecs[1].iov_len;
+    total_size = iovecs[1].iov_len + iovecs[2].iov_len;
   }
 
   ssize_t sent = sendmsg(sock, &hdr, MSG_NOSIGNAL);

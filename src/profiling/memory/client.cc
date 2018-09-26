@@ -97,8 +97,6 @@ void FreePage::FlushLocked(SocketPool* pool) {
   SendWireMessage(*fd, msg);
 }
 
-
-
 SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
     : sockets_(std::move(sockets)), available_sockets_(sockets_.size()) {}
 
