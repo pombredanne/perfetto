@@ -75,11 +75,6 @@ inline bool IsMainThread() {
 
 }  // namespace
 
-FreePage::FreePage() {
-  free_page_.header.size = sizeof(free_page_) - sizeof(uint64_t);
-  free_page_.header.record_type = RecordType::Free;
-}
-
 void FreePage::Add(const uint64_t addr,
                    const uint64_t sequence_number,
                    SocketPool* pool) {
@@ -95,19 +90,11 @@ void FreePage::Add(const uint64_t addr,
 }
 
 void FreePage::FlushLocked(SocketPool* pool) {
+  WireMessage msg = {};
+  msg.record_type = RecordType::Free;
+  msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
-  size_t written = 0;
-  // TODO(fmayer): Add timeout.
-  do {
-    ssize_t wr =
-        PERFETTO_EINTR(send(*fd, &free_page_ + written,
-                            sizeof(free_page_) - written, MSG_NOSIGNAL));
-    if (wr == -1) {
-      fd.Close();
-      return;
-    }
-    written += static_cast<size_t>(wr);
-  } while (written < sizeof(free_page_));
+  SendWireMessage(*fd, msg);
 }
 
 
