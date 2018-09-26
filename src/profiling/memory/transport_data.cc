@@ -37,32 +37,34 @@ bool ViewAndAdvance(char** ptr, T** out, const char* end) {
 
 bool SendWireMessage(int sock, const WireMessage& msg) {
   uint64_t total_size;
-  struct iovec iovecs[3];
+  struct iovec iovecs[4];
   iovecs[0].iov_base = &total_size;
   iovecs[0].iov_len = sizeof(total_size);
+  iovecs[1].iov_base = const_cast<RecordType*>(&msg.record_type);
+  iovecs[1].iov_len = sizeof(msg.record_type);
   if (msg.alloc_header) {
-    iovecs[1].iov_base = msg.alloc_header;
-    iovecs[1].iov_len = sizeof(*msg.alloc_header);
+    iovecs[2].iov_base = msg.alloc_header;
+    iovecs[2].iov_len = sizeof(*msg.alloc_header);
   } else {
     if (!msg.free_header) {
       PERFETTO_DCHECK(false);
       return false;
     }
-    iovecs[1].iov_base = msg.free_header;
-    iovecs[1].iov_len = sizeof(*msg.free_header);
+    iovecs[2].iov_base = msg.free_header;
+    iovecs[2].iov_len = sizeof(*msg.free_header);
   }
 
-  iovecs[2].iov_base = msg.payload;
-  iovecs[2].iov_len = msg.payload_size;
+  iovecs[3].iov_base = msg.payload;
+  iovecs[3].iov_len = msg.payload_size;
 
   struct msghdr hdr = {};
   hdr.msg_iov = iovecs;
   if (msg.payload) {
-    hdr.msg_iovlen = 3;
+    hdr.msg_iovlen = 4;
     total_size = iovecs[1].iov_len + iovecs[2].iov_len;
   } else {
     // If we are not sending payload, just ignore that iovec.
-    hdr.msg_iovlen = 2;
+    hdr.msg_iovlen = 3;
     total_size = iovecs[1].iov_len;
   }
 
