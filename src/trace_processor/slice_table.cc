@@ -38,16 +38,17 @@ void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 Table::Schema SliceTable::CreateSchema(int, const char* const*) {
   return Schema(
       {
-          Table::Column("ts", ColumnType::kUlong),
-          Table::Column("dur", ColumnType::kUlong),
-          Table::Column("utid", ColumnType::kUint),
-          Table::Column("cat", ColumnType::kString),
-          Table::Column("name", ColumnType::kString),
-          Table::Column("depth", ColumnType::kInt),
-          Table::Column("stack_id", ColumnType::kUlong),
-          Table::Column("parent_stack_id", ColumnType::kUlong),
+          Table::Column(Column::kTimestamp, "ts", ColumnType::kUlong),
+          Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
+          Table::Column(Column::kUtid, "utid", ColumnType::kUint),
+          Table::Column(Column::kCategory, "cat", ColumnType::kString),
+          Table::Column(Column::kName, "name", ColumnType::kString),
+          Table::Column(Column::kDepth, "depth", ColumnType::kInt),
+          Table::Column(Column::kStackId, "stack_id", ColumnType::kUlong),
+          Table::Column(Column::kParentStackId, "parent_stack_id",
+                        ColumnType::kUlong),
       },
-      {Column::kUtid, Column::kTimestamp, Column::kTimestamp});
+      {Column::kUtid, Column::kTimestamp, Column::kDepth});
 }
 
 std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(const QueryConstraints&,
