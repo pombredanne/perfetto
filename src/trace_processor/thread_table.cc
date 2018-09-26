@@ -36,14 +36,15 @@ void ThreadTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ThreadTable>(db, storage, "thread");
 }
 
-std::string ThreadTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE x("
-         "utid UNSIGNED INT, "
-         "upid UNSIGNED INT, "
-         "name TEXT, "
-         "tid UNSIGNED INT, "
-         "PRIMARY KEY(utid)"
-         ") WITHOUT ROWID;";
+Table::Schema ThreadTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column("utid", ColumnType::kInt),
+          Table::Column("upid", ColumnType::kInt),
+          Table::Column("name", ColumnType::kString),
+          Table::Column("tid", ColumnType::kInt),
+      },
+      {Column::kUtid});
 }
 
 std::unique_ptr<Table::Cursor> ThreadTable::CreateCursor() {

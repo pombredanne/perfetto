@@ -96,14 +96,15 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SchedSliceTable>(db, storage, "sched");
 }
 
-std::string SchedSliceTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE sched("
-         "ts UNSIGNED BIG INT, "
-         "cpu UNSIGNED INT, "
-         "dur UNSIGNED BIG INT, "
-         "utid UNSIGNED INT, "
-         "PRIMARY KEY(cpu, ts)"
-         ") WITHOUT ROWID;";
+Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column("ts", ColumnType::kUlong),
+          Table::Column("cpu", ColumnType::kUint),
+          Table::Column("dur", ColumnType::kUlong),
+          Table::Column("utid", ColumnType::kUint),
+      },
+      {Column::kCpu, Column::kTimestamp});
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor() {
