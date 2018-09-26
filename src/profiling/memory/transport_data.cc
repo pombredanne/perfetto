@@ -45,13 +45,12 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   if (msg.alloc_header) {
     iovecs[2].iov_base = msg.alloc_header;
     iovecs[2].iov_len = sizeof(*msg.alloc_header);
-  } else {
-    if (!msg.free_header) {
-      PERFETTO_DCHECK(false);
-      return false;
-    }
+  } else if (msg.free_header) {
     iovecs[2].iov_base = msg.free_header;
     iovecs[2].iov_len = sizeof(*msg.free_header);
+  } else {
+    PERFETTO_DCHECK(false);
+    return false;
   }
 
   iovecs[3].iov_base = msg.payload;
