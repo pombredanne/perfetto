@@ -176,3 +176,22 @@ source_set("integrationtests") {
     "../base:test_support",
   ]
 }
+
+if (!build_with_chromium) {
+  source_set("benchmarks") {
+    testonly = true
+    deps = [
+      ":lib",
+      "../../buildtools:benchmark",
+      "../../buildtools:sqlite",
+      "../../gn:default_deps",
+      "../../protos/perfetto/trace:lite",
+      "../../protos/perfetto/trace_processor:lite",
+      "../base",
+      "../base:test_support",
+    ]
+    sources = [
+      "trace_database_benchmark.cc",
+    ]
+  }
+}
