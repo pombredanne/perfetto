@@ -37,8 +37,8 @@ Table* ToTable(sqlite3_vtab* vtab) {
   return static_cast<Table*>(vtab);
 }
 
-Table::Cursor* ToCursor(sqlite3_vtab_cursor* cursor) {
-  return static_cast<Table::Cursor*>(cursor);
+Table::RawCursor* ToCursor(sqlite3_vtab_cursor* cursor) {
+  return static_cast<Table::RawCursor*>(cursor);
 }
 
 std::string TypeToString(Table::ColumnType type) {
@@ -119,7 +119,7 @@ void Table::RegisterInternal(sqlite3* db,
 
   module->xFilter = [](sqlite3_vtab_cursor* c, int i, const char* s, int a,
                        sqlite3_value** v) {
-    return ToCursor(c)->FilterInternal(i, s, a, v);
+    return ToCursor(c)->Filter(i, s, a, v);
   };
   module->xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
   module->xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
@@ -151,7 +151,7 @@ void Table::RegisterInternal(sqlite3* db,
 
 int Table::OpenInternal(sqlite3_vtab_cursor** ppCursor) {
   // Freed in xClose().
-  *ppCursor = static_cast<sqlite3_vtab_cursor*>(CreateCursor().release());
+  *ppCursor = static_cast<sqlite3_vtab_cursor*>(new RawCursor(this));
   return SQLITE_OK;
 }
 
@@ -218,16 +218,12 @@ int Table::Update(int, sqlite3_value**, sqlite3_int64*) {
   return SQLITE_READONLY;
 }
 
-Table::Cursor::~Cursor() = default;
+Table::RawCursor::RawCursor(Table* table) : table_(table) {}
 
-int Table::Cursor::RowId(sqlite3_int64*) {
-  return SQLITE_ERROR;
-}
-
-int Table::Cursor::FilterInternal(int idxNum,
-                                  const char* idxStr,
-                                  int argc,
-                                  sqlite3_value** argv) {
+int Table::RawCursor::Filter(int idxNum,
+                             const char* idxStr,
+                             int argc,
+                             sqlite3_value** argv) {
   auto* table = ToTable(this->pVtab);
   bool cache_hit = true;
   if (idxNum != table->qc_hash_) {
@@ -241,7 +237,30 @@ int Table::Cursor::FilterInternal(int idxNum,
   }
   PERFETTO_DCHECK(table->qc_cache_.constraints().size() ==
                   static_cast<size_t>(argc));
-  return Filter(table->qc_cache_, argv);
+  cursor_ = table_->CreateCursor(table->qc_cache_, argv);
+  return !cursor_ ? SQLITE_ERROR : SQLITE_OK;
+}
+
+int Table::RawCursor::Next() {
+  return cursor_->Next();
+}
+
+int Table::RawCursor::Eof() {
+  return cursor_->Eof();
+}
+
+int Table::RawCursor::Column(sqlite3_context* context, int N) {
+  return cursor_->Column(context, N);
+}
+
+int Table::RawCursor::RowId(sqlite3_int64* pRowId) {
+  return cursor_->RowId(pRowId);
+}
+
+Table::Cursor::~Cursor() = default;
+
+int Table::Cursor::RowId(sqlite3_int64*) {
+  return SQLITE_ERROR;
 }
 
 Table::Column::Column(size_t index,
