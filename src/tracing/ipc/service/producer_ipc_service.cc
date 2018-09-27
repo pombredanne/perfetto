@@ -211,7 +211,6 @@ void ProducerIPCService::RemoteProducer::OnConnect() {}
 // |service_endpoint| (in the RemoteProducer dtor).
 void ProducerIPCService::RemoteProducer::OnDisconnect() {}
 
-
 // Invoked by the |core_service_| business logic when it wants to create a new
 // data source.
 void ProducerIPCService::RemoteProducer::SetupDataSource(

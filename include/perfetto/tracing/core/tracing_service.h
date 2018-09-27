@@ -118,13 +118,19 @@ class PERFETTO_EXPORT TracingService {
    public:
     virtual ~ConsumerEndpoint();
 
-    // Prepares tracing, without starting data sources, with the given
-    // TraceConfig. The ScopedFile argument is used only when
-    // TraceConfig.write_into_file == true.
+    // Enables tracing with the given TraceConfig. The ScopedFile argument is
+    // used only when TraceConfig.write_into_file == true.
+    // If TraceConfig.deferred_start == true, all the tracing harness is brought
+    // up (e.g. buffers initialization) and data sources are configured via
+    // SetupDataSource(), they are not started until StartTracing() is called.
+    // This is to support pre-initialization and fast triggering of traces.
+    // The ScopedFile argument is used only when TraceConfig.write_into_file
+    // == true.
     virtual void EnableTracing(const TraceConfig&,
                                base::ScopedFile = base::ScopedFile()) = 0;
 
-    // Enables tracing. EnableTracing() must be called first.
+    // Starts all data sources configured in the trace config. This is used only
+    // after calling EnableTracing() setting TraceConfig.deferred_start=true.
     virtual void StartTracing() = 0;
 
     virtual void DisableTracing() = 0;

@@ -76,7 +76,8 @@ ProcessStatsDataSource::ProcessStatsDataSource(
     : ProbesDataSource(session_id, kTypeId),
       writer_(std::move(writer)),
       record_thread_names_(config.process_stats_config().record_thread_names()),
-      dump_all_procs_on_start_(config.process_stats_config().scan_all_processes_on_start()),
+      dump_all_procs_on_start_(
+          config.process_stats_config().scan_all_processes_on_start()),
       weak_factory_(this) {
   const auto& quirks = config.process_stats_config().quirks();
   enable_on_demand_dumps_ =

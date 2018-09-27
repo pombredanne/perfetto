@@ -169,6 +169,7 @@ class TracingServiceImpl : public TracingService {
   bool EnableTracing(ConsumerEndpointImpl*,
                      const TraceConfig&,
                      base::ScopedFile);
+  bool StartTracing(TracingSessionID);
   void DisableTracing(TracingSessionID, bool disable_immediately = false);
   void Flush(TracingSessionID tsid,
              uint32_t timeout_ms,
@@ -203,7 +204,12 @@ class TracingServiceImpl : public TracingService {
 
   // Represents an active data source for a tracing session.
   struct DataSourceInstance {
+    DataSourceInstance(const DataSourceInstance&) = delete;
+    DataSourceInstance& operator=(const DataSourceInstance&) = delete;
+    DataSourceInstance(DataSourceInstance&&) noexcept = default;
+
     DataSourceInstanceID instance_id;
+    DataSourceConfig config;
     std::string data_source_name;
     bool will_notify_on_stop;
   };
@@ -220,7 +226,7 @@ class TracingServiceImpl : public TracingService {
     enum State {
       DISABLED = 0,
       CONFIGURED,
-      ENABLED,
+      STARTED,
       DISABLING_WAITING_STOP_ACKS
     };
 
@@ -283,10 +289,10 @@ class TracingServiceImpl : public TracingService {
   TracingServiceImpl(const TracingServiceImpl&) = delete;
   TracingServiceImpl& operator=(const TracingServiceImpl&) = delete;
 
-  void SetupDataSource(const TraceConfig::DataSource&,
-                       const TraceConfig::ProducerConfig&,
-                       const RegisteredDataSource&,
-                       TracingSession*);
+  DataSourceInstance* SetupDataSource(const TraceConfig::DataSource&,
+                                      const TraceConfig::ProducerConfig&,
+                                      const RegisteredDataSource&,
+                                      TracingSession*);
 
   // Returns the next available ProducerID that is not in |producers_|.
   ProducerID GetNextProducerID();
