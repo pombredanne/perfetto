@@ -60,6 +60,8 @@ base::ScopedFile CreateSocket();
 void OffsetMsgHdr(struct msghdr* msg, size_t n);
 
 // Re-enter sendmsg until all the data has been sent or an error occurs.
+//
+// TODO(fmayer): Figure out how to do timeouts here for heapprofd.
 ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags);
 
 // A non-blocking UNIX domain socket in SOCK_STREAM mode. Allows also to

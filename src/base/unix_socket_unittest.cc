@@ -721,7 +721,8 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
 
   // Send something larger than send + recv buffers combined to make sendmsg
   // block.
-  char large_buf[8192];
+  char send_buf[8192];
+  char recv_buf[sizeof(send_buf)];
 
   // Need to install signal handler to cause the interrupt to happen.
   // man 3 pthread_kill:
@@ -737,28 +738,40 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
       rollback(&oldact);
 
   auto blocked_thread = pthread_self();
-  std::thread th([blocked_thread, &recv_socket] {
-    char buf[1024];
-    PERFETTO_EINTR(read(*recv_socket, buf, 1));
+  std::thread th([blocked_thread, &recv_socket, &recv_buf] {
+    PERFETTO_EINTR(read(*recv_socket, recv_buf, 1));
     // We are now sure the other thread is in sendmsg, send interrupt.
     ASSERT_EQ(pthread_kill(blocked_thread, SIGWINCH), 0);
     // Drain the socket to allow SendMsgAll to succeed.
-    while (PERFETTO_EINTR(read(*recv_socket, buf, sizeof(buf))) > 0) {
+    size_t offset = 1;
+    while (offset < sizeof(recv_buf)) {
+      ssize_t rd = PERFETTO_EINTR(
+          read(*recv_socket, recv_buf + offset, sizeof(recv_buf) - offset));
+      ASSERT_GE(rd, 0);
+      offset += static_cast<size_t>(rd);
     }
   });
 
+  // Test sending the send_buf in several chunks as an iov to exercise the
+  // more complicated code-paths of SendMsgAll.
   struct msghdr hdr;
-  struct iovec iov;
-  iov.iov_base = large_buf;
-  iov.iov_len = sizeof(large_buf);
-  hdr.msg_iov = &iov;
-  hdr.msg_iovlen = 1;
+  struct iovec iov[4];
+  static_assert(sizeof(send_buf) % base::ArraySize(iov) == 0,
+                "Cannot split buffer into even pieces.");
+  constexpr size_t kChunkSize = sizeof(send_buf) / base::ArraySize(iov);
+  for (size_t i = 0; i < base::ArraySize(iov); ++i) {
+    iov[i].iov_base = send_buf + i * kChunkSize;
+    iov[i].iov_len = kChunkSize;
+  }
+  hdr.msg_iov = iov;
+  hdr.msg_iovlen = base::ArraySize(iov);
 
-  ASSERT_EQ(SendMsgAll(*send_socket, &hdr, 0), sizeof(large_buf));
+  ASSERT_EQ(SendMsgAll(*send_socket, &hdr, 0), sizeof(send_buf));
   send_socket.reset();
   th.join();
   // Make sure the re-entry logic was actually triggered.
   ASSERT_EQ(hdr.msg_iov, nullptr);
+  ASSERT_EQ(memcmp(send_buf, recv_buf, sizeof(send_buf)), 0);
 }
 
 // TODO(primiano): add a test to check that in the case of a peer sending a fd

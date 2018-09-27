@@ -79,7 +79,7 @@ void OffsetMsgHdr(struct msghdr* msg, size_t n) {
     n -= vec->iov_len;
   }
   // We sent all the iovecs.
-  PERFETTO_DCHECK(n == 0);
+  PERFETTO_CHECK(n == 0);
   msg->msg_iovlen = 0;
   msg->msg_iov = nullptr;
 }
