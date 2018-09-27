@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {defaultTraceTime, State} from './state';
+import {createEmptyState, defaultTraceTime, State} from './state';
 import {TimeSpan} from './time';
 
 export interface Action { type: string; }
@@ -347,4 +347,21 @@ export function rootReducer(state: State, action: any): State {
       break;
   }
   return state;
+}
+
+export class Model {
+  private _state: State;
+
+  constructor() {
+    this._state = createEmptyState();
+  }
+
+  get state(): State {
+    return this._state;
+  }
+
+  // tslint:disable-next-line no-any
+  doAction(action: any): void {
+    this._state = rootReducer(this._state, action);
+  }
 }
