@@ -27,7 +27,10 @@ export function checkerboard(
   ctx.fillRect(leftPx, TRACK_PADDING, widthPx, SLICE_HEIGHT);
   ctx.fillStyle = '#666';
   ctx.fillText(
-      'loading...', widthPx / 2, TRACK_PADDING + SLICE_HEIGHT / 2, widthPx);
+      'loading...',
+      leftPx + widthPx / 2,
+      TRACK_PADDING + SLICE_HEIGHT / 2,
+      widthPx);
 }
 
 /**
