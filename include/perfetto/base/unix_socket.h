@@ -54,6 +54,9 @@ bool MakeSockAddr(const std::string& socket_name,
 
 base::ScopedFile CreateSocket();
 
+void OffsetMsgHdr(struct msghdr* msg, size_t n);
+ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags);
+
 // A non-blocking UNIX domain socket in SOCK_STREAM mode. Allows also to
 // transfer file descriptors. None of the methods in this class are blocking.
 // The main design goal is API simplicity and strong guarantees on the

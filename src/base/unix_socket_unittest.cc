@@ -620,6 +620,84 @@ TEST_F(UnixSocketTest, ReceiverDisconnectsDuringSend) {
   tx_thread.join();
 }
 
+TEST_F(UnixSocketTest, OffsetMsgHdrSendPartialFirst) {
+  // Send a part of the first iov, then send the rest.
+  struct iovec iov[2] = {};
+  char hello[] = "hello";
+  char world[] = "world";
+  iov[0].iov_base = &hello[0];
+  iov[0].iov_len = base::ArraySize(hello);
+
+  iov[1].iov_base = &world[0];
+  iov[1].iov_len = base::ArraySize(world);
+
+  struct msghdr hdr = {};
+  hdr.msg_iov = iov;
+  hdr.msg_iovlen = base::ArraySize(iov);
+
+  OffsetMsgHdr(&hdr, 1);
+  EXPECT_NE(hdr.msg_iov, nullptr);
+  EXPECT_EQ(hdr.msg_iovlen, 2);
+  EXPECT_STREQ(reinterpret_cast<char*>(hdr.msg_iov[0].iov_base), "ello");
+  EXPECT_EQ(iov[0].iov_len, base::ArraySize(hello) - 1);
+
+  OffsetMsgHdr(&hdr, base::ArraySize(hello) - 1);
+  EXPECT_EQ(hdr.msg_iov, &iov[1]);
+  EXPECT_EQ(hdr.msg_iovlen, 1);
+  EXPECT_STREQ(reinterpret_cast<char*>(hdr.msg_iov[0].iov_base), world);
+  EXPECT_EQ(hdr.msg_iov[0].iov_len, base::ArraySize(world));
+
+  OffsetMsgHdr(&hdr, base::ArraySize(world));
+  EXPECT_EQ(hdr.msg_iov, nullptr);
+  EXPECT_EQ(hdr.msg_iovlen, 0);
+}
+
+TEST_F(UnixSocketTest, OffsetMsgHdrSendFirstAndPartial) {
+  // Send first iov and part of the second iov, then send the rest.
+  struct iovec iov[2] = {};
+  char hello[] = "hello";
+  char world[] = "world";
+  iov[0].iov_base = &hello[0];
+  iov[0].iov_len = base::ArraySize(hello);
+
+  iov[1].iov_base = &world[0];
+  iov[1].iov_len = base::ArraySize(world);
+
+  struct msghdr hdr = {};
+  hdr.msg_iov = iov;
+  hdr.msg_iovlen = base::ArraySize(iov);
+
+  OffsetMsgHdr(&hdr, base::ArraySize(hello) + 1);
+  EXPECT_NE(hdr.msg_iov, nullptr);
+  EXPECT_EQ(hdr.msg_iovlen, 1);
+  EXPECT_STREQ(reinterpret_cast<char*>(hdr.msg_iov[0].iov_base), "orld");
+  EXPECT_EQ(hdr.msg_iov[0].iov_len, base::ArraySize(world) - 1);
+
+  OffsetMsgHdr(&hdr, base::ArraySize(world) - 1);
+  EXPECT_EQ(hdr.msg_iov, nullptr);
+  EXPECT_EQ(hdr.msg_iovlen, 0);
+}
+
+TEST_F(UnixSocketTest, OffsetMsgHdrSendEverything) {
+  // Send everything at once.
+  struct iovec iov[2] = {};
+  char hello[] = "hello";
+  char world[] = "world";
+  iov[0].iov_base = &hello[0];
+  iov[0].iov_len = base::ArraySize(hello);
+
+  iov[1].iov_base = &world[0];
+  iov[1].iov_len = base::ArraySize(world);
+
+  struct msghdr hdr = {};
+  hdr.msg_iov = iov;
+  hdr.msg_iovlen = base::ArraySize(iov);
+
+  OffsetMsgHdr(&hdr, base::ArraySize(world) + base::ArraySize(hello));
+  EXPECT_EQ(hdr.msg_iov, nullptr);
+  EXPECT_EQ(hdr.msg_iovlen, 0);
+}
+
 // TODO(primiano): add a test to check that in the case of a peer sending a fd
 // and the other end just doing a recv (without taking it), the fd is closed and
 // not left around.

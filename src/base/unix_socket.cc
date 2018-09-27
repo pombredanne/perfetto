@@ -64,6 +64,44 @@ using CBufLenType = socklen_t;
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #endif
 
+void OffsetMsgHdr(struct msghdr* msg, size_t n) {
+  for (size_t i = 0; i < msg->msg_iovlen; ++i) {
+    struct iovec* vec = &msg->msg_iov[i];
+    if (n < vec->iov_len) {
+      // We sent a part of this iovec.
+      vec->iov_base = reinterpret_cast<char*>(vec->iov_base) + n;
+      vec->iov_len -= n;
+      msg->msg_iov = vec;
+      msg->msg_iovlen -= i;
+      return;
+    }
+    // We sent the whole iovec.
+    n -= vec->iov_len;
+  }
+  // We sent all the iovecs.
+  PERFETTO_DCHECK(n == 0);
+  msg->msg_iovlen = 0;
+  msg->msg_iov = nullptr;
+}
+
+ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags) {
+  ssize_t total_sent = 0;
+  while (msg->msg_iov) {
+    ssize_t sent = PERFETTO_EINTR(sendmsg(sockfd, msg, flags));
+    if (sent <= 0) {
+      if (sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        return total_sent;
+      return sent;
+    }
+    total_sent += sent;
+    OffsetMsgHdr(msg, static_cast<size_t>(sent));
+    // Only send the auxilliary data with the first sendmsg call.
+    msg->msg_control = nullptr;
+    msg->msg_controllen = 0;
+  };
+  return total_sent;
+};
+
 ssize_t SockSend(int fd,
                  const void* msg,
                  size_t len,
@@ -90,7 +128,7 @@ ssize_t SockSend(int fd,
     msg_hdr.msg_controllen = cmsg->cmsg_len;
   }
 
-  return PERFETTO_EINTR(sendmsg(fd, &msg_hdr, kNoSigPipe));
+  return SendMsgAll(fd, &msg_hdr, kNoSigPipe);
 }
 
 ssize_t SockReceive(int fd,
@@ -414,6 +452,10 @@ bool UnixSocket::Send(const void* msg,
                       const int* send_fds,
                       size_t num_fds,
                       BlockingMode blocking_mode) {
+  // Non-blocking sends are broken because we do not properly handle partial
+  // sends.
+  PERFETTO_DCHECK(blocking_mode == BlockingMode::kBlocking);
+
   if (state_ != State::kConnected) {
     errno = last_error_ = ENOTCONN;
     return false;
