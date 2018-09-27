@@ -740,7 +740,7 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
   std::thread th([blocked_thread, &recv_socket] {
     char buf[1024];
     PERFETTO_EINTR(read(*recv_socket, buf, 1));
-    // We are now sure the other thread is in sendmsg, then send interrupt.
+    // We are now sure the other thread is in sendmsg, send interrupt.
     ASSERT_EQ(pthread_kill(blocked_thread, SIGWINCH), 0);
     // Drain the socket to allow SendMsgAll to succeed.
     while (PERFETTO_EINTR(read(*recv_socket, buf, sizeof(buf))) > 0) {
