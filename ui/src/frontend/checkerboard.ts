@@ -40,7 +40,7 @@ export function checkerboardExcept(
     leftPx: number,
     rightPx: number): void {
   // [leftPx, rightPx] doesn't overlap [startPx, endPx] at all:
-  if (rightPx <= startPx) {
+  if (rightPx <= startPx || leftPx >= endPx) {
     checkerboard(ctx, startPx, endPx);
     return;
   }
