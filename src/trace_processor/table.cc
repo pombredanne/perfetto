@@ -121,14 +121,18 @@ void Table::RegisterInternal(sqlite3* db,
                        sqlite3_value** v) {
     return ToCursor(c)->Filter(i, s, a, v);
   };
-  module->xNext = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Next(); };
-  module->xEof = [](sqlite3_vtab_cursor* c) { return ToCursor(c)->Eof(); };
+  module->xNext = [](sqlite3_vtab_cursor* c) {
+    return ToCursor(c)->cursor()->Next();
+  };
+  module->xEof = [](sqlite3_vtab_cursor* c) {
+    return ToCursor(c)->cursor()->Eof();
+  };
   module->xColumn = [](sqlite3_vtab_cursor* c, sqlite3_context* a, int b) {
-    return ToCursor(c)->Column(a, b);
+    return ToCursor(c)->cursor()->Column(a, b);
   };
 
   module->xRowid = [](sqlite3_vtab_cursor* c, sqlite3_int64* r) {
-    return ToCursor(c)->RowId(r);
+    return ToCursor(c)->cursor()->RowId(r);
   };
 
   module->xFindFunction =
@@ -239,22 +243,6 @@ int Table::RawCursor::Filter(int idxNum,
                   static_cast<size_t>(argc));
   cursor_ = table_->CreateCursor(table->qc_cache_, argv);
   return !cursor_ ? SQLITE_ERROR : SQLITE_OK;
-}
-
-int Table::RawCursor::Next() {
-  return cursor_->Next();
-}
-
-int Table::RawCursor::Eof() {
-  return cursor_->Eof();
-}
-
-int Table::RawCursor::Column(sqlite3_context* context, int N) {
-  return cursor_->Column(context, N);
-}
-
-int Table::RawCursor::RowId(sqlite3_int64* pRowId) {
-  return cursor_->RowId(pRowId);
 }
 
 Table::Cursor::~Cursor() = default;

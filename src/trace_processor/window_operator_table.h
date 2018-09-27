@@ -82,7 +82,7 @@ class WindowOperatorTable : public Table {
     uint64_t const step_size_;
     const WindowOperatorTable* const table_;
 
-    uint64_t current_ts_ = window_start_;
+    uint64_t current_ts_ = 0;
     uint32_t current_cpu_ = 0;
     uint64_t quantum_ts_ = 0;
     uint64_t row_id_ = 0;
