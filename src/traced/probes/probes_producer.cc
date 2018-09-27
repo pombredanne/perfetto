@@ -168,14 +168,13 @@ void ProbesProducer::StartDataSource(DataSourceInstanceID instance_id,
   }
   ProbesDataSource* data_source = it->second.get();
   PERFETTO_DCHECK(!data_source->started);
-  data_source->Start();
-  data_source->started = true;
-
   if (config.trace_duration_ms() != 0) {
     uint32_t timeout = 5000 + 2 * config.trace_duration_ms();
     watchdogs_.emplace(
         instance_id, base::Watchdog::GetInstance()->CreateFatalTimer(timeout));
   }
+  data_source->started = true;
+  data_source->Start();
 }
 
 std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(

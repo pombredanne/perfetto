@@ -137,7 +137,7 @@ message TraceConfig {
   optional GuardrailOverrides guardrail_overrides = 11;
 
   // When true, data sources are not started until an explicit call to
-  // StartTracing() on the consumer port. This is to support fast trace
-  // triggering.
+  // StartTracing() on the consumer port. This is to support early
+  // initialization and fast trace triggering.
   optional bool deferred_start = 12;
 }

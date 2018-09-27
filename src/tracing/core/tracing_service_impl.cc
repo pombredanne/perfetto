@@ -218,7 +218,6 @@ void TracingServiceImpl::DisconnectConsumer(ConsumerEndpointImpl* consumer) {
 #endif
 }
 
-// TODO before landing rename to Setup
 bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
                                        const TraceConfig& cfg,
                                        base::ScopedFile fd) {
@@ -383,7 +382,7 @@ bool TracingServiceImpl::StartTracing(TracingSessionID tsid) {
   }
 
   if (tracing_session->state != TracingSession::CONFIGURED) {
-    PERFETTO_DLOG("StartTracing() failed, tracing session state: %d",
+    PERFETTO_DLOG("StartTracing() failed, invalid session state: %d",
                   tracing_session->state);
     return false;
   }
