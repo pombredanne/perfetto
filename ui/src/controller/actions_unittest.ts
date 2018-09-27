@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {moveTrack, toggleTrackPinned} from '../common/actions';
+import {moveTrack, rootReducer, toggleTrackPinned} from '../common/actions';
 import {createEmptyState, State, TrackState} from '../common/state';
-
-import {rootReducer} from './reducer';
 
 function fakeTrack(state: State, id: string): TrackState {
   const track: TrackState = {

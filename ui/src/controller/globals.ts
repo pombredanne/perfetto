@@ -14,11 +14,10 @@
 
 import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
-import {Action} from '../common/actions';
+import {Action, rootReducer} from '../common/actions';
 import {createEmptyState, State} from '../common/state';
 import {ControllerAny} from './controller';
 import {Engine} from './engine';
-import {rootReducer} from './reducer';
 import {WasmEngineProxy} from './wasm_engine_proxy';
 import {
   createWasmEngine,
