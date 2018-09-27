@@ -93,9 +93,14 @@ void ConsumerIPCClientImpl::StartTracing() {
     return;
   }
 
+  ipc::Deferred<protos::StartTracingResponse> async_response;
+  async_response.Bind(
+      [](ipc::AsyncResult<protos::StartTracingResponse> response) {
+        if (!response)
+          PERFETTO_DLOG("StartTracing() failed");
+      });
   protos::StartTracingRequest req;
-  consumer_port_.StartTracing(req,
-                              ipc::Deferred<protos::StartTracingResponse>());
+  consumer_port_.StartTracing(req, std::move(async_response));
 }
 
 void ConsumerIPCClientImpl::DisableTracing() {

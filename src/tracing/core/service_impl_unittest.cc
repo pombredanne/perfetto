@@ -157,6 +157,10 @@ TEST_F(TracingServiceImplTest, EnableAndDisableTracing) {
   producer->WaitForDataSourceSetup("data_source");
   producer->WaitForDataSourceStart("data_source");
 
+  // Calling StartTracing() should be a noop (% a DLOG statement) because the
+  // trace config didn't have the |deferred_start| flag set.
+  consumer->StartTracing();
+
   consumer->DisableTracing();
   producer->WaitForDataSourceStop("data_source");
   consumer->WaitForTracingDisabled();
@@ -799,6 +803,44 @@ TEST_F(TracingServiceImplTest, ResynchronizeTraceStreamUsingSyncMarker) {
 
   ASSERT_EQ(whole_trace.packet_size(), merged_trace.packet_size());
   EXPECT_EQ(whole_trace.SerializeAsString(), merged_trace.SerializeAsString());
+}
+
+// Creates a tracing session with |deferred_start| and checks that data sources
+// are started only after calling StartTracing().
+TEST_F(TracingServiceImplTest, DeferredStart) {
+  std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
+  consumer->Connect(svc.get());
+
+  std::unique_ptr<MockProducer> producer = CreateMockProducer();
+  producer->Connect(svc.get(), "mock_producer");
+
+  // Create two data sources but enable only one of them.
+  producer->RegisterDataSource("ds_1");
+  producer->RegisterDataSource("ds_2");
+
+  TraceConfig trace_config;
+  trace_config.add_buffers()->set_size_kb(128);
+  trace_config.add_data_sources()->mutable_config()->set_name("ds_1");
+  trace_config.set_deferred_start(true);
+  trace_config.set_duration_ms(1);
+
+  consumer->EnableTracing(trace_config);
+  producer->WaitForTracingSetup();
+
+  producer->WaitForDataSourceSetup("ds_1");
+
+  // Make sure we don't get unexpected DataSourceStart() notifications yet.
+  task_runner.RunUntilIdle();
+
+  consumer->StartTracing();
+
+  producer->WaitForDataSourceStart("ds_1");
+
+  auto writer1 = producer->CreateTraceWriter("ds_1");
+  producer->WaitForFlush(writer1.get());
+
+  producer->WaitForDataSourceStop("ds_1");
+  consumer->WaitForTracingDisabled();
 }
 
 }  // namespace perfetto
