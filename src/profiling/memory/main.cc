@@ -42,20 +42,21 @@ constexpr size_t kUnwinderThreads = 5;
 // stack unwinding, and if it is a free just forwards the content of the record
 // to the bookkeeping thread.
 //
-//                                    +-----------------+
-//                      +------------>+Unwinding Thread +-----+
-//                      |             +-----------------+     |
-//                      |                                     |
-// +--------------+     |             +-----------------+     |
-// +------------------+ |SocketListener+-UnwindingRecord-->+Unwinding Thread
-// +-BookkeepingRecord->+Bookkeeping Thread|
-// +--------------+     |             +-----------------+     |
-// +------------------+
-//                      |                                     |
-//                      |             +-----------------+     |
-//                      +------------>+Unwinding Thread +-----+
-//                                    +-----------------+
-
+//             +--------------+
+//             |SocketListener|
+//             +------+-------+
+//                    |
+//          +--UnwindingRecord -+
+//          |                   |
+// +--------v-------+   +-------v--------+
+// |Unwinding Thread|   |Unwinding Thread|
+// +--------+-------+   +-------+--------+
+//          |                   |
+//          +-BookkeepingRecord +
+//                    |
+//           +--------v---------+
+//           |Bookkeeping Thread|
+//           +------------------+
 int HeapprofdMain(int argc, char** argv) {
   GlobalCallstackTrie callsites;
   std::unique_ptr<ipc::UnixSocket> sock;
