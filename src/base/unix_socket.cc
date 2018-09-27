@@ -84,14 +84,9 @@ void OffsetMsgHdr(struct msghdr* msg, size_t n) {
   msg->msg_iov = nullptr;
 }
 
-// Re-enter sendmsg until all the data has been sent or an error occurs.
-//
-// It is possible for sendmsg to returns a value smaller than the requested
-// bytes when it gets interrupted, even in blocking mode.
-//
-// Linux kernel dive to verify this is not only a theoretical possibility:
-// sock_stream_sendmsg, if sock_alloc_send_pskb returns NULL [1]
-// (which it does when it gets interrupted [2]), returns early with the
+// For the interested reader, Linux kernel dive to verify this is not only a
+// theoretical possibility: sock_stream_sendmsg, if sock_alloc_send_pskb returns
+// NULL [1] (which it does when it gets interrupted [2]), returns early with the
 // amount of bytes already sent.
 //
 // [1]:

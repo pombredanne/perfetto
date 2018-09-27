@@ -54,7 +54,12 @@ bool MakeSockAddr(const std::string& socket_name,
 
 base::ScopedFile CreateSocket();
 
+// Update msghdr so subsequent sendmsg will send data that remains after n bytes
+// have already been sent.
+// This should not be used, it's exported for test use only.
 void OffsetMsgHdr(struct msghdr* msg, size_t n);
+
+// Re-enter sendmsg until all the data has been sent or an error occurs.
 ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags);
 
 // A non-blocking UNIX domain socket in SOCK_STREAM mode. Allows also to
