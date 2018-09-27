@@ -129,8 +129,10 @@ void ProbesProducer::Restart() {
   ConnectWithRetries(socket_name, task_runner);
 }
 
-void ProbesProducer::StartDataSource(DataSourceInstanceID instance_id,
+void ProbesProducer::SetupDataSource(DataSourceInstanceID instance_id,
                                      const DataSourceConfig& config) {
+  PERFETTO_DLOG("SetupDataSource(id=%" PRIu64 ", name=%s)", instance_id,
+                config.name().c_str());
   PERFETTO_DCHECK(data_sources_.count(instance_id) == 0);
   TracingSessionID session_id = config.tracing_session_id();
   PERFETTO_CHECK(session_id > 0);
@@ -153,12 +155,26 @@ void ProbesProducer::StartDataSource(DataSourceInstanceID instance_id,
 
   session_data_sources_.emplace(session_id, data_source.get());
   data_sources_[instance_id] = std::move(data_source);
+}
 
+void ProbesProducer::StartDataSource(DataSourceInstanceID instance_id,
+                                     const DataSourceConfig& config) {
+  PERFETTO_DLOG("StartDataSource(id=%" PRIu64 ", name=%s)", instance_id,
+                config.name().c_str());
+  auto it = data_sources_.find(instance_id);
+  if (it == data_sources_.end()) {
+    PERFETTO_ELOG("Data source id=%" PRIu64 " not found", instance_id);
+    return;
+  }
+  ProbesDataSource* data_source = it->second.get();
+  PERFETTO_DCHECK(!data_source->started);
   if (config.trace_duration_ms() != 0) {
     uint32_t timeout = 5000 + 2 * config.trace_duration_ms();
     watchdogs_.emplace(
         instance_id, base::Watchdog::GetInstance()->CreateFatalTimer(timeout));
   }
+  data_source->started = true;
+  data_source->Start();
 }
 
 std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
@@ -223,9 +239,6 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateProcessStatsDataSource(
   auto data_source =
       std::unique_ptr<ProcessStatsDataSource>(new ProcessStatsDataSource(
           session_id, endpoint_->CreateTraceWriter(buffer_id), config));
-  if (config.process_stats_config().scan_all_processes_on_start()) {
-    data_source->WriteAllProcesses();
-  }
   return std::move(data_source);
 }
 
@@ -268,7 +281,7 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
                            size_t num_data_sources) {
   for (size_t i = 0; i < num_data_sources; i++) {
     auto it = data_sources_.find(data_source_ids[i]);
-    if (it == data_sources_.end())
+    if (it == data_sources_.end() || !it->second->started)
       continue;
     it->second->Flush();
   }
@@ -288,7 +301,7 @@ void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
   // unordered_multimap guarantees that entries with the same key are contiguous
   // in the iteration.
   for (auto it = session_data_sources_.begin(); /* check below*/; it++) {
-    // If this is the last iteration or this is the session id has changed,
+    // If this is the last iteration or the session id has changed,
     // dispatch the metadata update to the linked data sources, if any.
     if (it == session_data_sources_.end() || it->first != last_session_id) {
       bool has_inodes = metadata && !metadata->inode_and_device.empty();
@@ -307,6 +320,8 @@ void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
       last_session_id = it->first;
     }
     ProbesDataSource* ds = it->second;
+    if (!ds->started)
+      continue;
     switch (ds->type_id) {
       case FtraceDataSource::kTypeId:
         metadata = static_cast<FtraceDataSource*>(ds)->mutable_metadata();
