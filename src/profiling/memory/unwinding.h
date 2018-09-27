@@ -22,7 +22,7 @@
 #include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/bookkeeping.h"
 #include "src/profiling/memory/bounded_queue.h"
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 
@@ -80,8 +80,8 @@ struct UnwindingRecord {
 };
 
 struct FreeRecord {
-  size_t size;
   std::unique_ptr<uint8_t[]> free_data;
+  FreeMetadata* metadata;
 };
 
 struct AllocRecord {
@@ -96,10 +96,7 @@ struct BookkeepingRecord {
   FreeRecord free_record;
 };
 
-bool DoUnwind(void* mem,
-              size_t sz,
-              ProcessMetadata* metadata,
-              AllocRecord* out);
+bool DoUnwind(WireMessage*, ProcessMetadata* metadata, AllocRecord* out);
 
 bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
 void HandleBookkeepingRecord(BookkeepingRecord* rec);

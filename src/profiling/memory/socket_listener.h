@@ -30,8 +30,8 @@ namespace perfetto {
 class SocketListener : public ipc::UnixSocket::EventListener {
  public:
   SocketListener(std::function<void(UnwindingRecord)> fn,
-                 GlobalCallstackTrie* bookkeeping)
-      : callback_function_(std::move(fn)), callsites_(bookkeeping) {}
+                 GlobalCallstackTrie* callsites)
+      : callback_function_(std::move(fn)), callsites_(callsites) {}
   void OnDisconnect(ipc::UnixSocket* self) override;
   void OnNewIncomingConnection(
       ipc::UnixSocket* self,
