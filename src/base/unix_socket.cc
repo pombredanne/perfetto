@@ -84,7 +84,23 @@ void OffsetMsgHdr(struct msghdr* msg, size_t n) {
   msg->msg_iov = nullptr;
 }
 
+// Re-enter sendmsg until all the data has been sent or an error occurs.
+//
+// It is possible for sendmsg to returns a value smaller than the requested
+// bytes when it gets interrupted, even in blocking mode.
+//
+// Linux kernel dive to verify this is not only a theoretical possibility:
+// sock_stream_sendmsg, if sock_alloc_send_pskb returns NULL [1]
+// (which it does when it gets interrupted [2]), returns early with the
+// amount of bytes already sent.
+//
+// [1]:
+// https://elixir.bootlin.com/linux/v4.18.10/source/net/unix/af_unix.c#L1872
+// [2]: https://elixir.bootlin.com/linux/v4.18.10/source/net/core/sock.c#L2101
 ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags) {
+  // This does not make sense on non-blocking sockets.
+  PERFETTO_DCHECK((fcntl(sockfd, F_GETFL, 0) & O_NONBLOCK) == 0);
+
   ssize_t total_sent = 0;
   while (msg->msg_iov) {
     ssize_t sent = PERFETTO_EINTR(sendmsg(sockfd, msg, flags));

@@ -698,6 +698,69 @@ TEST_F(UnixSocketTest, OffsetMsgHdrSendEverything) {
   EXPECT_EQ(hdr.msg_iovlen, 0);
 }
 
+void Handler(int) {}
+
+int RollbackSigaction(const struct sigaction* act) {
+  return sigaction(SIGWINCH, act, nullptr);
+}
+
+TEST_F(UnixSocketTest, PartialSendMsgAll) {
+  int sv[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sv), 0);
+  base::ScopedFile send_socket(sv[0]);
+  base::ScopedFile recv_socket(sv[1]);
+
+  // Set bufsize to minimum.
+  int bufsize = 1024;
+  ASSERT_EQ(setsockopt(*send_socket, SOL_SOCKET, SO_SNDBUF, &bufsize,
+                       sizeof(bufsize)),
+            0);
+  ASSERT_EQ(setsockopt(*recv_socket, SOL_SOCKET, SO_RCVBUF, &bufsize,
+                       sizeof(bufsize)),
+            0);
+
+  // Send something larger than send + recv buffers combined to make sendmsg
+  // block.
+  char large_buf[8192];
+
+  // Need to install signal handler to cause the interrupt to happen.
+  // man 3 pthread_kill:
+  //   Signal dispositions are process-wide: if a signal handler is
+  //   installed, the handler will be invoked in the thread thread, but if
+  //   the disposition of the signal is "stop", "continue", or "terminate",
+  //   this action will affect the whole process.
+  struct sigaction oldact;
+  struct sigaction newact;
+  newact.sa_handler = Handler;
+  ASSERT_EQ(sigaction(SIGWINCH, &newact, &oldact), 0);
+  base::ScopedResource<const struct sigaction*, RollbackSigaction, nullptr>
+      rollback(&oldact);
+
+  auto blocked_thread = pthread_self();
+  std::thread th([blocked_thread, &recv_socket] {
+    char buf[1024];
+    PERFETTO_EINTR(read(*recv_socket, buf, 1));
+    // We are now sure the other thread is in sendmsg, then send interrupt.
+    ASSERT_EQ(pthread_kill(blocked_thread, SIGWINCH), 0);
+    // Drain the socket to allow SendMsgAll to succeed.
+    while (PERFETTO_EINTR(read(*recv_socket, buf, sizeof(buf))) > 0) {
+    }
+  });
+
+  struct msghdr hdr;
+  struct iovec iov;
+  iov.iov_base = large_buf;
+  iov.iov_len = sizeof(large_buf);
+  hdr.msg_iov = &iov;
+  hdr.msg_iovlen = 1;
+
+  ASSERT_EQ(SendMsgAll(*send_socket, &hdr, 0), sizeof(large_buf));
+  send_socket.reset();
+  th.join();
+  // Make sure the re-entry logic was actually triggered.
+  ASSERT_EQ(hdr.msg_iov, nullptr);
+}
+
 // TODO(primiano): add a test to check that in the case of a peer sending a fd
 // and the other end just doing a recv (without taking it), the fd is closed and
 // not left around.
