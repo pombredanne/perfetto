@@ -23,7 +23,7 @@
 
 #include "perfetto/base/logging.h"
 
-// Transport messages between threads. Single-producer / single-consumer.
+// Transport messages between threads. Multiple-producer / single-consumer.
 //
 // This has to outlive both the consumer and the producer who have to
 // negotiate termination separately, if needed. This is currently only used
