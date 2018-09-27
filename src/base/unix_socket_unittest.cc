@@ -719,8 +719,8 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
                        sizeof(bufsize)),
             0);
 
-  // Send something larger than send + recv buffers combined to make sendmsg
-  // block.
+  // Send something larger than send + recv kernel buffers combined to make
+  // sendmsg block.
   char send_buf[8192];
   char recv_buf[sizeof(send_buf)];
 
