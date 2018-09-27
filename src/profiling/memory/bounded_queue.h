@@ -23,7 +23,7 @@
 
 #include "perfetto/base/logging.h"
 
-// Transport messages between threads. Single-producer / single-consumer.
+// Transport messages between threads. Multiple-producer / single-consumer.
 //
 // This has to outlive both the consumer and the producer who have to
 // negotiate termination separately, if needed. This is currently only used
@@ -43,7 +43,7 @@ class BoundedQueue {
       full_cv_.wait(l, [this] { return deque_.size() < capacity_; });
     deque_.emplace_back(std::move(item));
     if (deque_.size() == 1)
-      empty_cv_.notify_one();
+      empty_cv_.notify_all();
   }
 
   T Get() {
@@ -54,7 +54,7 @@ class BoundedQueue {
     deque_.pop_front();
     if (deque_.size() == capacity_ - 1) {
       l.unlock();
-      full_cv_.notify_one();
+      full_cv_.notify_all();
     }
     return item;
   }
@@ -65,12 +65,11 @@ class BoundedQueue {
       std::lock_guard<std::mutex> l(mutex_);
       capacity_ = capacity;
     }
-    full_cv_.notify_one();
+    full_cv_.notify_all();
   }
 
  private:
   size_t capacity_;
-
   size_t elements_ = 0;
   std::deque<T> deque_;
   std::condition_variable full_cv_;

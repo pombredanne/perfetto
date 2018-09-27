@@ -96,11 +96,12 @@ void SocketListener::RecordReceived(base::UnixSocket* self,
                                     size_t size,
                                     std::unique_ptr<uint8_t[]> buf) {
   auto it = sockets_.find(self);
-  if (it == sockets_.end())
+  if (it == sockets_.end()) {
     // This happens for zero-length records, because the callback gets called
     // in the first call to Read, before InitProcess is called. Because zero
     // length records are useless anyway, this is not a problem.
     return;
+  }
   Entry& entry = it->second;
   if (!entry.process_metadata) {
     PERFETTO_DLOG("Received record without process metadata.");

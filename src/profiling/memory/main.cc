@@ -32,16 +32,41 @@ constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 
+// We create kUnwinderThreads unwinding threads and one bookeeping thread.
+// The bookkeeping thread is singleton in order to avoid expensive and
+// complicated synchronisation in the bookkeeping.
+//
+// We wire up the system by creating BoundedQueues between the threads. The main
+// thread runs the TaskRunner driving the SocketListener. The unwinding thread
+// takes the data received by the SocketListener and if it is a malloc does
+// stack unwinding, and if it is a free just forwards the content of the record
+// to the bookkeeping thread.
+//
+//                                    +-----------------+
+//                      +------------>+Unwinding Thread +-----+
+//                      |             +-----------------+     |
+//                      |                                     |
+// +--------------+     |             +-----------------+     |
+// +------------------+ |SocketListener+-UnwindingRecord-->+Unwinding Thread
+// +-BookkeepingRecord->+Bookkeeping Thread|
+// +--------------+     |             +-----------------+     |
+// +------------------+
+//                      |                                     |
+//                      |             +-----------------+     |
+//                      +------------>+Unwinding Thread +-----+
+//                                    +-----------------+
+
 int HeapprofdMain(int argc, char** argv) {
   GlobalCallstackTrie callsites;
   std::unique_ptr<ipc::UnixSocket> sock;
+
+  BoundedQueue<BookkeepingRecord> callsites_queue(kBookkeepingQueueSize);
+  std::thread bookkeeping_thread(
+      [&callsites_queue] { BookkeepingMainLoop(&callsites_queue); });
+
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
     unwinder_queues[i].SetSize(kUnwinderQueueSize);
-  BoundedQueue<BookkeepingRecord> callsites_queue(kBookkeepingQueueSize);
-  std::thread callsites_thread(
-      [&callsites_queue] { BookkeepingMainLoop(&callsites_queue); });
-
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
   for (size_t i = 0; i < kUnwinderThreads; ++i) {
@@ -51,7 +76,7 @@ int HeapprofdMain(int argc, char** argv) {
   }
 
   auto on_record_received = [&unwinder_queues](UnwindingRecord r) {
-    unwinder_queues[static_cast<size_t>(r.pid) % unwinder_queues.size()].Add(
+    unwinder_queues[static_cast<size_t>(r.pid) % kUnwinderThreads].Add(
         std::move(r));
   };
   SocketListener listener(std::move(on_record_received), &callsites);

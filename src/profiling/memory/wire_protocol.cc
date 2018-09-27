@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
@@ -37,7 +37,8 @@ bool ViewAndAdvance(char** ptr, T** out, const char* end) {
 
 bool SendWireMessage(int sock, const WireMessage& msg) {
   uint64_t total_size;
-  struct iovec iovecs[4];
+  struct iovec iovecs[4] = {};
+  // TODO(fmayer): Maye pack these two.
   iovecs[0].iov_base = &total_size;
   iovecs[0].iov_len = sizeof(total_size);
   iovecs[1].iov_base = const_cast<RecordType*>(&msg.record_type);
@@ -45,13 +46,12 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   if (msg.alloc_header) {
     iovecs[2].iov_base = msg.alloc_header;
     iovecs[2].iov_len = sizeof(*msg.alloc_header);
-  } else {
-    if (!msg.free_header) {
-      PERFETTO_DCHECK(false);
-      return false;
-    }
+  } else if (msg.free_header) {
     iovecs[2].iov_base = msg.free_header;
     iovecs[2].iov_len = sizeof(*msg.free_header);
+  } else {
+    PERFETTO_DCHECK(false);
+    return false;
   }
 
   iovecs[3].iov_base = msg.payload;
@@ -60,11 +60,11 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   struct msghdr hdr = {};
   hdr.msg_iov = iovecs;
   if (msg.payload) {
-    hdr.msg_iovlen = 4;
+    hdr.msg_iovlen = base::ArraySize(iovecs);
     total_size = iovecs[1].iov_len + iovecs[2].iov_len + iovecs[3].iov_len;
   } else {
     // If we are not sending payload, just ignore that iovec.
-    hdr.msg_iovlen = 3;
+    hdr.msg_iovlen = base::ArraySize(iovecs) - 1;
     total_size = iovecs[1].iov_len + iovecs[2].iov_len;
   }
 

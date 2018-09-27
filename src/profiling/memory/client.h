@@ -23,7 +23,7 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 
@@ -95,6 +95,7 @@ class FreePage {
 
 const char* GetThreadStackBase();
 
+// This is created and owned by the malloc hooks.
 class Client {
  public:
   Client(std::vector<base::ScopedFile> sockets);
