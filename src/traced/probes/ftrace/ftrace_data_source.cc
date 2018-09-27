@@ -44,15 +44,17 @@ FtraceDataSource::~FtraceDataSource() {
 };
 
 void FtraceDataSource::Start() {
-  // TODO(primiano): implement in next CL. For now the ftrace data source
-  // still starts immediately on creation.
+  FtraceController* ftrace = controller_weak_.get();
+  if (!ftrace)
+    return;
+  ftrace->StartDataSource(this);
+  DumpFtraceStats(&stats_before_);
 }
 
 void FtraceDataSource::Initialize(FtraceConfigId config_id,
                                   std::unique_ptr<EventFilter> event_filter) {
   config_id_ = config_id;
   event_filter_ = std::move(event_filter);
-  DumpFtraceStats(&stats_before_);
 }
 
 void FtraceDataSource::DumpFtraceStats(FtraceStats* stats) {

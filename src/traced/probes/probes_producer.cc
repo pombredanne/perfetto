@@ -209,7 +209,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
       endpoint_->CreateTraceWriter(buffer_id)));
   if (!ftrace_->AddDataSource(data_source.get())) {
     PERFETTO_ELOG(
-        "Failed to start tracing (too many concurrent sessions or ftrace is "
+        "Failed to setup tracing (too many concurrent sessions or ftrace is "
         "already in use)");
     return nullptr;
   }
