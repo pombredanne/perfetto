@@ -34,15 +34,16 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
                                uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
-    if (it->second.sequence_number > sequence_number)
+    if (it->second.sequence_number > sequence_number) {
       return;
-    else
+    } else {
       // Clean up previous allocation by pretending a free happened just after
       // it.
       // CommitFree only uses the sequence number to check whether the
       // currently active allocation is newer than the free, so we can make
       // up a sequence_number here.
       CommitFree(it->second.sequence_number + 1, address);
+    }
   }
 
   GlobalCallstackTrie::Node* node =

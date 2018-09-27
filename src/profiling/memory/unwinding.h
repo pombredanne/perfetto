@@ -22,7 +22,7 @@
 #include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/bookkeeping.h"
 #include "src/profiling/memory/bounded_queue.h"
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 

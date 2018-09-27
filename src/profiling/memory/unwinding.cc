@@ -42,8 +42,8 @@
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
-#include "src/profiling/memory/transport_data.h"
 #include "src/profiling/memory/unwinding.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 
@@ -201,13 +201,14 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
         // Process has already gone away.
         return false;
 
-      out->metadata = std::move(metadata);
+      out->metadata = std::move(rec->metadata);
       out->free_record = {};
       return DoUnwind(&msg, metadata.get(), &out->alloc_record);
     }
     case RecordType::Free: {
       // We need to keep this alive, because msg.free_header is a pointer into
       // this.
+      out->metadata = std::move(rec->metadata);
       out->free_record.free_data = std::move(rec->data);
       out->free_record.metadata = msg.free_header;
       out->alloc_record = {};

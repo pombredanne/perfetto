@@ -17,8 +17,8 @@
 // The data types used for communication between heapprofd and the client
 // embedded in processes that are being profiled.
 
-#ifndef SRC_PROFILING_MEMORY_TRANSPORT_DATA_H_
-#define SRC_PROFILING_MEMORY_TRANSPORT_DATA_H_
+#ifndef SRC_PROFILING_MEMORY_WIRE_PROTOCOL_H_
+#define SRC_PROFILING_MEMORY_WIRE_PROTOCOL_H_
 
 #include <inttypes.h>
 #include <unwindstack/Elf.h>
@@ -96,10 +96,11 @@ struct WireMessage {
 
 bool SendWireMessage(int sock, const WireMessage& msg);
 
-// Receive and parse message received over the wire.
-// buf has to outlive out.
+// Parse message received over the wire.
+// |buf| has to outlive |out|.
+// If buf is not a valid message, return false.
 bool ReceiveWireMessage(char* buf, size_t size, WireMessage* out);
 
 }  // namespace perfetto
 
-#endif  // SRC_PROFILING_MEMORY_TRANSPORT_DATA_H_
+#endif  // SRC_PROFILING_MEMORY_WIRE_PROTOCOL_H_

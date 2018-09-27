@@ -42,6 +42,7 @@ class HeapprofdIntegrationTest : public ::testing::Test {
   void TearDown() override { DESTROY_TEST_SOCK(kSocketName); }
 };
 
+// TODO(fmayer): Fix out of tree integration test.
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
 #define MAYBE_EndToEnd EndToEnd
 #else

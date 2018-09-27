@@ -37,7 +37,7 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/sock_utils.h"
 #include "perfetto/base/utils.h"
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 namespace {
@@ -109,6 +109,7 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
+  PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
   if (!sock) {
     // TODO(fmayer): Handle reconnect or similar.
     // This is just to prevent a deadlock.
@@ -162,6 +163,18 @@ const char* Client::GetStackBase() {
   return GetThreadStackBase();
 }
 
+// The stack grows towards numerically smaller addresses, so the stack layout
+// of main calling malloc is as follows.
+//
+//               +------------+
+//               |SendWireMsg |
+// stacktop +--> +------------+ 0x1000
+//               |RecordMalloc|    +
+//               +------------+    |
+//               | malloc     |    |
+//               +------------+    |
+//               |  main      |    v
+// stackbase +-> +------------+ 0xffff
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   AllocMetadata metadata;
   const char* stackbase = GetStackBase();
@@ -181,7 +194,7 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.arch = unwindstack::Regs::CurrentArch();
   metadata.sequence_number = ++sequence_number_;
 
-  WireMessage msg = {};
+  WireMessage msg{};
   msg.alloc_header = &metadata;
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
