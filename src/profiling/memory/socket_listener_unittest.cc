@@ -53,7 +53,7 @@ TEST_F(SocketListenerTest, ReceiveRecord) {
     callback_called();
   };
 
-  Callsites bookkeeping;
+  GlobalCallstackTrie bookkeeping;
   SocketListener listener({},  // We do not care about the sampling rate.
                           std::move(callback_fn), &bookkeeping);
   MockEventListener client_listener;

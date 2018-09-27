@@ -32,7 +32,7 @@ class SocketListener : public ipc::UnixSocket::EventListener {
  public:
   SocketListener(ClientConfiguration client_config,
                  std::function<void(UnwindingRecord)> fn,
-                 Callsites* bookkeeping)
+                 GlobalCallstackTrie* bookkeeping)
       : client_config_(client_config),
         callback_function_(std::move(fn)),
         callsites_(bookkeeping) {}
@@ -69,7 +69,7 @@ class SocketListener : public ipc::UnixSocket::EventListener {
   std::map<ipc::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
   std::function<void(UnwindingRecord)> callback_function_;
-  Callsites* callsites_;
+  GlobalCallstackTrie* callsites_;
 };
 
 }  // namespace perfetto

@@ -36,8 +36,8 @@ std::vector<CodeLocation> stack2() {
 
 TEST(BookkeepingTest, Basic) {
   uint64_t sequence_number = 1;
-  Callsites c;
-  HeapDump hd(&c);
+  GlobalCallstackTrie c;
+  HeapTracker hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, sequence_number++);
   hd.RecordMalloc(stack2(), 2, 2, sequence_number++);
@@ -48,12 +48,12 @@ TEST(BookkeepingTest, Basic) {
   ASSERT_EQ(c.GetCumSizeForTesting({{"map1", "fun1"}}), 0);
 }
 
-TEST(BookkeepingTest, TwoHeapDumps) {
+TEST(BookkeepingTest, TwoHeapTrackers) {
   uint64_t sequence_number = 1;
-  Callsites c;
-  HeapDump hd(&c);
+  GlobalCallstackTrie c;
+  HeapTracker hd(&c);
   {
-    HeapDump hd2(&c);
+    HeapTracker hd2(&c);
 
     hd.RecordMalloc(stack(), 1, 5, sequence_number++);
     hd2.RecordMalloc(stack2(), 2, 2, sequence_number++);
@@ -64,8 +64,8 @@ TEST(BookkeepingTest, TwoHeapDumps) {
 
 TEST(BookkeepingTest, ReplaceAlloc) {
   uint64_t sequence_number = 1;
-  Callsites c;
-  HeapDump hd(&c);
+  GlobalCallstackTrie c;
+  HeapTracker hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, sequence_number++);
   hd.RecordMalloc(stack2(), 1, 2, sequence_number++);
@@ -74,8 +74,8 @@ TEST(BookkeepingTest, ReplaceAlloc) {
 }
 
 TEST(BookkeepingTest, OutOfOrder) {
-  Callsites c;
-  HeapDump hd(&c);
+  GlobalCallstackTrie c;
+  HeapTracker hd(&c);
 
   hd.RecordMalloc(stack(), 1, 5, 1);
   hd.RecordMalloc(stack2(), 1, 2, 0);

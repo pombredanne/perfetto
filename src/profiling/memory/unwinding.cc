@@ -248,9 +248,12 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
   if (rec->free_record.free_data) {
     FreeRecord& free_rec = rec->free_record;
     uint64_t* data = reinterpret_cast<uint64_t*>(free_rec.free_data.get());
-    PERFETTO_DCHECK(free_rec.size % (2 * sizeof(uint64_t)) == sizeof(uint64_t));
-    for (size_t i = 1; i < free_rec.size / sizeof(uint64_t); i += 2)
-      metadata->heap_dump.RecordFree(data[i + 1], data[i]);
+    PERFETTO_DCHECK(free_rec.size % sizeof(FreePageEntry) == sizeof(uint64_t));
+    FreePageEntry* entries = reinterpret_cast<FreePageEntry*>(data + 1);
+    for (size_t i = 0; i < free_rec.size / sizeof(FreePageEntry); ++i) {
+      const FreePageEntry& entry = entries[i];
+      metadata->heap_dump.RecordFree(entry.addr, entry.sequence_number);
+    }
   } else {
     AllocRecord& alloc_rec = rec->alloc_record;
     std::vector<CodeLocation> code_locations;

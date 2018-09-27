@@ -34,7 +34,7 @@ constexpr size_t kUnwinderThreads = 5;
 constexpr double kSamplingRate = 512e3;
 
 int HeapprofdMain(int argc, char** argv) {
-  Callsites callsites;
+  GlobalCallstackTrie callsites;
   std::unique_ptr<ipc::UnixSocket> sock;
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
