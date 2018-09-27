@@ -19,11 +19,14 @@
 
 #include <sqlite3.h>
 
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
+#include "perfetto/base/logging.h"
 #include "src/trace_processor/query_constraints.h"
 
 namespace perfetto {

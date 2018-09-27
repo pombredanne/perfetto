@@ -70,10 +70,6 @@ class SchedSliceTable : public Table {
     size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
 
    private:
-    // Updates |sorted_row_ids_| with the indices into the slices sorted by the
-    // order by criteria.
-    void SetupSortedRowIds(uint64_t min_ts, uint64_t max_ts);
-
     // Compares the slice at index |f| with the slice at index |s|on all
     // columns.
     // Returns -1 if the first slice is before the second in the ordering, 1 if
@@ -88,13 +84,8 @@ class SchedSliceTable : public Table {
                               size_t s,
                               const QueryConstraints::OrderBy& order_by);
 
-    void FindNextRowAndTimestamp();
-
     // Vector of row ids sorted by the the given order by constraints.
     std::vector<uint32_t> sorted_row_ids_;
-
-    // Bitset for filtering slices.
-    std::vector<bool> row_filter_;
 
     // An offset into |sorted_row_ids_| indicating the next row to return.
     uint32_t next_row_id_index_ = 0;

@@ -62,6 +62,48 @@ inline std::string OpToString(int op) {
   }
 }
 
+template <typename T,
+          typename = typename std::
+              enable_if<std::is_convertible<sqlite3_int64, T>::value, T>::type>
+inline T CooerceType(sqlite3_value* argv) {
+  PERFETTO_CHECK(sqlite3_value_type(argv) == SQLITE_INTEGER);
+  return static_cast<T>(sqlite3_value_int64(argv));
+}
+
+template <class T>
+inline void FilterColumn(const std::deque<T>& data,
+                         const QueryConstraints::Constraint& constraint,
+                         sqlite3_value* argv,
+                         std::vector<bool>* filter) {
+  auto it = std::find(filter->begin(), filter->end(), true);
+  while (it != filter->end()) {
+    auto index = static_cast<size_t>(std::distance(filter->begin(), it));
+    switch (constraint.op) {
+      case SQLITE_INDEX_CONSTRAINT_EQ:
+        *it = data[index] == CooerceType<T>(argv);
+        break;
+      case SQLITE_INDEX_CONSTRAINT_GE:
+        *it = data[index] >= CooerceType<T>(argv);
+        break;
+      case SQLITE_INDEX_CONSTRAINT_GT:
+        *it = data[index] > CooerceType<T>(argv);
+        break;
+      case SQLITE_INDEX_CONSTRAINT_LE:
+        *it = data[index] <= CooerceType<T>(argv);
+        break;
+      case SQLITE_INDEX_CONSTRAINT_LT:
+        *it = data[index] < CooerceType<T>(argv);
+        break;
+      case SQLITE_INDEX_CONSTRAINT_NE:
+        *it = data[index] != CooerceType<T>(argv);
+        break;
+      default:
+        PERFETTO_CHECK(false);
+    }
+    it = std::find(it + 1, filter->end(), true);
+  }
+}
+
 }  // namespace sqlite_utils
 }  // namespace trace_processor
 }  // namespace perfetto

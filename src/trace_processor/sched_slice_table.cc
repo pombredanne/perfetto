@@ -34,49 +34,6 @@ using namespace sqlite_utils;
 
 constexpr uint64_t kUint64Max = std::numeric_limits<uint64_t>::max();
 
-template <size_t N = base::kMaxCpus>
-bool PopulateFilterBitmap(int op,
-                          sqlite3_value* value,
-                          std::bitset<N>* filter) {
-  bool constraint_implemented = true;
-  int64_t int_value = sqlite3_value_int64(value);
-  if (IsOpGe(op) || IsOpGt(op)) {
-    // If the operator is gt, then add one to the upper bound.
-    int_value = IsOpGt(op) ? int_value + 1 : int_value;
-
-    // Set to false all values less than |int_value|.
-    size_t ub = static_cast<size_t>(std::max<int64_t>(0, int_value));
-    ub = std::min(ub, filter->size());
-    for (size_t i = 0; i < ub; i++) {
-      filter->set(i, false);
-    }
-  } else if (IsOpLe(op) || IsOpLt(op)) {
-    // If the operator is lt, then minus one to the lower bound.
-    int_value = IsOpLt(op) ? int_value - 1 : int_value;
-
-    // Set to false all values greater than |int_value|.
-    size_t lb = static_cast<size_t>(std::max<int64_t>(0, int_value));
-    lb = std::min(lb, filter->size());
-    for (size_t i = lb; i < filter->size(); i++) {
-      filter->set(i, false);
-    }
-  } else if (IsOpEq(op)) {
-    if (int_value >= 0 && static_cast<size_t>(int_value) < filter->size()) {
-      // If the value is in bounds, set all bits to false and restore the value
-      // of the bit at the specified index.
-      bool existing = filter->test(static_cast<size_t>(int_value));
-      filter->reset();
-      filter->set(static_cast<size_t>(int_value), existing);
-    } else {
-      // If the index is out of bounds, nothing should match.
-      filter->reset();
-    }
-  } else {
-    constraint_implemented = false;
-  }
-  return constraint_implemented;
-}
-
 template <class T>
 inline int Compare(T first, T second, bool desc) {
   if (first < second) {
@@ -148,9 +105,6 @@ SchedSliceTable::Cursor::Cursor(const TraceStorage* storage,
   for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
     const auto& cs = query_constraints.constraints()[i];
     switch (cs.iColumn) {
-      case Column::kCpu:
-        PopulateFilterBitmap(cs.op, argv[i], &cpu_filter);
-        break;
       case Column::kTimestamp: {
         auto ts = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
         if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
@@ -162,22 +116,57 @@ SchedSliceTable::Cursor::Cursor(const TraceStorage* storage,
       }
     }
   }
-  SetupSortedRowIds(min_ts, max_ts);
 
-  // Filter rows on CPUs if any CPUs need to be excluded.
   const auto& slices = storage_->slices();
-  row_filter_.resize(sorted_row_ids_.size(), true);
-  if (cpu_filter.count() < cpu_filter.size()) {
-    for (size_t i = 0; i < sorted_row_ids_.size(); i++) {
-      row_filter_[i] = cpu_filter.test(slices.cpus()[sorted_row_ids_[i]]);
+  const auto& start_ns = slices.start_ns();
+  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+
+  auto min_it = std::lower_bound(start_ns.begin(), start_ns.end(), min_ts);
+  auto max_it = std::upper_bound(min_it, start_ns.end(), max_ts);
+  ptrdiff_t dist = std::distance(min_it, max_it);
+  PERFETTO_CHECK(dist >= 0 && static_cast<size_t>(dist) <= start_ns.size());
+
+  auto start_idx = std::distance(start_ns.begin(), min_it);
+  auto end_idx = std::distance(start_ns.begin(), max_it);
+
+  std::vector<bool> row_filter(start_ns.size(), true);
+  std::fill(row_filter.begin(), row_filter.begin() + start_idx, false);
+  std::fill(row_filter.begin() + end_idx, row_filter.end(), false);
+
+  for (size_t i = 0; i < query_constraints.constraints().size(); i++) {
+    const auto& cs = query_constraints.constraints()[i];
+    switch (cs.iColumn) {
+      case Column::kTimestamp:
+        break;
+      case Column::kCpu:
+        sqlite_utils::FilterColumn(slices.cpus(), cs, argv[i], &row_filter);
+        break;
     }
   }
-  FindNextRowAndTimestamp();
+
+  auto set_bits = std::count(row_filter.begin() + start_idx,
+                             row_filter.begin() + end_idx, true);
+
+  // Fill |indices| with the consecutive row numbers affected by the filtering.
+  sorted_row_ids_.resize(static_cast<size_t>(set_bits));
+  size_t i = 0;
+  auto it = std::find(row_filter.begin(), row_filter.end(), true);
+  while (it != row_filter.end()) {
+    auto index = std::distance(row_filter.begin(), it);
+    sorted_row_ids_[i++] = static_cast<uint32_t>(index);
+    it = std::find(it + 1, row_filter.end(), true);
+  }
+
+  // Sort if there is any order by constraints.
+  if (!order_by_.empty()) {
+    std::sort(
+        sorted_row_ids_.begin(), sorted_row_ids_.end(),
+        [this](uint32_t f, uint32_t s) { return CompareSlices(f, s) < 0; });
+  }
 }
 
 int SchedSliceTable::Cursor::Next() {
   next_row_id_index_++;
-  FindNextRowAndTimestamp();
   return SQLITE_OK;
 }
 
@@ -213,30 +202,6 @@ int SchedSliceTable::Cursor::Column(sqlite3_context* context, int N) {
   return SQLITE_OK;
 }
 
-void SchedSliceTable::Cursor::SetupSortedRowIds(uint64_t min_ts,
-                                                uint64_t max_ts) {
-  const auto& slices = storage_->slices();
-  const auto& start_ns = slices.start_ns();
-  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
-
-  auto min_it = std::lower_bound(start_ns.begin(), start_ns.end(), min_ts);
-  auto max_it = std::upper_bound(min_it, start_ns.end(), max_ts);
-  ptrdiff_t dist = std::distance(min_it, max_it);
-  PERFETTO_CHECK(dist >= 0 && static_cast<size_t>(dist) <= start_ns.size());
-
-  // Fill |indices| with the consecutive row numbers affected by the filtering.
-  sorted_row_ids_.resize(static_cast<size_t>(dist));
-  std::iota(sorted_row_ids_.begin(), sorted_row_ids_.end(),
-            std::distance(start_ns.begin(), min_it));
-
-  // Sort if there is any order by constraints.
-  if (!order_by_.empty()) {
-    std::sort(
-        sorted_row_ids_.begin(), sorted_row_ids_.end(),
-        [this](uint32_t f, uint32_t s) { return CompareSlices(f, s) < 0; });
-  }
-}
-
 int SchedSliceTable::Cursor::CompareSlices(size_t f_idx, size_t s_idx) {
   for (const auto& ob : order_by_) {
     int c = CompareSlicesOnColumn(f_idx, s_idx, ob);
@@ -262,15 +227,6 @@ int SchedSliceTable::Cursor::CompareSlicesOnColumn(
       return Compare(sl.utids()[f_idx], sl.utids()[s_idx], ob.desc);
   }
   PERFETTO_FATAL("Unexpected column %d", ob.iColumn);
-}
-
-void SchedSliceTable::Cursor::FindNextRowAndTimestamp() {
-  auto start =
-      row_filter_.begin() +
-      static_cast<decltype(row_filter_)::difference_type>(next_row_id_index_);
-  auto next_it = std::find(start, row_filter_.end(), true);
-  next_row_id_index_ =
-      static_cast<uint32_t>(std::distance(row_filter_.begin(), next_it));
 }
 
 }  // namespace trace_processor
