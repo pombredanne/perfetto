@@ -238,7 +238,7 @@ UnixSocket::UnixSocket(EventListener* event_listener,
   if (adopt_state == State::kDisconnected) {
     // We get here from the default ctor().
     PERFETTO_DCHECK(!adopt_fd);
-    fd_ = base::CreateSocket();
+    fd_ = CreateSocket();
     if (!fd_) {
       last_error_ = errno;
       return;
@@ -305,7 +305,7 @@ void UnixSocket::DoConnect(const std::string& socket_name) {
 
   sockaddr_un addr;
   socklen_t addr_size;
-  if (!base::MakeSockAddr(socket_name, &addr, &addr_size)) {
+  if (!MakeSockAddr(socket_name, &addr, &addr_size)) {
     last_error_ = errno;
     return NotifyConnectionState(false);
   }
