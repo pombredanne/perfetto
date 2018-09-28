@@ -731,7 +731,7 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
   //   the disposition of the signal is "stop", "continue", or "terminate",
   //   this action will affect the whole process.
   struct sigaction oldact;
-  struct sigaction newact;
+  struct sigaction newact = {};
   newact.sa_handler = Handler;
   ASSERT_EQ(sigaction(SIGWINCH, &newact, &oldact), 0);
   base::ScopedResource<const struct sigaction*, RollbackSigaction, nullptr>
