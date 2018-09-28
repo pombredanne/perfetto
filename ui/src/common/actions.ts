@@ -12,15 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {DraftObject, produce} from 'immer';
-
-import {
-  createEmptyState,
-  defaultTraceTime,
-  State,
-  Status,
-  TraceTime
-} from './state';
+import {produce, DraftObject} from 'immer';
+import {createEmptyState, defaultTraceTime, Status, State, TraceTime} from './state';
 import {TimeSpan} from './time';
 
 export interface Action { type: string; }
@@ -164,42 +157,43 @@ export class Model {
   setState(args: {newState: State}): void {
     this._state = args.newState;
   }
+
 }
 
 export const DoActions = {
 
   navigate(draft: StateDraft, args: {route: string}): void {
-  draft.route = args.route;
+    draft.route = args.route;
   },
 
   openTraceFromFile(draft: StateDraft, args: {file: File}): void {
-  draft.traceTime = {...defaultTraceTime};
-  draft.visibleTraceTime = {...defaultTraceTime};
-  const id = `${draft.nextId++}`;
-  // Reset displayed tracks.
-  draft.pinnedTracks = [];
-  draft.scrollingTracks = [];
-  draft.engines[id] = {
-    id,
-    ready: false,
-    source: args.file,
-  };
-  draft.route = `/viewer`;
+    draft.traceTime = {...defaultTraceTime};
+    draft.visibleTraceTime = {...defaultTraceTime};
+    const id = `${draft.nextId++}`;
+    // Reset displayed tracks.
+    draft.pinnedTracks = [];
+    draft.scrollingTracks = [];
+    draft.engines[id] = {
+      id,
+      ready: false,
+      source: args.file,
+    };
+    draft.route = `/viewer`;
   },
 
   openTraceFromUrl(draft: StateDraft, args: {url: string}): void {
-  draft.traceTime = {...defaultTraceTime};
-  draft.visibleTraceTime = {...defaultTraceTime};
-  const id = `${draft.nextId++}`;
-  // Reset displayed tracks.
-  draft.pinnedTracks = [];
-  draft.scrollingTracks = [];
-  draft.engines[id] = {
-    id,
-    ready: false,
-    source: args.url,
-  };
-  draft.route = `/viewer`;
+    draft.traceTime = {...defaultTraceTime};
+    draft.visibleTraceTime = {...defaultTraceTime};
+    const id = `${draft.nextId++}`;
+    // Reset displayed tracks.
+    draft.pinnedTracks = [];
+    draft.scrollingTracks = [];
+    draft.engines[id] = {
+      id,
+      ready: false,
+      source: args.url,
+    };
+    draft.route = `/viewer`;
   },
 
   addTrack(draft: StateDraft, args: {
@@ -208,15 +202,15 @@ export const DoActions = {
     name: string;
     config: {};
   }): void {
-  const id = `${draft.nextId++}`;
-  draft.tracks[id] = {
-    id,
-    engineId: args.engineId,
-    kind: args.kind,
-    name: args.name,
-    config: args.config,
-  };
-  draft.scrollingTracks.push(id);
+    const id = `${draft.nextId++}`;
+    draft.tracks[id] = {
+      id,
+      engineId: args.engineId,
+      kind: args.kind,
+      name: args.name,
+      config: args.config,
+    };
+    draft.scrollingTracks.push(id);
   },
 
   reqTrackData(draft: StateDraft, args: {
@@ -225,29 +219,29 @@ export const DoActions = {
   end: number;
   resolution: number;
   }): void {
-  const id = args.trackId;
-  draft.tracks[id].dataReq = {
-    start: args.start,
-    end: args.end,
-    resolution: args.resolution
-  };
+    const id = args.trackId;
+    draft.tracks[id].dataReq = {
+      start: args.start,
+      end: args.end,
+      resolution: args.resolution
+    };
   },
 
   clearTrackDataReq(draft: StateDraft, args: {trackId: string}): void {
-  const id = args.trackId;
-  draft.tracks[id].dataReq = undefined;
+    const id = args.trackId;
+    draft.tracks[id].dataReq = undefined;
   },
 
   executeQuery(draft: StateDraft, args: {queryId: string; engineId: string; query: string}): void {
-  draft.queries[args.queryId] = {
-    id: args.queryId,
-    engineId: args.engineId,
-    query: args.query,
-  };
+    draft.queries[args.queryId] = {
+      id: args.queryId,
+      engineId: args.engineId,
+      query: args.query,
+    };
   },
 
   deleteQuery(draft: StateDraft, args: {queryId: string}): void {
-  delete draft.queries[args.queryId];
+    delete draft.queries[args.queryId];
   },
 
   moveTrack(draft: StateDraft, args: {
@@ -255,97 +249,96 @@ export const DoActions = {
     direction: 'up'|'down',
   }): void {
 
-  const id = args.trackId;
-  const isPinned = draft.pinnedTracks.includes(id);
-  const isScrolling = draft.scrollingTracks.includes(id);
-  if (!isScrolling && !isPinned) {
-    throw new Error(`No track with id ${id}`);
-  }
-  const tracks = isPinned ? draft.pinnedTracks : draft.scrollingTracks;
+    const id = args.trackId;
+    const isPinned = draft.pinnedTracks.includes(id);
+    const isScrolling = draft.scrollingTracks.includes(id);
+    if (!isScrolling && !isPinned) {
+      throw new Error(`No track with id ${id}`);
+    }
+    const tracks = isPinned ? draft.pinnedTracks : draft.scrollingTracks;
 
-  const oldIndex = tracks.indexOf(id);
-  const newIndex = args.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
-  const swappedTrackId = tracks[newIndex];
-  if (isPinned && newIndex === draft.pinnedTracks.length) {
-    // Move from last element of pinned to first element of scrolling.
-    draft.scrollingTracks.unshift(draft.pinnedTracks.pop()!);
-  } else if (isScrolling && newIndex === -1) {
-    // Move first element of scrolling to last element of pinned.
-    draft.pinnedTracks.push(draft.scrollingTracks.shift()!);
-  } else if (swappedTrackId) {
-    tracks[newIndex] = id;
-    tracks[oldIndex] = swappedTrackId;
-  }
+    const oldIndex = tracks.indexOf(id);
+    const newIndex = args.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
+    const swappedTrackId = tracks[newIndex];
+    if (isPinned && newIndex === draft.pinnedTracks.length) {
+      // Move from last element of pinned to first element of scrolling.
+      draft.scrollingTracks.unshift(draft.pinnedTracks.pop()!);
+    } else if (isScrolling && newIndex === -1) {
+      // Move first element of scrolling to last element of pinned.
+      draft.pinnedTracks.push(draft.scrollingTracks.shift()!);
+    } else if (swappedTrackId) {
+      tracks[newIndex] = id;
+      tracks[oldIndex] = swappedTrackId;
+    }
   },
 
   toggleTrackPinned(draft: StateDraft, args: {
     trackId: string
   }): void {
-  const id = args.trackId;
-  const isPinned = draft.pinnedTracks.includes(id);
+    const id = args.trackId;
+    const isPinned = draft.pinnedTracks.includes(id);
 
-  if (isPinned) {
-    draft.pinnedTracks.splice(draft.pinnedTracks.indexOf(id), 1);
-    draft.scrollingTracks.unshift(id);
-  } else {
-    draft.scrollingTracks.splice(draft.scrollingTracks.indexOf(id), 1);
-    draft.pinnedTracks.push(id);
-  }
+    if (isPinned) {
+      draft.pinnedTracks.splice(draft.pinnedTracks.indexOf(id), 1);
+      draft.scrollingTracks.unshift(id);
+    } else {
+      draft.scrollingTracks.splice(draft.scrollingTracks.indexOf(id), 1);
+      draft.pinnedTracks.push(id);
+    }
   },
 
   setEngineReady(draft: StateDraft, args: {engineId: string, ready: boolean}): void {
-  draft.engines[args.engineId].ready = args.ready;
+    draft.engines[args.engineId].ready = args.ready;
   },
 
   createPermalink(draft: StateDraft, args: {requestId: string}): void {
-  draft.permalink = {requestId: args.requestId, hash: undefined};
+    draft.permalink = {requestId: args.requestId, hash: undefined};
   },
 
   setPermalink(draft: StateDraft, args: {requestId: string, hash: string}): void {
-  // Drop any links for old requests.
-  if (draft.permalink.requestId !== args.requestId) return;
-  draft.permalink = args;
+    // Drop any links for old requests.
+    if (draft.permalink.requestId !== args.requestId) return;
+    draft.permalink = args;
   },
 
   loadPermalink(draft: StateDraft, args: {requestId: string, hash: string}): void {
-  draft.permalink = args;
+    draft.permalink = args;
   },
 
   setTraceTime(draft: StateDraft, args: TraceTime): void {
-  draft.traceTime = args;
+    draft.traceTime = args;
   },
 
   setVisibleTraceTime(draft: StateDraft, args: TraceTime): void {
-  draft.visibleTraceTime = args;
+    draft.visibleTraceTime = args;
   },
 
   updateStatus(draft: StateDraft, args: Status): void {
-  draft.status = args;
+    draft.status = args;
   },
 }
 
 interface DeferredAction<Args> {
-      type: string;
-      args: Args;
-    }
+  type: string;
+  args: Args;
+}
 
-    type ActionFunction<Args> = (draft: StateDraft, args: Args) => void;
-    type DeferredActionFunc<T> = T extends ActionFunction<infer Args>?
-        (args: Args) => DeferredAction<Args>:
-        never;
+type ActionFunction<Args> = (draft: StateDraft, args: Args) => void;
+type DeferredActionFunc<T> = T extends ActionFunction<infer Args> ? (args: Args) => DeferredAction<Args> : never;
 
-    type DeferredActions<C> = {
-      [P in keyof C]: DeferredActionFunc<C[P]>;
-    }
+type DeferredActions<C> = {
+  [P in keyof C]: DeferredActionFunc<C[P]>;
+}
 
-    export const Actions =
-        new Proxy<DeferredActions<typeof DoActions>>({} as any, {
-          get(_: any, prop: string, _2: any) {
-            return (args: {}): DeferredAction<{}> => {
-              return {
-                type: prop,
-                args,
-              };
-            };
-          },
-        });
+export const Actions = new Proxy<DeferredActions<typeof DoActions>>({} as any, {
+  get(_: any, prop: string, _2: any) {
+    return (args: {}): DeferredAction<{}> => {
+      return {
+        type: prop,
+        args,
+      };
+    };
+  },
+});
+
+
