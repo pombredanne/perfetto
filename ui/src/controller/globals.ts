@@ -14,11 +14,10 @@
 
 import {assertExists} from '../base/logging';
 import {Remote} from '../base/remote';
-import {Action} from '../common/actions';
-import {createEmptyState, State} from '../common/state';
+import {Action, Model} from '../common/actions';
+import {State} from '../common/state';
 import {ControllerAny} from './controller';
 import {Engine} from './engine';
-import {rootReducer} from './reducer';
 import {WasmEngineProxy} from './wasm_engine_proxy';
 import {
   createWasmEngine,
@@ -29,14 +28,14 @@ import {
  * Global accessors for state/dispatch in the controller.
  */
 class Globals {
-  private _state?: State;
+  private _model?: Model;
   private _rootController?: ControllerAny;
   private _frontend?: Remote;
   private _runningControllers = false;
   private _queuedActions = new Array<Action>();
 
   initialize(rootController: ControllerAny, frontendProxy: Remote) {
-    this._state = createEmptyState();
+    this._model = new Model();
     this._rootController = rootController;
     this._frontend = frontendProxy;
   }
@@ -70,7 +69,7 @@ class Globals {
       this._queuedActions = new Array<Action>();
       for (const action of actions) {
         console.debug('Applying action', action);
-        this._state = rootReducer(this.state, action);
+        assertExists(this._model).doAction(action);
       }
       this._runningControllers = true;
       try {
@@ -99,15 +98,11 @@ class Globals {
   }
 
   get state(): State {
-    return assertExists(this._state);
-  }
-
-  set state(state: State) {
-    this._state = state;
+    return assertExists(this._model).state;
   }
 
   resetForTesting() {
-    this._state = undefined;
+    this._model = undefined;
     this._rootController = undefined;
   }
 }
