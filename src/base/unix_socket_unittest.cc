@@ -758,7 +758,7 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
 
   // Test sending the send_buf in several chunks as an iov to exercise the
   // more complicated code-paths of SendMsgAll.
-  struct msghdr hdr;
+  struct msghdr hdr = {};
   struct iovec iov[4];
   static_assert(sizeof(send_buf) % base::ArraySize(iov) == 0,
                 "Cannot split buffer into even pieces.");
