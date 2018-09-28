@@ -726,6 +726,9 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
   // Send something larger than send + recv kernel buffers combined to make
   // sendmsg block.
   char send_buf[8192];
+  // Make MSAN happy.
+  for (size_t i = 0; i < sizeof(send_buf); ++i)
+    send_buf[i] = static_cast<char>(i % 256);
   char recv_buf[sizeof(send_buf)];
 
   // Need to install signal handler to cause the interrupt to happen.
