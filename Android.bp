@@ -26,6 +26,7 @@ cc_library_shared {
     "src/base/temp_file.cc",
     "src/base/thread_checker.cc",
     "src/base/time.cc",
+    "src/base/unix_socket.cc",
     "src/base/unix_task_runner.cc",
     "src/base/virtual_destructors.cc",
     "src/base/watchdog_posix.cc",

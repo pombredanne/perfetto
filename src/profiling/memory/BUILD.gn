@@ -21,6 +21,7 @@ source_set("wire_protocol") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   sources = [
     "wire_protocol.cc",
@@ -35,7 +36,7 @@ source_set("daemon") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
-    "../../ipc",
+    "../../base:unix_socket",
   ]
   sources = [
     "bookkeeping.cc",
@@ -58,6 +59,7 @@ source_set("client") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   sources = [
     "client.cc",
@@ -109,6 +111,7 @@ source_set("malloc_hooks") {
     ":client",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   cflags = [
     "-isystem",

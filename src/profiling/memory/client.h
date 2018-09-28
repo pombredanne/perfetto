@@ -17,12 +17,11 @@
 #ifndef SRC_PROFILING_MEMORY_CLIENT_H_
 #define SRC_PROFILING_MEMORY_CLIENT_H_
 
+#include <pthread.h>
 #include <stddef.h>
 
 #include <mutex>
 #include <vector>
-
-#include <pthread.h>
 
 #include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/wire_protocol.h"
