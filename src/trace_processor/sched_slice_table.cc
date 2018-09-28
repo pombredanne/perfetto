@@ -84,7 +84,6 @@ PERFETTO_ALWAYS_INLINE int CompareSlices(
   return 0;
 }
 
-PERFETTO_ALWAYS_INLINE
 std::pair<uint64_t, uint64_t> FindTsBounds(const QueryConstraints& qc,
                                            sqlite3_value** argv) {
   uint64_t min_ts = 0;
@@ -108,7 +107,22 @@ std::pair<uint64_t, uint64_t> FindTsBounds(const QueryConstraints& qc,
   return std::make_pair(min_ts, max_ts);
 }
 
-PERFETTO_ALWAYS_INLINE
+std::pair<uint32_t, uint32_t> FindTsIndices(
+    const TraceStorage* storage,
+    std::pair<uint64_t, uint64_t> ts_bounds) {
+  const auto& slices = storage->slices();
+  const auto& ts = slices.start_ns();
+  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+
+  auto min_it = std::lower_bound(ts.begin(), ts.end(), ts_bounds.first);
+  auto min_idx = static_cast<uint32_t>(std::distance(ts.begin(), min_it));
+
+  auto max_it = std::upper_bound(min_it, ts.end(), ts_bounds.second);
+  auto max_idx = static_cast<uint32_t>(std::distance(ts.begin(), max_it));
+
+  return std::make_pair(min_idx, max_idx);
+}
+
 std::vector<bool> FilterNonTsColumns(const TraceStorage* storage,
                                      const QueryConstraints& qc,
                                      sqlite3_value** argv,
@@ -141,6 +155,19 @@ std::vector<bool> FilterNonTsColumns(const TraceStorage* storage,
   return filter;
 }
 
+bool HasOnlyTsConstraints(const QueryConstraints& qc) {
+  auto fn = [](const QueryConstraints::Constraint& c) {
+    return c.iColumn == SchedSliceTable::Column::kTimestamp;
+  };
+  return std::all_of(qc.constraints().begin(), qc.constraints().end(), fn);
+}
+
+bool IsTsOrdered(const QueryConstraints& qc) {
+  return qc.order_by().size() == 0 ||
+         (qc.order_by().size() == 1 &&
+          qc.order_by()[0].iColumn == SchedSliceTable::Column::kTimestamp);
+}
+
 }  // namespace
 
 SchedSliceTable::SchedSliceTable(sqlite3*, const TraceStorage* storage)
@@ -164,38 +191,23 @@ Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  const auto& slices = storage_->slices();
-  const auto& ts = slices.start_ns();
-  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+  auto ts_indices = FindTsIndices(storage_, FindTsBounds(qc, argv));
+  auto min_idx = ts_indices.first;
+  auto max_idx = ts_indices.second;
 
-  auto ts_bounds = FindTsBounds(qc, argv);
-  auto min_it = std::lower_bound(ts.begin(), ts.end(), ts_bounds.first);
-  auto min_idx = static_cast<uint32_t>(std::distance(ts.begin(), min_it));
-  auto max_it = std::upper_bound(min_it, ts.end(), ts_bounds.second);
-  auto max_idx = static_cast<uint32_t>(std::distance(ts.begin(), max_it));
-
-  const auto& cs = qc.constraints();
-  bool only_ts_cs = std::all_of(cs.begin(), cs.end(),
-                                [](const QueryConstraints::Constraint& c) {
-                                  return c.iColumn == Column::kTimestamp;
-                                });
-  bool ts_ordering = qc.order_by().size() == 0 ||
-                     (qc.order_by().size() == 1 &&
-                      qc.order_by()[0].iColumn == Column::kTimestamp);
-  if (only_ts_cs) {
-    if (ts_ordering) {
+  if (HasOnlyTsConstraints(qc)) {
+    if (IsTsOrdered(qc)) {
       bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
       return std::unique_ptr<Table::Cursor>(
           new IncrementCursor(storage_, min_idx, max_idx, desc));
-    } else {
-      return std::unique_ptr<Table::Cursor>(
-          new SortedCursor(storage_, min_idx, max_idx, qc.order_by()));
     }
+    return std::unique_ptr<Table::Cursor>(
+        new SortedCursor(storage_, min_idx, max_idx, qc.order_by()));
   }
 
   std::vector<bool> filter =
       FilterNonTsColumns(storage_, qc, argv, min_idx, max_idx);
-  if (ts_ordering) {
+  if (IsTsOrdered(qc)) {
     bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
     return std::unique_ptr<Table::Cursor>(
         new FilterCursor(storage_, min_idx, max_idx, std::move(filter), desc));
