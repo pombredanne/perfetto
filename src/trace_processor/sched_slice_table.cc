@@ -198,10 +198,10 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
   if (ts_ordering) {
     bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
     return std::unique_ptr<Table::Cursor>(
-        new FilterCursor(storage_, min_idx, max_idx, filter, desc));
+        new FilterCursor(storage_, min_idx, max_idx, std::move(filter), desc));
   }
-  return std::unique_ptr<Table::Cursor>(
-      new SortedCursor(storage_, min_idx, max_idx, filter, qc.order_by()));
+  return std::unique_ptr<Table::Cursor>(new SortedCursor(
+      storage_, min_idx, max_idx, std::move(filter), qc.order_by()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
@@ -272,8 +272,12 @@ SchedSliceTable::FilterCursor::FilterCursor(const TraceStorage* storage,
                                             uint32_t max_idx,
                                             std::vector<bool> filter,
                                             bool desc)
-    : BaseCursor(storage), min_idx_(min_idx), max_idx_(max_idx), desc_(desc) {
-  PERFETTO_CHECK(max_idx - min_idx == filter.size());
+    : BaseCursor(storage),
+      min_idx_(min_idx),
+      max_idx_(max_idx),
+      filter_(std::move(filter)),
+      desc_(desc) {
+  PERFETTO_CHECK(max_idx - min_idx == filter_.size());
   FindNext();
 }
 
@@ -285,11 +289,11 @@ int SchedSliceTable::FilterCursor::Next() {
 
 void SchedSliceTable::FilterCursor::FindNext() {
   if (desc_) {
-    auto it = std::find(filter_.begin() + offset_, filter_.end(), true);
-    offset_ = static_cast<uint32_t>(std::distance(filter_.begin(), it));
-  } else {
     auto it = std::find(filter_.rbegin() + offset_, filter_.rend(), true);
     offset_ = static_cast<uint32_t>(std::distance(filter_.rbegin(), it));
+  } else {
+    auto it = std::find(filter_.begin() + offset_, filter_.end(), true);
+    offset_ = static_cast<uint32_t>(std::distance(filter_.begin(), it));
   }
 }
 
@@ -317,7 +321,7 @@ SchedSliceTable::SortedCursor::SortedCursor(
     const TraceStorage* storage,
     uint32_t min_idx,
     uint32_t max_idx,
-    std::vector<bool> filter,
+    const std::vector<bool>& filter,
     const std::vector<QueryConstraints::OrderBy>& ob)
     : BaseCursor(storage) {
   auto diff = static_cast<size_t>(max_idx - min_idx);

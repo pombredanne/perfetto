@@ -120,7 +120,7 @@ class SchedSliceTable : public Table {
     SortedCursor(const TraceStorage* storage,
                  uint32_t min_idx,
                  uint32_t max_idx,
-                 std::vector<bool> filter,
+                 const std::vector<bool>& filter,
                  const std::vector<QueryConstraints::OrderBy>&);
 
     int Next() override;
