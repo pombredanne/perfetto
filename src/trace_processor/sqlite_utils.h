@@ -18,6 +18,7 @@
 #define SRC_TRACE_PROCESSOR_SQLITE_UTILS_H_
 
 #include <sqlite3.h>
+#include <algorithm>
 #include <deque>
 #include <iterator>
 
@@ -65,7 +66,7 @@ inline std::string OpToString(int op) {
 }
 
 template <typename F>
-inline bool Compare(uint32_t actual, sqlite3_value* value) {
+PERFETTO_ALWAYS_INLINE bool Compare(uint32_t actual, sqlite3_value* value) {
   PERFETTO_CHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<uint32_t>(sqlite3_value_int64(value)));
 }
