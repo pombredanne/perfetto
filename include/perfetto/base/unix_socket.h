@@ -189,7 +189,8 @@ class UnixSocket {
             const int* send_fds,
             size_t num_fds,
             BlockingMode blocking = BlockingMode::kNonBlocking);
-  bool Send(const std::string& msg);
+  bool Send(const std::string& msg,
+            BlockingMode blockimg = BlockingMode::kNonBlocking);
 
   // Returns the number of bytes (<= |len|) written in |msg| or 0 if there
   // is no data in the buffer to read or an error occurs (in which case a

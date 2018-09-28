@@ -115,7 +115,7 @@ TEST_F(UnixSocketTest, ConnectionImmediatelyDroppedByServer) {
   auto cli_disconnected = task_runner_.CreateCheckpoint("cli_disconnected");
   EXPECT_CALL(event_listener_, OnDisconnect(cli.get()))
       .WillOnce(InvokeWithoutArgs(cli_disconnected));
-  EXPECT_FALSE(cli->Send("whatever"));
+  EXPECT_FALSE(cli->Send("whatever", UnixSocket::BlockingMode::kBlocking));
   task_runner_.RunUntilCheckpoint("cli_disconnected");
 }
 
@@ -153,8 +153,8 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeData) {
         ASSERT_EQ("cli>srv", s->ReceiveString());
         srv_did_recv();
       }));
-  ASSERT_TRUE(cli->Send("cli>srv"));
-  ASSERT_TRUE(srv_conn->Send("srv>cli"));
+  ASSERT_TRUE(cli->Send("cli>srv", UnixSocket::BlockingMode::kBlocking));
+  ASSERT_TRUE(srv_conn->Send("srv>cli", UnixSocket::BlockingMode::kBlocking));
   task_runner_.RunUntilCheckpoint("cli_did_recv");
   task_runner_.RunUntilCheckpoint("srv_did_recv");
 
@@ -168,8 +168,8 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeData) {
   ASSERT_EQ("", cli->ReceiveString());
   ASSERT_EQ(0u, srv_conn->Receive(&msg, sizeof(msg)));
   ASSERT_EQ("", srv_conn->ReceiveString());
-  ASSERT_FALSE(cli->Send("foo"));
-  ASSERT_FALSE(srv_conn->Send("bar"));
+  ASSERT_FALSE(cli->Send("foo", UnixSocket::BlockingMode::kBlocking));
+  ASSERT_FALSE(srv_conn->Send("bar", UnixSocket::BlockingMode::kBlocking));
   srv->Shutdown(true);
   task_runner_.RunUntilCheckpoint("cli_disconnected");
   task_runner_.RunUntilCheckpoint("srv_disconnected");
@@ -244,10 +244,12 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
 
   int buf_fd[2] = {null_fd.get(), zero_fd.get()};
 
-  ASSERT_TRUE(
-      cli->Send(cli_str, sizeof(cli_str), buf_fd, base::ArraySize(buf_fd)));
+  ASSERT_TRUE(cli->Send(cli_str, sizeof(cli_str), buf_fd,
+                        base::ArraySize(buf_fd),
+                        UnixSocket::BlockingMode::kBlocking));
   ASSERT_TRUE(srv_conn->Send(srv_str, sizeof(srv_str), buf_fd,
-                             base::ArraySize(buf_fd)));
+                             base::ArraySize(buf_fd),
+                             UnixSocket::BlockingMode::kBlocking));
   task_runner_.RunUntilCheckpoint("srv_did_recv");
   task_runner_.RunUntilCheckpoint("cli_did_recv");
 
@@ -300,7 +302,7 @@ TEST_F(UnixSocketTest, SeveralClients) {
         EXPECT_CALL(event_listener_, OnDataAvailable(s))
             .WillOnce(Invoke([](UnixSocket* t) {
               ASSERT_EQ("PING", t->ReceiveString());
-              ASSERT_TRUE(t->Send("PONG"));
+              ASSERT_TRUE(t->Send("PONG", UnixSocket::BlockingMode::kBlocking));
             }));
       }));
 
@@ -309,7 +311,7 @@ TEST_F(UnixSocketTest, SeveralClients) {
     EXPECT_CALL(event_listener_, OnConnect(cli[i].get(), true))
         .WillOnce(Invoke([](UnixSocket* s, bool success) {
           ASSERT_TRUE(success);
-          ASSERT_TRUE(s->Send("PING"));
+          ASSERT_TRUE(s->Send("PING", UnixSocket::BlockingMode::kBlocking));
         }));
 
     auto checkpoint = task_runner_.CreateCheckpoint(std::to_string(i));
@@ -356,7 +358,8 @@ TEST_F(UnixSocketTest, SharedMemory) {
         .WillOnce(Invoke(
             [this, tmp_fd, checkpoint, mem](UnixSocket*, UnixSocket* new_conn) {
               ASSERT_EQ(geteuid(), static_cast<uint32_t>(new_conn->peer_uid()));
-              ASSERT_TRUE(new_conn->Send("txfd", 5, tmp_fd));
+              ASSERT_TRUE(new_conn->Send("txfd", 5, tmp_fd,
+                                         UnixSocket::BlockingMode::kBlocking));
               // Wait for the client to change this again.
               EXPECT_CALL(event_listener_, OnDataAvailable(new_conn))
                   .WillOnce(Invoke([checkpoint, mem](UnixSocket* s) {
@@ -391,7 +394,8 @@ TEST_F(UnixSocketTest, SharedMemory) {
 
           // Now change the shared memory and ping the other process.
           memcpy(mem, "rock more", 10);
-          ASSERT_TRUE(s->Send("change notify"));
+          ASSERT_TRUE(
+              s->Send("change notify", UnixSocket::BlockingMode::kBlocking));
           checkpoint();
         }));
     task_runner_.RunUntilCheckpoint("change_seen_by_client");
@@ -409,7 +413,7 @@ bool AtomicWrites_SendAttempt(UnixSocket* s,
                               int num_frame) {
   char buf[kAtomicWrites_FrameSize];
   memset(buf, static_cast<char>(num_frame), sizeof(buf));
-  if (s->Send(buf, sizeof(buf)))
+  if (s->Send(buf, sizeof(buf), -1, UnixSocket::BlockingMode::kBlocking))
     return true;
   task_runner->PostTask(
       std::bind(&AtomicWrites_SendAttempt, s, task_runner, num_frame));
