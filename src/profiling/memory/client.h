@@ -25,7 +25,7 @@
 #include <pthread.h>
 
 #include "perfetto/base/scoped_file.h"
-#include "src/profiling/memory/transport_data.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
 
@@ -81,31 +81,16 @@ class BorrowedSocket {
 // free separately, so we batch and send the whole buffer once it is full.
 class FreePage {
  public:
-  FreePage();
-
   // Add address to buffer. Flush if necessary using a socket borrowed from
   // pool.
   // Can be called from any thread. Must not hold mutex_.`
   void Add(const uint64_t addr, uint64_t sequence_number, SocketPool* pool);
 
  private:
-  struct FreePageHeader {
-    uint64_t size;
-    RecordType record_type;
-  };
-
-  static constexpr size_t kFreePageSize =
-      (base::kPageSize - sizeof(FreePageHeader)) / sizeof(FreePageEntry);
-
-  struct FreePageData {
-    FreePageHeader header;
-    FreePageEntry entries[kFreePageSize];
-  };
-
   // Needs to be called holding mutex_.
   void FlushLocked(SocketPool* pool);
 
-  FreePageData free_page_;
+  FreeMetadata free_page_;
   std::mutex mutex_;
   size_t offset_ = 0;
 };
@@ -131,6 +116,7 @@ class PThreadKey {
   bool valid_;
 };
 
+// This is created and owned by the malloc hooks.
 class Client {
  public:
   Client(std::vector<base::ScopedFile> sockets);
