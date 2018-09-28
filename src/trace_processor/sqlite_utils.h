@@ -18,6 +18,8 @@
 #define SRC_TRACE_PROCESSOR_SQLITE_UTILS_H_
 
 #include <sqlite3.h>
+#include <deque>
+#include <iterator>
 
 namespace perfetto {
 namespace trace_processor {
@@ -62,45 +64,55 @@ inline std::string OpToString(int op) {
   }
 }
 
-template <typename T,
-          typename = typename std::
-              enable_if<std::is_convertible<sqlite3_int64, T>::value, T>::type>
-inline T CooerceType(sqlite3_value* argv) {
-  PERFETTO_CHECK(sqlite3_value_type(argv) == SQLITE_INTEGER);
-  return static_cast<T>(sqlite3_value_int64(argv));
+template <typename F>
+inline bool Compare(uint32_t actual, sqlite3_value* value) {
+  PERFETTO_CHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
+  return F()(actual, static_cast<uint32_t>(sqlite3_value_int64(value)));
 }
 
-template <class T>
-inline void FilterColumn(const std::deque<T>& data,
-                         const QueryConstraints::Constraint& constraint,
-                         sqlite3_value* argv,
-                         std::vector<bool>* filter) {
-  auto it = std::find(filter->begin(), filter->end(), true);
-  while (it != filter->end()) {
-    auto index = static_cast<size_t>(std::distance(filter->begin(), it));
+template <typename F>
+PERFETTO_ALWAYS_INLINE bool Compare(uint64_t actual, sqlite3_value* value) {
+  PERFETTO_CHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
+  return F()(actual, static_cast<uint64_t>(sqlite3_value_int64(value)));
+}
+
+template <class RandomAccessIterator>
+PERFETTO_ALWAYS_INLINE void FilterColumn(
+    RandomAccessIterator begin,
+    RandomAccessIterator end,
+    const QueryConstraints::Constraint& constraint,
+    sqlite3_value* argv,
+    std::vector<bool>* row_filter) {
+  using T = typename RandomAccessIterator::value_type;
+  PERFETTO_DCHECK(static_cast<size_t>(std::distance(begin, end)) ==
+                  row_filter->size());
+
+  auto it = std::find(row_filter->begin(), row_filter->end(), true);
+  while (it != row_filter->end()) {
+    auto index = std::distance(row_filter->begin(), it);
     switch (constraint.op) {
       case SQLITE_INDEX_CONSTRAINT_EQ:
-        *it = data[index] == CooerceType<T>(argv);
+        *it = Compare<std::equal_to<T>>(begin[index], argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_GE:
-        *it = data[index] >= CooerceType<T>(argv);
+        *it = Compare<std::greater_equal<T>>(begin[index], argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_GT:
-        *it = data[index] > CooerceType<T>(argv);
+        *it = Compare<std::greater<T>>(begin[index], argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_LE:
-        *it = data[index] <= CooerceType<T>(argv);
+        *it = Compare<std::less_equal<T>>(begin[index], argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_LT:
-        *it = data[index] < CooerceType<T>(argv);
+        *it = Compare<std::less<T>>(begin[index], argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_NE:
-        *it = data[index] != CooerceType<T>(argv);
+        *it = Compare<std::not_equal_to<T>>(begin[index], argv);
         break;
       default:
         PERFETTO_CHECK(false);
     }
-    it = std::find(it + 1, filter->end(), true);
+    it = std::find(it + 1, row_filter->end(), true);
   }
 }
 

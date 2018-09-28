@@ -19,14 +19,11 @@
 
 #include <sqlite3.h>
 
-#include <deque>
 #include <functional>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <vector>
 
-#include "perfetto/base/logging.h"
 #include "src/trace_processor/query_constraints.h"
 
 namespace perfetto {
@@ -94,13 +91,10 @@ class Table : public sqlite3_vtab {
   // The raw cursor class which interfaces with SQLite to manage lifecycle.
   class RawCursor : public sqlite3_vtab_cursor {
    public:
-    RawCursor(Table* table);
+    explicit RawCursor(Table* table);
 
     int Filter(int num, const char* idxStr, int argc, sqlite3_value**);
-    int Next();
-    int Eof();
-    int Column(sqlite3_context* context, int N);
-    int RowId(sqlite3_int64*);
+    Cursor* cursor() { return cursor_.get(); }
 
    private:
     friend class Table;

@@ -98,6 +98,8 @@ WindowOperatorTable::Cursor::Cursor(const WindowOperatorTable* table,
       window_end_(window_end),
       step_size_(step_size),
       table_(table) {
+  current_ts_ = window_start_;
+
   // Set return first if there is a equals constraint on the row id asking to
   // return the first row.
   bool return_first = qc.constraints().size() == 1 &&

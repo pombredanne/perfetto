@@ -52,48 +52,87 @@ class SchedSliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  // Implementation of the Table cursor interface.
-  class Cursor : public Table::Cursor {
+  // Cursor class used
+  class BaseCursor : public Table::Cursor {
    public:
-    Cursor(const TraceStorage* storage,
-           const QueryConstraints& query_constraints,
-           sqlite3_value** argv);
+    BaseCursor(const TraceStorage* storage);
+    virtual ~BaseCursor() override;
+
+    virtual uint32_t RowIndex() = 0;
+    int Column(sqlite3_context*, int N) override final;
+
+   protected:
+    const TraceStorage* const storage_;
+  };
+
+  // Very fast which which simply increments through indices.
+  class IncrementCursor : public BaseCursor {
+   public:
+    IncrementCursor(const TraceStorage*,
+                    uint32_t min_idx,
+                    uint32_t max_idx,
+                    bool desc);
 
     int Next() override;
-    int Eof() override;
-    int Column(sqlite3_context*, int N) override;
-
-    inline bool IsNextRowIdIndexValid() const {
-      return next_row_id_index_ < sorted_row_ids_.size();
-    }
-
-    size_t next_row_id() const { return sorted_row_ids_[next_row_id_index_]; }
+    uint32_t RowIndex() override;
+    int Eof() override { return offset_ >= (max_idx_ - min_idx_); }
 
    private:
-    // Compares the slice at index |f| with the slice at index |s|on all
-    // columns.
-    // Returns -1 if the first slice is before the second in the ordering, 1 if
-    // the first slice is after the second and 0 if they are equal.
-    int CompareSlices(size_t f, size_t s);
+    uint32_t const min_idx_;
+    uint32_t const max_idx_;
+    bool const desc_;
 
-    // Compares the slice at index |f| with the slice at index |s| on the
-    // criteria in |order_by|.
-    // Returns -1 if the first slice is before the second in the ordering, 1 if
-    // the first slice is after the second and 0 if they are equal.
-    int CompareSlicesOnColumn(size_t f,
-                              size_t s,
-                              const QueryConstraints::OrderBy& order_by);
+    uint32_t offset_ = 0;
+  };
 
-    // Vector of row ids sorted by the the given order by constraints.
-    std::vector<uint32_t> sorted_row_ids_;
+  // Reasonably fast cursor which stores a vector of booleans about whether
+  // a row should be returned.
+  class FilterCursor : public BaseCursor {
+   public:
+    FilterCursor(const TraceStorage*,
+                 uint32_t min_idx,
+                 uint32_t max_idx,
+                 std::vector<bool> filter,
+                 bool desc);
+
+    int Next() override;
+    uint32_t RowIndex() override;
+    int Eof() override { return offset_ >= (max_idx_ - min_idx_); }
+
+   private:
+    void FindNext();
+
+    uint32_t const min_idx_;
+    uint32_t const max_idx_;
+    std::vector<bool> filter_;
+    bool const desc_;
+
+    uint32_t offset_ = 0;
+  };
+
+  // Slow path cursor which stores a sorted set of indices into storage.
+  class SortedCursor : public BaseCursor {
+   public:
+    SortedCursor(const TraceStorage* storage,
+                 uint32_t min_idx,
+                 uint32_t max_idx,
+                 const std::vector<QueryConstraints::OrderBy>&);
+    SortedCursor(const TraceStorage* storage,
+                 uint32_t min_idx,
+                 uint32_t max_idx,
+                 std::vector<bool> filter,
+                 const std::vector<QueryConstraints::OrderBy>&);
+
+    int Next() override;
+    uint32_t RowIndex() override { return sorted_rows_[next_row_idx_]; }
+    int Eof() override { return next_row_idx_ >= sorted_rows_.size(); }
+
+   private:
+    // Vector of row ids sorted by some order by constraints.
+    std::vector<uint32_t> sorted_rows_;
 
     // An offset into |sorted_row_ids_| indicating the next row to return.
-    uint32_t next_row_id_index_ = 0;
-
-    // The sorting criteria for this filter operation.
-    std::vector<QueryConstraints::OrderBy> order_by_;
-
-    const TraceStorage* const storage_;
+    uint32_t next_row_idx_ = 0;
   };
 
   const TraceStorage* const storage_;
