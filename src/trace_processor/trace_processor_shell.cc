@@ -38,6 +38,8 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 #include <linenoise.h>
+#include <pwd.h>
+#include <sys/types.h>
 #endif
 
 #if PERFETTO_HAS_SIGNAL_H()
@@ -52,13 +54,22 @@ TraceProcessor* g_tp;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 
+std::string GetHistoryPath() {
+  const char* homedir = getenv("HOME");
+  if (homedir == nullptr)
+    homedir = getpwuid(getuid())->pw_dir;
+  return std::string(homedir) + "/.trace_processor_shell_history";
+}
+
 void SetupLineEditor() {
   linenoiseSetMultiLine(true);
   linenoiseHistorySetMaxLen(1000);
+  linenoiseHistoryLoad(GetHistoryPath().c_str());
 }
 
 void FreeLine(char* line) {
   linenoiseHistoryAdd(line);
+  linenoiseHistorySave(GetHistoryPath().c_str());
   linenoiseFree(line);
 }
 
