@@ -12,90 +12,89 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {produce, DraftObject} from 'immer';
-import {createEmptyState, defaultTraceTime, Status, State, TraceTime} from './state';
+import {DraftObject, produce} from 'immer';
+
+import {
+  createEmptyState,
+  defaultTraceTime,
+  State,
+  Status,
+  TraceTime
+} from './state';
 import {TimeSpan} from './time';
 
 export interface Action { type: string; }
 
 export function openTraceFromUrl(url: string) {
-  return {
-    type: 'openTraceFromUrl',
+  return Actions.openTraceFromUrl({
     url,
-  };
+  });
 }
 
 export function openTraceFromFile(file: File) {
-  return {
-    type: 'openTraceFromFile',
+  return Actions.openTraceFromFile({
     file,
-  };
+  });
 }
 
-// TODO(hjd): Remove CPU and add a generic way to handle track specific state.
 export function addTrack(
     engineId: string, trackKind: string, name: string, config: {}) {
-  return {
-    type: 'addTrack',
+  return Actions.addTrack({
     engineId,
     kind: trackKind,
     name,
     config,
-  };
+  });
 }
 
 export function requestTrackData(
     trackId: string, start: number, end: number, resolution: number) {
-  return {type: 'reqTrackData', trackId, start, end, resolution};
+  return Actions.reqTrackData({trackId, start, end, resolution});
 }
 
 export function clearTrackDataRequest(trackId: string) {
-  return {type: 'clearTrackDataReq', trackId};
+  return Actions.clearTrackDataReq({trackId});
 }
 
 export function deleteQuery(queryId: string) {
-  return {
-    type: 'deleteQuery',
+  return Actions.deleteQuery({
     queryId,
-  };
+  });
 }
 
 export function navigate(route: string) {
-  return {
-    type: 'navigate',
+  return Actions.navigate({
     route,
-  };
+  });
 }
 
 export function moveTrack(trackId: string, direction: 'up'|'down') {
-  return {
-    type: 'moveTrack',
+  return Actions.moveTrack({
     trackId,
     direction,
-  };
+  });
 }
 
 export function toggleTrackPinned(trackId: string) {
-  return {
-    type: 'toggleTrackPinned',
+  return Actions.toggleTrackPinned({
     trackId,
-  };
+  });
 }
 
 export function setEngineReady(engineId: string, ready = true) {
-  return {type: 'setEngineReady', engineId, ready};
+  return Actions.setEngineReady({engineId, ready});
 }
 
 export function createPermalink() {
-  return {type: 'createPermalink', requestId: new Date().toISOString()};
+  return Actions.createPermalink({requestId: new Date().toISOString()});
 }
 
 export function setPermalink(requestId: string, hash: string) {
-  return {type: 'setPermalink', requestId, hash};
+  return Actions.setPermalink({requestId, hash});
 }
 
 export function loadPermalink(hash: string) {
-  return {type: 'loadPermalink', requestId: new Date().toISOString(), hash};
+  return Actions.loadPermalink({requestId: new Date().toISOString(), hash});
 }
 
 export function setState(newState: State) {
@@ -106,58 +105,23 @@ export function setState(newState: State) {
 }
 
 export function setTraceTime(ts: TimeSpan) {
-  return {
-    type: 'setTraceTime',
+  return Actions.setTraceTime({
     startSec: ts.start,
     endSec: ts.end,
     lastUpdate: Date.now() / 1000,
-  };
+  });
 }
 
 export function setVisibleTraceTime(ts: TimeSpan) {
-  return {
-    type: 'setVisibleTraceTime',
+  return Actions.setVisibleTraceTime({
     startSec: ts.start,
     endSec: ts.end,
     lastUpdate: Date.now() / 1000,
-  };
+  });
 }
 
 export function updateStatus(msg: string) {
-  return {type: 'updateStatus', msg, timestamp: Date.now() / 1000};
-}
-
-type StateDraft = DraftObject<State>;
-
-export class Model {
-  private _state: State;
-
-  constructor() {
-    this._state = createEmptyState();
-  }
-
-  get state(): State {
-    return this._state;
-  }
-
-  setStateForTesting(state: State) {
-    this._state = state;
-  }
-
-  // tslint:disable-next-line no-any
-  doAction(action: any): void {
-    if (action.type === 'setState') {
-      this.setState(action.newState);
-    }
-    this._state = produce(this.state, draft => {
-      (DoActions as any)[action.type](draft, action);
-    });
-  }
-
-  setState(args: {newState: State}): void {
-    this._state = args.newState;
-  }
-
+  return Actions.updateStatus({msg, timestamp: Date.now() / 1000});
 }
 
 export const DoActions = {
@@ -196,12 +160,9 @@ export const DoActions = {
     draft.route = `/viewer`;
   },
 
-  addTrack(draft: StateDraft, args: {
-    engineId: string;
-    kind: string;
-    name: string;
-    config: {};
-  }): void {
+  addTrack(
+      draft: StateDraft,
+      args: {engineId: string; kind: string; name: string; config: {};}): void {
     const id = `${draft.nextId++}`;
     draft.tracks[id] = {
       id,
@@ -214,10 +175,7 @@ export const DoActions = {
   },
 
   reqTrackData(draft: StateDraft, args: {
-  trackId: string;
-  start: number;
-  end: number;
-  resolution: number;
+    trackId: string; start: number; end: number; resolution: number;
   }): void {
     const id = args.trackId;
     draft.tracks[id].dataReq = {
@@ -232,7 +190,9 @@ export const DoActions = {
     draft.tracks[id].dataReq = undefined;
   },
 
-  executeQuery(draft: StateDraft, args: {queryId: string; engineId: string; query: string}): void {
+  executeQuery(
+      draft: StateDraft,
+      args: {queryId: string, engineId: string, query: string}): void {
     draft.queries[args.queryId] = {
       id: args.queryId,
       engineId: args.engineId,
@@ -245,10 +205,9 @@ export const DoActions = {
   },
 
   moveTrack(draft: StateDraft, args: {
-    trackId: string
-    direction: 'up'|'down',
+    trackId: string,
+    direction: 'up' | 'down',
   }): void {
-
     const id = args.trackId;
     const isPinned = draft.pinnedTracks.includes(id);
     const isScrolling = draft.scrollingTracks.includes(id);
@@ -272,9 +231,7 @@ export const DoActions = {
     }
   },
 
-  toggleTrackPinned(draft: StateDraft, args: {
-    trackId: string
-  }): void {
+  toggleTrackPinned(draft: StateDraft, args: {trackId: string}): void {
     const id = args.trackId;
     const isPinned = draft.pinnedTracks.includes(id);
 
@@ -287,23 +244,26 @@ export const DoActions = {
     }
   },
 
-  setEngineReady(draft: StateDraft, args: {engineId: string, ready: boolean}): void {
-    draft.engines[args.engineId].ready = args.ready;
-  },
+  setEngineReady(draft: StateDraft, args: {engineId: string, ready: boolean}):
+      void {
+        draft.engines[args.engineId].ready = args.ready;
+      },
 
   createPermalink(draft: StateDraft, args: {requestId: string}): void {
     draft.permalink = {requestId: args.requestId, hash: undefined};
   },
 
-  setPermalink(draft: StateDraft, args: {requestId: string, hash: string}): void {
-    // Drop any links for old requests.
-    if (draft.permalink.requestId !== args.requestId) return;
-    draft.permalink = args;
-  },
+  setPermalink(draft: StateDraft, args: {requestId: string, hash: string}):
+      void {
+        // Drop any links for old requests.
+        if (draft.permalink.requestId !== args.requestId) return;
+        draft.permalink = args;
+      },
 
-  loadPermalink(draft: StateDraft, args: {requestId: string, hash: string}): void {
-    draft.permalink = args;
-  },
+  loadPermalink(draft: StateDraft, args: {requestId: string, hash: string}):
+      void {
+        draft.permalink = args;
+      },
 
   setTraceTime(draft: StateDraft, args: TraceTime): void {
     draft.traceTime = args;
@@ -316,7 +276,40 @@ export const DoActions = {
   updateStatus(draft: StateDraft, args: Status): void {
     draft.status = args;
   },
+};
+
+type StateDraft = DraftObject<State>;
+
+export class Model {
+  private _state: State;
+
+  constructor() {
+    this._state = createEmptyState();
+  }
+
+  get state(): State {
+    return this._state;
+  }
+
+  setStateForTesting(state: State) {
+    this._state = state;
+  }
+
+  // tslint:disable-next-line no-any
+  doAction(action: any): void {
+    if (action.type === 'setState') {
+      this.setState(action.newState);
+    }
+    this._state = produce(this.state, draft => {
+      (DoActions as any)[action.type](draft, action);
+    });
+  }
+
+  setState(args: {newState: State}): void {
+    this._state = args.newState;
+  }
 }
+
 
 interface DeferredAction<Args> {
   type: string;
@@ -324,7 +317,9 @@ interface DeferredAction<Args> {
 }
 
 type ActionFunction<Args> = (draft: StateDraft, args: Args) => void;
-type DeferredActionFunc<T> = T extends ActionFunction<infer Args> ? (args: Args) => DeferredAction<Args> : never;
+type DeferredActionFunc<T> = T extends ActionFunction<infer Args>?
+    (args: Args) => DeferredAction<Args>:
+    never;
 
 type DeferredActions<C> = {
   [P in keyof C]: DeferredActionFunc<C[P]>;
@@ -340,5 +335,3 @@ export const Actions = new Proxy<DeferredActions<typeof DoActions>>({} as any, {
     };
   },
 });
-
-
