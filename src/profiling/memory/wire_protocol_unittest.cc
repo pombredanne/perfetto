@@ -133,7 +133,6 @@ TEST(WireProtocolTest, FreeMessage) {
   ASSERT_EQ(recv_msg.record_type, msg.record_type);
   ASSERT_EQ(*recv_msg.free_header, *msg.free_header);
   ASSERT_EQ(recv_msg.payload_size, msg.payload_size);
-  ASSERT_STREQ(recv_msg.payload, msg.payload);
 }
 
 }  // namespace
