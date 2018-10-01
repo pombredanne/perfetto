@@ -21,7 +21,7 @@ import {CPU_COUNTER_TRACK_KIND} from './common';
 
 class CpuCounterTrackController extends TrackController {
   static readonly kind = CPU_COUNTER_TRACK_KIND;
-  onBoundsChange(): void {}
+  async onBoundsChange(): Promise<void> {}
 }
 
 trackControllerRegistry.register(CpuCounterTrackController);

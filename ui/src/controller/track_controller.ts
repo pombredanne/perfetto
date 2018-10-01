@@ -26,37 +26,41 @@ import {globals} from './globals';
 // sched slices, nestable slices, counters).
 export abstract class TrackController<Config = {}, Data = {}> extends
     Controller<'main'> {
-  readonly trackId: string;
+  readonly id: string;
   readonly engine: Engine;
 
   constructor(args: TrackControllerArgs) {
     super('main');
-    this.trackId = args.trackId;
+    this.id = args.trackId;
     this.engine = args.engine;
+  }
+
+  private trackState(): TrackState {
+    return assertExists(globals.state.tracks[this.trackId]);
   }
 
   // Must be overridden by the track implementation. Is invoked when the track
   // frontend runs out of cached data. The derived track controller is expected
   // to publish new track data in response to this call.
-  abstract onBoundsChange(start: number, end: number, resolution: number): void;
-
-  get trackState(): TrackState {
-    return assertExists(globals.state.tracks[this.trackId]);
-  }
+  abstract async onBoundsChange(start: number, end: number, resolution: number):
+      Promise<void>;
 
   get config(): Config {
-    return this.trackState.config as Config;
+    return this.trackState().config as Config;
   }
 
   publish(data: Data): void {
-    globals.publish('TrackData', {id: this.trackId, data});
+    globals.publish('TrackData', {id: this.id, data});
   }
 
   run() {
-    const dataReq = this.trackState.dataReq;
+    const dataReq = this.trackState().dataReq;
     if (dataReq === undefined) return;
-    globals.dispatch(clearTrackDataRequest(this.trackId));
-    this.onBoundsChange(dataReq.start, dataReq.end, dataReq.resolution);
+    globals.dispatch(clearTrackDataRequest(this.id));
+    this.onBoundsChange(dataReq.start, dataReq.end, dataReq.resolution)
+        .catch(err => {
+          console.error(err);
+        });
   }
 }
 

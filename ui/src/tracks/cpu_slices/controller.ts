@@ -25,11 +25,7 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
   private busy = false;
   private setup = false;
 
-  onBoundsChange(start: number, end: number, resolution: number): void {
-    this.update(start, end, resolution);
-  }
-
-  private async update(start: number, end: number, resolution: number):
+  async onBoundsChange(start: number, end: number, resolution: number):
       Promise<void> {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
     if (this.busy) return;
@@ -40,20 +36,19 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
     this.busy = true;
     if (this.setup === false) {
-      await this.query(
-          `create virtual table window_${this.trackState.id} using window;`);
-      await this.query(`create virtual table span_${this.trackState.id}
-                     using span(sched, window_${this.trackState.id}, cpu);`);
+      await this.query(`create virtual table window_${this.id} using window;`);
+      await this.query(`create virtual table span_${this.id}
+                     using spans(sched, window_${this.id}, cpu);`);
       this.setup = true;
     }
 
-    this.query(`update window_${this.trackState.id} set
+    this.query(`update window_${this.id} set
       window_start=${startNs},
       window_dur=${endNs - startNs}
       where rowid = 0;`);
 
     const LIMIT = 10000;
-    const query = `select ts,dur,utid from span_${this.trackState.id} 
+    const query = `select ts,dur,utid from span_${this.id}
         where cpu = ${this.config.cpu}
         and utid != 0
         and dur >= ${resolutionNs}
@@ -95,8 +90,8 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
   onDestroy(): void {
     if (this.setup) {
-      this.query(`drop table window_${this.trackState.id}`);
-      this.query(`drop table span_${this.trackState.id}`);
+      this.query(`drop table window_${this.id}`);
+      this.query(`drop table span_${this.id}`);
       this.setup = false;
     }
   }

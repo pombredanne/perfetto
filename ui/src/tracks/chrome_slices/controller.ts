@@ -24,7 +24,7 @@ class ChromeSliceTrackController extends TrackController<Config, Data> {
   static readonly kind = SLICE_TRACK_KIND;
   private busy = false;
 
-  onBoundsChange(start: number, end: number, resolution: number) {
+  async onBoundsChange(start: number, end: number, resolution: number) {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.
     if (this.busy) return;
     const LIMIT = 10000;
