@@ -153,7 +153,7 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
     // Slowpath.
     timestamp_found = decoder.FindIntField<kTimestampFieldNumber>(&timestamp);
   }
-  if (PERFETTO_LIKELY(timestamp_found))
+  if (timestamp_found)
     last_timestamp_ = timestamp;
 
   // TODO(primiano): this can be optimized for the ftrace case.

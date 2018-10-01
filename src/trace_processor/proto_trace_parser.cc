@@ -242,6 +242,10 @@ void ProtoTraceParser::ParseMemInfo(uint64_t ts, TraceBlobView mem) {
         break;
     }
   }
+  if (PERFETTO_UNLIKELY(key >= meminfo_strs_id_.size())) {
+    PERFETTO_ELOG("MemInfo key %d is not recognized.", key);
+    return;
+  }
   context_->sched_tracker->PushCounter(ts, value, meminfo_strs_id_[key], 0,
                                        RefType::kNoRef);
 }
@@ -259,6 +263,10 @@ void ProtoTraceParser::ParseVmStat(uint64_t ts, TraceBlobView stat) {
         value = fld.as_uint32();
         break;
     }
+  }
+  if (PERFETTO_UNLIKELY(key >= vmstat_strs_id_.size())) {
+    PERFETTO_ELOG("VmStat key %d is not recognized.", key);
+    return;
   }
   context_->sched_tracker->PushCounter(ts, value, vmstat_strs_id_[key], 0,
                                        RefType::kNoRef);
