@@ -18,7 +18,13 @@ import {
   trackControllerRegistry
 } from '../../controller/track_controller';
 
-import {Config, CPU_SLICE_TRACK_KIND, Data} from './common';
+import {
+  Config,
+  CPU_SLICE_TRACK_KIND,
+  Data,
+  SliceData,
+  SummaryData
+} from './common';
 
 class CpuSliceTrackController extends TrackController<Config, Data> {
   static readonly kind = CPU_SLICE_TRACK_KIND;
@@ -36,7 +42,6 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
     const startNs = Math.round(start * 1e9);
     const endNs = Math.round(end * 1e9);
-    const resolutionNs = Math.round(resolution * 1e9);
 
     this.busy = true;
     if (this.setup === false) {
@@ -47,22 +52,79 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
       this.setup = true;
     }
 
+    // |resolution| is in s/px (to nearest power of 10) asumming a display
+    // of ~1000px 0.001 is 1s.
+    const isSummary = resolution >= 0.001;
+    // |resolution| is in s/px we want # ns for 10px window:
+    const bucketSizeNs = resolution * 10 * 1000000000;
+    let windowStartNs = startNs;
+    if (isSummary) {
+      windowStartNs = Math.floor(windowStartNs / bucketSizeNs) * bucketSizeNs;
+    }
+    const windowDurNs = endNs - windowStartNs;
+
     this.query(`update window_${this.trackState.id} set
-      window_start=${startNs},
-      window_dur=${endNs - startNs}
+      window_start=${windowStartNs},
+      window_dur=${windowDurNs},
+      quantum=${isSummary ? bucketSizeNs : 0}
       where rowid = 0;`);
 
-    const LIMIT = 10000;
-    const query = `select ts,dur,utid from span_${this.trackState.id} 
+    if (isSummary) {
+      this.publish(await this.summary(
+          fromNs(windowStartNs), end, resolution, bucketSizeNs));
+    } else {
+      this.publish(await this.slices(fromNs(windowStartNs), end, resolution));
+    }
+    this.busy = false;
+  }
+
+  private async summary(
+      start: number, end: number, resolution: number,
+      bucketSizeNs: number): Promise<SummaryData> {
+    const startNs = Math.round(start * 1e9);
+    const endNs = Math.round(end * 1e9);
+    const numBuckets = Math.ceil((endNs - startNs) / bucketSizeNs);
+
+    const query = `select
+        quantum_ts as bucket,
+        sum(dur)/cast(${bucketSizeNs} as float) as utilization
+        from span_${this.trackState.id}
         where cpu = ${this.config.cpu}
         and utid != 0
-        and dur >= ${resolutionNs}
+        group by quantum_ts`;
+
+    const rawResult = await this.query(query);
+    const numRows = +rawResult.numRecords;
+
+    const summary: Data = {
+      kind: 'summary',
+      start,
+      end,
+      resolution,
+      bucketSizeSeconds: fromNs(bucketSizeNs),
+      utilizations: new Float64Array(numBuckets),
+    };
+    const cols = rawResult.columns;
+    for (let row = 0; row < numRows; row++) {
+      const bucket = +cols[0].longValues![row];
+      summary.utilizations[bucket] = +cols[1].doubleValues![row];
+    }
+    return summary;
+  }
+
+  private async slices(start: number, end: number, resolution: number):
+      Promise<SliceData> {
+    const LIMIT = 10000;
+
+    const query = `select ts,dur,utid from span_${this.trackState.id}
+        where cpu = ${this.config.cpu}
+        and utid != 0
         limit ${LIMIT};`;
     const rawResult = await this.query(query);
 
     const numRows = +rawResult.numRecords;
-
-    const slices: Data = {
+    const slices: SliceData = {
+      kind: 'slice',
       start,
       end,
       resolution,
@@ -81,13 +143,13 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     if (numRows === LIMIT) {
       slices.end = slices.ends[slices.ends.length - 1];
     }
-    this.publish(slices);
-    this.busy = false;
+    return slices;
   }
 
   private async query(query: string) {
     const result = await this.engine.query(query);
     if (result.error) {
+      console.error(`Query error "${query}": ${result.error}`);
       throw new Error(`Query error "${query}": ${result.error}`);
     }
     return result;
