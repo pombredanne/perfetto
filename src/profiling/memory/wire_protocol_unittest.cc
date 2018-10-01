@@ -79,14 +79,15 @@ TEST(WireProtocolTest, AllocMessage) {
   char payload[] = {0x66, 0x66, 0x66, 0x00};
   WireMessage msg = {};
   msg.record_type = RecordType::Malloc;
-  AllocMetadata metadata;
+  AllocMetadata metadata = {};
   metadata.sequence_number = 0x111111111111111;
   metadata.alloc_size = 0x222222222222222;
-  metadata.stack_pointer = 0x333333333333333;
-  metadata.stack_pointer_offset = 0x444444444444444;
+  metadata.alloc_address = 0x333333333333333;
+  metadata.stack_pointer = 0x444444444444444;
+  metadata.stack_pointer_offset = 0x555555555555555;
   metadata.arch = unwindstack::ARCH_X86;
   for (size_t i = 0; i < kMaxRegisterDataSize; ++i)
-    metadata.register_data[i] = 0x55;
+    metadata.register_data[i] = 0x66;
   msg.alloc_header = &metadata;
   msg.payload = payload;
   msg.payload_size = sizeof(payload);
@@ -111,7 +112,7 @@ TEST(WireProtocolTest, AllocMessage) {
 TEST(WireProtocolTest, FreeMessage) {
   WireMessage msg = {};
   msg.record_type = RecordType::Free;
-  FreeMetadata metadata;
+  FreeMetadata metadata = {};
   metadata.num_entries = kFreePageSize;
   for (size_t i = 0; i < kFreePageSize; ++i) {
     metadata.entries[i].sequence_number = 0x111111111111111;
