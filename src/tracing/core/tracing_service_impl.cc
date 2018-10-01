@@ -370,6 +370,7 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   // triggering, using TraceConfig.deferred_start.
   if (!cfg.deferred_start())
     return StartTracing(tsid);
+
   return true;
 }
 
