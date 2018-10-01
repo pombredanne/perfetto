@@ -129,7 +129,7 @@ class PERFETTO_EXPORT TracingService {
                                base::ScopedFile = base::ScopedFile()) = 0;
 
     // Starts all data sources configured in the trace config. This is used only
-    // after calling EnableTracing() setting TraceConfig.deferred_start=true.
+    // after calling EnableTracing() with TraceConfig.deferred_start=true.
     // It's a no-op if called after a regular EnableTracing(), without setting
     // deferred_start.
     virtual void StartTracing() = 0;

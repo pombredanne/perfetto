@@ -119,7 +119,7 @@ message GetAsyncCommandRequest {}
 
 message GetAsyncCommandResponse {
   // Called after SetupTracing and before StartDataSource.
-  // This message was introduced after Android P.
+  // This message was introduced in Android Q.
   message SetupDataSource {
     optional uint64 new_instance_id = 1;
     optional protos.DataSourceConfig config = 2;
