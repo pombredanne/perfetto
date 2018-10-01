@@ -36,7 +36,7 @@ export abstract class TrackController<Config = {}, Data = {}> extends
   }
 
   private trackState(): TrackState {
-    return assertExists(globals.state.tracks[this.trackId]);
+    return assertExists(globals.state.tracks[this.id]);
   }
 
   // Must be overridden by the track implementation. Is invoked when the track

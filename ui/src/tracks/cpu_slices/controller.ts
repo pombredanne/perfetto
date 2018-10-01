@@ -38,7 +38,7 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     if (this.setup === false) {
       await this.query(`create virtual table window_${this.id} using window;`);
       await this.query(`create virtual table span_${this.id}
-                     using spans(sched, window_${this.id}, cpu);`);
+                     using span(sched, window_${this.id}, cpu);`);
       this.setup = true;
     }
 
