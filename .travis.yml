@@ -66,7 +66,8 @@ matrix:
       sudo: false
       compiler: clang
       env: CFG=linux_trusty-clang-x86_64-msan GN_ARGS="is_debug=false is_msan=true"
-# This always times out in Travis. Re-enable once that is fixed.
+# TODO(b/117093687): This always times out in Travis.
+# Re-enable once that is fixed.
 #    - os: linux
 #      dist: trusty
 #      sudo: true
