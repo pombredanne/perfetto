@@ -167,7 +167,8 @@ void ProbesProducer::StartDataSource(DataSourceInstanceID instance_id,
     return;
   }
   ProbesDataSource* data_source = it->second.get();
-  PERFETTO_DCHECK(!data_source->started);
+  if (data_source->started)
+    return;
   if (config.trace_duration_ms() != 0) {
     uint32_t timeout = 5000 + 2 * config.trace_duration_ms();
     watchdogs_.emplace(

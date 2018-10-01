@@ -69,7 +69,7 @@ class PERFETTO_EXPORT Producer {
   // Or, in the edge case where a trace is aborted immediately:
   // SetupDataSource  -> StopDataSource.
 
-  // Called by the Service to configure one of the data source previously
+  // Called by the Service to configure one of the data sources previously
   // registered through TracingService::ProducerEndpoint::RegisterDataSource().
   // This method is always called before StartDataSource. There is always a
   // SetupDataSource() call before each StartDataSource() call.
@@ -82,7 +82,7 @@ class PERFETTO_EXPORT Producer {
   virtual void SetupDataSource(DataSourceInstanceID,
                                const DataSourceConfig&) = 0;
 
-  // Called by the Service to turn on one of the data source previously
+  // Called by the Service to turn on one of the data sources previously
   // registered through TracingService::ProducerEndpoint::RegisterDataSource()
   // and initialized through SetupDataSource().
   // Args:
