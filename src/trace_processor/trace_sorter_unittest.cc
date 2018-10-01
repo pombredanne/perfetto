@@ -28,6 +28,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::InSequence;
+using ::testing::NiceMock;
 
 class MockTraceParser : public ProtoTraceParser {
  public:
@@ -64,7 +65,7 @@ class TraceSorterTest : public ::testing::TestWithParam<OptimizationMode> {
  public:
   TraceSorterTest()
       : test_buffer_(std::unique_ptr<uint8_t[]>(new uint8_t[8]), 0, 8) {
-    storage_ = new MockTraceStorage();
+    storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(storage_);
     context_.sorter.reset(
         new TraceSorter(&context_, GetParam(), 0 /*window_size*/));
@@ -75,7 +76,7 @@ class TraceSorterTest : public ::testing::TestWithParam<OptimizationMode> {
  protected:
   TraceProcessorContext context_;
   MockTraceParser* parser_;
-  MockTraceStorage* storage_;
+  NiceMock<MockTraceStorage>* storage_;
   TraceBlobView test_buffer_;
 };
 

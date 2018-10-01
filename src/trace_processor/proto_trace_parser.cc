@@ -110,8 +110,26 @@ ProtoTraceParser::ProtoTraceParser(TraceProcessorContext* context)
           context->storage->InternString("num_softirq_total")),
       num_irq_name_id_(context->storage->InternString("num_irq")),
       num_softirq_name_id_(context->storage->InternString("num_softirq")),
-      meminfo_strs_(BuildMeminfoCounterNames()),
-      vmstat_strs_(BuildVmstatCounterNames()) {}
+      cpu_times_user_ns_id_(
+          context->storage->InternString("cpu.times.user_ns")),
+      cpu_times_user_ice_ns_id_(
+          context->storage->InternString("cpu.times.user_ice_ns")),
+      cpu_times_system_mode_ns_id_(
+          context->storage->InternString("cpu.times.system_mode_ns")),
+      cpu_times_idle_ns_id_(
+          context->storage->InternString("cpu.times.idle_ns")),
+      cpu_times_io_wait_ns_id_(
+          context->storage->InternString("cpu.times.io_wait_ns")),
+      cpu_times_irq_ns_id_(context->storage->InternString("cpu.times.irq_ns")),
+      cpu_times_softirq_ns_id_(
+          context->storage->InternString("cpu.times.softirq_ns")) {
+  for (const auto& name : BuildMeminfoCounterNames()) {
+    meminfo_strs_id_.emplace_back(context->storage->InternString(name));
+  }
+  for (const auto& name : BuildVmstatCounterNames()) {
+    vmstat_strs_id_.emplace_back(context->storage->InternString(name));
+  }
+}
 
 ProtoTraceParser::~ProtoTraceParser() = default;
 
@@ -224,9 +242,8 @@ void ProtoTraceParser::ParseMemInfo(uint64_t ts, TraceBlobView mem) {
         break;
     }
   }
-  context_->sched_tracker->PushCounter(
-      ts, value, context_->storage->InternString(meminfo_strs_[key]), 0,
-      RefType::kNoRef);
+  context_->sched_tracker->PushCounter(ts, value, meminfo_strs_id_[key], 0,
+                                       RefType::kNoRef);
 }
 
 void ProtoTraceParser::ParseVmStat(uint64_t ts, TraceBlobView stat) {
@@ -243,9 +260,8 @@ void ProtoTraceParser::ParseVmStat(uint64_t ts, TraceBlobView stat) {
         break;
     }
   }
-  context_->sched_tracker->PushCounter(
-      ts, value, context_->storage->InternString(vmstat_strs_[key]), 0,
-      RefType::kNoRef);
+  context_->sched_tracker->PushCounter(ts, value, vmstat_strs_id_[key], 0,
+                                       RefType::kNoRef);
 }
 
 void ProtoTraceParser::ParseCpuTimes(uint64_t ts, TraceBlobView cpu_times) {

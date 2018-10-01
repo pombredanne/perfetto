@@ -36,6 +36,7 @@ using ::testing::Args;
 using ::testing::ElementsAreArray;
 using ::testing::Eq;
 using ::testing::Pointwise;
+using ::testing::NiceMock;
 
 class MockSchedTracker : public SchedTracker {
  public:
@@ -79,7 +80,7 @@ class MockTraceStorage : public TraceStorage {
 class ProtoTraceParserTest : public ::testing::Test {
  public:
   ProtoTraceParserTest() {
-    storage_ = new MockTraceStorage();
+    storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(storage_);
     sched_ = new MockSchedTracker(&context_);
     context_.sched_tracker.reset(sched_);
@@ -102,7 +103,7 @@ class ProtoTraceParserTest : public ::testing::Test {
   TraceProcessorContext context_;
   MockSchedTracker* sched_;
   MockProcessTracker* process_;
-  MockTraceStorage* storage_;
+  NiceMock<MockTraceStorage>* storage_;
 };
 
 TEST_F(ProtoTraceParserTest, LoadSingleEvent) {

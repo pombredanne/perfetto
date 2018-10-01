@@ -138,7 +138,7 @@ void ProtoTraceTokenizer::ParsePacket(TraceBlobView packet) {
   const uint8_t* data = packet.data();
   const size_t length = packet.length();
   ProtoDecoder decoder(data, length);
-  uint64_t timestamp;
+  uint64_t timestamp = 0;
   bool timestamp_found = false;
 
   // Speculate on the fact that the timestamp is often the 1st field of the
