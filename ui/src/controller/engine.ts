@@ -50,7 +50,6 @@ export abstract class Engine {
    * Exactly the same as engine.rpc.rawQuery({rawQuery});
    */
   query(sqlQuery: string): Promise<RawQueryResult> {
-    console.log(sqlQuery);
     return this.rpc.rawQuery({sqlQuery});
   }
 

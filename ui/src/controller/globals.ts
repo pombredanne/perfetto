@@ -63,7 +63,7 @@ class Globals {
     let runAgain = false;
     let summary = this._queuedActions.map(action => action.type).join(', ');
     summary = `Controllers loop (${summary})`;
-    // console.time(summary);
+    console.time(summary);
     for (let iter = 0; runAgain || this._queuedActions.length > 0; iter++) {
       if (iter > 100) throw new Error('Controllers are stuck in a livelock');
       const actions = this._queuedActions;
@@ -80,7 +80,7 @@ class Globals {
       }
     }
     assertExists(this._frontend).send<void>('updateState', [this.state]);
-    // console.timeEnd(summary);
+    console.timeEnd(summary);
   }
 
   createEngine(): Engine {
