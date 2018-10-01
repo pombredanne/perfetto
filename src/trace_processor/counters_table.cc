@@ -36,20 +36,23 @@ void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<CountersTable>(db, storage, "counters");
 }
 
-std::string CountersTable::CreateTableStmt(int, const char* const*) {
-  return "CREATE TABLE x("
-         "ts UNSIGNED BIG INT, "
-         "name text, "
-         "value UNSIGNED BIG INT, "
-         "dur UNSIGNED BIG INT, "
-         "value_delta UNSIGNED BIG INT, "
-         "ref UNSIGNED INT, "
-         "ref_type TEXT, "
-         "PRIMARY KEY(name, ts, ref)"
-         ") WITHOUT ROWID;";
+Table::Schema CountersTable::CreateSchema(int, const char* const*) {
+  return Schema(
+      {
+          Table::Column(Column::kTimestamp, "ts", ColumnType::kUlong),
+          Table::Column(Column::kName, "name", ColumnType::kString),
+          Table::Column(Column::kValue, "value", ColumnType::kUlong),
+          Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
+          Table::Column(Column::kValueDelta, "value_delta", ColumnType::kUlong),
+          Table::Column(Column::kRef, "ref", ColumnType::kUint),
+          Table::Column(Column::kRefType, "ref_type", ColumnType::kString),
+      },
+      {Column::kName, Column::kTimestamp, Column::kRef});
 }
 
-std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {
+std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
+    const QueryConstraints&,
+    sqlite3_value**) {
   return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
 }
 
@@ -118,10 +121,6 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
       PERFETTO_FATAL("Unknown column %d", N);
       break;
   }
-  return SQLITE_OK;
-}
-
-int CountersTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   return SQLITE_OK;
 }
 

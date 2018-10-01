@@ -14,15 +14,44 @@
  * limitations under the License.
  */
 
-#include "perfetto/base/watchdog_noop.h"
+#include "src/profiling/memory/bounded_queue.h"
+
+#include "gtest/gtest.h"
+
+#include <thread>
 
 namespace perfetto {
-namespace base {
+namespace {
 
-Watchdog* Watchdog::GetInstance() {
-  static Watchdog* watchdog = new Watchdog();
-  return watchdog;
+TEST(BoundedQueueTest, IsFIFO) {
+  BoundedQueue<int> q(2);
+  q.Add(1);
+  q.Add(2);
+  EXPECT_EQ(q.Get(), 1);
+  EXPECT_EQ(q.Get(), 2);
 }
 
-}  // namespace base
+TEST(BoundedQueueTest, Blocking) {
+  BoundedQueue<int> q(2);
+  q.Add(1);
+  q.Add(2);
+  std::thread th([&q] { q.Add(3); });
+  EXPECT_EQ(q.Get(), 1);
+  EXPECT_EQ(q.Get(), 2);
+  EXPECT_EQ(q.Get(), 3);
+  th.join();
+}
+
+TEST(BoundedQueueTest, Resize) {
+  BoundedQueue<int> q(2);
+  q.Add(1);
+  q.Add(2);
+  q.SetCapacity(3);
+  q.Add(3);
+  EXPECT_EQ(q.Get(), 1);
+  EXPECT_EQ(q.Get(), 2);
+  EXPECT_EQ(q.Get(), 3);
+}
+
+}  // namespace
 }  // namespace perfetto

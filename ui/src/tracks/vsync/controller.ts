@@ -34,9 +34,8 @@ class VsyncTrackController extends TrackController<Config, Data> {
 
     this.busy = true;
     const rawResult = await this.engine.query(`
-      select ts, dur from counters
+      select ts, dur, value from counters
         where name like "VSync-sf%"
-        and value = 1
         order by ts;`);
     this.busy = false;
     const rowCount = +rawResult.numRecords;

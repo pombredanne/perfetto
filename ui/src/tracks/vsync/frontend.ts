@@ -43,14 +43,16 @@ class VsyncTrack extends Track<Config, Data> {
       return;
     }
 
-    ctx.fillStyle = 'black';
-    for (let i = 0; i < data.starts.length; i++) {
-      if (data.ends[i] < visibleWindowTime.start) continue;
-      if (data.starts[i] > visibleWindowTime.end) break;
-      const startPx = timeScale.timeToPx(data.starts[i]);
-      const endPx = timeScale.timeToPx(data.ends[i]);
-      const widthPx = endPx - startPx;
-      ctx.fillRect(startPx, MARGIN_TOP, widthPx, RECT_HEIGHT);
+    for (let i = 0; i < 2; i++) {
+      ctx.fillStyle = ['blue', 'red'][i];
+      for (let j = i; j < data.starts.length; j += 2) {
+        if (data.ends[j] < visibleWindowTime.start) continue;
+        if (data.starts[j] > visibleWindowTime.end) break;
+        const startPx = timeScale.timeToPx(data.starts[j]);
+        const endPx = timeScale.timeToPx(data.ends[j]);
+        const widthPx = endPx - startPx;
+        ctx.fillRect(startPx, MARGIN_TOP, widthPx, RECT_HEIGHT);
+      }
     }
   }
 }
