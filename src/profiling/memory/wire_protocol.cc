@@ -29,8 +29,8 @@ template <typename T>
 bool ViewAndAdvance(char** ptr, T** out, const char* end) {
   if (end - sizeof(T) < *ptr)
     return false;
-  *out = reinterpret_cast<T*>(ptr);
-  ptr += sizeof(T);
+  *out = reinterpret_cast<T*>(*ptr);
+  *ptr += sizeof(T);
   return true;
 }
 }  // namespace
@@ -44,9 +44,11 @@ bool SendWireMessage(int sock, const WireMessage& msg) {
   iovecs[1].iov_base = const_cast<RecordType*>(&msg.record_type);
   iovecs[1].iov_len = sizeof(msg.record_type);
   if (msg.alloc_header) {
+    PERFETTO_DCHECK(msg.record_type == RecordType::Malloc);
     iovecs[2].iov_base = msg.alloc_header;
     iovecs[2].iov_len = sizeof(*msg.alloc_header);
   } else if (msg.free_header) {
+    PERFETTO_DCHECK(msg.record_type == RecordType::Free);
     iovecs[2].iov_base = msg.free_header;
     iovecs[2].iov_len = sizeof(*msg.free_header);
   } else {
@@ -91,6 +93,8 @@ bool ReceiveWireMessage(char* buf, size_t size, WireMessage* out) {
     case RecordType::Free:
       if (!ViewAndAdvance<FreeMetadata>(&buf, &out->free_header, end))
         return false;
+      out->payload = nullptr;
+      out->payload_size = 0;
       break;
   }
   out->record_type = *record_type;
