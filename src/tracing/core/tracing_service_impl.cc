@@ -238,6 +238,11 @@ bool TracingServiceImpl::EnableTracing(ConsumerEndpointImpl* consumer,
   }
 
   if (cfg.enable_extra_guardrails()) {
+    if (cfg.deferred_start()) {
+      PERFETTO_ELOG(
+          "deferred_start=true is not supported in unsupervised traces");
+      return false;
+    }
     if (cfg.duration_ms() > kMaxTracingDurationMillis) {
       PERFETTO_ELOG("Requested too long trace (%" PRIu32 "ms  > %" PRIu64
                     " ms)",

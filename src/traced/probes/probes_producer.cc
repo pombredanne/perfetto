@@ -202,7 +202,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateFtraceDataSource(
     ftrace_->ClearTrace();
   }
 
-  PERFETTO_LOG("Ftrace start (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
+  PERFETTO_LOG("Ftrace setup (id=%" PRIu64 ", target_buf=%" PRIu32 ")", id,
                config.target_buffer());
   const BufferID buffer_id = static_cast<BufferID>(config.target_buffer());
   std::unique_ptr<FtraceDataSource> data_source(new FtraceDataSource(
@@ -221,7 +221,7 @@ std::unique_ptr<ProbesDataSource> ProbesProducer::CreateInodeFileDataSource(
     TracingSessionID session_id,
     DataSourceInstanceID id,
     DataSourceConfig source_config) {
-  PERFETTO_LOG("Inode file map start (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
+  PERFETTO_LOG("Inode file map setup (id=%" PRIu64 ", target_buf=%" PRIu32 ")",
                id, source_config.target_buffer());
   auto buffer_id = static_cast<BufferID>(source_config.target_buffer());
   if (system_inodes_.empty())
