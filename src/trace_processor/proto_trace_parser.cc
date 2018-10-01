@@ -287,52 +287,44 @@ void ProtoTraceParser::ParseCpuTimes(uint64_t ts, TraceBlobView cpu_times) {
     switch (fld.id) {
       case protos::SysStats::CpuTimes::kUserNsFieldNumber: {
         value = fld.as_uint32();
-        context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.user_ns"),
-            cpu, RefType::kCPU_ID);
+        context_->sched_tracker->PushCounter(ts, value, cpu_times_user_ns_id_,
+                                             cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kUserIceNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.user_ice_ns"),
-            cpu, RefType::kCPU_ID);
+            ts, value, cpu_times_user_ice_ns_id_, cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kSystemModeNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value,
-            context_->storage->InternString("cpu.times.system_mode_ns"), cpu,
-            RefType::kCPU_ID);
+            ts, value, cpu_times_system_mode_ns_id_, cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIdleNsFieldNumber: {
         value = fld.as_uint32();
-        context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.idle_ns"),
-            cpu, RefType::kCPU_ID);
+        context_->sched_tracker->PushCounter(ts, value, cpu_times_idle_ns_id_,
+                                             cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIoWaitNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.io_wait_ns"),
-            cpu, RefType::kCPU_ID);
+            ts, value, cpu_times_io_wait_ns_id_, cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kIrqNsFieldNumber: {
         value = fld.as_uint32();
-        context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.irq_ns"), cpu,
-            RefType::kCPU_ID);
+        context_->sched_tracker->PushCounter(ts, value, cpu_times_irq_ns_id_,
+                                             cpu, RefType::kCPU_ID);
         break;
       }
       case protos::SysStats::CpuTimes::kSoftirqNsFieldNumber: {
         value = fld.as_uint32();
         context_->sched_tracker->PushCounter(
-            ts, value, context_->storage->InternString("cpu.times.softirq_ns"),
-            cpu, RefType::kCPU_ID);
+            ts, value, cpu_times_softirq_ns_id_, cpu, RefType::kCPU_ID);
         break;
       }
       default:
