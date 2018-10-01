@@ -93,6 +93,11 @@ class SpanOperatorTable : public Table {
  private:
   static constexpr uint8_t kReservedColumns = Column::kJoinValue + 1;
 
+  enum ChildTable {
+    kFirst = 0,
+    kSecond = 1,
+  };
+
   // Contains the definition of the child tables.
   struct TableDefinition {
     std::string name;
@@ -128,6 +133,10 @@ class SpanOperatorTable : public Table {
       // The rows of the table indexed by the values of join column.
       // TODO(lalitm): see how we can expand this past int64_t.
       std::map<int64_t, Span> spans;
+
+      uint64_t current_ts = std::numeric_limits<uint64_t>::max();
+      uint64_t current_dur = 0;
+      int64_t current_join_val = std::numeric_limits<int64_t>::max();
     };
 
     // A span which has data from both tables associated with it.
@@ -138,6 +147,10 @@ class SpanOperatorTable : public Table {
       Span t1_span;
       Span t2_span;
     };
+
+    // Steps the cursor forward for the given table and updates the state
+    // for that table.
+    int StepForTable(ChildTable table);
 
     // Computes the next value from the child tables.
     int ExtractNext(bool pull_t1);
@@ -160,6 +173,7 @@ class SpanOperatorTable : public Table {
 
     TableState t1_;
     TableState t2_;
+    ChildTable pull_table_ = ChildTable::kFirst;
 
     bool children_have_more_ = true;
     std::deque<IntersectingSpan> intersecting_spans_;

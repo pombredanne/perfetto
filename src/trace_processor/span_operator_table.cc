@@ -31,6 +31,7 @@ namespace {
 
 using namespace sqlite_utils;
 
+constexpr int64_t kI64Max = std::numeric_limits<int64_t>::max();
 constexpr uint64_t kU64Max = std::numeric_limits<uint64_t>::max();
 
 std::vector<Table::Column> GetColumnsForTable(
@@ -185,27 +186,47 @@ int SpanOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   if (err != SQLITE_OK)
     return err;
 
-  err = sqlite3_step(t1_.stmt.get());
-  if (err != SQLITE_DONE) {
-    if (err != SQLITE_ROW)
-      return SQLITE_ERROR;
-    int64_t ts = sqlite3_column_int64(t1_.stmt.get(), Column::kTimestamp);
-    t1_.latest_ts = static_cast<uint64_t>(ts);
-    t1_.col_count = static_cast<size_t>(sqlite3_column_count(t1_.stmt.get()));
-  }
+  // We pull from table 2 and allow Next() to pull from table 1.
+  pull_table_ = ChildTable::kFirst;
+  err = StepForTable(ChildTable::kSecond);
 
-  err = sqlite3_step(t2_.stmt.get());
-  if (err != SQLITE_DONE) {
-    if (err != SQLITE_ROW)
-      return SQLITE_ERROR;
-    int64_t ts = sqlite3_column_int64(t2_.stmt.get(), Column::kTimestamp);
-    t2_.latest_ts = static_cast<uint64_t>(ts);
-    t2_.col_count = static_cast<size_t>(sqlite3_column_count(t2_.stmt.get()));
-  }
+  // If there's no data in this table, then we are done without even looking
+  // at the other table.
+  if (err != SQLITE_ROW)
+    return err == SQLITE_DONE ? SQLITE_OK : err;
+
+  // Otherwise, find an overlapping span.
   return Next();
 }
 
 SpanOperatorTable::Cursor::~Cursor() {}
+
+int SpanOperatorTable::Cursor::Next() {
+  int err = StepForTable(pull_table_);
+  while (t1_.current_join_val < kI64Max && t2_.current_join_val < kI64Max) {
+  }
+  return SQLITE_OK;
+}
+
+int SpanOperatorTable::Cursor::StepForTable(ChildTable table) {
+  TableState* pull_state = table == ChildTable::kFirst ? &t1_ : &t2_;
+  auto* stmt = pull_state->stmt.get();
+
+  int err = sqlite3_step(stmt);
+  if (err == SQLITE_ROW) {
+    int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
+    int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
+    int64_t join_val = sqlite3_column_int64(stmt, Column::kJoinValue);
+    pull_state->current_ts = static_cast<uint64_t>(ts);
+    pull_state->current_dur = static_cast<uint64_t>(dur);
+    pull_state->current_join_val = join_val;
+  } else if (err == SQLITE_DONE) {
+    pull_state->current_ts = kU64Max;
+    pull_state->current_dur = 0;
+    pull_state->current_join_val = kI64Max;
+  }
+  return err;
+}
 
 int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
                                               sqlite3_value** argv,
@@ -244,53 +265,11 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
              reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
     }
   }
-  sql += " ORDER BY ts;";
+  sql += " ORDER BY " + table_->join_col_ + ", ts;";
 
   PERFETTO_DLOG("%s", sql.c_str());
   int t1_size = static_cast<int>(sql.size());
   return sqlite3_prepare_v2(db_, sql.c_str(), t1_size, stmt, nullptr);
-}
-
-int SpanOperatorTable::Cursor::Next() {
-  PERFETTO_DCHECK(!intersecting_spans_.empty() || children_have_more_);
-
-  // If there are no more rows to be added from the child tables, simply pop the
-  // the front of the queue and return.
-  if (!children_have_more_) {
-    intersecting_spans_.pop_front();
-    return SQLITE_OK;
-  }
-
-  // Remove the previously returned span but also try and find more
-  // intersections.
-  if (!intersecting_spans_.empty())
-    intersecting_spans_.pop_front();
-
-  // Pull from whichever cursor has the earlier timestamp and return if there
-  // is a valid span.
-  while (t1_.latest_ts < kU64Max || t2_.latest_ts < kU64Max) {
-    int err = ExtractNext(t1_.latest_ts <= t2_.latest_ts);
-    if (err == SQLITE_ROW) {
-      return SQLITE_OK;
-    } else if (err != SQLITE_DONE) {
-      return err;
-    }
-  }
-
-  // Once both cursors are completely exhausted, do one last pass through the
-  // tables and return any final intersecting spans.
-  for (auto it = t1_.spans.begin(); it != t1_.spans.end(); it++) {
-    auto join_val = it->first;
-    auto t2_it = t2_.spans.find(join_val);
-    if (t2_it == t2_.spans.end())
-      continue;
-    MaybeAddIntersectingSpan(join_val, std::move(it->second),
-                             std::move(t2_it->second));
-  }
-
-  // We don't have any more items to yield.
-  children_have_more_ = false;
-  return SQLITE_OK;
 }
 
 PERFETTO_ALWAYS_INLINE int SpanOperatorTable::Cursor::ExtractNext(
