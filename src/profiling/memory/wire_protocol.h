@@ -80,6 +80,9 @@ struct FreePageEntry {
 };
 
 struct ClientConfiguration {
+  // On average, sample one allocation every rate bytes,
+  // If rate == 1, sample every allocation.
+  // Should be >= 1.
   double rate;
 };
 
