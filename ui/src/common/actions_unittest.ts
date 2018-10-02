@@ -1,11 +1,11 @@
 // Copyright (C) 2018 The Android Open Source Project
-
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-
+//
 //      http://www.apache.org/licenses/LICENSE-2.0
-
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import {produce} from 'immer';
-import {DoActions, Model} from '../common/actions';
-import {createEmptyState, State, TrackState} from '../common/state';
+import {StateActions} from './actions';
+import {createEmptyState, State, TrackState} from './state';
 
 function fakeTrack(state: State, id: string): TrackState {
   const track: TrackState = {
@@ -30,14 +30,14 @@ function fakeTrack(state: State, id: string): TrackState {
 
 test('navigate', () => {
   const after = produce(createEmptyState(), draft => {
-    DoActions.navigate(draft, {route: '/foo'});
+    StateActions.navigate(draft, {route: '/foo'});
   });
   expect(after.route).toBe('/foo');
 });
 
 test('add tracks', () => {
   const once = produce(createEmptyState(), draft => {
-    DoActions.addTrack(draft, {
+    StateActions.addTrack(draft, {
       engineId: '1',
       kind: 'cpu',
       name: 'Cpu 1',
@@ -45,7 +45,7 @@ test('add tracks', () => {
     });
   });
   const twice = produce(once, draft => {
-    DoActions.addTrack(draft, {
+    StateActions.addTrack(draft, {
       engineId: '2',
       kind: 'cpu',
       name: 'Cpu 2',
@@ -59,13 +59,13 @@ test('add tracks', () => {
 
 test('reorder tracks', () => {
   const once = produce(createEmptyState(), draft => {
-    DoActions.addTrack(draft, {
+    StateActions.addTrack(draft, {
       engineId: '1',
       kind: 'cpu',
       name: 'Cpu 1',
       config: {},
     });
-    DoActions.addTrack(draft, {
+    StateActions.addTrack(draft, {
       engineId: '2',
       kind: 'cpu',
       name: 'Cpu 2',
@@ -77,7 +77,7 @@ test('reorder tracks', () => {
   const secondTrackId = once.scrollingTracks[1];
 
   const twice = produce(once, draft => {
-    DoActions.moveTrack(draft, {
+    StateActions.moveTrack(draft, {
       trackId: `${firstTrackId}`,
       direction: 'down',
     });
@@ -96,7 +96,7 @@ test('reorder pinned to scrolling', () => {
   state.scrollingTracks = ['c'];
 
   const after = produce(state, draft => {
-    DoActions.moveTrack(draft, {
+    StateActions.moveTrack(draft, {
       trackId: 'b',
       direction: 'down',
     });
@@ -115,7 +115,7 @@ test('reorder scrolling to pinned', () => {
   state.scrollingTracks = ['b', 'c'];
 
   const after = produce(state, draft => {
-    DoActions.moveTrack(draft, {
+    StateActions.moveTrack(draft, {
       trackId: 'b',
       direction: 'up',
     });
@@ -134,7 +134,7 @@ test('reorder clamp bottom', () => {
   state.scrollingTracks = ['c'];
 
   const after = produce(state, draft => {
-    DoActions.moveTrack(draft, {
+    StateActions.moveTrack(draft, {
       trackId: 'a',
       direction: 'up',
     });
@@ -151,7 +151,7 @@ test('reorder clamp top', () => {
   state.scrollingTracks = ['b', 'c'];
 
   const after = produce(state, draft => {
-    DoActions.moveTrack(draft, {
+    StateActions.moveTrack(draft, {
       trackId: 'c',
       direction: 'down',
     });
@@ -168,7 +168,7 @@ test('pin', () => {
   state.scrollingTracks = ['b', 'c'];
 
   const after = produce(state, draft => {
-    DoActions.toggleTrackPinned(draft, {
+    StateActions.toggleTrackPinned(draft, {
       trackId: 'c',
     });
   });
@@ -185,7 +185,7 @@ test('unpin', () => {
   state.scrollingTracks = ['c'];
 
   const after = produce(state, draft => {
-    DoActions.toggleTrackPinned(draft, {
+    StateActions.toggleTrackPinned(draft, {
       trackId: 'a',
     });
   });
@@ -193,9 +193,9 @@ test('unpin', () => {
   expect(after.scrollingTracks).toEqual(['a', 'c']);
 });
 
-test('open trace', async () => {
+test('open trace', () => {
   const after = produce(createEmptyState(), draft => {
-    DoActions.openTraceFromUrl(draft, {
+    StateActions.openTraceFromUrl(draft, {
       url: 'https://example.com/bar',
     });
   });
@@ -206,24 +206,15 @@ test('open trace', async () => {
   expect(after.route).toBe('/viewer');
 });
 
-test('set state', async () => {
-  const newState = createEmptyState();
-  const model = new Model();
-  model.setState({
-    newState,
-  });
-  expect(model.state).toBe(newState);
-});
-
 test('open second trace from file', () => {
   const once = produce(createEmptyState(), draft => {
-    DoActions.openTraceFromUrl(draft, {
+    StateActions.openTraceFromUrl(draft, {
       url: 'https://example.com/bar',
     });
   });
 
   const twice = produce(once, draft => {
-    DoActions.addTrack(draft, {
+    StateActions.addTrack(draft, {
       engineId: '1',
       kind: 'cpu',
       name: 'Cpu 1',
@@ -232,7 +223,7 @@ test('open second trace from file', () => {
   });
 
   const thrice = produce(twice, draft => {
-    DoActions.openTraceFromUrl(draft, {
+    StateActions.openTraceFromUrl(draft, {
       url: 'https://example.com/foo',
     });
   });

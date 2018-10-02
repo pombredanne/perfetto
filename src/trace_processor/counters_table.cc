@@ -50,7 +50,9 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
       {Column::kName, Column::kTimestamp, Column::kRef});
 }
 
-std::unique_ptr<Table::Cursor> CountersTable::CreateCursor() {
+std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
+    const QueryConstraints&,
+    sqlite3_value**) {
   return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
 }
 
@@ -100,6 +102,18 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
           sqlite3_result_text(context, "utid", -1, nullptr);
           break;
         }
+        case RefType::kNoRef: {
+          sqlite3_result_null(context);
+          break;
+        }
+        case RefType::kIrq: {
+          sqlite3_result_text(context, "irq", -1, nullptr);
+          break;
+        }
+        case RefType::kSoftIrq: {
+          sqlite3_result_text(context, "softirq", -1, nullptr);
+          break;
+        }
       }
       break;
     }
@@ -119,10 +133,6 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
       PERFETTO_FATAL("Unknown column %d", N);
       break;
   }
-  return SQLITE_OK;
-}
-
-int CountersTable::Cursor::Filter(const QueryConstraints&, sqlite3_value**) {
   return SQLITE_OK;
 }
 
