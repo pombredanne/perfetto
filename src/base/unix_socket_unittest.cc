@@ -743,13 +743,14 @@ TEST_F(UnixSocketTest, PartialSendMsgAll) {
 
   auto blocked_thread = pthread_self();
   std::thread th([blocked_thread, &recv_socket, &recv_buf] {
-    ASSERT_EQ(PERFETTO_EINTR(read(*recv_socket, recv_buf, 1)), 1);
+    ssize_t rd = PERFETTO_EINTR(read(*recv_socket, recv_buf, 1));
+    ASSERT_EQ(rd, 1);
     // We are now sure the other thread is in sendmsg, interrupt send.
     ASSERT_EQ(pthread_kill(blocked_thread, SIGWINCH), 0);
     // Drain the socket to allow SendMsgAll to succeed.
     size_t offset = 1;
     while (offset < sizeof(recv_buf)) {
-      ssize_t rd = PERFETTO_EINTR(
+      rd = PERFETTO_EINTR(
           read(*recv_socket, recv_buf + offset, sizeof(recv_buf) - offset));
       ASSERT_GE(rd, 0);
       offset += static_cast<size_t>(rd);
