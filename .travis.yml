@@ -72,7 +72,7 @@ matrix:
       dist: trusty
       sudo: true
       compiler: clang
-      env: CFG=linux_trusty-clang-x86_64_asan_lsan GN_ARGS="is_debug=false is_asan=true is_lsan=true"
+      env: CFG=linux_trusty-clang-x86_64-asan_lsan GN_ARGS="is_debug=false is_asan=true is_lsan=true"
     - os: linux
       dist: trusty
       sudo: false
