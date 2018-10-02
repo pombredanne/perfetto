@@ -96,7 +96,7 @@ class FreePage {
 
 const char* GetThreadStackBase();
 
-// RAII wrapper around PThreadKey. This is different from a ScopedResource
+// RAII wrapper around pthread_key_t. This is different from a ScopedResource
 // because it needs a separate boolean indicating validity.
 class PThreadKey {
  public:
