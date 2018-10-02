@@ -54,11 +54,11 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
 
     // |resolution| is in s/px (to nearest power of 10) asumming a display
     // of ~1000px 0.001 is 1s.
-    const isSummary = resolution >= 0.001;
+    const isQuantized = resolution >= 0.001;
     // |resolution| is in s/px we want # ns for 10px window:
-    const bucketSizeNs = resolution * 10 * 1000000000;
+    const bucketSizeNs = Math.round(resolution * 10 * 1e9);
     let windowStartNs = startNs;
-    if (isSummary) {
+    if (isQuantized) {
       windowStartNs = Math.floor(windowStartNs / bucketSizeNs) * bucketSizeNs;
     }
     const windowDurNs = endNs - windowStartNs;
@@ -66,19 +66,20 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     this.query(`update window_${this.trackState.id} set
       window_start=${windowStartNs},
       window_dur=${windowDurNs},
-      quantum=${isSummary ? bucketSizeNs : 0}
+      quantum=${isQuantized ? bucketSizeNs : 0}
       where rowid = 0;`);
 
-    if (isSummary) {
-      this.publish(await this.summary(
+    if (isQuantized) {
+      this.publish(await this.computeSummary(
           fromNs(windowStartNs), end, resolution, bucketSizeNs));
     } else {
-      this.publish(await this.slices(fromNs(windowStartNs), end, resolution));
+      this.publish(
+          await this.computeSlices(fromNs(windowStartNs), end, resolution));
     }
     this.busy = false;
   }
 
-  private async summary(
+  private async computeSummary(
       start: number, end: number, resolution: number,
       bucketSizeNs: number): Promise<SummaryData> {
     const startNs = Math.round(start * 1e9);
@@ -112,8 +113,9 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
     return summary;
   }
 
-  private async slices(start: number, end: number, resolution: number):
+  private async computeSlices(start: number, end: number, resolution: number):
       Promise<SliceData> {
+    // TODO(hjd): Remove LIMIT
     const LIMIT = 10000;
 
     const query = `select ts,dur,utid from span_${this.trackState.id}

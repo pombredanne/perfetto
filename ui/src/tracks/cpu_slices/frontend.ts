@@ -28,7 +28,8 @@ import {
   SummaryData
 } from './common';
 
-const MARGIN_TOP = 5;
+// 0.5 Makes the horizontal lines sharp.
+const MARGIN_TOP = 5.5;
 const RECT_HEIGHT = 30;
 
 function cropText(str: string, charWidth: number, rectWidth: number) {
@@ -62,9 +63,13 @@ class CpuSliceTrack extends Track<Config, Data> {
   private hoveredUtid = -1;
   private mouseXpos?: number;
   private reqPending = false;
+  private hue: number;
 
   constructor(trackState: TrackState) {
     super(trackState);
+    // TODO: this needs to be kept in sync with the hue generation algorithm
+    // of overview_timeline_panel.ts
+    this.hue = (128 + (32 * this.config.cpu)) % 256;
   }
 
   reqDataDeferred() {
@@ -114,12 +119,12 @@ class CpuSliceTrack extends Track<Config, Data> {
   renderSummary(ctx: CanvasRenderingContext2D, data: SummaryData): void {
     const {timeScale, visibleWindowTime} = globals.frontendLocalState;
     const startPx = Math.floor(timeScale.timeToPx(visibleWindowTime.start));
-    const bottomY = MARGIN_TOP + RECT_HEIGHT + 0.5;
+    const bottomY = MARGIN_TOP + RECT_HEIGHT;
 
     let lastX = startPx;
     let lastY = bottomY;
 
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = `hsl(${this.hue}, 50%, 60%)`;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     for (let i = 0; i < data.utilizations.length; i++) {
@@ -129,7 +134,7 @@ class CpuSliceTrack extends Track<Config, Data> {
       lastX = Math.floor(timeScale.timeToPx(startTime));
 
       ctx.lineTo(lastX, lastY);
-      lastY = MARGIN_TOP + Math.round(RECT_HEIGHT * (1 - utilization)) + 0.5;
+      lastY = MARGIN_TOP + Math.round(RECT_HEIGHT * (1 - utilization));
       ctx.lineTo(lastX, lastY);
     }
     ctx.lineTo(lastX, bottomY);
@@ -146,10 +151,6 @@ class CpuSliceTrack extends Track<Config, Data> {
     ctx.font = '12px Google Sans';
     const charWidth = ctx.measureText('dbpqaouk').width / 8;
 
-    // TODO: this needs to be kept in sync with the hue generation algorithm
-    // of overview_timeline_panel.ts
-    const hue = (128 + (32 * this.config.cpu)) % 256;
-
     for (let i = 0; i < data.starts.length; i++) {
       const tStart = data.starts[i];
       const tEnd = data.ends[i];
@@ -157,15 +158,14 @@ class CpuSliceTrack extends Track<Config, Data> {
       if (tEnd <= visibleWindowTime.start || tStart >= visibleWindowTime.end) {
         continue;
       }
-      const rectStart = Math.floor(timeScale.timeToPx(tStart));
-      const rectEnd = Math.floor(timeScale.timeToPx(tEnd));
+      const rectStart = timeScale.timeToPx(tStart);
+      const rectEnd = timeScale.timeToPx(tEnd);
       const rectWidth = rectEnd - rectStart;
       if (rectWidth < 0.1) continue;
 
       const hovered = this.hoveredUtid === utid;
-      ctx.fillStyle = `hsl(${hue}, 50%, ${hovered ? 25 : 60}%`;
-      ctx.fillRect(
-          rectStart, MARGIN_TOP + 0.5, rectEnd - rectStart, RECT_HEIGHT);
+      ctx.fillStyle = `hsl(${this.hue}, 50%, ${hovered ? 25 : 60}%)`;
+      ctx.fillRect(rectStart, MARGIN_TOP, rectEnd - rectStart, RECT_HEIGHT);
 
       // TODO: consider de-duplicating this code with the copied one from
       // chrome_slices/frontend.ts.
