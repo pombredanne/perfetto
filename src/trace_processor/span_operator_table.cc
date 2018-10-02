@@ -186,8 +186,8 @@ int SpanOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
   if (err != SQLITE_OK)
     return err;
 
-  // We pull from table 2 and allow Next() to pull from table 1.
-  pull_table_ = ChildTable::kFirst;
+  // We step table 2 and allow Next() to step from table 1.
+  next_stepped_table_ = ChildTable::kFirst;
   err = StepForTable(ChildTable::kSecond);
 
   // If there's no data in this table, then we are done without even looking
@@ -202,27 +202,30 @@ int SpanOperatorTable::Cursor::Initialize(const QueryConstraints& qc,
 SpanOperatorTable::Cursor::~Cursor() {}
 
 int SpanOperatorTable::Cursor::Next() {
-  int err = StepForTable(pull_table_);
-  for (; err == SQLITE_ROW; err = StepForTable(pull_table_)) {
+  int err = StepForTable(next_stepped_table_);
+  for (; err == SQLITE_ROW; err = StepForTable(next_stepped_table_)) {
     // Get both tables on the same join value.
     if (t1_.join_val < t2_.join_val) {
-      pull_table_ = ChildTable::kFirst;
+      next_stepped_table_ = ChildTable::kFirst;
       continue;
     } else if (t2_.join_val < t1_.join_val) {
-      pull_table_ = ChildTable::kSecond;
+      next_stepped_table_ = ChildTable::kSecond;
       continue;
     }
 
     // Get both tables to have an overlapping slice.
     if (t1_.ts_end <= t2_.ts_start) {
-      pull_table_ = ChildTable::kFirst;
+      next_stepped_table_ = ChildTable::kFirst;
       continue;
     } else if (t2_.ts_end <= t1_.ts_start) {
-      pull_table_ = ChildTable::kSecond;
+      next_stepped_table_ = ChildTable::kSecond;
       continue;
     }
 
     // Both slices now have an overlapping slice and the same join value.
+    // Update the next stepped table to be the one which finishes earliest.
+    next_stepped_table_ =
+        t1_.ts_end <= t2_.ts_end ? ChildTable::kFirst : ChildTable::kSecond;
     return SQLITE_OK;
   }
   return err == SQLITE_DONE ? SQLITE_OK : err;
@@ -297,24 +300,28 @@ int SpanOperatorTable::Cursor::Eof() {
 }
 
 int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
-  const auto& ret = intersecting_spans_.front();
   switch (N) {
     case Column::kTimestamp: {
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.ts));
+      auto max_ts = std::max(t1_.ts_start, t2_.ts_start);
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(max_ts));
       break;
     }
     case Column::kDuration: {
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.dur));
+      auto max_start = std::max(t1_.ts_start, t2_.ts_start);
+      auto min_end = std::min(t1_.ts_end, t2_.ts_end);
+      auto dur = min_end - max_start;
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
       break;
     }
     case Column::kJoinValue: {
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.join_val));
+      PERFETTO_DCHECK(t1_.join_val == t2_.join_val);
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(t1_.join_val));
       break;
     }
     default: {
       auto index_pair = table_->GetTableAndColumnIndex(N);
-      const auto& row = index_pair.first ? ret.t1_span : ret.t2_span;
-      ReportSqliteResult(context, row.values[index_pair.second]);
+      const auto& stmt = index_pair.first ? t1_.stmt : t2_.stmt;
+      ReportSqliteResult(context, stmt.get(), index_pair.second);
     }
   }
   return SQLITE_OK;
@@ -322,27 +329,22 @@ int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
 
 PERFETTO_ALWAYS_INLINE void SpanOperatorTable::Cursor::ReportSqliteResult(
     sqlite3_context* context,
-    SpanOperatorTable::Value value) {
-  switch (value.type) {
-    case Table::ColumnType::kUint:
-      sqlite3_result_int(context, static_cast<int>(value.uint_value));
+    sqlite3_stmt* stmt,
+    size_t index) {
+  int idx = static_cast<int>(index);
+  switch (sqlite3_column_type(stmt, idx)) {
+    case SQLITE_INTEGER:
+      sqlite3_result_int64(context, sqlite3_column_int64(stmt, idx));
       break;
-    case Table::ColumnType::kUlong:
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(value.ulong_value));
+    case SQLITE_FLOAT:
+      sqlite3_result_double(context, sqlite3_column_double(stmt, idx));
       break;
-    case Table::ColumnType::kString: {
-      // Note: If you could guarantee that you never sqlite3_step() the cursor
-      // before accessing the values here, you could avoid string copies and
-      // pass through the const char* obtained in ExtractNext
-      const auto kSqliteTransient =
-          reinterpret_cast<sqlite3_destructor_type>(-1);
-      sqlite3_result_text(context, value.text_value.c_str(), -1,
-                          kSqliteTransient);
+    case SQLITE_TEXT: {
+      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
+      auto ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx));
+      sqlite3_result_text(context, ptr, -1, kSqliteStatic);
       break;
     }
-    case Table::ColumnType::kInt:
-      PERFETTO_CHECK(false);
   }
 }
 

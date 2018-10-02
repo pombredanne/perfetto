@@ -52,7 +52,7 @@ class SchedSliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  // Cursor class used
+  // Base class for other cursors, implementing column reporting.
   class BaseCursor : public Table::Cursor {
    public:
     BaseCursor(const TraceStorage* storage);
@@ -65,7 +65,7 @@ class SchedSliceTable : public Table {
     const TraceStorage* const storage_;
   };
 
-  // Very fast which which simply increments through indices.
+  // Very fast cursor which which simply increments through indices.
   class IncrementCursor : public BaseCursor {
    public:
     IncrementCursor(const TraceStorage*,
@@ -75,13 +75,15 @@ class SchedSliceTable : public Table {
 
     int Next() override;
     uint32_t RowIndex() override;
-    int Eof() override { return offset_ >= (max_idx_ - min_idx_); }
+    int Eof() override;
 
    private:
     uint32_t const min_idx_;
     uint32_t const max_idx_;
     bool const desc_;
 
+    // In non-desc mode, this is an offset from min_idx while in desc mode, this
+    // is an offset from max_idx_.
     uint32_t offset_ = 0;
   };
 
@@ -97,7 +99,7 @@ class SchedSliceTable : public Table {
 
     int Next() override;
     uint32_t RowIndex() override;
-    int Eof() override { return offset_ >= (max_idx_ - min_idx_); }
+    int Eof() override;
 
    private:
     void FindNext();
@@ -107,6 +109,8 @@ class SchedSliceTable : public Table {
     std::vector<bool> filter_;
     bool const desc_;
 
+    // In non-desc mode, this is an offset from min_idx while in desc mode, this
+    // is an offset from max_idx_.
     uint32_t offset_ = 0;
   };
 
@@ -120,12 +124,12 @@ class SchedSliceTable : public Table {
     SortedCursor(const TraceStorage* storage,
                  uint32_t min_idx,
                  uint32_t max_idx,
-                 const std::vector<bool>& filter,
-                 const std::vector<QueryConstraints::OrderBy>&);
+                 const std::vector<QueryConstraints::OrderBy>&,
+                 const std::vector<bool>& filter);
 
     int Next() override;
-    uint32_t RowIndex() override { return sorted_rows_[next_row_idx_]; }
-    int Eof() override { return next_row_idx_ >= sorted_rows_.size(); }
+    uint32_t RowIndex() override;
+    int Eof() override;
 
    private:
     // Vector of row ids sorted by some order by constraints.

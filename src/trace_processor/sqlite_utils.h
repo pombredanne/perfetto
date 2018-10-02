@@ -22,6 +22,9 @@
 #include <deque>
 #include <iterator>
 
+#include "perfetto/base/logging.h"
+#include "src/trace_processor/query_constraints.h"
+
 namespace perfetto {
 namespace trace_processor {
 namespace sqlite_utils {
@@ -66,24 +69,23 @@ inline std::string OpToString(int op) {
 }
 
 template <typename F>
-PERFETTO_ALWAYS_INLINE bool Compare(uint32_t actual, sqlite3_value* value) {
-  PERFETTO_CHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
+bool Compare(uint32_t actual, sqlite3_value* value) {
+  PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<uint32_t>(sqlite3_value_int64(value)));
 }
 
 template <typename F>
-PERFETTO_ALWAYS_INLINE bool Compare(uint64_t actual, sqlite3_value* value) {
+bool Compare(uint64_t actual, sqlite3_value* value) {
   PERFETTO_CHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<uint64_t>(sqlite3_value_int64(value)));
 }
 
 template <class RandomAccessIterator>
-PERFETTO_ALWAYS_INLINE void FilterColumn(
-    RandomAccessIterator begin,
-    RandomAccessIterator end,
-    const QueryConstraints::Constraint& constraint,
-    sqlite3_value* argv,
-    std::vector<bool>* row_filter) {
+void FilterColumn(RandomAccessIterator begin,
+                  RandomAccessIterator end,
+                  const QueryConstraints::Constraint& constraint,
+                  sqlite3_value* argv,
+                  std::vector<bool>* row_filter) {
   using T = typename RandomAccessIterator::value_type;
   PERFETTO_DCHECK(static_cast<size_t>(std::distance(begin, end)) ==
                   row_filter->size());

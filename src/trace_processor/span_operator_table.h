@@ -72,14 +72,6 @@ class SpanOperatorTable : public Table {
     // All other columns are dynamic depending on the joined tables.
   };
 
-  // Represents possible values of a SQLite joined table.
-  struct Value {
-    Table::ColumnType type;
-    std::string text_value;
-    uint64_t ulong_value;
-    uint32_t uint_value;
-  };
-
   SpanOperatorTable(sqlite3*, const TraceStorage*);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
@@ -117,13 +109,6 @@ class SpanOperatorTable : public Table {
     int Column(sqlite3_context* context, int N) override;
 
    private:
-    // Details of a row of one of the child tables.
-    struct Span {
-      uint64_t ts = 0;
-      uint64_t dur = 0;
-      std::vector<Value> values;  // One for each column.
-    };
-
     // Details of the state of retrieval from a table across all join values.
     struct TableState {
       ScopedStmt stmt;
@@ -136,9 +121,9 @@ class SpanOperatorTable : public Table {
     // for that table.
     int StepForTable(ChildTable table);
 
-    // Reports to SQLite the value given by |value| based on its type.
     void ReportSqliteResult(sqlite3_context* context,
-                            SpanOperatorTable::Value value);
+                            sqlite3_stmt* stmt,
+                            size_t index);
 
     int PrepareRawStmt(const QueryConstraints& qc,
                        sqlite3_value** argv,
@@ -148,7 +133,7 @@ class SpanOperatorTable : public Table {
 
     TableState t1_;
     TableState t2_;
-    ChildTable pull_table_ = ChildTable::kFirst;
+    ChildTable next_stepped_table_ = ChildTable::kFirst;
 
     sqlite3* const db_;
     SpanOperatorTable* const table_;
