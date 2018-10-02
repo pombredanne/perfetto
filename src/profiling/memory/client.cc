@@ -168,6 +168,8 @@ Client::Client(std::vector<base::ScopedFile> socks)
     : pthread_key_(ThreadLocalSamplingData::KeyDestructor),
       socket_pool_(std::move(socks)),
       main_thread_stack_base_(FindMainThreadStack()) {
+  PERFETTO_DCHECK(pthread_key_.valid());
+
   uint64_t size = 0;
   int fds[2];
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
