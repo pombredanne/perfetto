@@ -279,4 +279,16 @@ if (!build_with_chromium) {
       "src/profiling/memory:malloc_hooks",
     ]
   }
+
+  executable("heapprofd") {
+    deps = [
+      "gn:default_deps",
+      "src/base",
+      "src/base:unix_socket",
+      "src/profiling/memory:daemon",
+    ]
+    sources = [
+      "src/profiling/memory/main.cc",
+    ]
+  }
 }

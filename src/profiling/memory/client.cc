@@ -74,6 +74,28 @@ inline bool IsMainThread() {
   return getpid() == gettid();
 }
 
+// TODO(fmayer): Remove this after making bionic implementation safe to use.
+char* FindMainThreadStack() {
+  FILE* maps = fopen("/proc/self/maps", "r");
+  if (maps == nullptr) {
+    return nullptr;
+  }
+  while (!feof(maps)) {
+    char line[1024];
+    char* data = fgets(line, sizeof(line), maps);
+    if (data != nullptr && strstr(data, "[stack]")) {
+      char* sep = strstr(data, "-");
+      if (sep == nullptr)
+        continue;
+      sep++;
+      fclose(maps);
+      return reinterpret_cast<char*>(strtoll(sep, nullptr, 16));
+    }
+  }
+  fclose(maps);
+  return nullptr;
+}
+
 }  // namespace
 
 void FreePage::Add(const uint64_t addr,
@@ -93,6 +115,7 @@ void FreePage::Add(const uint64_t addr,
 void FreePage::FlushLocked(SocketPool* pool) {
   WireMessage msg = {};
   msg.record_type = RecordType::Free;
+  free_page_.num_entries = offset_;
   msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
   SendWireMessage(*fd, msg);
@@ -142,7 +165,9 @@ const char* GetThreadStackBase() {
 }
 
 Client::Client(std::vector<base::ScopedFile> socks)
-    : pthread_key_(KeyDestructor), socket_pool_(std::move(socks)) {
+    : pthread_key_(KeyDestructor),
+      socket_pool_(std::move(socks)),
+      main_thread_stack_base_(FindMainThreadStack()) {
   uint64_t size = 0;
   int fds[2];
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
@@ -199,6 +224,7 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   metadata.sequence_number = ++sequence_number_;
 
   WireMessage msg{};
+  msg.record_type = RecordType::Malloc;
   msg.alloc_header = &metadata;
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);

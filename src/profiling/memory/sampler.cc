@@ -21,19 +21,21 @@
 namespace perfetto {
 namespace {
 ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
-                                     void* (*malloc)(size_t)) {
+                                     void* (*unhooked_malloc)(size_t),
+                                     void (*unhooked_free)(void*)) {
+  // This should not be used with glibc as it might re-enter into malloc, see
+  // http://crbug.com/776475.
   void* specific = pthread_getspecific(key);
   if (specific == nullptr) {
-    specific = malloc(sizeof(ThreadLocalSamplingData));
-    new (specific) ThreadLocalSamplingData;
+    specific = unhooked_malloc(sizeof(ThreadLocalSamplingData));
+    new (specific) ThreadLocalSamplingData(unhooked_free);
     pthread_setspecific(key, specific);
   }
   return reinterpret_cast<ThreadLocalSamplingData*>(specific);
 }
 }  // namespace
 
-// The algorithm below is a re-implementation of the Chromium sampling
-// algorithm at
+// The algorithm below is a inspired by the Chromium sampling algorithm at
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
 int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
@@ -55,15 +57,20 @@ size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
 size_t ShouldSample(pthread_key_t key,
                     size_t sz,
                     double rate,
-                    void* (*malloc)(size_t)) {
+                    void* (*unhooked_malloc)(size_t),
+                    void (*unhooked_free)(void*)) {
   if (PERFETTO_UNLIKELY(sz >= rate))
     return 1;
-  return GetSpecific(key, malloc)->ShouldSample(sz, rate);
+  return GetSpecific(key, unhooked_malloc, unhooked_free)
+      ->ShouldSample(sz, rate);
 }
 
-void KeyDestructor(void* ptr) {
-  reinterpret_cast<ThreadLocalSamplingData*>(ptr)->~ThreadLocalSamplingData();
-  free(ptr);
+void ThreadLocalSamplingData::KeyDestructor(void* ptr) {
+  ThreadLocalSamplingData* thread_local_data =
+      reinterpret_cast<ThreadLocalSamplingData*>(ptr);
+  void (*unhooked_free)(void*) = thread_local_data->unhooked_free_;
+  thread_local_data->~ThreadLocalSamplingData();
+  unhooked_free(ptr);
 }
 
 }  // namespace perfetto

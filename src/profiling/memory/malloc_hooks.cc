@@ -194,7 +194,7 @@ void HEAPPROFD_ADD_PREFIX(_malloc_enable)() {
 }
 
 #if defined(HAVE_DEPRECATED_MALLOC_FUNCS)
-void* HEAPPROFD_ADD_PREFIX(_pvalloc)(size_t bytes) {
+void* HEAPPROFD_ADD_PREFIX(_pvalloc)(size_t size) {
   return g_dispatch->pvalloc(size);
 }
 

@@ -194,26 +194,32 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
   if (!ReceiveWireMessage(reinterpret_cast<char*>(rec->data.get()), rec->size,
                           &msg))
     return false;
-  switch (msg.record_type) {
-    case RecordType::Malloc: {
-      std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
-      if (!metadata)
-        // Process has already gone away.
-        return false;
+  if (msg.record_type == RecordType::Malloc) {
+    std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
+    if (!metadata) {
+      // Process has already gone away.
+      return false;
+    }
 
-      out->metadata = std::move(rec->metadata);
-      out->free_record = {};
-      return DoUnwind(&msg, metadata.get(), &out->alloc_record);
+    out->record_type = BookkeepingRecordType::Malloc;
+    out->metadata = std::move(rec->metadata);
+    if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
+      PERFETTO_LOG("Unwinding failed.");
+      return false;
     }
-    case RecordType::Free: {
-      // We need to keep this alive, because msg.free_header is a pointer into
-      // this.
-      out->metadata = std::move(rec->metadata);
-      out->free_record.free_data = std::move(rec->data);
-      out->free_record.metadata = msg.free_header;
-      out->alloc_record = {};
-      return true;
-    }
+    PERFETTO_LOG("Unwound.");
+    return true;
+  } else if (msg.record_type == RecordType::Free) {
+    // We need to keep this alive, because msg.free_header is a pointer into
+    // this.
+    out->record_type = BookkeepingRecordType::Free;
+    out->metadata = std::move(rec->metadata);
+    out->free_record.free_data = std::move(rec->data);
+    out->free_record.metadata = msg.free_header;
+    return true;
+  } else {
+    PERFETTO_DCHECK(false);
+    return false;
   }
 }
 
@@ -234,15 +240,19 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
     // Process has already gone away.
     return;
 
-  if (rec->free_record.free_data) {
+  if (rec->record_type == BookkeepingRecordType::Dump) {
+  } else if (rec->record_type == BookkeepingRecordType::Free) {
     FreeRecord& free_rec = rec->free_record;
     FreePageEntry* entries = free_rec.metadata->entries;
     uint64_t num_entries = free_rec.metadata->num_entries;
+    if (num_entries > kFreePageSize)
+      return;
     for (size_t i = 0; i < num_entries; ++i) {
       const FreePageEntry& entry = entries[i];
+      PERFETTO_LOG("Free %" PRIu64 ".", entry.addr);
       metadata->heap_dump.RecordFree(entry.addr, entry.sequence_number);
     }
-  } else {
+  } else if (rec->record_type == BookkeepingRecordType::Malloc) {
     AllocRecord& alloc_rec = rec->alloc_record;
     std::vector<CodeLocation> code_locations;
     for (unwindstack::FrameData& frame : alloc_rec.frames)
@@ -251,6 +261,8 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
                                      alloc_rec.alloc_metadata.alloc_address,
                                      alloc_rec.alloc_metadata.alloc_size,
                                      alloc_rec.alloc_metadata.sequence_number);
+  } else {
+    PERFETTO_DCHECK(false);
   }
 }
 

@@ -45,6 +45,7 @@ default_targets = [
     '//:traced_probes',
     '//:trace_to_text',
     '//:heapprofd_client',
+    '//:heapprofd',
 ]
 
 # Defines a custom init_rc argument to be applied to the corresponding output
