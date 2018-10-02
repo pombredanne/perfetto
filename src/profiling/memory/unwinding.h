@@ -89,8 +89,15 @@ struct AllocRecord {
   std::vector<unwindstack::FrameData> frames;
 };
 
+enum class BookkeepingRecordType {
+  Dump = 0,
+  Malloc = 1,
+  Free = 2,
+};
+
 struct BookkeepingRecord {
   // TODO(fmayer): Use a union.
+  BookkeepingRecordType record_type;
   std::weak_ptr<ProcessMetadata> metadata;
   AllocRecord alloc_record;
   FreeRecord free_record;
