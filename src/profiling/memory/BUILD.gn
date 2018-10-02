@@ -21,7 +21,6 @@ source_set("wire_protocol") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
-    "../../base:unix_socket",
   ]
   sources = [
     "wire_protocol.cc",
@@ -36,7 +35,7 @@ source_set("daemon") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
-    "../../base:unix_socket",
+    "../../ipc",
   ]
   sources = [
     "bookkeeping.cc",
@@ -59,7 +58,6 @@ source_set("client") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
-    "../../base:unix_socket",
   ]
   sources = [
     "client.cc",
@@ -95,18 +93,14 @@ source_set("unittests") {
   ]
 }
 
-source_set("malloc_hooks") {
+executable("heapprofd") {
   deps = [
-    ":client",
+    ":daemon",
     "../../../gn:default_deps",
     "../../base",
-    "../../base:unix_socket",
-  ]
-  cflags = [
-    "-isystem",
-    rebase_path("../../../buildtools/bionic/libc", root_build_dir),
+    "../../ipc",
   ]
   sources = [
-    "malloc_hooks.cc",
+    "main.cc",
   ]
 }
