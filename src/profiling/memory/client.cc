@@ -165,7 +165,7 @@ const char* GetThreadStackBase() {
 }
 
 Client::Client(std::vector<base::ScopedFile> socks)
-    : pthread_key_(KeyDestructor),
+    : pthread_key_(ThreadLocalSamplingData::KeyDestructor),
       socket_pool_(std::move(socks)),
       main_thread_stack_base_(FindMainThreadStack()) {
   uint64_t size = 0;
@@ -238,9 +238,11 @@ void Client::RecordFree(uint64_t alloc_address) {
   free_page_.Add(alloc_address, ++sequence_number_, &socket_pool_);
 }
 
-bool Client::ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t)) {
+bool Client::ShouldSampleAlloc(uint64_t alloc_size,
+                               void* (*unhooked_malloc)(size_t),
+                               void (*unhooked_free)(void*)) {
   return ShouldSample(pthread_key_.get(), alloc_size, client_config_.rate,
-                      malloc);
+                      unhooked_malloc, unhooked_free);
 }
 
 }  // namespace perfetto

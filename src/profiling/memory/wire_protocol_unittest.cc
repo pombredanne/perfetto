@@ -76,15 +76,15 @@ RecordReader::Record ReceiveAll(int sock) {
 }
 
 TEST(WireProtocolTest, AllocMessage) {
-  char payload[] = {0x66, 0x66, 0x66, 0x00};
+  char payload[] = {0x77, 0x77, 0x77, 0x00};
   WireMessage msg = {};
   msg.record_type = RecordType::Malloc;
   AllocMetadata metadata = {};
-  metadata.sequence_number = 0x111111111111111;
-  metadata.alloc_size = 0x222222222222222;
-  metadata.alloc_address = 0x333333333333333;
-  metadata.stack_pointer = 0x444444444444444;
-  metadata.stack_pointer_offset = 0x555555555555555;
+  metadata.sequence_number = 0xA1A2A3A4A5A6A7A8;
+  metadata.alloc_size = 0xB1B2B3B4B5B6B7B8;
+  metadata.alloc_address = 0xC1C2C3C4C5C6C7C8;
+  metadata.stack_pointer = 0xD1D2D3D4D5D6D7D8;
+  metadata.stack_pointer_offset = 0xE1E2E3E4E5E6E7E8;
   metadata.arch = unwindstack::ARCH_X86;
   for (size_t i = 0; i < kMaxRegisterDataSize; ++i)
     metadata.register_data[i] = 0x66;

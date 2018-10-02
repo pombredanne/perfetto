@@ -18,8 +18,6 @@
 
 #include "perfetto/base/logging.h"
 
-#include <inttypes.h>
-
 namespace perfetto {
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(

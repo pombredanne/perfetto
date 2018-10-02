@@ -123,7 +123,7 @@ size_t HEAPPROFD_ADD_PREFIX(_malloc_usable_size)(void* pointer) {
 
 void* HEAPPROFD_ADD_PREFIX(_malloc)(size_t size) {
   void* addr = g_dispatch->malloc(size);
-  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc))
+  if (g_client->ShouldSampleAlloc(size, g_dispatch->malloc, g_dispatch->free))
     g_client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
   return addr;
 }

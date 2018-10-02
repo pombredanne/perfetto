@@ -122,7 +122,9 @@ class Client {
   Client(const std::string& sock_name, size_t conns);
   void RecordMalloc(uint64_t alloc_size, uint64_t alloc_address);
   void RecordFree(uint64_t alloc_address);
-  bool ShouldSampleAlloc(uint64_t alloc_size, void* (*malloc)(size_t));
+  bool ShouldSampleAlloc(uint64_t alloc_size,
+                         void* (*unhooked_malloc)(size_t),
+                         void (*unhooked_free)(void*));
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
 
