@@ -54,17 +54,49 @@ TraceProcessor* g_tp;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_STANDALONE_BUILD)
 
-std::string GetHistoryPath() {
+bool EnsureDir(const std::string& path) {
+  return mkdir(path.c_str(), 0755) != -1 || errno == EEXIST;
+}
+
+bool EnsureFile(const std::string& path) {
+  return base::OpenFile(path, O_RDONLY | O_CREAT).get() != -1;
+}
+
+std::string GetConfigPath() {
   const char* homedir = getenv("HOME");
   if (homedir == nullptr)
     homedir = getpwuid(getuid())->pw_dir;
-  return std::string(homedir) + "/.trace_processor_shell_history";
+  if (homedir == nullptr)
+    return "";
+  return std::string(homedir) + "/.config";
+}
+
+std::string GetPerfettoPath() {
+  std::string config = GetConfigPath();
+  if (config == "")
+    return "";
+  return config + "/perfetto";
+}
+
+std::string GetHistoryPath() {
+  std::string perfetto = GetPerfettoPath();
+  if (perfetto == "")
+    return "";
+  return perfetto + "/.trace_processor_shell_history";
 }
 
 void SetupLineEditor() {
   linenoiseSetMultiLine(true);
   linenoiseHistorySetMaxLen(1000);
-  linenoiseHistoryLoad(GetHistoryPath().c_str());
+
+  bool success = GetHistoryPath() != "";
+  success = success && EnsureDir(GetConfigPath());
+  success = success && EnsureDir(GetPerfettoPath());
+  success = success && EnsureFile(GetHistoryPath());
+  success = success && linenoiseHistoryLoad(GetHistoryPath().c_str()) != -1;
+  if (!success) {
+    PERFETTO_PLOG("Could not load history from %s", GetHistoryPath().c_str());
+  }
 }
 
 void FreeLine(char* line) {
