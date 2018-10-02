@@ -203,9 +203,29 @@ SpanOperatorTable::Cursor::~Cursor() {}
 
 int SpanOperatorTable::Cursor::Next() {
   int err = StepForTable(pull_table_);
-  while (t1_.current_join_val < kI64Max && t2_.current_join_val < kI64Max) {
+  for (; err == SQLITE_ROW; err = StepForTable(pull_table_)) {
+    // Get both tables on the same join value.
+    if (t1_.join_val < t2_.join_val) {
+      pull_table_ = ChildTable::kFirst;
+      continue;
+    } else if (t2_.join_val < t1_.join_val) {
+      pull_table_ = ChildTable::kSecond;
+      continue;
+    }
+
+    // Get both tables to have an overlapping slice.
+    if (t1_.ts_end <= t2_.ts_start) {
+      pull_table_ = ChildTable::kFirst;
+      continue;
+    } else if (t2_.ts_end <= t1_.ts_start) {
+      pull_table_ = ChildTable::kSecond;
+      continue;
+    }
+
+    // Both slices now have an overlapping slice and the same join value.
+    return SQLITE_OK;
   }
-  return SQLITE_OK;
+  return err == SQLITE_DONE ? SQLITE_OK : err;
 }
 
 int SpanOperatorTable::Cursor::StepForTable(ChildTable table) {
@@ -217,13 +237,13 @@ int SpanOperatorTable::Cursor::StepForTable(ChildTable table) {
     int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
     int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
     int64_t join_val = sqlite3_column_int64(stmt, Column::kJoinValue);
-    pull_state->current_ts = static_cast<uint64_t>(ts);
-    pull_state->current_dur = static_cast<uint64_t>(dur);
-    pull_state->current_join_val = join_val;
+    pull_state->ts_start = static_cast<uint64_t>(ts);
+    pull_state->ts_end = pull_state->ts_start + static_cast<uint64_t>(dur);
+    pull_state->join_val = join_val;
   } else if (err == SQLITE_DONE) {
-    pull_state->current_ts = kU64Max;
-    pull_state->current_dur = 0;
-    pull_state->current_join_val = kI64Max;
+    pull_state->ts_start = kU64Max;
+    pull_state->ts_end = kU64Max;
+    pull_state->join_val = kI64Max;
   }
   return err;
 }
@@ -254,8 +274,8 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
       col_name = table_->join_col_;
     } else {
       auto index_pair = table_->GetTableAndColumnIndex(c);
-      bool is_constraint_in_current_table = index_pair.first == is_t1;
-      if (is_constraint_in_current_table) {
+      bool is_constraint_in_table = index_pair.first == is_t1;
+      if (is_constraint_in_table) {
         col_name = def.cols[index_pair.second].name();
       }
     }
@@ -272,110 +292,25 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
   return sqlite3_prepare_v2(db_, sql.c_str(), t1_size, stmt, nullptr);
 }
 
-PERFETTO_ALWAYS_INLINE int SpanOperatorTable::Cursor::ExtractNext(
-    bool pull_t1) {
-  // Decide which table we will be retrieving a row from.
-  TableState* pull_table = pull_t1 ? &t1_ : &t2_;
-
-  // Extract the timestamp, duration and join value from that table.
-  sqlite3_stmt* stmt = pull_table->stmt.get();
-  int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
-  int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
-  int64_t join_val = sqlite3_column_int64(stmt, Column::kJoinValue);
-
-  // Extract the actual row from the state.
-  auto* pull_span = &pull_table->spans[join_val];
-
-  // Save the old span (to allow us to return it) and then update the data in
-  // the span.
-  Span saved_span = std::move(*pull_span);
-  pull_span->ts = static_cast<uint64_t>(ts);
-  pull_span->dur = static_cast<uint64_t>(dur);
-  pull_span->values.resize(pull_table->col_count - kReservedColumns);
-
-  // Update all other columns.
-  const auto& table_desc = pull_t1 ? table_->t1_defn_ : table_->t2_defn_;
-  int col_count = static_cast<int>(pull_table->col_count);
-  for (int i = kReservedColumns; i < col_count; i++) {
-    size_t off = static_cast<size_t>(i - kReservedColumns);
-
-    Value* value = &pull_span->values[off];
-    value->type = table_desc.cols[off].type();
-    switch (value->type) {
-      case Table::ColumnType::kUlong:
-        value->ulong_value =
-            static_cast<uint64_t>(sqlite3_column_int64(stmt, i));
-        break;
-      case Table::ColumnType::kUint:
-        value->uint_value = static_cast<uint32_t>(sqlite3_column_int(stmt, i));
-        break;
-      case Table::ColumnType::kString:
-        value->text_value =
-            reinterpret_cast<const char*>(sqlite3_column_text(stmt, i));
-        break;
-      case Table::ColumnType::kInt:
-        PERFETTO_CHECK(false);
-    }
-  }
-
-  // Get the next value from whichever table we just updated.
-  int err = sqlite3_step(stmt);
-  switch (err) {
-    case SQLITE_DONE:
-      pull_table->latest_ts = kU64Max;
-      break;
-    case SQLITE_ROW:
-      pull_table->latest_ts =
-          static_cast<uint64_t>(sqlite3_column_int64(stmt, Column::kTimestamp));
-      break;
-    default:
-      return err;
-  }
-
-  // Create copies of the spans we want to intersect then perform the intersect.
-  auto t1_span = pull_t1 ? std::move(saved_span) : t1_.spans[join_val];
-  auto t2_span = pull_t1 ? t2_.spans[join_val] : std::move(saved_span);
-  bool span_added = MaybeAddIntersectingSpan(join_val, t1_span, t2_span);
-  return span_added ? SQLITE_ROW : SQLITE_DONE;
-}
-
-bool SpanOperatorTable::Cursor::MaybeAddIntersectingSpan(int64_t join_value,
-                                                         Span t1_span,
-                                                         Span t2_span) {
-  uint64_t t1_end = t1_span.ts + t1_span.dur;
-  uint64_t t2_end = t2_span.ts + t2_span.dur;
-
-  // If there is no overlap between the two spans, don't return anything.
-  if (t1_end == 0 || t2_end == 0 || t2_end < t1_span.ts || t1_end < t2_span.ts)
-    return false;
-
-  IntersectingSpan value;
-  value.ts = std::max(t1_span.ts, t2_span.ts);
-  value.dur = std::min(t1_end, t2_end) - value.ts;
-  value.join_val = join_value;
-  value.t1_span = std::move(t1_span);
-  value.t2_span = std::move(t2_span);
-  intersecting_spans_.emplace_back(std::move(value));
-
-  return true;
-}
-
 int SpanOperatorTable::Cursor::Eof() {
-  return intersecting_spans_.empty() && !children_have_more_;
+  return t1_.ts_start == kU64Max || t2_.ts_start == kU64Max;
 }
 
 int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
   const auto& ret = intersecting_spans_.front();
   switch (N) {
-    case Column::kTimestamp:
+    case Column::kTimestamp: {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.ts));
       break;
-    case Column::kDuration:
+    }
+    case Column::kDuration: {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.dur));
       break;
-    case Column::kJoinValue:
+    }
+    case Column::kJoinValue: {
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(ret.join_val));
       break;
+    }
     default: {
       auto index_pair = table_->GetTableAndColumnIndex(N);
       const auto& row = index_pair.first ? ret.t1_span : ret.t2_span;
