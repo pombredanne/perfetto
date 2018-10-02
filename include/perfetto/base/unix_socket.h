@@ -57,7 +57,7 @@ base::ScopedFile CreateSocket();
 // Update msghdr so subsequent sendmsg will send data that remains after n bytes
 // have already been sent.
 // This should not be used, it's exported for test use only.
-void OffsetMsgHdr(struct msghdr* msg, size_t n);
+void ShiftMsgHdr(size_t n, struct msghdr* msg);
 
 // Re-enter sendmsg until all the data has been sent or an error occurs.
 //
@@ -180,6 +180,8 @@ class UnixSocket {
   // EventListener::OnDisconnect() will be called.
   // If the socket is not connected, Send() will just return false.
   // Does not append a null string terminator to msg in any case.
+  //
+  // DO NOT PASS kNonBlocking, it is broken.
   bool Send(const void* msg,
             size_t len,
             int send_fd = -1,

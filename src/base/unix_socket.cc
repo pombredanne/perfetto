@@ -64,7 +64,7 @@ using CBufLenType = socklen_t;
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
 #endif
 
-void OffsetMsgHdr(struct msghdr* msg, size_t n) {
+void ShiftMsgHdr(size_t n, struct msghdr* msg) {
   for (size_t i = 0; i < msg->msg_iovlen; ++i) {
     struct iovec* vec = &msg->msg_iov[i];
     if (n < vec->iov_len) {
@@ -105,8 +105,8 @@ ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags) {
       return sent;
     }
     total_sent += sent;
-    OffsetMsgHdr(msg, static_cast<size_t>(sent));
-    // Only send the auxilliary data with the first sendmsg call.
+    ShiftMsgHdr(static_cast<size_t>(sent), msg);
+    // Only send the ancillary data with the first sendmsg call.
     msg->msg_control = nullptr;
     msg->msg_controllen = 0;
   };
@@ -463,8 +463,8 @@ bool UnixSocket::Send(const void* msg,
                       const int* send_fds,
                       size_t num_fds,
                       BlockingMode blocking_mode) {
-  // Non-blocking sends are broken because we do not properly handle partial
-  // sends.
+  // TODO(b/117139237): Non-blocking sends are broken because we do not
+  // properly handle partial sends.
   PERFETTO_DCHECK(blocking_mode == BlockingMode::kBlocking);
 
   if (state_ != State::kConnected) {
