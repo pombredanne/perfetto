@@ -30,20 +30,19 @@ namespace perfetto {
 namespace trace_processor {
 namespace {
 
+constexpr size_t kChunkSize = 128 * 1024;
+
 class TraceProcessorFixture {
  public:
   TraceProcessorFixture() : processor(TraceProcessor::Config()) {}
 
   TraceProcessor processor;
 
-  bool LoadTrace(const char* name, int min_chunk_size = 1) {
+  bool LoadTrace(const char* name) {
     base::ScopedFstream f(fopen(base::GetTestDataPath(name).c_str(), "rb"));
-    std::minstd_rand0 rnd_engine(0);
-    std::uniform_int_distribution<> dist(min_chunk_size, 1024);
     while (!feof(*f)) {
-      size_t chunk_size = static_cast<size_t>(dist(rnd_engine));
-      std::unique_ptr<uint8_t[]> buf(new uint8_t[chunk_size]);
-      auto rsize = fread(reinterpret_cast<char*>(buf.get()), 1, chunk_size, *f);
+      std::unique_ptr<uint8_t[]> buf(new uint8_t[kChunkSize]);
+      auto rsize = fread(reinterpret_cast<char*>(buf.get()), 1, kChunkSize, *f);
       if (!processor.Parse(std::move(buf), rsize))
         return false;
     }
