@@ -23,6 +23,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
@@ -182,7 +183,8 @@ class FakeHost : public base::UnixSocket::EventListener {
   void Reply(const Frame& frame) {
     auto buf = BufferedFrameDeserializer::Serialize(frame);
     ASSERT_TRUE(client_sock->is_connected());
-    EXPECT_TRUE(client_sock->Send(buf.data(), buf.size(), next_reply_fd));
+    EXPECT_TRUE(client_sock->Send(buf.data(), buf.size(), next_reply_fd,
+                                  base::UnixSocket::BlockingMode::kBlocking));
     next_reply_fd = -1;
   }
 
@@ -348,7 +350,8 @@ TEST_F(ClientImplTest, ReceiveFileDescriptor) {
 
   base::TempFile tx_file = base::TempFile::CreateUnlinked();
   static constexpr char kFileContent[] = "shared file";
-  base::ignore_result(write(tx_file.fd(), kFileContent, sizeof(kFileContent)));
+  ASSERT_EQ(base::WriteAll(tx_file.fd(), kFileContent, sizeof(kFileContent)),
+            sizeof(kFileContent));
   host_->next_reply_fd = tx_file.fd();
 
   EXPECT_CALL(*host_method, OnInvoke(_, _))
@@ -392,7 +395,8 @@ TEST_F(ClientImplTest, SendFileDescriptor) {
 
   base::TempFile tx_file = base::TempFile::CreateUnlinked();
   static constexpr char kFileContent[] = "shared file";
-  base::ignore_result(write(tx_file.fd(), kFileContent, sizeof(kFileContent)));
+  ASSERT_EQ(base::WriteAll(tx_file.fd(), kFileContent, sizeof(kFileContent)),
+            sizeof(kFileContent));
   EXPECT_CALL(*host_method, OnInvoke(_, _))
       .WillOnce(Invoke(
           [](const Frame::InvokeMethod&, Frame::InvokeMethodReply* reply) {

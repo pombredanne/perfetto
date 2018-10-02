@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {
-  TrackController,
-  trackControllerRegistry
-} from '../../controller/track_controller';
-
-import {CPU_COUNTER_TRACK_KIND} from './common';
-
-class CpuCounterTrackController extends TrackController {
-  static readonly kind = CPU_COUNTER_TRACK_KIND;
-  onBoundsChange(): void {}
+export async function copyToClipboard(text: string): Promise<void> {
+  try {
+    // TODO(hjd): Fix typescript type for navigator.
+    // tslint:disable-next-line no-any
+    await(navigator as any).clipboard.writeText(text);
+  } catch (err) {
+    console.error(`Failed to copy "${text}" to clipboard: ${err}`);
+  }
 }
-
-trackControllerRegistry.register(CpuCounterTrackController);
