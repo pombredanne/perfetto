@@ -23,6 +23,8 @@ namespace {
 ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
                                      void* (*unhooked_malloc)(size_t),
                                      void (*unhooked_free)(void*)) {
+  // This should not be used with glibc as it might re-enter into malloc, see
+  // http://crbug.com/776475.
   void* specific = pthread_getspecific(key);
   if (specific == nullptr) {
     specific = unhooked_malloc(sizeof(ThreadLocalSamplingData));
