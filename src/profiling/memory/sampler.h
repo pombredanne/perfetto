@@ -30,6 +30,9 @@ namespace perfetto {
 // We apply poisson sampling individually to each byte. The whole
 // allocation gets accounted as often as the number of sampled bytes it
 // contains.
+//
+// Googlers see go/chrome-shp for more details about the sampling (from
+// Chrome's heap profiler).
 class ThreadLocalSamplingData {
  public:
   ThreadLocalSamplingData(void (*unhooked_free)(void*))
