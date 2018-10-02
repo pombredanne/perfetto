@@ -133,6 +133,9 @@ std::vector<bool> FilterNonTsColumns(const TraceStorage* storage,
                                      uint32_t min_idx,
                                      uint32_t max_idx) {
   const auto& slices = storage->slices();
+  ptrdiff_t min_idx_ptr = static_cast<ptrdiff_t>(min_idx);
+  ptrdiff_t max_idx_ptr = static_cast<ptrdiff_t>(max_idx);
+
   auto dist = static_cast<size_t>(max_idx - min_idx);
   std::vector<bool> filter(dist, true);
   for (size_t i = 0; i < qc.constraints().size(); i++) {
@@ -141,17 +144,17 @@ std::vector<bool> FilterNonTsColumns(const TraceStorage* storage,
     switch (cs.iColumn) {
       case SchedSliceTable::Column::kCpu: {
         auto it = slices.cpus().begin();
-        FilterColumn(it + min_idx, it + max_idx, cs, v, &filter);
+        FilterColumn(it + min_idx_ptr, it + max_idx_ptr, cs, v, &filter);
         break;
       }
       case SchedSliceTable::Column::kDuration: {
         auto it = slices.durations().begin();
-        FilterColumn(it + min_idx, it + max_idx, cs, v, &filter);
+        FilterColumn(it + min_idx_ptr, it + max_idx_ptr, cs, v, &filter);
         break;
       }
       case SchedSliceTable::Column::kUtid: {
         auto it = slices.utids().begin();
-        FilterColumn(it + min_idx, it + max_idx, cs, v, &filter);
+        FilterColumn(it + min_idx_ptr, it + max_idx_ptr, cs, v, &filter);
         break;
       }
     }
@@ -303,11 +306,12 @@ int SchedSliceTable::FilterCursor::Next() {
 }
 
 void SchedSliceTable::FilterCursor::FindNext() {
+  ptrdiff_t offset = static_cast<ptrdiff_t>(offset_);
   if (desc_) {
-    auto it = std::find(filter_.rbegin() + offset_, filter_.rend(), true);
+    auto it = std::find(filter_.rbegin() + offset, filter_.rend(), true);
     offset_ = static_cast<uint32_t>(std::distance(filter_.rbegin(), it));
   } else {
-    auto it = std::find(filter_.begin() + offset_, filter_.end(), true);
+    auto it = std::find(filter_.begin() + offset, filter_.end(), true);
     offset_ = static_cast<uint32_t>(std::distance(filter_.begin(), it));
   }
 }
@@ -351,8 +355,8 @@ SchedSliceTable::SortedCursor::SortedCursor(
 
   auto it = std::find(filter.begin(), filter.end(), true);
   for (size_t i = 0; it != filter.end(); i++) {
-    auto index = std::distance(filter.begin(), it);
-    sorted_rows_[i] = static_cast<uint32_t>(min_idx + index);
+    auto index = static_cast<uint32_t>(std::distance(filter.begin(), it));
+    sorted_rows_[i] = min_idx + index;
     it = std::find(it + 1, filter.end(), true);
   }
   std::sort(sorted_rows_.begin(), sorted_rows_.end(),
