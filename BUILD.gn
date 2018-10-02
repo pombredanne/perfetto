@@ -173,6 +173,7 @@ if (!build_with_chromium) {
       "gn:default_deps",
       "src/traced/probes",
       "src/traced/service",
+      "src/tracing:api",
     ]
   }
 
