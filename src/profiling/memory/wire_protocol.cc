@@ -79,25 +79,27 @@ bool ReceiveWireMessage(char* buf, size_t size, WireMessage* out) {
   char* end = buf + size;
   if (!ViewAndAdvance<RecordType>(&buf, &record_type, end))
     return false;
-  switch (*record_type) {
-    case RecordType::Malloc:
-      if (!ViewAndAdvance<AllocMetadata>(&buf, &out->alloc_header, end))
-        return false;
-      out->payload = buf;
-      if (buf > end) {
-        PERFETTO_DCHECK(false);
-        return false;
-      }
-      out->payload_size = static_cast<size_t>(end - buf);
-      break;
-    case RecordType::Free:
-      if (!ViewAndAdvance<FreeMetadata>(&buf, &out->free_header, end))
-        return false;
-      out->payload = nullptr;
-      out->payload_size = 0;
-      break;
-  }
+
+  out->payload = nullptr;
+  out->payload_size = 0;
   out->record_type = *record_type;
+
+  if (*record_type == RecordType::Malloc) {
+    if (!ViewAndAdvance<AllocMetadata>(&buf, &out->alloc_header, end))
+      return false;
+    out->payload = buf;
+    if (buf > end) {
+      PERFETTO_DCHECK(false);
+      return false;
+    }
+    out->payload_size = static_cast<size_t>(end - buf);
+  } else if (*record_type == RecordType::Free) {
+    if (!ViewAndAdvance<FreeMetadata>(&buf, &out->free_header, end))
+      return false;
+  } else {
+    PERFETTO_DCHECK(false);
+    return false;
+  }
   return true;
 }
 
