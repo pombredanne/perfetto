@@ -79,6 +79,10 @@ struct FreePageEntry {
   uint64_t addr;
 };
 
+struct ClientConfiguration {
+  double rate;
+};
+
 struct FreeMetadata {
   uint64_t num_entries;
   FreePageEntry entries[kFreePageSize];
