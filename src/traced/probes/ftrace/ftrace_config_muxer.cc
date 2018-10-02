@@ -240,7 +240,8 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
     if (is_ftrace_enabled)
       return 0;
 
-    // If we're about to turn tracing on use this opportunity do some setup:
+    // Setup ftrace, without starting it. Setting buffers can be quite slow
+    // (up to hundreds of ms).
     SetupClock(request);
     SetupBufferSize(request);
   } else {
@@ -279,8 +280,10 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
 }
 
 bool FtraceConfigMuxer::ActivateConfig(FtraceConfigId id) {
-  if (!id || configs_.count(id) == 0)
+  if (!id || configs_.count(id) == 0) {
+    PERFETTO_DCHECK(false);
     return false;
+  }
 
   active_configs_.insert(id);
   if (active_configs_.size() > 1) {
@@ -334,7 +337,7 @@ bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
   }
 
   // Even if we don't have any other active configs, we might still have idle
-  // configs aruond. Tear down the rest of the ftrace config only if all
+  // configs around. Tear down the rest of the ftrace config only if all
   // configs are removed.
   if (configs_.empty()) {
     ftrace_->SetCpuBufferSizeInPages(0);

@@ -316,8 +316,7 @@ bool FtraceController::StartDataSource(FtraceDataSource* data_source) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   FtraceConfigId config_id = data_source->config_id();
-  if (!config_id)
-    return false;
+  PERFETTO_CHECK(config_id);
 
   if (!ftrace_config_muxer_->ActivateConfig(config_id))
     return false;
@@ -329,7 +328,6 @@ bool FtraceController::StartDataSource(FtraceDataSource* data_source) {
 
 void FtraceController::RemoveDataSource(FtraceDataSource* data_source) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_DCHECK(!data_source->started);
   started_data_sources_.erase(data_source);
   size_t removed = data_sources_.erase(data_source);
   if (!removed)

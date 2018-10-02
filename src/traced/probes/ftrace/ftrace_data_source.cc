@@ -43,18 +43,21 @@ FtraceDataSource::~FtraceDataSource() {
     controller_weak_->RemoveDataSource(this);
 };
 
+void FtraceDataSource::Initialize(FtraceConfigId config_id,
+                                  std::unique_ptr<EventFilter> event_filter) {
+  PERFETTO_CHECK(config_id);
+  config_id_ = config_id;
+  event_filter_ = std::move(event_filter);
+}
+
 void FtraceDataSource::Start() {
   FtraceController* ftrace = controller_weak_.get();
   if (!ftrace)
     return;
-  ftrace->StartDataSource(this);
+  PERFETTO_CHECK(config_id_);  // Must be initialized at this point.
+  if (!ftrace->StartDataSource(this))
+    return;
   DumpFtraceStats(&stats_before_);
-}
-
-void FtraceDataSource::Initialize(FtraceConfigId config_id,
-                                  std::unique_ptr<EventFilter> event_filter) {
-  config_id_ = config_id;
-  event_filter_ = std::move(event_filter);
 }
 
 void FtraceDataSource::DumpFtraceStats(FtraceStats* stats) {
