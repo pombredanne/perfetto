@@ -60,5 +60,17 @@ bool ReadFile(const std::string& path, std::string* out) {
   return ReadFileDescriptor(*fd, out);
 }
 
+ssize_t WriteAll(int fd, const void* buf, size_t count) {
+  size_t written = 0;
+  while (written < count) {
+    ssize_t wr = PERFETTO_EINTR(
+        write(fd, static_cast<const char*>(buf) + written, count - written));
+    if (wr < 0)
+      return wr;
+    written += static_cast<size_t>(wr);
+  }
+  return static_cast<ssize_t>(written);
+}
+
 }  // namespace base
 }  // namespace perfetto
