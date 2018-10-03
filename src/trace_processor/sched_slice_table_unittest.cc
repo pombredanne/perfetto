@@ -70,13 +70,13 @@ TEST_F(SchedSliceTableTest, RowsReturnedInCorrectOrderWithinCpu) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 3, pid_2, prev_state,
-                                          kCommProc2, pid_1);
+                                          pid_1, kCommProc2);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 10, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur");
 
@@ -109,17 +109,17 @@ TEST_F(SchedSliceTableTest, RowsReturnedInCorrectOrderBetweenCpu) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
   context_.sched_tracker->PushSchedSwitch(cpu_3, timestamp - 2, pid_1,
-                                          prev_state, kCommProc1, pid_2);
+                                          prev_state, pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu_3, timestamp - 1, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
   context_.sched_tracker->PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 3, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
   context_.sched_tracker->PushSchedSwitch(cpu_1, timestamp + 4, pid_1,
-                                          prev_state, kCommProc1, pid_2);
+                                          prev_state, pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 10, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur desc");
 
@@ -151,13 +151,13 @@ TEST_F(SchedSliceTableTest, FilterCpus) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
   context_.sched_tracker->PushSchedSwitch(cpu_1, timestamp, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 3, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
   context_.sched_tracker->PushSchedSwitch(cpu_1, timestamp + 4, pid_1,
-                                          prev_state, kCommProc1, pid_2);
+                                          prev_state, pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 10, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
 
   PrepareValidStatement("SELECT dur, ts, cpu FROM sched WHERE cpu = 3");
 
@@ -178,13 +178,13 @@ TEST_F(SchedSliceTableTest, UtidTest) {
   static const char kCommProc2[] = "process2";
   uint32_t pid_2 = 4;
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 3, pid_2, prev_state,
-                                          kCommProc2, pid_1);
+                                          pid_1, kCommProc2);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 4, pid_1, prev_state,
-                                          kCommProc1, pid_2);
+                                          pid_2, kCommProc1);
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 10, pid_2,
-                                          prev_state, kCommProc2, pid_1);
+                                          prev_state, pid_1, kCommProc2);
 
   PrepareValidStatement("SELECT utid FROM sched ORDER BY utid");
 
@@ -211,11 +211,11 @@ TEST_F(SchedSliceTableTest, TimestampFiltering) {
   // respectively, @ T=50 and T=70.
   for (uint64_t i = 0; i <= 11; i++) {
     context_.sched_tracker->PushSchedSwitch(cpu_5, 50 + i, pid_1, prev_state,
-                                            "pid_1", pid_1);
+                                            pid_1, "pid_1");
   }
   for (uint64_t i = 0; i <= 11; i++) {
     context_.sched_tracker->PushSchedSwitch(cpu_7, 70 + i, pid_2, prev_state,
-                                            "pid_2", pid_2);
+                                            pid_2, "pid_2");
   }
 
   auto query = [this](const std::string& where_clauses) {
