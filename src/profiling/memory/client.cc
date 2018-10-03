@@ -35,6 +35,7 @@
 #include <unwindstack/RegsGetLocal.h>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/unix_socket.h"
 #include "perfetto/base/utils.h"
 #include "src/profiling/memory/sampler.h"
@@ -74,25 +75,24 @@ inline bool IsMainThread() {
   return getpid() == gettid();
 }
 
-// TODO(fmayer): Remove this after making bionic implementation safe to use.
+// TODO(b/117203899): Remove this after making bionic implementation safe to
+// use.
 char* FindMainThreadStack() {
-  FILE* maps = fopen("/proc/self/maps", "r");
-  if (maps == nullptr) {
+  base::ScopedFstream maps(fopen("/proc/self/maps", "r"));
+  if (!maps) {
     return nullptr;
   }
-  while (!feof(maps)) {
+  while (!feof(*maps)) {
     char line[1024];
-    char* data = fgets(line, sizeof(line), maps);
+    char* data = fgets(line, sizeof(line), *maps);
     if (data != nullptr && strstr(data, "[stack]")) {
       char* sep = strstr(data, "-");
       if (sep == nullptr)
         continue;
       sep++;
-      fclose(maps);
       return reinterpret_cast<char*>(strtoll(sep, nullptr, 16));
     }
   }
-  fclose(maps);
   return nullptr;
 }
 
@@ -175,9 +175,12 @@ Client::Client(std::vector<base::ScopedFile> socks)
   fds[0] = open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
   fds[1] = open("/proc/self/mem", O_RDONLY | O_CLOEXEC);
   auto fd = socket_pool_.Borrow();
+  // Send an empty record to transfer fds for /proc/self/maps and
+  // /proc/self/mem.
   base::SockSend(*fd, &size, sizeof(size), fds, 2);
   PERFETTO_DCHECK(recv(*fd, &client_config_, sizeof(client_config_), 0) ==
                   sizeof(client_config_));
+  PERFETTO_DCHECK(client_config_.rate >= 1);
 }
 
 Client::Client(const std::string& sock_name, size_t conns)
