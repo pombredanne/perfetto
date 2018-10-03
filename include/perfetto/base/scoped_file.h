@@ -37,7 +37,7 @@ typedef int mode_t;
 namespace perfetto {
 namespace base {
 
-constexpr mode_t kInvalidMode = -1;
+constexpr mode_t kInvalidMode = static_cast<mode_t>(-1);
 
 // RAII classes for auto-releasing fds and dirs.
 template <typename T,
