@@ -103,14 +103,17 @@ class PThreadKey {
   PThreadKey(const PThreadKey&) = delete;
   PThreadKey& operator=(const PThreadKey&) = delete;
 
-  PThreadKey(void (*destructor)(void*))
+  PThreadKey(void (*destructor)(void*)) noexcept
       : valid_(pthread_key_create(&key_, destructor) == 0) {}
-  ~PThreadKey() {
+  ~PThreadKey() noexcept {
     if (valid_)
       pthread_key_delete(key_);
   }
-  bool valid() { return valid_; }
-  pthread_key_t get() { return key_; }
+  bool valid() const { return valid_; }
+  pthread_key_t get() const {
+    PERFETTO_DCHECK(valid_);
+    return key_;
+  }
 
  private:
   pthread_key_t key_;
