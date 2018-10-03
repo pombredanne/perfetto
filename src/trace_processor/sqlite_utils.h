@@ -100,7 +100,8 @@ bool CompareToSqliteValue(int64_t actual, sqlite3_value* value) {
 
 template <typename F>
 bool CompareToSqliteValue(double actual, sqlite3_value* value) {
-  PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_FLOAT);
+  auto type = sqlite3_value_type(value);
+  PERFETTO_DCHECK(type == SQLITE_FLOAT || type == SQLITE_INTEGER);
   return F()(actual, sqlite3_value_double(value));
 }
 

@@ -50,28 +50,26 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   PERFETTO_DCHECK(cpu < base::kMaxCpus);
 
   auto* slices = context_->storage->mutable_slices();
-  auto slice_it = pending_sched_per_cpu_.find(cpu);
-  if (slice_it != pending_sched_per_cpu_.end()) {
-    const auto& pending_slice = slice_it->second;
-
+  auto* pending_slice = &pending_sched_per_cpu_[cpu];
+  if (pending_slice->storage_index < std::numeric_limits<size_t>::max()) {
     // If the this events previous pid does not match the previous event's next
     // pid, make a note of this.
-    if (prev_pid != pending_slice.pid) {
+    if (prev_pid != pending_slice->pid) {
       context_->storage->AddMismatchedSchedSwitch();
     }
 
-    size_t idx = pending_slice.storage_index;
+    size_t idx = pending_slice->storage_index;
     uint64_t duration = timestamp - slices->start_ns()[idx];
-    slices->FinishSlice(idx, duration);
+    slices->set_duration(idx, duration);
   }
 
   StringId name_id = GetThreadNameId(next_pid, next_comm);
   auto utid =
       context_->process_tracker->UpdateThread(timestamp, next_pid, name_id);
 
-  auto* pending = &pending_sched_per_cpu_[cpu];
-  pending->storage_index = slices->AddSlice(cpu, timestamp, utid);
-  pending->pid = next_pid;
+  pending_slice->storage_index =
+      slices->AddSlice(cpu, timestamp, 0 /* duration */, utid);
+  pending_slice->pid = next_pid;
 }
 
 void SchedTracker::PushCounter(uint64_t timestamp,
@@ -94,11 +92,13 @@ void SchedTracker::PushCounter(uint64_t timestamp,
 
     uint64_t duration = timestamp - counters->timestamps()[idx];
     double value_delta = value - counters->values()[idx];
-    counters->FinishCounter(idx, duration, value_delta);
+    counters->set_duration(idx, duration);
+    counters->set_value_delta(idx, value_delta);
   }
 
   pending_counters_per_key_[key] = counters->AddCounter(
-      timestamp, name_id, value, static_cast<int64_t>(ref), ref_type);
+      timestamp, 0 /* duration */, name_id, value, 0 /* value_delta */,
+      static_cast<int64_t>(ref), ref_type);
 }
 
 }  // namespace trace_processor
