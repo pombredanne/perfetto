@@ -157,7 +157,7 @@ bool RateLimiter::ClearState() {
 }
 
 bool RateLimiter::LoadState(PerfettoCmdState* state) {
-  base::ScopedFile in_fd(base::OpenFile(GetStateFilePath().c_str(), O_RDONLY));
+  base::ScopedFile in_fd(base::OpenFile(GetStateFilePath(), O_RDONLY));
 
   if (!in_fd)
     return false;

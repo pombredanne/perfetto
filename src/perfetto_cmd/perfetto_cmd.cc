@@ -371,8 +371,7 @@ bool PerfettoCmd::OpenOutputFile() {
   } else if (trace_out_path_ == "-") {
     fd.reset(dup(STDOUT_FILENO));
   } else {
-    fd = base::OpenFile(trace_out_path_.c_str(), O_RDWR | O_CREAT | O_TRUNC,
-                        0600);
+    fd = base::OpenFile(trace_out_path_, O_RDWR | O_CREAT | O_TRUNC, 0600);
   }
   trace_out_stream_.reset(fdopen(fd.release(), "wb"));
   PERFETTO_CHECK(trace_out_stream_);
