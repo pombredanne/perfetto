@@ -78,7 +78,8 @@ TEST_F(SchedSliceTableTest, RowsReturnedInCorrectOrderWithinCpu) {
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 10, pid_2,
                                           prev_state, pid_1, kCommProc2);
 
-  PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur");
+  PrepareValidStatement(
+      "SELECT dur, ts, cpu FROM sched where dur != 0 ORDER BY dur");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 1 /* duration */);
@@ -121,7 +122,8 @@ TEST_F(SchedSliceTableTest, RowsReturnedInCorrectOrderBetweenCpu) {
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 10, pid_2,
                                           prev_state, pid_1, kCommProc2);
 
-  PrepareValidStatement("SELECT dur, ts, cpu FROM sched ORDER BY dur desc");
+  PrepareValidStatement(
+      "SELECT dur, ts, cpu FROM sched where dur != 0 ORDER BY dur desc");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 7 /* duration */);
@@ -159,7 +161,8 @@ TEST_F(SchedSliceTableTest, FilterCpus) {
   context_.sched_tracker->PushSchedSwitch(cpu_2, timestamp + 10, pid_2,
                                           prev_state, pid_1, kCommProc2);
 
-  PrepareValidStatement("SELECT dur, ts, cpu FROM sched WHERE cpu = 3");
+  PrepareValidStatement(
+      "SELECT dur, ts, cpu FROM sched WHERE dur != 0 and cpu = 3");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 4 /* duration */);
@@ -186,7 +189,7 @@ TEST_F(SchedSliceTableTest, UtidTest) {
   context_.sched_tracker->PushSchedSwitch(cpu, timestamp + 10, pid_2,
                                           prev_state, pid_1, kCommProc2);
 
-  PrepareValidStatement("SELECT utid FROM sched ORDER BY utid");
+  PrepareValidStatement("SELECT utid FROM sched where dur != 0 ORDER BY utid");
 
   ASSERT_EQ(sqlite3_step(*stmt_), SQLITE_ROW);
   ASSERT_EQ(sqlite3_column_int64(*stmt_, 0), 1 /* duration */);
@@ -219,7 +222,8 @@ TEST_F(SchedSliceTableTest, TimestampFiltering) {
   }
 
   auto query = [this](const std::string& where_clauses) {
-    PrepareValidStatement("SELECT ts from sched WHERE " + where_clauses);
+    PrepareValidStatement("SELECT ts from sched WHERE dur != 0 and " +
+                          where_clauses);
     std::vector<int> res;
     while (sqlite3_step(*stmt_) == SQLITE_ROW) {
       res.push_back(sqlite3_column_int(*stmt_, 0));
