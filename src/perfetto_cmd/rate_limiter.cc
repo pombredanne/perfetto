@@ -175,8 +175,8 @@ bool RateLimiter::SaveState(const PerfettoCmdState& state) {
   // be able to read the file and will clear it, aborting the trace.
   // SELinux still prevents that anything other than the perfetto
   // executable can change the guardrail file.
-  base::ScopedFile out_fd(base::OpenFile(GetStateFilePath().c_str(),
-                                         O_WRONLY | O_CREAT | O_TRUNC, 0666));
+  base::ScopedFile out_fd(
+      base::OpenFile(GetStateFilePath(), O_WRONLY | O_CREAT | O_TRUNC, 0666));
   if (!out_fd)
     return false;
   char buf[1024];
