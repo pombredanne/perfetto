@@ -55,22 +55,23 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     renderStats: new RunningStatistics(10),
   };
 
-  // Attrs received in the most recent mithril redraw. We receive a new vnode
-  // with new attrs on every redraw, and we cache it here so that resize
+  // Attrs and dom received in the most recent mithril redraw. We receive a new
+  // vnode with new attrs on every redraw, and we cache it here so that resize
   // listeners and canvas redraw callbacks can access it.
   private attrs: Attrs;
 
-  private canvasOverdrawFactor: number;
   private ctx?: CanvasRenderingContext2D;
 
   private onResize: () => void = () => {};
   private parentOnScroll: () => void = () => {};
   private canvasRedrawer: () => void;
 
+  get canvasOverdrawFactor() {
+    return this.attrs.doesScroll ? SCROLLING_CANVAS_OVERDRAW_FACTOR : 1;
+  }
+
   constructor(vnode: m.CVnode<Attrs>) {
     this.attrs = vnode.attrs;
-    this.canvasOverdrawFactor =
-        vnode.attrs.doesScroll ? SCROLLING_CANVAS_OVERDRAW_FACTOR : 1;
     this.canvasRedrawer = () => this.redrawCanvas();
     globals.rafScheduler.addRedrawCallback(this.canvasRedrawer);
     perfDisplay.addContainer(this);
@@ -94,15 +95,15 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     this.readPanelHeightsFromDom(vnodeDom.dom);
     (vnodeDom.dom as HTMLElement).style.height = `${this.totalPanelHeight}px`;
 
-    this.updateCanvasDimensions(vnodeDom);
-    this.repositionCanvas(vnodeDom);
+    this.updateCanvasDimensions();
+    this.repositionCanvas();
 
     // Save the resize handler in the state so we can remove it later.
     // TODO: Encapsulate resize handling better.
     this.onResize = () => {
       this.readParentSizeFromDom(vnodeDom.dom);
-      this.updateCanvasDimensions(vnodeDom);
-      this.repositionCanvas(vnodeDom);
+      this.updateCanvasDimensions();
+      this.repositionCanvas();
       globals.rafScheduler.scheduleFullRedraw();
     };
 
@@ -110,10 +111,10 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     window.addEventListener('resize', this.onResize);
 
     // TODO(dproy): Handle change in doesScroll attribute.
-    if (vnodeDom.attrs.doesScroll) {
+    if (this.attrs.doesScroll) {
       this.parentOnScroll = () => {
-        this.scrollTop = vnodeDom.dom.parentElement!.scrollTop;
-        this.repositionCanvas(vnodeDom);
+        this.scrollTop = assertExists(vnodeDom.dom.parentElement).scrollTop;
+        this.repositionCanvas();
         globals.rafScheduler.scheduleRedraw();
       };
       vnodeDom.dom.parentElement!.addEventListener(
@@ -153,22 +154,28 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     const canvasSizeShouldChange =
         this.attrs.doesScroll ? parentSizeChanged : totalPanelHeightChanged;
     if (canvasSizeShouldChange) {
-      this.updateCanvasDimensions(vnodeDom);
-      this.repositionCanvas(vnodeDom);
+      this.updateCanvasDimensions();
+      this.repositionCanvas();
     }
   }
 
-  private updateCanvasDimensions(vnodeDom: m.CVnodeDOM<Attrs>) {
-    this.canvasHeight = this.getCanvasHeight(vnodeDom.attrs.doesScroll);
-    const canvas =
-        assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
-        HTMLCanvasElement;
+  private updateCanvasDimensions() {
+    this.canvasHeight = this.attrs.doesScroll ?
+        this.parentHeight * this.canvasOverdrawFactor :
+        this.totalPanelHeight;
     const ctx = assertExists(this.ctx);
+    const canvas = assertExists(ctx.canvas);
     canvas.style.height = `${this.canvasHeight}px`;
     const dpr = window.devicePixelRatio;
     ctx.canvas.width = this.parentWidth * dpr;
     ctx.canvas.height = this.canvasHeight * dpr;
     ctx.scale(dpr, dpr);
+  }
+
+  private repositionCanvas() {
+    const canvas = assertExists(assertExists(this.ctx).canvas);
+    const canvasYStart = this.scrollTop - this.getCanvasOverdrawHeightPerSide();
+    canvas.style.transform = `translateY(${canvasYStart}px)`;
   }
 
   /**
@@ -202,19 +209,6 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     }
 
     return this.totalPanelHeight !== prevHeight;
-  }
-
-  private getCanvasHeight(doesScroll: boolean) {
-    return doesScroll ? this.parentHeight * this.canvasOverdrawFactor :
-                        this.totalPanelHeight;
-  }
-
-  private repositionCanvas(vnodeDom: m.CVnodeDOM<Attrs>) {
-    const canvas =
-        assertExists(vnodeDom.dom.querySelector('canvas.main-canvas')) as
-        HTMLCanvasElement;
-    const canvasYStart = this.scrollTop - this.getCanvasOverdrawHeightPerSide();
-    canvas.style.transform = `translateY(${canvasYStart}px)`;
   }
 
   private overlapsCanvas(yStart: number, yEnd: number) {
