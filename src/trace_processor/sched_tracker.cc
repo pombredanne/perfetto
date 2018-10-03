@@ -30,12 +30,16 @@ SchedTracker::SchedTracker(TraceProcessorContext* context)
 
 SchedTracker::~SchedTracker() = default;
 
+StringId SchedTracker::GetThreadNameId(uint32_t tid, base::StringView comm) {
+  return tid == 0 ? idle_string_id_ : context_->storage->InternString(comm);
+}
+
 void SchedTracker::PushSchedSwitch(uint32_t cpu,
                                    uint64_t timestamp,
                                    uint32_t prev_pid,
-                                   uint32_t prev_state,
-                                   base::StringView prev_comm,
-                                   uint32_t next_pid) {
+                                   uint32_t,
+                                   uint32_t next_pid,
+                                   base::StringView next_comm) {
   // At this stage all events should be globally timestamp ordered.
   if (timestamp < prev_timestamp_) {
     PERFETTO_ELOG("sched_switch event out of order by %.4f ms, skipping",
@@ -44,31 +48,31 @@ void SchedTracker::PushSchedSwitch(uint32_t cpu,
   }
   prev_timestamp_ = timestamp;
   PERFETTO_DCHECK(cpu < base::kMaxCpus);
-  SchedSwitchEvent* prev = &last_sched_per_cpu_[cpu];
-  // If we had a valid previous event, then inform the storage about the
-  // slice.
-  if (prev->valid()) {
-    uint64_t duration = timestamp - prev->timestamp;
-    StringId prev_thread_name_id =
-        prev->next_pid == 0 ? idle_string_id_
-                            : context_->storage->InternString(prev_comm);
-    UniqueTid utid = context_->process_tracker->UpdateThread(
-        prev->timestamp, prev->next_pid /* == prev_pid */, prev_thread_name_id);
-    context_->storage->AddSliceToCpu(cpu, prev->timestamp, duration, utid);
+
+  auto* slices = context_->storage->mutable_slices();
+  auto slice_it = pending_sched_per_cpu_.find(cpu);
+  if (slice_it != pending_sched_per_cpu_.end()) {
+    const auto& pending_slice = slice_it->second;
+
+    // If the this events previous pid does not match the previous event's next
+    // pid, make a note of this.
+    if (prev_pid != pending_slice.pid) {
+      context_->storage->AddMismatchedSchedSwitch();
+    }
+
+    size_t idx = pending_slice.storage_index;
+    uint64_t duration = timestamp - slices->start_ns()[idx];
+    slices->FinishSlice(idx, duration);
   }
 
-  // If the this events previous pid does not match the previous event's next
-  // pid, make a note of this.
-  if (prev_pid != prev->next_pid) {
-    context_->storage->AddMismatchedSchedSwitch();
-  }
+  StringId name_id = GetThreadNameId(next_pid, next_comm);
+  auto utid =
+      context_->process_tracker->UpdateThread(timestamp, next_pid, name_id);
 
-  // Update the map with the current event.
-  prev->timestamp = timestamp;
-  prev->prev_pid = prev_pid;
-  prev->prev_state = prev_state;
-  prev->next_pid = next_pid;
-};
+  auto* pending = &pending_sched_per_cpu_[cpu];
+  pending->storage_index = slices->AddSlice(cpu, timestamp, utid);
+  pending->pid = next_pid;
+}
 
 void SchedTracker::PushCounter(uint64_t timestamp,
                                double value,
@@ -82,24 +86,20 @@ void SchedTracker::PushCounter(uint64_t timestamp,
   }
   prev_timestamp_ = timestamp;
 
-  // The previous counter with the same ref and name_id.
-  Counter& prev = prev_counters_[CounterKey{ref, name_id}];
+  auto* counters = context_->storage->mutable_counters();
+  const auto& key = CounterKey{ref, name_id};
+  auto counter_it = pending_counters_per_key_.find(key);
+  if (counter_it != pending_counters_per_key_.end()) {
+    size_t idx = counter_it->second;
 
-  uint64_t duration = 0;
-  double value_delta = 0;
-
-  if (prev.timestamp != 0) {
-    duration = timestamp - prev.timestamp;
-    value_delta = value - prev.value;
-
-    context_->storage->mutable_counters()->AddCounter(
-        prev.timestamp, duration, name_id, prev.value, value_delta,
-        static_cast<int64_t>(ref), ref_type);
+    uint64_t duration = timestamp - counters->timestamps()[idx];
+    double value_delta = value - counters->values()[idx];
+    counters->FinishCounter(idx, duration, value_delta);
   }
 
-  prev.timestamp = timestamp;
-  prev.value = value;
-};
+  pending_counters_per_key_[key] = counters->AddCounter(
+      timestamp, name_id, value, static_cast<int64_t>(ref), ref_type);
+}
 
 }  // namespace trace_processor
 }  // namespace perfetto
