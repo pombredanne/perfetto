@@ -199,7 +199,7 @@ export const StateActions = {
 
   executeQuery(
       state: StateDraft,
-      args: {queryId: string, engineId: string, query: string}): void {
+      args: {queryId: string; engineId: string; query: string}): void {
     state.queries[args.queryId] = {
       id: args.queryId,
       engineId: args.engineId,
@@ -211,32 +211,31 @@ export const StateActions = {
     delete state.queries[args.queryId];
   },
 
-  moveTrack(state: StateDraft, args: {
-    trackId: string,
-    direction: 'up' | 'down',
-  }): void {
-    const id = args.trackId;
-    const isPinned = state.pinnedTracks.includes(id);
-    const isScrolling = state.scrollingTracks.includes(id);
-    if (!isScrolling && !isPinned) {
-      throw new Error(`No track with id ${id}`);
-    }
-    const tracks = isPinned ? state.pinnedTracks : state.scrollingTracks;
+  moveTrack(
+      state: StateDraft, args: {trackId: string; direction: 'up' | 'down';}):
+      void {
+        const id = args.trackId;
+        const isPinned = state.pinnedTracks.includes(id);
+        const isScrolling = state.scrollingTracks.includes(id);
+        if (!isScrolling && !isPinned) {
+          throw new Error(`No track with id ${id}`);
+        }
+        const tracks = isPinned ? state.pinnedTracks : state.scrollingTracks;
 
-    const oldIndex: number = tracks.indexOf(id);
-    const newIndex = args.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
-    const swappedTrackId = tracks[newIndex];
-    if (isPinned && newIndex === state.pinnedTracks.length) {
-      // Move from last element of pinned to first element of scrolling.
-      state.scrollingTracks.unshift(state.pinnedTracks.pop()!);
-    } else if (isScrolling && newIndex === -1) {
-      // Move first element of scrolling to last element of pinned.
-      state.pinnedTracks.push(state.scrollingTracks.shift()!);
-    } else if (swappedTrackId) {
-      tracks[newIndex] = id;
-      tracks[oldIndex] = swappedTrackId;
-    }
-  },
+        const oldIndex: number = tracks.indexOf(id);
+        const newIndex = args.direction === 'up' ? oldIndex - 1 : oldIndex + 1;
+        const swappedTrackId = tracks[newIndex];
+        if (isPinned && newIndex === state.pinnedTracks.length) {
+          // Move from last element of pinned to first element of scrolling.
+          state.scrollingTracks.unshift(state.pinnedTracks.pop()!);
+        } else if (isScrolling && newIndex === -1) {
+          // Move first element of scrolling to last element of pinned.
+          state.pinnedTracks.push(state.scrollingTracks.shift()!);
+        } else if (swappedTrackId) {
+          tracks[newIndex] = id;
+          tracks[oldIndex] = swappedTrackId;
+        }
+      },
 
   toggleTrackPinned(state: StateDraft, args: {trackId: string}): void {
     const id = args.trackId;
@@ -251,7 +250,7 @@ export const StateActions = {
     }
   },
 
-  setEngineReady(state: StateDraft, args: {engineId: string, ready: boolean}):
+  setEngineReady(state: StateDraft, args: {engineId: string; ready: boolean}):
       void {
         state.engines[args.engineId].ready = args.ready;
       },
@@ -260,14 +259,14 @@ export const StateActions = {
     state.permalink = {requestId: args.requestId, hash: undefined};
   },
 
-  setPermalink(state: StateDraft, args: {requestId: string, hash: string}):
+  setPermalink(state: StateDraft, args: {requestId: string; hash: string}):
       void {
         // Drop any links for old requests.
         if (state.permalink.requestId !== args.requestId) return;
         state.permalink = args;
       },
 
-  loadPermalink(state: StateDraft, args: {requestId: string, hash: string}):
+  loadPermalink(state: StateDraft, args: {requestId: string; hash: string}):
       void {
         state.permalink = args;
       },
