@@ -55,8 +55,8 @@ export class PanelContainer implements m.ClassComponent<Attrs> {
     renderStats: new RunningStatistics(10),
   };
 
-  // Attrs and dom received in the most recent mithril redraw. We receive a new
-  // vnode with new attrs on every redraw, and we cache it here so that resize
+  // Attrs received in the most recent mithril redraw. We receive a new vnode
+  // with new attrs on every redraw, and we cache it here so that resize
   // listeners and canvas redraw callbacks can access it.
   private attrs: Attrs;
 
