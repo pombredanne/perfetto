@@ -43,7 +43,7 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = size_t;
 
-enum RefType { kUTID = 0, kCPU_ID = 1 };
+enum RefType { kNoRef = 0, kUTID = 1, kCPU_ID = 2, kIrq = 3, kSoftIrq = 4 };
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -80,14 +80,16 @@ class TraceStorage {
 
   class Slices {
    public:
-    inline void AddSlice(uint32_t cpu,
-                         uint64_t start_ns,
-                         uint64_t duration_ns,
-                         UniqueTid utid) {
+    inline size_t AddSlice(uint32_t cpu, uint64_t start_ns, UniqueTid utid) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
-      durations_.emplace_back(duration_ns);
+      durations_.emplace_back(0);
       utids_.emplace_back(utid);
+      return slice_count() - 1;
+    }
+
+    void FinishSlice(size_t index, uint64_t duration_ns) {
+      durations_[index] = duration_ns;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -154,21 +156,26 @@ class TraceStorage {
 
   class Counters {
    public:
-    inline void AddCounter(uint64_t timestamp,
-                           uint64_t duration,
-                           StringId name_id,
-                           double value,
-                           double value_delta,
-                           int64_t ref,
-                           RefType type) {
+    inline size_t AddCounter(uint64_t timestamp,
+                             StringId name_id,
+                             double value,
+                             int64_t ref,
+                             RefType type) {
       timestamps_.emplace_back(timestamp);
-      durations_.emplace_back(duration);
+      durations_.emplace_back(0);
       name_ids_.emplace_back(name_id);
       values_.emplace_back(value);
-      value_deltas_.emplace_back(value_delta);
+      value_deltas_.emplace_back(0);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
+      return counter_count() - 1;
     }
+
+    void FinishCounter(size_t index, uint64_t duration, double value_delta) {
+      durations_[index] = duration;
+      value_deltas_[index] = value_delta;
+    }
+
     size_t counter_count() const { return timestamps_.size(); }
 
     const std::deque<uint64_t>& timestamps() const { return timestamps_; }
@@ -196,11 +203,6 @@ class TraceStorage {
   };
 
   void ResetStorage();
-
-  void AddSliceToCpu(uint32_t cpu,
-                     uint64_t start_ns,
-                     uint64_t duration_ns,
-                     UniqueTid utid);
 
   UniqueTid AddEmptyThread(uint32_t tid) {
     unique_threads_.emplace_back(tid);
@@ -247,6 +249,8 @@ class TraceStorage {
   }
 
   const Slices& slices() const { return slices_; }
+  Slices* mutable_slices() { return &slices_; }
+
   const NestableSlices& nestable_slices() const { return nestable_slices_; }
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
