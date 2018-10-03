@@ -157,6 +157,13 @@ bool IsTsOrdered(const QueryConstraints& qc) {
           qc.order_by()[0].iColumn == SchedSliceTable::Column::kTimestamp);
 }
 
+bool IsCpuAndTsAscOrdered(const QueryConstraints& qc) {
+  const auto& ob = qc.order_by();
+  return ob.size() == 2 && ob[0].iColumn == SchedSliceTable::Column::kCpu &&
+         !ob[0].desc && ob[1].iColumn == SchedSliceTable::Column::kTimestamp &&
+         !ob[1].desc;
+}
+
 }  // namespace
 
 SchedSliceTable::SchedSliceTable(sqlite3*, const TraceStorage* storage)
@@ -189,6 +196,9 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
       bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
       return std::unique_ptr<Table::Cursor>(
           new IncrementCursor(storage_, min_idx, max_idx, desc));
+    } else if (IsCpuAndTsAscOrdered(qc)) {
+      return std::unique_ptr<Table::Cursor>(
+          new CpuSortedCursor(storage_, min_idx, max_idx));
     }
     return std::unique_ptr<Table::Cursor>(
         new SortedCursor(storage_, min_idx, max_idx, qc.order_by()));
@@ -200,6 +210,9 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
     return std::unique_ptr<Table::Cursor>(
         new FilterCursor(storage_, min_idx, max_idx, std::move(filter), desc));
+  } else if (IsCpuAndTsAscOrdered(qc)) {
+    return std::unique_ptr<Table::Cursor>(
+        new CpuSortedCursor(storage_, min_idx, filter));
   }
   return std::unique_ptr<Table::Cursor>(
       new SortedCursor(storage_, min_idx, qc.order_by(), std::move(filter)));
@@ -304,6 +317,63 @@ uint32_t SchedSliceTable::FilterCursor::RowIndex() {
 
 int SchedSliceTable::FilterCursor::Eof() {
   return offset_ >= (max_idx_ - min_idx_);
+}
+
+SchedSliceTable::CpuSortedCursor::CpuSortedCursor(const TraceStorage* storage,
+                                                  uint32_t min_idx,
+                                                  uint32_t max_idx)
+    : BaseCursor(storage) {
+  const auto& slices = storage->slices();
+  for (uint32_t i = min_idx; i < max_idx; i++) {
+    uint32_t cpu = slices.cpus()[i];
+    indices_per_cpu_[cpu].push_back(i);
+  }
+  FindNext();
+}
+
+SchedSliceTable::CpuSortedCursor::CpuSortedCursor(
+    const TraceStorage* storage,
+    uint32_t offset,
+    const std::vector<bool>& filter)
+    : BaseCursor(storage) {
+  const auto& slices = storage->slices();
+  auto it = std::find(filter.begin(), filter.end(), true);
+  for (; it != filter.end(); it = std::find(it + 1, filter.end(), true)) {
+    uint32_t index =
+        offset + static_cast<uint32_t>(std::distance(filter.begin(), it));
+    uint32_t cpu = slices.cpus()[index];
+    indices_per_cpu_[cpu].push_back(index);
+  }
+  FindNext();
+}
+
+int SchedSliceTable::CpuSortedCursor::Next() {
+  current_idx_in_cpu_++;
+  FindNext();
+  return SQLITE_OK;
+}
+
+void SchedSliceTable::CpuSortedCursor::FindNext() {
+  if (current_idx_in_cpu_ < indices_per_cpu_[current_cpu_].size())
+    return;
+
+  for (uint32_t cpu = current_cpu_ + 1; cpu < base::kMaxCpus; ++cpu) {
+    if (indices_per_cpu_[cpu].size() > 0) {
+      current_cpu_ = cpu;
+      current_idx_in_cpu_ = 0;
+      return;
+    }
+  }
+  current_cpu_ = base::kMaxCpus;
+  current_idx_in_cpu_ = 0;
+}
+
+uint32_t SchedSliceTable::CpuSortedCursor::RowIndex() {
+  return indices_per_cpu_[current_cpu_][current_idx_in_cpu_];
+}
+
+int SchedSliceTable::CpuSortedCursor::Eof() {
+  return current_cpu_ >= base::kMaxCpus;
 }
 
 SchedSliceTable::SortedCursor::SortedCursor(

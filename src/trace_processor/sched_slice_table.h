@@ -114,6 +114,30 @@ class SchedSliceTable : public Table {
     uint32_t offset_ = 0;
   };
 
+  // Reasonably fast cursor which stores a vector for each cpu ordered by ts.
+  class CpuSortedCursor : public BaseCursor {
+   public:
+    CpuSortedCursor(const TraceStorage* storage,
+                    uint32_t min_idx,
+                    uint32_t max_idx);
+    CpuSortedCursor(const TraceStorage* storage,
+                    uint32_t offset,
+                    const std::vector<bool>& filter);
+
+    int Next() override;
+    uint32_t RowIndex() override;
+    int Eof() override;
+
+   private:
+    void FindNext();
+
+    // Vector of row ids sorted by some order by constraints.
+    std::array<std::vector<uint32_t>, base::kMaxCpus> indices_per_cpu_{};
+
+    uint32_t current_cpu_ = 0;
+    size_t current_idx_in_cpu_ = 0;
+  };
+
   // Slow path cursor which stores a sorted set of indices into storage.
   class SortedCursor : public BaseCursor {
    public:
