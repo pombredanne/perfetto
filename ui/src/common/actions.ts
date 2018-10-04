@@ -144,8 +144,8 @@ export const StateActions = {
         state.engines[args.engineId].ready = args.ready;
       },
 
-  createPermalink(state: StateDraft, args: {requestId: string}): void {
-    state.permalink = {requestId: args.requestId, hash: undefined};
+  createPermalink(state: StateDraft, _: {}): void {
+    state.permalink = {requestId: `${state.nextId++}`, hash: undefined};
   },
 
   setPermalink(state: StateDraft, args: {requestId: string; hash: string}):
@@ -155,10 +155,12 @@ export const StateActions = {
         state.permalink = args;
       },
 
-  loadPermalink(state: StateDraft, args: {requestId: string; hash: string}):
-      void {
-        state.permalink = args;
-      },
+  loadPermalink(state: StateDraft, args: {hash: string}): void {
+    state.permalink = {
+      requestId: `${state.nextId++}`,
+      hash: args.hash,
+    };
+  },
 
   setTraceTime(state: StateDraft, args: TraceTime): void {
     state.traceTime = args;

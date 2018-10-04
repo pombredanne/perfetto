@@ -67,7 +67,6 @@ export class PermalinkController extends Controller<'main'> {
     return hash;
   }
 
-
   private static async saveState(state: State): Promise<string> {
     const text = JSON.stringify(state);
     const hash = await this.toSha256(text);
@@ -101,7 +100,6 @@ export class PermalinkController extends Controller<'main'> {
     await response.json();
     return `https://storage.googleapis.com/${BUCKET_NAME}/${name}`;
   }
-
 
   private static async loadState(id: string): Promise<State> {
     const url = `https://storage.googleapis.com/${BUCKET_NAME}/${id}`;
