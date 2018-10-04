@@ -37,6 +37,8 @@ class Event {
  public:
   Event();
   ~Event();
+  Event(Event&&) noexcept = default;
+  Event& operator=(Event&&) = default;
 
   // The non-blocking file descriptor that can be polled to wait for the event.
   int fd() const { return fd_.get(); }
