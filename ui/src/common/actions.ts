@@ -24,6 +24,7 @@ export const StateActions = {
     state.route = args.route;
   },
 
+  // TODO(hjd): Factor common code from openTraceFromUrl.
   openTraceFromFile(state: StateDraft, args: {file: File}): void {
     state.traceTime = defaultTraceTime;
     state.visibleTraceTime = defaultTraceTime;
@@ -39,6 +40,7 @@ export const StateActions = {
     state.route = `/viewer`;
   },
 
+  // TODO(hjd): Factor common code from openTraceFromFile.
   openTraceFromUrl(state: StateDraft, args: {url: string}): void {
     state.traceTime = defaultTraceTime;
     state.visibleTraceTime = defaultTraceTime;
@@ -179,7 +181,15 @@ export const StateActions = {
   },
 };
 
-// A DeferredAction is a bundle of Args and a method name.
+
+// When we are on the frontend side, we don't really want to execute the
+// actions above, we just want to serialize them and marshal their
+// arguments, send them over to the controller side and have them being
+// executed there. The magic below takes care of turning each action into a
+// function that returns the marshaled args.
+
+// A DeferredAction is a bundle of Args and a method name. This is the marshaled
+// version of a StateActions method call.
 export interface DeferredAction<Args = {}> {
   type: string;
   args: Args;
