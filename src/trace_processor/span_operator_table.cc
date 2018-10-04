@@ -231,6 +231,7 @@ int SpanOperatorTable::Cursor::Next() {
   return err == SQLITE_DONE ? SQLITE_OK : err;
 }
 
+PERFETTO_ALWAYS_INLINE
 int SpanOperatorTable::Cursor::StepForTable(ChildTable table) {
   TableState* pull_state = table == ChildTable::kFirst ? &t1_ : &t2_;
   auto* stmt = pull_state->stmt.get();
