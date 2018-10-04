@@ -22,6 +22,7 @@
 #include "perfetto/base/unix_socket.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 #include "perfetto/base/unix_task_runner.h"
 
@@ -93,7 +94,7 @@ int HeapprofdMain(int argc, char** argv) {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
     // variable.
-    const char* sock_fd = getenv("ANDROID_SOCKET_heapprofd");
+    const char* sock_fd = getenv(kHeapprofdSocketEnvVar);
     if (sock_fd == nullptr)
       PERFETTO_FATAL(
           "No argument given and environment variable ANDROID_SOCKET_heapprof "

@@ -25,10 +25,10 @@
 
 #include "perfetto/base/build_config.h"
 #include "src/profiling/memory/client.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 static std::atomic<const MallocDispatch*> g_dispatch{nullptr};
 static std::atomic<perfetto::Client*> g_client{nullptr};
-static constexpr const char* kHeapprofdSock = "/dev/socket/heapprofd";
 static constexpr size_t kNumConnections = 2;
 
 static constexpr std::memory_order write_order = std::memory_order_release;
@@ -100,8 +100,9 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int*,
                                        const char*) {
   g_dispatch.store(malloc_dispatch, write_order);
-  g_client.store(new perfetto::Client(kHeapprofdSock, kNumConnections),
-                 write_order);
+  g_client.store(
+      new perfetto::Client(perfetto::kHeapprofdSocketFile, kNumConnections),
+      write_order);
   return true;
 }
 

@@ -98,9 +98,9 @@ library_not_in_pdk = {
 
 # Additional arguments to apply to Android.bp rules.
 additional_args = {
-    "heapprofd_client": {
-        "include_dirs": ["bionic/libc"],
-    },
+    "heapprofd_client": [
+        ("include_dirs", ["bionic/libc"]),
+    ],
 }
 
 
@@ -212,8 +212,7 @@ class Module(object):
         self._output_field(output, 'local_include_dirs')
         # We have to sort because there is no defined iteration order for
         # dictionaries.
-        for key, value in sorted(
-            additional_args.get(self.name, {}).iteritems()):
+        for key, value in additional_args.get(self.name, []):
           self._write_value(output, key, value)
 
         disable_pdk = any(name in library_not_in_pdk for name in self.shared_libs)
