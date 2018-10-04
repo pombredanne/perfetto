@@ -210,8 +210,6 @@ class Module(object):
         self._output_field(output, 'defaults')
         self._output_field(output, 'cflags')
         self._output_field(output, 'local_include_dirs')
-        # We have to sort because there is no defined iteration order for
-        # dictionaries.
         for key, value in additional_args.get(self.name, []):
           self._write_value(output, key, value)
 
