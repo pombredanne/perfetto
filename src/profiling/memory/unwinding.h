@@ -39,20 +39,13 @@ class FileDescriptorMaps : public unwindstack::Maps {
 };
 
 struct ProcessMetadata {
-  ProcessMetadata(pid_t p,
-                  base::ScopedFile maps_fd,
-                  base::ScopedFile mem,
-                  GlobalCallstackTrie* callsites)
-      : pid(p),
-        maps(std::move(maps_fd)),
-        mem_fd(std::move(mem)),
-        heap_dump(callsites) {
+  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
+      : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
     PERFETTO_CHECK(maps.Parse());
   }
   pid_t pid;
   FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
-  HeapTracker heap_dump;
 };
 
 // Overlays size bytes pointed to by stack for addresses in [sp, sp + size).
@@ -96,9 +89,9 @@ enum class BookkeepingRecordType {
 };
 
 struct BookkeepingRecord {
+  uint64_t pid;
   // TODO(fmayer): Use a union.
   BookkeepingRecordType record_type;
-  std::weak_ptr<ProcessMetadata> metadata;
   AllocRecord alloc_record;
   FreeRecord free_record;
 };
@@ -106,12 +99,36 @@ struct BookkeepingRecord {
 bool DoUnwind(WireMessage*, ProcessMetadata* metadata, AllocRecord* out);
 
 bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
-void HandleBookkeepingRecord(BookkeepingRecord* rec);
 
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
 
-void BookkeepingMainLoop(BoundedQueue<BookkeepingRecord>* input_queue);
+struct BookkeepingData {
+  BookkeepingData(GlobalCallstackTrie* callsites) : heap_tracker(callsites) {}
+
+  HeapTracker heap_tracker;
+  uint64_t ref_count = 0;
+};
+
+class BookkeepingActor {
+ public:
+  BookkeepingActor(BoundedQueue<BookkeepingRecord>* input_queue,
+                   GlobalCallstackTrie* callsites)
+      : input_queue_(input_queue), callsites_(callsites) {}
+
+  void Run();
+  void AddSocket(uint64_t pid);
+  void RemoveSocket(uint64_t pid);
+
+ private:
+  void HandleBookkeepingRecord(BookkeepingRecord* rec);
+
+  BoundedQueue<BookkeepingRecord>* const input_queue_;
+  GlobalCallstackTrie* const callsites_;
+
+  std::map<uint64_t, BookkeepingData> bookkeeping_data_;
+  std::mutex bookkeeping_mutex_;
+};
 
 }  // namespace perfetto
 

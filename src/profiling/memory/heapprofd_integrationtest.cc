@@ -55,18 +55,15 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");
   constexpr double kSamplingRate = 123;
-  SocketListener listener(
-      {kSamplingRate},
-      [&done](UnwindingRecord r) {
-        // TODO(fmayer): Test symbolization and result of unwinding.
-        // This check will only work on in-tree builds as out-of-tree
-        // libunwindstack is behaving a bit weirdly.
-        BookkeepingRecord bookkeeping_record;
-        ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
-        HandleBookkeepingRecord(&bookkeeping_record);
-        done();
-      },
-      &callsites);
+  SocketListener listener({kSamplingRate}, [&done](UnwindingRecord r) {
+    // TODO(fmayer): Test symbolization and result of unwinding.
+    // This check will only work on in-tree builds as out-of-tree
+    // libunwindstack is behaving a bit weirdly.
+    BookkeepingRecord bookkeeping_record;
+    ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
+    //        HandleBookkeepingRecord(&bookkeeping_record);
+    done();
+  });
 
   auto sock = base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
   if (!sock->is_listening()) {

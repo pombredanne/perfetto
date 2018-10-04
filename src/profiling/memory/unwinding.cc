@@ -202,7 +202,6 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
     }
 
     out->record_type = BookkeepingRecordType::Malloc;
-    out->metadata = std::move(rec->metadata);
     if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
       PERFETTO_LOG("Unwinding failed.");
       return false;
@@ -213,7 +212,6 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
     // We need to keep this alive, because msg.free_header is a pointer into
     // this.
     out->record_type = BookkeepingRecordType::Free;
-    out->metadata = std::move(rec->metadata);
     out->free_record.free_data = std::move(rec->data);
     out->free_record.metadata = msg.free_header;
     return true;
@@ -234,12 +232,17 @@ __attribute__((noreturn)) void UnwindingMainLoop(
   }
 }
 
-void HandleBookkeepingRecord(BookkeepingRecord* rec) {
-  std::shared_ptr<ProcessMetadata> metadata = rec->metadata.lock();
-  if (!metadata)
-    // Process has already gone away.
-    return;
-
+void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
+  BookkeepingData* bookkeeping_data;
+  {
+    std::lock_guard<std::mutex> l(bookkeeping_mutex_);
+    auto it = bookkeeping_data_.find(rec->pid);
+    if (it == bookkeeping_data_.end()) {
+      PERFETTO_DCHECK(false);
+      return;
+    }
+    bookkeeping_data = &it->second;
+  }
   if (rec->record_type == BookkeepingRecordType::Dump) {
   } else if (rec->record_type == BookkeepingRecordType::Free) {
     FreeRecord& free_rec = rec->free_record;
@@ -249,27 +252,43 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
       return;
     for (size_t i = 0; i < num_entries; ++i) {
       const FreePageEntry& entry = entries[i];
-      PERFETTO_LOG("Free %" PRIu64 ".", entry.addr);
-      metadata->heap_dump.RecordFree(entry.addr, entry.sequence_number);
+      bookkeeping_data->heap_tracker.RecordFree(entry.addr,
+                                                entry.sequence_number);
     }
   } else if (rec->record_type == BookkeepingRecordType::Malloc) {
     AllocRecord& alloc_rec = rec->alloc_record;
     std::vector<CodeLocation> code_locations;
     for (unwindstack::FrameData& frame : alloc_rec.frames)
       code_locations.emplace_back(frame.map_name, frame.function_name);
-    metadata->heap_dump.RecordMalloc(code_locations,
-                                     alloc_rec.alloc_metadata.alloc_address,
-                                     alloc_rec.alloc_metadata.alloc_size,
-                                     alloc_rec.alloc_metadata.sequence_number);
+    bookkeeping_data->heap_tracker.RecordMalloc(
+        code_locations, alloc_rec.alloc_metadata.alloc_address,
+        alloc_rec.alloc_metadata.alloc_size,
+        alloc_rec.alloc_metadata.sequence_number);
   } else {
     PERFETTO_DCHECK(false);
   }
 }
 
-__attribute__((noreturn)) void BookkeepingMainLoop(
-    BoundedQueue<BookkeepingRecord>* input_queue) {
+void BookkeepingActor::AddSocket(uint64_t pid) {
+  std::lock_guard<std::mutex> l(bookkeeping_mutex_);
+  auto p = bookkeeping_data_.emplace(pid, callsites_);
+  auto it = p.first;
+  it->second.ref_count++;
+}
+
+void BookkeepingActor::RemoveSocket(uint64_t pid) {
+  std::lock_guard<std::mutex> l(bookkeeping_mutex_);
+  auto it = bookkeeping_data_.find(pid);
+  if (it == bookkeeping_data_.end()) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+  it->second.ref_count--;
+}
+
+__attribute__((noreturn)) void BookkeepingActor::Run() {
   for (;;) {
-    BookkeepingRecord rec = input_queue->Get();
+    BookkeepingRecord rec = input_queue_->Get();
     HandleBookkeepingRecord(&rec);
   }
 }
