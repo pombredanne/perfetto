@@ -80,15 +80,18 @@ class TraceStorage {
 
   class Slices {
    public:
-    inline size_t AddSlice(uint32_t cpu, uint64_t start_ns, UniqueTid utid) {
+    inline size_t AddSlice(uint32_t cpu,
+                           uint64_t start_ns,
+                           uint64_t duration_ns,
+                           UniqueTid utid) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
-      durations_.emplace_back(0);
+      durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
       return slice_count() - 1;
     }
 
-    void FinishSlice(size_t index, uint64_t duration_ns) {
+    void set_duration(size_t index, uint64_t duration_ns) {
       durations_[index] = duration_ns;
     }
 
@@ -157,22 +160,27 @@ class TraceStorage {
   class Counters {
    public:
     inline size_t AddCounter(uint64_t timestamp,
+                             uint64_t duration,
                              StringId name_id,
                              double value,
+                             double value_delta,
                              int64_t ref,
                              RefType type) {
       timestamps_.emplace_back(timestamp);
-      durations_.emplace_back(0);
+      durations_.emplace_back(duration);
       name_ids_.emplace_back(name_id);
       values_.emplace_back(value);
-      value_deltas_.emplace_back(0);
+      value_deltas_.emplace_back(value_delta);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
       return counter_count() - 1;
     }
 
-    void FinishCounter(size_t index, uint64_t duration, double value_delta) {
+    void set_duration(size_t index, uint64_t duration) {
       durations_[index] = duration;
+    }
+
+    void set_value_delta(size_t index, double value_delta) {
       value_deltas_[index] = value_delta;
     }
 
