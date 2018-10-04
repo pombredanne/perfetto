@@ -59,7 +59,7 @@ bool EnsureDir(const std::string& path) {
 }
 
 bool EnsureFile(const std::string& path) {
-  return base::OpenFile(path, O_RDONLY | O_CREAT).get() != -1;
+  return base::OpenFile(path, O_RDONLY | O_CREAT, 0755).get() != -1;
 }
 
 std::string GetConfigPath() {
@@ -202,8 +202,7 @@ int main(int argc, char** argv) {
   TraceProcessor::Config config;
   config.optimization_mode = OptimizationMode::kMaxBandwidth;
   TraceProcessor tp(config);
-  base::ScopedFile fd;
-  fd.reset(open(trace_file_path, O_RDONLY));
+  base::ScopedFile fd(base::OpenFile(trace_file_path, O_RDONLY));
   PERFETTO_CHECK(fd);
 
   // Load the trace in chunks using async IO. We create a simple pipeline where,
