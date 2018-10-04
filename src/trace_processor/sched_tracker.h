@@ -18,6 +18,7 @@
 #define SRC_TRACE_PROCESSOR_SCHED_TRACKER_H_
 
 #include <array>
+#include <limits>
 
 #include "perfetto/base/string_view.h"
 #include "perfetto/base/utils.h"
