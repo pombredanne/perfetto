@@ -77,12 +77,12 @@ class SchedTracker {
 
   // Represents a slice which is currently pending.
   struct PendingSchedSlice {
-    size_t storage_index = 0;
+    size_t storage_index = std::numeric_limits<size_t>::max();
     uint32_t pid = 0;
   };
 
   // Store pending sched slices for each CPU.
-  std::unordered_map<uint32_t, PendingSchedSlice> pending_sched_per_cpu_;
+  std::array<PendingSchedSlice, base::kMaxCpus> pending_sched_per_cpu_{};
 
   // Store pending counters for each counter key.
   std::unordered_map<CounterKey, size_t, CounterKey::Hasher>
