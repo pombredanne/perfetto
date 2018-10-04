@@ -235,20 +235,20 @@ int SpanOperatorTable::Cursor::StepForTable(ChildTable table) {
   TableState* pull_state = table == ChildTable::kFirst ? &t1_ : &t2_;
   auto* stmt = pull_state->stmt.get();
 
-  int err = sqlite3_step(stmt);
-  if (err == SQLITE_ROW) {
+  int res = sqlite3_step(stmt);
+  if (res == SQLITE_ROW) {
     int64_t ts = sqlite3_column_int64(stmt, Column::kTimestamp);
     int64_t dur = sqlite3_column_int64(stmt, Column::kDuration);
     int64_t join_val = sqlite3_column_int64(stmt, Column::kJoinValue);
     pull_state->ts_start = static_cast<uint64_t>(ts);
     pull_state->ts_end = pull_state->ts_start + static_cast<uint64_t>(dur);
     pull_state->join_val = join_val;
-  } else if (err == SQLITE_DONE) {
+  } else if (res == SQLITE_DONE) {
     pull_state->ts_start = kU64Max;
     pull_state->ts_end = kU64Max;
     pull_state->join_val = kI64Max;
   }
-  return err;
+  return res;
 }
 
 int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
@@ -309,6 +309,8 @@ int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
     case Column::kDuration: {
       auto max_start = std::max(t1_.ts_start, t2_.ts_start);
       auto min_end = std::min(t1_.ts_end, t2_.ts_end);
+      PERFETTO_DCHECK(min_end > max_start);
+
       auto dur = min_end - max_start;
       sqlite3_result_int64(context, static_cast<sqlite3_int64>(dur));
       break;
@@ -340,9 +342,10 @@ PERFETTO_ALWAYS_INLINE void SpanOperatorTable::Cursor::ReportSqliteResult(
       sqlite3_result_double(context, sqlite3_column_double(stmt, idx));
       break;
     case SQLITE_TEXT: {
-      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
+      const auto kSqliteTransient =
+          reinterpret_cast<sqlite3_destructor_type>(-1);
       auto ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx));
-      sqlite3_result_text(context, ptr, -1, kSqliteStatic);
+      sqlite3_result_text(context, ptr, -1, kSqliteTransient);
       break;
     }
   }
