@@ -65,6 +65,8 @@ ssize_t WriteAll(int fd, const void* buf, size_t count) {
   while (written < count) {
     ssize_t wr = PERFETTO_EINTR(
         write(fd, static_cast<const char*>(buf) + written, count - written));
+    if (wr == 0)
+      break;
     if (wr < 0)
       return wr;
     written += static_cast<size_t>(wr);
