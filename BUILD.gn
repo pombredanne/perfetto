@@ -287,6 +287,7 @@ if (!build_with_chromium) {
       "src/base",
       "src/base:unix_socket",
       "src/profiling/memory:daemon",
+      "src/profiling/memory:wire_protocol",
     ]
     sources = [
       "src/profiling/memory/main.cc",
