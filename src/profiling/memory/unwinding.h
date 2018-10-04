@@ -39,11 +39,11 @@ class FileDescriptorMaps : public unwindstack::Maps {
 };
 
 struct ProcessMetadata {
-  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
+  ProcessMetadata(uint64_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
       : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
     PERFETTO_CHECK(maps.Parse());
   }
-  pid_t pid;
+  uint64_t pid;
   FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
 };
@@ -66,7 +66,7 @@ class StackMemory : public unwindstack::Memory {
 size_t RegSize(unwindstack::ArchEnum arch);
 
 struct UnwindingRecord {
-  pid_t pid;
+  uint64_t pid;
   size_t size;
   std::unique_ptr<uint8_t[]> data;
   std::weak_ptr<ProcessMetadata> metadata;

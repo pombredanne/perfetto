@@ -201,6 +201,7 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
       return false;
     }
 
+    out->pid = rec->pid;
     out->record_type = BookkeepingRecordType::Malloc;
     if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
       PERFETTO_LOG("Unwinding failed.");
@@ -209,9 +210,10 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
     PERFETTO_LOG("Unwound.");
     return true;
   } else if (msg.record_type == RecordType::Free) {
+    out->record_type = BookkeepingRecordType::Free;
+    out->pid = rec->pid;
     // We need to keep this alive, because msg.free_header is a pointer into
     // this.
-    out->record_type = BookkeepingRecordType::Free;
     out->free_record.free_data = std::move(rec->data);
     out->free_record.metadata = msg.free_header;
     return true;

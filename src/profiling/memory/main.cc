@@ -62,10 +62,10 @@ int HeapprofdMain(int argc, char** argv) {
   GlobalCallstackTrie callsites;
   std::unique_ptr<base::UnixSocket> sock;
 
-  BoundedQueue<BookkeepingRecord> callsites_queue(kBookkeepingQueueSize);
-  std::thread bookkeeping_thread([&callsites_queue, &callsites] {
-    BookkeepingMainLoop(&callsites_queue, &callsites);
-  });
+  BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
+  BookkeepingActor bookkeeping_actor(&bookkeeping_queue, &callsites);
+  std::thread bookkeeping_thread(
+      [&bookkeeping_actor] { bookkeeping_actor.Run(); });
 
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
@@ -73,8 +73,8 @@ int HeapprofdMain(int argc, char** argv) {
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
   for (size_t i = 0; i < kUnwinderThreads; ++i) {
-    unwinding_threads.emplace_back([&unwinder_queues, &callsites_queue, i] {
-      UnwindingMainLoop(&unwinder_queues[i], &callsites_queue);
+    unwinding_threads.emplace_back([&unwinder_queues, &bookkeeping_queue, i] {
+      UnwindingMainLoop(&unwinder_queues[i], &bookkeeping_queue);
     });
   }
 
