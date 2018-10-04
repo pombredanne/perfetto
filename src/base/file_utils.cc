@@ -20,6 +20,9 @@
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/scoped_file.h"
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <unistd.h>
+#endif
 
 namespace perfetto {
 namespace base {
@@ -61,8 +64,6 @@ bool ReadFile(const std::string& path, std::string* out) {
 }
 
 #if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-
-#include <unistd.h>
 
 ssize_t WriteAll(int fd, const void* buf, size_t count) {
   size_t written = 0;
