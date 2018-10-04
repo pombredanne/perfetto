@@ -60,6 +60,10 @@ bool ReadFile(const std::string& path, std::string* out) {
   return ReadFileDescriptor(*fd, out);
 }
 
+#if !PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+
+#include <unistd.h>
+
 ssize_t WriteAll(int fd, const void* buf, size_t count) {
   size_t written = 0;
   while (written < count) {
@@ -73,6 +77,8 @@ ssize_t WriteAll(int fd, const void* buf, size_t count) {
   }
   return static_cast<ssize_t>(written);
 }
+
+#endif
 
 }  // namespace base
 }  // namespace perfetto
