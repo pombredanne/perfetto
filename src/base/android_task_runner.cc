@@ -27,7 +27,6 @@ AndroidTaskRunner::AndroidTaskRunner()
       delayed_timer_(
           timerfd_create(kWallTimeClockSource, TFD_NONBLOCK | TFD_CLOEXEC)) {
   ALooper_acquire(looper_);
-  PERFETTO_CHECK(immediate_event_);
   PERFETTO_CHECK(delayed_timer_);
   AddFileDescriptorWatch(immediate_event_.fd(),
                          std::bind(&AndroidTaskRunner::RunImmediateTask, this));
