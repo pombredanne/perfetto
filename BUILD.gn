@@ -274,6 +274,7 @@ if (!build_with_chromium) {
 }
 
 if (!build_with_chromium) {
+  # TODO(fmayer): Investigate shared library for common pieces.
   shared_library("heapprofd_client") {
     deps = [
       "src/profiling/memory:malloc_hooks",
