@@ -19,6 +19,8 @@
 
 #include <string>
 
+#include "perfetto/base/build_config.h"
+
 namespace perfetto {
 namespace base {
 
