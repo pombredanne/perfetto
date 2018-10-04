@@ -32,7 +32,14 @@ static constexpr const char* kHeapprofdSock = "/dev/socket/heapprofd";
 static constexpr size_t kNumConnections = 2;
 
 static constexpr std::memory_order write_order = std::memory_order_release;
+#if defined(__arch64__) || defined(__arm64__) || defined(__arm__)
+// On ARM, ldr respects data dependencies. See:
+// https://preshing.com/20140709/the-purpose-of-memory_order_consume-in-cpp11/
 static constexpr std::memory_order read_order = std::memory_order_relaxed;
+#else
+// Do not make assumptions about any other architectures.
+static constexpr std::memory_order read_order = std::memory_order_acquire;
+#endif
 
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so
@@ -44,7 +51,7 @@ static constexpr std::memory_order read_order = std::memory_order_relaxed;
   PERFETTO_BUILDFLAG_CAT(HEAPPROFD_PREFIX, name)
 
 #pragma GCC visibility push(default)
-__BEGIN_DECLS
+extern "C" {
 
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
                                        int* malloc_zygote_child,
@@ -86,8 +93,7 @@ void HEAPPROFD_ADD_PREFIX(_malloc_enable)();
 void* HEAPPROFD_ADD_PREFIX(_pvalloc)(size_t bytes);
 void* HEAPPROFD_ADD_PREFIX(_valloc)(size_t size);
 #endif
-
-__END_DECLS
+}
 #pragma GCC visibility pop
 
 bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
@@ -100,7 +106,8 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
-  g_client.store(nullptr, write_order);
+  // TODO(fmayer): Shut down client.
+  // Allow to re-enable existing client on subsequent initialize call.
 }
 
 void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char*) {}
