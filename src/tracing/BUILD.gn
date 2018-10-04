@@ -78,6 +78,19 @@ source_set("api") {
   ]
 }
 
+executable("consumer_api_test") {
+  deps = [
+    ":api",
+    "../../gn:default_deps",
+    "../../protos/perfetto/config:lite",
+    "../../protos/perfetto/trace:lite",
+    "../base",
+  ]
+  sources = [
+    "api_impl/consumer_api_test.cc",
+  ]
+}
+
 source_set("unittests") {
   testonly = true
   deps = [
