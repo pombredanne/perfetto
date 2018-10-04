@@ -13,6 +13,8 @@
 // limitations under the License.
 
 import {globals} from '../controller/globals';
+
+import {ConfigController} from './config_controller';
 import {Child, Controller, ControllerInitializerAny} from './controller';
 import {PermalinkController} from './permalink_controller';
 import {TraceController} from './trace_controller';
@@ -33,6 +35,7 @@ export class AppController extends Controller<'main'> {
   run() {
     const childControllers: ControllerInitializerAny[] = [
       Child('permalink', PermalinkController, {}),
+      Child('config', ConfigController, {app: globals}),
     ];
     for (const engineCfg of Object.values(globals.state.engines)) {
       childControllers.push(Child(engineCfg.id, TraceController, engineCfg.id));
