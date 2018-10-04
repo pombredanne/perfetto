@@ -59,8 +59,10 @@ void Event::Notify() {
   ssize_t ret = write(write_fd_.get(), &value, sizeof(uint8_t));
 #endif
 
-  if (ret <= 0 && errno != EAGAIN)
+  if (ret <= 0 && errno != EAGAIN) {
     PERFETTO_DPLOG("write()");
+    PERFETTO_DCHECK(false);
+  }
 }
 
 void Event::Clear() {

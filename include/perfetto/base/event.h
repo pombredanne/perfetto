@@ -46,6 +46,8 @@ class Event {
   // Can be called from any thread.
   void Notify();
 
+  // Can be called from any thread. If more Notify() are queued a Clear() call
+  // can clear all of them (up to 16 per call).
   void Clear();
 
  private:
