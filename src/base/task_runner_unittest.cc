@@ -27,8 +27,6 @@
 
 #include <thread>
 
-#include "perfetto/base/file_utils.h"
-
 namespace perfetto {
 namespace base {
 namespace {
@@ -64,7 +62,7 @@ struct Pipe {
 
   void Write() {
     const char b = '?';
-    PERFETTO_DCHECK(WriteAll(write_fd.get(), &b, 1) == 1);
+    PERFETTO_DCHECK(write(write_fd.get(), &b, 1) == 1);
   }
 
   ScopedFile read_fd;

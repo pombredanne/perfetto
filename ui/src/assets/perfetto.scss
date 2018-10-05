@@ -311,19 +311,6 @@ header {
   height: 25px;
 }
 
-header.overview {
-  display: flex;
-  justify-content: space-between;
-}
-
-.query-error {
-  user-select: text;
-}
-
-span.code {
-  user-select: text;
-}
-
 .debug-panel-border {
   position: absolute;
   top: 0px;
