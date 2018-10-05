@@ -31,8 +31,11 @@ namespace perfetto {
 class SocketListener : public base::UnixSocket::EventListener {
  public:
   SocketListener(ClientConfiguration client_config,
-                 std::function<void(UnwindingRecord)> fn)
-      : client_config_(client_config), callback_function_(std::move(fn)) {}
+                 std::function<void(UnwindingRecord)> fn,
+                 BookkeepingActor* bookkeeping_actor)
+      : client_config_(client_config),
+        callback_function_(std::move(fn)),
+        bookkeeping_actor_(bookkeeping_actor) {}
   void OnDisconnect(base::UnixSocket* self) override;
   void OnNewIncomingConnection(
       base::UnixSocket* self,
@@ -66,6 +69,7 @@ class SocketListener : public base::UnixSocket::EventListener {
   std::map<base::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
   std::function<void(UnwindingRecord)> callback_function_;
+  BookkeepingActor* const bookkeeping_actor_;
 };
 
 }  // namespace perfetto

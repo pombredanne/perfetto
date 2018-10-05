@@ -278,14 +278,14 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   }
 }
 
-void BookkeepingActor::AddSocket(uint64_t pid) {
+void BookkeepingActor::AddSocket(pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   auto p = bookkeeping_data_.emplace(pid, callsites_);
   auto it = p.first;
   it->second.ref_count++;
 }
 
-void BookkeepingActor::RemoveSocket(uint64_t pid) {
+void BookkeepingActor::RemoveSocket(pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   auto it = bookkeeping_data_.find(pid);
   if (it == bookkeeping_data_.end()) {
@@ -295,9 +295,10 @@ void BookkeepingActor::RemoveSocket(uint64_t pid) {
   it->second.ref_count--;
 }
 
-__attribute__((noreturn)) void BookkeepingActor::Run() {
+__attribute__((noreturn)) void BookkeepingActor::Run(
+    BoundedQueue<BookkeepingRecord>* input_queue) {
   for (;;) {
-    BookkeepingRecord rec = input_queue_->Get();
+    BookkeepingRecord rec = input_queue->Get();
     HandleBookkeepingRecord(&rec);
   }
 }

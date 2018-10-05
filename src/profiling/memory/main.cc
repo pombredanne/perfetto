@@ -63,9 +63,10 @@ int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<base::UnixSocket> sock;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
-  BookkeepingActor bookkeeping_actor(&bookkeeping_queue, &callsites);
-  std::thread bookkeeping_thread(
-      [&bookkeeping_actor] { bookkeeping_actor.Run(); });
+  BookkeepingActor bookkeeping_actor(&callsites);
+  std::thread bookkeeping_thread([&bookkeeping_actor, &bookkeeping_queue] {
+    bookkeeping_actor.Run(&bookkeeping_queue);
+  });
 
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
@@ -82,7 +83,8 @@ int HeapprofdMain(int argc, char** argv) {
     unwinder_queues[static_cast<size_t>(r.pid) % kUnwinderThreads].Add(
         std::move(r));
   };
-  SocketListener listener({kSamplingRate}, std::move(on_record_received));
+  SocketListener listener({kSamplingRate}, std::move(on_record_received),
+                          &bookkeeping_actor);
 
   base::UnixTaskRunner read_task_runner;
   if (argc == 2) {

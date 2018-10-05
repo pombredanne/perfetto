@@ -39,11 +39,11 @@ class FileDescriptorMaps : public unwindstack::Maps {
 };
 
 struct ProcessMetadata {
-  ProcessMetadata(uint64_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
+  ProcessMetadata(pid_t p, base::ScopedFile maps_fd, base::ScopedFile mem)
       : pid(p), maps(std::move(maps_fd)), mem_fd(std::move(mem)) {
     PERFETTO_CHECK(maps.Parse());
   }
-  uint64_t pid;
+  pid_t pid;
   FileDescriptorMaps maps;
   base::ScopedFile mem_fd;
 };
@@ -66,7 +66,7 @@ class StackMemory : public unwindstack::Memory {
 size_t RegSize(unwindstack::ArchEnum arch);
 
 struct UnwindingRecord {
-  uint64_t pid;
+  pid_t pid;
   size_t size;
   std::unique_ptr<uint8_t[]> data;
   std::weak_ptr<ProcessMetadata> metadata;
@@ -89,7 +89,7 @@ enum class BookkeepingRecordType {
 };
 
 struct BookkeepingRecord {
-  uint64_t pid;
+  pid_t pid;
   // TODO(fmayer): Use a union.
   BookkeepingRecordType record_type;
   AllocRecord alloc_record;
@@ -112,21 +112,17 @@ struct BookkeepingData {
 
 class BookkeepingActor {
  public:
-  BookkeepingActor(BoundedQueue<BookkeepingRecord>* input_queue,
-                   GlobalCallstackTrie* callsites)
-      : input_queue_(input_queue), callsites_(callsites) {}
+  BookkeepingActor(GlobalCallstackTrie* callsites) : callsites_(callsites) {}
 
-  void Run();
-  void AddSocket(uint64_t pid);
-  void RemoveSocket(uint64_t pid);
-
- private:
+  void Run(BoundedQueue<BookkeepingRecord>* input_queue);
+  void AddSocket(pid_t pid);
+  void RemoveSocket(pid_t pid);
   void HandleBookkeepingRecord(BookkeepingRecord* rec);
 
-  BoundedQueue<BookkeepingRecord>* const input_queue_;
+ private:
   GlobalCallstackTrie* const callsites_;
 
-  std::map<uint64_t, BookkeepingData> bookkeeping_data_;
+  std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;
 };
 

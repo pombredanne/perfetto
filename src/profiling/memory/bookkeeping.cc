@@ -91,7 +91,6 @@ void HeapTracker::Dump() {
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
     if (alloc.sequence_number <= sequence_number_) {
-      PERFETTO_LOG("%" PRIu64 " => %s", p.first, alloc.node->str().c_str());
     }
   }
 }
