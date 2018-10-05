@@ -36,7 +36,7 @@ static constexpr size_t kNumConnections = 2;
 // malloc functions, we can use relaxed memory mode for both writing, and more
 // importantly because in the fast-path, reading.
 static constexpr std::memory_order write_order = std::memory_order_relaxed;
-static constexpr std::memory_order read_order = std::memory_order_relax;
+static constexpr std::memory_order read_order = std::memory_order_relaxed;
 
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so
