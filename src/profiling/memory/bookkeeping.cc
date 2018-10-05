@@ -88,9 +88,14 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 }
 
 void HeapTracker::Dump() {
+  // TODO(fmayer): Implement proper dump.
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
+    const InternedCodeLocation& interned_code_loc =
+        alloc.node->interned_code_location();
     if (alloc.sequence_number <= sequence_number_) {
+      PERFETTO_DLOG("%" PRIu64 ": %s", p.first,
+                    interned_code_loc.function_name.str().c_str());
     }
   }
 }

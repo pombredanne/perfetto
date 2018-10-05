@@ -82,6 +82,10 @@ class GlobalCallstackTrie {
     Node(InternedCodeLocation location, Node* parent)
         : parent_(parent), location_(std::move(location)) {}
 
+    const InternedCodeLocation& interned_code_location() const {
+      return location_;
+    }
+
    private:
     Node* GetOrCreateChild(const InternedCodeLocation& loc);
 
