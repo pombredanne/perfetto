@@ -31,15 +31,12 @@ static std::atomic<const MallocDispatch*> g_dispatch{nullptr};
 static std::atomic<perfetto::Client*> g_client{nullptr};
 static constexpr size_t kNumConnections = 2;
 
-static constexpr std::memory_order write_order = std::memory_order_release;
-#if defined(__arch64__) || defined(__arm64__) || defined(__arm__)
-// On ARM, ldr respects data dependencies. See:
-// https://preshing.com/20140709/the-purpose-of-memory_order_consume-in-cpp11/
-static constexpr std::memory_order read_order = std::memory_order_relaxed;
-#else
-// Do not make assumptions about any other architectures.
-static constexpr std::memory_order read_order = std::memory_order_acquire;
-#endif
+// The only writes are in the initialization function. Because Bionic does a
+// release write after initialization and an acquire read to retrieve the hooked
+// malloc functions, we can use relaxed memory mode for both writing, and more
+// importantly because in the fast-path, reading.
+static constexpr std::memory_order write_order = std::memory_order_relaxed;
+static constexpr std::memory_order read_order = std::memory_order_relax;
 
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so

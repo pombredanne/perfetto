@@ -29,6 +29,7 @@
 #include <utility>
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/time.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -73,18 +74,14 @@ uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
 }
 
 void WriteToFile(const char* path, const char* str) {
-  int fd = open(path, O_WRONLY);
-  if (fd == -1)
+  auto fd = base::OpenFile(path, O_WRONLY);
+  if (!fd)
     return;
-  perfetto::base::ignore_result(write(fd, str, strlen(str)));
-  perfetto::base::ignore_result(close(fd));
+  base::ignore_result(base::WriteAll(*fd, str, strlen(str)));
 }
 
 void ClearFile(const char* path) {
-  int fd = open(path, O_WRONLY | O_TRUNC);
-  if (fd == -1)
-    return;
-  perfetto::base::ignore_result(close(fd));
+  auto fd = base::OpenFile(path, O_WRONLY | O_TRUNC);
 }
 
 }  // namespace

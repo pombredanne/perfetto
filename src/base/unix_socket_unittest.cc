@@ -16,6 +16,7 @@
 
 #include "perfetto/base/unix_socket.h"
 
+#include <signal.h>
 #include <sys/mman.h>
 
 #include <list>
@@ -24,6 +25,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/temp_file.h"
 #include "perfetto/base/utils.h"
@@ -200,8 +202,8 @@ TEST_F(UnixSocketTest, ClientAndServerExchangeFDs) {
   ASSERT_TRUE(srv_conn);
   ASSERT_TRUE(cli->is_connected());
 
-  ScopedFile null_fd(open("/dev/null", O_RDONLY));
-  ScopedFile zero_fd(open("/dev/zero", O_RDONLY));
+  ScopedFile null_fd(base::OpenFile("/dev/null", O_RDONLY));
+  ScopedFile zero_fd(base::OpenFile("/dev/zero", O_RDONLY));
 
   auto cli_did_recv = task_runner_.CreateCheckpoint("cli_did_recv");
   EXPECT_CALL(event_listener_, OnDataAvailable(cli.get()))
@@ -351,7 +353,7 @@ TEST_F(UnixSocketTest, SharedMemory) {
     auto srv = UnixSocket::Listen(kSocketName, &event_listener_, &task_runner_);
     ASSERT_TRUE(srv->is_listening());
     // Signal the other process that it can connect.
-    ASSERT_EQ(1, PERFETTO_EINTR(write(pipes[1], ".", 1)));
+    ASSERT_EQ(1, base::WriteAll(pipes[1], ".", 1));
     auto checkpoint = task_runner_.CreateCheckpoint("change_seen_by_server");
     EXPECT_CALL(event_listener_, OnNewIncomingConnection(srv.get(), _))
         .WillOnce(Invoke(
