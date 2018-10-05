@@ -1,0 +1,29 @@
+{
+  "linux_trusty-clang-x86_64-debug": {
+    "GN_ARGS": "is_debug=true is_hermetic_clang=false"
+  },
+  "linux_trusty-clang-x86_64-tsan": {
+    "GN_ARGS": "is_debug=false is_tsan=true"
+  },
+  "linux_trusty-clang-x86_64-msan": {
+    "GN_ARGS": "is_debug=false is_msan=true"
+  },
+  "linux_trusty-clang-x86_64-ubsan_asan_lsan": {
+    "GN_ARGS": "is_debug=false is_ubsan=true is_asan=true is_lsan=true"
+  },
+  "linux_trusty-gcc7-x86_64-release": {
+    "GN_ARGS": "is_debug=false is_clang=false use_custom_libcxx=false cc=\"gcc-7\" cxx=\"g++-7\""
+  },
+  "android-clang-arm-release": {
+    "GN_ARGS": "is_debug=false target_os=\"android\" target_cpu=\"arm\""
+  },
+  "android-clang-arm-asan": {
+    "GN_ARGS": "is_debug=false target_os=\"android\" target_cpu=\"arm\" is_asan=true"
+  },
+  "linux_trusty-clang-x86_64-libfuzzer": {
+    "GN_ARGS": "is_clang=true is_debug=false use_libfuzzer=true is_asan=true"
+  },
+  "ui-clang-x86_64-release": {
+    "GN_ARGS": "is_debug=false is_clang=true"
+  }
+}

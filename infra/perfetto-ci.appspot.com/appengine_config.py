@@ -1,4 +1,4 @@
-# Copyright (C) 2017 The Android Open Source Project
+# Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-deploy:
-	gcloud app deploy app.yaml --project perfetto-ci
-
-
-testdeploy:
-	gcloud app deploy app.yaml --project perfetto-ci --version testing --no-promote
-
-test:
-	dev_appserver.py \
-		--appidentity_email_address appengine-testing-devserver@perfetto-ci.iam.gserviceaccount.com \
-		--appidentity_private_key_path ~/Downloads/perfetto-devappserver.pem \
-		app.yaml
-
-.PHONY: deploy test testdeploy
+import sys
+import os.path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))

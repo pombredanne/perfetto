@@ -1,0 +1,68 @@
+{
+  "kind": "compute#instance",
+  "name": "ci-worker-1",
+  "zone": "projects/perfetto-ci/zones/us-central1-c",
+  "machineType": "projects/perfetto-ci/zones/us-central1-c/machineTypes/n1-highcpu-8",
+  "metadata": {
+    "kind": "compute#metadata",
+    "items": []
+  },
+  "tags": {
+    "items": []
+  },
+  "disks": [
+    {
+      "kind": "compute#attachedDisk",
+      "type": "PERSISTENT",
+      "boot": true,
+      "mode": "READ_WRITE",
+      "autoDelete": true,
+      "deviceName": "ci-worker-1",
+      "initializeParams": {
+        "sourceImage": "projects/cos-cloud/global/images/cos-stable-66-10452-101-0",
+        "diskType": "projects/perfetto-ci/zones/us-central1-c/diskTypes/pd-ssd",
+        "diskSizeGb": "40"
+      },
+      "diskEncryptionKey": {}
+    }
+  ],
+  "canIpForward": false,
+  "networkInterfaces": [
+    {
+      "kind": "compute#networkInterface",
+      "subnetwork": "projects/perfetto-ci/regions/us-central1/subnetworks/default",
+      "accessConfigs": [
+        {
+          "kind": "compute#accessConfig",
+          "name": "External NAT",
+          "type": "ONE_TO_ONE_NAT",
+          "networkTier": "PREMIUM"
+        }
+      ],
+      "aliasIpRanges": []
+    }
+  ],
+  "description": "",
+  "labels": {
+    "pool": "gce-worker"
+  },
+  "scheduling": {
+    "preemptible": true,
+    "onHostMaintenance": "TERMINATE",
+    "automaticRestart": false
+  },
+  "deletionProtection": false,
+  "serviceAccounts": [
+    {
+      "email": "695561751710-compute@developer.gserviceaccount.com",
+      "scopes": [
+        "https://www.googleapis.com/auth/devstorage.read_only",
+        "https://www.googleapis.com/auth/logging.write",
+        "https://www.googleapis.com/auth/monitoring.write",
+        "https://www.googleapis.com/auth/servicecontrol",
+        "https://www.googleapis.com/auth/service.management.readonly",
+        "https://www.googleapis.com/auth/trace.append"
+      ]
+    }
+  ]
+}
