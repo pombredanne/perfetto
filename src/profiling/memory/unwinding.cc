@@ -145,7 +145,7 @@ bool FileDescriptorMaps::Parse() {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
         maps_.push_back(
-            new unwindstack::MapInfo(start, end, pgoff, flags, name));
+            new unwindstack::MapInfo(nullptr, start, end, pgoff, flags, name));
       });
 }
 
@@ -245,7 +245,14 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     }
     bookkeeping_data = &it->second;
   }
+
   if (rec->record_type == BookkeepingRecordType::Dump) {
+    bookkeeping_data->heap_tracker.Dump();
+    // Garbage collect HeapTracker for processes that went away after last Dump.
+    if (bookkeeping_data->ref_count == 0) {
+      std::lock_guard<std::mutex> l(bookkeeping_mutex_);
+      bookkeeping_data_.erase(rec->pid);
+    }
   } else if (rec->record_type == BookkeepingRecordType::Free) {
     FreeRecord& free_rec = rec->free_record;
     FreePageEntry* entries = free_rec.metadata->entries;

@@ -16,6 +16,8 @@
 
 #include "src/profiling/memory/bookkeeping.h"
 
+#include <inttypes.h>
+
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
@@ -83,6 +85,15 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   if (value.sequence_number > sequence_number)
     return;
   allocations_.erase(leaf_it);
+}
+
+void HeapTracker::Dump() {
+  for (const auto& p : allocations_) {
+    const Allocation& alloc = p.second;
+    if (alloc.sequence_number <= sequence_number_) {
+      PERFETTO_LOG("%" PRIu64 " => %s", p.first, alloc.node->str().c_str());
+    }
+  }
 }
 
 uint64_t GlobalCallstackTrie::GetCumSizeForTesting(

@@ -123,6 +123,7 @@ class HeapTracker {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
+  void Dump();
 
  private:
   static constexpr uint64_t kNoopFree = 0;
