@@ -109,7 +109,7 @@ bool SendWireMessage(int sock, const WireMessage& msg);
 bool ReceiveWireMessage(char* buf, size_t size, WireMessage* out);
 
 constexpr const char* kHeapprofdSocketEnvVar = "ANDROID_SOCKET_heapprofd";
-constexpr const char* kHeapprofdSocketFile = "/dev/socket/heaprofd";
+constexpr const char* kHeapprofdSocketFile = "/dev/socket/heapprofd";
 
 }  // namespace perfetto
 
