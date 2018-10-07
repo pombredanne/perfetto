@@ -68,6 +68,7 @@ Watchdog::~Watchdog() {
     PERFETTO_DCHECK(!enabled_);
     return;
   }
+  PERFETTO_DCHECK(enabled_);
   enabled_ = false;
   exit_signal_.notify_one();
   thread_.join();
