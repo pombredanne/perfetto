@@ -21,6 +21,7 @@
 
 #include <signal.h>
 
+#include "perfetto/base/event.h"
 #include "perfetto/base/unix_socket.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
@@ -35,10 +36,10 @@ constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 constexpr double kSamplingRate = 512e4;
 
-int g_dumppipe = 0;
+base::Event* g_dump_evt = nullptr;
 
 void DumpSignalHandler(int) {
-  write(g_dumppipe, "1", 1);
+  g_dump_evt->Notify();
 }
 
 // We create kUnwinderThreads unwinding threads and one bookeeping thread.
@@ -67,6 +68,24 @@ void DumpSignalHandler(int) {
 //           |Bookkeeping Thread|
 //           +------------------+
 int HeapprofdMain(int argc, char** argv) {
+  // If we set this up before launching any threads, we do not use a std::atomic
+  // for g_dump_evt.
+  base::Event dump_evt;
+  g_dump_evt = &dump_evt;
+
+  struct sigaction action = {};
+  action.sa_handler = DumpSignalHandler;
+  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
+  task_runner.AddFileDescriptorWatch(
+      dump_evt.fd(), [&bookkeeping_queue, &dump_evt] {
+        PERFETTO_LOG("Triggering dump.");
+        dump_evt.Clear();
+
+        BookkeepingRecord rec;
+        rec.record_type = BookkeepingRecordType::Dump;
+        bookkeeping_queue.Add(std::move(rec));
+      });
+
   GlobalCallstackTrie callsites;
   std::unique_ptr<base::UnixSocket> sock;
 
@@ -123,22 +142,6 @@ int HeapprofdMain(int argc, char** argv) {
     PERFETTO_FATAL("Failed to initialize socket: %s",
                    strerror(sock->last_error()));
 
-  int dumppipes[2];
-  struct sigaction action = {};
-  action.sa_handler = DumpSignalHandler;
-  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
-  PERFETTO_CHECK(pipe(dumppipes) != -1);
-  g_dumppipe = dumppipes[1];
-  task_runner.AddFileDescriptorWatch(
-      dumppipes[0], [&bookkeeping_queue, &dumppipes] {
-        PERFETTO_LOG("Triggering dump.");
-        char buf[512];
-        if (read(dumppipes[0], buf, sizeof(buf)) == -1)
-          PERFETTO_DPLOG("read");
-        BookkeepingRecord rec;
-        rec.record_type = BookkeepingRecordType::Dump;
-        bookkeeping_queue.Add(std::move(rec));
-      });
   task_runner.Run();
   return 0;
 }
