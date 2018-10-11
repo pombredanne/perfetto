@@ -42,7 +42,7 @@ def main():
     (filename, _) = os.path.splitext(filename_with_ext)
 
     [trace_name, query_name] = filename.split('-')
-    
+
     trace_path = os.path.join(args.traces, trace_name + '.pb')
     query_path = os.path.join(args.queries, query_name + '.sql')
 
@@ -53,7 +53,7 @@ def main():
     with open(query_path, "r") as query_file:
       actual_raw = subprocess.check_output([args.trace_processor, trace_path],
                                            stdin=query_file, stderr=None)
-      actual = actual_raw.decode("utf-8") 
+      actual = actual_raw.decode("utf-8")
 
     with open(f, "r") as expected_file:
       expected = expected_file.read()
