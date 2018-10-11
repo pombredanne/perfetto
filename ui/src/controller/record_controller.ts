@@ -13,26 +13,19 @@
 // limitations under the License.
 
 import {TraceConfig} from '../common/protos';
-import {ConfigEditorConfig} from '../common/state';
+import {RecordConfig} from '../common/state';
 import {Controller} from './controller';
 import {App} from './globals';
 
 export function uint8ArrayToBase64(buffer: Uint8Array): string {
-  const s = [...buffer]
-                .map(c => {
-                  return String.fromCharCode(c);
-                })
-                .join('');
-  return btoa(s);
+  return btoa(String.fromCharCode.apply(null, buffer));
 }
 
-export function encodeConfig(config: ConfigEditorConfig): Uint8Array {
+export function encodeConfig(config: RecordConfig): Uint8Array {
   const sizeKb = config.bufferSizeMb * 1024;
   const durationMs = config.durationSeconds * 1000;
 
   const dataSources = [];
-  const producers = [];
-
   if (config.ftrace) {
     dataSources.push({
       config: {
@@ -59,10 +52,6 @@ export function encodeConfig(config: ConfigEditorConfig): Uint8Array {
     });
   }
 
-  if (config.processMetadata || config.ftrace) {
-    producers.push({producerName: 'perfetto.traced_probes'});
-  }
-
   const buffer = TraceConfig
                      .encode({
                        buffers: [
@@ -71,7 +60,6 @@ export function encodeConfig(config: ConfigEditorConfig): Uint8Array {
                          },
                        ],
                        dataSources,
-                       producers,
                        durationMs,
                      })
                      .finish();
@@ -107,9 +95,9 @@ export function toPbtxt(configBuffer: Uint8Array): string {
   return [...message(json, 0)].join('');
 }
 
-export class ConfigController extends Controller<'main'> {
+export class RecordController extends Controller<'main'> {
   private app: App;
-  private config: ConfigEditorConfig|null = null;
+  private config: RecordConfig|null = null;
 
   constructor(args: {app: App}) {
     super('main');
@@ -117,16 +105,17 @@ export class ConfigController extends Controller<'main'> {
   }
 
   run() {
-    if (this.app.state.configEditor === this.config) return;
-    this.config = this.app.state.configEditor;
+    if (this.app.state.recordConfig === this.config) return;
+    this.config = this.app.state.recordConfig;
     const configProto = encodeConfig(this.config);
     const configProtoText = toPbtxt(configProto);
     const commandline = `
-      echo ${uint8ArrayToBase64(configProto)} |
+      echo '${uint8ArrayToBase64(configProto)}' |
       base64 --decode |
       adb shell "perfetto -c - -o /data/misc/perfetto-traces/trace" &&
       adb pull /data/misc/perfetto-traces/trace /tmp/trace
     `;
+    // TODO(hjd): This should not be TrackData after we unify the stores.
     this.app.publish('TrackData', {
       id: 'config',
       data: {

@@ -51,7 +51,8 @@ export interface PermalinkConfig {
   hash?: string;       // Set by the controller when the link has been created.
 }
 
-export interface ConfigEditorConfig {
+export interface RecordConfig {
+  [key: string]: number|boolean|string|string[];
   durationSeconds: number;
   bufferSizeMb: number;
   processMetadata: boolean;
@@ -80,7 +81,7 @@ export interface State {
   /**
    * State of the ConfigEditor.
    */
-  configEditor: ConfigEditorConfig;
+  recordConfig: RecordConfig;
 
   /**
    * Open traces.
@@ -114,12 +115,12 @@ export function createEmptyState(): State {
     scrollingTracks: [],
     queries: {},
     permalink: {},
-    configEditor: createEmptyConfigEditerConfig(),
+    recordConfig: createEmptyRecordConfig(),
     status: {msg: '', timestamp: 0},
   };
 }
 
-export function createEmptyConfigEditerConfig(): ConfigEditorConfig {
+export function createEmptyRecordConfig(): RecordConfig {
   return {
     durationSeconds: 10.0,
     bufferSizeMb: 10.0,

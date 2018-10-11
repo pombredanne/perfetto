@@ -14,9 +14,9 @@
 
 import {globals} from '../controller/globals';
 
-import {ConfigController} from './config_controller';
 import {Child, Controller, ControllerInitializerAny} from './controller';
 import {PermalinkController} from './permalink_controller';
+import {RecordController} from './record_controller';
 import {TraceController} from './trace_controller';
 
 // The root controller for the entire app. It handles the lifetime of all
@@ -35,7 +35,7 @@ export class AppController extends Controller<'main'> {
   run() {
     const childControllers: ControllerInitializerAny[] = [
       Child('permalink', PermalinkController, {}),
-      Child('config', ConfigController, {app: globals}),
+      Child('record', RecordController, {app: globals}),
     ];
     for (const engineCfg of Object.values(globals.state.engines)) {
       childControllers.push(Child(engineCfg.id, TraceController, engineCfg.id));

@@ -15,15 +15,15 @@
 import {dingus} from 'dingusjs';
 
 import {TraceConfig} from '../common/protos';
-import {createEmptyConfigEditerConfig} from '../common/state';
+import {createEmptyRecordConfig} from '../common/state';
 
+import {App} from './globals';
 import {
-  ConfigController,
   encodeConfig,
+  RecordController,
   toPbtxt,
   uint8ArrayToBase64
-} from './config_controller';
-import {App} from './globals';
+} from './record_controller';
 
 test('uint8ArrayToBase64', () => {
   const bytes = [...'Hello, world'].map(c => c.charCodeAt(0));
@@ -32,7 +32,7 @@ test('uint8ArrayToBase64', () => {
 });
 
 test('encodeConfig', () => {
-  const config = createEmptyConfigEditerConfig();
+  const config = createEmptyRecordConfig();
   config.durationSeconds = 10;
   const result = TraceConfig.decode(encodeConfig(config));
   expect(result.durationMs).toBe(10000);
@@ -65,34 +65,35 @@ test('toPbtxt', () => {
   const text = toPbtxt(TraceConfig.encode(config).finish());
 
   expect(text).toEqual(`buffers: {
-    sizeKb: 42
+    size_kb: 42
 }
 data_sources: {
     config {
-        name: 'linux.ftrace'
+        name: "linux.ftrace"
         target_buffer: 1
         ftrace_config {
-            ftrace_events: 'sched_switch'
-            ftrace_events: 'print'
+            ftrace_events: "sched_switch"
+            ftrace_events: "print"
         }
     }
 }
 duration_ms: 1000
 producers: {
-    producer_name: 'perfetto.traced_probes'
+    producer_name: "perfetto.traced_probes"
 }
 `);
 });
 
-test('ConfigController', () => {
-  const api = dingus<App>('globals');
-  api.state.configEditor.durationSeconds = 1000;
-  const controller = new ConfigController({api});
+test('RecordController', () => {
+  const app = dingus<App>('globals');
+  // app.state.recordConfig.durationSeconds = 1000;
+  const controller = new RecordController({app});
   controller.run();
   controller.run();
   controller.run();
   // tslint:disable-next-line no-any
-  const calls = api.calls.filter((call: any) => call[0] === 'publish()');
+  const calls = app.calls.filter((call: any) => call[0] === 'publish()');
   expect(calls.length).toBe(1);
+  // TODO(hjd): Fix up dingus to have a more sensible API.
   expect(calls[0][1][0]).toEqual('TrackData');
 });

@@ -475,7 +475,7 @@ class Numeric implements m.ClassComponent<NumericAttrs> {
 
 export const RecordPage = createPage({
   view() {
-    const state = globals.state.configEditor;
+    const state = globals.state.recordConfig;
     const data = globals.trackDataStore.get('config') as {
       commandline: string,
       pbtxt: string,
