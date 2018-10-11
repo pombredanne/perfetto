@@ -83,7 +83,7 @@ int HeapprofdMain(int argc, char** argv) {
         PERFETTO_LOG("Triggering dump.");
         dump_evt.Clear();
 
-        BookkeepingRecord rec;
+        BookkeepingRecord rec = {};
         rec.record_type = BookkeepingRecordType::Dump;
         bookkeeping_queue.Add(std::move(rec));
       });
