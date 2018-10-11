@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
+
 #include <array>
 #include <atomic>
 
@@ -26,6 +28,8 @@
 using namespace perfetto::consumer;
 
 namespace {
+
+int g_pointer = 0;
 
 std::string GetConfig(uint32_t duration_ms) {
   perfetto::protos::TraceConfig trace_config;
@@ -77,14 +81,16 @@ void DumpTrace(TraceBuffer buf) {
   PERFETTO_LOG("Got %d mm_filemap events", num_filemap_events);
 }
 
-void OnStateChanged(Handle handle, State state) {
-  PERFETTO_LOG("Callback: handle=%d state=%d", handle, state);
+void OnStateChanged(Handle handle, State state, void* ptr) {
+  PERFETTO_LOG("Callback: handle=%" PRId64 " state=%d", handle, state);
+  PERFETTO_CHECK(ptr == &g_pointer);
 }
 
 void TestSingle() {
   std::string cfg = GetConfig(1000);
-  auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged);
-  PERFETTO_ILOG("Starting, handle=%d state=%d", handle, PollState(handle));
+  auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged, &g_pointer);
+  PERFETTO_ILOG("Starting, handle=%" PRId64 " state=%d", handle,
+                PollState(handle));
   usleep(100000);
   StartTracing(handle);
   // Wait for either completion or error.
@@ -109,9 +115,10 @@ void TestMany() {
 
   std::array<Handle, 5> handles{};
   for (size_t i = 0; i < handles.size(); i++) {
-    auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged);
+    auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged, &g_pointer);
     handles[i] = handle;
-    PERFETTO_ILOG("Creating handle=%d state=%d", handle, PollState(handle));
+    PERFETTO_ILOG("Creating handle=%" PRId64 " state=%d", handle,
+                  PollState(handle));
   }
 
   // Wait that all sessions are connected.

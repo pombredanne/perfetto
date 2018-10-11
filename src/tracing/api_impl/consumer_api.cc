@@ -17,6 +17,7 @@
 #include "perfetto/public/consumer_api.h"
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/select.h>
@@ -62,6 +63,7 @@ class TracingSession : public Consumer {
   TracingSession(base::TaskRunner*,
                  Handle,
                  OnStateChangedCb,
+                 void* callback_arg,
                  const perfetto::protos::TraceConfig&);
   ~TracingSession() override;
 
@@ -98,6 +100,7 @@ class TracingSession : public Consumer {
   base::TaskRunner* const task_runner_;
   Handle const handle_;
   OnStateChangedCb const callback_ = nullptr;
+  void* const callback_arg_ = nullptr;
   TraceConfig trace_config_;
   base::ScopedFile buf_fd_;
   std::unique_ptr<TracingService::ConsumerEndpoint> consumer_endpoint_;
@@ -114,8 +117,12 @@ TracingSession::TracingSession(
     base::TaskRunner* task_runner,
     Handle handle,
     OnStateChangedCb callback,
+    void* callback_arg,
     const perfetto::protos::TraceConfig& trace_config_proto)
-    : task_runner_(task_runner), handle_(handle), callback_(callback) {
+    : task_runner_(task_runner),
+      handle_(handle),
+      callback_(callback),
+      callback_arg_(callback_arg) {
   PERFETTO_DETACH_FROM_THREAD(thread_checker_);
   trace_config_.FromProto(trace_config_proto);
   trace_config_.set_write_into_file(true);
@@ -140,7 +147,7 @@ bool TracingSession::Initialize() {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   char memfd_name[64];
-  snprintf(memfd_name, sizeof(memfd_name), "perfetto_trace_%d", handle_);
+  snprintf(memfd_name, sizeof(memfd_name), "perfetto_trace_%" PRId64, handle_);
   buf_fd_.reset(
       static_cast<int>(syscall(__NR_memfd_create, memfd_name, MFD_CLOEXEC)));
 #else
@@ -233,11 +240,13 @@ void TracingSession::OnTraceData(std::vector<TracePacket>, bool) {
 void TracingSession::NotifyCallback() {
   if (!callback_)
     return;
+  auto state = state_.load();
   auto callback = callback_;
   auto handle = handle_;
-  auto state = state_.load();
-  task_runner_->PostTask(
-      [callback, handle, state] { callback(handle, state); });
+  auto callback_arg = callback_arg_;
+  task_runner_->PostTask([callback, callback_arg, handle, state] {
+    callback(handle, state, callback_arg);
+  });
 }
 
 class TracingController {
@@ -246,7 +255,7 @@ class TracingController {
   TracingController();
 
   // These methods are called from a thread != |task_runner_|.
-  Handle Create(const void*, size_t, OnStateChangedCb);
+  Handle Create(const void*, size_t, OnStateChangedCb, void* callback_arg);
   void StartTracing(Handle);
   State PollState(Handle);
   TraceBuffer ReadTrace(Handle);
@@ -285,7 +294,8 @@ void TracingController::ThreadMain() {
 
 Handle TracingController::Create(const void* config_proto_buf,
                                  size_t config_len,
-                                 OnStateChangedCb callback) {
+                                 OnStateChangedCb callback,
+                                 void* callback_arg) {
   perfetto::protos::TraceConfig config_proto;
   bool parsed = config_proto.ParseFromArray(config_proto_buf,
                                             static_cast<int>(config_len));
@@ -304,8 +314,8 @@ Handle TracingController::Create(const void* config_proto_buf,
   {
     std::unique_lock<std::mutex> lock(mutex_);
     handle = ++last_handle_;
-    session =
-        new TracingSession(task_runner_.get(), handle, callback, config_proto);
+    session = new TracingSession(task_runner_.get(), handle, callback,
+                                 callback_arg, config_proto);
     sessions_.emplace(handle, std::unique_ptr<TracingSession>(session));
   }
 
@@ -344,18 +354,17 @@ TraceBuffer TracingController::ReadTrace(Handle handle) {
   auto it = sessions_.find(handle);
   if (it == sessions_.end()) {
     PERFETTO_DLOG("Handle invalid");
-    buf.state = State::kSessionNotFound;
     return buf;
   }
 
   TracingSession* session = it->second.get();
-  buf.state = session->state();
-  if (buf.state == State::kTraceEnded) {
+  auto state = session->state();
+  if (state == State::kTraceEnded) {
     std::tie(buf.begin, buf.size) = session->mapped_buf();
     return buf;
   }
 
-  PERFETTO_DLOG("ReadTrace(): called in an unexpected state (%d)", buf.state);
+  PERFETTO_DLOG("ReadTrace(): called in an unexpected state (%d)", state);
   return buf;
 }
 
@@ -378,9 +387,10 @@ void TracingController::Destroy(Handle handle) {
 
 PERFETTO_EXPORTED_API Handle Create(const void* config_proto,
                                     size_t config_len,
-                                    OnStateChangedCb callback) {
+                                    OnStateChangedCb callback,
+                                    void* callback_arg) {
   return TracingController::GetInstance()->Create(config_proto, config_len,
-                                                  callback);
+                                                  callback, callback_arg);
 }
 
 PERFETTO_EXPORTED_API
