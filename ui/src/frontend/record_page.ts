@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {Actions} from '../common/actions';
 
+import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
 import {createPage} from './pages';
 
@@ -329,16 +330,6 @@ const SCAN_ALL_PROCESSES_ON_START_HELP =
 
 function toId(label: string): string {
   return label.toLowerCase().replace(' ', '-');
-}
-
-async function copyToClipboard(text: string): Promise<void> {
-  try {
-    // TODO(hjd): Fix typescript type for navigator.
-    // tslint:disable-next-line no-any
-    await(navigator as any).clipboard.writeText(text);
-  } catch (err) {
-    console.error(`Failed to copy "${text}" to clipboard: ${err}`);
-  }
 }
 
 interface CodeSampleAttrs {
