@@ -68,6 +68,8 @@ void DumpSignalHandler(int) {
 //           |Bookkeeping Thread|
 //           +------------------+
 int HeapprofdMain(int argc, char** argv) {
+  base::UnixTaskRunner task_runner;
+  BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
   // If we set this up before launching any threads, we do not use a std::atomic
   // for g_dump_evt.
   base::Event dump_evt;
@@ -89,7 +91,6 @@ int HeapprofdMain(int argc, char** argv) {
   GlobalCallstackTrie callsites;
   std::unique_ptr<base::UnixSocket> sock;
 
-  BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
   BookkeepingActor bookkeeping_actor(&callsites, "/data/local/tmp/heap_dump");
   std::thread bookkeeping_thread([&bookkeeping_actor, &bookkeeping_queue] {
     bookkeeping_actor.Run(&bookkeeping_queue);
@@ -113,7 +114,6 @@ int HeapprofdMain(int argc, char** argv) {
   SocketListener listener({kSamplingRate}, std::move(on_record_received),
                           &bookkeeping_actor);
 
-  base::UnixTaskRunner task_runner;
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
