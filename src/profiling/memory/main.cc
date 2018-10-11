@@ -34,7 +34,7 @@ namespace {
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
-constexpr double kSamplingRate = 512e4;
+constexpr double kSamplingRate = 128e3;
 
 base::Event* g_dump_evt = nullptr;
 
