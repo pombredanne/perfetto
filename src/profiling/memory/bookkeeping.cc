@@ -51,7 +51,7 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
 
   GlobalCallstackTrie::Node* node =
       callsites_->IncrementCallsite(callstack, size);
-  PERFETTO_LOG("Emplacing to allocations.");
+  PERFETTO_LOG("Emplacing to allocations %zu.", allocations_.size());
   allocations_.emplace(address, Allocation(size, sequence_number, node));
 
   // Keep the sequence tracker consistent.
