@@ -18,6 +18,34 @@ syntax = "proto2";
 option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
+message ChromeTracedValue {
+  message Value {
+    oneof values {
+      // The field id for the dict value must
+      // be the same as the top-level "root",
+      // so we can directly memcpy in other
+      // TracedValue messages.
+      Dict dict_value = 1;
+      int32 int_value = 2;
+      double double_value = 3;
+      bool bool_value = 4;
+      string string_value = 5;
+      Array array_value = 6;
+    }
+  }
+
+  message Array { repeated Value values = 1; }
+
+  message DictEntry {
+    optional string name = 1;
+    optional Value value = 2;
+  }
+
+  message Dict { repeated DictEntry entries = 2; }
+
+  optional Dict root = 1;
+}
+
 message ChromeStringTableEntry {
   optional string value = 1;
   optional int32 index = 2;
@@ -37,6 +65,7 @@ message ChromeTraceEvent {
       // differently from other uint64 values.
       uint64 pointer_value = 7;
       string json_value = 8;
+      ChromeTracedValue traced_value = 10;
     }
 
     // Takes precedence over |name| if set,
