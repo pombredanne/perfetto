@@ -47,11 +47,11 @@ std::string GetTestDataPath(const std::string& path) {
   std::string self_path = std::string(buf);
   // Cut binary name.
   self_path = self_path.substr(0, self_path.find_last_of("/"));
-  return self_path + "/../../test/data/" + path;
+  return self_path + "/../../test/data/traces/" + path;
 #else
   // TODO(hjd): Implement on MacOS/Windows
   // Fall back to relative to root dir.
-  return "test/data/" + path;
+  return "test/data/traces/" + path;
 #endif
 }
 

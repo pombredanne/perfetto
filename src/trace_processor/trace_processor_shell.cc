@@ -16,10 +16,12 @@
 
 #include <aio.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <functional>
+#include <iostream>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
@@ -132,7 +134,8 @@ char* GetLine(const char* prompt) {
 
 #endif
 
-void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
+void PrintQueryResultInteractively(base::TimeNanos t_start,
+                                   const protos::RawQueryResult& res) {
   if (res.has_error()) {
     PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
     return;
@@ -164,29 +167,119 @@ void OnQueryResult(base::TimeNanos t_start, const protos::RawQueryResult& res) {
     for (int c = 0; c < res.columns_size(); c++) {
       switch (res.column_descriptors(c).type()) {
         case protos::RawQueryResult_ColumnDesc_Type_STRING:
-          printf("%-20.20s ", res.columns(c).string_values(r).c_str());
+          printf("%-20.20s", res.columns(c).string_values(r).c_str());
           break;
         case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
-          printf("%20f ", res.columns(c).double_values(r));
+          printf("%20f", res.columns(c).double_values(r));
           break;
         case protos::RawQueryResult_ColumnDesc_Type_LONG: {
           auto value = res.columns(c).long_values(r);
-          printf((value < 0xffffffll) ? "%20lld " : "%20llx ", value);
-
+          printf((value < 0xffffffll) ? "%20lld" : "%20llx", value);
           break;
         }
       }
+      printf(" ");
     }
     printf("\n");
   }
   printf("\nQuery executed in %.3f ms\n\n", (t_end - t_start).count() / 1E6);
 }
 
+void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
+  if (res.has_error()) {
+    fprintf(output, "%s\n", res.error().c_str());
+    return;
+  }
+  PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
+
+  for (int r = 0; r < static_cast<int>(res.num_records()); r++) {
+    if (r == 0) {
+      for (int c = 0; c < res.column_descriptors_size(); c++) {
+        const auto& col = res.column_descriptors(c);
+        if (c > 0)
+          fprintf(output, ",");
+        fprintf(output, "%s", col.name().c_str());
+      }
+      fprintf(output, "\n");
+    }
+
+    for (int c = 0; c < res.columns_size(); c++) {
+      if (c > 0)
+        fprintf(output, ",");
+      switch (res.column_descriptors(c).type()) {
+        case protos::RawQueryResult_ColumnDesc_Type_STRING:
+          fprintf(output, "%s", res.columns(c).string_values(r).c_str());
+          break;
+        case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
+          fprintf(output, "%f", res.columns(c).double_values(r));
+          break;
+        case protos::RawQueryResult_ColumnDesc_Type_LONG: {
+          auto value = res.columns(c).long_values(r);
+          fprintf(output, "%lld", value);
+          break;
+        }
+      }
+    }
+    printf("\n");
+  }
+}
+
+void PrintUsage(char** argv) {
+  PERFETTO_ELOG("Usage: %s [-d] trace_file.proto", argv[0]);
+}
+
+void StartInteractiveShell() {
+  SetupLineEditor();
+
+  for (;;) {
+    char* line = GetLine("> ");
+    if (!line || strcmp(line, "q\n") == 0)
+      break;
+    if (strcmp(line, "") == 0)
+      continue;
+    protos::RawQueryArgs query;
+    query.set_sql_query(line);
+    base::TimeNanos t_start = base::GetWallTimeNs();
+    g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
+      PrintQueryResultInteractively(t_start, res);
+    });
+
+    FreeLine(line);
+  }
+}
+
+void RunQueryAndPrintResult(FILE* input, FILE* output) {
+  char buffer[4096];
+  bool is_first_query = true;
+  while (!feof(input) && !ferror(input)) {
+    // Add an extra newline separator between query results.
+    if (!is_first_query)
+      fprintf(output, "\n");
+    is_first_query = false;
+
+    std::string sql_query;
+    while (fgets(buffer, sizeof(buffer), input)) {
+      if (strncmp(buffer, "\n", sizeof(buffer)) == 0)
+        break;
+      sql_query.append(buffer);
+    }
+    if (sql_query.back() == '\n')
+      sql_query.resize(sql_query.size() - 1);
+    PERFETTO_ILOG("Executing query: %s", sql_query.c_str());
+
+    protos::RawQueryArgs query;
+    query.set_sql_query(sql_query);
+    g_tp->ExecuteQuery(query, [output](const protos::RawQueryResult& res) {
+      PrintQueryResultAsCsv(res, output);
+    });
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    PERFETTO_ELOG("Usage: %s [-d] trace_file.proto", argv[0]);
+    PrintUsage(argv);
     return 1;
   }
   const char* trace_file_path = nullptr;
@@ -196,6 +289,11 @@ int main(int argc, char** argv) {
       continue;
     }
     trace_file_path = argv[i];
+  }
+
+  if (trace_file_path == nullptr) {
+    PrintUsage(argv);
+    return 1;
   }
 
   // Load the trace file into the trace processor.
@@ -255,22 +353,12 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  SetupLineEditor();
-
-  for (;;) {
-    char* line = GetLine("> ");
-    if (!line || strcmp(line, "q\n") == 0)
-      break;
-    if (strcmp(line, "") == 0)
-      continue;
-    protos::RawQueryArgs query;
-    query.set_sql_query(line);
-    base::TimeNanos t_start = base::GetWallTimeNs();
-    g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
-      OnQueryResult(t_start, res);
-    });
-
-    FreeLine(line);
+  // If stdin is a terminal, then open in interactive mode. Otherwise just
+  // read from stdin and execute the query.
+  if (isatty(fileno(stdin))) {
+    StartInteractiveShell();
+  } else {
+    RunQueryAndPrintResult(stdin, stdout);
   }
 
   return 0;
