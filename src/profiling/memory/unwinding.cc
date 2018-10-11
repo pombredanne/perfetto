@@ -245,12 +245,14 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   }
 
   if (rec->record_type == BookkeepingRecordType::Dump) {
-    // Garbage collect HeapTracker for processes that went away after last Dump.
+    PERFETTO_LOG("Dumping heaps");
     auto it = bookkeeping_data_.begin();
     while (it != bookkeeping_data_.end()) {
+      PERFETTO_LOG("Dumping %d", it->first);
       base::ScopedFile fd = base::OpenFile(
           file_name_ + "." + std::to_string(it->first), O_RDONLY);
       it->second.heap_tracker.Dump(fd.get());
+      // Garbage collect for processes that already went away.
       if (it->second.ref_count == 0) {
         std::lock_guard<std::mutex> l(bookkeeping_mutex_);
         it = bookkeeping_data_.erase(it);
