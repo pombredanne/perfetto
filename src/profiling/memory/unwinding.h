@@ -112,7 +112,8 @@ struct BookkeepingData {
 
 class BookkeepingActor {
  public:
-  BookkeepingActor(GlobalCallstackTrie* callsites) : callsites_(callsites) {}
+  BookkeepingActor(GlobalCallstackTrie* callsites, std::string file_name)
+      : callsites_(callsites), file_name_(file_name) {}
 
   void Run(BoundedQueue<BookkeepingRecord>* input_queue);
   void AddSocket(pid_t pid);
@@ -124,6 +125,7 @@ class BookkeepingActor {
 
   std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;
+  std::string file_name_;
 };
 
 }  // namespace perfetto

@@ -18,6 +18,7 @@
 
 #include <inttypes.h>
 
+#include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
@@ -87,16 +88,15 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   allocations_.erase(leaf_it);
 }
 
-void HeapTracker::Dump() {
-  // TODO(fmayer): Implement proper dump.
+void HeapTracker::Dump(int fd) {
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
-    const InternedCodeLocation& interned_code_loc =
-        alloc.node->interned_code_location();
-    if (alloc.sequence_number <= sequence_number_) {
-      PERFETTO_DLOG("%" PRIu64 ": %s", p.first,
-                    interned_code_loc.function_name.str().c_str());
+    for (const InternedCodeLocation& location : alloc.node->callstack()) {
+      std::string data = location.function_name.str() + " ";
+      base::WriteAll(fd, data.c_str(), data.size());
     }
+    std::string data = std::to_string(alloc.alloc_size) + "\n";
+    base::WriteAll(fd, data.c_str(), data.size());
   }
 }
 

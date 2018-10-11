@@ -204,10 +204,8 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
     out->pid = rec->pid;
     out->record_type = BookkeepingRecordType::Malloc;
     if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
-      PERFETTO_LOG("Unwinding failed.");
       return false;
     }
-    PERFETTO_LOG("Unwound.");
     return true;
   } else if (msg.record_type == RecordType::Free) {
     out->record_type = BookkeepingRecordType::Free;
@@ -235,8 +233,8 @@ __attribute__((noreturn)) void UnwindingMainLoop(
 }
 
 void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
-  BookkeepingData* bookkeeping_data;
-  {
+  BookkeepingData* bookkeeping_data = nullptr;
+  if (rec->pid != 0) {
     std::lock_guard<std::mutex> l(bookkeeping_mutex_);
     auto it = bookkeeping_data_.find(rec->pid);
     if (it == bookkeeping_data_.end()) {
@@ -247,11 +245,18 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   }
 
   if (rec->record_type == BookkeepingRecordType::Dump) {
-    bookkeeping_data->heap_tracker.Dump();
     // Garbage collect HeapTracker for processes that went away after last Dump.
-    if (bookkeeping_data->ref_count == 0) {
-      std::lock_guard<std::mutex> l(bookkeeping_mutex_);
-      bookkeeping_data_.erase(rec->pid);
+    auto it = bookkeeping_data_.begin();
+    while (it != bookkeeping_data_.end()) {
+      base::ScopedFile fd = base::OpenFile(
+          file_name_ + "." + std::to_string(it->first), O_RDONLY);
+      it->second.heap_tracker.Dump(fd.get());
+      if (it->second.ref_count == 0) {
+        std::lock_guard<std::mutex> l(bookkeeping_mutex_);
+        it = bookkeeping_data_.erase(it);
+      } else {
+        ++it;
+      }
     }
   } else if (rec->record_type == BookkeepingRecordType::Free) {
     FreeRecord& free_rec = rec->free_record;

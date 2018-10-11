@@ -19,6 +19,8 @@
 #include <memory>
 #include <vector>
 
+#include <signal.h>
+
 #include "perfetto/base/unix_socket.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
@@ -32,6 +34,12 @@ constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 constexpr double kSamplingRate = 1;
+
+int g_dumppipe = 0;
+
+void DumpSignalHandler(int) {
+  write(g_dumppipe, "1", 1);
+}
 
 // We create kUnwinderThreads unwinding threads and one bookeeping thread.
 // The bookkeeping thread is singleton in order to avoid expensive and
@@ -63,7 +71,7 @@ int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<base::UnixSocket> sock;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
-  BookkeepingActor bookkeeping_actor(&callsites);
+  BookkeepingActor bookkeeping_actor(&callsites, "/system/data/tmp/heap_dump");
   std::thread bookkeeping_thread([&bookkeeping_actor, &bookkeeping_queue] {
     bookkeeping_actor.Run(&bookkeeping_queue);
   });
@@ -86,11 +94,11 @@ int HeapprofdMain(int argc, char** argv) {
   SocketListener listener({kSamplingRate}, std::move(on_record_received),
                           &bookkeeping_actor);
 
-  base::UnixTaskRunner read_task_runner;
+  base::UnixTaskRunner task_runner;
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
-    sock = base::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
+    sock = base::UnixSocket::Listen(argv[1], &listener, &task_runner);
   } else if (argc == 1) {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
@@ -106,7 +114,7 @@ int HeapprofdMain(int argc, char** argv) {
       PERFETTO_FATAL(
           "Invalid ANDROID_SOCKET_heapprofd. Expected decimal integer.");
     sock = base::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
-                                    &read_task_runner);
+                                    &task_runner);
   } else {
     PERFETTO_FATAL("Invalid number of arguments. %s [SOCKET]", argv[0]);
   }
@@ -115,7 +123,18 @@ int HeapprofdMain(int argc, char** argv) {
     PERFETTO_FATAL("Failed to initialize socket: %s",
                    strerror(sock->last_error()));
 
-  read_task_runner.Run();
+  int dumppipes[2];
+  g_dumppipe = dumppipes[1];
+  struct sigaction action = {};
+  action.sa_handler = DumpSignalHandler;
+  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
+  PERFETTO_CHECK(pipe(dumppipes) != -1);
+  task_runner.AddFileDescriptorWatch(dumppipes[0], [&bookkeeping_queue] {
+    BookkeepingRecord rec;
+    rec.record_type = BookkeepingRecordType::Dump;
+    bookkeeping_queue.Add(std::move(rec));
+  });
+  task_runner.Run();
   return 0;
 }
 }  // namespace

@@ -82,8 +82,14 @@ class GlobalCallstackTrie {
     Node(InternedCodeLocation location, Node* parent)
         : parent_(parent), location_(std::move(location)) {}
 
-    const InternedCodeLocation& interned_code_location() const {
-      return location_;
+    std::vector<InternedCodeLocation> callstack() const {
+      const Node* node = this;
+      std::vector<InternedCodeLocation> res;
+      while (node) {
+        res.emplace_back(node->location_);
+        node = node->parent_;
+      }
+      return res;
     }
 
    private:
@@ -127,7 +133,7 @@ class HeapTracker {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
-  void Dump();
+  void Dump(int fd);
 
  private:
   static constexpr uint64_t kNoopFree = 0;
