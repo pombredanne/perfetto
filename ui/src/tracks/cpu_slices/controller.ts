@@ -123,7 +123,6 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
         and utid != 0
         limit ${LIMIT};`;
     const rawResult = await this.query(query);
-    this.busy = false;
 
     const numRows = +rawResult.numRecords;
     const slices: SliceData = {

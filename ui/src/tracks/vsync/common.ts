@@ -15,8 +15,10 @@
 export const KIND = 'VsyncTrack';
 
 export interface Data {
-  starts: Float64Array;
-  ends: Float64Array;
+  start: number;
+  end: number;
+  resolution: number;
+  vsyncs: Float64Array;
 }
 
 export interface Config { counterName: string; }

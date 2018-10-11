@@ -190,13 +190,21 @@ export class TraceController extends Controller<States> {
     const numCpus = await engine.getNumberOfCpus();
 
     // TODO(hjd): Move this code out of TraceController.
-    const hasVsync =
-        !!(await engine.query(
-               `select ts from counters where name like "Vsync-sf%" limit 1`))
-              .numRecords;
-    if (hasVsync) {
-      addToTrackActions.push(addTrack(this.engineId, 'VsyncTrack', 'Vsync', {
-        counterName: 'Vsync-sf',
+    for (const counterName of ['VSYNC-sf', 'VSYNC-app']) {
+      const hasVsync =
+          !!(await engine.query(
+                 `select ts from counters where name like "${
+                                                             counterName
+                                                           }" limit 1`))
+                .numRecords;
+      if (!hasVsync) continue;
+      addToTrackActions.push(Actions.addTrack({
+        engineId: this.engineId,
+        kind: 'VsyncTrack',
+        name: `${counterName}`,
+        config: {
+          counterName,
+        }
       }));
     }
 
