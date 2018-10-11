@@ -104,7 +104,7 @@ void HeapTracker::Dump(int fd) {
       std::string data;
       if (it != callstack.begin())
         data += ";";
-      data += location.function_name.str();
+      data += it->function_name.str();
       base::WriteAll(fd, data.c_str(), data.size());
     }
     std::string data = " " + std::to_string(alloc.alloc_size) + "\n";
