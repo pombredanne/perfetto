@@ -248,10 +248,13 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     PERFETTO_LOG("Dumping heaps");
     auto it = bookkeeping_data_.begin();
     while (it != bookkeeping_data_.end()) {
-      PERFETTO_LOG("Dumping %d", it->first);
-      base::ScopedFile fd = base::OpenFile(
-          file_name_ + "." + std::to_string(it->first), O_RDONLY);
-      it->second.heap_tracker.Dump(fd.get());
+      std::string dump_file_name = file_name_ + "." + std::to_string(it->first);
+      PERFETTO_LOG("Dumping %d to %s", it->first, dump_file_name.c_str());
+      base::ScopedFile fd = base::OpenFile(dump_file_name, O_RDONLY);
+      if (fd)
+        it->second.heap_tracker.Dump(fd.get());
+      else
+        PERFETTO_DLOG("Failed to open %s", dump_file_name.c_str());
       // Garbage collect for processes that already went away.
       if (it->second.ref_count == 0) {
         std::lock_guard<std::mutex> l(bookkeeping_mutex_);
