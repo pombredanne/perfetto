@@ -51,7 +51,8 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
 
   GlobalCallstackTrie::Node* node =
       callsites_->IncrementCallsite(callstack, size);
-  PERFETTO_LOG("Emplacing to allocations %zu.", allocations_.size());
+  PERFETTO_LOG("Emplacing %" PRIu64 " to allocations %zu.", address,
+               allocations_.size());
   allocations_.emplace(address, Allocation(size, sequence_number, node));
 
   // Keep the sequence tracker consistent.
@@ -86,19 +87,27 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   const Allocation& value = leaf_it->second;
   if (value.sequence_number > sequence_number)
     return;
+  PERFETTO_LOG("Removing %" PRIu64 " from allocations %zu", address,
+               allocations_.size());
   allocations_.erase(leaf_it);
 }
 
 void HeapTracker::Dump(int fd) {
+  // TODO(fmayer): This should dump protocol buffers into the perfetto service.
+  // For now, output a text file compatible with flamegraph.pl.
   PERFETTO_LOG("Dumping allocations %zu.", allocations_.size());
   for (const auto& p : allocations_) {
     PERFETTO_LOG("Dumping allocation.");
     const Allocation& alloc = p.second;
-    for (const InternedCodeLocation& location : alloc.node->callstack()) {
-      std::string data = location.function_name.str() + " ";
+    const auto callstack = alloc.node->callstack();
+    for (auto it = callstack.begin(); it != callstack.end(); ++it) {
+      std::string data;
+      if (it != callstack.begin())
+        data += ";";
+      data += location.function_name.str();
       base::WriteAll(fd, data.c_str(), data.size());
     }
-    std::string data = std::to_string(alloc.alloc_size) + "\n";
+    std::string data = " " + std::to_string(alloc.alloc_size) + "\n";
     base::WriteAll(fd, data.c_str(), data.size());
   }
 }
