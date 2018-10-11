@@ -256,7 +256,7 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
       if (fd)
         it->second.heap_tracker.Dump(fd.get());
       else
-        PERFETTO_DLOG("Failed to open %s", dump_file_name.c_str());
+        PERFETTO_LOG("Failed to open %s", dump_file_name.c_str());
       // Garbage collect for processes that already went away.
       if (it->second.ref_count == 0) {
         std::lock_guard<std::mutex> l(bookkeeping_mutex_);
