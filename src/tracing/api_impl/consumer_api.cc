@@ -220,9 +220,8 @@ void TracingSession::OnDisconnect() {
 void TracingSession::DestroyConnection() {
   // Destroys the connection in a separate task. This is to avoid destroying
   // the IPC connection directly from within the IPC callback.
-  std::shared_ptr<TracingService::ConsumerEndpoint> endpoint(
-      std::move(consumer_endpoint_));
-  task_runner_->PostTask([endpoint] {});
+  TracingService::ConsumerEndpoint* endpoint = consumer_endpoint_.release();
+  task_runner_->PostTask([endpoint] { delete endpoint; });
 }
 
 void TracingSession::OnTraceData(std::vector<TracePacket>, bool) {
@@ -363,16 +362,16 @@ TraceBuffer TracingController::ReadTrace(Handle handle) {
 void TracingController::Destroy(Handle handle) {
   // Post an empty task on the task runner to delete the session on its own
   // thread.
-  std::shared_ptr<TracingSession> session;
+  TracingSession* session;
   {
     std::unique_lock<std::mutex> lock(mutex_);
     auto it = sessions_.find(handle);
     if (it == sessions_.end())
       return;
-    session = std::move(it->second);
+    session = it->second.release();
     sessions_.erase(it);
   }
-  task_runner_->PostTask([session] {});
+  task_runner_->PostTask([session] { delete session; });
 }
 
 }  // namespace
