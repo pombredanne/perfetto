@@ -130,6 +130,7 @@ int HeapprofdMain(int argc, char** argv) {
   PERFETTO_CHECK(pipe(dumppipes) != -1);
   g_dumppipe = dumppipes[1];
   task_runner.AddFileDescriptorWatch(dumppipes[0], [&bookkeeping_queue] {
+    PERFETTO_LOG("Triggering dump.");
     BookkeepingRecord rec;
     rec.record_type = BookkeepingRecordType::Dump;
     bookkeeping_queue.Add(std::move(rec));
