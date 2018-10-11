@@ -33,7 +33,7 @@ namespace {
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
-constexpr double kSamplingRate = 1;
+constexpr double kSamplingRate = 512e4;
 
 int g_dumppipe = 0;
 
