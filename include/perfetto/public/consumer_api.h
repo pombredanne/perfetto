@@ -147,7 +147,7 @@ TraceBuffer ReadTrace(Handle);
 
 // Destroys all the resources associated to the tracing session (connection to
 // traced and trace buffer). The handle must not be used after this point.
-// It is safe to call this twice or call it on an invalid handle.
+// It's safe to call this regardless of the handle's current state and validity.
 void Destroy(Handle);
 
 // Returns the state of the tracing session (for debugging).
