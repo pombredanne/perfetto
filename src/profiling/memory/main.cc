@@ -80,7 +80,6 @@ int HeapprofdMain(int argc, char** argv) {
   PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
   task_runner.AddFileDescriptorWatch(
       dump_evt.fd(), [&bookkeeping_queue, &dump_evt] {
-        PERFETTO_LOG("Triggering dump.");
         dump_evt.Clear();
 
         BookkeepingRecord rec = {};
