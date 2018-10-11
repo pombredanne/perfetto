@@ -72,7 +72,7 @@ class TracingSession : public Consumer {
   State state() const { return state_; }
   std::pair<char*, size_t> mapped_buf() const {
     // The comparison operator will do an acquire-load on the atomic |state_|.
-    if (state_ == kTraceEnded)
+    if (state_ == State::kTraceEnded)
       return std::make_pair(mapped_buf_, mapped_buf_size_);
     return std::make_pair(nullptr, 0);
   }
@@ -103,7 +103,7 @@ class TracingSession : public Consumer {
   std::unique_ptr<TracingService::ConsumerEndpoint> consumer_endpoint_;
 
   // |mapped_buf_| and |mapped_buf_size_| are seq-consistent with |state_|.
-  std::atomic<State> state_{kIdle};
+  std::atomic<State> state_{State::kIdle};
   char* mapped_buf_ = nullptr;
   size_t mapped_buf_size_ = 0;
 
@@ -135,7 +135,7 @@ TracingSession::~TracingSession() {
 bool TracingSession::Initialize() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
-  if (state_ != kIdle)
+  if (state_ != State::kIdle)
     return false;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
@@ -153,7 +153,7 @@ bool TracingSession::Initialize() {
     return false;
   }
 
-  state_ = kConnecting;
+  state_ = State::kConnecting;
   consumer_endpoint_ =
       ConsumerIPCClient::Connect(GetConsumerSocket(), this, task_runner_);
 
@@ -165,13 +165,13 @@ void TracingSession::OnConnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   PERFETTO_DLOG("OnConnect");
-  PERFETTO_DCHECK(state_ == kConnecting);
+  PERFETTO_DCHECK(state_ == State::kConnecting);
   consumer_endpoint_->EnableTracing(trace_config_,
                                     base::ScopedFile(dup(*buf_fd_)));
   if (trace_config_.deferred_start())
-    state_ = kConfigured;
+    state_ = State::kConfigured;
   else
-    state_ = kTracing;
+    state_ = State::kTracing;
   NotifyCallback();
 }
 
@@ -179,11 +179,11 @@ void TracingSession::StartTracing() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   auto state = state_.load();
-  if (state != kConfigured) {
+  if (state != State::kConfigured) {
     PERFETTO_ELOG("StartTracing(): invalid state (%d)", state);
     return;
   }
-  state_ = kTracing;
+  state_ = State::kTracing;
   consumer_endpoint_->StartTracing();
 }
 
@@ -201,10 +201,10 @@ void TracingSession::OnTracingDisabled() {
   if (mapped_buf_size_ == 0 || mapped_buf_ == MAP_FAILED) {
     mapped_buf_ = nullptr;
     mapped_buf_size_ = 0;
-    state_ = kTraceFailed;
+    state_ = State::kTraceFailed;
     PERFETTO_ELOG("Tracing session failed");
   } else {
-    state_ = kTraceEnded;
+    state_ = State::kTraceEnded;
   }
   NotifyCallback();
 }
@@ -213,7 +213,7 @@ void TracingSession::OnDisconnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("OnDisconnect");
   DestroyConnection();
-  state_ = kConnectionError;
+  state_ = State::kConnectionError;
   NotifyCallback();
 }
 
@@ -333,7 +333,7 @@ State TracingController::PollState(Handle handle) {
   std::unique_lock<std::mutex> lock(mutex_);
   auto it = sessions_.find(handle);
   if (it == sessions_.end())
-    return kSessionNotFound;
+    return State::kSessionNotFound;
   return it->second->state();
 }
 
@@ -344,13 +344,13 @@ TraceBuffer TracingController::ReadTrace(Handle handle) {
   auto it = sessions_.find(handle);
   if (it == sessions_.end()) {
     PERFETTO_DLOG("Handle invalid");
-    buf.state = kSessionNotFound;
+    buf.state = State::kSessionNotFound;
     return buf;
   }
 
   TracingSession* session = it->second.get();
   buf.state = session->state();
-  if (buf.state == kTraceEnded) {
+  if (buf.state == State::kTraceEnded) {
     std::tie(buf.begin, buf.size) = session->mapped_buf();
     return buf;
   }

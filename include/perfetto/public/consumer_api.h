@@ -24,7 +24,7 @@
 namespace perfetto {
 namespace consumer {
 
-enum State {
+enum class State {
   // The trace session failed. Look at logcat -s perfetto to find out more.
   kTraceFailed = -3,
 

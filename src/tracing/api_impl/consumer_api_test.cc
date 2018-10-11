@@ -88,11 +88,12 @@ void TestSingle() {
   usleep(100000);
   StartTracing(handle);
   // Wait for either completion or error.
-  while (PollState(handle) > 0 && PollState(handle) != kTraceEnded) {
+  while (static_cast<int>(PollState(handle)) > 0 &&
+         PollState(handle) != State::kTraceEnded) {
     usleep(10000);
   }
 
-  if (PollState(handle) == kTraceEnded) {
+  if (PollState(handle) == State::kTraceEnded) {
     auto buf = ReadTrace(handle);
     DumpTrace(buf);
   } else {
@@ -117,7 +118,7 @@ void TestMany() {
   for (bool all_connected = false; !all_connected;) {
     all_connected = true;
     for (size_t i = 0; i < handles.size(); i++) {
-      if (PollState(handles[i]) != kConfigured) {
+      if (PollState(handles[i]) != State::kConfigured) {
         all_connected = false;
       }
     }
@@ -136,7 +137,7 @@ void TestMany() {
   for (int num_complete = 0; num_complete != 3;) {
     num_complete = 0;
     for (size_t i = 0; i < handles.size(); i++) {
-      if (PollState(handles[i]) == kTraceEnded) {
+      if (PollState(handles[i]) == State::kTraceEnded) {
         num_complete++;
       }
     }
