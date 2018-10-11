@@ -145,7 +145,7 @@ bool FileDescriptorMaps::Parse() {
           flags |= unwindstack::MAPS_FLAGS_DEVICE_MAP;
         }
         maps_.push_back(
-            new unwindstack::MapInfo(start, end, pgoff, flags, name));
+            new unwindstack::MapInfo(nullptr, start, end, pgoff, flags, name));
       });
 }
 
@@ -238,6 +238,8 @@ void HandleBookkeepingRecord(BookkeepingRecord* rec) {
     FreeRecord& free_rec = rec->free_record;
     FreePageEntry* entries = free_rec.metadata->entries;
     uint64_t num_entries = free_rec.metadata->num_entries;
+    if (num_entries > kFreePageSize)
+      return;
     for (size_t i = 0; i < num_entries; ++i) {
       const FreePageEntry& entry = entries[i];
       metadata->heap_dump.RecordFree(entry.addr, entry.sequence_number);

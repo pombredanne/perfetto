@@ -31,11 +31,19 @@ class VsyncTrackController extends TrackController<Config, Data> {
   private async update(_start: number, _end: number, _resolution: number) {
     // TODO(hjd): we should really call TraceProcessor.Interrupt() here.
     if (this.busy) return;
-
     this.busy = true;
+
+    if (this.setup === false) {
+      await this.query(
+          `create virtual table window_${this.trackState.id} using window;`);
+      await this.query(`create virtual table span_${this.trackState.id}
+                     using span(sched, window_${this.trackState.id}, cpu);`);
+      this.setup = true;
+    }
+
     const rawResult = await this.engine.query(`
       select ts, dur, value from counters
-        where name like "VSync-sf%"
+        where name like "${this.config.counterName}%"
         order by ts;`);
     this.busy = false;
     const rowCount = +rawResult.numRecords;
@@ -50,6 +58,14 @@ class VsyncTrackController extends TrackController<Config, Data> {
       result.ends[i] = startSec + fromNs(+cols[1].longValues![i]);
     }
     this.publish(result);
+  }
+
+  onDestroy(): void {
+    if (this.setup) {
+      this.query(`drop table window_${this.trackState.id}`);
+      this.query(`drop table span_${this.trackState.id}`);
+      this.setup = false;
+    }
   }
 }
 

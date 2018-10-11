@@ -19,4 +19,4 @@ export interface Data {
   ends: Float64Array;
 }
 
-export interface Config {}
+export interface Config { counterName: string; }
