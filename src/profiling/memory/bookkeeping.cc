@@ -90,7 +90,7 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 }
 
 void HeapTracker::Dump(int fd) {
-  PERFETTO_LOG("Dumping allocations.");
+  PERFETTO_LOG("Dumping allocations %zu.", allocations_.size());
   for (const auto& p : allocations_) {
     PERFETTO_LOG("Dumping allocation.");
     const Allocation& alloc = p.second;
