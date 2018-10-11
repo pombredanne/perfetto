@@ -309,15 +309,11 @@ Handle TracingController::Create(const void* config_proto_buf,
     return kInvalidHandle;
   }
 
-  TracingSession* session;
-  Handle handle;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    handle = ++last_handle_;
-    session = new TracingSession(task_runner_.get(), handle, callback,
-                                 callback_arg, config_proto);
-    sessions_.emplace(handle, std::unique_ptr<TracingSession>(session));
-  }
+  std::unique_lock<std::mutex> lock(mutex_);
+  Handle handle = ++last_handle_;
+  auto* session = new TracingSession(task_runner_.get(), handle, callback,
+                                     callback_arg, config_proto);
+  sessions_.emplace(handle, std::unique_ptr<TracingSession>(session));
 
   // Enable the TracingSession on its own thread.
   task_runner_->PostTask([session] { session->Initialize(); });
@@ -326,16 +322,13 @@ Handle TracingController::Create(const void* config_proto_buf,
 }
 
 void TracingController::StartTracing(Handle handle) {
-  TracingSession* session;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    auto it = sessions_.find(handle);
-    if (it == sessions_.end()) {
-      PERFETTO_ELOG("StartTracing(): Invalid tracing session handle");
-      return;
-    };
-    session = it->second.get();
-  }
+  std::unique_lock<std::mutex> lock(mutex_);
+  auto it = sessions_.find(handle);
+  if (it == sessions_.end()) {
+    PERFETTO_ELOG("StartTracing(): Invalid tracing session handle");
+    return;
+  };
+  TracingSession* session = it->second.get();
   task_runner_->PostTask([session] { session->StartTracing(); });
 }
 
@@ -371,15 +364,12 @@ TraceBuffer TracingController::ReadTrace(Handle handle) {
 void TracingController::Destroy(Handle handle) {
   // Post an empty task on the task runner to delete the session on its own
   // thread.
-  TracingSession* session;
-  {
-    std::unique_lock<std::mutex> lock(mutex_);
-    auto it = sessions_.find(handle);
-    if (it == sessions_.end())
-      return;
-    session = it->second.release();
-    sessions_.erase(it);
-  }
+  std::unique_lock<std::mutex> lock(mutex_);
+  auto it = sessions_.find(handle);
+  if (it == sessions_.end())
+    return;
+  TracingSession* session = it->second.release();
+  sessions_.erase(it);
   task_runner_->PostTask([session] { delete session; });
 }
 
