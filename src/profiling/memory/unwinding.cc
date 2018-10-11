@@ -250,7 +250,8 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     while (it != bookkeeping_data_.end()) {
       std::string dump_file_name = file_name_ + "." + std::to_string(it->first);
       PERFETTO_LOG("Dumping %d to %s", it->first, dump_file_name.c_str());
-      base::ScopedFile fd = base::OpenFile(dump_file_name, O_RDONLY);
+      base::ScopedFile fd =
+          base::OpenFile(dump_file_name, O_WRONLY | O_CREAT, 0755);
       if (fd)
         it->second.heap_tracker.Dump(fd.get());
       else
