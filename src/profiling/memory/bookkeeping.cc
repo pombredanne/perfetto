@@ -35,7 +35,6 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
                                uint64_t address,
                                uint64_t size,
                                uint64_t sequence_number) {
-  PERFETTO_LOG("Record malloc.");
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
     if (it->second.sequence_number > sequence_number) {
@@ -52,6 +51,7 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
 
   GlobalCallstackTrie::Node* node =
       callsites_->IncrementCallsite(callstack, size);
+  PERFETTO_LOG("Emplacing to allocations.");
   allocations_.emplace(address, Allocation(size, sequence_number, node));
 
   // Keep the sequence tracker consistent.
@@ -59,7 +59,6 @@ void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
 }
 
 void HeapTracker::RecordFree(uint64_t address, uint64_t sequence_number) {
-  PERFETTO_LOG("Record free.");
   if (sequence_number != sequence_number_ + 1) {
     pending_frees_.emplace(sequence_number, address);
     return;
