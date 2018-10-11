@@ -58,9 +58,9 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
       self->Send(&client_config_, sizeof(client_config_), -1,
                  base::UnixSocket::BlockingMode::kBlocking);
     } else if (fds[0] || fds[1]) {
-      PERFETTO_LOG("Received partial FDs.");
+      PERFETTO_DLOG("Received partial FDs.");
     } else {
-      PERFETTO_LOG("Received no FDs.");
+      PERFETTO_DLOG("Received no FDs.");
     }
   }
   RecordReader::Record record;
