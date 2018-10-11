@@ -90,6 +90,7 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 
 void HeapTracker::Dump(int fd) {
   for (const auto& p : allocations_) {
+    PERFETTO_LOG("Dumping allocation.");
     const Allocation& alloc = p.second;
     for (const InternedCodeLocation& location : alloc.node->callstack()) {
       std::string data = location.function_name.str() + " ";
