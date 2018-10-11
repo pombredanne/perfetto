@@ -71,7 +71,7 @@ int HeapprofdMain(int argc, char** argv) {
   std::unique_ptr<base::UnixSocket> sock;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
-  BookkeepingActor bookkeeping_actor(&callsites, "/system/data/tmp/heap_dump");
+  BookkeepingActor bookkeeping_actor(&callsites, "/data/local/tmp/heap_dump");
   std::thread bookkeeping_thread([&bookkeeping_actor, &bookkeeping_queue] {
     bookkeeping_actor.Run(&bookkeeping_queue);
   });
