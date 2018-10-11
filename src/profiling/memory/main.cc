@@ -129,12 +129,16 @@ int HeapprofdMain(int argc, char** argv) {
   PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
   PERFETTO_CHECK(pipe(dumppipes) != -1);
   g_dumppipe = dumppipes[1];
-  task_runner.AddFileDescriptorWatch(dumppipes[0], [&bookkeeping_queue] {
-    PERFETTO_LOG("Triggering dump.");
-    BookkeepingRecord rec;
-    rec.record_type = BookkeepingRecordType::Dump;
-    bookkeeping_queue.Add(std::move(rec));
-  });
+  task_runner.AddFileDescriptorWatch(
+      dumppipes[0], [&bookkeeping_queue, &dumppipes] {
+        PERFETTO_LOG("Triggering dump.");
+        char buf[512];
+        if (read(dumppipes[0], buf, sizeof(buf)) == -1)
+          PERFETTO_DPLOG("read");
+        BookkeepingRecord rec;
+        rec.record_type = BookkeepingRecordType::Dump;
+        bookkeeping_queue.Add(std::move(rec));
+      });
   task_runner.Run();
   return 0;
 }
