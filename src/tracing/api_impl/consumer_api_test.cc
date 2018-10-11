@@ -23,6 +23,8 @@
 #include "perfetto/config/trace_config.pb.h"
 #include "perfetto/trace/trace.pb.h"
 
+using namespace perfetto::consumer;
+
 namespace {
 
 std::string GetConfig(uint32_t duration_ms) {
@@ -41,7 +43,7 @@ std::string GetConfig(uint32_t duration_ms) {
   return trace_config.SerializeAsString();
 }
 
-void DumpTrace(PerfettoConsumer_TraceBuffer buf) {
+void DumpTrace(TraceBuffer buf) {
   perfetto::protos::Trace trace;
   bool parsed = trace.ParseFromArray(buf.begin, static_cast<int>(buf.size));
   if (!parsed) {
@@ -75,54 +77,47 @@ void DumpTrace(PerfettoConsumer_TraceBuffer buf) {
   PERFETTO_LOG("Got %d mm_filemap events", num_filemap_events);
 }
 
-void OnStateChanged(PerfettoConsumer_Handle handle,
-                    PerfettoConsumer_State state) {
+void OnStateChanged(Handle handle, State state) {
   PERFETTO_LOG("Callback: handle=%d state=%d", handle, state);
 }
 
 void TestSingle() {
   std::string cfg = GetConfig(1000);
-  auto handle =
-      PerfettoConsumer_Create(cfg.data(), cfg.size(), &OnStateChanged);
-  PERFETTO_ILOG("Starting, handle=%d state=%d", handle,
-                PerfettoConsumer_PollState(handle));
+  auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged);
+  PERFETTO_ILOG("Starting, handle=%d state=%d", handle, PollState(handle));
   usleep(100000);
-  PerfettoConsumer_StartTracing(handle);
+  StartTracing(handle);
   // Wait for either completion or error.
-  while (PerfettoConsumer_PollState(handle) > 0 &&
-         PerfettoConsumer_PollState(handle) != PerfettoConsumer_kTraceEnded) {
+  while (PollState(handle) > 0 && PollState(handle) != kTraceEnded) {
     usleep(10000);
   }
 
-  if (PerfettoConsumer_PollState(handle) == PerfettoConsumer_kTraceEnded) {
-    auto buf = PerfettoConsumer_ReadTrace(handle);
+  if (PollState(handle) == kTraceEnded) {
+    auto buf = ReadTrace(handle);
     DumpTrace(buf);
   } else {
     PERFETTO_ELOG("Trace failed");
   }
 
   PERFETTO_ILOG("Destroying");
-  PerfettoConsumer_Destroy(handle);
+  Destroy(handle);
 }
 
 void TestMany() {
   std::string cfg = GetConfig(8000);
 
-  std::array<PerfettoConsumer_Handle, 5> handles{};
+  std::array<Handle, 5> handles{};
   for (size_t i = 0; i < handles.size(); i++) {
-    auto handle =
-        PerfettoConsumer_Create(cfg.data(), cfg.size(), &OnStateChanged);
+    auto handle = Create(cfg.data(), cfg.size(), &OnStateChanged);
     handles[i] = handle;
-    PERFETTO_ILOG("Creating handle=%d state=%d", handle,
-                  PerfettoConsumer_PollState(handle));
+    PERFETTO_ILOG("Creating handle=%d state=%d", handle, PollState(handle));
   }
 
   // Wait that all sessions are connected.
   for (bool all_connected = false; !all_connected;) {
     all_connected = true;
     for (size_t i = 0; i < handles.size(); i++) {
-      if (PerfettoConsumer_PollState(handles[i]) !=
-          PerfettoConsumer_kConfigured) {
+      if (PollState(handles[i]) != kConfigured) {
         all_connected = false;
       }
     }
@@ -132,7 +127,7 @@ void TestMany() {
   // Start only 3 out of 5 sessions, scattering them with 1 second delay.
   for (size_t i = 0; i < handles.size(); i++) {
     if (i % 2 == 0) {
-      PerfettoConsumer_StartTracing(handles[i]);
+      StartTracing(handles[i]);
       sleep(1);
     }
   }
@@ -141,8 +136,7 @@ void TestMany() {
   for (int num_complete = 0; num_complete != 3;) {
     num_complete = 0;
     for (size_t i = 0; i < handles.size(); i++) {
-      if (PerfettoConsumer_PollState(handles[i]) ==
-          PerfettoConsumer_kTraceEnded) {
+      if (PollState(handles[i]) == kTraceEnded) {
         num_complete++;
       }
     }
@@ -151,7 +145,7 @@ void TestMany() {
 
   // Read the trace buffers.
   for (size_t i = 0; i < handles.size(); i++) {
-    auto buf = PerfettoConsumer_ReadTrace(handles[i]);
+    auto buf = ReadTrace(handles[i]);
     PERFETTO_ILOG("ReadTrace[%zu] buf=%p %zu", i, static_cast<void*>(buf.begin),
                   buf.size);
     if (i % 2 == 0) {
@@ -165,7 +159,7 @@ void TestMany() {
 
   PERFETTO_ILOG("Destroying");
   for (size_t i = 0; i < handles.size(); i++)
-    PerfettoConsumer_Destroy(handles[i]);
+    Destroy(handles[i]);
 }
 }  // namespace
 

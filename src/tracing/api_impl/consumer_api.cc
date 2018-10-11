@@ -50,16 +50,18 @@
 
 #include "perfetto/config/trace_config.pb.h"
 
-#define PERFETTO_EXPORTED_API extern "C" __attribute__((visibility("default")))
+#define PERFETTO_EXPORTED_API __attribute__((visibility("default")))
+
+namespace perfetto {
+namespace consumer {
 
 namespace {
-using namespace perfetto;
 
 class TracingSession : public Consumer {
  public:
   TracingSession(base::TaskRunner*,
-                 PerfettoConsumer_Handle,
-                 PerfettoConsumer_OnStateChangedCb,
+                 Handle,
+                 OnStateChangedCb,
                  const perfetto::protos::TraceConfig&);
   ~TracingSession() override;
 
@@ -67,10 +69,10 @@ class TracingSession : public Consumer {
   // to clear up mapped_buf_ on dtor.
 
   // These methods are called on a thread != |task_runner_|.
-  PerfettoConsumer_State state() const { return state_; }
+  State state() const { return state_; }
   std::pair<char*, size_t> mapped_buf() const {
     // The comparison operator will do an acquire-load on the atomic |state_|.
-    if (state_ == PerfettoConsumer_kTraceEnded)
+    if (state_ == kTraceEnded)
       return std::make_pair(mapped_buf_, mapped_buf_size_);
     return std::make_pair(nullptr, 0);
   }
@@ -94,14 +96,14 @@ class TracingSession : public Consumer {
   void NotifyCallback();
 
   base::TaskRunner* const task_runner_;
-  PerfettoConsumer_Handle const handle_;
-  PerfettoConsumer_OnStateChangedCb const callback_ = nullptr;
+  Handle const handle_;
+  OnStateChangedCb const callback_ = nullptr;
   TraceConfig trace_config_;
   base::ScopedFile buf_fd_;
   std::unique_ptr<TracingService::ConsumerEndpoint> consumer_endpoint_;
 
   // |mapped_buf_| and |mapped_buf_size_| are seq-consistent with |state_|.
-  std::atomic<PerfettoConsumer_State> state_{PerfettoConsumer_kIdle};
+  std::atomic<State> state_{kIdle};
   char* mapped_buf_ = nullptr;
   size_t mapped_buf_size_ = 0;
 
@@ -110,8 +112,8 @@ class TracingSession : public Consumer {
 
 TracingSession::TracingSession(
     base::TaskRunner* task_runner,
-    PerfettoConsumer_Handle handle,
-    PerfettoConsumer_OnStateChangedCb callback,
+    Handle handle,
+    OnStateChangedCb callback,
     const perfetto::protos::TraceConfig& trace_config_proto)
     : task_runner_(task_runner), handle_(handle), callback_(callback) {
   PERFETTO_DETACH_FROM_THREAD(thread_checker_);
@@ -133,7 +135,7 @@ TracingSession::~TracingSession() {
 bool TracingSession::Initialize() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
-  if (state_ != PerfettoConsumer_kIdle)
+  if (state_ != kIdle)
     return false;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
@@ -151,7 +153,7 @@ bool TracingSession::Initialize() {
     return false;
   }
 
-  state_ = PerfettoConsumer_kConnecting;
+  state_ = kConnecting;
   consumer_endpoint_ =
       ConsumerIPCClient::Connect(GetConsumerSocket(), this, task_runner_);
 
@@ -163,13 +165,13 @@ void TracingSession::OnConnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   PERFETTO_DLOG("OnConnect");
-  PERFETTO_DCHECK(state_ == PerfettoConsumer_kConnecting);
+  PERFETTO_DCHECK(state_ == kConnecting);
   consumer_endpoint_->EnableTracing(trace_config_,
                                     base::ScopedFile(dup(*buf_fd_)));
   if (trace_config_.deferred_start())
-    state_ = PerfettoConsumer_kConfigured;
+    state_ = kConfigured;
   else
-    state_ = PerfettoConsumer_kTracing;
+    state_ = kTracing;
   NotifyCallback();
 }
 
@@ -177,11 +179,11 @@ void TracingSession::StartTracing() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
   auto state = state_.load();
-  if (state != PerfettoConsumer_kConfigured) {
+  if (state != kConfigured) {
     PERFETTO_ELOG("StartTracing(): invalid state (%d)", state);
     return;
   }
-  state_ = PerfettoConsumer_kTracing;
+  state_ = kTracing;
   consumer_endpoint_->StartTracing();
 }
 
@@ -199,10 +201,10 @@ void TracingSession::OnTracingDisabled() {
   if (mapped_buf_size_ == 0 || mapped_buf_ == MAP_FAILED) {
     mapped_buf_ = nullptr;
     mapped_buf_size_ = 0;
-    state_ = PerfettoConsumer_kTraceFailed;
+    state_ = kTraceFailed;
     PERFETTO_ELOG("Tracing session failed");
   } else {
-    state_ = PerfettoConsumer_kTraceEnded;
+    state_ = kTraceEnded;
   }
   NotifyCallback();
 }
@@ -211,7 +213,7 @@ void TracingSession::OnDisconnect() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_DLOG("OnDisconnect");
   DestroyConnection();
-  state_ = PerfettoConsumer_kConnectionError;
+  state_ = kConnectionError;
   NotifyCallback();
 }
 
@@ -245,13 +247,11 @@ class TracingController {
   TracingController();
 
   // These methods are called from a thread != |task_runner_|.
-  PerfettoConsumer_Handle Create(const void*,
-                                 size_t,
-                                 PerfettoConsumer_OnStateChangedCb);
-  void StartTracing(PerfettoConsumer_Handle);
-  PerfettoConsumer_State PollState(PerfettoConsumer_Handle);
-  PerfettoConsumer_TraceBuffer ReadTrace(PerfettoConsumer_Handle);
-  void Destroy(PerfettoConsumer_Handle);
+  Handle Create(const void*, size_t, OnStateChangedCb);
+  void StartTracing(Handle);
+  State PollState(Handle);
+  TraceBuffer ReadTrace(Handle);
+  void Destroy(Handle);
 
  private:
   void ThreadMain();  // Called on |task_runner_| thread.
@@ -260,8 +260,8 @@ class TracingController {
   std::thread thread_;
   std::unique_ptr<base::UnixTaskRunner> task_runner_;
   std::condition_variable task_runner_initialized_;
-  PerfettoConsumer_Handle last_handle_ = 0;
-  std::map<PerfettoConsumer_Handle, std::unique_ptr<TracingSession>> sessions_;
+  Handle last_handle_ = 0;
+  std::map<Handle, std::unique_ptr<TracingSession>> sessions_;
 };
 
 TracingController* TracingController::GetInstance() {
@@ -284,25 +284,24 @@ void TracingController::ThreadMain() {
   task_runner_->Run();
 }
 
-PerfettoConsumer_Handle TracingController::Create(
-    const void* config_proto_buf,
-    size_t config_len,
-    PerfettoConsumer_OnStateChangedCb callback) {
+Handle TracingController::Create(const void* config_proto_buf,
+                                 size_t config_len,
+                                 OnStateChangedCb callback) {
   perfetto::protos::TraceConfig config_proto;
   bool parsed = config_proto.ParseFromArray(config_proto_buf,
                                             static_cast<int>(config_len));
   if (!parsed) {
     PERFETTO_ELOG("Failed to decode TraceConfig proto");
-    return PerfettoConsumer_kInvalidHandle;
+    return kInvalidHandle;
   }
 
   if (!config_proto.duration_ms()) {
     PERFETTO_ELOG("The trace config must specify a duration");
-    return PerfettoConsumer_kInvalidHandle;
+    return kInvalidHandle;
   }
 
   TracingSession* session;
-  PerfettoConsumer_Handle handle;
+  Handle handle;
   {
     std::unique_lock<std::mutex> lock(mutex_);
     handle = ++last_handle_;
@@ -317,7 +316,7 @@ PerfettoConsumer_Handle TracingController::Create(
   return handle;
 }
 
-void TracingController::StartTracing(PerfettoConsumer_Handle handle) {
+void TracingController::StartTracing(Handle handle) {
   TracingSession* session;
   {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -331,30 +330,28 @@ void TracingController::StartTracing(PerfettoConsumer_Handle handle) {
   task_runner_->PostTask([session] { session->StartTracing(); });
 }
 
-PerfettoConsumer_State TracingController::PollState(
-    PerfettoConsumer_Handle handle) {
+State TracingController::PollState(Handle handle) {
   std::unique_lock<std::mutex> lock(mutex_);
   auto it = sessions_.find(handle);
   if (it == sessions_.end())
-    return PerfettoConsumer_kSessionNotFound;
+    return kSessionNotFound;
   return it->second->state();
 }
 
-PerfettoConsumer_TraceBuffer TracingController::ReadTrace(
-    PerfettoConsumer_Handle handle) {
-  PerfettoConsumer_TraceBuffer buf{};
+TraceBuffer TracingController::ReadTrace(Handle handle) {
+  TraceBuffer buf{};
 
   std::unique_lock<std::mutex> lock(mutex_);
   auto it = sessions_.find(handle);
   if (it == sessions_.end()) {
     PERFETTO_DLOG("Handle invalid");
-    buf.state = PerfettoConsumer_kSessionNotFound;
+    buf.state = kSessionNotFound;
     return buf;
   }
 
   TracingSession* session = it->second.get();
   buf.state = session->state();
-  if (buf.state == PerfettoConsumer_kTraceEnded) {
+  if (buf.state == kTraceEnded) {
     std::tie(buf.begin, buf.size) = session->mapped_buf();
     return buf;
   }
@@ -363,7 +360,7 @@ PerfettoConsumer_TraceBuffer TracingController::ReadTrace(
   return buf;
 }
 
-void TracingController::Destroy(PerfettoConsumer_Handle handle) {
+void TracingController::Destroy(Handle handle) {
   // Post an empty task on the task runner to delete the session on its own
   // thread.
   std::shared_ptr<TracingSession> session;
@@ -380,30 +377,28 @@ void TracingController::Destroy(PerfettoConsumer_Handle handle) {
 
 }  // namespace
 
-PERFETTO_EXPORTED_API PerfettoConsumer_Handle
-PerfettoConsumer_Create(const void* config_proto,
-                        size_t config_len,
-                        PerfettoConsumer_OnStateChangedCb callback) {
+PERFETTO_EXPORTED_API Handle Create(const void* config_proto,
+                                    size_t config_len,
+                                    OnStateChangedCb callback) {
   return TracingController::GetInstance()->Create(config_proto, config_len,
                                                   callback);
 }
 
 PERFETTO_EXPORTED_API
-void PerfettoConsumer_StartTracing(PerfettoConsumer_Handle handle) {
+void StartTracing(Handle handle) {
   return TracingController::GetInstance()->StartTracing(handle);
 }
 
-PERFETTO_EXPORTED_API PerfettoConsumer_State
-PerfettoConsumer_PollState(PerfettoConsumer_Handle handle) {
+PERFETTO_EXPORTED_API State PollState(Handle handle) {
   return TracingController::GetInstance()->PollState(handle);
 }
 
-PERFETTO_EXPORTED_API PerfettoConsumer_TraceBuffer
-PerfettoConsumer_ReadTrace(PerfettoConsumer_Handle handle) {
+PERFETTO_EXPORTED_API TraceBuffer ReadTrace(Handle handle) {
   return TracingController::GetInstance()->ReadTrace(handle);
 }
 
-PERFETTO_EXPORTED_API void PerfettoConsumer_Destroy(
-    PerfettoConsumer_Handle handle) {
+PERFETTO_EXPORTED_API void Destroy(Handle handle) {
   TracingController::GetInstance()->Destroy(handle);
 }
+}  // namespace consumer
+}  // namespace perfetto

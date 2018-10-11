@@ -19,45 +19,47 @@
 
 #include <stddef.h>
 
-extern "C" {
+// Public API for perfetto consumer, exposed to the rest of the Android tree.
 
-enum PerfettoConsumer_State {
+namespace perfetto {
+namespace consumer {
+
+enum State {
   // The trace session failed. Look at logcat -s perfetto to find out more.
-  PerfettoConsumer_kTraceFailed = -3,
+  kTraceFailed = -3,
 
   // Failed to connect to the traced daemon.
-  PerfettoConsumer_kConnectionError = -2,
+  kConnectionError = -2,
 
   // The passed handle is invalid.
-  PerfettoConsumer_kSessionNotFound = -1,
+  kSessionNotFound = -1,
 
   // Idle state (should never be returned, internal only).
-  PerfettoConsumer_kIdle = 0,
+  kIdle = 0,
 
   // Establishing the connection to the traced daemon.
-  PerfettoConsumer_kConnecting = 1,
+  kConnecting = 1,
 
   // Tracing configured (buffers allocated) but not started.
   // This state is reached only when setting |deferred_start| == true,
   // otherwise the session transitions immediately into kTracing after the
   // Create() call.
-  PerfettoConsumer_kConfigured = 2,
+  kConfigured = 2,
 
   // Tracing is active.
-  PerfettoConsumer_kTracing = 3,
+  kTracing = 3,
 
   // Tracing ended succesfully. The trace buffer can now be retrieved through
   // the ReadTrace() call.
-  PerfettoConsumer_kTraceEnded = 4,
+  kTraceEnded = 4,
 };
 
-typedef int PerfettoConsumer_Handle;
-const int PerfettoConsumer_kInvalidHandle = -1;
+typedef int Handle;
+const int kInvalidHandle = -1;
 
 // Signature for callback function provided by the embedder to get notified
 // about state changes.
-typedef void (*PerfettoConsumer_OnStateChangedCb)(PerfettoConsumer_Handle,
-                                                  PerfettoConsumer_State);
+typedef void (*OnStateChangedCb)(Handle, State);
 
 // None of the calls below are blocking, unless otherwise specified.
 
@@ -80,10 +82,9 @@ typedef void (*PerfettoConsumer_OnStateChangedCb)(PerfettoConsumer_Handle,
 //    Do NOT directly close() the handle, use Destroy(handle) to do so. The
 //    client maintains other state associated to the handle that would be leaked
 //    otherwise.
-PerfettoConsumer_Handle PerfettoConsumer_Create(
-    const void* config_proto,
-    size_t config_len,
-    PerfettoConsumer_OnStateChangedCb callback);
+Handle Create(const void* config_proto,
+              size_t config_len,
+              OnStateChangedCb callback);
 
 // Starts recording the trace. Can be used only when setting the
 // |deferred_start| flag in the trace config passed to Create().
@@ -91,13 +92,13 @@ PerfettoConsumer_Handle PerfettoConsumer_Create(
 // on a Pixel 2.
 // This method can be called only once per handle. TODO(primiano): relax this
 // and allow to recycle handles without re-configuring the trace session.
-void PerfettoConsumer_StartTracing(PerfettoConsumer_Handle);
+void StartTracing(Handle);
 
 // Returns the state of the tracing session (for debugging).
-PerfettoConsumer_State PerfettoConsumer_PollState(PerfettoConsumer_Handle);
+State PollState(Handle);
 
-struct PerfettoConsumer_TraceBuffer {
-  PerfettoConsumer_State state;
+struct TraceBuffer {
+  State state;
   char* begin;
   size_t size;
 };
@@ -111,13 +112,13 @@ struct PerfettoConsumer_TraceBuffer {
 //   Destroy() call.
 //   If called before the session reaches the kTraceEnded state, a null buffer
 //   is returned and the current session state is set in the |state| field.
-PerfettoConsumer_TraceBuffer PerfettoConsumer_ReadTrace(
-    PerfettoConsumer_Handle);
+TraceBuffer ReadTrace(Handle);
 
 // Destroys all the resources associated to the tracing session (connection to
 // traced and trace buffer). The handle should not be used after this point.
-void PerfettoConsumer_Destroy(PerfettoConsumer_Handle);
+void Destroy(Handle);
 
-}  // extern "C".
+}  // namespace consumer
+}  // namespace perfetto
 
 #endif  // INCLUDE_PERFETTO_PUBLIC_CONSUMER_API_H_
