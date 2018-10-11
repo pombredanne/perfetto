@@ -124,11 +124,11 @@ int HeapprofdMain(int argc, char** argv) {
                    strerror(sock->last_error()));
 
   int dumppipes[2];
-  g_dumppipe = dumppipes[1];
   struct sigaction action = {};
   action.sa_handler = DumpSignalHandler;
   PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
   PERFETTO_CHECK(pipe(dumppipes) != -1);
+  g_dumppipe = dumppipes[1];
   task_runner.AddFileDescriptorWatch(dumppipes[0], [&bookkeeping_queue] {
     BookkeepingRecord rec;
     rec.record_type = BookkeepingRecordType::Dump;
