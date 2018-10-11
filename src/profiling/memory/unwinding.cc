@@ -238,7 +238,7 @@ void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     std::lock_guard<std::mutex> l(bookkeeping_mutex_);
     auto it = bookkeeping_data_.find(rec->pid);
     if (it == bookkeeping_data_.end()) {
-      PERFETTO_DCHECK(false);
+      PERFETTO_LOG("Invalid pid: %d", rec->pid) : PERFETTO_DCHECK(false);
       return;
     }
     bookkeeping_data = &it->second;
