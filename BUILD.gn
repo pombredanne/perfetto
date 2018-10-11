@@ -62,7 +62,6 @@ group("all") {
     if (!build_with_android) {
       deps += [
         ":trace_processor",
-        "src/tracing:consumer_api_test",
         "tools/trace_to_text",
       ]
     }
@@ -174,7 +173,6 @@ if (!build_with_chromium) {
       "gn:default_deps",
       "src/traced/probes",
       "src/traced/service",
-      "src/tracing:api",
     ]
   }
 
