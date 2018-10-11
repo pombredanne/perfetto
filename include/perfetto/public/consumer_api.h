@@ -40,7 +40,7 @@ enum PerfettoConsumer_State {
   // Tracing configured (buffers allocated) but not started.
   // This state is reached only when setting |deferred_start| == true,
   // otherwise the session transitions immediately into kTracing after the
-  // EnableTracing() call.
+  // Create() call.
   PerfettoConsumer_kConfigured = 2,
 
   // Tracing is active.
@@ -54,14 +54,23 @@ enum PerfettoConsumer_State {
 typedef int PerfettoConsumer_Handle;
 const int PerfettoConsumer_kInvalidHandle = -1;
 
+// Signature for callback function provided by the embedder to get notified
+// about state changes.
+typedef void (*PerfettoConsumer_OnStateChangedCb)(PerfettoConsumer_Handle,
+                                                  PerfettoConsumer_State);
+
+// None of the calls below are blocking, unless otherwise specified.
+
 // Enables tracing with the given TraceConfig. If the trace config has the
 // |deferred_start| flag set (see trace_config.proto) tracing is initialized
 // but not started. An explicit call to StartTracing() must be issued in order
 // to start the capture.
 // Args:
 //   [trace_config_proto, trace_config_len] point to a binary-encoded proto
-//   containing the trace config. See //external/perfetto/docs/trace-config.md
-//   for more details.
+//     containing the trace config. See //external/perfetto/docs/trace-config.md
+//     for more details.
+//   callback: a user-defined callback that will be invoked upon state changes.
+//     The callback will be invoked on an internal thread and must not block.
 // Return value:
 //    Returns a handle that can be used to poll, wait and retrieve the trace or
 //    kInvalidHandle in case of failure (e.g., the trace config is malformed).
@@ -71,36 +80,39 @@ const int PerfettoConsumer_kInvalidHandle = -1;
 //    Do NOT directly close() the handle, use Destroy(handle) to do so. The
 //    client maintains other state associated to the handle that would be leaked
 //    otherwise.
-PerfettoConsumer_Handle PerfettoConsumer_EnableTracing(const void* config_proto,
-                                                       size_t config_len);
+PerfettoConsumer_Handle PerfettoConsumer_Create(
+    const void* config_proto,
+    size_t config_len,
+    PerfettoConsumer_OnStateChangedCb callback);
 
 // Starts recording the trace. Can be used only when setting the
-// |deferred_start| flag in the trace config passed to EnableTracing().
+// |deferred_start| flag in the trace config passed to Create().
 // The estimated end-to-end (this call to ftrace enabling) latency is 2-3 ms
 // on a Pixel 2.
+// This method can be called only once per handle. TODO(primiano): relax this
+// and allow to recycle handles without re-configuring the trace session.
 void PerfettoConsumer_StartTracing(PerfettoConsumer_Handle);
 
-// Returns the state of the tracing session.
+// Returns the state of the tracing session (for debugging).
 PerfettoConsumer_State PerfettoConsumer_PollState(PerfettoConsumer_Handle);
 
 struct PerfettoConsumer_TraceBuffer {
+  PerfettoConsumer_State state;
   char* begin;
   size_t size;
 };
 
-// Retrieves the trace buffer. This call can be used both in blocking and
-// non-blocking mode.
+// Retrieves the whole trace buffer. It avoids extra copies by directly mmaping
+// the tmp fd passed to the traced daemon.
 // Return value:
-//   If the trace is ended (PollState() returned kTraceEnded) returns a buffer
-//   containing the whole trace. The buffer lifetime is tied to the traing
-//   session is owned by the library and is valid until the Destroy() call.
-//   If the trace is not ended (or failed) returns a zero-sized null buffer.
-// Args:
-//   |wait_ms| > 0: waits for the trace to be ended, blocking for at most X ms.
-//   |wait_ms| = 0: returns immediately, either the full buffer or a
-//   zero-sized one if the trace is not ended yet.
-PerfettoConsumer_TraceBuffer PerfettoConsumer_ReadTrace(PerfettoConsumer_Handle,
-                                                        int wait_ms);
+//   If the trace is ended (state == kTraceEnded) returns a buffer containing
+//   the whole trace. This buffer can be parsed directly with libprotobuf.
+//   The buffer lifetime is tied to the tracing session and is valid until the
+//   Destroy() call.
+//   If called before the session reaches the kTraceEnded state, a null buffer
+//   is returned and the current session state is set in the |state| field.
+PerfettoConsumer_TraceBuffer PerfettoConsumer_ReadTrace(
+    PerfettoConsumer_Handle);
 
 // Destroys all the resources associated to the tracing session (connection to
 // traced and trace buffer). The handle should not be used after this point.

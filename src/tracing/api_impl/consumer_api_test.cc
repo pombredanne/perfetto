@@ -15,6 +15,7 @@
  */
 
 #include <array>
+#include <atomic>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/public/consumer_api.h"
@@ -23,6 +24,7 @@
 #include "perfetto/trace/trace.pb.h"
 
 namespace {
+
 std::string GetConfig(uint32_t duration_ms) {
   perfetto::protos::TraceConfig trace_config;
   trace_config.set_duration_ms(duration_ms);
@@ -48,77 +50,69 @@ void DumpTrace(PerfettoConsumer_TraceBuffer buf) {
   }
 
   PERFETTO_LOG("Parsing %d trace packets", trace.packet_size());
+  int num_filemap_events = 0;
   for (const auto& packet : trace.packet()) {
     if (packet.has_ftrace_events()) {
       const auto& bundle = packet.ftrace_events();
       for (const auto& ftrace : bundle.event()) {
         if (ftrace.has_mm_filemap_add_to_page_cache()) {
-          const auto& evt = ftrace.mm_filemap_add_to_page_cache();
-          PERFETTO_LOG(
-              "mm_filemap_add_to_page_cache pfn=%llu, dev=%llu, ino=%llu",
-              evt.pfn(), evt.s_dev(), evt.i_ino());
+          num_filemap_events++;
+          // const auto& evt = ftrace.mm_filemap_add_to_page_cache();
+          // PERFETTO_LOG(
+          //     "mm_filemap_add_to_page_cache pfn=%llu, dev=%llu, ino=%llu",
+          //     evt.pfn(), evt.s_dev(), evt.i_ino());
         }
         if (ftrace.has_mm_filemap_delete_from_page_cache()) {
-          const auto& evt = ftrace.mm_filemap_delete_from_page_cache();
-          PERFETTO_LOG(
-              "mm_filemap_delete_from_page_cache pfn=%llu, dev=%llu, ino=%llu",
-              evt.pfn(), evt.s_dev(), evt.i_ino());
+          num_filemap_events++;
+          // const auto& evt = ftrace.mm_filemap_delete_from_page_cache();
+          // PERFETTO_LOG(
+          //     "mm_filemap_delete_from_page_cache pfn=%llu, dev=%llu,
+          //     ino=%llu", evt.pfn(), evt.s_dev(), evt.i_ino());
         }
       }
     }
   }
+  PERFETTO_LOG("Got %d mm_filemap events", num_filemap_events);
 }
 
-void TestSingleBlocking() {
+void OnStateChanged(PerfettoConsumer_Handle handle,
+                    PerfettoConsumer_State state) {
+  PERFETTO_LOG("Callback: handle=%d state=%d", handle, state);
+}
+
+void TestSingle() {
   std::string cfg = GetConfig(1000);
-  auto handle = PerfettoConsumer_EnableTracing(cfg.data(), cfg.size());
+  auto handle =
+      PerfettoConsumer_Create(cfg.data(), cfg.size(), &OnStateChanged);
   PERFETTO_ILOG("Starting, handle=%d state=%d", handle,
                 PerfettoConsumer_PollState(handle));
-  sleep(1);
+  usleep(100000);
   PerfettoConsumer_StartTracing(handle);
-  auto buf = PerfettoConsumer_ReadTrace(handle, 5000);
-  PERFETTO_ILOG("Got buf=%p %zu", static_cast<void*>(buf.begin), buf.size);
-  DumpTrace(buf);
-  PERFETTO_ILOG("Destroying");
-  PerfettoConsumer_Destroy(handle);
-}
-
-void TestSinglePolling() {
-  std::string cfg = GetConfig(1000);
-
-  auto handle = PerfettoConsumer_EnableTracing(cfg.data(), cfg.size());
-  PERFETTO_ILOG("Starting, handle=%d state=%d", handle,
-                PerfettoConsumer_PollState(handle));
-
-  for (int i = 0; i < 10; i++) {
-    auto state = PerfettoConsumer_PollState(handle);
-    PERFETTO_ILOG("State=%d", state);
-    if (state == PerfettoConsumer_kTraceEnded)
-      break;
-    sleep(1);
-    if (i == 0)
-      PerfettoConsumer_StartTracing(handle);
+  // Wait for either completion or error.
+  while (PerfettoConsumer_PollState(handle) > 0 &&
+         PerfettoConsumer_PollState(handle) != PerfettoConsumer_kTraceEnded) {
+    usleep(10000);
   }
 
-  auto buf = PerfettoConsumer_ReadTrace(handle, 0);
-  PERFETTO_ILOG("Got buf=%p %zu", static_cast<void*>(buf.begin), buf.size);
-  DumpTrace(buf);
+  if (PerfettoConsumer_PollState(handle) == PerfettoConsumer_kTraceEnded) {
+    auto buf = PerfettoConsumer_ReadTrace(handle);
+    DumpTrace(buf);
+  } else {
+    PERFETTO_ELOG("Trace failed");
+  }
+
   PERFETTO_ILOG("Destroying");
   PerfettoConsumer_Destroy(handle);
 }
 
-void TestManyPolling() {
+void TestMany() {
   std::string cfg = GetConfig(8000);
 
   std::array<PerfettoConsumer_Handle, 5> handles{};
-  fd_set fdset;
-  FD_ZERO(&fdset);
-  int max_fd = 0;
   for (size_t i = 0; i < handles.size(); i++) {
-    auto handle = PerfettoConsumer_EnableTracing(cfg.data(), cfg.size());
+    auto handle =
+        PerfettoConsumer_Create(cfg.data(), cfg.size(), &OnStateChanged);
     handles[i] = handle;
-    max_fd = std::max(max_fd, handle);
-    FD_SET(handle, &fdset);
     PERFETTO_ILOG("Creating handle=%d state=%d", handle,
                   PerfettoConsumer_PollState(handle));
   }
@@ -132,6 +126,7 @@ void TestManyPolling() {
         all_connected = false;
       }
     }
+    usleep(10000);
   }
 
   // Start only 3 out of 5 sessions, scattering them with 1 second delay.
@@ -142,19 +137,21 @@ void TestManyPolling() {
     }
   }
 
-  for (int i = 0; i < 10; i++) {
-    auto tmp_set = fdset;
-    int ret =
-        PERFETTO_EINTR(select(max_fd + 1, &tmp_set, nullptr, nullptr, nullptr));
-    PERFETTO_LOG("select(): %d", ret);
-    if (ret == 3)
-      break;
-    sleep(1);
+  // Wait until all sessions are complete.
+  for (int num_complete = 0; num_complete != 3;) {
+    num_complete = 0;
+    for (size_t i = 0; i < handles.size(); i++) {
+      if (PerfettoConsumer_PollState(handles[i]) ==
+          PerfettoConsumer_kTraceEnded) {
+        num_complete++;
+      }
+    }
+    usleep(10000);
   }
 
   // Read the trace buffers.
   for (size_t i = 0; i < handles.size(); i++) {
-    auto buf = PerfettoConsumer_ReadTrace(handles[i], 0);
+    auto buf = PerfettoConsumer_ReadTrace(handles[i]);
     PERFETTO_ILOG("ReadTrace[%zu] buf=%p %zu", i, static_cast<void*>(buf.begin),
                   buf.size);
     if (i % 2 == 0) {
@@ -173,22 +170,17 @@ void TestManyPolling() {
 }  // namespace
 
 int main() {
-  PERFETTO_LOG("Testing single trace, blocking mode");
+  PERFETTO_LOG("Testing single trace");
   PERFETTO_LOG("=============================================================");
-  TestSingleBlocking();
-  PERFETTO_LOG("=============================================================");
-
-  PERFETTO_LOG("\n");
-
-  PERFETTO_LOG("Testing single trace, polling mode");
-  PERFETTO_LOG("=============================================================");
-  TestSinglePolling();
+  TestSingle();
   PERFETTO_LOG("=============================================================");
 
   PERFETTO_LOG("\n");
-  PERFETTO_LOG("Testing concurrent traces, polling mode");
+
+  PERFETTO_LOG("\n");
+  PERFETTO_LOG("Testing concurrent traces");
   PERFETTO_LOG("=============================================================");
-  TestManyPolling();
+  TestMany();
   PERFETTO_LOG("=============================================================");
 
   return 0;
