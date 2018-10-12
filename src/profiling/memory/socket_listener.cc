@@ -21,7 +21,7 @@ namespace perfetto {
 
 void SocketListener::OnDisconnect(base::UnixSocket* self) {
   PERFETTO_LOG("Remove socket %d", self->peer_pid());
-  bookkeeping_actor_->RemoveSocket(self->peer_pid());
+  bookkeeping_thread_->RemoveSocketForPid(self->peer_pid());
   sockets_.erase(self);
 }
 
@@ -95,7 +95,7 @@ void SocketListener::InitProcess(Entry* entry,
     entry->process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
   }
   PERFETTO_LOG("Adding socket %d", peer_pid);
-  bookkeeping_actor_->AddSocket(peer_pid);
+  bookkeeping_thread_->AddSocketForPid(peer_pid);
 }
 
 void SocketListener::RecordReceived(base::UnixSocket* self,

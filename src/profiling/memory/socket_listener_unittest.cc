@@ -54,7 +54,7 @@ TEST_F(SocketListenerTest, ReceiveRecord) {
   };
 
   GlobalCallstackTrie callsites;
-  BookkeepingActor actor(&callsites, "");
+  BookkeepingThread actor(&callsites, "");
   SocketListener listener({},  // We do not care about the sampling rate.
                           std::move(callback_fn), &actor);
   MockEventListener client_listener;

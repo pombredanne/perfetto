@@ -70,29 +70,27 @@ void DumpSignalHandler(int) {
 int HeapprofdMain(int argc, char** argv) {
   base::UnixTaskRunner task_runner;
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
-  // If we set this up before launching any threads, we do not use a std::atomic
-  // for g_dump_evt.
-  base::Event dump_evt;
-  g_dump_evt = &dump_evt;
+  // We set this up before launching any threads, so we do not have to use a
+  // std::atomic for g_dump_evt.
+  g_dump_evt = new base::Event;
 
   struct sigaction action = {};
   action.sa_handler = DumpSignalHandler;
-  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) != -1);
-  task_runner.AddFileDescriptorWatch(
-      dump_evt.fd(), [&bookkeeping_queue, &dump_evt] {
-        dump_evt.Clear();
+  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) == 0);
+  task_runner.AddFileDescriptorWatch(g_dump_evt->fd(), [&bookkeeping_queue] {
+    g_dump_evt->Clear();
 
-        BookkeepingRecord rec = {};
-        rec.record_type = BookkeepingRecordType::Dump;
-        bookkeeping_queue.Add(std::move(rec));
-      });
+    BookkeepingRecord rec = {};
+    rec.record_type = BookkeepingRecord::Type::Dump;
+    bookkeeping_queue.Add(std::move(rec));
+  });
 
   GlobalCallstackTrie callsites;
   std::unique_ptr<base::UnixSocket> sock;
 
-  BookkeepingActor bookkeeping_actor(&callsites, "/data/local/tmp/heap_dump");
-  std::thread bookkeeping_thread([&bookkeeping_actor, &bookkeeping_queue] {
-    bookkeeping_actor.Run(&bookkeeping_queue);
+  BookkeepingThread bookkeeping_thread(&callsites, "/data/local/tmp/heap_dump");
+  std::thread bookkeeping_th([&bookkeeping_thread, &bookkeeping_queue] {
+    bookkeeping_thread.Run(&bookkeeping_queue);
   });
 
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
@@ -111,7 +109,7 @@ int HeapprofdMain(int argc, char** argv) {
         std::move(r));
   };
   SocketListener listener({kSamplingRate}, std::move(on_record_received),
-                          &bookkeeping_actor);
+                          &bookkeeping_thread);
 
   if (argc == 2) {
     // Allow to be able to manually specify the socket to listen on

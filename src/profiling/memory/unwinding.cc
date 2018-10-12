@@ -202,13 +202,13 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out) {
     }
 
     out->pid = rec->pid;
-    out->record_type = BookkeepingRecordType::Malloc;
+    out->record_type = BookkeepingRecord::Type::Malloc;
     if (!DoUnwind(&msg, metadata.get(), &out->alloc_record)) {
       return false;
     }
     return true;
   } else if (msg.record_type == RecordType::Free) {
-    out->record_type = BookkeepingRecordType::Free;
+    out->record_type = BookkeepingRecord::Type::Free;
     out->pid = rec->pid;
     // We need to keep this alive, because msg.free_header is a pointer into
     // this.
@@ -231,88 +231,4 @@ __attribute__((noreturn)) void UnwindingMainLoop(
       output_queue->Add(std::move(out));
   }
 }
-
-void BookkeepingActor::HandleBookkeepingRecord(BookkeepingRecord* rec) {
-  BookkeepingData* bookkeeping_data = nullptr;
-  if (rec->pid != 0) {
-    std::lock_guard<std::mutex> l(bookkeeping_mutex_);
-    auto it = bookkeeping_data_.find(rec->pid);
-    if (it == bookkeeping_data_.end()) {
-      PERFETTO_LOG("Invalid pid: %d", rec->pid);
-      PERFETTO_DCHECK(false);
-      return;
-    }
-    bookkeeping_data = &it->second;
-  }
-
-  if (rec->record_type == BookkeepingRecordType::Dump) {
-    PERFETTO_LOG("Dumping heaps");
-    auto it = bookkeeping_data_.begin();
-    while (it != bookkeeping_data_.end()) {
-      std::string dump_file_name = file_name_ + "." + std::to_string(it->first);
-      PERFETTO_LOG("Dumping %d to %s", it->first, dump_file_name.c_str());
-      base::ScopedFile fd =
-          base::OpenFile(dump_file_name, O_WRONLY | O_CREAT, 0755);
-      if (fd)
-        it->second.heap_tracker.Dump(fd.get());
-      else
-        PERFETTO_LOG("Failed to open %s", dump_file_name.c_str());
-      // Garbage collect for processes that already went away.
-      if (it->second.ref_count == 0) {
-        std::lock_guard<std::mutex> l(bookkeeping_mutex_);
-        it = bookkeeping_data_.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  } else if (rec->record_type == BookkeepingRecordType::Free) {
-    FreeRecord& free_rec = rec->free_record;
-    FreePageEntry* entries = free_rec.metadata->entries;
-    uint64_t num_entries = free_rec.metadata->num_entries;
-    if (num_entries > kFreePageSize)
-      return;
-    for (size_t i = 0; i < num_entries; ++i) {
-      const FreePageEntry& entry = entries[i];
-      bookkeeping_data->heap_tracker.RecordFree(entry.addr,
-                                                entry.sequence_number);
-    }
-  } else if (rec->record_type == BookkeepingRecordType::Malloc) {
-    AllocRecord& alloc_rec = rec->alloc_record;
-    std::vector<CodeLocation> code_locations;
-    for (unwindstack::FrameData& frame : alloc_rec.frames)
-      code_locations.emplace_back(frame.map_name, frame.function_name);
-    bookkeeping_data->heap_tracker.RecordMalloc(
-        code_locations, alloc_rec.alloc_metadata.alloc_address,
-        alloc_rec.alloc_metadata.alloc_size,
-        alloc_rec.alloc_metadata.sequence_number);
-  } else {
-    PERFETTO_DCHECK(false);
-  }
-}
-
-void BookkeepingActor::AddSocket(pid_t pid) {
-  std::lock_guard<std::mutex> l(bookkeeping_mutex_);
-  auto p = bookkeeping_data_.emplace(pid, callsites_);
-  auto it = p.first;
-  it->second.ref_count++;
-}
-
-void BookkeepingActor::RemoveSocket(pid_t pid) {
-  std::lock_guard<std::mutex> l(bookkeeping_mutex_);
-  auto it = bookkeeping_data_.find(pid);
-  if (it == bookkeeping_data_.end()) {
-    PERFETTO_DCHECK(false);
-    return;
-  }
-  it->second.ref_count--;
-}
-
-__attribute__((noreturn)) void BookkeepingActor::Run(
-    BoundedQueue<BookkeepingRecord>* input_queue) {
-  for (;;) {
-    BookkeepingRecord rec = input_queue->Get();
-    HandleBookkeepingRecord(&rec);
-  }
-}
-
 }  // namespace perfetto

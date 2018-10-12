@@ -22,6 +22,7 @@
 #include "perfetto/base/scoped_file.h"
 #include "src/profiling/memory/bookkeeping.h"
 #include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/queue_messages.h"
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
@@ -65,36 +66,7 @@ class StackMemory : public unwindstack::Memory {
 
 size_t RegSize(unwindstack::ArchEnum arch);
 
-struct UnwindingRecord {
-  pid_t pid;
-  size_t size;
-  std::unique_ptr<uint8_t[]> data;
-  std::weak_ptr<ProcessMetadata> metadata;
-};
 
-struct FreeRecord {
-  std::unique_ptr<uint8_t[]> free_data;
-  FreeMetadata* metadata;
-};
-
-struct AllocRecord {
-  AllocMetadata alloc_metadata;
-  std::vector<unwindstack::FrameData> frames;
-};
-
-enum class BookkeepingRecordType {
-  Dump = 0,
-  Malloc = 1,
-  Free = 2,
-};
-
-struct BookkeepingRecord {
-  pid_t pid;
-  // TODO(fmayer): Use a union.
-  BookkeepingRecordType record_type;
-  AllocRecord alloc_record;
-  FreeRecord free_record;
-};
 
 bool DoUnwind(WireMessage*, ProcessMetadata* metadata, AllocRecord* out);
 
@@ -102,31 +74,6 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
 
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
-
-struct BookkeepingData {
-  BookkeepingData(GlobalCallstackTrie* callsites) : heap_tracker(callsites) {}
-
-  HeapTracker heap_tracker;
-  uint64_t ref_count = 0;
-};
-
-class BookkeepingActor {
- public:
-  BookkeepingActor(GlobalCallstackTrie* callsites, std::string file_name)
-      : callsites_(callsites), file_name_(file_name) {}
-
-  void Run(BoundedQueue<BookkeepingRecord>* input_queue);
-  void AddSocket(pid_t pid);
-  void RemoveSocket(pid_t pid);
-  void HandleBookkeepingRecord(BookkeepingRecord* rec);
-
- private:
-  GlobalCallstackTrie* const callsites_;
-
-  std::map<pid_t, BookkeepingData> bookkeeping_data_;
-  std::mutex bookkeeping_mutex_;
-  std::string file_name_;
-};
 
 }  // namespace perfetto
 
