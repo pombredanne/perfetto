@@ -152,9 +152,8 @@ void ForEachPacketInTrace(
     // A TracePacket consists in one byte stating its field id and type ...
     char preamble;
     input->get(preamble);
-    if (!input->good()) {
+    if (!input->good())
       break;
-    }
     bytes_processed++;
     PERFETTO_DCHECK(preamble == 0x0a);  // Field ID:1, type:length delimited.
 

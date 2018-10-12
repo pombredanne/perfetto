@@ -2869,7 +2869,7 @@ std::string FormatPrefix(uint64_t timestamp,
   uint64_t useconds = TimestampToMicroseconds(timestamp);
   if (pid == 0) {
     name = "<idle>";
-  };
+  }
   sprintf(line,
           "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32 "] d..3 %" PRIu64
           ".%.6" PRIu64 ": ",
@@ -2888,7 +2888,7 @@ std::string FormatFtraceEvent(
   std::string name = "<...>";
   if (event.has_sched_switch()) {
     name = event.sched_switch().prev_comm();
-  };
+  }
 
   std::string line = FormatEventText(event);
   if (line == "")
