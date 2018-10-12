@@ -20,7 +20,6 @@
 namespace perfetto {
 
 void SocketListener::OnDisconnect(base::UnixSocket* self) {
-  PERFETTO_LOG("Remove socket %d", self->peer_pid());
   bookkeeping_thread_->RemoveSocketForPid(self->peer_pid());
   sockets_.erase(self);
 }
@@ -30,6 +29,7 @@ void SocketListener::OnNewIncomingConnection(
     std::unique_ptr<base::UnixSocket> new_connection) {
   base::UnixSocket* new_connection_raw = new_connection.get();
   sockets_.emplace(new_connection_raw, std::move(new_connection));
+  bookkeeping_thread_->AddSocketForPid(new_connection_raw->peer_pid());
 }
 
 void SocketListener::OnDataAvailable(base::UnixSocket* self) {
@@ -94,8 +94,6 @@ void SocketListener::InitProcess(Entry* entry,
     // file descriptors.
     entry->process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
   }
-  PERFETTO_LOG("Adding socket %d", peer_pid);
-  bookkeeping_thread_->AddSocketForPid(peer_pid);
 }
 
 void SocketListener::RecordReceived(base::UnixSocket* self,
