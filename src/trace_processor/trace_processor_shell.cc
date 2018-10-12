@@ -225,7 +225,9 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
 }
 
 void PrintUsage(char** argv) {
-  PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.proto", argv[0]);
+  PERFETTO_ELOG(
+      "Usage: %s [-d] [-q query.sql] [-t timings.out] trace_file.proto",
+      argv[0]);
 }
 
 void StartInteractiveShell() {
@@ -248,7 +250,14 @@ void StartInteractiveShell() {
   }
 }
 
-void RunQueryAndPrintResult(FILE* input, FILE* output) {
+void PrintTimeTaken(base::TimeNanos time_taken, FILE* timings_file) {
+  if (timings_file == nullptr)
+    return;
+  int64_t time_taken_ns = time_taken.count();
+  fprintf(timings_file, "%" PRId64 "\n", time_taken_ns);
+}
+
+void RunQueryAndPrintResult(FILE* input, FILE* output, FILE* timings) {
   char buffer[4096];
   bool is_first_query = true;
   while (!feof(input) && !ferror(input)) {
@@ -269,9 +278,13 @@ void RunQueryAndPrintResult(FILE* input, FILE* output) {
 
     protos::RawQueryArgs query;
     query.set_sql_query(sql_query);
-    g_tp->ExecuteQuery(query, [output](const protos::RawQueryResult& res) {
-      PrintQueryResultAsCsv(res, output);
-    });
+    base::TimeNanos t_start = base::GetWallTimeNs();
+    g_tp->ExecuteQuery(
+        query, [output, timings, t_start](const protos::RawQueryResult& res) {
+          base::TimeNanos t_taken = base::GetWallTimeNs() - t_start;
+          PrintQueryResultAsCsv(res, output);
+          PrintTimeTaken(t_taken, timings);
+        });
   }
 }
 
@@ -284,6 +297,7 @@ int main(int argc, char** argv) {
   }
   const char* trace_file_path = nullptr;
   const char* query_file_path = nullptr;
+  const char* timing_file_path = nullptr;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-d") == 0) {
       EnableSQLiteVtableDebugging();
@@ -295,6 +309,14 @@ int main(int argc, char** argv) {
         return 1;
       }
       query_file_path = argv[i];
+      continue;
+    }
+    if (strcmp(argv[i], "-t") == 0) {
+      if (++i == argc) {
+        PrintUsage(argv);
+        return 1;
+      }
+      timing_file_path = argv[i];
       continue;
     }
     trace_file_path = argv[i];
@@ -367,8 +389,10 @@ int main(int argc, char** argv) {
   if (query_file_path == nullptr) {
     StartInteractiveShell();
   } else {
-    base::ScopedFstream file(fopen(query_file_path, "r"));
-    RunQueryAndPrintResult(file.get(), stdout);
+    base::ScopedFstream query_file(fopen(query_file_path, "r"));
+    base::ScopedFstream timing_file(
+        timing_file_path ? fopen(timing_file_path, "w+") : nullptr);
+    RunQueryAndPrintResult(query_file.get(), stdout, timing_file.get());
   }
 
   return 0;
