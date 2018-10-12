@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef TOOLS_TRACE_TO_TEXT_FTRACE_EVENT_FORMATTER_H_
-#define TOOLS_TRACE_TO_TEXT_FTRACE_EVENT_FORMATTER_H_
-
-#include "tools/trace_to_text/ftrace_event_formatter.h"
+#ifndef TOOLS_TRACE_TO_TEXT_PROCESS_FORMATTER_H_
+#define TOOLS_TRACE_TO_TEXT_PROCESS_FORMATTER_H_
 
 #include <string>
-#include <unordered_map>
 
 #include "perfetto/trace/trace_packet.pb.h"
 
 namespace perfetto {
 
-std::string FormatFtraceEvent(
-    uint64_t timestamp,
-    size_t cpu,
-    const protos::FtraceEvent&,
-    const std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/>& thread_map);
+std::string FormatProcess(const protos::ProcessTree::Process&);
+std::string FormatThread(const protos::ProcessTree::Thread&);
 
 }  // namespace perfetto
 
-#endif  // TOOLS_TRACE_TO_TEXT_FTRACE_EVENT_FORMATTER_H_
+#endif  // TOOLS_TRACE_TO_TEXT_PROCESS_FORMATTER_H_

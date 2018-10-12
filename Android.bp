@@ -4050,6 +4050,7 @@ cc_binary_host {
     "tools/trace_to_text/ftrace_event_formatter.cc",
     "tools/trace_to_text/ftrace_inode_handler.cc",
     "tools/trace_to_text/main.cc",
+    "tools/trace_to_text/process_formatter.cc",
   ],
   shared_libs: [
     "liblog",

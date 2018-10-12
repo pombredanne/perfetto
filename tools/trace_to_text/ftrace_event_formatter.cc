@@ -2859,26 +2859,44 @@ uint64_t TimestampToMicroseconds(uint64_t timestamp) {
   return (timestamp / 1000) % 1000000ul;
 }
 
-std::string FormatPrefix(uint64_t timestamp, uint64_t cpu) {
+std::string FormatPrefix(uint64_t timestamp,
+                         uint64_t cpu,
+                         uint32_t pid,
+                         uint32_t tgid,
+                         std::string name) {
   char line[2048];
   uint64_t seconds = TimestampToSeconds(timestamp);
   uint64_t useconds = TimestampToMicroseconds(timestamp);
+  if (pid == 0) {
+    name = "<idle>";
+  };
   sprintf(line,
-          "<idle>-0     (-----) [%03" PRIu64 "] d..3 %" PRIu64 ".%.6" PRIu64
-          ": ",
-          cpu, seconds, useconds);
+          "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32 "] d..3 %" PRIu64
+          ".%.6" PRIu64 ": ",
+          name.c_str(), pid, tgid, cpu, seconds, useconds);
   return std::string(line);
 }
 
 }  // namespace
 
-std::string FormatFtraceEvent(uint64_t timestamp,
-                              size_t cpu,
-                              const protos::FtraceEvent& event) {
+std::string FormatFtraceEvent(
+    uint64_t timestamp,
+    size_t cpu,
+    const protos::FtraceEvent& event,
+    const std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/>& thread_map) {
+  std::string name = "<...>";
+  if (event.has_sched_switch()) {
+    name = event.sched_switch().prev_comm();
+  };
   std::string line = FormatEventText(event);
   if (line == "")
     return "";
-  return FormatPrefix(timestamp, cpu) + line;
+  uint32_t pid = event.pid();
+  uint32_t tgid = 0;
+  if (thread_map.find(pid) != thread_map.end()) {
+    tgid = thread_map.at(pid);
+  }
+  return FormatPrefix(timestamp, cpu, event.pid(), tgid, name) + line;
 }
 
 }  // namespace perfetto
