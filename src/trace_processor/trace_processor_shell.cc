@@ -187,7 +187,7 @@ void PrintQueryResultInteractively(base::TimeNanos t_start,
 
 void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
   if (res.has_error()) {
-    fprintf(output, "%s\n", res.error().c_str());
+    PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
     return;
   }
   PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
@@ -198,7 +198,7 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
         const auto& col = res.column_descriptors(c);
         if (c > 0)
           fprintf(output, ",");
-        fprintf(output, "%s", col.name().c_str());
+        fprintf(output, "\"%s\"", col.name().c_str());
       }
       fprintf(output, "\n");
     }
@@ -208,7 +208,7 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
         fprintf(output, ",");
       switch (res.column_descriptors(c).type()) {
         case protos::RawQueryResult_ColumnDesc_Type_STRING:
-          fprintf(output, "%s", res.columns(c).string_values(r).c_str());
+          fprintf(output, "\"%s\"", res.columns(c).string_values(r).c_str());
           break;
         case protos::RawQueryResult_ColumnDesc_Type_DOUBLE:
           fprintf(output, "%f", res.columns(c).double_values(r));
@@ -283,9 +283,18 @@ int main(int argc, char** argv) {
     return 1;
   }
   const char* trace_file_path = nullptr;
+  const char* query_file_path = nullptr;
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "-d") == 0) {
       EnableSQLiteVtableDebugging();
+      continue;
+    }
+    if (strcmp(argv[i], "-q") == 0) {
+      if (++i == argc) {
+        PrintUsage(argv);
+        return 1;
+      }
+      query_file_path = argv[i];
       continue;
     }
     trace_file_path = argv[i];
@@ -353,12 +362,13 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  // If stdin is a terminal, then open in interactive mode. Otherwise just
-  // read from stdin and execute the query.
-  if (isatty(fileno(stdin))) {
+  // If there is no query file, start a shell. Otherwise run the queries and
+  // print the results.
+  if (query_file_path == nullptr) {
     StartInteractiveShell();
   } else {
-    RunQueryAndPrintResult(stdin, stdout);
+    base::ScopedFstream file(fopen(query_file_path, "r"));
+    RunQueryAndPrintResult(file.get(), stdout);
   }
 
   return 0;
