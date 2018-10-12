@@ -185,6 +185,11 @@ export class TraceController extends Controller<States> {
 
   private async listTracks() {
     this.updateStatus('Loading tracks');
+
+    // When we reload from a permalink don't create extra tracks:
+    const state = globals.state;
+    if (state.pinnedTracks.length || state.scrollingTracks.length) return;
+
     const engine = assertExists<Engine>(this.engine);
     const addToTrackActions: DeferredAction[] = [];
     const numCpus = await engine.getNumberOfCpus();
