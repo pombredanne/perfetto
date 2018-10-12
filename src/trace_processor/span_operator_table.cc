@@ -266,10 +266,10 @@ int SpanOperatorTable::Cursor::Next() {
     }
 
     // Get both tables to have an overlapping slice.
-    if (t1_.ts_end <= t2_.ts_start) {
+    if (t1_.ts_end <= t2_.ts_start || t1_.ts_start == t1_.ts_end) {
       next_stepped_table_ = ChildTable::kFirst;
       continue;
-    } else if (t2_.ts_end <= t1_.ts_start) {
+    } else if (t2_.ts_end <= t1_.ts_start || t2_.ts_start == t2_.ts_end) {
       next_stepped_table_ = ChildTable::kSecond;
       continue;
     }
@@ -353,7 +353,8 @@ int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
     default: {
       auto index_pair = table_->GetTableAndColumnIndex(N);
       const auto& stmt = index_pair.first ? t1_.stmt : t2_.stmt;
-      ReportSqliteResult(context, stmt.get(), index_pair.second);
+      size_t index = index_pair.second + kReservedColumns;
+      ReportSqliteResult(context, stmt.get(), index);
     }
   }
   return SQLITE_OK;
