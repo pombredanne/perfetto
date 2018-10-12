@@ -95,6 +95,7 @@ source_set("unittests") {
   ]
 }
 
+# This will export publicly visibile symbols for the malloc_hooks.
 source_set("malloc_hooks") {
   deps = [
     ":client",
