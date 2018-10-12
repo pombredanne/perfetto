@@ -225,7 +225,7 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
 }
 
 void PrintUsage(char** argv) {
-  PERFETTO_ELOG("Usage: %s [-d] trace_file.proto", argv[0]);
+  PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.proto", argv[0]);
 }
 
 void StartInteractiveShell() {
