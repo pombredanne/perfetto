@@ -2884,19 +2884,23 @@ std::string FormatFtraceEvent(
     size_t cpu,
     const protos::FtraceEvent& event,
     const std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/>& thread_map) {
+  // Sched_switch events contain the thread name so use that in the prefix.
   std::string name = "<...>";
   if (event.has_sched_switch()) {
     name = event.sched_switch().prev_comm();
   };
+
   std::string line = FormatEventText(event);
   if (line == "")
     return "";
+
+  // Retrieve the tgid if it exists for the current event pid.
   uint32_t pid = event.pid();
   uint32_t tgid = 0;
   if (thread_map.find(pid) != thread_map.end()) {
     tgid = thread_map.at(pid);
   }
-  return FormatPrefix(timestamp, cpu, event.pid(), tgid, name) + line;
+  return FormatPrefix(timestamp, cpu, pid, tgid, name) + line;
 }
 
 }  // namespace perfetto
