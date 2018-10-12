@@ -56,7 +56,7 @@ export abstract class Engine {
   async queryOneRow(query: string): Promise<number[]> {
     const result = await this.query(query);
     const res: number[] = [];
-    result.columns.map(c => res.push(+c.longValues[0]));
+    result.columns.map(c => res.push(+c.longValues![0]));
     return res;
   }
 
