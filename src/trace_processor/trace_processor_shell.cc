@@ -184,12 +184,28 @@ void PrintQueryResultInteractively(base::TimeNanos t_start,
   }
   printf("\nQuery executed in %.3f ms\n\n", (t_end - t_start).count() / 1E6);
 }
+int StartInteractiveShell() {
+  SetupLineEditor();
+
+  for (;;) {
+    char* line = GetLine("> ");
+    if (!line || strcmp(line, "q\n") == 0)
+      break;
+    if (strcmp(line, "") == 0)
+      continue;
+    protos::RawQueryArgs query;
+    query.set_sql_query(line);
+    base::TimeNanos t_start = base::GetWallTimeNs();
+    g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
+      PrintQueryResultInteractively(t_start, res);
+    });
+
+    FreeLine(line);
+  }
+  return 0;
+}
 
 void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
-  if (res.has_error()) {
-    PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
-    return;
-  }
   PERFETTO_CHECK(res.columns_size() == res.column_descriptors_size());
 
   for (int r = 0; r < static_cast<int>(res.num_records()); r++) {
@@ -224,34 +240,12 @@ void PrintQueryResultAsCsv(const protos::RawQueryResult& res, FILE* output) {
   }
 }
 
-void PrintUsage(char** argv) {
-  PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.proto", argv[0]);
-}
-
-void StartInteractiveShell() {
-  SetupLineEditor();
-
-  for (;;) {
-    char* line = GetLine("> ");
-    if (!line || strcmp(line, "q\n") == 0)
-      break;
-    if (strcmp(line, "") == 0)
-      continue;
-    protos::RawQueryArgs query;
-    query.set_sql_query(line);
-    base::TimeNanos t_start = base::GetWallTimeNs();
-    g_tp->ExecuteQuery(query, [t_start](const protos::RawQueryResult& res) {
-      PrintQueryResultInteractively(t_start, res);
-    });
-
-    FreeLine(line);
-  }
-}
-
-void RunQueryAndPrintResult(FILE* input, FILE* output) {
+int RunQueryAndPrintResult(FILE* input, FILE* output) {
   char buffer[4096];
   bool is_first_query = true;
-  while (!feof(input) && !ferror(input)) {
+  bool is_query_error = false;
+  bool has_output_printed = false;
+  while (!feof(input) && !ferror(input) && !is_query_error) {
     // Add an extra newline separator between query results.
     if (!is_first_query)
       fprintf(output, "\n");
@@ -269,10 +263,28 @@ void RunQueryAndPrintResult(FILE* input, FILE* output) {
 
     protos::RawQueryArgs query;
     query.set_sql_query(sql_query);
-    g_tp->ExecuteQuery(query, [output](const protos::RawQueryResult& res) {
+    g_tp->ExecuteQuery(query, [output, &is_query_error, &has_output_printed](
+                                  const protos::RawQueryResult& res) {
+      if (res.has_error()) {
+        PERFETTO_ELOG("SQLite error: %s", res.error().c_str());
+        is_query_error = true;
+        return;
+      } else if (res.num_records() != 0) {
+        if (has_output_printed) {
+          PERFETTO_ELOG("Multiple queries had output; this is unsupported");
+          is_query_error = true;
+          return;
+        }
+        has_output_printed = true;
+      }
       PrintQueryResultAsCsv(res, output);
     });
   }
+  return is_query_error ? 1 : 0;
+}
+
+void PrintUsage(char** argv) {
+  PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.proto", argv[0]);
 }
 
 }  // namespace
@@ -362,14 +374,12 @@ int main(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  // If there is no query file, start a shell. Otherwise run the queries and
-  // print the results.
+  // If there is no query file, start a shell.
   if (query_file_path == nullptr) {
-    StartInteractiveShell();
-  } else {
-    base::ScopedFstream file(fopen(query_file_path, "r"));
-    RunQueryAndPrintResult(file.get(), stdout);
+    return StartInteractiveShell();
   }
 
-  return 0;
+  // Otherwise run the queries and print the results.
+  base::ScopedFstream file(fopen(query_file_path, "r"));
+  return RunQueryAndPrintResult(file.get(), stdout);
 }
