@@ -193,7 +193,7 @@ export const StateActions = {
     const config = state.recordConfig as any;
     const options = config[args.name];
     for (const option of args.optionsToAdd) {
-      if (options.includes(option)) return;
+      if (options.includes(option)) continue;
       options.push(option);
     }
   },
@@ -206,7 +206,7 @@ export const StateActions = {
         const options = config[args.name];
         for (const option of args.optionsToRemove) {
           const index = options.indexOf(option);
-          if (index === -1) return;
+          if (index === -1) continue;
           options.splice(index, 1);
         }
       },
