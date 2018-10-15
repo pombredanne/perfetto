@@ -34,10 +34,12 @@ inline std::string FormatProcess(const protos::ProcessTree::Process& p) {
 
 inline std::string FormatThread(const protos::ProcessTree::Thread& t) {
   char line[2048];
-  std::string name = "<...>";
+  std::string name;
   if (t.has_name()) {
     name = t.name();
-  };
+  } else {
+    name = "<...>";
+  }
   sprintf(line, "root         %d %d %s", t.tgid(), t.tid(), name.c_str());
   return line;
 };

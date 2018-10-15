@@ -2870,10 +2870,17 @@ std::string FormatPrefix(uint64_t timestamp,
   if (pid == 0) {
     name = "<idle>";
   }
-  sprintf(line,
-          "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32 "] d..3 %" PRIu64
-          ".%.6" PRIu64 ": ",
-          name.c_str(), pid, tgid, cpu, seconds, useconds);
+  if (tgid == 0) {
+    sprintf(line,
+            "%s-%" PRIu32 "     (-----) [%03" PRIu32 "] d..3 %" PRIu64
+            ".%.6" PRIu64 ": ",
+            name.c_str(), pid, cpu, seconds, useconds);
+  } else {
+    sprintf(line,
+            "%s-%" PRIu32 "     (%5" PRIu32 ") [%03" PRIu32 "] d..3 %" PRIu64
+            ".%.6" PRIu64 ": ",
+            name.c_str(), pid, tgid, cpu, seconds, useconds);
+  }
   return std::string(line);
 }
 

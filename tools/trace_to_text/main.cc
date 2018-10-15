@@ -205,13 +205,14 @@ int TraceToSystrace(std::istream* input,
           packets_to_process.emplace_back(std::move(packet));
           return;
         }
-
         const ProcessTree& process_tree = packet.process_tree();
         for (const auto& process : process_tree.processes()) {
+          // Main threads will have the same pid as tgid.
+          thread_map[static_cast<uint32_t>(process.pid())] =
+              static_cast<uint32_t>(process.pid());
           std::string p = FormatProcess(process);
           proc_dump.emplace_back(p);
         }
-
         for (const auto& thread : process_tree.threads()) {
           // Populate thread map for matching tids to tgids.
           thread_map[static_cast<uint32_t>(thread.tid())] =
@@ -219,7 +220,6 @@ int TraceToSystrace(std::istream* input,
           std::string t = FormatThread(thread);
           thread_dump.emplace_back(t);
         }
-
       });
 
   for (const auto& packet : packets_to_process) {
