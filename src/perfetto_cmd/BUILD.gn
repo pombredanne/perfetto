@@ -28,6 +28,8 @@ source_set("perfetto_cmd") {
     "../tracing:ipc_consumer",
   ]
   sources = [
+    "pbtxt_to_pb.cc",
+    "pbtxt_to_pb.h",
     "perfetto_cmd.cc",
     "perfetto_cmd.h",
     "rate_limiter.cc",
@@ -53,8 +55,10 @@ source_set("unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../include/perfetto/base",
+    "../../protos/perfetto/config:lite",
   ]
   sources = [
+    "pbtxt_to_pb_unittest.cc",
     "rate_limiter_unittest.cc",
   ]
 }
