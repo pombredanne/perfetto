@@ -64,7 +64,7 @@ int HeapprofdMain(int argc, char** argv) {
   // and receives its configuration via that.
   double sampling_rate = kDefaultSamplingRate;
   int opt;
-  while ((opt = getopt(argc, argv, "r:"))) {
+  while ((opt = getopt(argc, argv, "r:")) != -1) {
     switch (opt) {
       case 'r': {
         char* end;
@@ -102,12 +102,12 @@ int HeapprofdMain(int argc, char** argv) {
                           &callsites);
 
   base::UnixTaskRunner read_task_runner;
-  if (optind == argc - 2) {
+  if (optind == argc - 1) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
     sock =
         base::UnixSocket::Listen(argv[argc - 1], &listener, &read_task_runner);
-  } else if (optind == argc - 1) {
+  } else if (optind == argc) {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
     // variable.
