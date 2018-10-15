@@ -53,14 +53,38 @@ export interface PermalinkConfig {
 
 export interface RecordConfig {
   [key: string]: number|boolean|string|string[];
+
+  displayConfigAsPbtxt: boolean;
+
+  // Global settings
   durationSeconds: number;
+  writeIntoFile: boolean;
+  fileWritePeriodMs: number;
+
+  // Buffer setup
   bufferSizeMb: number;
+
+  // Ps
   processMetadata: boolean;
   scanAllProcessesOnStart: boolean;
+
+  // Ftrace
   ftrace: boolean;
   ftraceEvents: string[];
   atraceCategories: string[];
   atraceApps: string[];
+  ftraceDrainPeriodMs: number;
+  ftraceBufferSizeKb: number;
+
+
+  // SysStats
+  sysStats: boolean;
+  meminfoPeriodMs: number;
+  meminfoCounters: string[];
+  vmstatPeriodMs: number;
+  vmstatCounters: string[];
+  statPeriodMs: number;
+  statCounters: string[];
 }
 
 export interface TraceTime {
@@ -123,12 +147,27 @@ export function createEmptyState(): State {
 export function createEmptyRecordConfig(): RecordConfig {
   return {
     durationSeconds: 10.0,
+    writeIntoFile: false,
+    fileWritePeriodMs: 0,
     bufferSizeMb: 10.0,
     processMetadata: false,
     scanAllProcessesOnStart: false,
+
     ftrace: false,
     ftraceEvents: [],
     atraceApps: [],
     atraceCategories: [],
+    ftraceDrainPeriodMs: 0,
+    ftraceBufferSizeKb: 0,
+
+    sysStats: false,
+    meminfoPeriodMs: 0,
+    meminfoCounters: [],
+    vmstatPeriodMs: 0,
+    vmstatCounters: [],
+    statPeriodMs: 0,
+    statCounters: [],
+
+    displayConfigAsPbtxt: false,
   };
 }

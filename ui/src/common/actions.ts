@@ -187,23 +187,28 @@ export const StateActions = {
     config[args.name] = args.value;
   },
 
-  addConfigControl(state: StateDraft, args: {name: string; option: string;}):
-      void {
-        // tslint:disable-next-line no-any
-        const config = state.recordConfig as any;
-        const options = config[args.name];
-        if (options.includes(args.option)) return;
-        options.push(args.option);
-      },
+  addConfigControl(
+      state: StateDraft, args: {name: string; optionsToAdd: string[];}): void {
+    // tslint:disable-next-line no-any
+    const config = state.recordConfig as any;
+    const options = config[args.name];
+    for (const option of args.optionsToAdd) {
+      if (options.includes(option)) return;
+      options.push(option);
+    }
+  },
 
-  removeConfigControl(state: StateDraft, args: {name: string; option: string;}):
+  removeConfigControl(
+      state: StateDraft, args: {name: string; optionsToRemove: string[];}):
       void {
         // tslint:disable-next-line no-any
         const config = state.recordConfig as any;
         const options = config[args.name];
-        const index = options.indexOf(args.option);
-        if (index === -1) return;
-        options.splice(index, 1);
+        for (const option of args.optionsToRemove) {
+          const index = options.indexOf(option);
+          if (index === -1) return;
+          options.splice(index, 1);
+        }
       },
 };
 

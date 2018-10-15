@@ -15,10 +15,18 @@
 import * as m from 'mithril';
 
 import {Actions} from '../common/actions';
+import {MeminfoCounters, StatCounters, VmstatCounters} from '../common/protos';
 
 import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
 import {createPage} from './pages';
+
+const COUNTER_PRESETS = [
+  {label: '0ms', value: 0},
+  {label: '10ms', value: 10},
+  {label: '50ms', value: 50},
+  {label: '500ms', value: 500},
+];
 
 const CONFIG_PROTO_URL =
     `https://android.googlesource.com/platform/external/perfetto/+/master/protos/perfetto/config/perfetto_config.proto`;
@@ -302,7 +310,6 @@ const ATRACE_CATERGORIES = [
 const ATRACE_APPS = [
   'com.android.chrome',
   'com.android.bluetooth',
-  'com.android.chrome',
   'com.android.nfc',
   'com.android.phone',
   'com.android.settings',
@@ -321,12 +328,14 @@ const ATRACE_APPS = [
   'com.google.android.volta',
 ];
 
-const DURATION_HELP = `Duration to trace for.`;
-const BUFFER_SIZE_HELP = `Size of the ring buffer which stores the trace.`;
+const DURATION_HELP = `Duration to trace for`;
+const BUFFER_SIZE_HELP = `Size of the ring buffer which stores the trace`;
 const PROCESS_METADATA_HELP =
-    `Record process names and parent child relationships.`;
+    `Record process names and parent child relationships`;
 const SCAN_ALL_PROCESSES_ON_START_HELP =
-    `When tracing begins read metadata for all processes.`;
+    `When tracing begins read metadata for all processes`;
+const FTRACE_AND_ATRACE_HELP = `Record ftrace & atrace events`;
+const SYS_STATS_HELP = ``;
 
 function toId(label: string): string {
   return label.toLowerCase().replace(' ', '-');
@@ -387,22 +396,42 @@ interface MultiSelectAttrs {
   label: string;
   selected: string[];
   options: string[];
-  onadd: (value: string) => void;
-  onsubtract: (value: string) => void;
+  onadd: (values: string[]) => void;
+  onsubtract: (values: string[]) => void;
 }
 
 class MultiSelect implements m.ClassComponent<MultiSelectAttrs> {
   view({attrs}: m.CVnode<MultiSelectAttrs>) {
+    const unselected = attrs.options.filter(o => !attrs.selected.includes(o));
     return m(
         'label.multiselect',
-        {class: attrs.enabled ? '' : 'disabled'},
-        attrs.label,
+      {
+        class: attrs.enabled ? '' : 'disabled',
+        for: `multiselect-${toId(attrs.label)}`,
+      },
+      attrs.label,
+      m('div',
+        unselected.length === 0 ?
+        m('button', {
+          disabled: !attrs.enabled,
+          onclick: () => {
+        attrs.onsubtract(attrs.selected);
+          },
+        }, 'Remove all') :
+        m('button', {
+          disabled: !attrs.enabled,
+          onclick: () => {
+        attrs.onadd(unselected);
+          },
+        }, 'Add all'),
+      ),
         m('input', {
+          id: `multiselect-${toId(attrs.label)}`,
           list: toId(attrs.label),
           disabled: !attrs.enabled,
           onchange: (e: Event) => {
             const elem = e.target as HTMLInputElement;
-            attrs.onadd(elem.value);
+            attrs.onadd([elem.value]);
             elem.value = '';
           },
         }),
@@ -417,7 +446,8 @@ class MultiSelect implements m.ClassComponent<MultiSelectAttrs> {
               selected =>
                   m('button.multiselect-selected',
                     {
-                      onclick: (_: Event) => attrs.onsubtract(selected),
+                      disabled: !attrs.enabled,
+                      onclick: (_: Event) => attrs.onsubtract([selected]),
                     },
                     selected))), );
   }
@@ -431,6 +461,7 @@ interface Preset {
 interface NumericAttrs {
   label: string;
   sublabel: string;
+  enabled: boolean;
   help: string;
   value: number;
   onchange: (value: number) => void;
@@ -444,6 +475,7 @@ class Numeric implements m.ClassComponent<NumericAttrs> {
         {
           'for': `range-${attrs.label}`,
           'title': attrs.help,
+          class: attrs.enabled ? '' : 'disabled',
         },
         attrs.label,
         m('.range-control',
@@ -451,6 +483,7 @@ class Numeric implements m.ClassComponent<NumericAttrs> {
               p =>
                   m('button',
                     {
+                      disabled: !attrs.enabled,
                       class: attrs.value === p.value ? 'selected' : '',
                       onclick: () => attrs.onchange(p.value),
                     },
@@ -458,14 +491,35 @@ class Numeric implements m.ClassComponent<NumericAttrs> {
           m('input[type=number][min=0]', {
             id: `range-${attrs.label}`,
             value: attrs.value,
-            onchange: m.withAttr('value', attrs.onchange),
+            disabled: !attrs.enabled,
+            onchange: m.withAttr('value', s => attrs.onchange(Number(s))),
           })),
         m('small', attrs.sublabel), );
   }
 }
 
+
+function onAdd(name: string) {
+  return (optionsToAdd: string[]) => {
+    globals.dispatch(Actions.addConfigControl({name, optionsToAdd}));
+  };
+}
+
+function onSubtract(name: string) {
+  return (optionsToRemove: string[]) => {
+    globals.dispatch(Actions.removeConfigControl({name, optionsToRemove}));
+  };
+}
+
+function onChange<T extends string|number|boolean>(name: string) {
+  return (value: T) => {
+    globals.dispatch(Actions.setConfigControl({name, value}));
+  };
+}
+
 export const RecordPage = createPage({
   view() {
+    console.log(MeminfoCounters);
     const state = globals.state.recordConfig;
     const data = globals.trackDataStore.get('config') as {
       commandline: string,
@@ -474,44 +528,61 @@ export const RecordPage = createPage({
     return m(
         '.record-page',
 
-        m('.text-column', ),
-        m('.text-column', `To collect a ${state.durationSeconds}
+        m('.text-column.top'),
+        m('.text-column.top', `To collect a ${state.durationSeconds}
           second Perfetto trace from an Android phone run this command:`),
-        m('.text-column',
-          `A Perfetto config controls what and how much information is
+        state.displayConfigAsPbtxt ?
+            m('.text-column.top',
+              `A Perfetto config controls what and how much information is
         collected. It is encoded as a `,
-          m('a',
-            {
-              href: CONFIG_PROTO_URL,
-            },
-            'proto'),
-          '.'),
+              m('a',
+                {
+                  href: CONFIG_PROTO_URL,
+                },
+                'proto'),
+              '.') :
+            null,
 
-        m('.text-column',
+        m('.text-column.bottom',
           m(Numeric, {
+            enabled: true,
             label: 'Duration',
             sublabel: 's',
             value: state.durationSeconds,
             help: DURATION_HELP,
-            onchange: (value: number) => {
-              globals.dispatch(
-                  Actions.setConfigControl({name: 'durationSeconds', value}));
-            },
+            onchange: onChange<number>('durationSeconds'),
             presets: [
               {label: '10s', value: 10},
               {label: '1m', value: 60},
             ]
           }),
 
+          m(Toggle, {
+            label: 'Periodically flush to file',
+            help: '',
+            value: state.writeIntoFile,
+            enabled: true,
+            onchange: onChange<boolean>('writeIntoFile'),
+          }),
+          m('.control-group', m(Numeric, {
+              enabled: state.writeIntoFile,
+              label: 'File flush period',
+              sublabel: 'ms',
+              value: state.fileWritePeriodMs,
+              help: '',
+              onchange: onChange<number>('fileWritePeriodMs'),
+              presets: [
+                {label: '5000ms', value: 5000},
+              ]
+            }), ),
+
           m(Numeric, {
+            enabled: true,
             label: 'Buffer size',
             sublabel: 'mb',
             help: BUFFER_SIZE_HELP,
             value: state.bufferSizeMb,
-            onchange: (value: number) => {
-              globals.dispatch(
-                  Actions.setConfigControl({name: 'bufferSizeMb', value}));
-            },
+            onchange: onChange<number>('bufferSizeMb'),
             presets: [
               {label: '1mb', value: 1},
               {label: '10mb', value: 10},
@@ -524,31 +595,22 @@ export const RecordPage = createPage({
             help: PROCESS_METADATA_HELP,
             value: state.processMetadata,
             enabled: true,
-            onchange: (value: boolean) => {
-              globals.dispatch(
-                  Actions.setConfigControl({name: 'processMetadata', value}));
-            },
+            onchange: onChange<boolean>('processMetadata'),
           }),
           m('.control-group', m(Toggle, {
               label: 'Scan all processes on start',
               value: state.scanAllProcessesOnStart,
               help: SCAN_ALL_PROCESSES_ON_START_HELP,
               enabled: state.processMetadata,
-              onchange: (value: boolean) => {
-                globals.dispatch(Actions.setConfigControl(
-                    {name: 'scanAllProcessesOnStart', value}));
-              },
-            }), ),
+              onchange: onChange<boolean>('scanAllProcessesOnStart'),
+            })),
 
           m(Toggle, {
             label: 'Ftrace & Atrace',
             value: state.ftrace,
             enabled: true,
-            help: SCAN_ALL_PROCESSES_ON_START_HELP,
-            onchange: (value: boolean) => {
-              globals.dispatch(
-                  Actions.setConfigControl({name: 'ftrace', value}));
-            },
+            help: FTRACE_AND_ATRACE_HELP,
+            onchange: onChange<boolean>('ftrace'),
           }),
 
           m('.control-group',
@@ -557,14 +619,8 @@ export const RecordPage = createPage({
               enabled: state.ftrace,
               selected: state.ftraceEvents,
               options: FTRACE_EVENTS,
-              onadd: (option: string) => {
-                globals.dispatch(
-                    Actions.addConfigControl({name: 'ftraceEvents', option}));
-              },
-              onsubtract: (option: string) => {
-                globals.dispatch(Actions.removeConfigControl(
-                    {name: 'ftraceEvents', option}));
-              },
+              onadd: onAdd('ftraceEvents'),
+              onsubtract: onSubtract('ftraceEvents'),
             }),
 
             m(MultiSelect, {
@@ -572,14 +628,8 @@ export const RecordPage = createPage({
               enabled: state.ftrace,
               selected: state.atraceCategories,
               options: ATRACE_CATERGORIES,
-              onadd: (option: string) => {
-                globals.dispatch(Actions.addConfigControl(
-                    {name: 'atraceCategories', option}));
-              },
-              onsubtract: (option: string) => {
-                globals.dispatch(Actions.removeConfigControl(
-                    {name: 'atraceCategories', option}));
-              },
+              onadd: onAdd('atraceCategories'),
+              onsubtract: onSubtract('atraceCategories'),
             }),
 
             m(MultiSelect, {
@@ -587,26 +637,134 @@ export const RecordPage = createPage({
               enabled: state.ftrace,
               selected: state.atraceApps,
               options: ATRACE_APPS,
-              onadd: (option: string) => {
-                globals.dispatch(
-                    Actions.addConfigControl({name: 'atraceApps', option}));
-              },
-              onsubtract: (option: string) => {
-                globals.dispatch(
-                    Actions.removeConfigControl({name: 'atraceApps', option}));
-              },
-            }), ),
+              onadd: onAdd('atraceApps'),
+              onsubtract: onSubtract('atraceApps'),
+            }),
+
+            m(Numeric, {
+              enabled: state.ftrace,
+              label: 'Ftrace drain period',
+              sublabel: 'ms',
+              help: '',
+              value: state.ftraceDrainPeriodMs,
+              onchange: onChange<number>('ftraceDrainPeriodMs'),
+              presets: [
+                {label: '10ms', value: 10},
+                {label: '100ms', value: 100},
+                {label: '400ms', value: 400},
+              ]
+            }),
+
+            m(Numeric, {
+              enabled: state.ftrace,
+              label: 'Ftrace buffer size',
+              sublabel: 'kb',
+              help: '',
+              value: state.ftraceBufferSizeKb,
+              onchange: onChange<number>('ftraceBufferSizeKb'),
+              presets: [
+                {label: '20mb', value: 20 * 1024},
+              ]
+            }),
+
+            ),
+
+          m(Toggle, {
+            label: 'Sys Stats',
+            value: state.sysStats,
+            enabled: true,
+            help: SYS_STATS_HELP,
+            onchange: onChange<boolean>('sysStats'),
+          }),
+
+          m('.control-group',
+            m(Numeric, {
+              label: 'Stats sample period',
+              sublabel: 'ms',
+              enabled: state.sysStats,
+              help: '',
+              value: state.statPeriodMs,
+              onchange: onChange<number>('statPeriodMs'),
+              presets: COUNTER_PRESETS,
+            }),
+
+            m(MultiSelect, {
+              label: 'Stat Counters',
+              enabled: state.sysStats && (state.statPeriodMs !== 0),
+              selected: state.statCounters,
+              options: Object.keys(StatCounters)
+                           .filter(c => c !== 'STAT_UNSPECIFIED'),
+              onadd: onAdd('statCounters'),
+              onsubtract: onSubtract('statCounters'),
+            }),
+
+
+            m(Numeric, {
+              label: 'Meminfo sample period',
+              sublabel: 'ms',
+              enabled: state.sysStats,
+              help: '',
+              value: state.meminfoPeriodMs,
+              onchange: onChange<number>('meminfoPeriodMs'),
+              presets: COUNTER_PRESETS,
+            }),
+
+            m(MultiSelect, {
+              label: 'Meminfo Counters',
+              enabled: state.sysStats && (state.meminfoPeriodMs !== 0),
+              selected: state.meminfoCounters,
+              options: Object.keys(MeminfoCounters)
+                           .filter(c => c !== 'MEMINFO_UNSPECIFIED'),
+              onadd: onAdd('meminfoCounters'),
+              onsubtract: onSubtract('meminfoCounters'),
+            }),
+
+            m(Numeric, {
+              label: 'Vmstat sample period',
+              sublabel: 'ms',
+              enabled: state.sysStats,
+              help: '',
+              value: state.vmstatPeriodMs,
+              onchange: onChange<number>('vmstatPeriodMs'),
+              presets: COUNTER_PRESETS,
+            }),
+
+            m(MultiSelect, {
+              label: 'Vmstat Counters',
+              enabled: state.sysStats && (state.vmstatPeriodMs !== 0),
+              selected: state.vmstatCounters,
+              options: Object.keys(VmstatCounters)
+                           .filter(c => c !== 'VMSTAT_UNSPECIFIED'),
+              onadd: onAdd('vmstatCounters'),
+              onsubtract: onSubtract('vmstatCounters'),
+            }),
+
+            ),
+
+          m('hr'),
+
+
+          m(Toggle, {
+            label: 'Display config as pbtxt',
+            value: state.displayConfigAsPbtxt,
+            enabled: true,
+            help: '',
+            onchange: onChange<boolean>('displayConfigAsPbtxt'),
+          }),
+
 
           ),
 
         data ?
             [
-              m('.text-column',
+              m('.text-column.bottom',
                 m(CodeSample, {text: data.commandline}),
                 'Then click "Open trace file" in the menu to the left and select',
                 ' "/tmp/trace".', ),
-              m('.text-column',
-                m(CodeSample, {text: data.pbtxt, hardWhitespace: true}), ),
+              state.displayConfigAsPbtxt ?
+                  m('.text-column.bottom',
+                    m(CodeSample, {text: data.pbtxt, hardWhitespace: true})) :
+                  null,
             ] :
             null);
   }
