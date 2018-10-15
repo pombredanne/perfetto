@@ -189,8 +189,8 @@ int TraceToSystrace(std::istream* input,
                     std::ostream* output,
                     bool wrap_in_json) {
   std::multimap<uint64_t, std::string> ftrace_sorted;
-  std::vector<std::string> processes;
-  std::vector<std::string> threads;
+  std::vector<std::string> proc_dump;
+  std::vector<std::string> thread_dump;
   std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/> thread_map;
 
   std::vector<const char*> meminfo_strs = BuildMeminfoCounterNames();
@@ -198,25 +198,29 @@ int TraceToSystrace(std::istream* input,
 
   std::vector<const protos::TracePacket> packets_to_process;
 
-  ForEachPacketInTrace(input, [&thread_map, &packets_to_process, &processes,
-                               &threads](const protos::TracePacket& packet) {
-    const ProcessTree& process_tree = packet.process_tree();
-    if (packet.has_process_tree()) {
-      for (const auto& process : process_tree.processes()) {
-        std::string p = FormatProcess(process);
-        processes.emplace_back(p);
-      }
-      for (const auto& thread : process_tree.threads()) {
-        // Populate thread map for matching tids to tgids.
-        thread_map[static_cast<uint32_t>(thread.tid())] =
-            static_cast<uint32_t>(thread.tgid());
-        std::string t = FormatThread(thread);
-        threads.emplace_back(t);
-      }
-    } else {
-      packets_to_process.emplace_back(packet);
-    }
-  });
+  ForEachPacketInTrace(
+      input, [&thread_map, &packets_to_process, &proc_dump,
+              &thread_dump](const protos::TracePacket& packet) {
+        if (!packet.has_process_tree()) {
+          packets_to_process.emplace_back(std::move(packet));
+          return;
+        }
+
+        const ProcessTree& process_tree = packet.process_tree();
+        for (const auto& process : process_tree.processes()) {
+          std::string p = FormatProcess(process);
+          proc_dump.emplace_back(p);
+        }
+
+        for (const auto& thread : process_tree.threads()) {
+          // Populate thread map for matching tids to tgids.
+          thread_map[static_cast<uint32_t>(thread.tid())] =
+              static_cast<uint32_t>(thread.tgid());
+          std::string t = FormatThread(thread);
+          thread_dump.emplace_back(t);
+        }
+
+      });
 
   for (const auto& packet : packets_to_process) {
     if (packet.has_ftrace_events()) {
@@ -260,11 +264,11 @@ int TraceToSystrace(std::istream* input,
   if (wrap_in_json) {
     *output << kTraceHeader;
     *output << kProcessDumpHeader;
-    for (const auto& process : processes) {
+    for (const auto& process : proc_dump) {
       *output << process << "\\n";
     }
     *output << kThreadHeader;
-    for (const auto& thread : threads) {
+    for (const auto& thread : thread_dump) {
       *output << thread << "\\n";
     }
     *output << "\",";

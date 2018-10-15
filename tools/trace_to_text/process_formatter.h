@@ -23,8 +23,24 @@
 
 namespace perfetto {
 
-std::string FormatProcess(const protos::ProcessTree::Process&);
-std::string FormatThread(const protos::ProcessTree::Thread&);
+inline std::string FormatProcess(const protos::ProcessTree::Process& p) {
+  char line[2048];
+  sprintf(line,
+          "root             %d     %d   00000   000 null 0000000000 S %s       "
+          "  null",
+          p.pid(), p.ppid(), p.cmdline(0).c_str());
+  return line;
+};
+
+inline std::string FormatThread(const protos::ProcessTree::Thread& t) {
+  char line[2048];
+  std::string name = "<...>";
+  if (t.has_name()) {
+    name = t.name();
+  };
+  sprintf(line, "root         %d %d %s", t.tgid(), t.tid(), name.c_str());
+  return line;
+};
 
 }  // namespace perfetto
 
