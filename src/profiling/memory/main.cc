@@ -124,7 +124,7 @@ int HeapprofdMain(int argc, char** argv) {
     sock = base::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
                                     &read_task_runner);
   } else {
-    PERFETTO_FATAL("Invalid number of arguments. %s {-r rate} [SOCKET]",
+    PERFETTO_FATAL("Invalid number of arguments. %s [-r rate] [SOCKET]",
                    argv[0]);
   }
 
