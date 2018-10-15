@@ -67,9 +67,9 @@ int HeapprofdMain(int argc, char** argv) {
   while ((opt = getopt(argc, argv, "r:"))) {
     switch (opt) {
       case 'r': {
-        char* endptr;
-        sampling_rate = strtol(optarg, &endptr, 10);
-        if (*endptr != '\0' || *optarg == '\0')
+        char* end;
+        sampling_rate = strtol(optarg, &end, 10);
+        if (*end != '\0' || *optarg == '\0')
           PERFETTO_FATAL("Invalid sampling rate: %s", optarg);
         break;
       }
