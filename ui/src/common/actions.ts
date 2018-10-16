@@ -182,7 +182,7 @@ export const StateActions = {
   // aosp/778194
   setConfigControl(
       state: StateDraft,
-      args: {name: string; value: string | number | boolean;}): void {
+      args: {name: string; value: string | number | boolean | null;}): void {
     const config = state.recordConfig;
     config[args.name] = args.value;
   },

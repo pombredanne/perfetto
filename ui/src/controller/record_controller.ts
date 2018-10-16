@@ -126,8 +126,8 @@ export function toPbtxt(configBuffer: Uint8Array): string {
   function snakeCase(s: string): string {
     return s.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
   }
-  // TODO(hjd): With the ahead of time compiled protos we can't seem to
-  // tell which fields are enums.
+  // With the ahead of time compiled protos we can't seem to tell which
+  // fields are enums.
   function looksLikeEnum(value: string): boolean {
     return value.startsWith('MEMINFO_') || value.startsWith('VMSTAT_') ||
         value.startsWith('STAT_');

@@ -1,3 +1,4 @@
+// Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +13,31 @@
 // limitations under the License.
 
 .record-page {
+  &.three {
+    @media (min-width: 2000px) {
+      grid-template: "config command pbtxt" auto / auto auto auto;
+    }
+    grid-template: "config command" min-content "config pbtxt" auto / auto auto;
+  }
+
+  &.two {
+    grid-template: "config command" auto / auto auto;
+  }
+
+  .config {
+    grid-area: config;
+  }
+
+  .command {
+    grid-area: command;
+  }
+
+  .pbtxt {
+    grid-area: pbtxt;
+  }
+
   display: grid;
   justify-content: space-evenly;
-  grid-template-rows: auto 1fr;
   grid-column-gap: 2rem;
   padding: 2rem;
   overflow-y: scroll;
@@ -23,11 +46,14 @@
     overflow: initial;
   }
 
-  .top {
-    grid-row: 1;
+  i {
+    display: block;
+    padding: 0.5rem 0;
+    font-size: smaller;
   }
-  .bottom {
-    grid-row: 2;
+
+  .heading {
+    padding-top: 0.75rem;
   }
 
   .control-group {
@@ -37,7 +63,7 @@
   .text-column {
     // 2-3 alphabets per line is comfortable for reading.
     // https://practicaltypography.com/line-length.html
-    width: calc(26ch*2.34 + 1rem);
+    max-width: calc(26ch*2.34 + 1rem);
     user-select: text;
     word-break: break-word;
   }
@@ -86,7 +112,7 @@
   }
 
   label {
-    margin: 0.75rem 0;
+    margin-bottom: 0.75rem;
     overflow: visible;
   }
 
@@ -117,7 +143,7 @@
       }
     }
     & * {
-      transition: opacity 0.3s ease;
+      @include transition(0.3s);
     }
     &.disabled * {
       opacity: 0;
@@ -150,11 +176,11 @@
         margin-top: 0.5rem;
         padding: 3px;
         border-radius: 4px;
-        background-color: #e3f2fd;
+        background-color: #fde3e3;
       }
     }
     & * {
-      transition: opacity 0.3s ease;
+      @include transition(0.3s);
     }
     &.disabled * {
       opacity: 0;
@@ -215,7 +241,7 @@
     }
   }
 
-  label.disabled {
+  .disabled {
     color: grey;
     filter: grayscale(1);
   }

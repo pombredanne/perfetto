@@ -52,14 +52,14 @@ export interface PermalinkConfig {
 }
 
 export interface RecordConfig {
-  [key: string]: number|boolean|string|string[];
+  [key: string]: null|number|boolean|string|string[];
 
   displayConfigAsPbtxt: boolean;
 
   // Global settings
   durationSeconds: number;
   writeIntoFile: boolean;
-  fileWritePeriodMs: number;
+  fileWritePeriodMs: number|null;
 
   // Buffer setup
   bufferSizeMb: number;
@@ -73,17 +73,17 @@ export interface RecordConfig {
   ftraceEvents: string[];
   atraceCategories: string[];
   atraceApps: string[];
-  ftraceDrainPeriodMs: number;
-  ftraceBufferSizeKb: number;
+  ftraceDrainPeriodMs: number|null;
+  ftraceBufferSizeKb: number|null;
 
 
   // SysStats
   sysStats: boolean;
-  meminfoPeriodMs: number;
+  meminfoPeriodMs: number|null;
   meminfoCounters: string[];
-  vmstatPeriodMs: number;
+  vmstatPeriodMs: number|null;
   vmstatCounters: string[];
-  statPeriodMs: number;
+  statPeriodMs: number|null;
   statCounters: string[];
 }
 
@@ -148,7 +148,7 @@ export function createEmptyRecordConfig(): RecordConfig {
   return {
     durationSeconds: 10.0,
     writeIntoFile: false,
-    fileWritePeriodMs: 0,
+    fileWritePeriodMs: null,
     bufferSizeMb: 10.0,
     processMetadata: false,
     scanAllProcessesOnStart: false,
@@ -157,15 +157,15 @@ export function createEmptyRecordConfig(): RecordConfig {
     ftraceEvents: [],
     atraceApps: [],
     atraceCategories: [],
-    ftraceDrainPeriodMs: 0,
-    ftraceBufferSizeKb: 0,
+    ftraceDrainPeriodMs: null,
+    ftraceBufferSizeKb: null,
 
     sysStats: false,
-    meminfoPeriodMs: 0,
+    meminfoPeriodMs: null,
     meminfoCounters: [],
-    vmstatPeriodMs: 0,
+    vmstatPeriodMs: null,
     vmstatCounters: [],
-    statPeriodMs: 0,
+    statPeriodMs: null,
     statCounters: [],
 
     displayConfigAsPbtxt: false,
