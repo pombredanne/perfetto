@@ -72,7 +72,7 @@ int HeapprofdMain(int argc, char** argv) {
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
   // We set this up before launching any threads, so we do not have to use a
   // std::atomic for g_dump_evt.
-  g_dump_evt = new base::Event;
+  g_dump_evt = new base::Event();
 
   struct sigaction action = {};
   action.sa_handler = DumpSignalHandler;
@@ -85,10 +85,9 @@ int HeapprofdMain(int argc, char** argv) {
     bookkeeping_queue.Add(std::move(rec));
   });
 
-  GlobalCallstackTrie callsites;
   std::unique_ptr<base::UnixSocket> sock;
 
-  BookkeepingThread bookkeeping_thread(&callsites, "/data/local/tmp/heap_dump");
+  BookkeepingThread bookkeeping_thread("/data/local/tmp/heap_dump");
   std::thread bookkeeping_th([&bookkeeping_thread, &bookkeeping_queue] {
     bookkeeping_thread.Run(&bookkeeping_queue);
   });

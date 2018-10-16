@@ -36,6 +36,7 @@ struct UnwindingRecord {
 
 struct FreeRecord {
   std::unique_ptr<uint8_t[]> free_data;
+  // This is a pointer into free_data.
   FreeMetadata* metadata;
 };
 

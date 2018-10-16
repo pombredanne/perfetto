@@ -201,7 +201,7 @@ struct BookkeepingData {
   HeapTracker heap_tracker;
 
   // This is different to a shared_ptr to HeapTracker, because we want to keep
-  // it around until the first dump after the last socker for the PID has
+  // it around until the first dump after the last socket for the PID has
   // disconnected.
   uint64_t ref_count = 0;
 };
@@ -210,27 +210,26 @@ struct BookkeepingData {
 // method receives messages on the input_queue and does the bookkeeping.
 class BookkeepingThread {
  public:
-  BookkeepingThread(GlobalCallstackTrie* callsites, std::string file_name)
-      : callsites_(callsites), file_name_(file_name) {}
+  BookkeepingThread(std::string file_name) : file_name_(file_name) {}
 
   void Run(BoundedQueue<BookkeepingRecord>* input_queue);
 
   // Inform the bookkeeping thread that a socket for this pid connected.
   //
   // This can be called from arbitrary threads.
-  void AddSocketForPid(pid_t pid);
+  void NotifyClientConnected(pid_t pid);
 
   // Inform the bookkeeping thread that a socket for this pid disconnected.
-  // The BookkeepingData is garbage-collected after the first Dump after
-  // the last socket for it disconnected.
+  // After the last client for a PID disconnects, the BookkeepingData is
+  // retained until the next dump, upon which it gets garbage collected.
   //
   // This can be called from arbitrary threads.
-  void RemoveSocketForPid(pid_t pid);
+  void NotifyClientDisconnected(pid_t pid);
 
   void HandleBookkeepingRecord(BookkeepingRecord* rec);
 
  private:
-  GlobalCallstackTrie* const callsites_;
+  GlobalCallstackTrie callsites_;
 
   std::map<pid_t, BookkeepingData> bookkeeping_data_;
   std::mutex bookkeeping_mutex_;

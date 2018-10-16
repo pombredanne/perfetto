@@ -183,7 +183,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
       if (fd)
         it->second.heap_tracker.Dump(fd.get());
       else
-        PERFETTO_LOG("Failed to open %s", dump_file_name.c_str());
+        PERFETTO_PLOG("Failed to open %s", dump_file_name.c_str());
       // Garbage collect for processes that already went away.
       if (it->second.ref_count == 0) {
         std::lock_guard<std::mutex> l(bookkeeping_mutex_);
@@ -217,17 +217,16 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   }
 }
 
-void BookkeepingThread::AddSocketForPid(pid_t pid) {
+void BookkeepingThread::NotifyClientConnected(pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   // emplace gives the existing BookkeepingData for pid if it already exists
   // or creates a new one.
-  std::pair<decltype(bookkeeping_data_)::iterator, bool> p =
-      bookkeeping_data_.emplace(pid, callsites_);
-  auto it = p.first;
-  it->second.ref_count++;
+  auto it_and_inserted = bookkeeping_data_.emplace(pid, &callsites_);
+  BookkeepingData& bk = it_and_inserted.first->second;
+  bk.ref_count++;
 }
 
-void BookkeepingThread::RemoveSocketForPid(pid_t pid) {
+void BookkeepingThread::NotifyClientDisconnected(pid_t pid) {
   std::lock_guard<std::mutex> l(bookkeeping_mutex_);
   auto it = bookkeeping_data_.find(pid);
   if (it == bookkeeping_data_.end()) {
