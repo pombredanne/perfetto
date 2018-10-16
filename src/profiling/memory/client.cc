@@ -134,8 +134,7 @@ BorrowedSocket SocketPool::Borrow() {
   });
 
   if (dead_sockets_ == sockets_.size()) {
-    PERFETTO_DCHECK(false);
-    return {base::ScopedFile(), this};
+    return {base::ScopedFile(), nullptr};
   }
 
   PERFETTO_CHECK(available_sockets_ > 0);
@@ -152,7 +151,6 @@ void SocketPool::Return(base::ScopedFile sock) {
     }
     cv_.notify_one();
   } else {
-    PERFETTO_DCHECK(false);
     dead_sockets_++;
     if (dead_sockets_ == sockets_.size())
       cv_.notify_all();
