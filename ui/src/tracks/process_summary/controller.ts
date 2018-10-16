@@ -98,9 +98,11 @@ class ProcessSummaryTrackController extends TrackController<Config, Data> {
         from span_${this.sqlTrackId}
         group by quantum_ts`;
 
-    const before = performance.now();
+    const beforeQuery = performance.now();
     const rawResult = await this.query(query);
-    console.log('UTIL computeSUmmary took ', performance.now() - before);
+    console.info('Summary query: ', query);
+    console.info(
+        'Summary query execution time: ', performance.now() - beforeQuery);
     const numRows = +rawResult.numRecords;
 
     const summary: Data = {
@@ -120,7 +122,6 @@ class ProcessSummaryTrackController extends TrackController<Config, Data> {
 
   // TODO(dproy); Dedup with other controllers.
   private async query(query: string) {
-    console.log('GROUP QUERY: ', query);
     const result = await this.engine.query(query);
     if (result.error) {
       console.error(`Query error "${query}": ${result.error}`);
