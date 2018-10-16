@@ -113,25 +113,6 @@ export const StateActions = {
     state.tracks[id].dataReq = undefined;
   },
 
-  // TODO(dproy): Reduce duplication with reqTrackData.
-  reqTrackGroupData(state: StateDraft, args: {
-    trackGroupId: string; start: number; end: number; resolution: number;
-  }): void {
-    const id = args.trackGroupId;
-    state.trackGroups[id].dataReq = {
-      start: args.start,
-      end: args.end,
-      resolution: args.resolution
-    };
-  },
-
-  // TODO(dproy): Reduce duplication with clearTrackDataReq.
-  clearTrackGroupDataReq(state: StateDraft, args: {trackGroupId: string}):
-      void {
-        const id = args.trackGroupId;
-        state.trackGroups[id].dataReq = undefined;
-      },
-
   executeQuery(
       state: StateDraft,
       args: {queryId: string; engineId: string; query: string}): void {
