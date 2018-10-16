@@ -48,8 +48,8 @@
 #include <signal.h>
 #endif
 
-using namespace perfetto;
-using namespace perfetto::trace_processor;
+namespace perfetto {
+namespace trace_processor {
 
 namespace {
 TraceProcessor* g_tp;
@@ -271,7 +271,9 @@ int RunQueryAndPrintResult(FILE* input, FILE* output) {
         return;
       } else if (res.num_records() != 0) {
         if (has_output_printed) {
-          PERFETTO_ELOG("Multiple queries had output; this is unsupported");
+          PERFETTO_ELOG(
+              "More than one query generated result rows. This is "
+              "unsupported.");
           is_query_error = true;
           return;
         }
@@ -287,9 +289,7 @@ void PrintUsage(char** argv) {
   PERFETTO_ELOG("Usage: %s [-d] [-q query.sql] trace_file.proto", argv[0]);
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+int TraceProcessorMain(int argc, char** argv) {
   if (argc < 2) {
     PrintUsage(argv);
     return 1;
@@ -382,4 +382,13 @@ int main(int argc, char** argv) {
   // Otherwise run the queries and print the results.
   base::ScopedFstream file(fopen(query_file_path, "r"));
   return RunQueryAndPrintResult(file.get(), stdout);
+}
+
+}  // namespace
+
+}  // namespace trace_processor
+}  // namespace perfetto
+
+int main(int argc, char** argv) {
+  return perfetto::trace_processor::TraceProcessorMain(argc, argv);
 }
