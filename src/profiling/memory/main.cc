@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <array>
 #include <memory>
 #include <vector>
@@ -34,7 +35,7 @@ namespace {
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
-constexpr double kSamplingRate = 128e3;
+constexpr double kDefaultSamplingRate = 1;
 
 base::Event* g_dump_evt = nullptr;
 
@@ -68,6 +69,22 @@ void DumpSignalHandler(int) {
 //           |Bookkeeping Thread|
 //           +------------------+
 int HeapprofdMain(int argc, char** argv) {
+  // TODO(fmayer): This is temporary until heapprofd is integrated with Perfetto
+  // and receives its configuration via that.
+  double sampling_rate = kDefaultSamplingRate;
+  int opt;
+  while ((opt = getopt(argc, argv, "r:")) != -1) {
+    switch (opt) {
+      case 'r': {
+        char* end;
+        sampling_rate = strtol(optarg, &end, 10);
+        if (*end != '\0' || *optarg == '\0')
+          PERFETTO_FATAL("Invalid sampling rate: %s", optarg);
+        break;
+      }
+    }
+  }
+
   base::UnixTaskRunner task_runner;
   BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
   // We set this up before launching any threads, so we do not have to use a
@@ -107,14 +124,14 @@ int HeapprofdMain(int argc, char** argv) {
     unwinder_queues[static_cast<size_t>(r.pid) % kUnwinderThreads].Add(
         std::move(r));
   };
-  SocketListener listener({kSamplingRate}, std::move(on_record_received),
+  SocketListener listener({sampling_rate}, std::move(on_record_received),
                           &bookkeeping_thread);
 
-  if (argc == 2) {
+  if (optind == argc - 1) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
-    sock = base::UnixSocket::Listen(argv[1], &listener, &task_runner);
-  } else if (argc == 1) {
+    sock = base::UnixSocket::Listen(argv[argc - 1], &listener, &task_runner);
+  } else if (optind == argc) {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
     // variable.
@@ -131,7 +148,8 @@ int HeapprofdMain(int argc, char** argv) {
     sock = base::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
                                     &task_runner);
   } else {
-    PERFETTO_FATAL("Invalid number of arguments. %s [SOCKET]", argv[0]);
+    PERFETTO_FATAL("Invalid number of arguments. %s [-r rate] [SOCKET]",
+                   argv[0]);
   }
 
   if (sock->last_error() != 0)
