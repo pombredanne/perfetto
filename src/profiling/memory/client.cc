@@ -143,17 +143,18 @@ BorrowedSocket SocketPool::Borrow() {
 
 void SocketPool::Return(base::ScopedFile sock) {
   PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
+  std::unique_lock<std::mutex> lck_(mutex_);
   if (sock) {
-    {
-      std::lock_guard<std::mutex> lck_(mutex_);
-      PERFETTO_CHECK(available_sockets_ < sockets_.size());
-      sockets_[available_sockets_++] = std::move(sock);
-    }
+    PERFETTO_CHECK(available_sockets_ < sockets_.size());
+    sockets_[available_sockets_++] = std::move(sock);
+    lck_.unlock();
     cv_.notify_one();
   } else {
     dead_sockets_++;
-    if (dead_sockets_ == sockets_.size())
+    if (dead_sockets_ == sockets_.size()) {
+      lck_.unlock();
       cv_.notify_all();
+    }
   }
 }
 
