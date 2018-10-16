@@ -150,8 +150,11 @@ void SocketPool::Return(base::ScopedFile sock) {
     sockets_[available_sockets_++] = std::move(sock);
     lck_.unlock();
     cv_.notify_one();
-  } else if (++dead_sockets_ == sockets_.size()) {
-    cv_.notify_all();
+  } else {
+    PERFETTO_DCHECK(false);
+    dead_sockets_++;
+    if (dead_sockets_ == sockets_.size())
+      cv_.notify_all();
   }
 }
 
