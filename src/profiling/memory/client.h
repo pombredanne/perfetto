@@ -136,6 +136,7 @@ class Client {
  private:
   const char* GetStackBase();
 
+  bool inited_ = false;
   ClientConfiguration client_config_;
   PThreadKey pthread_key_;
   SocketPool socket_pool_;

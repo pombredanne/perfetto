@@ -129,10 +129,10 @@ SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
 
 BorrowedSocket SocketPool::Borrow() {
   std::unique_lock<std::mutex> lck_(mutex_);
-  if (available_sockets_ == 0)
-    cv_.wait(lck_, [this] {
-      return available_sockets_ > 0 || dead_sockets_ == sockets_.size();
-    });
+  cv_.wait(lck_, [this] {
+    return available_sockets_ > 0 || dead_sockets_ == sockets_.size();
+  });
+
   if (dead_sockets_ == sockets_.size()) {
     PERFETTO_DCHECK(false);
     return {base::ScopedFile(), this};
@@ -191,10 +191,17 @@ Client::Client(std::vector<base::ScopedFile> socks)
     return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
-  base::SockSend(*fd, &size, sizeof(size), fds, 2);
-  PERFETTO_DCHECK(recv(*fd, &client_config_, sizeof(client_config_), 0) ==
-                  sizeof(client_config_));
+  if (base::SockSend(*fd, &size, sizeof(size), fds, 2) != sizeof(size)) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+  if (recv(*fd, &client_config_, sizeof(client_config_), 0) !=
+      sizeof(client_config_)) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
   PERFETTO_DCHECK(client_config_.rate >= 1);
+  inited_ = true;
 }
 
 Client::Client(const std::string& sock_name, size_t conns)
@@ -224,6 +231,7 @@ const char* Client::GetStackBase() {
 //               |  main      |    v
 // stackbase +-> +------------+ 0xffff
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
+  PERFETTO_DCHECK(inited_);
   AllocMetadata metadata;
   const char* stackbase = GetStackBase();
   const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
@@ -261,12 +269,16 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
 }
 
 void Client::RecordFree(uint64_t alloc_address) {
+  if (!inited_)
+    return;
   free_page_.Add(alloc_address, ++sequence_number_, &socket_pool_);
 }
 
 bool Client::ShouldSampleAlloc(uint64_t alloc_size,
                                void* (*unhooked_malloc)(size_t),
                                void (*unhooked_free)(void*)) {
+  if (!inited_)
+    return false;
   return ShouldSample(pthread_key_.get(), alloc_size, client_config_.rate,
                       unhooked_malloc, unhooked_free);
 }
