@@ -231,7 +231,8 @@ const char* Client::GetStackBase() {
 //               |  main      |    v
 // stackbase +-> +------------+ 0xffff
 void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
-  PERFETTO_DCHECK(inited_);
+  if (!inited_)
+    return;
   AllocMetadata metadata;
   const char* stackbase = GetStackBase();
   const char* stacktop = reinterpret_cast<char*>(__builtin_frame_address(0));
