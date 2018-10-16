@@ -29,7 +29,7 @@ namespace {
 constexpr char kSocketName[] = TEST_SOCK_NAME("heapprofd_integrationtest");
 
 void __attribute__((noinline)) OtherFunction(Client* client) {
-  client->RecordMalloc(10, 0xf00);
+  client->RecordMalloc(10, 10, 0xf00);
 }
 
 void __attribute__((noinline)) SomeFunction(Client* client) {
@@ -51,22 +51,24 @@ class HeapprofdIntegrationTest : public ::testing::Test {
 
 TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
   GlobalCallstackTrie callsites;
+  // TODO(fmayer): Actually test the dump.
+  BookkeepingThread bookkeeping_thread("");
 
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");
-  constexpr double kSamplingRate = 123;
+  constexpr uint64_t kSamplingRate = 123;
   SocketListener listener(
       {kSamplingRate},
-      [&done](UnwindingRecord r) {
+      [&done, &bookkeeping_thread](UnwindingRecord r) {
         // TODO(fmayer): Test symbolization and result of unwinding.
         // This check will only work on in-tree builds as out-of-tree
         // libunwindstack is behaving a bit weirdly.
         BookkeepingRecord bookkeeping_record;
         ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
-        HandleBookkeepingRecord(&bookkeeping_record);
+        bookkeeping_thread.HandleBookkeepingRecord(&bookkeeping_record);
         done();
       },
-      &callsites);
+      &bookkeeping_thread);
 
   auto sock = base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
   if (!sock->is_listening()) {

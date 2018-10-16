@@ -40,6 +40,7 @@ source_set("daemon") {
   sources = [
     "bookkeeping.cc",
     "bookkeeping.h",
+    "queue_messages.h",
     "record_reader.cc",
     "record_reader.h",
     "socket_listener.cc",
@@ -96,6 +97,7 @@ source_set("unittests") {
 executable("heapprofd") {
   deps = [
     ":daemon",
+    ":wire_protocol",
     "../../../gn:default_deps",
     "../../base",
     "../../ipc",
