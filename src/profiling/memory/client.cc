@@ -118,7 +118,10 @@ void FreePage::FlushLocked(SocketPool* pool) {
   free_page_.num_entries = offset_;
   msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
-  SendWireMessage(*fd, msg);
+  if (!*fd || !SendWireMessage(*fd, msg)) {
+    PERFETTO_DCHECK(false);
+    fd.Close();
+  }
 }
 
 SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
@@ -127,25 +130,28 @@ SocketPool::SocketPool(std::vector<base::ScopedFile> sockets)
 BorrowedSocket SocketPool::Borrow() {
   std::unique_lock<std::mutex> lck_(mutex_);
   if (available_sockets_ == 0)
-    cv_.wait(lck_, [this] { return available_sockets_ > 0; });
+    cv_.wait(lck_, [this] {
+      return available_sockets_ > 0 || dead_sockets_ == sockets_.size();
+    });
+  if (dead_sockets_ == sockets_.size()) {
+    PERFETTO_DCHECK(false);
+    return {base::ScopedFile(), this};
+  }
+
   PERFETTO_CHECK(available_sockets_ > 0);
   return {std::move(sockets_[--available_sockets_]), this};
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
   PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
-  if (!sock) {
-    // TODO(fmayer): Handle reconnect or similar.
-    // This is just to prevent a deadlock.
-    PERFETTO_CHECK(++dead_sockets_ != sockets_.size());
-    return;
-  }
-  std::unique_lock<std::mutex> lck_(mutex_);
-  PERFETTO_CHECK(available_sockets_ < sockets_.size());
-  sockets_[available_sockets_++] = std::move(sock);
-  if (available_sockets_ == 1) {
+  if (sock) {
+    std::unique_lock<std::mutex> lck_(mutex_);
+    PERFETTO_CHECK(available_sockets_ < sockets_.size());
+    sockets_[available_sockets_++] = std::move(sock);
     lck_.unlock();
     cv_.notify_one();
+  } else if (dead_sockets_ == sockets_.size()) {
+    cv_.notify_all();
   }
 }
 
@@ -177,6 +183,8 @@ Client::Client(std::vector<base::ScopedFile> socks)
   fds[0] = *maps;
   fds[1] = *mem;
   auto fd = socket_pool_.Borrow();
+  if (!fd.get())
+    return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
   base::SockSend(*fd, &size, sizeof(size), fds, 2);
@@ -237,8 +245,15 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   msg.payload_size = static_cast<size_t>(stack_size);
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
-  // TODO(fmayer): Handle failure.
-  PERFETTO_CHECK(SendWireMessage(*sockfd, msg));
+  if (!sockfd.get()) {
+    PERFETTO_DCHECK(false);
+    return;
+  }
+
+  if (!SendWireMessage(*sockfd, msg)) {
+    PERFETTO_DCHECK(false);
+    sockfd.Close();
+  }
 }
 
 void Client::RecordFree(uint64_t alloc_address) {
