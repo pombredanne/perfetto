@@ -19,13 +19,26 @@
  */
 export interface ObjectById<Class extends{id: string}> { [id: string]: Class; }
 
+export const SCROLLING_TRACK_GROUP = 'ScrollingTracks';
+
 export interface TrackState {
   id: string;
   engineId: string;
   kind: string;
   name: string;
+  trackGroup?: string;
   dataReq?: TrackDataRequest;
   config: {};
+}
+
+export interface TrackGroupState {
+  id: string;
+  engineId: string;
+  name: string;
+  collapsed: boolean;
+  tracks: string[];  // Child track ids.
+  summaryTrack: string;
+  dataReq?: TrackDataRequest;
 }
 
 export interface TrackDataRequest {
@@ -89,6 +102,7 @@ export interface State {
   engines: ObjectById<EngineConfig>;
   traceTime: TraceTime;
   visibleTraceTime: TraceTime;
+  trackGroups: ObjectById<TrackGroupState>;
   tracks: ObjectById<TrackState>;
   scrollingTracks: string[];
   pinnedTracks: string[];
@@ -111,6 +125,7 @@ export function createEmptyState(): State {
     traceTime: {...defaultTraceTime},
     visibleTraceTime: {...defaultTraceTime},
     tracks: {},
+    trackGroups: {},
     pinnedTracks: [],
     scrollingTracks: [],
     queries: {},
