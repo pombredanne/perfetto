@@ -145,10 +145,11 @@ BorrowedSocket SocketPool::Borrow() {
 void SocketPool::Return(base::ScopedFile sock) {
   PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
   if (sock) {
-    std::unique_lock<std::mutex> lck_(mutex_);
-    PERFETTO_CHECK(available_sockets_ < sockets_.size());
-    sockets_[available_sockets_++] = std::move(sock);
-    lck_.unlock();
+    {
+      std::lock_guard<std::mutex> lck_(mutex_);
+      PERFETTO_CHECK(available_sockets_ < sockets_.size());
+      sockets_[available_sockets_++] = std::move(sock);
+    }
     cv_.notify_one();
   } else {
     PERFETTO_DCHECK(false);
@@ -186,7 +187,7 @@ Client::Client(std::vector<base::ScopedFile> socks)
   fds[0] = *maps;
   fds[1] = *mem;
   auto fd = socket_pool_.Borrow();
-  if (!fd.get())
+  if (!*fd)
     return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
@@ -248,7 +249,7 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   msg.payload_size = static_cast<size_t>(stack_size);
 
   BorrowedSocket sockfd = socket_pool_.Borrow();
-  if (!sockfd.get()) {
+  if (!*sockfd) {
     PERFETTO_DCHECK(false);
     return;
   }
