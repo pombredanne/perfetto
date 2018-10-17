@@ -186,7 +186,7 @@ Client::Client(std::vector<base::ScopedFile> socks)
   fds[0] = *maps;
   fds[1] = *mem;
   auto fd = socket_pool_.Borrow();
-  if (!*fd)
+  if (!fd)
     return;
   // Send an empty record to transfer fds for /proc/self/maps and
   // /proc/self/mem.
