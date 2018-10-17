@@ -277,8 +277,8 @@ size_t Client::ShouldSampleAlloc(uint64_t alloc_size,
                                  void (*unhooked_free)(void*)) {
   if (!inited_)
     return false;
-  return ShouldSample(pthread_key_.get(), alloc_size, client_config_.rate,
-                      unhooked_malloc, unhooked_free);
+  return SampleSize(pthread_key_.get(), alloc_size, client_config_.rate,
+                    unhooked_malloc, unhooked_free);
 }
 
 void Client::MaybeSampleAlloc(uint64_t alloc_size,
