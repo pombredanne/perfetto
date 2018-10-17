@@ -70,6 +70,7 @@ class BorrowedSocket {
   int get() { return *fd_; }
 
   void Close() { fd_.reset(); }
+
   operator bool() const { return !!fd_; }
 
  private:
