@@ -53,8 +53,11 @@ class ThreadLocalSamplingData {
   std::default_random_engine random_engine_;
 };
 
-// Returns number of times a sample should be accounted. Due to how the
-// poission sampling works, some samples should be accounted multiple times.
+// Returns number of bytes that should be be attributed to the sample.
+// If returned size is 0, the allocation should not be sampled.
+//
+// Due to how the poission sampling works, some samples should be accounted
+// multiple times.
 //
 // Delegate to this thread's ThreadLocalSamplingData.
 //
