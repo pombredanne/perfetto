@@ -61,7 +61,7 @@ class ThreadLocalSamplingData {
 // We have to pass through the real malloc in order to allocate the TLS.
 size_t ShouldSample(pthread_key_t key,
                     size_t sz,
-                    double rate,
+                    uint64_t rate,
                     void* (*unhooked_malloc)(size_t),
                     void (*unhooked_free)(void*));
 

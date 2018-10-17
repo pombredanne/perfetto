@@ -56,13 +56,13 @@ size_t ThreadLocalSamplingData::ShouldSample(size_t sz, double rate) {
 
 size_t ShouldSample(pthread_key_t key,
                     size_t sz,
-                    double rate,
+                    uint64_t rate,
                     void* (*unhooked_malloc)(size_t),
                     void (*unhooked_free)(void*)) {
   if (PERFETTO_UNLIKELY(sz >= rate))
-    return 1;
-  return GetSpecific(key, unhooked_malloc, unhooked_free)
-      ->ShouldSample(sz, rate);
+    return sz;
+  return rate * GetSpecific(key, unhooked_malloc, unhooked_free)
+                    ->ShouldSample(sz, rate);
 }
 
 void ThreadLocalSamplingData::KeyDestructor(void* ptr) {
