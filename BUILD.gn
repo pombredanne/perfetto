@@ -53,6 +53,7 @@ group("all") {
       ":traced",
       ":traced_probes",
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
+      "protos/perfetto/profiling:lite",
       "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
       "test/configs",
       "tools:protoc_helper",
