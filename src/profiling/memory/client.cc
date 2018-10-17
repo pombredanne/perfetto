@@ -118,7 +118,7 @@ void FreePage::FlushLocked(SocketPool* pool) {
   free_page_.num_entries = offset_;
   msg.free_header = &free_page_;
   BorrowedSocket fd(pool->Borrow());
-  if (!*fd || !SendWireMessage(*fd, msg)) {
+  if (!fd || !SendWireMessage(*fd, msg)) {
     PERFETTO_DCHECK(false);
     fd.Close();
   }
@@ -142,8 +142,8 @@ BorrowedSocket SocketPool::Borrow() {
 }
 
 void SocketPool::Return(base::ScopedFile sock) {
-  PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
   std::unique_lock<std::mutex> lck_(mutex_);
+  PERFETTO_CHECK(dead_sockets_ + available_sockets_ < sockets_.size());
   if (sock) {
     PERFETTO_CHECK(available_sockets_ < sockets_.size());
     sockets_[available_sockets_++] = std::move(sock);
@@ -256,15 +256,10 @@ void Client::RecordMalloc(uint64_t alloc_size, uint64_t alloc_address) {
   msg.payload = const_cast<char*>(stacktop);
   msg.payload_size = static_cast<size_t>(stack_size);
 
-  BorrowedSocket sockfd = socket_pool_.Borrow();
-  if (!*sockfd) {
+  BorrowedSocket fd = socket_pool_.Borrow();
+  if (!fd || !SendWireMessage(*fd, msg)) {
     PERFETTO_DCHECK(false);
-    return;
-  }
-
-  if (!SendWireMessage(*sockfd, msg)) {
-    PERFETTO_DCHECK(false);
-    sockfd.Close();
+    fd.Close();
   }
 }
 
