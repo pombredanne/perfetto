@@ -70,8 +70,11 @@ std::vector<base::ScopedFile> ConnectPool(const std::string& sock_name,
     }
     if (setsockopt(*sock, SOL_SOCKET, SO_SNDTIMEO,
                    reinterpret_cast<const char*>(&kSendTimeout),
-                   sizeof(kSendTimeout)) == 0)
-      res.emplace_back(std::move(sock));
+                   sizeof(kSendTimeout)) != 0) {
+      PERFETTO_PLOG("Failed to set timeout for %s", sock_name.c_str());
+      continue;
+    }
+    res.emplace_back(std::move(sock));
   }
   return res;
 }
