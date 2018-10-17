@@ -81,6 +81,9 @@ export class TrackGroupPanel extends Panel<Attrs> {
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {
+    const collapsed = this.trackGroupState.collapsed;
+    if (!collapsed) return;
+
     ctx.save();
     ctx.translate(this.shellWidth, 0);
 
