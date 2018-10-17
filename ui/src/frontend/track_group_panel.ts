@@ -32,6 +32,7 @@ interface Attrs {
 export class TrackGroupPanel extends Panel<Attrs> {
   private readonly trackGroupId: string;
   private shellWidth = 0;
+  private backgroundColor = '#ffffff';  // Updated from CSS later.
   private summaryTrack: Track;
 
   constructor({attrs}: m.CVnode<Attrs>) {
@@ -47,13 +48,13 @@ export class TrackGroupPanel extends Panel<Attrs> {
 
   get summaryTrackState(): TrackState {
     return assertExists(
-        globals.state.tracks[this.trackGroupState.summaryTrack]);
+        globals.state.tracks[this.trackGroupState.summaryTrackId]);
   }
 
   view({attrs}: m.CVnode<Attrs>) {
     const collapsed = this.trackGroupState.collapsed;
     return m(
-        `.process-panel[collapsed=${collapsed}]`,
+        `.track-group-panel[collapsed=${collapsed}]`,
         m('.shell',
           m('h1', `${this.trackGroupState.name}`),
           m('.fold-button',
@@ -75,11 +76,17 @@ export class TrackGroupPanel extends Panel<Attrs> {
   onupdate({dom}: m.CVnodeDOM<Attrs>) {
     const shell = assertExists(dom.querySelector('.shell'));
     this.shellWidth = shell.getBoundingClientRect().width;
+    this.backgroundColor =
+        getComputedStyle(dom).getPropertyValue('--collapsed-background');
   }
 
   renderCanvas(ctx: CanvasRenderingContext2D, size: PanelSize) {
     ctx.save();
     ctx.translate(this.shellWidth, 0);
+
+    ctx.fillStyle = this.backgroundColor;
+    ctx.fillRect(0, 0, size.width, size.height);
+
     drawGridLines(
         ctx,
         globals.frontendLocalState.timeScale,

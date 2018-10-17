@@ -37,8 +37,7 @@ export interface TrackGroupState {
   name: string;
   collapsed: boolean;
   tracks: string[];  // Child track ids.
-  summaryTrack: string;
-  dataReq?: TrackDataRequest;
+  summaryTrackId: string;
 }
 
 export interface TrackDataRequest {
@@ -65,15 +64,39 @@ export interface PermalinkConfig {
 }
 
 export interface RecordConfig {
-  [key: string]: number|boolean|string|string[];
+  [key: string]: null|number|boolean|string|string[];
+
+  displayConfigAsPbtxt: boolean;
+
+  // Global settings
   durationSeconds: number;
+  writeIntoFile: boolean;
+  fileWritePeriodMs: number|null;
+
+  // Buffer setup
   bufferSizeMb: number;
+
+  // Ps
   processMetadata: boolean;
   scanAllProcessesOnStart: boolean;
+
+  // Ftrace
   ftrace: boolean;
   ftraceEvents: string[];
   atraceCategories: string[];
   atraceApps: string[];
+  ftraceDrainPeriodMs: number|null;
+  ftraceBufferSizeKb: number|null;
+
+
+  // SysStats
+  sysStats: boolean;
+  meminfoPeriodMs: number|null;
+  meminfoCounters: string[];
+  vmstatPeriodMs: number|null;
+  vmstatCounters: string[];
+  statPeriodMs: number|null;
+  statCounters: string[];
 }
 
 export interface TraceTime {
@@ -138,12 +161,27 @@ export function createEmptyState(): State {
 export function createEmptyRecordConfig(): RecordConfig {
   return {
     durationSeconds: 10.0,
+    writeIntoFile: false,
+    fileWritePeriodMs: null,
     bufferSizeMb: 10.0,
     processMetadata: false,
     scanAllProcessesOnStart: false,
+
     ftrace: false,
     ftraceEvents: [],
     atraceApps: [],
     atraceCategories: [],
+    ftraceDrainPeriodMs: null,
+    ftraceBufferSizeKb: null,
+
+    sysStats: false,
+    meminfoPeriodMs: null,
+    meminfoCounters: [],
+    vmstatPeriodMs: null,
+    vmstatCounters: [],
+    statPeriodMs: null,
+    statCounters: [],
+
+    displayConfigAsPbtxt: false,
   };
 }

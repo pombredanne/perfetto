@@ -264,6 +264,7 @@ button.close {
   // Override top level overflow: hidden so height of this flex item can be
   // its content height.
   overflow: visible;
+  border-bottom: 1px solid #262f3c;
 }
 
 // In the scrolling case, since the canvas is overdrawn and continuously
@@ -384,7 +385,10 @@ span.code {
   }
 }
 
-.process-panel {
+.track-group-panel {
+  --collapsed-background: hsla(190, 49%, 97%, 1);
+  --collapsed-transparent: hsla(190, 49%, 97%, 0);
+  --expanded-background: hsl(215, 22%, 19%);
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: 1fr;
@@ -392,19 +396,19 @@ span.code {
   transition: background-color .4s, color .4s;
   &[collapsed=true] {
     height: 40px;
-    background-color: hsla(215, 22%, 19%, 0);
+    background-color: var(--collapsed-background-transparent);
     .shell {
       border-right: 1px solid #c7d0db;
-      background-color: hsla(190, 49%, 97%, 1);
+      background-color: var(--collapsed-background);
     }
   }
   &[collapsed=false] {
     height: 25px;
-    background-color: hsl(215, 22%, 19%);
+    background-color: var(--expanded-background);
     color: white;
     font-weight: bold;
     .shell {
-      background-color: hsl(215, 22%, 19%);
+      background-color: var(--expanded-background);
       h1 {
         font-size: 15px;
       }

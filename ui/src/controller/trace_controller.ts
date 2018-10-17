@@ -1,5 +1,4 @@
 // Copyright (C) 2018 The Android Open Source Project
-
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -183,13 +182,21 @@ export class TraceController extends Controller<States> {
 
     globals.dispatchMultiple(actions);
 
-    await this.listTracks();
+    {
+      // When we reload from a permalink don't create extra tracks:
+      const {pinnedTracks, scrollingTracks} = globals.state;
+      if (!pinnedTracks.length && !scrollingTracks.length) {
+        await this.listTracks();
+      }
+    }
+
     await this.listThreads();
     await this.loadTimelineOverview(traceTime);
   }
 
   private async listTracks() {
     this.updateStatus('Loading tracks');
+
     const engine = assertExists<Engine>(this.engine);
     const addToTrackActions: DeferredAction[] = [];
     const numCpus = await engine.getNumberOfCpus();
@@ -273,7 +280,7 @@ export class TraceController extends Controller<States> {
         }));
         addTrackGroupActions.push(Actions.addTrackGroup({
           engineId: this.engineId,
-          summaryTrack: summaryTrackId,
+          summaryTrackId,
           name: `${processName} ${pid}`,
           id: pUuid,
           collapsed: true,
