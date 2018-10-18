@@ -71,7 +71,7 @@ const EXAMPLE_CHROME_TRACE_URL =
 const SECTIONS = [
   {
     title: 'Navigation',
-    summary: 'Expore a new trace',
+    summary: 'Open or record a new trace',
     expanded: true,
     items: [
       {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
