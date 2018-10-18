@@ -136,9 +136,8 @@ int HeapprofdMain(int argc, char** argv) {
   SocketListener listener({sampling_rate}, std::move(on_record_received),
                           &bookkeeping_thread);
 
-  if (optind != argc) {
+  if (optind != argc)
     PERFETTO_FATAL("Unexpected arguments.");
-  }
 
   if (runlocal) {
     // Allow to be able to manually specify the socket to listen on
