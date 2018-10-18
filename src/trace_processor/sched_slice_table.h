@@ -23,6 +23,8 @@
 
 #include "perfetto/base/utils.h"
 #include "src/trace_processor/query_constraints.h"
+#include "src/trace_processor/row_iterators.h"
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -52,90 +54,15 @@ class SchedSliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  // Base class for other cursors, implementing column reporting.
-  class BaseCursor : public Table::Cursor {
+  class ValueRetriever : public StorageCursor::ValueRetriever {
    public:
-    BaseCursor(const TraceStorage* storage);
-    virtual ~BaseCursor() override;
+    ValueRetriever(const TraceStorage* storage);
 
-    virtual uint32_t RowIndex() = 0;
-    int Column(sqlite3_context*, int N) override final;
-
-   protected:
-    const TraceStorage* const storage_;
-  };
-
-  // Very fast cursor which which simply increments through indices.
-  class IncrementCursor : public BaseCursor {
-   public:
-    IncrementCursor(const TraceStorage*,
-                    uint32_t min_idx,
-                    uint32_t max_idx,
-                    bool desc);
-
-    int Next() override;
-    uint32_t RowIndex() override;
-    int Eof() override;
+    uint32_t GetUint(size_t, uint32_t) const override;
+    uint64_t GetUlong(size_t, uint32_t) const override;
 
    private:
-    uint32_t const min_idx_;
-    uint32_t const max_idx_;
-    bool const desc_;
-
-    // In non-desc mode, this is an offset from min_idx while in desc mode, this
-    // is an offset from max_idx_.
-    uint32_t offset_ = 0;
-  };
-
-  // Reasonably fast cursor which stores a vector of booleans about whether
-  // a row should be returned.
-  class FilterCursor : public BaseCursor {
-   public:
-    FilterCursor(const TraceStorage*,
-                 uint32_t min_idx,
-                 uint32_t max_idx,
-                 std::vector<bool> filter,
-                 bool desc);
-
-    int Next() override;
-    uint32_t RowIndex() override;
-    int Eof() override;
-
-   private:
-    void FindNext();
-
-    uint32_t const min_idx_;
-    uint32_t const max_idx_;
-    std::vector<bool> filter_;
-    bool const desc_;
-
-    // In non-desc mode, this is an offset from min_idx while in desc mode, this
-    // is an offset from max_idx_.
-    uint32_t offset_ = 0;
-  };
-
-  // Slow path cursor which stores a sorted set of indices into storage.
-  class SortedCursor : public BaseCursor {
-   public:
-    SortedCursor(const TraceStorage* storage,
-                 uint32_t min_idx,
-                 uint32_t max_idx,
-                 const std::vector<QueryConstraints::OrderBy>&);
-    SortedCursor(const TraceStorage* storage,
-                 uint32_t offset,
-                 const std::vector<QueryConstraints::OrderBy>&,
-                 const std::vector<bool>& filter);
-
-    int Next() override;
-    uint32_t RowIndex() override;
-    int Eof() override;
-
-   private:
-    // Vector of row ids sorted by some order by constraints.
-    std::vector<uint32_t> sorted_rows_;
-
-    // An offset into |sorted_row_ids_| indicating the next row to return.
-    uint32_t next_row_idx_ = 0;
+    const TraceStorage* storage_;
   };
 
   const TraceStorage* const storage_;

@@ -30,8 +30,6 @@ namespace trace_processor {
 
 namespace {
 
-using namespace sqlite_utils;
-
 constexpr uint64_t kUint64Max = std::numeric_limits<uint64_t>::max();
 
 // Compares the slice at index |f| with the slice at index |s| on the
@@ -46,13 +44,13 @@ PERFETTO_ALWAYS_INLINE int CompareSlicesOnColumn(
   const auto& sl = storage->slices();
   switch (ob.iColumn) {
     case SchedSliceTable::Column::kTimestamp:
-      return CompareValues(sl.start_ns(), f_idx, s_idx, ob.desc);
+      return sqlite_utils::CompareValues(sl.start_ns(), f_idx, s_idx, ob.desc);
     case SchedSliceTable::Column::kDuration:
-      return CompareValues(sl.durations(), f_idx, s_idx, ob.desc);
+      return sqlite_utils::CompareValues(sl.durations(), f_idx, s_idx, ob.desc);
     case SchedSliceTable::Column::kCpu:
-      return CompareValues(sl.cpus(), f_idx, s_idx, ob.desc);
+      return sqlite_utils::CompareValues(sl.cpus(), f_idx, s_idx, ob.desc);
     case SchedSliceTable::Column::kUtid:
-      return CompareValues(sl.utids(), f_idx, s_idx, ob.desc);
+      return sqlite_utils::CompareValues(sl.utids(), f_idx, s_idx, ob.desc);
     default:
       PERFETTO_FATAL("Unexpected column %d", ob.iColumn);
   }
@@ -84,11 +82,11 @@ std::pair<uint64_t, uint64_t> GetTsBounds(const QueryConstraints& qc,
     switch (cs.iColumn) {
       case SchedSliceTable::Column::kTimestamp:
         auto ts = static_cast<uint64_t>(sqlite3_value_int64(argv[i]));
-        if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-          min_ts = IsOpGe(cs.op) ? ts : ts + 1;
-        } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-          max_ts = IsOpLe(cs.op) ? ts : ts - 1;
-        } else if (IsOpEq(cs.op)) {
+        if (sqlite_utils::IsOpGe(cs.op) || sqlite_utils::IsOpGt(cs.op)) {
+          min_ts = sqlite_utils::IsOpGe(cs.op) ? ts : ts + 1;
+        } else if (sqlite_utils::IsOpLe(cs.op) || sqlite_utils::IsOpLt(cs.op)) {
+          max_ts = sqlite_utils::IsOpLe(cs.op) ? ts : ts - 1;
+        } else if (sqlite_utils::IsOpEq(cs.op)) {
           min_ts = ts;
           max_ts = ts;
         } else {
@@ -117,33 +115,6 @@ std::pair<uint32_t, uint32_t> FindTsIndices(
   return std::make_pair(min_idx, max_idx);
 }
 
-std::vector<bool> FilterNonTsColumns(const TraceStorage* storage,
-                                     const QueryConstraints& qc,
-                                     sqlite3_value** argv,
-                                     uint32_t min_idx,
-                                     uint32_t max_idx) {
-  const auto& slices = storage->slices();
-
-  auto dist = static_cast<size_t>(max_idx - min_idx);
-  std::vector<bool> filter(dist, true);
-  for (size_t i = 0; i < qc.constraints().size(); i++) {
-    const auto& cs = qc.constraints()[i];
-    auto* v = argv[i];
-    switch (cs.iColumn) {
-      case SchedSliceTable::Column::kCpu:
-        FilterColumn(slices.cpus(), min_idx, cs, v, &filter);
-        break;
-      case SchedSliceTable::Column::kDuration:
-        FilterColumn(slices.durations(), min_idx, cs, v, &filter);
-        break;
-      case SchedSliceTable::Column::kUtid:
-        FilterColumn(slices.utids(), min_idx, cs, v, &filter);
-        break;
-    }
-  }
-  return filter;
-}
-
 bool HasOnlyTsConstraints(const QueryConstraints& qc) {
   auto fn = [](const QueryConstraints::Constraint& c) {
     return c.iColumn == SchedSliceTable::Column::kTimestamp;
@@ -155,6 +126,46 @@ bool IsTsOrdered(const QueryConstraints& qc) {
   return qc.order_by().size() == 0 ||
          (qc.order_by().size() == 1 &&
           qc.order_by()[0].iColumn == SchedSliceTable::Column::kTimestamp);
+}
+
+std::unique_ptr<StorageCursor::RowIterator> CreateIterator(
+    const TraceStorage* storage,
+    const StorageCursor::ValueRetriever& retriever,
+    const Table::Schema& schema,
+    const QueryConstraints& qc,
+    sqlite3_value** argv,
+    std::pair<uint32_t, uint32_t> bounding_indices) {
+  auto min_idx = bounding_indices.first;
+  auto max_idx = bounding_indices.second;
+  auto comparator = [storage, &qc](uint32_t f, uint32_t s) {
+    return CompareSlices(storage, f, s, qc.order_by()) < 0;
+  };
+
+  if (HasOnlyTsConstraints(qc)) {
+    if (IsTsOrdered(qc)) {
+      bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
+      return std::unique_ptr<FilteredRowIterator>(
+          new FilteredRowIterator(min_idx, max_idx, desc));
+    }
+
+    std::vector<uint32_t> sorted(static_cast<size_t>(max_idx - min_idx));
+    std::iota(sorted.begin(), sorted.end(), min_idx);
+    std::sort(sorted.begin(), sorted.end(), comparator);
+    return std::unique_ptr<SortedRowIterator>(
+        new SortedRowIterator(std::move(sorted)));
+  }
+
+  auto filter = sqlite_utils::CreateFilterVector(retriever, schema, qc, argv,
+                                                 min_idx, max_idx);
+  if (IsTsOrdered(qc)) {
+    bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
+    return std::unique_ptr<FilteredRowIterator>(
+        new FilteredRowIterator(min_idx, desc, std::move(filter)));
+  }
+  auto sorted =
+      sqlite_utils::CreateSortedIndexFromFilter(min_idx, filter, comparator);
+  return std::unique_ptr<SortedRowIterator>(
+      new SortedRowIterator(std::move(sorted)));
 }
 
 }  // namespace
@@ -181,28 +192,11 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   auto ts_indices = FindTsIndices(storage_, GetTsBounds(qc, argv));
-  auto min_idx = ts_indices.first;
-  auto max_idx = ts_indices.second;
-
-  if (HasOnlyTsConstraints(qc)) {
-    if (IsTsOrdered(qc)) {
-      bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
-      return std::unique_ptr<Table::Cursor>(
-          new IncrementCursor(storage_, min_idx, max_idx, desc));
-    }
-    return std::unique_ptr<Table::Cursor>(
-        new SortedCursor(storage_, min_idx, max_idx, qc.order_by()));
-  }
-
-  std::vector<bool> filter =
-      FilterNonTsColumns(storage_, qc, argv, min_idx, max_idx);
-  if (IsTsOrdered(qc)) {
-    bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
-    return std::unique_ptr<Table::Cursor>(
-        new FilterCursor(storage_, min_idx, max_idx, std::move(filter), desc));
-  }
+  std::unique_ptr<ValueRetriever> retriver(new ValueRetriever(storage_));
+  auto row_it =
+      CreateIterator(storage_, *retriver, schema(), qc, argv, ts_indices);
   return std::unique_ptr<Table::Cursor>(
-      new SortedCursor(storage_, min_idx, qc.order_by(), std::move(filter)));
+      new StorageCursor(schema(), std::move(row_it), std::move(retriver)));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
@@ -218,133 +212,33 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
   return SQLITE_OK;
 }
 
-SchedSliceTable::BaseCursor::BaseCursor(const TraceStorage* storage)
+SchedSliceTable::ValueRetriever::ValueRetriever(const TraceStorage* storage)
     : storage_(storage) {}
-SchedSliceTable::BaseCursor::~BaseCursor() = default;
 
-int SchedSliceTable::BaseCursor::Column(sqlite3_context* context, int N) {
-  size_t row = RowIndex();
+uint32_t SchedSliceTable::ValueRetriever::GetUint(size_t column,
+                                                  uint32_t row) const {
   const auto& slices = storage_->slices();
-  switch (N) {
-    case Column::kTimestamp: {
-      uint64_t ts = slices.start_ns()[row];
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(ts));
-      break;
-    }
-    case Column::kCpu: {
-      sqlite3_result_int(context, static_cast<int>(slices.cpus()[row]));
-      break;
-    }
-    case Column::kDuration: {
-      uint64_t duration = slices.durations()[row];
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(duration));
-      break;
-    }
-    case Column::kUtid: {
-      sqlite3_result_int64(context, slices.utids()[row]);
-      break;
-    }
-  }
-  return SQLITE_OK;
-}
-
-SchedSliceTable::IncrementCursor::IncrementCursor(const TraceStorage* storage,
-                                                  uint32_t min_idx,
-                                                  uint32_t max_idx,
-                                                  bool desc)
-    : BaseCursor(storage), min_idx_(min_idx), max_idx_(max_idx), desc_(desc) {}
-
-int SchedSliceTable::IncrementCursor::Next() {
-  offset_++;
-  return SQLITE_OK;
-}
-
-uint32_t SchedSliceTable::IncrementCursor::RowIndex() {
-  return desc_ ? max_idx_ - 1 - offset_ : min_idx_ + offset_;
-}
-
-int SchedSliceTable::IncrementCursor::Eof() {
-  return offset_ >= (max_idx_ - min_idx_);
-}
-
-SchedSliceTable::FilterCursor::FilterCursor(const TraceStorage* storage,
-                                            uint32_t min_idx,
-                                            uint32_t max_idx,
-                                            std::vector<bool> filter,
-                                            bool desc)
-    : BaseCursor(storage),
-      min_idx_(min_idx),
-      max_idx_(max_idx),
-      filter_(std::move(filter)),
-      desc_(desc) {
-  PERFETTO_CHECK(max_idx - min_idx == filter_.size());
-  FindNext();
-}
-
-int SchedSliceTable::FilterCursor::Next() {
-  offset_++;
-  FindNext();
-  return SQLITE_OK;
-}
-
-void SchedSliceTable::FilterCursor::FindNext() {
-  ptrdiff_t offset = static_cast<ptrdiff_t>(offset_);
-  if (desc_) {
-    auto it = std::find(filter_.rbegin() + offset, filter_.rend(), true);
-    offset_ = static_cast<uint32_t>(std::distance(filter_.rbegin(), it));
-  } else {
-    auto it = std::find(filter_.begin() + offset, filter_.end(), true);
-    offset_ = static_cast<uint32_t>(std::distance(filter_.begin(), it));
+  switch (column) {
+    case Column::kCpu:
+      return slices.cpus()[row];
+    case Column::kUtid:
+      return slices.utids()[row];
+    default:
+      PERFETTO_FATAL("Unknown column requested");
   }
 }
 
-uint32_t SchedSliceTable::FilterCursor::RowIndex() {
-  return desc_ ? max_idx_ - 1 - offset_ : min_idx_ + offset_;
-}
-
-int SchedSliceTable::FilterCursor::Eof() {
-  return offset_ >= (max_idx_ - min_idx_);
-}
-
-SchedSliceTable::SortedCursor::SortedCursor(
-    const TraceStorage* storage,
-    uint32_t min_idx,
-    uint32_t max_idx,
-    const std::vector<QueryConstraints::OrderBy>& ob)
-    : BaseCursor(storage) {
-  auto diff = static_cast<size_t>(max_idx - min_idx);
-  sorted_rows_.resize(static_cast<size_t>(diff));
-
-  std::iota(sorted_rows_.begin(), sorted_rows_.end(), min_idx);
-  std::sort(sorted_rows_.begin(), sorted_rows_.end(),
-            [this, &ob](uint32_t f, uint32_t s) {
-              return CompareSlices(storage_, f, s, ob) < 0;
-            });
-}
-
-SchedSliceTable::SortedCursor::SortedCursor(
-    const TraceStorage* storage,
-    uint32_t offset,
-    const std::vector<QueryConstraints::OrderBy>& ob,
-    const std::vector<bool>& filter)
-    : BaseCursor(storage) {
-  sorted_rows_ = CreateSortedIndexFromFilter(
-      offset, filter, [this, &ob](uint32_t f, uint32_t s) {
-        return CompareSlices(storage_, f, s, ob) < 0;
-      });
-}
-
-int SchedSliceTable::SortedCursor::Next() {
-  next_row_idx_++;
-  return SQLITE_OK;
-}
-
-uint32_t SchedSliceTable::SortedCursor::RowIndex() {
-  return sorted_rows_[next_row_idx_];
-}
-
-int SchedSliceTable::SortedCursor::Eof() {
-  return next_row_idx_ >= sorted_rows_.size();
+uint64_t SchedSliceTable::ValueRetriever::GetUlong(size_t column,
+                                                   uint32_t row) const {
+  const auto& slices = storage_->slices();
+  switch (column) {
+    case Column::kTimestamp:
+      return slices.start_ns()[row];
+    case Column::kDuration:
+      return slices.durations()[row];
+    default:
+      PERFETTO_FATAL("Unknown column requested");
+  }
 }
 
 }  // namespace trace_processor
