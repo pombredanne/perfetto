@@ -75,7 +75,7 @@ int HeapprofdMain(int argc, char** argv) {
   uint64_t sampling_rate = kDefaultSamplingRate;
   bool runlocal = false;
   int opt;
-  while ((opt = getopt(argc, argv, "r:l")) != -1) {
+  while ((opt = getopt(argc, argv, "r:s")) != -1) {
     switch (opt) {
       case 'r': {
         char* end;
@@ -86,9 +86,11 @@ int HeapprofdMain(int argc, char** argv) {
         sampling_rate = static_cast<uint64_t>(sampling_rate_arg);
         break;
       }
-      case 'l':
+      case 's':
         runlocal = true;
         break;
+      default:
+        PERFETTO_FATAL("Invalid option");
     }
   }
 
