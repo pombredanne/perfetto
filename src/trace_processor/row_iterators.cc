@@ -81,7 +81,7 @@ std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
 
   FilteredRowIterator inner_it(min_idx, max_idx, desc);
   if (!sqlite_utils::HasOnlyConstraintsForColumn(qc, natural_bounding_column)) {
-    std::vector<bool> filter(max_idx - min_idx);
+    std::vector<bool> filter(max_idx - min_idx, true);
     const auto& cs = qc.constraints();
     for (size_t i = 0; i < cs.size(); i++) {
       sqlite_utils::FilterOnConstraint(schema, retr, cs[i], argv[i], min_idx,
