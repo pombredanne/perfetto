@@ -334,7 +334,6 @@ int TraceProcessorMain(int argc, char** argv) {
   cb.aio_nbytes = kChunkSize;
   cb.aio_fildes = *fd;
 
-  // The control block has ownership of the buffer while the read is in-flight.
   std::unique_ptr<uint8_t[]> aio_buf(new uint8_t[kChunkSize]);
   cb.aio_buf = aio_buf.get();
 
