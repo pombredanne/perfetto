@@ -916,7 +916,6 @@ void TracingServiceImpl::RegisterDataSource(ProducerID producer_id,
 
   ProducerEndpointImpl* producer = GetProducer(producer_id);
   if (!producer) {
-    PERFETTO_DCHECK(false);
     PERFETTO_DFATAL("Producer not found.");
     return;
   }
