@@ -46,6 +46,7 @@ class SliceTable : public Table {
     kDepth = 5,
     kStackId = 6,
     kParentStackId = 7,
+    kCpu = 8,
   };
 
   SliceTable(sqlite3*, const TraceStorage* storage);

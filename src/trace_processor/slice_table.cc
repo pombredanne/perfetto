@@ -69,6 +69,7 @@ Table::Schema SliceTable::CreateSchema(int, const char* const*) {
           Table::Column(Column::kStackId, "stack_id", ColumnType::kUlong),
           Table::Column(Column::kParentStackId, "parent_stack_id",
                         ColumnType::kUlong),
+          Table::Column(Column::kCpu, "cpu", ColumnType::kUint),
       },
       {Column::kUtid, Column::kTimestamp, Column::kDepth});
 }
@@ -124,6 +125,8 @@ uint32_t SliceTable::ValueRetriever::GetUint(size_t column,
       return slices.utids()[row];
     case Column::kDepth:
       return slices.depths()[row];
+    case Column::kCpu:
+      return 0;
     default:
       PERFETTO_FATAL("Unknown column requested");
   }
