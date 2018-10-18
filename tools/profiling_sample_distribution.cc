@@ -77,9 +77,10 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
 
   while (times-- > 0) {
     PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
-    // We want to use the same API here that the client uses,
-    // which involves TLS. In order to destruct that TLS, we need to spawn a
-    // thread because pthread_key_delete does not delete any associated data.
+    // We want to use the same API here that the client uses, which involves
+    // TLS. In order to destruct that TLS, we need to spawn a thread because
+    // pthread_key_delete does not delete any associated data, but rather it
+    // gets deleted when the owning thread terminates.
     //
     // Sad times.
     std::thread th([&] {
