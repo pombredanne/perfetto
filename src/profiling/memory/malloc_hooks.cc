@@ -142,9 +142,10 @@ void* HEAPPROFD_ADD_PREFIX(_malloc)(size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   perfetto::Client* client = GetClient();
   void* addr = dispatch->malloc(size);
-  if (client &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free))
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  if (client) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
+                             dispatch->malloc, dispatch->free);
+  }
   return addr;
 }
 
@@ -160,9 +161,10 @@ void* HEAPPROFD_ADD_PREFIX(_aligned_alloc)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   perfetto::Client* client = GetClient();
   void* addr = dispatch->aligned_alloc(alignment, size);
-  if (client &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free))
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  if (client) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
+                             dispatch->malloc, dispatch->free);
+  }
   return addr;
 }
 
@@ -170,9 +172,10 @@ void* HEAPPROFD_ADD_PREFIX(_memalign)(size_t alignment, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   perfetto::Client* client = GetClient();
   void* addr = dispatch->memalign(alignment, size);
-  if (client &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free))
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  if (client) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
+                             dispatch->malloc, dispatch->free);
+  }
   return addr;
 }
 
@@ -182,9 +185,9 @@ void* HEAPPROFD_ADD_PREFIX(_realloc)(void* pointer, size_t size) {
   if (client && pointer)
     client->RecordFree(reinterpret_cast<uint64_t>(pointer));
   void* addr = dispatch->realloc(pointer, size);
-  if (client && size > 0 &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free)) {
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  if (client && size > 0) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
+                             dispatch->malloc, dispatch->free);
   }
   return addr;
 }
@@ -193,9 +196,9 @@ void* HEAPPROFD_ADD_PREFIX(_calloc)(size_t nmemb, size_t size) {
   const MallocDispatch* dispatch = GetDispatch();
   perfetto::Client* client = GetClient();
   void* addr = dispatch->calloc(nmemb, size);
-  if (client &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free)) {
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(addr));
+  if (client) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(addr),
+                             dispatch->malloc, dispatch->free);
   }
   return addr;
 }
@@ -216,9 +219,10 @@ int HEAPPROFD_ADD_PREFIX(_posix_memalign)(void** memptr,
   const MallocDispatch* dispatch = GetDispatch();
   perfetto::Client* client = GetClient();
   int res = dispatch->posix_memalign(memptr, alignment, size);
-  if (res == 0 && client &&
-      client->ShouldSampleAlloc(size, dispatch->malloc, dispatch->free))
-    client->RecordMalloc(size, reinterpret_cast<uint64_t>(*memptr));
+  if (res == 0 && client) {
+    client->MaybeSampleAlloc(size, reinterpret_cast<uint64_t>(*memptr),
+                             dispatch->malloc, dispatch->free);
+  }
   return res;
 }
 

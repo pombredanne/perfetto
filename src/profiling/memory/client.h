@@ -71,6 +71,8 @@ class BorrowedSocket {
 
   void Close() { fd_.reset(); }
 
+  operator bool() const { return !!fd_; }
+
  private:
   base::ScopedFile fd_;
   SocketPool* socket_pool_ = nullptr;
@@ -125,17 +127,24 @@ class Client {
  public:
   Client(std::vector<base::ScopedFile> sockets);
   Client(const std::string& sock_name, size_t conns);
-  void RecordMalloc(uint64_t alloc_size, uint64_t alloc_address);
+  void RecordMalloc(uint64_t alloc_size,
+                    uint64_t total_size,
+                    uint64_t alloc_address);
   void RecordFree(uint64_t alloc_address);
-  bool ShouldSampleAlloc(uint64_t alloc_size,
-                         void* (*unhooked_malloc)(size_t),
-                         void (*unhooked_free)(void*));
+  void MaybeSampleAlloc(uint64_t alloc_size,
+                        uint64_t alloc_address,
+                        void* (*unhooked_malloc)(size_t),
+                        void (*unhooked_free)(void*));
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
 
  private:
+  size_t ShouldSampleAlloc(uint64_t alloc_size,
+                           void* (*unhooked_malloc)(size_t),
+                           void (*unhooked_free)(void*));
   const char* GetStackBase();
 
+  bool inited_ = false;
   ClientConfiguration client_config_;
   PThreadKey pthread_key_;
   SocketPool socket_pool_;
