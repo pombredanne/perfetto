@@ -90,7 +90,7 @@ int HeapprofdMain(int argc, char** argv) {
         standalone = true;
         break;
       default:
-        PERFETTO_FATAL("Invalid option");
+        PERFETTO_FATAL("%s [-r rate] [-s]", argv[0]);
     }
   }
 
@@ -137,7 +137,7 @@ int HeapprofdMain(int argc, char** argv) {
                           &bookkeeping_thread);
 
   if (optind != argc)
-    PERFETTO_FATAL("Unexpected arguments.");
+    PERFETTO_FATAL("%s [-r rate] [-s]", argv[0]);
 
   if (standalone) {
     // Allow to be able to manually specify the socket to listen on
