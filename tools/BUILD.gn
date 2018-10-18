@@ -43,4 +43,14 @@ if (is_linux) {
       "../src/base",
     ]
   }
+
+  executable("profiling_sample_distribution") {
+    sources = [
+      "profiling_sample_distribution.cc",
+    ]
+    deps = [
+      "../gn:default_deps",
+      "../src/profiling/memory:client",
+    ]
+  }
 }

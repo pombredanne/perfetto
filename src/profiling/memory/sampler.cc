@@ -21,6 +21,7 @@
 namespace perfetto {
 namespace {
 ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
+                                     uint64_t rate,
                                      void* (*unhooked_malloc)(size_t),
                                      void (*unhooked_free)(void*)) {
   // This should not be used with glibc as it might re-enter into malloc, see
@@ -28,7 +29,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
   void* specific = pthread_getspecific(key);
   if (specific == nullptr) {
     specific = unhooked_malloc(sizeof(ThreadLocalSamplingData));
-    new (specific) ThreadLocalSamplingData(unhooked_free);
+    new (specific) ThreadLocalSamplingData(unhooked_free, rate);
     pthread_setspecific(key, specific);
   }
   return reinterpret_cast<ThreadLocalSamplingData*>(specific);
@@ -41,14 +42,16 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
   std::exponential_distribution<double> dist(1 / rate);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
-  return next < 1 ? 1 : next;
+  next = next < 1 ? 1 : next;
+  last_interval_to_next_sample_ = static_cast<uint64_t>(next);
+  return next;
 }
 
-size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz, double rate) {
+size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz) {
   interval_to_next_sample_ -= sz;
   size_t sz_multiplier = 0;
   while (PERFETTO_UNLIKELY(interval_to_next_sample_ <= 0)) {
-    interval_to_next_sample_ += NextSampleInterval(rate);
+    interval_to_next_sample_ += NextSampleInterval(rate_);
     ++sz_multiplier;
   }
   return sz_multiplier;
@@ -61,8 +64,8 @@ size_t SampleSize(pthread_key_t key,
                   void (*unhooked_free)(void*)) {
   if (PERFETTO_UNLIKELY(sz >= rate))
     return sz;
-  return rate * GetSpecific(key, unhooked_malloc, unhooked_free)
-                    ->NumberOfSamples(sz, rate);
+  return rate * GetSpecific(key, rate, unhooked_malloc, unhooked_free)
+                    ->NumberOfSamples(sz);
 }
 
 void ThreadLocalSamplingData::KeyDestructor(void* ptr) {

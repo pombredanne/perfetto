@@ -35,11 +35,13 @@ namespace perfetto {
 // Chrome's heap profiler).
 class ThreadLocalSamplingData {
  public:
-  ThreadLocalSamplingData(void (*unhooked_free)(void*))
-      : unhooked_free_(unhooked_free) {}
+  ThreadLocalSamplingData(void (*unhooked_free)(void*), uint64_t rate)
+      : unhooked_free_(unhooked_free),
+        rate_(rate),
+        interval_to_next_sample_(NextSampleInterval(rate_)) {}
   // Returns number of times a sample should be accounted. Due to how the
   // poission sampling works, some samples should be accounted multiple times.
-  size_t NumberOfSamples(size_t sz, double rate);
+  size_t NumberOfSamples(size_t sz);
 
   // Destroy a TheadLocalSamplingData object after the pthread key has been
   // deleted or when the thread shuts down. This uses unhooked_free passed in
@@ -49,8 +51,10 @@ class ThreadLocalSamplingData {
  private:
   int64_t NextSampleInterval(double rate);
   void (*unhooked_free_)(void*);
-  int64_t interval_to_next_sample_ = 0;
-  std::default_random_engine random_engine_;
+  double rate_;
+  std::random_device random_engine_;
+  uint64_t last_interval_to_next_sample_;
+  int64_t interval_to_next_sample_;
 };
 
 // Returns number of bytes that should be be attributed to the sample.

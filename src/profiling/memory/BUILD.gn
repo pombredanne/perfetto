@@ -59,6 +59,7 @@ source_set("client") {
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
+    "../../base:unix_socket",
   ]
   sources = [
     "client.cc",
