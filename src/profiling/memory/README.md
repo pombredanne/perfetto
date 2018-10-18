@@ -11,9 +11,7 @@ To start profiling the process `${PID}`, run the following sequence of commands.
 ```
 adb root
 adb shell setenforce 0
-
-adb shell rm /dev/socket/heapprofd
-adb shell 'heapprofd -r 128000 /dev/socket/heapprofd' &
+adb shell 'heapprofd -l -r 128000' &
 adb shell kill -36 ${PID}
 ```
 
