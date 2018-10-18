@@ -57,7 +57,11 @@ int StorageCursor::Column(sqlite3_context* context, int raw_col) {
       break;
     case Table::ColumnType::kString: {
       auto pair = retriever_->GetString(column, row);
-      sqlite3_result_text(context, pair.first, -1, pair.second);
+      if (pair.first == nullptr) {
+        sqlite3_result_null(context);
+      } else {
+        sqlite3_result_text(context, pair.first, -1, pair.second);
+      }
       break;
     }
   }

@@ -16,7 +16,10 @@
 
 #include "src/trace_processor/row_iterators.h"
 
+#include <memory>
+
 #include "perfetto/base/logging.h"
+#include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -64,6 +67,39 @@ void FilteredRowIterator::NextRow() {
 SortedRowIterator::SortedRowIterator(std::vector<uint32_t> sorted_rows)
     : sorted_rows_(std::move(sorted_rows)) {}
 SortedRowIterator::~SortedRowIterator() = default;
+
+std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
+    const Table::Schema& schema,
+    const StorageCursor::ValueRetriever& retr,
+    int natural_bounding_column,
+    std::pair<uint32_t, uint32_t> natural_bounding_indices,
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
+  auto min_idx = natural_bounding_indices.first;
+  auto max_idx = natural_bounding_indices.second;
+  bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
+
+  FilteredRowIterator inner_it(min_idx, max_idx, desc);
+  if (!sqlite_utils::HasOnlyConstraintsForColumn(qc, natural_bounding_column)) {
+    std::vector<bool> filter(max_idx - min_idx);
+    const auto& cs = qc.constraints();
+    for (size_t i = 0; i < cs.size(); i++) {
+      sqlite_utils::FilterOnConstraint(schema, retr, cs[i], argv[i], min_idx,
+                                       &filter);
+    }
+    inner_it = FilteredRowIterator(min_idx, desc, std::move(filter));
+  }
+
+  if (sqlite_utils::IsNaturallyOrdered(qc, natural_bounding_column))
+    return base::make_unique<FilteredRowIterator>(std::move(inner_it));
+
+  std::vector<uint32_t> sorted_rows(inner_it.RowCount());
+  for (size_t i = 0; !inner_it.IsEnd(); inner_it.NextRow(), i++)
+    sorted_rows[i] = inner_it.Row();
+  sqlite_utils::SortOnOrderBys(schema, retr, qc.order_by(), &sorted_rows);
+
+  return base::make_unique<SortedRowIterator>(std::move(sorted_rows));
+}
 
 }  // namespace trace_processor
 }  // namespace perfetto

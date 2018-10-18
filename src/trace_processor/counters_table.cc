@@ -18,6 +18,7 @@
 
 #include "perfetto/base/logging.h"
 #include "src/trace_processor/query_constraints.h"
+#include "src/trace_processor/row_iterators.h"
 #include "src/trace_processor/sqlite_utils.h"
 
 namespace perfetto {
@@ -25,45 +26,21 @@ namespace trace_processor {
 
 namespace {
 
-using namespace sqlite_utils;
-
-PERFETTO_ALWAYS_INLINE int CompareCountersOnColumn(
+std::pair<uint32_t, uint32_t> FindTsIndices(
     const TraceStorage* storage,
-    size_t f_idx,
-    size_t s_idx,
-    const QueryConstraints::OrderBy& ob) {
-  const auto& co = storage->counters();
-  switch (ob.iColumn) {
-    case CountersTable::Column::kTimestamp:
-      return CompareValues(co.timestamps(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kValue:
-      return CompareValues(co.values(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kName:
-      return CompareValues(co.name_ids(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kRef:
-      return CompareValues(co.refs(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kDuration:
-      return CompareValues(co.durations(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kValueDelta:
-      return CompareValues(co.value_deltas(), f_idx, s_idx, ob.desc);
-    case CountersTable::Column::kRefType:
-      return CompareValues(co.types(), f_idx, s_idx, ob.desc);
-    default:
-      PERFETTO_FATAL("Unexpected column %d", ob.iColumn);
-  }
-}
+    std::pair<uint64_t, uint64_t> ts_bounds) {
+  const auto& counters = storage->counters();
+  const auto& ts = counters.timestamps();
+  PERFETTO_CHECK(counters.counter_count() <=
+                 std::numeric_limits<uint32_t>::max());
 
-PERFETTO_ALWAYS_INLINE int CompareCounters(
-    const TraceStorage* storage,
-    size_t f_idx,
-    size_t s_idx,
-    const std::vector<QueryConstraints::OrderBy>& order_by) {
-  for (const auto& ob : order_by) {
-    int c = CompareCountersOnColumn(storage, f_idx, s_idx, ob);
-    if (c != 0)
-      return c;
-  }
-  return 0;
+  auto min_it = std::lower_bound(ts.begin(), ts.end(), ts_bounds.first);
+  auto min_idx = static_cast<uint32_t>(std::distance(ts.begin(), min_it));
+
+  auto max_it = std::upper_bound(min_it, ts.end(), ts_bounds.second);
+  auto max_idx = static_cast<uint32_t>(std::distance(ts.begin(), max_it));
+
+  return std::make_pair(min_idx, max_idx);
 }
 
 }  // namespace
@@ -83,7 +60,7 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
           Table::Column(Column::kValue, "value", ColumnType::kUlong),
           Table::Column(Column::kDuration, "dur", ColumnType::kUlong),
           Table::Column(Column::kValueDelta, "value_delta", ColumnType::kUlong),
-          Table::Column(Column::kRef, "ref", ColumnType::kUint),
+          Table::Column(Column::kRef, "ref", ColumnType::kLong),
           Table::Column(Column::kRefType, "ref_type", ColumnType::kString),
       },
       {Column::kName, Column::kTimestamp, Column::kRef});
@@ -92,7 +69,15 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
 std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  return std::unique_ptr<Table::Cursor>(new Cursor(storage_, qc, argv));
+  auto ts_bounds = sqlite_utils::GetBoundsForNumericColumn<uint64_t>(
+      qc, argv, Column::kTimestamp);
+  auto ts_indices = FindTsIndices(storage_, ts_bounds);
+
+  std::unique_ptr<ValueRetriever> retr(new ValueRetriever(storage_));
+  auto row_it = CreateOptimalRowIterator(schema(), *retr, Column::kTimestamp,
+                                         ts_indices, qc, argv);
+  return std::unique_ptr<Table::Cursor>(
+      new StorageCursor(schema(), std::move(row_it), std::move(retr)));
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
@@ -104,123 +89,69 @@ int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
   return SQLITE_OK;
 }
 
-CountersTable::Cursor::Cursor(const TraceStorage* storage,
-                              const QueryConstraints& qc,
-                              sqlite3_value** argv)
-    : storage_(storage) {
-  const auto& counters = storage->counters();
+CountersTable::ValueRetriever::ValueRetriever(const TraceStorage* storage)
+    : storage_(storage) {}
 
-  std::vector<bool> filter(counters.counter_count(), true);
-  for (size_t i = 0; i < qc.constraints().size(); i++) {
-    const auto& cs = qc.constraints()[i];
-    auto* v = argv[i];
-    switch (cs.iColumn) {
-      case CountersTable::Column::kTimestamp:
-        FilterColumn(counters.timestamps(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kValue:
-        FilterColumn(counters.values(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kName:
-        FilterColumn(counters.name_ids(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kRef:
-        FilterColumn(counters.refs(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kDuration:
-        FilterColumn(counters.durations(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kValueDelta:
-        FilterColumn(counters.value_deltas(), 0, cs, v, &filter);
-        break;
-      case CountersTable::Column::kRefType: {
-        // TODO(lalitm): add support for filtering here.
-      }
-    }
-  }
-
-  sorted_rows_ = CreateSortedIndexFromFilter(
-      0, filter, [this, &qc](uint32_t f, uint32_t s) {
-        return CompareCounters(storage_, f, s, qc.order_by()) < 0;
-      });
-}
-
-int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
-  size_t row = sorted_rows_[next_row_idx_];
-  switch (N) {
-    case Column::kTimestamp: {
-      sqlite3_result_int64(
-          context,
-          static_cast<int64_t>(storage_->counters().timestamps()[row]));
+CountersTable::ValueRetriever::StringAndDestructor
+CountersTable::ValueRetriever::GetString(size_t column, uint32_t row) const {
+  const auto& counters = storage_->counters();
+  const char* string = nullptr;
+  switch (column) {
+    case Column::kName:
+      string = storage_->GetString(counters.name_ids()[row]).c_str();
       break;
-    }
-    case Column::kValue: {
-      sqlite3_result_int64(
-          context, static_cast<int64_t>(storage_->counters().values()[row]));
-      break;
-    }
-    case Column::kName: {
-      sqlite3_result_text(
-          context,
-          storage_->GetString(storage_->counters().name_ids()[row]).c_str(), -1,
-          nullptr);
-      break;
-    }
-    case Column::kRef: {
-      sqlite3_result_int64(
-          context, static_cast<int64_t>(storage_->counters().refs()[row]));
-      break;
-    }
-    case Column::kRefType: {
+    case Column::kRefType:
       switch (storage_->counters().types()[row]) {
-        case RefType::kCPU_ID: {
-          sqlite3_result_text(context, "cpu", -1, nullptr);
+        case RefType::kCPU_ID:
+          string = "cpu";
           break;
-        }
-        case RefType::kUTID: {
-          sqlite3_result_text(context, "utid", -1, nullptr);
+        case RefType::kUTID:
+          string = "utid";
           break;
-        }
-        case RefType::kNoRef: {
-          sqlite3_result_null(context);
+        case RefType::kNoRef:
+          string = nullptr;
           break;
-        }
-        case RefType::kIrq: {
-          sqlite3_result_text(context, "irq", -1, nullptr);
+        case RefType::kIrq:
+          string = "irq";
           break;
-        }
-        case RefType::kSoftIrq: {
-          sqlite3_result_text(context, "softirq", -1, nullptr);
+        case RefType::kSoftIrq:
+          string = "softirq";
           break;
-        }
       }
       break;
-    }
-    case Column::kDuration: {
-      sqlite3_result_int64(
-          context, static_cast<int64_t>(storage_->counters().durations()[row]));
-      break;
-    }
-    case Column::kValueDelta: {
-      sqlite3_result_int64(
-          context,
-          static_cast<int64_t>(storage_->counters().value_deltas()[row]));
-      break;
-    }
     default:
-      PERFETTO_FATAL("Unknown column %d", N);
-      break;
+      PERFETTO_FATAL("Unknown column requested");
   }
-  return SQLITE_OK;
+  auto kStaticDestructor = static_cast<sqlite3_destructor_type>(0);
+  return std::make_pair(string, kStaticDestructor);
 }
 
-int CountersTable::Cursor::Next() {
-  next_row_idx_++;
-  return SQLITE_OK;
+int64_t CountersTable::ValueRetriever::GetLong(size_t column,
+                                               uint32_t row) const {
+  const auto& counters = storage_->counters();
+  switch (column) {
+    case Column::kRef:
+      return counters.refs()[row];
+    default:
+      PERFETTO_FATAL("Unknown column requested");
+  }
 }
 
-int CountersTable::Cursor::Eof() {
-  return next_row_idx_ >= sorted_rows_.size();
+uint64_t CountersTable::ValueRetriever::GetUlong(size_t column,
+                                                 uint32_t row) const {
+  const auto& counters = storage_->counters();
+  switch (column) {
+    case Column::kTimestamp:
+      return counters.timestamps()[row];
+    case Column::kDuration:
+      return counters.durations()[row];
+    case Column::kValue:
+      return static_cast<uint64_t>(counters.values()[row]);
+    case Column::kValueDelta:
+      return static_cast<uint64_t>(counters.value_deltas()[row]);
+    default:
+      PERFETTO_FATAL("Unknown column requested");
+  }
 }
 
 }  // namespace trace_processor

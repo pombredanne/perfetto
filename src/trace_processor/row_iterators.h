@@ -20,6 +20,7 @@
 #include <stddef.h>
 #include <vector>
 
+#include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/storage_cursor.h"
 
 namespace perfetto {
@@ -36,6 +37,13 @@ class FilteredRowIterator : public StorageCursor::RowIterator {
   bool IsEnd() override { return offset_ >= end_row_ - start_row_; }
   uint32_t Row() override {
     return desc_ ? end_row_ - offset_ - 1 : start_row_ + offset_;
+  }
+
+  uint32_t RowCount() const {
+    return row_filter_.empty()
+               ? end_row_ - start_row_
+               : static_cast<uint32_t>(
+                     std::count(row_filter_.begin(), row_filter_.end(), true));
   }
 
  private:
@@ -65,6 +73,14 @@ class SortedRowIterator : public StorageCursor::RowIterator {
   // An offset into |sorted_row_ids_| indicating the next row to return.
   uint32_t next_row_idx_ = 0;
 };
+
+std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
+    const Table::Schema& schema,
+    const StorageCursor::ValueRetriever& retr,
+    int natural_bounding_column,
+    std::pair<uint32_t, uint32_t> natural_bounding_indices,
+    const QueryConstraints& qc,
+    sqlite3_value** argv);
 
 }  // namespace trace_processor
 }  // namespace perfetto

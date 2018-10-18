@@ -47,7 +47,7 @@ class StorageCursor : public Table::Cursor {
     virtual uint64_t GetUlong(size_t, uint32_t) const {
       PERFETTO_FATAL("Unimplemented method");
     }
-    virtual StringAndDestructor GetString(size_t, size_t) const {
+    virtual StringAndDestructor GetString(size_t, uint32_t) const {
       PERFETTO_FATAL("Unimplemented method");
     }
     virtual int64_t GetLong(size_t, uint32_t) const {

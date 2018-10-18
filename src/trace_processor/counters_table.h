@@ -20,6 +20,7 @@
 #include <limits>
 #include <memory>
 
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -49,23 +50,16 @@ class CountersTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class Cursor : public Table::Cursor {
+  class ValueRetriever : public StorageCursor::ValueRetriever {
    public:
-    Cursor(const TraceStorage*, const QueryConstraints&, sqlite3_value**);
+    ValueRetriever(const TraceStorage* storage);
 
-    // Implementation of Table::Cursor.
-    int Next() override;
-    int Eof() override;
-    int Column(sqlite3_context*, int N) override;
+    StringAndDestructor GetString(size_t, uint32_t) const override;
+    int64_t GetLong(size_t, uint32_t) const override;
+    uint64_t GetUlong(size_t, uint32_t) const override;
 
    private:
-    // Vector of row ids sorted by some order by constraints.
-    std::vector<uint32_t> sorted_rows_;
-
-    // An offset into |sorted_row_ids_| indicating the next row to return.
-    uint32_t next_row_idx_ = 0;
-
-    const TraceStorage* const storage_;
+    const TraceStorage* storage_;
   };
 
   const TraceStorage* const storage_;
