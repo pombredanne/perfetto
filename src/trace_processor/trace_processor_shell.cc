@@ -358,7 +358,7 @@ int TraceProcessorMain(int argc, char** argv) {
     // with a fresh buffer.
     std::unique_ptr<uint8_t[]> buf(std::move(aio_buf));
     aio_buf.reset(new uint8_t[kChunkSize]);
-    cb.aio_buf = new uint8_t[kChunkSize];
+    cb.aio_buf = aio_buf.get();
     cb.aio_offset += rsize;
     PERFETTO_CHECK(aio_read(&cb) == 0);
 
