@@ -73,7 +73,7 @@ int HeapprofdMain(int argc, char** argv) {
   // TODO(fmayer): This is temporary until heapprofd is integrated with Perfetto
   // and receives its configuration via that.
   uint64_t sampling_rate = kDefaultSamplingRate;
-  bool runlocal = false;
+  bool standalone = false;
   int opt;
   while ((opt = getopt(argc, argv, "r:s")) != -1) {
     switch (opt) {
@@ -87,7 +87,7 @@ int HeapprofdMain(int argc, char** argv) {
         break;
       }
       case 's':
-        runlocal = true;
+        standalone = true;
         break;
       default:
         PERFETTO_FATAL("Invalid option");
@@ -139,7 +139,7 @@ int HeapprofdMain(int argc, char** argv) {
   if (optind != argc)
     PERFETTO_FATAL("Unexpected arguments.");
 
-  if (runlocal) {
+  if (standalone) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
     unlink(kHeapprofdSocketFile);
