@@ -12,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build_overrides/build.gni")
+import("perfetto.gni")
 
-if (!build_with_chromium) {
+if (!defined(perfetto_protobuf_target_prefix)) {
+  if (perfetto_build_standalone || perfetto_build_with_android) {
+    perfetto_protobuf_target_prefix = "//buildtools"
+  } else {
+    perfetto_protobuf_target_prefix = "//third_party/protobuf"
+  }
+}
+
+if (perfetto_build_standalone || perfetto_build_with_android) {
   import("//gn/standalone/proto_library.gni")
+} else if (perfetto_build_with_embedder) {
+  import("//gni/proto_library.gni")
 } else {
   import("//third_party/protobuf/proto_library.gni")
 }
