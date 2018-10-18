@@ -23,10 +23,32 @@
 #include <bitset>
 #include <numeric>
 
+#include "src/trace_processor/row_iterators.h"
+#include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
+
+namespace {
+
+std::pair<uint32_t, uint32_t> FindTsIndices(
+    const TraceStorage* storage,
+    std::pair<uint64_t, uint64_t> ts_bounds) {
+  const auto& slices = storage->nestable_slices();
+  const auto& ts = slices.start_ns();
+  PERFETTO_CHECK(slices.slice_count() <= std::numeric_limits<uint32_t>::max());
+
+  auto min_it = std::lower_bound(ts.begin(), ts.end(), ts_bounds.first);
+  auto min_idx = static_cast<uint32_t>(std::distance(ts.begin(), min_it));
+
+  auto max_it = std::upper_bound(min_it, ts.end(), ts_bounds.second);
+  auto max_idx = static_cast<uint32_t>(std::distance(ts.begin(), max_it));
+
+  return std::make_pair(min_idx, max_idx);
+}
+
+}  // namespace
 
 SliceTable::SliceTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {}
@@ -43,7 +65,7 @@ Table::Schema SliceTable::CreateSchema(int, const char* const*) {
           Table::Column(Column::kUtid, "utid", ColumnType::kUint),
           Table::Column(Column::kCategory, "cat", ColumnType::kString),
           Table::Column(Column::kName, "name", ColumnType::kString),
-          Table::Column(Column::kDepth, "depth", ColumnType::kInt),
+          Table::Column(Column::kDepth, "depth", ColumnType::kUint),
           Table::Column(Column::kStackId, "stack_id", ColumnType::kUlong),
           Table::Column(Column::kParentStackId, "parent_stack_id",
                         ColumnType::kUlong),
@@ -51,72 +73,77 @@ Table::Schema SliceTable::CreateSchema(int, const char* const*) {
       {Column::kUtid, Column::kTimestamp, Column::kDepth});
 }
 
-std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(const QueryConstraints&,
-                                                        sqlite3_value**) {
-  return std::unique_ptr<Table::Cursor>(new Cursor(storage_));
+std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
+    const QueryConstraints& qc,
+    sqlite3_value** argv) {
+  auto ts_bounds = sqlite_utils::GetBoundsForNumericColumn<uint64_t>(
+      qc, argv, Column::kTimestamp);
+  auto ts_indices = FindTsIndices(storage_, ts_bounds);
+
+  std::unique_ptr<ValueRetriever> retriver(new ValueRetriever(storage_));
+  auto row_it = CreateOptimalRowIterator(
+      schema(), *retriver, Column::kTimestamp, ts_indices, qc, argv);
+
+  return std::unique_ptr<Table::Cursor>(
+      new StorageCursor(schema(), std::move(row_it), std::move(retriver)));
 }
 
 int SliceTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
-  info->order_by_consumed = false;  // Delegate sorting to SQLite.
+  info->order_by_consumed = true;
   info->estimated_cost =
       static_cast<uint32_t>(storage_->nestable_slices().slice_count());
   return SQLITE_OK;
 }
 
-SliceTable::Cursor::Cursor(const TraceStorage* storage) : storage_(storage) {
-  num_rows_ = storage->nestable_slices().slice_count();
-}
+SliceTable::ValueRetriever::ValueRetriever(const TraceStorage* storage)
+    : storage_(storage) {}
 
-SliceTable::Cursor::~Cursor() = default;
-
-int SliceTable::Cursor::Next() {
-  row_++;
-  return SQLITE_OK;
-}
-
-int SliceTable::Cursor::Eof() {
-  return row_ >= num_rows_;
-}
-
-int SliceTable::Cursor::Column(sqlite3_context* context, int col) {
-  const auto& slices = storage_->nestable_slices();
-  switch (col) {
-    case Column::kTimestamp:
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(slices.start_ns()[row_]));
-      break;
-    case Column::kDuration:
-      sqlite3_result_int64(
-          context, static_cast<sqlite3_int64>(slices.durations()[row_]));
-      break;
-    case Column::kUtid:
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(slices.utids()[row_]));
-      break;
+SliceTable::ValueRetriever::StringAndDestructor
+SliceTable::ValueRetriever::GetString(size_t column, uint32_t row) const {
+  const auto& counters = storage_->nestable_slices();
+  const char* string = nullptr;
+  switch (column) {
     case Column::kCategory:
-      sqlite3_result_text(context,
-                          storage_->GetString(slices.cats()[row_]).c_str(), -1,
-                          nullptr);
+      string = storage_->GetString(counters.cats()[row]).c_str();
       break;
     case Column::kName:
-      sqlite3_result_text(context,
-                          storage_->GetString(slices.names()[row_]).c_str(), -1,
-                          nullptr);
+      string = storage_->GetString(counters.names()[row]).c_str();
       break;
-    case Column::kDepth:
-      sqlite3_result_int64(context,
-                           static_cast<sqlite3_int64>(slices.depths()[row_]));
-      break;
-    case Column::kStackId:
-      sqlite3_result_int64(
-          context, static_cast<sqlite3_int64>(slices.stack_ids()[row_]));
-      break;
-    case Column::kParentStackId:
-      sqlite3_result_int64(
-          context, static_cast<sqlite3_int64>(slices.parent_stack_ids()[row_]));
-      break;
+    default:
+      PERFETTO_FATAL("Unknown column requested");
   }
-  return SQLITE_OK;
+  auto kStaticDestructor = static_cast<sqlite3_destructor_type>(0);
+  return std::make_pair(string, kStaticDestructor);
+}
+
+uint32_t SliceTable::ValueRetriever::GetUint(size_t column,
+                                             uint32_t row) const {
+  const auto& slices = storage_->nestable_slices();
+  switch (column) {
+    case Column::kUtid:
+      return slices.utids()[row];
+    case Column::kDepth:
+      return slices.depths()[row];
+    default:
+      PERFETTO_FATAL("Unknown column requested");
+  }
+}
+
+uint64_t SliceTable::ValueRetriever::GetUlong(size_t column,
+                                              uint32_t row) const {
+  const auto& slices = storage_->nestable_slices();
+  switch (column) {
+    case Column::kTimestamp:
+      return slices.start_ns()[row];
+    case Column::kDuration:
+      return slices.durations()[row];
+    case Column::kStackId:
+      return slices.stack_ids()[row];
+    case Column::kParentStackId:
+      return slices.parent_stack_ids()[row];
+    default:
+      PERFETTO_FATAL("Unknown column requested");
+  }
 }
 
 }  // namespace trace_processor

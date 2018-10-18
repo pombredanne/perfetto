@@ -20,6 +20,7 @@
 #include <limits>
 #include <memory>
 
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
@@ -58,21 +59,16 @@ class SliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  // Implementation of the SQLite cursor interface.
-  class Cursor : public Table::Cursor {
+  class ValueRetriever : public StorageCursor::ValueRetriever {
    public:
-    Cursor(const TraceStorage* storage);
-    ~Cursor() override;
+    ValueRetriever(const TraceStorage* storage);
 
-    // Implementation of Table::Cursor.
-    int Next() override;
-    int Eof() override;
-    int Column(sqlite3_context*, int N) override;
+    uint32_t GetUint(size_t, uint32_t) const override;
+    uint64_t GetUlong(size_t, uint32_t) const override;
+    StringAndDestructor GetString(size_t, uint32_t) const override;
 
    private:
-    size_t row_ = 0;
-    size_t num_rows_ = 0;
-    const TraceStorage* const storage_;
+    const TraceStorage* storage_;
   };
 
   const TraceStorage* const storage_;
