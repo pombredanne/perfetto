@@ -53,7 +53,6 @@ class ThreadLocalSamplingData {
   void (*unhooked_free_)(void*);
   double rate_;
   std::random_device random_engine_;
-  uint64_t last_interval_to_next_sample_;
   int64_t interval_to_next_sample_;
 };
 

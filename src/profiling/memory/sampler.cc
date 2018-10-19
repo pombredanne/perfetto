@@ -42,9 +42,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
   std::exponential_distribution<double> dist(1 / rate);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
-  next = next < 1 ? 1 : next;
-  last_interval_to_next_sample_ = static_cast<uint64_t>(next);
-  return next;
+  return next < 1 ? 1 : next;
 }
 
 size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz) {
