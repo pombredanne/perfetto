@@ -81,10 +81,13 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
-  // TODO(taylori): Work out cost dependant on constraints.
   info->estimated_cost =
       static_cast<uint32_t>(storage_->counters().counter_count());
+
+  // We should be able to handle any constraint and any order by clause given
+  // to us.
   info->order_by_consumed = true;
+  std::fill(info->omit.begin(), info->omit.end(), true);
 
   return SQLITE_OK;
 }

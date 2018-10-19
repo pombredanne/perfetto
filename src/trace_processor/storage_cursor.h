@@ -35,38 +35,20 @@ class StorageCursor : public Table::Cursor {
     virtual bool IsEnd() = 0;
   };
 
-  class ValueRetriever {
+  class ColumnOperator {
    public:
-    using StringAndDestructor = std::pair<const char*, sqlite3_destructor_type>;
+    using Predicate = std::function<bool(uint32_t)>;
+    using Comparator = std::function<bool(uint32_t, uint32_t)>;
 
-    virtual ~ValueRetriever();
+    virtual ~ColumnOperator() = default;
 
-    virtual uint32_t GetUint(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual uint64_t GetUlong(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual StringAndDestructor GetString(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual int64_t GetLong(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual int32_t GetInt(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual float GetFloat(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
-    virtual double GetDouble(size_t, uint32_t) const {
-      PERFETTO_FATAL("Unimplemented method");
-    }
+    virtual Predicate Filter(int op, sqlite3_value* value) = 0;
+    virtual Comparator Sort(QueryConstraints::OrderBy ob) = 0;
   };
 
-  StorageCursor(Table::Schema,
-                std::unique_ptr<RowIterator>,
-                std::unique_ptr<ValueRetriever>);
+  using ColumnOperators = std::vector<std::unique_ptr<ColumnOperator>>;
+
+  StorageCursor(std::unique_ptr<RowIterator>, ColumnOperators ops);
 
   // Implementation of Table::Cursor.
   int Next() override;
@@ -74,9 +56,7 @@ class StorageCursor : public Table::Cursor {
   int Column(sqlite3_context*, int N) override;
 
  private:
-  Table::Schema schema_;
   std::unique_ptr<RowIterator> iterator_;
-  std::unique_ptr<ValueRetriever> retriever_;
 };
 
 }  // namespace trace_processor

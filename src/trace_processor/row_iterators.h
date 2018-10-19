@@ -75,10 +75,8 @@ class SortedRowIterator : public StorageCursor::RowIterator {
 };
 
 std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
-    const Table::Schema& schema,
-    const StorageCursor::ValueRetriever& retr,
-    int natural_bounding_column,
-    std::pair<uint32_t, uint32_t> natural_bounding_indices,
+    const StorageCursor::ColumnOperators& ops,
+    int natural_ordered_col,
     const QueryConstraints& qc,
     sqlite3_value** argv);
 

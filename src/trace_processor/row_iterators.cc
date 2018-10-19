@@ -34,6 +34,14 @@ uint32_t FindNextOffset(Iterator begin, Iterator end, uint32_t offset) {
   return static_cast<uint32_t>(std::distance(begin, current_it));
 }
 
+uint32_t FindNextOffset(const std::vector<bool>& filter,
+                        uint32_t offset,
+                        bool desc) {
+  if (desc)
+    return FindNextOffset(filter.rbegin(), filter.rend(), offset);
+  return FindNextOffset(filter.begin(), filter.end(), offset);
+}
+
 }  // namespace
 
 FilteredRowIterator::FilteredRowIterator(uint32_t start_row,
@@ -49,19 +57,15 @@ FilteredRowIterator::FilteredRowIterator(uint32_t start_row,
       desc_(desc),
       row_filter_(std::move(row_filter)) {
   if (start_row_ < end_row_)
-    NextRow();
+    offset_ = FindNextOffset(row_filter_, offset_, desc_);
 }
 
 void FilteredRowIterator::NextRow() {
   PERFETTO_DCHECK(!IsEnd());
   offset_++;
-  if (row_filter_.empty())
-    return;
 
-  if (desc_)
-    offset_ = FindNextOffset(row_filter_.rbegin(), row_filter_.rend(), offset_);
-  else
-    offset_ = FindNextOffset(row_filter_.begin(), row_filter_.end(), offset_);
+  if (!row_filter_.empty())
+    offset_ = FindNextOffset(row_filter_, offset_, desc_);
 }
 
 SortedRowIterator::SortedRowIterator(std::vector<uint32_t> sorted_rows)
@@ -69,10 +73,8 @@ SortedRowIterator::SortedRowIterator(std::vector<uint32_t> sorted_rows)
 SortedRowIterator::~SortedRowIterator() = default;
 
 std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
-    const Table::Schema& schema,
-    const StorageCursor::ValueRetriever& retr,
-    int natural_bounding_column,
-    std::pair<uint32_t, uint32_t> natural_bounding_indices,
+    const StorageCursor::ColumnOperators& retr,
+    int natural_ordered_column,
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   auto min_idx = natural_bounding_indices.first;
@@ -80,7 +82,7 @@ std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
   bool desc = qc.order_by().size() == 1 && qc.order_by()[0].desc;
 
   FilteredRowIterator inner_it(min_idx, max_idx, desc);
-  if (!sqlite_utils::HasOnlyConstraintsForColumn(qc, natural_bounding_column)) {
+  if (!sqlite_utils::HasOnlyConstraintsForColumn(qc, natural_ordered_column)) {
     std::vector<bool> filter(max_idx - min_idx, true);
     const auto& cs = qc.constraints();
     for (size_t i = 0; i < cs.size(); i++) {
@@ -90,7 +92,7 @@ std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
     inner_it = FilteredRowIterator(min_idx, desc, std::move(filter));
   }
 
-  if (sqlite_utils::IsNaturallyOrdered(qc, natural_bounding_column))
+  if (sqlite_utils::IsNaturallyOrdered(qc, natural_ordered_column))
     return base::make_unique<FilteredRowIterator>(std::move(inner_it));
 
   std::vector<uint32_t> sorted_rows(inner_it.RowCount());

@@ -88,9 +88,10 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
       sqlite_utils::HasOnlyConstraintsForColumn(qc, Column::kTimestamp);
 
   info->estimated_cost = is_time_constrained ? 10 : 10000;
-  info->order_by_consumed = true;
 
-  // We should be able to handle any constraint thrown at us.
+  // We should be able to handle any constraint and any order by clause given
+  // to us.
+  info->order_by_consumed = true;
   std::fill(info->omit.begin(), info->omit.end(), true);
 
   return SQLITE_OK;

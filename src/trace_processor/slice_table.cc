@@ -48,6 +48,29 @@ std::pair<uint32_t, uint32_t> FindTsIndices(
   return std::make_pair(min_idx, max_idx);
 }
 
+template <typename T>
+class DequeColumnOperator : public StorageCursor::ColumnOperator {
+ public:
+  DequeColumnOperator(const std::deque<T>* deque) : deque_(deque) {}
+
+  Predicate Filter(int op, sqlite3_value* value) override {
+    auto bipredicate = sqlite_utils::GetPredicateForOp<T>(op);
+    T extracted = sqlite_utils::ExtractSqliteValue<T>(value);
+    return [this, bipredicate, extracted](uint32_t idx) {
+      return bipredicate(deque_[idx], extracted);
+    };
+  }
+
+  Comparator Sort(QueryConstraints::OrderBy ob) override {
+    if (ob.desc)
+      return [this](uint32_t f, uint32_t s) { return deque_[s] < deque_[f]; };
+    return [this](uint32_t f, uint32_t s) { return deque_[f] < deque_[s]; };
+  }
+
+ private:
+  const std::deque<T>* deque_;
+};
+
 }  // namespace
 
 SliceTable::SliceTable(sqlite3*, const TraceStorage* storage)
@@ -90,9 +113,14 @@ std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
 }
 
 int SliceTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
-  info->order_by_consumed = true;
   info->estimated_cost =
       static_cast<uint32_t>(storage_->nestable_slices().slice_count());
+
+  // We should be able to handle any constraint and any order by clause given
+  // to us.
+  info->order_by_consumed = true;
+  std::fill(info->omit.begin(), info->omit.end(), true);
+
   return SQLITE_OK;
 }
 
