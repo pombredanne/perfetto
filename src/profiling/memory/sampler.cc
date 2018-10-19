@@ -39,8 +39,8 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 // The algorithm below is a inspired by the Chromium sampling algorithm at
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
-int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
-  std::exponential_distribution<double> dist(1 / rate);
+int64_t ThreadLocalSamplingData::NextSampleInterval() {
+  std::exponential_distribution<double> dist(1 / rate_);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
   return next < 1 ? 1 : next;
 }
@@ -49,11 +49,13 @@ size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz) {
   interval_to_next_sample_ -= sz;
   size_t sz_multiplier = 0;
   while (PERFETTO_UNLIKELY(interval_to_next_sample_ <= 0)) {
-    interval_to_next_sample_ += NextSampleInterval(rate_);
+    interval_to_next_sample_ += NextSampleInterval();
     ++sz_multiplier;
   }
   return sz_multiplier;
 }
+
+std::atomic<uint64_t> ThreadLocalSamplingData::seed_for_testing(1);
 
 size_t SampleSize(pthread_key_t key,
                   size_t sz,

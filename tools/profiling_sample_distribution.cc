@@ -36,8 +36,9 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
   int opt;
   uint64_t sampling_rate = kDefaultSamplingRate;
   long long times = 1;
+  uint64_t init_seed = 1;
 
-  while ((opt = getopt(argc, argv, "t:r:")) != -1) {
+  while ((opt = getopt(argc, argv, "t:r:s:")) != -1) {
     switch (opt) {
       case 'r': {
         char* end;
@@ -55,6 +56,16 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
           PERFETTO_FATAL("Invalid times: %s", optarg);
         break;
       }
+      case 's': {
+        char* end;
+        init_seed = static_cast<uint64_t>(strtoll(optarg, &end, 10));
+        if (*end != '\0' || *optarg == '\0')
+          PERFETTO_FATAL("Invalid seed: %s", optarg);
+        break;
+      }
+
+      default:
+        PERFETTO_FATAL("%s [-t times] [-r rate] [-s seed]", argv[0]);
     }
   }
 
@@ -76,8 +87,11 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
     allocations.emplace_back(std::move(callsite), size);
   }
 
+  std::default_random_engine seed_engine(init_seed);
+
   while (times-- > 0) {
     PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
+    ThreadLocalSamplingData::seed_for_testing = seed_engine();
     // We want to use the same API here that the client uses, which involves
     // TLS. In order to destruct that TLS, we need to spawn a thread because
     // pthread_key_delete does not delete any associated data, but rather it

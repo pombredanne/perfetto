@@ -17,6 +17,8 @@
 #ifndef SRC_PROFILING_MEMORY_SAMPLER_H_
 #define SRC_PROFILING_MEMORY_SAMPLER_H_
 
+#include <atomic>
+
 #include <pthread.h>
 #include <stdint.h>
 
@@ -38,7 +40,8 @@ class ThreadLocalSamplingData {
   ThreadLocalSamplingData(void (*unhooked_free)(void*), uint64_t rate)
       : unhooked_free_(unhooked_free),
         rate_(rate),
-        interval_to_next_sample_(NextSampleInterval(rate_)) {}
+        random_engine_(seed_for_testing.load(std::memory_order_relaxed)),
+        interval_to_next_sample_(NextSampleInterval()) {}
   // Returns number of times a sample should be accounted. Due to how the
   // poission sampling works, some samples should be accounted multiple times.
   size_t NumberOfSamples(size_t sz);
@@ -48,11 +51,13 @@ class ThreadLocalSamplingData {
   // the constructor.
   static void KeyDestructor(void* ptr);
 
+  static std::atomic<uint64_t> seed_for_testing;
+
  private:
-  int64_t NextSampleInterval(double rate);
+  int64_t NextSampleInterval();
   void (*unhooked_free_)(void*);
   double rate_;
-  std::random_device random_engine_;
+  std::default_random_engine random_engine_;
   int64_t interval_to_next_sample_;
 };
 
