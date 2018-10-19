@@ -21,8 +21,6 @@ ftrace_proto_names = [
   "test_bundle_wrapper.proto",
   "print.proto",
   "sched_switch.proto",
-  "cpufreq_interactive_target.proto",
-  "cpufreq_interactive_unboost.proto",
   "cpu_frequency.proto",
   "cpu_frequency_limits.proto",
   "cpu_idle.proto",

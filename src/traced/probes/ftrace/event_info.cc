@@ -37,28 +37,6 @@ std::vector<Event> GetStaticEventInfo() {
   {
     events.emplace_back(Event{});
     Event* event = &events.back();
-    event->name = "cpufreq_interactive_target";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 9;
-    event->fields.push_back(MakeField("cpu_id", 1, kProtoUint64));
-    event->fields.push_back(MakeField("load", 2, kProtoUint64));
-    event->fields.push_back(MakeField("curtarg", 3, kProtoUint64));
-    event->fields.push_back(MakeField("curactual", 4, kProtoUint64));
-    event->fields.push_back(MakeField("newtarg", 5, kProtoUint64));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
-    event->name = "cpufreq_interactive_unboost";
-    event->group = "cpufreq_interactive";
-    event->proto_field_id = 10;
-    event->fields.push_back(MakeField("s", 1, kProtoString));
-  }
-
-  {
-    events.emplace_back(Event{});
-    Event* event = &events.back();
     event->name = "cpu_frequency";
     event->group = "power";
     event->proto_field_id = 11;

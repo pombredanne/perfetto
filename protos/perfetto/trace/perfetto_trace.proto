@@ -241,8 +241,8 @@ message FtraceEvent {
     // removed field with id 6;
     // removed field with id 7;
     // removed field with id 8;
-    CpufreqInteractiveTargetFtraceEvent cpufreq_interactive_target = 9;
-    CpufreqInteractiveUnboostFtraceEvent cpufreq_interactive_unboost = 10;
+    // removed field with id 9;
+    // removed field with id 10;
     CpuFrequencyFtraceEvent cpu_frequency = 11;
     CpuFrequencyLimitsFtraceEvent cpu_frequency_limits = 12;
     CpuIdleFtraceEvent cpu_idle = 13;
