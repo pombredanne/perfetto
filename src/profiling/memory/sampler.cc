@@ -42,7 +42,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 int64_t ThreadLocalSamplingData::NextSampleInterval() {
   std::exponential_distribution<double> dist(1 / rate_);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
-  // This corrects the distribution of the first value in the interval.
+  // The +1 corrects the distribution of the first value in the interval.
   // TODO(fmayer): Figure out why.
   return next + 1;
 }
