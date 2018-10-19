@@ -19,13 +19,19 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message ChromeTracedValue {
-  repeated string dict_keys = 1;
-  repeated ChromeTracedValue dict_values = 2;
-  repeated ChromeTracedValue array_values = 3;
-  optional int32 int_value = 4;
-  optional double double_value = 5;
-  optional bool bool_value = 6;
-  optional string string_value = 7;
+  enum NestedType {
+    DICT = 0;
+    ARRAY = 1;
+  }
+  optional NestedType nested_type = 1;
+
+  repeated string dict_keys = 2;
+  repeated ChromeTracedValue dict_values = 3;
+  repeated ChromeTracedValue array_values = 4;
+  optional int32 int_value = 5;
+  optional double double_value = 6;
+  optional bool bool_value = 7;
+  optional string string_value = 8;
 }
 
 message ChromeStringTableEntry {
