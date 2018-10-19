@@ -14,7 +14,24 @@
  * limitations under the License.
  */
 
-// Tool that takes in a stream of allocations from stdin and
+// Tool that takes in a stream of allocations from stdin and outputs samples
+//
+// Input format is code_location size tuples, output format is code_location
+// sample_size tuples. The sum of all allocations in the input is echoed back
+// as real_${code_location}
+//
+// Example input:
+// foo 1
+// bar 10
+// foo 1000
+// baz 1
+//
+// Example output;
+// real_foo 1001
+// real_bar 10
+// real_baz 1
+// foo 1000
+// bar 100
 
 #include <iostream>
 #include <string>
@@ -35,7 +52,7 @@ constexpr uint64_t kDefaultSamplingRate = 128000;
 int ProfilingSampleDistributionMain(int argc, char** argv) {
   int opt;
   uint64_t sampling_rate = kDefaultSamplingRate;
-  long long times = 1;
+  uint64_t times = 1;
   uint64_t init_seed = 1;
 
   while ((opt = getopt(argc, argv, "t:r:s:")) != -1) {
@@ -51,9 +68,11 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
       }
       case 't': {
         char* end;
-        times = strtoll(optarg, &end, 10);
+        long long times_arg = strtoll(optarg, &end, 10);
         if (*end != '\0' || *optarg == '\0')
           PERFETTO_FATAL("Invalid times: %s", optarg);
+        PERFETTO_CHECK(times_arg > 0);
+        times = static_cast<uint64_t>(times_arg);
         break;
       }
       case 's': {
@@ -86,6 +105,13 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
       PERFETTO_FATAL("Could not read size");
     allocations.emplace_back(std::move(callsite), size);
   }
+  std::map<std::string, uint64_t> total_ground_truth;
+  for (const auto& pair : allocations)
+    total_ground_truth[pair.first] += pair.second;
+
+  for (const auto& pair : total_ground_truth)
+    std::cout << "real_" << pair.first << " " << times * pair.second
+              << std::endl;
 
   std::default_random_engine seed_engine(init_seed);
 
