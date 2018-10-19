@@ -86,8 +86,9 @@ void Message::AppendBytes(uint32_t field_id, const void* src, size_t size) {
   WriteToStream(src_u8, src_u8 + size);
 }
 
-size_t Message::AppendBytes(uint32_t field_id,
-                            MessageWriterDelegate* delegate) {
+size_t Message::AppendScatteredBytes(uint32_t field_id,
+                                     ContiguousMemoryRange* buffers,
+                                     size_t num_ranges) {
   uint8_t data[proto_utils::kMaxTagEncodedSize];
   uint8_t* data_end = proto_utils::WriteVarInt(
       proto_utils::MakeTagLengthDelimited(field_id), data);
@@ -99,9 +100,9 @@ size_t Message::AppendBytes(uint32_t field_id,
 
   size_t size = 0;
 
-  ContiguousMemoryRange range;
-  while (delegate->GetNextBuffer(&range)) {
-    size += static_cast<size_t>(range.end - range.begin);
+  for (size_t i = 0; i < num_ranges; ++i) {
+    auto& range = buffers[i];
+    size += range.size();
     WriteToStream(range.begin, range.end);
   }
 

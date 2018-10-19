@@ -207,31 +207,17 @@ TEST_F(MessageTest, NestedMessagesSimple) {
   ASSERT_EQ("2803", GetNextSerializedBytes(2));
 }
 
-// Tests using a MessageWriterDelegate to append raw bytes to
-// a field from multiple buffers.
-class MyWriterDelegate : public Message::MessageWriterDelegate {
- public:
-  MyWriterDelegate() { memset(buffer_, 0x42, sizeof(buffer_)); }
-
-  bool GetNextBuffer(ContiguousMemoryRange* range) override {
-    if (buffers_returned_++ == 2)
-      return false;
-
-    range->begin = buffer_;
-    range->end = buffer_ + sizeof(buffer_);
-    return true;
-  }
-
- private:
-  uint8_t buffer_[42];
-  size_t buffers_returned_ = 0;
-};
-
+// Tests using a AppendScatteredBytes to append raw bytes to
+// a message using multiple individual buffers.
 TEST_F(MessageTest, AppendBytesWithWriter) {
-  MyWriterDelegate delegate;
   Message* root_msg = NewMessage();
 
-  root_msg->AppendBytes(1 /* field_id */, &delegate);
+  uint8_t buffer[42];
+  memset(buffer, 0x42, sizeof(buffer));
+
+  ContiguousMemoryRange ranges[] = {{buffer, buffer + sizeof(buffer)},
+                                    {buffer, buffer + sizeof(buffer)}};
+  root_msg->AppendScatteredBytes(1 /* field_id */, ranges, 2);
   EXPECT_EQ(89u, root_msg->Finalize());
   EXPECT_EQ(89u, GetNumSerializedBytes());
 

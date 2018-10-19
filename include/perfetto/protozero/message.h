@@ -146,16 +146,11 @@ class PERFETTO_EXPORT Message {
   void AppendString(uint32_t field_id, const char* str);
   void AppendBytes(uint32_t field_id, const void* value, size_t size);
 
-  // Append raw bytes for a field, using the supplied |delegate| to
-  // be able to copy from multiple sub-buffers.
-  class MessageWriterDelegate {
-   public:
-    virtual ~MessageWriterDelegate() = default;
-    // Return false when no more data is available; fill in
-    // |range| otherwise.
-    virtual bool GetNextBuffer(ContiguousMemoryRange* range) = 0;
-  };
-  size_t AppendBytes(uint32_t field_id, MessageWriterDelegate* delegate);
+  // Append raw bytes for a field, using the supplied |buffers| to
+  // copy from |num_ranges| individual buffers.
+  size_t AppendScatteredBytes(uint32_t field_id,
+                              ContiguousMemoryRange* buffers,
+                              size_t num_ranges);
 
   // Begins a nested message, using the static storage provided by the parent
   // class (see comment in |nested_messages_arena_|). The nested message ends
