@@ -17,7 +17,11 @@
 #ifndef INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
 #define INCLUDE_PERFETTO_BASE_FILE_UTILS_H_
 
+#include <stddef.h>
+
 #include <string>
+
+#include "perfetto/base/utils.h"  // For ssize_t on Windows.
 
 namespace perfetto {
 namespace base {

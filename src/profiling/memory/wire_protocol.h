@@ -62,16 +62,18 @@ struct AllocMetadata {
   uint64_t sequence_number;
   // Size of the allocation that was made.
   uint64_t alloc_size;
+  // Total number of bytes attributed to this allocation.
+  uint64_t total_size;
   // Pointer returned by malloc(2) for this allocation.
   uint64_t alloc_address;
   // Current value of the stack pointer.
   uint64_t stack_pointer;
   // Offset of the data at stack_pointer from the start of this record.
   uint64_t stack_pointer_offset;
+  alignas(uint64_t) char register_data[kMaxRegisterDataSize];
   // CPU architecture of the client. This determines the size of the
   // register data that follows this struct.
   unwindstack::ArchEnum arch;
-  char register_data[kMaxRegisterDataSize];
 };
 
 struct FreePageEntry {
@@ -83,7 +85,7 @@ struct ClientConfiguration {
   // On average, sample one allocation every rate bytes,
   // If rate == 1, sample every allocation.
   // Must be >= 1.
-  double rate;
+  uint64_t rate;
 };
 
 struct FreeMetadata {
@@ -107,6 +109,9 @@ bool SendWireMessage(int sock, const WireMessage& msg);
 // |buf| has to outlive |out|.
 // If buf is not a valid message, return false.
 bool ReceiveWireMessage(char* buf, size_t size, WireMessage* out);
+
+constexpr const char* kHeapprofdSocketEnvVar = "ANDROID_SOCKET_heapprofd";
+constexpr const char* kHeapprofdSocketFile = "/dev/socket/heapprofd";
 
 }  // namespace perfetto
 

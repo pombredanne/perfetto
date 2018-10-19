@@ -178,16 +178,44 @@ export class TraceController extends Controller<States> {
 
     globals.dispatchMultiple(actions);
 
-    await this.listTracks();
+    {
+      // When we reload from a permalink don't create extra tracks:
+      const {pinnedTracks, scrollingTracks} = globals.state;
+      if (!pinnedTracks.length && !scrollingTracks.length) {
+        await this.listTracks();
+      }
+    }
+
     await this.listThreads();
     await this.loadTimelineOverview(traceTime);
   }
 
   private async listTracks() {
     this.updateStatus('Loading tracks');
+
     const engine = assertExists<Engine>(this.engine);
     const addToTrackActions: DeferredAction[] = [];
     const numCpus = await engine.getNumberOfCpus();
+
+    // TODO(hjd): Move this code out of TraceController.
+    for (const counterName of ['VSYNC-sf', 'VSYNC-app']) {
+      const hasVsync =
+          !!(await engine.query(
+                 `select ts from counters where name like "${
+                                                             counterName
+                                                           }" limit 1`))
+                .numRecords;
+      if (!hasVsync) continue;
+      addToTrackActions.push(Actions.addTrack({
+        engineId: this.engineId,
+        kind: 'VsyncTrack',
+        name: `${counterName}`,
+        config: {
+          counterName,
+        }
+      }));
+    }
+
     for (let cpu = 0; cpu < numCpus; cpu++) {
       addToTrackActions.push(Actions.addTrack({
         engineId: this.engineId,
@@ -199,9 +227,13 @@ export class TraceController extends Controller<States> {
       }));
     }
 
-    const threadQuery = await engine.query(
-        'select upid, utid, tid, thread.name, max(slices.depth) ' +
-        'from thread inner join slices using(utid) group by utid');
+    const threadQuery = await engine.query(`
+      select upid, utid, tid, thread.name, depth
+      from thread inner join (
+        select utid, max(slices.depth) as depth
+        from slices
+        group by utid
+      ) using(utid)`);
     for (let i = 0; i < threadQuery.numRecords; i++) {
       const upid = threadQuery.columns[0].longValues![i];
       const utid = threadQuery.columns[1].longValues![i];

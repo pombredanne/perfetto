@@ -15,13 +15,18 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <array>
 #include <memory>
 #include <vector>
 
+#include <signal.h>
+
+#include "perfetto/base/event.h"
 #include "perfetto/base/unix_socket.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
+#include "src/profiling/memory/wire_protocol.h"
 
 #include "perfetto/base/unix_task_runner.h"
 
@@ -31,7 +36,13 @@ namespace {
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
-constexpr double kSamplingRate = 1;
+constexpr uint64_t kDefaultSamplingRate = 1;
+
+base::Event* g_dump_evt = nullptr;
+
+void DumpSignalHandler(int) {
+  g_dump_evt->Notify();
+}
 
 // We create kUnwinderThreads unwinding threads and one bookeeping thread.
 // The bookkeeping thread is singleton in order to avoid expensive and
@@ -59,12 +70,53 @@ constexpr double kSamplingRate = 1;
 //           |Bookkeeping Thread|
 //           +------------------+
 int HeapprofdMain(int argc, char** argv) {
-  GlobalCallstackTrie callsites;
+  // TODO(fmayer): This is temporary until heapprofd is integrated with Perfetto
+  // and receives its configuration via that.
+  uint64_t sampling_rate = kDefaultSamplingRate;
+  bool standalone = false;
+  int opt;
+  while ((opt = getopt(argc, argv, "r:s")) != -1) {
+    switch (opt) {
+      case 'r': {
+        char* end;
+        long long sampling_rate_arg = strtoll(optarg, &end, 10);
+        if (*end != '\0' || *optarg == '\0')
+          PERFETTO_FATAL("Invalid sampling rate: %s", optarg);
+        PERFETTO_CHECK(sampling_rate > 0);
+        sampling_rate = static_cast<uint64_t>(sampling_rate_arg);
+        break;
+      }
+      case 's':
+        standalone = true;
+        break;
+      default:
+        PERFETTO_FATAL("%s [-r rate] [-s]", argv[0]);
+    }
+  }
+
+  base::UnixTaskRunner task_runner;
+  BoundedQueue<BookkeepingRecord> bookkeeping_queue(kBookkeepingQueueSize);
+  // We set this up before launching any threads, so we do not have to use a
+  // std::atomic for g_dump_evt.
+  g_dump_evt = new base::Event();
+
+  struct sigaction action = {};
+  action.sa_handler = DumpSignalHandler;
+  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) == 0);
+  task_runner.AddFileDescriptorWatch(g_dump_evt->fd(), [&bookkeeping_queue] {
+    g_dump_evt->Clear();
+
+    BookkeepingRecord rec = {};
+    rec.record_type = BookkeepingRecord::Type::Dump;
+    bookkeeping_queue.Add(std::move(rec));
+  });
+
   std::unique_ptr<base::UnixSocket> sock;
 
-  BoundedQueue<BookkeepingRecord> callsites_queue(kBookkeepingQueueSize);
-  std::thread bookkeeping_thread(
-      [&callsites_queue] { BookkeepingMainLoop(&callsites_queue); });
+  BookkeepingThread bookkeeping_thread("/data/local/tmp/heap_dump");
+  std::thread bookkeeping_th([&bookkeeping_thread, &bookkeeping_queue] {
+    bookkeeping_thread.Run(&bookkeeping_queue);
+  });
 
   std::array<BoundedQueue<UnwindingRecord>, kUnwinderThreads> unwinder_queues;
   for (size_t i = 0; i < kUnwinderThreads; ++i)
@@ -72,8 +124,8 @@ int HeapprofdMain(int argc, char** argv) {
   std::vector<std::thread> unwinding_threads;
   unwinding_threads.reserve(kUnwinderThreads);
   for (size_t i = 0; i < kUnwinderThreads; ++i) {
-    unwinding_threads.emplace_back([&unwinder_queues, &callsites_queue, i] {
-      UnwindingMainLoop(&unwinder_queues[i], &callsites_queue);
+    unwinding_threads.emplace_back([&unwinder_queues, &bookkeeping_queue, i] {
+      UnwindingMainLoop(&unwinder_queues[i], &bookkeeping_queue);
     });
   }
 
@@ -81,39 +133,40 @@ int HeapprofdMain(int argc, char** argv) {
     unwinder_queues[static_cast<size_t>(r.pid) % kUnwinderThreads].Add(
         std::move(r));
   };
-  SocketListener listener({kSamplingRate}, std::move(on_record_received),
-                          &callsites);
+  SocketListener listener({sampling_rate}, std::move(on_record_received),
+                          &bookkeeping_thread);
 
-  base::UnixTaskRunner read_task_runner;
-  if (argc == 2) {
+  if (optind != argc)
+    PERFETTO_FATAL("%s [-r rate] [-s]", argv[0]);
+
+  if (standalone) {
     // Allow to be able to manually specify the socket to listen on
     // for testing and sideloading purposes.
-    sock = base::UnixSocket::Listen(argv[1], &listener, &read_task_runner);
-  } else if (argc == 1) {
+    unlink(kHeapprofdSocketFile);
+    sock =
+        base::UnixSocket::Listen(kHeapprofdSocketFile, &listener, &task_runner);
+  } else {
     // When running as a service launched by init on Android, the socket
     // is created by init and passed to the application using an environment
     // variable.
-    const char* sock_fd = getenv("ANDROID_SOCKET_heapprofd");
+    const char* sock_fd = getenv(kHeapprofdSocketEnvVar);
     if (sock_fd == nullptr)
-      PERFETTO_FATAL(
-          "No argument given and environment variable ANDROID_SOCKET_heapprof "
-          "is unset.");
+      PERFETTO_FATAL("No argument given and environment variable %s is unset.",
+                     kHeapprofdSocketEnvVar);
     char* end;
     int raw_fd = static_cast<int>(strtol(sock_fd, &end, 10));
     if (*end != '\0')
-      PERFETTO_FATAL(
-          "Invalid ANDROID_SOCKET_heapprofd. Expected decimal integer.");
+      PERFETTO_FATAL("Invalid %s. Expected decimal integer.",
+                     kHeapprofdSocketEnvVar);
     sock = base::UnixSocket::Listen(base::ScopedFile(raw_fd), &listener,
-                                    &read_task_runner);
-  } else {
-    PERFETTO_FATAL("Invalid number of arguments. %s [SOCKET]", argv[0]);
+                                    &task_runner);
   }
 
   if (sock->last_error() != 0)
     PERFETTO_FATAL("Failed to initialize socket: %s",
                    strerror(sock->last_error()));
 
-  read_task_runner.Run();
+  task_runner.Run();
   return 0;
 }
 }  // namespace

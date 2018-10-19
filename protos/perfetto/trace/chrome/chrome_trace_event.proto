@@ -19,31 +19,13 @@ option optimize_for = LITE_RUNTIME;
 package perfetto.protos;
 
 message ChromeTracedValue {
-  message Value {
-    oneof values {
-      // The field id for the dict value must
-      // be the same as the top-level "root",
-      // so we can directly memcpy in other
-      // TracedValue messages.
-      Dict dict_value = 1;
-      int32 int_value = 2;
-      double double_value = 3;
-      bool bool_value = 4;
-      string string_value = 5;
-      Array array_value = 6;
-    }
-  }
-
-  message Array { repeated Value values = 1; }
-
-  message DictEntry {
-    optional string name = 1;
-    optional Value value = 2;
-  }
-
-  message Dict { repeated DictEntry entries = 2; }
-
-  optional Dict root = 1;
+  repeated string dict_keys = 1;
+  repeated ChromeTracedValue dict_values = 2;
+  repeated ChromeTracedValue array_values = 3;
+  optional int32 int_value = 4;
+  optional double double_value = 5;
+  optional bool bool_value = 6;
+  optional string string_value = 7;
 }
 
 message ChromeStringTableEntry {
@@ -70,7 +52,7 @@ message ChromeTraceEvent {
 
     // Takes precedence over |name| if set,
     // and is an index into |string_table|.
-    optional int32 name_index = 9;
+    optional uint32 name_index = 9;
   }
 
   optional string name = 1;
@@ -92,8 +74,8 @@ message ChromeTraceEvent {
   // Takes precedence over respectively |name| and
   // |category_group_name_index| if set,
   // and are indices into |string_table|.
-  optional int32 name_index = 15;
-  optional int32 category_group_name_index = 16;
+  optional uint32 name_index = 15;
+  optional uint32 category_group_name_index = 16;
 }
 
 message ChromeMetadata {

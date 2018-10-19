@@ -51,6 +51,42 @@ export interface PermalinkConfig {
   hash?: string;       // Set by the controller when the link has been created.
 }
 
+export interface RecordConfig {
+  [key: string]: null|number|boolean|string|string[];
+
+  displayConfigAsPbtxt: boolean;
+
+  // Global settings
+  durationSeconds: number;
+  writeIntoFile: boolean;
+  fileWritePeriodMs: number|null;
+
+  // Buffer setup
+  bufferSizeMb: number;
+
+  // Ps
+  processMetadata: boolean;
+  scanAllProcessesOnStart: boolean;
+
+  // Ftrace
+  ftrace: boolean;
+  ftraceEvents: string[];
+  atraceCategories: string[];
+  atraceApps: string[];
+  ftraceDrainPeriodMs: number|null;
+  ftraceBufferSizeKb: number|null;
+
+
+  // SysStats
+  sysStats: boolean;
+  meminfoPeriodMs: number|null;
+  meminfoCounters: string[];
+  vmstatPeriodMs: number|null;
+  vmstatCounters: string[];
+  statPeriodMs: number|null;
+  statCounters: string[];
+}
+
 export interface TraceTime {
   startSec: number;
   endSec: number;
@@ -65,6 +101,11 @@ export interface Status {
 export interface State {
   route: string|null;
   nextId: number;
+
+  /**
+   * State of the ConfigEditor.
+   */
+  recordConfig: RecordConfig;
 
   /**
    * Open traces.
@@ -98,6 +139,35 @@ export function createEmptyState(): State {
     scrollingTracks: [],
     queries: {},
     permalink: {},
+    recordConfig: createEmptyRecordConfig(),
     status: {msg: '', timestamp: 0},
+  };
+}
+
+export function createEmptyRecordConfig(): RecordConfig {
+  return {
+    durationSeconds: 10.0,
+    writeIntoFile: false,
+    fileWritePeriodMs: null,
+    bufferSizeMb: 10.0,
+    processMetadata: false,
+    scanAllProcessesOnStart: false,
+
+    ftrace: false,
+    ftraceEvents: [],
+    atraceApps: [],
+    atraceCategories: [],
+    ftraceDrainPeriodMs: null,
+    ftraceBufferSizeKb: null,
+
+    sysStats: false,
+    meminfoPeriodMs: null,
+    meminfoCounters: [],
+    vmstatPeriodMs: null,
+    vmstatCounters: [],
+    statPeriodMs: null,
+    statCounters: [],
+
+    displayConfigAsPbtxt: false,
   };
 }

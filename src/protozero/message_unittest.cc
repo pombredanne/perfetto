@@ -207,6 +207,42 @@ TEST_F(MessageTest, NestedMessagesSimple) {
   ASSERT_EQ("2803", GetNextSerializedBytes(2));
 }
 
+// Tests using a MessageWriterDelegate to append raw bytes to
+// a field from multiple buffers.
+class MyWriterDelegate : public Message::MessageWriterDelegate {
+ public:
+  MyWriterDelegate() { memset(buffer_, 0x42, sizeof(buffer_)); }
+
+  bool GetNextBuffer(ContiguousMemoryRange* range) override {
+    if (buffers_returned_++ == 2)
+      return false;
+
+    range->begin = buffer_;
+    range->end = buffer_ + sizeof(buffer_);
+    return true;
+  }
+
+ private:
+  uint8_t buffer_[42];
+  size_t buffers_returned_ = 0;
+};
+
+TEST_F(MessageTest, AppendBytesWithWriter) {
+  MyWriterDelegate delegate;
+  Message* root_msg = NewMessage();
+
+  root_msg->AppendBytes(1 /* field_id */, &delegate);
+  EXPECT_EQ(89u, root_msg->Finalize());
+  EXPECT_EQ(89u, GetNumSerializedBytes());
+
+  // field_id
+  EXPECT_EQ("0A", GetNextSerializedBytes(1));
+  // field length
+  EXPECT_EQ("D4808000", GetNextSerializedBytes(4));
+  // start of contents
+  EXPECT_EQ("42424242", GetNextSerializedBytes(4));
+}
+
 // Checks that the size field of root and nested messages is properly written
 // on finalization.
 TEST_F(MessageTest, BackfillSizeOnFinalization) {

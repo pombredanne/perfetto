@@ -86,6 +86,31 @@ void Message::AppendBytes(uint32_t field_id, const void* src, size_t size) {
   WriteToStream(src_u8, src_u8 + size);
 }
 
+size_t Message::AppendBytes(uint32_t field_id,
+                            MessageWriterDelegate* delegate) {
+  uint8_t data[proto_utils::kMaxTagEncodedSize];
+  uint8_t* data_end = proto_utils::WriteVarInt(
+      proto_utils::MakeTagLengthDelimited(field_id), data);
+  WriteToStream(data, data_end);
+
+  uint8_t* size_field =
+      stream_writer_->ReserveBytes(proto_utils::kMessageLengthFieldSize);
+  size_ += proto_utils::kMessageLengthFieldSize;
+
+  size_t size = 0;
+
+  ContiguousMemoryRange range;
+  while (delegate->GetNextBuffer(&range)) {
+    size += static_cast<size_t>(range.end - range.begin);
+    WriteToStream(range.begin, range.end);
+  }
+
+  PERFETTO_DCHECK(size < proto_utils::kMaxMessageLength);
+  proto_utils::WriteRedundantVarInt(static_cast<uint32_t>(size), size_field);
+
+  return size;
+}
+
 uint32_t Message::Finalize() {
   if (finalized_)
     return size_;

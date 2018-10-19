@@ -17,7 +17,7 @@ import * as m from 'mithril';
 import {QueryResponse} from '../common/queries';
 import {TimeSpan} from '../common/time';
 
-import {FlameGraphPanel} from './flame_graph_panel';
+import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
 import {HeaderPanel} from './header_panel';
 import {OverviewTimelinePanel} from './overview_timeline_panel';
@@ -54,8 +54,27 @@ class QueryTable extends Panel {
     return m(
         'div',
         m('header.overview',
-          `Query result - ${Math.round(resp.durationMs)} ms`,
-          m('span.code', resp.query)),
+          m('span',
+            `Query result - ${Math.round(resp.durationMs)} ms`,
+            m('span.code', resp.query)),
+          resp.error ? null :
+                       m('button',
+                         {
+                           onclick: () => {
+                             const lines: string[][] = [];
+                             lines.push(resp.columns);
+                             for (const row of resp.rows) {
+                               const line = [];
+                               for (const col of resp.columns) {
+                                 line.push(row[col].toString());
+                               }
+                               lines.push(line);
+                             }
+                             copyToClipboard(
+                                 lines.map(line => line.join('\t')).join('\n'));
+                           },
+                         },
+                         'Copy as .tsv')),
         resp.error ?
             m('.query-error', `SQL error: ${resp.error}`) :
             m('table.query-table', m('thead', header), m('tbody', rows)));
@@ -112,6 +131,7 @@ class TraceViewer implements m.ClassComponent {
           tStart = tEnd - origDelta;
         }
         frontendLocalState.updateVisibleTime(new TimeSpan(tStart, tEnd));
+        globals.rafScheduler.scheduleRedraw();
       },
       onZoomed: (_: number, zoomRatio: number) => {
         const vizTime = frontendLocalState.visibleWindowTime;
@@ -139,7 +159,6 @@ class TraceViewer implements m.ClassComponent {
           m(HeaderPanel, {title: 'Tracks', key: 'tracksheader'}),
           ...globals.state.scrollingTracks.map(
               id => m(TrackPanel, {key: id, id})),
-          m(FlameGraphPanel, {key: 'flamegraph'}),
         ] :
         [];
     scrollingPanels.unshift(m(QueryTable));

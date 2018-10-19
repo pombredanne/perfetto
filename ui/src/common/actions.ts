@@ -18,20 +18,23 @@ import {defaultTraceTime, State, Status, TraceTime} from './state';
 
 type StateDraft = DraftObject<State>;
 
+
+function clearTraceState(state: StateDraft) {
+  state.traceTime = defaultTraceTime;
+  state.visibleTraceTime = defaultTraceTime;
+  state.pinnedTracks = [];
+  state.scrollingTracks = [];
+}
+
 export const StateActions = {
 
   navigate(state: StateDraft, args: {route: string}): void {
     state.route = args.route;
   },
 
-  // TODO(hjd): Factor common code from openTraceFromUrl.
   openTraceFromFile(state: StateDraft, args: {file: File}): void {
-    state.traceTime = defaultTraceTime;
-    state.visibleTraceTime = defaultTraceTime;
+    clearTraceState(state);
     const id = `${state.nextId++}`;
-    // Reset displayed tracks.
-    state.pinnedTracks = [];
-    state.scrollingTracks = [];
     state.engines[id] = {
       id,
       ready: false,
@@ -40,14 +43,9 @@ export const StateActions = {
     state.route = `/viewer`;
   },
 
-  // TODO(hjd): Factor common code from openTraceFromFile.
   openTraceFromUrl(state: StateDraft, args: {url: string}): void {
-    state.traceTime = defaultTraceTime;
-    state.visibleTraceTime = defaultTraceTime;
+    clearTraceState(state);
     const id = `${state.nextId++}`;
-    // Reset displayed tracks.
-    state.pinnedTracks = [];
-    state.scrollingTracks = [];
     state.engines[id] = {
       id,
       ready: false,
@@ -179,8 +177,40 @@ export const StateActions = {
     // so it appears on the proxy Actions class.
     throw new Error('Called setState on StateActions.');
   },
-};
 
+  // TODO(hjd): Parametrize this to increase type safety. See comments on
+  // aosp/778194
+  setConfigControl(
+      state: StateDraft,
+      args: {name: string; value: string | number | boolean | null;}): void {
+    const config = state.recordConfig;
+    config[args.name] = args.value;
+  },
+
+  addConfigControl(
+      state: StateDraft, args: {name: string; optionsToAdd: string[];}): void {
+    // tslint:disable-next-line no-any
+    const config = state.recordConfig as any;
+    const options = config[args.name];
+    for (const option of args.optionsToAdd) {
+      if (options.includes(option)) continue;
+      options.push(option);
+    }
+  },
+
+  removeConfigControl(
+      state: StateDraft, args: {name: string; optionsToRemove: string[];}):
+      void {
+        // tslint:disable-next-line no-any
+        const config = state.recordConfig as any;
+        const options = config[args.name];
+        for (const option of args.optionsToRemove) {
+          const index = options.indexOf(option);
+          if (index === -1) continue;
+          options.splice(index, 1);
+        }
+      },
+};
 
 // When we are on the frontend side, we don't really want to execute the
 // actions above, we just want to serialize them and marshal their
