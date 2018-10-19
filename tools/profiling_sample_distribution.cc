@@ -110,8 +110,7 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
     total_ground_truth[pair.first] += pair.second;
 
   for (const auto& pair : total_ground_truth)
-    std::cout << "real_" << pair.first << " " << times * pair.second
-              << std::endl;
+    std::cout << "g " << pair.first << " " << pair.second << std::endl;
 
   std::default_random_engine seed_engine(init_seed);
 
@@ -132,12 +131,12 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
       for (const auto& pair : allocations) {
         size_t sample_size =
             SampleSize(key.get(), pair.second, sampling_rate, malloc, free);
-        if (sample_size > 0)
-          totals[pair.first] += sample_size;
+        totals[pair.first] += sample_size;
       }
 
       for (const auto& pair : totals)
-        std::cout << pair.first << " " << pair.second << std::endl;
+        std::cout << times << " " << pair.first << " " << pair.second
+                  << std::endl;
     });
     th.join();
   }
