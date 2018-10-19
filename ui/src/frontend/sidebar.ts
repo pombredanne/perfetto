@@ -136,12 +136,51 @@ function openTraceUrl(url: string): (e: Event) => void {
   };
 }
 
+interface TraceViewerCtl extends Element {
+  setActiveTrace(name: string, blob: Blob): void;
+}
+
+async function openWithLegacyTraceViewer(file: File) {
+  const GCS_BUCKET = 'https://storage.googleapis.com/trace-viewer-legacy';
+  const REV = 'b026043a43f9';
+  let legacyTraceViewer =
+      await(await fetch(`${GCS_BUCKET}/about_tracing-${REV}.html`)).text();
+  legacyTraceViewer = legacyTraceViewer.replace(
+      'tracing.js', `${GCS_BUCKET}/about_tracing-${REV}.js`);
+
+  document.body.style.transition = 'filter ease 1s';
+  document.body.style.filter = 'grayscale(1) blur(10px) opacity(0)';
+  let done = false;
+  document.body.addEventListener('transitionend', () => {
+    if (done) return;
+    done = true;
+    const newDoc = document.open('text/html', 'replace');
+    newDoc.addEventListener('readystatechange', () => {
+      if (document.readyState !== 'complete') return;
+      // tslint:disable-next-line no-any
+      (window as any).tr.ui.b.readFile(file).then((data: any) => {
+        const ctl = document.getElementsByTagName('x-profiling-view')[0] as
+            TraceViewerCtl;
+        ctl.setActiveTrace(file.name, data);
+      });
+    });
+    document.write(legacyTraceViewer);
+    document.close();
+  });
+}
+
 function onInputElementFileSelectionChanged(e: Event) {
   if (!(e.target instanceof HTMLInputElement)) {
     throw new Error('Not an input element');
   }
   if (!e.target.files) return;
-  globals.dispatch(Actions.openTraceFromFile({file: e.target.files[0]}));
+  const file = e.target.files[0];
+  const fileName = file.name.toLowerCase();
+  if (fileName.endsWith('.gz') || fileName.endsWith('.html')) {
+    openWithLegacyTraceViewer(file);
+    return;
+  }
+  globals.dispatch(Actions.openTraceFromFile({file}));
 }
 
 function navigateRecord(e: Event) {
