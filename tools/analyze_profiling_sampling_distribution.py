@@ -56,7 +56,6 @@ def main(argv):
     print key, "ground truth %d " % ground_truth[key], sp.stats.describe(value)
     sns.distplot(value)
     plt.show()
-  # TODO(fmayer): Plotting
 
 
 if __name__ == '__main__':
