@@ -50,6 +50,7 @@ if (is_linux) {
     ]
     deps = [
       "../gn:default_deps",
+      "../src/base",
       "../src/profiling/memory:client",
     ]
   }

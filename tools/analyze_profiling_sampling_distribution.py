@@ -53,7 +53,9 @@ def main(argv):
       (key, value.values()) for key, value in distributions.iteritems())
 
   for key, value in flat_distributions.iteritems():
-    print key, " ", sp.stats.describe(value)
+    print key, "ground truth %d " % ground_truth[key], sp.stats.describe(value)
+    sns.distplot(value)
+    plt.show()
   # TODO(fmayer): Plotting
 
 
