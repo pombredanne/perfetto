@@ -149,7 +149,7 @@ class PERFETTO_EXPORT Message {
   // Append raw bytes for a field, using the supplied |buffers| to
   // copy from |num_ranges| individual buffers.
   size_t AppendScatteredBytes(uint32_t field_id,
-                              ContiguousMemoryRange* buffers,
+                              ContiguousMemoryRange* ranges,
                               size_t num_ranges);
 
   // Begins a nested message, using the static storage provided by the parent

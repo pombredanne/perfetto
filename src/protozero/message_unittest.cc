@@ -209,7 +209,7 @@ TEST_F(MessageTest, NestedMessagesSimple) {
 
 // Tests using a AppendScatteredBytes to append raw bytes to
 // a message using multiple individual buffers.
-TEST_F(MessageTest, AppendBytesWithWriter) {
+TEST_F(MessageTest, AppendScatteredBytes) {
   Message* root_msg = NewMessage();
 
   uint8_t buffer[42];
@@ -218,13 +218,13 @@ TEST_F(MessageTest, AppendBytesWithWriter) {
   ContiguousMemoryRange ranges[] = {{buffer, buffer + sizeof(buffer)},
                                     {buffer, buffer + sizeof(buffer)}};
   root_msg->AppendScatteredBytes(1 /* field_id */, ranges, 2);
-  EXPECT_EQ(89u, root_msg->Finalize());
-  EXPECT_EQ(89u, GetNumSerializedBytes());
+  EXPECT_EQ(86u, root_msg->Finalize());
+  EXPECT_EQ(86u, GetNumSerializedBytes());
 
   // field_id
   EXPECT_EQ("0A", GetNextSerializedBytes(1));
   // field length
-  EXPECT_EQ("D4808000", GetNextSerializedBytes(4));
+  EXPECT_EQ("54", GetNextSerializedBytes(1));
   // start of contents
   EXPECT_EQ("42424242", GetNextSerializedBytes(4));
 }

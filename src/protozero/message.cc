@@ -87,27 +87,26 @@ void Message::AppendBytes(uint32_t field_id, const void* src, size_t size) {
 }
 
 size_t Message::AppendScatteredBytes(uint32_t field_id,
-                                     ContiguousMemoryRange* buffers,
+                                     ContiguousMemoryRange* ranges,
                                      size_t num_ranges) {
-  uint8_t data[proto_utils::kMaxTagEncodedSize];
-  uint8_t* data_end = proto_utils::WriteVarInt(
-      proto_utils::MakeTagLengthDelimited(field_id), data);
-  WriteToStream(data, data_end);
-
-  uint8_t* size_field =
-      stream_writer_->ReserveBytes(proto_utils::kMessageLengthFieldSize);
-  size_ += proto_utils::kMessageLengthFieldSize;
-
   size_t size = 0;
-
   for (size_t i = 0; i < num_ranges; ++i) {
-    auto& range = buffers[i];
-    size += range.size();
-    WriteToStream(range.begin, range.end);
+    size += ranges[i].size();
   }
 
   PERFETTO_DCHECK(size < proto_utils::kMaxMessageLength);
-  proto_utils::WriteRedundantVarInt(static_cast<uint32_t>(size), size_field);
+
+  uint8_t buffer[proto_utils::kMaxSimpleFieldEncodedSize];
+  uint8_t* pos = buffer;
+  pos = proto_utils::WriteVarInt(proto_utils::MakeTagLengthDelimited(field_id),
+                                 pos);
+  pos = proto_utils::WriteVarInt(static_cast<uint32_t>(size), pos);
+  WriteToStream(buffer, pos);
+
+  for (size_t i = 0; i < num_ranges; ++i) {
+    auto& range = ranges[i];
+    WriteToStream(range.begin, range.end);
+  }
 
   return size;
 }
