@@ -146,7 +146,7 @@ class PERFETTO_EXPORT Message {
   void AppendString(uint32_t field_id, const char* str);
   void AppendBytes(uint32_t field_id, const void* value, size_t size);
 
-  // Append raw bytes for a field, using the supplied |buffers| to
+  // Append raw bytes for a field, using the supplied |ranges| to
   // copy from |num_ranges| individual buffers.
   size_t AppendScatteredBytes(uint32_t field_id,
                               ContiguousMemoryRange* ranges,
