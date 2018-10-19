@@ -16,9 +16,9 @@
 
 // Tool that takes in a stream of allocations from stdin and outputs samples
 //
-// Input format is code_location size tuples, output format is code_location
-// sample_size tuples. The sum of all allocations in the input is echoed back
-// as real_${code_location}
+// Input format is code_location size tuples, output format is iteration number
+// code_location sample_size tuples. The sum of all allocations in the input is
+// echoed back in the special iteration 'g'
 //
 // Example input:
 // foo 1
@@ -27,11 +27,11 @@
 // baz 1
 //
 // Example output;
-// real_foo 1001
-// real_bar 10
-// real_baz 1
-// foo 1000
-// bar 100
+// g foo 1001
+// g bar 10
+// g baz 1
+// 1 foo 1000
+// 1 bar 100
 
 #include <iostream>
 #include <string>
@@ -131,6 +131,9 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
       for (const auto& pair : allocations) {
         size_t sample_size =
             SampleSize(key.get(), pair.second, sampling_rate, malloc, free);
+        // We also want to add 0 to make downstream processing easier, making
+        // sure every iteration has an entry for every key, even if it is
+        // zero.
         totals[pair.first] += sample_size;
       }
 

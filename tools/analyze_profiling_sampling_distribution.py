@@ -32,6 +32,7 @@ FLAGS = flags.FLAGS
 def main(argv):
   sns.set()
 
+  # Map from key to map from iteration id to bytes allocated.
   distributions = defaultdict(lambda: defaultdict(int))
   ground_truth = {}
   for line in sys.stdin:
@@ -47,13 +48,13 @@ def main(argv):
       assert int(itr) not in distributions[key]
       distributions[key][int(itr)] += int(value)
 
+  # Map from key to list of bytes allocated, one for each iteration.
   flat_distributions = dict(
       (key, value.values()) for key, value in distributions.iteritems())
 
   for key, value in flat_distributions.iteritems():
     print key, "", sp.stats.describe(value)
-    sns.distplot(value, rug=True)
-    plt.show()
+  # TODO(fmayer): Plotting
 
 
 if __name__ == '__main__':
