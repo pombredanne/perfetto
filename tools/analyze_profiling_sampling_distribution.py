@@ -53,7 +53,7 @@ def main(argv):
       (key, value.values()) for key, value in distributions.iteritems())
 
   for key, value in flat_distributions.iteritems():
-    print key, "", sp.stats.describe(value)
+    print key, " ", sp.stats.describe(value)
   # TODO(fmayer): Plotting
 
 
