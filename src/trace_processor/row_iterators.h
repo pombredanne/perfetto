@@ -74,12 +74,6 @@ class SortedRowIterator : public StorageCursor::RowIterator {
   uint32_t next_row_idx_ = 0;
 };
 
-std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
-    const StorageCursor::ColumnOperators& ops,
-    int natural_ordered_col,
-    const QueryConstraints& qc,
-    sqlite3_value** argv);
-
 }  // namespace trace_processor
 }  // namespace perfetto
 

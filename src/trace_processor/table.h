@@ -52,10 +52,7 @@ class Table : public sqlite3_vtab {
   // Describes a column of this table.
   class Column {
    public:
-    Column(size_t index,
-           std::string name,
-           ColumnType type,
-           bool hidden = false);
+    Column(size_t idx, std::string name, ColumnType type, bool hidden = false);
 
     size_t index() const { return index_; }
     const std::string& name() const { return name_; }

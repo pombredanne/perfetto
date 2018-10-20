@@ -19,12 +19,9 @@
 namespace perfetto {
 namespace trace_processor {
 
-StorageCursor::StorageCursor(Table::Schema schema,
-                             std::unique_ptr<RowIterator> iterator,
-                             std::unique_ptr<ValueRetriever> retriever)
-    : schema_(std::move(schema)),
-      iterator_(std::move(iterator)),
-      retriever_(std::move(retriever)) {}
+StorageCursor::StorageCursor(std::unique_ptr<RowIterator> iterator,
+                             std::vector<ColumnDefn*> cols)
+    : iterator_(std::move(iterator)), columns_(std::move(cols)) {}
 
 int StorageCursor::Next() {
   iterator_->NextRow();
@@ -36,31 +33,31 @@ int StorageCursor::Eof() {
 }
 
 int StorageCursor::Column(sqlite3_context* context, int raw_col) {
-  uint32_t row = iterator_->Row();
+  // uint32_t row = iterator_->Row();
   size_t column = static_cast<size_t>(raw_col);
-  switch (schema_.columns()[static_cast<size_t>(column)].type()) {
+  switch (columns_[column]->GetType()) {
     case Table::ColumnType::kUlong:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(
-                                        retriever_->GetUlong(column, row)));
+      sqlite3_result_int64(context, static_cast<sqlite3_int64>(0));
       break;
     case Table::ColumnType::kUint:
-      sqlite3_result_int64(context, retriever_->GetUint(column, row));
+      sqlite3_result_int64(context, 0);
       break;
     case Table::ColumnType::kDouble:
-      sqlite3_result_double(context, retriever_->GetDouble(column, row));
+      sqlite3_result_double(context, 0);
       break;
     case Table::ColumnType::kLong:
-      sqlite3_result_int64(context, retriever_->GetLong(column, row));
+      sqlite3_result_int64(context, 0);
       break;
     case Table::ColumnType::kInt:
-      sqlite3_result_int(context, retriever_->GetInt(column, row));
+      sqlite3_result_int(context, 0);
       break;
     case Table::ColumnType::kString: {
-      auto pair = retriever_->GetString(column, row);
+      auto pair =
+          std::make_pair((nullptr), static_cast<sqlite3_destructor_type>(0));
       if (pair.first == nullptr) {
         sqlite3_result_null(context);
-      } else {
-        sqlite3_result_text(context, pair.first, -1, pair.second);
+        // } else {
+        // sqlite3_result_text(context, pair.first, -1, pair.second);
       }
       break;
     }
@@ -69,7 +66,10 @@ int StorageCursor::Column(sqlite3_context* context, int raw_col) {
 }
 
 StorageCursor::RowIterator::~RowIterator() = default;
-StorageCursor::ValueRetriever::~ValueRetriever() = default;
+
+StorageCursor::ColumnDefn::ColumnDefn(std::string col_name, bool hidden)
+    : col_name_(col_name), hidden_(hidden) {}
+StorageCursor::ColumnDefn::~ColumnDefn() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto

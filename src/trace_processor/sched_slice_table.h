@@ -35,13 +35,6 @@ namespace trace_processor {
 // metadata for those slices.
 class SchedSliceTable : public Table {
  public:
-  enum Column {
-    kTimestamp = 0,
-    kCpu = 1,
-    kDuration = 2,
-    kUtid = 3,
-  };
-
   SchedSliceTable(sqlite3*, const TraceStorage* storage);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
@@ -54,17 +47,7 @@ class SchedSliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class ValueRetriever : public StorageCursor::ValueRetriever {
-   public:
-    ValueRetriever(const TraceStorage* storage);
-
-    uint32_t GetUint(size_t, uint32_t) const override;
-    uint64_t GetUlong(size_t, uint32_t) const override;
-
-   private:
-    const TraceStorage* storage_;
-  };
-
+  std::vector<std::unique_ptr<StorageCursor::ColumnDefn>> columns_;
   const TraceStorage* const storage_;
 };
 

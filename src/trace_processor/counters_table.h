@@ -29,16 +29,6 @@ namespace trace_processor {
 
 class CountersTable : public Table {
  public:
-  enum Column {
-    kTimestamp = 0,
-    kName = 1,
-    kValue = 2,
-    kDuration = 3,
-    kValueDelta = 4,
-    kRef = 5,
-    kRefType = 6,
-  };
-
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   CountersTable(sqlite3*, const TraceStorage*);
@@ -50,18 +40,8 @@ class CountersTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  class ValueRetriever : public StorageCursor::ValueRetriever {
-   public:
-    ValueRetriever(const TraceStorage* storage);
-
-    StringAndDestructor GetString(size_t, uint32_t) const override;
-    int64_t GetLong(size_t, uint32_t) const override;
-    uint64_t GetUlong(size_t, uint32_t) const override;
-
-   private:
-    const TraceStorage* storage_;
-  };
-
+  std::deque<std::string> ref_types_;
+  std::vector<std::unique_ptr<StorageCursor::ColumnDefn>> columns_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

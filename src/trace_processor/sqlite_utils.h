@@ -20,12 +20,12 @@
 #include <sqlite3.h>
 #include <algorithm>
 #include <deque>
+#include <functional>
 #include <iterator>
+#include <string>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
-#include "src/trace_processor/query_constraints.h"
-#include "src/trace_processor/storage_cursor.h"
 
 namespace perfetto {
 namespace trace_processor {
@@ -122,48 +122,6 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_FLOAT || type == SQLITE_INTEGER);
   return sqlite3_value_double(value);
-}
-
-inline bool IsNaturallyOrdered(const QueryConstraints& qc,
-                               int natural_ordered_column) {
-  return qc.order_by().size() == 0 ||
-         (qc.order_by().size() == 1 &&
-          qc.order_by()[0].iColumn == natural_ordered_column);
-}
-
-inline bool HasOnlyConstraintsForColumn(const QueryConstraints& qc,
-                                        int column) {
-  auto fn = [column](const QueryConstraints::Constraint& c) {
-    return c.iColumn == column;
-  };
-  return std::all_of(qc.constraints().begin(), qc.constraints().end(), fn);
-}
-
-template <typename T>
-std::pair<T, T> GetBoundsForNumericColumn(const QueryConstraints& qc,
-                                          sqlite3_value** argv,
-                                          int column) {
-  uint64_t min = 0;
-  uint64_t max = internal::kUint64Max;
-  for (size_t i = 0; i < qc.constraints().size(); i++) {
-    const auto& cs = qc.constraints()[i];
-    if (cs.iColumn != column)
-      continue;
-
-    auto value = ExtractSqliteValue<T>(argv[i]);
-    if (IsOpGe(cs.op) || IsOpGt(cs.op)) {
-      min = IsOpGe(cs.op) ? value : value + 1;
-    } else if (IsOpLe(cs.op) || IsOpLt(cs.op)) {
-      max = IsOpLe(cs.op) ? value : value - 1;
-    } else if (IsOpEq(cs.op)) {
-      min = value;
-      max = value;
-    } else {
-      // We can't handle any other constraints on ts.
-      PERFETTO_CHECK(false);
-    }
-  }
-  return std::make_pair(min, max);
 }
 
 }  // namespace sqlite_utils
