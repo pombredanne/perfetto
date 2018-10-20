@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {Module, ModuleArgs} from '../gen/trace_processor';
+import {FileSystem, Module, ModuleArgs} from '../gen/trace_processor';
 
 import {WasmBridge} from './wasm_bridge';
 
 class MockModule implements Module {
-  locateFile: (s: string) => string;
-  onRuntimeInitialized: () => void;
-  onAbort: () => void;
+  locateFile: ((s: string) => string)|undefined;
+  onRuntimeInitialized: (() => void)|undefined;
+  onAbort: (() => void)|undefined;
   addFunction = jest.fn();
   ccall = jest.fn();
 
@@ -47,6 +47,10 @@ class MockModule implements Module {
     heap.set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 0);
     return heap;
   }
+
+  get FS(): FileSystem {
+    return ({} as FileSystem);
+  }
 }
 
 test('wasm bridge should locate files', async () => {
@@ -54,7 +58,7 @@ test('wasm bridge should locate files', async () => {
   const callback = jest.fn();
   const bridge = new WasmBridge(m.init.bind(m), callback);
   expect(bridge);
-  expect(m.locateFile('foo.wasm')).toBe('foo.wasm');
+  expect(m.locateFile!('foo.wasm')).toBe('foo.wasm');
 });
 
 test('wasm bridge early calls are delayed', async () => {
@@ -71,7 +75,7 @@ test('wasm bridge early calls are delayed', async () => {
 
   const readyPromise = bridge.initialize();
 
-  m.onRuntimeInitialized();
+  m.onRuntimeInitialized!();
 
   await readyPromise;
   bridge.onReply(100, true, 0, 1);
@@ -88,7 +92,7 @@ test('wasm bridge aborts all calls on failure', async () => {
 
   const readyPromise = bridge.initialize();
 
-  m.onRuntimeInitialized();
+  m.onRuntimeInitialized!();
 
   bridge.callWasm({
     id: 100,

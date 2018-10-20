@@ -41,14 +41,13 @@ template("wasm_lib") {
   _lib_name = invoker.name
 
   if (is_wasm) {
-    assert(defined(invoker.sources))
     _target_ldflags = [
       "-s",
       "MODULARIZE=1",
       "-s",
-      "WASM=1",
+      "EXPORT_NAME=${target_name}",
       "-s",
-      "NO_FILESYSTEM=1",
+      "WASM=1",
       "-s",
       "DISABLE_EXCEPTION_CATCHING=1",
       "-s",
@@ -64,7 +63,7 @@ template("wasm_lib") {
       "-s",
       "EXPORT_FUNCTION_TABLES=1",
       "-s",
-      "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'addFunction']",
+      "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'addFunction', 'FS']",
     ]
     if (is_debug) {
       _target_ldflags += [ "-g4" ]

@@ -18,6 +18,7 @@ import {Remote} from '../base/remote';
 
 import {AppController} from './app_controller';
 import {globals} from './globals';
+import {ConvertTrace} from './trace_converter';
 import {warmupWasmEngine} from './wasm_engine_proxy';
 
 function main(port: MessagePort) {
@@ -37,3 +38,6 @@ function main(port: MessagePort) {
 }
 
 main(self as {} as MessagePort);
+
+// tslint:disable-next-line no-any
+(self as any).conv = ConvertTrace;

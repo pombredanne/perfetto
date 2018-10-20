@@ -15,6 +15,7 @@ export default {
       ignore: [
         'fs',
         'path',
+        'crypto',
       ]
     }),
 
