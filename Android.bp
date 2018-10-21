@@ -3729,6 +3729,7 @@ genrule {
 genrule {
   name: "perfetto_src_perfetto_cmd_protos_gen",
   srcs: [
+    "src/perfetto_cmd/descriptor.proto",
     "src/perfetto_cmd/perfetto_cmd_state.proto",
   ],
   tools: [
@@ -3736,6 +3737,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto/ $(in)",
   out: [
+    "external/perfetto/src/perfetto_cmd/descriptor.pb.cc",
     "external/perfetto/src/perfetto_cmd/perfetto_cmd_state.pb.cc",
   ],
 }
@@ -3744,6 +3746,7 @@ genrule {
 genrule {
   name: "perfetto_src_perfetto_cmd_protos_gen_headers",
   srcs: [
+    "src/perfetto_cmd/descriptor.proto",
     "src/perfetto_cmd/perfetto_cmd_state.proto",
   ],
   tools: [
@@ -3751,6 +3754,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto --proto_path=external/perfetto/ $(in)",
   out: [
+    "external/perfetto/src/perfetto_cmd/descriptor.pb.h",
     "external/perfetto/src/perfetto_cmd/perfetto_cmd_state.pb.h",
   ],
   export_include_dirs: [

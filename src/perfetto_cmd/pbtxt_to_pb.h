@@ -25,8 +25,18 @@
 
 namespace perfetto {
 
-std::vector<uint8_t> PbtxtToPb(
-    google::protobuf::io::ZeroCopyInputStream* input);
+class ErrorReporter {
+ public:
+  ErrorReporter();
+  virtual ~ErrorReporter();
+  virtual void AddError(size_t line,
+                        size_t column_start,
+                        size_t column_end,
+                        const std::string& message) = 0;
+};
+
+std::vector<uint8_t> PbtxtToPb(const std::string& input,
+                               ErrorReporter* reporter);
 
 }  // namespace perfetto
 
