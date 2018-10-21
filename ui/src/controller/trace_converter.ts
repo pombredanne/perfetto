@@ -31,9 +31,7 @@ export function ConvertTrace(trace: Blob) {
       const fsNode = mod.FS.lookupPath(outPath).node;
       const data = fsNode.contents.buffer;
       const size = fsNode.usedBytes;
-      setTimeout(() => {
-        globals.publish('LegacyTrace', {data, size}, [data]);
-      }, 0);
+      globals.publish('LegacyTrace', {data, size}, /*transfer=*/[data]);
       mod.FS.unlink(outPath);
     },
     onAbort: () => {

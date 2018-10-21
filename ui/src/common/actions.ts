@@ -14,7 +14,7 @@
 
 import {DraftObject} from 'immer';
 
-import {assertExists, assertTrue} from '../base/logging';
+import {assertExists} from '../base/logging';
 import {ConvertTrace} from '../controller/trace_converter';
 
 import {
@@ -52,8 +52,7 @@ export const StateActions = {
     state.route = `/viewer`;
   },
 
-  convertTraceToJson(state: StateDraft, args: {file: File}): void {
-    assertTrue(state !== undefined);
+  convertTraceToJson(_: StateDraft, args: {file: File}): void {
     ConvertTrace(args.file);
   },
 

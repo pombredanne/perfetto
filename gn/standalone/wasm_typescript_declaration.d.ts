@@ -59,11 +59,10 @@ declare namespace Wasm {
 
   export interface ModuleArgs {
     noInitialRun?: boolean;
-    noExitRuntime?: boolean;
-    locateFile?(s: string): string;
-    print?(s: string): void;
-    printErr?(s: string): void;
-    onRuntimeInitialized?(): void;
-    onAbort?(): void;
+    locateFile(s: string): string;
+    print(s: string): void;
+    printErr(s: string): void;
+    onRuntimeInitialized(): void;
+    onAbort(): void;
   }
 }

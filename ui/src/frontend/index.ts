@@ -23,7 +23,7 @@ import {TimeSpan} from '../common/time';
 
 import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
-import {openWithLegacyTraceViewer} from './legacy_trace_viewer';
+import {openBufferWithLegacyTraceViewer} from './legacy_trace_viewer';
 import {RecordPage} from './record_page';
 import {Router} from './router';
 import {ViewerPage} from './viewer_page';
@@ -89,7 +89,7 @@ class FrontendApi {
   publishLegacyTrace(args: {data: ArrayBuffer, size: number}) {
     const arr = new Uint8Array(args.data, 0, args.size);
     const str = (new TextDecoder('utf-8')).decode(arr);
-    openWithLegacyTraceViewer('trace.json', str, 0);
+    openBufferWithLegacyTraceViewer('trace.json', str, 0);
   }
 
   private redraw(): void {

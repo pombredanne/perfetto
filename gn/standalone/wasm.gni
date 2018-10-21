@@ -61,9 +61,9 @@ template("wasm_lib") {
       "-s",
       "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'addFunction', 'FS']",
 
-      # This forces the MEMFS filesystem library to always use typedarrays
+      # This forces the MEMFS filesystem library to always use typed arrays
       # instead of building strings/arrays when appending to a file. This allows
-      # to deal with MEMFS pseudo-files larger than 128 MB.
+      # to deal with pseudo-files larger than 128 MB when calling trace_to_text.
       "-s",
       "MEMFS_APPEND_TO_TYPED_ARRAYS=1",
 
@@ -72,8 +72,7 @@ template("wasm_lib") {
       "MODULARIZE=1",
 
       # This is to prevent that two different wasm modules end up generating
-      # JS that overrides the same global variable (var Module = ...). This
-      # rule names the module variable after the target name.
+      # JS that overrides the same global variable (var Module = ...)
       "-s",
       "EXPORT_NAME=${target_name}",
     ]

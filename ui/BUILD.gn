@@ -27,6 +27,7 @@ nodejs_bin = rebase_path("$nodejs_root/bin", root_build_dir)
 group("ui") {
   deps = [
     ":assets_dist",
+    ":catapult_dist",
     ":controller_bundle_dist",
     ":engine_bundle_dist",
     ":frontend_bundle_dist",
@@ -369,6 +370,17 @@ copy("wasm_gen") {
   }
   outputs = [
     "$ui_gen_dir/{{source_file_part}}",
+  ]
+}
+
+# Copy over the vulcanized legacy trace viewer.
+copy("catapult_dist") {
+  sources = [
+    "../buildtools/catapult_trace_viewer/catapult_trace_viewer.html",
+    "../buildtools/catapult_trace_viewer/catapult_trace_viewer.js",
+  ]
+  outputs = [
+    "$ui_dir/assets/{{source_file_part}}",
   ]
 }
 

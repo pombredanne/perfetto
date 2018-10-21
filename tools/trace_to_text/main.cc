@@ -40,6 +40,7 @@
 #include <google/protobuf/util/field_comparator.h>
 #include <google/protobuf/util/message_differencer.h>
 
+#include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/trace/ftrace/ftrace_stats.pb.h"
 #include "perfetto/trace/trace.pb.h"
@@ -49,8 +50,40 @@
 #include "tools/trace_to_text/ftrace_inode_handler.h"
 #include "tools/trace_to_text/process_formatter.h"
 
+// When running in Web Assembly, fflush() is a no-op and the stdio buffering
+// sends progress updates to JS only when a write ends with \n.
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WASM)
+#define PROGRESS_CHAR "\n"
+#else
+#define PROGRESS_CHAR "\r"
+#endif
+
 namespace perfetto {
 namespace {
+
+using google::protobuf::Descriptor;
+using google::protobuf::DynamicMessageFactory;
+using google::protobuf::FileDescriptor;
+using google::protobuf::Message;
+using google::protobuf::TextFormat;
+using google::protobuf::compiler::DiskSourceTree;
+using google::protobuf::compiler::Importer;
+using google::protobuf::compiler::MultiFileErrorCollector;
+using google::protobuf::io::OstreamOutputStream;
+
+using protos::FtraceEvent;
+using protos::FtraceEventBundle;
+using protos::InodeFileMap;
+using protos::PrintFtraceEvent;
+using protos::ProcessTree;
+using protos::Trace;
+using protos::TracePacket;
+using protos::FtraceStats;
+using protos::FtraceStats_Phase_START_OF_TRACE;
+using protos::FtraceStats_Phase_END_OF_TRACE;
+using protos::SysStats;
+using Entry = protos::InodeFileMap::Entry;
+using Process = protos::ProcessTree::Process;
 
 // Having an empty traceEvents object is necessary for trace viewer to
 // load the json properly.
@@ -87,31 +120,7 @@ const char kFtraceHeader[] =
     "#           TASK-PID    TGID   CPU#  ||||    TIMESTAMP  FUNCTION\\n"
     "#              | |        |      |   ||||       |         |\\n";
 
-using google::protobuf::Descriptor;
-using google::protobuf::DynamicMessageFactory;
-using google::protobuf::FileDescriptor;
-using google::protobuf::Message;
-using google::protobuf::TextFormat;
-using google::protobuf::compiler::DiskSourceTree;
-using google::protobuf::compiler::Importer;
-using google::protobuf::compiler::MultiFileErrorCollector;
-using google::protobuf::io::OstreamOutputStream;
-
-using protos::FtraceEvent;
-using protos::FtraceEventBundle;
-using protos::InodeFileMap;
-using protos::PrintFtraceEvent;
-using protos::ProcessTree;
-using protos::Trace;
-using protos::TracePacket;
-using protos::FtraceStats;
-using protos::FtraceStats_Phase_START_OF_TRACE;
-using protos::FtraceStats_Phase_END_OF_TRACE;
-using protos::SysStats;
-using Entry = protos::InodeFileMap::Entry;
-using Process = protos::ProcessTree::Process;
-
-// TODO(hjd): Add tests.
+bool g_output_is_tty = false;
 
 size_t GetWidth() {
   if (!isatty(STDOUT_FILENO))
@@ -150,7 +159,8 @@ void ForEachPacketInTrace(
   // using libprotobuf.
   for (uint32_t i = 0;; i++) {
     if ((i & 0x3f) == 0) {
-      fprintf(stderr, "Processing trace: %8zu KB\n", bytes_processed / 1024);
+      fprintf(stderr, "Processing trace: %8zu KB" PROGRESS_CHAR,
+              bytes_processed / 1024);
       fflush(stderr);
     }
     // A TracePacket consists in one byte stating its field id and type ...
@@ -289,8 +299,9 @@ int TraceToSystrace(std::istream* input,
   for (auto it = ftrace_sorted.begin(); it != ftrace_sorted.end(); it++) {
     *output << it->second;
     *output << (wrap_in_json ? "\\n" : "\n");
-    if (written_events++ % 1000 == 0 /*&& !isatty(STDOUT_FILENO)*/) {
-      fprintf(stderr, "Writing trace: %.2f %%\n",
+    if (!g_output_is_tty && (written_events++ % 1000 == 0 ||
+                             written_events == ftrace_sorted.size())) {
+      fprintf(stderr, "Writing trace: %.2f %%" PROGRESS_CHAR,
               written_events * 100.0 / total_events);
       fflush(stderr);
       output->flush();
@@ -711,8 +722,8 @@ namespace {
 
 int Usage(const char* argv0) {
   printf(
-      "Usage: %s [systrace|json|text|summary|short_summary] < trace.proto > "
-      "trace.txt\n",
+      "Usage: %s systrace|json|text|summary|short_summary [trace.proto] "
+      "[trace.txt]\n",
       argv0);
   return 1;
 }
@@ -723,9 +734,7 @@ int main(int argc, char** argv) {
   if (argc < 2)
     return Usage(argv[0]);
 
-  std::istream* input_stream = &std::cin;
-  std::ostream* output_stream = &std::cout;
-
+  std::istream* input_stream;
   std::ifstream file_istream;
   if (argc > 2) {
     const char* file_path = argv[2];
@@ -733,8 +742,17 @@ int main(int argc, char** argv) {
     if (!file_istream.is_open())
       PERFETTO_FATAL("Could not open %s", file_path);
     input_stream = &file_istream;
+  } else {
+    if (isatty(STDIN_FILENO)) {
+      PERFETTO_ELOG("Reading from stdin but it's connected to a TTY");
+      PERFETTO_LOG("It is unlikely that you want to type in some binary.");
+      PERFETTO_LOG("Either pass a file path to the cmdline or pipe stdin");
+      return Usage(argv[0]);
+    }
+    input_stream = &std::cin;
   }
 
+  std::ostream* output_stream;
   std::ofstream file_ostream;
   if (argc > 3) {
     const char* file_path = argv[3];
@@ -742,6 +760,9 @@ int main(int argc, char** argv) {
     if (!file_ostream.is_open())
       PERFETTO_FATAL("Could not open %s", file_path);
     output_stream = &file_ostream;
+  } else {
+    output_stream = &std::cout;
+    perfetto::g_output_is_tty = isatty(STDOUT_FILENO);
   }
 
   std::string format(argv[1]);
