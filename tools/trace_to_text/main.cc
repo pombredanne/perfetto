@@ -148,9 +148,11 @@ void ForEachPacketInTrace(
   // that a trace is merely a sequence of TracePackets. Here we just manually
   // tokenize the repeated TracePacket messages and parse them individually
   // using libprotobuf.
-  for (;;) {
-    fprintf(stderr, "Processing trace: %8zu KB\r", bytes_processed / 1024);
-    fflush(stderr);
+  for (uint32_t i = 0;; i++) {
+    if ((i & 0x3f) == 0) {
+      fprintf(stderr, "Processing trace: %8zu KB\n", bytes_processed / 1024);
+      fflush(stderr);
+    }
     // A TracePacket consists in one byte stating its field id and type ...
     char preamble;
     input->get(preamble);
@@ -285,11 +287,13 @@ int TraceToSystrace(std::istream* input,
   size_t total_events = ftrace_sorted.size();
   size_t written_events = 0;
   for (auto it = ftrace_sorted.begin(); it != ftrace_sorted.end(); it++) {
-    *output << it->second << (wrap_in_json ? "\\n" : "\n");
-    if (written_events++ % 100 == 0 && !isatty(STDOUT_FILENO)) {
-      fprintf(stderr, "Writing trace: %.2f %%\r",
+    *output << it->second;
+    *output << (wrap_in_json ? "\\n" : "\n");
+    if (written_events++ % 1000 == 0 /*&& !isatty(STDOUT_FILENO)*/) {
+      fprintf(stderr, "Writing trace: %.2f %%\n",
               written_events * 100.0 / total_events);
       fflush(stderr);
+      output->flush();
     }
   }
 
@@ -716,25 +720,46 @@ int Usage(const char* argv0) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 2)
+  if (argc < 2)
     return Usage(argv[0]);
+
+  std::istream* input_stream = &std::cin;
+  std::ostream* output_stream = &std::cout;
+
+  std::ifstream file_istream;
+  if (argc > 2) {
+    const char* file_path = argv[2];
+    file_istream.open(file_path, std::ios_base::in | std::ios_base::binary);
+    if (!file_istream.is_open())
+      PERFETTO_FATAL("Could not open %s", file_path);
+    input_stream = &file_istream;
+  }
+
+  std::ofstream file_ostream;
+  if (argc > 3) {
+    const char* file_path = argv[3];
+    file_ostream.open(file_path, std::ios_base::out | std::ios_base::trunc);
+    if (!file_ostream.is_open())
+      PERFETTO_FATAL("Could not open %s", file_path);
+    output_stream = &file_ostream;
+  }
 
   std::string format(argv[1]);
 
   if (format == "json")
-    return perfetto::TraceToSystrace(&std::cin, &std::cout,
+    return perfetto::TraceToSystrace(input_stream, output_stream,
                                      /*wrap_in_json=*/true);
   if (format == "systrace")
-    return perfetto::TraceToSystrace(&std::cin, &std::cout,
+    return perfetto::TraceToSystrace(input_stream, output_stream,
                                      /*wrap_in_json=*/false);
   if (format == "text")
-    return perfetto::TraceToText(&std::cin, &std::cout);
+    return perfetto::TraceToText(input_stream, output_stream);
 
   if (format == "summary")
-    return perfetto::TraceToSummary(&std::cin, &std::cout,
+    return perfetto::TraceToSummary(input_stream, output_stream,
                                     /* compact_output */ false);
   if (format == "short_summary")
-    return perfetto::TraceToSummary(&std::cin, &std::cout,
+    return perfetto::TraceToSummary(input_stream, output_stream,
                                     /* compact_output */ true);
 
   return Usage(argv[0]);

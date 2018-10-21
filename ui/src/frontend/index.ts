@@ -20,8 +20,10 @@ import {forwardRemoteCalls} from '../base/remote';
 import {Actions} from '../common/actions';
 import {State} from '../common/state';
 import {TimeSpan} from '../common/time';
+
 import {globals, QuantizedLoad, ThreadDesc} from './globals';
 import {HomePage} from './home_page';
+import {openWithLegacyTraceViewer} from './legacy_trace_viewer';
 import {RecordPage} from './record_page';
 import {Router} from './router';
 import {ViewerPage} from './viewer_page';
@@ -44,7 +46,6 @@ class FrontendApi {
       globals.frontendLocalState.updateVisibleTime(
           new TimeSpan(vizTraceTime.startSec, vizTraceTime.endSec));
     }
-
     this.redraw();
   }
 
@@ -82,6 +83,13 @@ class FrontendApi {
       globals.threads.set(thread.utid, thread);
     });
     this.redraw();
+  }
+
+  // For opening JSON/HTML traces with the legacy catapult viewer.
+  publishLegacyTrace(args: {data: ArrayBuffer, size: number}) {
+    const arr = new Uint8Array(args.data, 0, args.size);
+    const str = (new TextDecoder('utf-8')).decode(arr);
+    openWithLegacyTraceViewer('trace.json', str, 0);
   }
 
   private redraw(): void {

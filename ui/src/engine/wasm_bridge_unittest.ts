@@ -51,6 +51,8 @@ class MockModule implements Module {
   get FS(): FileSystem {
     return ({} as FileSystem);
   }
+
+  callMain() {}
 }
 
 test('wasm bridge should locate files', async () => {

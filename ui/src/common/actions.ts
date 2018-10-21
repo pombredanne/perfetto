@@ -14,7 +14,8 @@
 
 import {DraftObject} from 'immer';
 
-import {assertExists} from '../base/logging';
+import {assertExists, assertTrue} from '../base/logging';
+import {ConvertTrace} from '../controller/trace_converter';
 
 import {
   defaultTraceTime,
@@ -49,6 +50,11 @@ export const StateActions = {
       source: args.file,
     };
     state.route = `/viewer`;
+  },
+
+  convertTraceToJson(state: StateDraft, args: {file: File}): void {
+    assertTrue(state !== undefined);
+    ConvertTrace(args.file);
   },
 
   openTraceFromUrl(state: StateDraft, args: {url: string}): void {

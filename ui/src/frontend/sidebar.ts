@@ -17,6 +17,10 @@ import * as m from 'mithril';
 import {Actions} from '../common/actions';
 
 import {globals} from './globals';
+import {
+  isLegacyTrace,
+  openFileWithLegacyTraceViewer,
+} from './legacy_trace_viewer';
 
 const ALL_PROCESSES_QUERY = 'select name, pid from process order by name;';
 
@@ -74,8 +78,13 @@ const SECTIONS = [
     expanded: true,
     items: [
       {t: 'Open trace file', a: popupFileSelectionDialog, i: 'folder_open'},
+      {
+        t: 'Open with legacy UI',
+        a: popupFileSelectionDialogOldUI,
+        i: 'folder_open'
+      },
       {t: 'Record new trace', a: navigateRecord, i: 'fiber_smart_record'},
-      {t: 'Show timeline', a: navigateViewer, i: 'fiber_smart_record'},
+      {t: 'Show timeline', a: navigateViewer, i: 'line_style'},
       {t: 'Share current trace', a: dispatchCreatePermalink, i: 'share'},
     ],
   },
@@ -124,9 +133,20 @@ const SECTIONS = [
   },
 ];
 
+function getFileElement(): HTMLInputElement {
+  return document.querySelector('input[type=file]')! as HTMLInputElement;
+}
+
 function popupFileSelectionDialog(e: Event) {
   e.preventDefault();
-  (document.querySelector('input[type=file]')! as HTMLInputElement).click();
+  delete getFileElement().dataset['useCatapultLegacyUi'];
+  getFileElement().click();
+}
+
+function popupFileSelectionDialogOldUI(e: Event) {
+  e.preventDefault();
+  getFileElement().dataset['useCatapultLegacyUi'] = '1';
+  getFileElement().click();
 }
 
 function openTraceUrl(url: string): (e: Event) => void {
@@ -135,51 +155,24 @@ function openTraceUrl(url: string): (e: Event) => void {
     globals.dispatch(Actions.openTraceFromUrl({url}));
   };
 }
-
-interface TraceViewerCtl extends Element {
-  setActiveTrace(name: string, blob: Blob): void;
-}
-
-async function openWithLegacyTraceViewer(file: File) {
-  const GCS_BUCKET = 'https://storage.googleapis.com/trace-viewer-legacy';
-  const REV = 'b026043a43f9';
-  let legacyTraceViewer =
-      await(await fetch(`${GCS_BUCKET}/about_tracing-${REV}.html`)).text();
-  legacyTraceViewer = legacyTraceViewer.replace(
-      'tracing.js', `${GCS_BUCKET}/about_tracing-${REV}.js`);
-
-  document.body.style.transition = 'filter ease 1s';
-  document.body.style.filter = 'grayscale(1) blur(10px) opacity(0)';
-  let done = false;
-  document.body.addEventListener('transitionend', () => {
-    if (done) return;
-    done = true;
-    const newDoc = document.open('text/html', 'replace');
-    newDoc.addEventListener('readystatechange', () => {
-      if (document.readyState !== 'complete') return;
-      // tslint:disable-next-line no-any
-      (window as any).tr.ui.b.readFile(file).then((data: any) => {
-        const ctl = document.getElementsByTagName('x-profiling-view')[0] as
-            TraceViewerCtl;
-        ctl.setActiveTrace(file.name, data);
-      });
-    });
-    document.write(legacyTraceViewer);
-    document.close();
-  });
-}
-
 function onInputElementFileSelectionChanged(e: Event) {
   if (!(e.target instanceof HTMLInputElement)) {
     throw new Error('Not an input element');
   }
   if (!e.target.files) return;
   const file = e.target.files[0];
-  const fileName = file.name.toLowerCase();
-  if (fileName.endsWith('.gz') || fileName.endsWith('.html')) {
-    openWithLegacyTraceViewer(file);
+
+  if (e.target.dataset['useCatapultLegacyUi'] === '1') {
+    // Switch back the old catapult UI.
+    if (isLegacyTrace(file.name)) {
+      openFileWithLegacyTraceViewer(file);
+    } else {
+      globals.dispatch(Actions.convertTraceToJson({file}));
+    }
     return;
   }
+
+  // Open with the current UI.
   globals.dispatch(Actions.openTraceFromFile({file}));
 }
 

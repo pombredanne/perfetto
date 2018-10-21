@@ -24,20 +24,28 @@ declare namespace Wasm {
 
   export interface FileSystemType {}
 
-  export interface EmscriptenFileSystems {
+  export interface FileSystemTypes {
     MEMFS: FileSystemType;
     IDBFS: FileSystemType;
     WORKERFS: FileSystemType;
+  }
+
+  export interface FileSystemNode {
+    contents: Uint8Array;
+    usedBytes: number;
   }
 
   export interface FileSystem {
     mkdir(path: string, mode?: number): any;
     mount(type: Wasm.FileSystemType, opts: any, mountpoint: string): any;
     unmount(mountpoint: string): void;
-    filesystems: Wasm.EmscriptenFileSystems;
+    unlink(mountpoint: string): void;
+    lookupPath(path: string): {path: string, node: Wasm.FileSystemNode};
+    filesystems: Wasm.FileSystemTypes;
   }
 
   export interface Module {
+    callMain(args: string[]): void;
     addFunction(f: any, argTypes: string): void;
     ccall(
         ident: string,

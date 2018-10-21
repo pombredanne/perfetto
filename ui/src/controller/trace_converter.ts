@@ -12,21 +12,48 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Actions} from '../common/actions';
 import * as trace_to_text from '../gen/trace_to_text';
 
-export function ConvertTrace() {
+import {globals} from './globals';
+
+export function ConvertTrace(trace: Blob) {
   const mod = trace_to_text({
     noInitialRun: true,
     locateFile: (s: string) => s,
-    print: (x) => console.log('P', x),
-    printErr: (x) => console.warn('E', x),
-    onRuntimeInitialized: () => {},
+    print: updateStatus,
+    printErr: updateStatus,
+    onRuntimeInitialized: () => {
+      updateStatus('Converting trace');
+      const outPath = '/trace.json';
+      mod.callMain(['json', '/fs/trace.proto', outPath]);
+      updateStatus('Trace conversion completed');
+      const fsNode = mod.FS.lookupPath(outPath).node;
+      const data = fsNode.contents.buffer;
+      const size = fsNode.usedBytes;
+      setTimeout(() => {
+        globals.publish('LegacyTrace', {data, size}, [data]);
+      }, 0);
+      mod.FS.unlink(outPath);
+    },
     onAbort: () => {
       console.log('ABORT');
     },
   });
   mod.FS.mkdir('/fs');
-  mod.FS.mount(mod.FS.filesystems.WORKERFS, {blobs: []}, '/fs');
+  mod.FS.mount(
+      mod.FS.filesystems.WORKERFS,
+      {blobs: [{name: 'trace.proto', data: trace}]},
+      '/fs');
 
-  return mod;
+  // TODO removeme.
+  (self as {} as {mod: {}}).mod = mod;
+}
+
+function updateStatus(msg: {}) {
+  console.log(msg);
+  globals.dispatch(Actions.updateStatus({
+    msg: msg.toString(),
+    timestamp: Date.now() / 1000,
+  }));
 }
