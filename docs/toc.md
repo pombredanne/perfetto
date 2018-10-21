@@ -16,6 +16,6 @@
   * [Trace format](trace-format.md)
   * [Multi-layer tracing](multi-layer-tracing.md)
   * [Security model](security-model.md)
-  * [Embedding Perfetto in your own project](embedder-guide.md)
+  * [Embedding Perfetto](embedder-guide.md)
   * [ProtoZero internals](protozero.md)
   * [IPC internals](ipc.md)
