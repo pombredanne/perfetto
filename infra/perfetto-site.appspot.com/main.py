@@ -15,6 +15,7 @@
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
 
+import re
 import webapp2
 
 BASE = 'https://catapult-project.github.io/perfetto/%s'
@@ -31,7 +32,7 @@ class MainHandler(webapp2.RequestHandler):
 
 class GithubMirrorHandler(webapp2.RequestHandler):
     def get(self, resource):
-        if '..' in resource:
+        if not re.match('^[a-zA-Z0-9-_./]*$', resource):
             self.response.set_status(403)
             return
 
