@@ -24,11 +24,6 @@ import seaborn as sns
 from collections import defaultdict
 from matplotlib import pyplot as plt
 
-from absl import app
-from absl import flags
-
-FLAGS = flags.FLAGS
-
 def main(argv):
   sns.set()
 
@@ -40,17 +35,17 @@ def main(argv):
     # Skip empty lines
     if not stripped:
       continue
-    itr, key, value = stripped.split(" ")
+    itr, code_location, size = stripped.split(" ")
     if itr == 'g':
-      assert key not in ground_truth
-      ground_truth[key] = int(value)
+      assert code_location not in ground_truth
+      ground_truth[code_location] = int(size)
     else:
-      assert int(itr) not in distributions[key]
-      distributions[key][int(itr)] += int(value)
+      assert int(itr) not in distributions[code_location]
+      distributions[code_location][int(itr)] += int(size)
 
   # Map from key to list of bytes allocated, one for each iteration.
-  flat_distributions = dict(
-      (key, value.values()) for key, value in distributions.iteritems())
+  flat_distributions = {key: value.values() for key, value
+                        in distributions.iteritems())
 
   for key, value in flat_distributions.iteritems():
     print key, "ground truth %d " % ground_truth[key], sp.stats.describe(value)
@@ -59,4 +54,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-  app.run(main)
+  main(sys.argv)

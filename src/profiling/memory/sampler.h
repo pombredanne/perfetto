@@ -37,10 +37,10 @@ namespace perfetto {
 // Chrome's heap profiler).
 class ThreadLocalSamplingData {
  public:
-  ThreadLocalSamplingData(void (*unhooked_free)(void*), uint64_t rate)
+  ThreadLocalSamplingData(void (*unhooked_free)(void*), uint64_t interval)
       : unhooked_free_(unhooked_free),
-        rate_(rate),
-        random_engine_(seed_for_testing.load(std::memory_order_relaxed)),
+        rate_(1 / static_cast<double>(interval)),
+        random_engine_(seed.load(std::memory_order_relaxed)),
         interval_to_next_sample_(NextSampleInterval()) {}
   // Returns number of times a sample should be accounted. Due to how the
   // poission sampling works, some samples should be accounted multiple times.
@@ -51,7 +51,7 @@ class ThreadLocalSamplingData {
   // the constructor.
   static void KeyDestructor(void* ptr);
 
-  static std::atomic<uint64_t> seed_for_testing;
+  static std::atomic<uint64_t> seed;
 
  private:
   int64_t NextSampleInterval();

@@ -25,16 +25,6 @@
 namespace perfetto {
 namespace {
 
-// Get integer that is large enough to be sampled in the first call to
-// SampleSize. Emulates the interal behaviour of the RNG in
-// ThreadLocalSamplingData.
-uint64_t GetSmall() {
-  std::default_random_engine random_engine(
-      ThreadLocalSamplingData::seed_for_testing);
-  std::exponential_distribution<double> dist(1 / 512.);
-  return static_cast<uint64_t>(dist(random_engine)) + 1;
-}
-
 TEST(SamplerTest, TestLarge) {
   PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
   ASSERT_TRUE(key.valid());
@@ -44,20 +34,18 @@ TEST(SamplerTest, TestLarge) {
 TEST(SamplerTest, TestSmall) {
   PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
   ASSERT_TRUE(key.valid());
-  uint64_t small = GetSmall();
-  EXPECT_EQ(SampleSize(key.get(), small, 512, malloc, free), 512);
+  EXPECT_EQ(SampleSize(key.get(), 511, 512, malloc, free), 512);
 }
 
 TEST(SamplerTest, TestSmallFromThread) {
   PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
   ASSERT_TRUE(key.valid());
-  uint64_t small = GetSmall();
-  std::thread th([&key, small] {
-    EXPECT_EQ(SampleSize(key.get(), small, 512, malloc, free), 512);
+  std::thread th([&key] {
+    EXPECT_EQ(SampleSize(key.get(), 511, 512, malloc, free), 512);
   });
-  std::thread th2([&key, small] {
+  std::thread th2([&key] {
     // The threads should have separate state.
-    EXPECT_EQ(SampleSize(key.get(), small, 512, malloc, free), 512);
+    EXPECT_EQ(SampleSize(key.get(), 511, 512, malloc, free), 512);
   });
   th.join();
   th2.join();

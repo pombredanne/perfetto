@@ -21,7 +21,7 @@
 namespace perfetto {
 namespace {
 ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
-                                     uint64_t rate,
+                                     uint64_t interval,
                                      void* (*unhooked_malloc)(size_t),
                                      void (*unhooked_free)(void*)) {
   // This should not be used with glibc as it might re-enter into malloc, see
@@ -29,7 +29,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
   void* specific = pthread_getspecific(key);
   if (specific == nullptr) {
     specific = unhooked_malloc(sizeof(ThreadLocalSamplingData));
-    new (specific) ThreadLocalSamplingData(unhooked_free, rate);
+    new (specific) ThreadLocalSamplingData(unhooked_free, interval);
     pthread_setspecific(key, specific);
   }
   return reinterpret_cast<ThreadLocalSamplingData*>(specific);
@@ -40,7 +40,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
 int64_t ThreadLocalSamplingData::NextSampleInterval() {
-  std::exponential_distribution<double> dist(1 / rate_);
+  std::exponential_distribution<double> dist(rate_);
   int64_t next = static_cast<int64_t>(dist(random_engine_));
   // The +1 corrects the distribution of the first value in the interval.
   // TODO(fmayer): Figure out why.
@@ -57,17 +57,17 @@ size_t ThreadLocalSamplingData::NumberOfSamples(size_t sz) {
   return sz_multiplier;
 }
 
-std::atomic<uint64_t> ThreadLocalSamplingData::seed_for_testing(1);
+std::atomic<uint64_t> ThreadLocalSamplingData::seed(1);
 
 size_t SampleSize(pthread_key_t key,
                   size_t sz,
-                  uint64_t rate,
+                  uint64_t interval,
                   void* (*unhooked_malloc)(size_t),
                   void (*unhooked_free)(void*)) {
-  if (PERFETTO_UNLIKELY(sz >= rate))
+  if (PERFETTO_UNLIKELY(sz >= interval))
     return sz;
-  return rate * GetSpecific(key, rate, unhooked_malloc, unhooked_free)
-                    ->NumberOfSamples(sz);
+  return interval * GetSpecific(key, interval, unhooked_malloc, unhooked_free)
+                        ->NumberOfSamples(sz);
 }
 
 void ThreadLocalSamplingData::KeyDestructor(void* ptr) {

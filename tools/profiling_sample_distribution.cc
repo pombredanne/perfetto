@@ -116,7 +116,7 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
 
   while (times-- > 0) {
     PThreadKey key(ThreadLocalSamplingData::KeyDestructor);
-    ThreadLocalSamplingData::seed_for_testing = seed_engine();
+    ThreadLocalSamplingData::seed = seed_engine();
     // We want to use the same API here that the client uses, which involves
     // TLS. In order to destruct that TLS, we need to spawn a thread because
     // pthread_key_delete does not delete any associated data, but rather it
