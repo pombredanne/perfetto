@@ -16,14 +16,7 @@
 
 #include "src/trace_processor/sched_slice_table.h"
 
-#include <string.h>
-#include <algorithm>
-#include <bitset>
-#include <numeric>
-
 #include "perfetto/base/logging.h"
-#include "perfetto/base/utils.h"
-#include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/table_utils.h"
 
 namespace perfetto {

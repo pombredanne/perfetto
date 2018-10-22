@@ -17,8 +17,6 @@
 #include "src/trace_processor/counters_table.h"
 
 #include "perfetto/base/logging.h"
-#include "src/trace_processor/query_constraints.h"
-#include "src/trace_processor/row_iterators.h"
 #include "src/trace_processor/table_utils.h"
 
 namespace perfetto {

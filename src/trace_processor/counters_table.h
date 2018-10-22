@@ -17,9 +17,6 @@
 #ifndef SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 
-#include <limits>
-#include <memory>
-
 #include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"

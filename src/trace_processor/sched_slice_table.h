@@ -17,13 +17,6 @@
 #ifndef SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 
-#include <sqlite3.h>
-#include <limits>
-#include <memory>
-
-#include "perfetto/base/utils.h"
-#include "src/trace_processor/query_constraints.h"
-#include "src/trace_processor/row_iterators.h"
 #include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
