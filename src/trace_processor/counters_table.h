@@ -17,7 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 #define SRC_TRACE_PROCESSOR_COUNTERS_TABLE_H_
 
-#include "src/trace_processor/storage_cursor.h"
+#include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -38,7 +38,7 @@ class CountersTable : public Table {
 
  private:
   std::deque<std::string> ref_types_;
-  std::vector<std::unique_ptr<StorageCursor::ColumnDefn>> columns_;
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 }  // namespace trace_processor

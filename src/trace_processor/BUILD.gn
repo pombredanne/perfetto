@@ -72,6 +72,8 @@ source_set("lib") {
     "sqlite_utils.h",
     "storage_cursor.cc",
     "storage_cursor.h",
+    "storage_schema.cc",
+    "storage_schema.h",
     "string_table.cc",
     "string_table.h",
     "table.cc",

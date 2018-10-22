@@ -31,35 +31,32 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 
 Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
   const auto& slices = storage_->slices();
-
-  columns_.emplace_back(StorageCursor::NumericColumnPtr(
-      "ts", &slices.start_ns(), false /* hidden */, true /* ordered */));
-  columns_.emplace_back(StorageCursor::NumericColumnPtr("cpu", &slices.cpus()));
-  columns_.emplace_back(
-      StorageCursor::NumericColumnPtr("dur", &slices.durations()));
-  columns_.emplace_back(
-      StorageCursor::NumericColumnPtr("utid", &slices.utids()));
-  return table_utils::CreateSchemaFromStorageColumns(columns_, {"cpu", "ts"});
+  std::unique_ptr<StorageSchema::Column> cols[] = {
+      StorageSchema::NumericColumnPtr("ts", &slices.start_ns(),
+                                      false /* hidden */, true /* ordered */),
+      StorageSchema::NumericColumnPtr("cpu", &slices.cpus()),
+      StorageSchema::NumericColumnPtr("dur", &slices.durations()),
+      StorageSchema::NumericColumnPtr("utid", &slices.utids())};
+  schema_ = StorageSchema({
+      std::make_move_iterator(std::begin(cols)),
+      std::make_move_iterator(std::end(cols)),
+  });
+  return schema_.ToTableSchema({"cpu", "ts"});
 }
 
 std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
-  auto row_it =
-      table_utils::CreateOptimalRowIterator(columns_, count, qc, argv);
-
-  std::vector<StorageCursor::ColumnDefn*> defns;
-  for (const auto& col : columns_)
-    defns.emplace_back(col.get());
-  return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(row_it), std::move(defns)));
+  return std::unique_ptr<Table::Cursor>(new StorageCursor(
+      table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
+      schema_.Columns()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
                                BestIndexInfo* info) {
   const auto& cs = qc.constraints();
-  size_t ts_idx = table_utils::ColumnIndexFromName(columns_, "ts");
+  size_t ts_idx = schema_.ColumnIndexFromName("ts");
   auto predicate = [ts_idx](const QueryConstraints::Constraint& c) {
     return c.iColumn == static_cast<int>(ts_idx);
   };

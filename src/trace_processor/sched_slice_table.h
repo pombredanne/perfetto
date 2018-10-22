@@ -40,7 +40,7 @@ class SchedSliceTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  std::vector<std::unique_ptr<StorageCursor::ColumnDefn>> columns_;
+  StorageSchema schema_;
   const TraceStorage* const storage_;
 };
 
