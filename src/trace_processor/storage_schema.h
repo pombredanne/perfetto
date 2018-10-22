@@ -25,8 +25,12 @@
 namespace perfetto {
 namespace trace_processor {
 
+// Defines the schema for a table which is backed by concrete storage (i.e. does
+// not generate data on the fly).
+// Used by all tables which are backed by data in TraceStorage.
 class StorageSchema {
  public:
+  // A column of data backed by data storage.
   class Column : public StorageCursor::ColumnReporter {
    public:
     struct Bounds {
@@ -40,12 +44,26 @@ class StorageSchema {
     Column(std::string col_name, bool hidden);
     virtual ~Column() override;
 
+    // Implements StorageCursor::ColumnReporter.
     virtual void ReportResult(sqlite3_context*, uint32_t) const override = 0;
 
+    // Bounds a filter on this column between a minimum and maximum index.
+    // Generally this is only possible if the column is sorted.
     virtual Bounds BoundFilter(int op, sqlite3_value* value) const = 0;
+
+    // Given a SQLite operator and value for the comparision, returns a
+    // predicate which takes in a row index and returns whether the row should
+    // be returned.
     virtual Predicate Filter(int op, sqlite3_value* value) const = 0;
+
+    // Given a order by constraint for this column, returns a comparator
+    // function which compares data in this column at two indices.
     virtual Comparator Sort(const QueryConstraints::OrderBy& ob) const = 0;
+
+    // Returns the type of this column.
     virtual Table::ColumnType GetType() const = 0;
+
+    // Returns whether this column is sorted in the storage.
     virtual bool IsNaturallyOrdered() const = 0;
 
     const std::string& name() const { return col_name_; }
@@ -56,6 +74,7 @@ class StorageSchema {
     bool hidden_ = false;
   };
 
+  // A column of numeric data backed by a deque.
   template <typename T>
   class NumericColumn final : public Column {
    public:
@@ -66,6 +85,10 @@ class StorageSchema {
         : Column(col_name, hidden),
           deque_(deque),
           is_naturally_ordered_(is_naturally_ordered) {}
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
+      sqlite_utils::ReportSqliteResult(ctx, deque_->operator[](row));
+    }
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override {
       Bounds bounds;
@@ -136,10 +159,6 @@ class StorageSchema {
       };
     }
 
-    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      sqlite_utils::ReportSqliteResult(ctx, deque_->operator[](row));
-    }
-
     bool IsNaturallyOrdered() const override { return is_naturally_ordered_; }
 
     Table::ColumnType GetType() const override {
@@ -170,6 +189,16 @@ class StorageSchema {
                  const std::deque<std::string>* string_map,
                  bool hidden = false)
         : Column(col_name, hidden), deque_(deque), string_map_(string_map) {}
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
+      const auto& str = string_map_->operator[](deque_->operator[](row));
+      if (str.empty()) {
+        sqlite3_result_null(ctx);
+      } else {
+        auto kStatic = static_cast<sqlite3_destructor_type>(0);
+        sqlite3_result_text(ctx, str.c_str(), -1, kStatic);
+      }
+    }
 
     Bounds BoundFilter(int, sqlite3_value*) const override {
       Bounds bounds;
@@ -202,16 +231,6 @@ class StorageSchema {
           return 1;
         return 0;
       };
-    }
-
-    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      const auto& str = string_map_->operator[](deque_->operator[](row));
-      if (str.empty()) {
-        sqlite3_result_null(ctx);
-      } else {
-        auto kStatic = static_cast<sqlite3_destructor_type>(0);
-        sqlite3_result_text(ctx, str.c_str(), -1, kStatic);
-      }
     }
 
     Table::ColumnType GetType() const override {

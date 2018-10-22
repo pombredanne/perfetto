@@ -21,10 +21,12 @@ namespace perfetto {
 namespace trace_processor {
 
 // A cursor which abstracts common patterns found in storage backed tables. It
-// takes a strategy to iterate throw rows and a column reporter for each column
-// to implement the Cursor interface.
+// takes a strategy to iterate through rows and a column reporter for each
+// column to implement the Cursor interface.
 class StorageCursor final : public Table::Cursor {
  public:
+  // Implements a strategy of yielding indices into a storage system to fulfil
+  // a query.
   class RowIterator {
    public:
     virtual ~RowIterator();
@@ -33,6 +35,8 @@ class StorageCursor final : public Table::Cursor {
     virtual uint32_t Row() = 0;
     virtual bool IsEnd() = 0;
   };
+
+  // Reports the data at a column to SQLite for a given row.
   class ColumnReporter {
    public:
     virtual ~ColumnReporter();

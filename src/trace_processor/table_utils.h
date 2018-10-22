@@ -117,11 +117,13 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
 
 }  // namespace internal
 
-inline std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
-    const StorageSchema& schema,
-    uint32_t size,
-    const QueryConstraints& qc,
-    sqlite3_value** argv) {
+// Creates a row iterator which is optimized for a generic storage schema (i.e.
+// it does not make assumptions about values of columns).
+inline std::unique_ptr<StorageCursor::RowIterator>
+CreateBestRowIteratorForGenericSchema(const StorageSchema& schema,
+                                      uint32_t size,
+                                      const QueryConstraints& qc,
+                                      sqlite3_value** argv) {
   const auto& cs = qc.constraints();
   const auto& obs = qc.order_by();
 
