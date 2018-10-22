@@ -36,7 +36,7 @@ ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
 }
 }  // namespace
 
-// The algorithm below is a inspired by the Chromium sampling algorithm at
+// The algorithm below is inspired by the Chromium sampling algorithm at
 // https://cs.chromium.org/search/?q=f:cc+symbol:AllocatorShimLogAlloc+package:%5Echromium$&type=cs
 
 int64_t ThreadLocalSamplingData::NextSampleInterval(double rate) {
