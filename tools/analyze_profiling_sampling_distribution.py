@@ -45,7 +45,7 @@ def main(argv):
 
   # Map from key to list of bytes allocated, one for each iteration.
   flat_distributions = {key: value.values() for key, value
-                        in distributions.iteritems())
+                        in distributions.iteritems()}
 
   for key, value in flat_distributions.iteritems():
     print key, "ground truth %d " % ground_truth[key], sp.stats.describe(value)
