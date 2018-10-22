@@ -124,6 +124,34 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   return sqlite3_value_double(value);
 }
 
+template <typename T>
+void ReportSqliteResult(sqlite3_context*, T value);
+
+template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, int32_t value) {
+  sqlite3_result_int(ctx, value);
+}
+
+template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, int64_t value) {
+  sqlite3_result_int64(ctx, value);
+}
+
+template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, uint32_t value) {
+  sqlite3_result_int64(ctx, value);
+}
+
+template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, uint64_t value) {
+  sqlite3_result_int64(ctx, static_cast<sqlite_int64>(value));
+}
+
+template <>
+inline void ReportSqliteResult(sqlite3_context* ctx, double value) {
+  sqlite3_result_double(ctx, value);
+}
+
 }  // namespace sqlite_utils
 }  // namespace trace_processor
 }  // namespace perfetto

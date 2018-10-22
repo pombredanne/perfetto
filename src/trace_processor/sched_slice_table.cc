@@ -43,7 +43,7 @@ Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
       "ts", &slices.start_ns(), false /* hidden */, true /* ordered */));
   columns_.emplace_back(StorageCursor::NumericColumnPtr("cpu", &slices.cpus()));
   columns_.emplace_back(
-      StorageCursor::NumericColumnPtr("duration", &slices.durations()));
+      StorageCursor::NumericColumnPtr("dur", &slices.durations()));
   columns_.emplace_back(
       StorageCursor::NumericColumnPtr("utid", &slices.utids()));
   return table_utils::CreateSchemaFromStorageColumns(columns_, {"cpu", "ts"});

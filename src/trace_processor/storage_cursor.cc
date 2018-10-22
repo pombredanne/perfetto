@@ -33,35 +33,8 @@ int StorageCursor::Eof() {
 }
 
 int StorageCursor::Column(sqlite3_context* context, int raw_col) {
-  // uint32_t row = iterator_->Row();
   size_t column = static_cast<size_t>(raw_col);
-  switch (columns_[column]->GetType()) {
-    case Table::ColumnType::kUlong:
-      sqlite3_result_int64(context, static_cast<sqlite3_int64>(0));
-      break;
-    case Table::ColumnType::kUint:
-      sqlite3_result_int64(context, 0);
-      break;
-    case Table::ColumnType::kDouble:
-      sqlite3_result_double(context, 0);
-      break;
-    case Table::ColumnType::kLong:
-      sqlite3_result_int64(context, 0);
-      break;
-    case Table::ColumnType::kInt:
-      sqlite3_result_int(context, 0);
-      break;
-    case Table::ColumnType::kString: {
-      auto pair =
-          std::make_pair((nullptr), static_cast<sqlite3_destructor_type>(0));
-      if (pair.first == nullptr) {
-        sqlite3_result_null(context);
-        // } else {
-        // sqlite3_result_text(context, pair.first, -1, pair.second);
-      }
-      break;
-    }
-  }
+  columns_[column]->ReportResult(context, iterator_->Row());
   return SQLITE_OK;
 }
 

@@ -55,6 +55,7 @@ class StorageCursor final : public Table::Cursor {
     virtual Bounds BoundFilter(int op, sqlite3_value* value) = 0;
     virtual Predicate Filter(int op, sqlite3_value* value) = 0;
     virtual Comparator Sort(QueryConstraints::OrderBy ob) = 0;
+    virtual void ReportResult(sqlite3_context*, uint32_t row) = 0;
     virtual Table::ColumnType GetType() = 0;
     virtual bool IsNaturallyOrdered() = 0;
 
@@ -148,6 +149,10 @@ class StorageCursor final : public Table::Cursor {
       };
     }
 
+    void ReportResult(sqlite3_context* ctx, uint32_t row) override {
+      sqlite_utils::ReportSqliteResult(ctx, deque_->operator[](row));
+    }
+
     bool IsNaturallyOrdered() override { return is_naturally_ordered_; }
 
     Table::ColumnType GetType() override {
@@ -212,6 +217,16 @@ class StorageCursor final : public Table::Cursor {
           return 1;
         return 0;
       };
+    }
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) override {
+      const auto& str = string_map_->operator[](deque_->operator[](row));
+      if (str.empty()) {
+        sqlite3_result_null(ctx);
+      } else {
+        auto kStatic = static_cast<sqlite3_destructor_type>(0);
+        sqlite3_result_text(ctx, str.c_str(), -1, kStatic);
+      }
     }
 
     Table::ColumnType GetType() override { return Table::ColumnType::kString; }
