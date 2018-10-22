@@ -47,7 +47,7 @@
 namespace perfetto {
 namespace {
 
-constexpr uint64_t kDefaultSamplingRate = 128000;
+constexpr uint64_t kDefaultSamplingInterval = 128000;
 
 int ProfilingSampleDistributionMain(int argc, char** argv) {
   int opt;
