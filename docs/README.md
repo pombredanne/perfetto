@@ -77,28 +77,6 @@ Perfetto allows third parties to defined their own protobufs for:
 Allowing apps to define their own strongly-typed input and output schema.
 See [trace-format.md](trace-format.md) for more details.
 
-
-Docs
-----
-* [Contributing](contributing.md)
-* [Build instructions](build-instructions.md)
-* [Running tests](testing.md)
-* [Running Perfetto](running.md)
-* [Capturing long traces](long-traces.md)
-* [Trace processor](trace-processor.md)
-* [Key concepts and architecture](architecture.md)
-* [Life of a tracing session](life-of-a-tracing-session.md)
-* [Ftrace interop](ftrace.md)
-* [Performance benchmarks](benchmarks.md)
-* [Trace config](trace-config.md)
-* [Trace format](trace-format.md)
-* [Multi-layer tracing](multi-layer-tracing.md)
-* [Security model](security-model.md)
-* [Embedding Perfetto in your own project](embedder-guide.md)
-* [ProtoZero internals](protozero.md)
-* [IPC internals](ipc.md)
-
-
 Bugs
 ----
 * For bugs affecting Android or the tracing internals use the internal
