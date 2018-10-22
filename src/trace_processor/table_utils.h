@@ -157,12 +157,13 @@ inline std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
   // Create the filter iterator and if we are sorted, just return it.
   auto filter_it = internal::CreateFilteredIterator(cols, size, desc, cs, argv);
   if (is_ordered)
-    return base::make_unique<FilteredRowIterator>(std::move(filter_it));
+    return std::unique_ptr<FilteredRowIterator>(
+        new FilteredRowIterator(std::move(filter_it)));
 
   // Otherwise, create the sorted vector of indices and create the sorted
   // iterator.
-  return base::make_unique<SortedRowIterator>(
-      internal::CreateSortedIndexVector(cols, std::move(filter_it), obs));
+  return std::unique_ptr<SortedRowIterator>(new SortedRowIterator(
+      internal::CreateSortedIndexVector(cols, std::move(filter_it), obs)));
 }
 
 }  // namespace table_utils

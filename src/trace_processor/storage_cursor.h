@@ -251,8 +251,8 @@ class StorageCursor final : public Table::Cursor {
       const std::deque<T>* deque,
       bool hidden = false,
       bool is_naturally_ordered = false) {
-    return base::make_unique<NumericColumn<T>>(column_name, deque, hidden,
-                                               is_naturally_ordered);
+    return std::unique_ptr<NumericColumn<T>>(
+        new NumericColumn<T>(column_name, deque, hidden, is_naturally_ordered));
   }
 
   template <typename Id>
@@ -261,8 +261,8 @@ class StorageCursor final : public Table::Cursor {
       const std::deque<Id>* deque,
       const std::deque<std::string>* lookup_map,
       bool hidden = false) {
-    return base::make_unique<StringColumn<Id>>(column_name, deque, lookup_map,
-                                               hidden);
+    return std::unique_ptr<StringColumn<Id>>(
+        new StringColumn<Id>(column_name, deque, lookup_map, hidden));
   }
 
  private:

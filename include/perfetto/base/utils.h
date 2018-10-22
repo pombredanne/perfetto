@@ -26,8 +26,6 @@
 #include <sys/types.h>
 #endif
 
-#include <memory>
-
 #define PERFETTO_EINTR(x)                                   \
   ({                                                        \
     decltype(x) eintr_wrapper_result;                       \
@@ -103,11 +101,6 @@ template <size_t alignment>
 constexpr size_t AlignUp(size_t size) {
   static_assert((alignment & (alignment - 1)) == 0, "alignment must be a pow2");
   return (size + alignment - 1) & ~(alignment - 1);
-}
-
-template <class T, class... Args>
-std::unique_ptr<T> make_unique(Args&&... args) {
-  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
 }  // namespace base
