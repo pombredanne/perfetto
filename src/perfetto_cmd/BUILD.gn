@@ -15,6 +15,24 @@
 import("../../gn/perfetto.gni")
 import("../../gn/proto_library.gni")
 
+template("include_binary") {
+  action(target_name) {
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+    script = "tools/include_binary.py"
+    software
+    args = [
+      rebase_path("node_modules/.bin/$_node_cmd", root_build_dir),
+    ] 
+  }
+}
+
+include_binary(trace_config_descriptor) {
+  deps = ["../../protos/perfetto/config:lite"]
+  source = "$perfetto_root_path/protos/perfetto/trace/config.descriptor"
+}
+
 source_set("perfetto_cmd") {
   public_deps = [
     ":protos",
