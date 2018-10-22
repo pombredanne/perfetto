@@ -70,22 +70,36 @@ TEST(PagedMemoryTest, Uncommitted) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
     // Windows only commits the first 128 pages.
     constexpr size_t kMappedSize = 4096 * 128;
+
+    for (size_t i = 0; i < kMappedSize / sizeof(uint64_t); i++)
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kMappedSize));
 
     // Next page shouldn't be mapped.
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw + kMappedSize, 4096));
-    EXPECT_DEATH({ raw[kMappedSize] = 'x'; }, ".*");
-#else
-    ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
-#endif
+    EXPECT_DEATH({ ptr_raw[kMappedSize] = 'x'; }, ".*");
 
-    // Commit the remaining pages. This should only have an effect on Win.
+    // Commit the remaining pages.
     ASSERT_TRUE(mem.EnsureCommitted(ptr_raw + kSize));
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+    for (size_t i = kMappedSize / sizeof(uint64_t);
+         i < kSize / sizeof(uint64_t); i++)
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #else
+    // Linux only maps on access.
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
+
+    // This should not have any effect.
+    ASSERT_TRUE(mem.EnsureCommitted(ptr_raw + kSize));
+    ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
+
+    for (size_t i = kMappedSize / sizeof(uint64_t);
+         i < kSize / sizeof(uint64_t); i++)
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+    ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #endif
   }
 

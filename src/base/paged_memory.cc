@@ -52,8 +52,8 @@ PagedMemory PagedMemory::AllocateMayFail(size_t size, bool commit) {
 
 // static
 PagedMemory PagedMemory::AllocateInternal(size_t size,
-                                          bool unchecked,
-                                          bool commit) {
+                                          bool commit,
+                                          bool unchecked) {
   PERFETTO_DCHECK(size % kPageSize == 0);
   size_t outer_size = size + kGuardSize * 2;
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -85,7 +85,7 @@ PagedMemory::PagedMemory(char* p, size_t size, bool commit_all)
   char* initial_commit = p + size_;
   if (!commit_all)
     initial_commit = std::min(initial_commit, p + kCommitChunkSize);
-  EnsureCommitted(initial_commit);
+  PERFETTO_CHECK(EnsureCommitted(initial_commit));
 }
 
 PagedMemory::PagedMemory(PagedMemory&& other) {
@@ -141,12 +141,18 @@ bool PagedMemory::EnsureCommitted(void* p) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   size_t delta = static_cast<size_t>(static_cast<char*>(p) - p_);
   if (committed_size_ >= delta)
-    return;
+    return true;
+  // Rounding up.
   size_t num_additional_chunks =
-      static_cast<size_t>(std::ceil(delta / kCommitChunkSize));
-  void* res = VirtualAlloc(p_ + committed_size_,
-                           num_additional_chunks * kCommitChunkSize, MEM_COMMIT,
+      (delta + kCommitChunkSize - 1) / kCommitChunkSize;
+  PERFETTO_DCHECK(num_additional_chunks * kCommitChunkSize >= delta);
+  // Don't commit more than the total size.
+  size_t commit_size = std::min(num_additional_chunks * kCommitChunkSize,
+                                size_ - committed_size_);
+  void* res = VirtualAlloc(p_ + committed_size_, commit_size, MEM_COMMIT,
                            PAGE_READWRITE);
+  if (res)
+    committed_size_ += commit_size;
   return res;
 #else
   // mmap commits automatically when needed, no need for us to do anything.
