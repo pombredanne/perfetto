@@ -45,6 +45,7 @@
 #include "perfetto/base/logging.h"
 
 namespace perfetto {
+namespace profiling {
 namespace {
 
 constexpr uint64_t kDefaultSamplingInterval = 128000;
@@ -148,8 +149,9 @@ int ProfilingSampleDistributionMain(int argc, char** argv) {
 }
 
 }  // namespace
+}  // namespace profiling
 }  // namespace perfetto
 
 int main(int argc, char** argv) {
-  return perfetto::ProfilingSampleDistributionMain(argc, argv);
+  return perfetto::profiling::ProfilingSampleDistributionMain(argc, argv);
 }
