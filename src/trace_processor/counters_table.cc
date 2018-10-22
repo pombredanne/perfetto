@@ -16,7 +16,7 @@
 
 #include "src/trace_processor/counters_table.h"
 
-#include "perfetto/base/logging.h"
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table_utils.h"
 
 namespace perfetto {
@@ -62,7 +62,7 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
   uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
   return std::unique_ptr<Table::Cursor>(new StorageCursor(
       table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
-      schema_.Columns()));
+      schema_.ToColumnReporters()));
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {

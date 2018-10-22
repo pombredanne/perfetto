@@ -17,7 +17,7 @@
 #ifndef SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 #define SRC_TRACE_PROCESSOR_SCHED_SLICE_TABLE_H_
 
-#include "src/trace_processor/storage_cursor.h"
+#include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 

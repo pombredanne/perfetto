@@ -18,6 +18,7 @@
 #include <deque>
 
 #include "src/trace_processor/sqlite_utils.h"
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/trace_storage.h"
 
@@ -26,7 +27,7 @@ namespace trace_processor {
 
 class StorageSchema {
  public:
-  class Column {
+  class Column : public StorageCursor::ColumnReporter {
    public:
     struct Bounds {
       uint32_t min_idx = 0;
@@ -37,12 +38,13 @@ class StorageSchema {
     using Comparator = std::function<int(uint32_t, uint32_t)>;
 
     Column(std::string col_name, bool hidden);
-    virtual ~Column();
+    virtual ~Column() override;
+
+    virtual void ReportResult(sqlite3_context*, uint32_t) const override = 0;
 
     virtual Bounds BoundFilter(int op, sqlite3_value* value) const = 0;
     virtual Predicate Filter(int op, sqlite3_value* value) const = 0;
     virtual Comparator Sort(const QueryConstraints::OrderBy& ob) const = 0;
-    virtual void ReportResult(sqlite3_context*, uint32_t row) const = 0;
     virtual Table::ColumnType GetType() const = 0;
     virtual bool IsNaturallyOrdered() const = 0;
 
@@ -230,8 +232,8 @@ class StorageSchema {
 
   size_t ColumnIndexFromName(const std::string& name);
 
-  std::vector<const Column*> Columns() const {
-    std::vector<const Column*> defns;
+  std::vector<const StorageCursor::ColumnReporter*> ToColumnReporters() const {
+    std::vector<const StorageCursor::ColumnReporter*> defns;
     for (const auto& col : columns_)
       defns.emplace_back(col.get());
     return defns;

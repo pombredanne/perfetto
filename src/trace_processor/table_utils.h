@@ -20,7 +20,7 @@
 #include <memory>
 
 #include "src/trace_processor/row_iterators.h"
-#include "src/trace_processor/storage_cursor.h"
+#include "src/trace_processor/storage_schema.h"
 
 namespace perfetto {
 namespace trace_processor {

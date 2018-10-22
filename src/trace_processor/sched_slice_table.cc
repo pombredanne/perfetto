@@ -16,7 +16,7 @@
 
 #include "src/trace_processor/sched_slice_table.h"
 
-#include "perfetto/base/logging.h"
+#include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table_utils.h"
 
 namespace perfetto {
@@ -50,7 +50,7 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
   uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
   return std::unique_ptr<Table::Cursor>(new StorageCursor(
       table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
-      schema_.Columns()));
+      schema_.ToColumnReporters()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,

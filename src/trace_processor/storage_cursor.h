@@ -15,16 +15,14 @@
 #ifndef SRC_TRACE_PROCESSOR_STORAGE_CURSOR_H_
 #define SRC_TRACE_PROCESSOR_STORAGE_CURSOR_H_
 
-#include <deque>
-
-#include "src/trace_processor/sqlite_utils.h"
-#include "src/trace_processor/storage_schema.h"
 #include "src/trace_processor/table.h"
-#include "src/trace_processor/trace_storage.h"
 
 namespace perfetto {
 namespace trace_processor {
 
+// A cursor which abstracts common patterns found in storage backed tables. It
+// takes a strategy to iterate throw rows and a column reporter for each column
+// to implement the Cursor interface.
 class StorageCursor final : public Table::Cursor {
  public:
   class RowIterator {
@@ -35,9 +33,15 @@ class StorageCursor final : public Table::Cursor {
     virtual uint32_t Row() = 0;
     virtual bool IsEnd() = 0;
   };
+  class ColumnReporter {
+   public:
+    virtual ~ColumnReporter();
+
+    virtual void ReportResult(sqlite3_context*, uint32_t row) const = 0;
+  };
 
   StorageCursor(std::unique_ptr<RowIterator>,
-                std::vector<const StorageSchema::Column*>);
+                std::vector<const ColumnReporter*>);
 
   // Implementation of Table::Cursor.
   int Next() override;
@@ -46,7 +50,7 @@ class StorageCursor final : public Table::Cursor {
 
  private:
   std::unique_ptr<RowIterator> iterator_;
-  std::vector<const StorageSchema::Column*> columns_;
+  std::vector<const ColumnReporter*> columns_;
 };
 
 }  // namespace trace_processor

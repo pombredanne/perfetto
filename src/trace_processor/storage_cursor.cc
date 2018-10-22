@@ -20,7 +20,7 @@ namespace perfetto {
 namespace trace_processor {
 
 StorageCursor::StorageCursor(std::unique_ptr<RowIterator> iterator,
-                             std::vector<const StorageSchema::Column*> cols)
+                             std::vector<const ColumnReporter*> cols)
     : iterator_(std::move(iterator)), columns_(std::move(cols)) {}
 
 int StorageCursor::Next() {
@@ -39,6 +39,7 @@ int StorageCursor::Column(sqlite3_context* context, int raw_col) {
 }
 
 StorageCursor::RowIterator::~RowIterator() = default;
+StorageCursor::ColumnReporter::~ColumnReporter() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto
