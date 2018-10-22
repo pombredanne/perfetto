@@ -18,6 +18,7 @@ from google.appengine.api import urlfetch
 import re
 import webapp2
 
+MEMCACHE_TTL_SEC= 60 * 60 * 24
 BASE = 'https://catapult-project.github.io/perfetto/%s'
 HEADERS = {'last-modified', 'content-type',
            'content-length', 'content-encoding', 'etag'}
@@ -51,7 +52,7 @@ class GithubMirrorHandler(webapp2.RequestHandler):
                 if k in HEADERS:
                     cache[k] = v
             cache['content'] = result.content
-            memcache.set(url, cache, time=60*60*24)
+            memcache.set(url, cache, time=MEMCACHE_TTL_SEC)
 
         for k, v in cache.iteritems():
             if k != 'content':
