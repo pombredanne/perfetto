@@ -300,7 +300,7 @@ bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
 uint8_t* CpuReader::GetBuffer() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   if (!buffer_)
-    buffer_ = base::PageAllocator::Allocate(base::kPageSize);
+    buffer_ = base::PagedMemory::Allocate(base::kPageSize, true /*commit*/);
   return reinterpret_cast<uint8_t*>(buffer_.get());
 }
 

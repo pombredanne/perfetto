@@ -21,7 +21,7 @@
 
 #include <memory>
 
-#include "perfetto/base/page_allocator.h"
+#include "perfetto/base/paged_memory.h"
 #include "perfetto/tracing/core/shared_memory.h"
 
 namespace perfetto {
@@ -42,7 +42,7 @@ class TestSharedMemory : public SharedMemory {
   void* start() const override { return mem_.get(); }
   size_t size() const override { return size_; }
 
-  base::PageAllocator::UniquePtr mem_;
+  base::PagedMemory mem_;
   size_t size_;
 };
 

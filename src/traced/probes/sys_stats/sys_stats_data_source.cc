@@ -74,7 +74,7 @@ SysStatsDataSource::SysStatsDataSource(base::TaskRunner* task_runner,
   vmstat_fd_ = open_fn("/proc/vmstat");
   stat_fd_ = open_fn("/proc/stat");
 
-  read_buf_ = base::PageAllocator::Allocate(kReadBufSize);
+  read_buf_ = base::PagedMemory::Allocate(kReadBufSize, true /*commit*/);
 
   // Build a lookup map that allows to quickly translate strings like "MemTotal"
   // into the corresponding enum value, only for the counters enabled in the

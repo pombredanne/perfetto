@@ -24,7 +24,7 @@
 
 #include <sys/mman.h>
 
-#include "perfetto/base/page_allocator.h"
+#include "perfetto/base/paged_memory.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/ipc/basic_types.h"
 
@@ -120,7 +120,7 @@ class BufferedFrameDeserializer {
 
   char* buf() { return reinterpret_cast<char*>(buf_.get()); }
 
-  base::PageAllocator::UniquePtr buf_;
+  base::PagedMemory buf_;
   const size_t capacity_ = 0;  // sizeof(|buf_|).
 
   // THe number of bytes in |buf_| that contain valid data (as a result of

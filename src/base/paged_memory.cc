@@ -1,0 +1,166 @@
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "perfetto/base/paged_memory.h"
+
+#include <algorithm>
+#include <cmath>
+
+#include "perfetto/base/build_config.h"
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#include <Windows.h>
+#else
+#include <sys/mman.h>
+#endif
+
+#include "perfetto/base/logging.h"
+#include "perfetto/base/utils.h"
+
+namespace perfetto {
+namespace base {
+
+namespace {
+
+constexpr size_t kGuardSize = kPageSize;
+constexpr size_t kCommitChunkSize = kPageSize * 128;
+
+}  // namespace
+
+// static
+PagedMemory PagedMemory::Allocate(size_t size, bool commit) {
+  return AllocateInternal(size, commit, false /*unchecked*/);
+}
+
+// static
+PagedMemory PagedMemory::AllocateMayFail(size_t size, bool commit) {
+  return AllocateInternal(size, commit, true /*unchecked*/);
+}
+
+// static
+PagedMemory PagedMemory::AllocateInternal(size_t size,
+                                          bool unchecked,
+                                          bool commit) {
+  PERFETTO_DCHECK(size % kPageSize == 0);
+  size_t outer_size = size + kGuardSize * 2;
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  void* ptr = VirtualAlloc(nullptr, outer_size, MEM_RESERVE, PAGE_NOACCESS);
+  if (!ptr && unchecked)
+    return PagedMemory();
+  PERFETTO_CHECK(ptr);
+  char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
+#else
+  void* ptr = mmap(nullptr, outer_size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+  if (ptr == MAP_FAILED && unchecked)
+    return PagedMemory();
+  PERFETTO_CHECK(ptr && ptr != MAP_FAILED);
+  char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
+  int res = mprotect(ptr, kGuardSize, PROT_NONE);
+  res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
+  PERFETTO_CHECK(res == 0);
+#endif
+  return PagedMemory(usable_region, size, commit);
+}
+
+PagedMemory::PagedMemory() : PagedMemory(nullptr, 0u, false) {}
+
+PagedMemory::PagedMemory(char* p, size_t size, bool commit_all)
+    : p_(p), size_(size) {
+  if (!p_)
+    return;
+  char* initial_commit = p + size_;
+  if (!commit_all)
+    initial_commit = std::min(initial_commit, p + kCommitChunkSize);
+  EnsureCommitted(initial_commit);
+}
+
+PagedMemory::PagedMemory(PagedMemory&& other) {
+  p_ = other.p_;
+  size_ = other.size_;
+  committed_size_ = other.committed_size_;
+  other.p_ = nullptr;
+}
+
+PagedMemory& PagedMemory::operator=(PagedMemory&& other) {
+  p_ = other.p_;
+  size_ = other.size_;
+  committed_size_ = other.committed_size_;
+  other.p_ = nullptr;
+  return *this;
+}
+
+PagedMemory::~PagedMemory() {
+  if (!p_)
+    return;
+  PERFETTO_CHECK(size_);
+  char* start = p_ - kGuardSize;
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  BOOL res = VirtualFree(start, 0, MEM_RELEASE);
+  PERFETTO_CHECK(res != 0);
+#else
+  const size_t outer_size = size_ + kGuardSize * 2;
+  int res = munmap(start, outer_size);
+  PERFETTO_CHECK(res == 0);
+#endif
+}
+
+bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
+  PERFETTO_DCHECK(p_);
+  PERFETTO_DCHECK(p >= p_);
+  PERFETTO_DCHECK(static_cast<char*>(p) + size <= p_ + size_);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  // Discarding pages on Windows has more CPU cost than is justified for the
+  // possible memory savings.
+  return false;
+#else
+  // http://man7.org/linux/man-pages/man2/madvise.2.html
+  int res = madvise(p, size, MADV_DONTNEED);
+  PERFETTO_DCHECK(res == 0);
+  return true;
+#endif
+}
+
+bool PagedMemory::EnsureCommitted(void* p) {
+  PERFETTO_DCHECK(p_);
+  PERFETTO_DCHECK(p > p_);
+  PERFETTO_DCHECK(p <= p_ + size_);
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  size_t delta = static_cast<size_t>(static_cast<char*>(p) - p_);
+  if (committed_size_ >= delta)
+    return;
+  size_t num_additional_chunks =
+      static_cast<size_t>(std::ceil(delta / kCommitChunkSize));
+  void* res = VirtualAlloc(p_ + committed_size_,
+                           num_additional_chunks * kCommitChunkSize, MEM_COMMIT,
+                           PAGE_READWRITE);
+  return res;
+#else
+  // mmap commits automatically when needed, no need for us to do anything.
+  return true;
+#endif
+}
+
+void* PagedMemory::get() const noexcept {
+  return p_;
+}
+
+PagedMemory::operator bool() const noexcept {
+  return p_;
+}
+
+}  // namespace base
+}  // namespace perfetto
