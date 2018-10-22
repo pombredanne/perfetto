@@ -27,7 +27,7 @@ CountersTable::CountersTable(sqlite3*, const TraceStorage* storage)
   ref_types_.resize(RefType::kMax);
   ref_types_[RefType::kCPU_ID] = "cpu";
   ref_types_[RefType::kUTID] = "utid";
-  ref_types_[RefType::kNoRef] = nullptr;
+  ref_types_[RefType::kNoRef] = "";
   ref_types_[RefType::kIrq] = "irq";
   ref_types_[RefType::kSoftIrq] = "softirq";
 }
@@ -60,7 +60,6 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
-
   return std::unique_ptr<Table::Cursor>(new StorageCursor(
       table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
       schema_.Columns()));

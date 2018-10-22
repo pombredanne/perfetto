@@ -28,7 +28,7 @@ namespace table_utils {
 
 namespace internal {
 
-inline FilteredRowIterator CreateFilteredIterator(
+inline RangeRowIterator CreateRangeIterator(
     const StorageSchema& schema,
     uint32_t size,
     bool desc,
@@ -54,7 +54,7 @@ inline FilteredRowIterator CreateFilteredIterator(
   // If we have no other constraints then we can just iterate between min
   // and max.
   if (bitvector_cs.empty())
-    return FilteredRowIterator(min_idx, max_idx, desc);
+    return RangeRowIterator(min_idx, max_idx, desc);
 
   // Otherwise, create a bitvector with true meaning the row should be returned
   // and false otherwise.
@@ -74,7 +74,7 @@ inline FilteredRowIterator CreateFilteredIterator(
       *it = predicate(min_idx + filter_idx);
     }
   }
-  return FilteredRowIterator(min_idx, desc, std::move(filter));
+  return RangeRowIterator(min_idx, desc, std::move(filter));
 }
 
 inline std::pair<bool, bool> IsOrdered(
@@ -90,7 +90,7 @@ inline std::pair<bool, bool> IsOrdered(
 
 inline std::vector<uint32_t> CreateSortedIndexVector(
     const StorageSchema& schema,
-    FilteredRowIterator it,
+    RangeRowIterator it,
     const std::vector<QueryConstraints::OrderBy>& obs) {
   std::vector<uint32_t> sorted_rows(it.RowCount());
   for (size_t i = 0; !it.IsEnd(); it.NextRow(), i++)
@@ -130,15 +130,15 @@ inline std::unique_ptr<StorageCursor::RowIterator> CreateOptimalRowIterator(
   bool is_ordered, desc = false;
   std::tie(is_ordered, desc) = internal::IsOrdered(schema, obs);
 
-  // Create the filter iterator and if we are sorted, just return it.
-  auto it = internal::CreateFilteredIterator(schema, size, desc, cs, argv);
+  // Create the range iterator and if we are sorted, just return it.
+  auto it = internal::CreateRangeIterator(schema, size, desc, cs, argv);
   if (is_ordered)
-    return std::unique_ptr<FilteredRowIterator>(
-        new FilteredRowIterator(std::move(it)));
+    return std::unique_ptr<RangeRowIterator>(
+        new RangeRowIterator(std::move(it)));
 
-  // Otherwise, create the sorted vector of indices and create the sorted
+  // Otherwise, create the sorted vector of indices and create the vector
   // iterator.
-  return std::unique_ptr<SortedRowIterator>(new SortedRowIterator(
+  return std::unique_ptr<VectorRowIterator>(new VectorRowIterator(
       internal::CreateSortedIndexVector(schema, std::move(it), obs)));
 }
 

@@ -18,24 +18,14 @@
 #define SRC_TRACE_PROCESSOR_SQLITE_UTILS_H_
 
 #include <sqlite3.h>
-#include <algorithm>
-#include <deque>
-#include <functional>
-#include <iterator>
+
 #include <string>
 
 #include "perfetto/base/logging.h"
-#include "perfetto/base/utils.h"
 
 namespace perfetto {
 namespace trace_processor {
 namespace sqlite_utils {
-
-namespace internal {
-
-constexpr uint64_t kUint64Max = std::numeric_limits<uint64_t>::max();
-
-}  // namespace internal
 
 inline bool IsOpEq(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_EQ;

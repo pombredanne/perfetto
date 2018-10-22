@@ -44,14 +44,14 @@ uint32_t FindNextOffset(const std::vector<bool>& filter,
 
 }  // namespace
 
-FilteredRowIterator::FilteredRowIterator(uint32_t start_row,
-                                         uint32_t end_row,
-                                         bool desc)
+RangeRowIterator::RangeRowIterator(uint32_t start_row,
+                                   uint32_t end_row,
+                                   bool desc)
     : start_row_(start_row), end_row_(end_row), desc_(desc) {}
 
-FilteredRowIterator::FilteredRowIterator(uint32_t start_row,
-                                         bool desc,
-                                         std::vector<bool> row_filter)
+RangeRowIterator::RangeRowIterator(uint32_t start_row,
+                                   bool desc,
+                                   std::vector<bool> row_filter)
     : start_row_(start_row),
       end_row_(start_row_ + static_cast<uint32_t>(row_filter.size())),
       desc_(desc),
@@ -60,7 +60,7 @@ FilteredRowIterator::FilteredRowIterator(uint32_t start_row,
     offset_ = FindNextOffset(row_filter_, offset_, desc_);
 }
 
-void FilteredRowIterator::NextRow() {
+void RangeRowIterator::NextRow() {
   PERFETTO_DCHECK(!IsEnd());
   offset_++;
 
@@ -68,9 +68,9 @@ void FilteredRowIterator::NextRow() {
     offset_ = FindNextOffset(row_filter_, offset_, desc_);
 }
 
-SortedRowIterator::SortedRowIterator(std::vector<uint32_t> sorted_rows)
-    : sorted_rows_(std::move(sorted_rows)) {}
-SortedRowIterator::~SortedRowIterator() = default;
+VectorRowIterator::VectorRowIterator(std::vector<uint32_t> row_indices)
+    : row_indices_(std::move(row_indices)) {}
+VectorRowIterator::~VectorRowIterator() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto

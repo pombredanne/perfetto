@@ -26,12 +26,12 @@
 namespace perfetto {
 namespace trace_processor {
 
-class FilteredRowIterator : public StorageCursor::RowIterator {
+// A row iterator which iterates through a range of indicies in either ascending
+// or descending order and optionally skips rows depending on a bitvector.
+class RangeRowIterator : public StorageCursor::RowIterator {
  public:
-  FilteredRowIterator(uint32_t start_row, uint32_t end_row, bool desc);
-  FilteredRowIterator(uint32_t start_row,
-                      bool desc,
-                      std::vector<bool> row_filter);
+  RangeRowIterator(uint32_t start_row, uint32_t end_row, bool desc);
+  RangeRowIterator(uint32_t start_row, bool desc, std::vector<bool> row_filter);
 
   void NextRow() override;
   bool IsEnd() override { return offset_ >= end_row_ - start_row_; }
@@ -57,21 +57,19 @@ class FilteredRowIterator : public StorageCursor::RowIterator {
   uint32_t offset_ = 0;
 };
 
-class SortedRowIterator : public StorageCursor::RowIterator {
+// A row iterator which yields row indices from a provided vector.
+class VectorRowIterator : public StorageCursor::RowIterator {
  public:
-  SortedRowIterator(std::vector<uint32_t> sorted_rows);
-  ~SortedRowIterator() override;
+  VectorRowIterator(std::vector<uint32_t> row_indices);
+  ~VectorRowIterator() override;
 
-  void NextRow() override { next_row_idx_++; }
-  bool IsEnd() override { return next_row_idx_ >= sorted_rows_.size(); }
-  uint32_t Row() override { return sorted_rows_[next_row_idx_]; }
+  void NextRow() override { offset_++; }
+  bool IsEnd() override { return offset_ >= row_indices_.size(); }
+  uint32_t Row() override { return row_indices_[offset_]; }
 
  private:
-  // Vector of row ids sorted by some order by constraints.
-  std::vector<uint32_t> sorted_rows_;
-
-  // An offset into |sorted_row_ids_| indicating the next row to return.
-  uint32_t next_row_idx_ = 0;
+  std::vector<uint32_t> row_indices_;
+  uint32_t offset_ = 0;
 };
 
 }  // namespace trace_processor

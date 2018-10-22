@@ -43,7 +43,7 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = size_t;
 
-enum RefType : StringId {
+enum RefType {
   kNoRef = 0,
   kUTID = 1,
   kCPU_ID = 2,

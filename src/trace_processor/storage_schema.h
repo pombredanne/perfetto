@@ -41,7 +41,7 @@ class StorageSchema {
 
     virtual Bounds BoundFilter(int op, sqlite3_value* value) const = 0;
     virtual Predicate Filter(int op, sqlite3_value* value) const = 0;
-    virtual Comparator Sort(QueryConstraints::OrderBy ob) const = 0;
+    virtual Comparator Sort(const QueryConstraints::OrderBy& ob) const = 0;
     virtual void ReportResult(sqlite3_context*, uint32_t row) const = 0;
     virtual Table::ColumnType GetType() const = 0;
     virtual bool IsNaturallyOrdered() const = 0;
@@ -111,24 +111,24 @@ class StorageSchema {
       };
     }
 
-    Comparator Sort(QueryConstraints::OrderBy ob) const override {
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          auto a = deque_[f];
-          auto b = deque_[s];
-          if (a < b)
+          T a = deque_->operator[](f);
+          T b = deque_->operator[](s);
+          if (a > b)
             return -1;
-          else if (a > b)
+          else if (a < b)
             return 1;
           return 0;
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        auto a = deque_[f];
-        auto b = deque_[s];
-        if (a > b)
+        T a = deque_->operator[](f);
+        T b = deque_->operator[](s);
+        if (a < b)
           return -1;
-        else if (a < b)
+        else if (a > b)
           return 1;
         return 0;
       };
@@ -179,24 +179,24 @@ class StorageSchema {
       return [](uint32_t) { return true; };
     }
 
-    Comparator Sort(QueryConstraints::OrderBy ob) const override {
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          const auto& a = string_map_->operator[](deque_->operator[](f));
-          const auto& b = string_map_->operator[](deque_->operator[](s));
-          if (a < b)
+          const std::string& a = string_map_->operator[](deque_->operator[](f));
+          const std::string& b = string_map_->operator[](deque_->operator[](s));
+          if (a > b)
             return -1;
-          else if (a > b)
+          else if (a < b)
             return 1;
           return 0;
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        const auto& a = string_map_->operator[](deque_->operator[](f));
-        const auto& b = string_map_->operator[](deque_->operator[](s));
-        if (a > b)
+        const std::string& a = string_map_->operator[](deque_->operator[](f));
+        const std::string& b = string_map_->operator[](deque_->operator[](s));
+        if (a < b)
           return -1;
-        else if (a < b)
+        else if (a > b)
           return 1;
         return 0;
       };
