@@ -43,7 +43,14 @@ using UniqueTid = uint32_t;
 // StringId is an offset into |string_pool_|.
 using StringId = size_t;
 
-enum RefType { kNoRef = 0, kUTID = 1, kCPU_ID = 2, kIrq = 3, kSoftIrq = 4 };
+enum RefType {
+  kNoRef = 0,
+  kUTID = 1,
+  kCPU_ID = 2,
+  kIrq = 3,
+  kSoftIrq = 4,
+  kMax = kSoftIrq + 1
+};
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
 // to read or search across a single field of the trace (e.g. all the thread
@@ -264,6 +271,8 @@ class TraceStorage {
 
   const Counters& counters() const { return counters_; }
   Counters* mutable_counters() { return &counters_; }
+
+  const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
   // is reserved to indicate an invalid process.
