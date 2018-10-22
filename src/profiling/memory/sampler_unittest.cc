@@ -23,6 +23,7 @@
 #include "src/profiling/memory/client.h"  // For PThreadKey.
 
 namespace perfetto {
+namespace profiling {
 namespace {
 
 TEST(SamplerTest, TestLarge) {
@@ -56,4 +57,5 @@ TEST(SamplerTest, TestSmallFromThread) {
 }
 
 }  // namespace
+}  // namespace profiling
 }  // namespace perfetto

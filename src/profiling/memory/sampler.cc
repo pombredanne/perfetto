@@ -19,6 +19,7 @@
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
+namespace profiling {
 namespace {
 ThreadLocalSamplingData* GetSpecific(pthread_key_t key,
                                      void* (*unhooked_malloc)(size_t),
@@ -73,4 +74,5 @@ void ThreadLocalSamplingData::KeyDestructor(void* ptr) {
   unhooked_free(ptr);
 }
 
+}  // namespace profiling
 }  // namespace perfetto
