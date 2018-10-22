@@ -16,7 +16,7 @@ INTERVAL=128000
 
 adb root
 adb shell setenforce 0
-adb shell heapprofd -s -r ${INTERVAL} &
+adb shell heapprofd -s -i ${INTERVAL} &
 adb shell kill -36 ${PID} # Start profiling the process.
 ```
 
