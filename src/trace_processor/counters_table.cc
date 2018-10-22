@@ -60,9 +60,10 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
-  return std::unique_ptr<Table::Cursor>(new StorageCursor(
-      table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
-      schema_.ToColumnReporters()));
+  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
+                                                               qc, argv);
+  return std::unique_ptr<Table::Cursor>(
+      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
 }
 
 int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {

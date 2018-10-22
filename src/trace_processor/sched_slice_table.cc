@@ -48,9 +48,10 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
-  return std::unique_ptr<Table::Cursor>(new StorageCursor(
-      table_utils::CreateOptimalRowIterator(schema_, count, qc, argv),
-      schema_.ToColumnReporters()));
+  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
+                                                               qc, argv);
+  return std::unique_ptr<Table::Cursor>(
+      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
