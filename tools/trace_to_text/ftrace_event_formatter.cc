@@ -3228,9 +3228,6 @@ std::string FormatEventText(const protos::FtraceEvent& event) {
   } else if (event.has_alloc_pages_iommu_end()) {
     const auto& inner = event.alloc_pages_iommu_end();
     return FormatAllocPagesIommuEnd(inner);
-  } else if (event.has_alloc_pages_iommu_end()) {
-    const auto& inner = event.alloc_pages_iommu_end();
-    return FormatAllocPagesIommuEnd(inner);
   } else if (event.has_alloc_pages_iommu_fail()) {
     const auto& inner = event.alloc_pages_iommu_fail();
     return FormatAllocPagesIommuFail(inner);
@@ -3368,7 +3365,7 @@ uint64_t TimestampToMicroseconds(uint64_t timestamp) {
 }
 
 std::string FormatPrefix(uint64_t timestamp,
-                         uint64_t cpu,
+                         uint32_t cpu,
                          uint32_t pid,
                          uint32_t tgid,
                          std::string name) {
@@ -3396,7 +3393,7 @@ std::string FormatPrefix(uint64_t timestamp,
 
 std::string FormatFtraceEvent(
     uint64_t timestamp,
-    size_t cpu,
+    uint32_t cpu,
     const protos::FtraceEvent& event,
     const std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/>& thread_map) {
   // Sched_switch events contain the thread name so use that in the prefix.
