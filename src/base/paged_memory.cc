@@ -68,10 +68,7 @@ PagedMemory PagedMemory::Allocate(size_t size, int flags) {
   size_t initial_commit = size;
   if (flags & kDontCommit)
     initial_commit = std::min(initial_commit, kCommitChunkSize);
-  bool commit_success = memory.EnsureCommitted(initial_commit);
-  if (!commit_success && (flags & kMayFail))
-    return PagedMemory();
-  PERFETTO_CHECK(commit_success);
+  memory.EnsureCommitted(initial_commit);
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   return memory;
 }
@@ -122,7 +119,7 @@ bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
-bool PagedMemory::EnsureCommitted(size_t committed_size) {
+void PagedMemory::EnsureCommitted(size_t committed_size) {
   PERFETTO_DCHECK(committed_size > 0u);
   PERFETTO_DCHECK(committed_size <= size_);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -138,12 +135,10 @@ bool PagedMemory::EnsureCommitted(size_t committed_size) {
                                 size_ - committed_size_);
   void* res = VirtualAlloc(p_ + committed_size_, commit_size, MEM_COMMIT,
                            PAGE_READWRITE);
-  if (res)
-    committed_size_ += commit_size;
-  return res;
+  PERFETTO_CHECK(res);
+  committed_size_ += commit_size;
 #else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  // mmap commits automatically as needed, no need for us to do anything.
-  return true;
+// mmap commits automatically as needed, no need for us to do anything.
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 

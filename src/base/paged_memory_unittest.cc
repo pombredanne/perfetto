@@ -81,7 +81,7 @@ TEST(PagedMemoryTest, Uncommitted) {
     EXPECT_DEATH({ ptr_raw[kMappedSize] = 'x'; }, ".*");
 
     // Commit the remaining pages.
-    ASSERT_TRUE(mem.EnsureCommitted(kSize));
+    mem.EnsureCommitted(kSize);
 
     for (size_t i = kMappedSize / sizeof(uint64_t);
          i < kSize / sizeof(uint64_t); i++) {
@@ -94,7 +94,7 @@ TEST(PagedMemoryTest, Uncommitted) {
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
     // This should not have any effect.
-    ASSERT_TRUE(mem.EnsureCommitted(kSize));
+    mem.EnsureCommitted(kSize);
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
