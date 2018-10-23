@@ -118,7 +118,7 @@ class BufferedFrameDeserializer {
   // If a valid frame is decoded it is added to |decoded_frames_|.
   void DecodeFrame(const char*, size_t);
 
-  char* buf() { return reinterpret_cast<char*>(buf_.get()); }
+  char* buf() { return reinterpret_cast<char*>(buf_.Get()); }
 
   base::PagedMemory buf_;
   const size_t capacity_ = 0;  // sizeof(|buf_|).

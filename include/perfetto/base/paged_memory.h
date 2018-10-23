@@ -19,6 +19,8 @@
 
 #include <memory>
 
+#include "perfetto/base/build_config.h"
+
 namespace perfetto {
 namespace base {
 
@@ -27,22 +29,29 @@ class PagedMemory {
   // Initializes an invalid PagedMemory pointing to nullptr.
   PagedMemory();
 
-  PagedMemory(PagedMemory&& other);
+  ~PagedMemory();
+
+  PagedMemory(PagedMemory&& other) noexcept;
   PagedMemory& operator=(PagedMemory&& other);
+
+  enum AllocationFlags : uint8_t {
+    // By default, Allocate() crashes if the underlying mmap fails (e.g., if out
+    // of virtual address space). When this flag is provided, an invalid
+    // PagedMemory pointing to nullptr is returned in this case instead.
+    kMayFail = 1 << 0,
+
+    // By default, Allocate() commits the allocated memory immediately. When
+    // this flag is provided, the memory virtual address space may only be
+    // reserved and the user should call EnsureCommitted() before writing to
+    // memory addresses.
+    kDontCommit = 1 << 1,
+  };
 
   // Allocates |size| bytes using mmap(MAP_ANONYMOUS). The returned memory is
   // guaranteed to be page-aligned and guaranteed to be zeroed. |size| must be a
-  // multiple of 4KB (a page size). Crashes if the underlying mmap() fails. When
-  // |commit| is true, the memory is immediately committed. Otherwise, the
-  // memory may only be reserved and the user should call EnsureCommitted()
-  // before writing to memory addresses.
-  static PagedMemory Allocate(size_t size, bool commit);
-
-  // Like the above, but returns a PagedMemory pointing to nullptr if the mmap()
-  // fails (e.g., if out of virtual address space).
-  static PagedMemory AllocateMayFail(size_t size, bool commit);
-
-  ~PagedMemory();
+  // multiple of 4KB (a page size). For |flags|, see the AllocationFlags enum
+  // above.
+  static PagedMemory Allocate(size_t size, uint8_t flags = 0);
 
   // Hint to the OS that the memory range is not needed and can be discarded.
   // The memory remains accessible and its contents may be retained, or they
@@ -50,25 +59,28 @@ class PagedMemory {
   // if implemented.
   bool AdviseDontNeed(void* p, size_t size);
 
-  // Ensures that the memory region up to but excluding |p| is committed. The
-  // implementation may commit memory in larger chunks above and beyond |p| to
-  // minimize the number of commits. Returns |false| if the memory couldn't be
+  // Ensures that at least the first |committed_size| bytes of the allocated
+  // memory region are committed. The implementation may commit memory in larger
+  // chunks above |committed_size|. Returns |false| if the memory couldn't be
   // committed.
-  bool EnsureCommitted(void* p);
+  bool EnsureCommitted(size_t committed_size);
 
-  void* get() const noexcept;
-  explicit operator bool() const noexcept;
+  void* Get() const noexcept;
+  bool IsValid() const noexcept;
 
  private:
-  static PagedMemory AllocateInternal(size_t size, bool commit, bool unchecked);
+  PagedMemory(char* p, size_t size);
 
-  PagedMemory(char* p, size_t size, bool commit_all);
   PagedMemory(const PagedMemory&) = delete;
-  PagedMemory& operator=(const PagedMemory&) = delete;
+  // Defaulted for implementation of move constructor + assignment.
+  PagedMemory& operator=(const PagedMemory&) = default;
 
-  char* p_;
-  size_t size_;
+  char* p_ = nullptr;
+  size_t size_ = 0;
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   size_t committed_size_ = 0u;
+#endif
 };
 
 }  // namespace base

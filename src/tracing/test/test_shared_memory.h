@@ -39,7 +39,7 @@ class TestSharedMemory : public SharedMemory {
   explicit TestSharedMemory(size_t size);
   ~TestSharedMemory() override;
 
-  void* start() const override { return mem_.get(); }
+  void* start() const override { return mem_.Get(); }
   size_t size() const override { return size_; }
 
   base::PagedMemory mem_;

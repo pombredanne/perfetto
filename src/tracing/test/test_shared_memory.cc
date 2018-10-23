@@ -24,7 +24,7 @@
 namespace perfetto {
 
 TestSharedMemory::TestSharedMemory(size_t size) {
-  mem_ = base::PagedMemory::Allocate(size, true /*commit*/);
+  mem_ = base::PagedMemory::Allocate(size);
   size_ = size;
 }
 

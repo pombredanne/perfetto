@@ -19,8 +19,6 @@
 #include <algorithm>
 #include <cmath>
 
-#include "perfetto/base/build_config.h"
-
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <Windows.h>
 #else
@@ -36,36 +34,27 @@ namespace base {
 namespace {
 
 constexpr size_t kGuardSize = kPageSize;
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 constexpr size_t kCommitChunkSize = kPageSize * 128;
+#endif
 
 }  // namespace
 
 // static
-PagedMemory PagedMemory::Allocate(size_t size, bool commit) {
-  return AllocateInternal(size, commit, false /*unchecked*/);
-}
-
-// static
-PagedMemory PagedMemory::AllocateMayFail(size_t size, bool commit) {
-  return AllocateInternal(size, commit, true /*unchecked*/);
-}
-
-// static
-PagedMemory PagedMemory::AllocateInternal(size_t size,
-                                          bool commit,
-                                          bool unchecked) {
+PagedMemory PagedMemory::Allocate(size_t size, uint8_t flags) {
   PERFETTO_DCHECK(size % kPageSize == 0);
   size_t outer_size = size + kGuardSize * 2;
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   void* ptr = VirtualAlloc(nullptr, outer_size, MEM_RESERVE, PAGE_NOACCESS);
-  if (!ptr && unchecked)
+  if (!ptr && (flags & kMayFail))
     return PagedMemory();
   PERFETTO_CHECK(ptr);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
 #else
   void* ptr = mmap(nullptr, outer_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-  if (ptr == MAP_FAILED && unchecked)
+  if (ptr == MAP_FAILED && (flags & kMayFail))
     return PagedMemory();
   PERFETTO_CHECK(ptr && ptr != MAP_FAILED);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
@@ -73,32 +62,32 @@ PagedMemory PagedMemory::AllocateInternal(size_t size,
   res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
   PERFETTO_CHECK(res == 0);
 #endif
-  return PagedMemory(usable_region, size, commit);
+  auto memory = PagedMemory(usable_region, size);
+
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+  size_t initial_commit = size;
+  if (flags & kDontCommit)
+    initial_commit = std::min(initial_commit, kCommitChunkSize);
+  bool commit_success = memory.EnsureCommitted(initial_commit);
+  if (!commit_success && (flags & kMayFail))
+    return PagedMemory();
+  PERFETTO_CHECK(commit_success);
+#endif
+
+  return memory;
 }
 
-PagedMemory::PagedMemory() : PagedMemory(nullptr, 0u, false) {}
+PagedMemory::PagedMemory() {}
 
-PagedMemory::PagedMemory(char* p, size_t size, bool commit_all)
-    : p_(p), size_(size) {
-  if (!p_)
-    return;
-  char* initial_commit = p + size_;
-  if (!commit_all)
-    initial_commit = std::min(initial_commit, p + kCommitChunkSize);
-  PERFETTO_CHECK(EnsureCommitted(initial_commit));
-}
+PagedMemory::PagedMemory(char* p, size_t size) : p_(p), size_(size) {}
 
 PagedMemory::PagedMemory(PagedMemory&& other) {
-  p_ = other.p_;
-  size_ = other.size_;
-  committed_size_ = other.committed_size_;
+  *this = other;
   other.p_ = nullptr;
 }
 
 PagedMemory& PagedMemory::operator=(PagedMemory&& other) {
-  p_ = other.p_;
-  size_ = other.size_;
-  committed_size_ = other.committed_size_;
+  *this = other;
   other.p_ = nullptr;
   return *this;
 }
@@ -134,15 +123,14 @@ bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
 #endif
 }
 
-bool PagedMemory::EnsureCommitted(void* p) {
-  PERFETTO_DCHECK(p_);
-  PERFETTO_DCHECK(p > p_);
-  PERFETTO_DCHECK(p <= p_ + size_);
+bool PagedMemory::EnsureCommitted(size_t committed_size) {
+  PERFETTO_DCHECK(committed_size > 0u);
+  PERFETTO_DCHECK(committed_size <= size_);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-  size_t delta = static_cast<size_t>(static_cast<char*>(p) - p_);
-  if (committed_size_ >= delta)
+  if (committed_size_ >= committed_size)
     return true;
   // Rounding up.
+  size_t delta = committed_size - committed_size_;
   size_t num_additional_chunks =
       (delta + kCommitChunkSize - 1) / kCommitChunkSize;
   PERFETTO_DCHECK(num_additional_chunks * kCommitChunkSize >= delta);
@@ -155,16 +143,16 @@ bool PagedMemory::EnsureCommitted(void* p) {
     committed_size_ += commit_size;
   return res;
 #else
-  // mmap commits automatically when needed, no need for us to do anything.
+  // mmap commits automatically as needed, no need for us to do anything.
   return true;
 #endif
 }
 
-void* PagedMemory::get() const noexcept {
+void* PagedMemory::Get() const noexcept {
   return p_;
 }
 
-PagedMemory::operator bool() const noexcept {
+bool PagedMemory::IsValid() const noexcept {
   return p_;
 }
 

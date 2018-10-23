@@ -50,10 +50,10 @@ BufferedFrameDeserializer::BeginReceive() {
   // Upon the first recv initialize the buffer to the max message size but
   // release the physical memory for all but the first page. The kernel will
   // automatically give us physical pages back as soon as we page-fault on them.
-  if (!buf_) {
+  if (!buf_.IsValid()) {
     PERFETTO_DCHECK(size_ == 0);
     // TODO(eseckler): Don't commit all of the buffer at once on Windows.
-    buf_ = base::PagedMemory::Allocate(capacity_, true /*commit*/);
+    buf_ = base::PagedMemory::Allocate(capacity_);
 
     // Surely we are going to use at least the first page, but we may not need
     // the rest for a bit.

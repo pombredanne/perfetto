@@ -37,11 +37,11 @@ TEST(PagedMemoryTest, Basic) {
   void* ptr_raw = nullptr;
   {
     PagedMemory mem = PagedMemory::Allocate(kSize, true /*commit*/);
-    ASSERT_TRUE(mem);
-    ASSERT_EQ(0u, reinterpret_cast<uintptr_t>(mem.get()) % 4096);
-    ptr_raw = mem.get();
+    ASSERT_TRUE(mem.IsValid());
+    ASSERT_EQ(0u, reinterpret_cast<uintptr_t>(mem.Get()) % 4096);
+    ptr_raw = mem.Get();
     for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
-      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
 
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
@@ -64,15 +64,15 @@ TEST(PagedMemoryTest, Uncommitted) {
   char* ptr_raw = nullptr;
   {
     PagedMemory mem = PagedMemory::Allocate(kSize, false /*commit*/);
-    ASSERT_TRUE(mem);
-    ptr_raw = reinterpret_cast<char*>(mem.get());
+    ASSERT_TRUE(mem.IsValid());
+    ptr_raw = reinterpret_cast<char*>(mem.Get());
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
     // Windows only commits the first 128 pages.
     constexpr size_t kMappedSize = 4096 * 128;
 
     for (size_t i = 0; i < kMappedSize / sizeof(uint64_t); i++)
-      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
 
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kMappedSize));
 
@@ -81,11 +81,12 @@ TEST(PagedMemoryTest, Uncommitted) {
     EXPECT_DEATH({ ptr_raw[kMappedSize] = 'x'; }, ".*");
 
     // Commit the remaining pages.
-    ASSERT_TRUE(mem.EnsureCommitted(ptr_raw + kSize));
+    ASSERT_TRUE(mem.EnsureCommitted(kSize));
 
     for (size_t i = kMappedSize / sizeof(uint64_t);
-         i < kSize / sizeof(uint64_t); i++)
-      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+         i < kSize / sizeof(uint64_t); i++) {
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
+    }
 
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #else
@@ -93,12 +94,11 @@ TEST(PagedMemoryTest, Uncommitted) {
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
     // This should not have any effect.
-    ASSERT_TRUE(mem.EnsureCommitted(ptr_raw + kSize));
+    ASSERT_TRUE(mem.EnsureCommitted(kSize));
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
-    for (size_t i = kMappedSize / sizeof(uint64_t);
-         i < kSize / sizeof(uint64_t); i++)
-      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.get()) + i));
+    for (size_t i = kSize / sizeof(uint64_t); i < kSize / sizeof(uint64_t); i++)
+      ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #endif
   }
@@ -110,8 +110,8 @@ TEST(PagedMemoryTest, Uncommitted) {
 TEST(PagedMemoryTest, GuardRegions) {
   const size_t kSize = 4096;
   PagedMemory mem = PagedMemory::Allocate(kSize, true /*commit*/);
-  ASSERT_TRUE(mem);
-  volatile char* raw = reinterpret_cast<char*>(mem.get());
+  ASSERT_TRUE(mem.IsValid());
+  volatile char* raw = reinterpret_cast<char*>(mem.Get());
   EXPECT_DEATH({ raw[-1] = 'x'; }, ".*");
   EXPECT_DEATH({ raw[kSize] = 'x'; }, ".*");
 }
@@ -138,8 +138,8 @@ TEST(PagedMemoryTest, Unchecked) {
   ASSERT_EXIT(
       {
         ASSERT_EQ(0, setrlimit(RLIMIT_AS, &limit));
-        auto mem = PagedMemory::AllocateMayFail(kMemLimit * 2, true /*commit*/);
-        ASSERT_FALSE(mem);
+        auto mem = PagedMemory::Allocate(kMemLimit * 2, PagedMemory::kMayFail);
+        ASSERT_FALSE(mem.IsValid());
         exit(0);
       },
       ::testing::ExitedWithCode(0), "");
