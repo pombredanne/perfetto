@@ -70,7 +70,11 @@ class PagedMemory {
   // Ensures that at least the first |committed_size| bytes of the allocated
   // memory region are committed. The implementation may commit memory in larger
   // chunks above |committed_size|. Crashes if the memory couldn't be committed.
+#if TRACK_COMMITTED_SIZE()
   void EnsureCommitted(size_t committed_size);
+#else  // TRACK_COMMITTED_SIZE()
+  void EnsureCommitted(size_t /*committed_size*/) {}
+#endif  // TRACK_COMMITTED_SIZE()
 
   void* Get() const noexcept;
   bool IsValid() const noexcept;

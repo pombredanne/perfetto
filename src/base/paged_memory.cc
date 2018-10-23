@@ -121,6 +121,7 @@ bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
+#if TRACK_COMMITTED_SIZE()
 void PagedMemory::EnsureCommitted(size_t committed_size) {
   PERFETTO_DCHECK(committed_size > 0u);
   PERFETTO_DCHECK(committed_size <= size_);
@@ -140,14 +141,13 @@ void PagedMemory::EnsureCommitted(size_t committed_size) {
   PERFETTO_CHECK(res);
   committed_size_ += commit_size;
 #else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-// mmap commits automatically as needed, so we only track here for ASAN.
-#if TRACK_COMMITTED_SIZE()
+  // mmap commits automatically as needed, so we only track here for ASAN.
   committed_size = std::max(committed_size_, committed_size);
   ANNOTATE_CHANGE_SIZE(p_, size_, committed_size_, committed_size);
   committed_size_ = committed_size;
-#endif  // TRACK_COMMITTED_SIZE()
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
+#endif  // TRACK_COMMITTED_SIZE()
 
 void* PagedMemory::Get() const noexcept {
   return p_;
