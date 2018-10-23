@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {assertTrue} from '../base/logging';
-import {globals} from '../frontend/globals';
+import {globals} from './globals';
 
 export function isLegacyTrace(fileName: string): boolean {
   fileName = fileName.toLowerCase();
@@ -33,7 +33,7 @@ export function openFileWithLegacyTraceViewer(file: File) {
       return openBufferWithLegacyTraceViewer(file.name, str, str.length);
     }
   };
-  reader.onerror = (err) => {
+  reader.onerror = err => {
     console.error(err);
   };
   if (file.name.endsWith('.gz') || file.name.endsWith('.zip')) {
@@ -55,7 +55,7 @@ export function openBufferWithLegacyTraceViewer(
       'filter 1s ease, transform 1s cubic-bezier(0.985, 0.005, 1.000, 0.225)';
   document.body.style.filter = 'grayscale(1) blur(10px) opacity(0)';
   document.body.style.transform = 'scale(0)';
-  const transitionPromise = new Promise((resolve) => {
+  const transitionPromise = new Promise(resolve => {
     document.body.addEventListener('transitionend', (e: TransitionEvent) => {
       if (e.propertyName === 'transform') {
         resolve();
@@ -63,9 +63,9 @@ export function openBufferWithLegacyTraceViewer(
     });
   });
 
-  const loadPromise = new Promise((resolve) => {
-    fetch('/assets/catapult_trace_viewer.html').then((resp) => {
-      resp.text().then((content) => {
+  const loadPromise = new Promise(resolve => {
+    fetch('/assets/catapult_trace_viewer.html').then(resp => {
+      resp.text().then(content => {
         resolve(content);
       });
     });
@@ -83,7 +83,7 @@ export function openBufferWithLegacyTraceViewer(
 // document we are about to destroy.
 function replaceWindowWithTraceViewer(
     name: string, data: ArrayBuffer|string, htmlContent: string) {
-  globals.rafScheduler.shutdown();
+  globals.shutdown();
   const newWin = window.open('', '_self') as Window;
   newWin.document.open('text/html', 'replace');
   newWin.document.addEventListener('readystatechange', () => {

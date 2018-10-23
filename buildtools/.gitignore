@@ -6,6 +6,7 @@ bionic/
 catapult_trace_viewer/
 clang/
 clang_format/
+d8/
 emulator/
 googletest/
 jsoncpp/

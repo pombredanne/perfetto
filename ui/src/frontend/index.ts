@@ -119,7 +119,7 @@ function main() {
       },
       dispatch);
   forwardRemoteCalls(channel.port2, new FrontendApi(router));
-  globals.initialize(dispatch);
+  globals.initialize(dispatch, controller);
 
   globals.rafScheduler.domRedraw = () =>
       m.render(document.body, m(router.resolve(globals.state.route)));
