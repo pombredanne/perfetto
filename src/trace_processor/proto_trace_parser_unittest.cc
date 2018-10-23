@@ -122,7 +122,7 @@ TEST_F(ProtoTraceParserTest, LoadSingleEvent) {
   sched_switch->set_next_comm(kProcName);
   sched_switch->set_next_pid(100);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32, 100,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
                                        base::StringView(kProcName)));
   Tokenize(trace);
 }
@@ -153,10 +153,10 @@ TEST_F(ProtoTraceParserTest, LoadMultipleEvents) {
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32, 100,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
                                        base::StringView(kProcName1)));
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32, 10,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
                                        base::StringView(kProcName2)));
 
   Tokenize(trace);
@@ -191,10 +191,10 @@ TEST_F(ProtoTraceParserTest, LoadMultiplePackets) {
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32, 100,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
                                        base::StringView(kProcName1)));
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32, 10,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
                                        base::StringView(kProcName2)));
   Tokenize(trace);
 }
@@ -224,11 +224,11 @@ TEST_F(ProtoTraceParserTest, RepeatedLoadSinglePacket) {
   sched_switch->set_next_comm(kProcName2);
   sched_switch->set_next_pid(10);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1000, 10, 32, 100,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1000, 10, 32, 100,
                                        base::StringView(kProcName1)));
   Tokenize(trace_1);
 
-  EXPECT_CALL(*sched_, PushSchedSwitch(10, 1001, 100, 32, 10,
+  EXPECT_CALL(*event_, PushSchedSwitch(10, 1001, 100, 32, 10,
                                        base::StringView(kProcName2)));
   Tokenize(trace_2);
 }
@@ -244,7 +244,7 @@ TEST_F(ProtoTraceParserTest, LoadMemInfo) {
   uint32_t value = 10;
   meminfo->set_value(value);
 
-  EXPECT_CALL(*sched_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  EXPECT_CALL(*event_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
   Tokenize(trace_1);
 }
 
@@ -259,7 +259,7 @@ TEST_F(ProtoTraceParserTest, LoadVmStats) {
   uint32_t value = 10;
   meminfo->set_value(value);
 
-  EXPECT_CALL(*sched_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
+  EXPECT_CALL(*event_, PushCounter(ts, value, 0, 0, RefType::kNoRef));
   Tokenize(trace_1);
 }
 
@@ -273,7 +273,7 @@ TEST_F(ProtoTraceParserTest, LoadCpuFreq) {
   cpu_freq->set_cpu_id(10);
   cpu_freq->set_state(2000);
 
-  EXPECT_CALL(*sched_, PushCounter(1000, 2000, 0, 10, RefType::kCPU_ID));
+  EXPECT_CALL(*event_, PushCounter(1000, 2000, 0, 10, RefType::kCpuId));
   Tokenize(trace_1);
 }
 

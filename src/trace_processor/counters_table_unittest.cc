@@ -65,13 +65,13 @@ TEST_F(CountersTableUnittest, SelectWhereCpu) {
 
   context_.storage->mutable_counters()->AddCounter(
       timestamp, 0 /* dur */, 1, freq, 0 /* value delta */, 1 /* cpu */,
-      RefType::kCPU_ID);
+      RefType::kCpuId);
   context_.storage->mutable_counters()->AddCounter(
       timestamp + 1, 1 /* dur */, 1, freq + 1000, 1000 /* value delta */,
-      1 /* cpu */, RefType::kCPU_ID);
+      1 /* cpu */, RefType::kCpuId);
   context_.storage->mutable_counters()->AddCounter(
       timestamp + 2, 1 /* dur */, 1, freq + 2000, 1000 /* value delta */,
-      2 /* cpu */, RefType::kCPU_ID);
+      2 /* cpu */, RefType::kCpuId);
 
   PrepareValidStatement("SELECT ts, dur, value FROM counters where ref = 1");
 
@@ -95,13 +95,13 @@ TEST_F(CountersTableUnittest, GroupByFreq) {
 
   context_.storage->mutable_counters()->AddCounter(
       timestamp, 1 /* dur */, name_id, freq, 0 /* value delta */, 1 /* cpu */,
-      RefType::kCPU_ID);
+      RefType::kCpuId);
   context_.storage->mutable_counters()->AddCounter(
       timestamp + 1, 2 /* dur */, name_id, freq + 1000, 1000 /* value delta */,
-      1 /* cpu */, RefType::kCPU_ID);
+      1 /* cpu */, RefType::kCpuId);
   context_.storage->mutable_counters()->AddCounter(
       timestamp + 3, 0 /* dur */, name_id, freq, -1000 /* value delta */,
-      1 /* cpu */, RefType::kCPU_ID);
+      1 /* cpu */, RefType::kCpuId);
 
   PrepareValidStatement(
       "SELECT value, sum(dur) as dur_sum FROM counters where value > 0 group "
