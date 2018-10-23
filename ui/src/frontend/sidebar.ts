@@ -142,7 +142,7 @@ const SECTIONS = [
       },
       {
         t: 'Report a bug',
-        a: 'https://issuetracker.google.com/issues?q=componentid:323270',
+        a: 'https://goto.google.com/perfetto-ui-bug',
         i: 'bug_report',
       },
     ],
