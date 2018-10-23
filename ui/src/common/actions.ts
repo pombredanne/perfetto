@@ -32,8 +32,12 @@ type StateDraft = DraftObject<State>;
 function clearTraceState(state: StateDraft) {
   state.traceTime = defaultTraceTime;
   state.visibleTraceTime = defaultTraceTime;
+  state.queries = {};
+  state.engines = {};
   state.pinnedTracks = [];
   state.scrollingTracks = [];
+  state.trackGroups = {};
+  state.tracks = {};
 }
 
 export const StateActions = {

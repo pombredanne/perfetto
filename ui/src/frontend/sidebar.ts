@@ -131,6 +131,23 @@ const SECTIONS = [
       },
     ],
   },
+  {
+    title: 'Support',
+    summary: 'Documentation & Bugs',
+    items: [
+      {
+        t: 'Documentation',
+        a: 'https://perfetto.dev',
+        i: 'help',
+      },
+      {
+        t: 'Report a bug',
+        a: 'https://issuetracker.google.com/issues?q=componentid:323270',
+        i: 'bug_report',
+      },
+    ],
+  },
+
 ];
 
 function getFileElement(): HTMLInputElement {
@@ -202,8 +219,11 @@ export class Sidebar implements m.ClassComponent {
       for (const item of section.items) {
         vdomItems.push(
             m('li',
-              m(`a[href=#]`,
-                {onclick: item.a},
+              m(`a`,
+                {
+                  onclick: typeof item.a === 'function' ? item.a : null,
+                  href: typeof item.a === 'string' ? item.a : '#',
+                },
                 m('i.material-icons', item.i),
                 item.t)));
       }
