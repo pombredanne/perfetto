@@ -15,19 +15,58 @@
 import("../../gn/perfetto.gni")
 import("../../gn/proto_library.gni")
 
+template("include_binary") {
+  name = target_name
+  action_name = name + "_gen"
+  action(action_name) {
+    assert(defined(invoker.source))
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+
+    script = rebase_path("../../tools/include_binary.py", root_build_dir)
+    inputs = [
+      invoker.source,
+    ]
+    outputs = [
+     "$target_gen_dir/$name.cc",
+     "$target_gen_dir/$name.h",
+    ]
+    args = [
+      rebase_path(inputs[0], root_build_dir),
+      rebase_path("$target_gen_dir/$name", root_build_dir),
+    ]
+  }
+  source_set(target_name) {
+    deps = [":$action_name"]
+    sources = get_target_outputs(":$action_name")
+  }
+}
+
+include_binary("trace_config_descriptor") {
+  deps = [
+    "../../protos/perfetto/config:lite",
+  ]
+  source = "$root_gen_dir/protos/perfetto/trace/config.descriptor"
+}
+
 source_set("perfetto_cmd") {
   public_deps = [
     ":protos",
     "../../include/perfetto/traced",
   ]
   deps = [
+    "../../buildtools:protobuf_lite",
     "../../gn:default_deps",
     "../../protos/perfetto/config:lite",
     "../base",
     "../protozero",
     "../tracing:ipc_consumer",
+    ":trace_config_descriptor",
   ]
   sources = [
+    "pbtxt_to_pb.cc",
+    "pbtxt_to_pb.h",
     "perfetto_cmd.cc",
     "perfetto_cmd.h",
     "rate_limiter.cc",
@@ -39,6 +78,7 @@ proto_library("protos") {
   generate_python = false
   deps = []
   sources = [
+    "descriptor.proto",
     "perfetto_cmd_state.proto",
   ]
   proto_in_dir = perfetto_root_path
@@ -53,8 +93,10 @@ source_set("unittests") {
     "../../gn:default_deps",
     "../../gn:gtest_deps",
     "../../include/perfetto/base",
+    "../../protos/perfetto/config:lite",
   ]
   sources = [
+    "pbtxt_to_pb_unittest.cc",
     "rate_limiter_unittest.cc",
   ]
 }
