@@ -21,9 +21,9 @@
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <Windows.h>
-#else
+#else  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #include <sys/mman.h>
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
@@ -37,12 +37,12 @@ constexpr size_t kGuardSize = kPageSize;
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 constexpr size_t kCommitChunkSize = kPageSize * 128;
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
 }  // namespace
 
 // static
-PagedMemory PagedMemory::Allocate(size_t size, uint8_t flags) {
+PagedMemory PagedMemory::Allocate(size_t size, int flags) {
   PERFETTO_DCHECK(size % kPageSize == 0);
   size_t outer_size = size + kGuardSize * 2;
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
@@ -51,7 +51,7 @@ PagedMemory PagedMemory::Allocate(size_t size, uint8_t flags) {
     return PagedMemory();
   PERFETTO_CHECK(ptr);
   char* usable_region = reinterpret_cast<char*>(ptr) + kGuardSize;
-#else
+#else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   void* ptr = mmap(nullptr, outer_size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
   if (ptr == MAP_FAILED && (flags & kMayFail))
@@ -61,9 +61,9 @@ PagedMemory PagedMemory::Allocate(size_t size, uint8_t flags) {
   int res = mprotect(ptr, kGuardSize, PROT_NONE);
   res |= mprotect(usable_region + size, kGuardSize, PROT_NONE);
   PERFETTO_CHECK(res == 0);
-#endif
-  auto memory = PagedMemory(usable_region, size);
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
+  auto memory = PagedMemory(usable_region, size);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   size_t initial_commit = size;
   if (flags & kDontCommit)
@@ -72,8 +72,7 @@ PagedMemory PagedMemory::Allocate(size_t size, uint8_t flags) {
   if (!commit_success && (flags & kMayFail))
     return PagedMemory();
   PERFETTO_CHECK(commit_success);
-#endif
-
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   return memory;
 }
 
@@ -100,11 +99,11 @@ PagedMemory::~PagedMemory() {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   BOOL res = VirtualFree(start, 0, MEM_RELEASE);
   PERFETTO_CHECK(res != 0);
-#else
+#else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   const size_t outer_size = size_ + kGuardSize * 2;
   int res = munmap(start, outer_size);
   PERFETTO_CHECK(res == 0);
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
 bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
@@ -115,12 +114,12 @@ bool PagedMemory::AdviseDontNeed(void* p, size_t size) {
   // Discarding pages on Windows has more CPU cost than is justified for the
   // possible memory savings.
   return false;
-#else
+#else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   // http://man7.org/linux/man-pages/man2/madvise.2.html
   int res = madvise(p, size, MADV_DONTNEED);
   PERFETTO_DCHECK(res == 0);
   return true;
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
 bool PagedMemory::EnsureCommitted(size_t committed_size) {
@@ -142,10 +141,10 @@ bool PagedMemory::EnsureCommitted(size_t committed_size) {
   if (res)
     committed_size_ += commit_size;
   return res;
-#else
+#else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   // mmap commits automatically as needed, no need for us to do anything.
   return true;
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
 void* PagedMemory::Get() const noexcept {

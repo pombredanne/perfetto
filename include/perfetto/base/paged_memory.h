@@ -34,7 +34,7 @@ class PagedMemory {
   PagedMemory(PagedMemory&& other) noexcept;
   PagedMemory& operator=(PagedMemory&& other);
 
-  enum AllocationFlags : uint8_t {
+  enum AllocationFlags {
     // By default, Allocate() crashes if the underlying mmap fails (e.g., if out
     // of virtual address space). When this flag is provided, an invalid
     // PagedMemory pointing to nullptr is returned in this case instead.
@@ -51,7 +51,7 @@ class PagedMemory {
   // guaranteed to be page-aligned and guaranteed to be zeroed. |size| must be a
   // multiple of 4KB (a page size). For |flags|, see the AllocationFlags enum
   // above.
-  static PagedMemory Allocate(size_t size, uint8_t flags = 0);
+  static PagedMemory Allocate(size_t size, int flags = 0);
 
   // Hint to the OS that the memory range is not needed and can be discarded.
   // The memory remains accessible and its contents may be retained, or they
@@ -80,7 +80,7 @@ class PagedMemory {
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   size_t committed_size_ = 0u;
-#endif
+#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 };
 
 }  // namespace base
