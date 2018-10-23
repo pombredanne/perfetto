@@ -97,7 +97,7 @@ TEST(PagedMemoryTest, Uncommitted) {
     ASSERT_TRUE(mem.EnsureCommitted(kSize));
     ASSERT_FALSE(vm_test_utils::IsMapped(ptr_raw, kSize));
 
-    for (size_t i = kSize / sizeof(uint64_t); i < kSize / sizeof(uint64_t); i++)
+    for (size_t i = 0; i < kSize / sizeof(uint64_t); i++)
       ASSERT_EQ(0u, *(reinterpret_cast<uint64_t*>(mem.Get()) + i));
     ASSERT_TRUE(vm_test_utils::IsMapped(ptr_raw, kSize));
 #endif
