@@ -124,7 +124,7 @@ void PagedMemory::EnsureCommitted(size_t committed_size) {
   PERFETTO_DCHECK(committed_size <= size_);
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
   if (committed_size_ >= committed_size)
-    return true;
+    return;
   // Rounding up.
   size_t delta = committed_size - committed_size_;
   size_t num_additional_chunks =
