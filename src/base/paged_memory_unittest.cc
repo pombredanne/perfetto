@@ -36,7 +36,7 @@ TEST(PagedMemoryTest, Basic) {
   const size_t kSize = 4096 * kNumPages;
   void* ptr_raw = nullptr;
   {
-    PagedMemory mem = PagedMemory::Allocate(kSize, true /*commit*/);
+    PagedMemory mem = PagedMemory::Allocate(kSize);
     ASSERT_TRUE(mem.IsValid());
     ASSERT_EQ(0u, reinterpret_cast<uintptr_t>(mem.Get()) % 4096);
     ptr_raw = mem.Get();
@@ -63,7 +63,7 @@ TEST(PagedMemoryTest, Uncommitted) {
   constexpr size_t kSize = 4096 * kNumPages;
   char* ptr_raw = nullptr;
   {
-    PagedMemory mem = PagedMemory::Allocate(kSize, false /*commit*/);
+    PagedMemory mem = PagedMemory::Allocate(kSize, PagedMemory::kDontCommit);
     ASSERT_TRUE(mem.IsValid());
     ptr_raw = reinterpret_cast<char*>(mem.Get());
 
@@ -109,7 +109,7 @@ TEST(PagedMemoryTest, Uncommitted) {
 
 TEST(PagedMemoryTest, GuardRegions) {
   const size_t kSize = 4096;
-  PagedMemory mem = PagedMemory::Allocate(kSize, true /*commit*/);
+  PagedMemory mem = PagedMemory::Allocate(kSize);
   ASSERT_TRUE(mem.IsValid());
   volatile char* raw = reinterpret_cast<char*>(mem.Get());
   EXPECT_DEATH({ raw[-1] = 'x'; }, ".*");
