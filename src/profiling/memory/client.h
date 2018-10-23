@@ -37,8 +37,11 @@ class SocketPool {
   SocketPool(std::vector<base::ScopedFile> sockets);
 
   BorrowedSocket Borrow();
+  void Shutdown();
 
  private:
+  bool shutdown_ = false;
+
   void Return(base::ScopedFile fd);
   std::mutex mutex_;
   std::condition_variable cv_;
