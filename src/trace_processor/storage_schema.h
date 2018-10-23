@@ -15,6 +15,7 @@
 #ifndef SRC_TRACE_PROCESSOR_STORAGE_SCHEMA_H_
 #define SRC_TRACE_PROCESSOR_STORAGE_SCHEMA_H_
 
+#include <algorithm>
 #include <deque>
 
 #include "src/trace_processor/sqlite_utils.h"

@@ -18,6 +18,8 @@
 #define SRC_TRACE_PROCESSOR_ROW_ITERATORS_H_
 
 #include <stddef.h>
+
+#include <algorithm>
 #include <vector>
 
 #include "src/trace_processor/sqlite_utils.h"
