@@ -90,9 +90,11 @@ void EventTracker::PushCounter(uint64_t timestamp,
   if (counter_it != pending_counters_per_key_.end()) {
     size_t idx = counter_it->second;
     uint64_t duration = timestamp - counters->timestamps()[idx];
+    // Update duration of previously stored event.
     counters->set_duration(idx, duration);
   }
 
+  // At this point we don't know the duration so just store 0.
   pending_counters_per_key_[key] =
       counters->AddCounter(timestamp, 0 /* duration */, name_id, value,
                            static_cast<int64_t>(ref), ref_type);

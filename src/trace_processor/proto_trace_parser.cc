@@ -498,6 +498,8 @@ void ProtoTraceParser::ParseIonHeapGrow(uint64_t timestamp,
                                         TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
   uint32_t value = 0;
+  // TODO(b/118300811): The heap name pointer cannot be read. Read once it
+  // has been fixed.
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::IonHeapGrowFtraceEvent::kTotalAllocatedFieldNumber:
@@ -516,7 +518,8 @@ void ProtoTraceParser::ParseIonHeapShrink(uint64_t timestamp,
                                           TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
   uint32_t value = 0;
-  base::StringView heap_name;
+  // TODO(b/118300811): The heap name pointer cannot be read. Read once it
+  // has been fixed.
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::IonHeapShrinkFtraceEvent::kTotalAllocatedFieldNumber:
