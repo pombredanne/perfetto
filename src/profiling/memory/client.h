@@ -136,6 +136,7 @@ class Client {
                         uint64_t alloc_address,
                         void* (*unhooked_malloc)(size_t),
                         void (*unhooked_free)(void*));
+  void Shutdown();
 
   ClientConfiguration client_config_for_testing() { return client_config_; }
 

@@ -300,5 +300,9 @@ void Client::MaybeSampleAlloc(uint64_t alloc_size,
     RecordMalloc(alloc_size, total_size, alloc_address);
 }
 
+void Client::Shutdown() {
+  //  TODO(fmayer): Disconnect sockets etc.
+}
+
 }  // namespace profiling
 }  // namespace perfetto
