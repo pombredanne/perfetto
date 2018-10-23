@@ -1,4 +1,6 @@
 ../data/android_sched_and_ps.pb smoke.sql android_sched_and_ps_smoke.out
+../data/sfgate.json smoke.sql sfgate_smoke.out
+../data/sfgate.json smoke_slices.sql sfgate_smoke_slices.out
 ../data/synth_1.pb smoke.sql synth_1_smoke.out
 ../data/synth_1.pb filter_sched.sql synth_1_filter_sched.out
 ../data/synth_1.pb filter_counters.sql synth_1_filter_counters.out
