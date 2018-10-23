@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,38 +19,39 @@
 
 #include "perfetto/base/build_config.h"
 
-#if defined(ADDRESS_SANITIZER) && defined(PERFETTO_OS_LINUX)
-#define ANNOTATE_CONTIGUOUS_CONTAINER
-#define ANNOTATE_NEW_BUFFER(buffer, capacity, newSize)                       \
+#if defined(ADDRESS_SANITIZER)
+#define ANNOTATE_NEW_BUFFER(buffer, capacity, new_size)                      \
   if (buffer) {                                                              \
     __sanitizer_annotate_contiguous_container(buffer, (buffer) + (capacity), \
                                               (buffer) + (capacity),         \
-                                              (buffer) + (newSize));         \
+                                              (buffer) + (new_size));        \
   }
-#define ANNOTATE_DELETE_BUFFER(buffer, capacity, oldSize)                    \
+#define ANNOTATE_DELETE_BUFFER(buffer, capacity, old_size)                   \
   if (buffer) {                                                              \
     __sanitizer_annotate_contiguous_container(buffer, (buffer) + (capacity), \
-                                              (buffer) + (oldSize),          \
+                                              (buffer) + (old_size),         \
                                               (buffer) + (capacity));        \
   }
-#define ANNOTATE_CHANGE_SIZE(buffer, capacity, oldSize, newSize)             \
+#define ANNOTATE_CHANGE_SIZE(buffer, capacity, old_size, new_size)           \
   if (buffer) {                                                              \
     __sanitizer_annotate_contiguous_container(buffer, (buffer) + (capacity), \
-                                              (buffer) + (oldSize),          \
-                                              (buffer) + (newSize));         \
+                                              (buffer) + (old_size),         \
+                                              (buffer) + (new_size));        \
   }
-#define ANNOTATE_CHANGE_CAPACITY(buffer, oldCapacity, bufferSize, newCapacity) \
-  ANNOTATE_DELETE_BUFFER(buffer, oldCapacity, bufferSize);                     \
-  ANNOTATE_NEW_BUFFER(buffer, newCapacity, bufferSize);
+#define ANNOTATE_CHANGE_CAPACITY(buffer, old_capacity, buffer_size, \
+                                 new_capacity)                      \
+  ANNOTATE_DELETE_BUFFER(buffer, old_capacity, buffer_size);        \
+  ANNOTATE_NEW_BUFFER(buffer, new_capacity, buffer_size);
 // Annotations require buffers to begin on an 8-byte boundary.
 
-#else  // defined(ADDRESS_SANITIZER) && defined(PERFETTO_OS_LINUX)
+#else  // defined(ADDRESS_SANITIZER)
 
-#define ANNOTATE_NEW_BUFFER(buffer, capacity, newSize)
-#define ANNOTATE_DELETE_BUFFER(buffer, capacity, oldSize)
-#define ANNOTATE_CHANGE_SIZE(buffer, capacity, oldSize, newSize)
-#define ANNOTATE_CHANGE_CAPACITY(buffer, oldCapacity, bufferSize, newCapacity)
+#define ANNOTATE_NEW_BUFFER(buffer, capacity, new_size)
+#define ANNOTATE_DELETE_BUFFER(buffer, capacity, old_size)
+#define ANNOTATE_CHANGE_SIZE(buffer, capacity, old_size, new_size)
+#define ANNOTATE_CHANGE_CAPACITY(buffer, old_capacity, buffer_size, \
+                                 new_capacity)
 
-#endif  // defined(ADDRESS_SANITIZER) && defined(PERFETTO_OS_LINUX)
+#endif  // defined(ADDRESS_SANITIZER)
 
 #endif  // INCLUDE_PERFETTO_BASE_CONTAINER_ANNOTATIONS_H_
