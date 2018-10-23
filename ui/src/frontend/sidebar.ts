@@ -205,10 +205,7 @@ function navigateViewer(e: Event) {
 
 function dispatchCreatePermalink(e: Event) {
   e.preventDefault();
-  // TODO(hjd): Should requestId not be set to nextId++ in the controller?
-  globals.dispatch(Actions.createPermalink({
-    requestId: new Date().toISOString(),
-  }));
+  globals.dispatch(Actions.createPermalink({}));
 }
 
 export class Sidebar implements m.ClassComponent {
