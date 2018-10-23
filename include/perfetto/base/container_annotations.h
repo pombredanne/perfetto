@@ -43,15 +43,12 @@
   ANNOTATE_DELETE_BUFFER(buffer, old_capacity, buffer_size);        \
   ANNOTATE_NEW_BUFFER(buffer, new_capacity, buffer_size);
 // Annotations require buffers to begin on an 8-byte boundary.
-
 #else  // defined(ADDRESS_SANITIZER)
-
 #define ANNOTATE_NEW_BUFFER(buffer, capacity, new_size)
 #define ANNOTATE_DELETE_BUFFER(buffer, capacity, old_size)
 #define ANNOTATE_CHANGE_SIZE(buffer, capacity, old_size, new_size)
 #define ANNOTATE_CHANGE_CAPACITY(buffer, old_capacity, buffer_size, \
                                  new_capacity)
-
 #endif  // defined(ADDRESS_SANITIZER)
 
 #endif  // INCLUDE_PERFETTO_BASE_CONTAINER_ANNOTATIONS_H_

@@ -59,7 +59,7 @@ TEST(PagedMemoryTest, Basic) {
 }
 
 TEST(PagedMemoryTest, Uncommitted) {
-  constexpr size_t kNumPages = 1024;
+  constexpr size_t kNumPages = 4096;
   constexpr size_t kSize = 4096 * kNumPages;
   char* ptr_raw = nullptr;
   {
@@ -111,7 +111,7 @@ TEST(PagedMemoryTest, Uncommitted) {
 TEST(PagedMemoryTest, AccessUncommittedMemoryTriggersASAN) {
   EXPECT_DEATH(
       {
-        constexpr size_t kNumPages = 1024;
+        constexpr size_t kNumPages = 4096;
         constexpr size_t kSize = 4096 * kNumPages;
         PagedMemory mem =
             PagedMemory::Allocate(kSize, PagedMemory::kDontCommit);
