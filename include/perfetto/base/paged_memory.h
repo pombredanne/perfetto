@@ -20,6 +20,15 @@
 #include <memory>
 
 #include "perfetto/base/build_config.h"
+#include "perfetto/base/container_annotations.h"
+
+// We need to track the committed size on windows and when ASAN is enabled.
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN) || \
+    defined(ANNOTATE_CONTIGUOUS_CONTAINER)
+#define TRACK_COMMITTED_SIZE 1
+#else
+#define TRACK_COMMITTED_SIZE 0
+#endif
 
 namespace perfetto {
 namespace base {
@@ -77,9 +86,9 @@ class PagedMemory {
   char* p_ = nullptr;
   size_t size_ = 0;
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#if TRACK_COMMITTED_SIZE
   size_t committed_size_ = 0u;
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#endif  // TRACK_COMMITTED_SIZE
 };
 
 }  // namespace base

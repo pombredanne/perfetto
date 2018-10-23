@@ -35,9 +35,9 @@ namespace {
 
 constexpr size_t kGuardSize = kPageSize;
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#if TRACK_COMMITTED_SIZE
 constexpr size_t kCommitChunkSize = kPageSize * 128;
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#endif  // TRACK_COMMITTED_SIZE
 
 }  // namespace
 
@@ -64,18 +64,20 @@ PagedMemory PagedMemory::Allocate(size_t size, int flags) {
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 
   auto memory = PagedMemory(usable_region, size);
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#if TRACK_COMMITTED_SIZE
   size_t initial_commit = size;
   if (flags & kDontCommit)
     initial_commit = std::min(initial_commit, kCommitChunkSize);
   memory.EnsureCommitted(initial_commit);
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
+#endif  // TRACK_COMMITTED_SIZE
   return memory;
 }
 
 PagedMemory::PagedMemory() {}
 
-PagedMemory::PagedMemory(char* p, size_t size) : p_(p), size_(size) {}
+PagedMemory::PagedMemory(char* p, size_t size) : p_(p), size_(size) {
+  ANNOTATE_NEW_BUFFER(p_, size_, committed_size_);
+}
 
 PagedMemory::PagedMemory(PagedMemory&& other) {
   *this = other;
@@ -138,7 +140,13 @@ void PagedMemory::EnsureCommitted(size_t committed_size) {
   PERFETTO_CHECK(res);
   committed_size_ += commit_size;
 #else   // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
-// mmap commits automatically as needed, no need for us to do anything.
+// mmap commits automatically as needed, so no need for us to do anything,
+// except when ASAN is enabled.
+#if TRACK_COMMITTED_SIZE
+  size_t old_committed_size = committed_size_;
+  committed_size_ = std::max(committed_size_, committed_size);
+  ANNOTATE_CHANGE_SIZE(p_, size_, old_committed_size, committed_size_);
+#endif  // TRACK_COMMITTED_SIZE
 #endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 }
 
