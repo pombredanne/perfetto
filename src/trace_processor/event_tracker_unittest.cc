@@ -144,22 +144,12 @@ TEST_F(EventTrackerTest, MixedEventsValueDelta) {
   ASSERT_EQ(context.storage->counters().timestamps().at(0), timestamp);
   ASSERT_EQ(context.storage->counters().durations().at(0), 3);
   ASSERT_EQ(context.storage->counters().values().at(0), 1000);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(0), 0);
+  ASSERT_EQ(context.storage->counters().value_deltas().at(0), 4000);
 
   ASSERT_EQ(context.storage->counters().timestamps().at(1), timestamp + 1);
   ASSERT_EQ(context.storage->counters().durations().at(1), 8);
   ASSERT_EQ(context.storage->counters().values().at(1), 0);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(1), 0);
-
-  ASSERT_EQ(context.storage->counters().timestamps().at(2), timestamp + 3);
-  ASSERT_EQ(context.storage->counters().durations().at(2), 0);
-  ASSERT_EQ(context.storage->counters().values().at(2), 5000);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(2), 4000);
-
-  ASSERT_EQ(context.storage->counters().timestamps().at(3), timestamp + 9);
-  ASSERT_EQ(context.storage->counters().durations().at(3), 0);
-  ASSERT_EQ(context.storage->counters().values().at(3), 1);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(3), 1);
+  ASSERT_EQ(context.storage->counters().value_deltas().at(1), 1);
 }
 
 }  // namespace
