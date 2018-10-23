@@ -119,7 +119,6 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
-  // Allow to re-enable existing client on subsequent initialize call.
   perfetto::profiling::Client* client = GetClient();
   if (client)
     client->Shutdown();
