@@ -15,7 +15,7 @@
  */
 
 #include "src/trace_processor/counters_table.h"
-#include "src/trace_processor/sched_tracker.h"
+#include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/trace_processor_context.h"
 
@@ -34,7 +34,7 @@ class CountersTableUnittest : public ::testing::Test {
     db_.reset(db);
 
     context_.storage.reset(new TraceStorage());
-    context_.sched_tracker.reset(new SchedTracker(&context_));
+    context_.event_tracker.reset(new EventTracker(&context_));
 
     CountersTable::RegisterTable(db_.get(), context_.storage.get());
   }

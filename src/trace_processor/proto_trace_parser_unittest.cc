@@ -19,9 +19,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "perfetto/base/string_view.h"
+#include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/process_tracker.h"
 #include "src/trace_processor/proto_trace_parser.h"
-#include "src/trace_processor/sched_tracker.h"
 #include "src/trace_processor/trace_sorter.h"
 
 #include "perfetto/trace/trace.pb.h"
@@ -38,10 +38,10 @@ using ::testing::Eq;
 using ::testing::Pointwise;
 using ::testing::NiceMock;
 
-class MockSchedTracker : public SchedTracker {
+class MockEventTracker : public EventTracker {
  public:
-  MockSchedTracker(TraceProcessorContext* context) : SchedTracker(context) {}
-  virtual ~MockSchedTracker() = default;
+  MockEventTracker(TraceProcessorContext* context) : EventTracker(context) {}
+  virtual ~MockEventTracker() = default;
 
   MOCK_METHOD6(PushSchedSwitch,
                void(uint32_t cpu,
@@ -82,8 +82,8 @@ class ProtoTraceParserTest : public ::testing::Test {
   ProtoTraceParserTest() {
     storage_ = new NiceMock<MockTraceStorage>();
     context_.storage.reset(storage_);
-    sched_ = new MockSchedTracker(&context_);
-    context_.sched_tracker.reset(sched_);
+    event_ = new MockEventTracker(&context_);
+    context_.event_tracker.reset(event_);
     process_ = new MockProcessTracker(&context_);
     context_.process_tracker.reset(process_);
     const auto optim = OptimizationMode::kMinLatency;
@@ -101,7 +101,7 @@ class ProtoTraceParserTest : public ::testing::Test {
 
  protected:
   TraceProcessorContext context_;
-  MockSchedTracker* sched_;
+  MockEventTracker* event_;
   MockProcessTracker* process_;
   NiceMock<MockTraceStorage>* storage_;
 };
