@@ -352,7 +352,8 @@ int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     default: {
       auto index_pair = table_->GetTableAndColumnIndex(N);
-      const auto& stmt = index_pair.first ? t1_.stmt : t2_.stmt;
+      const auto& stmt =
+          index_pair.first == ChildTable::kFirst ? t1_.stmt : t2_.stmt;
       size_t index = index_pair.second + kReservedColumns;
       ReportSqliteResult(context, stmt.get(), index);
     }
