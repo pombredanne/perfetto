@@ -90,8 +90,8 @@ void EventTracker::PushCounter(uint64_t timestamp,
   if (counter_it != pending_counters_per_key_.end()) {
     size_t idx = counter_it->second;
     uint64_t duration = timestamp - counters->timestamps()[idx];
-    counters->set_duration(idx, duration);
     double value_delta = value - counters->values()[idx];
+    counters->set_duration(idx, duration);
     counters->set_value_delta(idx, value_delta);
   }
 
