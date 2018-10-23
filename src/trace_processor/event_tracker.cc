@@ -90,14 +90,12 @@ void EventTracker::PushCounter(uint64_t timestamp,
   if (counter_it != pending_counters_per_key_.end()) {
     size_t idx = counter_it->second;
     uint64_t duration = timestamp - counters->timestamps()[idx];
-    double value_delta = value - counters->values()[idx];
     counters->set_duration(idx, duration);
-    counters->set_value_delta(idx, value_delta);
   }
 
-  pending_counters_per_key_[key] = counters->AddCounter(
-      timestamp, 0 /* duration */, name_id, value, 0 /* value_delta */,
-      static_cast<int64_t>(ref), ref_type);
+  pending_counters_per_key_[key] =
+      counters->AddCounter(timestamp, 0 /* duration */, name_id, value,
+                           static_cast<int64_t>(ref), ref_type);
 }
 
 }  // namespace trace_processor

@@ -33,7 +33,6 @@ class CountersTable : public Table {
     kName = 1,
     kValue = 2,
     kDuration = 3,
-    kValueDelta = 4,
     kRef = 5,
     kRefType = 6,
   };

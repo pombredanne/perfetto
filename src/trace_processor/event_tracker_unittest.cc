@@ -125,33 +125,6 @@ TEST_F(EventTrackerTest, CounterDuration) {
   ASSERT_EQ(context.storage->counters().values().at(2), 5000);
 }
 
-TEST_F(EventTrackerTest, MixedEventsValueDelta) {
-  uint32_t cpu = 3;
-  uint64_t timestamp = 100;
-  StringId name_id_cpu = 0;
-  StringId name_id_upid = 0;
-  UniquePid upid = 12;
-  context.event_tracker->PushCounter(timestamp, 1000, name_id_cpu, cpu,
-                                     RefType::kCpuId);
-  context.event_tracker->PushCounter(timestamp + 1, 0, name_id_upid, upid,
-                                     RefType::kUtid);
-  context.event_tracker->PushCounter(timestamp + 3, 5000, name_id_cpu, cpu,
-                                     RefType::kCpuId);
-  context.event_tracker->PushCounter(timestamp + 9, 1, name_id_upid, upid,
-                                     RefType::kUtid);
-
-  ASSERT_EQ(context.storage->counters().counter_count(), 4ul);
-  ASSERT_EQ(context.storage->counters().timestamps().at(0), timestamp);
-  ASSERT_EQ(context.storage->counters().durations().at(0), 3);
-  ASSERT_EQ(context.storage->counters().values().at(0), 1000);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(0), 4000);
-
-  ASSERT_EQ(context.storage->counters().timestamps().at(1), timestamp + 1);
-  ASSERT_EQ(context.storage->counters().durations().at(1), 8);
-  ASSERT_EQ(context.storage->counters().values().at(1), 0);
-  ASSERT_EQ(context.storage->counters().value_deltas().at(1), 1);
-}
-
 }  // namespace
 }  // namespace trace_processor
 }  // namespace perfetto
