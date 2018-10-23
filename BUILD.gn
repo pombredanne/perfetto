@@ -224,7 +224,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       testonly = true
       deps = [
         "gn:default_deps",
-        "tools/trace_to_text:lib",
+        "tools/trace_to_text:full",
       ]
     }
 
@@ -237,26 +237,15 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       ]
     }
   }
-}
-
-if (build_with_chromium) {
-  component("libperfetto") {
-    public_configs = [ "gn:public_config" ]
-    deps = [
-      "src/tracing",
-    ]
-    configs -= [ "//build/config/compiler:chromium_code" ]
-    configs += [ "//build/config/compiler:no_chromium_code" ]
-    public_deps = [
-      "include/perfetto/tracing/core",
-      "protos/perfetto/trace:zero",
-      "protos/perfetto/trace/chrome:zero",
-    ]
-  }
-}
+}  # if (perfetto_build_standalone || perfetto_build_with_android)
 
 if (perfetto_build_with_embedder) {
-  source_set("libperfetto") {
+  if (build_with_chromium) {
+    libperfetto_target_type = "component"
+  } else {
+    libperfetto_target_type = "source_set"
+  }
+  target(libperfetto_target_type, "libperfetto") {
     public_configs = [ "gn:public_config" ]
     deps = [
       "src/tracing",
@@ -293,7 +282,7 @@ if (perfetto_build_standalone) {
   }
 }
 
-if (!build_with_chromium) {
+if (perfetto_build_with_android) {
   # TODO(fmayer): Investigate shared library for common pieces.
   shared_library("heapprofd_client") {
     deps = [

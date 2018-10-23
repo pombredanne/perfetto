@@ -26,7 +26,7 @@ group("gtest_prod_config") {
 }
 
 config("gtest_config") {
-  if (build_with_chromium || perfetto_build_with_embedder) {
+  if (perfetto_build_with_embedder) {
     include_dirs = [ "//testing/gtest/include" ]
   }
 }

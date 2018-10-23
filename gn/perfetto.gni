@@ -14,6 +14,35 @@
 
 import("//build_overrides/build.gni")
 
+# Summary of our build configurations:
+
+# 1. Standalone builds
+#    perfetto_build_standalone = true
+#    perfetto_build_with_embedder = false
+#    perfetto_build_with_android = false
+#    build_with_chromium = false
+
+# 2. Android tree builds
+#    perfetto_build_standalone = false
+#    perfetto_build_with_android = true
+#    perfetto_build_with_embedder = false
+#    build_with_chromium = false
+
+# 3. Chromium tree builds
+#    perfetto_build_standalone = false
+#    perfetto_build_with_android = false
+#    perfetto_build_with_embedder = true
+#    build_with_chromium = true
+
+# 4. Builds in other embedder trees
+#    perfetto_build_standalone = false
+#    perfetto_build_with_android = false
+#    perfetto_build_with_embedder = true
+#    build_with_chromium = false
+
+# Note that |build_with_chromium| is a global convention used by several
+# projects, set outside of our control.
+
 declare_args() {
   # The Android blueprint file generator overrides this to true.
   perfetto_build_with_android = false
@@ -24,7 +53,7 @@ declare_args() {
 }
 
 if (!defined(perfetto_build_with_embedder)) {
-  perfetto_build_with_embedder = false
+  perfetto_build_with_embedder = build_with_chromium
 }
 
 perfetto_build_standalone =
@@ -42,3 +71,9 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
 if (perfetto_build_with_android) {
   start_daemons_for_testing = false
 }
+
+# Cross-checks.
+
+# If |build_with_chromium| is true then also |perfetto_build_with_embedder|
+# must be true
+assert(!build_with_chromium || perfetto_build_with_embedder)
