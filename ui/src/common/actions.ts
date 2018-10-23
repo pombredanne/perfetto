@@ -18,26 +18,26 @@ import {assertExists} from '../base/logging';
 import {ConvertTrace} from '../controller/trace_converter';
 
 import {
-  defaultTraceTime,
+  createEmptyState,
+  RecordConfig,
   SCROLLING_TRACK_GROUP,
   State,
   Status,
   TraceTime,
-  RecordConfig,
 } from './state';
 
 type StateDraft = DraftObject<State>;
 
 
 function clearTraceState(state: StateDraft) {
-  state.traceTime = defaultTraceTime;
-  state.visibleTraceTime = defaultTraceTime;
-  state.queries = {};
-  state.engines = {};
-  state.pinnedTracks = [];
-  state.scrollingTracks = [];
-  state.trackGroups = {};
-  state.tracks = {};
+  const nextId = state.nextId;
+  const recordConfig = state.recordConfig;
+  const route = state.route;
+
+  Object.assign(state, createEmptyState());
+  state.nextId = nextId;
+  state.recordConfig = recordConfig;
+  state.route = route;
 }
 
 export const StateActions = {

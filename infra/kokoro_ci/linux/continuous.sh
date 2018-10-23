@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (C) 2018 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import("//build_overrides/build.gni")
-import("perfetto.gni")
+set -ex
 
-if (perfetto_build_standalone) {
-  import("//gn/standalone/wasm.gni")
-} else {
-  is_wasm = false  # The WASM toolchain is supported only in standalone builds.
-
-  # Create a dummy template to avoid GN warnings in non-standalone builds.
-  template("wasm_lib") {
-    source_set("${target_name}_${invoker.name}_unused") {
-      forward_variables_from(invoker, "*")
-    }
-  }
-}
+# Kokoro will check out the repository into the following path. Switch to that
+# directory and invoke the actual test file (hiding the magic path details from
+# the latter).
+cd git/perfetto
+infra/kokoro_ci/run_tests.sh
