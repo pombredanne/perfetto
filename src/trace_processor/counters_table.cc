@@ -173,11 +173,11 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
     }
     case Column::kRefType: {
       switch (storage_->counters().types()[row]) {
-        case RefType::kCPU_ID: {
+        case RefType::kCpuId: {
           sqlite3_result_text(context, "cpu", -1, nullptr);
           break;
         }
-        case RefType::kUTID: {
+        case RefType::kUtid: {
           sqlite3_result_text(context, "utid", -1, nullptr);
           break;
         }
