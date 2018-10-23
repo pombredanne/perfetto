@@ -4468,6 +4468,11 @@ cc_binary_host {
     "tools/trace_to_text/ftrace_event_formatter.cc",
     "tools/trace_to_text/ftrace_inode_handler.cc",
     "tools/trace_to_text/main.cc",
+    "tools/trace_to_text/proto_full_utils.cc",
+    "tools/trace_to_text/trace_to_summary.cc",
+    "tools/trace_to_text/trace_to_systrace.cc",
+    "tools/trace_to_text/trace_to_text.cc",
+    "tools/trace_to_text/utils.cc",
   ],
   shared_libs: [
     "liblog",
@@ -4583,11 +4588,10 @@ cc_library_static {
   ],
 }
 
-java_library_static {
-  name: "perfetto_config-lite",
-  host_supported: true,
+java_library_host {
+  name: "perfetto_config-full",
   proto: {
-      type: "lite",
+      type: "full",
   },
   srcs: [
     "protos/perfetto/config/perfetto_config.proto",
