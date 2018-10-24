@@ -13,23 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -ex
+set -eux
 
 SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 ROOT_DIR="$(realpath ${SCRIPT_DIR}/../..)"
 
 cd ${ROOT_DIR}
 
-# Make space for docker image by symlinking the hardcoded /var/lib/docker path
-# to a tmpfs mount. Cargo culted from other projects' scripts.
-sudo -n /etc/init.d/docker stop
-sudo -n mv /var/lib/docker /tmpfs/
-sudo -n ln -s /tmpfs/docker /var/lib/docker
-sudo -n /etc/init.d/docker start
+# Check that the expected environment variables are present.
+echo ${PERFETTO_TEST_GN_ARGS}
+echo ${PERFETTO_TEST_ENTRYPT}
 
-# Run a prebaked build+test configuration in a container.
-# TODO(rsavitski): pass configuration via environment variables.
-docker run --rm -t --user=perfetto:perfetto \
+# TODO(rsavitski): figure out how to copy files into the container without
+# requiring o= permissions on the ${ROOT_DIR} subtree.
+# TODO(rsavitski): switch from :experimental to :latest image
+sudo docker run --rm -t \
+  -e PERFETTO_TEST_GN_ARGS="${PERFETTO_TEST_GN_ARGS}" \
   -v ${ROOT_DIR}:/perfetto:ro \
-  asia.gcr.io/perfetto-ci/perfetto-ci:latest \
-  /bin/bash run_tests.sh
+  asia.gcr.io/perfetto-ci/perfetto-ci:experimental \
+  /bin/bash \
+  "-c" \
+  "cp -r /perfetto /home/perfetto/src && \
+  cd /home/perfetto/src && \
+  ${PERFETTO_TEST_ENTRYPT}"
