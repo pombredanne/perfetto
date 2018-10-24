@@ -212,6 +212,10 @@ export const StateActions = {
     };
   },
 
+  clearPermalink(state: StateDraft, _: {}): void {
+    state.permalink = {};
+  },
+
   setTraceTime(state: StateDraft, args: TraceTime): void {
     state.traceTime = args;
   },
