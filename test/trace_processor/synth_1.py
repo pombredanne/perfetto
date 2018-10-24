@@ -40,4 +40,3 @@ trace.add_sched(ts=390, prev_pid=2, next_pid=4)
 trace.add_cpufreq(ts=400, freq=100, cpu=0)
 
 print(trace.trace.SerializeToString())
-#print(trace.trace)
