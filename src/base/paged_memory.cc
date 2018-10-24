@@ -37,7 +37,7 @@ constexpr size_t kGuardSize = kPageSize;
 
 #if TRACK_COMMITTED_SIZE()
 constexpr size_t kCommitChunkSize = kPageSize * 1024;  // 4mB
-#endif                                                 // TRACK_COMMITTED_SIZE()
+#endif  // TRACK_COMMITTED_SIZE()
 
 }  // namespace
 
