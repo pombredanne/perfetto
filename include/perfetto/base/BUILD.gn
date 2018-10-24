@@ -17,12 +17,13 @@ import("../../../gn/perfetto.gni")
 source_set("base") {
   sources = [
     "build_config.h",
+    "container_annotations.h",
     "event.h",
     "export.h",
     "file_utils.h",
     "logging.h",
     "metatrace.h",
-    "page_allocator.h",
+    "paged_memory.h",
     "scoped_file.h",
     "small_set.h",
     "string_splitter.h",
