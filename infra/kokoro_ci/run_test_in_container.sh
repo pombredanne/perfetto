@@ -27,7 +27,9 @@ echo ${PERFETTO_TEST_ENTRYPT}
 # TODO(rsavitski): figure out how to copy files into the container without
 # requiring o= permissions on the ${ROOT_DIR} subtree.
 # TODO(rsavitski): switch from :experimental to :latest image
+# Note: SYS_PTRACE capability is added for [at least] the leak sanitizer.
 sudo docker run --rm -t \
+  --cap-add SYS_PTRACE \
   -e PERFETTO_TEST_GN_ARGS="${PERFETTO_TEST_GN_ARGS}" \
   -v ${ROOT_DIR}:/perfetto:ro \
   asia.gcr.io/perfetto-ci/perfetto-ci:experimental \
