@@ -20,9 +20,9 @@ ROOT_DIR="$(realpath ${SCRIPT_DIR}/../..)"
 
 cd ${ROOT_DIR}
 
-# Check that the expected environment variables are present.
-echo ${PERFETTO_TEST_GN_ARGS}
-echo ${PERFETTO_TEST_ENTRYPT}
+# Check that the expected environment variables are present (due to set -u).
+echo PERFETTO_TEST_GN_ARGS: ${PERFETTO_TEST_GN_ARGS}
+echo PERFETTO_TEST_ENTRYPT: ${PERFETTO_TEST_ENTRYPT}
 
 # TODO(rsavitski): figure out how to copy files into the container without
 # requiring o= permissions on the ${ROOT_DIR} subtree.

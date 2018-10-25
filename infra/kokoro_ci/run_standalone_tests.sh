@@ -15,12 +15,13 @@
 
 set -eux
 
-echo ${PERFETTO_TEST_GN_ARGS}
-
 SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 ROOT_DIR="$(realpath ${SCRIPT_DIR}/../..)"
 
 cd ${ROOT_DIR}
+
+# Check that the expected environment variables are present (due to set -u).
+echo PERFETTO_TEST_GN_ARGS: ${PERFETTO_TEST_GN_ARGS}
 
 tools/install-build-deps --no-android
 
