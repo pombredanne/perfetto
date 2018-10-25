@@ -15,8 +15,9 @@
 import("perfetto.gni")
 import("proto_library.gni")
 
-# Used in production targets (i.e. testonly == false) for the FRIEND_TEST_*
-# macros.
+# Used by base/gtest_prod_util.h for the FRIEND_TEST_* macros. Note that other
+# production targets (i.e. testonly == false) should use base/gtest_prod_util.h
+# instead.
 group("gtest_prod_config") {
   if (perfetto_build_standalone || perfetto_build_with_android) {
     public_configs = [ "//buildtools:googletest_prod_config" ]
@@ -41,6 +42,11 @@ group("gtest_deps") {
       "//buildtools:gmock",
       "//buildtools:gtest",
     ]
+  } else if (build_with_chromium) {
+    public_deps = [
+      "//third_party/googletest:gmock",
+      "//third_party/googletest:gtest",
+    ]
   } else {
     public_deps = [
       "//testing/gmock",
@@ -55,6 +61,10 @@ group("gtest_main") {
   if (perfetto_build_standalone || perfetto_build_with_android) {
     public_deps = [
       "//buildtools:gtest_main",
+    ]
+  } else if (build_with_chromium) {
+    public_deps = [
+      "//third_party/googletest:gtest_main",
     ]
   } else {
     public_deps = [
