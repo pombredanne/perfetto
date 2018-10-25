@@ -80,31 +80,46 @@ int CompareValues(const D& deque, size_t a, size_t b, bool desc) {
   return 0;
 }
 
-template <typename F>
-bool CompareToSqliteValue(unsigned long actual, sqlite3_value* value) {
+template <typename F,
+          typename T,
+          typename std::enable_if<std::is_same<T, size_t>::value,
+                                  size_t>::type* = nullptr>
+bool CompareToSqliteValue(size_t actual, sqlite3_value* value) {
   PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
-  return F()(actual, static_cast<unsigned long>(sqlite3_value_int64(value)));
+  return F()(actual, static_cast<size_t>(sqlite3_value_int64(value)));
 }
 
-template <typename F>
+template <typename F,
+          typename T,
+          typename std::enable_if<std::is_same<T, uint32_t>::value,
+                                  uint32_t>::type* = nullptr>
 bool CompareToSqliteValue(uint32_t actual, sqlite3_value* value) {
   PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<uint32_t>(sqlite3_value_int64(value)));
 }
 
-template <typename F>
+template <typename F,
+          typename T,
+          typename std::enable_if<std::is_same<T, uint64_t>::value,
+                                  uint64_t>::type* = nullptr>
 bool CompareToSqliteValue(uint64_t actual, sqlite3_value* value) {
   PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<uint64_t>(sqlite3_value_int64(value)));
 }
 
-template <typename F>
+template <typename F,
+          typename T,
+          typename std::enable_if<std::is_same<T, int64_t>::value,
+                                  int64_t>::type* = nullptr>
 bool CompareToSqliteValue(int64_t actual, sqlite3_value* value) {
   PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
   return F()(actual, static_cast<int64_t>(sqlite3_value_int64(value)));
 }
 
-template <typename F>
+template <typename F,
+          typename T,
+          typename std::enable_if<std::is_same<T, double>::value,
+                                  double>::type* = nullptr>
 bool CompareToSqliteValue(double actual, sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_FLOAT || type == SQLITE_INTEGER);
@@ -125,22 +140,22 @@ void FilterColumn(const D& deque,
     T actual = deque[offset + filter_idx];
     switch (constraint.op) {
       case SQLITE_INDEX_CONSTRAINT_EQ:
-        *it = CompareToSqliteValue<std::equal_to<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::equal_to<T>, T>(actual, argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_GE:
-        *it = CompareToSqliteValue<std::greater_equal<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::greater_equal<T>, T>(actual, argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_GT:
-        *it = CompareToSqliteValue<std::greater<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::greater<T>, T>(actual, argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_LE:
-        *it = CompareToSqliteValue<std::less_equal<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::less_equal<T>, T>(actual, argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_LT:
-        *it = CompareToSqliteValue<std::less<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::less<T>, T>(actual, argv);
         break;
       case SQLITE_INDEX_CONSTRAINT_NE:
-        *it = CompareToSqliteValue<std::not_equal_to<T>>(actual, argv);
+        *it = CompareToSqliteValue<std::not_equal_to<T>, T>(actual, argv);
         break;
       default:
         PERFETTO_CHECK(false);
