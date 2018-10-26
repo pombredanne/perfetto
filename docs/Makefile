@@ -13,23 +13,9 @@
 # limitations under the License.
 
 test: static
-	dev_appserver.py .
+	docsify serve
 
-static: node_modules/.stamp
-	rm -rf static
-	mkdir -p static
-	cp logo.png static/
-	cp node_modules/docsify/lib/docsify.min.js static/
-	cp node_modules/docsify-themeable/dist/js/docsify-themeable.min.js static/
-	cp node_modules/docsify-themeable/dist/css/theme-simple.css static/
-	cp node_modules/docsify-copy-code/dist/docsify-copy-code.min.js static/
-	cp node_modules/prismjs/components/prism-bash.min.js static/
+static:
+	make -C ../infra/perfetto-site.appspot.com/ static
 
-deploy: static
-	gcloud app deploy app.yaml --project perfetto-site
-
-node_modules/.stamp: package.json
-	npm install --quiet
-	touch "$@"
-
-.PHONY: deploy test static
+.PHONY: test static
