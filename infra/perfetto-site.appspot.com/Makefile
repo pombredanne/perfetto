@@ -18,7 +18,6 @@ test: static
 static: node_modules/.stamp
 	rm -rf static
 	mkdir -p static
-	cp logo.png static/
 	cp node_modules/docsify/lib/docsify.min.js static/
 	cp node_modules/docsify-themeable/dist/js/docsify-themeable.min.js static/
 	cp node_modules/docsify-themeable/dist/css/theme-simple.css static/
