@@ -32,20 +32,24 @@ config("gtest_config") {
   }
 }
 
+config("gmock_config") {
+  if (perfetto_build_with_embedder) {
+    include_dirs = [ "//testing/gmock/include" ]
+  }
+}
+
 group("gtest_deps") {
   testonly = true
 
-  public_configs = [ ":gtest_config" ]
+  public_configs = [
+    ":gtest_config",
+    ":gmock_config",
+  ]
 
   if (perfetto_build_standalone || perfetto_build_with_android) {
     public_deps = [
       "//buildtools:gmock",
       "//buildtools:gtest",
-    ]
-  } else if (build_with_chromium) {
-    public_deps = [
-      "//third_party/googletest:gmock",
-      "//third_party/googletest:gtest",
     ]
   } else {
     public_deps = [
@@ -61,10 +65,6 @@ group("gtest_main") {
   if (perfetto_build_standalone || perfetto_build_with_android) {
     public_deps = [
       "//buildtools:gtest_main",
-    ]
-  } else if (build_with_chromium) {
-    public_deps = [
-      "//third_party/googletest:gtest_main",
     ]
   } else {
     public_deps = [
