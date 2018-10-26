@@ -12,10 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-deploy:
+node_modules/.stamp: package.json
+	npm install --quiet
+	touch "$@"
+
+static: node_modules/.stamp
+	rm -rf static
+	mkdir -p static
+	cp logo.png static/
+	cp node_modules/docsify/lib/docsify.min.js static/
+	cp node_modules/docsify-themeable/dist/js/docsify-themeable.min.js static/
+	cp node_modules/docsify-themeable/dist/css/theme-simple.css static/
+	cp node_modules/docsify-copy-code/dist/docsify-copy-code.min.js static/
+	cp node_modules/prismjs/components/prism-bash.min.js static/
+
+deploy: static
 	gcloud app deploy app.yaml --project perfetto-site
 
-test:
+test: static
 	dev_appserver.py .
 
-.PHONY: deploy test
+.PHONY: deploy test static
