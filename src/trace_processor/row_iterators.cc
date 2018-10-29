@@ -68,9 +68,37 @@ void RangeRowIterator::NextRow() {
     offset_ = FindNextOffset(row_filter_, offset_, desc_);
 }
 
+bool RangeRowIterator::IsEnd() {
+  return offset_ >= end_row_ - start_row_;
+}
+
+uint32_t RangeRowIterator::Row() {
+  return desc_ ? end_row_ - offset_ - 1 : start_row_ + offset_;
+}
+
+uint32_t RangeRowIterator::RowCount() const {
+  if (row_filter_.empty()) {
+    return end_row_ - start_row_;
+  }
+  auto count = std::count(row_filter_.begin(), row_filter_.end(), true);
+  return static_cast<uint32_t>(count);
+}
+
 VectorRowIterator::VectorRowIterator(std::vector<uint32_t> row_indices)
     : row_indices_(std::move(row_indices)) {}
 VectorRowIterator::~VectorRowIterator() = default;
+
+void VectorRowIterator::NextRow() {
+  offset_++;
+}
+
+bool VectorRowIterator::IsEnd() {
+  return offset_ >= row_indices_.size();
+}
+
+uint32_t VectorRowIterator::Row() {
+  return row_indices_[offset_];
+}
 
 }  // namespace trace_processor
 }  // namespace perfetto

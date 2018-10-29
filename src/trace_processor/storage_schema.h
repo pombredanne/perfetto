@@ -88,7 +88,7 @@ class StorageSchema {
           is_naturally_ordered_(is_naturally_ordered) {}
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      sqlite_utils::ReportSqliteResult(ctx, deque_->operator[](row));
+      sqlite_utils::ReportSqliteResult(ctx, (*deque_)[row]);
     }
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override {
@@ -130,33 +130,25 @@ class StorageSchema {
     }
 
     Predicate Filter(int op, sqlite3_value* value) const override {
-      auto bipredicate = sqlite_utils::GetPredicateForOp<T>(op);
+      auto binary_op = sqlite_utils::GetPredicateForOp<T>(op);
       T extracted = sqlite_utils::ExtractSqliteValue<T>(value);
-      return [this, bipredicate, extracted](uint32_t idx) {
-        return bipredicate(deque_->operator[](idx), extracted);
+      return [this, binary_op, extracted](uint32_t idx) {
+        return binary_op((*deque_)[idx], extracted);
       };
     }
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          T a = deque_->operator[](f);
-          T b = deque_->operator[](s);
-          if (a > b)
-            return -1;
-          else if (a < b)
-            return 1;
-          return 0;
+          T a = (*deque_)[f];
+          T b = (*deque_)[s];
+          return a > b ? -1 : (a < b ? 1 : 0);
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        T a = deque_->operator[](f);
-        T b = deque_->operator[](s);
-        if (a < b)
-          return -1;
-        else if (a > b)
-          return 1;
-        return 0;
+        T a = (*deque_)[f];
+        T b = (*deque_)[s];
+        return a < b ? -1 : (a > b ? 1 : 0);
       };
     }
 
@@ -192,7 +184,7 @@ class StorageSchema {
         : Column(col_name, hidden), deque_(deque), string_map_(string_map) {}
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      const auto& str = string_map_->operator[](deque_->operator[](row));
+      const auto& str = (*string_map_)[(*deque_)[row]];
       if (str.empty()) {
         sqlite3_result_null(ctx);
       } else {
@@ -214,23 +206,15 @@ class StorageSchema {
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          const std::string& a = string_map_->operator[](deque_->operator[](f));
-          const std::string& b = string_map_->operator[](deque_->operator[](s));
-          if (a > b)
-            return -1;
-          else if (a < b)
-            return 1;
-          return 0;
+          const std::string& a = (*string_map_)[(*deque_)[f]];
+          const std::string& b = (*string_map_)[(*deque_)[s]];
+          return a > b ? -1 : (a < b ? 1 : 0);
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        const std::string& a = string_map_->operator[](deque_->operator[](f));
-        const std::string& b = string_map_->operator[](deque_->operator[](s));
-        if (a < b)
-          return -1;
-        else if (a > b)
-          return 1;
-        return 0;
+        const std::string& a = (*string_map_)[(*deque_)[f]];
+        const std::string& b = (*string_map_)[(*deque_)[s]];
+        return a < b ? -1 : (a > b ? 1 : 0);
       };
     }
 
