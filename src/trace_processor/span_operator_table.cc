@@ -86,14 +86,6 @@ std::vector<Table::Column> GetColumnsForTable(
   return columns;
 }
 
-std::string SerializeConstraints(const std::vector<std::string>& constraints) {
-  std::string sql = "WHERE 1";
-  for (const auto& c : constraints) {
-    sql += " AND " + c;
-  }
-  return sql;
-}
-
 }  // namespace
 
 SpanOperatorTable::SpanOperatorTable(sqlite3* db, const TraceStorage*)
@@ -181,13 +173,12 @@ std::vector<std::string> SpanOperatorTable::ComputeSqlConstraintVector(
       case SpanOperatorTable::Column::kDuration:
         col_name = "dur";
         break;
-      case SpanOperatorTable::Column::kJoinValue:
-        if (!join_col_.empty()) {
+      default: {
+        if (constraint.iColumn == SpanOperatorTable::Column::kJoinValue &&
+            !join_col_.empty()) {
           col_name = join_col_;
           break;
         }
-        [[clang::fallthrough]];
-      default: {
         auto index_pair = GetTableAndColumnIndex(constraint.iColumn);
         bool is_constraint_in_table = index_pair.first == table;
         if (is_constraint_in_table) {
@@ -199,7 +190,8 @@ std::vector<std::string> SpanOperatorTable::ComputeSqlConstraintVector(
     if (!col_name.empty()) {
       const auto& value =
           reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
-      constraints.emplace_back(col_name + OpToString(constraint.op) + value);
+      constraints.emplace_back("`" + col_name + "`" +
+                               OpToString(constraint.op) + "'" + value + "'");
     }
   }
   return constraints;
@@ -311,14 +303,17 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
                                               sqlite3_stmt** stmt) {
   // TODO(lalitm): pass through constraints on other tables to those tables.
   std::string sql;
-  sql += "SELECT ts, dur, " + table_->join_col_;
+  sql += "SELECT ts, dur, `" + table_->join_col_ + "`";
   for (const auto& col : def.cols) {
     sql += ", " + col.name();
   }
   sql += " FROM " + def.name;
-  sql += " " + SerializeConstraints(
-                   table_->ComputeSqlConstraintVector(qc, argv, table));
-  sql += " ORDER BY " + table_->join_col_ + ", ts;";
+  sql += " WHERE 1";
+  auto cs = table_->ComputeSqlConstraintVector(qc, argv, table);
+  for (const auto& c : cs) {
+    sql += " AND " + c;
+  }
+  sql += " ORDER BY `" + table_->join_col_ + "`, ts;";
 
   PERFETTO_DLOG("%s", sql.c_str());
   int t1_size = static_cast<int>(sql.size());
@@ -374,6 +369,9 @@ PERFETTO_ALWAYS_INLINE void SpanOperatorTable::Cursor::ReportSqliteResult(
       sqlite3_result_double(context, sqlite3_column_double(stmt, idx));
       break;
     case SQLITE_TEXT: {
+      // TODO(lalitm): note for future optimizations: if we knew the addresses
+      // of the string intern pool, we could check if the string returned here
+      // comes from the pool, and pass it as non-transient.
       const auto kSqliteTransient =
           reinterpret_cast<sqlite3_destructor_type>(-1);
       auto ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx));
