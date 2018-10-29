@@ -47,13 +47,15 @@ class MockErrorReporter : public ErrorReporter {
 protos::TraceConfig ToProto(const std::string& input) {
   StrictMock<MockErrorReporter> reporter;
   std::vector<uint8_t> output = PbtxtToPb(input, &reporter);
+  EXPECT_FALSE(output.empty());
   protos::TraceConfig config;
   config.ParseFromArray(output.data(), static_cast<int>(output.size()));
   return config;
 }
 
 void ToErrors(const std::string& input, MockErrorReporter* reporter) {
-  PbtxtToPb(input, reporter);
+  std::vector<uint8_t> output = PbtxtToPb(input, reporter);
+  EXPECT_TRUE(output.empty());
 }
 
 TEST(PbtxtToPb, OneField) {
@@ -105,12 +107,120 @@ TEST(PbtxtToPb, MultipleNestedMessage) {
   EXPECT_EQ(config.buffers().Get(1).size_kb(), 2);
 }
 
+TEST(PbtxtToPb, NestedMessageCrossFile) {
+  protos::TraceConfig config = ToProto(R"(
+data_sources {
+  config {
+    ftrace_config {
+      drain_period_ms: 42
+    }
+  }
+}
+  )");
+  ASSERT_EQ(config.data_sources().Get(0).config().ftrace_config().drain_period_ms(), 42);
+}
+
 TEST(PbtxtToPb, Booleans) {
   protos::TraceConfig config = ToProto(R"(
     write_into_file: false; deferred_start: true;
   )");
   EXPECT_EQ(config.write_into_file(), false);
   EXPECT_EQ(config.deferred_start(), true);
+}
+
+TEST(PbtxtToPb, Enums) {
+  protos::TraceConfig config = ToProto(R"(
+    buffers: {
+      fill_policy: RING_BUFFER
+    }
+  )");
+  EXPECT_EQ(config.buffers().Get(0).fill_policy(), protos::TraceConfig::BufferConfig::RING_BUFFER);
+}
+
+TEST(PbtxtToPb, AllFieldTypes) {
+  protos::TraceConfig config = ToProto(R"(
+data_sources {
+  config {
+    for_testing {
+      dummy_fields {
+        field_uint32: 1;
+        field_uint64: 2;
+        field_int32: 3;
+        field_int64: 4;
+        field_fixed64: 5;
+        field_sfixed64: 6;
+        field_fixed32: 7;
+        field_sfixed32: 8;
+        field_double: 9;
+        field_float: 10;
+        field_sint64: 11;
+        field_sint32: 12;
+        field_string: "13";
+        field_bytes: "14";
+      }
+    }
+  }
+}
+  )");
+  const auto& fields = config.data_sources().Get(0).config().for_testing().dummy_fields();
+  ASSERT_EQ(fields.field_uint32(), 1);
+  ASSERT_EQ(fields.field_uint64(), 2);
+  ASSERT_EQ(fields.field_int32(), 3);
+  ASSERT_EQ(fields.field_int64(), 4);
+  ASSERT_EQ(fields.field_fixed64(), 5);
+  ASSERT_EQ(fields.field_sfixed64(), 6);
+  ASSERT_EQ(fields.field_fixed32(), 7);
+  ASSERT_EQ(fields.field_sfixed32(), 8);
+  ASSERT_EQ(fields.field_double(), 9);
+  ASSERT_EQ(fields.field_float(), 10);
+  ASSERT_EQ(fields.field_sint64(), 11);
+  ASSERT_EQ(fields.field_sint32(), 12);
+  ASSERT_EQ(fields.field_string(), "13");
+  ASSERT_EQ(fields.field_bytes(), "14");
+}
+
+TEST(PbtxtToPb, NegativeNumbers) {
+  protos::TraceConfig config = ToProto(R"(
+data_sources {
+  config {
+    for_testing {
+      dummy_fields {
+        field_int32: -1;
+        field_int64: -2;
+        field_fixed64: -3;
+        field_sfixed64: -4;
+        field_fixed32: -5;
+        field_sfixed32: -6;
+        field_double: -7;
+        field_float: -8;
+        field_sint64: -9;
+        field_sint32: -10;
+      }
+    }
+  }
+}
+  )");
+  const auto& fields = config.data_sources().Get(0).config().for_testing().dummy_fields();
+  ASSERT_EQ(fields.field_int32(), -1);
+  ASSERT_EQ(fields.field_int64(), -2);
+  ASSERT_EQ(fields.field_fixed64(), -3);
+  ASSERT_EQ(fields.field_sfixed64(), -4);
+  ASSERT_EQ(fields.field_fixed32(), -5);
+  ASSERT_EQ(fields.field_sfixed32(), -6);
+  ASSERT_EQ(fields.field_double(), -7);
+  ASSERT_EQ(fields.field_float(), -8);
+  ASSERT_EQ(fields.field_sint64(), -9);
+  ASSERT_EQ(fields.field_sint32(), -10);
+}
+
+TEST(PbtxtToPb, EofEndsNumeric) {
+  protos::TraceConfig config = ToProto(R"(duration_ms: 1234)");
+  EXPECT_EQ(config.duration_ms(), 1234);
+}
+
+TEST(PbtxtToPb, EofEndsIdentifier) {
+  protos::TraceConfig config = ToProto(R"(enable_extra_guardrails: true)");
+  EXPECT_EQ(config.enable_extra_guardrails(), true);
 }
 
 TEST(PbtxtToPb, UnknownField) {
@@ -123,6 +233,22 @@ TEST(PbtxtToPb, UnknownField) {
     not_a_label: false
   )",
            &reporter);
+}
+
+TEST(PbtxtToPb, UnknownNestedField) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(
+      reporter,
+      AddError(0, 0, 0,
+               "No field with name \"not_a_field_name\" in proto DataSourceConfig."));
+  ToErrors(R"(
+data_sources {
+  config {
+    not_a_field_name {
+    }
+  }
+}
+  )", &reporter);
 }
 
 TEST(PbtxtToPb, BadBoolean) {
@@ -152,6 +278,38 @@ TEST(PbtxtToPb, MissingBoolean) {
 //    }
 //  )", &reporter);
 //}
+
+// TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
+//  MockErrorReporter reporter;
+//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
+//  saw: ")); ToErrors(R"(
+// write_into_file: false; write_into_file: true;
+//    }
+//  )", &reporter);
+//}
+
+// TEST(PbtxtToPb, OverflowOnIntegers) {
+//  MockErrorReporter reporter;
+//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
+//  saw: ")); ToErrors(R"(
+// write_into_file: false; write_into_file: true;
+//    }
+//  )", &reporter);
+//}
+
+// TEST(PbtxtToPb, NegativeNumbersForUnsignedInt) {
+//  MockErrorReporter reporter;
+//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
+//  saw: ")); ToErrors(R"(
+// write_into_file: false; write_into_file: true;
+//    }
+//  )", &reporter);
+//}
+
+// TEST(PbtxtToPb, UnterminatedString) {
+// TEST(PbtxtToPb, NumberIsEof) {
+// TEST(PbtxtToPb, NumberIsEof) {
+// TEST(PbtxtToPb, EscapedQuotes) {
 
 }  // namespace
 }  // namespace perfetto

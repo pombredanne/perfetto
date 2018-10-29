@@ -39,6 +39,7 @@
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
+#include "src/perfetto_cmd/pbtxt_to_pb.h"
 
 #include "perfetto/config/trace_config.pb.h"
 
@@ -58,6 +59,20 @@ namespace {
 constexpr char kDefaultDropBoxTag[] = "perfetto";
 
 perfetto::PerfettoCmd* g_consumer_cmd;
+
+class LoggingErrorReporter : public ErrorReporter {
+ public:
+  void AddError(size_t, size_t, size_t, const std::string& message) {
+    PERFETTO_ELOG("%s", message.c_str()); 
+  }
+};
+
+bool ParseTraceConfigPbtxt(const std::string& pbtxt, protos::TraceConfig* config) {
+  LoggingErrorReporter reporter;
+  std::vector<uint8_t> output = PbtxtToPb(pbtxt, &reporter);
+  config->ParseFromArray(output.data(), static_cast<int>(output.size()));
+  return !output.empty();
+}
 
 }  // namespace
 
@@ -216,6 +231,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   perfetto::protos::TraceConfig trace_config_proto;
   PERFETTO_DLOG("Parsing TraceConfig, %zu bytes", trace_config_raw.size());
   bool parsed = trace_config_proto.ParseFromString(trace_config_raw);
+  parsed = parsed || ParseTraceConfigPbtxt(trace_config_raw, &trace_config_proto); 
   if (!parsed) {
     PERFETTO_ELOG("Could not parse TraceConfig proto");
     return 1;

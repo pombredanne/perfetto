@@ -30,6 +30,7 @@ namespace perfetto {
 constexpr char kConfigProtoName[] = ".perfetto.protos.TraceConfig";
 
 using protos::DescriptorProto;
+using protos::EnumDescriptorProto;
 using protos::FieldDescriptorProto;
 using protos::FileDescriptorSet;
 using ::google::protobuf::io::ZeroCopyInputStream;
@@ -53,7 +54,7 @@ constexpr bool IsNumeric(char c) {
 }
 
 constexpr bool IsSymbol(char c) {
-  return c == ':' || c == ';' || c == '{' || c == '}';
+  return c == ':' || c == ';' || c == '{' || c == '}' || c == '-';
 }
 
 bool IsWhitespace(char c) {
@@ -112,6 +113,8 @@ class Tokenizer {
       return NextNumber();
     } else if (IsSymbol(c)) {
       return NextSymbol();
+    } else if (c == '"') {
+      return NextString();
     }
     char buf[50];
     sprintf(buf, "Unexpected character \"%c\"", c);
@@ -138,15 +141,17 @@ class Tokenizer {
   }
 
   void NextIdentifier() {
-    auto start = i_;
+    size_t start = i_;
     i_ = input_.find_first_not_of(kIdentifierBody, i_);
+    i_ = i_ == std::string::npos ? input_.size() : i_;
     current_token_ =
         Token{kTypeIdentifier, std::string(input_, start, i_ - start)};
   }
 
   void NextNumber() {
-    auto start = i_;
+    size_t start = i_;
     i_ = input_.find_first_not_of(kNumeric, i_);
+    i_ = i_ == std::string::npos ? input_.size() : i_;
     current_token_ =
         Token{kTypeInteger, std::string(input_, start, i_ - start)};
   }
@@ -154,6 +159,13 @@ class Tokenizer {
   void NextSymbol() {
     current_token_ = Token{kTypeSymbol, std::string(input_, i_, 1)};
     i_++;
+  }
+
+  void NextString() {
+    size_t start = i_++;
+    i_ = input_.find_first_of("\"", i_);
+    i_++;
+    current_token_ = Token{kTypeString, std::string(input_, start, i_-start)};
   }
 
   std::string input_;
@@ -164,27 +176,19 @@ class Tokenizer {
   Token current_token_ = Token::Start();
 };
 
-bool ExpectNumber(Tokenizer* input, uint32_t* number_ptr);
-bool ExpectNumber(Tokenizer* input, uint32_t* number_ptr) {
-  if (input->current().type != kTypeInteger)
-    return false;
-  uint32_t n = 0;
-  PERFETTO_CHECK(sscanf(input->current().text.c_str(), "%" PRIu32, &n) == 1);
-  *number_ptr = n;
-  input->Next();
-  return true;
-}
 
 class Parser {
  public:
   Parser(Tokenizer* tokenizer,
          protozero::Message* message,
          ErrorReporter* reporter,
-         std::map<std::string, const DescriptorProto*> name_to_descriptor)
+         std::map<std::string, const DescriptorProto*> name_to_descriptor,
+         std::map<std::string, const EnumDescriptorProto*> name_to_enum)
       : input_(tokenizer),
         output_(message),
         reporter_(reporter),
-        name_to_descriptor_(std::move(name_to_descriptor)) {}
+        name_to_descriptor_(std::move(name_to_descriptor)),
+        name_to_enum_(std::move(name_to_enum)) {}
 
   bool ParseMessage(const DescriptorProto* descriptor) {
     PERFETTO_CHECK(input_);
@@ -213,8 +217,6 @@ class Parser {
   }
 
   bool ParseField(const DescriptorProto* descriptor, protozero::Message* msg) {
-    PERFETTO_ILOG("%d %s", input_->current().type,
-                  input_->current().text.c_str());
     std::string name;
     if (!ExpectIdentifier(input_, name)) {
       return false;
@@ -233,18 +235,57 @@ class Parser {
       reporter_->AddError(0, 0, 0, buf);
       return false;
     }
-    const uint32_t field_id = static_cast<uint32_t>(field->number());
+    uint32_t field_id = static_cast<uint32_t>(field->number());
     const auto& field_type = field->type();
     switch (field_type) {
-      case FieldDescriptorProto::TYPE_UINT32: {
-        uint32_t num = 0;
-        PERFETTO_CHECK(TryConsume(':'));
-        PERFETTO_ILOG("%s", current().text.c_str());
-        PERFETTO_CHECK(ExpectNumber(input_, &num));
-        msg->AppendVarInt<uint32_t>(field_id, num);
-        PERFETTO_ILOG("%s %u", name.c_str(), num);
+      case FieldDescriptorProto::TYPE_UINT32:
+        if (!ParseVarInt<uint32_t>(field_id, msg))
+          return false;
         break;
-      }
+      case FieldDescriptorProto::TYPE_INT64:
+        if (!ParseVarInt<int64_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_UINT64:
+        if (!ParseVarInt<uint64_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_INT32:
+        if (!ParseVarInt<int32_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_SINT32:
+        if (!ParseSignedVarInt<int32_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_SINT64:
+        if (!ParseSignedVarInt<int64_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_FIXED64:
+        if (!ParseFixedInt<int64_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_FIXED32:
+        if (!ParseFixedInt<int32_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_SFIXED32:
+        if (!ParseFixedInt<int32_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_SFIXED64:
+        if (!ParseFixedInt<int64_t>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_DOUBLE:
+        if (!ParseFixedInt<double>(field_id, msg))
+          return false;
+        break;
+      case FieldDescriptorProto::TYPE_FLOAT:
+        if (!ParseFixedInt<float>(field_id, msg))
+          return false;
+        break;
       case FieldDescriptorProto::TYPE_BOOL: {
         PERFETTO_CHECK(TryConsume(':'));
         if (current().type != kTypeIdentifier ||
@@ -258,11 +299,24 @@ class Parser {
         input_->Next();
         break;
       }
-      case FieldDescriptorProto::TYPE_MESSAGE: {
+
+      case FieldDescriptorProto::TYPE_BYTES:
+      case FieldDescriptorProto::TYPE_STRING:
         PERFETTO_CHECK(TryConsume(':'));
+        if (current().type != kTypeString) {
+          reporter_->AddError(0, 0, 0, "Expected string instead saw: " + current().text);
+        }
+        PERFETTO_CHECK(current().text.size() >= 2);
+        PERFETTO_CHECK(current().text[0] == '"');
+        PERFETTO_CHECK(current().text[current().text.size()-1] == '"');
+        msg->AppendBytes(field_id, current().text.c_str()+1, current().text.size()-2);
+        input_->Next();
+        break;
+
+      case FieldDescriptorProto::TYPE_MESSAGE: {
+        TryConsume(':');
         PERFETTO_CHECK(TryConsume('{'));
         const std::string& type_name = field->type_name();
-        PERFETTO_ILOG("%s", type_name.c_str());
         const DescriptorProto* nested_descriptor =
             name_to_descriptor_[type_name];
         PERFETTO_CHECK(nested_descriptor);
@@ -272,26 +326,62 @@ class Parser {
         nested_msg->Finalize();
         break;
       }
-      case FieldDescriptorProto::TYPE_DOUBLE:
-      case FieldDescriptorProto::TYPE_FLOAT:
-      case FieldDescriptorProto::TYPE_INT64:
-      case FieldDescriptorProto::TYPE_UINT64:
-      case FieldDescriptorProto::TYPE_INT32:
-      case FieldDescriptorProto::TYPE_FIXED64:
-      case FieldDescriptorProto::TYPE_FIXED32:
-      case FieldDescriptorProto::TYPE_STRING:
+
+      case FieldDescriptorProto::TYPE_ENUM: {
+        PERFETTO_CHECK(TryConsume(':'));
+        if (current().type != kTypeIdentifier) {
+          reporter_->AddError(
+              0, 0, 0,
+              "Expected enum value instead saw: " + current().text);
+          return false;
+        }
+        const std::string& value = current().text;
+        const std::string& type_name = field->type_name();
+        const EnumDescriptorProto* enum_descriptor = name_to_enum_[type_name];
+        PERFETTO_CHECK(enum_descriptor);
+        PERFETTO_LOG("%s %s", value.c_str(), type_name.c_str());
+        //for () {
+        //}
+        input_->Next();
+        break;
+      }
+
       case FieldDescriptorProto::TYPE_GROUP:
-      case FieldDescriptorProto::TYPE_BYTES:
-      case FieldDescriptorProto::TYPE_ENUM:
-      case FieldDescriptorProto::TYPE_SFIXED32:
-      case FieldDescriptorProto::TYPE_SFIXED64:
-      case FieldDescriptorProto::TYPE_SINT32:
-      case FieldDescriptorProto::TYPE_SINT64:
         PERFETTO_FATAL("Unhandled type %d", field_type);
     }
 
     // Fields may be semicolon separated.
     TryConsume(';');
+    return true;
+  }
+
+  template <typename T>
+  bool ParseVarInt(uint32_t field_id, protozero::Message* msg) {
+    PERFETTO_CHECK(TryConsume(':'));
+    bool is_negative = TryConsume('-');
+    T number = 0;
+    PERFETTO_CHECK(ExpectNumber(input_, &number));
+    msg->AppendVarInt<T>(field_id, is_negative ? -number : number);
+    return true;
+  }
+
+  template <typename T>
+  bool ParseSignedVarInt(uint32_t field_id, protozero::Message* msg) {
+    PERFETTO_CHECK(TryConsume(':'));
+    bool is_negative = TryConsume('-');
+    T number = 0;
+    PERFETTO_CHECK(ExpectNumber(input_, &number));
+    msg->AppendSignedVarInt<T>(field_id, is_negative ? -number : number);
+    return true;
+  }
+
+  template <typename T>
+  bool ParseFixedInt(uint32_t field_id, protozero::Message* msg) {
+    PERFETTO_CHECK(TryConsume(':'));
+    bool is_negative = TryConsume('-');
+    T number = 0;
+    PERFETTO_CHECK(ExpectNumber(input_, &number));
+    msg->AppendFixed<T>(field_id, is_negative ? -number : number);
     return true;
   }
 
@@ -312,22 +402,40 @@ class Parser {
     return true;
   }
 
+  template<typename T>
+  bool ExpectNumber(Tokenizer* input, T* number_ptr) {
+    if (input->current().type != kTypeInteger)
+      return false;
+    uint64_t n = 0;
+    PERFETTO_CHECK(sscanf(input->current().text.c_str(), "%" PRIu64, &n) == 1);
+    PERFETTO_CHECK(n <= std::numeric_limits<T>::max());
+    *number_ptr = static_cast<T>(n);
+    input->Next();
+    return true;
+  }
+
   Token current() { return input_->current(); }
 
   Tokenizer* input_;
   protozero::Message* output_;
   ErrorReporter* reporter_;
   std::map<std::string, const DescriptorProto*> name_to_descriptor_;
+  std::map<std::string, const EnumDescriptorProto*> name_to_enum_;
 };
 
 void AddNestedDescriptors(
     const std::string& prefix,
     const DescriptorProto* descriptor,
-    std::map<std::string, const DescriptorProto*>* name_to_descriptor) {
+    std::map<std::string, const DescriptorProto*>* name_to_descriptor,
+    std::map<std::string, const EnumDescriptorProto*>* name_to_enum) {
+  for (const EnumDescriptorProto& enum_descriptor : descriptor->enum_type()) {
+    const std::string name = prefix + "." + enum_descriptor.name();
+    (*name_to_enum)[name] = &enum_descriptor;
+  }
   for (const DescriptorProto& nested_descriptor : descriptor->nested_type()) {
     const std::string name = prefix + "." + nested_descriptor.name();
     (*name_to_descriptor)[name] = &nested_descriptor;
-    AddNestedDescriptors(name, &nested_descriptor, name_to_descriptor);
+    AddNestedDescriptors(name, &nested_descriptor, name_to_descriptor, name_to_enum);
   }
 }
 
@@ -344,16 +452,22 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
   stream_delegate.set_writer(&stream);
 
   std::map<std::string, const DescriptorProto*> name_to_descriptor;
+  std::map<std::string, const EnumDescriptorProto*> name_to_enum;
   FileDescriptorSet file_descriptor_set;
   {
     ArrayInputStream config_descriptor_stream(kTraceConfigDescriptor, static_cast<int>(kTraceConfigDescriptorSize));
     file_descriptor_set.ParseFromZeroCopyStream(&config_descriptor_stream);
     for (const auto& file_descriptor : file_descriptor_set.file()) {
+      for (const auto& enum_descriptor : file_descriptor.enum_type()) {
+        const std::string name =
+            "." + file_descriptor.package() + "." + enum_descriptor.name();
+        name_to_enum[name] = &enum_descriptor;
+      }
       for (const auto& descriptor : file_descriptor.message_type()) {
         const std::string name =
             "." + file_descriptor.package() + "." + descriptor.name();
         name_to_descriptor[name] = &descriptor;
-        AddNestedDescriptors(name, &descriptor, &name_to_descriptor);
+        AddNestedDescriptors(name, &descriptor, &name_to_descriptor, &name_to_enum);
       }
     }
   }
@@ -363,9 +477,10 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
   {
     protozero::Message message;
     message.Reset(&stream);
-    Parser(&tokenizer, &message, reporter, std::move(name_to_descriptor))
+    bool success = Parser(&tokenizer, &message, reporter, std::move(name_to_descriptor), std::move(name_to_enum))
         .ParseMessage(descriptor);
-    //    PERFETTO_CHECK(ParseMessage(&tokenizer, descriptor, &message));
+    if (!success)
+      return std::vector<uint8_t>();
   }
 
   return stream_delegate.StitchChunks();
