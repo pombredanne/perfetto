@@ -25,8 +25,8 @@ namespace trace_processor {
 CountersTable::CountersTable(sqlite3*, const TraceStorage* storage)
     : storage_(storage) {
   ref_types_.resize(RefType::kMax);
-  ref_types_[RefType::kCPU_ID] = "cpu";
-  ref_types_[RefType::kUTID] = "utid";
+  ref_types_[RefType::kCpuId] = "cpu";
+  ref_types_[RefType::kUtid] = "utid";
   ref_types_[RefType::kNoRef] = "";
   ref_types_[RefType::kIrq] = "irq";
   ref_types_[RefType::kSoftIrq] = "softirq";
@@ -45,7 +45,6 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
                                      &storage_->string_pool()),
       StorageSchema::NumericColumnPtr("value", &counters.values()),
       StorageSchema::NumericColumnPtr("dur", &counters.durations()),
-      StorageSchema::NumericColumnPtr("value_delta", &counters.value_deltas()),
       StorageSchema::NumericColumnPtr("ref", &counters.refs()),
       StorageSchema::StringColumnPtr("ref_type", &counters.types(),
                                      &ref_types_)};
