@@ -42,7 +42,6 @@ static_library("trace_processor") {
 
 source_set("lib") {
   sources = [
-    "basic_types.h",
     "chunked_trace_reader.h",
     "counters_table.cc",
     "counters_table.h",
@@ -76,9 +75,10 @@ source_set("lib") {
     "thread_table.h",
     "trace_blob_view.h",
     "trace_processor.cc",
-    "trace_processor.h",
     "trace_processor_context.cc",
     "trace_processor_context.h",
+    "trace_processor_impl.cc",
+    "trace_processor_impl.h",
     "trace_sorter.cc",
     "trace_sorter.h",
     "trace_storage.cc",
@@ -90,6 +90,7 @@ source_set("lib") {
   deps = [
     "../../buildtools:sqlite",
     "../../gn:default_deps",
+    "../../include/perfetto/trace_processor",
     "../../include/perfetto/traced:sys_stats_counters",
     "../../protos/perfetto/trace:lite",
     "../../protos/perfetto/trace_processor:lite",
