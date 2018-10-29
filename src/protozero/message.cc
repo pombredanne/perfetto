@@ -39,8 +39,17 @@ constexpr uint32_t Message::kMaxNestingDepth;
 void Message::Reset(ScatteredStreamWriter* stream_writer) {
 // Older versions of libstdcxx don't have is_trivially_constructible.
 #if !defined(__GLIBCXX__) || __GLIBCXX__ >= 20170516
-  static_assert(std::is_trivially_constructible<Message>::value,
-                "Message must be trivially constructible");
+// Property is relaxed in debug builds as we initialize a debug counter
+// (generation_).
+#if !PERFETTO_DCHECK_IS_ON()
+  static_assert(std::is_trivially_default_constructible<Message>::value,
+                "Message must be trivially default constructible");
+#else
+  static_assert(
+      std::is_default_constructible<Message>::value,
+      "Message must be trivially default constructible in release builds, "
+      "relaxed to is_default_constructible for debug builds only.");
+#endif
 #endif
 
   static_assert(std::is_trivially_destructible<Message>::value,

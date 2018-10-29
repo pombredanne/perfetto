@@ -211,9 +211,12 @@ class PERFETTO_EXPORT Message {
   uint8_t nesting_depth_;
 
 #if PERFETTO_DCHECK_IS_ON()
-  // Current generation of message. Incremented on Reset.
-  // Used to detect stale handles.
-  uint32_t generation_;
+  // Current generation of message. Incremented on Reset. Used to detect stale
+  // handles. Note that the default member initializer makes the class no longer
+  // trivially-default-constructible (in debug builds). Therefore the property
+  // assertion in Reset() is relaxed to default-constructible (*only* for debug
+  // builds).
+  uint32_t generation_ = 0;
 
   MessageHandleBase* handle_;
 #endif
