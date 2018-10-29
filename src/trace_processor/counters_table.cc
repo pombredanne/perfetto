@@ -175,8 +175,8 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
           sqlite3_result_text(context, "utid", -1, nullptr);
           break;
         }
-        case RefType::kNoRef: {
-          sqlite3_result_null(context);
+        case RefType::kUpid: {
+          sqlite3_result_text(context, "upid", -1, nullptr);
           break;
         }
         case RefType::kIrq: {
@@ -185,6 +185,10 @@ int CountersTable::Cursor::Column(sqlite3_context* context, int N) {
         }
         case RefType::kSoftIrq: {
           sqlite3_result_text(context, "softirq", -1, nullptr);
+          break;
+        }
+        case RefType::kNoRef: {
+          sqlite3_result_null(context);
           break;
         }
       }

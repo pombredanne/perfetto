@@ -3486,6 +3486,7 @@ genrule {
 genrule {
   name: "perfetto_protos_perfetto_trace_ps_lite_gen",
   srcs: [
+    "protos/perfetto/trace/ps/process_stats.proto",
     "protos/perfetto/trace/ps/process_tree.proto",
   ],
   tools: [
@@ -3493,6 +3494,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/trace/ps/process_stats.pb.cc",
     "external/perfetto/protos/perfetto/trace/ps/process_tree.pb.cc",
   ],
 }
@@ -3501,6 +3503,7 @@ genrule {
 genrule {
   name: "perfetto_protos_perfetto_trace_ps_lite_gen_headers",
   srcs: [
+    "protos/perfetto/trace/ps/process_stats.proto",
     "protos/perfetto/trace/ps/process_tree.proto",
   ],
   tools: [
@@ -3508,6 +3511,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/trace/ps/process_stats.pb.h",
     "external/perfetto/protos/perfetto/trace/ps/process_tree.pb.h",
   ],
   export_include_dirs: [
@@ -3519,6 +3523,7 @@ genrule {
 genrule {
   name: "perfetto_protos_perfetto_trace_ps_zero_gen",
   srcs: [
+    "protos/perfetto/trace/ps/process_stats.proto",
     "protos/perfetto/trace/ps/process_tree.proto",
   ],
   tools: [
@@ -3527,6 +3532,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/trace/ps/process_stats.pbzero.cc",
     "external/perfetto/protos/perfetto/trace/ps/process_tree.pbzero.cc",
   ],
 }
@@ -3535,6 +3541,7 @@ genrule {
 genrule {
   name: "perfetto_protos_perfetto_trace_ps_zero_gen_headers",
   srcs: [
+    "protos/perfetto/trace/ps/process_stats.proto",
     "protos/perfetto/trace/ps/process_tree.proto",
   ],
   tools: [
@@ -3543,6 +3550,7 @@ genrule {
   ],
   cmd: "mkdir -p $(genDir)/external/perfetto/protos && $(location aprotoc) --cpp_out=$(genDir)/external/perfetto/protos --proto_path=external/perfetto/protos --plugin=protoc-gen-plugin=$(location perfetto_src_protozero_protoc_plugin_protoc_plugin___gn_standalone_toolchain_gcc_like_host_) --plugin_out=wrapper_namespace=pbzero:$(genDir)/external/perfetto/protos $(in)",
   out: [
+    "external/perfetto/protos/perfetto/trace/ps/process_stats.pbzero.h",
     "external/perfetto/protos/perfetto/trace/ps/process_tree.pbzero.h",
   ],
   export_include_dirs: [
