@@ -94,9 +94,7 @@ ProcessStatsDataSource::ProcessStatsDataSource(
   enable_on_demand_dumps_ =
       (std::find(quirks.begin(), quirks.end(),
                  ProcessStatsConfig::DISABLE_ON_DEMAND) == quirks.end());
-  tick_period_ms_ = ps_config.proc_stats_poll_ms();
-  for (const std::string& str : ps_config.proc_stats_filter())
-    filtered_procs_.emplace_back(str);
+  poll_period_ms_ = ps_config.proc_stats_poll_ms();
 }
 
 ProcessStatsDataSource::~ProcessStatsDataSource() = default;
@@ -105,7 +103,7 @@ void ProcessStatsDataSource::Start() {
   if (dump_all_procs_on_start_)
     WriteAllProcesses();
 
-  if (tick_period_ms_) {
+  if (poll_period_ms_) {
     auto weak_this = GetWeakPtr();
     task_runner_->PostTask(std::bind(&ProcessStatsDataSource::Tick, weak_this));
   }
@@ -268,7 +266,7 @@ void ProcessStatsDataSource::Tick(
   if (!weak_this)
     return;
   ProcessStatsDataSource& thiz = *weak_this;
-  uint32_t period_ms = thiz.tick_period_ms_;
+  uint32_t period_ms = thiz.poll_period_ms_;
   uint32_t delay_ms = period_ms - (base::GetWallTimeMs().count() % period_ms);
   thiz.task_runner_->PostDelayedTask(
       std::bind(&ProcessStatsDataSource::Tick, weak_this), delay_ms);
