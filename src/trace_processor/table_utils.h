@@ -80,6 +80,9 @@ inline RangeRowIterator CreateRangeIterator(
 inline std::pair<bool, bool> IsOrdered(
     const StorageSchema& schema,
     const std::vector<QueryConstraints::OrderBy>& obs) {
+  if (obs.size() == 0)
+    return std::make_pair(true, false);
+
   if (obs.size() != 1)
     return std::make_pair(false, false);
 
@@ -92,6 +95,8 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
     const StorageSchema& schema,
     RangeRowIterator it,
     const std::vector<QueryConstraints::OrderBy>& obs) {
+  PERFETTO_DCHECK(obs.size() > 0);
+
   std::vector<uint32_t> sorted_rows(it.RowCount());
   for (size_t i = 0; !it.IsEnd(); it.NextRow(), i++)
     sorted_rows[i] = it.Row();

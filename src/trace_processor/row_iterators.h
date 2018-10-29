@@ -18,6 +18,8 @@
 #define SRC_TRACE_PROCESSOR_ROW_ITERATORS_H_
 
 #include <stddef.h>
+
+#include <algorithm>
 #include <vector>
 
 #include "src/trace_processor/sqlite_utils.h"
@@ -34,17 +36,10 @@ class RangeRowIterator : public StorageCursor::RowIterator {
   RangeRowIterator(uint32_t start_row, bool desc, std::vector<bool> row_filter);
 
   void NextRow() override;
-  bool IsEnd() override { return offset_ >= end_row_ - start_row_; }
-  uint32_t Row() override {
-    return desc_ ? end_row_ - offset_ - 1 : start_row_ + offset_;
-  }
+  bool IsEnd() override;
+  uint32_t Row() override;
 
-  uint32_t RowCount() const {
-    return row_filter_.empty()
-               ? end_row_ - start_row_
-               : static_cast<uint32_t>(
-                     std::count(row_filter_.begin(), row_filter_.end(), true));
-  }
+  uint32_t RowCount() const;
 
  private:
   uint32_t start_row_ = 0;
@@ -60,12 +55,12 @@ class RangeRowIterator : public StorageCursor::RowIterator {
 // A row iterator which yields row indices from a provided vector.
 class VectorRowIterator : public StorageCursor::RowIterator {
  public:
-  VectorRowIterator(std::vector<uint32_t> row_indices);
+  explicit VectorRowIterator(std::vector<uint32_t> row_indices);
   ~VectorRowIterator() override;
 
-  void NextRow() override { offset_++; }
-  bool IsEnd() override { return offset_ >= row_indices_.size(); }
-  uint32_t Row() override { return row_indices_[offset_]; }
+  void NextRow() override;
+  bool IsEnd() override;
+  uint32_t Row() override;
 
  private:
   std::vector<uint32_t> row_indices_;

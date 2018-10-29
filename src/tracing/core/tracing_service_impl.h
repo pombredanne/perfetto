@@ -22,9 +22,8 @@
 #include <memory>
 #include <set>
 
-#include "gtest/gtest_prod.h"
+#include "perfetto/base/gtest_prod_util.h"
 #include "perfetto/base/logging.h"
-#include "perfetto/base/page_allocator.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/weak_ptr.h"
 #include "perfetto/tracing/core/basic_types.h"

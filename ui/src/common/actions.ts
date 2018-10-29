@@ -15,23 +15,29 @@
 import {DraftObject} from 'immer';
 
 import {assertExists} from '../base/logging';
+import {ConvertTrace} from '../controller/trace_converter';
 
 import {
-  defaultTraceTime,
+  createEmptyState,
+  RecordConfig,
   SCROLLING_TRACK_GROUP,
   State,
   Status,
-  TraceTime
+  TraceTime,
 } from './state';
 
 type StateDraft = DraftObject<State>;
 
 
 function clearTraceState(state: StateDraft) {
-  state.traceTime = defaultTraceTime;
-  state.visibleTraceTime = defaultTraceTime;
-  state.pinnedTracks = [];
-  state.scrollingTracks = [];
+  const nextId = state.nextId;
+  const recordConfig = state.recordConfig;
+  const route = state.route;
+
+  Object.assign(state, createEmptyState());
+  state.nextId = nextId;
+  state.recordConfig = recordConfig;
+  state.route = route;
 }
 
 export const StateActions = {
@@ -49,6 +55,10 @@ export const StateActions = {
       source: args.file,
     };
     state.route = `/viewer`;
+  },
+
+  convertTraceToJson(_: StateDraft, args: {file: File}): void {
+    ConvertTrace(args.file);
   },
 
   openTraceFromUrl(state: StateDraft, args: {url: string}): void {
@@ -184,8 +194,8 @@ export const StateActions = {
         state.engines[args.engineId].ready = args.ready;
       },
 
-  createPermalink(state: StateDraft, args: {requestId: string}): void {
-    state.permalink = {requestId: args.requestId, hash: undefined};
+  createPermalink(state: StateDraft, _: {}): void {
+    state.permalink = {requestId: `${state.nextId++}`, hash: undefined};
   },
 
   setPermalink(state: StateDraft, args: {requestId: string; hash: string}):
@@ -195,10 +205,12 @@ export const StateActions = {
         state.permalink = args;
       },
 
-  loadPermalink(state: StateDraft, args: {requestId: string; hash: string}):
-      void {
-        state.permalink = args;
-      },
+  loadPermalink(state: StateDraft, args: {hash: string}): void {
+    state.permalink = {
+      requestId: `${state.nextId++}`,
+      hash: args.hash,
+    };
+  },
 
   setTraceTime(state: StateDraft, args: TraceTime): void {
     state.traceTime = args;
@@ -218,6 +230,10 @@ export const StateActions = {
     // replace the whole tree here however we still need a method here
     // so it appears on the proxy Actions class.
     throw new Error('Called setState on StateActions.');
+  },
+
+  setConfig(state: StateDraft, args: {config: RecordConfig;}): void {
+    state.recordConfig = args.config;
   },
 
   // TODO(hjd): Parametrize this to increase type safety. See comments on

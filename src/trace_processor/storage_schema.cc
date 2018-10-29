@@ -57,7 +57,7 @@ StorageSchema::TsEndColumn::~TsEndColumn() = default;
 
 void StorageSchema::TsEndColumn::ReportResult(sqlite3_context* ctx,
                                               uint32_t row) const {
-  uint64_t add = ts_start_->operator[](row) + dur_->operator[](row);
+  uint64_t add = (*ts_start_)[row] + (*dur_)[row];
   sqlite3_result_int64(ctx, static_cast<sqlite3_int64>(add));
 }
 
@@ -75,7 +75,7 @@ StorageSchema::Column::Predicate StorageSchema::TsEndColumn::Filter(
   auto bipredicate = sqlite_utils::GetPredicateForOp<uint64_t>(op);
   uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
   return [this, bipredicate, extracted](uint32_t idx) {
-    uint64_t add = ts_start_->operator[](idx) + dur_->operator[](idx);
+    uint64_t add = (*ts_start_)[idx] + (*dur_)[idx];
     return bipredicate(add, extracted);
   };
 }
@@ -84,23 +84,15 @@ StorageSchema::Column::Comparator StorageSchema::TsEndColumn::Sort(
     const QueryConstraints::OrderBy& ob) const {
   if (ob.desc) {
     return [this](uint32_t f, uint32_t s) {
-      uint64_t a = ts_start_->operator[](f) + dur_->operator[](f);
-      uint64_t b = ts_start_->operator[](s) + dur_->operator[](s);
-      if (a > b)
-        return -1;
-      else if (a < b)
-        return 1;
-      return 0;
+      uint64_t a = (*ts_start_)[f] + (*dur_)[f];
+      uint64_t b = (*ts_start_)[s] + (*dur_)[s];
+      return a > b ? -1 : (a < b ? 1 : 0);
     };
   }
   return [this](uint32_t f, uint32_t s) {
-    uint64_t a = ts_start_->operator[](f) + dur_->operator[](f);
-    uint64_t b = ts_start_->operator[](s) + dur_->operator[](s);
-    if (a < b)
-      return -1;
-    else if (a > b)
-      return 1;
-    return 0;
+    uint64_t a = (*ts_start_)[f] + (*dur_)[f];
+    uint64_t b = (*ts_start_)[s] + (*dur_)[s];
+    return a < b ? -1 : (a > b ? 1 : 0);
   };
 }
 

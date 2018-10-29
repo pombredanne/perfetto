@@ -26,6 +26,7 @@
 #include "src/profiling/memory/wire_protocol.h"
 
 namespace perfetto {
+namespace profiling {
 
 // Read /proc/[pid]/maps from an open file descriptor.
 // TODO(fmayer): Figure out deduplication to other maps.
@@ -64,10 +65,6 @@ class StackMemory : public unwindstack::Memory {
   uint8_t* stack_;
 };
 
-size_t RegSize(unwindstack::ArchEnum arch);
-
-
-
 bool DoUnwind(WireMessage*, ProcessMetadata* metadata, AllocRecord* out);
 
 bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
@@ -75,6 +72,7 @@ bool HandleUnwindingRecord(UnwindingRecord* rec, BookkeepingRecord* out);
 void UnwindingMainLoop(BoundedQueue<UnwindingRecord>* input_queue,
                        BoundedQueue<BookkeepingRecord>* output_queue);
 
+}  // namespace profiling
 }  // namespace perfetto
 
 #endif  // SRC_PROFILING_MEMORY_UNWINDING_H_

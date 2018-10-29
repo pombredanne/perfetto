@@ -60,11 +60,10 @@ int SchedSliceTable::BestIndex(const QueryConstraints& qc,
                                BestIndexInfo* info) {
   const auto& cs = qc.constraints();
   size_t ts_idx = schema_.ColumnIndexFromName("ts");
-  auto predicate = [ts_idx](const QueryConstraints::Constraint& c) {
+  auto has_ts_column = [ts_idx](const QueryConstraints::Constraint& c) {
     return c.iColumn == static_cast<int>(ts_idx);
   };
-  bool is_time_constrained = std::any_of(cs.begin(), cs.end(), predicate);
-  bool has_time_constraint = !qc.constraints().empty() && is_time_constrained;
+  bool has_time_constraint = std::any_of(cs.begin(), cs.end(), has_ts_column);
   info->estimated_cost = has_time_constraint ? 10 : 10000;
 
   // We should be able to handle any constraint and any order by clause given
