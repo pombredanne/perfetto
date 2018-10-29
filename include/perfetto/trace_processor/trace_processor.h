@@ -19,6 +19,7 @@
 
 #include <functional>
 #include <memory>
+
 #include "perfetto/trace_processor/basic_types.h"
 
 namespace perfetto {

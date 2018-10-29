@@ -90,12 +90,14 @@ source_set("lib") {
   deps = [
     "../../buildtools:sqlite",
     "../../gn:default_deps",
-    "../../include/perfetto/trace_processor",
     "../../include/perfetto/traced:sys_stats_counters",
     "../../protos/perfetto/trace:lite",
     "../../protos/perfetto/trace_processor:lite",
     "../base",
     "../protozero",
+  ]
+  public_deps = [
+    "../../include/perfetto/trace_processor",
   ]
   if (perfetto_build_standalone) {
     sources += [
