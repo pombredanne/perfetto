@@ -46,11 +46,9 @@ void Message::Reset(ScatteredStreamWriter* stream_writer) {
                 "Message must be trivially default constructible");
 #else
   static_assert(
-      std::is_default_constructible<Message>::value &&
-          std::is_trivially_destructible<Message>::value,
+      std::is_default_constructible<Message>::value,
       "Message must be trivially default constructible in release builds, "
-      "relaxed to is_default_constructible && is_trivially_destructible for "
-      "debug builds only.");
+      "relaxed to is_default_constructible for debug builds only.");
 #endif
 #endif
 
