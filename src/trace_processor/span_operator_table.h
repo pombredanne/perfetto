@@ -83,8 +83,6 @@ class SpanOperatorTable : public Table {
   int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
 
  private:
-  static constexpr uint8_t kReservedColumns = Column::kJoinValue + 1;
-
   enum ChildTable {
     kFirst = 0,
     kSecond = 1,
@@ -94,14 +92,49 @@ class SpanOperatorTable : public Table {
   struct TableDefinition {
     std::string name;
     std::vector<Table::Column> cols;
-    std::string join_col_name;
   };
 
   // Cursor on the span table.
-  class Cursor : public Table::Cursor {
+  class SparseCursor : public Table::Cursor {
    public:
-    Cursor(SpanOperatorTable*, sqlite3* db);
-    ~Cursor() override;
+    SparseCursor(SpanOperatorTable*, sqlite3* db);
+    ~SparseCursor() override;
+
+    int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context* context, int N) override;
+
+   private:
+    struct TableState {
+      ScopedStmt stmt;
+      TableDefinition* defn = nullptr;
+      ChildTable table = ChildTable::kFirst;
+      std::vector<std::string> constraints;
+      uint64_t ts_start = std::numeric_limits<uint64_t>::max();
+      uint64_t ts_end = std::numeric_limits<uint64_t>::max();
+    };
+
+    int FastForwardDenseTable();
+
+    int StepForTable(TableState* state);
+
+    int PrepareRawStmt(const std::vector<std::string>& constraints,
+                       const TableState& state,
+                       sqlite3_stmt** stmt);
+
+    TableState sparse_;
+    TableState dense_;
+
+    sqlite3* const db_;
+    SpanOperatorTable* const table_;
+  };
+
+  // Cursor on the span table.
+  class JoinCursor : public Table::Cursor {
+   public:
+    JoinCursor(SpanOperatorTable*, sqlite3* db);
+    ~JoinCursor() override;
 
     int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
     int Next() override;
@@ -120,10 +153,6 @@ class SpanOperatorTable : public Table {
     // Steps the cursor forward for the given table and updates the state
     // for that table.
     int StepForTable(ChildTable table);
-
-    void ReportSqliteResult(sqlite3_context* context,
-                            sqlite3_stmt* stmt,
-                            size_t index);
 
     int PrepareRawStmt(const QueryConstraints& qc,
                        sqlite3_value** argv,
@@ -149,8 +178,11 @@ class SpanOperatorTable : public Table {
   // Returns a (table, index) pair with the table indicating whether the index
   // is into table 1 or 2 and the index being the offset into the relevant
   // table's columns.
-  std::pair<SpanOperatorTable::ChildTable, size_t> GetTableAndColumnIndex(
-      int joined_column_idx);
+  std::pair<ChildTable, size_t> GetTableAndColumnIndex(int joined_column_idx);
+
+  uint8_t GetReservedColumns() {
+    return join_col_.empty() ? kDuration + 1 : kJoinValue + 1;
+  }
 
   TableDefinition t1_defn_;
   TableDefinition t2_defn_;

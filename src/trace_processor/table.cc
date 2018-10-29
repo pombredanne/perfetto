@@ -282,7 +282,7 @@ std::string Table::Schema::ToCreateTableStmt() {
     stmt += " " + col.name() + " " + TypeToString(col.type());
     if (col.hidden())
       stmt += " HIDDEN";
-     stmt += ",";
+    stmt += ",";
   }
   stmt += " PRIMARY KEY(";
   for (size_t i = 0; i < primary_keys_.size(); i++) {
