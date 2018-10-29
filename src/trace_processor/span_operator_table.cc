@@ -289,7 +289,7 @@ int SpanOperatorTable::Cursor::PrepareRawStmt(const QueryConstraints& qc,
              reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
     }
   }
-  sql += " ORDER BY " + table_->join_col_ + ", ts;";
+  sql += " ORDER BY `" + table_->join_col_ + "`, ts;";
 
   PERFETTO_DLOG("%s", sql.c_str());
   int t1_size = static_cast<int>(sql.size());
@@ -344,6 +344,9 @@ PERFETTO_ALWAYS_INLINE void SpanOperatorTable::Cursor::ReportSqliteResult(
       sqlite3_result_double(context, sqlite3_column_double(stmt, idx));
       break;
     case SQLITE_TEXT: {
+      // TODO(lalitm): note for future optimizations: if we knew the addresses
+      // of the string intern pool, we could check if the string returned here
+      // comes from the pool, and pass it as non-transient.
       const auto kSqliteTransient =
           reinterpret_cast<sqlite3_destructor_type>(-1);
       auto ptr = reinterpret_cast<const char*>(sqlite3_column_text(stmt, idx));
