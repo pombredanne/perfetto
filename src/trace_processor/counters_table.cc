@@ -71,9 +71,9 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
+  size_t name_index = schema_.ColumnIndexFromName("name");
+  size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
-    size_t name_index = schema_.ColumnIndexFromName("name");
-    size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
         qc.constraints()[i].iColumn != static_cast<int>(ref_type_index);
