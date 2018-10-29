@@ -65,14 +65,20 @@ std::unique_ptr<Table::Cursor> CountersTable::CreateCursor(
       new StorageCursor(std::move(it), schema_.ToColumnReporters()));
 }
 
-int CountersTable::BestIndex(const QueryConstraints&, BestIndexInfo* info) {
+int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   info->estimated_cost =
       static_cast<uint32_t>(storage_->counters().counter_count());
 
   // We should be able to handle any constraint and any order by clause given
   // to us.
   info->order_by_consumed = true;
-  std::fill(info->omit.begin(), info->omit.end(), true);
+  for (size_t i = 0; i < qc.constraints().size(); i++) {
+    size_t name_index = schema_.ColumnIndexFromName("name");
+    size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
+    info->omit[i] =
+        qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
+        qc.constraints()[i].iColumn != static_cast<int>(ref_type_index);
+  }
 
   return SQLITE_OK;
 }
