@@ -154,6 +154,7 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       "../../include/perfetto/tracing/ipc",
     ]
     sources = [
+      "core/reconnecting_producer.h",
       "ipc/consumer/consumer_ipc_client_impl.cc",
       "ipc/consumer/consumer_ipc_client_impl.h",
       "ipc/default_socket.cc",

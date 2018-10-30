@@ -43,7 +43,7 @@ const uint64_t kLRUInodeCacheSize = 1000;
 
 class ProbesProducer : public Producer, public FtraceController::Observer {
  public:
-  ProbesProducer();
+  ProbesProducer(base::TaskRunner* task_runner);
   ~ProbesProducer() override;
 
   // Producer Impl:
@@ -60,9 +60,6 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   // FtraceController::Observer implementation.
   void OnFtraceDataWrittenIntoDataSourceBuffers() override;
 
-  // Our Impl
-  void ConnectWithRetries(const char* socket_name,
-                          base::TaskRunner* task_runner);
   std::unique_ptr<ProbesDataSource> CreateFtraceDataSource(
       TracingSessionID session_id,
       DataSourceInstanceID id,
@@ -81,28 +78,13 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
       const DataSourceConfig& config);
 
  private:
-  enum State {
-    kNotStarted = 0,
-    kNotConnected,
-    kConnecting,
-    kConnected,
-  };
-
   ProbesProducer(const ProbesProducer&) = delete;
   ProbesProducer& operator=(const ProbesProducer&) = delete;
 
-  void Connect();
-  void Restart();
-  void ResetConnectionBackoff();
-  void IncreaseConnectionBackoff();
-
-  State state_ = kNotStarted;
-  base::TaskRunner* task_runner_ = nullptr;
+  base::TaskRunner* const task_runner_;
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
   std::unique_ptr<FtraceController> ftrace_;
   bool ftrace_creation_failed_ = false;
-  uint32_t connection_backoff_ms_ = 0;
-  const char* socket_name_ = nullptr;
 
   // Owning map for all active data sources.
   std::unordered_map<DataSourceInstanceID, std::unique_ptr<ProbesDataSource>>
