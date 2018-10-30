@@ -119,10 +119,10 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
+  // TODO(fmayer): This should not leak.
   perfetto::profiling::Client* client = GetClient();
   if (client)
     client->Shutdown();
-  client = nullptr;
 }
 
 void HEAPPROFD_ADD_PREFIX(_dump_heap)(const char*) {}
