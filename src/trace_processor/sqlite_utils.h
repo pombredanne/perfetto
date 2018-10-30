@@ -164,7 +164,7 @@ inline std::string SqliteValueAsString(sqlite3_value* value) {
       return "'" + std::string(str) + "'";
     }
     default:
-      PERFETTO_CHECK(false);
+      PERFETTO_FATAL("Unknown value type %d", sqlite3_value_type(value));
   }
 }
 
