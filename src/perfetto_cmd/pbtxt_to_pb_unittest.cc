@@ -128,6 +128,28 @@ TEST(PbtxtToPb, Booleans) {
   EXPECT_EQ(config.deferred_start(), true);
 }
 
+TEST(PbtxtToPb, Comments) {
+  protos::TraceConfig config = ToProto(R"(
+    write_into_file: false # deferred_start: true;
+    buffers# 1
+    # 2
+    :# 3
+    # 4
+    {# 5
+    # 6
+    fill_policy# 7
+    # 8
+    :# 9
+    # 10
+    RING_BUFFER# 11
+    # 12
+    ;# 13
+    
+  )");
+  EXPECT_EQ(config.write_into_file(), false);
+  EXPECT_EQ(config.deferred_start(), false);
+}
+
 TEST(PbtxtToPb, Enums) {
   protos::TraceConfig config = ToProto(R"(
     buffers: {
@@ -221,6 +243,61 @@ TEST(PbtxtToPb, EofEndsNumeric) {
 TEST(PbtxtToPb, EofEndsIdentifier) {
   protos::TraceConfig config = ToProto(R"(enable_extra_guardrails: true)");
   EXPECT_EQ(config.enable_extra_guardrails(), true);
+}
+
+TEST(PbtxtToPb, ExampleConfig) {
+  protos::TraceConfig config = ToProto(R"(
+buffers {
+  size_kb: 100024
+  fill_policy: RING_BUFFER
+}
+
+data_sources {
+  config {
+    name: "linux.ftrace"
+    target_buffer: 0
+    ftrace_config {
+      buffer_size_kb: 512 # 4 (page size) * 128
+      drain_period_ms: 200
+      ftrace_events: "binder_lock"
+      ftrace_events: "binder_locked"
+      atrace_categories: "gfx"
+    }
+  }
+}
+
+data_sources {
+  config {
+    name: "linux.process_stats"
+    target_buffer: 0
+  }
+}
+
+data_sources {
+  config {
+    name: "linux.inode_file_map"
+    target_buffer: 0
+    inode_file_config {
+      scan_delay_ms: 1000
+      scan_interval_ms: 1000
+      scan_batch_size: 500
+      mount_point_mapping: {
+        mountpoint: "/data"
+        scan_roots: "/data/app"
+      }
+    }
+  }
+}
+
+producers {
+  producer_name: "perfetto.traced_probes"
+  shm_size_kb: 4096
+  page_size_kb: 4
+}
+
+duration_ms: 10000
+)");
+  EXPECT_EQ(config.duration_ms(), 10000);
 }
 
 TEST(PbtxtToPb, UnknownField) {
