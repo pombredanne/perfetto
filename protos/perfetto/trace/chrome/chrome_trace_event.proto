@@ -95,19 +95,25 @@ message ChromeMetadata {
   }
 }
 
-// System traces in their native opaque format, e.g. ETW (json), CrOS (ftrace),
-// Cast (ftrace), CrOS Arc (json).
-// TODO(eseckler): Replace system traces with native perfetto service where
-// possible.
-message ChromeSystemTraceBlob {
-  optional string label = 1;
+// Trace events produced in legacy json format by Chrome tracing agents not yet
+// updated to support the new binary format, e.g. ETW and CrOS ARC.
+// TODO(eseckler): Update these agents to become perfetto producers.
+message ChromeLegacyJsonTrace {
+  enum NestedType {
+    USER_TRACE = 0;
+    SYSTEM_TRACE = 1;
+  }
+  optional TraceType type = 1;
   optional string data = 2;
 }
 
 message ChromeEventBundle {
   repeated ChromeTraceEvent trace_events = 1;
   repeated ChromeMetadata metadata = 2;
-  repeated ChromeSystemTraceBlob system_trace = 4;
+  // ftrace output from CrOS and Cast system tracing agents.
+  // TODO(eseckler): Replace system traces with native perfetto service.
+  repeated string ftrace_output = 4;
+  repeated ChromeLegacyJsonTrace json_trace = 5;
 
   // Contents of a string table that's valid for
   // the whole ChromeEventBundle entry.
