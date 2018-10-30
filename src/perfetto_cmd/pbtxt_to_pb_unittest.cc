@@ -144,7 +144,6 @@ TEST(PbtxtToPb, Comments) {
     RING_BUFFER# 11
     # 12
     ;# 13
-    
   )");
   EXPECT_EQ(config.write_into_file(), false);
   EXPECT_EQ(config.deferred_start(), false);
@@ -331,7 +330,7 @@ data_sources {
 TEST(PbtxtToPb, BadBoolean) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(0, 0, 0, "Expected 'true' or 'false' instead saw: foo"));
+              AddError(1, 22, 3, "Expected 'true' or 'false' instead saw: foo"));
   ToErrors(R"(
     write_into_file: foo;
   )",

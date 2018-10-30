@@ -14,17 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACE_PROCESSOR_BASIC_TYPES_H_
-#define SRC_TRACE_PROCESSOR_BASIC_TYPES_H_
+#ifndef INCLUDE_PERFETTO_BASE_GTEST_PROD_UTIL_H_
+#define INCLUDE_PERFETTO_BASE_GTEST_PROD_UTIL_H_
 
-#include <memory>
+#include "gtest/gtest_prod.h"  // nogncheck
 
-namespace perfetto {
-namespace trace_processor {
-
-enum class OptimizationMode { kMaxBandwidth = 0, kMinLatency };
-
-}  // namespace trace_processor
-}  // namespace perfetto
-
-#endif  // SRC_TRACE_PROCESSOR_BASIC_TYPES_H_
+#endif  // INCLUDE_PERFETTO_BASE_GTEST_PROD_UTIL_H_

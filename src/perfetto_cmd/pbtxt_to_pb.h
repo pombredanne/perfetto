@@ -29,9 +29,9 @@ class ErrorReporter {
  public:
   ErrorReporter();
   virtual ~ErrorReporter();
-  virtual void AddError(size_t line,
-                        size_t column_start,
-                        size_t column_end,
+  virtual void AddError(size_t row,
+                        size_t column,
+                        size_t size,
                         const std::string& message) = 0;
 };
 
