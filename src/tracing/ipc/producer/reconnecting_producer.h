@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_TRACING_CORE_RECONNECTING_PRODUCER_H_
-#define SRC_TRACING_CORE_RECONNECTING_PRODUCER_H_
+#ifndef SRC_TRACING_IPC_PRODUCER_RECONNECTING_PRODUCER_H_
+#define SRC_TRACING_IPC_PRODUCER_RECONNECTING_PRODUCER_H_
 
 #include "perfetto/base/logging.h"
 #include "perfetto/tracing/core/producer.h"
@@ -94,8 +94,8 @@ class ReconnectingProducer : public Producer {
   void Connect() {
     PERFETTO_DCHECK(state_ == kNotConnected);
     state_ = kConnecting;
-    endpoint_ = ProducerIPCClient::Connect(
-        socket_name_, this, "perfetto.traced_probes", task_runner_);
+    endpoint_ =
+        ProducerIPCClient::Connect(socket_name_, this, T::name, task_runner_);
   }
 
   void ResetConnectionBackoff() {
@@ -119,4 +119,4 @@ class ReconnectingProducer : public Producer {
 
 }  // namespace perfetto
 
-#endif  // SRC_TRACING_CORE_RECONNECTING_PRODUCER_H_
+#endif  // SRC_TRACING_IPC_PRODUCER_RECONNECTING_PRODUCER_H_

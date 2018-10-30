@@ -308,4 +308,6 @@ void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
   }    // for (session_data_sources_)
 }
 
+const char* ProbesProducer::name = "perfetto.traced_probes";
+
 }  // namespace perfetto

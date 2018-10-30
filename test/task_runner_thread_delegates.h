@@ -19,7 +19,7 @@
 
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/traced/probes/probes_producer.h"
-#include "src/tracing/core/reconnecting_producer.h"
+#include "src/tracing/ipc/producer/reconnecting_producer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 

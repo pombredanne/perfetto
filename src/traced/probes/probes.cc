@@ -25,8 +25,8 @@
 
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/traced/probes/probes_producer.h"
-#include "src/tracing/core/reconnecting_producer.h"
 #include "src/tracing/ipc/default_socket.h"
+#include "src/tracing/ipc/producer/reconnecting_producer.h"
 
 namespace perfetto {
 
