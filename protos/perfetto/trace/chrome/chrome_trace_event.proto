@@ -112,8 +112,8 @@ message ChromeEventBundle {
   repeated ChromeMetadata metadata = 2;
   // ftrace output from CrOS and Cast system tracing agents.
   // TODO(eseckler): Replace system traces with native perfetto service.
-  repeated string ftrace_output = 4;
-  repeated ChromeLegacyJsonTrace json_trace = 5;
+  repeated string legacy_ftrace_output = 4;
+  repeated ChromeLegacyJsonTrace legacy_json_trace = 5;
 
   // Contents of a string table that's valid for
   // the whole ChromeEventBundle entry.
