@@ -45,7 +45,8 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
  public:
   static const char* name;
 
-  ProbesProducer(base::TaskRunner* task_runner);
+  ProbesProducer(base::TaskRunner* task_runner,
+                 TracingService::ProducerEndpoint* endpoint);
   ~ProbesProducer() override;
 
   // Producer Impl:
@@ -84,7 +85,8 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   ProbesProducer& operator=(const ProbesProducer&) = delete;
 
   base::TaskRunner* const task_runner_;
-  std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
+  // Borrowed from caller.
+  TracingService::ProducerEndpoint* endpoint_;
   std::unique_ptr<FtraceController> ftrace_;
   bool ftrace_creation_failed_ = false;
 

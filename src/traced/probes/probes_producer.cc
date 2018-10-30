@@ -60,8 +60,9 @@ constexpr char kSysStatsSourceName[] = "linux.sys_stats";
 //                    +--------------+
 //
 
-ProbesProducer::ProbesProducer(base::TaskRunner* task_runner)
-    : task_runner_(task_runner), weak_factory_(this) {}
+ProbesProducer::ProbesProducer(base::TaskRunner* task_runner,
+                               TracingService::ProducerEndpoint* endpoint)
+    : task_runner_(task_runner), endpoint_(endpoint), weak_factory_(this) {}
 ProbesProducer::~ProbesProducer() {
   // The ftrace data sources must be deleted before the ftrace controller.
   data_sources_.clear();

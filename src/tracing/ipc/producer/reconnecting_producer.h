@@ -31,9 +31,10 @@ class ReconnectingProducer : public Producer {
 
   void OnConnect() override {
     PERFETTO_DCHECK(state_ == kConnecting);
+    PERFETTO_DCHECK(endpoint_);
     state_ = kConnected;
     ResetConnectionBackoff();
-    producer_.reset(new T(task_runner_));
+    producer_.reset(new T(task_runner_, endpoint_.get()));
     producer_->OnConnect();
   }
 
