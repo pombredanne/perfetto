@@ -15,6 +15,7 @@
  */
 
 #include <stack>
+#include <ctype.h>
 
 #include "src/perfetto_cmd/pbtxt_to_pb.h"
 
@@ -44,16 +45,12 @@ namespace {
 
 const char* kWhitespace = " \n\t\x0b\x0c\r";
 
-constexpr bool IsNumeric(char c) {
-  return '0' <= c && c <= '9';
-}
-
 constexpr bool IsIdentifierStart(char c) {
   return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_';
 }
 
 constexpr bool IsIdentifierBody(char c) {
-  return IsIdentifierStart(c) || IsNumeric(c);
+  return IsIdentifierStart(c) || isdigit(c);
 }
 
 bool IsWhitespace(char c) {
@@ -323,7 +320,7 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
           state = kReadingStringValue;
           continue;
         }
-        if (c == '-' || IsNumeric(c)) {
+        if (c == '-' || isdigit(c)) {
           state = kReadingNumericValue;
           continue;
         }
@@ -348,7 +345,7 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
           delegate->NumericField(key, value);
           continue;
         }
-        if (IsNumeric(c))
+        if (isdigit(c))
           continue;
         break;
 

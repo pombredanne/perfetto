@@ -15,39 +15,27 @@
 import("../../gn/perfetto.gni")
 import("../../gn/proto_library.gni")
 
-template("include_binary") {
-  name = target_name
-  action_name = name + "_gen"
-  action(action_name) {
-    assert(defined(invoker.source))
-    if (defined(invoker.deps)) {
-      deps = invoker.deps
-    }
-
-    script = rebase_path("../../tools/include_binary.py", root_build_dir)
-    inputs = [
-      invoker.source,
-    ]
-    outputs = [
-     "$target_gen_dir/$name.cc",
-     "$target_gen_dir/$name.h",
-    ]
-    args = [
-      rebase_path(inputs[0], root_build_dir),
-      rebase_path("$target_gen_dir/$name", root_build_dir),
-    ]
-  }
-  source_set(target_name) {
-    deps = [":$action_name"]
-    sources = get_target_outputs(":$action_name")
-  }
-}
-
-include_binary("trace_config_descriptor") {
+action("trace_config_descriptor_gen") {
   deps = [
     "../../protos/perfetto/config:lite",
   ]
-  source = "$root_gen_dir/protos/perfetto/trace/config.descriptor"
+  script = rebase_path("../../tools/include_binary.py", root_build_dir)
+  inputs = [
+    "$root_gen_dir/protos/perfetto/trace/config.descriptor"
+  ]
+  outputs = [
+   "$target_gen_dir/trace_config_descriptor.cc",
+   "$target_gen_dir/trace_config_descriptor.h",
+  ]
+  args = [
+    rebase_path(inputs[0], root_build_dir),
+    rebase_path("$target_gen_dir/trace_config_descriptor", root_build_dir),
+  ]
+}
+
+source_set("trace_config_descriptor") {
+  deps = [":trace_config_descriptor_gen"]
+  sources = get_target_outputs(":trace_config_descriptor_gen")
 }
 
 source_set("perfetto_cmd") {
