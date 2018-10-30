@@ -218,11 +218,6 @@ std::vector<std::string> SpanOperatorTable::ComputeSqlConstraintVector(
         col_name = "dur";
         break;
       default: {
-        if (constraint.iColumn == SpanOperatorTable::Column::kJoinValue &&
-            !join_col_.empty()) {
-          col_name = join_col_;
-          break;
-        }
         auto index_pair = GetTableAndColumnIndex(constraint.iColumn);
         bool is_constraint_in_table = index_pair.first == table;
         if (is_constraint_in_table) {
@@ -232,10 +227,9 @@ std::vector<std::string> SpanOperatorTable::ComputeSqlConstraintVector(
     }
 
     if (!col_name.empty()) {
-      const auto& value =
-          reinterpret_cast<const char*>(sqlite3_value_text(argv[i]));
+      auto value = sqlite_utils::SqliteValueAsString(argv[i]);
       constraints.emplace_back("`" + col_name + "`" +
-                               OpToString(constraint.op) + "'" + value + "'");
+                               OpToString(constraint.op) + value);
     }
   }
   return constraints;
