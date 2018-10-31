@@ -32,19 +32,13 @@ class ReconnectingProducer : public Producer {
                            TracingService::ProducerEndpoint*)> factory);
 
   void OnConnect() override;
-
   void OnDisconnect() override;
-
   void SetupDataSource(DataSourceInstanceID id,
                        const DataSourceConfig& cfg) override;
-
   void StartDataSource(DataSourceInstanceID id,
                        const DataSourceConfig& cfg) override;
-
   void StopDataSource(DataSourceInstanceID id) override;
-
   void OnTracingSetup() override;
-
   void Flush(FlushRequestID id,
              const DataSourceInstanceID* data_source_ids,
              size_t num_data_sources) override;
