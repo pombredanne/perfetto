@@ -14,7 +14,7 @@
 
 import("../../../gn/perfetto.gni")
 import("../../../gn/proto_library.gni")
-import("../../../src/protozero/protozero_library.gni")
+import("../../../gn/protozero_library.gni")
 
 profiling_proto_names = [ "profile_packet.proto" ]
 

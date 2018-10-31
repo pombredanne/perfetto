@@ -25,8 +25,9 @@
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/scoped_file.h"
 #include "perfetto/base/time.h"
-#include "src/trace_processor/trace_processor.h"
+#include "perfetto/trace_processor/trace_processor.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
 
@@ -61,7 +62,7 @@ bool EnsureDir(const std::string& path) {
 }
 
 bool EnsureFile(const std::string& path) {
-  return base::OpenFile(path, O_RDONLY | O_CREAT, 0755).get() != -1;
+  return base::OpenFile(path, O_RDONLY | O_CREAT, 0644).get() != -1;
 }
 
 std::string GetConfigPath() {
@@ -318,7 +319,7 @@ int TraceProcessorMain(int argc, char** argv) {
   }
 
   // Load the trace file into the trace processor.
-  TraceProcessor::Config config;
+  Config config;
   config.optimization_mode = OptimizationMode::kMaxBandwidth;
   TraceProcessor tp(config);
   base::ScopedFile fd(base::OpenFile(trace_file_path, O_RDONLY));
@@ -334,8 +335,8 @@ int TraceProcessorMain(int argc, char** argv) {
   cb.aio_nbytes = kChunkSize;
   cb.aio_fildes = *fd;
 
-  // The control block has ownership of the buffer while the read is in-flight.
-  cb.aio_buf = new uint8_t[kChunkSize];
+  std::unique_ptr<uint8_t[]> aio_buf(new uint8_t[kChunkSize]);
+  cb.aio_buf = aio_buf.get();
 
   PERFETTO_CHECK(aio_read(&cb) == 0);
   struct aiocb* aio_list[1] = {&cb};
@@ -355,9 +356,9 @@ int TraceProcessorMain(int argc, char** argv) {
 
     // Take ownership of the completed buffer and enqueue a new async read
     // with a fresh buffer.
-    std::unique_ptr<uint8_t[]> buf(
-        reinterpret_cast<uint8_t*>(const_cast<void*>(cb.aio_buf)));
-    cb.aio_buf = new uint8_t[kChunkSize];
+    std::unique_ptr<uint8_t[]> buf(std::move(aio_buf));
+    aio_buf.reset(new uint8_t[kChunkSize]);
+    cb.aio_buf = aio_buf.get();
     cb.aio_offset += rsize;
     PERFETTO_CHECK(aio_read(&cb) == 0);
 

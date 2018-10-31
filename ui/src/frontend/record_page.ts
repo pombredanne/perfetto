@@ -16,6 +16,7 @@ import * as m from 'mithril';
 
 import {Actions} from '../common/actions';
 import {MeminfoCounters, StatCounters, VmstatCounters} from '../common/protos';
+import {RecordConfig} from '../common/state';
 
 import {copyToClipboard} from './clipboard';
 import {globals} from './globals';
@@ -156,7 +157,6 @@ const FTRACE_EVENTS = [
   'block_rq_abort',
   'block_rq_complete',
   'block_rq_insert',
-  '  removed',
   'block_rq_remap',
   'block_rq_requeue',
   'block_sleeprq',
@@ -293,6 +293,70 @@ const FTRACE_EVENTS = [
   'f2fs_write_begin',
   'f2fs_write_checkpoint',
   'f2fs_write_end',
+];
+
+const CONFIG_PRESETS = [
+  {
+    label: 'cpu',
+    config: {
+      durationSeconds: 10.0,
+      writeIntoFile: false,
+      fileWritePeriodMs: null,
+      bufferSizeMb: 10.0,
+
+      processMetadata: true,
+      scanAllProcessesOnStart: false,
+
+      ftrace: true,
+      ftraceEvents: [
+        'print',
+        'sched_switch',
+      ],
+      atraceApps: [],
+      atraceCategories: ['sched', 'freq', 'idle'],
+      ftraceDrainPeriodMs: null,
+      ftraceBufferSizeKb: null,
+
+      sysStats: false,
+      meminfoPeriodMs: null,
+      meminfoCounters: [],
+      vmstatPeriodMs: null,
+      vmstatCounters: [],
+      statPeriodMs: null,
+      statCounters: [],
+
+      displayConfigAsPbtxt: false,
+    },
+  },
+  {
+    label: 'empty',
+    config: {
+      durationSeconds: 10.0,
+      writeIntoFile: false,
+      fileWritePeriodMs: null,
+      bufferSizeMb: 10.0,
+
+      processMetadata: false,
+      scanAllProcessesOnStart: false,
+
+      ftrace: false,
+      ftraceEvents: [],
+      atraceApps: [],
+      atraceCategories: [],
+      ftraceDrainPeriodMs: null,
+      ftraceBufferSizeKb: null,
+
+      sysStats: false,
+      meminfoPeriodMs: null,
+      meminfoCounters: [],
+      vmstatPeriodMs: null,
+      vmstatCounters: [],
+      statPeriodMs: null,
+      statCounters: [],
+
+      displayConfigAsPbtxt: false,
+    },
+  },
 ];
 
 const ATRACE_CATERGORIES = [
@@ -437,7 +501,7 @@ class MultiSelect implements m.ClassComponent<MultiSelectAttrs> {
   }
 }
 
-interface Preset {
+interface NumericPreset {
   label: string;
   value: number|null;
 }
@@ -450,7 +514,7 @@ interface NumericAttrs {
   placeholder?: string;
   value: number|null;
   onchange: (value: null|number) => void;
-  presets: Preset[];
+  presets: NumericPreset[];
 }
 
 function toNumber(s: string): number|null {
@@ -515,9 +579,12 @@ function isTruthy(x: undefined|null|number|'') {
   return !isFalsy(x);
 }
 
+function sameConfig(a: RecordConfig, b: RecordConfig) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export const RecordPage = createPage({
   view() {
-    console.log(MeminfoCounters);
     const state = globals.state.recordConfig;
     const data = globals.trackDataStore.get('config') as {
       commandline: string,
@@ -527,9 +594,21 @@ export const RecordPage = createPage({
       '.record-page',
         {class: state.displayConfigAsPbtxt ? 'three' : 'two' },
         m('.config.text-column',
-          `To collect a Perfetto trace, configure the options below then
-          use the command on the right to capture the trace.`,
-          m('.heading', m(Numeric, {
+          `To collect a Perfetto trace, use one of the following preset configs
+          or customize the config manually before using the command on the
+          right to capture the trace.`,
+
+          m('.heading.config-presets',
+            m('i', 'Presets'),
+            CONFIG_PRESETS.map(preset => m('button', {
+              onclick: () => globals.dispatch(
+                Actions.setConfig({config: preset.config})),
+              class: sameConfig(preset.config, state) ? 'selected' : '',
+            }, preset.label))),
+
+          m('.heading',
+            m('i', 'Configuration'),
+            m(Numeric, {
             enabled: true,
             label: 'Duration',
             sublabel: 's',

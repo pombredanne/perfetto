@@ -49,6 +49,8 @@ std::string TypeToString(Table::ColumnType type) {
       return "UNSIGNED INT";
     case Table::ColumnType::kUlong:
       return "UNSIGNED BIG INT";
+    case Table::ColumnType::kLong:
+      return "BIG INT";
     case Table::ColumnType::kInt:
       return "INT";
     case Table::ColumnType::kDouble:
@@ -277,7 +279,10 @@ Table::Schema& Table::Schema::operator=(const Schema&) = default;
 std::string Table::Schema::ToCreateTableStmt() {
   std::string stmt = "CREATE TABLE x(";
   for (const auto& col : columns_) {
-    stmt += " " + col.name() + " " + TypeToString(col.type()) + ",";
+    stmt += " " + col.name() + " " + TypeToString(col.type());
+    if (col.hidden())
+      stmt += " HIDDEN";
+     stmt += ",";
   }
   stmt += " PRIMARY KEY(";
   for (size_t i = 0; i < primary_keys_.size(); i++) {
