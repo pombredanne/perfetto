@@ -43,8 +43,6 @@ const uint64_t kLRUInodeCacheSize = 1000;
 
 class ProbesProducer : public Producer, public FtraceController::Observer {
  public:
-  static const char* name;
-
   ProbesProducer(base::TaskRunner* task_runner,
                  TracingService::ProducerEndpoint* endpoint);
   ~ProbesProducer() override;
