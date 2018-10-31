@@ -23,9 +23,9 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <sstream>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
