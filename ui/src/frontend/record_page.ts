@@ -471,6 +471,7 @@ class Toggle implements m.ClassComponent<ToggleAttrs> {
         attrs.label,
         m('input[type="checkbox"]', {
           onchange: m.withAttr('checked', attrs.onchange),
+          disabled: !attrs.enabled,
           class: attrs.enabled ? '' : 'disabled',
           checked: attrs.value,
         }));
