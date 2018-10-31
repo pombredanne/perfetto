@@ -580,9 +580,10 @@ void ProtoTraceParser::ParseSignalDeliver(uint64_t timestamp,
         break;
     }
   }
+  auto* instants = context_->storage->mutable_instants();
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  context_->event_tracker->PushCounter(timestamp, sig, signal_deliver_id_, utid,
-                                       RefType::kUtid);
+  instants->AddInstantEvent(timestamp, sig, signal_deliver_id_, utid,
+                            RefType::kUtid);
 }
 
 void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
@@ -600,9 +601,11 @@ void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
         break;
     }
   }
+  auto* instants = context_->storage->mutable_instants();
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  context_->event_tracker->PushCounter(timestamp, sig, signal_generate_id_,
-                                       utid, RefType::kUtid);
+  PERFETTO_LOG("here");
+  instants->AddInstantEvent(timestamp, sig, signal_generate_id_, utid,
+                            RefType::kUtid);
 }
 
 void ProtoTraceParser::ParseRssStat(uint64_t timestamp,

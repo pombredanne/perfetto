@@ -209,6 +209,44 @@ class TraceStorage {
     std::deque<RefType> types_;
   };
 
+  class Instants {
+   public:
+    inline size_t AddInstantEvent(uint64_t timestamp,
+                                  StringId name_id,
+                                  double value,
+                                  int64_t ref,
+                                  RefType type) {
+      timestamps_.emplace_back(timestamp);
+      name_ids_.emplace_back(name_id);
+      values_.emplace_back(value);
+      refs_.emplace_back(ref);
+      types_.emplace_back(type);
+      PERFETTO_LOG("adding event %lu, %lu, %.2f, %lu, %d", timestamp, name_id,
+                   value, ref, type);
+      PERFETTO_LOG("instant_events: %lu", instant_count() - 1);
+      return instant_count() - 1;
+    }
+
+    size_t instant_count() const { return timestamps_.size(); }
+
+    const std::deque<uint64_t>& timestamps() const { return timestamps_; }
+
+    const std::deque<StringId>& name_ids() const { return name_ids_; }
+
+    const std::deque<double>& values() const { return values_; }
+
+    const std::deque<int64_t>& refs() const { return refs_; }
+
+    const std::deque<RefType>& types() const { return types_; }
+
+   private:
+    std::deque<uint64_t> timestamps_;
+    std::deque<StringId> name_ids_;
+    std::deque<double> values_;
+    std::deque<int64_t> refs_;
+    std::deque<RefType> types_;
+  };
+
   void ResetStorage();
 
   UniqueTid AddEmptyThread(uint32_t tid) {
@@ -264,6 +302,9 @@ class TraceStorage {
   const Counters& counters() const { return counters_; }
   Counters* mutable_counters() { return &counters_; }
 
+  const Instants& instants() const { return instants_; }
+  Instants* mutable_instants() { return &instants_; }
+
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -306,6 +347,11 @@ class TraceStorage {
   // Counter events from the trace. This includes CPU frequency events as well
   // systrace trace_marker counter events.
   Counters counters_;
+
+  // These are instantaneous events in the trace. They have no duration
+  // and do not have a value that make sense to track over time.
+  // e.g. signal events
+  Instants instants_;
 };
 
 }  // namespace trace_processor

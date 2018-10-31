@@ -2679,17 +2679,15 @@ std::string FormatRssStat(const RssStatFtraceEvent& event) {
 }
 std::string FormatSignalDeliver(const SignalDeliverFtraceEvent& event) {
   char line[2048];
-  sprintf(line, "signal_deliver: sig=%d errno=%d code=%d sa_flags=%lx",
-          event.sig(), event.err_no(), event.code(), event.sa_flags());
+  sprintf(line, "signal_deliver: sig=%d code=%d sa_flags=%lx", event.sig(),
+          event.code(), event.sa_flags());
   return std::string(line);
 }
 std::string FormatSignalGenerate(const SignalGenerateFtraceEvent& event) {
   char line[2048];
-  sprintf(
-      line,
-      "signal_generate: sig=%d errno=%d code=%d comm=%s pid=%d grp=%d res=%d",
-      event.sig(), event.err_no(), event.code(), event.comm().c_str(),
-      event.pid(), event.group(), event.result());
+  sprintf(line, "signal_generate: sig=%d code=%d comm=%s pid=%d grp=%d res=%d",
+          event.sig(), event.code(), event.comm().c_str(), event.pid(),
+          event.group(), event.result());
   return std::string(line);
 }
 

@@ -8,7 +8,6 @@ package perfetto.protos;
 
 message SignalDeliverFtraceEvent {
   optional int32 code = 1;
-  optional int32 err_no = 2;
-  optional uint64 sa_flags = 3;
-  optional int32 sig = 4;
+  optional uint64 sa_flags = 2;
+  optional int32 sig = 3;
 }

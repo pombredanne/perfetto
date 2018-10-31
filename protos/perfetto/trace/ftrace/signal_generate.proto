@@ -9,9 +9,8 @@ package perfetto.protos;
 message SignalGenerateFtraceEvent {
   optional int32 code = 1;
   optional string comm = 2;
-  optional int32 err_no = 3;
-  optional int32 group = 4;
-  optional int32 pid = 5;
-  optional int32 result = 6;
-  optional int32 sig = 7;
+  optional int32 group = 3;
+  optional int32 pid = 4;
+  optional int32 result = 5;
+  optional int32 sig = 6;
 }
