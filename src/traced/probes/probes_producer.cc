@@ -45,8 +45,6 @@
 namespace perfetto {
 namespace {
 
-constexpr uint32_t kInitialConnectionBackoffMs = 100;
-constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
 constexpr char kFtraceSourceName[] = "linux.ftrace";
 constexpr char kProcessStatsSourceName[] = "linux.process_stats";
 constexpr char kInodeMapSourceName[] = "linux.inode_file_map";
@@ -62,7 +60,9 @@ constexpr char kSysStatsSourceName[] = "linux.sys_stats";
 //                    +--------------+
 //
 
-ProbesProducer::ProbesProducer() : weak_factory_(this) {}
+ProbesProducer::ProbesProducer(base::TaskRunner* task_runner,
+                               TracingService::ProducerEndpoint* endpoint)
+    : task_runner_(task_runner), endpoint_(endpoint), weak_factory_(this) {}
 ProbesProducer::~ProbesProducer() {
   // The ftrace data sources must be deleted before the ftrace controller.
   data_sources_.clear();
@@ -70,11 +70,6 @@ ProbesProducer::~ProbesProducer() {
 }
 
 void ProbesProducer::OnConnect() {
-  PERFETTO_DCHECK(state_ == kConnecting);
-  state_ = kConnected;
-  ResetConnectionBackoff();
-  PERFETTO_LOG("Connected to the service");
-
   {
     DataSourceDescriptor desc;
     desc.set_name(kFtraceSourceName);
@@ -101,32 +96,6 @@ void ProbesProducer::OnConnect() {
 }
 
 void ProbesProducer::OnDisconnect() {
-  PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
-  PERFETTO_LOG("Disconnected from tracing service");
-  if (state_ == kConnected)
-    return task_runner_->PostTask([this] { this->Restart(); });
-
-  state_ = kNotConnected;
-  IncreaseConnectionBackoff();
-  task_runner_->PostDelayedTask([this] { this->Connect(); },
-                                connection_backoff_ms_);
-}
-
-void ProbesProducer::Restart() {
-  // We lost the connection with the tracing service. At this point we need
-  // to reset all the data sources. Trying to handle that manually is going to
-  // be error prone. What we do here is simply desroying the instance and
-  // recreating it again.
-  // TODO(hjd): Add e2e test for this.
-
-  base::TaskRunner* task_runner = task_runner_;
-  const char* socket_name = socket_name_;
-
-  // Invoke destructor and then the constructor again.
-  this->~ProbesProducer();
-  new (this) ProbesProducer();
-
-  ConnectWithRetries(socket_name, task_runner);
 }
 
 void ProbesProducer::SetupDataSource(DataSourceInstanceID instance_id,
@@ -349,32 +318,6 @@ void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
   }    // for (session_data_sources_)
 }
 
-void ProbesProducer::ConnectWithRetries(const char* socket_name,
-                                        base::TaskRunner* task_runner) {
-  PERFETTO_DCHECK(state_ == kNotStarted);
-  state_ = kNotConnected;
-
-  ResetConnectionBackoff();
-  socket_name_ = socket_name;
-  task_runner_ = task_runner;
-  Connect();
-}
-
-void ProbesProducer::Connect() {
-  PERFETTO_DCHECK(state_ == kNotConnected);
-  state_ = kConnecting;
-  endpoint_ = ProducerIPCClient::Connect(
-      socket_name_, this, "perfetto.traced_probes", task_runner_);
-}
-
-void ProbesProducer::IncreaseConnectionBackoff() {
-  connection_backoff_ms_ *= 2;
-  if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
-    connection_backoff_ms_ = kMaxConnectionBackoffMs;
-}
-
-void ProbesProducer::ResetConnectionBackoff() {
-  connection_backoff_ms_ = kInitialConnectionBackoffMs;
-}
+const char* ProbesProducer::name = "perfetto.traced_probes";
 
 }  // namespace perfetto
