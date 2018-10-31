@@ -3738,9 +3738,8 @@ std::vector<Event> GetStaticEventInfo() {
     event->group = "signal";
     event->proto_field_id = 324;
     event->fields.push_back(MakeField("code", 1, kProtoInt32));
-    event->fields.push_back(MakeField("err_no", 2, kProtoInt32));
-    event->fields.push_back(MakeField("sa_flags", 3, kProtoUint64));
-    event->fields.push_back(MakeField("sig", 4, kProtoInt32));
+    event->fields.push_back(MakeField("sa_flags", 2, kProtoUint64));
+    event->fields.push_back(MakeField("sig", 3, kProtoInt32));
   }
 
   {
@@ -3751,11 +3750,10 @@ std::vector<Event> GetStaticEventInfo() {
     event->proto_field_id = 325;
     event->fields.push_back(MakeField("code", 1, kProtoInt32));
     event->fields.push_back(MakeField("comm", 2, kProtoString));
-    event->fields.push_back(MakeField("err_no", 3, kProtoInt32));
-    event->fields.push_back(MakeField("group", 4, kProtoInt32));
-    event->fields.push_back(MakeField("pid", 5, kProtoInt32));
-    event->fields.push_back(MakeField("result", 6, kProtoInt32));
-    event->fields.push_back(MakeField("sig", 7, kProtoInt32));
+    event->fields.push_back(MakeField("group", 3, kProtoInt32));
+    event->fields.push_back(MakeField("pid", 4, kProtoInt32));
+    event->fields.push_back(MakeField("result", 5, kProtoInt32));
+    event->fields.push_back(MakeField("sig", 6, kProtoInt32));
   }
 
   return events;

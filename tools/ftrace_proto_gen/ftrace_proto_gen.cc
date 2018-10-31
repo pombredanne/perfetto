@@ -364,12 +364,9 @@ bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
     // preprocessor level. It's impossible to have a variable or a function
     // called sa_handler. On the good side, we realistically don't care about
     // this field, it's just easier to skip it.
-    if (name == "" || seen.count(name) || name == "sa_handler")
+    if (name == "" || seen.count(name) || name == "sa_handler" ||
+        name == "errno")
       continue;
-    // To avoid clashing with the errno macro.
-    if (name == "errno") {
-      name = "err_no";
-    }
     seen.insert(name);
     ProtoType type = InferProtoType(field);
     // Check we managed to infer a type.
