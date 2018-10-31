@@ -19,6 +19,11 @@
 #include "perfetto/base/task_runner.h"
 
 namespace perfetto {
+namespace {
+constexpr uint32_t kInitialConnectionBackoffMs = 100;
+constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
+}  // namespace
+
 ReconnectingProducer::ReconnectingProducer(
     const char* producer_name,
     const char* socket_name,
@@ -81,5 +86,22 @@ void ReconnectingProducer::ConnectWithRetries() {
   state_ = kNotConnected;
   ResetConnectionBackoff();
   Connect();
+}
+
+void ReconnectingProducer::Connect() {
+  PERFETTO_DCHECK(state_ == kNotConnected);
+  state_ = kConnecting;
+  endpoint_ = ProducerIPCClient::Connect(socket_name_, this, producer_name_,
+                                         task_runner_);
+}
+
+void ReconnectingProducer::ResetConnectionBackoff() {
+  connection_backoff_ms_ = kInitialConnectionBackoffMs;
+}
+
+void ReconnectingProducer::IncreaseConnectionBackoff() {
+  connection_backoff_ms_ *= 2;
+  if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
+    connection_backoff_ms_ = kMaxConnectionBackoffMs;
 }
 }  // namespace perfetto

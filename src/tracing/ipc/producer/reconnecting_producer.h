@@ -46,9 +46,6 @@ class ReconnectingProducer : public Producer {
   void ConnectWithRetries();
 
  private:
-  static constexpr uint32_t kInitialConnectionBackoffMs = 100;
-  static constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
-
   enum State {
     kNotStarted = 0,
     kNotConnected,
@@ -56,22 +53,9 @@ class ReconnectingProducer : public Producer {
     kConnected,
   };
 
-  void Connect() {
-    PERFETTO_DCHECK(state_ == kNotConnected);
-    state_ = kConnecting;
-    endpoint_ = ProducerIPCClient::Connect(socket_name_, this, producer_name_,
-                                           task_runner_);
-  }
-
-  void ResetConnectionBackoff() {
-    connection_backoff_ms_ = kInitialConnectionBackoffMs;
-  }
-
-  void IncreaseConnectionBackoff() {
-    connection_backoff_ms_ *= 2;
-    if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
-      connection_backoff_ms_ = kMaxConnectionBackoffMs;
-  }
+  void Connect();
+  void ResetConnectionBackoff();
+  void IncreaseConnectionBackoff();
 
   const char* producer_name_;
   const char* socket_name_;
