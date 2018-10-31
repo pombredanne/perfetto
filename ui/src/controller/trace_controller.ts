@@ -247,6 +247,8 @@ export class TraceController extends Controller<States> {
       if (refType === 'utid') counterUtids.add(ref);
     }
 
+    // Add all the global counter tracks that are not bound to any pid/tid,
+    // the ones for which refType == NULL.
     for (let i = 0; i < counters.numRecords; i++) {
       const name = counters.columns[0].stringValues![i];
       const refType = counters.columns[2].stringValues![i];
