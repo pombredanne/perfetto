@@ -18,8 +18,11 @@
 #define SRC_PROFILING_MEMORY_HEAPPROFD_PRODUCER_H_
 
 #include "perfetto/base/task_runner.h"
+#include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/tracing_service.h"
+
+#include <map>
 
 namespace perfetto {
 namespace profiling {
@@ -42,8 +45,16 @@ class HeapprofdProducer : public Producer {
              size_t num_data_sources) override;
 
  private:
+  class DataSource {
+   public:
+    DataSource(const DataSourceConfig&) {}
+    void Start(base::TaskRunner*) {}
+    void Flush() {}
+  };
   base::TaskRunner* const task_runner_;
   TracingService::ProducerEndpoint* const endpoint_;
+
+  std::map<DataSourceInstanceID, DataSource> data_sources_;
 };
 
 }  // namespace profiling

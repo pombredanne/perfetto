@@ -22,9 +22,9 @@ package perfetto.protos;
 message HeapprofdConfig {
   message ContinousDumpConfig {
     // ms to wait before first dump.
-    optional uint64 dump_ms_phase_ms = 5;
+    optional uint64 dump_phase_ms = 5;
     // ms to wait between following dumps.
-    optional uint64 dump_ms_interval_ms = 6;
+    optional uint64 dump_interval_ms = 6;
   };
 
   // Set to 1 for perfect accuracy.

@@ -61,17 +61,15 @@ class PERFETTO_EXPORT HeapprofdConfig {
         const perfetto::protos::HeapprofdConfig_ContinousDumpConfig&);
     void ToProto(perfetto::protos::HeapprofdConfig_ContinousDumpConfig*) const;
 
-    uint64_t dump_ms_phase_ms() const { return dump_ms_phase_ms_; }
-    void set_dump_ms_phase_ms(uint64_t value) { dump_ms_phase_ms_ = value; }
+    uint64_t dump_phase_ms() const { return dump_phase_ms_; }
+    void set_dump_phase_ms(uint64_t value) { dump_phase_ms_ = value; }
 
-    uint64_t dump_ms_interval_ms() const { return dump_ms_interval_ms_; }
-    void set_dump_ms_interval_ms(uint64_t value) {
-      dump_ms_interval_ms_ = value;
-    }
+    uint64_t dump_interval_ms() const { return dump_interval_ms_; }
+    void set_dump_interval_ms(uint64_t value) { dump_interval_ms_ = value; }
 
    private:
-    uint64_t dump_ms_phase_ms_ = {};
-    uint64_t dump_ms_interval_ms_ = {};
+    uint64_t dump_phase_ms_ = {};
+    uint64_t dump_interval_ms_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility
     // with future versions of .proto files.

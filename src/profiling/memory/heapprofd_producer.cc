@@ -16,8 +16,11 @@
 
 #include "src/profiling/memory/heapprofd_producer.h"
 
+#include <inttypes.h>
+
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
+#include "perfetto/tracing/core/trace_writer.h"
 
 namespace perfetto {
 namespace profiling {
@@ -45,16 +48,48 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
 
   auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
   auto trace_writer = endpoint_->CreateTraceWriter(buffer_id);
-  const HeapprofdConfig& heapprofd_cfg = cfg.heapprofd_config();
+
+  bool inserted;
+  std::tie(std::ignore, inserted) = data_sources_.emplace(id, cfg);
+  if (!inserted)
+    PERFETTO_DFATAL("Received duplicated data source instance id: %" PRIu64,
+                    id);
 }
 
 void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
-                                        const DataSourceConfig& cfg) {}
+                                        const DataSourceConfig&) {
+  auto it = data_sources_.find(id);
+  if (it == data_sources_.end()) {
+    PERFETTO_DFATAL("Received invalid data source instance to start: %" PRIu64,
+                    id);
+    return;
+  }
+  DataSource& data_source = it->second;
+  data_source.Start(task_runner_);
+}
 
-void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {}
+void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
+  if (data_sources_.erase(id) != 1)
+    PERFETTO_DFATAL("Trying to stop non existing data source: %" PRIu64, id);
+}
+
 void HeapprofdProducer::OnTracingSetup() {}
-void HeapprofdProducer::Flush(FlushRequestID id,
+void HeapprofdProducer::Flush(FlushRequestID flush_id,
                               const DataSourceInstanceID* data_source_ids,
-                              size_t num_data_sources) {}
+                              size_t num_data_sources) {
+  for (size_t i = 0; i < num_data_sources; ++i) {
+    DataSourceInstanceID id = data_source_ids[i];
+    auto it = data_sources_.find(id);
+    if (it == data_sources_.end()) {
+      PERFETTO_DFATAL(
+          "Received invalid data source instance to start: %" PRIu64, id);
+      return;
+    }
+    DataSource& data_source = it->second;
+    data_source.Flush();
+  }
+  endpoint_->NotifyFlushComplete(flush_id);
+}
+
 }  // namespace profiling
 }  // namespace perfetto
