@@ -23,15 +23,15 @@ message ProfilePacket {
   // either a function or library name.
   repeated InternedString strings = 1;
   message InternedString {
-    optional string str = 1;
-    optional uint64 id = 2;
+    optional uint64 id = 1;
+    optional string str = 2;
   }
 
   repeated Frame frames = 2;
   message Frame {
     optional uint64 id = 1;  // Interning key
     // E.g. "fopen"
-    optional uint64 function_name_id = 2;  // Index into strings.
+    optional uint64 function_name_id = 2;  // id of string.
     optional uint64 mapping_id = 3;
     optional uint64 rel_pc = 4;
   }
@@ -51,16 +51,16 @@ message ProfilePacket {
     optional uint64 end = 5;
     optional uint64 load_bias = 6;
     // E.g. ["system", "lib64", "libc.so"]
-    repeated uint64 path_string_ids = 7;  // Indices into strings.
+    repeated uint64 path_string_ids = 7;  // id of string.
   }
 
   message Sample {
     optional uint64 callstack_id = 1;
+    // bytes allocated at this frame and in functions called by it.
     optional uint64 cumulative_allocated = 2;
+    // bytes freed at this frame and in functions called by it.
     optional uint64 cumulative_freed = 3;
-    optional int64 tid = 4;          // In the future.
-    optional int64 object_type = 5;  // In the future.
-    optional uint64 timestamp = 6;   // timestamp [opt]
+    optional uint64 timestamp = 4;  // timestamp [opt]
   }
 
   repeated ProcessDump process_dumps = 5;
