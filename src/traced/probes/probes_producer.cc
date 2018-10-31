@@ -338,8 +338,9 @@ void ProbesProducer::OnFtraceDataWrittenIntoDataSourceBuffers() {
         // Only use the one that has on-demand dumps enabled, if any.
         auto ps = static_cast<ProcessStatsDataSource*>(ds);
         if (ps->on_demand_dumps_enabled())
-          ps_data_source = static_cast<ProcessStatsDataSource*>(ds);
-      } break;
+          ps_data_source = ps;
+        break;
+      }
       case SysStatsDataSource::kTypeId:
         break;
       default:

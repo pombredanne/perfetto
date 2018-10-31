@@ -117,6 +117,8 @@ base::WeakPtr<ProcessStatsDataSource> ProcessStatsDataSource::GetWeakPtr()
 void ProcessStatsDataSource::WriteAllProcesses() {
   PERFETTO_DCHECK(!cur_ps_tree_);
   base::ScopedDir proc_dir = OpenProcDir();
+  if (!proc_dir)
+    return;
   while (int32_t pid = ReadNextNumericDir(*proc_dir)) {
     WriteProcessOrThread(pid);
     char task_path[255];
@@ -236,6 +238,7 @@ void ProcessStatsDataSource::StartNewPacketIfNeeded() {
   uint64_t now = static_cast<uint64_t>(base::GetBootTimeNs().count());
   cur_packet_->set_timestamp(now);
 }
+
 protos::pbzero::ProcessTree* ProcessStatsDataSource::GetOrCreatePsTree() {
   StartNewPacketIfNeeded();
   if (!cur_ps_tree_)
@@ -280,6 +283,8 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
 
   PERFETTO_METATRACE("WriteAllProcessStats", 0);
   base::ScopedDir proc_dir = OpenProcDir();
+  if (!proc_dir)
+    return;
   std::vector<int32_t> pids;
   while (int32_t pid = ReadNextNumericDir(*proc_dir)) {
     std::string proc_status = ReadProcPidFile(pid, "status");
@@ -302,9 +307,10 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
 bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
                                                const std::string& proc_status) {
   // The MemCounters entry for a process is created lazily on the first call.
-  // This is to prevent creating empty entires that have only a pid for
+  // This is to prevent creating empty entries that have only a pid for
   // kernel threads and other /proc/[pid] entries that have no counters
   // associated.
+  bool proc_status_has_mem_counters = false;
   protos::pbzero::ProcessStats::MemCounters* mem_counters = nullptr;
   auto get_counters_lazy = [this, &mem_counters, pid] {
     if (!mem_counters) {
@@ -314,7 +320,16 @@ bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
     return mem_counters;
   };
 
-  bool did_dump_counters = false;
+  // Parse /proc/[pid]/status, which looks like this:
+  // Name:   cat
+  // Umask:  0027
+  // State:  R (running)
+  // FDSize: 256
+  // Groups: 4 20 24 46 997
+  // VmPeak:     5992 kB
+  // VmSize:     5992 kB
+  // VmLck:         0 kB
+  // ...
   std::vector<char> key;
   std::vector<char> value;
   enum { kKey, kSeparator, kValue } state = kKey;
@@ -323,9 +338,11 @@ bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
       key.push_back('\0');
       value.push_back('\0');
 
+      // |value| will contain "1234 KB". We rely on strtol() (in ToU32()) to
+      // stop parsing at the first non-numeric character.
       if (strcmp(key.data(), "VmSize") == 0) {
         // Assume that if we see VmSize we'll see also the others.
-        did_dump_counters = true;
+        proc_status_has_mem_counters = true;
         get_counters_lazy()->set_vm_size_kb(ToU32(value.data()));
       } else if (strcmp(key.data(), "VmLck") == 0) {
         get_counters_lazy()->set_vm_locked_kb(ToU32(value.data()));
@@ -370,7 +387,7 @@ bool ProcessStatsDataSource::WriteProcessStats(int32_t pid,
       value.push_back(c);
     }
   }
-  return did_dump_counters;
+  return proc_status_has_mem_counters;
 }
 
 }  // namespace perfetto

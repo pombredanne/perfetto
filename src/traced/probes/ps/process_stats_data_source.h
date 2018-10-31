@@ -81,7 +81,7 @@ class ProcessStatsDataSource : public ProbesDataSource {
   void WriteProcessOrThread(int32_t pid);
   std::string ReadProcStatusEntry(const std::string& buf, const char* key);
 
-  // Functons for periodically sampling process stats/counters.
+  // Functions for periodically sampling process stats/counters.
   static void Tick(base::WeakPtr<ProcessStatsDataSource>);
   void WriteAllProcessStats();
   bool WriteProcessStats(int32_t pid, const std::string& proc_status);

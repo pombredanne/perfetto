@@ -445,7 +445,7 @@ void ProtoTraceParser::ParseProcMemCounters(uint64_t ts,
     if (!has_counter[field_id])
       continue;
 
-    // Lookup the itnerned string id from the field name using the
+    // Lookup the interned string id from the field name using the
     // pre-cached |proc_mem_counter_names_| map.
     StringId name = proc_mem_counter_names_[field_id];
     uint64_t value = counter_values[field_id];

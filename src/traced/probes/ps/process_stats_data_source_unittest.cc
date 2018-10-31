@@ -154,17 +154,17 @@ TEST_F(ProcessStatsDataSourceTest, MemCounters) {
   int iter = 0;
   for (int pid : kPids) {
     EXPECT_CALL(*data_source, ReadProcPidFile(pid, "status"))
-        .WillRepeatedly(
-            Invoke([checkpoint, kPids, &iter](int32_t p, const std::string&) {
-              char ret[1024];
-              sprintf(ret, "Name:	pid_10\nVmSize:	 %d kB\nVmRSS:\t%d  kB\n",
-                      p * 100 + iter * 10 + 1, p * 100 + iter * 10 + 2);
-              if (p == kPids[base::ArraySize(kPids) - 1]) {
-                if (++iter == kNumIters)
-                  checkpoint();
-              }
-              return std::string(ret);
-            }));
+        .WillRepeatedly(Invoke([checkpoint, kPids, &iter](int32_t p,
+                                                          const std::string&) {
+          char ret[1024];
+          sprintf(ret, "Name:	pid_10\nVmSize:	 %d kB\nVmRSS:\t%d  kB\n",
+                  p * 100 + iter * 10 + 1, p * 100 + iter * 10 + 2);
+          if (p == kPids[base::ArraySize(kPids) - 1]) {
+            if (++iter == kNumIters)
+              checkpoint();
+          }
+          return std::string(ret);
+        }));
   }
 
   data_source->Start();
