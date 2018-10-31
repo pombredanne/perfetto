@@ -126,6 +126,9 @@ button.close {
 }
 
 .alerts {
+  * {
+    user-select: text;
+  }
   grid-area: alerts;
   background-color: #f2f2f2;
   >div {
