@@ -28,8 +28,8 @@ class CounterTrackController extends TrackController<Config, Data> {
   static readonly kind = COUNTER_TRACK_KIND;
   private busy = false;
   private setup = false;
-  private maximum = 0;
-  private minimum = 0;
+  private maximumValue = 0;
+  private minimumValue = 0;
 
   onBoundsChange(start: number, end: number, resolution: number): void {
     this.update(start, end, resolution);
@@ -45,15 +45,16 @@ class CounterTrackController extends TrackController<Config, Data> {
 
     this.busy = true;
     if (!this.setup) {
-      const result = await this.query(`select max(value), min(value) from
-        counters where name = '${this.config.name}' and ref = ${
-                                                                this.config.ref
-                                                              }`);
-      this.maximum = +result.columns[0].doubleValues![0];
-      this.minimum = +result.columns[1].doubleValues![0];
+      const result = await this.query(`
+      select max(value), min(value) from
+        counters where name = '${this.config.name}'
+        and ref = ${this.config.ref}`);
+      this.maximumValue = +result.columns[0].doubleValues![0];
+      this.minimumValue = +result.columns[1].doubleValues![0];
       this.setup = true;
     }
 
+    // TODO(hjd): Implement window clipping.
     const query = `select ts, value from counters
         where ${startNs} <= ts and ts <= ${endNs}
         and name = '${this.config.name}' and ref = ${this.config.ref};`;
@@ -64,8 +65,8 @@ class CounterTrackController extends TrackController<Config, Data> {
     const data: Data = {
       start,
       end,
-      maximum: this.maximum,
-      minimum: this.minimum,
+      maximumValue: this.maximumValue,
+      minimumValue: this.minimumValue,
       resolution,
       timestamps: new Float64Array(numRows),
       values: new Float64Array(numRows),

@@ -18,8 +18,8 @@ export interface Data {
   start: number;
   end: number;
   resolution: number;
-  maximum: number;
-  minimum: number;
+  maximumValue: number;
+  minimumValue: number;
 
   timestamps: Float64Array;
   values: Float64Array;

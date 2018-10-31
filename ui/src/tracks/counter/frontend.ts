@@ -36,6 +36,15 @@ function getCurResolution() {
   return Math.pow(10, Math.floor(Math.log10(resolution)));
 }
 
+function computeHue(name: string, ref: number) {
+  let hue = 128;
+  for (let i = 0; i < name.length; i++) {
+    hue += name.charCodeAt(i);
+  }
+  hue += ref;
+  return hue % 256;
+}
+
 class CounterTrack extends Track<Config, Data> {
   static readonly kind = COUNTER_TRACK_KIND;
   static create(trackState: TrackState): CounterTrack {
@@ -44,11 +53,12 @@ class CounterTrack extends Track<Config, Data> {
 
   private reqPending = false;
   private mouseXpos = 0;
-  private hoveredTime: number|undefined = undefined;
   private hoveredValue: number|undefined = undefined;
+  private hue: number;
 
   constructor(trackState: TrackState) {
     super(trackState);
+    this.hue = computeHue(this.config.name, this.config.ref);
   }
 
   reqDataDeferred() {
@@ -101,7 +111,7 @@ class CounterTrack extends Track<Config, Data> {
     let lastX = startPx;
     let lastY = bottomY;
 
-    ctx.fillStyle = '#323D48';
+    ctx.fillStyle = `hsl(${this.hue}, 50%, 60%)`;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     for (let i = 0; i < data.values.length; i++) {
@@ -110,16 +120,18 @@ class CounterTrack extends Track<Config, Data> {
 
       lastX = Math.floor(timeScale.timeToPx(startTime));
 
+      const height = Math.round(RECT_HEIGHT * (1 - value / data.maximumValue));
       ctx.lineTo(lastX, lastY);
-      lastY = MARGIN_TOP + Math.round(RECT_HEIGHT * (1 - value / data.maximum));
+      lastY = MARGIN_TOP + height;
       ctx.lineTo(lastX, lastY);
     }
     ctx.lineTo(lastX, bottomY);
     ctx.closePath();
     ctx.fill();
 
-    if (this.hoveredTime) {
-      const text = `value: ${this.hoveredValue}`;
+    if (this.hoveredValue) {
+      // TODO(hjd): Add units.
+      const text = `value: ${this.hoveredValue.toLocaleString()}`;
 
       ctx.font = '10px Google Sans';
       const width = ctx.measureText(text).width;
@@ -137,17 +149,16 @@ class CounterTrack extends Track<Config, Data> {
     if (data === undefined) return;
     this.mouseXpos = x;
     const {timeScale} = globals.frontendLocalState;
-    this.hoveredTime = timeScale.pxToTime(x);
+    const time = timeScale.pxToTime(x);
     this.hoveredValue = undefined;
 
     for (let i = 0; i < data.values.length; i++) {
-      if (data.timestamps[i] > this.hoveredTime) break;
+      if (data.timestamps[i] > time) break;
       this.hoveredValue = data.values[i];
     }
   }
 
   onMouseOut() {
-    this.hoveredTime = undefined;
     this.hoveredValue = undefined;
   }
 }

@@ -221,6 +221,18 @@ export class TraceController extends Controller<States> {
     //  }));
     //}
 
+    for (let cpu = 0; cpu < numCpus; cpu++) {
+      addToTrackActions.push(Actions.addTrack({
+        engineId: this.engineId,
+        kind: CPU_SLICE_TRACK_KIND,
+        name: `Cpu ${cpu}`,
+        trackGroup: SCROLLING_TRACK_GROUP,
+        config: {
+          cpu,
+        }
+      }));
+    }
+
     {
       const result = await engine.query(`
          select distinct(name), ref_type from counters;
@@ -255,18 +267,6 @@ export class TraceController extends Controller<States> {
           //}
         }
       }
-    }
-
-    for (let cpu = 0; cpu < numCpus; cpu++) {
-      addToTrackActions.push(Actions.addTrack({
-        engineId: this.engineId,
-        kind: CPU_SLICE_TRACK_KIND,
-        name: `Cpu ${cpu}`,
-        trackGroup: SCROLLING_TRACK_GROUP,
-        config: {
-          cpu,
-        }
-      }));
     }
 
     // Local experiments shows getting maxDepth separately is ~2x faster than
