@@ -324,8 +324,6 @@ const CONFIG_PRESETS = [
       vmstatCounters: [],
       statPeriodMs: null,
       statCounters: [],
-
-      displayConfigAsPbtxt: false,
     },
   },
   {
@@ -353,8 +351,6 @@ const CONFIG_PRESETS = [
       vmstatCounters: [],
       statPeriodMs: null,
       statCounters: [],
-
-      displayConfigAsPbtxt: false,
     },
   },
 ];
@@ -592,7 +588,7 @@ export const RecordPage = createPage({
     } | null;
     return m(
       '.record-page',
-        {class: state.displayConfigAsPbtxt ? 'three' : 'two' },
+        {class: globals.state.displayConfigAsPbtxt ? 'three' : 'two' },
         m('.config.text-column',
           `To collect a Perfetto trace, use one of the following preset configs
           or customize the config manually before using the command on the
@@ -824,10 +820,12 @@ export const RecordPage = createPage({
 
           m(Toggle, {
             label: 'Display config as pbtxt',
-            value: state.displayConfigAsPbtxt,
+            value: globals.state.displayConfigAsPbtxt,
             enabled: true,
             help: '',
-            onchange: onChange<boolean>('displayConfigAsPbtxt'),
+            onchange: () => {
+              globals.dispatch(Actions.toggleDisplayConfigAsPbtxt({}));
+            },
           }),
 
 
@@ -842,7 +840,7 @@ export const RecordPage = createPage({
                 'Then click "Open trace file" in the menu to the left and select',
                 ' "/tmp/trace".'),
 
-              state.displayConfigAsPbtxt ?
+              globals.state.displayConfigAsPbtxt ?
                 m('.pbtxt.text-column',
                   `A Perfetto config controls what and how much information is
                   collected. It is encoded as a `,
