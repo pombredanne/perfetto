@@ -366,6 +366,10 @@ bool GenerateProto(const FtraceEvent& format, Proto* proto_out) {
     // this field, it's just easier to skip it.
     if (name == "" || seen.count(name) || name == "sa_handler")
       continue;
+    // To avoid clashing with the errno macro.
+    if (name == "errno") {
+      name = "err_no";
+    }
     seen.insert(name);
     ProtoType type = InferProtoType(field);
     // Check we managed to infer a type.
