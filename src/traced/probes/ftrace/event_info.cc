@@ -3740,8 +3740,7 @@ std::vector<Event> GetStaticEventInfo() {
     event->fields.push_back(MakeField("code", 1, kProtoInt32));
     event->fields.push_back(MakeField("errno", 2, kProtoInt32));
     event->fields.push_back(MakeField("sa_flags", 3, kProtoUint64));
-    event->fields.push_back(MakeField("sa_handler", 4, kProtoUint64));
-    event->fields.push_back(MakeField("sig", 5, kProtoInt32));
+    event->fields.push_back(MakeField("sig", 4, kProtoInt32));
   }
 
   {
