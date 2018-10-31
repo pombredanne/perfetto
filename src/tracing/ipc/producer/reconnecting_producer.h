@@ -23,63 +23,33 @@
 
 namespace perfetto {
 
-template <typename T>
 class ReconnectingProducer : public Producer {
  public:
-  ReconnectingProducer(const char* socket_name, base::TaskRunner* task_runner)
-      : socket_name_(socket_name), task_runner_(task_runner) {}
+  ReconnectingProducer(const char* producer_name,
+                       const char* socket_name,
+                       base::TaskRunner* task_runner,
+                       std::function<std::unique_ptr<Producer>(
+                           TracingService::ProducerEndpoint*)> factory);
 
-  void OnConnect() override {
-    PERFETTO_DCHECK(state_ == kConnecting);
-    PERFETTO_DCHECK(endpoint_);
-    state_ = kConnected;
-    ResetConnectionBackoff();
-    producer_.reset(new T(task_runner_, endpoint_.get()));
-    producer_->OnConnect();
-  }
+  void OnConnect() override;
 
-  void OnDisconnect() override {
-    PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
-    PERFETTO_LOG("Disconnected from tracing service");
-    if (state_ == kConnected) {
-      producer_.reset(nullptr);
-      return task_runner_->PostTask([this] { ConnectWithRetries(); });
-    }
-
-    state_ = kNotConnected;
-    IncreaseConnectionBackoff();
-    task_runner_->PostDelayedTask([this] { Connect(); },
-                                  connection_backoff_ms_);
-  }
+  void OnDisconnect() override;
 
   void SetupDataSource(DataSourceInstanceID id,
-                       const DataSourceConfig& cfg) override {
-    producer_->SetupDataSource(id, cfg);
-  }
+                       const DataSourceConfig& cfg) override;
 
   void StartDataSource(DataSourceInstanceID id,
-                       const DataSourceConfig& cfg) override {
-    producer_->StartDataSource(id, cfg);
-  }
+                       const DataSourceConfig& cfg) override;
 
-  void StopDataSource(DataSourceInstanceID id) override {
-    producer_->StopDataSource(id);
-  }
+  void StopDataSource(DataSourceInstanceID id) override;
 
-  void OnTracingSetup() override { producer_->OnTracingSetup(); }
+  void OnTracingSetup() override;
 
   void Flush(FlushRequestID id,
              const DataSourceInstanceID* data_source_ids,
-             size_t num_data_sources) override {
-    producer_->Flush(id, data_source_ids, num_data_sources);
-  }
+             size_t num_data_sources) override;
 
-  void ConnectWithRetries() {
-    PERFETTO_DCHECK(state_ == kNotStarted);
-    state_ = kNotConnected;
-    ResetConnectionBackoff();
-    Connect();
-  }
+  void ConnectWithRetries();
 
  private:
   static constexpr uint32_t kInitialConnectionBackoffMs = 100;
@@ -95,8 +65,8 @@ class ReconnectingProducer : public Producer {
   void Connect() {
     PERFETTO_DCHECK(state_ == kNotConnected);
     state_ = kConnecting;
-    endpoint_ =
-        ProducerIPCClient::Connect(socket_name_, this, T::name, task_runner_);
+    endpoint_ = ProducerIPCClient::Connect(socket_name_, this, producer_name_,
+                                           task_runner_);
   }
 
   void ResetConnectionBackoff() {
@@ -109,12 +79,15 @@ class ReconnectingProducer : public Producer {
       connection_backoff_ms_ = kMaxConnectionBackoffMs;
   }
 
+  const char* producer_name_;
   const char* socket_name_;
-  std::unique_ptr<T> producer_;
+  base::TaskRunner* const task_runner_;
+  std::function<std::unique_ptr<Producer>(TracingService::ProducerEndpoint*)>
+      factory_;
+  std::unique_ptr<Producer> producer_;
 
   uint32_t connection_backoff_ms_ = 0;
   State state_ = kNotStarted;
-  base::TaskRunner* task_runner_ = nullptr;
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
 };
 

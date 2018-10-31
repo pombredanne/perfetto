@@ -69,8 +69,12 @@ int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   }
 
   base::UnixTaskRunner task_runner;
-  ReconnectingProducer<ProbesProducer> producer(GetProducerSocket(),
-                                                &task_runner);
+  ReconnectingProducer producer(
+      "perfetto.traced_probes", GetProducerSocket(), &task_runner,
+      [&task_runner](TracingService::ProducerEndpoint* endpoint) {
+        return std::unique_ptr<Producer>(
+            new ProbesProducer(&task_runner, endpoint));
+      });
   producer.ConnectWithRetries();
   task_runner.Run();
   return 0;

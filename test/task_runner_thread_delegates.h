@@ -53,14 +53,18 @@ class ProbesProducerDelegate : public ThreadDelegate {
   ~ProbesProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(new ReconnectingProducer<ProbesProducer>(
-        producer_socket_.c_str(), task_runner));
+    producer_.reset(new ReconnectingProducer(
+        "perfetto.traced_probes", producer_socket_.c_str(), task_runner,
+        [task_runner](TracingService::ProducerEndpoint* endpoint) {
+          return std::unique_ptr<Producer>(
+              new ProbesProducer(task_runner, endpoint));
+        }));
     producer_->ConnectWithRetries();
   }
 
  private:
   std::string producer_socket_;
-  std::unique_ptr<ReconnectingProducer<ProbesProducer>> producer_;
+  std::unique_ptr<ReconnectingProducer> producer_;
 };
 
 class FakeProducerDelegate : public ThreadDelegate {
