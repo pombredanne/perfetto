@@ -26,11 +26,24 @@ namespace perfetto {
 namespace profiling {
 namespace {
 constexpr char kHeapprofdDataSource[] = "android.heapprofd";
-}
+constexpr size_t kUnwinderQueueSize = 1000;
+constexpr size_t kBookkeepingQueueSize = 1000;
+constexpr size_t kUnwinderThreads = 5;
+constexpr const char* kDumpOutput = "/data/local/tmp/heap_dump";
+constexpr uint64_t kDefaultSamplingInterval = 1;
+}  // namespace
 
 HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
                                      TracingService::ProducerEndpoint* endpoint)
-    : task_runner_(task_runner), endpoint_(endpoint) {}
+    : task_runner_(task_runner),
+      endpoint_(endpoint),
+      bookkeeping_queue_(kBookkeepingQueueSize),
+      bookkeeping_thread_(kDumpOutput),
+      unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
+      unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
+      socket_listener_({kDefaultSamplingInterval},
+                       MakeSocketListenerCallback(),
+                       &bookkeeping_thread_) {}
 
 HeapprofdProducer::~HeapprofdProducer() = default;
 
@@ -89,6 +102,33 @@ void HeapprofdProducer::Flush(FlushRequestID flush_id,
     data_source.Flush();
   }
   endpoint_->NotifyFlushComplete(flush_id);
+}
+
+std::function<void(UnwindingRecord)>
+HeapprofdProducer::MakeSocketListenerCallback() {
+  return [this](UnwindingRecord record) {
+    unwinder_queues_[static_cast<size_t>(record.pid) % kUnwinderThreads].Add(
+        std::move(record));
+  };
+}
+
+std::vector<BoundedQueue<UnwindingRecord>>
+HeapprofdProducer::MakeUnwinderQueues(size_t n) {
+  std::vector<BoundedQueue<UnwindingRecord>> ret(n);
+  for (size_t i = 0; i < n; ++i) {
+    ret[i].SetCapacity(kUnwinderQueueSize);
+  }
+  return ret;
+}
+
+std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreads(size_t n) {
+  std::vector<std::thread> ret;
+  for (size_t i = 0; i < n; ++i) {
+    ret.emplace_back([this, i] {
+      UnwindingMainLoop(&unwinder_queues_[i], &bookkeeping_queue_);
+    });
+  }
+  return ret;
 }
 
 }  // namespace profiling

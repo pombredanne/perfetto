@@ -21,6 +21,8 @@
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/tracing_service.h"
+#include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/socket_listener.h"
 
 #include <map>
 
@@ -45,6 +47,9 @@ class HeapprofdProducer : public Producer {
              size_t num_data_sources) override;
 
  private:
+  std::function<void(UnwindingRecord)> MakeSocketListenerCallback();
+  std::vector<BoundedQueue<UnwindingRecord>> MakeUnwinderQueues(size_t n);
+  std::vector<std::thread> MakeUnwindingThreads(size_t n);
   class DataSource {
    public:
     DataSource(const DataSourceConfig&) {}
@@ -55,6 +60,13 @@ class HeapprofdProducer : public Producer {
   TracingService::ProducerEndpoint* const endpoint_;
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
+
+  BoundedQueue<BookkeepingRecord> bookkeeping_queue_;
+  BookkeepingThread bookkeeping_thread_;
+  std::vector<BoundedQueue<UnwindingRecord>> unwinder_queues_;
+  std::vector<std::thread> unwinding_threads_;
+  SocketListener socket_listener_;
+  std::unique_ptr<base::UnixSocket> socket_;
 };
 
 }  // namespace profiling
