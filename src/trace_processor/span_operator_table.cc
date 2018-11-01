@@ -47,8 +47,8 @@ void SpanOperatorTable::RegisterTable(sqlite3* db,
 Table::Schema SpanOperatorTable::CreateSchema(int argc,
                                               const char* const* argv) {
   // argv[0] - argv[2] are SQLite populated fields which are always present.
-  if (argc < 6) {
-    PERFETTO_ELOG("SPAN JOIN expected at least 3 args, received %d", argc - 3);
+  if (argc < 5) {
+    PERFETTO_ELOG("SPAN JOIN expected at least 2 args, received %d", argc - 3);
     return Table::Schema({}, {});
   }
 
@@ -75,11 +75,10 @@ Table::Schema SpanOperatorTable::CreateSchema(int argc,
   cols.emplace_back(Column::kTimestamp, "ts", ColumnType::kUlong);
   cols.emplace_back(Column::kDuration, "dur", ColumnType::kUlong);
 
-  bool is_same_partition = t1_defn_.partition_col() == t1_defn_.partition_col();
-  if (is_same_partition) {
-    const auto& partition_col = t1_defn_.partition_col();
+  bool is_same_partition = t1_desc.partition_col == t2_desc.partition_col;
+  const auto& partition_col = t1_desc.partition_col;
+  if (is_same_partition)
     cols.emplace_back(Column::kPartition, partition_col, ColumnType::kLong);
-  }
 
   CreateSchemaColsForDefn(t1_defn_, is_same_partition, &cols);
   CreateSchemaColsForDefn(t2_defn_, is_same_partition, &cols);
@@ -93,11 +92,10 @@ void SpanOperatorTable::CreateSchemaColsForDefn(
     std::vector<Table::Column>* cols) {
   for (size_t i = 0; i < defn.columns().size(); i++) {
     const auto& n = defn.columns()[i].name();
-    if (n == "ts" || n == "dur") {
+    if (n == "ts" || n == "dur")
       continue;
-    } else if (n == defn.partition_col() && is_same_partition) {
+    else if (n == defn.partition_col() && is_same_partition)
       continue;
-    }
 
     ColumnLocator* locator = &global_index_to_column_locator_[cols->size()];
     locator->defn = &defn;
@@ -238,9 +236,9 @@ int SpanOperatorTable::Cursor::Column(sqlite3_context* context, int N) {
       size_t index = static_cast<size_t>(N);
       const auto& locator = table_->global_index_to_column_locator_[index];
       if (locator.defn == t1_.definition())
-        t1_.ReportSqliteResult(context, index);
+        t1_.ReportSqliteResult(context, locator.col_index);
       else
-        t2_.ReportSqliteResult(context, index);
+        t2_.ReportSqliteResult(context, locator.col_index);
       break;
     }
   }
@@ -284,6 +282,9 @@ std::string SpanOperatorTable::Cursor::TableQueryState::CreateSqlQuery(
   std::string sql;
   sql += "SELECT ts, dur, `" + defn_->partition_col() + "`";
   for (const auto& col : defn_->columns()) {
+    if (col.name() == "ts" || col.name() == "dur" ||
+        col.name() == defn_->partition_col())
+      continue;
     sql += ", " + col.name();
   }
   sql += " FROM " + defn_->name();

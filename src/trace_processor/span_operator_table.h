@@ -84,8 +84,6 @@ class SpanOperatorTable : public Table {
   int BestIndex(const QueryConstraints& qc, BestIndexInfo* info) override;
 
  private:
-  static constexpr uint8_t kReservedColumns = Column::kPartition + 1;
-
   // Parsed version of a table descriptor.
   struct TableDescriptor {
     static TableDescriptor Parse(const std::string& raw_descriptor);
