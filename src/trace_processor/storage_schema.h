@@ -125,6 +125,7 @@ class StorageSchema {
       auto max_it = std::upper_bound(min_it, deque_->end(), max);
       bounds.max_idx =
           static_cast<uint32_t>(std::distance(deque_->begin(), max_it));
+      bounds.consumed = true;
 
       return bounds;
     }
@@ -157,7 +158,8 @@ class StorageSchema {
     Table::ColumnType GetType() const override {
       if (std::is_same<T, int32_t>::value) {
         return Table::ColumnType::kInt;
-      } else if (std::is_same<T, uint32_t>::value) {
+      } else if (std::is_same<T, uint8_t>::value ||
+                 std::is_same<T, uint32_t>::value) {
         return Table::ColumnType::kUint;
       } else if (std::is_same<T, int64_t>::value) {
         return Table::ColumnType::kLong;
