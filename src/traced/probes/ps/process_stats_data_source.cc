@@ -300,6 +300,9 @@ void ProcessStatsDataSource::WriteAllProcessStats() {
     if (proc_status.empty())
       continue;
     if (!WriteProcessStats(pid, proc_status)) {
+      // If WriteProcessStats() fails the pid is very likely a kernel thread
+      // that has a valid /proc/[pid]/status but no memory values. In this
+      // case avoid keep polling it over and over.
       if (pids_to_skip_.size() <= pid_u)
         pids_to_skip_.resize(pid_u + 1);
       pids_to_skip_[pid_u] = true;
