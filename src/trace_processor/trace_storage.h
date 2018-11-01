@@ -221,9 +221,6 @@ class TraceStorage {
       values_.emplace_back(value);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
-      PERFETTO_LOG("adding event %lu, %lu, %.2f, %lu, %d", timestamp, name_id,
-                   value, ref, type);
-      PERFETTO_LOG("instant_events: %lu", instant_count() - 1);
       return instant_count() - 1;
     }
 
