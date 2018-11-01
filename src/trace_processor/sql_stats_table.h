@@ -28,7 +28,8 @@ namespace trace_processor {
 class QueryConstraints;
 class TraceStorage;
 
-// A virtual table that allows to list and query all the strings in the db.
+// A virtual table that allows to introspect performances of the SQL engine
+// for the kMaxLogEntries queries.
 class SqlStatsTable : public Table {
  public:
   enum Column {
