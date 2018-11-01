@@ -55,6 +55,9 @@ class HeapprofdProducer : public Producer {
   ClientConfiguration MakeClientConfiguration(const DataSourceConfig&);
 
   struct DataSource {
+    DataSource(std::vector<pid_t> p) : pids(p) {}
+
+    std::vector<pid_t> pids;
     // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
     // thread for unwinding.
     std::shared_ptr<TraceWriter> trace_writer;

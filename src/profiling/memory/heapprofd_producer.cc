@@ -61,7 +61,10 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   if (cfg.name() != kHeapprofdDataSource)
     return;
 
-  std::vector<uint64_t> pids = cfg.heapprofd_config().pid();
+  std::vector<pid_t> pids;
+  for (uint64_t pid : cfg.heapprofd_config().pid())
+    pids.emplace_back(static_cast<pid_t>(pid));
+
   if (pids.empty()) {
     // TODO(fmayer): Whole system profiling.
     PERFETTO_DLOG("No pids given");
@@ -75,16 +78,16 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
-  std::tie(it, std::ignore) = data_sources_.emplace(id, DataSource{});
+  std::tie(it, std::ignore) = data_sources_.emplace(id, pids);
   DataSource& data_source = it->second;
 
   auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
   data_source.trace_writer = endpoint_->CreateTraceWriter(buffer_id);
 
   ClientConfiguration client_config = MakeClientConfiguration(cfg);
-  for (uint64_t pid : pids) {
+  for (pid_t pid : pids) {
     data_source.sessions.emplace_back(
-        socket_listener_.ExpectPID(static_cast<pid_t>(pid), client_config));
+        socket_listener_.ExpectPID(pid, client_config));
   }
 }
 
@@ -113,6 +116,8 @@ void HeapprofdProducer::OnTracingSetup() {}
 void HeapprofdProducer::Flush(FlushRequestID,
                               const DataSourceInstanceID*,
                               size_t) {
+  DumpRecord dump_record;
+
   // TODO(fmayer): Flush
 }
 
