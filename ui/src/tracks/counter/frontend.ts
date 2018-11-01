@@ -103,12 +103,19 @@ class CounterTrack extends Track<Config, Data> {
 
     // Quantize the Y axis to quarters of powers of tens (7.5K, 10K, 12.5K).
     let yMax = data.maximumValue;
+    if (globals.frontendLocalState.countersDeltaMode) {
+      yMax = 0;
+      for (let i = 1; i < data.values.length; i++) {
+        yMax = Math.max(yMax, data.values[i] - data.values[i - 1]);
+      }
+    }
     const kUnits = ['', 'K', 'M', 'G', 'T', 'E'];
     const exp = Math.ceil(Math.log10(Math.max(yMax, 1)));
     const pow10 = Math.pow(10, exp);
     yMax = Math.ceil(yMax / (pow10 / 4)) * (pow10 / 4);
     const unitGroup = Math.floor(exp / 3);
     const yLabel = `${yMax / Math.pow(10, unitGroup * 3)} ${kUnits[unitGroup]}`;
+
     // There are 360deg of hue. We want a scale that starts at green with
     // exp <= 3 (<= 1KB), goes orange around exp = 6 (~1MB) and red/violet
     // around exp >= 9 (1GB).
@@ -125,7 +132,10 @@ class CounterTrack extends Track<Config, Data> {
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
     for (let i = 0; i < data.values.length; i++) {
-      const value = data.values[i];
+      let value = data.values[i];
+      if (globals.frontendLocalState.countersDeltaMode) {
+        value = Math.max(data.values[i] - data.values[i > 0 ? i - 1 : 0], 0);
+      }
       const startTime = data.timestamps[i];
 
       lastX = Math.floor(timeScale.timeToPx(startTime));
@@ -180,6 +190,9 @@ class CounterTrack extends Track<Config, Data> {
     for (let i = 0; i < data.values.length; i++) {
       if (data.timestamps[i] > time) break;
       this.hoveredValue = data.values[i];
+      if (globals.frontendLocalState.countersDeltaMode) {
+        this.hoveredValue -= data.values[i > 0 ? i - 1 : 0];
+      }
     }
   }
 
