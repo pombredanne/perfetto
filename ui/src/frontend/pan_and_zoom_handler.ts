@@ -154,6 +154,10 @@ export class PanAndZoomHandler {
       this.zoomAnimation.start(animationTime);
       clearTimeout(this.cancelZoomTimeout!);
     }
+
+    if (e.key === 'F1') {
+      globals.frontendLocalState.toggleCountersDeltaMode();
+    }
   }
 
   private onKeyUp(e: KeyboardEvent) {
