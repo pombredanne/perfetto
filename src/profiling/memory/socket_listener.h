@@ -32,11 +32,41 @@ namespace profiling {
 
 class SocketListener : public base::UnixSocket::EventListener {
  public:
-  SocketListener(ClientConfiguration client_config,
-                 std::function<void(UnwindingRecord)> fn,
+  friend class ProfilingSession;
+  class ProfilingSession {
+   public:
+    friend class SocketListener;
+
+    ProfilingSession(ProfilingSession&& other)
+        : pid_(other.pid_), listener_(other.listener_) {
+      other.listener_ = nullptr;
+    }
+
+    ~ProfilingSession() {
+      if (listener_)
+        listener_->ShutdownPID(pid_);
+    }
+    ProfilingSession& operator=(ProfilingSession&& other) {
+      pid_ = other.pid_;
+      listener_ = other.listener_;
+      other.listener_ = nullptr;
+      return *this;
+    }
+
+    ProfilingSession(const ProfilingSession&) = delete;
+    ProfilingSession& operator=(const ProfilingSession&) = delete;
+
+   private:
+    ProfilingSession(pid_t pid, SocketListener* listener)
+        : pid_(pid), listener_(listener) {}
+
+    pid_t pid_;
+    SocketListener* listener_ = nullptr;
+  };
+
+  SocketListener(std::function<void(UnwindingRecord)> fn,
                  BookkeepingThread* bookkeeping_thread)
-      : client_config_(client_config),
-        callback_function_(std::move(fn)),
+      : callback_function_(std::move(fn)),
         bookkeeping_thread_(bookkeeping_thread) {}
   void OnDisconnect(base::UnixSocket* self) override;
   void OnNewIncomingConnection(
@@ -44,7 +74,15 @@ class SocketListener : public base::UnixSocket::EventListener {
       std::unique_ptr<base::UnixSocket> new_connection) override;
   void OnDataAvailable(base::UnixSocket* self) override;
 
+  ProfilingSession ExpectPID(pid_t pid, ClientConfiguration cfg);
+
  private:
+  struct ProcessInfo {
+    ProcessInfo(ClientConfiguration cfg) : client_config(std::move(cfg)) {}
+    ClientConfiguration client_config;
+    std::set<base::UnixSocket*> sockets;
+  };
+
   struct Entry {
     Entry(std::unique_ptr<base::UnixSocket> s) : sock(std::move(s)) {}
     // Only here for ownership of the object.
@@ -66,10 +104,11 @@ class SocketListener : public base::UnixSocket::EventListener {
                    pid_t peer_pid,
                    base::ScopedFile maps_fd,
                    base::ScopedFile mem_fd);
+  void ShutdownPID(pid_t pid);
 
-  ClientConfiguration client_config_;
   std::map<base::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
+  std::map<pid_t, ProcessInfo> process_info_;
   std::function<void(UnwindingRecord)> callback_function_;
   BookkeepingThread* const bookkeeping_thread_;
 };

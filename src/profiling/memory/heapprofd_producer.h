@@ -50,16 +50,24 @@ class HeapprofdProducer : public Producer {
   std::function<void(UnwindingRecord)> MakeSocketListenerCallback();
   std::vector<BoundedQueue<UnwindingRecord>> MakeUnwinderQueues(size_t n);
   std::vector<std::thread> MakeUnwindingThreads(size_t n);
-  class DataSource {
-   public:
-    DataSource(const DataSourceConfig&) {}
-    void Start(base::TaskRunner*) {}
-    void Flush() {}
+  std::unique_ptr<base::UnixSocket> MakeSocket();
+
+  ClientConfiguration MakeClientConfiguration(const DataSourceConfig&);
+
+  struct DataSource {
+    // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
+    // thread for unwinding.
+    std::shared_ptr<TraceWriter> trace_writer;
+    // These are opaque handles that shut down the sockets in SocketListener
+    // once they go away.
+    std::vector<SocketListener::ProfilingSession> sessions;
   };
-  base::TaskRunner* const task_runner_;
-  TracingService::ProducerEndpoint* const endpoint_;
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
+
+  // These two are borrowed from the caller.
+  base::TaskRunner* const task_runner_;
+  TracingService::ProducerEndpoint* const endpoint_;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue_;
   BookkeepingThread bookkeeping_thread_;

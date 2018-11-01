@@ -17,6 +17,8 @@
 #include "src/profiling/memory/heapprofd_producer.h"
 
 #include <inttypes.h>
+#include <signal.h>
+#include <sys/types.h>
 
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
@@ -30,7 +32,8 @@ constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 constexpr const char* kDumpOutput = "/data/local/tmp/heap_dump";
-constexpr uint64_t kDefaultSamplingInterval = 1;
+constexpr int kHeapprofdSignal = 36;
+
 }  // namespace
 
 HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
@@ -41,9 +44,8 @@ HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
       bookkeeping_thread_(kDumpOutput),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
-      socket_listener_({kDefaultSamplingInterval},
-                       MakeSocketListenerCallback(),
-                       &bookkeeping_thread_) {}
+      socket_listener_(MakeSocketListenerCallback(), &bookkeeping_thread_),
+      socket_(MakeSocket()) {}
 
 HeapprofdProducer::~HeapprofdProducer() = default;
 
@@ -59,26 +61,47 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   if (cfg.name() != kHeapprofdDataSource)
     return;
 
-  auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
-  auto trace_writer = endpoint_->CreateTraceWriter(buffer_id);
+  std::vector<uint64_t> pids = cfg.heapprofd_config().pid();
+  if (pids.empty()) {
+    // TODO(fmayer): Whole system profiling.
+    PERFETTO_DLOG("No pids given");
+    return;
+  }
 
-  bool inserted;
-  std::tie(std::ignore, inserted) = data_sources_.emplace(id, cfg);
-  if (!inserted)
+  auto it = data_sources_.find(id);
+  if (it != data_sources_.end()) {
     PERFETTO_DFATAL("Received duplicated data source instance id: %" PRIu64,
                     id);
+    return;
+  }
+
+  std::tie(it, std::ignore) = data_sources_.emplace(id, DataSource{});
+  DataSource& data_source = it->second;
+
+  auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
+  data_source.trace_writer = endpoint_->CreateTraceWriter(buffer_id);
+
+  ClientConfiguration client_config = MakeClientConfiguration(cfg);
+  for (uint64_t pid : pids) {
+    data_source.sessions.emplace_back(
+        socket_listener_.ExpectPID(static_cast<pid_t>(pid), client_config));
+  }
 }
 
 void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
-                                        const DataSourceConfig&) {
+                                        const DataSourceConfig& cfg) {
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
     PERFETTO_DFATAL("Received invalid data source instance to start: %" PRIu64,
                     id);
     return;
   }
-  DataSource& data_source = it->second;
-  data_source.Start(task_runner_);
+
+  for (uint64_t pid : cfg.heapprofd_config().pid()) {
+    if (kill(static_cast<pid_t>(pid), kHeapprofdSignal) != 0) {
+      PERFETTO_DPLOG("kill");
+    }
+  }
 }
 
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
@@ -87,21 +110,10 @@ void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
 }
 
 void HeapprofdProducer::OnTracingSetup() {}
-void HeapprofdProducer::Flush(FlushRequestID flush_id,
-                              const DataSourceInstanceID* data_source_ids,
-                              size_t num_data_sources) {
-  for (size_t i = 0; i < num_data_sources; ++i) {
-    DataSourceInstanceID id = data_source_ids[i];
-    auto it = data_sources_.find(id);
-    if (it == data_sources_.end()) {
-      PERFETTO_DFATAL(
-          "Received invalid data source instance to start: %" PRIu64, id);
-      return;
-    }
-    DataSource& data_source = it->second;
-    data_source.Flush();
-  }
-  endpoint_->NotifyFlushComplete(flush_id);
+void HeapprofdProducer::Flush(FlushRequestID,
+                              const DataSourceInstanceID*,
+                              size_t) {
+  // TODO(fmayer): Flush
 }
 
 std::function<void(UnwindingRecord)>
@@ -129,6 +141,29 @@ std::vector<std::thread> HeapprofdProducer::MakeUnwindingThreads(size_t n) {
     });
   }
   return ret;
+}
+
+std::unique_ptr<base::UnixSocket> HeapprofdProducer::MakeSocket() {
+  const char* sock_fd = getenv(kHeapprofdSocketEnvVar);
+  if (sock_fd == nullptr) {
+    unlink(kHeapprofdSocketFile);
+    return base::UnixSocket::Listen(kHeapprofdSocketFile, &socket_listener_,
+                                    task_runner_);
+  }
+  char* end;
+  int raw_fd = static_cast<int>(strtol(sock_fd, &end, 10));
+  if (*end != '\0')
+    PERFETTO_FATAL("Invalid %s. Expected decimal integer.",
+                   kHeapprofdSocketEnvVar);
+  return base::UnixSocket::Listen(base::ScopedFile(raw_fd), &socket_listener_,
+                                  task_runner_);
+}
+
+ClientConfiguration HeapprofdProducer::MakeClientConfiguration(
+    const DataSourceConfig& cfg) {
+  ClientConfiguration client_config;
+  client_config.interval = cfg.heapprofd_config().sampling_interval_bytes();
+  return client_config;
 }
 
 }  // namespace profiling

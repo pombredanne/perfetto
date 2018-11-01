@@ -29,8 +29,18 @@ void SocketListener::OnNewIncomingConnection(
     base::UnixSocket*,
     std::unique_ptr<base::UnixSocket> new_connection) {
   base::UnixSocket* new_connection_raw = new_connection.get();
+  pid_t pid = new_connection_raw->peer_pid();
+
+  auto it = process_info_.find(pid);
+  if (it == process_info_.end()) {
+    PERFETTO_DFATAL("Unexpected connection.");
+    return;
+  }
+  ProcessInfo& process_info = it->second;
+
   sockets_.emplace(new_connection_raw, std::move(new_connection));
-  bookkeeping_thread_->NotifyClientConnected(new_connection_raw->peer_pid());
+  process_info.sockets.emplace(new_connection_raw);
+  bookkeeping_thread_->NotifyClientConnected(pid);
 }
 
 void SocketListener::OnDataAvailable(base::UnixSocket* self) {
@@ -40,6 +50,14 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
 
   Entry& entry = it->second;
   RecordReader::ReceiveBuffer buf = entry.record_reader.BeginReceive();
+
+  auto process_info_it = process_info_.find(self->peer_pid());
+  if (process_info_it == process_info_.end()) {
+    PERFETTO_DFATAL("This should not happen.");
+    return;
+  }
+  ProcessInfo& process_info = process_info_it->second;
+
   size_t rd;
   if (PERFETTO_LIKELY(entry.recv_fds)) {
     rd = self->Receive(buf.data, buf.size);
@@ -56,7 +74,8 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
       InitProcess(&entry, self->peer_pid(), std::move(fds[0]),
                   std::move(fds[1]));
       entry.recv_fds = true;
-      self->Send(&client_config_, sizeof(client_config_), -1,
+      self->Send(&process_info.client_config,
+                 sizeof(process_info.client_config), -1,
                  base::UnixSocket::BlockingMode::kBlocking);
     } else if (fds[0] || fds[1]) {
       PERFETTO_DLOG("Received partial FDs.");
@@ -77,6 +96,25 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
       self->Shutdown(true);
       break;
   }
+}
+
+SocketListener::ProfilingSession SocketListener::ExpectPID(
+    pid_t pid,
+    ClientConfiguration cfg) {
+  process_info_.emplace(pid, std::move(cfg));
+  return ProfilingSession(pid, this);
+}
+
+void SocketListener::ShutdownPID(pid_t pid) {
+  auto it = process_info_.find(pid);
+  if (it == process_info_.end()) {
+    PERFETTO_DFATAL("Shutting down nonexistant pid.");
+    return;
+  }
+  ProcessInfo& process_info = it->second;
+  // Disconnect all sockets for process.
+  for (base::UnixSocket* socket : process_info.sockets)
+    sockets_.erase(socket);
 }
 
 void SocketListener::InitProcess(Entry* entry,
