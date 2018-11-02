@@ -50,7 +50,7 @@ class CpuSliceTrackController extends TrackController<Config, Data> {
       await this.query(
           `create virtual table span_${this.trackState.id}
                 using span(sched PARTITIONED cpu,
-                           window_${this.trackState.id} PARTITIONED cpu);`);
+                           window_${this.trackState.id});`);
       this.setup = true;
     }
 

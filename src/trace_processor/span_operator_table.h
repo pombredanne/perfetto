@@ -105,6 +105,15 @@ class SpanOperatorTable : public Table {
     const std::string& partition_col() const { return partition_col_; }
     const std::vector<Table::Column>& columns() const { return cols_; }
 
+    int ColumnIndexByName(const std::string& name) const {
+      auto filter_fn = [&name](const Table::Column& c) {
+        return c.name() == name;
+      };
+      auto it = std::find_if(cols_.begin(), cols_.end(), filter_fn);
+      PERFETTO_CHECK(it != cols_.end());
+      return static_cast<int>(std::distance(cols_.begin(), it));
+    }
+
     bool is_parititioned() const { return partition_col_ != ""; }
 
    private:
@@ -113,11 +122,50 @@ class SpanOperatorTable : public Table {
     std::vector<Table::Column> cols_;
   };
 
-  // Cursor on the span table.
-  class Cursor : public Table::Cursor {
+  // State of a query on a particular table.
+  class TableQueryState {
    public:
-    Cursor(SpanOperatorTable*, sqlite3* db);
-    ~Cursor() override;
+    TableQueryState(SpanOperatorTable*, const TableDefinition*, sqlite3* db);
+
+    std::vector<std::string> ComputeConstraints(const QueryConstraints& qc,
+                                                sqlite3_value** argv);
+    std::string CreateSqlQuery(const std::vector<std::string>& cs,
+                               bool order_by_partition);
+    int PrepareRawStmt(const std::string& sql);
+
+    int Step();
+    void ReportSqliteResult(sqlite3_context* context, size_t index);
+
+    const TableDefinition* definition() const { return defn_; }
+
+    uint64_t ts_start() const { return ts_start_; }
+    uint64_t ts_end() const { return ts_end_; }
+    int64_t partition() const { return partition_; }
+
+   private:
+    ScopedStmt stmt_;
+
+    int ts_start_col_index_ = 0;
+    int dur_col_index_ = 0;
+    int partition_col_index_ = 0;
+
+    uint64_t ts_start_ = std::numeric_limits<uint64_t>::max();
+    uint64_t ts_end_ = std::numeric_limits<uint64_t>::max();
+    int64_t partition_ = std::numeric_limits<int64_t>::max();
+
+    const TableDefinition* const defn_;
+    sqlite3* const db_;
+    SpanOperatorTable* const table_;
+  };
+
+  // Cursor on the span table.
+  class SparseSinglePartitionCursor : public Table::Cursor {
+   public:
+    SparseSinglePartitionCursor(SpanOperatorTable*,
+                                sqlite3* db,
+                                const TableDefinition* partitioned,
+                                const TableDefinition* unpartitioned);
+    ~SparseSinglePartitionCursor() override;
 
     int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
     int Next() override;
@@ -125,36 +173,54 @@ class SpanOperatorTable : public Table {
     int Column(sqlite3_context* context, int N) override;
 
    private:
-    // State of a query on a particular table.
-    class TableQueryState {
-     public:
-      TableQueryState(SpanOperatorTable*, const TableDefinition*, sqlite3* db);
+    int UpdatePartitionedQuery();
 
-      int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
-      int StepAndCacheValues();
-      void ReportSqliteResult(sqlite3_context* context, size_t index);
+    TableQueryState partitioned_;
+    TableQueryState unpartitioned_;
 
-      const TableDefinition* definition() const { return defn_; }
+    std::vector<std::string> partitioned_constraints_;
 
-      uint64_t ts_start() const { return ts_start_; }
-      uint64_t ts_end() const { return ts_end_; }
-      int64_t partition() const { return partition_; }
+    SpanOperatorTable* const table_;
+  };
 
-     private:
-      std::string CreateSqlQuery(const std::vector<std::string>& cs);
-      int PrepareRawStmt(const std::string& sql);
+  // Cursor on the span table.
+  class DenseSinglePartitionCursor : public Table::Cursor {
+   public:
+    DenseSinglePartitionCursor(SpanOperatorTable*,
+                               sqlite3* db,
+                               const TableDefinition* partitioned,
+                               const TableDefinition* unpartitioned);
+    ~DenseSinglePartitionCursor() override;
 
-      ScopedStmt stmt_;
+    int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context* context, int N) override;
 
-      uint64_t ts_start_ = std::numeric_limits<uint64_t>::max();
-      uint64_t ts_end_ = std::numeric_limits<uint64_t>::max();
-      int64_t partition_ = std::numeric_limits<int64_t>::max();
+   private:
+    int UpdateUnpartitionedQuery();
 
-      const TableDefinition* const defn_;
-      sqlite3* const db_;
-      SpanOperatorTable* const table_;
-    };
+    TableQueryState partitioned_;
+    TableQueryState unpartitioned_;
+    TableQueryState* next_stepped_table_ = nullptr;
 
+    std::string unpartitioned_sql_;
+
+    SpanOperatorTable* const table_;
+  };
+
+  // Cursor on the span table.
+  class SamePartitionCursor : public Table::Cursor {
+   public:
+    SamePartitionCursor(SpanOperatorTable*, sqlite3* db);
+    ~SamePartitionCursor() override;
+
+    int Initialize(const QueryConstraints& qc, sqlite3_value** argv);
+    int Next() override;
+    int Eof() override;
+    int Column(sqlite3_context* context, int N) override;
+
+   private:
     TableQueryState t1_;
     TableQueryState t2_;
     TableQueryState* next_stepped_table_ = nullptr;
@@ -167,6 +233,10 @@ class SpanOperatorTable : public Table {
     const TableDefinition* defn;
     size_t col_index;
   };
+
+  static bool IsOverlappingSpan(TableQueryState* t1,
+                                TableQueryState* t2,
+                                TableQueryState** next_stepped_table);
 
   std::vector<std::string> ComputeSqlConstraintsForDefinition(
       const TableDefinition& defn,

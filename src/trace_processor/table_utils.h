@@ -42,13 +42,15 @@ inline RangeRowIterator CreateRangeIterator(
   for (size_t i = 0; i < cs.size(); i++) {
     const auto& c = cs[i];
     size_t column = static_cast<size_t>(c.iColumn);
-    auto bounds = schema.GetColumn(column).BoundFilter(c.op, argv[i]);
-    if (bounds.consumed) {
-      min_idx = std::max(min_idx, bounds.min_idx);
-      max_idx = std::min(max_idx, bounds.max_idx);
-    } else {
+    auto bounds = schema.GetColumn(column)->BoundFilter(c.op, argv[i]);
+    PERFETTO_DLOG("Column %zu. Op: %d. Consumed filter: %d", column, c.op,
+                  bounds.consumed);
+
+    min_idx = std::max(min_idx, bounds.min_idx);
+    max_idx = std::min(max_idx, bounds.max_idx);
+
+    if (!bounds.consumed)
       bitvector_cs.emplace_back(i);
-    }
   }
 
   // If we have no other constraints then we can just iterate between min
@@ -64,7 +66,7 @@ inline RangeRowIterator CreateRangeIterator(
     auto* value = argv[c_idx];
 
     auto col = static_cast<size_t>(c.iColumn);
-    auto predicate = schema.GetColumn(col).Filter(c.op, value);
+    auto predicate = schema.GetColumn(col)->Filter(c.op, value);
 
     auto b = filter.begin();
     auto e = filter.end();
@@ -88,7 +90,7 @@ inline std::pair<bool, bool> IsOrdered(
 
   const auto& ob = obs[0];
   auto col = static_cast<size_t>(ob.iColumn);
-  return std::make_pair(schema.GetColumn(col).IsNaturallyOrdered(), ob.desc);
+  return std::make_pair(schema.GetColumn(col)->IsNaturallyOrdered(), ob.desc);
 }
 
 inline std::vector<uint32_t> CreateSortedIndexVector(
@@ -104,7 +106,7 @@ inline std::vector<uint32_t> CreateSortedIndexVector(
   std::vector<StorageSchema::Column::Comparator> comparators;
   for (const auto& ob : obs) {
     auto col = static_cast<size_t>(ob.iColumn);
-    comparators.emplace_back(schema.GetColumn(col).Sort(ob));
+    comparators.emplace_back(schema.GetColumn(col)->Sort(ob));
   }
 
   auto comparator = [&comparators](uint32_t f, uint32_t s) {

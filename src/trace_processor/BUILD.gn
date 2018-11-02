@@ -57,6 +57,7 @@ source_set("lib") {
     "proto_trace_tokenizer.h",
     "query_constraints.cc",
     "query_constraints.h",
+    "query_utils.h",
     "row_iterators.cc",
     "row_iterators.h",
     "sched_slice_table.cc",

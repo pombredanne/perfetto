@@ -50,7 +50,7 @@ class StorageSchema {
 
     // Bounds a filter on this column between a minimum and maximum index.
     // Generally this is only possible if the column is sorted.
-    virtual Bounds BoundFilter(int op, sqlite3_value* value) const = 0;
+    virtual Bounds BoundFilter(int op, sqlite3_value* value) = 0;
 
     // Given a SQLite operator and value for the comparision, returns a
     // predicate which takes in a row index and returns whether the row should
@@ -91,7 +91,7 @@ class StorageSchema {
       sqlite_utils::ReportSqliteResult(ctx, (*deque_)[row]);
     }
 
-    Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override {
+    Bounds BoundFilter(int op, sqlite3_value* sqlite_val) override {
       Bounds bounds;
       bounds.max_idx = static_cast<uint32_t>(deque_->size());
 
@@ -125,6 +125,7 @@ class StorageSchema {
       auto max_it = std::upper_bound(min_it, deque_->end(), max);
       bounds.max_idx =
           static_cast<uint32_t>(std::distance(deque_->begin(), max_it));
+      bounds.consumed = true;
 
       return bounds;
     }
@@ -193,7 +194,7 @@ class StorageSchema {
       }
     }
 
-    Bounds BoundFilter(int, sqlite3_value*) const override {
+    Bounds BoundFilter(int, sqlite3_value*) override {
       Bounds bounds;
       bounds.max_idx = static_cast<uint32_t>(deque_->size());
       return bounds;
@@ -243,7 +244,7 @@ class StorageSchema {
 
     // Bounds a filter on this column between a minimum and maximum index.
     // Generally this is only possible if the column is sorted.
-    Bounds BoundFilter(int op, sqlite3_value* value) const override;
+    Bounds BoundFilter(int op, sqlite3_value* value) override;
 
     // Given a SQLite operator and value for the comparision, returns a
     // predicate which takes in a row index and returns whether the row should
@@ -265,6 +266,8 @@ class StorageSchema {
    private:
     const std::deque<uint64_t>* ts_start_;
     const std::deque<uint64_t>* dur_;
+
+    uint64_t max_dur_ = std::numeric_limits<uint64_t>::max();
   };
 
   StorageSchema();
@@ -281,7 +284,7 @@ class StorageSchema {
     return defns;
   }
 
-  const Column& GetColumn(size_t idx) const { return *(columns_[idx]); }
+  Column* GetColumn(size_t idx) const { return &*(columns_[idx]); }
 
   template <typename T>
   static std::unique_ptr<TsEndColumn> TsEndPtr(std::string column_name,

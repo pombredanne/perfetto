@@ -62,10 +62,32 @@ void StorageSchema::TsEndColumn::ReportResult(sqlite3_context* ctx,
 }
 
 StorageSchema::Column::Bounds StorageSchema::TsEndColumn::BoundFilter(
-    int,
-    sqlite3_value*) const {
+    int op,
+    sqlite3_value* value) {
   Bounds bounds;
   bounds.max_idx = static_cast<uint32_t>(ts_start_->size());
+
+  // Add a fast path for ts_end >= value queries as they are executed in span
+  // joins.
+  if (sqlite_utils::IsOpGe(op)) {
+    uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
+
+    // Find the max duration in the deque so we can do a lower bound operation
+    // in subsequent queries.
+    if (max_dur_ == std::numeric_limits<uint64_t>::max())
+      max_dur_ = *std::max_element(dur_->begin(), dur_->end());
+
+    uint64_t lower_bound = extracted - max_dur_;
+    auto it =
+        std::lower_bound(ts_start_->begin(), ts_start_->end(), lower_bound);
+
+    bounds.min_idx =
+        static_cast<uint32_t>(std::distance(ts_start_->begin(), it));
+
+    // Even though we have bounded the search space, we still need to check
+    // that items in the range meet the constraint.
+    bounds.consumed = false;
+  }
   return bounds;
 }
 

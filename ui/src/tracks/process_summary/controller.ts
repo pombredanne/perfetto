@@ -60,7 +60,7 @@ class ProcessSummaryTrackController extends TrackController<Config, Data> {
       await this.query(`create virtual table ${this.tableName('span')}
                      using span(${processSliceView} PARTITIONED cpu, ${
                                                        this.tableName('window')
-                                                     }  PARTITIONED cpu);`);
+                                                     });`);
       this.setup = true;
     }
 
