@@ -62,9 +62,10 @@ TraceType GuessTraceType(const uint8_t* data, size_t size) {
     return kUnknownTraceType;
   std::string start(reinterpret_cast<const char*>(data),
                     std::min<size_t>(size, 20));
-  if (IsPrefix("{\"traceEvents\":[", RemoveWhitespace(start)))
+  std::string start_minus_white_space = RemoveWhitespace(start);
+  if (IsPrefix("{\"traceEvents\":[", start_minus_white_space))
     return kJsonTraceType;
-  if (IsPrefix("[{", RemoveWhitespace(start)))
+  if (IsPrefix("[{", start_minus_white_space))
     return kJsonTraceType;
   return kProtoTraceType;
 }
