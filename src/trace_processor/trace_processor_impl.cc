@@ -23,6 +23,7 @@
 #include "perfetto/base/time.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
+#include "src/trace_processor/instants_table.h"
 #include "src/trace_processor/json_trace_parser.h"
 #include "src/trace_processor/process_table.h"
 #include "src/trace_processor/process_tracker.h"
@@ -31,7 +32,7 @@
 #include "src/trace_processor/sched_slice_table.h"
 #include "src/trace_processor/slice_table.h"
 #include "src/trace_processor/slice_tracker.h"
-#include "src/trace_processor/span_operator_table.h"
+#include "src/trace_processor/span_join_operator_table.h"
 #include "src/trace_processor/sql_stats_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
@@ -40,6 +41,21 @@
 #include "src/trace_processor/window_operator_table.h"
 
 #include "perfetto/trace_processor/raw_query.pb.h"
+
+// defined in sqlite_src/ext/misc/percentile.c
+extern "C" int sqlite3_percentile_init(sqlite3* db,
+                                       char** error,
+                                       const sqlite3_api_routines* api);
+
+namespace {
+void InitializeSqliteModules(sqlite3* db) {
+  char* error = nullptr;
+  sqlite3_percentile_init(db, &error, nullptr);
+  if (error != nullptr) {
+    PERFETTO_ELOG("Error initializing: %s", error);
+  }
+}
+}  // namespace
 
 namespace perfetto {
 namespace trace_processor {
@@ -73,6 +89,7 @@ TraceType GuessTraceType(const uint8_t* data, size_t size) {
 TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   sqlite3* db = nullptr;
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
+  InitializeSqliteModules(db);
   db_.reset(std::move(db));
 
   context_.storage.reset(new TraceStorage());
@@ -90,8 +107,9 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   StringTable::RegisterTable(*db_, context_.storage.get());
   ThreadTable::RegisterTable(*db_, context_.storage.get());
   CountersTable::RegisterTable(*db_, context_.storage.get());
-  SpanOperatorTable::RegisterTable(*db_, context_.storage.get());
+  SpanJoinOperatorTable::RegisterTable(*db_, context_.storage.get());
   WindowOperatorTable::RegisterTable(*db_, context_.storage.get());
+  InstantsTable::RegisterTable(*db_, context_.storage.get());
 }
 
 TraceProcessorImpl::~TraceProcessorImpl() = default;

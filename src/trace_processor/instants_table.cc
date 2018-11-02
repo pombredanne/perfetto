@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/slice_table.h"
+#include "src/trace_processor/instants_table.h"
 
 #include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table_utils.h"
@@ -22,61 +22,64 @@
 namespace perfetto {
 namespace trace_processor {
 
-SliceTable::SliceTable(sqlite3*, const TraceStorage* storage)
-    : storage_(storage) {}
+InstantsTable::InstantsTable(sqlite3*, const TraceStorage* storage)
+    : storage_(storage) {
+  ref_types_.resize(RefType::kMax);
+  ref_types_[RefType::kNoRef] = "";
+  ref_types_[RefType::kUtid] = "utid";
+  ref_types_[RefType::kCpuId] = "cpu";
+  ref_types_[RefType::kIrq] = "irq";
+  ref_types_[RefType::kSoftIrq] = "softirq";
+  ref_types_[RefType::kUpid] = "upid";
+};
 
-void SliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
-  Table::Register<SliceTable>(db, storage, "slices");
+void InstantsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
+  Table::Register<InstantsTable>(db, storage, "instants");
 }
 
-Table::Schema SliceTable::CreateSchema(int, const char* const*) {
-  const auto& slices = storage_->nestable_slices();
+Table::Schema InstantsTable::CreateSchema(int, const char* const*) {
+  const auto& instants = storage_->instants();
   std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("ts", &slices.start_ns(),
+      StorageSchema::NumericColumnPtr("ts", &instants.timestamps(),
                                       false /* hidden */, true /* ordered */),
-      StorageSchema::NumericColumnPtr("dur", &slices.durations()),
-      StorageSchema::NumericColumnPtr("utid", &slices.utids()),
-      StorageSchema::StringColumnPtr("cat", &slices.cats(),
+      StorageSchema::StringColumnPtr("name", &instants.name_ids(),
                                      &storage_->string_pool()),
-      StorageSchema::StringColumnPtr("name", &slices.names(),
-                                     &storage_->string_pool()),
-      StorageSchema::NumericColumnPtr("depth", &slices.depths()),
-      StorageSchema::NumericColumnPtr("stack_id", &slices.stack_ids()),
-      StorageSchema::NumericColumnPtr("parent_stack_id",
-                                      &slices.parent_stack_ids())};
+      StorageSchema::NumericColumnPtr("value", &instants.values()),
+      StorageSchema::NumericColumnPtr("ref", &instants.refs()),
+      StorageSchema::StringColumnPtr("ref_type", &instants.types(),
+                                     &ref_types_)};
   schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
   });
-  return schema_.ToTableSchema({"utid", "ts", "depth"});
+  return schema_.ToTableSchema({"name", "ts", "ref"});
 }
 
-std::unique_ptr<Table::Cursor> SliceTable::CreateCursor(
+std::unique_ptr<Table::Cursor> InstantsTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  uint32_t count =
-      static_cast<uint32_t>(storage_->nestable_slices().slice_count());
+  uint32_t count = static_cast<uint32_t>(storage_->instants().instant_count());
   auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
                                                                qc, argv);
   return std::unique_ptr<Table::Cursor>(
       new StorageCursor(std::move(it), schema_.ToColumnReporters()));
 }
 
-int SliceTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+int InstantsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   info->estimated_cost =
-      static_cast<uint32_t>(storage_->nestable_slices().slice_count());
+      static_cast<uint32_t>(storage_->counters().counter_count());
 
   // Only the string columns are handled by SQLite
   info->order_by_consumed = true;
   size_t name_index = schema_.ColumnIndexFromName("name");
-  size_t cat_index = schema_.ColumnIndexFromName("cat");
+  size_t ref_type_index = schema_.ColumnIndexFromName("ref_type");
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     info->omit[i] =
         qc.constraints()[i].iColumn != static_cast<int>(name_index) &&
-        qc.constraints()[i].iColumn != static_cast<int>(cat_index);
+        qc.constraints()[i].iColumn != static_cast<int>(ref_type_index);
   }
+
   return SQLITE_OK;
 }
-
 }  // namespace trace_processor
 }  // namespace perfetto

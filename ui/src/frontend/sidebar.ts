@@ -43,7 +43,8 @@ order by cpu_sec desc limit 100;`;
 
 const CYCLES_PER_P_STATE_PER_CPU = `
 select ref as cpu, value as freq, sum(dur * value)/1e6 as mcycles
-from counters group by cpu, freq order by mcycles desc limit 20;`;
+from counters where name = 'cpufreq' group by cpu, freq
+order by mcycles desc limit 32;`;
 
 const CPU_TIME_BY_CLUSTER_BY_PROCESS = `
 select process.name as process, thread, core, cpu_sec from (
@@ -76,10 +77,10 @@ function createCannedQuery(query: string): (_: Event) => void {
 }
 
 const EXAMPLE_ANDROID_TRACE_URL =
-    'https://storage.googleapis.com/perfetto-misc/example_trace_30s';
+    'https://storage.googleapis.com/perfetto-misc/example_android_trace_30s_1';
 
 const EXAMPLE_CHROME_TRACE_URL =
-    'https://storage.googleapis.com/perfetto-misc/example_chrome_trace_10s.json';
+    'https://storage.googleapis.com/perfetto-misc/example_chrome_trace_4s_1.json';
 
 const SECTIONS = [
   {

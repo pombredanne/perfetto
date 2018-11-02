@@ -65,7 +65,10 @@ class ProtoTraceParser {
   void ParseProcMemCounters(uint64_t timestamp, TraceBlobView);
   void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, TraceBlobView);
   void ParseCpuFreq(uint64_t timestamp, TraceBlobView);
-  void ParsePrint(uint32_t cpu, uint64_t timestamp, TraceBlobView);
+  void ParsePrint(uint32_t cpu,
+                  uint64_t timestamp,
+                  uint32_t pid,
+                  TraceBlobView);
   void ParseThread(TraceBlobView);
   void ParseProcess(TraceBlobView);
   void ParseSysStats(uint64_t ts, TraceBlobView);
@@ -76,6 +79,9 @@ class ProtoTraceParser {
   void ParseRssStat(uint64_t ts, uint32_t pid, TraceBlobView);
   void ParseIonHeapGrow(uint64_t ts, uint32_t pid, TraceBlobView);
   void ParseIonHeapShrink(uint64_t ts, uint32_t pid, TraceBlobView);
+  void ParseSignalDeliver(uint64_t ts, uint32_t pid, TraceBlobView);
+  void ParseSignalGenerate(uint64_t ts, TraceBlobView);
+  void ParseLowmemoryKill(uint64_t ts, TraceBlobView);
 
  private:
   TraceProcessorContext* context_;
@@ -94,6 +100,8 @@ class ProtoTraceParser {
   const StringId cpu_times_softirq_ns_id_;
   const StringId ion_heap_grow_id_;
   const StringId ion_heap_shrink_id_;
+  const StringId signal_deliver_id_;
+  const StringId signal_generate_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;
