@@ -16,6 +16,7 @@ import * as protos from '../gen/protos';
 
 // Aliases protos to avoid the super nested namespaces.
 // See https://www.typescriptlang.org/docs/handbook/namespaces.html#aliases
+import IProcessStatsConfig = protos.perfetto.protos.IProcessStatsConfig;
 import IRawQueryArgs = protos.perfetto.protos.IRawQueryArgs;
 import ISysStatsConfig = protos.perfetto.protos.ISysStatsConfig;
 import ITraceConfig = protos.perfetto.protos.ITraceConfig;
@@ -46,7 +47,28 @@ function getCell(result: RawQueryResult, column: number, row: number): number|
 }
 
 export function rawQueryResultColumns(result: RawQueryResult): string[] {
-  return result.columnDescriptors.map(d => d.name || '');
+  // Two columns can conflict on the same name, e.g.
+  // select x.foo, y.foo from x join y. In that case store them using the
+  // full table.column notation.
+  const res = [] as string[];
+  const uniqColNames = new Set<string>();
+  const colNamesToDedupe = new Set<string>();
+  for (const col of result.columnDescriptors) {
+    const colName = col.name || '';
+    if (uniqColNames.has(colName)) {
+      colNamesToDedupe.add(colName);
+    }
+    uniqColNames.add(colName);
+  }
+  for (let i = 0; i < result.columnDescriptors.length; i++) {
+    const colName = result.columnDescriptors[i].name || '';
+    if (colNamesToDedupe.has(colName)) {
+      res.push(`${colName}.${i + 1}`);
+    } else {
+      res.push(colName);
+    }
+  }
+  return res;
 }
 
 export function* rawQueryResultIter(result: RawQueryResult) {
@@ -62,14 +84,15 @@ export function* rawQueryResultIter(result: RawQueryResult) {
 }
 
 export {
-  TraceConfig,
-  ITraceConfig,
-  TraceProcessor,
+  IProcessStatsConfig,
   IRawQueryArgs,
   ISysStatsConfig,
+  ITraceConfig,
+  MeminfoCounters,
   RawQueryArgs,
   RawQueryResult,
-  MeminfoCounters,
-  VmstatCounters,
   StatCounters,
+  TraceConfig,
+  TraceProcessor,
+  VmstatCounters,
 };
