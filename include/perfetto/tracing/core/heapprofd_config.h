@@ -61,15 +61,15 @@ class PERFETTO_EXPORT HeapprofdConfig {
         const perfetto::protos::HeapprofdConfig_ContinousDumpConfig&);
     void ToProto(perfetto::protos::HeapprofdConfig_ContinousDumpConfig*) const;
 
-    uint64_t dump_phase_ms() const { return dump_phase_ms_; }
-    void set_dump_phase_ms(uint64_t value) { dump_phase_ms_ = value; }
+    uint32_t dump_phase_ms() const { return dump_phase_ms_; }
+    void set_dump_phase_ms(uint32_t value) { dump_phase_ms_ = value; }
 
-    uint64_t dump_interval_ms() const { return dump_interval_ms_; }
-    void set_dump_interval_ms(uint64_t value) { dump_interval_ms_ = value; }
+    uint32_t dump_interval_ms() const { return dump_interval_ms_; }
+    void set_dump_interval_ms(uint32_t value) { dump_interval_ms_ = value; }
 
    private:
-    uint64_t dump_phase_ms_ = {};
-    uint64_t dump_interval_ms_ = {};
+    uint32_t dump_phase_ms_ = {};
+    uint32_t dump_interval_ms_ = {};
 
     // Allows to preserve unknown protobuf fields for compatibility
     // with future versions of .proto files.
@@ -92,15 +92,15 @@ class PERFETTO_EXPORT HeapprofdConfig {
     sampling_interval_bytes_ = value;
   }
 
-  int native_process_name_size() const {
-    return static_cast<int>(native_process_name_.size());
+  int native_binary_name_size() const {
+    return static_cast<int>(native_binary_name_.size());
   }
-  const std::vector<std::string>& native_process_name() const {
-    return native_process_name_;
+  const std::vector<std::string>& native_binary_name() const {
+    return native_binary_name_;
   }
-  std::string* add_native_process_name() {
-    native_process_name_.emplace_back();
-    return &native_process_name_.back();
+  std::string* add_native_binary_name() {
+    native_binary_name_.emplace_back();
+    return &native_binary_name_.back();
   }
 
   int app_name_size() const { return static_cast<int>(app_name_.size()); }
@@ -129,7 +129,7 @@ class PERFETTO_EXPORT HeapprofdConfig {
 
  private:
   uint64_t sampling_interval_bytes_ = {};
-  std::vector<std::string> native_process_name_;
+  std::vector<std::string> native_binary_name_;
   std::vector<std::string> app_name_;
   std::vector<uint64_t> pid_;
   bool retain_max_ = {};

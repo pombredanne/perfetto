@@ -37,11 +37,13 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
+/*
 base::Event* g_dump_evt = nullptr;
 
 void DumpSignalHandler(int) {
   g_dump_evt->Notify();
 }
+*/
 
 // We create kUnwinderThreads unwinding threads and one bookeeping thread.
 // The bookkeeping thread is singleton in order to avoid expensive and

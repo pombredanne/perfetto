@@ -54,6 +54,10 @@ class HeapprofdProducer : public Producer {
 
   ClientConfiguration MakeClientConfiguration(const DataSourceConfig&);
   void FinishDataSourceFlush(FlushRequestID flush_id);
+  bool Dump(DataSourceInstanceID id,
+            FlushRequestID flush_id,
+            bool has_flush_id);
+  void DoContiniousDump(DataSourceInstanceID id, uint32_t dump_interval);
 
   struct DataSource {
     DataSource(std::vector<pid_t> p) : pids(p) {}
@@ -76,6 +80,7 @@ class HeapprofdProducer : public Producer {
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue_;
   BookkeepingThread bookkeeping_thread_;
+  std::thread bookkeeping_th_;
   std::vector<BoundedQueue<UnwindingRecord>> unwinder_queues_;
   std::vector<std::thread> unwinding_threads_;
   SocketListener socket_listener_;

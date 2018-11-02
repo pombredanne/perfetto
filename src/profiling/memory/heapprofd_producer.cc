@@ -34,6 +34,44 @@ constexpr size_t kUnwinderThreads = 5;
 constexpr const char* kDumpOutput = "/data/local/tmp/heap_dump";
 constexpr int kHeapprofdSignal = 36;
 
+void FindPidsForBinaries(std::vector<std::string> binaries,
+                         std::vector<pid_t>* pids) {
+  base::ScopedDir proc_dir(opendir("/proc"));
+  if (!proc_dir) {
+    PERFETTO_DFATAL("Failed to open /proc");
+    return;
+  }
+  struct dirent* entry;
+  while ((entry = readdir(*proc_dir))) {
+    char* end;
+    long int pid = strtol(entry->d_name, &end, 10);
+    if (*end != '\0') {
+      continue;
+    }
+
+    char link_buf[128];
+    char binary_buf[128];
+
+    if (snprintf(link_buf, sizeof(link_buf), "/proc/%lu/exe", pid) < 0) {
+      PERFETTO_DFATAL("Failed to create exe filename for %lu", pid);
+      continue;
+    }
+    ssize_t link_size = readlink(link_buf, binary_buf, sizeof(binary_buf));
+    if (link_size < 0) {
+      continue;
+    }
+    if (link_size == sizeof(binary_buf)) {
+      PERFETTO_DFATAL("Potential overflow in binary name.");
+      continue;
+    }
+    binary_buf[link_size] = '\0';
+    for (const std::string& binary : binaries) {
+      if (binary == binary_buf)
+        pids->emplace_back(static_cast<pid_t>(pid));
+    }
+  }
+}
+
 }  // namespace
 
 HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
@@ -42,6 +80,7 @@ HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
       endpoint_(endpoint),
       bookkeeping_queue_(kBookkeepingQueueSize),
       bookkeeping_thread_(kDumpOutput),
+      bookkeeping_th_([this] { bookkeeping_thread_.Run(&bookkeeping_queue_); }),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
       socket_listener_(MakeSocketListenerCallback(), &bookkeeping_thread_),
@@ -57,20 +96,18 @@ void HeapprofdProducer::OnConnect() {
 }
 
 void HeapprofdProducer::OnDisconnect() {}
+
 void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
                                         const DataSourceConfig& cfg) {
-  if (cfg.name() != kHeapprofdDataSource)
+  PERFETTO_DLOG("Setting up data source.");
+  if (cfg.name() != kHeapprofdDataSource) {
+    PERFETTO_DLOG("Invalid data source name.");
     return;
+  }
 
   std::vector<pid_t> pids;
   for (uint64_t pid : cfg.heapprofd_config().pid())
     pids.emplace_back(static_cast<pid_t>(pid));
-
-  if (pids.empty()) {
-    // TODO(fmayer): Whole system profiling.
-    PERFETTO_DLOG("No pids given");
-    return;
-  }
 
   auto it = data_sources_.find(id);
   if (it != data_sources_.end()) {
@@ -79,6 +116,8 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
+  FindPidsForBinaries(cfg.heapprofd_config().native_binary_name(), &pids);
+
   std::tie(it, std::ignore) = data_sources_.emplace(id, pids);
   DataSource& data_source = it->second;
 
@@ -86,14 +125,36 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   data_source.trace_writer = endpoint_->CreateTraceWriter(buffer_id);
 
   ClientConfiguration client_config = MakeClientConfiguration(cfg);
+
   for (pid_t pid : pids) {
     data_source.sessions.emplace_back(
         socket_listener_.ExpectPID(pid, client_config));
+  }
+
+  if (pids.empty()) {
+    // TODO(fmayer): Whole system profiling.
+    PERFETTO_DLOG("No pids given");
+  }
+  PERFETTO_DLOG("Set up data source.");
+}
+
+void HeapprofdProducer::DoContiniousDump(DataSourceInstanceID id,
+                                         uint32_t dump_interval) {
+  if (Dump(id, 0, false)) {
+    auto weak_producer = weak_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_producer, id, dump_interval] {
+          if (!weak_producer)
+            return;
+          weak_producer->DoContiniousDump(id, dump_interval);
+        },
+        dump_interval);
   }
 }
 
 void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
                                         const DataSourceConfig& cfg) {
+  PERFETTO_DLOG("Start DataSource");
   auto it = data_sources_.find(id);
   if (it == data_sources_.end()) {
     PERFETTO_DFATAL("Received invalid data source instance to start: %" PRIu64,
@@ -101,11 +162,29 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
     return;
   }
 
-  for (uint64_t pid : cfg.heapprofd_config().pid()) {
-    if (kill(static_cast<pid_t>(pid), kHeapprofdSignal) != 0) {
+  const DataSource& data_source = it->second;
+
+  for (pid_t pid : data_source.pids) {
+    PERFETTO_DLOG("Sending %d to %d", kHeapprofdSignal, pid);
+    if (kill(pid, kHeapprofdSignal) != 0) {
       PERFETTO_DPLOG("kill");
     }
   }
+
+  const auto continuous_dump_config =
+      cfg.heapprofd_config().continuous_dump_config();
+  uint32_t dump_interval = continuous_dump_config.dump_interval_ms();
+  if (dump_interval) {
+    auto weak_producer = weak_factory_.GetWeakPtr();
+    task_runner_->PostDelayedTask(
+        [weak_producer, id, dump_interval] {
+          if (!weak_producer)
+            return;
+          weak_producer->DoContiniousDump(id, dump_interval);
+        },
+        continuous_dump_config.dump_phase_ms());
+  }
+  PERFETTO_DLOG("Started DataSource");
 }
 
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
@@ -114,38 +193,53 @@ void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
 }
 
 void HeapprofdProducer::OnTracingSetup() {}
-void HeapprofdProducer::Flush(FlushRequestID flush_id,
-                              const DataSourceInstanceID* ids,
-                              size_t num_ids) {
-  size_t& flush_in_progress = flushes_in_progress_[flush_id];
-  PERFETTO_DCHECK(flush_in_progress == 0);
-  flush_in_progress = num_ids;
-  for (size_t i = 0; i < num_ids; ++i) {
-    auto it = data_sources_.find(ids[i]);
-    if (it == data_sources_.end()) {
-      PERFETTO_DFATAL("Trying to flush invalid data source.");
-      continue;
-    }
-    const DataSource& data_source = it->second;
-    DumpRecord dump_record;
-    dump_record.pids = data_source.pids;
-    dump_record.trace_writer = data_source.trace_writer;
 
-    auto weak_producer = weak_factory_.GetWeakPtr();
-    base::TaskRunner* task_runner = task_runner_;
+bool HeapprofdProducer::Dump(DataSourceInstanceID id,
+                             FlushRequestID flush_id,
+                             bool has_flush_id) {
+  PERFETTO_DLOG("Dumping %" PRIu64 ", flush: %d", id, has_flush_id);
+  auto it = data_sources_.find(id);
+  if (it == data_sources_.end()) {
+    return false;
+  }
+
+  const DataSource& data_source = it->second;
+  BookkeepingRecord record{};
+  record.record_type = BookkeepingRecord::Type::Dump;
+  DumpRecord& dump_record = record.dump_record;
+  dump_record.pids = data_source.pids;
+  dump_record.trace_writer = data_source.trace_writer;
+
+  auto weak_producer = weak_factory_.GetWeakPtr();
+  base::TaskRunner* task_runner = task_runner_;
+  if (has_flush_id) {
     dump_record.callback = [task_runner, weak_producer, flush_id] {
       task_runner->PostTask([weak_producer, flush_id] {
         if (!weak_producer)
           return weak_producer->FinishDataSourceFlush(flush_id);
       });
     };
+  } else {
+    dump_record.callback = [] {};
   }
+
+  bookkeeping_queue_.Add(std::move(record));
+  return true;
+}
+void HeapprofdProducer::Flush(FlushRequestID flush_id,
+                              const DataSourceInstanceID* ids,
+                              size_t num_ids) {
+  size_t& flush_in_progress = flushes_in_progress_[flush_id];
+  PERFETTO_DCHECK(flush_in_progress == 0);
+  flush_in_progress = num_ids;
+  for (size_t i = 0; i < num_ids; ++i)
+    Dump(ids[i], flush_id, true);
 }
 
 void HeapprofdProducer::FinishDataSourceFlush(FlushRequestID flush_id) {
   size_t& flush_in_progress = flushes_in_progress_[flush_id];
   if (flush_in_progress == 0) {
-    PERFETTO_DFATAL("Too many FinishDatasourceFlush for %" PRIu64, flush_id);
+    PERFETTO_DFATAL("Too many FinishDataSourceFlush for %" PRIu64, flush_id);
     return;
   }
   if (--flush_in_progress == 0)

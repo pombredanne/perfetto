@@ -44,6 +44,8 @@ void SocketListener::OnNewIncomingConnection(
 }
 
 void SocketListener::OnDataAvailable(base::UnixSocket* self) {
+  pid_t pid = self->peer_pid();
+
   auto it = sockets_.find(self);
   if (it == sockets_.end())
     return;
@@ -51,7 +53,7 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
   Entry& entry = it->second;
   RecordReader::ReceiveBuffer buf = entry.record_reader.BeginReceive();
 
-  auto process_info_it = process_info_.find(self->peer_pid());
+  auto process_info_it = process_info_.find(pid);
   if (process_info_it == process_info_.end()) {
     PERFETTO_DFATAL("This should not happen.");
     return;
@@ -71,16 +73,16 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
     base::ScopedFile fds[2];
     rd = self->Receive(buf.data, buf.size, fds, base::ArraySize(fds));
     if (fds[0] && fds[1]) {
-      InitProcess(&entry, self->peer_pid(), std::move(fds[0]),
-                  std::move(fds[1]));
+      PERFETTO_DLOG("%d: Received FDs.", pid);
+      InitProcess(&entry, pid, std::move(fds[0]), std::move(fds[1]));
       entry.recv_fds = true;
       self->Send(&process_info.client_config,
                  sizeof(process_info.client_config), -1,
                  base::UnixSocket::BlockingMode::kBlocking);
     } else if (fds[0] || fds[1]) {
-      PERFETTO_DLOG("Received partial FDs.");
+      PERFETTO_DLOG("%d: Received partial FDs.", pid);
     } else {
-      PERFETTO_DLOG("Received no FDs.");
+      PERFETTO_DLOG("%d: Received no FDs.", pid);
     }
   }
   RecordReader::Record record;
@@ -101,11 +103,13 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
 SocketListener::ProfilingSession SocketListener::ExpectPID(
     pid_t pid,
     ClientConfiguration cfg) {
+  PERFETTO_PLOG("Expecting connecting from %d", pid);
   process_info_.emplace(pid, std::move(cfg));
   return ProfilingSession(pid, this);
 }
 
 void SocketListener::ShutdownPID(pid_t pid) {
+  PERFETTO_PLOG("Shutting down connecting from %d", pid);
   auto it = process_info_.find(pid);
   if (it == process_info_.end()) {
     PERFETTO_DFATAL("Shutting down nonexistant pid.");
