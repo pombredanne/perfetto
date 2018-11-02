@@ -37,39 +37,6 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-/*
-base::Event* g_dump_evt = nullptr;
-
-void DumpSignalHandler(int) {
-  g_dump_evt->Notify();
-}
-*/
-
-// We create kUnwinderThreads unwinding threads and one bookeeping thread.
-// The bookkeeping thread is singleton in order to avoid expensive and
-// complicated synchronisation in the bookkeeping.
-//
-// We wire up the system by creating BoundedQueues between the threads. The main
-// thread runs the TaskRunner driving the SocketListener. The unwinding thread
-// takes the data received by the SocketListener and if it is a malloc does
-// stack unwinding, and if it is a free just forwards the content of the record
-// to the bookkeeping thread.
-//
-//             +--------------+
-//             |SocketListener|
-//             +------+-------+
-//                    |
-//          +--UnwindingRecord -+
-//          |                   |
-// +--------v-------+   +-------v--------+
-// |Unwinding Thread|   |Unwinding Thread|
-// +--------+-------+   +-------+--------+
-//          |                   |
-//          +-BookkeepingRecord +
-//                    |
-//           +--------v---------+
-//           |Bookkeeping Thread|
-//           +------------------+
 int HeapprofdMain(int, char**) {
   base::UnixTaskRunner task_runner;
   ReconnectingProducer producer(
