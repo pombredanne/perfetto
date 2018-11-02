@@ -53,6 +53,7 @@ class HeapprofdProducer : public Producer {
   std::unique_ptr<base::UnixSocket> MakeSocket();
 
   ClientConfiguration MakeClientConfiguration(const DataSourceConfig&);
+  void FinishDataSourceFlush(FlushRequestID flush_id);
 
   struct DataSource {
     DataSource(std::vector<pid_t> p) : pids(p) {}
@@ -67,6 +68,7 @@ class HeapprofdProducer : public Producer {
   };
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
+  std::map<FlushRequestID, size_t> flushes_in_progress_;
 
   // These two are borrowed from the caller.
   base::TaskRunner* const task_runner_;
@@ -78,6 +80,8 @@ class HeapprofdProducer : public Producer {
   std::vector<std::thread> unwinding_threads_;
   SocketListener socket_listener_;
   std::unique_ptr<base::UnixSocket> socket_;
+
+  base::WeakPtrFactory<HeapprofdProducer> weak_factory_;
 };
 
 }  // namespace profiling

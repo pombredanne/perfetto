@@ -522,12 +522,14 @@ message HeapprofdConfig {
 
   // Set to 1 for perfect accuracy.
   optional uint64 sampling_interval_bytes = 1;
-  repeated string process_name = 2;
-  // For watermark based triggering.
-  repeated uint64 pid = 3;
 
-  optional bool retain_max = 4;
-  optional ContinousDumpConfig continuous_dump_config = 5;
+  repeated string native_process_name = 2;
+  repeated string app_name = 3;
+  // For watermark based triggering.
+  repeated uint64 pid = 4;
+
+  optional bool retain_max = 5;
+  optional ContinousDumpConfig continuous_dump_config = 6;
 }
 
 // End of protos/perfetto/config/profiling/heapprofd_config.proto

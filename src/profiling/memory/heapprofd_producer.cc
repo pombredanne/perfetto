@@ -45,7 +45,8 @@ HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
       unwinding_threads_(MakeUnwindingThreads(kUnwinderThreads)),
       socket_listener_(MakeSocketListenerCallback(), &bookkeeping_thread_),
-      socket_(MakeSocket()) {}
+      socket_(MakeSocket()),
+      weak_factory_(this) {}
 
 HeapprofdProducer::~HeapprofdProducer() = default;
 
@@ -113,12 +114,44 @@ void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
 }
 
 void HeapprofdProducer::OnTracingSetup() {}
-void HeapprofdProducer::Flush(FlushRequestID,
-                              const DataSourceInstanceID*,
-                              size_t) {
-  DumpRecord dump_record;
+void HeapprofdProducer::Flush(FlushRequestID flush_id,
+                              const DataSourceInstanceID* ids,
+                              size_t num_ids) {
+  size_t& flush_in_progress = flushes_in_progress_[flush_id];
+  PERFETTO_DCHECK(flush_in_progress == 0);
+  flush_in_progress = num_ids;
+  for (size_t i = 0; i < num_ids; ++i) {
+    auto it = data_sources_.find(ids[i]);
+    if (it == data_sources_.end()) {
+      PERFETTO_DFATAL("Trying to flush invalid data source.");
+      continue;
+    }
+    const DataSource& data_source = it->second;
+    DumpRecord dump_record;
+    dump_record.pids = data_source.pids;
+    dump_record.trace_writer = data_source.trace_writer;
 
-  // TODO(fmayer): Flush
+    auto weak_producer = weak_factory_.GetWeakPtr();
+    base::TaskRunner* task_runner = task_runner_;
+    dump_record.callback = [task_runner, weak_producer, flush_id] {
+      task_runner->PostTask([weak_producer, flush_id] {
+        if (!weak_producer)
+          return weak_producer->FinishDataSourceFlush(flush_id);
+      });
+    };
+  }
+}
+
+void HeapprofdProducer::FinishDataSourceFlush(FlushRequestID flush_id) {
+  size_t& flush_in_progress = flushes_in_progress_[flush_id];
+  if (flush_in_progress == 0) {
+    PERFETTO_DFATAL("Too many FinishDatasourceFlush for %" PRIu64, flush_id);
+    return;
+  }
+  if (--flush_in_progress == 0)
+    endpoint_->NotifyFlushComplete(flush_id);
+
+  flushes_in_progress_.erase(flush_id);
 }
 
 std::function<void(UnwindingRecord)>

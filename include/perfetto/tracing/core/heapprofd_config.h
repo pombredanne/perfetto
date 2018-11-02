@@ -92,13 +92,22 @@ class PERFETTO_EXPORT HeapprofdConfig {
     sampling_interval_bytes_ = value;
   }
 
-  int process_name_size() const {
-    return static_cast<int>(process_name_.size());
+  int native_process_name_size() const {
+    return static_cast<int>(native_process_name_.size());
   }
-  const std::vector<std::string>& process_name() const { return process_name_; }
-  std::string* add_process_name() {
-    process_name_.emplace_back();
-    return &process_name_.back();
+  const std::vector<std::string>& native_process_name() const {
+    return native_process_name_;
+  }
+  std::string* add_native_process_name() {
+    native_process_name_.emplace_back();
+    return &native_process_name_.back();
+  }
+
+  int app_name_size() const { return static_cast<int>(app_name_.size()); }
+  const std::vector<std::string>& app_name() const { return app_name_; }
+  std::string* add_app_name() {
+    app_name_.emplace_back();
+    return &app_name_.back();
   }
 
   int pid_size() const { return static_cast<int>(pid_.size()); }
@@ -120,7 +129,8 @@ class PERFETTO_EXPORT HeapprofdConfig {
 
  private:
   uint64_t sampling_interval_bytes_ = {};
-  std::vector<std::string> process_name_;
+  std::vector<std::string> native_process_name_;
+  std::vector<std::string> app_name_;
   std::vector<uint64_t> pid_;
   bool retain_max_ = {};
   ContinousDumpConfig continuous_dump_config_ = {};
