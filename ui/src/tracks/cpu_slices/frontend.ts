@@ -209,7 +209,7 @@ class CpuSliceTrack extends Track<Config, Data> {
       // chrome_slices/frontend.ts.
       let title = `[utid:${utid}]`;
       let subTitle = '';
-      let color = Object.assign({}, MD_PALETTE[14]);
+      const color = Object.assign({}, MD_PALETTE[14]);
 
       const threadInfo = globals.threads.get(utid);
       if (threadInfo !== undefined) {
@@ -217,7 +217,7 @@ class CpuSliceTrack extends Track<Config, Data> {
         title = `${procName} [${threadInfo.pid}]`;
         subTitle = `${threadInfo.threadName} [${threadInfo.tid}]`;
         const colorIdx = hash(threadInfo.pid.toString(), 16);
-        color = Object.assign({}, MD_PALETTE[colorIdx]);
+        Object.assign(color, MD_PALETTE[colorIdx]);
       }
 
       const hovered = globals.frontendLocalState.highlightedUtid === utid;
