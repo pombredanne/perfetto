@@ -161,6 +161,7 @@ source_set("unittests") {
     "slice_tracker_unittest.cc",
     "span_operator_table_unittest.cc",
     "thread_table_unittest.cc",
+    "trace_processor_impl_unittest.cc",
     "trace_sorter_unittest.cc",
   ]
   deps = [

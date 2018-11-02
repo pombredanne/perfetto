@@ -17,6 +17,7 @@
 #include "src/trace_processor/trace_processor_impl.h"
 
 #include <sqlite3.h>
+#include <algorithm>
 #include <functional>
 
 #include "perfetto/base/time.h"
@@ -42,6 +43,31 @@
 
 namespace perfetto {
 namespace trace_processor {
+namespace {
+
+bool IsPrefix(const std::string& a, const std::string& b) {
+  return a.size() <= b.size() && b.substr(0, a.size()) == a;
+}
+
+std::string RemoveWhitespace(const std::string& input) {
+  std::string str(input);
+  str.erase(std::remove_if(str.begin(), str.end(), ::isspace), str.end());
+  return str;
+}
+
+}  // namespace
+
+TraceType GuessTraceType(const uint8_t* data, size_t size) {
+  if (size == 0)
+    return kUnknownTraceType;
+  std::string start(reinterpret_cast<const char*>(data),
+                    std::min<size_t>(size, 20));
+  if (IsPrefix("{\"traceEvents\":[", RemoveWhitespace(start)))
+    return kJsonTraceType;
+  if (IsPrefix("[{", RemoveWhitespace(start)))
+    return kJsonTraceType;
+  return kProtoTraceType;
+}
 
 TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   sqlite3* db = nullptr;
@@ -78,15 +104,17 @@ bool TraceProcessorImpl::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
   // If this is the first Parse() call, guess the trace type and create the
   // appropriate parser.
   if (!context_.chunk_reader) {
-    char buf[32];
-    memcpy(buf, &data[0], std::min(size, sizeof(buf)));
-    buf[sizeof(buf) - 1] = '\0';
-    const size_t kPreambleLen = strlen(JsonTraceParser::kPreamble);
-    if (strncmp(buf, JsonTraceParser::kPreamble, kPreambleLen) == 0) {
-      PERFETTO_DLOG("Legacy JSON trace detected");
-      context_.chunk_reader.reset(new JsonTraceParser(&context_));
-    } else {
-      context_.chunk_reader.reset(new ProtoTraceTokenizer(&context_));
+    TraceType trace_type = GuessTraceType(data.get(), size);
+    switch (trace_type) {
+      case kJsonTraceType:
+        PERFETTO_DLOG("Legacy JSON trace detected");
+        context_.chunk_reader.reset(new JsonTraceParser(&context_));
+        break;
+      case kProtoTraceType:
+        context_.chunk_reader.reset(new ProtoTraceTokenizer(&context_));
+        break;
+      case kUnknownTraceType:
+        return false;
     }
   }
 

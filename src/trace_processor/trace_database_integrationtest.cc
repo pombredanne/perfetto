@@ -76,7 +76,7 @@ TEST_F(TraceProcessorIntegrationTest, AndroidSchedAndPs) {
 }
 
 TEST_F(TraceProcessorIntegrationTest, Sfgate) {
-  ASSERT_TRUE(LoadTrace("sfgate.json", strlen(JsonTraceParser::kPreamble)));
+  LoadTrace("sfgate.json", strlen("{\"traceEvents\":["));
   protos::RawQueryResult res;
   Query("select count(*), max(ts) - min(ts) from slices where utid != 0", &res);
   ASSERT_EQ(res.num_records(), 1);
