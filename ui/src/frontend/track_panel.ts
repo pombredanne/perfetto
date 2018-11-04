@@ -34,21 +34,52 @@ function isPinned(id: string) {
 interface TrackShellAttrs {
   trackState: TrackState;
 }
+
 class TrackShell implements m.ClassComponent<TrackShellAttrs> {
+  private dragging = false;
+  private dropping: 'before'|'after'|undefined = undefined;
+
   view({attrs}: m.CVnode<TrackShellAttrs>) {
+    const dragClass = this.dragging ? `.drag` : '';
+    const dropClass = this.dropping ? `.drop-${this.dropping}` : '';
     return m(
-        '.track-shell',
+        `.track-shell${dragClass}${dropClass}[draggable=true]`,
+        {
+          ondragstart: (e: DragEvent) => {
+            this.dragging = true;
+            e.dataTransfer!.setData('perfetto/track', `${attrs.trackState.id}`);
+            globals.rafScheduler.scheduleFullRedraw();
+          },
+          ondragend: () => {
+            this.dragging = false;
+            globals.rafScheduler.scheduleFullRedraw();
+          },
+          ondragover: (e: DragEvent) => {
+            if (this.dragging) return;
+            if (e.dataTransfer!.types.indexOf('perfetto/track') < 0) {
+              return;
+            }
+            this.dropping =
+                e.offsetY < e.toElement.scrollHeight / 2 ? 'before' : 'after';
+            globals.rafScheduler.scheduleFullRedraw();
+            e.dataTransfer!.dropEffect = 'move';
+            e.preventDefault();
+          },
+          ondragleave: () => {
+            this.dropping = undefined;
+            globals.rafScheduler.scheduleFullRedraw();
+          },
+          ondrop: (e: DragEvent) => {
+            if (this.dropping === undefined) return;
+            globals.rafScheduler.scheduleFullRedraw();
+            const srcId = e.dataTransfer!.getData('perfetto/track');
+            const dstId = attrs.trackState.id;
+            globals.dispatch(
+                Actions.moveTrack({srcId, op: this.dropping, dstId}));
+            this.dropping = undefined;
+          }
+        },
         m('h1', attrs.trackState.name),
-        m(TrackButton, {
-          action: Actions.moveTrack(
-              {trackId: attrs.trackState.id, direction: 'up'}),
-          i: 'arrow_upward_alt',
-        }),
-        m(TrackButton, {
-          action: Actions.moveTrack(
-              {trackId: attrs.trackState.id, direction: 'down'}),
-          i: 'arrow_downward_alt',
-        }),
         m(TrackButton, {
           action: Actions.toggleTrackPinned({trackId: attrs.trackState.id}),
           i: isPinned(attrs.trackState.id) ? 'star' : 'star_border',

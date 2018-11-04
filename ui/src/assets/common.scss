@@ -231,15 +231,30 @@ button.close {
     grid-template-columns: auto 1fr;
     grid-template-rows: 1fr;
     border-top: 1px solid #c7d0db;
+    box-sizing: content-box;
+
     .track-shell {
+        @include transition();
         padding: 0 20px;
         display: grid;
-        grid-template-areas: "title pin up down";
+        grid-template-areas: "title pin";
         grid-template-columns: 1fr auto auto;
         align-items: center;
         width: 300px;
         background: #fff;
         border-right: 1px solid #c7d0db;
+
+        &.drag {
+          background-color: #eee;
+          box-shadow: 0 4px 12px -4px #999 inset;
+        }
+        &.drop-before {
+          box-shadow: 0 4px 2px -1px hsl(213, 40%, 50%) inset;
+        }
+        &.drop-after {
+          box-shadow: 0 -4px 2px -1px hsl(213, 40%, 50%) inset;
+        }
+
         h1 {
             grid-area: title;
             margin: 0;
