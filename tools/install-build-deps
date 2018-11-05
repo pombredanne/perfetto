@@ -152,6 +152,12 @@ BUILD_DEPS_HOST = [
    'all'
   ),
 
+  ('buildtools/sqlite_src.zip',
+   'https://www.sqlite.org/2018/sqlite-src-3250200.zip',
+   '43c087e4e8d2abf8ff723ee787bd8984f7057b6d',
+   'all'
+  ),
+
   # JsonCpp for legacy json import. Used only by the trace processor in
   # standalone builds.
   ('buildtools/jsoncpp.zip',
