@@ -103,22 +103,12 @@ class PERFETTO_EXPORT HeapprofdConfig {
     return &native_binary_name_.back();
   }
 
-  int app_name_size() const { return static_cast<int>(app_name_.size()); }
-  const std::vector<std::string>& app_name() const { return app_name_; }
-  std::string* add_app_name() {
-    app_name_.emplace_back();
-    return &app_name_.back();
-  }
-
   int pid_size() const { return static_cast<int>(pid_.size()); }
   const std::vector<uint64_t>& pid() const { return pid_; }
   uint64_t* add_pid() {
     pid_.emplace_back();
     return &pid_.back();
   }
-
-  bool retain_max() const { return retain_max_; }
-  void set_retain_max(bool value) { retain_max_ = value; }
 
   const ContinousDumpConfig& continuous_dump_config() const {
     return continuous_dump_config_;
@@ -130,9 +120,7 @@ class PERFETTO_EXPORT HeapprofdConfig {
  private:
   uint64_t sampling_interval_bytes_ = {};
   std::vector<std::string> native_binary_name_;
-  std::vector<std::string> app_name_;
   std::vector<uint64_t> pid_;
-  bool retain_max_ = {};
   ContinousDumpConfig continuous_dump_config_ = {};
 
   // Allows to preserve unknown protobuf fields for compatibility

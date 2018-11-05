@@ -56,24 +56,12 @@ void HeapprofdConfig::FromProto(
         static_cast<decltype(native_binary_name_)::value_type>(field);
   }
 
-  app_name_.clear();
-  for (const auto& field : proto.app_name()) {
-    app_name_.emplace_back();
-    static_assert(sizeof(app_name_.back()) == sizeof(proto.app_name(0)),
-                  "size mismatch");
-    app_name_.back() = static_cast<decltype(app_name_)::value_type>(field);
-  }
-
   pid_.clear();
   for (const auto& field : proto.pid()) {
     pid_.emplace_back();
     static_assert(sizeof(pid_.back()) == sizeof(proto.pid(0)), "size mismatch");
     pid_.back() = static_cast<decltype(pid_)::value_type>(field);
   }
-
-  static_assert(sizeof(retain_max_) == sizeof(proto.retain_max()),
-                "size mismatch");
-  retain_max_ = static_cast<decltype(retain_max_)>(proto.retain_max());
 
   continuous_dump_config_.FromProto(proto.continuous_dump_config());
   unknown_fields_ = proto.unknown_fields();
@@ -96,20 +84,10 @@ void HeapprofdConfig::ToProto(perfetto::protos::HeapprofdConfig* proto) const {
                   "size mismatch");
   }
 
-  for (const auto& it : app_name_) {
-    proto->add_app_name(static_cast<decltype(proto->app_name(0))>(it));
-    static_assert(sizeof(it) == sizeof(proto->app_name(0)), "size mismatch");
-  }
-
   for (const auto& it : pid_) {
     proto->add_pid(static_cast<decltype(proto->pid(0))>(it));
     static_assert(sizeof(it) == sizeof(proto->pid(0)), "size mismatch");
   }
-
-  static_assert(sizeof(retain_max_) == sizeof(proto->retain_max()),
-                "size mismatch");
-  proto->set_retain_max(
-      static_cast<decltype(proto->retain_max())>(retain_max_));
 
   continuous_dump_config_.ToProto(proto->mutable_continuous_dump_config());
   *(proto->mutable_unknown_fields()) = unknown_fields_;
