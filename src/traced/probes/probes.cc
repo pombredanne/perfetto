@@ -26,6 +26,7 @@
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/traced/probes/probes_producer.h"
 #include "src/tracing/ipc/default_socket.h"
+#include "src/tracing/ipc/producer/reconnecting_producer.h"
 
 namespace perfetto {
 
@@ -68,8 +69,13 @@ int __attribute__((visibility("default"))) ProbesMain(int argc, char** argv) {
   }
 
   base::UnixTaskRunner task_runner;
-  ProbesProducer producer;
-  producer.ConnectWithRetries(GetProducerSocket(), &task_runner);
+  ReconnectingProducer producer(
+      "perfetto.traced_probes", GetProducerSocket(), &task_runner,
+      [&task_runner](TracingService::ProducerEndpoint* endpoint) {
+        return std::unique_ptr<Producer>(
+            new ProbesProducer(&task_runner, endpoint));
+      });
+  producer.ConnectWithRetries();
   task_runner.Run();
   return 0;
 }

@@ -186,6 +186,8 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
       "ipc/posix_shared_memory.h",
       "ipc/producer/producer_ipc_client_impl.cc",
       "ipc/producer/producer_ipc_client_impl.h",
+      "ipc/producer/reconnecting_producer.cc",
+      "ipc/producer/reconnecting_producer.h",
       "ipc/service/consumer_ipc_service.cc",
       "ipc/service/consumer_ipc_service.h",
       "ipc/service/producer_ipc_service.cc",
