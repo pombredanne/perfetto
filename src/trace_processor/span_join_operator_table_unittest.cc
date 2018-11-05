@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/trace_processor/span_operator_table.h"
+#include "src/trace_processor/span_join_operator_table.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
