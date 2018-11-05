@@ -31,7 +31,7 @@ constexpr char kHeapprofdDataSource[] = "android.heapprofd";
 constexpr size_t kUnwinderQueueSize = 1000;
 constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
-constexpr const char* kDumpOutput = "/data/local/tmp/heap_dump";
+constexpr const char* kDumpOutput = "/data/misc/peretto-traces/heap_dump";
 constexpr int kHeapprofdSignal = 36;
 
 void FindPidsForBinaries(std::vector<std::string> binaries,
