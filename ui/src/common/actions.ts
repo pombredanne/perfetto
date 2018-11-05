@@ -137,9 +137,9 @@ export const StateActions = {
     delete state.queries[args.queryId];
   },
 
-  moveTrack(state: StateDraft, args: {
-    srcId: string; op: 'before' | 'after', dstId: string
-  }): void {
+  moveTrack(
+      state: StateDraft,
+      args: {srcId: string; op: 'before' | 'after', dstId: string}): void {
     const moveWithinTrackList = (trackList: string[]) => {
       const newList: string[] = [];
       for (let i = 0; i < trackList.length; i++) {

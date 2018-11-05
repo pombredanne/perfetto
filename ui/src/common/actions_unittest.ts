@@ -28,6 +28,7 @@ function fakeTrack(state: State, id: string): TrackState {
     engineId: '1',
     kind: 'SOME_TRACK_KIND',
     name: 'A track',
+    trackGroup: SCROLLING_TRACK_GROUP,
     config: {},
   };
   state.tracks[id] = track;
@@ -91,6 +92,113 @@ test('add track to track group', () => {
   });
 
   expect(afterTrackAdd.trackGroups['123-123-123'].tracks[0]).toBe('1');
+});
+
+test('reorder tracks', () => {
+  const once = produce(createEmptyState(), draft => {
+    StateActions.addTrack(draft, {
+      engineId: '1',
+      kind: 'cpu',
+      name: 'Cpu 1',
+      config: {},
+    });
+    StateActions.addTrack(draft, {
+      engineId: '2',
+      kind: 'cpu',
+      name: 'Cpu 2',
+      config: {},
+    });
+  });
+
+  const firstTrackId = once.scrollingTracks[0];
+  const secondTrackId = once.scrollingTracks[1];
+
+  const twice = produce(once, draft => {
+    StateActions.moveTrack(draft, {
+      srcId: `${firstTrackId}`,
+      op: 'after',
+      dstId: `${secondTrackId}`,
+    });
+  });
+
+  expect(twice.scrollingTracks[0]).toBe(secondTrackId);
+  expect(twice.scrollingTracks[1]).toBe(firstTrackId);
+});
+
+test('reorder pinned to scrolling', () => {
+  const state = createEmptyState();
+  fakeTrack(state, 'a');
+  fakeTrack(state, 'b');
+  fakeTrack(state, 'c');
+  state.pinnedTracks = ['a', 'b'];
+  state.scrollingTracks = ['c'];
+
+  const after = produce(state, draft => {
+    StateActions.moveTrack(draft, {
+      srcId: 'b',
+      op: 'before',
+      dstId: 'c',
+    });
+  });
+
+  expect(after.pinnedTracks).toEqual(['a']);
+  expect(after.scrollingTracks).toEqual(['b', 'c']);
+});
+
+test('reorder scrolling to pinned', () => {
+  const state = createEmptyState();
+  fakeTrack(state, 'a');
+  fakeTrack(state, 'b');
+  fakeTrack(state, 'c');
+  state.pinnedTracks = ['a'];
+  state.scrollingTracks = ['b', 'c'];
+
+  const after = produce(state, draft => {
+    StateActions.moveTrack(draft, {
+      srcId: 'b',
+      op: 'after',
+      dstId: 'a',
+    });
+  });
+
+  expect(after.pinnedTracks).toEqual(['a', 'b']);
+  expect(after.scrollingTracks).toEqual(['c']);
+});
+
+test('reorder clamp bottom', () => {
+  const state = createEmptyState();
+  fakeTrack(state, 'a');
+  fakeTrack(state, 'b');
+  fakeTrack(state, 'c');
+  state.pinnedTracks = ['a', 'b'];
+  state.scrollingTracks = ['c'];
+
+  const after = produce(state, draft => {
+    StateActions.moveTrack(draft, {
+      srcId: 'a',
+      op: 'before',
+      dstId: 'a',
+    });
+  });
+  expect(after).toEqual(state);
+});
+
+test('reorder clamp top', () => {
+  const state = createEmptyState();
+  fakeTrack(state, 'a');
+  fakeTrack(state, 'b');
+  fakeTrack(state, 'c');
+  state.pinnedTracks = ['a'];
+  state.scrollingTracks = ['b', 'c'];
+
+  const after = produce(state, draft => {
+    StateActions.moveTrack(draft, {
+      srcId: 'c',
+      op: 'after',
+      dstId: 'c',
+    });
+  });
+  expect(after).toEqual(state);
 });
 
 test('pin', () => {
