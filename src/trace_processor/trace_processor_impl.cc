@@ -49,7 +49,7 @@ void InitializeSqliteModules(sqlite3* db) {
   char* error = nullptr;
   sqlite3_percentile_init(db, &error, nullptr);
   if (error != nullptr) {
-    PERFETTO_ELOG("Error loading lib: %s", error);
+    PERFETTO_ELOG("Error initializing: %s", error);
   }
 }
 }  // namespace
