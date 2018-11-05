@@ -44,12 +44,11 @@ inline RangeRowIterator CreateRangeIterator(
     const auto& c = cs[i];
     size_t column = static_cast<size_t>(c.iColumn);
     auto bounds = schema.GetColumn(column).BoundFilter(c.op, argv[i]);
-    if (bounds.consumed) {
-      min_idx = std::max(min_idx, bounds.min_idx);
-      max_idx = std::min(max_idx, bounds.max_idx);
-    } else {
+
+    min_idx = std::max(min_idx, bounds.min_idx);
+    max_idx = std::min(max_idx, bounds.max_idx);
+    if (!bounds.consumed)
       bitvector_cs.emplace_back(i);
-    }
   }
 
   // If we have no other constraints then we can just iterate between min
