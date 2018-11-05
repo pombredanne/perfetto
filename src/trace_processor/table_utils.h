@@ -47,6 +47,12 @@ inline RangeRowIterator CreateRangeIterator(
 
     min_idx = std::max(min_idx, bounds.min_idx);
     max_idx = std::min(max_idx, bounds.max_idx);
+
+    // If the lower bound is higher than the upper bound, return a zero-sized
+    // range iterator.
+    if (min_idx >= max_idx)
+      return RangeRowIterator(min_idx, min_idx, desc);
+
     if (!bounds.consumed)
       bitvector_cs.emplace_back(i);
   }
