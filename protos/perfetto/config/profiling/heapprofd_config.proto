@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,11 +30,15 @@ message HeapprofdConfig {
   // Set to 1 for perfect accuracy.
   optional uint64 sampling_interval_bytes = 1;
 
+  // E.g. /system/bin/surfaceflinger
   repeated string native_binary_name = 2;
   repeated string app_name = 3;  // TODO(fmayer): Implement
-  // For watermark based triggering.
+  // For watermark based triggering or local debugging.
   repeated uint64 pid = 4;
 
+  // Dump once at the end of the trace, emitting the heap dump at maximum
+  // memory usage.
   optional bool retain_max = 5;  // TODO(fmayer): Implement
+  // Dump at a predefined interval.
   optional ContinousDumpConfig continuous_dump_config = 6;
 }
