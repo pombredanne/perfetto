@@ -209,6 +209,26 @@ class TraceStorage {
     std::deque<RefType> types_;
   };
 
+  class SqlStats {
+   public:
+    static constexpr size_t kMaxLogEntries = 100;
+    void RecordQueryBegin(const std::string& query,
+                          uint64_t time_queued,
+                          uint64_t time_started);
+    void RecordQueryEnd(uint64_t time_ended);
+    size_t size() const { return queries_.size(); }
+    const std::deque<std::string>& queries() const { return queries_; }
+    const std::deque<uint64_t>& times_queued() const { return times_queued_; }
+    const std::deque<uint64_t>& times_started() const { return times_started_; }
+    const std::deque<uint64_t>& times_ended() const { return times_ended_; }
+
+   private:
+    std::deque<std::string> queries_;
+    std::deque<uint64_t> times_queued_;
+    std::deque<uint64_t> times_started_;
+    std::deque<uint64_t> times_ended_;
+  };
+
   class Instants {
    public:
     inline size_t AddInstantEvent(uint64_t timestamp,
@@ -299,6 +319,9 @@ class TraceStorage {
   const Counters& counters() const { return counters_; }
   Counters* mutable_counters() { return &counters_; }
 
+  const SqlStats& sql_stats() const { return sql_stats_; }
+  SqlStats* mutable_sql_stats() { return &sql_stats_; }
+
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
 
@@ -345,6 +368,7 @@ class TraceStorage {
   // systrace trace_marker counter events.
   Counters counters_;
 
+  SqlStats sql_stats_;
   // These are instantaneous events in the trace. They have no duration
   // and do not have a value that make sense to track over time.
   // e.g. signal events
