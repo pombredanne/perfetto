@@ -33,6 +33,7 @@ class TraceStorage;
 // particularly efficient, as it delegates all the sorting and filtering to
 // the SQLite query engine.
 class SliceTable : public Table {
+ public:
   SliceTable(sqlite3*, const TraceStorage* storage);
 
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
