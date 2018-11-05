@@ -44,16 +44,16 @@ void SocketListener::OnNewIncomingConnection(
 }
 
 void SocketListener::OnDataAvailable(base::UnixSocket* self) {
-  pid_t pid = self->peer_pid();
-
-  auto it = sockets_.find(self);
-  if (it == sockets_.end())
+  auto socket_it = sockets_.find(self);
+  if (socket_it == sockets_.end())
     return;
 
-  Entry& entry = it->second;
+  pid_t peer_pid = self->peer_pid();
+
+  Entry& entry = socket_it->second;
   RecordReader::ReceiveBuffer buf = entry.record_reader.BeginReceive();
 
-  auto process_info_it = process_info_.find(pid);
+  auto process_info_it = process_info_.find(peer_pid);
   if (process_info_it == process_info_.end()) {
     PERFETTO_DFATAL("This should not happen.");
     return;
@@ -64,25 +64,31 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
   if (PERFETTO_LIKELY(entry.recv_fds)) {
     rd = self->Receive(buf.data, buf.size);
   } else {
-    // The first record we receive should contain file descriptors for the
-    // process' /proc/[pid]/maps and /proc/[pid]/mem. Receive those and store
-    // them into metadata for process.
-    //
-    // If metadata for the process already exists, they will just go out of
-    // scope in InitProcess.
-    base::ScopedFile fds[2];
-    rd = self->Receive(buf.data, buf.size, fds, base::ArraySize(fds));
-    if (fds[0] && fds[1]) {
-      PERFETTO_DLOG("%d: Received FDs.", pid);
-      InitProcess(&entry, pid, std::move(fds[0]), std::move(fds[1]));
+    auto it = process_metadata_.find(peer_pid);
+    if (it != process_metadata_.end() && !it->second.expired()) {
       entry.recv_fds = true;
-      self->Send(&process_info.client_config,
-                 sizeof(process_info.client_config), -1,
-                 base::UnixSocket::BlockingMode::kBlocking);
-    } else if (fds[0] || fds[1]) {
-      PERFETTO_DLOG("%d: Received partial FDs.", pid);
+      // If the process already has metadata, this is an additional socket for
+      // an existing process. Reuse existing metadata and close the received
+      // file descriptors.
+      entry.process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
+      rd = self->Receive(buf.data, buf.size);
     } else {
-      PERFETTO_DLOG("%d: Received no FDs.", pid);
+      base::ScopedFile fds[2];
+      rd = self->Receive(buf.data, buf.size, fds, base::ArraySize(fds));
+      if (fds[0] && fds[1]) {
+        PERFETTO_DLOG("%d: Received FDs.", peer_pid);
+        entry.recv_fds = true;
+        entry.process_metadata = std::make_shared<ProcessMetadata>(
+            peer_pid, std::move(fds[0]), std::move(fds[1]));
+        process_metadata_[peer_pid] = entry.process_metadata;
+        self->Send(&process_info.client_config,
+                   sizeof(process_info.client_config), -1,
+                   base::UnixSocket::BlockingMode::kBlocking);
+      } else if (fds[0] || fds[1]) {
+        PERFETTO_DLOG("%d: Received partial FDs.", peer_pid);
+      } else {
+        PERFETTO_DLOG("%d: Received no FDs.", peer_pid);
+      }
     }
   }
   RecordReader::Record record;
@@ -103,13 +109,13 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
 SocketListener::ProfilingSession SocketListener::ExpectPID(
     pid_t pid,
     ClientConfiguration cfg) {
-  PERFETTO_PLOG("Expecting connecting from %d", pid);
+  PERFETTO_DLOG("Expecting connection from %d", pid);
   process_info_.emplace(pid, std::move(cfg));
   return ProfilingSession(pid, this);
 }
 
 void SocketListener::ShutdownPID(pid_t pid) {
-  PERFETTO_PLOG("Shutting down connecting from %d", pid);
+  PERFETTO_DLOG("Shutting down connecting from %d", pid);
   auto it = process_info_.find(pid);
   if (it == process_info_.end()) {
     PERFETTO_DFATAL("Shutting down nonexistant pid.");
@@ -121,32 +127,14 @@ void SocketListener::ShutdownPID(pid_t pid) {
     sockets_.erase(socket);
 }
 
-void SocketListener::InitProcess(Entry* entry,
-                                 pid_t peer_pid,
-                                 base::ScopedFile maps_fd,
-                                 base::ScopedFile mem_fd) {
-  auto it = process_metadata_.find(peer_pid);
-  if (it == process_metadata_.end() || it->second.expired()) {
-    // We have not seen the PID yet or the PID is being recycled.
-    entry->process_metadata = std::make_shared<ProcessMetadata>(
-        peer_pid, std::move(maps_fd), std::move(mem_fd));
-    process_metadata_[peer_pid] = entry->process_metadata;
-  } else {
-    // If the process already has metadata, this is an additional socket for
-    // an existing process. Reuse existing metadata and close the received
-    // file descriptors.
-    entry->process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
-  }
-}
-
 void SocketListener::RecordReceived(base::UnixSocket* self,
                                     size_t size,
                                     std::unique_ptr<uint8_t[]> buf) {
   auto it = sockets_.find(self);
   if (it == sockets_.end()) {
     // This happens for zero-length records, because the callback gets called
-    // in the first call to Read, before InitProcess is called. Because zero
-    // length records are useless anyway, this is not a problem.
+    // in the first call to Read. Because zero length records are useless,
+    // this is not a problem.
     return;
   }
   Entry& entry = it->second;
