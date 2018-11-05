@@ -124,7 +124,7 @@ void SocketListener::ShutdownPID(pid_t pid) {
   ProcessInfo& process_info = it->second;
   // Disconnect all sockets for process.
   for (base::UnixSocket* socket : process_info.sockets)
-    sockets_.erase(socket);
+    socket->Shutdown(true);
 }
 
 void SocketListener::RecordReceived(base::UnixSocket* self,
