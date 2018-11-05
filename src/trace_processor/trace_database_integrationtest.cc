@@ -33,9 +33,10 @@ namespace {
 
 class TraceProcessorIntegrationTest : public ::testing::Test {
  public:
-  TraceProcessorIntegrationTest() : processor(Config()) {}
+  TraceProcessorIntegrationTest()
+      : processor(TraceProcessor::CreateInstance(Config())) {}
 
-  TraceProcessor processor;
+  std::unique_ptr<TraceProcessor> processor;
 
  protected:
   bool LoadTrace(const char* name, int min_chunk_size = 1) {
@@ -46,10 +47,10 @@ class TraceProcessorIntegrationTest : public ::testing::Test {
       size_t chunk_size = static_cast<size_t>(dist(rnd_engine));
       std::unique_ptr<uint8_t[]> buf(new uint8_t[chunk_size]);
       auto rsize = fread(reinterpret_cast<char*>(buf.get()), 1, chunk_size, *f);
-      if (!processor.Parse(std::move(buf), rsize))
+      if (!processor->Parse(std::move(buf), rsize))
         return false;
     }
-    processor.NotifyEndOfFile();
+    processor->NotifyEndOfFile();
     return true;
   }
 
@@ -59,7 +60,7 @@ class TraceProcessorIntegrationTest : public ::testing::Test {
     auto on_result = [&result](const protos::RawQueryResult& res) {
       result->CopyFrom(res);
     };
-    processor.ExecuteQuery(args, on_result);
+    processor->ExecuteQuery(args, on_result);
   }
 };
 
