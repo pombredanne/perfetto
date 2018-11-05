@@ -19,6 +19,7 @@ option optimize_for = LITE_RUNTIME;
 
 package perfetto.protos;
 
+// Configuration for go/heapprofd.
 message HeapprofdConfig {
   message ContinousDumpConfig {
     // ms to wait before first dump.
@@ -28,17 +29,20 @@ message HeapprofdConfig {
   };
 
   // Set to 1 for perfect accuracy.
+  // Otherwise, sample every sample_interval_bytes on average.
+  // TODO(fmayer): Add link to docs elaborating on this.
   optional uint64 sampling_interval_bytes = 1;
 
   // E.g. /system/bin/surfaceflinger
   repeated string native_binary_name = 2;
-  repeated string app_name = 3;  // TODO(fmayer): Implement
+  // repeated string android_app = 3;  // TODO(fmayer): Implement
   // For watermark based triggering or local debugging.
   repeated uint64 pid = 4;
 
   // Dump once at the end of the trace, emitting the heap dump at maximum
   // memory usage.
-  optional bool retain_max = 5;  // TODO(fmayer): Implement
+  // optional bool retain_max = 5;  // TODO(fmayer): Implement
+
   // Dump at a predefined interval.
   optional ContinousDumpConfig continuous_dump_config = 6;
 }
