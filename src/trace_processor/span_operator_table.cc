@@ -64,7 +64,7 @@ Table::Schema SpanOperatorTable::CreateSchema(int argc,
 
   // TODO(lalitm): add logic to ensure that the tables that are being joined
   // are actually valid to be joined i.e. they have the ts and dur columns and
-  // have the join column.
+  // have the same partition.
   auto t1_cols = sqlite_utils::GetColumnsForTable(db_, t1_desc.name);
   auto t2_cols = sqlite_utils::GetColumnsForTable(db_, t2_desc.name);
 
@@ -126,7 +126,7 @@ std::vector<std::string> SpanOperatorTable::ComputeSqlConstraintsForDefinition(
   std::vector<std::string> constraints;
   for (size_t i = 0; i < qc.constraints().size(); i++) {
     const auto& cs = qc.constraints()[i];
-    if (cs.iColumn == Column::kTimestamp || cs.iColumn == Column::kTimestamp) {
+    if (cs.iColumn == Column::kTimestamp || cs.iColumn == Column::kDuration) {
       // We don't support constraints on ts or duration in the child tables.
       PERFETTO_DCHECK(false);
       continue;
@@ -179,7 +179,7 @@ SpanOperatorTable::Cursor::~Cursor() {}
 int SpanOperatorTable::Cursor::Next() {
   int err = next_stepped_table_->StepAndCacheValues();
   for (; err == SQLITE_ROW; err = next_stepped_table_->StepAndCacheValues()) {
-    // Get both tables on the same join value.
+    // Get both tables on the same parition.
     if (t1_.partition() < t2_.partition()) {
       next_stepped_table_ = &t1_;
       continue;
@@ -198,7 +198,7 @@ int SpanOperatorTable::Cursor::Next() {
       continue;
     }
 
-    // Both slices now have an overlapping slice and the same join value.
+    // Both slices now have an overlapping slice and the same partition.
     // Update the next stepped table to be the one which finishes earliest.
     next_stepped_table_ = t1_.ts_end() <= t2_.ts_end() ? &t1_ : &t2_;
     return SQLITE_OK;
