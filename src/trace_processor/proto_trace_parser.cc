@@ -586,6 +586,8 @@ void ProtoTraceParser::ParseSignalDeliver(uint64_t timestamp,
                             RefType::kUtid);
 }
 
+// This event has both the pid of the thread that sent the signal and the
+// destination of the signal. Currently storing the pid of the destination.
 void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
                                            TraceBlobView view) {
   ProtoDecoder decoder(view.data(), view.length());
@@ -604,6 +606,35 @@ void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
   auto* instants = context_->storage->mutable_instants();
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
   instants->AddInstantEvent(timestamp, signal_generate_id_, sig, utid,
+                            RefType::kUtid);
+}
+
+void ProtoTraceParser::ParseLowmemoryKill(uint64_t timestamp,
+                                          TraceBlobView view) {
+  // TODO(taylori): Store the pagecache_limit and free fields. In an args table?
+  ProtoDecoder decoder(view.data(), view.length());
+  uint32_t pid = 0;
+  base::StringView comm;
+  uint64_t pagecache_size = 0;
+  for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
+    switch (fld.id) {
+      case protos::LowmemoryKillFtraceEvent::kPidFieldNumber:
+        pid = fld.as_uint32();
+        break;
+      case protos::LowmemoryKillFtraceEvent::kCommFieldNumber:
+        comm = fld.as_string();
+        break;
+      case protos::LowmemoryKillFtraceEvent::kPagecacheSizeFieldNumber:
+        pagecache_size = fld.as_uint64();
+        break;
+    }
+  }
+  StringId name = context_->storage->InternString(
+      base::StringView("mem.lmk." + comm.ToStdString()));
+  auto* instants = context_->storage->mutable_instants();
+  // Storing the pid of the event that is lmk-ed.
+  UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
+  instants->AddInstantEvent(timestamp, pagecache_size, name, utid,
                             RefType::kUtid);
 }
 
