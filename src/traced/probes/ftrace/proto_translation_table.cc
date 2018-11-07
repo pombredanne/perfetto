@@ -201,24 +201,6 @@ void SetProtoType(FtraceFieldType ftrace_type,
   }
 }
 
-// For every field in the ftrace event, make a field in the generic event.
-void MergeGenericFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
-                        Event& event) {
-  for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
-    std::string field_name = GetNameFromTypeAndName(ftrace_field.type_and_name);
-    Field field{};
-    field.ftrace_name = field_name.c_str();
-    event.fields.push_back(field);
-    Field* stored_field = &event.fields.back();
-    InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
-                    ftrace_field.is_signed, &stored_field->ftrace_type);
-    PERFETTO_LOG("ftrace_type: %d", stored_field->ftrace_type);
-    SetProtoType(stored_field->ftrace_type, &stored_field->proto_field_type,
-                 &stored_field->proto_field_id);
-    MergeFieldInfo(ftrace_field, stored_field, "sched_switch");
-  }
-}
-
 }  // namespace
 
 // This is similar but different from InferProtoType (see format_parser.cc).
@@ -439,15 +421,16 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
 
   PERFETTO_LOG("ftrace_id: %d", ftrace_event.id);
   if (ftrace_event.id > largest_id_) {
-    PERFETTO_LOG("this probably shopuldnt happen");
     events_.resize(ftrace_event.id);
     largest_id_ = ftrace_event.id;
   }
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
   e->proto_field_id = 326;  // generic event id.
-  e->name = "sched_switch";
-  e->group = "sched";
+  size_t name_index = InternGenericString(base::StringView(e_name));
+  size_t group_index = InternGenericString(base::StringView(group));
+  e->name = generic_strings_.at(name_index).c_str();
+  e->group = generic_strings_.at(group_index).c_str();
 
   MergeGenericFields(ftrace_event.fields, *e);
 
@@ -456,6 +439,39 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
 
   return e;
 };
+
+size_t ProtoTranslationTable::InternGenericString(base::StringView str) {
+  auto hash = str.Hash();
+  auto id_it = generic_string_index_.find(hash);
+  if (id_it != generic_string_index_.end()) {
+    PERFETTO_DCHECK(base::StringView(generic_strings_[id_it->second]) == str);
+    return id_it->second;
+  }
+  generic_strings_.emplace_back(str.ToStdString());
+  size_t string_id = generic_strings_.size() - 1;
+  generic_string_index_.emplace(hash, string_id);
+  return string_id;
+}
+
+// For every field in the ftrace event, make a field in the generic event.
+void ProtoTranslationTable::MergeGenericFields(
+    const std::vector<FtraceEvent::Field>& ftrace_fields,
+    Event& event) {
+  for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
+    size_t index = InternGenericString(
+        base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
+    Field field{};
+    field.ftrace_name = generic_strings_.at(index).c_str();
+    event.fields.push_back(field);
+    Field* stored_field = &event.fields.back();
+    InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
+                    ftrace_field.is_signed, &stored_field->ftrace_type);
+    PERFETTO_LOG("ftrace_type: %d", stored_field->ftrace_type);
+    SetProtoType(stored_field->ftrace_type, &stored_field->proto_field_type,
+                 &stored_field->proto_field_id);
+    MergeFieldInfo(ftrace_field, stored_field, "sched_switch");
+  }
+}
 
 ProtoTranslationTable::~ProtoTranslationTable() = default;
 

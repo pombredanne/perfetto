@@ -466,11 +466,30 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
+  if (info.proto_field_id == 326) {
+    protozero::Message* proto_field =
+        nested->BeginNestedMessage<protozero::Message>(1);
+    const char* name_end = info.name;
+    while (*name_end != '\0') {
+      PERFETTO_LOG("%c", *name_end);
+      ++name_end;
+    }
+    proto_field->AppendBytes(1, info.name,
+                             static_cast<size_t>(name_end - info.name));
+  }
 
   for (const Field& field : info.fields) {
     if (info.proto_field_id == 326) {  // generic event
       protozero::Message* proto_field =
-          nested->BeginNestedMessage<protozero::Message>(1);
+          nested->BeginNestedMessage<protozero::Message>(2);
+      // TODO(taylori): Don't output the field name every time.
+      const char* name_end = field.ftrace_name;
+      while (*name_end != '\0') {
+        ++name_end;
+      }
+      proto_field->AppendBytes(
+          1, field.ftrace_name,
+          static_cast<size_t>(name_end - field.ftrace_name));
       success &= ParseField(field, start, end, proto_field, metadata);
     } else {
       success &= ParseField(field, start, end, nested, metadata);

@@ -19,13 +19,16 @@
 
 #include <stdint.h>
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/string_view.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/format_parser.h"
 
@@ -107,10 +110,14 @@ class ProtoTranslationTable {
   }
 
   const Event* AddGenericEvent(const std::string name);
+  void MergeGenericFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
+                          Event& event);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
+
+  size_t InternGenericString(base::StringView name);
 
   std::vector<Event> events_;
   const FtraceProcfs* ftrace_procfs_;
@@ -119,6 +126,8 @@ class ProtoTranslationTable {
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};
+  std::unordered_map<uint64_t /*hash*/, size_t /*index*/> generic_string_index_;
+  std::deque<std::string> generic_strings_;
 };
 
 }  // namespace perfetto
