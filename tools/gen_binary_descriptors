@@ -23,7 +23,7 @@ import argparse
 import tempfile
 import subprocess
 import hashlib
-import re
+import textwrap
 
 SOURCE_TARGET = {
     'protos/perfetto/config/perfetto_config.proto':
@@ -51,7 +51,7 @@ def check(source, target):
   assert sorted([SCRIPT_PATH, source]) == sorted([key for key, _ in hashes])
   for path, expected_sha1 in hashes:
     actual_sha1 = hash_path(os.path.join(ROOT_DIR, path))
-    assert actual_sha1 == expected_sha1,
+    assert actual_sha1 == expected_sha1, \
         'Hash for path {} did not match'.format(path)
 
 
@@ -69,8 +69,12 @@ def generate(source, target, protoc_path):
     ], cwd=ROOT_DIR)
 
     s = fdescriptor.read()
-    constant_name = 'k' + target_name.title().replace('.', '').replace('_', '')
-    binary = ',\n'.join((hex(ord(c)) for c in s))
+    constant_name = 'k' + target_name.title()[:-2].translate(None, '._')
+    binary = '{' + ', '.join('{0:#04x}'.format(ord(c)) for c in s) + '}'
+    binary = textwrap.fill(binary,
+        width=80,
+        initial_indent='    ',
+        subsequent_indent='     ')
     include_guard = target.replace('/', '_').replace('.', '_').upper() + '_'
 
     with open(os.path.join(ROOT_DIR, target), 'wb') as f:
@@ -78,8 +82,8 @@ def generate(source, target, protoc_path):
 #ifndef {include_guard}
 #define {include_guard}
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <array>
 
@@ -91,9 +95,10 @@ def generate(source, target, protoc_path):
 
 namespace perfetto {{
 
-const std::array<uint8_t, {size}> {constant_name}{{{{{binary}}}}};
+const std::array<uint8_t, {size}> {constant_name}{{
+{binary}}};
 
-}} // namespace perfetto
+}}  // namespace perfetto
 
 #endif  // {include_guard}
 """.format(**{

@@ -29,7 +29,7 @@
 #include "perfetto/base/string_view.h"
 #include "perfetto/protozero/message.h"
 #include "perfetto/protozero/message_handle.h"
-#include "src/perfetto_cmd/trace_config_descriptor.gen.h"
+#include "src/perfetto_cmd/perfetto_config.descriptor.h"
 #include "src/protozero/scattered_stream_memory_delegate.h"
 
 namespace perfetto {
@@ -573,8 +573,8 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
   FileDescriptorSet file_descriptor_set;
   {
     file_descriptor_set.ParseFromArray(
-        kTraceConfigDescriptor.data(),
-        static_cast<int>(kTraceConfigDescriptor.size()));
+        kPerfettoConfigDescriptor.data(),
+        static_cast<int>(kPerfettoConfigDescriptor.size()));
     for (const auto& file_descriptor : file_descriptor_set.file()) {
       for (const auto& enum_descriptor : file_descriptor.enum_type()) {
         const std::string name =
