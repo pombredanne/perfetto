@@ -131,7 +131,9 @@ data_sources {
   }
 }
   )");
-  ASSERT_EQ(config.data_sources().Get(0).config().ftrace_config().drain_period_ms(), 42);
+  ASSERT_EQ(
+      config.data_sources().Get(0).config().ftrace_config().drain_period_ms(),
+      42);
 }
 
 TEST(PbtxtToPb, Booleans) {
@@ -169,7 +171,8 @@ TEST(PbtxtToPb, Enums) {
       fill_policy: RING_BUFFER
     }
   )");
-  EXPECT_EQ(config.buffers().Get(0).fill_policy(), protos::TraceConfig::BufferConfig::RING_BUFFER);
+  EXPECT_EQ(config.buffers().Get(0).fill_policy(),
+            protos::TraceConfig::BufferConfig::RING_BUFFER);
 }
 
 TEST(PbtxtToPb, AllFieldTypes) {
@@ -197,7 +200,8 @@ data_sources {
   }
 }
   )");
-  const auto& fields = config.data_sources().Get(0).config().for_testing().dummy_fields();
+  const auto& fields =
+      config.data_sources().Get(0).config().for_testing().dummy_fields();
   ASSERT_EQ(fields.field_uint32(), 1);
   ASSERT_EQ(fields.field_uint64(), 2);
   ASSERT_EQ(fields.field_int32(), 3);
@@ -235,7 +239,8 @@ data_sources {
   }
 }
   )");
-  const auto& fields = config.data_sources().Get(0).config().for_testing().dummy_fields();
+  const auto& fields =
+      config.data_sources().Get(0).config().for_testing().dummy_fields();
   ASSERT_EQ(fields.field_int32(), -1);
   ASSERT_EQ(fields.field_int64(), -2);
   ASSERT_EQ(fields.field_fixed64(), -3);
@@ -315,10 +320,9 @@ duration_ms: 10000
 
 TEST(PbtxtToPb, UnknownField) {
   MockErrorReporter reporter;
-  EXPECT_CALL(
-      reporter,
-      AddError(1, 5, 11,
-               "No field named \"not_a_label\" in proto TraceConfig."));
+  EXPECT_CALL(reporter,
+              AddError(1, 5, 11,
+                       "No field named \"not_a_label\" in proto TraceConfig."));
   ToErrors(R"(
     not_a_label: false
   )",
@@ -329,8 +333,9 @@ TEST(PbtxtToPb, UnknownNestedField) {
   MockErrorReporter reporter;
   EXPECT_CALL(
       reporter,
-      AddError(3, 5, 16,
-               "No field named \"not_a_field_name\" in proto DataSourceConfig."));
+      AddError(
+          3, 5, 16,
+          "No field named \"not_a_field_name\" in proto DataSourceConfig."));
   ToErrors(R"(
 data_sources {
   config {
@@ -338,25 +343,29 @@ data_sources {
     }
   }
 }
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, BadBoolean) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter,
-              AddError(1, 22, 3, "Expected 'true' or 'false' for boolean field write_into_file in proto TraceConfig instead saw 'foo'"));
+  EXPECT_CALL(reporter, AddError(1, 22, 3,
+                                 "Expected 'true' or 'false' for boolean field "
+                                 "write_into_file in proto TraceConfig instead "
+                                 "saw 'foo'"));
   ToErrors(R"(
     write_into_file: foo;
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, MissingBoolean) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter,
-              AddError(2, 3, 0, "Unexpected end of input"));
+  EXPECT_CALL(reporter, AddError(2, 3, 0, "Unexpected end of input"));
   ToErrors(R"(
     write_into_file:
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, RootProtoMustNotEndWithBrace) {
@@ -364,32 +373,45 @@ TEST(PbtxtToPb, RootProtoMustNotEndWithBrace) {
   EXPECT_CALL(reporter, AddError(1, 5, 0, "Unmatched closing brace"));
   ToErrors(R"(
     }
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(2,5,15, "Saw non-repeating field 'write_into_file' more than once"));
+  EXPECT_CALL(
+      reporter,
+      AddError(2, 5, 15,
+               "Saw non-repeating field 'write_into_file' more than once"));
   ToErrors(R"(
     write_into_file: true;
     write_into_file: true;
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, WrongTypeBoolean) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(1, 18, 4, "Expected value of type uint32 for field duration_ms in proto TraceConfig instead saw 'true'"));
+  EXPECT_CALL(reporter,
+              AddError(1, 18, 4,
+                       "Expected value of type uint32 for field duration_ms in "
+                       "proto TraceConfig instead saw 'true'"));
   ToErrors(R"(
     duration_ms: true;
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 TEST(PbtxtToPb, WrongTypeNumber) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(1, 14, 3, "Expected value of type message for field buffers in proto TraceConfig instead saw '100'"));
+  EXPECT_CALL(reporter,
+              AddError(1, 14, 3,
+                       "Expected value of type message for field buffers in "
+                       "proto TraceConfig instead saw '100'"));
   ToErrors(R"(
     buffers: 100;
-  )", &reporter);
+  )",
+           &reporter);
 }
 
 // TEST(PbtxtToPb, WrongTypeString)

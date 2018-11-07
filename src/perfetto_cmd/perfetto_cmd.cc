@@ -62,15 +62,17 @@ perfetto::PerfettoCmd* g_consumer_cmd;
 
 class LoggingErrorReporter : public ErrorReporter {
  public:
-  LoggingErrorReporter(const char* config): config_(config) {
-  }
+  LoggingErrorReporter(const char* config) : config_(config) {}
 
-  void AddError(size_t row, size_t column, size_t length, const std::string& message) override {
+  void AddError(size_t row,
+                size_t column,
+                size_t length,
+                const std::string& message) override {
     const char* start = FindLine(row);
     PERFETTO_ELOG("%s", message.c_str());
     PERFETTO_ELOG("%s", start);
-    std::string guide(column+length, ' ');
-    for (size_t i=column; i<column+length; i++) {
+    std::string guide(column + length, ' ');
+    for (size_t i = column; i < column + length; i++) {
       guide[i] = i == column ? '^' : '~';
     }
     PERFETTO_ELOG("%s", guide.c_str());
@@ -92,7 +94,8 @@ class LoggingErrorReporter : public ErrorReporter {
   const char* config_;
 };
 
-bool ParseTraceConfigPbtxt(const std::string& pbtxt, protos::TraceConfig* config) {
+bool ParseTraceConfigPbtxt(const std::string& pbtxt,
+                           protos::TraceConfig* config) {
   LoggingErrorReporter reporter(pbtxt.c_str());
   std::vector<uint8_t> output = PbtxtToPb(pbtxt, &reporter);
   config->ParseFromArray(output.data(), static_cast<int>(output.size()));

@@ -82,7 +82,7 @@ message DescriptorProto {
   repeated DescriptorProto nested_type = 3;
   repeated EnumDescriptorProto enum_type = 4;
 
-  reserved  5;
+  reserved 5;
 
   repeated OneofDescriptorProto oneof_decl = 8;
 

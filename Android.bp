@@ -62,6 +62,7 @@ cc_binary {
     "src/protozero/message_handle.cc",
     "src/protozero/proto_decoder.cc",
     "src/protozero/proto_field_descriptor.cc",
+    "src/protozero/scattered_stream_memory_delegate.cc",
     "src/protozero/scattered_stream_null_delegate.cc",
     "src/protozero/scattered_stream_writer.cc",
     "src/tracing/core/chrome_config.cc",

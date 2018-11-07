@@ -207,7 +207,9 @@ template("proto_library") {
       ]
     }
 
-    public_deps = [ ":$action_name" ]
+    public_deps = [
+      ":$action_name",
+    ]
     deps += [ ":$action_name" ]
     if (defined(invoker.deps)) {
       deps += invoker.deps

@@ -15,28 +15,6 @@
 import("../../gn/perfetto.gni")
 import("../../gn/proto_library.gni")
 
-action("trace_config_descriptor_gen") {
-  deps = [
-    "../../protos/perfetto/config:lite",
-  ]
-  script = rebase_path("../../tools/binary_to_cpp_const.py", root_build_dir)
-  inputs = [
-    "$root_gen_dir/protos/perfetto/trace/config.descriptor"
-  ]
-  outputs = [
-   "$target_gen_dir/trace_config_descriptor.gen.h",
-  ]
-  args = [
-    rebase_path(inputs[0], root_build_dir),
-    rebase_path("$target_gen_dir/trace_config_descriptor", root_build_dir),
-  ]
-}
-
-source_set("trace_config_descriptor") {
-  deps = [":trace_config_descriptor_gen"]
-  sources = get_target_outputs(":trace_config_descriptor_gen")
-}
-
 source_set("perfetto_cmd") {
   public_deps = [
     ":protos",
@@ -49,13 +27,13 @@ source_set("perfetto_cmd") {
     "../base",
     "../protozero",
     "../tracing:ipc_consumer",
-    ":trace_config_descriptor",
   ]
   sources = [
     "pbtxt_to_pb.cc",
     "pbtxt_to_pb.h",
     "perfetto_cmd.cc",
     "perfetto_cmd.h",
+    "perfetto_config.descriptor.h",
     "rate_limiter.cc",
     "rate_limiter.h",
   ]
