@@ -183,6 +183,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
       continue;
     }
     data_source.sessions.emplace_back(std::move(profiling_session));
+    ++pid_it;
   }
 
   if (data_source.pids.empty()) {
