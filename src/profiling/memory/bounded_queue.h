@@ -28,10 +28,12 @@ namespace profiling {
 
 // Transport messages between threads. Multiple-producer / single-consumer.
 //
-// This has to outlive both the consumer and the producer who have to
-// negotiate termination separately, if needed. This is currently only used
-// in a scenario where the producer and consumer both are loops that never
-// terminate.
+// This has to outlive both the consumer and the producer. The Shutdown method
+// can be used to unblock both producers and consumers blocked on the queue.
+// The general shutdown logic is:
+// q.Shutdown()
+// Join all producer and consumer threads
+// destruct q
 template <typename T>
 class BoundedQueue {
  public:
