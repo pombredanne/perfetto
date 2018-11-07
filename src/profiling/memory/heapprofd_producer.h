@@ -78,8 +78,6 @@ class HeapprofdProducer : public Producer {
   void DoContiniousDump(DataSourceInstanceID id, uint32_t dump_interval);
 
   struct DataSource {
-    DataSource() {}
-
     std::vector<pid_t> pids;
     // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
     // thread for unwinding.
