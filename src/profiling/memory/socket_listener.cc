@@ -22,6 +22,13 @@ namespace profiling {
 
 void SocketListener::OnDisconnect(base::UnixSocket* self) {
   bookkeeping_thread_->NotifyClientDisconnected(self->peer_pid());
+  auto it = process_info_.find(self->peer_pid());
+  if (it != process_info_.end()) {
+    ProcessInfo& process_info = it->second;
+    process_info.sockets.erase(self);
+  } else {
+    PERFETTO_DFATAL("Disconnect from socket without ProcessInfo.");
+  }
   sockets_.erase(self);
 }
 
