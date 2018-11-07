@@ -27,52 +27,27 @@ def main():
 
   root, name = os.path.split(args.OUTPUT)
 
-  h_path = os.path.join(root, name + '.h')
-  cc_path = os.path.join(root, name + '.cc')
+  h_path = os.path.join(root, name + '.gen.h')
 
-  include_guard = h_path.replace('/', '_').replace('.', '_').upper() + '_'
   constant_name = 'k' + name.title().replace('_', '')
   binary = ', '.join((hex(ord(c)) for c in s))
 
   with open(h_path, 'wb') as f:
     f.write("""
-#ifndef {include_guard}
-#define {include_guard}
-
 #include <stdint.h>
 #include <stddef.h>
 
+#include <array>
+
 namespace perfetto {{
 
-extern const size_t {constant_name}Size;
-extern const uint8_t {constant_name}[{size}];
+const std::array<uint8_t, {size}> {constant_name}{{{{{binary}}}}};
 
 }} // namespace perfetto
-
-#endif  // {include_guard}
 """.format(**{
       'size': len(s),
-      'include_guard': include_guard,
       'constant_name': constant_name,
-    }))
-
-  with open(cc_path, 'wb') as f:
-    f.write("""
-#include "{h_path}"
-
-namespace perfetto {{
-
-const size_t {constant_name}Size = {size};
-const uint8_t {constant_name}[{size}] = {{
-{binary}
-}};
-
-}} // namespace perfetto
-""".format(**{
-      'h_path': name + '.h',
-      'size': len(s),
       'binary': binary,
-      'constant_name': constant_name,
     }))
 
 if __name__ == '__main__':

@@ -19,13 +19,12 @@ action("trace_config_descriptor_gen") {
   deps = [
     "../../protos/perfetto/config:lite",
   ]
-  script = rebase_path("../../tools/include_binary.py", root_build_dir)
+  script = rebase_path("../../tools/binary_to_cpp_const.py", root_build_dir)
   inputs = [
     "$root_gen_dir/protos/perfetto/trace/config.descriptor"
   ]
   outputs = [
-   "$target_gen_dir/trace_config_descriptor.cc",
-   "$target_gen_dir/trace_config_descriptor.h",
+   "$target_gen_dir/trace_config_descriptor.gen.h",
   ]
   args = [
     rebase_path(inputs[0], root_build_dir),

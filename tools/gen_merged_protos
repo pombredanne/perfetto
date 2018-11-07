@@ -31,6 +31,7 @@ CONFIG_PROTOS = (
   'protos/perfetto/config/sys_stats/sys_stats_config.proto',
   'protos/perfetto/config/test_config.proto',
   'protos/perfetto/config/trace_config.proto',
+  'protos/perfetto/config/profiling/heapprofd_config.proto',
 )
 
 MERGED_CONFIG_PROTO = 'protos/perfetto/config/perfetto_config.proto'
@@ -42,6 +43,7 @@ TRACE_PROTOS = (
   'protos/perfetto/trace/ftrace/ftrace_event_bundle.proto',
   'protos/perfetto/trace/ftrace/ftrace_event.proto',
   'protos/perfetto/trace/filesystem/inode_file_map.proto',
+  'protos/perfetto/trace/ps/process_stats.proto',
   'protos/perfetto/trace/ps/process_tree.proto',
   'protos/perfetto/trace/clock_snapshot.proto',
   'protos/perfetto/trace/sys_stats/sys_stats.proto',

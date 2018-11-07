@@ -22,7 +22,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "perfetto/config/trace_config.pb.h"
 
 namespace perfetto {
@@ -55,7 +54,6 @@ protos::TraceConfig ToProto(const std::string& input) {
 
 void ToErrors(const std::string& input, MockErrorReporter* reporter) {
   std::vector<uint8_t> output = PbtxtToPb(input, reporter);
-  EXPECT_TRUE(output.empty());
 }
 
 TEST(PbtxtToPb, OneField) {
@@ -91,6 +89,22 @@ TEST(PbtxtToPb, NestedMessage) {
   )");
   ASSERT_EQ(config.buffers().size(), 1);
   EXPECT_EQ(config.buffers().Get(0).size_kb(), 123);
+}
+
+TEST(PbtxtToPb, SplitNested) {
+  protos::TraceConfig config = ToProto(R"(
+    buffers: {
+      size_kb: 1
+    }
+    duration_ms: 1000;
+    buffers: {
+      size_kb: 2
+    }
+  )");
+  ASSERT_EQ(config.buffers().size(), 2);
+  EXPECT_EQ(config.buffers().Get(0).size_kb(), 1);
+  EXPECT_EQ(config.buffers().Get(1).size_kb(), 2);
+  EXPECT_EQ(config.duration_ms(), 1000);
 }
 
 TEST(PbtxtToPb, MultipleNestedMessage) {
@@ -303,8 +317,8 @@ TEST(PbtxtToPb, UnknownField) {
   MockErrorReporter reporter;
   EXPECT_CALL(
       reporter,
-      AddError(0, 0, 0,
-               "No field with name \"not_a_label\" in proto TraceConfig."));
+      AddError(1, 5, 11,
+               "No field named \"not_a_label\" in proto TraceConfig."));
   ToErrors(R"(
     not_a_label: false
   )",
@@ -315,8 +329,8 @@ TEST(PbtxtToPb, UnknownNestedField) {
   MockErrorReporter reporter;
   EXPECT_CALL(
       reporter,
-      AddError(0, 0, 0,
-               "No field with name \"not_a_field_name\" in proto DataSourceConfig."));
+      AddError(3, 5, 16,
+               "No field named \"not_a_field_name\" in proto DataSourceConfig."));
   ToErrors(R"(
 data_sources {
   config {
@@ -330,62 +344,60 @@ data_sources {
 TEST(PbtxtToPb, BadBoolean) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(1, 22, 3, "Expected 'true' or 'false' instead saw: foo"));
+              AddError(1, 22, 3, "Expected 'true' or 'false' for boolean field write_into_file in proto TraceConfig instead saw 'foo'"));
   ToErrors(R"(
     write_into_file: foo;
-  )",
-           &reporter);
+  )", &reporter);
 }
 
 TEST(PbtxtToPb, MissingBoolean) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(0, 0, 0, "Expected 'true' or 'false' instead saw: "));
+              AddError(2, 3, 0, "Unexpected end of input"));
   ToErrors(R"(
     write_into_file:
-  )",
-           &reporter);
+  )", &reporter);
 }
 
-// TEST(PbtxtToPb, RootProtoMustNotEndWithBrace) {
-//  MockErrorReporter reporter;
-//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
-//  saw: ")); ToErrors(R"(
-//    }
-//  )", &reporter);
-//}
+TEST(PbtxtToPb, RootProtoMustNotEndWithBrace) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(reporter, AddError(1, 5, 0, "Unmatched closing brace"));
+  ToErrors(R"(
+    }
+  )", &reporter);
+}
 
-// TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
-//  MockErrorReporter reporter;
-//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
-//  saw: ")); ToErrors(R"(
-// write_into_file: false; write_into_file: true;
-//    }
-//  )", &reporter);
-//}
+TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(reporter, AddError(2,5,15, "Saw non-repeating field 'write_into_file' more than once"));
+  ToErrors(R"(
+    write_into_file: true;
+    write_into_file: true;
+  )", &reporter);
+}
 
-// TEST(PbtxtToPb, OverflowOnIntegers) {
-//  MockErrorReporter reporter;
-//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
-//  saw: ")); ToErrors(R"(
-// write_into_file: false; write_into_file: true;
-//    }
-//  )", &reporter);
-//}
+TEST(PbtxtToPb, WrongTypeBoolean) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(reporter, AddError(1, 18, 4, "Expected value of type uint32 for field duration_ms in proto TraceConfig instead saw 'true'"));
+  ToErrors(R"(
+    duration_ms: true;
+  )", &reporter);
+}
 
-// TEST(PbtxtToPb, NegativeNumbersForUnsignedInt) {
-//  MockErrorReporter reporter;
-//  EXPECT_CALL(reporter, AddError(0,0,0, "Expected 'true' or 'false' instead
-//  saw: ")); ToErrors(R"(
-// write_into_file: false; write_into_file: true;
-//    }
-//  )", &reporter);
-//}
+TEST(PbtxtToPb, WrongTypeNumber) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(reporter, AddError(1, 14, 3, "Expected value of type message for field buffers in proto TraceConfig instead saw '100'"));
+  ToErrors(R"(
+    buffers: 100;
+  )", &reporter);
+}
 
+// TEST(PbtxtToPb, WrongTypeString)
+// TEST(PbtxtToPb, OverflowOnIntegers)
+// TEST(PbtxtToPb, NegativeNumbersForUnsignedInt)
 // TEST(PbtxtToPb, UnterminatedString) {
-// TEST(PbtxtToPb, NumberIsEof) {
-// TEST(PbtxtToPb, NumberIsEof) {
-// TEST(PbtxtToPb, EscapedQuotes) {
+// TEST(PbtxtToPb, NumberIsEof)
+// TEST(PbtxtToPb, EscapedQuotes)
 
 }  // namespace
 }  // namespace perfetto

@@ -15,6 +15,8 @@
  */
 
 #include <stack>
+#include <string>
+#include <set>
 #include <ctype.h>
 
 #include "src/perfetto_cmd/pbtxt_to_pb.h"
@@ -28,7 +30,7 @@
 #include "perfetto/protozero/message.h"
 #include "perfetto/protozero/message_handle.h"
 #include "src/protozero/scattered_stream_memory_delegate.h"
-#include "src/perfetto_cmd/trace_config_descriptor.h"
+#include "src/perfetto_cmd/trace_config_descriptor.gen.h"
 
 namespace perfetto {
 constexpr char kConfigProtoName[] = ".perfetto.protos.TraceConfig";
@@ -43,8 +45,6 @@ using ::google::protobuf::io::ArrayInputStream;
 
 namespace {
 
-const char* kWhitespace = " \n\t\x0b\x0c\r";
-
 constexpr bool IsIdentifierStart(char c) {
   return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || c == '_';
 }
@@ -53,12 +53,45 @@ constexpr bool IsIdentifierBody(char c) {
   return IsIdentifierStart(c) || isdigit(c);
 }
 
-bool IsWhitespace(char c) {
-  for (size_t i = 0; i < strlen(kWhitespace); i++) {
-    if (c == kWhitespace[i])
-      return true;
+const char* FieldToTypeName(const FieldDescriptorProto* field) {
+  switch (field->type()) {
+    case FieldDescriptorProto::TYPE_UINT64:
+      return "uint64";
+    case FieldDescriptorProto::TYPE_UINT32:
+      return "uint32";
+    case FieldDescriptorProto::TYPE_INT64:
+      return "int64";
+    case FieldDescriptorProto::TYPE_SINT64:
+      return "sint64";
+    case FieldDescriptorProto::TYPE_INT32:
+      return "int32";
+    case FieldDescriptorProto::TYPE_SINT32:
+      return "sint32";
+    case FieldDescriptorProto::TYPE_FIXED64:
+      return "fixed64";
+    case FieldDescriptorProto::TYPE_SFIXED64:
+      return "sfixed64";
+    case FieldDescriptorProto::TYPE_FIXED32:
+      return "fixed32";
+    case FieldDescriptorProto::TYPE_SFIXED32:
+      return "sfixed32";
+    case FieldDescriptorProto::TYPE_DOUBLE:
+      return "double";
+    case FieldDescriptorProto::TYPE_FLOAT:
+      return "float";
+    case FieldDescriptorProto::TYPE_BOOL:
+      return "bool";
+    case FieldDescriptorProto::TYPE_STRING:
+      return "string";
+    case FieldDescriptorProto::TYPE_BYTES:
+      return "bytes";
+    case FieldDescriptorProto::TYPE_GROUP:
+      return "group";
+    case FieldDescriptorProto::TYPE_MESSAGE:
+      return "message";
+    case FieldDescriptorProto::TYPE_ENUM:
+      return "enum";
   }
-  return false;
 }
 
 std::string Format(const char* fmt, std::map<std::string, std::string> args) {
@@ -94,6 +127,7 @@ struct Token {
 struct ParserDelegateContext {
   const DescriptorProto* descriptor;
   protozero::Message* message;
+  std::set<std::string> seen_fields;
 };
 
 class ParserDelegate {
@@ -107,22 +141,67 @@ class ParserDelegate {
        reporter_(reporter),
         name_to_descriptor_(std::move(name_to_descriptor)),
         name_to_enum_(std::move(name_to_enum)) {
-     ctx_.push(ParserDelegateContext{descriptor, message});
+     ctx_.push(ParserDelegateContext{descriptor, message, {}});
   }
 
   void NumericField(Token key, Token value) {
-    const FieldDescriptorProto* field = FindFieldByName(key.ToStdString());
+    const FieldDescriptorProto* field = FindFieldByName(key, value, {
+      FieldDescriptorProto::TYPE_UINT64,
+      FieldDescriptorProto::TYPE_UINT32,
+      FieldDescriptorProto::TYPE_INT64,
+      FieldDescriptorProto::TYPE_SINT64,
+      FieldDescriptorProto::TYPE_INT32,
+      FieldDescriptorProto::TYPE_SINT32,
+      FieldDescriptorProto::TYPE_FIXED64,
+      FieldDescriptorProto::TYPE_SFIXED64,
+      FieldDescriptorProto::TYPE_FIXED32,
+      FieldDescriptorProto::TYPE_SFIXED32,
+      FieldDescriptorProto::TYPE_DOUBLE,
+      FieldDescriptorProto::TYPE_FLOAT,
+    });
     if (!field)
       return;
-    uint32_t field_id = static_cast<uint32_t>(field->number());
-    //const auto& field_type = field->type();
-    uint64_t n = 0;
-    PERFETTO_CHECK(ParseInteger(value.txt, &n));
-    msg()->AppendVarInt<uint64_t>(field_id, n);
+    const auto& field_type = field->type();
+    switch (field_type) {
+      case FieldDescriptorProto::TYPE_UINT64:
+        return VarIntField<uint64_t>(field, value);
+      case FieldDescriptorProto::TYPE_UINT32:
+        return VarIntField<uint32_t>(field, value);
+      case FieldDescriptorProto::TYPE_INT64:
+      case FieldDescriptorProto::TYPE_SINT64:
+        return VarIntField<int64_t>(field, value);
+      case FieldDescriptorProto::TYPE_INT32:
+      case FieldDescriptorProto::TYPE_SINT32:
+        return VarIntField<int32_t>(field, value);
+
+      case FieldDescriptorProto::TYPE_FIXED64:
+      case FieldDescriptorProto::TYPE_SFIXED64:
+        return FixedField<int64_t>(field, value);
+
+      case FieldDescriptorProto::TYPE_FIXED32:
+      case FieldDescriptorProto::TYPE_SFIXED32:
+        return FixedField<int32_t>(field, value);
+
+      case FieldDescriptorProto::TYPE_DOUBLE:
+        return FixedFloatField<double>(field, value);
+      case FieldDescriptorProto::TYPE_FLOAT:
+        return FixedFloatField<float>(field, value);
+
+      case FieldDescriptorProto::TYPE_BOOL:
+      case FieldDescriptorProto::TYPE_STRING:
+      case FieldDescriptorProto::TYPE_BYTES:
+      case FieldDescriptorProto::TYPE_GROUP:
+      case FieldDescriptorProto::TYPE_MESSAGE:
+      case FieldDescriptorProto::TYPE_ENUM:
+        PERFETTO_FATAL("Unhandled type");
+    }
   }
 
   void StringField(Token key, Token value) {
-    const FieldDescriptorProto* field = FindFieldByName(key.ToStdString());
+    const FieldDescriptorProto* field = FindFieldByName(key, value, {
+      FieldDescriptorProto::TYPE_STRING,
+      FieldDescriptorProto::TYPE_BYTES,
+    });
     if (!field)
       return;
     uint32_t field_id = static_cast<uint32_t>(field->number());
@@ -133,7 +212,10 @@ class ParserDelegate {
   }
 
   void IdentifierField(Token key, Token value) {
-    const FieldDescriptorProto* field = FindFieldByName(key.ToStdString());
+    const FieldDescriptorProto* field = FindFieldByName(key, value, {
+      FieldDescriptorProto::TYPE_BOOL,
+      FieldDescriptorProto::TYPE_ENUM,
+    });
     if (!field)
       return;
     uint32_t field_id = static_cast<uint32_t>(field->number());
@@ -141,7 +223,7 @@ class ParserDelegate {
     if (field_type == FieldDescriptorProto::TYPE_BOOL) {
       if (value.txt != "true" && value.txt != "false") {
         AddError(value,
-            "Expected either 'true' or 'false' for boolean field $k in "
+            "Expected 'true' or 'false' for boolean field $k in "
             "proto $n instead saw '$v'", std::map<std::string, std::string>{
               {"$k", key.ToStdString()},
               {"$n", descriptor_name()},
@@ -165,25 +247,24 @@ class ParserDelegate {
         }
         PERFETTO_CHECK(found_value);
         msg()->AppendVarInt<int32_t>(field_id, enum_value_number);
-    }
+    } else {
 
+    }
   }
 
-  void BeginNestedMessage(Token key) {
-    const FieldDescriptorProto* field = FindFieldByName(key.ToStdString());
+  void BeginNestedMessage(Token key, Token value) {
+    const FieldDescriptorProto* field = FindFieldByName(key, value, {
+      FieldDescriptorProto::TYPE_MESSAGE,
+    });
     if (!field)
       return;
-
     uint32_t field_id = static_cast<uint32_t>(field->number());
-    //const auto& field_type = field->type();
-
     const std::string& type_name = field->type_name();
     const DescriptorProto* nested_descriptor =
         name_to_descriptor_[type_name];
     PERFETTO_CHECK(nested_descriptor);
-
     auto* nested_msg = msg()->BeginNestedMessage<protozero::Message>(field_id);
-    ctx_.push(ParserDelegateContext{nested_descriptor, nested_msg});
+    ctx_.push(ParserDelegateContext{nested_descriptor, nested_msg, {}});
   }
 
   void EndNestedMessage() {
@@ -194,7 +275,43 @@ class ParserDelegate {
   void Eof() {
   }
 
+  void AddError(size_t row, size_t column, const char* fmt, const std::map<std::string, std::string>& args) {
+    reporter_->AddError(row, column, 0, Format(fmt, args));
+  }
+
+  void AddError(Token token, const char* fmt, const std::map<std::string, std::string>& args) {
+    reporter_->AddError(token.row, token.column, token.size(), Format(fmt, args));
+  }
+
  private:
+
+  template<typename T>
+  void VarIntField(const FieldDescriptorProto* field, Token t) {
+    uint32_t field_id = static_cast<uint32_t>(field->number());
+    uint64_t n = 0;
+    PERFETTO_CHECK(ParseInteger(t.txt, &n));
+    if (field->type() == FieldDescriptorProto::TYPE_SINT64 ||
+        field->type() == FieldDescriptorProto::TYPE_SINT32) {
+      msg()->AppendSignedVarInt<T>(field_id, static_cast<T>(n));
+    } else {
+      msg()->AppendVarInt<T>(field_id, static_cast<T>(n));
+    }
+  }
+
+  template<typename T>
+  void FixedField(const FieldDescriptorProto* field, Token t) {
+    uint32_t field_id = static_cast<uint32_t>(field->number());
+    uint64_t n = 0;
+    PERFETTO_CHECK(ParseInteger(t.txt, &n));
+    msg()->AppendFixed<T>(field_id, static_cast<T>(n));
+  }
+
+  template<typename T>
+  void FixedFloatField(const FieldDescriptorProto* field, Token t) {
+    uint32_t field_id = static_cast<uint32_t>(field->number());
+    double n = std::stod(t.ToStdString());
+    msg()->AppendFixed<T>(field_id, static_cast<T>(n));
+  }
 
   template<typename T>
   bool ParseInteger(base::StringView s, T* number_ptr) {
@@ -205,13 +322,48 @@ class ParserDelegate {
     return true;
   }
 
-  const FieldDescriptorProto* FindFieldByName(const std::string& name) {
+  const FieldDescriptorProto* FindFieldByName(
+      Token key,
+      Token value,
+      std::set<FieldDescriptorProto::Type> valid_field_types) {
+    const std::string field_name = key.ToStdString();
+    const FieldDescriptorProto* field_descriptor = nullptr;
     for (const auto& f : descriptor()->field()) {
-      if (f.name() == name)
-        return &f;
+      if (f.name() == field_name) {
+        field_descriptor = &f;
+        break;
+      }
     }
-    reporter_->AddError(0,0,0, "No field in");
-    return nullptr;
+
+    if (!field_descriptor) {
+      AddError(key, "No field named \"$n\" in proto $p.", {
+        {"$n", field_name},
+        {"$p", descriptor_name()},
+      });
+      return nullptr;
+    }
+
+    bool is_repeated = field_descriptor->label() == FieldDescriptorProto::LABEL_REPEATED;
+    auto it_and_inserted = ctx_.top().seen_fields.emplace(field_name);
+    if (!it_and_inserted.second && !is_repeated) {
+      AddError(key, "Saw non-repeating field '$f' more than once", {
+        {"$f", field_name},
+      });
+    }
+
+    if (!valid_field_types.count(field_descriptor->type())) {
+      AddError(value,
+          "Expected value of type $t for field $k in proto $n "
+          "instead saw '$v'", {
+            {"$t", FieldToTypeName(field_descriptor)},
+            {"$k", field_name},
+            {"$n", descriptor_name()},
+            {"$v", value.ToStdString()},
+      });
+      return nullptr;
+    }
+
+    return field_descriptor;
   }
 
   const DescriptorProto* descriptor() {
@@ -228,9 +380,7 @@ class ParserDelegate {
     return ctx_.top().message;
   }
 
-  void AddError(Token token, const char* fmt, const std::map<std::string, std::string>& args) {
-    reporter_->AddError(token.row, token.column, token.size(), Format(fmt, args));
-  }
+
 
   std::stack<ParserDelegateContext> ctx_;
   ErrorReporter* reporter_;
@@ -265,13 +415,17 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
 
     switch (state) {
       case kWaitingForKey:
-        if (IsWhitespace(c))
+        if (isspace(c))
           continue;
         if (c == '#') {
           comment_till_eol = true;
           continue;
         }
-        if (depth > 0 && c == '}') {
+        if (c == '}') {
+          if (depth == 0) {
+            delegate->AddError(row, column, "Unmatched closing brace", {});
+            return;
+          }
           saw_semicolon_for_this_value = false;
           depth--;
           delegate->EndNestedMessage();
@@ -295,14 +449,13 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
         if (IsIdentifierBody(c))
           continue;
         key.txt = base::StringView(input.data() + key.offset, i-key.offset);
-        PERFETTO_ILOG("%s", key.ToStdString().c_str());
         state = kWaitingForValue;
         if (c == '#')
           comment_till_eol = true;
         continue;
 
       case kWaitingForValue:
-        if (IsWhitespace(c))
+        if (isspace(c))
           continue;
         if (c == '#') {
           comment_till_eol = true;
@@ -331,13 +484,14 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
         if (c == '{') {
           state = kWaitingForKey;
           depth++;
-          delegate->BeginNestedMessage(key);
+          value.txt = base::StringView(input.data() + value.offset, 1);
+          delegate->BeginNestedMessage(key, value);
           continue;
         }
         break;
 
       case kReadingNumericValue:
-        if (IsWhitespace(c) || c == ';' || last_character) {
+        if (isspace(c) || c == ';' || last_character) {
           size_t size = i-value.offset + (last_character ? 1 : 0);
           value.txt = base::StringView(input.data() + value.offset, size);
           saw_semicolon_for_this_value = c == ';';
@@ -352,7 +506,7 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
       case kReadingStringValue:
         if (c == '"') {
           size_t size = i - value.offset - 1;
-          value.txt = base::StringView(input.data() + value.offset, size);
+          value.txt = base::StringView(input.data() + value.offset + 1, size);
           saw_semicolon_for_this_value = false;
           state = kWaitingForKey;
           delegate->StringField(key, value);
@@ -361,7 +515,7 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
         continue;
 
       case kReadingIdentifierValue:
-        if (IsWhitespace(c) || c == ';' || c == '#' || last_character) {
+        if (isspace(c) || c == ';' || c == '#' || last_character) {
           size_t size = i-value.offset + (last_character ? 1 : 0);
           value.txt = base::StringView(input.data() + value.offset, size);
           comment_till_eol = c == '#';
@@ -377,6 +531,9 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
     }
     PERFETTO_FATAL("Unexpected char %c", c);
   } // for
+  if (state == kWaitingForValue) {
+    delegate->AddError(row, column, "Unexpected end of input", {});
+  }
   delegate->Eof();
 }
 
@@ -407,8 +564,9 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
   std::map<std::string, const EnumDescriptorProto*> name_to_enum;
   FileDescriptorSet file_descriptor_set;
   {
-    ArrayInputStream config_descriptor_stream(kTraceConfigDescriptor, static_cast<int>(kTraceConfigDescriptorSize));
-    file_descriptor_set.ParseFromZeroCopyStream(&config_descriptor_stream);
+    file_descriptor_set.ParseFromArray(
+        kTraceConfigDescriptor.data(),
+        static_cast<int>(kTraceConfigDescriptor.size()));
     for (const auto& file_descriptor : file_descriptor_set.file()) {
       for (const auto& enum_descriptor : file_descriptor.enum_type()) {
         const std::string name =

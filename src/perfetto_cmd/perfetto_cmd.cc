@@ -62,13 +62,38 @@ perfetto::PerfettoCmd* g_consumer_cmd;
 
 class LoggingErrorReporter : public ErrorReporter {
  public:
-  void AddError(size_t, size_t, size_t, const std::string& message) {
-    PERFETTO_ELOG("%s", message.c_str()); 
+  LoggingErrorReporter(const char* config): config_(config) {
   }
+
+  void AddError(size_t row, size_t column, size_t length, const std::string& message) override {
+    const char* start = FindLine(row);
+    PERFETTO_ELOG("%s", message.c_str());
+    PERFETTO_ELOG("%s", start);
+    std::string guide(column+length, ' ');
+    for (size_t i=column; i<column+length; i++) {
+      guide[i] = i == column ? '^' : '~';
+    }
+    PERFETTO_ELOG("%s", guide.c_str());
+  }
+
+ private:
+  const char* FindLine(size_t row) {
+    const char* ptr = config_;
+    char c = '\0';
+    while ((c = *ptr++)) {
+      if (c == '\n')
+        row--;
+      if (row == 0)
+        return ptr;
+    }
+    PERFETTO_FATAL("Too few lines in config");
+  }
+
+  const char* config_;
 };
 
 bool ParseTraceConfigPbtxt(const std::string& pbtxt, protos::TraceConfig* config) {
-  LoggingErrorReporter reporter;
+  LoggingErrorReporter reporter(pbtxt.c_str());
   std::vector<uint8_t> output = PbtxtToPb(pbtxt, &reporter);
   config->ParseFromArray(output.data(), static_cast<int>(output.size()));
   return !output.empty();
@@ -92,6 +117,7 @@ Usage: %s
   --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
+  --txt            -t     : Parse config as pbtxt.
   --help           -h
 
 statsd-specific flags:
@@ -118,6 +144,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"background", no_argument, nullptr, 'b'},
       {"dropbox", optional_argument, nullptr, 'd'},
       {"no-guardrails", optional_argument, nullptr, 'n'},
+      {"txt", optional_argument, nullptr, 't'},
       {"alert-id", required_argument, nullptr, OPT_ALERT_ID},
       {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
@@ -128,12 +155,13 @@ int PerfettoCmd::Main(int argc, char** argv) {
   std::string trace_config_raw;
   bool background = false;
   bool ignore_guardrails = false;
+  bool parse_as_pbtxt = false;
   perfetto::protos::TraceConfig::StatsdMetadata statsd_metadata;
   RateLimiter limiter;
 
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:bd::n", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:bd::nt", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -188,6 +216,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
+    if (option == 't') {
+      parse_as_pbtxt = true;
+      continue;
+    }
+
     if (option == OPT_RESET_GUARDRAILS) {
       PERFETTO_CHECK(limiter.ClearState());
       PERFETTO_ILOG("Guardrail state cleared");
@@ -230,8 +263,13 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   perfetto::protos::TraceConfig trace_config_proto;
   PERFETTO_DLOG("Parsing TraceConfig, %zu bytes", trace_config_raw.size());
-  bool parsed = trace_config_proto.ParseFromString(trace_config_raw);
-  parsed = parsed || ParseTraceConfigPbtxt(trace_config_raw, &trace_config_proto); 
+  bool parsed;
+  if (parse_as_pbtxt) {
+    parsed = ParseTraceConfigPbtxt(trace_config_raw, &trace_config_proto);
+  } else {
+    parsed = trace_config_proto.ParseFromString(trace_config_raw);
+  }
+
   if (!parsed) {
     PERFETTO_ELOG("Could not parse TraceConfig proto");
     return 1;

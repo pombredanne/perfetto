@@ -84,9 +84,9 @@ body {
     display: grid;
     grid-template-areas:
       "sidebar topbar"
-      "sidebar page"
-      "sidebar alerts";
-    grid-template-rows: var(--topbar-height) 1fr auto;
+      "sidebar alerts"
+      "sidebar page";
+    grid-template-rows: var(--topbar-height) auto 1fr;
     grid-template-columns: var(--sidebar-width) auto;
     color: #121212;
 }
@@ -126,17 +126,23 @@ button.close {
 }
 
 .alerts {
+  * {
+    user-select: text;
+  }
   grid-area: alerts;
-  background-color: #262f3c;
-  div {
+  background-color: #f2f2f2;
+  >div {
     font-family: 'Raleway';
     font-weight: 400;
     letter-spacing: 0.25px;
-    color: white;
-    padding: 25px;
-    a {
-      color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    button {
+      width: 24px;
+      height: 24px;
     }
+
   }
 }
 
@@ -165,7 +171,7 @@ button.close {
     border: 0;
     thead td {
         background-color: hsl(214, 22%, 90%);
-        color: #262f3b;
+        color: #262f3c;
         text-align: center;
         padding: 1px 3px;
         border-style: solid;
@@ -317,6 +323,17 @@ header.overview {
   user-select: text;
 }
 
+button.query-copy {
+  background: #262f3c;
+  color: white;
+  border-radius: 10px;
+  font-size: 10px;
+  height: 18px;
+  line-height: 18px;
+  min-width: 7em;
+  margin: auto 0;
+}
+
 span.code {
   user-select: text;
 }
@@ -394,8 +411,8 @@ span.code {
   grid-template-rows: 1fr;
   border-top: 1px solid #c7d0db;
   transition: background-color .4s, color .4s;
+  height: 40px;
   &[collapsed=true] {
-    height: 40px;
     background-color: var(--collapsed-background-transparent);
     .shell {
       border-right: 1px solid #c7d0db;
@@ -403,12 +420,10 @@ span.code {
     }
   }
   &[collapsed=false] {
-    height: 25px;
     background-color: var(--expanded-background);
     color: white;
     font-weight: bold;
     .shell {
-      background-color: var(--expanded-background);
       h1 {
         font-size: 15px;
       }
