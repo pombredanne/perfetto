@@ -29,8 +29,8 @@
 #include "perfetto/base/string_view.h"
 #include "perfetto/protozero/message.h"
 #include "perfetto/protozero/message_handle.h"
+#include "perfetto/protozero/scattered_stream_memory_delegate.h"
 #include "src/perfetto_cmd/perfetto_config.descriptor.h"
-#include "src/protozero/scattered_stream_memory_delegate.h"
 
 namespace perfetto {
 constexpr char kConfigProtoName[] = ".perfetto.protos.TraceConfig";

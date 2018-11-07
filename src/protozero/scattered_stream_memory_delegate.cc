@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "src/protozero/scattered_stream_memory_delegate.h"
+#include "perfetto/protozero/scattered_stream_memory_delegate.h"
 
 namespace perfetto {
 

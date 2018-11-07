@@ -21,7 +21,7 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/message.h"
 #include "perfetto/protozero/proto_utils.h"
-#include "src/protozero/scattered_stream_memory_delegate.h"
+#include "perfetto/protozero/scattered_stream_memory_delegate.h"
 
 namespace protozero {
 namespace {

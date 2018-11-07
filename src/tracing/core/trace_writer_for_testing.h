@@ -17,9 +17,9 @@
 #define SRC_TRACING_CORE_TRACE_WRITER_FOR_TESTING_H_
 
 #include "perfetto/protozero/message_handle.h"
+#include "perfetto/protozero/scattered_stream_memory_delegate.h"
 #include "perfetto/trace/trace_packet.pb.h"
 #include "perfetto/tracing/core/trace_writer.h"
-#include "src/protozero/scattered_stream_memory_delegate.h"
 
 namespace perfetto {
 
