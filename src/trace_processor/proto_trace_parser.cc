@@ -611,11 +611,11 @@ void ProtoTraceParser::ParseSignalGenerate(uint64_t timestamp,
 
 void ProtoTraceParser::ParseLowmemoryKill(uint64_t timestamp,
                                           TraceBlobView view) {
-  // TODO(taylori): Store the pagecache_limit and free fields. In an args table?
+  // TODO(taylori): Store the pagecache_size, pagecache_limit and free fields
+  // in an args table
   ProtoDecoder decoder(view.data(), view.length());
   uint32_t pid = 0;
   base::StringView comm;
-  uint64_t pagecache_size = 0;
   for (auto fld = decoder.ReadField(); fld.id != 0; fld = decoder.ReadField()) {
     switch (fld.id) {
       case protos::LowmemoryKillFtraceEvent::kPidFieldNumber:
@@ -624,18 +624,15 @@ void ProtoTraceParser::ParseLowmemoryKill(uint64_t timestamp,
       case protos::LowmemoryKillFtraceEvent::kCommFieldNumber:
         comm = fld.as_string();
         break;
-      case protos::LowmemoryKillFtraceEvent::kPagecacheSizeFieldNumber:
-        pagecache_size = fld.as_uint64();
-        break;
     }
   }
+  // TODO(taylori): Move the comm to the args table once it exists.
   StringId name = context_->storage->InternString(
       base::StringView("mem.lmk." + comm.ToStdString()));
   auto* instants = context_->storage->mutable_instants();
   // Storing the pid of the event that is lmk-ed.
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
-  instants->AddInstantEvent(timestamp, pagecache_size, name, utid,
-                            RefType::kUtid);
+  instants->AddInstantEvent(timestamp, 0, name, utid, RefType::kUtid);
 }
 
 void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
