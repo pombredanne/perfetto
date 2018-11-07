@@ -63,7 +63,8 @@ class ProtoTranslationTable {
       std::vector<Field> common_fields);
   ~ProtoTranslationTable();
 
-  ProtoTranslationTable(const std::vector<Event>& events,
+  ProtoTranslationTable(const FtraceProcfs* ftrace_procfs,
+                        const std::vector<Event>& events,
                         std::vector<Field> common_fields,
                         FtracePageHeaderSpec ftrace_page_header_spec);
 
@@ -85,10 +86,12 @@ class ProtoTranslationTable {
   }
 
   const Event* GetEventById(size_t id) const {
-    if (id == 0 || id > largest_id_)
+    if (id == 0 || id > largest_id_) {
       return nullptr;
-    if (!events_.at(id).ftrace_event_id)
+    }
+    if (!events_.at(id).ftrace_event_id) {
       return nullptr;
+    }
     return &events_.at(id);
   }
 
@@ -103,11 +106,14 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
+  const Event* AddGenericEvent(const std::string name);
+
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
-  const std::vector<Event> events_;
+  std::vector<Event> events_;
+  const FtraceProcfs* ftrace_procfs_;
   size_t largest_id_;
   std::map<std::string, const Event*> name_to_event_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;

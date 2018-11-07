@@ -93,7 +93,7 @@ class MockTaskRunner : public base::TaskRunner {
   std::function<void()> task_;
 };
 
-std::unique_ptr<Table> FakeTable() {
+std::unique_ptr<Table> FakeTable(FtraceProcfs* ftrace) {
   std::vector<Field> common_fields;
   std::vector<Event> events;
 
@@ -114,13 +114,12 @@ std::unique_ptr<Table> FakeTable() {
   }
 
   return std::unique_ptr<Table>(
-      new Table(events, std::move(common_fields),
+      new Table(ftrace, events, std::move(common_fields),
                 ProtoTranslationTable::DefaultPageHeaderSpecForTesting()));
 }
 
-std::unique_ptr<FtraceConfigMuxer> FakeModel(
-    FtraceProcfs* ftrace,
-    const ProtoTranslationTable* table) {
+std::unique_ptr<FtraceConfigMuxer> FakeModel(FtraceProcfs* ftrace,
+                                             ProtoTranslationTable* table) {
   return std::unique_ptr<FtraceConfigMuxer>(
       new FtraceConfigMuxer(ftrace, table));
 }
@@ -258,8 +257,6 @@ std::unique_ptr<TestFtraceController> CreateTestController(
     runner = std::unique_ptr<MockTaskRunner>(new MockTaskRunner());
   }
 
-  auto table = FakeTable();
-
   std::unique_ptr<MockFtraceProcfs> ftrace_procfs;
   if (procfs_is_nice_mock) {
     ftrace_procfs = std::unique_ptr<MockFtraceProcfs>(
@@ -268,6 +265,8 @@ std::unique_ptr<TestFtraceController> CreateTestController(
     ftrace_procfs =
         std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs(cpu_count));
   }
+
+  auto table = FakeTable(ftrace_procfs.get());
 
   auto model = FakeModel(ftrace_procfs.get(), table.get());
 

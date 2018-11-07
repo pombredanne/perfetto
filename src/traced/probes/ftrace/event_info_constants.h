@@ -42,6 +42,7 @@ enum ProtoFieldType {
   kProtoBool,
   kProtoString,
   kProtoBytes,
+  kGenericField,
 };
 
 enum FtraceFieldType {
@@ -125,6 +126,8 @@ inline const char* ToString(ProtoFieldType v) {
       return "string";
     case kProtoBytes:
       return "bytes";
+    case kGenericField:
+      return "generic";
   }
   // For gcc:
   PERFETTO_CHECK(false);

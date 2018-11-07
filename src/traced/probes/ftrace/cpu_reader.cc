@@ -85,8 +85,10 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   std::vector<bool> enabled(table.largest_id() + 1);
   for (const std::string& name : names) {
     const Event* event = table.GetEventByName(name);
-    if (!event)
+    if (!event) {
+      PERFETTO_LOG("not enabled: %s", name.c_str());
       continue;
+    }
     enabled[event->ftrace_event_id] = true;
   }
   return enabled;
@@ -420,8 +422,13 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, table, event, metadata))
+          if (!ParseEvent(ftrace_event_id, start, next, table, event,
+                          metadata)) {
+            if (ftrace_event_id == 93) {
+              PERFETTO_LOG("Did not parse");
+            }
             return 0;
+          }
         }
 
         // Jump to next event.
@@ -460,8 +467,15 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
-  for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, metadata);
+  for (const Field& field : info.fields) {
+    if (info.proto_field_id == 326) {  // generic event
+      protozero::Message* proto_field =
+          nested->BeginNestedMessage<protozero::Message>(1);
+      success &= ParseField(field, start, end, proto_field, metadata);
+    } else {
+      success &= ParseField(field, start, end, nested, metadata);
+    }
+  }
 
   // This finalizes |nested| automatically.
   message->Finalize();
