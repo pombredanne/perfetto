@@ -373,8 +373,8 @@ void HeapprofdProducer::ConnectWithRetries(const char* socket_name) {
 void HeapprofdProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
-  endpoint_ = ProducerIPCClient::Connect(
-      socket_name_, this, "perfetto.traced_probes", task_runner_);
+  endpoint_ = ProducerIPCClient::Connect(socket_name_, this,
+                                         "android.heapprofd", task_runner_);
 }
 
 void HeapprofdProducer::IncreaseConnectionBackoff() {
