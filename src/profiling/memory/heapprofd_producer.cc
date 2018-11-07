@@ -121,7 +121,16 @@ HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner)
       socket_(MakeSocket()),
       weak_factory_(this) {}
 
-HeapprofdProducer::~HeapprofdProducer() = default;
+HeapprofdProducer::~HeapprofdProducer() {
+  bookkeeping_queue_.Shutdown();
+  for (auto& queue : unwinder_queues_) {
+    queue.Shutdown();
+  }
+  bookkeeping_th_.join();
+  for (std::thread& th : unwinding_threads_) {
+    th.join();
+  }
+}
 
 void HeapprofdProducer::OnConnect() {
   // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -359,7 +368,7 @@ std::unique_ptr<base::UnixSocket> HeapprofdProducer::MakeSocket() {
 }
 
 // TODO(fmayer): Delete these and used ReconnectingProducer once submitted
-__attribute__((noreturn)) void HeapprofdProducer::Restart() {
+void HeapprofdProducer::Restart() {
   // We lost the connection with the tracing service. At this point we need
   // to reset all the data sources. Trying to handle that manually is going to
   // be error prone. What we do here is simply desroying the instance and
@@ -368,9 +377,6 @@ __attribute__((noreturn)) void HeapprofdProducer::Restart() {
 
   base::TaskRunner* task_runner = task_runner_;
   const char* socket_name = socket_name_;
-
-  // TODO(fmayer): Allow queues to be torn down and fix this.
-  PERFETTO_FATAL("Restart is not supported.");
 
   // Invoke destructor and then the constructor again.
   this->~HeapprofdProducer();
