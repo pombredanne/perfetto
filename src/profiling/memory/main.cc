@@ -29,7 +29,6 @@
 #include "src/profiling/memory/socket_listener.h"
 #include "src/profiling/memory/wire_protocol.h"
 #include "src/tracing/ipc/default_socket.h"
-#include "src/tracing/ipc/producer/reconnecting_producer.h"
 
 #include "perfetto/base/unix_task_runner.h"
 
@@ -39,13 +38,8 @@ namespace {
 
 int HeapprofdMain(int, char**) {
   base::UnixTaskRunner task_runner;
-  ReconnectingProducer producer(
-      "android.heapprofd", GetProducerSocket(), &task_runner,
-      [&task_runner](TracingService::ProducerEndpoint* endpoint) {
-        return std::unique_ptr<Producer>(
-            new HeapprofdProducer(&task_runner, endpoint));
-      });
-  producer.ConnectWithRetries();
+  HeapprofdProducer producer;
+  producer.ConnectWithRetries(GetProducerSocket(), &task_runner);
   task_runner.Run();
   return 0;
 }

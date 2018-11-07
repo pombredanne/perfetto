@@ -23,6 +23,7 @@
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_writer.h"
+#include "perfetto/tracing/ipc/producer_ipc_client.h"
 
 namespace perfetto {
 namespace profiling {
@@ -33,6 +34,9 @@ constexpr size_t kBookkeepingQueueSize = 1000;
 constexpr size_t kUnwinderThreads = 5;
 constexpr const char* kDumpOutput = "/data/misc/peretto-traces/heap_dump";
 constexpr int kHeapprofdSignal = 36;
+
+constexpr uint32_t kInitialConnectionBackoffMs = 100;
+constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
 
 void FindPidsForBinaries(std::vector<std::string> binaries,
                          std::vector<pid_t>* pids) {
@@ -100,11 +104,8 @@ void FindPidsForBinaries(std::vector<std::string> binaries,
 //           |Bookkeeping Thread|
 //           +------------------+
 
-HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
-                                     TracingService::ProducerEndpoint* endpoint)
-    : task_runner_(task_runner),
-      endpoint_(endpoint),
-      bookkeeping_queue_(kBookkeepingQueueSize),
+HeapprofdProducer::HeapprofdProducer()
+    : bookkeeping_queue_(kBookkeepingQueueSize),
       bookkeeping_thread_(kDumpOutput),
       bookkeeping_th_([this] { bookkeeping_thread_.Run(&bookkeeping_queue_); }),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
@@ -116,12 +117,29 @@ HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner,
 HeapprofdProducer::~HeapprofdProducer() = default;
 
 void HeapprofdProducer::OnConnect() {
+  // TODO(fmayer): Delete once we have generic reconnect logic.
+  PERFETTO_DCHECK(state_ == kConnecting);
+  state_ = kConnected;
+  ResetConnectionBackoff();
+  PERFETTO_LOG("Connected to the service");
+
   DataSourceDescriptor desc;
   desc.set_name(kHeapprofdDataSource);
   endpoint_->RegisterDataSource(desc);
 }
 
-void HeapprofdProducer::OnDisconnect() {}
+// TODO(fmayer): Delete once we have generic reconnect logic.
+void HeapprofdProducer::OnDisconnect() {
+  PERFETTO_DCHECK(state_ == kConnected || state_ == kConnecting);
+  PERFETTO_LOG("Disconnected from tracing service");
+  if (state_ == kConnected)
+    return task_runner_->PostTask([this] { this->Restart(); });
+
+  state_ = kNotConnected;
+  IncreaseConnectionBackoff();
+  task_runner_->PostDelayedTask([this] { this->Connect(); },
+                                connection_backoff_ms_);
+}
 
 void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
                                         const DataSourceConfig& cfg) {
@@ -322,6 +340,52 @@ ClientConfiguration HeapprofdProducer::MakeClientConfiguration(
   ClientConfiguration client_config;
   client_config.interval = cfg.heapprofd_config().sampling_interval_bytes();
   return client_config;
+}
+
+// TODO(fmayer): Delete these and used ReconnectingProducer once submitted
+void HeapprofdProducer::Restart() {
+  // We lost the connection with the tracing service. At this point we need
+  // to reset all the data sources. Trying to handle that manually is going to
+  // be error prone. What we do here is simply desroying the instance and
+  // recreating it again.
+  // TODO(hjd): Add e2e test for this.
+
+  base::TaskRunner* task_runner = task_runner_;
+  const char* socket_name = socket_name_;
+
+  // Invoke destructor and then the constructor again.
+  this->~HeapprofdProducer();
+  new (this) HeapprofdProducer();
+
+  ConnectWithRetries(socket_name, task_runner);
+}
+
+void HeapprofdProducer::ConnectWithRetries(const char* socket_name,
+                                           base::TaskRunner* task_runner) {
+  PERFETTO_DCHECK(state_ == kNotStarted);
+  state_ = kNotConnected;
+
+  ResetConnectionBackoff();
+  socket_name_ = socket_name;
+  task_runner_ = task_runner;
+  Connect();
+}
+
+void HeapprofdProducer::Connect() {
+  PERFETTO_DCHECK(state_ == kNotConnected);
+  state_ = kConnecting;
+  endpoint_ = ProducerIPCClient::Connect(
+      socket_name_, this, "perfetto.traced_probes", task_runner_);
+}
+
+void HeapprofdProducer::IncreaseConnectionBackoff() {
+  connection_backoff_ms_ *= 2;
+  if (connection_backoff_ms_ > kMaxConnectionBackoffMs)
+    connection_backoff_ms_ = kMaxConnectionBackoffMs;
+}
+
+void HeapprofdProducer::ResetConnectionBackoff() {
+  connection_backoff_ms_ = kInitialConnectionBackoffMs;
 }
 
 }  // namespace profiling

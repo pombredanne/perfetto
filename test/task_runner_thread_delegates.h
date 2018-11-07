@@ -19,7 +19,6 @@
 
 #include "perfetto/tracing/ipc/service_ipc_host.h"
 #include "src/traced/probes/probes_producer.h"
-#include "src/tracing/ipc/producer/reconnecting_producer.h"
 #include "test/fake_producer.h"
 #include "test/task_runner_thread.h"
 
@@ -53,18 +52,13 @@ class ProbesProducerDelegate : public ThreadDelegate {
   ~ProbesProducerDelegate() override = default;
 
   void Initialize(base::TaskRunner* task_runner) override {
-    producer_.reset(new ReconnectingProducer(
-        "perfetto.traced_probes", producer_socket_.c_str(), task_runner,
-        [task_runner](TracingService::ProducerEndpoint* endpoint) {
-          return std::unique_ptr<Producer>(
-              new ProbesProducer(task_runner, endpoint));
-        }));
-    producer_->ConnectWithRetries();
+    producer_.reset(new ProbesProducer);
+    producer_->ConnectWithRetries(producer_socket_.c_str(), task_runner);
   }
 
  private:
   std::string producer_socket_;
-  std::unique_ptr<ReconnectingProducer> producer_;
+  std::unique_ptr<ProbesProducer> producer_;
 };
 
 class FakeProducerDelegate : public ThreadDelegate {

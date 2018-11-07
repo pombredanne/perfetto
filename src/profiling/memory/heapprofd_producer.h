@@ -31,8 +31,7 @@ namespace profiling {
 
 class HeapprofdProducer : public Producer {
  public:
-  HeapprofdProducer(base::TaskRunner* task_runner,
-                    TracingService::ProducerEndpoint* endpoint);
+  HeapprofdProducer();
   ~HeapprofdProducer() override;
 
   // Producer Impl:
@@ -46,7 +45,28 @@ class HeapprofdProducer : public Producer {
              const DataSourceInstanceID* data_source_ids,
              size_t num_data_sources) override;
 
+  // TODO(fmayer): Delete once we have generic reconnect logic.
+  void ConnectWithRetries(const char* socket_name,
+                          base::TaskRunner* task_runner);
+
  private:
+  // TODO(fmayer): Delete once we have generic reconnect logic.
+  enum State {
+    kNotStarted = 0,
+    kNotConnected,
+    kConnecting,
+    kConnected,
+  };
+  void Connect();
+  void Restart();
+  void ResetConnectionBackoff();
+  void IncreaseConnectionBackoff();
+
+  // TODO(fmayer): Delete once we have generic reconnect logic.
+  State state_ = kNotStarted;
+  uint32_t connection_backoff_ms_ = 0;
+  const char* socket_name_ = nullptr;
+
   std::function<void(UnwindingRecord)> MakeSocketListenerCallback();
   std::vector<BoundedQueue<UnwindingRecord>> MakeUnwinderQueues(size_t n);
   std::vector<std::thread> MakeUnwindingThreads(size_t n);
@@ -75,8 +95,8 @@ class HeapprofdProducer : public Producer {
   std::map<FlushRequestID, size_t> flushes_in_progress_;
 
   // These two are borrowed from the caller.
-  base::TaskRunner* const task_runner_;
-  TracingService::ProducerEndpoint* const endpoint_;
+  base::TaskRunner* task_runner_;
+  std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue_;
   BookkeepingThread bookkeeping_thread_;
