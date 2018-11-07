@@ -104,8 +104,9 @@ void FindPidsForBinaries(std::vector<std::string> binaries,
 //           |Bookkeeping Thread|
 //           +------------------+
 
-HeapprofdProducer::HeapprofdProducer()
-    : bookkeeping_queue_(kBookkeepingQueueSize),
+HeapprofdProducer::HeapprofdProducer(base::TaskRunner* task_runner)
+    : task_runner_(task_runner),
+      bookkeeping_queue_(kBookkeepingQueueSize),
       bookkeeping_thread_(kDumpOutput),
       bookkeeping_th_([this] { bookkeeping_thread_.Run(&bookkeeping_queue_); }),
       unwinder_queues_(MakeUnwinderQueues(kUnwinderThreads)),
@@ -355,19 +356,17 @@ void HeapprofdProducer::Restart() {
 
   // Invoke destructor and then the constructor again.
   this->~HeapprofdProducer();
-  new (this) HeapprofdProducer();
+  new (this) HeapprofdProducer(task_runner);
 
-  ConnectWithRetries(socket_name, task_runner);
+  ConnectWithRetries(socket_name);
 }
 
-void HeapprofdProducer::ConnectWithRetries(const char* socket_name,
-                                           base::TaskRunner* task_runner) {
+void HeapprofdProducer::ConnectWithRetries(const char* socket_name) {
   PERFETTO_DCHECK(state_ == kNotStarted);
   state_ = kNotConnected;
 
   ResetConnectionBackoff();
   socket_name_ = socket_name;
-  task_runner_ = task_runner;
   Connect();
 }
 

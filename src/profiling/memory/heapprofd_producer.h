@@ -31,7 +31,7 @@ namespace profiling {
 
 class HeapprofdProducer : public Producer {
  public:
-  HeapprofdProducer();
+  HeapprofdProducer(base::TaskRunner* task_runner);
   ~HeapprofdProducer() override;
 
   // Producer Impl:
@@ -46,8 +46,7 @@ class HeapprofdProducer : public Producer {
              size_t num_data_sources) override;
 
   // TODO(fmayer): Delete once we have generic reconnect logic.
-  void ConnectWithRetries(const char* socket_name,
-                          base::TaskRunner* task_runner);
+  void ConnectWithRetries(const char* socket_name);
 
  private:
   // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -95,7 +94,7 @@ class HeapprofdProducer : public Producer {
   std::map<FlushRequestID, size_t> flushes_in_progress_;
 
   // These two are borrowed from the caller.
-  base::TaskRunner* task_runner_;
+  base::TaskRunner* const task_runner_;
   std::unique_ptr<TracingService::ProducerEndpoint> endpoint_;
 
   BoundedQueue<BookkeepingRecord> bookkeeping_queue_;

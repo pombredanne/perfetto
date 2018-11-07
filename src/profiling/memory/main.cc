@@ -38,8 +38,8 @@ namespace {
 
 int HeapprofdMain(int, char**) {
   base::UnixTaskRunner task_runner;
-  HeapprofdProducer producer;
-  producer.ConnectWithRetries(GetProducerSocket(), &task_runner);
+  HeapprofdProducer producer(&task_runner);
+  producer.ConnectWithRetries(GetProducerSocket());
   task_runner.Run();
   return 0;
 }

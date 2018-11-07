@@ -46,6 +46,7 @@ source_set("daemon") {
     "../../base",
     "../../base:unix_socket",
     "../../tracing",
+    "../../tracing:ipc",
   ]
   sources = [
     "bookkeeping.cc",
