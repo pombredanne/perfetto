@@ -53,6 +53,8 @@ class SocketListener : public base::UnixSocket::EventListener {
       return *this;
     }
 
+    operator bool() const { return listener_ != nullptr; }
+
     ProfilingSession(const ProfilingSession&) = delete;
     ProfilingSession& operator=(const ProfilingSession&) = delete;
 
@@ -96,14 +98,14 @@ class SocketListener : public base::UnixSocket::EventListener {
     //
     // This does not get initialized in the ctor because the file descriptors
     // only get received after the first Receive call of the socket.
-    std::shared_ptr<ProcessMetadata> process_metadata;
+    std::shared_ptr<UnwindingMetadata> unwinding_metadata;
   };
 
   void RecordReceived(base::UnixSocket*, size_t, std::unique_ptr<uint8_t[]>);
   void ShutdownPID(pid_t pid);
 
   std::map<base::UnixSocket*, Entry> sockets_;
-  std::map<pid_t, std::weak_ptr<ProcessMetadata>> process_metadata_;
+  std::map<pid_t, std::weak_ptr<UnwindingMetadata>> unwinding_metadata_;
   std::map<pid_t, ProcessInfo> process_info_;
   std::function<void(UnwindingRecord)> callback_function_;
   BookkeepingThread* const bookkeeping_thread_;

@@ -38,6 +38,12 @@ constexpr int kHeapprofdSignal = 36;
 constexpr uint32_t kInitialConnectionBackoffMs = 100;
 constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
 
+ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
+  ClientConfiguration client_config;
+  client_config.interval = cfg.heapprofd_config().sampling_interval_bytes();
+  return client_config;
+}
+
 void FindPidsForBinaries(std::vector<std::string> binaries,
                          std::vector<pid_t>* pids) {
   base::ScopedDir proc_dir(opendir("/proc"));
@@ -150,10 +156,6 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
-  std::vector<pid_t> pids;
-  for (uint64_t pid : cfg.heapprofd_config().pid())
-    pids.emplace_back(static_cast<pid_t>(pid));
-
   auto it = data_sources_.find(id);
   if (it != data_sources_.end()) {
     PERFETTO_DFATAL("Received duplicated data source instance id: %" PRIu64,
@@ -161,40 +163,53 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
     return;
   }
 
-  FindPidsForBinaries(cfg.heapprofd_config().native_binary_name(), &pids);
+  DataSource data_source;
 
-  std::tie(it, std::ignore) = data_sources_.emplace(id, pids);
-  DataSource& data_source = it->second;
+  ClientConfiguration client_config = MakeClientConfiguration(cfg);
+
+  for (uint64_t pid : cfg.heapprofd_config().pid())
+    data_source.pids.emplace_back(static_cast<pid_t>(pid));
+
+  FindPidsForBinaries(cfg.heapprofd_config().native_binary_name(),
+                      &data_source.pids);
+
+  auto pid_it = data_source.pids.begin();
+  while (pid_it != data_source.pids.end()) {
+    auto profiling_session = socket_listener_.ExpectPID(*pid_it, client_config);
+    if (!profiling_session) {
+      PERFETTO_DFATAL("No enabling duplicate profiling session for %d",
+                      *pid_it);
+      pid_it = data_source.pids.erase(pid_it);
+      continue;
+    }
+    data_source.sessions.emplace_back(std::move(profiling_session));
+  }
+
+  if (data_source.pids.empty()) {
+    // TODO(fmayer): Whole system profiling.
+    PERFETTO_DLOG("No valid pids given. Not setting up data source.");
+    return;
+  }
 
   auto buffer_id = static_cast<BufferID>(cfg.target_buffer());
   data_source.trace_writer = endpoint_->CreateTraceWriter(buffer_id);
 
-  ClientConfiguration client_config = MakeClientConfiguration(cfg);
-
-  for (pid_t pid : pids) {
-    data_source.sessions.emplace_back(
-        socket_listener_.ExpectPID(pid, client_config));
-  }
-
-  if (pids.empty()) {
-    // TODO(fmayer): Whole system profiling.
-    PERFETTO_DLOG("No pids given");
-  }
+  data_sources_.emplace(id, std::move(data_source));
   PERFETTO_DLOG("Set up data source.");
 }
 
 void HeapprofdProducer::DoContiniousDump(DataSourceInstanceID id,
                                          uint32_t dump_interval) {
-  if (Dump(id, 0, false)) {
-    auto weak_producer = weak_factory_.GetWeakPtr();
-    task_runner_->PostDelayedTask(
-        [weak_producer, id, dump_interval] {
-          if (!weak_producer)
-            return;
-          weak_producer->DoContiniousDump(id, dump_interval);
-        },
-        dump_interval);
-  }
+  if (!Dump(id, 0 /* flush_id */, false /* is_flush */))
+    return;
+  auto weak_producer = weak_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_producer, id, dump_interval] {
+        if (!weak_producer)
+          return;
+        weak_producer->DoContiniousDump(id, dump_interval);
+      },
+      dump_interval);
 }
 
 void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
@@ -233,6 +248,8 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
 }
 
 void HeapprofdProducer::StopDataSource(DataSourceInstanceID id) {
+  // DataSource holds ProfilingSession handles which on being destructed tear
+  // down the profiling on the client.
   if (data_sources_.erase(id) != 1)
     PERFETTO_DFATAL("Trying to stop non existing data source: %" PRIu64, id);
 }
@@ -271,9 +288,13 @@ bool HeapprofdProducer::Dump(DataSourceInstanceID id,
   bookkeeping_queue_.Add(std::move(record));
   return true;
 }
+
 void HeapprofdProducer::Flush(FlushRequestID flush_id,
                               const DataSourceInstanceID* ids,
                               size_t num_ids) {
+  if (num_ids == 0)
+    return;
+
   size_t& flush_in_progress = flushes_in_progress_[flush_id];
   PERFETTO_DCHECK(flush_in_progress == 0);
   flush_in_progress = num_ids;
@@ -282,15 +303,16 @@ void HeapprofdProducer::Flush(FlushRequestID flush_id,
 }
 
 void HeapprofdProducer::FinishDataSourceFlush(FlushRequestID flush_id) {
-  size_t& flush_in_progress = flushes_in_progress_[flush_id];
-  if (flush_in_progress == 0) {
-    PERFETTO_DFATAL("Too many FinishDataSourceFlush for %" PRIu64, flush_id);
+  auto it = flushes_in_progress_.find(flush_id);
+  if (it == flushes_in_progress_.end()) {
+    PERFETTO_DFATAL("FinishDataSourceFlush id invalid: %" PRIu64, flush_id);
     return;
   }
-  if (--flush_in_progress == 0)
+  size_t& flush_in_progress = it->second;
+  if (--flush_in_progress == 0) {
     endpoint_->NotifyFlushComplete(flush_id);
-
-  flushes_in_progress_.erase(flush_id);
+    flushes_in_progress_.erase(flush_id);
+  }
 }
 
 std::function<void(UnwindingRecord)>
@@ -304,9 +326,8 @@ HeapprofdProducer::MakeSocketListenerCallback() {
 std::vector<BoundedQueue<UnwindingRecord>>
 HeapprofdProducer::MakeUnwinderQueues(size_t n) {
   std::vector<BoundedQueue<UnwindingRecord>> ret(n);
-  for (size_t i = 0; i < n; ++i) {
+  for (size_t i = 0; i < n; ++i)
     ret[i].SetCapacity(kUnwinderQueueSize);
-  }
   return ret;
 }
 
@@ -336,15 +357,8 @@ std::unique_ptr<base::UnixSocket> HeapprofdProducer::MakeSocket() {
                                   task_runner_);
 }
 
-ClientConfiguration HeapprofdProducer::MakeClientConfiguration(
-    const DataSourceConfig& cfg) {
-  ClientConfiguration client_config;
-  client_config.interval = cfg.heapprofd_config().sampling_interval_bytes();
-  return client_config;
-}
-
 // TODO(fmayer): Delete these and used ReconnectingProducer once submitted
-void HeapprofdProducer::Restart() {
+__attribute__((noreturn)) void HeapprofdProducer::Restart() {
   // We lost the connection with the tracing service. At this point we need
   // to reset all the data sources. Trying to handle that manually is going to
   // be error prone. What we do here is simply desroying the instance and
@@ -353,6 +367,9 @@ void HeapprofdProducer::Restart() {
 
   base::TaskRunner* task_runner = task_runner_;
   const char* socket_name = socket_name_;
+
+  // TODO(fmayer): Allow queues to be torn down and fix this.
+  PERFETTO_FATAL("Restart is not supported.");
 
   // Invoke destructor and then the constructor again.
   this->~HeapprofdProducer();

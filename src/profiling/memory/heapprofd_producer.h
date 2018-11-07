@@ -17,14 +17,14 @@
 #ifndef SRC_PROFILING_MEMORY_HEAPPROFD_PRODUCER_H_
 #define SRC_PROFILING_MEMORY_HEAPPROFD_PRODUCER_H_
 
+#include <map>
+
 #include "perfetto/base/task_runner.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/producer.h"
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
-
-#include <map>
 
 namespace perfetto {
 namespace profiling {
@@ -71,7 +71,6 @@ class HeapprofdProducer : public Producer {
   std::vector<std::thread> MakeUnwindingThreads(size_t n);
   std::unique_ptr<base::UnixSocket> MakeSocket();
 
-  ClientConfiguration MakeClientConfiguration(const DataSourceConfig&);
   void FinishDataSourceFlush(FlushRequestID flush_id);
   bool Dump(DataSourceInstanceID id,
             FlushRequestID flush_id,
@@ -79,7 +78,7 @@ class HeapprofdProducer : public Producer {
   void DoContiniousDump(DataSourceInstanceID id, uint32_t dump_interval);
 
   struct DataSource {
-    DataSource(std::vector<pid_t> p) : pids(p) {}
+    DataSource() {}
 
     std::vector<pid_t> pids;
     // This is a shared ptr so we can lend a weak_ptr to the bookkeeping

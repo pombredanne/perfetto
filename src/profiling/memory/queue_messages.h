@@ -28,13 +28,13 @@
 namespace perfetto {
 namespace profiling {
 
-struct ProcessMetadata;
+struct UnwindingMetadata;
 
 struct UnwindingRecord {
   pid_t pid;
   size_t size;
   std::unique_ptr<uint8_t[]> data;
-  std::weak_ptr<ProcessMetadata> metadata;
+  std::weak_ptr<UnwindingMetadata> metadata;
 };
 
 struct FreeRecord {

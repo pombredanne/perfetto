@@ -47,6 +47,8 @@ void SocketListener::OnNewIncomingConnection(
 
   sockets_.emplace(new_connection_raw, std::move(new_connection));
   process_info.sockets.emplace(new_connection_raw);
+  // TODO(fmayer): Move destruction of bookkeeping data to
+  // HeapprofdProducer.
   bookkeeping_thread_->NotifyClientConnected(pid);
 }
 
@@ -71,13 +73,13 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
   if (PERFETTO_LIKELY(entry.recv_fds)) {
     rd = self->Receive(buf.data, buf.size);
   } else {
-    auto it = process_metadata_.find(peer_pid);
-    if (it != process_metadata_.end() && !it->second.expired()) {
+    auto it = unwinding_metadata_.find(peer_pid);
+    if (it != unwinding_metadata_.end() && !it->second.expired()) {
       entry.recv_fds = true;
       // If the process already has metadata, this is an additional socket for
       // an existing process. Reuse existing metadata and close the received
       // file descriptors.
-      entry.process_metadata = std::shared_ptr<ProcessMetadata>(it->second);
+      entry.unwinding_metadata = std::shared_ptr<UnwindingMetadata>(it->second);
       rd = self->Receive(buf.data, buf.size);
     } else {
       base::ScopedFile fds[2];
@@ -85,9 +87,9 @@ void SocketListener::OnDataAvailable(base::UnixSocket* self) {
       if (fds[0] && fds[1]) {
         PERFETTO_DLOG("%d: Received FDs.", peer_pid);
         entry.recv_fds = true;
-        entry.process_metadata = std::make_shared<ProcessMetadata>(
+        entry.unwinding_metadata = std::make_shared<UnwindingMetadata>(
             peer_pid, std::move(fds[0]), std::move(fds[1]));
-        process_metadata_[peer_pid] = entry.process_metadata;
+        unwinding_metadata_[peer_pid] = entry.unwinding_metadata;
         self->Send(&process_info.client_config,
                    sizeof(process_info.client_config), -1,
                    base::UnixSocket::BlockingMode::kBlocking);
@@ -117,7 +119,10 @@ SocketListener::ProfilingSession SocketListener::ExpectPID(
     pid_t pid,
     ClientConfiguration cfg) {
   PERFETTO_DLOG("Expecting connection from %d", pid);
-  process_info_.emplace(pid, std::move(cfg));
+  bool inserted;
+  std::tie(std::ignore, inserted) = process_info_.emplace(pid, std::move(cfg));
+  if (!inserted)
+    return ProfilingSession(0, nullptr);
   return ProfilingSession(pid, this);
 }
 
@@ -145,7 +150,7 @@ void SocketListener::RecordReceived(base::UnixSocket* self,
     return;
   }
   Entry& entry = it->second;
-  if (!entry.process_metadata) {
+  if (!entry.unwinding_metadata) {
     PERFETTO_DLOG("Received record without process metadata.");
     return;
   }
@@ -155,12 +160,12 @@ void SocketListener::RecordReceived(base::UnixSocket* self,
     return;
   }
   // This needs to be a weak_ptr for two reasons:
-  // 1) most importantly, the weak_ptr in process_metadata_ should expire as
+  // 1) most importantly, the weak_ptr in unwinding_metadata_ should expire as
   // soon as the last socket for a process goes away. Otherwise, a recycled
   // PID might reuse incorrect metadata.
   // 2) it is a waste to unwind for a process that had already gone away.
-  std::weak_ptr<ProcessMetadata> weak_metadata(entry.process_metadata);
-  callback_function_({entry.process_metadata->pid, size, std::move(buf),
+  std::weak_ptr<UnwindingMetadata> weak_metadata(entry.unwinding_metadata);
+  callback_function_({entry.unwinding_metadata->pid, size, std::move(buf),
                       std::move(weak_metadata)});
 }
 
