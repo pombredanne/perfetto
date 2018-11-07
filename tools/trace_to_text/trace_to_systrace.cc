@@ -100,42 +100,55 @@ int TraceToSystrace(std::istream* input,
   std::vector<std::string> proc_dump;
   std::vector<std::string> thread_dump;
   std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/> thread_map;
+  std::unordered_map<uint32_t /*tid*/, std::string> thread_names;
 
   std::vector<const char*> meminfo_strs = BuildMeminfoCounterNames();
   std::vector<const char*> vmstat_strs = BuildVmstatCounterNames();
 
   std::vector<protos::TracePacket> packets_to_process;
 
-  ForEachPacketInTrace(
-      input, [&thread_map, &packets_to_process, &proc_dump,
-              &thread_dump](const protos::TracePacket& packet) {
-        if (!packet.has_process_tree()) {
-          packets_to_process.emplace_back(std::move(packet));
-          return;
+  ForEachPacketInTrace(input, [&thread_map, &packets_to_process, &proc_dump,
+                               &thread_names, &thread_dump](
+                                  const protos::TracePacket& packet) {
+    // Store the name associated with a pid in a map.
+    // TODO(taylori): This (incorrectly) assumes pids are unique and have only
+    // one name for the duration of a trace.
+    if (packet.has_ftrace_events()) {
+      const FtraceEventBundle& bundle = packet.ftrace_events();
+      for (const FtraceEvent& event : bundle.event()) {
+        if (event.has_sched_switch()) {
+          thread_names[static_cast<uint32_t>(event.sched_switch().prev_pid())] =
+              event.sched_switch().prev_comm();
         }
-        const ProcessTree& process_tree = packet.process_tree();
-        for (const auto& process : process_tree.processes()) {
-          // Main threads will have the same pid as tgid.
-          thread_map[static_cast<uint32_t>(process.pid())] =
-              static_cast<uint32_t>(process.pid());
-          std::string p = FormatProcess(process);
-          proc_dump.emplace_back(p);
-        }
-        for (const auto& thread : process_tree.threads()) {
-          // Populate thread map for matching tids to tgids.
-          thread_map[static_cast<uint32_t>(thread.tid())] =
-              static_cast<uint32_t>(thread.tgid());
-          std::string t = FormatThread(thread);
-          thread_dump.emplace_back(t);
-        }
-      });
+      }
+    }
+    if (!packet.has_process_tree()) {
+      packets_to_process.emplace_back(std::move(packet));
+      return;
+    }
+    const ProcessTree& process_tree = packet.process_tree();
+    for (const auto& process : process_tree.processes()) {
+      // Main threads will have the same pid as tgid.
+      thread_map[static_cast<uint32_t>(process.pid())] =
+          static_cast<uint32_t>(process.pid());
+      std::string p = FormatProcess(process);
+      proc_dump.emplace_back(p);
+    }
+    for (const auto& thread : process_tree.threads()) {
+      // Populate thread map for matching tids to tgids.
+      thread_map[static_cast<uint32_t>(thread.tid())] =
+          static_cast<uint32_t>(thread.tgid());
+      std::string t = FormatThread(thread);
+      thread_dump.emplace_back(t);
+    }
+  });
 
   for (const auto& packet : packets_to_process) {
     if (packet.has_ftrace_events()) {
       const FtraceEventBundle& bundle = packet.ftrace_events();
       for (const FtraceEvent& event : bundle.event()) {
         std::string line = FormatFtraceEvent(event.timestamp(), bundle.cpu(),
-                                             event, thread_map);
+                                             event, thread_map, thread_names);
         if (line == "")
           continue;
         ftrace_sorted.emplace(event.timestamp(), line);
@@ -153,7 +166,8 @@ int TraceToSystrace(std::istream* input,
         sprintf(str, "C|1|%s|%" PRIu64, meminfo_strs[meminfo.key()],
                 static_cast<uint64_t>(meminfo.value()));
         event.mutable_print()->set_buf(str);
-        ftrace_sorted.emplace(ts, FormatFtraceEvent(ts, 0, event, thread_map));
+        ftrace_sorted.emplace(
+            ts, FormatFtraceEvent(ts, 0, event, thread_map, thread_names));
       }
       for (const auto& vmstat : sys_stats.vmstat()) {
         FtraceEvent event;
@@ -164,7 +178,8 @@ int TraceToSystrace(std::istream* input,
         sprintf(str, "C|1|%s|%" PRIu64, vmstat_strs[vmstat.key()],
                 static_cast<uint64_t>(vmstat.value()));
         event.mutable_print()->set_buf(str);
-        ftrace_sorted.emplace(ts, FormatFtraceEvent(ts, 0, event, thread_map));
+        ftrace_sorted.emplace(
+            ts, FormatFtraceEvent(ts, 0, event, thread_map, thread_names));
       }
     }
   }
