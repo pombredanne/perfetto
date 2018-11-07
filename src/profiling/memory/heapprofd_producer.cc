@@ -198,7 +198,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   PERFETTO_DLOG("Set up data source.");
 }
 
-void HeapprofdProducer::DoContiniousDump(DataSourceInstanceID id,
+void HeapprofdProducer::DoContinuousDump(DataSourceInstanceID id,
                                          uint32_t dump_interval) {
   if (!Dump(id, 0 /* flush_id */, false /* is_flush */))
     return;
@@ -207,7 +207,7 @@ void HeapprofdProducer::DoContiniousDump(DataSourceInstanceID id,
       [weak_producer, id, dump_interval] {
         if (!weak_producer)
           return;
-        weak_producer->DoContiniousDump(id, dump_interval);
+        weak_producer->DoContinuousDump(id, dump_interval);
       },
       dump_interval);
 }
@@ -240,7 +240,7 @@ void HeapprofdProducer::StartDataSource(DataSourceInstanceID id,
         [weak_producer, id, dump_interval] {
           if (!weak_producer)
             return;
-          weak_producer->DoContiniousDump(id, dump_interval);
+          weak_producer->DoContinuousDump(id, dump_interval);
         },
         continuous_dump_config.dump_phase_ms());
   }

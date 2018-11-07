@@ -75,7 +75,7 @@ class HeapprofdProducer : public Producer {
   bool Dump(DataSourceInstanceID id,
             FlushRequestID flush_id,
             bool has_flush_id);
-  void DoContiniousDump(DataSourceInstanceID id, uint32_t dump_interval);
+  void DoContinuousDump(DataSourceInstanceID id, uint32_t dump_interval);
 
   struct DataSource {
     std::vector<pid_t> pids;
