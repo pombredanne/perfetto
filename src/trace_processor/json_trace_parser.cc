@@ -102,7 +102,7 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     while (next != end && *next != '[') {
       next++;
     }
-    if (next == end || next + 1 == end) {
+    if (next == end) {
       PERFETTO_ELOG("Failed to parse: first chunk missing opening [");
       return false;
     }
