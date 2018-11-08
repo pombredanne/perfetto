@@ -131,7 +131,7 @@ std::unique_ptr<ProtoTranslationTable> CreateFakeTable() {
   }
 
   return std::unique_ptr<ProtoTranslationTable>(new ProtoTranslationTable(
-      events, std::move(common_fields),
+      new MockFtraceProcfs(), events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting()));
 }
 

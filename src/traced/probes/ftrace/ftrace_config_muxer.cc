@@ -230,7 +230,6 @@ FtraceConfigMuxer::~FtraceConfigMuxer() = default;
 
 FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
   FtraceConfig actual;
-  PERFETTO_LOG("setting up config");
   bool is_ftrace_enabled = ftrace_->IsTracingEnabled();
   if (configs_.empty()) {
     PERFETTO_DCHECK(active_configs_.empty());
@@ -257,10 +256,8 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
 
   for (auto& name : events) {
     const Event* event;
-    // Might be a generic event
     if (name.find("generic") == 0) {
       event = table_->AddGenericEvent(name);
-      PERFETTO_LOG("set event");
     } else {
       event = table_->GetEventByName(name);
     }
@@ -268,13 +265,11 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
       PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
       continue;
     }
-
     if (current_state_.ftrace_events.count(event->name) ||
         std::string("ftrace") == event->group) {
       *actual.add_ftrace_events() = name;
       continue;
     }
-
     if (ftrace_->EnableEvent(event->group, event->name)) {
       current_state_.ftrace_events.insert(event->name);
       *actual.add_ftrace_events() = event->name;

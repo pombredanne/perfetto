@@ -39,6 +39,8 @@ namespace perfetto {
 
 namespace {
 
+constexpr int kGenericProtoId = 326;
+
 bool ReadIntoString(const uint8_t* start,
                     const uint8_t* end,
                     uint32_t field_id,
@@ -466,23 +468,22 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
 
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
-  if (info.proto_field_id == 326) {
-    protozero::Message* proto_field =
-        nested->BeginNestedMessage<protozero::Message>(1);
+
+  // Output event_name
+  if (info.proto_field_id == kGenericProtoId) {
     const char* name_end = info.name;
     while (*name_end != '\0') {
-      PERFETTO_LOG("%c", *name_end);
       ++name_end;
     }
-    proto_field->AppendBytes(1, info.name,
-                             static_cast<size_t>(name_end - info.name));
+    nested->AppendBytes(1, info.name,
+                        static_cast<size_t>(name_end - info.name));
   }
 
   for (const Field& field : info.fields) {
-    if (info.proto_field_id == 326) {  // generic event
+    if (info.proto_field_id == kGenericProtoId) {  // generic event
       protozero::Message* proto_field =
           nested->BeginNestedMessage<protozero::Message>(2);
-      // TODO(taylori): Don't output the field name every time.
+      // Output field name
       const char* name_end = field.ftrace_name;
       while (*name_end != '\0') {
         ++name_end;
@@ -490,13 +491,34 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
       proto_field->AppendBytes(
           1, field.ftrace_name,
           static_cast<size_t>(name_end - field.ftrace_name));
+      // Determine and output field type
+      std::string type;
+      switch (field.proto_field_id) {
+        case 3:
+          type = "STRING";
+          break;
+        case 4:
+          type = "INT32";
+          break;
+        case 5:
+          type = "INT64";
+          break;
+        case 6:
+          type = "UINT32";
+          break;
+        case 7:
+          type = "UINT64";
+          break;
+      }
+      proto_field->AppendBytes(2, type.c_str(), type.size());
+      // Parse field value
       success &= ParseField(field, start, end, proto_field, metadata);
     } else {
       success &= ParseField(field, start, end, nested, metadata);
     }
   }
 
-  // This finalizes |nested| automatically.
+  // This finalizes |nested| and |proto_field| automatically.
   message->Finalize();
   metadata->FinishEvent();
   return success;

@@ -30,6 +30,8 @@ namespace perfetto {
 
 namespace {
 
+constexpr int kGenericProtoId = 326;
+
 ProtoTranslationTable::FtracePageHeaderSpec MakeFtracePageHeaderSpec(
     const std::vector<FtraceEvent::Field>& fields) {
   ProtoTranslationTable::FtracePageHeaderSpec spec;
@@ -161,6 +163,7 @@ bool Match(const char* string, const char* pattern) {
   return ret != REG_NOMATCH;
 }
 
+// Set proto field type and id based on the ftrace type.
 void SetProtoType(FtraceFieldType ftrace_type,
                   ProtoFieldType* proto_type,
                   uint32_t* proto_field_id) {
@@ -168,35 +171,36 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceCString:
     case kFtraceFixedCString:
     case kFtraceStringPtr:
+    case kFtraceDataLoc:
       *proto_type = kProtoString;
       *proto_field_id = 3;
       break;
-    case kFtraceBool:
-      *proto_type = kProtoBool;
-      *proto_field_id = 5;
-      break;
-    case kFtraceInt64:
-      *proto_type = kProtoInt64;
-      *proto_field_id = 4;
-      break;
     case kFtraceInt8:
     case kFtraceInt16:
-    case kFtracePid32:
     case kFtraceInt32:
+    case kFtracePid32:
+    case kFtraceCommonPid32:
       *proto_type = kProtoInt32;
       *proto_field_id = 4;
       break;
-    case kFtraceDataLoc:
-    case kFtraceDevId32:
-    case kFtraceInode32:
-    case kFtraceDevId64:
-    case kFtraceInode64:
-    case kFtraceCommonPid32:
+    case kFtraceInt64:
+      *proto_type = kProtoInt64;
+      *proto_field_id = 5;
+      break;
     case kFtraceUint8:
     case kFtraceUint16:
     case kFtraceUint32:
+    case kFtraceBool:
+      *proto_type = kProtoUint32;
+      *proto_field_id = 6;
+      break;
+    case kFtraceDevId32:
+    case kFtraceDevId64:
     case kFtraceUint64:
-      PERFETTO_LOG("not handled: %d", ftrace_type);
+    case kFtraceInode32:
+    case kFtraceInode64:
+      *proto_type = kProtoUint64;
+      *proto_field_id = 7;
       break;
   }
 }
@@ -344,8 +348,7 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
                                       &page_header_fields));
 
   for (Event& event : events) {
-    if (event.proto_field_id == 326 /* generic */) {
-      PERFETTO_LOG("skipping generic");
+    if (event.proto_field_id == kGenericProtoId) {
       continue;
     }
     PERFETTO_DCHECK(event.name);
@@ -384,7 +387,6 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
   auto table = std::unique_ptr<ProtoTranslationTable>(
       new ProtoTranslationTable(ftrace_procfs, events, std::move(common_fields),
                                 MakeFtracePageHeaderSpec(page_header_fields)));
-  PERFETTO_LOG("returning table");
   return table;
 }
 
@@ -405,34 +407,37 @@ ProtoTranslationTable::ProtoTranslationTable(
 }
 
 const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
+  // String is in form: generic:group/event_name
   std::string group = name.substr(name.find(":") + 1, name.find("/") - 8);
   std::string e_name = name.substr(name.find("/") + 1);
-
+  // Read the format file and create the ftrace event
   std::string contents = ftrace_procfs_->ReadEventFormat(group, e_name);
   FtraceEvent ftrace_event;
   if (!contents.empty()) {
     ParseFtraceEvent(contents, &ftrace_event);
   }
+  // If a specific proto for that event exists, use that rather than creating
+  // a generic event
   auto it = name_to_event_.find(e_name);
-  if (it != name_to_event_.end()) {  // event exists in static
-    // We want to use the normal event rather than the generic one.
+  if (it != name_to_event_.end()) {
     return it->second;
   }
-
-  PERFETTO_LOG("ftrace_id: %d", ftrace_event.id);
+  // Ensure events vector is large enough
   if (ftrace_event.id > largest_id_) {
     events_.resize(ftrace_event.id);
     largest_id_ = ftrace_event.id;
   }
+
+  // Set known event variables
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
-  e->proto_field_id = 326;  // generic event id.
+  e->proto_field_id = kGenericProtoId;
   size_t name_index = InternGenericString(base::StringView(e_name));
   size_t group_index = InternGenericString(base::StringView(group));
   e->name = generic_strings_.at(name_index).c_str();
   e->group = generic_strings_.at(group_index).c_str();
 
-  MergeGenericFields(ftrace_event.fields, *e);
+  CreateGenericEventFields(ftrace_event.fields, *e);
 
   name_to_event_[e->name] = &events_.at(e->ftrace_event_id);
   group_to_events_[e->group].push_back(&events_.at(e->ftrace_event_id));
@@ -453,23 +458,21 @@ size_t ProtoTranslationTable::InternGenericString(base::StringView str) {
   return string_id;
 }
 
-// For every field in the ftrace event, make a field in the generic event.
-void ProtoTranslationTable::MergeGenericFields(
+void ProtoTranslationTable::CreateGenericEventFields(
     const std::vector<FtraceEvent::Field>& ftrace_fields,
     Event& event) {
+  // For every field in the ftrace event, make a field in the generic event.
   for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
-    size_t index = InternGenericString(
+    size_t field_name_index = InternGenericString(
         base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
-    Field field{};
-    field.ftrace_name = generic_strings_.at(index).c_str();
-    event.fields.push_back(field);
-    Field* stored_field = &event.fields.back();
+    event.fields.emplace_back();
+    Field* field = &event.fields.back();
+    field->ftrace_name = generic_strings_.at(field_name_index).c_str();
     InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
-                    ftrace_field.is_signed, &stored_field->ftrace_type);
-    PERFETTO_LOG("ftrace_type: %d", stored_field->ftrace_type);
-    SetProtoType(stored_field->ftrace_type, &stored_field->proto_field_type,
-                 &stored_field->proto_field_id);
-    MergeFieldInfo(ftrace_field, stored_field, "sched_switch");
+                    ftrace_field.is_signed, &field->ftrace_type);
+    SetProtoType(field->ftrace_type, &field->proto_field_type,
+                 &field->proto_field_id);
+    MergeFieldInfo(ftrace_field, field, event.name);
   }
 }
 

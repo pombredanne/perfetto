@@ -89,12 +89,10 @@ class ProtoTranslationTable {
   }
 
   const Event* GetEventById(size_t id) const {
-    if (id == 0 || id > largest_id_) {
+    if (id == 0 || id > largest_id_)
       return nullptr;
-    }
-    if (!events_.at(id).ftrace_event_id) {
+    if (!events_.at(id).ftrace_event_id)
       return nullptr;
-    }
     return &events_.at(id);
   }
 
@@ -110,13 +108,15 @@ class ProtoTranslationTable {
   }
 
   const Event* AddGenericEvent(const std::string name);
-  void MergeGenericFields(const std::vector<FtraceEvent::Field>& ftrace_fields,
-                          Event& event);
+  void CreateGenericEventFields(
+      const std::vector<FtraceEvent::Field>& ftrace_fields,
+      Event& event);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
+  // Store strings so they can be read when writing the trace output.
   size_t InternGenericString(base::StringView name);
 
   std::vector<Event> events_;

@@ -32,6 +32,7 @@
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pb.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/traced/probes/ftrace/test/cpu_reader_support.h"
 #include "src/traced/probes/ftrace/test/test_messages.pb.h"
 #include "src/traced/probes/ftrace/test/test_messages.pbzero.h"
@@ -44,6 +45,9 @@ using testing::Eq;
 using testing::Pair;
 using testing::StartsWith;
 using testing::Contains;
+using testing::_;
+using testing::Return;
+using testing::AnyNumber;
 
 namespace perfetto {
 
@@ -66,6 +70,23 @@ constexpr uint64_t kNanoInMicro = 1000;
          << (actual_ns % kNanoInSecond) / kNanoInMicro << " vs. " << expected_s
          << "." << expected_us;
 }
+
+class MockFtraceProcfs : public FtraceProcfs {
+ public:
+  MockFtraceProcfs() : FtraceProcfs("/root/") {
+    ON_CALL(*this, NumberOfCpus()).WillByDefault(Return(1));
+    ON_CALL(*this, WriteToFile(_, _)).WillByDefault(Return(true));
+    ON_CALL(*this, ClearFile(_)).WillByDefault(Return(true));
+    EXPECT_CALL(*this, NumberOfCpus()).Times(AnyNumber());
+  }
+
+  MOCK_METHOD2(WriteToFile,
+               bool(const std::string& path, const std::string& str));
+  MOCK_METHOD1(ReadOneCharFromFile, char(const std::string& path));
+  MOCK_METHOD1(ClearFile, bool(const std::string& path));
+  MOCK_CONST_METHOD1(ReadFileIntoString, std::string(const std::string& path));
+  MOCK_CONST_METHOD0(NumberOfCpus, size_t());
+};
 
 // Single class to manage the whole protozero -> scattered stream -> chunks ->
 // single buffer -> real proto dance. Has a method: writer() to get an
@@ -212,7 +233,7 @@ TEST(EventFilterTest, EventFilter) {
   }
 
   ProtoTranslationTable table(
-      events, std::move(common_fields),
+      new MockFtraceProcfs(), events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
   EventFilter filter(table, {"foo"});
 
@@ -827,7 +848,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   }
 
   ProtoTranslationTable table(
-      events, std::move(common_fields),
+      new MockFtraceProcfs(), events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
 
   FakeEventProvider provider(base::kPageSize);

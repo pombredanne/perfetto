@@ -335,7 +335,7 @@ TEST(TranslationTableTest, Getters) {
   }
 
   ProtoTranslationTable table(
-      events, std::move(common_fields),
+      new MockFtraceProcfs(), events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
   EXPECT_EQ(table.largest_id(), 100ul);
   EXPECT_EQ(table.EventNameToFtraceId("foo"), 1ul);
