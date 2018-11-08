@@ -137,7 +137,7 @@ Usage: %s
   --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
-  --txt            -t     : Parse config as pbtxt.
+  --txt            -t     : Parse config as pbtxt. Not a stable API. Not for production use.
   --help           -h
 
 statsd-specific flags:
