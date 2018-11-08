@@ -67,8 +67,8 @@ void SliceTracker::EndAndroid(uint64_t timestamp,
                               uint32_t atrace_tid) {
   uint32_t actual_tid = ftrace_to_atrace_pid_[ftrace_tid];
   if (atrace_tid != 0 && atrace_tid != actual_tid) {
-    PERFETTO_DLOG("Mismatched atrace pid %u and looked up pid %u", actual_tid,
-                  atrace_tid);
+    PERFETTO_DLOG("Mismatched atrace pid %u and looked up pid %u", , atrace_tid,
+                  actual_tid);
   }
   if (actual_tid == 0)
     return;
