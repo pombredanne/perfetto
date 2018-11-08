@@ -97,8 +97,8 @@ const char* FieldToTypeName(const FieldDescriptorProto* field) {
 std::string Format(const char* fmt, std::map<std::string, std::string> args) {
   std::string result(fmt);
   for (const auto& key_value : args) {
-    PERFETTO_CHECK(result.find(key_value.first) != std::string::npos);
     size_t start = result.find(key_value.first);
+    PERFETTO_CHECK(start != std::string::npos);
     result.replace(start, key_value.first.size(), key_value.second);
     PERFETTO_CHECK(result.find(key_value.first) == std::string::npos);
   }
@@ -192,7 +192,7 @@ class ParserDelegate {
       case FieldDescriptorProto::TYPE_GROUP:
       case FieldDescriptorProto::TYPE_MESSAGE:
       case FieldDescriptorProto::TYPE_ENUM:
-        PERFETTO_FATAL("Unhandled type");
+        PERFETTO_FATAL("Invalid type");
     }
   }
 
@@ -539,9 +539,10 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
     }
     PERFETTO_FATAL("Unexpected char %c", c);
   }  // for
-  if (state == kWaitingForValue) {
+  if (depth > 0)
+    delegate->AddError(row, column, "Nested message not closed", {});
+  if (state != kWaitingForKey)
     delegate->AddError(row, column, "Unexpected end of input", {});
-  }
   delegate->Eof();
 }
 

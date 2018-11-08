@@ -31,6 +31,7 @@
 
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/string_view.h"
 #include "perfetto/base/time.h"
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/proto_utils.h"
@@ -70,7 +71,7 @@ class LoggingErrorReporter : public ErrorReporter {
                 size_t length,
                 const std::string& message) override {
     parsed_successfully_ = false;
-    std::string line = ExtractLine(row - 1);
+    std::string line = ExtractLine(row - 1).ToStdString();
     if (!line.empty() && line[line.length() - 1] == '\n') {
       line.erase(line.length() - 1);
     }
@@ -88,7 +89,7 @@ class LoggingErrorReporter : public ErrorReporter {
   bool Success() const { return parsed_successfully_; }
 
  private:
-  std::string ExtractLine(size_t line) {
+  base::StringView ExtractLine(size_t line) {
     const char* start = config_;
     const char* end = config_;
 
@@ -98,7 +99,7 @@ class LoggingErrorReporter : public ErrorReporter {
       while ((c = *end++) && c != '\n')
         ;
     }
-    return std::string(start, static_cast<size_t>(end - start));
+    return base::StringView(start, static_cast<size_t>(end - start));
   }
 
   bool parsed_successfully_ = true;

@@ -161,6 +161,9 @@ TEST(PbtxtToPb, Comments) {
     RING_BUFFER# 11
     # 12
     ;# 13
+    # 14
+    } # 15
+    # 16
   )");
   EXPECT_EQ(config.write_into_file(), false);
   EXPECT_EQ(config.deferred_start(), false);
@@ -317,6 +320,11 @@ producers {
 duration_ms: 10000
 )");
   EXPECT_EQ(config.duration_ms(), 10000);
+  EXPECT_EQ(config.buffers().Get(0).size_kb(), 100024);
+  EXPECT_EQ(config.data_sources().Get(0).config().name(), "linux.ftrace");
+  EXPECT_EQ(config.data_sources().Get(0).config().target_buffer(), 0);
+  EXPECT_EQ(config.producers().Get(0).producer_name(),
+            "perfetto.traced_probes");
 }
 
 TEST(PbtxtToPb, UnknownField) {
@@ -412,6 +420,14 @@ TEST(PbtxtToPb, WrongTypeNumber) {
   ToErrors(R"(
     buffers: 100;
   )",
+           &reporter);
+}
+
+TEST(PbtxtToPb, NestedMessageDidNotTerminate) {
+  MockErrorReporter reporter;
+  EXPECT_CALL(reporter, AddError(2, 15, 0, "Nested message not closed"));
+  ToErrors(R"(
+    buffers: {)",
            &reporter);
 }
 
