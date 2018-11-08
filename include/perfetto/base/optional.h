@@ -25,6 +25,26 @@
 namespace perfetto {
 namespace base {
 
+template <size_t Size, size_t ByteAlignment>
+struct AlignedMemory {
+ public:
+  alignas(ByteAlignment) uint8_t data_[Size];
+  void* void_data() { return static_cast<void*>(data_); }
+  const void* void_data() const { return static_cast<const void*>(data_); }
+  template <typename Type>
+  Type* data_as() {
+    return static_cast<Type*>(void_data());
+  }
+  template <typename Type>
+  const Type* data_as() const {
+    return static_cast<const Type*>(void_data());
+  }
+
+ private:
+  void* operator new(size_t);
+  void operator delete(void*);
+};
+
 // Specification:
 // http://en.cppreference.com/w/cpp/utility/optional/in_place_t
 struct in_place_t {};
@@ -256,7 +276,7 @@ class Optional {
   }
 
   bool is_null_ = true;
-  alignas(uint64_t) T buffer_;
+  base::AlignedMemory<sizeof(T), alignof(T)> buffer_;
 };
 
 template <class T>
