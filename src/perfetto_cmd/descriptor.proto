@@ -1,41 +1,20 @@
-// Protocol Buffers - Google's data interchange format
-// Copyright 2008 Google Inc.  All rights reserved.
-// https://developers.google.com/protocol-buffers/
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-//     * Neither the name of Google Inc. nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*
+ * Copyright (C) 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-// Author: kenton@google.com (Kenton Varda)
-//  Based on original Protocol Buffers design by
-//  Sanjay Ghemawat, Jeff Dean, and others.
-//
-// The messages in this file describe the definitions found in .proto files.
-// A valid .proto file can be translated directly to a FileDescriptorProto
-// without any other information (e.g. without reading its imports).
-
+// This is a subset of descriptor.proto from the Protobuf library.
 syntax = "proto2";
 
 package perfetto.protos;
@@ -188,23 +167,8 @@ message EnumDescriptorProto {
 
   repeated EnumValueDescriptorProto value = 2;
 
-  optional EnumOptions options = 3;
-
-  // Range of reserved numeric values. Reserved values may not be used by
-  // entries in the same enum. Reserved ranges may not overlap.
-  //
-  // Note that this is distinct from DescriptorProto.ReservedRange in that it
-  // is inclusive such that it can appropriately represent the entire int32
-  // domain.
-  message EnumReservedRange {
-    optional int32 start = 1;  // Inclusive.
-    optional int32 end = 2;    // Inclusive.
-  }
-
-  // Range of reserved numeric values. Reserved numeric values may not be used
-  // by enum values in the same enum declaration. Reserved ranges may not
-  // overlap.
-  repeated EnumReservedRange reserved_range = 4;
+  reserved 3;
+  reserved 4;
 
   // Reserved enum value names, which may not be reused. A given name may only
   // be reserved once.
@@ -216,42 +180,10 @@ message EnumValueDescriptorProto {
   optional string name = 1;
   optional int32 number = 2;
 
-  optional EnumValueOptions options = 3;
+  reserved 3;
 }
 
 message OneofOptions {
-  reserved 999;
-
-  // Clients can define custom options in extensions of this message. See above.
-  extensions 1000 to max;
-}
-
-message EnumOptions {
-  // Set this option to true to allow mapping different tag names to the same
-  // value.
-  optional bool allow_alias = 2;
-
-  // Is this enum deprecated?
-  // Depending on the target platform, this can emit Deprecated annotations
-  // for the enum, or it will be completely ignored; in the very least, this
-  // is a formalization for deprecating enums.
-  optional bool deprecated = 3 [default = false];
-
-  reserved 5;  // javanano_as_lite
-
-  reserved 999;
-
-  // Clients can define custom options in extensions of this message. See above.
-  extensions 1000 to max;
-}
-
-message EnumValueOptions {
-  // Is this enum value deprecated?
-  // Depending on the target platform, this can emit Deprecated annotations
-  // for the enum value, or it will be completely ignored; in the very least,
-  // this is a formalization for deprecating enum values.
-  optional bool deprecated = 1 [default = false];
-
   reserved 999;
 
   // Clients can define custom options in extensions of this message. See above.

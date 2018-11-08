@@ -62,44 +62,60 @@ perfetto::PerfettoCmd* g_consumer_cmd;
 
 class LoggingErrorReporter : public ErrorReporter {
  public:
-  LoggingErrorReporter(const char* config) : config_(config) {}
+  LoggingErrorReporter(std::string file_name, const char* config)
+      : file_name_(file_name), config_(config) {}
 
   void AddError(size_t row,
                 size_t column,
                 size_t length,
                 const std::string& message) override {
-    const char* start = FindLine(row);
-    PERFETTO_ELOG("%s", message.c_str());
-    PERFETTO_ELOG("%s", start);
+    parsed_successfully_ = false;
+    std::string line = ExtractLine(row - 1);
+    if (!line.empty() && line[line.length() - 1] == '\n') {
+      line.erase(line.length() - 1);
+    }
+
     std::string guide(column + length, ' ');
     for (size_t i = column; i < column + length; i++) {
-      guide[i] = i == column ? '^' : '~';
+      guide[i - 1] = i == column ? '^' : '~';
     }
-    PERFETTO_ELOG("%s", guide.c_str());
+    fprintf(stderr, "%s:%zu:%zu error: %s\n", file_name_.c_str(), row, column,
+            message.c_str());
+    fprintf(stderr, "%s\n", line.c_str());
+    fprintf(stderr, "%s\n", guide.c_str());
   }
+
+  bool Success() const { return parsed_successfully_; }
 
  private:
-  const char* FindLine(size_t row) {
-    const char* ptr = config_;
-    char c = '\0';
-    while ((c = *ptr++)) {
-      if (c == '\n')
-        row--;
-      if (row == 0)
-        return ptr;
+  std::string ExtractLine(size_t line) {
+    const char* start = config_;
+    const char* end = config_;
+
+    for (size_t i = 0; i < line + 1; i++) {
+      start = end;
+      char c;
+      while ((c = *end++) && c != '\n')
+        ;
     }
-    PERFETTO_FATAL("Too few lines in config");
+    return std::string(start, static_cast<size_t>(end - start));
   }
 
+  bool parsed_successfully_ = true;
+  std::string file_name_;
   const char* config_;
 };
 
-bool ParseTraceConfigPbtxt(const std::string& pbtxt,
+bool ParseTraceConfigPbtxt(const std::string& file_name,
+                           const std::string& pbtxt,
                            protos::TraceConfig* config) {
-  LoggingErrorReporter reporter(pbtxt.c_str());
-  std::vector<uint8_t> output = PbtxtToPb(pbtxt, &reporter);
-  config->ParseFromArray(output.data(), static_cast<int>(output.size()));
-  return !output.empty();
+  LoggingErrorReporter reporter(file_name, pbtxt.c_str());
+  std::vector<uint8_t> buf = PbtxtToPb(pbtxt, &reporter);
+  if (!reporter.Success())
+    return false;
+  if (!config->ParseFromArray(buf.data(), static_cast<int>(buf.size())))
+    return false;
+  return true;
 }
 
 }  // namespace
@@ -155,6 +171,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
+  std::string config_file_name;
   std::string trace_config_raw;
   bool background = false;
   bool ignore_guardrails = false;
@@ -170,6 +187,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       break;  // EOF.
 
     if (option == 'c') {
+      config_file_name = std::string(optarg);
       if (strcmp(optarg, "-") == 0) {
         std::istreambuf_iterator<char> begin(std::cin), end;
         trace_config_raw.assign(begin, end);
@@ -268,7 +286,8 @@ int PerfettoCmd::Main(int argc, char** argv) {
   PERFETTO_DLOG("Parsing TraceConfig, %zu bytes", trace_config_raw.size());
   bool parsed;
   if (parse_as_pbtxt) {
-    parsed = ParseTraceConfigPbtxt(trace_config_raw, &trace_config_proto);
+    parsed = ParseTraceConfigPbtxt(config_file_name, trace_config_raw,
+                                   &trace_config_proto);
   } else {
     parsed = trace_config_proto.ParseFromString(trace_config_raw);
   }

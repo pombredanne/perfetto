@@ -344,7 +344,7 @@ class ParserDelegate {
     }
 
     if (!field_descriptor) {
-      AddError(key, "No field named \"$n\" in proto $p.",
+      AddError(key, "No field named \"$n\" in proto $p",
                {
                    {"$n", field_name}, {"$p", descriptor_name()},
                });
@@ -398,7 +398,7 @@ class ParserDelegate {
 void Parse(const std::string& input, ParserDelegate* delegate) {
   ParseState state = kWaitingForKey;
   size_t column = 0;
-  size_t row = 0;
+  size_t row = 1;
   size_t depth = 0;
   bool saw_colon_for_this_key = false;
   bool saw_semicolon_for_this_value = true;
@@ -513,6 +513,7 @@ void Parse(const std::string& input, ParserDelegate* delegate) {
       case kReadingStringValue:
         if (c == '"') {
           size_t size = i - value.offset - 1;
+          value.column++;
           value.txt = base::StringView(input.data() + value.offset + 1, size);
           saw_semicolon_for_this_value = false;
           state = kWaitingForKey;
@@ -571,6 +572,7 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
   std::map<std::string, const DescriptorProto*> name_to_descriptor;
   std::map<std::string, const EnumDescriptorProto*> name_to_enum;
   FileDescriptorSet file_descriptor_set;
+
   {
     file_descriptor_set.ParseFromArray(
         kPerfettoConfigDescriptor.data(),
@@ -590,6 +592,7 @@ std::vector<uint8_t> PbtxtToPb(const std::string& input,
       }
     }
   }
+
   const DescriptorProto* descriptor = name_to_descriptor[kConfigProtoName];
   PERFETTO_CHECK(descriptor);
 

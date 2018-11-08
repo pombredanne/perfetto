@@ -22,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "perfetto/config/trace_config.pb.h"
 
 namespace perfetto {
@@ -321,8 +322,8 @@ duration_ms: 10000
 TEST(PbtxtToPb, UnknownField) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(1, 5, 11,
-                       "No field named \"not_a_label\" in proto TraceConfig."));
+              AddError(2, 5, 11,
+                       "No field named \"not_a_label\" in proto TraceConfig"));
   ToErrors(R"(
     not_a_label: false
   )",
@@ -334,8 +335,8 @@ TEST(PbtxtToPb, UnknownNestedField) {
   EXPECT_CALL(
       reporter,
       AddError(
-          3, 5, 16,
-          "No field named \"not_a_field_name\" in proto DataSourceConfig."));
+          4, 5, 16,
+          "No field named \"not_a_field_name\" in proto DataSourceConfig"));
   ToErrors(R"(
 data_sources {
   config {
@@ -349,7 +350,7 @@ data_sources {
 
 TEST(PbtxtToPb, BadBoolean) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(1, 22, 3,
+  EXPECT_CALL(reporter, AddError(2, 22, 3,
                                  "Expected 'true' or 'false' for boolean field "
                                  "write_into_file in proto TraceConfig instead "
                                  "saw 'foo'"));
@@ -361,7 +362,7 @@ TEST(PbtxtToPb, BadBoolean) {
 
 TEST(PbtxtToPb, MissingBoolean) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(2, 3, 0, "Unexpected end of input"));
+  EXPECT_CALL(reporter, AddError(3, 3, 0, "Unexpected end of input"));
   ToErrors(R"(
     write_into_file:
   )",
@@ -370,7 +371,7 @@ TEST(PbtxtToPb, MissingBoolean) {
 
 TEST(PbtxtToPb, RootProtoMustNotEndWithBrace) {
   MockErrorReporter reporter;
-  EXPECT_CALL(reporter, AddError(1, 5, 0, "Unmatched closing brace"));
+  EXPECT_CALL(reporter, AddError(2, 5, 0, "Unmatched closing brace"));
   ToErrors(R"(
     }
   )",
@@ -381,7 +382,7 @@ TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
   MockErrorReporter reporter;
   EXPECT_CALL(
       reporter,
-      AddError(2, 5, 15,
+      AddError(3, 5, 15,
                "Saw non-repeating field 'write_into_file' more than once"));
   ToErrors(R"(
     write_into_file: true;
@@ -393,7 +394,7 @@ TEST(PbtxtToPb, SawNonRepeatedFieldTwice) {
 TEST(PbtxtToPb, WrongTypeBoolean) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(1, 18, 4,
+              AddError(2, 18, 4,
                        "Expected value of type uint32 for field duration_ms in "
                        "proto TraceConfig instead saw 'true'"));
   ToErrors(R"(
@@ -405,7 +406,7 @@ TEST(PbtxtToPb, WrongTypeBoolean) {
 TEST(PbtxtToPb, WrongTypeNumber) {
   MockErrorReporter reporter;
   EXPECT_CALL(reporter,
-              AddError(1, 14, 3,
+              AddError(2, 14, 3,
                        "Expected value of type message for field buffers in "
                        "proto TraceConfig instead saw '100'"));
   ToErrors(R"(
@@ -414,12 +415,14 @@ TEST(PbtxtToPb, WrongTypeNumber) {
            &reporter);
 }
 
+// TODO(hjd): Add these tests.
 // TEST(PbtxtToPb, WrongTypeString)
 // TEST(PbtxtToPb, OverflowOnIntegers)
 // TEST(PbtxtToPb, NegativeNumbersForUnsignedInt)
 // TEST(PbtxtToPb, UnterminatedString) {
 // TEST(PbtxtToPb, NumberIsEof)
 // TEST(PbtxtToPb, EscapedQuotes)
+// TEST(PbtxtToPb, OneOf)
 
 }  // namespace
 }  // namespace perfetto
