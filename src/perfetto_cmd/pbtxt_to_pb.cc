@@ -92,6 +92,8 @@ const char* FieldToTypeName(const FieldDescriptorProto* field) {
     case FieldDescriptorProto::TYPE_ENUM:
       return "enum";
   }
+  // For gcc
+  PERFETTO_FATAL("Non conmplete switch");
 }
 
 std::string Format(const char* fmt, std::map<std::string, std::string> args) {
