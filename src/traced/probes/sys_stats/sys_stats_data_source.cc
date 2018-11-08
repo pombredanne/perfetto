@@ -51,6 +51,16 @@ base::ScopedFile OpenReadOnly(const char* path) {
   return fd;
 }
 
+uint32_t ClampTo10Ms(uint32_t period_ms, const char* counter_name) {
+  if (period_ms > 0 && period_ms < 10) {
+    PERFETTO_ILOG("%s %" PRIu32
+                  " is less than minimum of 10ms. Increasing to 10ms.",
+                  counter_name, period_ms);
+    return 10;
+  }
+  return period_ms;
+}
+
 }  // namespace
 
 // static
@@ -103,29 +113,9 @@ SysStatsDataSource::SysStatsDataSource(base::TaskRunner* task_runner,
   std::array<uint32_t, 3> ticks{};
   static_assert(periods_ms.size() == ticks.size(), "must have same size");
 
-  periods_ms[0] = config.meminfo_period_ms();
-  if (periods_ms[0] < 10) {
-    PERFETTO_ILOG("meminfo_period_ms %" PRIu32
-                  " is less than minimum of 10ms. Increasing to 10ms.",
-                  periods_ms[0]);
-    periods_ms[0] = 10;
-  }
-
-  periods_ms[1] = config.vmstat_period_ms();
-  if (periods_ms[1] < 10) {
-    PERFETTO_ILOG("vmstat_period_ms %" PRIu32
-                  " is less than minimum of 10ms. Increasing to 10ms.",
-                  periods_ms[1]);
-    periods_ms[1] = 10;
-  }
-
-  periods_ms[2] = config.stat_period_ms();
-  if (periods_ms[2] < 10) {
-    PERFETTO_ILOG("stat_period_ms %" PRIu32
-                  " is less than minimum of 10ms. Increasing to 10ms.",
-                  periods_ms[2]);
-    periods_ms[2] = 10;
-  }
+  periods_ms[0] = ClampTo10Ms(config.meminfo_period_ms(), "meminfo_period_ms");
+  periods_ms[1] = ClampTo10Ms(config.vmstat_period_ms(), "vmstat_period_ms");
+  periods_ms[2] = ClampTo10Ms(config.stat_period_ms(), "stat_period_ms");
 
   tick_period_ms_ = 0;
   for (uint32_t ms : periods_ms) {
