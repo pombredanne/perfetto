@@ -87,10 +87,8 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   std::vector<bool> enabled(table.largest_id() + 1);
   for (const std::string& name : names) {
     const Event* event = table.GetEventByName(name);
-    if (!event) {
-      PERFETTO_LOG("not enabled: %s", name.c_str());
+    if (!event)
       continue;
-    }
     enabled[event->ftrace_event_id] = true;
   }
   return enabled;
@@ -424,13 +422,8 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
         if (filter->IsEventEnabled(ftrace_event_id)) {
           protos::pbzero::FtraceEvent* event = bundle->add_event();
           event->set_timestamp(timestamp);
-          if (!ParseEvent(ftrace_event_id, start, next, table, event,
-                          metadata)) {
-            if (ftrace_event_id == 93) {
-              PERFETTO_LOG("Did not parse");
-            }
+          if (!ParseEvent(ftrace_event_id, start, next, table, event, metadata))
             return 0;
-          }
         }
 
         // Jump to next event.
