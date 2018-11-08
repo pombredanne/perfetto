@@ -21,7 +21,6 @@
 #include <string>
 
 #include "perfetto/base/build_config.h"
-#include "perfetto/base/logging.h"
 
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
