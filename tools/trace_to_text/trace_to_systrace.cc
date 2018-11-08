@@ -107,41 +107,32 @@ int TraceToSystrace(std::istream* input,
 
   std::vector<protos::TracePacket> packets_to_process;
 
-  ForEachPacketInTrace(input, [&thread_map, &packets_to_process, &proc_dump,
-                               &thread_names, &thread_dump](
-                                  const protos::TracePacket& packet) {
-    // Store the name associated with a pid in a map.
-    // TODO(taylori): This (incorrectly) assumes pids are unique and have only
-    // one name for the duration of a trace.
-    if (packet.has_ftrace_events()) {
-      const FtraceEventBundle& bundle = packet.ftrace_events();
-      for (const FtraceEvent& event : bundle.event()) {
-        if (event.has_sched_switch()) {
-          thread_names[static_cast<uint32_t>(event.sched_switch().prev_pid())] =
-              event.sched_switch().prev_comm();
+  ForEachPacketInTrace(
+      input, [&thread_map, &packets_to_process, &proc_dump, &thread_names,
+              &thread_dump](const protos::TracePacket& packet) {
+        if (!packet.has_process_tree()) {
+          packets_to_process.emplace_back(std::move(packet));
+          return;
         }
-      }
-    }
-    if (!packet.has_process_tree()) {
-      packets_to_process.emplace_back(std::move(packet));
-      return;
-    }
-    const ProcessTree& process_tree = packet.process_tree();
-    for (const auto& process : process_tree.processes()) {
-      // Main threads will have the same pid as tgid.
-      thread_map[static_cast<uint32_t>(process.pid())] =
-          static_cast<uint32_t>(process.pid());
-      std::string p = FormatProcess(process);
-      proc_dump.emplace_back(p);
-    }
-    for (const auto& thread : process_tree.threads()) {
-      // Populate thread map for matching tids to tgids.
-      thread_map[static_cast<uint32_t>(thread.tid())] =
-          static_cast<uint32_t>(thread.tgid());
-      std::string t = FormatThread(thread);
-      thread_dump.emplace_back(t);
-    }
-  });
+        const ProcessTree& process_tree = packet.process_tree();
+        for (const auto& process : process_tree.processes()) {
+          // Main threads will have the same pid as tgid.
+          thread_map[static_cast<uint32_t>(process.pid())] =
+              static_cast<uint32_t>(process.pid());
+          std::string p = FormatProcess(process);
+          proc_dump.emplace_back(p);
+        }
+        for (const auto& thread : process_tree.threads()) {
+          // Populate thread map for matching tids to tgids.
+          thread_map[static_cast<uint32_t>(thread.tid())] =
+              static_cast<uint32_t>(thread.tgid());
+          if (thread.has_name()) {
+            thread_names[static_cast<uint32_t>(thread.tid())] = thread.name();
+          }
+          std::string t = FormatThread(thread);
+          thread_dump.emplace_back(t);
+        }
+      });
 
   for (const auto& packet : packets_to_process) {
     if (packet.has_ftrace_events()) {

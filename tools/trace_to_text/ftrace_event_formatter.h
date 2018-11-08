@@ -31,7 +31,7 @@ std::string FormatFtraceEvent(
     uint32_t cpu,
     const protos::FtraceEvent&,
     const std::unordered_map<uint32_t /*tid*/, uint32_t /*tgid*/>& thread_map,
-    const std::unordered_map<uint32_t /*tid*/, std::string>& thread_names);
+    std::unordered_map<uint32_t /*tid*/, std::string>& thread_names);
 
 }  // namespace perfetto
 
