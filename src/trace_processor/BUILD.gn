@@ -132,6 +132,18 @@ if (current_toolchain == host_toolchain) {
       "trace_processor_shell.cc",
     ]
   }
+
+  executable("run_metric_host") {
+    deps = [
+      ":lib",
+      "../../gn:default_deps",
+      "../../protos/perfetto/trace_processor:lite",
+      "../base",
+    ]
+    sources = [
+      "run_metric.cc",
+    ]
+  }
 }
 
 copy("trace_processor_shell") {
@@ -145,6 +157,20 @@ copy("trace_processor_shell") {
   ]
   outputs = [
     "${root_out_dir}/trace_processor_shell",
+  ]
+}
+
+copy("run_metric") {
+  host_out_dir_ = get_label_info(":run_metric_host($host_toolchain)",
+                                 "root_out_dir")
+  deps = [
+    ":run_metric_host($host_toolchain)",
+  ]
+  sources = [
+    "${host_out_dir_}/run_metric_host",
+  ]
+  outputs = [
+    "${root_out_dir}/run_metric",
   ]
 }
 

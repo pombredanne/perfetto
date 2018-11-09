@@ -18,6 +18,7 @@
 #define SRC_TRACE_PROCESSOR_SLICE_TRACKER_H_
 
 #include <stdint.h>
+#include <json/value.h>
 
 #include "src/trace_processor/trace_storage.h"
 
@@ -31,16 +32,26 @@ class SliceTracker {
   explicit SliceTracker(TraceProcessorContext*);
   ~SliceTracker();
 
-  void Begin(uint64_t timestamp, UniqueTid utid, StringId cat, StringId name);
+  void Begin(uint64_t timestamp,
+             uint64_t thread_timestamp,
+             UniqueTid utid,
+             StringId cat,
+             StringId name,
+             const Json::Value& args);
 
   void Scoped(uint64_t timestamp,
+              uint64_t thread_timestamp,
+              uint64_t thread_duration,
               UniqueTid utid,
               StringId cat,
               StringId name,
-              uint64_t duration);
+              uint64_t duration,
+              Json::Value& args);
 
   void End(uint64_t timestamp,
+           uint64_t thread_timestamp,
            UniqueTid utid,
+           Json::Value& args,
            StringId opt_cat = {},
            StringId opt_name = {});
 
@@ -50,6 +61,9 @@ class SliceTracker {
     StringId name_id;
     uint64_t start_ts;
     uint64_t end_ts;  // Only for complete events (scoped TRACE_EVENT macros).
+    uint64_t thread_start_ts;
+    uint64_t thread_end_ts;  // Only for complete events (scoped TRACE_EVENT macros).
+    Json::Value args;
   };
   using SlicesStack = std::vector<Slice>;
 

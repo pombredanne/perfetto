@@ -17,6 +17,7 @@
 #include "src/trace_processor/proto_trace_parser.h"
 
 #include <string.h>
+#include <json/value.h>
 
 #include <string>
 
@@ -692,15 +693,19 @@ void ProtoTraceParser::ParsePrint(uint32_t,
   UniqueTid utid =
       context_->process_tracker->UpdateThread(timestamp, point.tid, 0);
 
+  // TODO: Find a better solution.
+  Json::Value null_json;
+
   switch (point.phase) {
     case 'B': {
       StringId name_id = context_->storage->InternString(point.name);
-      context_->slice_tracker->Begin(timestamp, utid, 0 /*cat_id*/, name_id);
+      context_->slice_tracker->Begin(timestamp, 0, utid, 0 /*cat_id*/, name_id,
+                                     null_json);
       break;
     }
 
     case 'E': {
-      context_->slice_tracker->End(timestamp, utid);
+      context_->slice_tracker->End(timestamp, 0, utid, null_json);
       break;
     }
 

@@ -123,24 +123,31 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     uint32_t tid = value["tid"].asUInt();
     uint32_t pid = value["pid"].asUInt();
     uint64_t ts = value["ts"].asLargestUInt() * 1000;
+    uint64_t tts = value["tts"].asLargestUInt() * 1000;
     const char* cat = value["cat"].asCString();
     const char* name = value["name"].asCString();
+    Json::Value args = value["args"];
     StringId cat_id = storage->InternString(cat);
     StringId name_id = storage->InternString(name);
     UniqueTid utid = procs->UpdateThread(tid, pid);
 
     switch (phase) {
       case 'B': {  // TRACE_EVENT_BEGIN.
-        slice_tracker->Begin(ts, utid, cat_id, name_id);
+        slice_tracker->Begin(ts, tts, utid, cat_id, name_id, args);
         break;
       }
       case 'E': {  // TRACE_EVENT_END.
-        slice_tracker->End(ts, utid, cat_id, name_id);
+        slice_tracker->End(ts, tts, utid, args, cat_id, name_id);
         break;
       }
       case 'X': {  // TRACE_EVENT (scoped event).
         uint64_t duration = value["dur"].asUInt() * 1000;
-        slice_tracker->Scoped(ts, utid, cat_id, name_id, duration);
+        uint64_t tdur = value["tdur"].asUInt() * 1000;
+        slice_tracker->Scoped(ts, tts, tdur, utid, cat_id, name_id, duration, args);
+        break;
+      }
+      case 'R': {  // TRACE_EVENT_MARK.
+        slice_tracker->Scoped(ts, tts, 0, utid, cat_id, name_id, 0, args);
         break;
       }
       case 'M': {  // Metadata events (process and thread names).

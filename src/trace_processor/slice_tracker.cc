@@ -17,6 +17,7 @@
 #include <limits>
 
 #include <stdint.h>
+#include <json/writer.h>
 
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -31,27 +32,36 @@ SliceTracker::SliceTracker(TraceProcessorContext* context)
 SliceTracker::~SliceTracker() = default;
 
 void SliceTracker::Begin(uint64_t timestamp,
+                         uint64_t thread_timestamp,
                          UniqueTid utid,
                          StringId cat,
-                         StringId name) {
+                         StringId name,
+                         const Json::Value& args) {
   auto& stack = threads_[utid];
   MaybeCloseStack(timestamp, stack);
-  stack.emplace_back(Slice{cat, name, timestamp, 0});
+  stack.emplace_back(Slice{cat, name, timestamp, 0, thread_timestamp, 0, args});
 }
 
 void SliceTracker::Scoped(uint64_t timestamp,
+                          uint64_t thread_timestamp,
+                          uint64_t thread_duration,
                           UniqueTid utid,
                           StringId cat,
                           StringId name,
-                          uint64_t duration) {
+                          uint64_t duration,
+                          Json::Value& args) {
   auto& stack = threads_[utid];
   MaybeCloseStack(timestamp, stack);
-  stack.emplace_back(Slice{cat, name, timestamp, timestamp + duration});
+  stack.emplace_back(Slice{cat, name, timestamp, timestamp + duration,
+                           thread_timestamp, thread_timestamp + thread_duration,
+                           args});
   CompleteSlice(utid);
 }
 
 void SliceTracker::End(uint64_t timestamp,
+                       uint64_t thread_timestamp,
                        UniqueTid utid,
+                       Json::Value& args,
                        StringId cat,
                        StringId name) {
   auto& stack = threads_[utid];
@@ -65,7 +75,11 @@ void SliceTracker::End(uint64_t timestamp,
 
   Slice& slice = stack.back();
   slice.end_ts = timestamp;
-
+  slice.thread_end_ts = thread_timestamp;
+  for (const auto& key : args.getMemberNames()) {
+    // End slice will override any arg with same key in begin slice.
+    slice.args[key] = args[key];
+  }
   CompleteSlice(utid);
   // TODO(primiano): auto-close B slices left open at the end.
 }
@@ -81,11 +95,13 @@ void SliceTracker::CompleteSlice(UniqueTid utid) {
   uint64_t parent_stack_id, stack_id;
   std::tie(parent_stack_id, stack_id) = GetStackHashes(stack);
 
+  Json::FastWriter writer;
   Slice& slice = stack.back();
   auto* slices = context_->storage->mutable_nestable_slices();
-  slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts, utid,
-                   slice.cat_id, slice.name_id, depth, stack_id,
-                   parent_stack_id);
+  slices->AddSlice(
+      slice.start_ts, slice.end_ts - slice.start_ts, slice.thread_start_ts,
+      slice.thread_end_ts - slice.thread_start_ts, utid, slice.cat_id,
+      slice.name_id, depth, stack_id, parent_stack_id, writer.write(slice.args));
 
   stack.pop_back();
 }

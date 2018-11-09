@@ -47,6 +47,9 @@ Table::Schema SliceTable::CreateSchema(int, const char* const*) {
           Table::Column(Column::kStackId, "stack_id", ColumnType::kUlong),
           Table::Column(Column::kParentStackId, "parent_stack_id",
                         ColumnType::kUlong),
+          Table::Column(Column::kThreadTimestamp, "tts", ColumnType::kUlong),
+          Table::Column(Column::kThreadDuration, "tdur", ColumnType::kUlong),
+          Table::Column(Column::kArgs, "args", ColumnType::kString),
       },
       {Column::kUtid, Column::kTimestamp, Column::kDepth});
 }
@@ -89,6 +92,14 @@ int SliceTable::Cursor::Column(sqlite3_context* context, int col) {
       sqlite3_result_int64(
           context, static_cast<sqlite3_int64>(slices.durations()[row_]));
       break;
+    case Column::kThreadTimestamp:
+      sqlite3_result_int64(context,
+                           static_cast<sqlite3_int64>(slices.thread_start_ns()[row_]));
+      break;
+    case Column::kThreadDuration:
+      sqlite3_result_int64(
+          context, static_cast<sqlite3_int64>(slices.thread_durations()[row_]));
+      break;
     case Column::kUtid:
       sqlite3_result_int64(context,
                            static_cast<sqlite3_int64>(slices.utids()[row_]));
@@ -114,6 +125,10 @@ int SliceTable::Cursor::Column(sqlite3_context* context, int col) {
     case Column::kParentStackId:
       sqlite3_result_int64(
           context, static_cast<sqlite3_int64>(slices.parent_stack_ids()[row_]));
+      break;
+    case Column::kArgs:
+      sqlite3_result_text(
+          context, slices.args()[row_].c_str(), -1, nullptr);
       break;
   }
   return SQLITE_OK;

@@ -126,25 +126,37 @@ class TraceStorage {
    public:
     inline void AddSlice(uint64_t start_ns,
                          uint64_t duration_ns,
+                         uint64_t thread_start_ns,
+                         uint64_t thread_duration_ns,
                          UniqueTid utid,
                          StringId cat,
                          StringId name,
                          uint8_t depth,
                          uint64_t stack_id,
-                         uint64_t parent_stack_id) {
+                         uint64_t parent_stack_id,
+                         const std::string& args) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
+      thread_start_ns_.emplace_back(thread_start_ns);
+      thread_durations_.emplace_back(thread_duration_ns);
       utids_.emplace_back(utid);
       cats_.emplace_back(cat);
       names_.emplace_back(name);
       depths_.emplace_back(depth);
       stack_ids_.emplace_back(stack_id);
       parent_stack_ids_.emplace_back(parent_stack_id);
+      args_.emplace_back(args);
     }
 
     size_t slice_count() const { return start_ns_.size(); }
     const std::deque<uint64_t>& start_ns() const { return start_ns_; }
     const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<uint64_t>& thread_start_ns() const {
+      return thread_start_ns_;
+    }
+    const std::deque<uint64_t>& thread_durations() const {
+      return thread_durations_;
+    }
     const std::deque<UniqueTid>& utids() const { return utids_; }
     const std::deque<StringId>& cats() const { return cats_; }
     const std::deque<StringId>& names() const { return names_; }
@@ -153,16 +165,23 @@ class TraceStorage {
     const std::deque<uint64_t>& parent_stack_ids() const {
       return parent_stack_ids_;
     }
+    // Should we intern arg strings? It would be nice if we could
+    // intern individual keys/values inside the json args.
+    const std::deque<std::string>& args() const { return args_; }
+
 
    private:
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
+    std::deque<uint64_t> thread_start_ns_;
+    std::deque<uint64_t> thread_durations_;
     std::deque<UniqueTid> utids_;
     std::deque<StringId> cats_;
     std::deque<StringId> names_;
     std::deque<uint8_t> depths_;
     std::deque<uint64_t> stack_ids_;
     std::deque<uint64_t> parent_stack_ids_;
+    std::deque<std::string> args_;
   };
 
   class Counters {
