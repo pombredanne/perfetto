@@ -63,7 +63,7 @@ class TraceStorage {
 
   virtual ~TraceStorage();
 
-  struct Stats {
+  struct ParseStats {
     uint64_t mismatched_sched_switch_tids_ = 0;
   };
 
@@ -276,8 +276,6 @@ class TraceStorage {
     return static_cast<UniquePid>(unique_processes_.size() - 1);
   }
 
-  void AddMismatchedSchedSwitch() { ++stats_.mismatched_sched_switch_tids_; }
-
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
   // Virtual for testing.
@@ -325,6 +323,9 @@ class TraceStorage {
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
 
+  const ParseStats& parse_stats() const { return parse_stats_; }
+  ParseStats* mutable_parse_stats() { return &parse_stats_; }
+
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -343,8 +344,8 @@ class TraceStorage {
 
   using StringHash = uint64_t;
 
-  // Metadata counters for events being added.
-  Stats stats_;
+  // Stats updating when parsing the trace.
+  ParseStats parse_stats_;
 
   // One entry for each CPU in the trace.
   Slices slices_;
