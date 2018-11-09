@@ -82,7 +82,7 @@ const char* StatsTable::Cursor::KeyForRow(uint8_t row) {
 int StatsTable::Cursor::ValueForRow(uint8_t row) {
   switch (row) {
     case StatsTable::Row::kMismatchedSchedSwitch: {
-      auto val = storage_->parse_stats().mismatched_sched_switch_tids_;
+      auto val = storage_->stats().mismatched_sched_switch_tids_;
       return static_cast<int>(val);
     }
     default:

@@ -63,7 +63,7 @@ class TraceStorage {
 
   virtual ~TraceStorage();
 
-  struct ParseStats {
+  struct Stats {
     uint64_t mismatched_sched_switch_tids_ = 0;
   };
 
@@ -332,8 +332,8 @@ class TraceStorage {
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
 
-  const ParseStats& parse_stats() const { return parse_stats_; }
-  ParseStats* mutable_parse_stats() { return &parse_stats_; }
+  const Stats& stats() const { return stats_; }
+  Stats* mutable_stats() { return &stats_; }
 
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
@@ -353,8 +353,8 @@ class TraceStorage {
 
   using StringHash = uint64_t;
 
-  // Stats updating when parsing the trace.
-  ParseStats parse_stats_;
+  // Stats about parsing the trace.
+  Stats stats_;
 
   // One entry for each CPU in the trace.
   Slices slices_;
