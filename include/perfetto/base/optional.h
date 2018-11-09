@@ -162,6 +162,7 @@ class Optional {
   T&& operator*() && { return std::move(value()); }
 
   constexpr explicit operator bool() const { return !is_null_; }
+  constexpr bool has_value() const noexcept { return !is_null_; }
 
   // TODO(mlamouri): using 'constexpr' here breaks compiler that assume it was
   // meant to be 'constexpr const'.

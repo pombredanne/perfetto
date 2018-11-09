@@ -75,14 +75,15 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
   for (auto it = tids_pair.first; it != tids_pair.second; it++) {
     UniqueTid iter_utid = it->second;
     auto* iter_thread = context_->storage->GetMutableThread(iter_utid);
-    if (iter_thread->upid == 0) {
+    if (!iter_thread->upid.has_value()) {
       // We haven't discovered the parent process for the thread. Assign it
       // now and use this thread.
       thread = iter_thread;
       utid = iter_utid;
       break;
     }
-    const auto& iter_process = context_->storage->GetProcess(iter_thread->upid);
+    const auto& iter_process =
+        context_->storage->GetProcess(iter_thread->upid.value());
     if (iter_process.pid == pid) {
       // We found a thread that matches both the tid and its parent pid.
       thread = iter_thread;
@@ -99,7 +100,7 @@ UniqueTid ProcessTracker::UpdateThread(uint32_t tid, uint32_t pid) {
   }
 
   // Find matching process or create new one.
-  if (thread->upid == 0) {  // Not set, upid == 0 is invalid.
+  if (!thread->upid.has_value()) {
     std::tie(thread->upid, std::ignore) =
         GetOrCreateProcess(pid, thread->start_ns);
   }
@@ -129,7 +130,7 @@ std::tuple<UniquePid, TraceStorage::Process*>
 ProcessTracker::GetOrCreateProcess(uint32_t pid, uint64_t start_ns) {
   auto pids_pair = pids_.equal_range(pid);
 
-  UniquePid upid = 0;
+  base::Optional<UniquePid> upid;
   for (auto it = pids_pair.first; it != pids_pair.second; it++) {
     if (it->first == pid) {
       upid = it->second;
@@ -137,12 +138,12 @@ ProcessTracker::GetOrCreateProcess(uint32_t pid, uint64_t start_ns) {
     }
   }
 
-  if (upid == 0) {
+  if (!upid.has_value()) {
     upid = context_->storage->AddEmptyProcess(pid);
-    pids_.emplace(pid, upid);
+    pids_.emplace(pid, upid.value());
   }
 
-  auto* process = context_->storage->GetMutableProcess(upid);
+  auto* process = context_->storage->GetMutableProcess(upid.value());
   if (process->start_ns == 0)
     process->start_ns = start_ns;
 
@@ -157,7 +158,7 @@ ProcessTracker::GetOrCreateProcess(uint32_t pid, uint64_t start_ns) {
         context_->storage->InternString(base::StringView(process_name, len));
   }
 
-  return std::make_tuple(upid, process);
+  return std::make_tuple(upid.value(), process);
 }
 
 }  // namespace trace_processor
