@@ -18,6 +18,8 @@
 #define SRC_PROFILING_MEMORY_BOOKKEEPING_H_
 
 #include "perfetto/base/lookup_set.h"
+#include "perfetto/trace/profiling/profile_packet.pbzero.h"
+#include "perfetto/trace/trace_packet.pbzero.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/queue_messages.h"
 #include "src/profiling/memory/string_interner.h"
@@ -86,6 +88,7 @@ class GlobalCallstackTrie {
         : parent_(parent), location_(std::move(location)) {}
 
     std::vector<InternedCodeLocation> BuildCallstack() const;
+    const void* id() const { return static_cast<const void*>(this); }
 
    private:
     Node* GetOrCreateChild(const InternedCodeLocation& loc);
@@ -115,6 +118,10 @@ class GlobalCallstackTrie {
   Node root_{{interner_.Intern(""), interner_.Intern("")}};
 };
 
+struct DumpState {
+  std::set<GlobalCallstackTrie::Node*> callstacks_to_dump;
+};
+
 // Snapshot for memory allocations of a particular process. Shares callsites
 // with other processes.
 class HeapTracker {
@@ -128,7 +135,8 @@ class HeapTracker {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
-  void Dump(int fd);
+  void Dump(protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
+            DumpState* dump_state);
 
  private:
   static constexpr uint64_t kNoopFree = 0;

@@ -104,21 +104,14 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   allocations_.erase(leaf_it);
 }
 
-void HeapTracker::Dump(int fd) {
-  // TODO(fmayer): This should dump protocol buffers into the perfetto service.
-  // For now, output a text file compatible with flamegraph.pl.
+void HeapTracker::Dump(protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
+                       DumpState* dump_state) {
   for (const auto& p : allocations_) {
-    std::string data;
     const Allocation& alloc = p.second;
-    const std::vector<InternedCodeLocation> callstack =
-        alloc.node->BuildCallstack();
-    for (auto it = callstack.begin(); it != callstack.end(); ++it) {
-      if (it != callstack.begin())
-        data += ";";
-      data += it->function_name.str();
-    }
-    data += " " + std::to_string(alloc.total_size) + "\n";
-    base::WriteAll(fd, data.c_str(), data.size());
+    dump_state->callstacks_to_dump.emplace(alloc.node);
+    protos::pbzero::ProfilePacket_HeapSample* sample = proto->add_samples();
+    sample->set_callstack_id(reinterpret_cast<uintptr_t>(alloc.node->id()));
+    sample->set_cumulative_allocated(alloc.total_size);
   }
 }
 
@@ -178,20 +171,37 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     if (!trace_writer)
       return;
     PERFETTO_LOG("Dumping heaps");
+    DumpState dump_state;
+    TraceWriter::TracePacketHandle trace_packet =
+        trace_writer->NewTracePacket();
+    auto profile_packet = trace_packet->set_profile_packet();
+    for (const pid_t pid : dump_rec.pids) {
+      protos::pbzero::ProfilePacket_ProcessHeapSamples* sample =
+          profile_packet->add_process_dumps();
+      auto it = bookkeeping_data_.find(pid);
+      if (it == bookkeeping_data_.end())
+        continue;
+
+      PERFETTO_LOG("Dumping %d ", it->first);
+      it->second.heap_tracker.Dump(sample, &dump_state);
+    }
+
+    /*
+    std::set<void*> dumped_strings;
+    size_t frame_id = 0;
+    for (GlobalCallstackTrie::Node* node : dump_state.callstacks_to_dump) {
+      protos::pbzero::ProfilePacket_Frame* frame = profile_packet->add_frames();
+      frame->set_id(++frame_id);
+    }
+    */
+
+    // We cannot garbage collect until we have finished dumping, as the state
+    // in DumpState points into the GlobalCallstackTrie.
     for (const pid_t pid : dump_rec.pids) {
       auto it = bookkeeping_data_.find(pid);
       if (it == bookkeeping_data_.end())
         continue;
 
-      std::string dump_file_name = file_name_ + "." + std::to_string(it->first);
-      PERFETTO_LOG("Dumping %d to %s", it->first, dump_file_name.c_str());
-      base::ScopedFile fd =
-          base::OpenFile(dump_file_name, O_WRONLY | O_CREAT, 0644);
-      if (fd)
-        it->second.heap_tracker.Dump(fd.get());
-      else
-        PERFETTO_PLOG("Failed to open %s", dump_file_name.c_str());
-      // Garbage collect for processes that already went away.
       if (it->second.ref_count == 0) {
         std::lock_guard<std::mutex> l(bookkeeping_mutex_);
         it = bookkeeping_data_.erase(it);

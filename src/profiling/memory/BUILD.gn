@@ -48,6 +48,10 @@ source_set("daemon") {
     "../../tracing",
     "../../tracing:ipc",
   ]
+  public_deps = [
+    "../../../protos/perfetto/trace:zero",
+    "../../../protos/perfetto/trace/profiling:zero",
+  ]
   sources = [
     "bookkeeping.cc",
     "bookkeeping.h",
