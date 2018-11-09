@@ -24,7 +24,6 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
@@ -109,9 +108,8 @@ class ProtoTranslationTable {
 
   const Event* AddGenericEvent(const std::string group,
                                const std::string event);
-  void CreateGenericEventFields(
-      const std::vector<FtraceEvent::Field>& ftrace_fields,
-      Event& event);
+  void CreateGenericEventField(const FtraceEvent::Field& ftrace_field,
+                               Event& event);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
@@ -127,7 +125,6 @@ class ProtoTranslationTable {
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};
-  std::unordered_map<uint64_t /*hash*/, size_t /*index*/> generic_string_index_;
   std::deque<std::string> generic_strings_;
 };
 

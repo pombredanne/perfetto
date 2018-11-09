@@ -435,7 +435,9 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
   e->name = InternGenericString(base::StringView(event));
   e->group = InternGenericString(base::StringView(group));
 
-  CreateGenericEventFields(ftrace_event.fields, *e);
+  // For every field in the ftrace event, make a field in the generic event.
+  for (const FtraceEvent::Field& ftrace_field : ftrace_event.fields)
+    CreateGenericEventField(ftrace_field, *e);
 
   name_to_event_[e->name] = &events_.at(e->ftrace_event_id);
   group_to_events_[e->group].push_back(&events_.at(e->ftrace_event_id));
@@ -453,22 +455,19 @@ const char* ProtoTranslationTable::InternGenericString(base::StringView str) {
   return (*it).c_str();
 }
 
-void ProtoTranslationTable::CreateGenericEventFields(
-    const std::vector<FtraceEvent::Field>& ftrace_fields,
+void ProtoTranslationTable::CreateGenericEventField(
+    const FtraceEvent::Field& ftrace_field,
     Event& event) {
-  // For every field in the ftrace event, make a field in the generic event.
-  for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
-    const char* field_name = InternGenericString(
-        base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
-    event.fields.emplace_back();
-    Field* field = &event.fields.back();
-    field->ftrace_name = field_name;
-    InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
-                    ftrace_field.is_signed, &field->ftrace_type);
-    SetProtoType(field->ftrace_type, &field->proto_field_type,
-                 &field->proto_field_id);
-    MergeFieldInfo(ftrace_field, field, event.name);
-  }
+  const char* field_name = InternGenericString(
+      base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
+  event.fields.emplace_back();
+  Field* field = &event.fields.back();
+  field->ftrace_name = field_name;
+  InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
+                  ftrace_field.is_signed, &field->ftrace_type);
+  SetProtoType(field->ftrace_type, &field->proto_field_type,
+               &field->proto_field_id);
+  MergeFieldInfo(ftrace_field, field, event.name);
 }
 
 ProtoTranslationTable::~ProtoTranslationTable() = default;
