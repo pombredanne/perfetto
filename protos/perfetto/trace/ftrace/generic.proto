@@ -5,6 +5,7 @@ package perfetto.protos;
 message GenericFtraceEvent {
   message Field {
     optional string name = 1;
+    // ftrace type
     optional string type = 2;
     oneof value {
       string str_value = 3;

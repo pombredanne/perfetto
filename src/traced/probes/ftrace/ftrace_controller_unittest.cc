@@ -290,7 +290,7 @@ TEST(FtraceControllerTest, RejectsBadEventNames) {
   auto controller =
       CreateTestController(true /* nice runner */, true /* nice procfs */);
 
-  FtraceConfig config = CreateFtraceConfig({"../try/to/escape"});
+  FtraceConfig config = CreateFtraceConfig({"..$try,to:escape"});
   EXPECT_FALSE(controller->AddFakeDataSource(config));
   EXPECT_FALSE(controller->procfs()->is_tracing_on());
 }

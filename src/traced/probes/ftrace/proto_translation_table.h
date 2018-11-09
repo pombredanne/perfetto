@@ -107,7 +107,8 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
-  const Event* AddGenericEvent(const std::string name);
+  const Event* AddGenericEvent(const std::string group,
+                               const std::string event);
   void CreateGenericEventFields(
       const std::vector<FtraceEvent::Field>& ftrace_fields,
       Event& event);
@@ -117,7 +118,7 @@ class ProtoTranslationTable {
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
   // Store strings so they can be read when writing the trace output.
-  size_t InternGenericString(base::StringView name);
+  const char* InternGenericString(base::StringView name);
 
   std::vector<Event> events_;
   const FtraceProcfs* ftrace_procfs_;

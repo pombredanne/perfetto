@@ -55,6 +55,15 @@ void AddEventGroup(const ProtoTranslationTable* table,
     to->insert(event->name);
 }
 
+std::pair<std::string, std::string> EventToGroupAndName(
+    const std::string& event) {
+  auto slash_pos = event.find("/");
+  if (slash_pos == std::string::npos)
+    return std::make_pair("", event);
+  return std::make_pair(event.substr(0, slash_pos),
+                        event.substr(slash_pos + 1));
+}
+
 }  // namespace
 
 std::set<std::string> GetFtraceEvents(const FtraceConfig& request,
@@ -256,14 +265,17 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
 
   for (auto& name : events) {
     const Event* event;
-    if (name.find("generic") == 0) {
-      event = table_->AddGenericEvent(name);
-    } else {
-      event = table_->GetEventByName(name);
-    }
+    std::string group;
+    std::string event_name;
+    std::tie(group, event_name) = EventToGroupAndName(name);
+    // TODO(taylori): Add all events for group if name is * e.g sched/*
+    event = table_->GetEventByName(event_name);
     if (!event) {
-      PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
-      continue;
+      event = table_->AddGenericEvent(group, event_name);
+      if (!event) {
+        PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
+        continue;
+      }
     }
     if (current_state_.ftrace_events.count(event->name) ||
         std::string("ftrace") == event->group) {

@@ -24,13 +24,13 @@
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/generic.pbzero.h"
 
 namespace perfetto {
 
 namespace {
-
-constexpr int kGenericProtoId = 326;
 
 ProtoTranslationTable::FtracePageHeaderSpec MakeFtracePageHeaderSpec(
     const std::vector<FtraceEvent::Field>& fields) {
@@ -173,7 +173,8 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceStringPtr:
     case kFtraceDataLoc:
       *proto_type = kProtoString;
-      *proto_field_id = 3;
+      *proto_field_id =
+          protos::pbzero::GenericFtraceEvent::Field::kStrValueFieldNumber;
       break;
     case kFtraceInt8:
     case kFtraceInt16:
@@ -181,18 +182,21 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtracePid32:
     case kFtraceCommonPid32:
       *proto_type = kProtoInt32;
-      *proto_field_id = 4;
+      *proto_field_id =
+          protos::pbzero::GenericFtraceEvent::Field::kInt32ValueFieldNumber;
       break;
     case kFtraceInt64:
       *proto_type = kProtoInt64;
-      *proto_field_id = 5;
+      *proto_field_id =
+          protos::pbzero::GenericFtraceEvent::Field::kInt64ValueFieldNumber;
       break;
     case kFtraceUint8:
     case kFtraceUint16:
     case kFtraceUint32:
     case kFtraceBool:
       *proto_type = kProtoUint32;
-      *proto_field_id = 6;
+      *proto_field_id =
+          protos::pbzero::GenericFtraceEvent::Field::kUint32ValueFieldNumber;
       break;
     case kFtraceDevId32:
     case kFtraceDevId64:
@@ -200,7 +204,8 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceInode32:
     case kFtraceInode64:
       *proto_type = kProtoUint64;
-      *proto_field_id = 7;
+      *proto_field_id =
+          protos::pbzero::GenericFtraceEvent::Field::kUint64ValueFieldNumber;
       break;
   }
 }
@@ -348,7 +353,8 @@ std::unique_ptr<ProtoTranslationTable> ProtoTranslationTable::Create(
                                       &page_header_fields));
 
   for (Event& event : events) {
-    if (event.proto_field_id == kGenericProtoId) {
+    if (event.proto_field_id ==
+        protos::pbzero::FtraceEvent::kGenericFieldNumber) {
       continue;
     }
     PERFETTO_DCHECK(event.name);
@@ -406,22 +412,16 @@ ProtoTranslationTable::ProtoTranslationTable(
   }
 }
 
-const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
-  // String is in form: generic:group/event_name
-  std::string group = name.substr(name.find(":") + 1, name.find("/") - 8);
-  std::string e_name = name.substr(name.find("/") + 1);
+const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
+                                                    const std::string event) {
   // Read the format file and create the ftrace event
-  std::string contents = ftrace_procfs_->ReadEventFormat(group, e_name);
+  std::string contents = ftrace_procfs_->ReadEventFormat(group, event);
   FtraceEvent ftrace_event;
-  if (!contents.empty()) {
-    ParseFtraceEvent(contents, &ftrace_event);
+  if (contents.empty()) {
+    return nullptr;
   }
-  // If a specific proto for that event exists, use that rather than creating
-  // a generic event
-  auto it = name_to_event_.find(e_name);
-  if (it != name_to_event_.end()) {
-    return it->second;
-  }
+  ParseFtraceEvent(contents, &ftrace_event);
+
   // Ensure events vector is large enough
   if (ftrace_event.id > largest_id_) {
     events_.resize(ftrace_event.id);
@@ -431,11 +431,9 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
   // Set known event variables
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
-  e->proto_field_id = kGenericProtoId;
-  size_t name_index = InternGenericString(base::StringView(e_name));
-  size_t group_index = InternGenericString(base::StringView(group));
-  e->name = generic_strings_.at(name_index).c_str();
-  e->group = generic_strings_.at(group_index).c_str();
+  e->proto_field_id = protos::pbzero::FtraceEvent::kGenericFieldNumber;
+  e->name = InternGenericString(base::StringView(event));
+  e->group = InternGenericString(base::StringView(group));
 
   CreateGenericEventFields(ftrace_event.fields, *e);
 
@@ -445,17 +443,14 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string name) {
   return e;
 };
 
-size_t ProtoTranslationTable::InternGenericString(base::StringView str) {
-  auto hash = str.Hash();
-  auto id_it = generic_string_index_.find(hash);
-  if (id_it != generic_string_index_.end()) {
-    PERFETTO_DCHECK(base::StringView(generic_strings_[id_it->second]) == str);
-    return id_it->second;
+const char* ProtoTranslationTable::InternGenericString(base::StringView str) {
+  auto it = std::find(generic_strings_.begin(), generic_strings_.end(),
+                      str.ToStdString());
+  if (it == generic_strings_.end()) {
+    generic_strings_.emplace_back(str.ToStdString());
+    return generic_strings_.back().c_str();
   }
-  generic_strings_.emplace_back(str.ToStdString());
-  size_t string_id = generic_strings_.size() - 1;
-  generic_string_index_.emplace(hash, string_id);
-  return string_id;
+  return (*it).c_str();
 }
 
 void ProtoTranslationTable::CreateGenericEventFields(
@@ -463,11 +458,11 @@ void ProtoTranslationTable::CreateGenericEventFields(
     Event& event) {
   // For every field in the ftrace event, make a field in the generic event.
   for (const FtraceEvent::Field& ftrace_field : ftrace_fields) {
-    size_t field_name_index = InternGenericString(
+    const char* field_name = InternGenericString(
         base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
     event.fields.emplace_back();
     Field* field = &event.fields.back();
-    field->ftrace_name = generic_strings_.at(field_name_index).c_str();
+    field->ftrace_name = field_name;
     InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
                     ftrace_field.is_signed, &field->ftrace_type);
     SetProtoType(field->ftrace_type, &field->proto_field_type,

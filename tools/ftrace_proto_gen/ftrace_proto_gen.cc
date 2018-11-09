@@ -396,7 +396,7 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
           << R"(.proto";)"
           << "\n";
   }
-
+  *fout << "import \"perfetto/trace/ftrace/generic.proto\";\n";
   *fout << "\n";
   *fout << "package perfetto.protos;\n\n";
   *fout << R"(message FtraceEvent {
@@ -423,6 +423,7 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
           << event.name() << " = " << i << ";\n";
     ++i;
   }
+  *fout << "GenericFtraceEvent = " << i << ";\n";
   *fout << "  }\n";
   *fout << "}\n";
 }

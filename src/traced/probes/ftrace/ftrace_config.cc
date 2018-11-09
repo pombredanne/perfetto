@@ -22,7 +22,7 @@ namespace perfetto {
 namespace {
 
 bool IsGoodPunctuation(char c) {
-  return c == '_' || c == '.' || c == '/' || c == ':';
+  return c == '_' || c == '.' || c == '/';
 }
 
 bool IsValid(const std::string& str) {
