@@ -54,8 +54,6 @@ class Patch {
 
  private:
   Patch& operator=(const Patch&) = delete;
-  Patch(Patch&&) noexcept = delete;
-  Patch& operator=(Patch&&) = delete;
 };
 
 // Note: the protozero::Message(s) will take pointers to the |size_field| of
