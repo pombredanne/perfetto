@@ -103,21 +103,21 @@ template <>
 inline uint32_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER || type == SQLITE_FLOAT);
-  return static_cast<uint8_t>(sqlite3_value_int(value));
+  return static_cast<uint32_t>(sqlite3_value_int(value));
 }
 
 template <>
 inline uint64_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER || type == SQLITE_FLOAT);
-  return static_cast<uint8_t>(sqlite3_value_int(value));
+  return static_cast<uint64_t>(sqlite3_value_int(value));
 }
 
 template <>
 inline int64_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER || type == SQLITE_FLOAT);
-  return static_cast<uint8_t>(sqlite3_value_int(value));
+  return static_cast<int64_t>(sqlite3_value_int(value));
 }
 
 template <>
