@@ -81,10 +81,8 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   // Collect the output from child process.
   std::string error;
   char buffer[4096];
-  while (1) {
-    ssize_t count = read(filedes[0], buffer, sizeof(buffer));
-    if (count == -1 && errno == EINTR)
-      continue;
+  while (true) {
+    ssize_t count = PERFETTO_EINTR(read(filedes[0], buffer, sizeof(buffer)));
     if (count == 0 || count == -1)
       break;
     error.append(buffer, static_cast<size_t>(count));
@@ -95,10 +93,10 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   // Wait until the child process exits fully.
   PERFETTO_EINTR(waitpid(pid, &status, 0));
 
-  bool ok = WIFEXITED(status) || WEXITSTATUS(status) == 0;
+  bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
   if (!ok) {
     // TODO(lalitm): use the stderr result from atrace.
-    base::ignore_result(stderr);
+    base::ignore_result(error);
   }
   return ok;
 }
