@@ -130,20 +130,23 @@ std::tuple<UniquePid, TraceStorage::Process*>
 ProcessTracker::GetOrCreateProcess(uint32_t pid, uint64_t start_ns) {
   auto pids_pair = pids_.equal_range(pid);
 
-  base::Optional<UniquePid> upid;
+  base::Optional<UniquePid> found_upid;
   for (auto it = pids_pair.first; it != pids_pair.second; it++) {
     if (it->first == pid) {
-      upid = it->second;
+      found_upid = it->second;
       break;
     }
   }
 
-  if (!upid.has_value()) {
+  UniquePid upid;
+  if (found_upid.has_value()) {
+    upid = found_upid.value();
+  } else {
     upid = context_->storage->AddEmptyProcess(pid);
-    pids_.emplace(pid, upid.value());
+    pids_.emplace(pid, upid);
   }
 
-  auto* process = context_->storage->GetMutableProcess(upid.value());
+  auto* process = context_->storage->GetMutableProcess(upid);
   if (process->start_ns == 0)
     process->start_ns = start_ns;
 
@@ -158,7 +161,7 @@ ProcessTracker::GetOrCreateProcess(uint32_t pid, uint64_t start_ns) {
         context_->storage->InternString(base::StringView(process_name, len));
   }
 
-  return std::make_tuple(upid.value(), process);
+  return std::make_tuple(upid, process);
 }
 
 }  // namespace trace_processor
