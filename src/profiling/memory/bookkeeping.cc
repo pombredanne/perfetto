@@ -232,9 +232,13 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     DumpState dump_state;
 
     for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
-      for (const Interner<Frame>::Interned& frame : node->BuildCallstack()) {
+      protos::pbzero::ProfilePacket_Callstack* callstack =
+          profile_packet->add_callstacks();
+      callstack->set_id(reinterpret_cast<uintptr_t>(node->id()));
+      for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
+        callstack->add_frame_ids(reinterpret_cast<uintptr_t>(frame.id()));
+      for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
         dump_state.WriteFrame(profile_packet, frame);
-      }
     }
 
     // We cannot garbage collect until we have finished dumping, as the state
