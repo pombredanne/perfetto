@@ -23,6 +23,8 @@
 namespace perfetto {
 namespace profiling {
 
+using InternID = uintptr_t;
+
 template <typename T>
 class Interner {
  private:
@@ -64,7 +66,7 @@ class Interner {
 
     const T& data() const { return entry_->data; }
 
-    void* id() const { return entry_; }
+    InternID id() const { return reinterpret_cast<InternID>(entry_); }
 
     ~Interned() {
       if (entry_ != nullptr)

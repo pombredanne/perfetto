@@ -168,7 +168,7 @@ void DumpState::WriteMap(protos::pbzero::ProfilePacket* packet,
     mapping->set_end(map->end);
     mapping->set_load_bias(map->load_bias);
     for (const Interner<std::string>::Interned& str : map->path_components)
-      mapping->add_path_string_ids(reinterpret_cast<uintptr_t>(str.id()));
+      mapping->add_path_string_ids(str.id());
   }
 }
 
@@ -188,7 +188,7 @@ void DumpState::WriteString(protos::pbzero::ProfilePacket* packet,
   std::tie(std::ignore, inserted) = dumped_strings.emplace(str.id());
   if (inserted) {
     auto interned_string = packet->add_strings();
-    interned_string->set_id(reinterpret_cast<uintptr_t>(str.id()));
+    interned_string->set_id(str.id());
     interned_string->set_str(str->c_str(), str->size());
   }
 }
@@ -236,7 +236,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
           profile_packet->add_callstacks();
       callstack->set_id(reinterpret_cast<uintptr_t>(node->id()));
       for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
-        callstack->add_frame_ids(reinterpret_cast<uintptr_t>(frame.id()));
+        callstack->add_frame_ids(frame.id());
       for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
         dump_state.WriteFrame(profile_packet, frame);
     }

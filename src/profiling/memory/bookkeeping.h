@@ -162,9 +162,9 @@ struct DumpState {
   void WriteString(protos::pbzero::ProfilePacket* packet,
                    const Interner<std::string>::Interned& str);
 
-  std::set<void*> dumped_strings;
-  std::set<void*> dumped_frames;
-  std::set<void*> dumped_mappings;
+  std::set<InternID> dumped_strings;
+  std::set<InternID> dumped_frames;
+  std::set<InternID> dumped_mappings;
 };
 
 // Snapshot for memory allocations of a particular process. Shares callsites
