@@ -50,6 +50,8 @@ struct Mapping {
 };
 
 struct Frame {
+  Frame(Interner<Mapping>::Interned m, Interner<std::string>::Interned fn_name)
+      : mapping(m), function_name(fn_name) {}
   Interner<Mapping>::Interned mapping;
   Interner<std::string>::Interned function_name;
   uint64_t rel_pc;
@@ -128,9 +130,17 @@ class GlobalCallstackTrie {
     while (sp.Next())
       map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
 
-    Frame frame{};
-    frame.mapping = mapping_interner_.Intern(std::move(map));
-    frame.function_name = string_interner_.Intern(loc.function_name);
+    Frame frame(mapping_interner_.Intern(std::move(map)),
+                string_interner_.Intern(loc.function_name));
+
+    return frame_interner_.Intern(frame);
+  }
+
+  Interner<Frame>::Interned MakeRootFrame() {
+    Mapping map{};
+
+    Frame frame(mapping_interner_.Intern(std::move(map)),
+                string_interner_.Intern(""));
 
     return frame_interner_.Intern(frame);
   }
@@ -139,7 +149,7 @@ class GlobalCallstackTrie {
   Interner<Mapping> mapping_interner_;
   Interner<Frame> frame_interner_;
 
-  Node root_{{frame_interner_.Intern(Frame{})}};
+  Node root_{MakeRootFrame()};
 };
 
 struct DumpState {

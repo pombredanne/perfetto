@@ -39,7 +39,6 @@ class Interner {
   class Interned {
    public:
     friend class Interner<T>;
-    Interned() : entry_(nullptr) {}
     Interned(Entry* entry) : entry_(entry) {}
     Interned(const Interned& other) : entry_(other.entry_) {
       if (entry_ != nullptr)
