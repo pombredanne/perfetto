@@ -23,7 +23,7 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-TEST(Interner<std::string> Test, Basic) {
+TEST(InternerStringTest, Basic) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -32,7 +32,7 @@ TEST(Interner<std::string> Test, Basic) {
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(Interner<std::string> Test, TwoStrings) {
+TEST(InternerStringTest, TwoStrings) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -43,7 +43,7 @@ TEST(Interner<std::string> Test, TwoStrings) {
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(Interner<std::string> Test, TwoReferences) {
+TEST(InternerStringTest, TwoReferences) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -55,7 +55,7 @@ TEST(Interner<std::string> Test, TwoReferences) {
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(Interner<std::string> Test, Move) {
+TEST(InternerStringTest, Move) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -68,7 +68,7 @@ TEST(Interner<std::string> Test, Move) {
   }
 }
 
-TEST(Interner<std::string> Test, Copy) {
+TEST(InternerStringTest, Copy) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -82,7 +82,7 @@ TEST(Interner<std::string> Test, Copy) {
   }
 }
 
-TEST(Interner<std::string> Test, MoveAssign) {
+TEST(InternerStringTest, MoveAssign) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");
@@ -95,7 +95,7 @@ TEST(Interner<std::string> Test, MoveAssign) {
   }
 }
 
-TEST(Interner<std::string> Test, CopyAssign) {
+TEST(InternerStringTest, CopyAssign) {
   Interner<std::string> interner;
   {
     Interner<std::string>::Interned interned_str = interner.Intern("foo");

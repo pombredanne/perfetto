@@ -50,8 +50,16 @@ class Interner {
       other.entry_ = nullptr;
     }
 
-    Interned& operator=(Interned other) {
-      std::swap(*this, other);
+    Interned& operator=(Interned&& other) {
+      entry_ = other.entry_;
+      other.entry_ = nullptr;
+      return *this;
+    }
+
+    Interned& operator=(Interned& other) {
+      entry_ = other.entry_;
+      if (entry_ != nullptr)
+        entry_->ref_count++;
       return *this;
     }
 
