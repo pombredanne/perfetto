@@ -119,7 +119,7 @@ class GlobalCallstackTrie {
  private:
   Interner<Frame>::Interned InternCodeLocation(
       const unwindstack::FrameData& loc) {
-    Mapping map;
+    Mapping map{};
     map.offset = loc.map_offset;
     map.start = loc.map_start;
     map.end = loc.map_end;
@@ -128,7 +128,7 @@ class GlobalCallstackTrie {
     while (sp.Next())
       map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
 
-    Frame frame;
+    Frame frame{};
     frame.mapping = mapping_interner_.Intern(std::move(map));
     frame.function_name = string_interner_.Intern(loc.function_name);
 
