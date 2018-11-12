@@ -62,7 +62,6 @@ source_set("daemon") {
     "record_reader.h",
     "socket_listener.cc",
     "socket_listener.h",
-    "string_interner.cc",
     "string_interner.h",
     "unwinding.cc",
     "unwinding.h",

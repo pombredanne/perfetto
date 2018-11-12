@@ -23,89 +23,89 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-TEST(StringInternerTest, Basic) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, Basic) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
-    ASSERT_EQ(interned_str.str(), "foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
+    ASSERT_EQ(interned_str.data(), "foo");
   }
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(StringInternerTest, TwoStrings) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, TwoStrings) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
-    StringInterner::InternedString other_interned_str = interner.Intern("bar");
-    ASSERT_EQ(interned_str.str(), "foo");
-    ASSERT_EQ(other_interned_str.str(), "bar");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
+    Interner<std::string>::Interned other_interned_str = interner.Intern("bar");
+    ASSERT_EQ(interned_str.data(), "foo");
+    ASSERT_EQ(other_interned_str.data(), "bar");
   }
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(StringInternerTest, TwoReferences) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, TwoReferences) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
-    ASSERT_EQ(interned_str.str(), "foo");
-    StringInterner::InternedString interned_str2 = interner.Intern("foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
+    ASSERT_EQ(interned_str.data(), "foo");
+    Interner<std::string>::Interned interned_str2 = interner.Intern("foo");
     ASSERT_EQ(interner.entry_count_for_testing(), 1);
-    ASSERT_EQ(interned_str2.str(), "foo");
+    ASSERT_EQ(interned_str2.data(), "foo");
   }
   ASSERT_EQ(interner.entry_count_for_testing(), 0);
 }
 
-TEST(StringInternerTest, Move) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, Move) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
     {
-      StringInterner::InternedString interned_str2(std::move(interned_str));
+      Interner<std::string>::Interned interned_str2(std::move(interned_str));
       ASSERT_EQ(interner.entry_count_for_testing(), 1);
-      ASSERT_EQ(interned_str2.str(), "foo");
+      ASSERT_EQ(interned_str2.data(), "foo");
     }
     ASSERT_EQ(interner.entry_count_for_testing(), 0);
   }
 }
 
-TEST(StringInternerTest, Copy) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, Copy) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
     {
-      StringInterner::InternedString interned_str2(interned_str);
+      Interner<std::string>::Interned interned_str2(interned_str);
       ASSERT_EQ(interner.entry_count_for_testing(), 1);
-      ASSERT_EQ(interned_str2.str(), "foo");
+      ASSERT_EQ(interned_str2.data(), "foo");
     }
     ASSERT_EQ(interner.entry_count_for_testing(), 1);
-    ASSERT_EQ(interned_str.str(), "foo");
+    ASSERT_EQ(interned_str.data(), "foo");
   }
 }
 
-TEST(StringInternerTest, MoveAssign) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, MoveAssign) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
     {
-      StringInterner::InternedString interned_str2 = std::move(interned_str);
+      Interner<std::string>::Interned interned_str2 = std::move(interned_str);
       ASSERT_EQ(interner.entry_count_for_testing(), 1);
-      ASSERT_EQ(interned_str2.str(), "foo");
+      ASSERT_EQ(interned_str2.data(), "foo");
     }
     ASSERT_EQ(interner.entry_count_for_testing(), 0);
   }
 }
 
-TEST(StringInternerTest, CopyAssign) {
-  StringInterner interner;
+TEST(Interner<std::string> Test, CopyAssign) {
+  Interner<std::string> interner;
   {
-    StringInterner::InternedString interned_str = interner.Intern("foo");
+    Interner<std::string>::Interned interned_str = interner.Intern("foo");
     {
-      StringInterner::InternedString interned_str2 = interned_str;
+      Interner<std::string>::Interned interned_str2 = interned_str;
       ASSERT_EQ(interner.entry_count_for_testing(), 1);
-      ASSERT_EQ(interned_str2.str(), "foo");
+      ASSERT_EQ(interned_str2.data(), "foo");
     }
     ASSERT_EQ(interner.entry_count_for_testing(), 1);
-    ASSERT_EQ(interned_str.str(), "foo");
+    ASSERT_EQ(interned_str.data(), "foo");
   }
 }
 

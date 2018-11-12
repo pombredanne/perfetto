@@ -19,49 +19,79 @@
 
 #include <stddef.h>
 #include <set>
-#include <string>
 
 namespace perfetto {
 namespace profiling {
 
-class StringInterner {
+template <typename T>
+class Interner {
  private:
   struct Entry {
-    Entry(std::string string, StringInterner* interner);
-    bool operator<(const Entry& other) const;
+    Entry(T d, Interner<T>* in) : data(d), interner(in) {}
+    bool operator<(const Entry& other) const { return data < other.data; }
 
-    const std::string string;
+    const T data;
     size_t ref_count = 0;
-    StringInterner* interner;
+    Interner<T>* interner;
   };
 
  public:
-  class InternedString {
+  class Interned {
    public:
-    friend class StringInterner;
-    InternedString(StringInterner::Entry* str);
-    InternedString(const InternedString& other);
-    InternedString(InternedString&& other);
-    InternedString& operator=(InternedString other);
+    friend class Interner<T>;
+    Interned() : entry_(nullptr) {}
+    Interned(Entry* entry) : entry_(entry) {}
+    Interned(const Interned& other) : entry_(other.entry_) {
+      if (entry_ != nullptr)
+        entry_->ref_count++;
+    }
 
-    const std::string& str() const;
-    void* id() const;
-    ~InternedString();
+    Interned(Interned&& other) : entry_(other.entry_) {
+      other.entry_ = nullptr;
+    }
+
+    Interned& operator=(Interned other) {
+      std::swap(*this, other);
+      return *this;
+    }
+
+    const T& data() const { return entry_->data; }
+
+    void* id() const { return entry_; }
+
+    ~Interned() {
+      if (entry_ != nullptr)
+        entry_->interner->Return(entry_);
+    }
+
+    bool operator<(const Interned& other) const {
+      if (entry_ == nullptr || other.entry_ == nullptr)
+        return entry_ < other.entry_;
+      return *entry_ < *(other.entry_);
+    }
+
+    const T* operator->() const { return &entry_->data; }
 
    private:
-    StringInterner::Entry* entry_;
+    Interner::Entry* entry_;
   };
 
-  InternedString Intern(const std::string& str);
-  size_t entry_count_for_testing();
+  Interned Intern(const T& data) {
+    auto itr = entries_.emplace(data, this);
+    Entry& entry = const_cast<Entry&>(*itr.first);
+    entry.ref_count++;
+    return Interned(&entry);
+  }
+  size_t entry_count_for_testing() { return entries_.size(); }
 
  private:
-  void Return(Entry* entry);
+  void Return(Entry* entry) {
+    if (--entry->ref_count == 0)
+      entries_.erase(*entry);
+  }
   std::set<Entry> entries_;
 };
 
-static_assert(sizeof(StringInterner::InternedString) == sizeof(void*),
-              "interned strings should be small");
 
 }  // namespace profiling
 }  // namespace perfetto

@@ -29,17 +29,17 @@ namespace perfetto {
 namespace profiling {
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
-    const InternedCodeLocation& loc) {
+    const Interner<Frame>::Interned& loc) {
   Node* child = children_.Get(loc);
   if (!child)
     child = children_.Emplace(loc, this);
   return child;
 }
 
-std::vector<InternedCodeLocation> GlobalCallstackTrie::Node::BuildCallstack()
-    const {
+std::vector<Interner<Frame>::Interned>
+GlobalCallstackTrie::Node::BuildCallstack() const {
   const Node* node = this;
-  std::vector<InternedCodeLocation> res;
+  std::vector<Interner<Frame>::Interned> res;
   while (node) {
     res.emplace_back(node->location_);
     node = node->parent_;
@@ -47,10 +47,11 @@ std::vector<InternedCodeLocation> GlobalCallstackTrie::Node::BuildCallstack()
   return res;
 }
 
-void HeapTracker::RecordMalloc(const std::vector<CodeLocation>& callstack,
-                               uint64_t address,
-                               uint64_t size,
-                               uint64_t sequence_number) {
+void HeapTracker::RecordMalloc(
+    const std::vector<unwindstack::FrameData>& callstack,
+    uint64_t address,
+    uint64_t size,
+    uint64_t sequence_number) {
   auto it = allocations_.find(address);
   if (it != allocations_.end()) {
     if (it->second.sequence_number > sequence_number) {
@@ -104,11 +105,12 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
   allocations_.erase(leaf_it);
 }
 
-void HeapTracker::Dump(protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
-                       DumpState* dump_state) {
+void HeapTracker::Dump(
+    protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
+    std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump) {
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
-    dump_state->callstacks_to_dump.emplace(alloc.node);
+    callstacks_to_dump->emplace(alloc.node);
     protos::pbzero::ProfilePacket_HeapSample* sample = proto->add_samples();
     sample->set_callstack_id(reinterpret_cast<uintptr_t>(alloc.node->id()));
     sample->set_cumulative_allocated(alloc.total_size);
@@ -116,9 +118,9 @@ void HeapTracker::Dump(protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
 }
 
 uint64_t GlobalCallstackTrie::GetCumSizeForTesting(
-    const std::vector<CodeLocation>& callstack) {
+    const std::vector<unwindstack::FrameData>& callstack) {
   Node* node = &root_;
-  for (const CodeLocation& loc : callstack) {
+  for (const unwindstack::FrameData& loc : callstack) {
     node = node->children_.Get(InternCodeLocation(loc));
     if (node == nullptr)
       return 0;
@@ -127,11 +129,11 @@ uint64_t GlobalCallstackTrie::GetCumSizeForTesting(
 }
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::IncrementCallsite(
-    const std::vector<CodeLocation>& callstack,
+    const std::vector<unwindstack::FrameData>& callstack,
     uint64_t size) {
   Node* node = &root_;
   node->cum_size_ += size;
-  for (const CodeLocation& loc : callstack) {
+  for (const unwindstack::FrameData& loc : callstack) {
     node = node->GetOrCreateChild(InternCodeLocation(loc));
     node->cum_size_ += size;
   }
@@ -153,6 +155,44 @@ void GlobalCallstackTrie::DecrementNode(Node* node, uint64_t size) {
   }
 }
 
+void DumpState::WriteMap(protos::pbzero::ProfilePacket* packet,
+                         const Interner<Mapping>::Interned map) {
+  auto map_it_and_inserted = dumped_mappings.emplace(map.id());
+  if (map_it_and_inserted.second) {
+    for (const Interner<std::string>::Interned& str : map->path_components)
+      WriteString(packet, str);
+
+    auto mapping = packet->add_mappings();
+    mapping->set_offset(map->offset);
+    mapping->set_start(map->start);
+    mapping->set_end(map->end);
+    mapping->set_load_bias(map->load_bias);
+    for (const Interner<std::string>::Interned& str : map->path_components)
+      mapping->add_path_string_ids(reinterpret_cast<uintptr_t>(str.id()));
+  }
+}
+
+void DumpState::WriteFrame(protos::pbzero::ProfilePacket* packet,
+                           Interner<Frame>::Interned frame) {
+  WriteMap(packet, frame->mapping);
+  WriteString(packet, frame->function_name);
+  auto frame_it_and_inserted = dumped_frames.emplace(frame.id());
+
+  if (frame_it_and_inserted.second) {
+  }
+}
+
+void DumpState::WriteString(protos::pbzero::ProfilePacket* packet,
+                            const Interner<std::string>::Interned& str) {
+  bool inserted;
+  std::tie(std::ignore, inserted) = dumped_strings.emplace(str.id());
+  if (inserted) {
+    auto interned_string = packet->add_strings();
+    interned_string->set_id(reinterpret_cast<uintptr_t>(str.id()));
+    interned_string->set_str(str->c_str(), str->size());
+  }
+}
+
 void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
   BookkeepingData* bookkeeping_data = nullptr;
   if (rec->pid != 0) {
@@ -171,7 +211,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     if (!trace_writer)
       return;
     PERFETTO_LOG("Dumping heaps");
-    DumpState dump_state;
+    std::set<GlobalCallstackTrie::Node*> callstacks_to_dump;
     TraceWriter::TracePacketHandle trace_packet =
         trace_writer->NewTracePacket();
     auto profile_packet = trace_packet->set_profile_packet();
@@ -183,17 +223,19 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
         continue;
 
       PERFETTO_LOG("Dumping %d ", it->first);
-      it->second.heap_tracker.Dump(sample, &dump_state);
+      it->second.heap_tracker.Dump(sample, &callstacks_to_dump);
     }
 
-    /*
-    std::set<void*> dumped_strings;
-    size_t frame_id = 0;
-    for (GlobalCallstackTrie::Node* node : dump_state.callstacks_to_dump) {
-      protos::pbzero::ProfilePacket_Frame* frame = profile_packet->add_frames();
-      frame->set_id(++frame_id);
+    // TODO(fmayer): For incremental dumps, this should be owned by the
+    // producer. This way we can keep track on what we dumped accross multiple
+    // dumps.
+    DumpState dump_state;
+
+    for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
+      for (const Interner<Frame>::Interned& frame : node->BuildCallstack()) {
+        dump_state.WriteFrame(profile_packet, frame);
+      }
     }
-    */
 
     // We cannot garbage collect until we have finished dumping, as the state
     // in DumpState points into the GlobalCallstackTrie.
@@ -221,11 +263,8 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     }
   } else if (rec->record_type == BookkeepingRecord::Type::Malloc) {
     AllocRecord& alloc_rec = rec->alloc_record;
-    std::vector<CodeLocation> code_locations;
-    for (unwindstack::FrameData& frame : alloc_rec.frames)
-      code_locations.emplace_back(frame.map_name, frame.function_name);
     bookkeeping_data->heap_tracker.RecordMalloc(
-        code_locations, alloc_rec.alloc_metadata.alloc_address,
+        alloc_rec.frames, alloc_rec.alloc_metadata.alloc_address,
         alloc_rec.alloc_metadata.total_size,
         alloc_rec.alloc_metadata.sequence_number);
   } else {
