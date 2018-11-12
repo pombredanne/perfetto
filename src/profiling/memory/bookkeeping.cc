@@ -155,6 +155,34 @@ void GlobalCallstackTrie::DecrementNode(Node* node, uint64_t size) {
   }
 }
 
+Interner<Frame>::Interned GlobalCallstackTrie::InternCodeLocation(
+    const unwindstack::FrameData& loc) {
+  Mapping map{};
+  map.offset = loc.map_offset;
+  map.start = loc.map_start;
+  map.end = loc.map_end;
+  map.load_bias = loc.map_load_bias;
+  base::StringSplitter sp(loc.map_name, '/');
+  while (sp.Next())
+    map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
+
+  Frame frame(mapping_interner_.Intern(std::move(map)),
+              string_interner_.Intern(loc.function_name));
+  frame.rel_pc = loc.rel_pc;
+
+  return frame_interner_.Intern(frame);
+}
+
+Interner<Frame>::Interned GlobalCallstackTrie::MakeRootFrame() {
+  Mapping map{};
+
+  Frame frame(mapping_interner_.Intern(std::move(map)),
+              string_interner_.Intern(""));
+  frame.rel_pc = 0;
+
+  return frame_interner_.Intern(frame);
+}
+
 void DumpState::WriteMap(protos::pbzero::ProfilePacket* packet,
                          const Interner<Mapping>::Interned map) {
   auto map_it_and_inserted = dumped_mappings.emplace(map.id());

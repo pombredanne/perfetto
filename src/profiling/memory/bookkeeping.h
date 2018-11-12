@@ -120,32 +120,8 @@ class GlobalCallstackTrie {
 
  private:
   Interner<Frame>::Interned InternCodeLocation(
-      const unwindstack::FrameData& loc) {
-    Mapping map{};
-    map.offset = loc.map_offset;
-    map.start = loc.map_start;
-    map.end = loc.map_end;
-    map.load_bias = loc.map_load_bias;
-    base::StringSplitter sp(loc.map_name, '/');
-    while (sp.Next())
-      map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
-
-    Frame frame(mapping_interner_.Intern(std::move(map)),
-                string_interner_.Intern(loc.function_name));
-    frame.rel_pc = loc.rel_pc;
-
-    return frame_interner_.Intern(frame);
-  }
-
-  Interner<Frame>::Interned MakeRootFrame() {
-    Mapping map{};
-
-    Frame frame(mapping_interner_.Intern(std::move(map)),
-                string_interner_.Intern(""));
-    frame.rel_pc = 0;
-
-    return frame_interner_.Intern(frame);
-  }
+      const unwindstack::FrameData& loc);
+  Interner<Frame>::Interned MakeRootFrame();
 
   Interner<std::string> string_interner_;
   Interner<Mapping> mapping_interner_;
