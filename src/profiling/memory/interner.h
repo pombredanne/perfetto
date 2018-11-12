@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef SRC_PROFILING_MEMORY_STRING_INTERNER_H_
-#define SRC_PROFILING_MEMORY_STRING_INTERNER_H_
+#ifndef SRC_PROFILING_MEMORY_INTERNER_H_
+#define SRC_PROFILING_MEMORY_INTERNER_H_
 
 #include <stddef.h>
 #include <set>
@@ -98,10 +98,11 @@ class Interner {
       entries_.erase(*entry);
   }
   std::set<Entry> entries_;
+  static_assert(sizeof(Interned) == sizeof(void*),
+                "interned strings should be small");
 };
-
 
 }  // namespace profiling
 }  // namespace perfetto
 
-#endif  // SRC_PROFILING_MEMORY_STRING_INTERNER_H_
+#endif  // SRC_PROFILING_MEMORY_INTERNER_H_

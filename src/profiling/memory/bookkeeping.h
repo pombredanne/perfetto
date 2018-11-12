@@ -22,8 +22,8 @@
 #include "perfetto/trace/profiling/profile_packet.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 #include "src/profiling/memory/bounded_queue.h"
+#include "src/profiling/memory/interner.h"
 #include "src/profiling/memory/queue_messages.h"
-#include "src/profiling/memory/string_interner.h"
 
 #include <map>
 #include <string>
