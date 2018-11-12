@@ -170,8 +170,7 @@ Interner<Frame>::Interned GlobalCallstackTrie::InternCodeLocation(
     map.path_components.emplace_back(string_interner_.Intern(sp.cur_token()));
 
   Frame frame(mapping_interner_.Intern(std::move(map)),
-              string_interner_.Intern(loc.function_name));
-  frame.rel_pc = loc.rel_pc;
+              string_interner_.Intern(loc.function_name), loc.rel_pc);
 
   return frame_interner_.Intern(frame);
 }
@@ -180,8 +179,7 @@ Interner<Frame>::Interned GlobalCallstackTrie::MakeRootFrame() {
   Mapping map{};
 
   Frame frame(mapping_interner_.Intern(std::move(map)),
-              string_interner_.Intern(""));
-  frame.rel_pc = 0;
+              string_interner_.Intern(""), 0);
 
   return frame_interner_.Intern(frame);
 }

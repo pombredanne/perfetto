@@ -50,8 +50,10 @@ struct Mapping {
 };
 
 struct Frame {
-  Frame(Interner<Mapping>::Interned m, Interner<std::string>::Interned fn_name)
-      : mapping(m), function_name(fn_name) {}
+  Frame(Interner<Mapping>::Interned m,
+        Interner<std::string>::Interned fn_name,
+        uint64_t pc)
+      : mapping(m), function_name(fn_name), rel_pc(pc) {}
   Interner<Mapping>::Interned mapping;
   Interner<std::string>::Interned function_name;
   uint64_t rel_pc;
