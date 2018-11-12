@@ -17,6 +17,10 @@
 #ifndef SRC_PROFILING_MEMORY_BOOKKEEPING_H_
 #define SRC_PROFILING_MEMORY_BOOKKEEPING_H_
 
+#include <map>
+#include <string>
+#include <vector>
+
 #include "perfetto/base/lookup_set.h"
 #include "perfetto/base/string_splitter.h"
 #include "perfetto/trace/profiling/profile_packet.pbzero.h"
@@ -24,10 +28,6 @@
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/interner.h"
 #include "src/profiling/memory/queue_messages.h"
-
-#include <map>
-#include <string>
-#include <vector>
 
 namespace perfetto {
 namespace profiling {
@@ -156,7 +156,7 @@ class HeapTracker {
                     uint64_t size,
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
-  void Dump(protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
+  void Dump(protos::pbzero::ProfilePacket::ProcessHeapSamples* proto,
             std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump);
 
  private:
@@ -185,8 +185,7 @@ class HeapTracker {
   };
 
   // Sequencing logic works as following:
-  // * mallocs are immediately commited to |allocations_|. They are rejected
-  // if
+  // * mallocs are immediately commited to |allocations_|. They are rejected if
   //   the current malloc for the address has a higher sequence number.
   //
   //   If all operations with sequence numbers lower than the malloc have been

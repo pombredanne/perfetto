@@ -27,6 +27,9 @@
 
 namespace perfetto {
 namespace profiling {
+namespace {
+using ::perfetto::protos::pbzero::ProfilePacket;
+}
 
 GlobalCallstackTrie::Node* GlobalCallstackTrie::Node::GetOrCreateChild(
     const Interner<Frame>::Interned& loc) {
@@ -106,12 +109,12 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 }
 
 void HeapTracker::Dump(
-    protos::pbzero::ProfilePacket_ProcessHeapSamples* proto,
+    ProfilePacket::ProcessHeapSamples* proto,
     std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump) {
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
     callstacks_to_dump->emplace(alloc.node);
-    protos::pbzero::ProfilePacket_HeapSample* sample = proto->add_samples();
+    ProfilePacket::HeapSample* sample = proto->add_samples();
     sample->set_callstack_id(alloc.node->id());
     sample->set_cumulative_allocated(alloc.total_size);
   }
@@ -183,7 +186,7 @@ Interner<Frame>::Interned GlobalCallstackTrie::MakeRootFrame() {
   return frame_interner_.Intern(frame);
 }
 
-void DumpState::WriteMap(protos::pbzero::ProfilePacket* packet,
+void DumpState::WriteMap(ProfilePacket* packet,
                          const Interner<Mapping>::Interned map) {
   auto map_it_and_inserted = dumped_mappings.emplace(map.id());
   if (map_it_and_inserted.second) {
@@ -200,17 +203,22 @@ void DumpState::WriteMap(protos::pbzero::ProfilePacket* packet,
   }
 }
 
-void DumpState::WriteFrame(protos::pbzero::ProfilePacket* packet,
+void DumpState::WriteFrame(ProfilePacket* packet,
                            Interner<Frame>::Interned frame) {
   WriteMap(packet, frame->mapping);
   WriteString(packet, frame->function_name);
-  auto frame_it_and_inserted = dumped_frames.emplace(frame.id());
-
-  if (frame_it_and_inserted.second) {
+  bool inserted;
+  std::tie(std::ignore, inserted) = dumped_frames.emplace(frame.id());
+  if (inserted) {
+    auto frame_proto = packet->add_frames();
+    frame_proto->set_id(frame.id());
+    frame_proto->set_function_name_id(frame->function_name.id());
+    frame_proto->set_mapping_id(frame->mapping.id());
+    frame_proto->set_rel_pc(frame->rel_pc);
   }
 }
 
-void DumpState::WriteString(protos::pbzero::ProfilePacket* packet,
+void DumpState::WriteString(ProfilePacket* packet,
                             const Interner<std::string>::Interned& str) {
   bool inserted;
   std::tie(std::ignore, inserted) = dumped_strings.emplace(str.id());
@@ -244,7 +252,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
         trace_writer->NewTracePacket();
     auto profile_packet = trace_packet->set_profile_packet();
     for (const pid_t pid : dump_rec.pids) {
-      protos::pbzero::ProfilePacket_ProcessHeapSamples* sample =
+      ProfilePacket::ProcessHeapSamples* sample =
           profile_packet->add_process_dumps();
       auto it = bookkeeping_data_.find(pid);
       if (it == bookkeeping_data_.end())
@@ -260,12 +268,12 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     DumpState dump_state;
 
     for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
-      protos::pbzero::ProfilePacket_Callstack* callstack =
-          profile_packet->add_callstacks();
+      ProfilePacket::Callstack* callstack = profile_packet->add_callstacks();
       callstack->set_id(node->id());
-      for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
+      auto built_callstack = node->BuildCallstack();
+      for (const Interner<Frame>::Interned& frame : built_callstack)
         callstack->add_frame_ids(frame.id());
-      for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
+      for (const Interner<Frame>::Interned& frame : built_callstack)
         dump_state.WriteFrame(profile_packet, frame);
     }
 

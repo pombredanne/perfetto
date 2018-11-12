@@ -100,7 +100,7 @@ class Interner {
   }
   std::set<Entry> entries_;
   static_assert(sizeof(Interned) == sizeof(void*),
-                "interned strings should be small");
+                "interned things should be small");
 };
 
 }  // namespace profiling
