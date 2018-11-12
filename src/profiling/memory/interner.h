@@ -27,7 +27,7 @@ template <typename T>
 class Interner {
  private:
   struct Entry {
-    Entry(T d, Interner<T>* in) : data(d), interner(in) {}
+    Entry(T d, Interner<T>* in) : data(std::move(d)), interner(in) {}
     bool operator<(const Entry& other) const { return data < other.data; }
 
     const T data;
@@ -46,7 +46,7 @@ class Interner {
         entry_->ref_count++;
     }
 
-    Interned(Interned&& other) : entry_(other.entry_) {
+    Interned(Interned&& other) noexcept : entry_(other.entry_) {
       other.entry_ = nullptr;
     }
 
@@ -56,7 +56,7 @@ class Interner {
       return *this;
     }
 
-    Interned& operator=(Interned& other) {
+    Interned& operator=(Interned& other) noexcept {
       entry_ = other.entry_;
       if (entry_ != nullptr)
         entry_->ref_count++;
