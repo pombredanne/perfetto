@@ -266,13 +266,15 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     DumpState dump_state;
 
     for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
-      ProfilePacket::Callstack* callstack = profile_packet->add_callstacks();
-      callstack->set_id(node->id());
+      // There need to be two separate loops over built_callstack because
+      // protozero cannot interleave different messages.
       auto built_callstack = node->BuildCallstack();
       for (const Interner<Frame>::Interned& frame : built_callstack)
-        callstack->add_frame_ids(frame.id());
-      for (const Interner<Frame>::Interned& frame : built_callstack)
         dump_state.WriteFrame(profile_packet, frame);
+      ProfilePacket::Callstack* callstack = profile_packet->add_callstacks();
+      callstack->set_id(node->id());
+      for (const Interner<Frame>::Interned& frame : built_callstack)
+        callstack->add_frame_ids(frame.id());
     }
 
     // We cannot garbage collect until we have finished dumping, as the state
