@@ -112,7 +112,7 @@ void HeapTracker::Dump(
     const Allocation& alloc = p.second;
     callstacks_to_dump->emplace(alloc.node);
     protos::pbzero::ProfilePacket_HeapSample* sample = proto->add_samples();
-    sample->set_callstack_id(reinterpret_cast<uintptr_t>(alloc.node->id()));
+    sample->set_callstack_id(alloc.node->id());
     sample->set_cumulative_allocated(alloc.total_size);
   }
 }
@@ -234,7 +234,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
       protos::pbzero::ProfilePacket_Callstack* callstack =
           profile_packet->add_callstacks();
-      callstack->set_id(reinterpret_cast<uintptr_t>(node->id()));
+      callstack->set_id(node->id());
       for (const Interner<Frame>::Interned& frame : node->BuildCallstack())
         callstack->add_frame_ids(frame.id());
       for (const Interner<Frame>::Interned& frame : node->BuildCallstack())

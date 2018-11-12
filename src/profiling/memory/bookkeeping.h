@@ -96,7 +96,7 @@ class GlobalCallstackTrie {
         : parent_(parent), location_(std::move(frame)) {}
 
     std::vector<Interner<Frame>::Interned> BuildCallstack() const;
-    const void* id() const { return static_cast<const void*>(this); }
+    uintptr_t id() const { return reinterpret_cast<uintptr_t>(this); }
 
    private:
     Node* GetOrCreateChild(const Interner<Frame>::Interned& loc);
