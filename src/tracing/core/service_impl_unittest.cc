@@ -292,7 +292,7 @@ TEST_F(TracingServiceImplTest, ProducerIDWrapping) {
   ASSERT_EQ(6u, connect_producer_and_get_id("6"));
 }
 
-TEST_F(TracingServiceImplTest, WriteIntoFileAndStopOnMaxSize) {
+TEST_F(TracingServiceImplTest, DISABLED_WriteIntoFileAndStopOnMaxSize) {
   std::unique_ptr<MockConsumer> consumer = CreateMockConsumer();
   consumer->Connect(svc.get());
 
