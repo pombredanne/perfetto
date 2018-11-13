@@ -29,7 +29,7 @@
 #endif
 
 #if !defined(PERFETTO_DLOG_IS_ON)
-#define PERFETTO_DLOG_IS_ON() PERFETTO_DCHECK_IS_ON()
+#define PERFETTO_DLOG_IS_ON PERFETTO_DCHECK_IS_ON()
 #endif
 
 #include "perfetto/base/build_config.h"
@@ -118,7 +118,7 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 #define PERFETTO_PLOG(x, ...) \
   PERFETTO_ELOG(x " (errno: %d, %s)", ##__VA_ARGS__, errno, strerror(errno))
 
-#if PERFETTO_DLOG_IS_ON()
+#if PERFETTO_DLOG_IS_ON
 
 #define PERFETTO_DLOG(fmt, ...) PERFETTO_XLOG(kLogDebug, fmt, ##__VA_ARGS__)
 
@@ -130,7 +130,7 @@ constexpr const char* kLogFmt[] = {"\x1b[2m", "\x1b[39m", "\x1b[32m\x1b[1m",
 #define PERFETTO_DLOG(...) ::perfetto::base::ignore_result(__VA_ARGS__)
 #define PERFETTO_DPLOG(...) ::perfetto::base::ignore_result(__VA_ARGS__)
 
-#endif  // PERFETTO_DLOG_IS_ON()
+#endif  // PERFETTO_DLOG_IS_ON
 
 #if PERFETTO_DCHECK_IS_ON()
 
