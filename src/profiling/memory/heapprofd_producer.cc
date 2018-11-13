@@ -45,7 +45,7 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
   return client_config;
 }
 
-void FindPidsForComm(const std::vector<std::string>& comms,
+void FindPidsForComm(const std::vector<std::string>& cmdlines,
                      std::vector<pid_t>* pids) {
   base::ScopedDir proc_dir(opendir("/proc"));
   if (!proc_dir) {
@@ -62,29 +62,29 @@ void FindPidsForComm(const std::vector<std::string>& comms,
 
     char filename_buf[128];
 
-    if (snprintf(filename_buf, sizeof(filename_buf), "/proc/%lu/comm", pid) <
+    if (snprintf(filename_buf, sizeof(filename_buf), "/proc/%lu/cmdline", pid) <
         0) {
       PERFETTO_DFATAL("Failed to create comm filename for %lu", pid);
       continue;
     }
-    std::string process_comm;
-    process_comm.reserve(128);
-    if (!base::ReadFile(filename_buf, &process_comm))
+    std::string process_cmdline;
+    process_cmdline.reserve(128);
+    if (!base::ReadFile(filename_buf, &process_cmdline))
       continue;
-    if (process_comm.empty())
+    if (process_cmdline.empty())
       continue;
 
     // Strip everything after @ for Java processes.
     // Otherwise, strip newline at EOF.
-    size_t endpos = process_comm.find('@');
+    size_t endpos = process_cmdline.find('\0');
     if (endpos == std::string::npos)
-      endpos = process_comm.size() - 1;
+      continue;
     if (endpos < 1)
       continue;
-    process_comm.resize(endpos);
+    process_cmdline.resize(endpos);
 
-    for (const std::string& comm : comms) {
-      if (process_comm == comm)
+    for (const std::string& cmdline : cmdlines) {
+      if (process_cmdline == cmdline)
         pids->emplace_back(static_cast<pid_t>(pid));
     }
   }
@@ -187,7 +187,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   for (uint64_t pid : cfg.heapprofd_config().pid())
     data_source.pids.emplace_back(static_cast<pid_t>(pid));
 
-  FindPidsForComm(cfg.heapprofd_config().process_comm(), &data_source.pids);
+  FindPidsForComm(cfg.heapprofd_config().process_cmdline(), &data_source.pids);
 
   auto pid_it = data_source.pids.begin();
   while (pid_it != data_source.pids.end()) {

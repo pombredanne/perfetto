@@ -34,7 +34,7 @@ message HeapprofdConfig {
   optional uint64 sampling_interval_bytes = 1;
 
   // E.g. surfaceflinger, com.android.phone
-  repeated string process_comm = 2;
+  repeated string process_cmdline = 2;
   // repeated string android_app = 3;  // TODO(fmayer): Implement
   // For watermark based triggering or local debugging.
   repeated uint64 pid = 4;
