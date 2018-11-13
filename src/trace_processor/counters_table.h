@@ -37,7 +37,19 @@ class CountersTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
+  class RefLookup {
+   public:
+    using value_type = int64_t;
+
+    RefLookup(const TraceStorage* storage);
+    value_type operator[](size_t index) const;
+
+   private:
+    const TraceStorage* const storage_;
+  };
+
   std::deque<std::string> ref_types_;
+  RefLookup ref_lookup_;
   StorageSchema schema_;
   const TraceStorage* const storage_;
 };

@@ -31,6 +31,7 @@ CountersTable::CountersTable(sqlite3*, const TraceStorage* storage)
   ref_types_[RefType::kIrq] = "irq";
   ref_types_[RefType::kSoftIrq] = "softirq";
   ref_types_[RefType::kUpid] = "upid";
+  ref_types_[RefType::kUtidLookupUpid] = "upid";
 }
 
 void CountersTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
@@ -48,7 +49,7 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
       StorageSchema::NumericColumnPtr("dur", &counters.durations()),
       StorageSchema::TsEndPtr("ts_end", &counters.timestamps(),
                               &counters.durations()),
-      StorageSchema::NumericColumnPtr("ref", &counters.refs()),
+      StorageSchema::NumericColumnPtr("ref", &ref_lookup_),
       StorageSchema::StringColumnPtr("ref_type", &counters.types(),
                                      &ref_types_)};
   schema_ = StorageSchema({
@@ -83,6 +84,18 @@ int CountersTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
   }
 
   return SQLITE_OK;
+}
+
+CountersTable::RefLookup::RefLookup(const TraceStorage* storage)
+    : storage_(storage) {}
+
+int64_t CountersTable::RefLookup::operator[](size_t index) const {
+  const auto& counters = storage_->counters();
+  if (counters.types()[index] == RefType::kUtidLookupUpid) {
+    UniqueTid utid = static_cast<UniqueTid>(counters.refs()[index]);
+    return static_cast<int64_t>(storage_->GetThread(utid).upid);
+  }
+  return counters.refs()[index];
 }
 
 }  // namespace trace_processor
