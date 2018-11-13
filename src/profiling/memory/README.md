@@ -43,19 +43,3 @@ duration_ms: 20000
 
 adb pull /data/misc/perfetto-traces/trace /tmp/trace
 ```
-
-To obtain heap dumps for all profiled processes, send `SIGUSR1` to heapprofd
-which produces heap dumps in /data/local/tmp.
-
-```bash
-adb shell killall -USR1 heapprofd
-adb pull /data/local/tmp/heap_dump.${PID}
-```
-
-This file can then be converted to a flamegraph using Brendan Gregg's
-[`flamegraph.pl`](
-  https://github.com/brendangregg/FlameGraph/blob/master/flamegraph.pl).
-
-```bash
-flamegraph.pl heap_dump.${PID} > heap_dump.${PID}.svg
-```
