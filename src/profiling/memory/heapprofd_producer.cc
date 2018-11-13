@@ -71,6 +71,11 @@ void FindPidsForComm(const std::vector<std::string>& comms,
     if (!base::ReadFile(link_buf, &process_comm)) {
       continue;
     }
+    // Strip everythin after @ for Java processes.
+    size_t end = process_comm.find('@');
+    if (end != std::string::npos)
+      process_comm.resize(end);
+
     for (const std::string& comm : comms) {
       if (process_comm == comm)
         pids->emplace_back(static_cast<pid_t>(pid));
