@@ -88,8 +88,12 @@ bool CoerceToUint64(const Json::Value& value, uint64_t* integer_ptr) {
     case Json::intValue:
       *integer_ptr = value.asUInt64();
       return true;
-    case Json::stringValue:
-      return sscanf(value.asString().c_str(), "%" PRIu64, integer_ptr) == 1;
+    case Json::stringValue: {
+      std::string s = value.asString();
+      char* end;
+      *integer_ptr = strtoull(s.c_str(), &end, 10);
+      return end == s.data() + s.size();
+    }
     default:
       return false;
   }

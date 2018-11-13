@@ -43,6 +43,9 @@ TEST(JsonTraceParserTest, CoerceToUint64) {
 
   ASSERT_TRUE(CoerceToUint64(Json::Value("42"), &n));
   EXPECT_EQ(n, 42);
+
+  ASSERT_FALSE(CoerceToUint64(Json::Value("foo"), &n));
+  ASSERT_FALSE(CoerceToUint64(Json::Value("1234!"), &n));
 }
 
 }  // namespace
