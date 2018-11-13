@@ -291,6 +291,7 @@ std::unique_ptr<TestFtraceController> CreateTestController(
 TEST(FtraceControllerTest, NonExistentEventsDontCrash) {
   auto controller =
       CreateTestController(true /* nice runner */, true /* nice procfs */);
+
   FtraceConfig config = CreateFtraceConfig({"not_an_event"});
   EXPECT_TRUE(controller->AddFakeDataSource(config));
 }
