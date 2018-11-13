@@ -69,18 +69,16 @@ void FindPidsForComm(const std::vector<std::string>& comms,
     }
     std::string process_comm;
     process_comm.reserve(128);
-    if (!base::ReadFile(filename_buf, &process_comm)) {
+    if (!base::ReadFile(filename_buf, &process_comm))
       continue;
-    }
+    if (process_comm.empty())
+      continue;
+
     // Strip everything after @ for Java processes.
     // Otherwise, strip newline at EOF.
     size_t endpos = process_comm.find('@');
-    if (endpos == std::string::npos) {
-      endpos = process_comm.size();
-      if (endpos < 1)
-        continue;
-      endpos--;
-    }
+    if (endpos == std::string::npos)
+      endpos = process_comm.size() - 1;
     if (endpos < 1)
       continue;
     process_comm.resize(endpos);
