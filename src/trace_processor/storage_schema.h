@@ -269,6 +269,106 @@ class StorageSchema {
     const std::deque<uint64_t>* dur_;
   };
 
+  // A column of numeric data backed by a variadic class.
+  class VariadicColumnBase : public Column {
+   public:
+    VariadicColumnBase(std::string col_name,
+                       const std::deque<Variadic>* deque,
+                       bool hidden)
+        : Column(col_name, hidden), deque_(deque) {}
+    ~VariadicColumnBase() override;
+    Bounds BoundFilter(int, sqlite3_value*) const override {
+      Bounds bounds;
+      bounds.max_idx = static_cast<uint32_t>(deque_->size());
+      return bounds;
+    }
+
+    Predicate Filter(int op, sqlite3_value* value) const override {
+      // TODO here.
+      (void)op;
+      (void)value;
+      return [](uint32_t) { return true; };
+    }
+
+    bool IsNaturallyOrdered() const override { return false; }
+
+   protected:
+    const std::deque<Variadic>* deque_ = nullptr;
+  };
+
+  class VariadicColumnInt final : public VariadicColumnBase {
+   public:
+    VariadicColumnInt(std::string col_name,
+                      const std::deque<Variadic>* deque,
+                      bool hidden)
+        : VariadicColumnBase(col_name, deque, hidden) {}
+    ~VariadicColumnInt() override;
+
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
+      int desc = ob.desc ? -1 : 1;
+      return [this, desc](uint32_t f, uint32_t s) {
+        const Variadic& a = (*deque_)[f];
+        const Variadic& b = (*deque_)[s];
+        if (a.type == Variadic::kInt && b.type == Variadic::kInt) {
+          return a.int_value > b.int_value
+                     ? -1 * desc
+                     : (a.int_value < b.int_value ? 1 * desc : 0);
+        }
+        if (a.type == Variadic::kInt)
+          return -1;
+        if (b.type == Variadic::kInt)
+          return 1;
+        return 0;
+      };
+    }
+
+    Table::ColumnType GetType() const override {
+      return Table::ColumnType::kLong;
+    }
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
+      sqlite3_result_int64(ctx, (*deque_)[row].int_value);
+    }
+
+  };
+
+  class VariadicColumnString final : public VariadicColumnBase {
+   public:
+    VariadicColumnString(std::string col_name,
+                      const std::deque<Variadic>* deque,
+                      bool hidden)
+        : VariadicColumnBase(col_name, deque, hidden) {}
+    ~VariadicColumnString() override;
+
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
+      int desc = ob.desc ? -1 : 1;
+      return [this, desc](uint32_t f, uint32_t s) {
+        const Variadic& a = (*deque_)[f];
+        const Variadic& b = (*deque_)[s];
+        if (a.type == Variadic::kString && b.type == Variadic::kString) {
+          // TODO here, this should be strcmp on the interned strings instead.
+          return a.int_value > b.int_value
+                     ? -1 * desc
+                     : (a.int_value < b.int_value ? 1 * desc : 0);
+        }
+        if (a.type == Variadic::kString)
+          return -1;
+        if (b.type == Variadic::kString)
+          return 1;
+        return 0;
+      };
+    }
+
+    Table::ColumnType GetType() const override {
+      return Table::ColumnType::kString;
+    }
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
+      // TODO string
+      sqlite3_result_int64(ctx, (*deque_)[row].int_value);
+    }
+  };
+
   StorageSchema();
   StorageSchema(std::vector<std::unique_ptr<Column>> columns);
 
@@ -311,6 +411,22 @@ class StorageSchema {
       bool hidden = false) {
     return std::unique_ptr<StringColumn<Id>>(
         new StringColumn<Id>(column_name, deque, lookup_map, hidden));
+  }
+
+  static std::unique_ptr<VariadicColumnInt> VariadicIntColumnPtr(
+      std::string column_name,
+      const std::deque<Variadic>* deque,
+      bool hidden = false) {
+    return std::unique_ptr<VariadicColumnInt>(
+        new VariadicColumnInt(column_name, deque, hidden));
+  }
+
+  static std::unique_ptr<VariadicColumnString> VariadicStrColumnPtr(
+      std::string column_name,
+      const std::deque<Variadic>* deque,
+      bool hidden = false) {
+    return std::unique_ptr<VariadicColumnString>(
+        new VariadicColumnString(column_name, deque, hidden));
   }
 
  private:

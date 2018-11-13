@@ -32,6 +32,15 @@ TraceStorage::TraceStorage() {
 
 TraceStorage::~TraceStorage() {}
 
+StringId TraceStorage::LookupInternedString(base::StringView str) const {
+  auto hash = str.Hash();
+  auto id_it = string_index_.find(hash);
+  if (id_it == string_index_.end())
+    return 0;
+  PERFETTO_DCHECK(base::StringView(string_pool_[id_it->second]) == str);
+  return id_it->second;
+}
+
 StringId TraceStorage::InternString(base::StringView str) {
   auto hash = str.Hash();
   auto id_it = string_index_.find(hash);

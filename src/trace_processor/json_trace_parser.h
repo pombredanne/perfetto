@@ -26,6 +26,10 @@
 #include "src/trace_processor/chunked_trace_reader.h"
 #include "src/trace_processor/trace_storage.h"
 
+namespace Json {
+class Value;
+}
+
 namespace perfetto {
 namespace trace_processor {
 
@@ -44,6 +48,8 @@ class JsonTraceParser : public ChunkedTraceReader {
   bool Parse(std::unique_ptr<uint8_t[]>, size_t) override;
 
  private:
+  void InsertArgs(uint64_t row_id, const char* name, const Json::Value&);
+
   TraceProcessorContext* const context_;
   uint64_t offset_ = 0;
   std::vector<char> buffer_;

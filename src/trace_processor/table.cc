@@ -175,8 +175,10 @@ int Table::BestIndexInternal(sqlite3_index_info* idx) {
 
   for (int i = 0; i < idx->nConstraint; i++) {
     const auto& cs = idx->aConstraint[i];
-    if (!cs.usable)
+    if (!cs.usable) {
+      PERFETTO_ELOG("unusable %d %d %c", cs.iColumn, cs.iTermOffset, cs.op);
       continue;
+    }
     query_constraints.AddConstraint(cs.iColumn, cs.op);
 
     // argvIndex is 1-based so use the current size of the vector.

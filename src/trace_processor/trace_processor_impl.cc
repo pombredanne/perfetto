@@ -20,6 +20,7 @@
 #include <functional>
 
 #include "perfetto/base/time.h"
+#include "src/trace_processor/args_table.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/instants_table.h"
@@ -54,6 +55,7 @@ void InitializeSqliteModules(sqlite3* db) {
     PERFETTO_ELOG("Error initializing: %s", error);
   }
 }
+
 }  // namespace
 
 namespace perfetto {
@@ -83,6 +85,11 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   SpanJoinOperatorTable::RegisterTable(*db_, context_.storage.get());
   WindowOperatorTable::RegisterTable(*db_, context_.storage.get());
   InstantsTable::RegisterTable(*db_, context_.storage.get());
+
+  ArgsTable::RegisterTable(*db_, context_.storage.get());
+  sqlite3_create_function(*db_, "x", 2, SQLITE_UTF8 | SQLITE_DETERMINISTIC,
+                          nullptr, ArgsTable::ExtractFunction, nullptr,
+                          nullptr);
 }
 
 TraceProcessorImpl::~TraceProcessorImpl() = default;

@@ -96,5 +96,9 @@ StorageSchema::Column::Comparator StorageSchema::TsEndColumn::Sort(
   };
 }
 
+StorageSchema::VariadicColumnBase::~VariadicColumnBase() = default;
+StorageSchema::VariadicColumnInt::~VariadicColumnInt() = default;
+StorageSchema::VariadicColumnString::~VariadicColumnString() = default;
+
 }  // namespace trace_processor
 }  // namespace perfetto

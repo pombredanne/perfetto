@@ -22,6 +22,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "perfetto/base/logging.h"
@@ -51,6 +52,27 @@ enum RefType {
   kSoftIrq = 4,
   kUpid = 5,
   kMax = kUpid + 1
+};
+
+struct Variadic {
+  enum Type : uint8_t {kNull = 0, kInt, kDouble, kString};
+  Type type;
+  union {
+    int64_t int_value;
+    double  real_value;
+  };
+
+  static Variadic Null() { return Variadic(); }
+  static Variadic Int(int64_t v) { return Variadic(kInt, v); }
+  static Variadic Int(uint64_t v) { return Variadic(kInt, static_cast<int64_t>(v)); }
+  static Variadic Bool(bool v) { return Variadic(kInt, v ? 1 : 0); }
+  static Variadic Double(double v) { return Variadic(kDouble, v, 0); }
+  static Variadic String(StringId v) { return Variadic(kString, static_cast<int64_t>(v)); }
+
+ private:
+  Variadic() : type(kNull), int_value(0) {}
+  Variadic(Type t, int64_t v) : type(t), int_value(v) {}
+  Variadic(Type t, double v, int) : type(t), real_value(v) {}
 };
 
 // Stores a data inside a trace file in a columnar form. This makes it efficient
@@ -245,15 +267,10 @@ class TraceStorage {
     }
 
     size_t instant_count() const { return timestamps_.size(); }
-
     const std::deque<uint64_t>& timestamps() const { return timestamps_; }
-
     const std::deque<StringId>& name_ids() const { return name_ids_; }
-
     const std::deque<double>& values() const { return values_; }
-
     const std::deque<int64_t>& refs() const { return refs_; }
-
     const std::deque<RefType>& types() const { return types_; }
 
    private:
@@ -262,6 +279,47 @@ class TraceStorage {
     std::deque<double> values_;
     std::deque<int64_t> refs_;
     std::deque<RefType> types_;
+  };
+
+  class Args {
+   public:
+    using RowId = uint64_t;
+
+    inline void Add(RowId row_id, StringId name, Variadic value) {
+      index_.emplace(std::make_pair(row_id, name), static_cast<ssize_t>(row_ids_.size()));
+      row_ids_.emplace_back(row_id);
+      names_.emplace_back(name);
+      values_.emplace_back(value);
+    }
+
+    // Return the index of the given arg name, or -1 if not found.
+    inline ssize_t Lookup(RowId row_id, StringId arg_name) const {
+      auto it = index_.find(std::make_pair(row_id, arg_name));
+      if (it == index_.end())
+        return -1;
+      return it->second;
+    }
+
+    size_t size() const { return row_ids_.size(); }
+    const std::deque<RowId>& row_ids() const { return row_ids_; }
+    const std::deque<StringId>& names() const { return names_; }
+    const std::deque<Variadic>& values() const { return values_; }
+
+  private:
+   struct Hasher {
+      size_t operator()(const std::pair<RowId, StringId>& p) const {
+        size_t const h1(std::hash<decltype(p.first)>{}(p.first));
+        size_t const h2(std::hash<decltype(p.second)>{}(p.second));
+        return h1 ^ (h2 << 1);
+      }
+    };
+
+    std::deque<RowId> row_ids_;
+    std::deque<StringId> names_;
+    std::deque<Variadic> values_;
+
+    // (slice/obj id, arg name) -> arg index. For fast lookup case.
+    std::unordered_map<std::pair<RowId, StringId>, ssize_t, Hasher> index_;
   };
 
   void ResetStorage();
@@ -282,6 +340,7 @@ class TraceStorage {
   // The string is copied internally and can be destroyed after this called.
   // Virtual for testing.
   virtual StringId InternString(base::StringView);
+  StringId LookupInternedString(base::StringView) const;
 
   Process* GetMutableProcess(UniquePid upid) {
     PERFETTO_DCHECK(upid > 0 && upid < unique_processes_.size());
@@ -324,6 +383,9 @@ class TraceStorage {
 
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
+
+  const Args& args() const { return args_; }
+  Args* mutable_args() { return &args_; }
 
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
@@ -369,10 +431,13 @@ class TraceStorage {
   Counters counters_;
 
   SqlStats sql_stats_;
+
   // These are instantaneous events in the trace. They have no duration
   // and do not have a value that make sense to track over time.
   // e.g. signal events
   Instants instants_;
+
+  Args args_;
 };
 
 }  // namespace trace_processor

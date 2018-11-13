@@ -156,10 +156,50 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
         }
       }
     }
+    if (value.isMember("args")) {
+      InsertArgs(0, "", value["args"]);
+    }
   }
   offset_ += static_cast<uint64_t>(next - buf);
   buffer_.erase(buffer_.begin(), buffer_.begin() + (next - buf));
   return true;
+}
+
+void JsonTraceParser::InsertArgs(uint64_t row_id,
+                                 const char* name,
+                                 const Json::Value& obj) {
+  TraceStorage* storage = context_->storage.get();
+  StringId name_id = storage->InternString(base::StringView(name));
+  TraceStorage::Args* args = context_->storage->mutable_args();
+  switch (obj.type()) {
+    case Json::nullValue:
+      args->Add(row_id, name_id, Variadic::Null());
+      break;
+    case Json::intValue:
+    case Json::uintValue:
+      args->Add(row_id, name_id, Variadic::Int(obj.asInt64()));
+      break;
+    case Json::booleanValue:
+      args->Add(row_id, name_id, Variadic::Bool(obj.asBool()));
+      break;
+    case Json::realValue:
+      args->Add(row_id, name_id, Variadic::Double(obj.asDouble()));
+      break;
+    case Json::stringValue:
+      args->Add(row_id, name_id,
+                Variadic::String(storage->InternString(obj.asCString())));
+      break;
+    case Json::objectValue:
+      for (const std::string& key : obj.getMemberNames()) {
+        char full_name[512];
+        sprintf(full_name, "%s.%s", name, key.c_str());
+        InsertArgs(row_id, full_name, obj[key]);
+      }
+      break;
+    case Json::arrayValue:
+      // TODO here
+      break;
+  }
 }
 
 }  // namespace trace_processor
