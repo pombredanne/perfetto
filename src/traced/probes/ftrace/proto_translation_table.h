@@ -116,7 +116,7 @@ class ProtoTranslationTable {
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
   // Store strings so they can be read when writing the trace output.
-  const char* InternGenericString(base::StringView name);
+  const char* InternString(base::StringView name);
 
   std::vector<Event> events_;
   const FtraceProcfs* ftrace_procfs_;
@@ -125,7 +125,7 @@ class ProtoTranslationTable {
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};
-  std::deque<std::string> generic_strings_;
+  std::set<std::string> interned_strings_;
 };
 
 }  // namespace perfetto

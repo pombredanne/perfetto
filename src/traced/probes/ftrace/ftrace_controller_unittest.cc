@@ -140,6 +140,16 @@ class MockFtraceProcfs : public FtraceProcfs {
     EXPECT_CALL(*this, ReadFileIntoString("/root/per_cpu/cpu0/stats"))
         .Times(AnyNumber());
 
+    ON_CALL(*this, ReadFileIntoString("/root/events//not_an_event/format"))
+        .WillByDefault(Return(""));
+    EXPECT_CALL(*this, ReadFileIntoString("/root/events//not_an_event/format"))
+        .Times(AnyNumber());
+
+    ON_CALL(*this, ReadFileIntoString("/root/events/group/bar/format"))
+        .WillByDefault(Return(""));
+    EXPECT_CALL(*this, ReadFileIntoString("/root/events/group/bar/format"))
+        .Times(AnyNumber());
+
     ON_CALL(*this, WriteToFile(_, _)).WillByDefault(Return(true));
     ON_CALL(*this, ClearFile(_)).WillByDefault(Return(true));
 
@@ -281,7 +291,6 @@ std::unique_ptr<TestFtraceController> CreateTestController(
 TEST(FtraceControllerTest, NonExistentEventsDontCrash) {
   auto controller =
       CreateTestController(true /* nice runner */, true /* nice procfs */);
-
   FtraceConfig config = CreateFtraceConfig({"not_an_event"});
   EXPECT_TRUE(controller->AddFakeDataSource(config));
 }

@@ -64,7 +64,9 @@ class TraceStorage {
   virtual ~TraceStorage();
 
   struct Stats {
-    uint64_t mismatched_sched_switch_tids_ = 0;
+    uint64_t mismatched_sched_switch_tids = 0;
+    uint64_t rss_stat_no_process = 0;
+    uint64_t mem_counter_no_process = 0;
   };
 
   // Information about a unique process seen in a trace.
@@ -124,14 +126,14 @@ class TraceStorage {
 
   class NestableSlices {
    public:
-    inline void AddSlice(uint64_t start_ns,
-                         uint64_t duration_ns,
-                         UniqueTid utid,
-                         StringId cat,
-                         StringId name,
-                         uint8_t depth,
-                         uint64_t stack_id,
-                         uint64_t parent_stack_id) {
+    inline size_t AddSlice(uint64_t start_ns,
+                           uint64_t duration_ns,
+                           UniqueTid utid,
+                           StringId cat,
+                           StringId name,
+                           uint8_t depth,
+                           uint64_t stack_id,
+                           uint64_t parent_stack_id) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
@@ -140,6 +142,15 @@ class TraceStorage {
       depths_.emplace_back(depth);
       stack_ids_.emplace_back(stack_id);
       parent_stack_ids_.emplace_back(parent_stack_id);
+      return slice_count() - 1;
+    }
+
+    void set_duration(size_t index, uint64_t duration_ns) {
+      durations_[index] = duration_ns;
+    }
+
+    void set_stack_id(size_t index, uint64_t stack_id) {
+      stack_ids_[index] = stack_id;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
@@ -276,8 +287,6 @@ class TraceStorage {
     return static_cast<UniquePid>(unique_processes_.size() - 1);
   }
 
-  void AddMismatchedSchedSwitch() { ++stats_.mismatched_sched_switch_tids_; }
-
   // Return an unqiue identifier for the contents of each string.
   // The string is copied internally and can be destroyed after this called.
   // Virtual for testing.
@@ -325,6 +334,9 @@ class TraceStorage {
   const Instants& instants() const { return instants_; }
   Instants* mutable_instants() { return &instants_; }
 
+  const Stats& stats() const { return stats_; }
+  Stats* mutable_stats() { return &stats_; }
+
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -343,7 +355,7 @@ class TraceStorage {
 
   using StringHash = uint64_t;
 
-  // Metadata counters for events being added.
+  // Stats about parsing the trace.
   Stats stats_;
 
   // One entry for each CPU in the trace.

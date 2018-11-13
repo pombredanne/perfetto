@@ -271,6 +271,8 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
     // TODO(taylori): Add all events for group if name is * e.g sched/*
     event = table_->GetEventByName(event_name);
     if (!event) {
+      PERFETTO_LOG("%s, %s", group.c_str(), event_name.c_str());
+      // Events will only be added as generic events if the group is specified.
       event = table_->AddGenericEvent(group, event_name);
       if (!event) {
         PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());

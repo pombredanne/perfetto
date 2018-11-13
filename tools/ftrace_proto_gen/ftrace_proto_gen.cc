@@ -424,7 +424,7 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
           << event.name() << " = " << i << ";\n";
     ++i;
   }
-  *fout << "GenericFtraceEvent generic = " << i << ";\n";
+  *fout << "    GenericFtraceEvent generic = " << i << ";\n";
   *fout << "  }\n";
   *fout << "}\n";
 }

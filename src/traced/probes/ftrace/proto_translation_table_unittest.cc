@@ -18,6 +18,8 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
+#include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 
@@ -353,6 +355,63 @@ TEST(TranslationTableTest, Getters) {
   EXPECT_THAT(*table.GetEventsByGroup("group_two"),
               Contains(testing::Field(&Event::name, "baz")));
   EXPECT_THAT(table.GetEventsByGroup("group_three"), IsNull());
+}
+
+TEST(TranslationTableTest, Generic) {
+  MockFtraceProcfs ftrace;
+  std::vector<Field> common_fields;
+  std::vector<Event> events;
+
+  ON_CALL(ftrace, ReadPageHeaderFormat())
+      .WillByDefault(Return(
+          R"(	field: u64 timestamp;	offset:0;	size:8;	signed:0;
+	field: local_t commit;	offset:8;	size:4;	signed:1;
+	field: int overwrite;	offset:8;	size:1;	signed:1;
+	field: char data;	offset:16;	size:4080;	signed:0;)"));
+  ON_CALL(ftrace, ReadEventFormat(_, _)).WillByDefault(Return(""));
+  ON_CALL(ftrace, ReadEventFormat("group", "foo"))
+      .WillByDefault(Return(R"(name: foo
+ID: 42
+format:
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+
+	field:char field_a[16];	offset:8;	size:16;	signed:0;
+	field:int field_b;	offset:24;	size:4;	signed:1;
+	field:int field_d;	offset:28;	size:4;	signed:1;
+	field:u32 field_e;	offset:32;	size:4;	signed:0;
+
+print fmt: "some format")"));
+
+  EXPECT_CALL(ftrace, ReadPageHeaderFormat()).Times(AnyNumber());
+  EXPECT_CALL(ftrace, ReadEventFormat(_, _)).Times(AnyNumber());
+
+  auto table = ProtoTranslationTable::Create(&ftrace, std::move(events),
+                                             std::move(common_fields));
+  EXPECT_EQ(table->largest_id(), 0ul);
+  std::string event_name = "foo";
+  const Event* e = table->AddGenericEvent("group", event_name);
+  EXPECT_EQ(table->largest_id(), 42ul);
+  EXPECT_EQ(table->EventNameToFtraceId(event_name), 42ul);
+
+  // Check getters
+  EXPECT_EQ(table->GetEventById(42)->proto_field_id,
+            protos::pbzero::FtraceEvent::kGenericFieldNumber);
+  EXPECT_EQ(table->GetEventByName(event_name)->proto_field_id,
+            protos::pbzero::FtraceEvent::kGenericFieldNumber);
+  EXPECT_EQ(table->GetEventsByGroup("group")->front()->name, event_name);
+
+  EXPECT_EQ(e->fields.size(), 4ul);
+  // Check one field
+  const std::vector<Field>& fields = e->fields;
+  const auto& first_field = fields[0];
+  EXPECT_STREQ(first_field.ftrace_name, "field_a");
+  EXPECT_EQ(first_field.proto_field_id,
+            protos::pbzero::GenericFtraceEvent::Field::kStrValueFieldNumber);
+  EXPECT_EQ(first_field.proto_field_type, kProtoString);
+  EXPECT_EQ(first_field.ftrace_type, kFtraceFixedCString);
+  EXPECT_EQ(first_field.ftrace_size, 16);
+  EXPECT_EQ(first_field.ftrace_offset, 8);
 }
 
 }  // namespace

@@ -48,6 +48,7 @@ using testing::Contains;
 using testing::_;
 using testing::Return;
 using testing::AnyNumber;
+using testing::NiceMock;
 
 namespace perfetto {
 
@@ -86,6 +87,11 @@ class MockFtraceProcfs : public FtraceProcfs {
   MOCK_METHOD1(ClearFile, bool(const std::string& path));
   MOCK_CONST_METHOD1(ReadFileIntoString, std::string(const std::string& path));
   MOCK_CONST_METHOD0(NumberOfCpus, size_t());
+};
+
+class CpuReaderTableTest : public ::testing::Test {
+ protected:
+  NiceMock<MockFtraceProcfs> ftrace_;
 };
 
 // Single class to manage the whole protozero -> scattered stream -> chunks ->
@@ -212,7 +218,7 @@ TEST(CpuReaderTest, BinaryWriter) {
   EXPECT_EQ(buffer.get()[8], 2);
 }
 
-TEST(EventFilterTest, EventFilter) {
+TEST_F(CpuReaderTableTest, EventFilter) {
   std::vector<Field> common_fields;
   std::vector<Event> events;
 
@@ -233,7 +239,7 @@ TEST(EventFilterTest, EventFilter) {
   }
 
   ProtoTranslationTable table(
-      new MockFtraceProcfs(), events, std::move(common_fields),
+      &ftrace_, events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
   EventFilter filter(table, {"foo"});
 
@@ -702,7 +708,7 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
   }
 }
 
-TEST(CpuReaderTest, ParseAllFields) {
+TEST_F(CpuReaderTableTest, ParseAllFields) {
   using FakeEventProvider =
       ProtoProvider<pbzero::FakeFtraceEvent, FakeFtraceEvent>;
 
@@ -848,7 +854,7 @@ TEST(CpuReaderTest, ParseAllFields) {
   }
 
   ProtoTranslationTable table(
-      new MockFtraceProcfs(), events, std::move(common_fields),
+      &ftrace_, events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
 
   FakeEventProvider provider(base::kPageSize);
