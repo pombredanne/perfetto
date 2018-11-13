@@ -154,6 +154,13 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     ts *= 1000;
     const char* cat = value.isMember("cat") ? value["cat"].asCString() : "";
     const char* name = value.isMember("name") ? value["name"].asCString() : "";
+
+    // TODO(lalitm): Remove this hack once support for tid/pid == 0 lands.
+    if (pid == 0)
+      pid = 12345;
+    if (tid == 0)
+      tid = 12345;
+
     StringId cat_id = storage->InternString(cat);
     StringId name_id = storage->InternString(name);
     UniqueTid utid = procs->UpdateThread(tid, pid);
