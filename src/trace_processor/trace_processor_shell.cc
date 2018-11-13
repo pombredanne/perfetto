@@ -141,7 +141,7 @@ int ExportTraceToDatabase(const std::string& output_name) {
     base::ScopedFile fd(base::OpenFile(output_name, O_CREAT | O_RDWR, 0600));
     if (!fd) {
       PERFETTO_PLOG("Failed to create file: %s", output_name.c_str());
-      return -1;
+      return 1;
     }
     int res = ftruncate(fd.get(), 0);
     PERFETTO_CHECK(res == 0);
@@ -274,7 +274,8 @@ int StartInteractiveShell() {
       } else if (strcmp(command, "help") == 0) {
         PrintShellUsage();
       } else if (strcmp(command, "dump") == 0 && strlen(arg)) {
-        ExportTraceToDatabase(arg);
+        if (ExportTraceToDatabase(arg) != 0)
+          PERFETTO_ELOG("Database export failed");
       } else {
         PrintShellUsage();
       }
@@ -482,19 +483,26 @@ int TraceProcessorMain(int argc, char** argv) {
   signal(SIGINT, [](int) { g_tp->InterruptQuery(); });
 #endif
 
-  // If we were asked to export the trace, do so and exit.
-  if (sqlite_file_path) {
+  int ret = 0;
+
+  // If we were given a query file, first load and execute it.
+  if (query_file_path) {
+    base::ScopedFstream file(fopen(query_file_path, "r"));
+    ret = RunQueryAndPrintResult(file.get(), stdout);
+  }
+
+  // After this we can dump the database and exit if needed.
+  if (ret == 0 && sqlite_file_path) {
     return ExportTraceToDatabase(sqlite_file_path);
   }
 
-  // If there is no query file, start a shell.
-  if (query_file_path == nullptr) {
-    return StartInteractiveShell();
+  // If we ran an automated query, exit.
+  if (query_file_path) {
+    return ret;
   }
 
-  // Otherwise run the queries and print the results.
-  base::ScopedFstream file(fopen(query_file_path, "r"));
-  return RunQueryAndPrintResult(file.get(), stdout);
+  // Otherwise start an interactive shell.
+  return StartInteractiveShell();
 }
 
 }  // namespace
