@@ -20,6 +20,7 @@
 #include <signal.h>
 #include <sys/types.h>
 
+#include "perfetto/base/file_utils.h"
 #include "perfetto/tracing/core/data_source_config.h"
 #include "perfetto/tracing/core/data_source_descriptor.h"
 #include "perfetto/tracing/core/trace_writer.h"
@@ -44,8 +45,8 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
   return client_config;
 }
 
-void FindPidsForBinaries(const std::vector<std::string>& binaries,
-                         std::vector<pid_t>* pids) {
+void FindPidsForComm(const std::vector<std::string>& comms,
+                     std::vector<pid_t>* pids) {
   base::ScopedDir proc_dir(opendir("/proc"));
   if (!proc_dir) {
     PERFETTO_DFATAL("Failed to open /proc");
@@ -60,23 +61,18 @@ void FindPidsForBinaries(const std::vector<std::string>& binaries,
     }
 
     char link_buf[128];
-    char binary_buf[128];
 
-    if (snprintf(link_buf, sizeof(link_buf), "/proc/%lu/exe", pid) < 0) {
-      PERFETTO_DFATAL("Failed to create exe filename for %lu", pid);
+    if (snprintf(link_buf, sizeof(link_buf), "/proc/%lu/comm", pid) < 0) {
+      PERFETTO_DFATAL("Failed to create comm filename for %lu", pid);
       continue;
     }
-    ssize_t link_size = readlink(link_buf, binary_buf, sizeof(binary_buf));
-    if (link_size < 0) {
+    std::string process_comm;
+    process_comm.reserve(128);
+    if (!base::ReadFile(link_buf, &process_comm)) {
       continue;
     }
-    if (link_size == sizeof(binary_buf)) {
-      PERFETTO_DFATAL("Potential overflow in binary name.");
-      continue;
-    }
-    binary_buf[link_size] = '\0';
-    for (const std::string& binary : binaries) {
-      if (binary == binary_buf)
+    for (const std::string& comm : comms) {
+      if (process_comm == comm)
         pids->emplace_back(static_cast<pid_t>(pid));
     }
   }
@@ -179,8 +175,7 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   for (uint64_t pid : cfg.heapprofd_config().pid())
     data_source.pids.emplace_back(static_cast<pid_t>(pid));
 
-  FindPidsForBinaries(cfg.heapprofd_config().native_binary_name(),
-                      &data_source.pids);
+  FindPidsForComm(cfg.heapprofd_config().process_comm(), &data_source.pids);
 
   auto pid_it = data_source.pids.begin();
   while (pid_it != data_source.pids.end()) {

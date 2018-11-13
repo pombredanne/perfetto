@@ -46,14 +46,13 @@ void HeapprofdConfig::FromProto(
   sampling_interval_bytes_ = static_cast<decltype(sampling_interval_bytes_)>(
       proto.sampling_interval_bytes());
 
-  native_binary_name_.clear();
-  for (const auto& field : proto.native_binary_name()) {
-    native_binary_name_.emplace_back();
-    static_assert(sizeof(native_binary_name_.back()) ==
-                      sizeof(proto.native_binary_name(0)),
+  process_comm_.clear();
+  for (const auto& field : proto.process_comm()) {
+    process_comm_.emplace_back();
+    static_assert(sizeof(process_comm_.back()) == sizeof(proto.process_comm(0)),
                   "size mismatch");
-    native_binary_name_.back() =
-        static_cast<decltype(native_binary_name_)::value_type>(field);
+    process_comm_.back() =
+        static_cast<decltype(process_comm_)::value_type>(field);
   }
 
   pid_.clear();
@@ -77,10 +76,9 @@ void HeapprofdConfig::ToProto(perfetto::protos::HeapprofdConfig* proto) const {
       static_cast<decltype(proto->sampling_interval_bytes())>(
           sampling_interval_bytes_));
 
-  for (const auto& it : native_binary_name_) {
-    proto->add_native_binary_name(
-        static_cast<decltype(proto->native_binary_name(0))>(it));
-    static_assert(sizeof(it) == sizeof(proto->native_binary_name(0)),
+  for (const auto& it : process_comm_) {
+    proto->add_process_comm(static_cast<decltype(proto->process_comm(0))>(it));
+    static_assert(sizeof(it) == sizeof(proto->process_comm(0)),
                   "size mismatch");
   }
 
