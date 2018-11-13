@@ -45,8 +45,8 @@ ClientConfiguration MakeClientConfiguration(const DataSourceConfig& cfg) {
   return client_config;
 }
 
-void FindPidsForComm(const std::vector<std::string>& cmdlines,
-                     std::vector<pid_t>* pids) {
+void FindPidsForCmdlines(const std::vector<std::string>& cmdlines,
+                         std::vector<pid_t>* pids) {
   base::ScopedDir proc_dir(opendir("/proc"));
   if (!proc_dir) {
     PERFETTO_DFATAL("Failed to open /proc");
@@ -187,7 +187,8 @@ void HeapprofdProducer::SetupDataSource(DataSourceInstanceID id,
   for (uint64_t pid : cfg.heapprofd_config().pid())
     data_source.pids.emplace_back(static_cast<pid_t>(pid));
 
-  FindPidsForComm(cfg.heapprofd_config().process_cmdline(), &data_source.pids);
+  FindPidsForCmdlines(cfg.heapprofd_config().process_cmdline(),
+                      &data_source.pids);
 
   auto pid_it = data_source.pids.begin();
   while (pid_it != data_source.pids.end()) {
