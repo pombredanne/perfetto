@@ -60,15 +60,16 @@ void FindPidsForComm(const std::vector<std::string>& comms,
       continue;
     }
 
-    char link_buf[128];
+    char filename_buf[128];
 
-    if (snprintf(link_buf, sizeof(link_buf), "/proc/%lu/comm", pid) < 0) {
+    if (snprintf(filename_buf, sizeof(filename_buf), "/proc/%lu/comm", pid) <
+        0) {
       PERFETTO_DFATAL("Failed to create comm filename for %lu", pid);
       continue;
     }
     std::string process_comm;
     process_comm.reserve(128);
-    if (!base::ReadFile(link_buf, &process_comm)) {
+    if (!base::ReadFile(filename_buf, &process_comm)) {
       continue;
     }
     // Strip everything after @ for Java processes.
