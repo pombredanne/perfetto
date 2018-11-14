@@ -20,7 +20,6 @@ adb shell su root start heapprofd
 echo '
 buffers {
   size_kb: 100024
-  fill_policy: RING_BUFFER
 }
 
 data_sources {
