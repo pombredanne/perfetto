@@ -111,7 +111,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
   g_dispatch.store(malloc_dispatch, write_order);
   // This can store a nullptr, so we have to check in the hooks below to avoid
   // segfaulting in that case.
-  std::unique_ptr<perfetto::Profiling::Client> client(
+  std::unique_ptr<perfetto::profiling::Client> client(
       new (std::nothrow) perfetto::profiling::Client(
           perfetto::profiling::kHeapprofdSocketFile, kNumConnections));
   if (!client || !client->inited())
