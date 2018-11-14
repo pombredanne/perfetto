@@ -84,25 +84,32 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   std::string error;
   char buffer[4096];
 
+  // Get the read end of the pipe and add it to the fd set for select.
   auto read_fd = filedes[0];
   fd_set rfds;
   FD_ZERO(&rfds);
   FD_SET(read_fd, &rfds);
 
+  // Store the start time of atrace and setup the timout.
   auto start = base::GetWallTimeMs();
   constexpr auto timeout = base::TimeMillis(7500);
   auto timeout_spec = base::ToPosixTimespec(timeout);
   while (true) {
+    // Wait for the value of the timout.
     auto ret = pselect(1, &rfds, nullptr, nullptr, &timeout_spec, nullptr);
     if (ret < 0) {
+      // An error occurding waiting on the read fd.
       break;
     } else if (ret > 0) {
+      // Data is available to be read from the fd.
       ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
       if (count == 0 || count == -1)
         break;
       error.append(buffer, static_cast<size_t>(count));
     }
 
+    // Check if we are below the timout and update the select timout to
+    // the time remaining.
     auto now = base::GetWallTimeMs();
     if (now - start >= timeout) {
       error.append("Timed out waiting for atrace");
