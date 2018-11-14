@@ -22,7 +22,7 @@
  * by
  * ../../tools/proto_to_cpp/proto_to_cpp.cc.
  * If you need to make changes here, change the .proto file and then run
- * ./tools/gen_tracing_cpp_headers_from_protos.py
+ * ./tools/gen_tracing_cpp_headers_from_protos
  */
 
 #include "perfetto/tracing/core/heapprofd_config.h"
@@ -46,14 +46,14 @@ void HeapprofdConfig::FromProto(
   sampling_interval_bytes_ = static_cast<decltype(sampling_interval_bytes_)>(
       proto.sampling_interval_bytes());
 
-  native_binary_name_.clear();
-  for (const auto& field : proto.native_binary_name()) {
-    native_binary_name_.emplace_back();
-    static_assert(sizeof(native_binary_name_.back()) ==
-                      sizeof(proto.native_binary_name(0)),
-                  "size mismatch");
-    native_binary_name_.back() =
-        static_cast<decltype(native_binary_name_)::value_type>(field);
+  process_cmdline_.clear();
+  for (const auto& field : proto.process_cmdline()) {
+    process_cmdline_.emplace_back();
+    static_assert(
+        sizeof(process_cmdline_.back()) == sizeof(proto.process_cmdline(0)),
+        "size mismatch");
+    process_cmdline_.back() =
+        static_cast<decltype(process_cmdline_)::value_type>(field);
   }
 
   pid_.clear();
@@ -62,6 +62,9 @@ void HeapprofdConfig::FromProto(
     static_assert(sizeof(pid_.back()) == sizeof(proto.pid(0)), "size mismatch");
     pid_.back() = static_cast<decltype(pid_)::value_type>(field);
   }
+
+  static_assert(sizeof(all_) == sizeof(proto.all()), "size mismatch");
+  all_ = static_cast<decltype(all_)>(proto.all());
 
   continuous_dump_config_.FromProto(proto.continuous_dump_config());
   unknown_fields_ = proto.unknown_fields();
@@ -77,10 +80,10 @@ void HeapprofdConfig::ToProto(perfetto::protos::HeapprofdConfig* proto) const {
       static_cast<decltype(proto->sampling_interval_bytes())>(
           sampling_interval_bytes_));
 
-  for (const auto& it : native_binary_name_) {
-    proto->add_native_binary_name(
-        static_cast<decltype(proto->native_binary_name(0))>(it));
-    static_assert(sizeof(it) == sizeof(proto->native_binary_name(0)),
+  for (const auto& it : process_cmdline_) {
+    proto->add_process_cmdline(
+        static_cast<decltype(proto->process_cmdline(0))>(it));
+    static_assert(sizeof(it) == sizeof(proto->process_cmdline(0)),
                   "size mismatch");
   }
 
@@ -88,6 +91,9 @@ void HeapprofdConfig::ToProto(perfetto::protos::HeapprofdConfig* proto) const {
     proto->add_pid(static_cast<decltype(proto->pid(0))>(it));
     static_assert(sizeof(it) == sizeof(proto->pid(0)), "size mismatch");
   }
+
+  static_assert(sizeof(all_) == sizeof(proto->all()), "size mismatch");
+  proto->set_all(static_cast<decltype(proto->all())>(all_));
 
   continuous_dump_config_.ToProto(proto->mutable_continuous_dump_config());
   *(proto->mutable_unknown_fields()) = unknown_fields_;
