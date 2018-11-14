@@ -132,13 +132,9 @@ class StorageSchema {
 
     Predicate Filter(int op, sqlite3_value* value) const override {
       auto type = sqlite3_value_type(value);
-      if (type == SQLITE_INTEGER) {
-        if (std::is_integral<T>::value) {
-          return FilterWithCast<int64_t>(op, value);
-        } else {
-          return FilterWithCast<double>(op, value);
-        }
-      } else if (type == SQLITE_FLOAT) {
+      if (type == SQLITE_INTEGER && std::is_integral<T>::value) {
+        return FilterWithCast<int64_t>(op, value);
+      } else if (type == SQLITE_INTEGER || type == SQLITE_FLOAT) {
         return FilterWithCast<double>(op, value);
       } else {
         PERFETTO_FATAL("Unexpected sqlite value to compare against");
