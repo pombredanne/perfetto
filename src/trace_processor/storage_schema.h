@@ -76,26 +76,24 @@ class StorageSchema {
   };
 
   // A column of numeric data backed by a deque.
-  template <typename Indexed>
+  template <typename T>
   class NumericColumn final : public Column {
    public:
-    using T = typename Indexed::value_type;
-
     NumericColumn(std::string col_name,
-                  const Indexed* indexed,
+                  const std::deque<T>* deque,
                   bool hidden,
                   bool is_naturally_ordered)
         : Column(col_name, hidden),
-          indexed_(indexed),
+          deque_(deque),
           is_naturally_ordered_(is_naturally_ordered) {}
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      sqlite_utils::ReportSqliteResult(ctx, (*indexed_)[row]);
+      sqlite_utils::ReportSqliteResult(ctx, (*deque_)[row]);
     }
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override {
       Bounds bounds;
-      bounds.max_idx = static_cast<uint32_t>(indexed_->size());
+      bounds.max_idx = static_cast<uint32_t>(deque_->size());
 
       if (!is_naturally_ordered_)
         return bounds;
@@ -120,13 +118,13 @@ class StorageSchema {
         return bounds;
       }
 
-      // Convert the values into indices into the indexed.
-      auto min_it = std::lower_bound(indexed_->begin(), indexed_->end(), min);
+      // Convert the values into indices into the deque.
+      auto min_it = std::lower_bound(deque_->begin(), deque_->end(), min);
       bounds.min_idx =
-          static_cast<uint32_t>(std::distance(indexed_->begin(), min_it));
-      auto max_it = std::upper_bound(min_it, indexed_->end(), max);
+          static_cast<uint32_t>(std::distance(deque_->begin(), min_it));
+      auto max_it = std::upper_bound(min_it, deque_->end(), max);
       bounds.max_idx =
-          static_cast<uint32_t>(std::distance(indexed_->begin(), max_it));
+          static_cast<uint32_t>(std::distance(deque_->begin(), max_it));
       bounds.consumed = true;
 
       return bounds;
@@ -136,22 +134,18 @@ class StorageSchema {
       auto binary_op = sqlite_utils::GetPredicateForOp<T>(op);
       T extracted = sqlite_utils::ExtractSqliteValue<T>(value);
       return [this, binary_op, extracted](uint32_t idx) {
-        return binary_op((*indexed_)[idx], extracted);
+        return binary_op((*deque_)[idx], extracted);
       };
     }
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          T a = (*indexed_)[f];
-          T b = (*indexed_)[s];
-          return a > b ? -1 : (a < b ? 1 : 0);
+          return sqlite_utils::CompareValuesDesc((*deque_)[f], (*deque_)[s]);
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        T a = (*indexed_)[f];
-        T b = (*indexed_)[s];
-        return a < b ? -1 : (a > b ? 1 : 0);
+        return sqlite_utils::CompareValuesAsc((*deque_)[f], (*deque_)[s]);
       };
     }
 
@@ -174,7 +168,7 @@ class StorageSchema {
     }
 
    private:
-    const Indexed* indexed_ = nullptr;
+    const std::deque<T>* deque_ = nullptr;
     bool is_naturally_ordered_ = false;
   };
 
@@ -212,13 +206,13 @@ class StorageSchema {
         return [this](uint32_t f, uint32_t s) {
           const std::string& a = (*string_map_)[(*deque_)[f]];
           const std::string& b = (*string_map_)[(*deque_)[s]];
-          return a > b ? -1 : (a < b ? 1 : 0);
+          return sqlite_utils::CompareValuesDesc(a, b);
         };
       }
       return [this](uint32_t f, uint32_t s) {
         const std::string& a = (*string_map_)[(*deque_)[f]];
         const std::string& b = (*string_map_)[(*deque_)[s]];
-        return a < b ? -1 : (a > b ? 1 : 0);
+        return sqlite_utils::CompareValuesAsc(a, b);
       };
     }
 
@@ -295,14 +289,14 @@ class StorageSchema {
         new TsEndColumn(column_name, ts_start, ts_end));
   }
 
-  template <typename Indexed>
-  static std::unique_ptr<NumericColumn<Indexed>> NumericColumnPtr(
+  template <typename T>
+  static std::unique_ptr<NumericColumn<T>> NumericColumnPtr(
       std::string column_name,
-      const Indexed* deque,
+      const std::deque<T>* deque,
       bool hidden = false,
       bool is_naturally_ordered = false) {
-    return std::unique_ptr<NumericColumn<Indexed>>(new NumericColumn<Indexed>(
-        column_name, deque, hidden, is_naturally_ordered));
+    return std::unique_ptr<NumericColumn<T>>(
+        new NumericColumn<T>(column_name, deque, hidden, is_naturally_ordered));
   }
 
   template <typename Id>
