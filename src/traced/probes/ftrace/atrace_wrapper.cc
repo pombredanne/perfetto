@@ -19,12 +19,14 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/time.h"
 
 namespace perfetto {
 
@@ -81,14 +83,39 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   // Collect the output from child process.
   std::string error;
   char buffer[4096];
+
+  auto read_fd = filedes[0];
+  fd_set rfds;
+  FD_ZERO(&rfds);
+  FD_SET(read_fd, &rfds);
+
+  auto start = base::GetWallTimeMs();
+  constexpr auto timeout = base::TimeMillis(7500);
+  auto timeout_spec = base::ToPosixTimespec(timeout);
   while (true) {
-    ssize_t count = PERFETTO_EINTR(read(filedes[0], buffer, sizeof(buffer)));
-    if (count == 0 || count == -1)
+    auto ret = pselect(1, &rfds, nullptr, nullptr, &timeout_spec, nullptr);
+    if (ret < 0) {
       break;
-    error.append(buffer, static_cast<size_t>(count));
+    } else if (ret > 0) {
+      ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
+      if (count == 0 || count == -1)
+        break;
+      error.append(buffer, static_cast<size_t>(count));
+    }
+
+    auto now = base::GetWallTimeMs();
+    if (now - start >= timeout) {
+      error.append("Timed out waiting for atrace");
+      break;
+    }
+    timeout_spec = base::ToPosixTimespec(now - start);
   }
+
   // Close the read end of the pipe.
   close(filedes[0]);
+
+  // Kill the forked process.
+  kill(pid, SIGKILL);
 
   // Wait until the child process exits fully.
   PERFETTO_EINTR(waitpid(pid, &status, 0));
@@ -96,7 +123,7 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   bool ok = WIFEXITED(status) && WEXITSTATUS(status) == 0;
   if (!ok) {
     // TODO(lalitm): use the stderr result from atrace.
-    base::ignore_result(error);
+    PERFETTO_ELOG("%s", error.c_str());
   }
   return ok;
 }
