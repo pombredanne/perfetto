@@ -60,8 +60,8 @@ void DumpProfilePacket(const ProfilePacket& packet,
   for (const ProfilePacket::Callstack& callstack : packet.callstacks()) {
     std::vector<uint64_t> frame_ids(
         static_cast<size_t>(callstack.frame_ids().size()));
-    std::copy(callstack.frame_ids().cbegin(), callstack.frame_ids().cend(),
-              frame_ids.begin());
+    std::reverse_copy(callstack.frame_ids().cbegin(),
+                      callstack.frame_ids().cend(), frame_ids.begin());
     callstack_lookup.emplace(callstack.id(), std::move(frame_ids));
   }
 
