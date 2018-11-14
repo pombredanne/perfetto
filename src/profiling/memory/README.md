@@ -43,3 +43,5 @@ duration_ms: 20000
 
 adb pull /data/misc/perfetto-traces/trace /tmp/trace
 ```
+
+TODO(fmayer): Add instructions how to visualize the trace.
