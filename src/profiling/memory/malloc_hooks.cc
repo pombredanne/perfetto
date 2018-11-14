@@ -115,7 +115,7 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
       new (std::nothrow) perfetto::profiling::Client(
           perfetto::profiling::kHeapprofdSocketFile, kNumConnections),
       write_order);
-  return true;
+  return g_client != nullptr && g_client->inited();
 }
 
 void HEAPPROFD_ADD_PREFIX(_finalize)() {
