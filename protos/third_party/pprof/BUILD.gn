@@ -1,0 +1,11 @@
+import("../../../gn/perfetto.gni")
+import("../../../gn/proto_library.gni")
+
+proto_library("lite") {
+  generate_python = false
+  sources = [
+    "profile.proto",
+  ]
+  proto_in_dir = "$perfetto_root_path/protos"
+  proto_out_dir = "$perfetto_root_path/protos"
+}

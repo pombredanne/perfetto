@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "perfetto/base/logging.h"
+#include "tools/trace_to_text/trace_to_profile.h"
 #include "tools/trace_to_text/trace_to_systrace.h"
 #include "tools/trace_to_text/trace_to_text.h"
 
@@ -77,6 +78,9 @@ int main(int argc, char** argv) {
                                                     /*wrap_in_json=*/false);
   if (format == "text")
     return perfetto::trace_to_text::TraceToText(input_stream, output_stream);
+
+  if (format == "profile")
+    return perfetto::trace_to_text::TraceToProfile(input_stream, output_stream);
 
   return Usage(argv[0]);
 }
