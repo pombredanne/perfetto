@@ -77,19 +77,18 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field,
   PERFETTO_DCHECK(field->proto_field_type);
   PERFETTO_DCHECK(!field->ftrace_offset);
   PERFETTO_DCHECK(!field->ftrace_size);
+  PERFETTO_DCHECK(!field->ftrace_type);
 
-  if (!field->ftrace_type) {
-    if (!InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
-                         ftrace_field.is_signed, &field->ftrace_type)) {
-      PERFETTO_FATAL(
-          "Failed to infer ftrace field type for \"%s.%s\" (type:\"%s\" "
-          "size:%d "
-          "signed:%d)",
-          event_name_for_debug, field->ftrace_name,
-          ftrace_field.type_and_name.c_str(), ftrace_field.size,
-          ftrace_field.is_signed);
-      return false;
-    }
+  if (!InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
+                       ftrace_field.is_signed, &field->ftrace_type)) {
+    PERFETTO_FATAL(
+        "Failed to infer ftrace field type for \"%s.%s\" (type:\"%s\" "
+        "size:%d "
+        "signed:%d)",
+        event_name_for_debug, field->ftrace_name,
+        ftrace_field.type_and_name.c_str(), ftrace_field.size,
+        ftrace_field.is_signed);
+    return false;
   }
 
   field->ftrace_offset = ftrace_field.offset;
@@ -400,8 +399,8 @@ ProtoTranslationTable::ProtoTranslationTable(
     const std::vector<Event>& events,
     std::vector<Field> common_fields,
     FtracePageHeaderSpec ftrace_page_header_spec)
-    : events_(BuildEventsVector(events)),
-      ftrace_procfs_(ftrace_procfs),
+    : ftrace_procfs_(ftrace_procfs),
+      events_(BuildEventsVector(events)),
       largest_id_(events_.size() - 1),
       common_fields_(std::move(common_fields)),
       ftrace_page_header_spec_(ftrace_page_header_spec) {
@@ -434,22 +433,30 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
   e->name = InternString(base::StringView(event));
   e->group = InternString(base::StringView(group));
 
+  // Calculate size of common fields.
+  uint16_t common_field_end = 0;
+  for (const FtraceEvent::Field& ftrace_field : ftrace_event.common_fields) {
+    uint16_t field_end = ftrace_field.offset + ftrace_field.size;
+    common_field_end = std::max(field_end, common_field_end);
+  }
+
   // For every field in the ftrace event, make a field in the generic event.
   for (const FtraceEvent::Field& ftrace_field : ftrace_event.fields)
-    CreateGenericEventField(ftrace_field, *e);
+    e->size = std::max(CreateGenericEventField(ftrace_field, *e), e->size);
 
   name_to_event_[e->name] = &events_.at(e->ftrace_event_id);
   group_to_events_[e->group].push_back(&events_.at(e->ftrace_event_id));
+  e->size = std::max(e->size, common_field_end);
 
   return e;
 };
 
 const char* ProtoTranslationTable::InternString(base::StringView str) {
-  auto it = interned_strings_.insert(str.ToStdString());
-  return it.first->c_str();
+  auto it_and_inserted = interned_strings_.insert(str.ToStdString());
+  return it_and_inserted.first->c_str();
 };
 
-void ProtoTranslationTable::CreateGenericEventField(
+uint16_t ProtoTranslationTable::CreateGenericEventField(
     const FtraceEvent::Field& ftrace_field,
     Event& event) {
   const char* field_name = InternString(
@@ -461,7 +468,13 @@ void ProtoTranslationTable::CreateGenericEventField(
                   ftrace_field.is_signed, &field->ftrace_type);
   SetProtoType(field->ftrace_type, &field->proto_field_type,
                &field->proto_field_id);
-  MergeFieldInfo(ftrace_field, field, event.name);
+  field->ftrace_offset = ftrace_field.offset;
+  field->ftrace_size = ftrace_field.size;
+  // Proto type is set based on ftrace type so all fields should have a
+  // translation strategy.
+  PERFETTO_DCHECK(SetTranslationStrategy(
+      field->ftrace_type, field->proto_field_type, &field->strategy));
+  return field->ftrace_offset + field->ftrace_size;
 }
 
 ProtoTranslationTable::~ProtoTranslationTable() = default;

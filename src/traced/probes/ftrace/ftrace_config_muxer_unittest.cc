@@ -70,12 +70,33 @@ struct MockRunAtrace {
   MOCK_METHOD1(RunAtrace, bool(const std::vector<std::string>&));
 };
 
+class MockProtoTranslationTable : public ProtoTranslationTable {
+ public:
+  MockProtoTranslationTable(NiceMock<MockFtraceProcfs>* ftrace_procfs,
+                            const std::vector<Event>& events,
+                            std::vector<Field> common_fields,
+                            FtracePageHeaderSpec ftrace_page_header_spec)
+      : ProtoTranslationTable(ftrace_procfs,
+                              events,
+                              common_fields,
+                              ftrace_page_header_spec) {}
+  MOCK_METHOD2(AddGenericEvent,
+               Event*(const std::string group, const std::string event));
+};
+
 class FtraceConfigMuxerTest : public ::testing::Test {
  protected:
+  std::unique_ptr<MockProtoTranslationTable> GetMockTable() {
+    std::vector<Field> common_fields;
+    std::vector<Event> events;
+    return std::unique_ptr<MockProtoTranslationTable>(
+        new MockProtoTranslationTable(
+            &table_procfs_, events, std::move(common_fields),
+            ProtoTranslationTable::DefaultPageHeaderSpecForTesting()));
+  }
   std::unique_ptr<ProtoTranslationTable> CreateFakeTable() {
     std::vector<Field> common_fields;
     std::vector<Event> events;
-
     {
       Event event;
       event.name = "sched_switch";
@@ -153,6 +174,42 @@ TEST_F(FtraceConfigMuxerTest, ComputeCpuBufferSizeInPages) {
   EXPECT_EQ(ComputeCpuBufferSizeInPages(3), 1u);
   // You picked a good size -> your size rounded to nearest page.
   EXPECT_EQ(ComputeCpuBufferSizeInPages(42), 10u);
+}
+
+TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
+  auto mock_table = GetMockTable();
+  MockFtraceProcfs ftrace;
+
+  FtraceConfig config = CreateFtraceConfig({"power/cpu_frequency"});
+
+  FtraceConfigMuxer model(&ftrace, mock_table.get());
+
+  ON_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
+      .WillByDefault(Return("[local] global boot"));
+  EXPECT_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
+      .Times(AnyNumber());
+
+  EXPECT_CALL(ftrace, ReadOneCharFromFile("/root/tracing_on"))
+      .Times(2)
+      .WillRepeatedly(Return('0'));
+  EXPECT_CALL(ftrace, WriteToFile("/root/buffer_size_kb", "512"));
+  EXPECT_CALL(ftrace, WriteToFile("/root/trace_clock", "boot"));
+  EXPECT_CALL(ftrace, WriteToFile("/root/tracing_on", "1"));
+  EXPECT_CALL(ftrace,
+              WriteToFile("/root/events/power/cpu_frequency/enable", "1"));
+
+  Event event_to_return;
+  event_to_return.name = "cpu_frequency";
+  event_to_return.group = "power";
+  ON_CALL(*mock_table, AddGenericEvent("power", "cpu_frequency"))
+      .WillByDefault(Return(&event_to_return));
+  EXPECT_CALL(*mock_table, AddGenericEvent("power", "cpu_frequency"));
+
+  FtraceConfigId id = model.SetupConfig(config);
+  ASSERT_TRUE(model.ActivateConfig(id));
+  const FtraceConfig* actual_config = model.GetConfig(id);
+  EXPECT_TRUE(actual_config);
+  EXPECT_THAT(actual_config->ftrace_events(), Contains("cpu_frequency"));
 }
 
 TEST_F(FtraceConfigMuxerTest, TurnFtraceOnOff) {

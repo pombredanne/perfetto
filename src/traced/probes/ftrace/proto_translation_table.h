@@ -63,7 +63,7 @@ class ProtoTranslationTable {
       const FtraceProcfs* ftrace_procfs,
       std::vector<Event> events,
       std::vector<Field> common_fields);
-  ~ProtoTranslationTable();
+  virtual ~ProtoTranslationTable();
 
   ProtoTranslationTable(const FtraceProcfs* ftrace_procfs,
                         const std::vector<Event>& events,
@@ -106,10 +106,9 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
-  const Event* AddGenericEvent(const std::string group,
-                               const std::string event);
-  void CreateGenericEventField(const FtraceEvent::Field& ftrace_field,
-                               Event& event);
+  // Virtual for testing.
+  virtual const Event* AddGenericEvent(const std::string group,
+                                       const std::string event);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
@@ -118,8 +117,11 @@ class ProtoTranslationTable {
   // Store strings so they can be read when writing the trace output.
   const char* InternString(base::StringView name);
 
-  std::vector<Event> events_;
+  uint16_t CreateGenericEventField(const FtraceEvent::Field& ftrace_field,
+                                   Event& event);
+
   const FtraceProcfs* ftrace_procfs_;
+  std::vector<Event> events_;
   size_t largest_id_;
   std::map<std::string, const Event*> name_to_event_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;

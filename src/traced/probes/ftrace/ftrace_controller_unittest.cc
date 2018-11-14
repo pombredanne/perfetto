@@ -300,16 +300,19 @@ TEST(FtraceControllerTest, RejectsBadEventNames) {
   auto controller =
       CreateTestController(true /* nice runner */, true /* nice procfs */);
 
-  FtraceConfig config = CreateFtraceConfig({"..$try,to:escape"});
+  FtraceConfig config = CreateFtraceConfig({"../try/to/escape"});
   EXPECT_FALSE(controller->AddFakeDataSource(config));
-  EXPECT_FALSE(controller->procfs()->is_tracing_on());
+  config = CreateFtraceConfig({"/event"});
+  EXPECT_FALSE(controller->AddFakeDataSource(config));
+  config = CreateFtraceConfig({"event/"});
+  EXPECT_FALSE(controller->AddFakeDataSource(config));
 }
 
 TEST(FtraceControllerTest, OneSink) {
   auto controller =
       CreateTestController(true /* nice runner */, false /* nice procfs */);
 
-  FtraceConfig config = CreateFtraceConfig({"foo"});
+  FtraceConfig config = CreateFtraceConfig({"group/foo"});
 
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));

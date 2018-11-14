@@ -36,7 +36,6 @@ std::set<std::string> FtraceEventsAsSet(const FtraceConfig&);
 // Returns true iff the config has any atrace categories or apps.
 bool RequiresAtrace(const FtraceConfig&);
 
-// Returns true iff the config is 'valid'.
 bool ValidConfig(const FtraceConfig& config);
 
 }  // namespace perfetto

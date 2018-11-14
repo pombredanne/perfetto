@@ -264,12 +264,11 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
     UpdateAtrace(request);
 
   for (auto& name : events) {
-    const Event* event;
     std::string group;
     std::string event_name;
     std::tie(group, event_name) = EventToGroupAndName(name);
     // TODO(taylori): Add all events for group if name is * e.g sched/*
-    event = table_->GetEventByName(event_name);
+    const Event* event = table_->GetEventByName(event_name);
     if (!event) {
       // Events will only be added as generic events if the group is specified.
       event = table_->AddGenericEvent(group, event_name);
@@ -287,7 +286,7 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
       current_state_.ftrace_events.insert(event->name);
       *actual.add_ftrace_events() = event->name;
     } else {
-      PERFETTO_LOG("Failed to enable %s.", name.c_str());
+      PERFETTO_DPLOG("Failed to enable %s.", name.c_str());
     }
   }
 

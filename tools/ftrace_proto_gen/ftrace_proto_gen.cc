@@ -414,6 +414,8 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
 
   int i = 3;
   for (const FtraceEventName& event : raw_whitelist) {
+    if (i == 326)
+      *fout << "    GenericFtraceEvent generic = " << i++ << ";\n";
     if (!event.valid()) {
       *fout << "    // removed field with id " << i << ";\n";
       ++i;
@@ -424,7 +426,8 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
           << event.name() << " = " << i << ";\n";
     ++i;
   }
-  *fout << "    GenericFtraceEvent generic = " << i << ";\n";
+  if (i == 326)
+    *fout << "    GenericFtraceEvent generic = " << i << ";\n";
   *fout << "  }\n";
   *fout << "}\n";
 }
