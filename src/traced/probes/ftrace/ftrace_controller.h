@@ -17,14 +17,13 @@
 #ifndef SRC_TRACED_PROBES_FTRACE_FTRACE_CONTROLLER_H_
 #define SRC_TRACED_PROBES_FTRACE_FTRACE_CONTROLLER_H_
 
+#include <stdint.h>
 #include <unistd.h>
 
 #include <bitset>
-#include <condition_variable>
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <string>
 
@@ -33,6 +32,7 @@
 #include "perfetto/base/utils.h"
 #include "perfetto/base/weak_ptr.h"
 #include "src/traced/probes/ftrace/ftrace_config.h"
+#include "src/traced/probes/ftrace/ftrace_thread_sync.h"
 
 namespace perfetto {
 
@@ -66,6 +66,7 @@ class FtraceController {
   bool AddDataSource(FtraceDataSource*) PERFETTO_WARN_UNUSED_RESULT;
   bool StartDataSource(FtraceDataSource*);
   void RemoveDataSource(FtraceDataSource*);
+  void Flush(bool wait);
 
   void DumpFtraceStats(FtraceStats*);
 
@@ -103,20 +104,16 @@ class FtraceController {
   static void DrainCPUs(base::WeakPtr<FtraceController>, size_t generation);
   static void UnblockReaders(const base::WeakPtr<FtraceController>&);
 
+  void SetThreadSyncCmd(FtraceThreadSync::Cmd);
+
   uint32_t GetDrainPeriodMs();
 
   void StartIfNeeded();
   void StopIfNeeded();
 
-  // Begin lock-protected members.
-  std::mutex lock_;
-  std::condition_variable data_drained_;
-  std::bitset<base::kMaxCpus> cpus_to_drain_;
-  bool listening_for_raw_trace_data_ = false;
-  // End lock-protected members.
-
   base::TaskRunner* const task_runner_;
   Observer* const observer_;
+  FtraceThreadSync thread_sync_;
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   std::unique_ptr<ProtoTranslationTable> table_;
   std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;

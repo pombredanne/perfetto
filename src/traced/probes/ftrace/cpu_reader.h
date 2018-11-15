@@ -40,6 +40,7 @@
 namespace perfetto {
 
 class FtraceDataSource;
+struct FtraceThreadSync;
 class ProtoTranslationTable;
 
 namespace protos {
@@ -59,6 +60,7 @@ class CpuReader {
   // |on_data_available| will be called on an arbitrary thread when at least one
   // page of ftrace data is available for draining on this CPU.
   CpuReader(const ProtoTranslationTable*,
+            FtraceThreadSync*,
             size_t cpu,
             base::ScopedFile fd,
             std::function<void()> on_data_available);
@@ -68,6 +70,8 @@ class CpuReader {
   // passed data sources.
   // Should be called in response to the |on_data_available| callback.
   bool Drain(const std::set<FtraceDataSource*>&);
+
+  void InterruptWorkerThreadWithSignal();
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
@@ -179,25 +183,24 @@ class CpuReader {
                          FtraceMetadata* metadata);
 
  private:
-  enum ThreadCtl : uint32_t { kRun = 0, kExit };
   static void RunWorkerThread(size_t cpu,
                               int trace_fd,
                               int staging_write_fd,
-                              const std::function<void()>& on_data_available,
-                              std::atomic<ThreadCtl>* cmd_atomic);
+                              FtraceThreadSync*,
+                              const std::function<void()>& on_data_available);
 
   uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
 
   const ProtoTranslationTable* const table_;
+  FtraceThreadSync* const thread_sync_;
   const size_t cpu_;
   base::ScopedFile trace_fd_;
   base::ScopedFile staging_read_fd_;
   base::ScopedFile staging_write_fd_;
   base::PagedMemory buffer_;
   std::thread worker_thread_;
-  std::atomic<ThreadCtl> cmd_{kRun};
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 

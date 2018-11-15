@@ -200,24 +200,27 @@ void FtraceController::UnblockReaders(
     return;
   // Unblock all waiting readers to start moving more data into their
   // respective staging pipes.
-  ctrl->data_drained_.notify_all();
+  for (const auto& kv : ctrl->cpu_readers_)
+    kv.second->Wakeup();
 }
 
 void FtraceController::StartIfNeeded() {
   if (started_data_sources_.size() > 1)
     return;
   PERFETTO_DCHECK(!started_data_sources_.empty());
-  {
-    std::unique_lock<std::mutex> lock(lock_);
-    PERFETTO_CHECK(!listening_for_raw_trace_data_);
-    listening_for_raw_trace_data_ = true;
-  }
+  PERFETTO_DCHECK(cpu_readers_.empty());
   generation_++;
   base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+
+  // Sets the FtraceThreadSync state to kRun. The notify_all() is a no-op in
+  // this case because there is no thread waiting on the condition variable yet.
+  IssueThreadSyncCmd(FtraceThreadSync::kRun);
+
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
     cpu_readers_.emplace(
         cpu, std::unique_ptr<CpuReader>(new CpuReader(
-                 table_.get(), cpu, ftrace_procfs_->OpenPipeForCpu(cpu),
+                 table_.get(), &thread_sync_, cpu,
+                 ftrace_procfs_->OpenPipeForCpu(cpu),
                  std::bind(&FtraceController::OnDataAvailable, this, weak_this,
                            generation_, cpu, GetDrainPeriodMs()))));
   }
@@ -246,19 +249,58 @@ void FtraceController::WriteTraceMarker(const std::string& s) {
   ftrace_procfs_->WriteTraceMarker(s);
 }
 
+void FtraceController::Flush(TODO_introduce_callback_here_and_timeout) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+
+  TODO who re - kRun s here ?
+
+  IssueThreadSyncCmd(FtraceThreadSync::kFlush);
+
+  if (!wait)
+    return;
+
+  const auto timeout = base::GetWallTimeMs() + base::TimeMillis(100);
+  const int expected_acks = static_cast<int>(cpu_readers_.size());
+  int seen_acks = 0;
+  do {
+    usleep(1000);
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    seen_acks = thread_sync_.flush_acks;
+    if (seen_acks >= expected_acks)
+      return; NOT really we need to wait for the OnDataAvailable() calls.
+  } while (base::GetWallTimeMs() < timeout);
+
+  PERFETTO_ELOG("CpuReader::Flush() timed out, got %d out of %d acks.",
+                seen_acks, expected_acks);
+  PERFETTO_DCHECK(false);
+}
+
 void FtraceController::StopIfNeeded() {
   if (!started_data_sources_.empty())
     return;
 
+  // TODO before landing: wait not really needed in dtor mode.
+  Flush(/*wait=*/true);
+
+  IssueThreadSyncCmd(FtraceThreadSync::kQuit);
+  cpus_to_drain_.reset();
+  cpu_readers_.clear();
+}
+
+void FtraceController::IssueThreadSyncCmd(FtraceThreadSync::Cmd cmd) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
   {
-    // Unblock any readers that are waiting for us to drain data.
-    std::unique_lock<std::mutex> lock(lock_);
-    listening_for_raw_trace_data_ = false;
-    cpus_to_drain_.reset();
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    thread_sync_.cmd = cmd;
+    thread_sync_.cmd_id++;
   }
 
-  data_drained_.notify_all();
-  cpu_readers_.clear();
+  // Send a SIGPIPE to all worker threads to wake them up if they are sitting in
+  // a blocking splice.
+  for (const auto& kv : cpu_readers_)
+    kv.second->InterruptWorkerThreadWithSignal();
+
+  thread_sync_.cond.notify_all();
 }
 
 // This method is called on the worker thread. Lifetime is guaranteed to be
@@ -271,25 +313,29 @@ void FtraceController::OnDataAvailable(
     size_t cpu,
     uint32_t drain_period_ms) {
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
-  std::unique_lock<std::mutex> lock(lock_);
-  if (!listening_for_raw_trace_data_)
-    return;
-  if (cpus_to_drain_.none()) {
-    // If this was the first CPU to wake up, schedule a drain for the next drain
-    // interval.
-    uint32_t delay_ms = drain_period_ms - (NowMs() % drain_period_ms);
-    task_runner_->PostDelayedTask(
-        std::bind(&FtraceController::DrainCPUs, weak_this, generation),
-        delay_ms);
-  }
-  cpus_to_drain_[cpu] = true;
 
-  // Wait until the main thread has finished draining.
-  // TODO(skyostil): The threads waiting here will all try to grab lock_
-  // when woken up. Find a way to avoid this.
-  data_drained_.wait(lock, [this, cpu] {
-    return !cpus_to_drain_[cpu] || !listening_for_raw_trace_data_;
-  });
+  std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+
+  switch (thread_sync_.cmd) {
+    case FtraceThreadSync::kQuit:
+      return;  // Too late, ignore.
+
+    case FtraceThreadSync::kRun:
+      if (thread_sync_.cpus_to_drain.none()) {
+        // If this was the first CPU to wake up, schedule a drain for the next
+        // drain interval.
+        uint32_t delay_ms = drain_period_ms - (NowMs() % drain_period_ms);
+        task_runner_->PostDelayedTask(
+            std::bind(&FtraceController::DrainCPUs, weak_this, generation),
+            delay_ms);
+      }
+      thread_sync_.cpus_to_drain[cpu] = true;
+      break;
+
+    case FtraceThreadSync::kFlush:
+      thread_sync_.flush_acks
+      break;
+  }
 }
 
 bool FtraceController::AddDataSource(FtraceDataSource* data_source) {

@@ -280,11 +280,18 @@ void ProbesProducer::OnTracingSetup() {}
 void ProbesProducer::Flush(FlushRequestID flush_request_id,
                            const DataSourceInstanceID* data_source_ids,
                            size_t num_data_sources) {
+  bool flush_ftrace = false;
   for (size_t i = 0; i < num_data_sources; i++) {
     auto it = data_sources_.find(data_source_ids[i]);
     if (it == data_sources_.end() || !it->second->started)
       continue;
     it->second->Flush();
+    if (it->second->type_id == FtraceDataSource::kTypeId)
+      flush_ftrace = true;
+  }
+  if (flush_ftrace && ftrace_) {
+    ftrace_->Flush(flush_request_id);
+    // TODO before landing HERE, after the FtraceController flush callback we should also flush the writer.
   }
   endpoint_->NotifyFlushComplete(flush_request_id);
 }
