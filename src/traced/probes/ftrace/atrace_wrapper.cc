@@ -17,9 +17,9 @@
 #include "src/traced/probes/ftrace/atrace_wrapper.h"
 
 #include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <string.h>
-#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -48,8 +48,7 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
   // Create the pipe for the child process to return stderr.
   int filedes[2];
-  if (pipe(filedes) == -1)
-    PERFETTO_FATAL("Unable to create pipe to atrace");
+  PERFETTO_CHECK(pipe(filedes) == 0);
 
   pid_t pid = fork();
   PERFETTO_CHECK(pid >= 0);
@@ -86,7 +85,9 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
   // Get the read end of the pipe.
   auto read_fd = filedes[0];
-  fd_set rfds;
+  struct pollfd fds[1];
+  fds[0].fd = read_fd;
+  fds[0].events = POLLIN;
 
   // Store the start time of atrace and setup the timeout.
   constexpr auto timeout = base::TimeMillis(7500);
@@ -99,24 +100,33 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
       error.append("Timed out waiting for atrace");
       break;
     }
-    auto timeout_spec = base::ToPosixTimespec(now - start);
-
-    // Add read fd to the fd set for select.
-    FD_ZERO(&rfds);
-    FD_SET(read_fd, &rfds);
 
     // Wait for the value of the timeout.
-    auto ret = pselect(1, &rfds, nullptr, nullptr, &timeout_spec, nullptr);
+    auto timeout_ms = static_cast<int>((now - start).count());
+    auto ret = PERFETTO_EINTR(poll(fds, sizeof(fds), timeout_ms));
     if (ret < 0) {
-      // An error occured waiting on the read fd.
+      // An error occured polling on the read fd.
+      error.append("Error while polling atrace stderr");
       break;
-    } else if (ret > 0) {
-      // Data is available to be read from the fd.
-      ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
-      if (count == 0 || count == -1)
-        break;
-      error.append(buffer, static_cast<size_t>(count));
+    } else if (ret == 0) {
+      // Timeout occured in poll. Continue so that this will be picked
+      // up by our own timeout logic.
+      continue;
     }
+
+    // Check if there is an error condition on the fd.
+    if ((fds[0].revents & POLLIN) == 0) {
+      error.append("Error while polling atrace stderr");
+      break;
+    }
+
+    // Data is available to be read from the fd.
+    ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
+    if (count < 0) {
+      error.append("Error while reading atrace stderr");
+      break;
+    }
+    error.append(buffer, static_cast<size_t>(count));
   }
 
   // Close the read end of the pipe.
