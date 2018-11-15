@@ -31,6 +31,17 @@ namespace perfetto {
 namespace profiling {
 
 class SocketListener : public base::UnixSocket::EventListener {
+ private:
+  struct ProcessInfo {
+    ProcessInfo(pid_t p, ClientConfiguration cfg)
+        : pid(p), client_config(std::move(cfg)) {}
+
+    pid_t pid;
+    size_t active_profile_sessions = 0;
+    ClientConfiguration client_config;
+    std::set<base::UnixSocket*> sockets;
+  };
+
  public:
   friend class ProfilingSession;
   class ProfilingSession {
@@ -38,16 +49,16 @@ class SocketListener : public base::UnixSocket::EventListener {
     friend class SocketListener;
 
     ProfilingSession(ProfilingSession&& other)
-        : pid_(other.pid_), listener_(other.listener_) {
+        : process_info_(other.process_info_), listener_(other.listener_) {
       other.listener_ = nullptr;
     }
 
     ~ProfilingSession() {
       if (listener_)
-        listener_->ShutdownPID(pid_);
+        listener_->RemoveProfilingSession(process_info_);
     }
     ProfilingSession& operator=(ProfilingSession&& other) {
-      pid_ = other.pid_;
+      process_info_ = other.process_info_;
       listener_ = other.listener_;
       other.listener_ = nullptr;
       return *this;
@@ -59,10 +70,10 @@ class SocketListener : public base::UnixSocket::EventListener {
     ProfilingSession& operator=(const ProfilingSession&) = delete;
 
    private:
-    ProfilingSession(pid_t pid, SocketListener* listener)
-        : pid_(pid), listener_(listener) {}
+    ProfilingSession(ProcessInfo* process_info, SocketListener* listener)
+        : process_info_(process_info), listener_(listener) {}
 
-    pid_t pid_;
+    ProcessInfo* process_info_;
     SocketListener* listener_ = nullptr;
   };
 
@@ -77,14 +88,9 @@ class SocketListener : public base::UnixSocket::EventListener {
   void OnDataAvailable(base::UnixSocket* self) override;
 
   ProfilingSession ExpectPID(pid_t pid, ClientConfiguration cfg);
+  ProfilingSession ExpectAll(ClientConfiguration cfg);
 
  private:
-  struct ProcessInfo {
-    ProcessInfo(ClientConfiguration cfg) : client_config(std::move(cfg)) {}
-    ClientConfiguration client_config;
-    std::set<base::UnixSocket*> sockets;
-  };
-
   struct Entry {
     Entry(std::unique_ptr<base::UnixSocket> s) : sock(std::move(s)) {}
     // Only here for ownership of the object.
@@ -102,7 +108,17 @@ class SocketListener : public base::UnixSocket::EventListener {
   };
 
   void RecordReceived(base::UnixSocket*, size_t, std::unique_ptr<uint8_t[]>);
-  void ShutdownPID(pid_t pid);
+  void AddProfilingSession(ProcessInfo* process_info) {
+    ++process_info->active_profile_sessions;
+  }
+
+  void RemoveProfilingSession(ProcessInfo* process_info) {
+    if (--process_info->active_profile_sessions == 0) {
+      for (base::UnixSocket* socket : process_info->sockets)
+        socket->Shutdown(true);
+    }
+    process_info_.erase(process_info->pid);
+  }
 
   std::map<base::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<UnwindingMetadata>> unwinding_metadata_;
