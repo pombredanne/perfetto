@@ -153,7 +153,7 @@ void DumpProfilePacket(const ProfilePacket& packet,
                                               sample.cumulative_freed()));
     }
 
-    std::string filename = file_prefix + std::to_string(samples.pid());
+    std::string filename = file_prefix + std::to_string(samples.pid()) + ".pb";
     base::ScopedFile fd(base::OpenFile(filename, O_CREAT | O_WRONLY, 0700));
     if (!fd)
       PERFETTO_FATAL("Failed to open %s", filename.c_str());
@@ -166,7 +166,7 @@ void DumpProfilePacket(const ProfilePacket& packet,
 }  // namespace
 
 int TraceToProfile(std::istream* input, std::ostream* output) {
-  std::string temp_dir = "/tmp/profile-XXXXXXX";
+  std::string temp_dir = "/tmp/heap_profile-XXXXXXX";
   size_t itr = 0;
   PERFETTO_CHECK(mkdtemp(&temp_dir[0]));
   ForEachPacketInTrace(input, [&temp_dir,
