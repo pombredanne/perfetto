@@ -26,7 +26,7 @@ namespace {
 
 int Usage(const char* argv0) {
   printf(
-      "Usage: %s systrace|json|text [trace.proto] "
+      "Usage: %s systrace|json|text|profile [trace.pb] "
       "[trace.txt]\n",
       argv0);
   return 1;

@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 2018 The Android Open Source Project
  *
@@ -85,8 +84,12 @@ void DumpProfilePacket(const ProfilePacket& packet,
     std::string filename;
     for (uint64_t str_id : mapping.path_string_ids()) {
       auto it = string_lookup.find(str_id);
-      if (it == string_lookup.end())
+      if (it == string_lookup.end()) {
+        PERFETTO_ELOG("Mapping %" PRIu64
+                      " referring to invalid string_id %" PRIu64 ".",
+                      static_cast<uint64_t>(mapping.id()), str_id);
         continue;
+      }
 
       filename += "/" + it->second;
     }
@@ -111,8 +114,11 @@ void DumpProfilePacket(const ProfilePacket& packet,
 
   for (uint64_t function_name_id : functions_to_dump) {
     auto str_it = string_lookup.find(function_name_id);
-    if (str_it == string_lookup.end())
+    if (str_it == string_lookup.end()) {
+      PERFETTO_ELOG("Function referring to invalid string id %" PRIu64,
+                    function_name_id);
       continue;
+    }
     decltype(string_table)::iterator it;
     std::tie(it, std::ignore) =
         string_table.emplace(str_it->second, string_table.size());
@@ -121,6 +127,9 @@ void DumpProfilePacket(const ProfilePacket& packet,
     gfunction->set_name(static_cast<int64_t>(it->second));
   }
 
+  // We keep the interning table as string -> uint64_t for fast and easy
+  // lookup. When dumping, we need to turn it into a uint64_t -> string
+  // table so we get it sorted by key order.
   std::map<uint64_t, std::string> inverted_string_table;
   for (const auto& p : string_table)
     inverted_string_table[p.second] = p.first;
@@ -133,8 +142,11 @@ void DumpProfilePacket(const ProfilePacket& packet,
     for (const ProfilePacket::HeapSample& sample : samples.samples()) {
       GSample* gsample = cur_profile.add_sample();
       auto it = callstack_lookup.find(sample.callstack_id());
-      if (it == callstack_lookup.end())
+      if (it == callstack_lookup.end()) {
+        PERFETTO_ELOG("Callstack referring to invalid callstack id %" PRIu64,
+                      static_cast<uint64_t>(sample.callstack_id()));
         continue;
+      }
       for (uint64_t frame_id : it->second)
         gsample->add_location_id(frame_id);
       gsample->add_value(static_cast<int64_t>(sample.cumulative_allocated() -
