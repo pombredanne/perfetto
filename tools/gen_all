@@ -54,7 +54,7 @@ def main():
     if not str(e):
       raise
     print('Error: {}'.format(e))
-    
+
   return 0
 
 if __name__ == '__main__':
