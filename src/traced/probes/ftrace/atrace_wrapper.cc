@@ -80,19 +80,19 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   close(filedes[1]);
 
   // Collect the output from child process.
-  std::string error;
-  char buffer[4096];
+  char buffer[1024];
+  std::string error = "";
 
   // Get the read end of the pipe.
-  auto read_fd = filedes[0];
-  struct pollfd fds[1];
-  fds[0].fd = read_fd;
+  constexpr uint8_t kFdCount = 1;
+  struct pollfd fds[kFdCount];
+  fds[0].fd = filedes[0];
   fds[0].events = POLLIN;
 
   // Store the start time of atrace and setup the timeout.
   constexpr auto timeout = base::TimeMillis(7500);
   auto start = base::GetWallTimeMs();
-  while (true) {
+  for (;;) {
     // Check if we are below the timeout and update the select timeout to
     // the time remaining.
     auto now = base::GetWallTimeMs();
@@ -104,9 +104,8 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
     // Wait for the value of the timeout.
     auto timeout_ms = static_cast<int>(remaining.count());
-    auto ret = PERFETTO_EINTR(poll(fds, sizeof(fds), timeout_ms));
+    auto ret = PERFETTO_EINTR(poll(fds, kFdCount, timeout_ms));
     if (ret < 0) {
-      // An error occured polling on the read fd.
       error.append("Error while polling atrace stderr");
       break;
     } else if (ret == 0) {
@@ -116,9 +115,12 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
     }
 
     // Data is available to be read from the fd.
-    ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
+    int64_t count = PERFETTO_EINTR(read(filedes[0], buffer, sizeof(buffer)));
     if (count < 0) {
       error.append("Error while reading atrace stderr");
+      break;
+    } else if (count == 0) {
+      // EOF so we can exit this loop.
       break;
     }
     error.append(buffer, static_cast<size_t>(count));
