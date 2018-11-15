@@ -48,6 +48,8 @@ class SocketListener : public base::UnixSocket::EventListener {
    public:
     friend class SocketListener;
 
+    ProfilingSession() : ProfilingSession(nullptr, nullptr) {}
+
     ProfilingSession(ProfilingSession&& other)
         : process_info_(other.process_info_), listener_(other.listener_) {
       other.listener_ = nullptr;
@@ -88,7 +90,6 @@ class SocketListener : public base::UnixSocket::EventListener {
   void OnDataAvailable(base::UnixSocket* self) override;
 
   ProfilingSession ExpectPID(pid_t pid, ClientConfiguration cfg);
-  ProfilingSession ExpectAll(ClientConfiguration cfg);
 
  private:
   struct Entry {
@@ -108,17 +109,9 @@ class SocketListener : public base::UnixSocket::EventListener {
   };
 
   void RecordReceived(base::UnixSocket*, size_t, std::unique_ptr<uint8_t[]>);
-  void AddProfilingSession(ProcessInfo* process_info) {
-    ++process_info->active_profile_sessions;
-  }
 
-  void RemoveProfilingSession(ProcessInfo* process_info) {
-    if (--process_info->active_profile_sessions == 0) {
-      for (base::UnixSocket* socket : process_info->sockets)
-        socket->Shutdown(true);
-    }
-    process_info_.erase(process_info->pid);
-  }
+  void AddProfilingSession(ProcessInfo* process_info);
+  void RemoveProfilingSession(ProcessInfo* process_info);
 
   std::map<base::UnixSocket*, Entry> sockets_;
   std::map<pid_t, std::weak_ptr<UnwindingMetadata>> unwinding_metadata_;

@@ -159,5 +159,17 @@ void SocketListener::RecordReceived(base::UnixSocket* self,
                       std::move(weak_metadata)});
 }
 
+void SocketListener::AddProfilingSession(ProcessInfo* process_info) {
+  ++process_info->active_profile_sessions;
+}
+
+void SocketListener::RemoveProfilingSession(ProcessInfo* process_info) {
+  if (--process_info->active_profile_sessions == 0) {
+    for (base::UnixSocket* socket : process_info->sockets)
+      socket->Shutdown(true);
+    process_info_.erase(process_info->pid);
+  }
+}
+
 }  // namespace profiling
 }  // namespace perfetto
