@@ -50,7 +50,7 @@ class HeapprofdIntegrationTest : public ::testing::Test {
 #define MAYBE_MultiSession MultiSession
 #else
 #define MAYBE_EndToEnd DISABLED_EndToEnd
-#define MAYBE_MultiSession MultiSession
+#define MAYBE_MultiSession DISABLED_MultiSession
 #endif
 
 TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
