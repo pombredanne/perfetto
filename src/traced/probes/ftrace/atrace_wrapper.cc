@@ -49,7 +49,7 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   // Create the pipe for the child process to return stderr.
   int filedes[2];
   if (pipe(filedes) == -1)
-    return false;
+    PERFETTO_FATAL("Unable to create pipe to atrace");
 
   pid_t pid = fork();
   PERFETTO_CHECK(pid >= 0);
@@ -57,7 +57,7 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
     // Duplicate the write end of the pipe into stderr.
     if ((dup2(filedes[1], STDERR_FILENO) == -1)) {
       const char kError[] = "Unable to duplicate stderr fd";
-      write(filedes[1], kError, sizeof(kError));
+      base::ignore_result(write(filedes[1], kError, sizeof(kError)));
       _exit(1);
     }
 
@@ -84,21 +84,31 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   std::string error;
   char buffer[4096];
 
-  // Get the read end of the pipe and add it to the fd set for select.
+  // Get the read end of the pipe.
   auto read_fd = filedes[0];
   fd_set rfds;
-  FD_ZERO(&rfds);
-  FD_SET(read_fd, &rfds);
 
-  // Store the start time of atrace and setup the timout.
-  auto start = base::GetWallTimeMs();
+  // Store the start time of atrace and setup the timeout.
   constexpr auto timeout = base::TimeMillis(7500);
-  auto timeout_spec = base::ToPosixTimespec(timeout);
+  auto start = base::GetWallTimeMs();
   while (true) {
-    // Wait for the value of the timout.
+    // Check if we are below the timeout and update the select timeout to
+    // the time remaining.
+    auto now = base::GetWallTimeMs();
+    if (now - start >= timeout) {
+      error.append("Timed out waiting for atrace");
+      break;
+    }
+    auto timeout_spec = base::ToPosixTimespec(now - start);
+
+    // Add read fd to the fd set for select.
+    FD_ZERO(&rfds);
+    FD_SET(read_fd, &rfds);
+
+    // Wait for the value of the timeout.
     auto ret = pselect(1, &rfds, nullptr, nullptr, &timeout_spec, nullptr);
     if (ret < 0) {
-      // An error occurding waiting on the read fd.
+      // An error occured waiting on the read fd.
       break;
     } else if (ret > 0) {
       // Data is available to be read from the fd.
@@ -107,15 +117,6 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
         break;
       error.append(buffer, static_cast<size_t>(count));
     }
-
-    // Check if we are below the timout and update the select timout to
-    // the time remaining.
-    auto now = base::GetWallTimeMs();
-    if (now - start >= timeout) {
-      error.append("Timed out waiting for atrace");
-      break;
-    }
-    timeout_spec = base::ToPosixTimespec(now - start);
   }
 
   // Close the read end of the pipe.
