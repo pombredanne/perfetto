@@ -115,12 +115,6 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
       continue;
     }
 
-    // Check if there is an error condition on the fd.
-    if ((fds[0].revents & POLLIN) == 0) {
-      error.append("Error while polling atrace stderr");
-      break;
-    }
-
     // Data is available to be read from the fd.
     ssize_t count = PERFETTO_EINTR(read(read_fd, buffer, sizeof(buffer)));
     if (count < 0) {
