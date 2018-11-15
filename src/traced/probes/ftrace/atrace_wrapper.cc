@@ -50,6 +50,9 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   int filedes[2];
   PERFETTO_CHECK(pipe(filedes) == 0);
 
+  int err = fcntl(filedes[0], F_SETFL, fcntl(filedes[0], F_GETFL) | O_NONBLOCK);
+  PERFETTO_CHECK(err == 0);
+
   pid_t pid = fork();
   PERFETTO_CHECK(pid >= 0);
   if (pid == 0) {
@@ -85,7 +88,7 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
   // Get the read end of the pipe.
   constexpr uint8_t kFdCount = 1;
-  struct pollfd fds[kFdCount];
+  struct pollfd fds[kFdCount]{};
   fds[0].fd = filedes[0];
   fds[0].events = POLLIN;
 
@@ -97,15 +100,24 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
     // the time remaining.
     auto now = base::GetWallTimeMs();
     auto remaining = timeout - (now - start);
-    if (remaining.count() <= 0) {
-      error.append("Timed out waiting for atrace");
+    auto timeout_ms = static_cast<int>(remaining.count());
+    if (timeout_ms <= 0) {
+      // Kill atrace.
+      kill(pid, SIGKILL);
+
+      std::string cmdline = "/system/bin/atrace";
+      for (const auto& arg : args) {
+        cmdline += " " + arg;
+      }
+      error.append("Timed out waiting for atrace (cmdline: " + cmdline + ")");
       break;
     }
 
     // Wait for the value of the timeout.
-    auto timeout_ms = static_cast<int>(remaining.count());
-    auto ret = PERFETTO_EINTR(poll(fds, kFdCount, timeout_ms));
-    if (ret < 0) {
+    auto ret = poll(fds, kFdCount, timeout_ms);
+    if (ret < 0 && errno == EINTR) {
+      continue;
+    } else if (ret < 0) {
       error.append("Error while polling atrace stderr");
       break;
     } else if (ret == 0) {
@@ -116,7 +128,9 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
     // Data is available to be read from the fd.
     int64_t count = PERFETTO_EINTR(read(filedes[0], buffer, sizeof(buffer)));
-    if (count < 0) {
+    if (ret < 0 && errno == EAGAIN) {
+      continue;
+    } else if (count < 0) {
       error.append("Error while reading atrace stderr");
       break;
     } else if (count == 0) {
@@ -128,9 +142,6 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
 
   // Close the read end of the pipe.
   close(filedes[0]);
-
-  // Kill the forked process.
-  kill(pid, SIGKILL);
 
   // Wait until the child process exits fully.
   PERFETTO_EINTR(waitpid(pid, &status, 0));
