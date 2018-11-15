@@ -101,22 +101,8 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_MultiSession) {
   base::TestTaskRunner task_runner;
   auto done = task_runner.CreateCheckpoint("done");
   constexpr uint64_t kSamplingInterval = 123;
-  SocketListener listener(
-      [&done, &bookkeeping_thread](UnwindingRecord r) {
-// TODO(fmayer): Test symbolization and result of unwinding.
-// This check will only work on in-tree builds as out-of-tree
-// libunwindstack is behaving a bit weirdly.
-// TODO(fmayer): Fix out of tree integration test.
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-        BookkeepingRecord bookkeeping_record;
-        ASSERT_TRUE(HandleUnwindingRecord(&r, &bookkeeping_record));
-        bookkeeping_thread.HandleBookkeepingRecord(&bookkeeping_record);
-#endif
-        base::ignore_result(r);
-        base::ignore_result(bookkeeping_thread);
-        done();
-      },
-      &bookkeeping_thread);
+  SocketListener listener([&done](UnwindingRecord) { done(); },
+                          &bookkeeping_thread);
 
   auto session = listener.ExpectPID(getpid(), {kSamplingInterval});
   // Allow to get a second session, but it will still use the previous
