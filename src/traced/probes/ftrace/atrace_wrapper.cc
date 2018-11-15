@@ -80,8 +80,8 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
   close(filedes[1]);
 
   // Collect the output from child process.
-  char buffer[1024];
-  std::string error = "";
+  char buffer[4096];
+  std::string error;
 
   // Get the read end of the pipe.
   constexpr uint8_t kFdCount = 1;
