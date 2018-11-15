@@ -96,13 +96,14 @@ bool ExecvAtrace(const std::vector<std::string>& args) {
     // Check if we are below the timeout and update the select timeout to
     // the time remaining.
     auto now = base::GetWallTimeMs();
-    if (now - start >= timeout) {
+    auto remaining = timeout - (now - start);
+    if (remaining.count() <= 0) {
       error.append("Timed out waiting for atrace");
       break;
     }
 
     // Wait for the value of the timeout.
-    auto timeout_ms = static_cast<int>((now - start).count());
+    auto timeout_ms = static_cast<int>(remaining.count());
     auto ret = PERFETTO_EINTR(poll(fds, sizeof(fds), timeout_ms));
     if (ret < 0) {
       // An error occured polling on the read fd.
