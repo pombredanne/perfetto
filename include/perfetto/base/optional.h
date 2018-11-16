@@ -289,8 +289,6 @@ class OptionalBase {
       storage_.Init(std::forward<U>(value));
   }
 
-  // TODO(lukasza): Figure out how to remove the NO_THREAD_SAFETY_ANALYSIS
-  // annotation below.  See https://crbug.com/881875#c1 for details.
   void FreeIfNeeded() {
     if (!storage_.is_populated_)
       return;
@@ -415,7 +413,7 @@ using RemoveCvRefT =
 // byte for its body. __declspec(empty_bases) enables the optimization.
 // cf)
 // https://blogs.msdn.microsoft.com/vcblog/2016/03/30/optimizing-the-layout-of-empty-base-classes-in-vs2015-update-2-3/
-#ifdef OS_WIN
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_WIN)
 #define OPTIONAL_DECLSPEC_EMPTY_BASES __declspec(empty_bases)
 #else
 #define OPTIONAL_DECLSPEC_EMPTY_BASES
@@ -440,6 +438,10 @@ using RemoveCvRefT =
 // which is recursive so it does not work. As of Feb 2018, std::optional C++17
 // implementation in both clang and gcc has same limitation. MSVC SFINAE looks
 // to have different behavior, but anyway it reports an error, too.
+//
+// This file is a modified version of optional.h from Chromium at revision
+// 5e71bd454e60511c1293c0c686544aaa76094424. The changes remove C++14/C++17
+// specific code and replace with C++11 counterparts.
 template <typename T>
 class OPTIONAL_DECLSPEC_EMPTY_BASES Optional
     : public internal::OptionalBase<T>,
@@ -645,9 +647,6 @@ class OPTIONAL_DECLSPEC_EMPTY_BASES Optional
 
   template <class U>
   constexpr T value_or(U&& default_value) const & {
-    // TODO(mlamouri): add the following assert when possible:
-    // static_assert(std::is_copy_constructible<T>::value,
-    //               "T must be copy constructible");
     static_assert(std::is_convertible<U, T>::value,
                   "U must be convertible to T");
     return storage_.is_populated_
@@ -657,9 +656,6 @@ class OPTIONAL_DECLSPEC_EMPTY_BASES Optional
 
   template <class U>
   T value_or(U&& default_value) && {
-    // TODO(mlamouri): add the following assert when possible:
-    // static_assert(std::is_move_constructible<T>::value,
-    //               "T must be move constructible");
     static_assert(std::is_convertible<U, T>::value,
                   "U must be convertible to T");
     return storage_.is_populated_
