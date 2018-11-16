@@ -2695,7 +2695,7 @@ std::string FormatSignalGenerate(const SignalGenerateFtraceEvent& event) {
 std::string FormatOomScoreAdjUpdate(const OomScoreAdjUpdateFtraceEvent& event) {
   char line[2048];
   sprintf(line, "oom_score_adj_update: pid=%d comm=%s oom_score_adj=%hd",
-          event.pid(), event.comm(), event.pid());
+          event.pid(), event.comm().c_str(), event.oom_score_adj());
   return std::string(line);
 }
 
