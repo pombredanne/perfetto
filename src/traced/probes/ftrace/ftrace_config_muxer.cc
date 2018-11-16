@@ -64,6 +64,15 @@ std::pair<std::string, std::string> EventToGroupAndName(
                         event.substr(slash_pos + 1));
 }
 
+std::set<std::string> GetEventsFromGroup(FtraceProcfs* ftrace_procfs,
+                                         const std::string& group) {
+  std::set<std::string> names =
+      ftrace_procfs->ReadDirectoryNames("/events/" + group);
+  names.erase("filter");
+  names.erase("enable");
+  return names;
+}
+
 }  // namespace
 
 std::set<std::string> GetFtraceEvents(const FtraceConfig& request,
@@ -263,30 +272,36 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
   if (RequiresAtrace(request))
     UpdateAtrace(request);
 
-  for (auto& name : events) {
+  for (auto& config_value : events) {
     std::string group;
-    std::string event_name;
-    std::tie(group, event_name) = EventToGroupAndName(name);
-    // TODO(taylori): Add all events for group if name is * e.g sched/*
-    const Event* event = table_->GetEventByName(event_name);
-    if (!event) {
-      // Events will only be added as generic events if the group is specified.
-      event = table_->AddGenericEvent(group, event_name);
+    std::string name;
+    std::set<std::string> event_names;
+    std::tie(group, name) = EventToGroupAndName(config_value);
+    event_names.insert(name);
+    if (name == "*")
+      event_names = GetEventsFromGroup(ftrace_, group);
+    for (const auto& event_name : event_names) {
+      const Event* event = table_->GetEventByName(event_name);
       if (!event) {
-        PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
+        // Events will only be added as generic events if the group is
+        // specified.
+        event = table_->AddGenericEvent(group, event_name);
+        if (!event) {
+          PERFETTO_DLOG("Can't enable %s, event not known", event_name.c_str());
+          continue;
+        }
+      }
+      if (current_state_.ftrace_events.count(event->name) ||
+          std::string("ftrace") == event->group) {
+        *actual.add_ftrace_events() = event->name;
         continue;
       }
-    }
-    if (current_state_.ftrace_events.count(event->name) ||
-        std::string("ftrace") == event->group) {
-      *actual.add_ftrace_events() = name;
-      continue;
-    }
-    if (ftrace_->EnableEvent(event->group, event->name)) {
-      current_state_.ftrace_events.insert(event->name);
-      *actual.add_ftrace_events() = event->name;
-    } else {
-      PERFETTO_DPLOG("Failed to enable %s.", name.c_str());
+      if (ftrace_->EnableEvent(event->group, event->name)) {
+        current_state_.ftrace_events.insert(event->name);
+        *actual.add_ftrace_events() = event->name;
+      } else {
+        PERFETTO_DPLOG("Failed to enable %s.", event_name.c_str());
+      }
     }
   }
 

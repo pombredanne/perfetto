@@ -22,7 +22,7 @@ namespace perfetto {
 namespace {
 
 bool IsGoodFtracePunctuation(char c) {
-  return c == '_' || c == '/';
+  return c == '_' || c == '/' || c == '*';
 }
 
 bool IsGoodAtracePunctuation(char c) {

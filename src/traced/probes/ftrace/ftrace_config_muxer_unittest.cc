@@ -54,6 +54,8 @@ class MockFtraceProcfs : public FtraceProcfs {
   MOCK_METHOD1(ClearFile, bool(const std::string& path));
   MOCK_CONST_METHOD1(ReadFileIntoString, std::string(const std::string& path));
   MOCK_CONST_METHOD0(NumberOfCpus, size_t());
+  MOCK_METHOD1(ReadDirectoryNames,
+               std::set<std::string>(const std::string& path));
 };
 
 struct MockRunAtrace {
@@ -82,6 +84,8 @@ class MockProtoTranslationTable : public ProtoTranslationTable {
                               ftrace_page_header_spec) {}
   MOCK_METHOD2(AddGenericEvent,
                Event*(const std::string& group, const std::string& event));
+  MOCK_CONST_METHOD0(name_to_event,
+                     const std::map<std::string, const Event*>());
 };
 
 class FtraceConfigMuxerTest : public ::testing::Test {
@@ -197,6 +201,7 @@ TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
   EXPECT_CALL(ftrace, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(ftrace,
               WriteToFile("/root/events/power/cpu_frequency/enable", "1"));
+  EXPECT_CALL(*mock_table, name_to_event()).Times(AnyNumber());
 
   Event event_to_return;
   event_to_return.name = "cpu_frequency";
@@ -210,6 +215,58 @@ TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
   const FtraceConfig* actual_config = model.GetConfig(id);
   EXPECT_TRUE(actual_config);
   EXPECT_THAT(actual_config->ftrace_events(), Contains("cpu_frequency"));
+}
+
+TEST_F(FtraceConfigMuxerTest, AddAllEvents) {
+  auto mock_table = GetMockTable();
+  MockFtraceProcfs ftrace;
+
+  FtraceConfig config = CreateFtraceConfig({"sched/*"});
+
+  ON_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
+      .WillByDefault(Return("[local] global boot"));
+  EXPECT_CALL(ftrace, ReadFileIntoString("/root/trace_clock"))
+      .Times(AnyNumber());
+
+  EXPECT_CALL(ftrace, ReadOneCharFromFile("/root/tracing_on"))
+      .Times(2)
+      .WillRepeatedly(Return('0'));
+  EXPECT_CALL(ftrace, WriteToFile("/root/buffer_size_kb", "512"));
+  EXPECT_CALL(ftrace, WriteToFile("/root/trace_clock", "boot"));
+  EXPECT_CALL(ftrace, WriteToFile("/root/tracing_on", "1"));
+  EXPECT_CALL(ftrace,
+              WriteToFile("/root/events/sched/sched_switch/enable", "1"));
+  EXPECT_CALL(ftrace,
+              WriteToFile("/root/events/sched/sched_new_event/enable", "1"));
+
+  FtraceConfigMuxer model(&ftrace, mock_table.get());
+  std::set<std::string> n = {"sched_switch", "sched_new_event", "enable",
+                             "filter"};
+  ON_CALL(ftrace, ReadDirectoryNames("/events/sched")).WillByDefault(Return(n));
+  EXPECT_CALL(ftrace, ReadDirectoryNames("/events/sched")).Times(1);
+
+  // Non-generic event.
+  std::map<std::string, const Event*> events;
+  const Event sched_switch = {"sched_switch", "sched"};
+  events["sched_switch"] = &sched_switch;
+  ON_CALL(*mock_table, name_to_event()).WillByDefault(Return(events));
+  EXPECT_CALL(*mock_table, name_to_event()).Times(AnyNumber());
+
+  // Generic event.
+  Event event_to_return;
+  event_to_return.name = "sched_new_event";
+  event_to_return.group = "sched";
+  ON_CALL(*mock_table, AddGenericEvent("sched", "sched_new_event"))
+      .WillByDefault(Return(&event_to_return));
+  EXPECT_CALL(*mock_table, AddGenericEvent("sched", "sched_new_event"));
+
+  FtraceConfigId id = model.SetupConfig(config);
+  ASSERT_TRUE(id);
+  ASSERT_TRUE(model.ActivateConfig(id));
+
+  const FtraceConfig* actual_config = model.GetConfig(id);
+  EXPECT_THAT(actual_config->ftrace_events(), Contains("sched_switch"));
+  EXPECT_THAT(actual_config->ftrace_events(), Contains("sched_new_event"));
 }
 
 TEST_F(FtraceConfigMuxerTest, TurnFtraceOnOff) {

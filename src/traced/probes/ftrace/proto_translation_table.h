@@ -75,9 +75,9 @@ class ProtoTranslationTable {
   const std::vector<Field>& common_fields() const { return common_fields_; }
 
   const Event* GetEventByName(const std::string& name) const {
-    if (!name_to_event_.count(name))
+    if (!name_to_event().count(name))
       return nullptr;
-    return name_to_event_.at(name);
+    return name_to_event().at(name);
   }
 
   const std::vector<const Event*>* GetEventsByGroup(
@@ -96,9 +96,9 @@ class ProtoTranslationTable {
   }
 
   size_t EventNameToFtraceId(const std::string& name) const {
-    if (!name_to_event_.count(name))
+    if (!name_to_event().count(name))
       return 0;
-    return name_to_event_.at(name)->ftrace_event_id;
+    return name_to_event().at(name)->ftrace_event_id;
   }
 
   const std::vector<Event>& events() { return events_; }
@@ -109,6 +109,12 @@ class ProtoTranslationTable {
   // Virtual for testing.
   virtual const Event* AddGenericEvent(const std::string& group,
                                        const std::string& event);
+
+ protected:
+  // Virtual for testing.
+  virtual const std::map<std::string, const Event*> name_to_event() const {
+    return name_to_event_;
+  }
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
