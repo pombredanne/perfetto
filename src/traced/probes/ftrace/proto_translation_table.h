@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <set>
@@ -26,6 +27,7 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
+#include "perfetto/base/string_view.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/format_parser.h"
 
@@ -61,9 +63,10 @@ class ProtoTranslationTable {
       const FtraceProcfs* ftrace_procfs,
       std::vector<Event> events,
       std::vector<Field> common_fields);
-  ~ProtoTranslationTable();
+  virtual ~ProtoTranslationTable();
 
-  ProtoTranslationTable(const std::vector<Event>& events,
+  ProtoTranslationTable(const FtraceProcfs* ftrace_procfs,
+                        const std::vector<Event>& events,
                         std::vector<Field> common_fields,
                         FtracePageHeaderSpec ftrace_page_header_spec);
 
@@ -103,16 +106,28 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
+  // Virtual for testing.
+  virtual const Event* AddGenericEvent(const std::string& group,
+                                       const std::string& event);
+
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
-  const std::vector<Event> events_;
+  // Store strings so they can be read when writing the trace output.
+  const char* InternString(const std::string& str);
+
+  uint16_t CreateGenericEventField(const FtraceEvent::Field& ftrace_field,
+                                   Event& event);
+
+  const FtraceProcfs* ftrace_procfs_;
+  std::vector<Event> events_;
   size_t largest_id_;
   std::map<std::string, const Event*> name_to_event_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};
+  std::set<std::string> interned_strings_;
 };
 
 }  // namespace perfetto

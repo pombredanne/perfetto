@@ -234,6 +234,7 @@ ftrace_proto_names = [
   "ftrace_event_bundle.proto",
   "ftrace_stats.proto",
   "test_bundle_wrapper.proto",
+  "generic.proto",
 )";
     for (const perfetto::FtraceEventName& event : whitelist) {
       if (!event.valid())

@@ -33,6 +33,7 @@
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -124,6 +125,8 @@ struct TimeStamp {
 };
 
 }  // namespace
+
+using protos::pbzero::GenericFtraceEvent;
 
 EventFilter::EventFilter(const ProtoTranslationTable& table,
                          std::set<std::string> names)
@@ -460,10 +463,27 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
-  for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, metadata);
+  // Parse generic event.
+  if (info.proto_field_id == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
+    nested->AppendString(GenericFtraceEvent::kEventNameFieldNumber, info.name);
+    for (const Field& field : info.fields) {
+      protozero::Message* generic_field =
+          nested->BeginNestedMessage<protozero::Message>(
+              GenericFtraceEvent::kFieldFieldNumber);
+      // TODO(taylori): Avoid outputting field names every time.
+      generic_field->AppendString(GenericFtraceEvent::Field::kNameFieldNumber,
+                                  field.ftrace_name);
+      generic_field->AppendString(GenericFtraceEvent::Field::kTypeFieldNumber,
+                                  ToString(field.ftrace_type));
+      success &= ParseField(field, start, end, generic_field, metadata);
+    }
+  } else {  // Parse all other events.
+    for (const Field& field : info.fields) {
+      success &= ParseField(field, start, end, nested, metadata);
+    }
+  }
 
-  // This finalizes |nested| automatically.
+  // This finalizes |nested| and |proto_field| automatically.
   message->Finalize();
   metadata->FinishEvent();
   return success;

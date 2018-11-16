@@ -1,0 +1,21 @@
+syntax = "proto2";
+option optimize_for = LITE_RUNTIME;
+package perfetto.protos;
+
+message GenericFtraceEvent {
+  message Field {
+    optional string name = 1;
+    // ftrace type
+    optional string type = 2;
+    oneof value {
+      string str_value = 3;
+      int32 int32_value = 4;
+      int64 int64_value = 5;
+      uint32 uint32_value = 6;
+      uint64 uint64_value = 7;
+    }
+  }
+
+  optional string event_name = 1;
+  repeated Field field = 2;
+}
