@@ -278,11 +278,8 @@ void Client::RecordMalloc(uint64_t alloc_size,
   metadata.stack_pointer = reinterpret_cast<uint64_t>(stacktop);
   metadata.stack_pointer_offset = sizeof(AllocMetadata);
   metadata.arch = unwindstack::Regs::CurrentArch();
-  // By using release for malloc and acquire for free, we make sure that the
-  // relative order of mallocs and frees is preserved, while not necessarily
-  // between different mallocs or different frees.
   metadata.sequence_number =
-      1 + sequence_number_.fetch_add(1, std::memory_order_release);
+      1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel);
 
   WireMessage msg{};
   msg.record_type = RecordType::Malloc;
@@ -301,7 +298,7 @@ void Client::RecordFree(uint64_t alloc_address) {
   if (!inited_.load(std::memory_order_acquire))
     return;
   free_page_.Add(alloc_address,
-                 1 + sequence_number_.fetch_add(1, std::memory_order_acquire),
+                 1 + sequence_number_.fetch_add(1, std::memory_order_acq_rel),
                  &socket_pool_);
 }
 
