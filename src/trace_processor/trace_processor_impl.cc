@@ -34,6 +34,7 @@
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/span_join_operator_table.h"
 #include "src/trace_processor/sql_stats_table.h"
+#include "src/trace_processor/stats_table.h"
 #include "src/trace_processor/string_table.h"
 #include "src/trace_processor/table.h"
 #include "src/trace_processor/thread_table.h"
@@ -51,8 +52,18 @@ namespace {
 void InitializeSqliteModules(sqlite3* db) {
   char* error = nullptr;
   sqlite3_percentile_init(db, &error, nullptr);
-  if (error != nullptr) {
+  if (error) {
     PERFETTO_ELOG("Error initializing: %s", error);
+    sqlite3_free(error);
+  }
+}
+
+void CreateBuiltinTables(sqlite3* db) {
+  char* error = nullptr;
+  sqlite3_exec(db, "CREATE TABLE perfetto_tables(name STRING)", 0, 0, &error);
+  if (error) {
+    PERFETTO_ELOG("Error initializing: %s", error);
+    sqlite3_free(error);
   }
 }
 }  // namespace
@@ -90,6 +101,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   sqlite3* db = nullptr;
   PERFETTO_CHECK(sqlite3_open(":memory:", &db) == SQLITE_OK);
   InitializeSqliteModules(db);
+  CreateBuiltinTables(db);
   db_.reset(std::move(db));
 
   context_.storage.reset(new TraceStorage());
@@ -110,6 +122,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   SpanJoinOperatorTable::RegisterTable(*db_, context_.storage.get());
   WindowOperatorTable::RegisterTable(*db_, context_.storage.get());
   InstantsTable::RegisterTable(*db_, context_.storage.get());
+  StatsTable::RegisterTable(*db_, context_.storage.get());
 }
 
 TraceProcessorImpl::~TraceProcessorImpl() = default;

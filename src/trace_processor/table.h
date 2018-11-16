@@ -138,12 +138,17 @@ class Table : public sqlite3_vtab {
   Table();
 
   // Called by derived classes to register themselves with the SQLite db.
+  // |read_write| specifies whether the table can also be written to.
+  // |requires_args| should be true if the table requires arguments in order to
+  // be instantiated.
   template <typename T>
   static void Register(sqlite3* db,
                        const TraceStorage* storage,
                        const std::string& name,
-                       bool read_write = false) {
-    RegisterInternal(db, storage, name, read_write, GetFactory<T>());
+                       bool read_write = false,
+                       bool requires_args = false) {
+    RegisterInternal(db, storage, name, read_write, requires_args,
+                     GetFactory<T>());
   }
 
   // Methods to be implemented by derived table classes.
@@ -159,6 +164,11 @@ class Table : public sqlite3_vtab {
   // At registration time, the function should also pass true for |read_write|.
   virtual int Update(int, sqlite3_value**, sqlite3_int64*);
 
+  void SetErrorMessage(char* error) {
+    sqlite3_free(zErrMsg);
+    zErrMsg = error;
+  }
+
   const Schema& schema() { return schema_; }
 
  private:
@@ -173,6 +183,7 @@ class Table : public sqlite3_vtab {
                                const TraceStorage*,
                                const std::string& name,
                                bool read_write,
+                               bool requires_args,
                                Factory);
 
   // Overriden functions from sqlite3_vtab.
