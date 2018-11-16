@@ -57,6 +57,7 @@ constexpr const char* kTracingPaths[] = {
 #endif
 
 constexpr int kDefaultDrainPeriodMs = 100;
+constexpr int kFlushTimeoutMs = 1000;
 constexpr int kMinDrainPeriodMs = 1;
 constexpr int kMaxDrainPeriodMs = 1000 * 60;
 
@@ -150,58 +151,72 @@ uint64_t FtraceController::NowMs() const {
   return static_cast<uint64_t>(base::GetWallTimeMs().count());
 }
 
-// static
-void FtraceController::DrainCPUs(base::WeakPtr<FtraceController> weak_this,
-                                 size_t generation) {
-  // The controller might be gone.
-  FtraceController* ctrl = weak_this.get();
-  if (!ctrl)
-    return;
+void FtraceController::DrainCPUs(size_t generation) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
 
   // We might have stopped tracing then quickly re-enabled it, in this case
   // we don't want to end up with two periodic tasks for each CPU:
-  if (ctrl->generation_ != generation)
+  if (generation_ != generation)
     return;
 
-  PERFETTO_DCHECK_THREAD(ctrl->thread_checker_);
+  const size_t num_cpus = ftrace_procfs_->NumberOfCpus();
+  FlushRequestID ack_flush_request_id = 0;
   std::bitset<base::kMaxCpus> cpus_to_drain;
   {
-    std::unique_lock<std::mutex> lock(ctrl->lock_);
-    // We might have stopped caring about events.
-    if (!ctrl->listening_for_raw_trace_data_)
-      return;
-    std::swap(cpus_to_drain, ctrl->cpus_to_drain_);
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    std::swap(cpus_to_drain, thread_sync_.cpus_to_drain);
+
+    if (cur_flush_request_id_) {
+      PERFETTO_DLOG("DrainCpus flush ack: %zu", thread_sync_.flush_acks.count());
+    }
+    // Check also if a flush is pending and if all cpus have acked. If that's
+    // the case, ack the overall Flush() request at the end of this function.
+    if (cur_flush_request_id_ && thread_sync_.flush_acks.count() >= num_cpus) {
+      thread_sync_.flush_acks.reset();
+      ack_flush_request_id = cur_flush_request_id_;
+      cur_flush_request_id_ = 0;
+      if (thread_sync_.cmd == FtraceThreadSync::kFlush)
+        IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
+    }
   }
 
-  for (size_t cpu = 0; cpu < ctrl->ftrace_procfs_->NumberOfCpus(); cpu++) {
+  for (size_t cpu = 0; cpu < num_cpus; cpu++) {
     if (!cpus_to_drain[cpu])
       continue;
     // This method reads the pipe and converts the raw ftrace data into
     // protobufs using the |data_source|'s TraceWriter.
-    ctrl->cpu_readers_[cpu]->Drain(ctrl->started_data_sources_);
-    ctrl->OnDrainCpuForTesting(cpu);
+    cpu_readers_[cpu]->Drain(started_data_sources_);
+    OnDrainCpuForTesting(cpu);
   }
 
   // If we filled up any SHM pages while draining the data, we will have posted
   // a task to notify traced about this. Only unblock the readers after this
   // notification is sent to make it less likely that they steal CPU time away
   // from traced.
-  ctrl->task_runner_->PostTask(
-      std::bind(&FtraceController::UnblockReaders, weak_this));
+  // If this drain was due to a flush request, UnblockReaders will be a no-op.
+  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostTask([weak_this] {
+    if (weak_this)
+      weak_this->UnblockReaders();
+  });
 
-  ctrl->observer_->OnFtraceDataWrittenIntoDataSourceBuffers();
+  observer_->OnFtraceDataWrittenIntoDataSourceBuffers();
+
+  // This will call FtraceDataSource::OnFtraceFlushComplete(), which will flush
+  // the userspace buffers and in turn ack the flush to the ProbesProducer.
+  if (ack_flush_request_id)
+    NotifyFlushCompleteToStartedDataSources(ack_flush_request_id);
 }
 
-// static
-void FtraceController::UnblockReaders(
-    const base::WeakPtr<FtraceController>& weak_this) {
-  FtraceController* ctrl = weak_this.get();
-  if (!ctrl)
+void FtraceController::UnblockReaders() {
+  // If a flush or a quit is pending, do nothing.
+  std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+  if (thread_sync_.cmd != FtraceThreadSync::kRun)
     return;
+
   // Unblock all waiting readers to start moving more data into their
   // respective staging pipes.
-  for (const auto& kv : ctrl->cpu_readers_)
-    kv.second->Wakeup();
+  IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
 }
 
 void FtraceController::StartIfNeeded() {
@@ -212,9 +227,11 @@ void FtraceController::StartIfNeeded() {
   generation_++;
   base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
 
-  // Sets the FtraceThreadSync state to kRun. The notify_all() is a no-op in
-  // this case because there is no thread waiting on the condition variable yet.
-  IssueThreadSyncCmd(FtraceThreadSync::kRun);
+  {
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    thread_sync_.cmd = FtraceThreadSync::kRun;
+    thread_sync_.cmd_id++;
+  }
 
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
     cpu_readers_.emplace(
@@ -249,58 +266,61 @@ void FtraceController::WriteTraceMarker(const std::string& s) {
   ftrace_procfs_->WriteTraceMarker(s);
 }
 
-void FtraceController::Flush(TODO_introduce_callback_here_and_timeout) {
+void FtraceController::Flush(FlushRequestID flush_id) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
 
-  TODO who re - kRun s here ?
+  if (flush_id == cur_flush_request_id_)
+    return;  // Already dealing with this flush request.
 
-  IssueThreadSyncCmd(FtraceThreadSync::kFlush);
-
-  if (!wait)
-    return;
-
-  const auto timeout = base::GetWallTimeMs() + base::TimeMillis(100);
-  const int expected_acks = static_cast<int>(cpu_readers_.size());
-  int seen_acks = 0;
-  do {
-    usleep(1000);
+  cur_flush_request_id_ = flush_id;
+  {
     std::unique_lock<std::mutex> lock(thread_sync_.mutex);
-    seen_acks = thread_sync_.flush_acks;
-    if (seen_acks >= expected_acks)
-      return; NOT really we need to wait for the OnDataAvailable() calls.
-  } while (base::GetWallTimeMs() < timeout);
+    thread_sync_.flush_acks.reset();
+    IssueThreadSyncCmd(FtraceThreadSync::kFlush, std::move(lock));
+  }
 
-  PERFETTO_ELOG("CpuReader::Flush() timed out, got %d out of %d acks.",
-                seen_acks, expected_acks);
-  PERFETTO_DCHECK(false);
+  // TODO who resets the state to kRun?
+
+  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+  task_runner_->PostDelayedTask(
+      [weak_this, flush_id] {
+        if (weak_this)
+          weak_this->OnFlushTimeout(flush_id);
+      },
+      kFlushTimeoutMs);
+}
+
+void FtraceController::OnFlushTimeout(FlushRequestID flush_request_id) {
+  if (flush_request_id != cur_flush_request_id_)
+    return;
+  unsigned long acks = 0;
+
+  {
+    // Unlock the cpu readers and move on.
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    acks = thread_sync_.flush_acks.to_ulong();
+    thread_sync_.flush_acks.reset();
+    if (thread_sync_.cmd == FtraceThreadSync::kFlush)
+      IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
+  }
+
+  PERFETTO_ELOG("Flush(%" PRIu64 ") timed out. Acked cpu set: 0x%lx",
+                flush_request_id, acks);
+  cur_flush_request_id_ = 0;
+  NotifyFlushCompleteToStartedDataSources(flush_request_id);
 }
 
 void FtraceController::StopIfNeeded() {
   if (!started_data_sources_.empty())
     return;
 
-  // TODO before landing: wait not really needed in dtor mode.
-  Flush(/*wait=*/true);
+  // We are not implicitly flushing on Stop. The tracing service is supposed to
+  // ask for an explicit flush before stopping, unless it needs to perform a
+  // non-graceful stop.
 
   IssueThreadSyncCmd(FtraceThreadSync::kQuit);
-  cpus_to_drain_.reset();
   cpu_readers_.clear();
-}
-
-void FtraceController::IssueThreadSyncCmd(FtraceThreadSync::Cmd cmd) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  {
-    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
-    thread_sync_.cmd = cmd;
-    thread_sync_.cmd_id++;
-  }
-
-  // Send a SIGPIPE to all worker threads to wake them up if they are sitting in
-  // a blocking splice.
-  for (const auto& kv : cpu_readers_)
-    kv.second->InterruptWorkerThreadWithSignal();
-
-  thread_sync_.cond.notify_all();
+  generation_++;
 }
 
 // This method is called on the worker thread. Lifetime is guaranteed to be
@@ -314,28 +334,37 @@ void FtraceController::OnDataAvailable(
     uint32_t drain_period_ms) {
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
 
-  std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+  // TODO we should probabl have a start/stop state at the controllerlevel and
+  // quit here, instead of relying on kQuit being final.
+  bool post_drain_task = false;
+  {
+    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    switch (thread_sync_.cmd) {
+      case FtraceThreadSync::kQuit:
+        return;  // Data arrived too late, ignore.
 
-  switch (thread_sync_.cmd) {
-    case FtraceThreadSync::kQuit:
-      return;  // Too late, ignore.
+      case FtraceThreadSync::kRun:
+        break;
 
-    case FtraceThreadSync::kRun:
-      if (thread_sync_.cpus_to_drain.none()) {
-        // If this was the first CPU to wake up, schedule a drain for the next
-        // drain interval.
-        uint32_t delay_ms = drain_period_ms - (NowMs() % drain_period_ms);
-        task_runner_->PostDelayedTask(
-            std::bind(&FtraceController::DrainCPUs, weak_this, generation),
-            delay_ms);
-      }
-      thread_sync_.cpus_to_drain[cpu] = true;
-      break;
+      case FtraceThreadSync::kFlush:
+        // In the case of a flush, drain soon to reduce flush latency. Flush
+        // should be quite rare and we don't care about extra cpu/wakeups
+        // required for the aggressive drain.
+        drain_period_ms = 0;
+        break;
+    }
+    // If this was the first CPU to wake up, schedule a drain for the next
+    // drain interval.
+    post_drain_task = thread_sync_.cpus_to_drain.none();
+    thread_sync_.cpus_to_drain[cpu] = true;
+  }  // lock(thread_sync_.mutex)
 
-    case FtraceThreadSync::kFlush:
-      thread_sync_.flush_acks
-      break;
-  }
+  task_runner_->PostDelayedTask(
+      [weak_this, generation] {
+        if (weak_this)
+          weak_this->DrainCPUs(generation);
+      },
+      drain_period_ms ? (drain_period_ms - (NowMs() % drain_period_ms)) : 0);
 }
 
 bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
@@ -381,6 +410,40 @@ void FtraceController::RemoveDataSource(FtraceDataSource* data_source) {
 
 void FtraceController::DumpFtraceStats(FtraceStats* stats) {
   DumpAllCpuStats(ftrace_procfs_.get(), stats);
+}
+
+void FtraceController::IssueThreadSyncCmd(
+    FtraceThreadSync::Cmd cmd,
+    std::unique_lock<std::mutex> already_locked) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  {
+    std::unique_lock<std::mutex> lock(std::move(already_locked));
+    if (!lock.owns_lock())
+      lock = std::unique_lock<std::mutex>(thread_sync_.mutex);
+
+    // If in kQuit state, we should never issue any other commands.
+    PERFETTO_DCHECK(thread_sync_.cmd != FtraceThreadSync::kQuit ||
+                    cmd == FtraceThreadSync::kQuit);
+    thread_sync_.cmd = cmd;
+    thread_sync_.cmd_id++;
+  }
+
+  // Send a SIGPIPE to all worker threads to wake them up if they are sitting in
+  // a blocking splice(). If they are not and instead they are sitting in the
+  // cond-variable.wait(), this, together with the one below, will have at best
+  // the same effect of a spurious wakeup, depending on the implementation of
+  // the condition variable.
+  for (const auto& kv : cpu_readers_)
+    kv.second->InterruptWorkerThreadWithSignal();
+
+  thread_sync_.cond.notify_all();
+}
+
+void FtraceController::NotifyFlushCompleteToStartedDataSources(
+    FlushRequestID flush_request_id) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  for (FtraceDataSource* data_source : started_data_sources_)
+    data_source->OnFtraceFlushComplete(flush_request_id);
 }
 
 FtraceController::Observer::~Observer() = default;

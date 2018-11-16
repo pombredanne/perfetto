@@ -47,6 +47,10 @@ namespace {
 
 constexpr uint32_t kInitialConnectionBackoffMs = 100;
 constexpr uint32_t kMaxConnectionBackoffMs = 30 * 1000;
+
+// Should be larger than FtraceController::kFlushTimeoutMs.
+constexpr uint32_t kFlushTimeoutMs = 2000;
+
 constexpr char kFtraceSourceName[] = "linux.ftrace";
 constexpr char kProcessStatsSourceName[] = "linux.process_stats";
 constexpr char kInodeMapSourceName[] = "linux.inode_file_map";
@@ -280,19 +284,59 @@ void ProbesProducer::OnTracingSetup() {}
 void ProbesProducer::Flush(FlushRequestID flush_request_id,
                            const DataSourceInstanceID* data_source_ids,
                            size_t num_data_sources) {
-  bool flush_ftrace = false;
+  PERFETTO_DCHECK(flush_request_id);
+  auto weak_this = weak_factory_.GetWeakPtr();
   for (size_t i = 0; i < num_data_sources; i++) {
-    auto it = data_sources_.find(data_source_ids[i]);
+    DataSourceInstanceID ds_id = data_source_ids[i];
+    auto it = data_sources_.find(ds_id);
     if (it == data_sources_.end() || !it->second->started)
       continue;
-    it->second->Flush();
-    if (it->second->type_id == FtraceDataSource::kTypeId)
-      flush_ftrace = true;
+    auto on_flush = [weak_this, flush_request_id, ds_id] {
+      if (weak_this)
+        weak_this->OnDataSourceFlushComplete(flush_request_id, ds_id);
+    };
+    auto post_on_flush = [weak_this, on_flush] {
+      if (weak_this)
+        weak_this->task_runner_->PostTask(on_flush);
+    };
+    pending_flushes_.emplace(flush_request_id, ds_id);
+    it->second->Flush(flush_request_id, post_on_flush);
   }
-  if (flush_ftrace && ftrace_) {
-    ftrace_->Flush(flush_request_id);
-    // TODO before landing HERE, after the FtraceController flush callback we should also flush the writer.
+
+  if (pending_flushes_.count(flush_request_id)) {
+    task_runner_->PostDelayedTask([weak_this, flush_request_id] {
+      if (weak_this)
+        weak_this->OnFlushTimeout(flush_request_id);
+    }, kFlushTimeoutMs);
+  } else {
+    // Ack immediately if no data sources were registered.
+    endpoint_->NotifyFlushComplete(flush_request_id);
   }
+}
+
+void ProbesProducer::OnDataSourceFlushComplete(
+    FlushRequestID flush_request_id, DataSourceInstanceID ds_id) {
+  PERFETTO_DLOG("Flush %" PRIu64 " done for data source %" PRIu64 " pending %zu", flush_request_id, ds_id, pending_flushes_.size());
+  auto range = pending_flushes_.equal_range(flush_request_id);
+  for (auto it = range.first; it != range.second; it++) {
+    if (it->second == ds_id) {
+       pending_flushes_.erase(it);
+       break;
+    }
+  }
+
+  if (pending_flushes_.count(flush_request_id))
+    return;  // Other data sources pending.
+
+  PERFETTO_DLOG("All data sources acked to flush %" PRIu64, flush_request_id);
+  endpoint_->NotifyFlushComplete(flush_request_id);
+}
+
+void ProbesProducer::OnFlushTimeout(FlushRequestID flush_request_id) {
+  if (pending_flushes_.count(flush_request_id) == 0)
+    return;
+  PERFETTO_ELOG("Flush(%" PRIu64 ") timed out", flush_request_id);
+  pending_flushes_.erase(flush_request_id);
   endpoint_->NotifyFlushComplete(flush_request_id);
 }
 

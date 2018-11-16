@@ -196,7 +196,7 @@ CpuReader::~CpuReader() {
   // trace fd (which prevents another splice from starting), raise SIGPIPE and
   // wait for the worker to exit (i.e., to guarantee no splice is in progress)
   // and only then close the staging pipe.
-  trace_fd_.reset();
+  trace_fd_.reset();  // Should this be moved down now?
   InterruptWorkerThreadWithSignal();
   worker_thread_.join();
 }
@@ -224,23 +224,21 @@ void CpuReader::RunWorkerThread(
   snprintf(thread_name, sizeof(thread_name), "traced_probes%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
   uint64_t last_cmd_id = 0;
-  uint32_t increment_flush_ack = 0;
 
   for (bool run_loop = true; run_loop;) {
     FtraceThreadSync::Cmd cmd;
     {
       std::unique_lock<std::mutex> lock(thread_sync->mutex);
-      thread_sync->flush_acks += increment_flush_ack;
-      increment_flush_ack = 0;
-      while (thread_sync->cmd_id != last_cmd_id)
-        thread_sync->wait(lock);
+      while (thread_sync->cmd_id == last_cmd_id) {
+        thread_sync->cond.wait(lock);
+      }
       cmd = thread_sync->cmd;
       last_cmd_id = thread_sync->cmd_id;
     }
+    PERFETTO_DLOG("CPU %zu cmd: %u", cpu, cmd);
 
     switch (cmd) {
-      case FtraceThreadSync::kExit:
-        PERFETTO_DPLOG("Stopping CPUReader thread for CPU %zd.", cpu);
+      case FtraceThreadSync::kQuit:
         run_loop = false;
         break;
 
@@ -276,16 +274,15 @@ void CpuReader::RunWorkerThread(
           }
 
           if (saved_err == ENOMEM || saved_err == EBUSY || saved_err == EINTR) {
-            // Case B. Wait and repeat. State is unchanged (ThreadCtl::kRun).
-            PERFETTO_DPLOG("Transient splice failure, retrying");
-            usleep(100 * 1000);
+            // Case B. Wait for the next kRun command (or any other).
+            if (saved_err != EINTR)
+              PERFETTO_DPLOG("Transient splice failure (errno: %d)", errno);
             break;
           }
 
           // Case C.
           errno = saved_err;
-          PERFETTO_FATAL("CpuReader failed with an unrecoverable errno:%d",
-                         saved_err);
+          PERFETTO_FATAL("Unrecoverable splice() error on cpu %zu", cpu);
         }
 
         // The blocking splice() succeeded. Now do as many non-blocking splices
@@ -299,7 +296,7 @@ void CpuReader::RunWorkerThread(
                      base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
           if (splice_res < 0) {
             if (errno != EAGAIN && errno != ENOMEM && errno != EBUSY)
-              PERFETTO_PLOG("non-blocking splice()");
+              PERFETTO_PLOG("splice(SPLICE_F_NONBLOCK) error");
             break;
           }
         }
@@ -314,35 +311,52 @@ void CpuReader::RunWorkerThread(
         // Go back to the main loop, waiting for the next command.
       } break;
 
-      case FtraceThreadSync::kFlush:
-        PERFETTO_DLOG("Flushing CPUReader %zd", cpu);
+      case FtraceThreadSync::kFlush: {
+        PERFETTO_METATRACE("Flush", cpu);
+        PERFETTO_DLOG("Flushing CPUReader %zd", cpu);  //////////////////////////////
         SetBlocking(trace_fd, false);  // TODO before landing make failure non fatal.
-        {
-          // Don't change the |buf| size. This relying on PIPE_BUF == 4096
-          // on Linux and on writes <= PIPE_BUF being atomic.
-          auto buf = base::PagedMemory::Allocate(base::kPageSize);
+        // |buf| needs to be precisely 4k. It relies on PIPE_BUF == 4096
+        // on Linux and on the fact that writes <= PIPE_BUF are atomic.
+        auto buf = base::PagedMemory::Allocate(base::kPageSize);
+
+        // Put a hard limit to the read() attempts. We can easily get into a
+        // livelock state where our own scheduling activity produce lot of
+        // trace data.
+        for(size_t i = 0; i < 64; i++) {
           auto rsize = read(trace_fd, buf.Get(), base::kPageSize);
-          if (rsize > 0) {
-            // Writing <= PIPE_BUF bytes on a non-blocking pipe is guaranteed
-            // to be atomic.
-            auto wsize =
-                write(staging_write_fd, buf.Get(), static_cast<size_t>(rsize));
-            if (wsize < 0) {
-              PERFETTO_PLOG("CPUReader flush write() failed");
-              // TODO before landing. What else can we do here? Maybe wait a
-              // bit? But that coud deadlock if the main thread is waiting in Flush().
-            }
+          if (rsize <= 0)
+            break;
+          // Writing <= 4k on a non-blocking pipe is guaranteed to be atomic.
+          auto wsize =
+              write(staging_write_fd, buf.Get(), static_cast<size_t>(rsize));
+          if (wsize < 0) {
+            PERFETTO_PLOG("CPUReader flush write() failed");
+            // TODO before landing. What else can we do here? Maybe wait a
+            // bit? But that coud deadlock if the main thread is waiting in Flush().
+            // remember that we can be re-ckicked for timedout here.
           }
+          // If the read becomes significantly smaller than a page size, it
+          // means that we have consumed the last page of the ftrace buffer and
+          // started consuming events in real-time.
+          if (rsize < 1024)
+            break;
         }
         SetBlocking(trace_fd, true);  // TODO before landing make failure non fatal.
+        PERFETTO_DLOG("Flushed CPUReader %zd", cpu);  //////////////////////////////
 
-        // The locked section on the top of the loop will deal with this.
-        HMM maybe this should just on_data_available() and FtraceController
-        should deal with the bookkeeping.
-        increment_flush_ack = 1;
+        {
+          std::unique_lock<std::mutex> lock(thread_sync->mutex);
+          thread_sync->flush_acks.set(cpu);
+        }
+
+        // TODO: on_data_available should be called within the loop if the write fails to prevent deadlock.
+        on_data_available();
+
         break;
+      }
     }
   }
+  PERFETTO_DPLOG("Terminating CPUReader thread for CPU %zd.", cpu);
 #else
   base::ignore_result(cpu);
   base::ignore_result(trace_fd);

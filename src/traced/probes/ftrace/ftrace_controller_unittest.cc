@@ -217,8 +217,8 @@ class TestFtraceController : public FtraceController,
   void WaitForData(size_t cpu) {
     while (true) {
       {
-        std::unique_lock<std::mutex> lock(lock_);
-        if (cpus_to_drain_[cpu])
+        std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+        if (thread_sync_.cpus_to_drain[cpu])
           return;
       }
       usleep(5000);

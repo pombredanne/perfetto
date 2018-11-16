@@ -71,6 +71,8 @@ void TraceWriterImpl::Flush(std::function<void()> callback) {
     shmem_arbiter_->FlushPendingCommitDataRequests(callback);
   } else {
     PERFETTO_DCHECK(patch_list_.empty());
+    PERFETTO_DLOG("TraceWriterImpl::Flush: nothing to flush");
+    callback();  // TODO needs posting
   }
   protobuf_stream_writer_.Reset({nullptr, nullptr});
 }

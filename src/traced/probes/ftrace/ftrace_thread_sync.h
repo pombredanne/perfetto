@@ -33,12 +33,15 @@ namespace perfetto {
 // instance of this state, owned by the FtraceController and shared with all
 // CpuReader(s).
 struct FtraceThreadSync {
-  // Mutex & condition variable shared by all threads. All variables below
-  // are read and modified only under |mutex|.
+  // Mutex & condition variable shared by main thread and all per-cpu workers.
+  // All fields of this class are read and modified holding |mutex|.
   std::mutex mutex;
+
+  // Used to suspend CpuReader(s) between cycles and to wake them up at the
+  // same time.
   std::condition_variable cond;
 
-  // These variables are written only by FtraceController. On each cycle,
+  // |cmd| and |cmd_id| are written only by FtraceController. On each cycle,
   // FtraceController increases the |cmd_id| monotonic counter and issues the
   // new command. |cmd_id| is used by the CpuReader(s) to distinguish a new
   // command from a spurious wakeup.
@@ -46,17 +49,14 @@ struct FtraceThreadSync {
   Cmd cmd = kRun;
   uint64_t cmd_id = 0;
 
-  // Incremented by the FtraceController every time ftrace is re-started.
-  uint64_t generation = 0;
-
   // This bitmap is cleared by the FtraceController before every kRun command
   // and is optionally set by OnDataAvailable() if a CpuReader did fetch any
   // ftrace data during the read cycle.
   std::bitset<base::kMaxCpus> cpus_to_drain;
 
-  // This is set to 0 by the FtraceController before issuing a kFlush command
-  // and is increased by each CpuReader after they have completed the flush.
-  int flush_acks = 0;
+  // This bitmap is cleared by the FtraceController before issuing a kFlush
+  // command and set by each CpuReader after they have completed the flush.
+  std::bitset<base::kMaxCpus> flush_acks;
 };
 
 }  // namespace perfetto

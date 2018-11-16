@@ -60,7 +60,7 @@ constexpr size_t kDefaultShmPageSize = base::kPageSize;
 constexpr int kMaxBuffersPerConsumer = 128;
 constexpr base::TimeMillis kSnapshotsInterval(10 * 1000);
 constexpr int kDefaultWriteIntoFilePeriodMs = 5000;
-constexpr int kFlushTimeoutMs = 1000;
+constexpr int kFlushTimeoutMs = 3000;
 constexpr int kMaxConcurrentTracingSessions = 5;
 
 constexpr uint64_t kMillisPerHour = 3600000;
@@ -587,6 +587,7 @@ void TracingServiceImpl::Flush(TracingSessionID tsid,
   }
 
   FlushRequestID flush_request_id = ++last_flush_request_id_;
+  PERFETTO_DLOG("Flushing, req=%" PRIu64, flush_request_id);
   PendingFlush& pending_flush =
       tracing_session->pending_flushes
           .emplace_hint(tracing_session->pending_flushes.end(),
