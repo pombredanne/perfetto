@@ -476,6 +476,7 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
         "signed:%d)",
         event.name, field->ftrace_name, ftrace_field.type_and_name.c_str(),
         ftrace_field.size, ftrace_field.is_signed);
+    event.fields.pop_back();
     return field_end;
   }
   SetProtoType(field->ftrace_type, &field->proto_field_type,
