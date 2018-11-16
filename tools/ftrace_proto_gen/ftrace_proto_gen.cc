@@ -26,6 +26,7 @@
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/string_splitter.h"
+#include "perfetto/trace/ftrace/ftrace_event.pb.h"
 
 namespace perfetto {
 
@@ -414,8 +415,6 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
 
   int i = 3;
   for (const FtraceEventName& event : raw_whitelist) {
-    if (i == 326)
-      *fout << "    GenericFtraceEvent generic = " << i++ << ";\n";
     if (!event.valid()) {
       *fout << "    // removed field with id " << i << ";\n";
       ++i;
@@ -425,9 +424,11 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
     *fout << "    " << ToCamelCase(event.name()) << "FtraceEvent "
           << event.name() << " = " << i << ";\n";
     ++i;
+    if (i == protos::FtraceEvent::kGenericFieldNumber) {
+      *fout << "    GenericFtraceEvent generic = " << i << ";\n";
+      ++i;
+    }
   }
-  if (i == 326)
-    *fout << "    GenericFtraceEvent generic = " << i << ";\n";
   *fout << "  }\n";
   *fout << "}\n";
 }

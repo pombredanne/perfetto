@@ -410,14 +410,15 @@ ProtoTranslationTable::ProtoTranslationTable(
   }
 }
 
-const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
-                                                    const std::string event) {
+const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
+                                                    const std::string& event) {
   // Read the format file and create the ftrace event
-  std::string contents = ftrace_procfs_->ReadEventFormat(group, event);
-  FtraceEvent ftrace_event;
-  if (contents.empty()) {
+  if (group.empty() || event.empty())
     return nullptr;
-  }
+  std::string contents = ftrace_procfs_->ReadEventFormat(group, event);
+  if (contents.empty())
+    return nullptr;
+  FtraceEvent ftrace_event;
   ParseFtraceEvent(contents, &ftrace_event);
 
   // Ensure events vector is large enough
@@ -430,14 +431,13 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
   e->proto_field_id = protos::pbzero::FtraceEvent::kGenericFieldNumber;
-  e->name = InternString(base::StringView(event));
-  e->group = InternString(base::StringView(group));
+  e->name = InternString(event);
+  e->group = InternString(group);
 
   // Calculate size of common fields.
-  uint16_t common_field_end = 0;
   for (const FtraceEvent::Field& ftrace_field : ftrace_event.common_fields) {
     uint16_t field_end = ftrace_field.offset + ftrace_field.size;
-    common_field_end = std::max(field_end, common_field_end);
+    e->size = std::max(field_end, e->size);
   }
 
   // For every field in the ftrace event, make a field in the generic event.
@@ -446,26 +446,38 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string group,
 
   name_to_event_[e->name] = &events_.at(e->ftrace_event_id);
   group_to_events_[e->group].push_back(&events_.at(e->ftrace_event_id));
-  e->size = std::max(e->size, common_field_end);
 
   return e;
 };
 
-const char* ProtoTranslationTable::InternString(base::StringView str) {
-  auto it_and_inserted = interned_strings_.insert(str.ToStdString());
+const char* ProtoTranslationTable::InternString(const std::string& str) {
+  auto it_and_inserted = interned_strings_.insert(str);
   return it_and_inserted.first->c_str();
 };
 
 uint16_t ProtoTranslationTable::CreateGenericEventField(
     const FtraceEvent::Field& ftrace_field,
     Event& event) {
-  const char* field_name = InternString(
-      base::StringView(GetNameFromTypeAndName(ftrace_field.type_and_name)));
+  uint16_t field_end = ftrace_field.offset + ftrace_field.size;
+  std::string field_name = GetNameFromTypeAndName(ftrace_field.type_and_name);
+  if (field_name.empty()) {
+    PERFETTO_DLOG("Field: %s could not be added to the generic event.",
+                  ftrace_field.type_and_name);
+    return field_end;
+  }
   event.fields.emplace_back();
   Field* field = &event.fields.back();
-  field->ftrace_name = field_name;
-  InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
-                  ftrace_field.is_signed, &field->ftrace_type);
+  field->ftrace_name = InternString(field_name);
+  if (!InferFtraceType(ftrace_field.type_and_name, ftrace_field.size,
+                       ftrace_field.is_signed, &field->ftrace_type)) {
+    PERFETTO_DLOG(
+        "Failed to infer ftrace field type for \"%s.%s\" (type:\"%s\" "
+        "size:%d "
+        "signed:%d)",
+        event.name, field->ftrace_name, ftrace_field.type_and_name.c_str(),
+        ftrace_field.size, ftrace_field.is_signed);
+    return field_end;
+  }
   SetProtoType(field->ftrace_type, &field->proto_field_type,
                &field->proto_field_id);
   field->ftrace_offset = ftrace_field.offset;
@@ -474,7 +486,7 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
   // translation strategy.
   PERFETTO_DCHECK(SetTranslationStrategy(
       field->ftrace_type, field->proto_field_type, &field->strategy));
-  return field->ftrace_offset + field->ftrace_size;
+  return field_end;
 }
 
 ProtoTranslationTable::~ProtoTranslationTable() = default;

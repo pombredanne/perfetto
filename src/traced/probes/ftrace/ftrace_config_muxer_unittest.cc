@@ -81,7 +81,7 @@ class MockProtoTranslationTable : public ProtoTranslationTable {
                               common_fields,
                               ftrace_page_header_spec) {}
   MOCK_METHOD2(AddGenericEvent,
-               Event*(const std::string group, const std::string event));
+               Event*(const std::string& group, const std::string& event));
 };
 
 class FtraceConfigMuxerTest : public ::testing::Test {

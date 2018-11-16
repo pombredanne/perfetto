@@ -107,15 +107,15 @@ class ProtoTranslationTable {
   }
 
   // Virtual for testing.
-  virtual const Event* AddGenericEvent(const std::string group,
-                                       const std::string event);
+  virtual const Event* AddGenericEvent(const std::string& group,
+                                       const std::string& event);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
   // Store strings so they can be read when writing the trace output.
-  const char* InternString(base::StringView name);
+  const char* InternString(const std::string& str);
 
   uint16_t CreateGenericEventField(const FtraceEvent::Field& ftrace_field,
                                    Event& event);
