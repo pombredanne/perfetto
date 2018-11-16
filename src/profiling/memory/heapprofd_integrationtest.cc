@@ -93,6 +93,7 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
   task_runner.RunUntilCheckpoint("done");
   th.join();
 }
+
 TEST_F(HeapprofdIntegrationTest, MAYBE_MultiSession) {
   GlobalCallstackTrie callsites;
   // TODO(fmayer): Actually test the dump.
