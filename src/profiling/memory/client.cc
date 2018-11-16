@@ -259,7 +259,7 @@ const char* Client::GetStackBase() {
 void Client::RecordMalloc(uint64_t alloc_size,
                           uint64_t total_size,
                           uint64_t alloc_address) {
-  if (!inited_.load(std::memory_order_relaxed))
+  if (!inited_.load(std::memory_order_acquire))
     return;
   AllocMetadata metadata;
   const char* stackbase = GetStackBase();
