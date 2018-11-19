@@ -311,6 +311,7 @@ import "perfetto/trace/ftrace/clk_set_rate.proto";
 import "perfetto/trace/ftrace/binder_transaction_alloc_buf.proto";
 import "perfetto/trace/ftrace/signal_deliver.proto";
 import "perfetto/trace/ftrace/signal_generate.proto";
+import "perfetto/trace/ftrace/oom_score_adj_update.proto";
 import "perfetto/trace/ftrace/generic.proto";
 
 package perfetto.protos;
@@ -666,6 +667,7 @@ message FtraceEvent {
     BinderTransactionAllocBufFtraceEvent binder_transaction_alloc_buf = 323;
     SignalDeliverFtraceEvent signal_deliver = 324;
     SignalGenerateFtraceEvent signal_generate = 325;
-    GenericFtraceEvent generic = 326;
+    OomScoreAdjUpdateFtraceEvent oom_score_adj_update = 326;
+    GenericFtraceEvent generic = 327;
   }
 }

@@ -462,7 +462,7 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
   std::string field_name = GetNameFromTypeAndName(ftrace_field.type_and_name);
   if (field_name.empty()) {
     PERFETTO_DLOG("Field: %s could not be added to the generic event.",
-                  ftrace_field.type_and_name);
+                  ftrace_field.type_and_name.c_str());
     return field_end;
   }
   event.fields.emplace_back();
