@@ -91,6 +91,7 @@ cc_binary {
   ],
   shared_libs: [
     "libbase",
+    "libdexfile",
     "liblog",
     "libprocinfo",
     "libprotobuf-cpp-lite",
@@ -153,6 +154,7 @@ cc_library_shared {
   ],
   shared_libs: [
     "libbase",
+    "libdexfile",
     "liblog",
     "libprocinfo",
     "libunwindstack",
@@ -4650,6 +4652,7 @@ cc_test {
   shared_libs: [
     "libandroid",
     "libbase",
+    "libdexfile",
     "liblog",
     "libprocinfo",
     "libprotobuf-cpp-full",

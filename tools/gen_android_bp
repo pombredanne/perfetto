@@ -129,6 +129,8 @@ def enable_protoc_lib(module):
     module.shared_libs.append('libprotoc')
 
 def enable_libunwindstack(module):
+    # libdexfile must go before libunwindstack to get the real dex file hooks.
+    module.shared_libs.append('libdexfile')
     module.shared_libs.append('libunwindstack')
     module.shared_libs.append('libprocinfo')
     module.shared_libs.append('libbase')
