@@ -54,8 +54,6 @@ group("all") {
       ":traced",
       ":traced_probes",
       "protos/perfetto/config:merged_config",  # For syntax-checking the proto.
-      "protos/perfetto/profiling:lite",  # For syntax-checking the proto.
-                                         # TODO(fmayer): Remove once used.
       "src/ipc/protoc_plugin:ipc_plugin($host_toolchain)",
       "tools:protoc_helper",
     ]
@@ -68,6 +66,7 @@ group("all") {
         "tools/ftrace_proto_gen:ftrace_proto_gen",
         "tools/proto_to_cpp",
         "tools/trace_to_text",
+        "tools/trace_to_text:trace_to_text_lite_host($host_toolchain)",
       ]
       if (is_linux || is_android) {
         deps += [ "tools/skippy" ]
@@ -298,6 +297,7 @@ if (should_build_heapprofd) {
   executable("heapprofd") {
     deps = [
       "gn:default_deps",
+      "protos/perfetto/trace:zero",
       "src/base",
       "src/base:unix_socket",
       "src/profiling/memory:daemon",

@@ -22,7 +22,7 @@
  * by
  * ../../tools/proto_to_cpp/proto_to_cpp.cc.
  * If you need to make changes here, change the .proto file and then run
- * ./tools/gen_tracing_cpp_headers_from_protos.py
+ * ./tools/gen_tracing_cpp_headers_from_protos
  */
 
 #ifndef INCLUDE_PERFETTO_TRACING_CORE_TRACE_CONFIG_H_
@@ -53,6 +53,7 @@ class SysStatsConfig;
 class HeapprofdConfig;
 class HeapprofdConfig_ContinousDumpConfig;
 class TestConfig;
+class TestConfig_DummyFields;
 class TraceConfig_ProducerConfig;
 class TraceConfig_StatsdMetadata;
 class TraceConfig_GuardrailOverrides;

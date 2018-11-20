@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#ifndef TOOLS_TRACE_TO_TEXT_TRACE_TO_SUMMARY_H_
-#define TOOLS_TRACE_TO_TEXT_TRACE_TO_SUMMARY_H_
+#ifndef TOOLS_TRACE_TO_TEXT_TRACE_TO_PROFILE_H_
+#define TOOLS_TRACE_TO_TEXT_TRACE_TO_PROFILE_H_
 
 #include <iostream>
 
 namespace perfetto {
 namespace trace_to_text {
 
-int TraceToSummary(std::istream* input,
-                   std::ostream* output,
-                   bool compact_output);
+int TraceToProfile(std::istream* input, std::ostream* output);
 
 }  // namespace trace_to_text
 }  // namespace perfetto
 
-#endif  // TOOLS_TRACE_TO_TEXT_TRACE_TO_SUMMARY_H_
+#endif  // TOOLS_TRACE_TO_TEXT_TRACE_TO_PROFILE_H_

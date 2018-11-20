@@ -31,6 +31,7 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/file_utils.h"
 #include "perfetto/base/logging.h"
+#include "perfetto/base/metatrace.h"
 #include "perfetto/base/time.h"
 #include "perfetto/tracing/core/trace_writer.h"
 #include "src/traced/probes/ftrace/cpu_reader.h"
@@ -42,6 +43,7 @@
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/traced/probes/ftrace/ftrace_stats.h"
 #include "src/traced/probes/ftrace/proto_translation_table.h"
+
 
 namespace perfetto {
 namespace {
@@ -57,7 +59,7 @@ constexpr const char* kTracingPaths[] = {
 #endif
 
 constexpr int kDefaultDrainPeriodMs = 100;
-constexpr int kFlushTimeoutMs = 1000;
+constexpr int kFlushTimeoutMs = 250;
 constexpr int kMinDrainPeriodMs = 1;
 constexpr int kMaxDrainPeriodMs = 1000 * 60;
 
@@ -153,6 +155,7 @@ uint64_t FtraceController::NowMs() const {
 
 void FtraceController::DrainCPUs(size_t generation) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_METATRACE("DrainCPUs()", 0);
 
   // We might have stopped tracing then quickly re-enabled it, in this case
   // we don't want to end up with two periodic tasks for each CPU:
@@ -175,8 +178,6 @@ void FtraceController::DrainCPUs(size_t generation) {
       thread_sync_.flush_acks.reset();
       ack_flush_request_id = cur_flush_request_id_;
       cur_flush_request_id_ = 0;
-      if (thread_sync_.cmd == FtraceThreadSync::kFlush)
-        IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
     }
   }
 
@@ -202,13 +203,21 @@ void FtraceController::DrainCPUs(size_t generation) {
 
   observer_->OnFtraceDataWrittenIntoDataSourceBuffers();
 
-  // This will call FtraceDataSource::OnFtraceFlushComplete(), which will flush
-  // the userspace buffers and in turn ack the flush to the ProbesProducer.
-  if (ack_flush_request_id)
+  if (ack_flush_request_id) {
+    {
+      std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+      if (thread_sync_.cmd == FtraceThreadSync::kFlush)
+        IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
+    }
+    // This will call FtraceDataSource::OnFtraceFlushComplete(), which in turn
+    // will flush the userspace buffers and ack the flush to the ProbesProducer.
     NotifyFlushCompleteToStartedDataSources(ack_flush_request_id);
+  }
 }
 
 void FtraceController::UnblockReaders() {
+  PERFETTO_METATRACE("UnblockReaders()", 0);
+
   // If a flush or a quit is pending, do nothing.
   std::unique_lock<std::mutex> lock(thread_sync_.mutex);
   if (thread_sync_.cmd != FtraceThreadSync::kRun)
@@ -333,6 +342,7 @@ void FtraceController::OnDataAvailable(
     size_t cpu,
     uint32_t drain_period_ms) {
   PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
+  PERFETTO_METATRACE("OnDataAvailable()", cpu);
 
   // TODO we should probabl have a start/stop state at the controllerlevel and
   // quit here, instead of relying on kQuit being final.
@@ -358,6 +368,9 @@ void FtraceController::OnDataAvailable(
     post_drain_task = thread_sync_.cpus_to_drain.none();
     thread_sync_.cpus_to_drain[cpu] = true;
   }  // lock(thread_sync_.mutex)
+
+  if (!post_drain_task)
+    return;
 
   task_runner_->PostDelayedTask(
       [weak_this, generation] {

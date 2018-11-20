@@ -18,7 +18,7 @@
 #include <iostream>
 
 #include "perfetto/base/logging.h"
-#include "tools/trace_to_text/trace_to_summary.h"
+#include "tools/trace_to_text/trace_to_profile.h"
 #include "tools/trace_to_text/trace_to_systrace.h"
 #include "tools/trace_to_text/trace_to_text.h"
 
@@ -26,7 +26,7 @@ namespace {
 
 int Usage(const char* argv0) {
   printf(
-      "Usage: %s systrace|json|text|summary|short_summary [trace.proto] "
+      "Usage: %s systrace|json|text|profile [trace.pb] "
       "[trace.txt]\n",
       argv0);
   return 1;
@@ -79,12 +79,8 @@ int main(int argc, char** argv) {
   if (format == "text")
     return perfetto::trace_to_text::TraceToText(input_stream, output_stream);
 
-  if (format == "summary")
-    return perfetto::trace_to_text::TraceToSummary(input_stream, output_stream,
-                                                   /* compact_output */ false);
-  if (format == "short_summary")
-    return perfetto::trace_to_text::TraceToSummary(input_stream, output_stream,
-                                                   /* compact_output */ true);
+  if (format == "profile")
+    return perfetto::trace_to_text::TraceToProfile(input_stream, output_stream);
 
   return Usage(argv[0]);
 }
