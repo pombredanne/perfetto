@@ -86,6 +86,7 @@ bool CoerceToUint64(const Json::Value& value, uint64_t* integer_ptr) {
   switch (static_cast<size_t>(value.type())) {
     case Json::uintValue:
     case Json::intValue:
+    case Json::realValue:
       *integer_ptr = value.asUInt64();
       return true;
     case Json::stringValue: {
@@ -149,10 +150,15 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     if (!ph.isString())
       continue;
     char phase = *ph.asCString();
-    uint32_t tid = 0;
-    PERFETTO_CHECK(CoerceToUint32(value["tid"], &tid));
+
     uint32_t pid = 0;
-    PERFETTO_CHECK(CoerceToUint32(value["pid"], &pid));
+    if (value.isMember("pid"))
+      PERFETTO_CHECK(CoerceToUint32(value["pid"], &pid));
+
+    uint32_t tid = pid;
+    if (value.isMember("tid"))
+      PERFETTO_CHECK(CoerceToUint32(value["tid"], &tid));
+
     uint64_t ts = 0;
     PERFETTO_CHECK(CoerceToUint64(value["ts"], &ts));
     ts *= 1000;
