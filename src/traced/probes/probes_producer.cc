@@ -288,12 +288,14 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
   auto weak_this = weak_factory_.GetWeakPtr();
 
   // Issue a Flush() to all started data sources.
+  bool flush_queued = false;
   for (size_t i = 0; i < num_data_sources; i++) {
     DataSourceInstanceID ds_id = data_source_ids[i];
     auto it = data_sources_.find(ds_id);
     if (it == data_sources_.end() || !it->second->started)
       continue;
     pending_flushes_.emplace(flush_request_id, ds_id);
+    flush_queued = true;
     auto flush_callback = [weak_this, flush_request_id, ds_id] {
       if (weak_this)
         weak_this->OnDataSourceFlushComplete(flush_request_id, ds_id);
@@ -302,7 +304,7 @@ void ProbesProducer::Flush(FlushRequestID flush_request_id,
   }
 
   // If there is nothing to flush, ack immediately.
-  if (!pending_flushes_.count(flush_request_id)) {
+  if (!flush_queued) {
     endpoint_->NotifyFlushComplete(flush_request_id);
     return;
   }
