@@ -73,6 +73,7 @@ PERFETTO_PID=$(adb exec-out 'CFG='"'${CFG}'
 "'echo ${CFG} | perfetto -t -c - -o /data/misc/perfetto-traces/trace -b'\
   | grep -o '^pid: [0-9]*$' | awk '{ print $2 }')
 
+# TODO(fmayer): Allow to interrupt.
 adb exec-out "while [[ -d /proc/$PERFETTO_PID ]]; do sleep 1; done" | cat
 adb pull /data/misc/perfetto-traces/trace /tmp/trace > /dev/null
 
