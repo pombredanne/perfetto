@@ -4535,6 +4535,7 @@ cc_test {
     "src/profiling/memory/interner_unittest.cc",
     "src/profiling/memory/record_reader.cc",
     "src/profiling/memory/record_reader_unittest.cc",
+    "src/profiling/memory/refcount_set_unittest.cc",
     "src/profiling/memory/sampler.cc",
     "src/profiling/memory/sampler_unittest.cc",
     "src/profiling/memory/socket_listener.cc",
