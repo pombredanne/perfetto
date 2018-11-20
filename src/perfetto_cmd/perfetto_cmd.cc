@@ -308,6 +308,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   if (background) {
     PERFETTO_CHECK(daemon(0 /*nochdir*/, 0 /*noclose*/) == 0);
     PERFETTO_DLOG("Continuing in background");
+    printf("pid: %d\n", getpid());
   }
 
   RateLimiter::Args args{};
