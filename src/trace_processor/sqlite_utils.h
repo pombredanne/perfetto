@@ -147,7 +147,7 @@ using is_int = typename std::enable_if<std::is_integral<T>::value, T>::type;
 // Greater bound for floating point numbers.
 template <typename T, typename sqlite_utils::is_float<T>* = nullptr>
 T FindGtBound(bool is_eq, sqlite3_value* sqlite_val) {
-  constexpr T kMax = std::numeric_limits<T>::max();
+  constexpr auto kMax = static_cast<long double>(std::numeric_limits<T>::max());
   auto type = sqlite3_value_type(sqlite_val);
   if (type != SQLITE_INTEGER && type != SQLITE_FLOAT) {
     return kMax;
@@ -177,7 +177,8 @@ T FindGtBound(bool is_eq, sqlite3_value* sqlite_val) {
 
 template <typename T, typename sqlite_utils::is_float<T>* = nullptr>
 T FindLtBound(bool is_eq, sqlite3_value* sqlite_val) {
-  constexpr T kMin = std::numeric_limits<T>::lowest();
+  constexpr auto kMin =
+      static_cast<long double>(std::numeric_limits<T>::lowest());
   auto type = sqlite3_value_type(sqlite_val);
   if (type != SQLITE_INTEGER && type != SQLITE_FLOAT) {
     return kMin;
