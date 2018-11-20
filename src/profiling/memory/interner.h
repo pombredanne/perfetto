@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include <set>
 
+#include "perfetto/base/logging.h"
+
 namespace perfetto {
 namespace profiling {
 
@@ -95,6 +97,9 @@ class Interner {
     entry.ref_count++;
     return Interned(&entry);
   }
+
+  ~Interner() { PERFETTO_DCHECK(entries_.empty()); }
+
   size_t entry_count_for_testing() { return entries_.size(); }
 
  private:
