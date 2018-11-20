@@ -183,27 +183,21 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceInt32:
     case kFtracePid32:
     case kFtraceCommonPid32:
-      *proto_type = kProtoInt32;
-      *proto_field_id = GenericFtraceEvent::Field::kInt32ValueFieldNumber;
-      break;
     case kFtraceInt64:
       *proto_type = kProtoInt64;
-      *proto_field_id = GenericFtraceEvent::Field::kInt64ValueFieldNumber;
+      *proto_field_id = GenericFtraceEvent::Field::kIntValueFieldNumber;
       break;
     case kFtraceUint8:
     case kFtraceUint16:
     case kFtraceUint32:
     case kFtraceBool:
-      *proto_type = kProtoUint32;
-      *proto_field_id = GenericFtraceEvent::Field::kUint32ValueFieldNumber;
-      break;
     case kFtraceDevId32:
     case kFtraceDevId64:
     case kFtraceUint64:
     case kFtraceInode32:
     case kFtraceInode64:
       *proto_type = kProtoUint64;
-      *proto_field_id = GenericFtraceEvent::Field::kUint64ValueFieldNumber;
+      *proto_field_id = GenericFtraceEvent::Field::kUintValueFieldNumber;
       break;
   }
 }
@@ -254,7 +248,7 @@ bool InferFtraceType(const std::string& type_and_name,
     return true;
   }
 
-  if (base::StartsWith(type_and_name, "bool ")) {
+  if (base::StartsWith(type_and_name, "bool ") && size == 1) {
     *out = kFtraceBool;
     return true;
   }
@@ -410,15 +404,21 @@ ProtoTranslationTable::ProtoTranslationTable(
   }
 }
 
-const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
-                                                    const std::string& event) {
-  // Read the format file and create the ftrace event
-  if (group.empty() || event.empty())
+const Event* ProtoTranslationTable::GetOrCreateEvent(
+    const std::string& group,
+    const std::string& event_name) {
+  // TODO(taylori): Index events by group and name to avoid future conflicts.
+  const Event* event = GetEventByName(event_name);
+  if (event)
+    return event;
+  // The ftrace event does not already exist so a new one will be created
+  // by parsing the format file.
+  if (group.empty() || event_name.empty())
     return nullptr;
-  std::string contents = ftrace_procfs_->ReadEventFormat(group, event);
+  std::string contents = ftrace_procfs_->ReadEventFormat(group, event_name);
   if (contents.empty())
     return nullptr;
-  FtraceEvent ftrace_event;
+  FtraceEvent ftrace_event = {};
   ParseFtraceEvent(contents, &ftrace_event);
 
   // Ensure events vector is large enough
@@ -431,7 +431,7 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
   e->proto_field_id = protos::pbzero::FtraceEvent::kGenericFieldNumber;
-  e->name = InternString(event);
+  e->name = InternString(event_name);
   e->group = InternString(group);
 
   // Calculate size of common fields.

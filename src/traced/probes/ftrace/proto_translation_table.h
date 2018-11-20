@@ -106,9 +106,11 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
-  // Virtual for testing.
-  virtual const Event* AddGenericEvent(const std::string& group,
-                                       const std::string& event);
+  // Retrieves the ftrace event from the proto translation
+  // table. If it does not exist, reads the format file and creates a
+  // new event with the proto id set to generic. Virtual for testing.
+  virtual const Event* GetOrCreateEvent(const std::string& group,
+                                        const std::string& event_name);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;

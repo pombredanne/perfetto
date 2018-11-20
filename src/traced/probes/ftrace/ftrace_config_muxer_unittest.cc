@@ -80,7 +80,7 @@ class MockProtoTranslationTable : public ProtoTranslationTable {
                               events,
                               common_fields,
                               ftrace_page_header_spec) {}
-  MOCK_METHOD2(AddGenericEvent,
+  MOCK_METHOD2(GetOrCreateEvent,
                Event*(const std::string& group, const std::string& event));
 };
 
@@ -201,9 +201,9 @@ TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
   Event event_to_return;
   event_to_return.name = "cpu_frequency";
   event_to_return.group = "power";
-  ON_CALL(*mock_table, AddGenericEvent("power", "cpu_frequency"))
+  ON_CALL(*mock_table, GetOrCreateEvent("power", "cpu_frequency"))
       .WillByDefault(Return(&event_to_return));
-  EXPECT_CALL(*mock_table, AddGenericEvent("power", "cpu_frequency"));
+  EXPECT_CALL(*mock_table, GetOrCreateEvent("power", "cpu_frequency"));
 
   FtraceConfigId id = model.SetupConfig(config);
   ASSERT_TRUE(model.ActivateConfig(id));

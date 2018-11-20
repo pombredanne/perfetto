@@ -268,14 +268,10 @@ FtraceConfigId FtraceConfigMuxer::SetupConfig(const FtraceConfig& request) {
     std::string event_name;
     std::tie(group, event_name) = EventToGroupAndName(name);
     // TODO(taylori): Add all events for group if name is * e.g sched/*
-    const Event* event = table_->GetEventByName(event_name);
+    const Event* event = table_->GetOrCreateEvent(group, event_name);
     if (!event) {
-      // Events will only be added as generic events if the group is specified.
-      event = table_->AddGenericEvent(group, event_name);
-      if (!event) {
-        PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
-        continue;
-      }
+      PERFETTO_DLOG("Can't enable %s, event not known", name.c_str());
+      continue;
     }
     if (current_state_.ftrace_events.count(event->name) ||
         std::string("ftrace") == event->group) {
