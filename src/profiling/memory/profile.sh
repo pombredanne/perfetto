@@ -27,14 +27,7 @@ while getopts ":i:d:p:n:" opt; do
   esac
 done
 
-if prodcertstatus > /dev/null; then
-  # If we have prodaccess, use the binfs trace_to_text version.
-  DIR=/google/bin/users/fmayer/third_party/perfetto:trace_to_text_sig
-else
-  # If the user uses a bundle on their workstation, find trace_to_text that
-  # co-locates this binary.
-  DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-fi;
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 ENFORCE_MODE=$(adb shell getenforce)
 function finish {
