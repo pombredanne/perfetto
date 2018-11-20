@@ -95,8 +95,6 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   void Restart();
   void ResetConnectionBackoff();
   void IncreaseConnectionBackoff();
-  void OnDataSourceFlushComplete(FlushRequestID, DataSourceInstanceID);
-  void OnFlushTimeout(FlushRequestID);
 
   State state_ = kNotStarted;
   base::TaskRunner* task_runner_ = nullptr;
@@ -113,9 +111,6 @@ class ProbesProducer : public Producer, public FtraceController::Observer {
   // Keeps (pointers to) data sources ordered by session id.
   std::unordered_multimap<TracingSessionID, ProbesDataSource*>
       session_data_sources_;
-
-  std::unordered_multimap<FlushRequestID, DataSourceInstanceID>
-      pending_flushes_;
 
   std::unordered_map<DataSourceInstanceID, base::Watchdog::Timer> watchdogs_;
   LRUInodeCache cache_{kLRUInodeCacheSize};

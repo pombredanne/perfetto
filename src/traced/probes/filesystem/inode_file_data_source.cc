@@ -182,10 +182,9 @@ void InodeFileDataSource::AddInodesFromLRUCache(
     PERFETTO_DLOG("%" PRIu64 " inodes found in cache", cache_found_count);
 }
 
-void InodeFileDataSource::Flush(FlushRequestID,
-                                std::function<void()> callback) {
+void InodeFileDataSource::Flush() {
   ResetTracePacket();
-  writer_->Flush(callback);
+  writer_->Flush();
 }
 
 void InodeFileDataSource::OnInodes(
