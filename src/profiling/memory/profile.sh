@@ -58,7 +58,7 @@ data_sources {
     heapprofd_config {
       sampling_interval_bytes: '${INTERVAL}'
       '${PID+"pid: $PID"}'
-      '${NAME+"process_cmdline: \"$NAME\""}'
+      '${NAME+"process_cmdline: \"${NAME}\""}'
       continuous_dump_config {
         dump_phase_ms: 10000
         dump_interval_ms: 1000
@@ -67,8 +67,7 @@ data_sources {
   }
 }
 
-duration_ms:'$DURATION'
-'
+duration_ms: '${DURATION}
 
 PERFETTO_PID=$(adb exec-out 'CFG='"'${CFG}'
 "'echo ${CFG} | perfetto -t -c - -o /data/misc/perfetto-traces/trace -b'\
