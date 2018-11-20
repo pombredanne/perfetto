@@ -97,10 +97,10 @@ void CountersTable::RefColumn::ReportResult(sqlite3_context* ctx,
   auto type = storage_->counters().types()[row];
   if (type == RefType::kUtidLookupUpid) {
     auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
-    if (upid == 0) {
-      sqlite3_result_null(ctx);
+    if (upid.has_value()) {
+      sqlite_utils::ReportSqliteResult(ctx, upid.value());
     } else {
-      sqlite_utils::ReportSqliteResult(ctx, upid);
+      sqlite3_result_null(ctx);
     }
   } else {
     sqlite_utils::ReportSqliteResult(ctx, ref);
@@ -125,7 +125,7 @@ CountersTable::RefColumn::Predicate CountersTable::RefColumn::Filter(
       auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
       // Trying to filter null with any operation we currently handle
       // should return false.
-      return upid != 0 && binary_op(upid, extracted);
+      return upid.has_value() && binary_op(upid.value(), extracted);
     }
     return binary_op(ref, extracted);
   };
@@ -150,16 +150,16 @@ int CountersTable::RefColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
     auto upid_f = storage_->GetThread(static_cast<uint32_t>(ref_f)).upid;
     if (type_s == RefType::kUtidLookupUpid) {
       auto upid_s = storage_->GetThread(static_cast<uint32_t>(ref_s)).upid;
-      if (upid_f == 0 && upid_s == 0) {
+      if (!upid_f.has_value() && !upid_s.has_value()) {
         return 0;
-      } else if (upid_f == 0) {
+      } else if (!upid_f.has_value()) {
         return -1;
-      } else if (upid_s == 0) {
+      } else if (!upid_s.has_value()) {
         return 1;
       }
-      return sqlite_utils::CompareValuesAsc(upid_f, upid_s);
+      return sqlite_utils::CompareValuesAsc(upid_f.value(), upid_s.value());
     }
-    if (upid_f == 0)
+    if (upid_f.has_value())
       return -1;
   }
   return sqlite_utils::CompareValuesAsc(ref_f, ref_s);

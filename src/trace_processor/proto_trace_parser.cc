@@ -659,6 +659,7 @@ void ProtoTraceParser::ParseRssStat(uint64_t timestamp,
     return;
   }
   UniqueTid utid = context_->process_tracker->UpdateThread(timestamp, pid, 0);
+
   context_->event_tracker->PushCounter(timestamp, size, rss_members_[member],
                                        utid, RefType::kUtidLookupUpid);
   PERFETTO_DCHECK(decoder.IsEndOfBuffer());
