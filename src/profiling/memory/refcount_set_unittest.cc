@@ -53,7 +53,10 @@ TEST(RefcountSetTest, OnlyOne) {
   {
     auto handle = s.Emplace(1);
     ASSERT_EQ(instances, 1);
-    auto handle2 = s.Emplace(1);
+    {
+      auto handle2 = s.Emplace(1);
+      ASSERT_EQ(instances, 1);
+    }
     ASSERT_EQ(instances, 1);
   }
   ASSERT_EQ(instances, 0);
