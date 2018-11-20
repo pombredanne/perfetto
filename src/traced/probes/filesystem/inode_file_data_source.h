@@ -85,7 +85,7 @@ class InodeFileDataSource : public ProbesDataSource,
 
   // ProbesDataSource implementation.
   void Start() override;
-  void Flush(FlushRequestID, std::function<void()> callback) override;
+  void Flush() override;
 
  protected:
   std::multimap<BlockDeviceID, std::string> mount_points_;

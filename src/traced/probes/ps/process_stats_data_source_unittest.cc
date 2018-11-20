@@ -169,7 +169,7 @@ TEST_F(ProcessStatsDataSourceTest, MemCounters) {
 
   data_source->Start();
   task_runner_.RunUntilCheckpoint("all_done");
-  data_source->Flush(1 /* FlushRequestId */, []() {});
+  data_source->Flush();
 
   // |packet| will contain the merge of all kNumIter packets written.
   std::unique_ptr<protos::TracePacket> packet = writer_raw_->ParseProto();

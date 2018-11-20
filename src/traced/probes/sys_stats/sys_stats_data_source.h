@@ -56,7 +56,7 @@ class SysStatsDataSource : public ProbesDataSource {
 
   // ProbesDataSource implementation.
   void Start() override;
-  void Flush(FlushRequestID, std::function<void()> callback) override;
+  void Flush() override;
 
   base::WeakPtr<SysStatsDataSource> GetWeakPtr() const;
 

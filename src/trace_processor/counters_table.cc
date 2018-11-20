@@ -159,7 +159,7 @@ int CountersTable::RefColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
       }
       return sqlite_utils::CompareValuesAsc(upid_f.value(), upid_s.value());
     }
-    if (upid_f.has_value())
+    if (!upid_f.has_value())
       return -1;
   }
   return sqlite_utils::CompareValuesAsc(ref_f, ref_s);
