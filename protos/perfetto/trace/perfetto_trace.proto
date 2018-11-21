@@ -256,26 +256,26 @@ message FtraceEvent {
     SchedBlockedReasonFtraceEvent sched_blocked_reason = 18;
     SchedCpuHotplugFtraceEvent sched_cpu_hotplug = 19;
     SchedWakingFtraceEvent sched_waking = 20;
-    IpiEntryFtraceEvent ipi_entry = 21;
-    IpiExitFtraceEvent ipi_exit = 22;
-    IpiRaiseFtraceEvent ipi_raise = 23;
-    SoftirqEntryFtraceEvent softirq_entry = 24;
-    SoftirqExitFtraceEvent softirq_exit = 25;
-    SoftirqRaiseFtraceEvent softirq_raise = 26;
-    I2cReadFtraceEvent i2c_read = 27;
-    I2cWriteFtraceEvent i2c_write = 28;
-    I2cResultFtraceEvent i2c_result = 29;
-    I2cReplyFtraceEvent i2c_reply = 30;
-    SmbusReadFtraceEvent smbus_read = 31;
-    SmbusWriteFtraceEvent smbus_write = 32;
-    SmbusResultFtraceEvent smbus_result = 33;
-    SmbusReplyFtraceEvent smbus_reply = 34;
+    // removed field with id 21
+    // removed field with id 22
+    // removed field with id 23
+    // removed field with id 24
+    // removed field with id 25
+    // removed field with id 26
+    // removed field with id 27
+    // removed field with id 28
+    // removed field with id 29
+    // removed field with id 30
+    // removed field with id 31
+    // removed field with id 32
+    // removed field with id 33
+    // removed field with id 34
     LowmemoryKillFtraceEvent lowmemory_kill = 35;
-    IrqHandlerEntryFtraceEvent irq_handler_entry = 36;
-    IrqHandlerExitFtraceEvent irq_handler_exit = 37;
-    SyncPtFtraceEvent sync_pt = 38;
-    SyncTimelineFtraceEvent sync_timeline = 39;
-    SyncWaitFtraceEvent sync_wait = 40;
+    // removed field with id 36
+    // removed field with id 37
+    // removed field with id 38
+    // removed field with id 39
+    // removed field with id 40
     Ext4DaWriteBeginFtraceEvent ext4_da_write_begin = 41;
     Ext4DaWriteEndFtraceEvent ext4_da_write_end = 42;
     Ext4SyncFileEnterFtraceEvent ext4_sync_file_enter = 43;
@@ -291,17 +291,17 @@ message FtraceEvent {
     BinderLockFtraceEvent binder_lock = 53;
     BinderLockedFtraceEvent binder_locked = 54;
     BinderUnlockFtraceEvent binder_unlock = 55;
-    WorkqueueActivateWorkFtraceEvent workqueue_activate_work = 56;
-    WorkqueueExecuteEndFtraceEvent workqueue_execute_end = 57;
-    WorkqueueExecuteStartFtraceEvent workqueue_execute_start = 58;
-    WorkqueueQueueWorkFtraceEvent workqueue_queue_work = 59;
-    RegulatorDisableFtraceEvent regulator_disable = 60;
-    RegulatorDisableCompleteFtraceEvent regulator_disable_complete = 61;
-    RegulatorEnableFtraceEvent regulator_enable = 62;
-    RegulatorEnableCompleteFtraceEvent regulator_enable_complete = 63;
-    RegulatorEnableDelayFtraceEvent regulator_enable_delay = 64;
-    RegulatorSetVoltageFtraceEvent regulator_set_voltage = 65;
-    RegulatorSetVoltageCompleteFtraceEvent regulator_set_voltage_complete = 66;
+    // removed field with id 56
+    // removed field with id 57
+    // removed field with id 58
+    // removed field with id 59
+    // removed field with id 60
+    // removed field with id 61
+    // removed field with id 62
+    // removed field with id 63
+    // removed field with id 64
+    // removed field with id 65
+    // removed field with id 66
     CgroupAttachTaskFtraceEvent cgroup_attach_task = 67;
     CgroupMkdirFtraceEvent cgroup_mkdir = 68;
     CgroupRemountFtraceEvent cgroup_remount = 69;
@@ -311,47 +311,44 @@ message FtraceEvent {
     CgroupReleaseFtraceEvent cgroup_release = 73;
     CgroupRenameFtraceEvent cgroup_rename = 74;
     CgroupSetupRootFtraceEvent cgroup_setup_root = 75;
-    MdpCmdKickoffFtraceEvent mdp_cmd_kickoff = 76;
-    MdpCommitFtraceEvent mdp_commit = 77;
-    MdpPerfSetOtFtraceEvent mdp_perf_set_ot = 78;
-    MdpSsppChangeFtraceEvent mdp_sspp_change = 79;
-    TracingMarkWriteFtraceEvent tracing_mark_write = 80;
-    MdpCmdPingpongDoneFtraceEvent mdp_cmd_pingpong_done = 81;
-    MdpCompareBwFtraceEvent mdp_compare_bw = 82;
-    MdpPerfSetPanicLutsFtraceEvent mdp_perf_set_panic_luts = 83;
-    MdpSsppSetFtraceEvent mdp_sspp_set = 84;
-    MdpCmdReadptrDoneFtraceEvent mdp_cmd_readptr_done = 85;
-    MdpMisrCrcFtraceEvent mdp_misr_crc = 86;
-    MdpPerfSetQosLutsFtraceEvent mdp_perf_set_qos_luts = 87;
-    MdpTraceCounterFtraceEvent mdp_trace_counter = 88;
-    MdpCmdReleaseBwFtraceEvent mdp_cmd_release_bw = 89;
-    MdpMixerUpdateFtraceEvent mdp_mixer_update = 90;
-    MdpPerfSetWmLevelsFtraceEvent mdp_perf_set_wm_levels = 91;
-    MdpVideoUnderrunDoneFtraceEvent mdp_video_underrun_done = 92;
-    MdpCmdWaitPingpongFtraceEvent mdp_cmd_wait_pingpong = 93;
-    MdpPerfPrefillCalcFtraceEvent mdp_perf_prefill_calc = 94;
-    MdpPerfUpdateBusFtraceEvent mdp_perf_update_bus = 95;
-    RotatorBwAoAsContextFtraceEvent rotator_bw_ao_as_context = 96;
+    // removed field with id 76
+    // removed field with id 77
+    // removed field with id 78
+    // removed field with id 79
+    // removed field with id 80
+    // removed field with id 81
+    // removed field with id 82
+    // removed field with id 83
+    // removed field with id 84
+    // removed field with id 85
+    // removed field with id 86
+    // removed field with id 87
+    // removed field with id 88
+    // removed field with id 89
+    // removed field with id 90
+    // removed field with id 91
+    // removed field with id 92
+    // removed field with id 93
+    // removed field with id 94
+    // removed field with id 95
+    // removed field with id 96
     MmFilemapAddToPageCacheFtraceEvent mm_filemap_add_to_page_cache = 97;
     MmFilemapDeleteFromPageCacheFtraceEvent mm_filemap_delete_from_page_cache =
         98;
-    MmCompactionBeginFtraceEvent mm_compaction_begin = 99;
-    MmCompactionDeferCompactionFtraceEvent mm_compaction_defer_compaction = 100;
-    MmCompactionDeferredFtraceEvent mm_compaction_deferred = 101;
-    MmCompactionDeferResetFtraceEvent mm_compaction_defer_reset = 102;
-    MmCompactionEndFtraceEvent mm_compaction_end = 103;
-    MmCompactionFinishedFtraceEvent mm_compaction_finished = 104;
-    MmCompactionIsolateFreepagesFtraceEvent mm_compaction_isolate_freepages =
-        105;
-    MmCompactionIsolateMigratepagesFtraceEvent
-        mm_compaction_isolate_migratepages = 106;
-    MmCompactionKcompactdSleepFtraceEvent mm_compaction_kcompactd_sleep = 107;
-    MmCompactionKcompactdWakeFtraceEvent mm_compaction_kcompactd_wake = 108;
-    MmCompactionMigratepagesFtraceEvent mm_compaction_migratepages = 109;
-    MmCompactionSuitableFtraceEvent mm_compaction_suitable = 110;
-    MmCompactionTryToCompactPagesFtraceEvent
-        mm_compaction_try_to_compact_pages = 111;
-    MmCompactionWakeupKcompactdFtraceEvent mm_compaction_wakeup_kcompactd = 112;
+    // removed field with id 99
+    // removed field with id 100
+    // removed field with id 101
+    // removed field with id 102
+    // removed field with id 103
+    // removed field with id 104
+    // removed field with id 105
+    // removed field with id 106
+    // removed field with id 107
+    // removed field with id 108
+    // removed field with id 109
+    // removed field with id 110
+    // removed field with id 111
+    // removed field with id 112
     SuspendResumeFtraceEvent suspend_resume = 113;
     SchedWakeupNewFtraceEvent sched_wakeup_new = 114;
     BlockBioBackmergeFtraceEvent block_bio_backmerge = 115;
@@ -568,17 +565,17 @@ message FtraceEvent {
     RssStatFtraceEvent rss_stat = 313;
     IonHeapShrinkFtraceEvent ion_heap_shrink = 314;
     IonHeapGrowFtraceEvent ion_heap_grow = 315;
-    FenceInitFtraceEvent fence_init = 316;
-    FenceDestroyFtraceEvent fence_destroy = 317;
-    FenceEnableSignalFtraceEvent fence_enable_signal = 318;
-    FenceSignaledFtraceEvent fence_signaled = 319;
+    // removed field with id 316
+    // removed field with id 317
+    // removed field with id 318
+    // removed field with id 319
     ClkEnableFtraceEvent clk_enable = 320;
     ClkDisableFtraceEvent clk_disable = 321;
     ClkSetRateFtraceEvent clk_set_rate = 322;
     BinderTransactionAllocBufFtraceEvent binder_transaction_alloc_buf = 323;
     SignalDeliverFtraceEvent signal_deliver = 324;
     SignalGenerateFtraceEvent signal_generate = 325;
-    OomScoreAdjUpdateFtraceEvent oom_score_adj_update = 326;
+    // removed field with id 326
   }
 }
 
@@ -1020,96 +1017,6 @@ message ClkSetRateFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/clk.proto
-
-// Begin of protos/perfetto/trace/ftrace/compaction.proto
-
-message MmCompactionBeginFtraceEvent {
-  optional uint64 zone_start = 1;
-  optional uint64 migrate_pfn = 2;
-  optional uint64 free_pfn = 3;
-  optional uint64 zone_end = 4;
-  optional uint32 sync = 5;
-}
-message MmCompactionDeferCompactionFtraceEvent {
-  optional int32 nid = 1;
-  optional uint32 idx = 2;
-  optional int32 order = 3;
-  optional uint32 considered = 4;
-  optional uint32 defer_shift = 5;
-  optional int32 order_failed = 6;
-}
-message MmCompactionDeferredFtraceEvent {
-  optional int32 nid = 1;
-  optional uint32 idx = 2;
-  optional int32 order = 3;
-  optional uint32 considered = 4;
-  optional uint32 defer_shift = 5;
-  optional int32 order_failed = 6;
-}
-message MmCompactionDeferResetFtraceEvent {
-  optional int32 nid = 1;
-  optional uint32 idx = 2;
-  optional int32 order = 3;
-  optional uint32 considered = 4;
-  optional uint32 defer_shift = 5;
-  optional int32 order_failed = 6;
-}
-message MmCompactionEndFtraceEvent {
-  optional uint64 zone_start = 1;
-  optional uint64 migrate_pfn = 2;
-  optional uint64 free_pfn = 3;
-  optional uint64 zone_end = 4;
-  optional uint32 sync = 5;
-  optional int32 status = 6;
-}
-message MmCompactionFinishedFtraceEvent {
-  optional int32 nid = 1;
-  optional uint32 idx = 2;
-  optional int32 order = 3;
-  optional int32 ret = 4;
-}
-message MmCompactionIsolateFreepagesFtraceEvent {
-  optional uint64 start_pfn = 1;
-  optional uint64 end_pfn = 2;
-  optional uint64 nr_scanned = 3;
-  optional uint64 nr_taken = 4;
-}
-message MmCompactionIsolateMigratepagesFtraceEvent {
-  optional uint64 start_pfn = 1;
-  optional uint64 end_pfn = 2;
-  optional uint64 nr_scanned = 3;
-  optional uint64 nr_taken = 4;
-}
-message MmCompactionKcompactdSleepFtraceEvent {
-  optional int32 nid = 1;
-}
-message MmCompactionKcompactdWakeFtraceEvent {
-  optional int32 nid = 1;
-  optional int32 order = 2;
-  optional uint32 classzone_idx = 3;
-}
-message MmCompactionMigratepagesFtraceEvent {
-  optional uint64 nr_migrated = 1;
-  optional uint64 nr_failed = 2;
-}
-message MmCompactionSuitableFtraceEvent {
-  optional int32 nid = 1;
-  optional uint32 idx = 2;
-  optional int32 order = 3;
-  optional int32 ret = 4;
-}
-message MmCompactionTryToCompactPagesFtraceEvent {
-  optional int32 order = 1;
-  optional uint32 gfp_mask = 2;
-  optional uint32 mode = 3;
-}
-message MmCompactionWakeupKcompactdFtraceEvent {
-  optional int32 nid = 1;
-  optional int32 order = 2;
-  optional uint32 classzone_idx = 3;
-}
-
-// End of protos/perfetto/trace/ftrace/compaction.proto
 
 // Begin of protos/perfetto/trace/ftrace/ext4.proto
 
@@ -2017,35 +1924,6 @@ message F2fsWriteEndFtraceEvent {
 
 // End of protos/perfetto/trace/ftrace/f2fs.proto
 
-// Begin of protos/perfetto/trace/ftrace/fence.proto
-
-message FenceInitFtraceEvent {
-  optional uint32 context = 1;
-  optional string driver = 2;
-  optional uint32 seqno = 3;
-  optional string timeline = 4;
-}
-message FenceDestroyFtraceEvent {
-  optional uint32 context = 1;
-  optional string driver = 2;
-  optional uint32 seqno = 3;
-  optional string timeline = 4;
-}
-message FenceEnableSignalFtraceEvent {
-  optional uint32 context = 1;
-  optional string driver = 2;
-  optional uint32 seqno = 3;
-  optional string timeline = 4;
-}
-message FenceSignaledFtraceEvent {
-  optional uint32 context = 1;
-  optional string driver = 2;
-  optional uint32 seqno = 3;
-  optional string timeline = 4;
-}
-
-// End of protos/perfetto/trace/ftrace/fence.proto
-
 // Begin of protos/perfetto/trace/ftrace/filemap.proto
 
 message MmFilemapAddToPageCacheFtraceEvent {
@@ -2105,26 +1983,26 @@ message FtraceEvent {
     SchedBlockedReasonFtraceEvent sched_blocked_reason = 18;
     SchedCpuHotplugFtraceEvent sched_cpu_hotplug = 19;
     SchedWakingFtraceEvent sched_waking = 20;
-    IpiEntryFtraceEvent ipi_entry = 21;
-    IpiExitFtraceEvent ipi_exit = 22;
-    IpiRaiseFtraceEvent ipi_raise = 23;
-    SoftirqEntryFtraceEvent softirq_entry = 24;
-    SoftirqExitFtraceEvent softirq_exit = 25;
-    SoftirqRaiseFtraceEvent softirq_raise = 26;
-    I2cReadFtraceEvent i2c_read = 27;
-    I2cWriteFtraceEvent i2c_write = 28;
-    I2cResultFtraceEvent i2c_result = 29;
-    I2cReplyFtraceEvent i2c_reply = 30;
-    SmbusReadFtraceEvent smbus_read = 31;
-    SmbusWriteFtraceEvent smbus_write = 32;
-    SmbusResultFtraceEvent smbus_result = 33;
-    SmbusReplyFtraceEvent smbus_reply = 34;
+    // removed field with id 21
+    // removed field with id 22
+    // removed field with id 23
+    // removed field with id 24
+    // removed field with id 25
+    // removed field with id 26
+    // removed field with id 27
+    // removed field with id 28
+    // removed field with id 29
+    // removed field with id 30
+    // removed field with id 31
+    // removed field with id 32
+    // removed field with id 33
+    // removed field with id 34
     LowmemoryKillFtraceEvent lowmemory_kill = 35;
-    IrqHandlerEntryFtraceEvent irq_handler_entry = 36;
-    IrqHandlerExitFtraceEvent irq_handler_exit = 37;
-    SyncPtFtraceEvent sync_pt = 38;
-    SyncTimelineFtraceEvent sync_timeline = 39;
-    SyncWaitFtraceEvent sync_wait = 40;
+    // removed field with id 36
+    // removed field with id 37
+    // removed field with id 38
+    // removed field with id 39
+    // removed field with id 40
     Ext4DaWriteBeginFtraceEvent ext4_da_write_begin = 41;
     Ext4DaWriteEndFtraceEvent ext4_da_write_end = 42;
     Ext4SyncFileEnterFtraceEvent ext4_sync_file_enter = 43;
@@ -2140,17 +2018,17 @@ message FtraceEvent {
     BinderLockFtraceEvent binder_lock = 53;
     BinderLockedFtraceEvent binder_locked = 54;
     BinderUnlockFtraceEvent binder_unlock = 55;
-    WorkqueueActivateWorkFtraceEvent workqueue_activate_work = 56;
-    WorkqueueExecuteEndFtraceEvent workqueue_execute_end = 57;
-    WorkqueueExecuteStartFtraceEvent workqueue_execute_start = 58;
-    WorkqueueQueueWorkFtraceEvent workqueue_queue_work = 59;
-    RegulatorDisableFtraceEvent regulator_disable = 60;
-    RegulatorDisableCompleteFtraceEvent regulator_disable_complete = 61;
-    RegulatorEnableFtraceEvent regulator_enable = 62;
-    RegulatorEnableCompleteFtraceEvent regulator_enable_complete = 63;
-    RegulatorEnableDelayFtraceEvent regulator_enable_delay = 64;
-    RegulatorSetVoltageFtraceEvent regulator_set_voltage = 65;
-    RegulatorSetVoltageCompleteFtraceEvent regulator_set_voltage_complete = 66;
+    // removed field with id 56
+    // removed field with id 57
+    // removed field with id 58
+    // removed field with id 59
+    // removed field with id 60
+    // removed field with id 61
+    // removed field with id 62
+    // removed field with id 63
+    // removed field with id 64
+    // removed field with id 65
+    // removed field with id 66
     CgroupAttachTaskFtraceEvent cgroup_attach_task = 67;
     CgroupMkdirFtraceEvent cgroup_mkdir = 68;
     CgroupRemountFtraceEvent cgroup_remount = 69;
@@ -2160,47 +2038,44 @@ message FtraceEvent {
     CgroupReleaseFtraceEvent cgroup_release = 73;
     CgroupRenameFtraceEvent cgroup_rename = 74;
     CgroupSetupRootFtraceEvent cgroup_setup_root = 75;
-    MdpCmdKickoffFtraceEvent mdp_cmd_kickoff = 76;
-    MdpCommitFtraceEvent mdp_commit = 77;
-    MdpPerfSetOtFtraceEvent mdp_perf_set_ot = 78;
-    MdpSsppChangeFtraceEvent mdp_sspp_change = 79;
-    TracingMarkWriteFtraceEvent tracing_mark_write = 80;
-    MdpCmdPingpongDoneFtraceEvent mdp_cmd_pingpong_done = 81;
-    MdpCompareBwFtraceEvent mdp_compare_bw = 82;
-    MdpPerfSetPanicLutsFtraceEvent mdp_perf_set_panic_luts = 83;
-    MdpSsppSetFtraceEvent mdp_sspp_set = 84;
-    MdpCmdReadptrDoneFtraceEvent mdp_cmd_readptr_done = 85;
-    MdpMisrCrcFtraceEvent mdp_misr_crc = 86;
-    MdpPerfSetQosLutsFtraceEvent mdp_perf_set_qos_luts = 87;
-    MdpTraceCounterFtraceEvent mdp_trace_counter = 88;
-    MdpCmdReleaseBwFtraceEvent mdp_cmd_release_bw = 89;
-    MdpMixerUpdateFtraceEvent mdp_mixer_update = 90;
-    MdpPerfSetWmLevelsFtraceEvent mdp_perf_set_wm_levels = 91;
-    MdpVideoUnderrunDoneFtraceEvent mdp_video_underrun_done = 92;
-    MdpCmdWaitPingpongFtraceEvent mdp_cmd_wait_pingpong = 93;
-    MdpPerfPrefillCalcFtraceEvent mdp_perf_prefill_calc = 94;
-    MdpPerfUpdateBusFtraceEvent mdp_perf_update_bus = 95;
-    RotatorBwAoAsContextFtraceEvent rotator_bw_ao_as_context = 96;
+    // removed field with id 76
+    // removed field with id 77
+    // removed field with id 78
+    // removed field with id 79
+    // removed field with id 80
+    // removed field with id 81
+    // removed field with id 82
+    // removed field with id 83
+    // removed field with id 84
+    // removed field with id 85
+    // removed field with id 86
+    // removed field with id 87
+    // removed field with id 88
+    // removed field with id 89
+    // removed field with id 90
+    // removed field with id 91
+    // removed field with id 92
+    // removed field with id 93
+    // removed field with id 94
+    // removed field with id 95
+    // removed field with id 96
     MmFilemapAddToPageCacheFtraceEvent mm_filemap_add_to_page_cache = 97;
     MmFilemapDeleteFromPageCacheFtraceEvent mm_filemap_delete_from_page_cache =
         98;
-    MmCompactionBeginFtraceEvent mm_compaction_begin = 99;
-    MmCompactionDeferCompactionFtraceEvent mm_compaction_defer_compaction = 100;
-    MmCompactionDeferredFtraceEvent mm_compaction_deferred = 101;
-    MmCompactionDeferResetFtraceEvent mm_compaction_defer_reset = 102;
-    MmCompactionEndFtraceEvent mm_compaction_end = 103;
-    MmCompactionFinishedFtraceEvent mm_compaction_finished = 104;
-    MmCompactionIsolateFreepagesFtraceEvent mm_compaction_isolate_freepages =
-        105;
-    MmCompactionIsolateMigratepagesFtraceEvent
-        mm_compaction_isolate_migratepages = 106;
-    MmCompactionKcompactdSleepFtraceEvent mm_compaction_kcompactd_sleep = 107;
-    MmCompactionKcompactdWakeFtraceEvent mm_compaction_kcompactd_wake = 108;
-    MmCompactionMigratepagesFtraceEvent mm_compaction_migratepages = 109;
-    MmCompactionSuitableFtraceEvent mm_compaction_suitable = 110;
-    MmCompactionTryToCompactPagesFtraceEvent
-        mm_compaction_try_to_compact_pages = 111;
-    MmCompactionWakeupKcompactdFtraceEvent mm_compaction_wakeup_kcompactd = 112;
+    // removed field with id 99
+    // removed field with id 100
+    // removed field with id 101
+    // removed field with id 102
+    // removed field with id 103
+    // removed field with id 104
+    // removed field with id 105
+    // removed field with id 106
+    // removed field with id 107
+    // removed field with id 108
+    // removed field with id 109
+    // removed field with id 110
+    // removed field with id 111
+    // removed field with id 112
     SuspendResumeFtraceEvent suspend_resume = 113;
     SchedWakeupNewFtraceEvent sched_wakeup_new = 114;
     BlockBioBackmergeFtraceEvent block_bio_backmerge = 115;
@@ -2417,17 +2292,17 @@ message FtraceEvent {
     RssStatFtraceEvent rss_stat = 313;
     IonHeapShrinkFtraceEvent ion_heap_shrink = 314;
     IonHeapGrowFtraceEvent ion_heap_grow = 315;
-    FenceInitFtraceEvent fence_init = 316;
-    FenceDestroyFtraceEvent fence_destroy = 317;
-    FenceEnableSignalFtraceEvent fence_enable_signal = 318;
-    FenceSignaledFtraceEvent fence_signaled = 319;
+    // removed field with id 316
+    // removed field with id 317
+    // removed field with id 318
+    // removed field with id 319
     ClkEnableFtraceEvent clk_enable = 320;
     ClkDisableFtraceEvent clk_disable = 321;
     ClkSetRateFtraceEvent clk_set_rate = 322;
     BinderTransactionAllocBufFtraceEvent binder_transaction_alloc_buf = 323;
     SignalDeliverFtraceEvent signal_deliver = 324;
     SignalGenerateFtraceEvent signal_generate = 325;
-    OomScoreAdjUpdateFtraceEvent oom_score_adj_update = 326;
+    // removed field with id 326
   }
 }
 
@@ -2503,130 +2378,6 @@ message FtraceStats {
 }
 
 // End of protos/perfetto/trace/ftrace/ftrace_stats.proto
-
-// Begin of protos/perfetto/trace/ftrace/i2c.proto
-
-message I2cReadFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 msg_nr = 2;
-  optional uint32 addr = 3;
-  optional uint32 flags = 4;
-  optional uint32 len = 5;
-}
-message I2cWriteFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 msg_nr = 2;
-  optional uint32 addr = 3;
-  optional uint32 flags = 4;
-  optional uint32 len = 5;
-  optional uint32 buf = 6;
-}
-message I2cResultFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 nr_msgs = 2;
-  optional int32 ret = 3;
-}
-message I2cReplyFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 msg_nr = 2;
-  optional uint32 addr = 3;
-  optional uint32 flags = 4;
-  optional uint32 len = 5;
-  optional uint32 buf = 6;
-}
-message SmbusReadFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 flags = 2;
-  optional uint32 addr = 3;
-  optional uint32 command = 4;
-  optional uint32 protocol = 5;
-}
-message SmbusWriteFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 addr = 2;
-  optional uint32 flags = 3;
-  optional uint32 command = 4;
-  optional uint32 len = 5;
-  optional uint32 protocol = 6;
-}
-message SmbusResultFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 addr = 2;
-  optional uint32 flags = 3;
-  optional uint32 read_write = 4;
-  optional uint32 command = 5;
-  optional int32 res = 6;
-  optional uint32 protocol = 7;
-}
-message SmbusReplyFtraceEvent {
-  optional int32 adapter_nr = 1;
-  optional uint32 addr = 2;
-  optional uint32 flags = 3;
-  optional uint32 command = 4;
-  optional uint32 len = 5;
-  optional uint32 protocol = 6;
-}
-
-// End of protos/perfetto/trace/ftrace/i2c.proto
-
-// Begin of protos/perfetto/trace/ftrace/ipi.proto
-
-message IpiEntryFtraceEvent {
-  optional string reason = 1;
-}
-message IpiExitFtraceEvent {
-  optional string reason = 1;
-}
-message IpiRaiseFtraceEvent {
-  optional uint32 target_cpus = 1;
-  optional string reason = 2;
-}
-
-// End of protos/perfetto/trace/ftrace/ipi.proto
-
-// Begin of protos/perfetto/trace/ftrace/irq.proto
-
-message SoftirqEntryFtraceEvent {
-  optional uint32 vec = 1;
-}
-message SoftirqExitFtraceEvent {
-  optional uint32 vec = 1;
-}
-message SoftirqRaiseFtraceEvent {
-  optional uint32 vec = 1;
-}
-message IrqHandlerEntryFtraceEvent {
-  optional int32 irq = 1;
-  optional string name = 2;
-  optional uint32 handler = 3;
-}
-message IrqHandlerExitFtraceEvent {
-  optional int32 irq = 1;
-  optional int32 ret = 2;
-}
-
-// End of protos/perfetto/trace/ftrace/irq.proto
-
-// Begin of protos/perfetto/trace/ftrace/kfree.proto
-
-message KfreeFtraceEvent {
-  optional uint64 call_site = 1;
-  optional uint64 ptr = 2;
-}
-
-// End of protos/perfetto/trace/ftrace/kfree.proto
-
-// Begin of protos/perfetto/trace/ftrace/kmalloc.proto
-
-message KmallocFtraceEvent {
-  optional uint64 bytes_alloc = 1;
-  optional uint64 bytes_req = 2;
-  optional uint64 call_site = 3;
-  optional uint32 gfp_flags = 4;
-  optional uint64 ptr = 5;
-}
-
-// End of protos/perfetto/trace/ftrace/kmalloc.proto
 
 // Begin of protos/perfetto/trace/ftrace/kmem.proto
 
@@ -2869,168 +2620,6 @@ message LowmemoryKillFtraceEvent {
 
 // End of protos/perfetto/trace/ftrace/lowmemorykiller.proto
 
-// Begin of protos/perfetto/trace/ftrace/mdss.proto
-
-message MdpCmdKickoffFtraceEvent {
-  optional uint32 ctl_num = 1;
-  optional int32 kickoff_cnt = 2;
-}
-message MdpCommitFtraceEvent {
-  optional uint32 num = 1;
-  optional uint32 play_cnt = 2;
-  optional uint32 clk_rate = 3;
-  optional uint64 bandwidth = 4;
-}
-message MdpPerfSetOtFtraceEvent {
-  optional uint32 pnum = 1;
-  optional uint32 xin_id = 2;
-  optional uint32 rd_lim = 3;
-  optional uint32 is_vbif_rt = 4;
-}
-message MdpSsppChangeFtraceEvent {
-  optional uint32 num = 1;
-  optional uint32 play_cnt = 2;
-  optional uint32 mixer = 3;
-  optional uint32 stage = 4;
-  optional uint32 flags = 5;
-  optional uint32 format = 6;
-  optional uint32 img_w = 7;
-  optional uint32 img_h = 8;
-  optional uint32 src_x = 9;
-  optional uint32 src_y = 10;
-  optional uint32 src_w = 11;
-  optional uint32 src_h = 12;
-  optional uint32 dst_x = 13;
-  optional uint32 dst_y = 14;
-  optional uint32 dst_w = 15;
-  optional uint32 dst_h = 16;
-}
-message TracingMarkWriteFtraceEvent {
-  optional int32 pid = 1;
-  optional string trace_name = 2;
-  optional uint32 trace_begin = 3;
-}
-message MdpCmdPingpongDoneFtraceEvent {
-  optional uint32 ctl_num = 1;
-  optional uint32 intf_num = 2;
-  optional uint32 pp_num = 3;
-  optional int32 koff_cnt = 4;
-}
-message MdpCompareBwFtraceEvent {
-  optional uint64 new_ab = 1;
-  optional uint64 new_ib = 2;
-  optional uint64 new_wb = 3;
-  optional uint64 old_ab = 4;
-  optional uint64 old_ib = 5;
-  optional uint64 old_wb = 6;
-  optional uint32 params_changed = 7;
-  optional uint32 update_bw = 8;
-}
-message MdpPerfSetPanicLutsFtraceEvent {
-  optional uint32 pnum = 1;
-  optional uint32 fmt = 2;
-  optional uint32 mode = 3;
-  optional uint32 panic_lut = 4;
-  optional uint32 robust_lut = 5;
-}
-message MdpSsppSetFtraceEvent {
-  optional uint32 num = 1;
-  optional uint32 play_cnt = 2;
-  optional uint32 mixer = 3;
-  optional uint32 stage = 4;
-  optional uint32 flags = 5;
-  optional uint32 format = 6;
-  optional uint32 img_w = 7;
-  optional uint32 img_h = 8;
-  optional uint32 src_x = 9;
-  optional uint32 src_y = 10;
-  optional uint32 src_w = 11;
-  optional uint32 src_h = 12;
-  optional uint32 dst_x = 13;
-  optional uint32 dst_y = 14;
-  optional uint32 dst_w = 15;
-  optional uint32 dst_h = 16;
-}
-message MdpCmdReadptrDoneFtraceEvent {
-  optional uint32 ctl_num = 1;
-  optional int32 koff_cnt = 2;
-}
-message MdpMisrCrcFtraceEvent {
-  optional uint32 block_id = 1;
-  optional uint32 vsync_cnt = 2;
-  optional uint32 crc = 3;
-}
-message MdpPerfSetQosLutsFtraceEvent {
-  optional uint32 pnum = 1;
-  optional uint32 fmt = 2;
-  optional uint32 intf = 3;
-  optional uint32 rot = 4;
-  optional uint32 fl = 5;
-  optional uint32 lut = 6;
-  optional uint32 linear = 7;
-}
-message MdpTraceCounterFtraceEvent {
-  optional int32 pid = 1;
-  optional string counter_name = 2;
-  optional int32 value = 3;
-}
-message MdpCmdReleaseBwFtraceEvent {
-  optional uint32 ctl_num = 1;
-}
-message MdpMixerUpdateFtraceEvent {
-  optional uint32 mixer_num = 1;
-}
-message MdpPerfSetWmLevelsFtraceEvent {
-  optional uint32 pnum = 1;
-  optional uint32 use_space = 2;
-  optional uint32 priority_bytes = 3;
-  optional uint32 wm0 = 4;
-  optional uint32 wm1 = 5;
-  optional uint32 wm2 = 6;
-  optional uint32 mb_cnt = 7;
-  optional uint32 mb_size = 8;
-}
-message MdpVideoUnderrunDoneFtraceEvent {
-  optional uint32 ctl_num = 1;
-  optional uint32 underrun_cnt = 2;
-}
-message MdpCmdWaitPingpongFtraceEvent {
-  optional uint32 ctl_num = 1;
-  optional int32 kickoff_cnt = 2;
-}
-message MdpPerfPrefillCalcFtraceEvent {
-  optional uint32 pnum = 1;
-  optional uint32 latency_buf = 2;
-  optional uint32 ot = 3;
-  optional uint32 y_buf = 4;
-  optional uint32 y_scaler = 5;
-  optional uint32 pp_lines = 6;
-  optional uint32 pp_bytes = 7;
-  optional uint32 post_sc = 8;
-  optional uint32 fbc_bytes = 9;
-  optional uint32 prefill_bytes = 10;
-}
-message MdpPerfUpdateBusFtraceEvent {
-  optional int32 client = 1;
-  optional uint64 ab_quota = 2;
-  optional uint64 ib_quota = 3;
-}
-message RotatorBwAoAsContextFtraceEvent {
-  optional uint32 state = 1;
-}
-
-// End of protos/perfetto/trace/ftrace/mdss.proto
-
-// Begin of protos/perfetto/trace/ftrace/oom.proto
-
-message OomScoreAdjUpdateFtraceEvent {
-  optional string comm = 1;
-  optional int32 oom_score_adj = 2;
-  optional int32 pid = 3;
-}
-
-// End of protos/perfetto/trace/ftrace/oom.proto
-
 // Begin of protos/perfetto/trace/ftrace/power.proto
 
 message CpuFrequencyFtraceEvent {
@@ -3077,35 +2666,6 @@ message PrintFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/print.proto
-
-// Begin of protos/perfetto/trace/ftrace/regulator.proto
-
-message RegulatorDisableFtraceEvent {
-  optional string name = 1;
-}
-message RegulatorDisableCompleteFtraceEvent {
-  optional string name = 1;
-}
-message RegulatorEnableFtraceEvent {
-  optional string name = 1;
-}
-message RegulatorEnableCompleteFtraceEvent {
-  optional string name = 1;
-}
-message RegulatorEnableDelayFtraceEvent {
-  optional string name = 1;
-}
-message RegulatorSetVoltageFtraceEvent {
-  optional string name = 1;
-  optional int32 min = 2;
-  optional int32 max = 3;
-}
-message RegulatorSetVoltageCompleteFtraceEvent {
-  optional string name = 1;
-  optional uint32 val = 2;
-}
-
-// End of protos/perfetto/trace/ftrace/regulator.proto
 
 // Begin of protos/perfetto/trace/ftrace/sched.proto
 
@@ -3201,24 +2761,6 @@ message SignalGenerateFtraceEvent {
 
 // End of protos/perfetto/trace/ftrace/signal.proto
 
-// Begin of protos/perfetto/trace/ftrace/sync.proto
-
-message SyncPtFtraceEvent {
-  optional string timeline = 1;
-  optional string value = 2;
-}
-message SyncTimelineFtraceEvent {
-  optional string name = 1;
-  optional string value = 2;
-}
-message SyncWaitFtraceEvent {
-  optional string name = 1;
-  optional int32 status = 2;
-  optional uint32 begin = 3;
-}
-
-// End of protos/perfetto/trace/ftrace/sync.proto
-
 // Begin of protos/perfetto/trace/ftrace/task.proto
 
 message TaskNewtaskFtraceEvent {
@@ -3235,17 +2777,6 @@ message TaskRenameFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/task.proto
-
-// Begin of protos/perfetto/trace/ftrace/test_bundle_wrapper.proto
-
-// TODO: Move this to ftrace_reader/test/protos.
-message TestBundleWrapper {
-  optional string before = 1;
-  repeated FtraceEventBundle bundle = 2;
-  optional string after = 3;
-}
-
-// End of protos/perfetto/trace/ftrace/test_bundle_wrapper.proto
 
 // Begin of protos/perfetto/trace/ftrace/vmscan.proto
 
@@ -3266,25 +2797,3 @@ message MmVmscanKswapdSleepFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/vmscan.proto
-
-// Begin of protos/perfetto/trace/ftrace/workqueue.proto
-
-message WorkqueueActivateWorkFtraceEvent {
-  optional uint64 work = 1;
-}
-message WorkqueueExecuteEndFtraceEvent {
-  optional uint64 work = 1;
-}
-message WorkqueueExecuteStartFtraceEvent {
-  optional uint64 work = 1;
-  optional uint64 function = 2;
-}
-message WorkqueueQueueWorkFtraceEvent {
-  optional uint64 work = 1;
-  optional uint64 function = 2;
-  optional uint64 workqueue = 3;
-  optional uint32 req_cpu = 4;
-  optional uint32 cpu = 5;
-}
-
-// End of protos/perfetto/trace/ftrace/workqueue.proto
