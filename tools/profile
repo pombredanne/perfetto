@@ -22,7 +22,7 @@ while getopts ":i:d:p:n:" opt; do
     d) DURATION=$OPTARG;;
     p) PID=$OPTARG;;
     n) NAME=$OPTARG;;
-    ?) echo "Usage: profile.sh -i INTERVAL -d DURATION [-p PID] [-n NAME]"
+    ?) echo "Usage: $0 -i SAMPLING_INTERVAL -d DURATION [-p PID] [-n NAME]"
        exit;;
   esac
 done
@@ -41,13 +41,12 @@ adb shell su root start heapprofd
 
 CFG='
 buffers {
-  size_kb: 100024
+  size_kb: 32768
 }
 
 data_sources {
   config {
     name: "android.heapprofd"
-    target_buffer: 0
     heapprofd_config {
       sampling_interval_bytes: '${INTERVAL}'
       '${PID+"pid: $PID"}'
@@ -63,14 +62,14 @@ data_sources {
 duration_ms: '${DURATION}
 
 PERFETTO_PID=$(adb exec-out 'CFG='"'${CFG}'
-"'echo ${CFG} | perfetto -t -c - -o /data/misc/perfetto-traces/trace -b'\
+"'echo ${CFG} | perfetto -t -c - -o /data/misc/perfetto-traces/profile -b'\
   | grep -o '^pid: [0-9]*$' | awk '{ print $2 }')
 
 # TODO(fmayer): Allow to interrupt.
 adb exec-out "while [[ -d /proc/$PERFETTO_PID ]]; do sleep 1; done" | cat
-adb pull /data/misc/perfetto-traces/trace /tmp/trace > /dev/null
+adb pull /data/misc/perfetto-traces/profile /tmp/profile > /dev/null
 
-OUTDIR=$($DIR/trace_to_text profile /tmp/trace | grep -o "/tmp/[^ ]*")
+OUTDIR=$($DIR/trace_to_text profile /tmp/profile | grep -o "/tmp/[^ ]*")
 gzip $OUTDIR/*.pb
 
 echo "Wrote profiles to $OUTDIR"
