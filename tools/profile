@@ -16,18 +16,25 @@
 
 set -euo pipefail
 
-while getopts ":i:d:p:n:" opt; do
+TRACE_TO_TEXT=""
+
+while getopts ":i:d:p:n:t:" opt; do
   case $opt in
     i) INTERVAL=$OPTARG;;
     d) DURATION=$OPTARG;;
     p) PID=$OPTARG;;
     n) NAME=$OPTARG;;
-    ?) echo "Usage: $0 -i SAMPLING_INTERVAL -d DURATION [-p PID] [-n NAME]"
+    t) TRACE_TO_TEXT=$OPTARG;;
+    ?) echo "Usage: $0 -i SAMPLING_INTERVAL -d DURATION [-p PID]"\
+      "[-n NAME] [-t TRACE_TO_TEXT_PATH]"
        exit;;
   esac
 done
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+if [[ -z "${TRACE_TO_TEXT}" ]]; then
+  SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+  TRACE_TO_TEXT="$SCRIPTDIR/trace_to_text"
+fi
 
 ENFORCE_MODE=$(adb shell getenforce)
 function finish {
@@ -69,7 +76,7 @@ PERFETTO_PID=$(adb exec-out 'CFG='"'${CFG}'
 adb exec-out "while [[ -d /proc/$PERFETTO_PID ]]; do sleep 1; done" | cat
 adb pull /data/misc/perfetto-traces/profile /tmp/profile > /dev/null
 
-OUTDIR=$($DIR/trace_to_text profile /tmp/profile | grep -o "/tmp/[^ ]*")
+OUTDIR=$($TRACE_TO_TEXT profile /tmp/profile | grep -o "[^ ]*heap_profile[^ ]*")
 gzip $OUTDIR/*.pb
 
 echo "Wrote profiles to $OUTDIR"
