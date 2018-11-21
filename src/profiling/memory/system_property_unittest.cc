@@ -30,6 +30,20 @@ TEST(SystemPropertyTest, All) {
   ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
 }
 
+TEST(SystemPropertyTest, RefcountAll) {
+  SystemProperties prop;
+  {
+    auto handle = prop.SetAll();
+    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
+    {
+      auto handle2 = prop.SetAll();
+      ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
+    }
+    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
+  }
+  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "");
+}
+
 TEST(SystemPropertyTest, CleanupAll) {
   SystemProperties prop;
   {
@@ -45,6 +59,25 @@ TEST(SystemPropertyTest, Specific) {
   ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "1");
   ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
             "1");
+}
+
+TEST(SystemPropertyTest, RefcountSpecific) {
+  SystemProperties prop;
+  {
+    auto handle = prop.SetProperty("system_server");
+    ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
+              "1");
+    {
+      auto handle2 = prop.SetProperty("system_server");
+      ASSERT_EQ(
+          android::base::GetProperty("heapprofd.enable.system_server", ""),
+          "1");
+    }
+    ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
+              "1");
+  }
+  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
+            "");
 }
 
 TEST(SystemPropertyTest, CleanupSpecific) {
