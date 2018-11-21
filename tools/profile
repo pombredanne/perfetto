@@ -26,7 +26,7 @@ while getopts ":i:d:p:n:t:" opt; do
     n) NAME=$OPTARG;;
     t) TRACE_TO_TEXT=$OPTARG;;
     ?) echo "Usage: $0 -i SAMPLING_INTERVAL -d DURATION [-p PID]"\
-      "[-n NAME] [-t TRACE_TO_TEXT_PATH]"
+      "[-n PROCESS_NAME] [-t TRACE_TO_TEXT_PATH]"
        exit;;
   esac
 done
