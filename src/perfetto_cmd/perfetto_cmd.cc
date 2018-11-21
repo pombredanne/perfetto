@@ -319,6 +319,9 @@ int PerfettoCmd::Main(int argc, char** argv) {
         PERFETTO_CHECK(dup2(*null, STDIN_FILENO) != -1);
         PERFETTO_CHECK(dup2(*null, STDOUT_FILENO) != -1);
         PERFETTO_CHECK(dup2(*null, STDERR_FILENO) != -1);
+        // Do not accidentally close stdin/stdout/stderr.
+        if (*null <= 2)
+          null.release();
         break;
       }
       default:
