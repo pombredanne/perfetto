@@ -110,9 +110,9 @@ ssize_t SendMsgAll(int sockfd, struct msghdr* msg, int flags) {
     // Only send the ancillary data with the first sendmsg call.
     msg->msg_control = nullptr;
     msg->msg_controllen = 0;
-  };
+  }
   return total_sent;
-};
+}
 
 ssize_t SockSend(int fd,
                  const void* msg,
@@ -137,7 +137,6 @@ ssize_t SockSend(int fd,
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = static_cast<CBufLenType>(CMSG_LEN(num_fds * sizeof(int)));
     memcpy(CMSG_DATA(cmsg), send_fds, num_fds * sizeof(int));
-    msg_hdr.msg_controllen = cmsg->cmsg_len;
   }
 
   return SendMsgAll(fd, &msg_hdr, kNoSigPipe);
