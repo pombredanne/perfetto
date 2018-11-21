@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
+import {Engine} from '../../controller/engine';
 import {
+  TrackConfig,
   TrackController,
   trackControllerRegistry
 } from '../../controller/track_controller';
@@ -26,6 +28,12 @@ import {
 
 class CounterTrackController extends TrackController<Config, Data> {
   static readonly kind = COUNTER_TRACK_KIND;
+
+  static async getConfigs(engine: Engine): Promise<Array<TrackConfig<Config>>> {
+    void engine;
+    return [];
+  }
+
   private busy = false;
   private setup = false;
   private maximumValueSeen = 0;

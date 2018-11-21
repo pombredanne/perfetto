@@ -46,3 +46,15 @@ test('registry throws error on non-existent track', () => {
   const registry = new Registry<Registrant>();
   expect(() => registry.get('foo')).toThrow();
 });
+
+test('iterator', () => {
+  const registry = new Registry<Registrant>();
+
+  const a: Registrant = {kind: 'a', n: 1};
+  const b: Registrant = {kind: 'b', n: 2};
+  registry.register(a);
+  registry.register(b);
+
+  expect([...registry.entries()]).toContainEqual(['a', a]);
+  expect([...registry.entries()]).toContainEqual(['b', b]);
+});

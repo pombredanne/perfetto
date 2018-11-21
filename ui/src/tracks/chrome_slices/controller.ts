@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
+import {Engine} from '../../controller/engine';
 import {
+  TrackConfig,
   TrackController,
   trackControllerRegistry
 } from '../../controller/track_controller';
@@ -23,6 +25,11 @@ import {Config, Data, SLICE_TRACK_KIND} from './common';
 class ChromeSliceTrackController extends TrackController<Config, Data> {
   static readonly kind = SLICE_TRACK_KIND;
   private busy = false;
+
+  static async getConfigs(engine: Engine): Promise<Array<TrackConfig<Config>>> {
+    void engine;
+    return [];
+  }
 
   onBoundsChange(start: number, end: number, resolution: number) {
     // TODO: we should really call TraceProcessor.Interrupt() at this point.

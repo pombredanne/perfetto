@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import {assertExists} from '../base/logging';
+import {Tags} from '../base/tags';
 import {Actions} from '../common/actions';
 import {Registry} from '../common/registry';
 import {TrackState} from '../common/state';
@@ -71,6 +72,13 @@ export abstract class TrackController<Config = {}, Data = {}> extends
   }
 }
 
+export interface TrackConfig<Config = {}> {
+  kind: string;
+  name: string;
+  tags: Tags;
+  config: Config;
+}
+
 export interface TrackControllerArgs {
   trackId: string;
   engine: Engine;
@@ -79,6 +87,7 @@ export interface TrackControllerArgs {
 export interface TrackControllerFactory extends
     ControllerFactory<TrackControllerArgs> {
   kind: string;
+  getConfigs(engine: Engine): Promise<TrackConfig[]>;
 }
 
 export const trackControllerRegistry = new Registry<TrackControllerFactory>();

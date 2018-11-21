@@ -17,6 +17,7 @@ import '../tracks/all_controller';
 import * as uuidv4 from 'uuid/v4';
 
 import {assertExists, assertTrue} from '../base/logging';
+import {TagCollection} from '../base/tags';
 import {
   Actions,
   DeferredAction,
@@ -25,14 +26,18 @@ import {SCROLLING_TRACK_GROUP} from '../common/state';
 import {TimeSpan} from '../common/time';
 import {QuantizedLoad, ThreadDesc} from '../frontend/globals';
 import {SLICE_TRACK_KIND} from '../tracks/chrome_slices/common';
-import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
+// import {CPU_SLICE_TRACK_KIND} from '../tracks/cpu_slices/common';
 import {PROCESS_SUMMARY_TRACK} from '../tracks/process_summary/common';
 
 import {Child, Children, Controller} from './controller';
 import {Engine} from './engine';
 import {globals} from './globals';
 import {QueryController, QueryControllerArgs} from './query_controller';
-import {TrackControllerArgs, trackControllerRegistry} from './track_controller';
+import {
+  TrackConfig,
+  TrackControllerArgs,
+  trackControllerRegistry
+} from './track_controller';
 
 type States = 'init'|'loading_trace'|'ready';
 
@@ -199,7 +204,32 @@ export class TraceController extends Controller<States> {
 
     const engine = assertExists<Engine>(this.engine);
     const addToTrackActions: DeferredAction[] = [];
-    const numCpus = await engine.getNumberOfCpus();
+
+
+    // Collect all valid tracks:
+    let tracks: TrackConfig[] = [];
+    {
+      const tracksPromises: Promise<TrackConfig[]>[] = [];
+      for (const [_, controller] of trackControllerRegistry.entries()) {
+        void _;
+        tracksPromises.push(controller.getConfigs(engine));
+      }
+      tracks = tracks.concat(...await Promise.all(tracksPromises));
+    }
+
+    const tags = TagCollection.from(tracks);
+
+    // Add all the tracks with the 'cpu' tag ordered by litte/big then number.
+    const cpuTracks = tags.filter('cpu').sort(['bigLITTLE', 'cpu']).asArray();
+    for (const track of cpuTracks) {
+      addToTrackActions.push(Actions.addTrack({
+        engineId: this.engineId,
+        kind: track.kind,
+        name: track.name,
+        trackGroup: SCROLLING_TRACK_GROUP,
+        config: track.config,
+      }));
+    }
 
     // TODO(hjd): Renable Vsync tracks when fixed.
     //// TODO(hjd): Move this code out of TraceController.
@@ -220,18 +250,6 @@ export class TraceController extends Controller<States> {
     //    }
     //  }));
     //}
-
-    for (let cpu = 0; cpu < numCpus; cpu++) {
-      addToTrackActions.push(Actions.addTrack({
-        engineId: this.engineId,
-        kind: CPU_SLICE_TRACK_KIND,
-        name: `Cpu ${cpu}`,
-        trackGroup: SCROLLING_TRACK_GROUP,
-        config: {
-          cpu,
-        }
-      }));
-    }
 
     const counters = await engine.query(`
       select name, ref, ref_type, count(ref_type)

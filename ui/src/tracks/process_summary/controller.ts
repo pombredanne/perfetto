@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
+import {Engine} from '../../controller/engine';
 import {
+  TrackConfig,
   TrackController,
   trackControllerRegistry
 } from '../../controller/track_controller';
@@ -29,10 +31,14 @@ class ProcessSummaryTrackController extends TrackController<Config, Data> {
   private busy = false;
   private setup = false;
 
+  static async getConfigs(engine: Engine): Promise<Array<TrackConfig<Config>>> {
+    void engine;
+    return [];
+  }
+
   onBoundsChange(start: number, end: number, resolution: number): void {
     this.update(start, end, resolution);
   }
-
 
   private async update(start: number, end: number, resolution: number):
       Promise<void> {

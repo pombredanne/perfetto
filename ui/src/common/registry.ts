@@ -41,6 +41,10 @@ export class Registry<T extends HasKind> {
     return registrant;
   }
 
+  * entries(): IterableIterator<[string, T]> {
+    yield* this.registry.entries();
+  }
+
   unregisterAllForTesting(): void {
     this.registry.clear();
   }

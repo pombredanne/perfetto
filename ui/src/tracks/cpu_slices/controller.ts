@@ -13,7 +13,9 @@
 // limitations under the License.
 
 import {fromNs} from '../../common/time';
+import {Engine} from '../../controller/engine';
 import {
+  TrackConfig,
   TrackController,
   trackControllerRegistry
 } from '../../controller/track_controller';
@@ -28,6 +30,27 @@ import {
 
 class CpuSliceTrackController extends TrackController<Config, Data> {
   static readonly kind = CPU_SLICE_TRACK_KIND;
+
+  static async getConfigs(engine: Engine): Promise<Array<TrackConfig<Config>>> {
+    const numCpus = await engine.getNumberOfCpus();
+    const configs: TrackConfig<Config>[] = [];
+    for (let cpu = 0; cpu < numCpus; cpu++) {
+      const bigLITTLE = (Math.floor(cpu / 4) === 0) ? 'little' : 'big';
+      configs.push({
+        kind: this.kind,
+        name: `Cpu ${cpu} (${bigLITTLE})`,
+        config: {
+          cpu,
+        },
+        tags: {
+          cpu,
+          bigLITTLE,
+        },
+      });
+    }
+    return configs;
+  }
+
   private busy = false;
   private setup = false;
 
