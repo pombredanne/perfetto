@@ -126,17 +126,20 @@ ssize_t SockSend(int fd,
   alignas(cmsghdr) char control_buf[256];
 
   if (num_fds > 0) {
+    const auto raw_data_sz = num_fds * sizeof(int);
     const CBufLenType control_buf_len =
-        static_cast<CBufLenType>(CMSG_SPACE(num_fds * sizeof(int)));
+        static_cast<CBufLenType>(CMSG_SPACE(raw_data_sz));
     PERFETTO_CHECK(control_buf_len <= sizeof(control_buf));
     memset(control_buf, 0, sizeof(control_buf));
     msg_hdr.msg_control = control_buf;
-    msg_hdr.msg_controllen = control_buf_len;
+    msg_hdr.msg_controllen = control_buf_len;  // used by CMSG_FIRSTHDR
     struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg_hdr);
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = static_cast<CBufLenType>(CMSG_LEN(num_fds * sizeof(int)));
+    cmsg->cmsg_len = static_cast<CBufLenType>(CMSG_LEN(raw_data_sz));
     memcpy(CMSG_DATA(cmsg), send_fds, num_fds * sizeof(int));
+    // note: if we were to send multiple cmsghdr structures, then
+    // msg_hdr.msg_controllen would need to be adjusted, see "man 3 cmsg".
   }
 
   return SendMsgAll(fd, &msg_hdr, kNoSigPipe);
