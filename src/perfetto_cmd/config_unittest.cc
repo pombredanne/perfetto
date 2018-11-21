@@ -30,7 +30,7 @@ using protos::TraceConfig;
 class CreateConfigFromOptionsTest : public ::testing::Test {
  public:
   TraceConfig config;
-  ConfigOptions options = DefaultConfigOptions();
+  ConfigOptions options;
 };
 
 TEST_F(CreateConfigFromOptionsTest, Default) {
@@ -78,11 +78,6 @@ TEST_F(CreateConfigFromOptionsTest, Gigabyte) {
   options.buffer_size = "2gb";
   ASSERT_TRUE(CreateConfigFromOptions(options, &config));
   EXPECT_EQ(config.buffers().Get(0).size_kb(), 2 * 1024 * 1024);
-}
-
-TEST_F(CreateConfigFromOptionsTest, BadLeadingSpace) {
-  options.buffer_size = " 2gb";
-  ASSERT_FALSE(CreateConfigFromOptions(options, &config));
 }
 
 TEST_F(CreateConfigFromOptionsTest, BadTrailingSpace) {

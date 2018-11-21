@@ -24,15 +24,17 @@
 
 namespace perfetto {
 
+// As an alternative to setting a full proto/pbtxt config users may also
+// pass a handful of flags for the most common settings. Turning those
+// options in a proto is the job of CreateConfigFromOptions.
+
 struct ConfigOptions {
-  std::string time;
-  std::string max_file_size;
-  std::string buffer_size;
+  std::string time = "10s";
+  std::string max_file_size = "1gb";
+  std::string buffer_size = "24mb";
   std::vector<std::string> atrace_apps;
   std::vector<std::string> categories;
 };
-
-ConfigOptions DefaultConfigOptions();
 
 bool CreateConfigFromOptions(const ConfigOptions& options,
                              perfetto::protos::TraceConfig* trace_config_proto);

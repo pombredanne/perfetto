@@ -142,7 +142,7 @@ Usage: %s
   --help           -h
 
 
-configuration flags:
+light configuration flags: (only when NOT using -c/--config)
   --length         -l      : Trace duration N[s,m,h] (default: 10s)
   --buffer         -b      : Ring buffer size N[mb,gb] (default: 32mb)
   --size           -s      : Maximum trace size N[mb,gb] (default: 100mb)
@@ -199,7 +199,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
   perfetto::protos::TraceConfig::StatsdMetadata statsd_metadata;
   RateLimiter limiter;
 
-  ConfigOptions config_options = DefaultConfigOptions();
+  ConfigOptions config_options;
   bool has_config_options = false;
 
   for (;;) {

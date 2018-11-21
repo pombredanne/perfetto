@@ -27,23 +27,14 @@ using ValueUnit = std::pair<uint64_t, std::string>;
 using UnitMultipler = std::pair<const char*, uint64_t>;
 
 bool SplitValueAndUnit(const std::string& arg, ValueUnit* out) {
-  size_t i = 0;
-  size_t j = 0;
-  for (i = 0; i < arg.size() && isdigit(arg[i]); i++)
-    ;
-  for (j = i; j < arg.size() && isalpha(arg[j]); j++)
-    ;
-  if (i == 0 || i == j || j != arg.size())
-    return false;
-
-  std::string value = arg.substr(0, i);
-  std::string unit = arg.substr(i, arg.size());
   char* end;
-  out->first = strtoull(value.c_str(), &end, 10);
-  if (*end != '\0')
+  if (!arg.size())
     return false;
+  out->first = strtoull(arg.c_str(), &end, 10);
+  if (end == arg.data())
+    return false;
+  std::string unit = arg.substr(static_cast<size_t>(end - arg.data()));
   out->second = std::move(unit);
-
   return true;
 }
 
@@ -82,14 +73,6 @@ bool ConvertSizeToKb(const std::string& arg, uint64_t* out) {
 
 }  // namespace
 
-ConfigOptions DefaultConfigOptions() {
-  ConfigOptions options{};
-  options.time = "10s";
-  options.buffer_size = "24mb";
-  options.max_file_size = "1gb";
-  return options;
-}
-
 bool CreateConfigFromOptions(const ConfigOptions& options,
                              TraceConfig* config) {
   uint64_t duration_ms = 0;
@@ -122,7 +105,6 @@ bool CreateConfigFromOptions(const ConfigOptions& options,
   config->add_buffers()->set_size_kb(static_cast<unsigned int>(buffer_size_kb));
   auto* ds_config = config->add_data_sources()->mutable_config();
   ds_config->set_name("linux.ftrace");
-  ds_config->set_target_buffer(0);
   for (const auto& evt : ftrace_events)
     ds_config->mutable_ftrace_config()->add_ftrace_events(evt);
   for (const auto& cat : atrace_categories)
