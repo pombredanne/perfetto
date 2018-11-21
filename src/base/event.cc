@@ -33,6 +33,8 @@ Event::Event() {
   fd_.reset(eventfd(/* start value */ 0, EFD_CLOEXEC | EFD_NONBLOCK));
   PERFETTO_CHECK(fd_);
 #else
+  // Make the pipe non-blocking so that we never block the waking thread (either
+  // the main thread or another one) when scheduling a wake-up.
   Pipe pipe = Pipe::Create(Pipe::kBothNonBlock);
   fd_ = std::move(pipe.rd);
   write_fd_ = std::move(pipe.wr);
