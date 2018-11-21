@@ -17,6 +17,8 @@
 #ifndef SRC_PROFILING_MEMORY_SYSTEM_PROPERTY_H_
 #define SRC_PROFILING_MEMORY_SYSTEM_PROPERTY_H_
 
+#include "src/profiling/memory/resetting_raw_ptr.h"
+
 #include <map>
 #include <string>
 
@@ -30,8 +32,8 @@ class SystemProperties {
     Handle(const Handle&) = delete;
     Handle& operator=(const Handle&) = delete;
 
-    Handle(Handle&&);
-    Handle& operator=(Handle&&);
+    Handle(Handle&&) = default;
+    Handle& operator=(Handle&&) = default;
 
     friend class SystemProperties;
     ~Handle();
@@ -41,7 +43,7 @@ class SystemProperties {
     explicit Handle(SystemProperties* system_properties, std::string property);
     explicit Handle(SystemProperties* system_properties);
 
-    SystemProperties* system_properties_;
+    ResettingRawPtr<SystemProperties> system_properties_;
     std::string property_;
     bool all_ = false;
   };

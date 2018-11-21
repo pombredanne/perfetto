@@ -21,6 +21,7 @@
 #include <set>
 
 #include "perfetto/base/logging.h"
+#include "src/profiling/memory/resetting_raw_ptr.h"
 
 namespace perfetto {
 namespace profiling {
@@ -48,46 +49,39 @@ class Interner {
     friend class Interner<T>;
     Interned(Entry* entry) : entry_(entry) {}
     Interned(const Interned& other) : entry_(other.entry_) {
-      if (entry_ != nullptr)
+      if (entry_)
         entry_->ref_count++;
     }
 
-    Interned(Interned&& other) noexcept : entry_(other.entry_) {
-      other.entry_ = nullptr;
-    }
-
-    Interned& operator=(Interned&& other) {
-      entry_ = other.entry_;
-      other.entry_ = nullptr;
-      return *this;
-    }
+    Interned(Interned&& other) = default;
+    Interned& operator=(Interned&& other) = default;
 
     Interned& operator=(Interned& other) noexcept {
       entry_ = other.entry_;
-      if (entry_ != nullptr)
+      if (entry_)
         entry_->ref_count++;
       return *this;
     }
 
     const T& data() const { return entry_->data; }
 
-    InternID id() const { return reinterpret_cast<InternID>(entry_); }
+    InternID id() const { return reinterpret_cast<InternID>(entry_.get()); }
 
     ~Interned() {
-      if (entry_ != nullptr)
-        entry_->interner->Return(entry_);
+      if (entry_)
+        entry_->interner->Return(entry_.get());
     }
 
     bool operator<(const Interned& other) const {
-      if (entry_ == nullptr || other.entry_ == nullptr)
-        return entry_ < other.entry_;
-      return *entry_ < *(other.entry_);
+      if (!entry_ || !other.entry_)
+        return entry_.get() < other.entry_.get();
+      return *entry_.get() < *(other.entry_.get());
     }
 
     const T* operator->() const { return &entry_->data; }
 
    private:
-    Interner::Entry* entry_;
+    ResettingRawPtr<Interner::Entry> entry_;
   };
 
   template <typename... U>

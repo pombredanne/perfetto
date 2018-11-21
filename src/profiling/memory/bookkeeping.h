@@ -28,6 +28,7 @@
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/interner.h"
 #include "src/profiling/memory/queue_messages.h"
+#include "src/profiling/memory/resetting_raw_ptr.h"
 
 namespace perfetto {
 namespace profiling {
@@ -159,7 +160,7 @@ class HeapTracker {
                     uint64_t sequence_number);
   void RecordFree(uint64_t address, uint64_t sequence_number);
   void Dump(protos::pbzero::ProfilePacket::ProcessHeapSamples* proto,
-            std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump);
+            std::set<const GlobalCallstackTrie::Node*>* callstacks_to_dump);
 
  private:
   static constexpr uint64_t kNoopFree = 0;
@@ -169,21 +170,17 @@ class HeapTracker {
 
     Allocation() = default;
     Allocation(const Allocation&) = delete;
-    Allocation(Allocation&& other) noexcept {
-      total_size = other.total_size;
-      sequence_number = other.sequence_number;
-      node = other.node;
-      other.node = nullptr;
-    }
+    Allocation(Allocation&& other) = default;
+    Allocation& operator=(Allocation&& other) = default;
 
     ~Allocation() {
       if (node)
-        GlobalCallstackTrie::DecrementNode(node, total_size);
+        GlobalCallstackTrie::DecrementNode(node.get(), total_size);
     }
 
     uint64_t total_size;
     uint64_t sequence_number;
-    GlobalCallstackTrie::Node* node;
+    ResettingRawPtr<GlobalCallstackTrie::Node> node;
   };
 
   // Sequencing logic works as following:

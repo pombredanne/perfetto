@@ -23,21 +23,6 @@
 namespace perfetto {
 namespace profiling {
 
-SystemProperties::Handle::Handle(Handle&& other) {
-  system_properties_ = other.system_properties_;
-  property_ = std::move(other.property_);
-  all_ = other.all_;
-  other.system_properties_ = nullptr;
-}
-
-SystemProperties::Handle& SystemProperties::Handle::operator=(Handle&& other) {
-  system_properties_ = other.system_properties_;
-  property_ = std::move(other.property_);
-  all_ = other.all_;
-  other.system_properties_ = nullptr;
-  return *this;
-}
-
 SystemProperties::Handle::Handle(SystemProperties* system_properties)
     : system_properties_(system_properties), all_(true) {}
 
@@ -55,7 +40,7 @@ SystemProperties::Handle::~Handle() {
 }
 
 SystemProperties::Handle::operator bool() {
-  return system_properties_ != nullptr;
+  return bool(system_properties_);
 }
 
 SystemProperties::Handle SystemProperties::SetProperty(std::string name) {

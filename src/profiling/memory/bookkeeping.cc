@@ -110,10 +110,10 @@ void HeapTracker::CommitFree(uint64_t sequence_number, uint64_t address) {
 
 void HeapTracker::Dump(
     ProfilePacket::ProcessHeapSamples* proto,
-    std::set<GlobalCallstackTrie::Node*>* callstacks_to_dump) {
+    std::set<const GlobalCallstackTrie::Node*>* callstacks_to_dump) {
   for (const auto& p : allocations_) {
     const Allocation& alloc = p.second;
-    callstacks_to_dump->emplace(alloc.node);
+    callstacks_to_dump->emplace(alloc.node.get());
     ProfilePacket::HeapSample* sample = proto->add_samples();
     sample->set_callstack_id(alloc.node->id());
     sample->set_cumulative_allocated(alloc.total_size);
@@ -246,7 +246,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     if (!trace_writer)
       return;
     PERFETTO_LOG("Dumping heaps");
-    std::set<GlobalCallstackTrie::Node*> callstacks_to_dump;
+    std::set<const GlobalCallstackTrie::Node*> callstacks_to_dump;
     TraceWriter::TracePacketHandle trace_packet =
         trace_writer->NewTracePacket();
     auto profile_packet = trace_packet->set_profile_packet();
@@ -267,7 +267,7 @@ void BookkeepingThread::HandleBookkeepingRecord(BookkeepingRecord* rec) {
     // dumps.
     DumpState dump_state;
 
-    for (GlobalCallstackTrie::Node* node : callstacks_to_dump) {
+    for (const GlobalCallstackTrie::Node* node : callstacks_to_dump) {
       // There need to be two separate loops over built_callstack because
       // protozero cannot interleave different messages.
       auto built_callstack = node->BuildCallstack();
