@@ -54,7 +54,6 @@ TRACE_PROTOS = (
   # FTrace events
   'protos/perfetto/trace/ftrace/binder.proto',
   'protos/perfetto/trace/ftrace/block.proto',
-  'protos/perfetto/trace/ftrace/cgroup.proto',
   'protos/perfetto/trace/ftrace/clk.proto',
   'protos/perfetto/trace/ftrace/ext4.proto',
   'protos/perfetto/trace/ftrace/f2fs.proto',

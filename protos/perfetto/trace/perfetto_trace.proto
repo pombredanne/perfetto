@@ -302,15 +302,15 @@ message FtraceEvent {
     // removed field with id 64
     // removed field with id 65
     // removed field with id 66
-    CgroupAttachTaskFtraceEvent cgroup_attach_task = 67;
-    CgroupMkdirFtraceEvent cgroup_mkdir = 68;
-    CgroupRemountFtraceEvent cgroup_remount = 69;
-    CgroupRmdirFtraceEvent cgroup_rmdir = 70;
-    CgroupTransferTasksFtraceEvent cgroup_transfer_tasks = 71;
-    CgroupDestroyRootFtraceEvent cgroup_destroy_root = 72;
-    CgroupReleaseFtraceEvent cgroup_release = 73;
-    CgroupRenameFtraceEvent cgroup_rename = 74;
-    CgroupSetupRootFtraceEvent cgroup_setup_root = 75;
+    // removed field with id 67
+    // removed field with id 68
+    // removed field with id 69
+    // removed field with id 70
+    // removed field with id 71
+    // removed field with id 72
+    // removed field with id 73
+    // removed field with id 74
+    // removed field with id 75
     // removed field with id 76
     // removed field with id 77
     // removed field with id 78
@@ -948,60 +948,6 @@ message BlockUnplugFtraceEvent {
 }
 
 // End of protos/perfetto/trace/ftrace/block.proto
-
-// Begin of protos/perfetto/trace/ftrace/cgroup.proto
-
-message CgroupAttachTaskFtraceEvent {
-  optional int32 dst_root = 1;
-  optional int32 dst_id = 2;
-  optional int32 pid = 3;
-  optional string comm = 4;
-  optional string cname = 5;
-}
-message CgroupMkdirFtraceEvent {
-  optional int32 root = 1;
-  optional int32 id = 2;
-  optional string cname = 3;
-}
-message CgroupRemountFtraceEvent {
-  optional int32 root = 1;
-  optional uint32 ss_mask = 2;
-  optional string name = 3;
-}
-message CgroupRmdirFtraceEvent {
-  optional int32 root = 1;
-  optional int32 id = 2;
-  optional string cname = 3;
-}
-message CgroupTransferTasksFtraceEvent {
-  optional int32 dst_root = 1;
-  optional int32 dst_id = 2;
-  optional int32 pid = 3;
-  optional string comm = 4;
-  optional string cname = 5;
-}
-message CgroupDestroyRootFtraceEvent {
-  optional int32 root = 1;
-  optional uint32 ss_mask = 2;
-  optional string name = 3;
-}
-message CgroupReleaseFtraceEvent {
-  optional int32 root = 1;
-  optional int32 id = 2;
-  optional string cname = 3;
-}
-message CgroupRenameFtraceEvent {
-  optional int32 root = 1;
-  optional int32 id = 2;
-  optional string cname = 3;
-}
-message CgroupSetupRootFtraceEvent {
-  optional int32 root = 1;
-  optional uint32 ss_mask = 2;
-  optional string name = 3;
-}
-
-// End of protos/perfetto/trace/ftrace/cgroup.proto
 
 // Begin of protos/perfetto/trace/ftrace/clk.proto
 
@@ -2029,15 +1975,15 @@ message FtraceEvent {
     // removed field with id 64
     // removed field with id 65
     // removed field with id 66
-    CgroupAttachTaskFtraceEvent cgroup_attach_task = 67;
-    CgroupMkdirFtraceEvent cgroup_mkdir = 68;
-    CgroupRemountFtraceEvent cgroup_remount = 69;
-    CgroupRmdirFtraceEvent cgroup_rmdir = 70;
-    CgroupTransferTasksFtraceEvent cgroup_transfer_tasks = 71;
-    CgroupDestroyRootFtraceEvent cgroup_destroy_root = 72;
-    CgroupReleaseFtraceEvent cgroup_release = 73;
-    CgroupRenameFtraceEvent cgroup_rename = 74;
-    CgroupSetupRootFtraceEvent cgroup_setup_root = 75;
+    // removed field with id 67
+    // removed field with id 68
+    // removed field with id 69
+    // removed field with id 70
+    // removed field with id 71
+    // removed field with id 72
+    // removed field with id 73
+    // removed field with id 74
+    // removed field with id 75
     // removed field with id 76
     // removed field with id 77
     // removed field with id 78
