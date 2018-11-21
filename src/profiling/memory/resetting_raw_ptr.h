@@ -31,8 +31,7 @@ class ResettingRawPtr {
     return *this;
   }
 
-  ResettingRawPtr(ResettingRawPtr&& other) {
-    ptr_ = other.ptr_;
+  ResettingRawPtr(ResettingRawPtr&& other) : ptr_(other.ptr_) {
     other.ptr_ = nullptr;
   }
 
@@ -43,18 +42,15 @@ class ResettingRawPtr {
   }
 
   T* operator*() { return ptr_; }
-
   T* operator*() const { return ptr_; }
 
   T* operator->() { return ptr_; }
-
   const T* operator->() const { return ptr_; }
 
   operator bool() const { return ptr_ != nullptr; }
 
-  const T* get() const { return ptr_; }
-
   T* get() { return ptr_; }
+  const T* get() const { return ptr_; }
 
  private:
   T* ptr_;
