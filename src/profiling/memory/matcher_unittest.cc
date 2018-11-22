@@ -161,6 +161,36 @@ TEST(MatcherTest, ExpiredProcessHandle) {
   EXPECT_FALSE(match);
 }
 
+TEST(MatcherTest, MatchCmdlineProcessSetFirstMultiple) {
+  bool match = false;
+  auto match_fn = [&match](const Process&, const std::vector<ProcessSet*>&) {
+    match = true;
+  };
+  bool shutdown = false;
+  auto shutdown_fn = [&shutdown](pid_t) { shutdown = true; };
+
+  Matcher m(std::move(shutdown_fn), std::move(match_fn));
+  ProcessSet ps;
+  ps.data_source = nullptr;  // Does not matter for this test.
+  ps.process_cmdline.emplace("init");
+  ProcessSet ps2;
+  HeapprofdProducer::DataSource ds;
+  ps2.data_source = &ds;  // Does not matter for this test.
+  ps2.process_cmdline.emplace("init");
+
+  auto ps_handle = m.AwaitProcessSet(std::move(ps));
+  auto ps2_handle = m.AwaitProcessSet(std::move(ps2));
+  auto handle = m.NotifyProcess({1, "init"});
+  EXPECT_TRUE(match);
+  m.GarbageCollectOrphans();
+  m.GarbageCollectOrphans();
+  EXPECT_FALSE(shutdown);
+  { auto destroy = std::move(ps2_handle); }
+  EXPECT_FALSE(shutdown);
+  { auto destroy = std::move(ps_handle); }
+  EXPECT_TRUE(shutdown);
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto
