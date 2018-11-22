@@ -28,6 +28,19 @@ bool ProcessSet::operator<(const ProcessSet& other) {
 Matcher::ProcessHandle::ProcessHandle(Matcher* matcher, pid_t pid)
     : matcher_(matcher), pid_(pid) {}
 
+Matcher::ProcessHandle::ProcessHandle(ProcessHandle&& other)
+    : matcher_(other.matcher_), pid_(other.pid_) {
+  other.matcher_ = nullptr;
+}
+
+Matcher::ProcessHandle& Matcher::ProcessHandle::operator=(
+    ProcessHandle&& other) {
+  matcher_ = other.matcher_;
+  pid_ = other.pid_;
+  other.matcher_ = nullptr;
+  return *this;
+}
+
 Matcher::ProcessHandle::~ProcessHandle() {
   if (matcher_)
     matcher_->RemoveProcess(pid_);
@@ -37,6 +50,19 @@ Matcher::ProcessSetHandle::ProcessSetHandle(
     Matcher* matcher,
     HeapprofdProducer::DataSource* data_source)
     : matcher_(matcher), data_source_(data_source) {}
+
+Matcher::ProcessSetHandle::ProcessSetHandle(ProcessSetHandle&& other)
+    : matcher_(other.matcher_), data_source_(other.data_source_) {
+  other.matcher_ = nullptr;
+}
+
+Matcher::ProcessSetHandle& Matcher::ProcessSetHandle::operator=(
+    ProcessSetHandle&& other) {
+  matcher_ = other.matcher_;
+  data_source_ = other.data_source_;
+  other.matcher_ = nullptr;
+  return *this;
+}
 
 Matcher::ProcessSetHandle::~ProcessSetHandle() {
   if (matcher_)

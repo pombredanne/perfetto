@@ -27,16 +27,12 @@
 namespace perfetto {
 namespace profiling {
 
-class Matcher;
-
 struct Process {
-  friend class Matcher;
   pid_t pid;
   std::string cmdline;
 };
 
 struct ProcessSet {
-  friend class Matcher;
   HeapprofdProducer::DataSource* data_source;
   std::set<pid_t> pids;
   std::set<std::string> process_cmdline;
@@ -73,6 +69,10 @@ class Matcher {
    public:
     friend class Matcher;
     ~ProcessHandle();
+    ProcessHandle(const ProcessHandle&) = delete;
+    ProcessHandle& operator=(const ProcessHandle&) = delete;
+    ProcessHandle(ProcessHandle&&) noexcept;
+    ProcessHandle& operator=(ProcessHandle&&) noexcept;
 
    private:
     ProcessHandle(Matcher* matcher, pid_t pid);
@@ -85,6 +85,10 @@ class Matcher {
    public:
     friend class Matcher;
     ~ProcessSetHandle();
+    ProcessSetHandle(const ProcessSetHandle&) = delete;
+    ProcessSetHandle& operator=(const ProcessSetHandle&) = delete;
+    ProcessSetHandle(ProcessSetHandle&&) noexcept;
+    ProcessSetHandle& operator=(ProcessSetHandle&&) noexcept;
 
    private:
     ProcessSetHandle(Matcher* matcher,
