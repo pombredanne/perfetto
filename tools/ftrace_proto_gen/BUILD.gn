@@ -34,7 +34,6 @@ source_set("ftrace_proto_gen_src") {
   deps = [
     "../../gn:default_deps",
     "../../gn:protobuf_full_deps",
-    "../../protos/perfetto/trace/ftrace:lite",
     "../../src/base",
     "../../src/traced/probes/ftrace:format_parser",
   ]
