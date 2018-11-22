@@ -113,8 +113,8 @@ Matcher::ProcessHandle Matcher::NotifyProcess(Process process) {
   for (ProcessSetItem* process_set_item : matching_process_set_items) {
     process_set_item->process_items.emplace(new_process_item);
     new_process_item->references.emplace(process_set_item);
-    // TODO(fmayer): New match here.
   }
+
   if (found_process_set_item)
     RunMatchFn(new_process_item);
 
