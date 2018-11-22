@@ -200,7 +200,8 @@ TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
   EXPECT_CALL(ftrace, WriteToFile("/root/tracing_on", "1"));
   EXPECT_CALL(ftrace,
               WriteToFile("/root/events/power/cpu_frequency/enable", "1"));
-  // EXPECT_CALL(*mock_table, GetEvent().Times(AnyNumber());
+  EXPECT_CALL(*mock_table, GetEvent(GroupAndName("power", "cpu_frequency")))
+      .Times(AnyNumber());
 
   Event event_to_return;
   event_to_return.name = "cpu_frequency";
@@ -215,6 +216,36 @@ TEST_F(FtraceConfigMuxerTest, AddGenericEvent) {
   const FtraceConfig* actual_config = model.GetConfig(id);
   EXPECT_TRUE(actual_config);
   EXPECT_THAT(actual_config->ftrace_events(), Contains("power/cpu_frequency"));
+}
+
+TEST_F(FtraceConfigMuxerTest, AddSameNameEvents) {
+  auto mock_table = GetMockTable();
+  NiceMock<MockFtraceProcfs> ftrace;
+
+  FtraceConfig config = CreateFtraceConfig({"group_one/foo", "group_two/foo"});
+
+  FtraceConfigMuxer model(&ftrace, mock_table.get());
+
+  Event event1;
+  event1.name = "foo";
+  event1.group = "group_one";
+  ON_CALL(*mock_table, GetOrCreateEvent(GroupAndName("group_one", "foo")))
+      .WillByDefault(Return(&event1));
+  EXPECT_CALL(*mock_table, GetOrCreateEvent(GroupAndName("group_one", "foo")));
+
+  Event event2;
+  event2.name = "cpu_frequency";
+  event2.group = "power";
+  ON_CALL(*mock_table, GetOrCreateEvent(GroupAndName("group_two", "foo")))
+      .WillByDefault(Return(&event2));
+  EXPECT_CALL(*mock_table, GetOrCreateEvent(GroupAndName("group_two", "foo")));
+
+  FtraceConfigId id = model.SetupConfig(config);
+  ASSERT_TRUE(model.ActivateConfig(id));
+  const FtraceConfig* actual_config = model.GetConfig(id);
+  EXPECT_TRUE(actual_config);
+  EXPECT_THAT(actual_config->ftrace_events(), Contains("group_one/foo"));
+  EXPECT_THAT(actual_config->ftrace_events(), Contains("group_two/foo"));
 }
 
 TEST_F(FtraceConfigMuxerTest, AddAllEvents) {

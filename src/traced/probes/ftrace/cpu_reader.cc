@@ -85,8 +85,8 @@ const std::vector<bool> BuildEnabledVector(
     const ProtoTranslationTable& table,
     const std::set<std::string>& events) {
   std::vector<bool> enabled(table.largest_id() + 1);
-  for (const std::string& group_and_name : events) {
-    const Event* event = table.GetEvent(GroupAndName(group_and_name));
+  for (const std::string& name : events) {
+    const Event* event = table.GetEvent(GroupAndName(name));
     if (!event)
       continue;
     enabled[event->ftrace_event_id] = true;

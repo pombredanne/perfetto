@@ -73,6 +73,12 @@ class FtraceConfigMuxer {
 
   const FtraceConfig* GetConfig(FtraceConfigId id);
 
+  // This processes the config to get the exact events.
+  // It guarantees that all events in the return set will have a group and a
+  // name.
+  // group/* -> Will read the fs and add all events in group.
+  // event -> Will look up the event to find the group.
+  // atrace category -> Will add events in that category.
   std::set<GroupAndName> GetFtraceEvents(const FtraceConfig& request,
                                          const ProtoTranslationTable*);
 

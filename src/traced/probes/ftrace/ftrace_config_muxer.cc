@@ -75,6 +75,8 @@ std::set<GroupAndName> FtraceConfigMuxer::GetFtraceEvents(
     if (group_and_name.name() == "*") {
       events = ReadEventsInGroupFromFs(ftrace_, group_and_name.group());
     } else if (group_and_name.group().empty()) {
+      // If there is no group specified, find an event with that name and
+      // use it's group.
       const Event* e = table->GetEvent(group_and_name);
       if (!e) {
         PERFETTO_DLOG(
