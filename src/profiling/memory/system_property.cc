@@ -61,14 +61,18 @@ SystemProperties::Handle::operator bool() {
 SystemProperties::Handle SystemProperties::SetProperty(std::string name) {
   auto it = properties_.find(name);
   if (it == properties_.end()) {
+    // Profiling for name is not enabled, enable it.
     if (!android::base::SetProperty("heapprofd.enable." + name, "1"))
       return Handle(nullptr);
     if (properties_.size() == 1 || alls_ == 0) {
       if (!android::base::SetProperty("heapprofd.enable", "1"))
         return Handle(nullptr);
     }
+    // Keep this last to ensure we only emplace if enabling was
+    // successful.
     properties_.emplace(name, 1);
   } else {
+    // Profiling for name is already enabled, increment refcount.
     it->second++;
   }
   return Handle(this, std::move(name));
@@ -76,9 +80,11 @@ SystemProperties::Handle SystemProperties::SetProperty(std::string name) {
 
 SystemProperties::Handle SystemProperties::SetAll() {
   if (alls_ == 0) {
+    // Profiling all is currently not enabled, enable it.
     if (!android::base::SetProperty("heapprofd.enable", "all"))
       return Handle(nullptr);
   }
+  // Profiling all is already enabled, increment refcount.
   alls_++;
   return Handle(this);
 }
@@ -94,10 +100,12 @@ void SystemProperties::UnsetProperty(const std::string& name) {
     return;
   }
   if (--(it->second) == 0) {
+    // Last reference went away, unset flag for name.
     properties_.erase(it);
     android::base::SetProperty("heapprofd.enable." + name, "");
-    if (properties_.empty() && alls_ == 0)
+    if (properties_.empty() && alls_ == 0) {
       android::base::SetProperty("heapprofd.enable", "");
+    }
   }
 }
 
