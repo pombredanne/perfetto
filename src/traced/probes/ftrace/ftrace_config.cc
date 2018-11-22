@@ -29,7 +29,7 @@ bool IsGoodAtracePunctuation(char c) {
   return c == '_' || c == '.';
 }
 
-bool IsValidAtrace(const std::string& str) {
+bool IsValidAtraceEventName(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
     if (!isalnum(str[i]) && !IsGoodAtracePunctuation(str[i]))
       return false;
@@ -37,7 +37,7 @@ bool IsValidAtrace(const std::string& str) {
   return true;
 }
 
-bool IsValidFtraceEvent(const std::string& str) {
+bool IsValidFtraceEventName(const std::string& str) {
   int slash_count = 0;
   for (size_t i = 0; i < str.size(); i++) {
     if (!isalnum(str[i]) && !IsGoodFtracePunctuation(str[i]))
@@ -48,6 +48,8 @@ bool IsValidFtraceEvent(const std::string& str) {
       if (slash_count > 1 || i == 0 || i == str.size() - 1)
         return false;
     }
+    if (str[i] == '*' && i != str.size() - 1)
+      return false;
   }
   return true;
 }
@@ -74,19 +76,19 @@ bool RequiresAtrace(const FtraceConfig& config) {
 
 bool ValidConfig(const FtraceConfig& config) {
   for (const std::string& event_name : config.ftrace_events()) {
-    if (!IsValidFtraceEvent(event_name)) {
+    if (!IsValidFtraceEventName(event_name)) {
       PERFETTO_ELOG("Bad event name '%s'", event_name.c_str());
       return false;
     }
   }
   for (const std::string& category : config.atrace_categories()) {
-    if (!IsValidAtrace(category)) {
+    if (!IsValidAtraceEventName(category)) {
       PERFETTO_ELOG("Bad category name '%s'", category.c_str());
       return false;
     }
   }
   for (const std::string& app : config.atrace_apps()) {
-    if (!IsValidAtrace(app)) {
+    if (!IsValidAtraceEventName(app)) {
       PERFETTO_ELOG("Bad app '%s'", app.c_str());
       return false;
     }

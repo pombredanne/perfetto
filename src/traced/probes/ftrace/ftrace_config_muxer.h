@@ -23,6 +23,7 @@
 #include "src/traced/probes/ftrace/ftrace_config.h"
 #include "src/traced/probes/ftrace/ftrace_controller.h"
 #include "src/traced/probes/ftrace/ftrace_procfs.h"
+#include "src/traced/probes/ftrace/proto_translation_table.h"
 
 namespace perfetto {
 
@@ -72,9 +73,12 @@ class FtraceConfigMuxer {
 
   const FtraceConfig* GetConfig(FtraceConfigId id);
 
+  std::set<GroupAndName> GetFtraceEvents(const FtraceConfig& request,
+                                         const ProtoTranslationTable*);
+
  private:
   struct FtraceState {
-    std::set<std::string> ftrace_events;
+    std::set<GroupAndName> ftrace_events;
     std::set<std::string> atrace_categories;
     std::set<std::string> atrace_apps;
     bool tracing_on = false;
@@ -108,8 +112,6 @@ class FtraceConfigMuxer {
   std::set<FtraceConfigId> active_configs_;
 };
 
-std::set<std::string> GetFtraceEvents(const FtraceConfig& request,
-                                      const ProtoTranslationTable*);
 size_t ComputeCpuBufferSizeInPages(size_t requested_buffer_size_kb);
 
 }  // namespace perfetto

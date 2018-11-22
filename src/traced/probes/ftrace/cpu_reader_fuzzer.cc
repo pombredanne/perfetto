@@ -52,7 +52,7 @@ void FuzzCpuReaderParsePage(const uint8_t* data, size_t size) {
   memset(g_page, 0, base::kPageSize);
   memcpy(g_page, data, std::min(base::kPageSize, size));
 
-  EventFilter filter(*table, {"sched_switch", "print"});
+  EventFilter filter(*table, {"sched/sched_switch", "ftrace/print"});
 
   writer.Reset(&stream);
   FtraceMetadata metadata{};

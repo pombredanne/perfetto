@@ -69,10 +69,10 @@ const char* kDevices[] = {
 
 TEST_P(AllTranslationTableTest, Create) {
   EXPECT_TRUE(table_);
-  EXPECT_TRUE(table_->GetEventByName("print"));
-  EXPECT_TRUE(table_->GetEventByName("sched_switch"));
-  EXPECT_TRUE(table_->GetEventByName("sched_wakeup"));
-  EXPECT_TRUE(table_->GetEventByName("ext4_da_write_begin"));
+  EXPECT_TRUE(table_->GetEvent("ftrace/print"));
+  EXPECT_TRUE(table_->GetEvent("sched/sched_switch"));
+  EXPECT_TRUE(table_->GetEvent("sched/sched_wakeup"));
+  EXPECT_TRUE(table_->GetEvent("ext4/ext4_da_write_begin"));
   for (const Event& event : table_->events()) {
     if (!event.ftrace_event_id)
       continue;
@@ -91,7 +91,7 @@ TEST_P(AllTranslationTableTest, Create) {
   EXPECT_EQ(pid_field.proto_field_id, 2u);
 
   {
-    auto event = table_->GetEventByName("print");
+    auto event = table_->GetEvent(GroupAndName("ftrace", "print"));
     EXPECT_TRUE(event);
     EXPECT_EQ(std::string(event->name), "print");
     EXPECT_EQ(std::string(event->group), "ftrace");
@@ -116,7 +116,7 @@ TEST(TranslationTableTest, Seed) {
   EXPECT_EQ(pid_field.ftrace_size, 4u);
 
   {
-    auto event = table->GetEventByName("sched_switch");
+    auto event = table->GetEvent(GroupAndName("sched", "sched_switch"));
     EXPECT_EQ(std::string(event->name), "sched_switch");
     EXPECT_EQ(std::string(event->group), "sched");
     EXPECT_EQ(event->ftrace_event_id, 68ul);
@@ -125,7 +125,7 @@ TEST(TranslationTableTest, Seed) {
   }
 
   {
-    auto event = table->GetEventByName("sched_wakeup");
+    auto event = table->GetEvent(GroupAndName("sched", "sched_wakeup"));
     EXPECT_EQ(std::string(event->name), "sched_wakeup");
     EXPECT_EQ(std::string(event->group), "sched");
     EXPECT_EQ(event->ftrace_event_id, 70ul);
@@ -134,7 +134,7 @@ TEST(TranslationTableTest, Seed) {
   }
 
   {
-    auto event = table->GetEventByName("ext4_da_write_begin");
+    auto event = table->GetEvent(GroupAndName("ext4", "ext4_da_write_begin"));
     EXPECT_EQ(std::string(event->name), "ext4_da_write_begin");
     EXPECT_EQ(std::string(event->group), "ext4");
     EXPECT_EQ(event->ftrace_event_id, 303ul);
@@ -229,9 +229,8 @@ print fmt: "some format")"));
   auto table = ProtoTranslationTable::Create(&ftrace, std::move(events),
                                              std::move(common_fields));
   EXPECT_EQ(table->largest_id(), 42ul);
-  EXPECT_EQ(table->EventNameToFtraceId("foo"), 42ul);
-  EXPECT_EQ(table->EventNameToFtraceId("bar"), 0ul);
-  EXPECT_EQ(table->EventNameToFtraceId("bar"), 0ul);
+  EXPECT_EQ(table->EventToFtraceId(GroupAndName("group/foo")), 42ul);
+  EXPECT_EQ(table->EventToFtraceId(GroupAndName("group/bar")), 0ul);
   EXPECT_FALSE(table->GetEventById(43ul));
   ASSERT_TRUE(table->GetEventById(42ul));
   EXPECT_EQ(table->ftrace_page_header_spec().timestamp.size, 8);
@@ -341,14 +340,15 @@ TEST(TranslationTableTest, Getters) {
       &ftrace, events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
   EXPECT_EQ(table.largest_id(), 100ul);
-  EXPECT_EQ(table.EventNameToFtraceId("foo"), 1ul);
-  EXPECT_EQ(table.EventNameToFtraceId("baz"), 100ul);
-  EXPECT_EQ(table.EventNameToFtraceId("no_such_event"), 0ul);
+  EXPECT_EQ(table.EventToFtraceId(GroupAndName("group_one/foo")), 1ul);
+  EXPECT_EQ(table.EventToFtraceId(GroupAndName("group_two/baz")), 100ul);
+  EXPECT_EQ(table.EventToFtraceId(GroupAndName("group_one/no_such_event")),
+            0ul);
   EXPECT_EQ(table.GetEventById(1)->name, "foo");
   EXPECT_EQ(table.GetEventById(3), nullptr);
   EXPECT_EQ(table.GetEventById(200), nullptr);
   EXPECT_EQ(table.GetEventById(0), nullptr);
-  EXPECT_EQ(table.GetEventByName("foo")->ftrace_event_id, 1u);
+  EXPECT_EQ(table.GetEvent(GroupAndName("group_one/foo"))->ftrace_event_id, 1u);
   EXPECT_THAT(*table.GetEventsByGroup("group_one"),
               Contains(testing::Field(&Event::name, "foo")));
   EXPECT_THAT(*table.GetEventsByGroup("group_one"),
@@ -378,9 +378,9 @@ format:
 	field:int common_pid;	offset:4;	size:4;	signed:1;
 
 	field:char field_a[16];	offset:8;	size:16;	signed:0;
-	field:int field_b;	offset:24;	size:4;	signed:1;
-	field:int field_d;	offset:28;	size:4;	signed:1;
-	field:u32 field_e;	offset:32;	size:4;	signed:0;
+	field:bool field_b;	offset:24;	size:1;	signed:0;
+	field:int field_c;	offset:25;	size:4;	signed:1;
+	field:u32 field_d;	offset:33;	size:4;	signed:0;
 
 print fmt: "some format")"));
 
@@ -390,29 +390,60 @@ print fmt: "some format")"));
   auto table = ProtoTranslationTable::Create(&ftrace, std::move(events),
                                              std::move(common_fields));
   EXPECT_EQ(table->largest_id(), 0ul);
-  std::string event_name = "foo";
-  const Event* e = table->AddGenericEvent("group", event_name);
+  GroupAndName group_and_name("group/foo");
+  const Event* e = table->GetOrCreateEvent(group_and_name);
   EXPECT_EQ(table->largest_id(), 42ul);
-  EXPECT_EQ(table->EventNameToFtraceId(event_name), 42ul);
+  EXPECT_EQ(table->EventToFtraceId(group_and_name), 42ul);
 
   // Check getters
   EXPECT_EQ(table->GetEventById(42)->proto_field_id,
             protos::pbzero::FtraceEvent::kGenericFieldNumber);
-  EXPECT_EQ(table->GetEventByName(event_name)->proto_field_id,
+  EXPECT_EQ(table->GetEvent(group_and_name)->proto_field_id,
             protos::pbzero::FtraceEvent::kGenericFieldNumber);
-  EXPECT_EQ(table->GetEventsByGroup("group")->front()->name, event_name);
+  EXPECT_EQ(table->GetEventsByGroup("group")->front()->name,
+            group_and_name.name());
 
   EXPECT_EQ(e->fields.size(), 4ul);
-  // Check one field
   const std::vector<Field>& fields = e->fields;
-  const auto& first_field = fields[0];
-  EXPECT_STREQ(first_field.ftrace_name, "field_a");
-  EXPECT_EQ(first_field.proto_field_id,
+  // Check string field
+  const auto& str_field = fields[0];
+  EXPECT_STREQ(str_field.ftrace_name, "field_a");
+  EXPECT_EQ(str_field.proto_field_id,
             protos::pbzero::GenericFtraceEvent::Field::kStrValueFieldNumber);
-  EXPECT_EQ(first_field.proto_field_type, kProtoString);
-  EXPECT_EQ(first_field.ftrace_type, kFtraceFixedCString);
-  EXPECT_EQ(first_field.ftrace_size, 16);
-  EXPECT_EQ(first_field.ftrace_offset, 8);
+  EXPECT_EQ(str_field.proto_field_type, kProtoString);
+  EXPECT_EQ(str_field.ftrace_type, kFtraceFixedCString);
+  EXPECT_EQ(str_field.ftrace_size, 16);
+  EXPECT_EQ(str_field.ftrace_offset, 8);
+
+  // Check bool field
+  const auto& bool_field = fields[1];
+  EXPECT_STREQ(bool_field.ftrace_name, "field_b");
+  EXPECT_EQ(bool_field.proto_field_id,
+            protos::pbzero::GenericFtraceEvent::Field::kUintValueFieldNumber);
+  EXPECT_EQ(bool_field.proto_field_type, kProtoUint64);
+  EXPECT_EQ(bool_field.ftrace_type, kFtraceBool);
+  EXPECT_EQ(bool_field.ftrace_size, 1);
+  EXPECT_EQ(bool_field.ftrace_offset, 24);
+
+  // Check int field
+  const auto& int_field = fields[2];
+  EXPECT_STREQ(int_field.ftrace_name, "field_c");
+  EXPECT_EQ(int_field.proto_field_id,
+            protos::pbzero::GenericFtraceEvent::Field::kIntValueFieldNumber);
+  EXPECT_EQ(int_field.proto_field_type, kProtoInt64);
+  EXPECT_EQ(int_field.ftrace_type, kFtraceInt32);
+  EXPECT_EQ(int_field.ftrace_size, 4);
+  EXPECT_EQ(int_field.ftrace_offset, 25);
+
+  // Check uint field
+  const auto& uint_field = fields[3];
+  EXPECT_STREQ(uint_field.ftrace_name, "field_d");
+  EXPECT_EQ(uint_field.proto_field_id,
+            protos::pbzero::GenericFtraceEvent::Field::kUintValueFieldNumber);
+  EXPECT_EQ(uint_field.proto_field_type, kProtoUint64);
+  EXPECT_EQ(uint_field.ftrace_type, kFtraceUint32);
+  EXPECT_EQ(uint_field.ftrace_size, 4);
+  EXPECT_EQ(uint_field.ftrace_offset, 33);
 }
 
 }  // namespace

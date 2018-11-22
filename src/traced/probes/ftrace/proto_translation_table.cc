@@ -97,7 +97,7 @@ bool MergeFieldInfo(const FtraceEvent::Field& ftrace_field,
   if (!SetTranslationStrategy(field->ftrace_type, field->proto_field_type,
                               &field->strategy)) {
     PERFETTO_DLOG(
-        "Failed to find translation stratagy for ftrace field \"%s.%s\" (%s -> "
+        "Failed to find translation strategy for ftrace field \"%s.%s\" (%s -> "
         "%s)",
         event_name_for_debug, field->ftrace_name, ToString(field->ftrace_type),
         ToString(field->proto_field_type));
@@ -183,27 +183,21 @@ void SetProtoType(FtraceFieldType ftrace_type,
     case kFtraceInt32:
     case kFtracePid32:
     case kFtraceCommonPid32:
-      *proto_type = kProtoInt32;
-      *proto_field_id = GenericFtraceEvent::Field::kInt32ValueFieldNumber;
-      break;
     case kFtraceInt64:
       *proto_type = kProtoInt64;
-      *proto_field_id = GenericFtraceEvent::Field::kInt64ValueFieldNumber;
+      *proto_field_id = GenericFtraceEvent::Field::kIntValueFieldNumber;
       break;
     case kFtraceUint8:
     case kFtraceUint16:
     case kFtraceUint32:
     case kFtraceBool:
-      *proto_type = kProtoUint32;
-      *proto_field_id = GenericFtraceEvent::Field::kUint32ValueFieldNumber;
-      break;
     case kFtraceDevId32:
     case kFtraceDevId64:
     case kFtraceUint64:
     case kFtraceInode32:
     case kFtraceInode64:
       *proto_type = kProtoUint64;
-      *proto_field_id = GenericFtraceEvent::Field::kUint64ValueFieldNumber;
+      *proto_field_id = GenericFtraceEvent::Field::kUintValueFieldNumber;
       break;
   }
 }
@@ -405,20 +399,27 @@ ProtoTranslationTable::ProtoTranslationTable(
       common_fields_(std::move(common_fields)),
       ftrace_page_header_spec_(ftrace_page_header_spec) {
   for (const Event& event : events) {
-    name_to_event_[event.name] = &events_.at(event.ftrace_event_id);
+    group_and_name_to_event_[GroupAndName(event.group, event.name)] =
+        &events_.at(event.ftrace_event_id);
+    name_to_events_[event.name].push_back(&events_.at(event.ftrace_event_id));
     group_to_events_[event.group].push_back(&events_.at(event.ftrace_event_id));
   }
 }
 
-const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
-                                                    const std::string& event) {
-  // Read the format file and create the ftrace event
-  if (group.empty() || event.empty())
+const Event* ProtoTranslationTable::GetOrCreateEvent(
+    const GroupAndName& group_and_name) {
+  const Event* event = GetEvent(group_and_name);
+  if (event)
+    return event;
+  // The ftrace event does not already exist so a new one will be created
+  // by parsing the format file.
+  if (group_and_name.group().empty() || group_and_name.name().empty())
     return nullptr;
-  std::string contents = ftrace_procfs_->ReadEventFormat(group, event);
+  std::string contents = ftrace_procfs_->ReadEventFormat(group_and_name.group(),
+                                                         group_and_name.name());
   if (contents.empty())
     return nullptr;
-  FtraceEvent ftrace_event;
+  FtraceEvent ftrace_event = {};
   ParseFtraceEvent(contents, &ftrace_event);
 
   // Ensure events vector is large enough
@@ -431,8 +432,8 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
   Event* e = &events_.at(ftrace_event.id);
   e->ftrace_event_id = ftrace_event.id;
   e->proto_field_id = protos::pbzero::FtraceEvent::kGenericFieldNumber;
-  e->name = InternString(event);
-  e->group = InternString(group);
+  e->name = InternString(group_and_name.name());
+  e->group = InternString(group_and_name.group());
 
   // Calculate size of common fields.
   for (const FtraceEvent::Field& ftrace_field : ftrace_event.common_fields) {
@@ -444,7 +445,8 @@ const Event* ProtoTranslationTable::AddGenericEvent(const std::string& group,
   for (const FtraceEvent::Field& ftrace_field : ftrace_event.fields)
     e->size = std::max(CreateGenericEventField(ftrace_field, *e), e->size);
 
-  name_to_event_[e->name] = &events_.at(e->ftrace_event_id);
+  group_and_name_to_event_[group_and_name] = &events_.at(e->ftrace_event_id);
+  name_to_events_[e->name].push_back(&events_.at(e->ftrace_event_id));
   group_to_events_[e->group].push_back(&events_.at(e->ftrace_event_id));
 
   return e;
@@ -462,7 +464,7 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
   std::string field_name = GetNameFromTypeAndName(ftrace_field.type_and_name);
   if (field_name.empty()) {
     PERFETTO_DLOG("Field: %s could not be added to the generic event.",
-                  ftrace_field.type_and_name);
+                  ftrace_field.type_and_name.c_str());
     return field_end;
   }
   event.fields.emplace_back();

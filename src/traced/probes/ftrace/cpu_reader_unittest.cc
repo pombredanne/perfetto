@@ -241,7 +241,7 @@ TEST_F(CpuReaderTableTest, EventFilter) {
   ProtoTranslationTable table(
       &ftrace_, events, std::move(common_fields),
       ProtoTranslationTable::DefaultPageHeaderSpecForTesting());
-  EventFilter filter(table, {"foo"});
+  EventFilter filter(table, {"foo_group/foo"});
 
   EXPECT_TRUE(filter.IsEventEnabled(1));
   EXPECT_FALSE(filter.IsEventEnabled(2));
@@ -364,7 +364,7 @@ TEST(CpuReaderTest, ParseSinglePrint) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"print"});
+  EventFilter filter(*table, {"ftrace/print"});
 
   FtraceMetadata metadata{};
   size_t bytes = CpuReader::ParsePage(
@@ -477,7 +477,7 @@ TEST(CpuReaderTest, ReallyLongEvent) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"print"});
+  EventFilter filter(*table, {"ftrace/print"});
 
   FtraceMetadata metadata{};
   CpuReader::ParsePage(page.get(), &filter, bundle_provider.writer(), table,
@@ -512,7 +512,7 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"print"});
+  EventFilter filter(*table, {"ftrace/print"});
 
   FtraceMetadata metadata{};
   ASSERT_FALSE(CpuReader::ParsePage(
@@ -590,7 +590,7 @@ TEST(CpuReaderTest, ParseThreePrint) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"print"});
+  EventFilter filter(*table, {"ftrace/print"});
 
   FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
@@ -684,7 +684,7 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"sched_switch"});
+  EventFilter filter(*table, {"sched/sched_switch"});
 
   FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
@@ -1352,7 +1352,7 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"sched_switch"});
+  EventFilter filter(*table, {"sched/sched_switch"});
 
   FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
@@ -1781,7 +1781,7 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, {"sched_switch"});
+  EventFilter filter(*table, {"sched/sched_switch"});
 
   FtraceMetadata metadata{};
   ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,

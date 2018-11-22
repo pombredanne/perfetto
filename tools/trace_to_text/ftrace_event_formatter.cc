@@ -340,6 +340,7 @@ using protos::ClkEnableFtraceEvent;
 using protos::ClkSetRateFtraceEvent;
 using protos::SignalDeliverFtraceEvent;
 using protos::SignalGenerateFtraceEvent;
+using protos::OomScoreAdjUpdateFtraceEvent;
 using protos::GenericFtraceEvent;
 
 const char* GetSchedSwitchFlag(int64_t state) {
@@ -2695,23 +2696,25 @@ std::string FormatGeneric(const GenericFtraceEvent& event) {
   std::string result = "generic (" + event.event_name() + "): ";
   for (const auto& field : event.field()) {
     char line[2048];
-    sprintf(line, "name=%s type=%s ", field.name().c_str(),
-            field.type().c_str());
+    sprintf(line, "name=%s ", field.name().c_str());
     result.append(line);
     char value[2048];
     if (field.has_str_value())
       sprintf(value, "value=%s ", field.str_value().c_str());
-    else if (field.has_int32_value())
-      sprintf(value, "value=%d ", field.int32_value());
-    else if (field.has_int64_value())
-      sprintf(value, "value=%ld ", field.int64_value());
-    else if (field.has_uint32_value())
-      sprintf(value, "value=%u ", field.uint32_value());
-    else if (field.has_uint64_value())
-      sprintf(value, "value=%lu ", field.uint64_value());
+    else if (field.has_int_value())
+      sprintf(value, "value=%ld ", field.int_value());
+    else if (field.has_uint_value())
+      sprintf(value, "value=%lu ", field.uint_value());
     result.append(value);
   }
   return result;
+}
+
+std::string FormatOomScoreAdjUpdate(const OomScoreAdjUpdateFtraceEvent& event) {
+  char line[2048];
+  sprintf(line, "oom_score_adj_update: pid=%d comm=%s oom_score_adj=%hd",
+          event.pid(), event.comm().c_str(), event.oom_score_adj());
+  return std::string(line);
 }
 
 std::string FormatEventText(const protos::FtraceEvent& event) {
@@ -3513,6 +3516,9 @@ std::string FormatEventText(const protos::FtraceEvent& event) {
   } else if (event.has_signal_generate()) {
     const auto& inner = event.signal_generate();
     return FormatSignalGenerate(inner);
+  } else if (event.has_oom_score_adj_update()) {
+    const auto& inner = event.oom_score_adj_update();
+    return FormatOomScoreAdjUpdate(inner);
   } else if (event.has_generic()) {
     const auto& inner = event.generic();
     return FormatGeneric(inner);

@@ -19,7 +19,6 @@
 
 #include <stdint.h>
 
-#include <deque>
 #include <map>
 #include <memory>
 #include <set>
@@ -27,7 +26,6 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/string_view.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/format_parser.h"
 
@@ -40,6 +38,42 @@ namespace pbzero {
 class FtraceEventBundle;
 }  // namespace pbzero
 }  // namespace protos
+
+// Used when reading the config to store the group and name info for the
+// ftrace event.
+class GroupAndName {
+ public:
+  GroupAndName(const std::string& group, const std::string& name)
+      : group_(group), name_(name) {}
+
+  GroupAndName(const std::string& event) {
+    auto slash_pos = event.find("/");
+    if (slash_pos == std::string::npos) {
+      group_ = "";
+      name_ = event;
+    } else {
+      group_ = event.substr(0, slash_pos);
+      name_ = event.substr(slash_pos + 1);
+    }
+  }
+
+  bool operator==(const GroupAndName& other) const {
+    return std::tie(group_, name_) == std::tie(other.group(), other.name());
+  }
+
+  bool operator<(const GroupAndName& other) const {
+    return std::tie(group_, name_) < std::tie(other.group(), other.name());
+  }
+
+  const std::string& name() const { return name_; }
+  const std::string& group() const { return group_; }
+
+  std::string ToString() const { return group_ + "/" + name_; }
+
+ private:
+  std::string group_;
+  std::string name_;
+};
 
 bool InferFtraceType(const std::string& type_and_name,
                      size_t size,
@@ -74,10 +108,20 @@ class ProtoTranslationTable {
 
   const std::vector<Field>& common_fields() const { return common_fields_; }
 
-  const Event* GetEventByName(const std::string& name) const {
-    if (!name_to_event().count(name))
+  // Retrieve the event by the group and name. If the group
+  // is empty, an event with that name will be returned.
+  // Virtual for testing.
+  virtual const Event* GetEvent(const GroupAndName& group_and_name) const {
+    if (group_and_name.group().empty())
+      return GetEventByName(group_and_name.name());
+    if (!group_and_name_to_event_.count(group_and_name)) {
       return nullptr;
-    return name_to_event().at(name);
+    }
+    return group_and_name_to_event_.at(group_and_name);
+  }
+
+  const Event* GetEvent(const std::string& event) const {
+    return GetEvent(GroupAndName(event));
   }
 
   const std::vector<const Event*>* GetEventsByGroup(
@@ -95,10 +139,10 @@ class ProtoTranslationTable {
     return &events_.at(id);
   }
 
-  size_t EventNameToFtraceId(const std::string& name) const {
-    if (!name_to_event().count(name))
+  size_t EventToFtraceId(GroupAndName group_and_name) const {
+    if (!group_and_name_to_event_.count(group_and_name))
       return 0;
-    return name_to_event().at(name)->ftrace_event_id;
+    return group_and_name_to_event_.at(group_and_name)->ftrace_event_id;
   }
 
   const std::vector<Event>& events() { return events_; }
@@ -106,19 +150,22 @@ class ProtoTranslationTable {
     return ftrace_page_header_spec_;
   }
 
-  // Virtual for testing.
-  virtual const Event* AddGenericEvent(const std::string& group,
-                                       const std::string& event);
-
- protected:
-  // Virtual for testing.
-  virtual const std::map<std::string, const Event*> name_to_event() const {
-    return name_to_event_;
-  }
+  // Retrieves the ftrace event from the proto translation
+  // table. If it does not exist, reads the format file and creates a
+  // new event with the proto id set to generic. Virtual for testing.
+  virtual const Event* GetOrCreateEvent(const GroupAndName&);
 
  private:
   ProtoTranslationTable(const ProtoTranslationTable&) = delete;
   ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
+
+  // This is for backwards compatibility. If a group is not specified in the
+  // config then the first event with that name will be returned.
+  const Event* GetEventByName(const std::string& name) const {
+    if (!name_to_events_.count(name))
+      return nullptr;
+    return name_to_events_.at(name)[0];
+  }
 
   // Store strings so they can be read when writing the trace output.
   const char* InternString(const std::string& str);
@@ -129,7 +176,8 @@ class ProtoTranslationTable {
   const FtraceProcfs* ftrace_procfs_;
   std::vector<Event> events_;
   size_t largest_id_;
-  std::map<std::string, const Event*> name_to_event_;
+  std::map<GroupAndName, const Event*> group_and_name_to_event_;
+  std::map<std::string, std::vector<const Event*>> name_to_events_;
   std::map<std::string, std::vector<const Event*>> group_to_events_;
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};

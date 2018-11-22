@@ -310,7 +310,7 @@ static void BM_ParsePageFullOfSchedSwitch(benchmark::State& state) {
   ProtoTranslationTable* table = GetTable(test_case->name);
   auto page = PageFromXxd(test_case->data);
 
-  EventFilter filter(*table, std::set<std::string>({"sched_switch"}));
+  EventFilter filter(*table, std::set<std::string>({"sched/sched_switch"}));
 
   FtraceMetadata metadata{};
   while (state.KeepRunning()) {
