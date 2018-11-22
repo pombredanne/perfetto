@@ -152,7 +152,7 @@ Matcher::ProcessSetHandle Matcher::AwaitProcessSet(ProcessSet process_set) {
   for (ProcessItem* process_item : matching_process_items) {
     new_process_set_item->process_items.emplace(process_item);
     process_item->references.emplace(new_process_set_item);
-    // TODO(fmayer): New match here.
+    RunMatchFn(process_item);
   }
 
   return ProcessSetHandle(this, ds);
