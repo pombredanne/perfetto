@@ -31,6 +31,16 @@ namespace profiling {
 
 class HeapprofdProducer : public Producer {
  public:
+  struct DataSource {
+    std::vector<pid_t> pids;
+    // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
+    // thread for unwinding.
+    std::shared_ptr<TraceWriter> trace_writer;
+    // These are opaque handles that shut down the sockets in SocketListener
+    // once they go away.
+    std::vector<SocketListener::ProfilingSession> sessions;
+  };
+
   HeapprofdProducer(base::TaskRunner* task_runner);
   ~HeapprofdProducer() override;
 
@@ -76,16 +86,6 @@ class HeapprofdProducer : public Producer {
             FlushRequestID flush_id,
             bool has_flush_id);
   void DoContinuousDump(DataSourceInstanceID id, uint32_t dump_interval);
-
-  struct DataSource {
-    std::vector<pid_t> pids;
-    // This is a shared ptr so we can lend a weak_ptr to the bookkeeping
-    // thread for unwinding.
-    std::shared_ptr<TraceWriter> trace_writer;
-    // These are opaque handles that shut down the sockets in SocketListener
-    // once they go away.
-    std::vector<SocketListener::ProfilingSession> sessions;
-  };
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
   std::map<FlushRequestID, size_t> flushes_in_progress_;

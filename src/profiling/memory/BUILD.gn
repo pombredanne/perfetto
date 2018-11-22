@@ -58,6 +58,8 @@ source_set("daemon") {
     "heapprofd_producer.cc",
     "heapprofd_producer.h",
     "interner.h",
+    "matcher.cc",
+    "matcher.h",
     "queue_messages.h",
     "record_reader.cc",
     "record_reader.h",
