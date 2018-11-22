@@ -82,6 +82,47 @@ TEST(MatcherTest, MatchPIDProcessSetSecond) {
   EXPECT_FALSE(shutdown);
 }
 
+TEST(MatcherTest, MatchCmdlineProcessSetFirst) {
+  bool match = false;
+  auto match_fn = [&match](const Process&, const std::vector<ProcessSet*>&) {
+    match = true;
+  };
+  bool shutdown = false;
+  auto shutdown_fn = [&shutdown](pid_t) { shutdown = true; };
+
+  Matcher m(std::move(shutdown_fn), std::move(match_fn));
+  ProcessSet ps;
+  ps.data_source = nullptr;  // Does not matter for this test.
+  ps.process_cmdline.emplace("init");
+
+  auto ps_handle = m.AwaitProcessSet(std::move(ps));
+  auto handle = m.NotifyProcess({1, "init"});
+  EXPECT_TRUE(match);
+  m.GarbageCollectOrphans();
+  m.GarbageCollectOrphans();
+  EXPECT_FALSE(shutdown);
+}
+
+TEST(MatcherTest, MatchCmdlineProcessSetSecond) {
+  bool match = false;
+  auto match_fn = [&match](const Process&, const std::vector<ProcessSet*>&) {
+    match = true;
+  };
+  bool shutdown = false;
+  auto shutdown_fn = [&shutdown](pid_t) { shutdown = true; };
+
+  Matcher m(std::move(shutdown_fn), std::move(match_fn));
+  ProcessSet ps;
+  ps.data_source = nullptr;  // Does not matter for this test.
+  ps.process_cmdline.emplace("init");
+
+  auto handle = m.NotifyProcess({1, "init"});
+  auto ps_handle = m.AwaitProcessSet(std::move(ps));
+  EXPECT_TRUE(match);
+  m.GarbageCollectOrphans();
+  m.GarbageCollectOrphans();
+  EXPECT_FALSE(shutdown);
+}
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto
