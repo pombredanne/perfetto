@@ -105,6 +105,10 @@ class Matcher {
   void GarbageCollectOrphans();
 
  private:
+  // ProcessItem and ProcessSetItem are held internally in the Matcher for
+  // each Process and ProcessSet. Matched Processes and ProcessSets have
+  // pointers to each other in their ProcessItem and ProcessSetItem structs,
+  // which are automatically kept up to date in the destructors.
   struct ProcessSetItem;
   struct ProcessItem {
     // No copy or move as we rely on pointer stability in ProcessSetItem.
@@ -147,7 +151,6 @@ class Matcher {
   std::function<void(const Process&, const std::vector<ProcessSet*>&)>
       match_fn_;
 
-  // TODO(fmayer): dtor order.
   std::map<pid_t, ProcessItem> pid_to_process_;
   std::map<std::string, ProcessItem*> cmdline_to_process_;
 
