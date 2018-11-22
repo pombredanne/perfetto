@@ -19,7 +19,6 @@
 
 #include <stdint.h>
 
-#include <deque>
 #include <map>
 #include <memory>
 #include <set>
@@ -27,7 +26,6 @@
 #include <vector>
 
 #include "perfetto/base/scoped_file.h"
-#include "perfetto/base/string_view.h"
 #include "src/traced/probes/ftrace/event_info.h"
 #include "src/traced/probes/ftrace/format_parser.h"
 

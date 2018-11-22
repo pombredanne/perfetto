@@ -248,7 +248,7 @@ bool InferFtraceType(const std::string& type_and_name,
     return true;
   }
 
-  if (base::StartsWith(type_and_name, "bool ") && size == 1) {
+  if (base::StartsWith(type_and_name, "bool ")) {
     *out = kFtraceBool;
     return true;
   }

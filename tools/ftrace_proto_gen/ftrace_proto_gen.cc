@@ -409,6 +409,9 @@ void GenerateFtraceEventProto(const std::vector<FtraceEventName>& raw_whitelist,
     *fout << "    " << ToCamelCase(event.name()) << "FtraceEvent "
           << event.name() << " = " << i << ";\n";
     ++i;
+    // We cannot depend on the proto file to get this number because
+    // it would cause a dependency cycle between this generator and the
+    // generated code.
     if (i == 327) {
       *fout << "    GenericFtraceEvent generic = " << i << ";\n";
       ++i;
