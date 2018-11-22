@@ -140,8 +140,6 @@ TEST(MatcherTest, ExpiredProcessSetHandle) {
   { auto ps_handle = m.AwaitProcessSet(std::move(ps)); }
   auto handle = m.NotifyProcess({1, "init"});
   EXPECT_FALSE(match);
-  m.GarbageCollectOrphans();
-  m.GarbageCollectOrphans();
 }
 
 TEST(MatcherTest, ExpiredProcessHandle) {
@@ -161,8 +159,6 @@ TEST(MatcherTest, ExpiredProcessHandle) {
   EXPECT_FALSE(shutdown);
   auto ps_handle = m.AwaitProcessSet(std::move(ps));
   EXPECT_FALSE(match);
-  m.GarbageCollectOrphans();
-  m.GarbageCollectOrphans();
 }
 
 }  // namespace
