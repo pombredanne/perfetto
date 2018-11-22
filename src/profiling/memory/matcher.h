@@ -45,6 +45,28 @@ struct ProcessSet {
   bool operator<(const ProcessSet& other);
 };
 
+// The Matcher allows DataSources to wait for ProcessSets, and the
+// SocketListener to notify connection of a new Process. Both of these
+// operations return an opaque handle that should be held on to by the caller.
+//
+// If the ProcessHandle gets destroyed, it signals to the Matcher that the
+// process disconnected. If the ProcessSetHandle goes away, it signals to
+// the Matcher that the ProcessSet has been torn down. When the last
+// ProcessSet referring to a Process gets torn down, the Process has to be
+// shut down.
+//
+// In the constructor, a match_fn and a shutdown_fn are supplied.
+// match_fn is called when the set of ProcessSets for a given process changes,
+// so that the SocketListener can compute and send the appropriate
+// ClientConfiguration.
+// shutdown_fn is called when the last DataSource for a process gets torn
+// down.
+//
+// To support user builds, where heapprofd gets forked off the profilee
+// process and then receives the configuration from traced, processes that
+// do not have matching ProcessSets when NotifyProcess is called are orphaned.
+// They get destroyed upon the second call to GarbageCollectOrphans if they
+// have not yet been matched to a ProcessSet.
 class Matcher {
  public:
   class ProcessHandle {
