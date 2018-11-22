@@ -21,10 +21,6 @@
 namespace perfetto {
 namespace profiling {
 
-bool ProcessSet::operator<(const ProcessSet& other) {
-  return data_source < other.data_source;
-}
-
 Matcher::ProcessHandle::ProcessHandle(Matcher* matcher, pid_t pid)
     : matcher_(matcher), pid_(pid) {}
 

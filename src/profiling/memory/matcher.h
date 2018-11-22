@@ -37,8 +37,6 @@ struct ProcessSet {
   std::set<pid_t> pids;
   std::set<std::string> process_cmdline;
   bool all = false;
-
-  bool operator<(const ProcessSet& other);
 };
 
 // The Matcher allows DataSources to wait for ProcessSets, and the
