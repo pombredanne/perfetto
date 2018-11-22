@@ -431,6 +431,13 @@ void HeapprofdProducer::ConnectWithRetries(const char* socket_name) {
   Connect();
 }
 
+void HeapprofdProducer::DumpAll() {
+  for (const auto& p : data_sources_) {
+    if (!Dump(p.first, 0 /* flush_id */, false /* is_flush */))
+      PERFETTO_DLOG("Failed to dump %" PRIu64, p.first);
+  }
+}
+
 void HeapprofdProducer::Connect() {
   PERFETTO_DCHECK(state_ == kNotConnected);
   state_ = kConnecting;
