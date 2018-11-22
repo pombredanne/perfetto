@@ -43,6 +43,14 @@ Matcher::ProcessSetHandle::~ProcessSetHandle() {
     matcher_->UnwaitProcessSet(data_source_);
 }
 
+Matcher::Matcher(std::function<void(pid_t)> shutdown_fn,
+                 std::function<void(const Process&,
+                                    const std::vector<ProcessSet*>&)> match_fn)
+    : shutdown_fn_(shutdown_fn),
+      match_fn_(match_fn),
+      current_orphan_generation_(new ProcessSetItem(this, ProcessSet{})),
+      old_orphan_generation_(new ProcessSetItem(this, ProcessSet{})) {}
+
 Matcher::ProcessHandle Matcher::NotifyProcess(Process process) {
   pid_t pid = process.pid;
   decltype(pid_to_process_)::iterator it;
@@ -73,17 +81,20 @@ Matcher::ProcessHandle Matcher::NotifyProcess(Process process) {
       matching_process_set_items.emplace(i->second);
   }
 
+  bool found_process_set_item = !matching_process_set_items.empty();
   // If we did not find any ProcessSet, we use the placeholder orphan process
   // set. This allows processes to connect before the DataSource was
   // initialized. This happens on user builds for the fork model.
-  if (matching_process_set_items.empty())
-    matching_process_set_items.emplace(current_orphan_generation.get());
+  if (!found_process_set_item)
+    matching_process_set_items.emplace(current_orphan_generation_.get());
 
   for (ProcessSetItem* process_set_item : matching_process_set_items) {
     process_set_item->process_items.emplace(new_process_item);
     new_process_item->references.emplace(process_set_item);
     // TODO(fmayer): New match here.
   }
+  if (found_process_set_item)
+    RunMatchFn(new_process_item);
 
   return ProcessHandle(this, pid);
 }
@@ -97,11 +108,6 @@ void Matcher::RemoveProcess(pid_t pid) {
   ProcessItem& process_item = it->second;
   size_t erased = cmdline_to_process_.erase(process_item.process.cmdline);
   PERFETTO_DCHECK(erased);
-  for (ProcessSetItem* process_set_item : process_item.references) {
-    erased = process_set_item->process_items.erase(&process_item);
-    PERFETTO_DCHECK(erased);
-  }
-
   pid_to_process_.erase(it);
 }
 
@@ -187,9 +193,8 @@ void Matcher::UnwaitProcessSet(HeapprofdProducer::DataSource* ds) {
 }
 
 void Matcher::GarbageCollectOrphans() {
-  using std::swap;
-  swap(current_orphan_generation, next_orphan_generation);
-  current_orphan_generation.reset(new ProcessSetItem(this, ProcessSet{}));
+  old_orphan_generation_ = std::move(current_orphan_generation_);
+  current_orphan_generation_.reset(new ProcessSetItem(this, ProcessSet{}));
 }
 
 Matcher::ProcessItem::~ProcessItem() {
@@ -209,7 +214,17 @@ Matcher::ProcessSetItem::~ProcessSetItem() {
 }
 
 void Matcher::ShutdownProcess(pid_t pid) {
-  pid_to_process_.erase(pid);
+  shutdown_fn_(pid);
+}
+
+void Matcher::RunMatchFn(ProcessItem* process_item) {
+  std::vector<ProcessSet*> process_sets;
+  for (ProcessSetItem* process_set_item : process_item->references) {
+    if (process_set_item != current_orphan_generation_.get() &&
+        process_set_item != old_orphan_generation_.get())
+      process_sets.emplace_back(&(process_set_item->process_set));
+  }
+  match_fn_(process_item->process, process_sets);
 }
 
 }  // namespace profiling

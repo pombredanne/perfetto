@@ -72,6 +72,9 @@ class Matcher {
     HeapprofdProducer::DataSource* data_source_;
   };
 
+  Matcher(std::function<void(pid_t)> shutdown_fn,
+          std::function<void(const Process&, const std::vector<ProcessSet*>&)>
+              match_fn);
   ProcessHandle NotifyProcess(Process process);
   ProcessSetHandle AwaitProcessSet(ProcessSet process_set);
 
@@ -114,6 +117,11 @@ class Matcher {
   void UnwaitProcessSet(HeapprofdProducer::DataSource* ds);
   void RemoveProcess(pid_t pid);
   void ShutdownProcess(pid_t pid);
+  void RunMatchFn(ProcessItem* process_item);
+
+  std::function<void(pid_t)> shutdown_fn_;
+  std::function<void(const Process&, const std::vector<ProcessSet*>&)>
+      match_fn_;
 
   // TODO(fmayer): dtor order.
   std::map<pid_t, ProcessItem> pid_to_process_;
@@ -124,8 +132,8 @@ class Matcher {
   std::multimap<std::string, ProcessSetItem*> cmdline_to_process_set_;
   std::set<ProcessSetItem*> process_set_for_all_;
 
-  std::unique_ptr<ProcessSetItem> current_orphan_generation;
-  std::unique_ptr<ProcessSetItem> next_orphan_generation;
+  std::unique_ptr<ProcessSetItem> current_orphan_generation_;
+  std::unique_ptr<ProcessSetItem> old_orphan_generation_;
 };
 
 }  // namespace profiling

@@ -105,6 +105,7 @@ source_set("unittests") {
     "client_unittest.cc",
     "heapprofd_integrationtest.cc",
     "interner_unittest.cc",
+    "matcher_unittest.cc",
     "record_reader_unittest.cc",
     "sampler_unittest.cc",
     "socket_listener_unittest.cc",
