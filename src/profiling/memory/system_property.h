@@ -23,19 +23,6 @@
 namespace perfetto {
 namespace profiling {
 
-// SystemProperties allows to set properties in a reference counted fashion.
-// SetAll() is used to enable startup profiling for all programs, SetProperty
-// can be used to enable startup profiling for a specific program name.
-// Both of those return opaque Handles that need to be held on to as long as
-// startup profiling should be enabled.
-//
-// This automatically manages the heappprofd.enable flag, which is first
-// checked to determine whether to check the program name specific flag.
-// Once the last Handle for a given program name goes away, the flag for the
-// program name is unset. Once the last of all Handles goes away, the
-// heapprofd.enable flag is unset.
-// See
-// https://android.googlesource.com/platform/bionic/+/0dbe6d1aec12d2f30f0331dcfea6dc8e8c55cf97/libc/bionic/malloc_common.cpp#473
 class SystemProperties {
  public:
   class Handle {
@@ -62,8 +49,12 @@ class SystemProperties {
   Handle SetProperty(std::string name);
   Handle SetAll();
 
-  ~SystemProperties();
+  virtual bool SetAndroidProperty(const std::string& name,
+                                  const std::string& value);
 
+  virtual ~SystemProperties();
+
+ protected:
  private:
   void UnsetProperty(const std::string& name);
   void UnsetAll();

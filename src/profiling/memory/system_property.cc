@@ -18,7 +18,9 @@
 
 #include "perfetto/base/logging.h"
 
-#include <android-base/properties.h>
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+#include <sys/system_properties.h>
+#endif
 
 namespace perfetto {
 namespace profiling {
@@ -61,18 +63,14 @@ SystemProperties::Handle::operator bool() {
 SystemProperties::Handle SystemProperties::SetProperty(std::string name) {
   auto it = properties_.find(name);
   if (it == properties_.end()) {
-    // Profiling for name is not enabled, enable it.
-    if (!android::base::SetProperty("heapprofd.enable." + name, "1"))
+    if (!SetAndroidProperty("heapprofd.enable." + name, "1"))
       return Handle(nullptr);
     if (properties_.size() == 1 || alls_ == 0) {
-      if (!android::base::SetProperty("heapprofd.enable", "1"))
+      if (!SetAndroidProperty("heapprofd.enable", "1"))
         return Handle(nullptr);
     }
-    // Keep this last to ensure we only emplace if enabling was
-    // successful.
     properties_.emplace(name, 1);
   } else {
-    // Profiling for name is already enabled, increment refcount.
     it->second++;
   }
   return Handle(this, std::move(name));
@@ -80,17 +78,27 @@ SystemProperties::Handle SystemProperties::SetProperty(std::string name) {
 
 SystemProperties::Handle SystemProperties::SetAll() {
   if (alls_ == 0) {
-    // Profiling all is currently not enabled, enable it.
-    if (!android::base::SetProperty("heapprofd.enable", "all"))
+    if (!SetAndroidProperty("heapprofd.enable", "all"))
       return Handle(nullptr);
   }
-  // Profiling all is already enabled, increment refcount.
   alls_++;
   return Handle(this);
 }
 
 SystemProperties::~SystemProperties() {
   PERFETTO_DCHECK(alls_ == 0 && properties_.empty());
+}
+
+bool SystemProperties::SetAndroidProperty(const std::string& name,
+                                          const std::string& value) {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+  return __system_property_set(name.c_str(), value.c_str());
+#else
+  // Allow this to be mocked out for tests on other platforms.
+  base::ignore_result(name);
+  base::ignore_result(value);
+  PERFETTO_FATAL("Properties can only be set on Android.");
+#endif
 }
 
 void SystemProperties::UnsetProperty(const std::string& name) {
@@ -100,21 +108,19 @@ void SystemProperties::UnsetProperty(const std::string& name) {
     return;
   }
   if (--(it->second) == 0) {
-    // Last reference went away, unset flag for name.
     properties_.erase(it);
-    android::base::SetProperty("heapprofd.enable." + name, "");
-    if (properties_.empty() && alls_ == 0) {
-      android::base::SetProperty("heapprofd.enable", "");
-    }
+    SetAndroidProperty("heapprofd.enable." + name, "");
+    if (properties_.empty() && alls_ == 0)
+      SetAndroidProperty("heapprofd.enable", "");
   }
 }
 
 void SystemProperties::UnsetAll() {
   if (--alls_ == 0) {
     if (properties_.empty())
-      android::base::SetProperty("heapprofd.enable", "");
+      SetAndroidProperty("heapprofd.enable", "");
     else
-      android::base::SetProperty("heapprofd.enable", "1");
+      SetAndroidProperty("heapprofd.enable", "1");
   }
 }
 

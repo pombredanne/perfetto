@@ -16,95 +16,116 @@
 
 #include "src/profiling/memory/system_property.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include <android-base/properties.h>
 
 namespace perfetto {
 namespace profiling {
 namespace {
 
+using ::testing::InSequence;
+using ::testing::Sequence;
+using ::testing::Return;
+
+class MockSystemProperties : public SystemProperties {
+ public:
+  MOCK_METHOD2(SetAndroidProperty,
+               bool(const std::string&, const std::string&));
+};
+
 TEST(SystemPropertyTest, All) {
-  SystemProperties prop;
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
   auto handle = prop.SetAll();
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
 }
 
 TEST(SystemPropertyTest, RefcountAll) {
-  SystemProperties prop;
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
   {
     auto handle = prop.SetAll();
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
-    {
-      auto handle2 = prop.SetAll();
-      ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
-    }
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
+    { auto handle2 = prop.SetAll(); }
   }
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "");
 }
 
 TEST(SystemPropertyTest, CleanupAll) {
-  SystemProperties prop;
-  {
-    auto handle = prop.SetAll();
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
-  }
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "");
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
+  { auto handle = prop.SetAll(); }
 }
 
 TEST(SystemPropertyTest, Specific) {
-  SystemProperties prop;
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", ""))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
   auto handle2 = prop.SetProperty("system_server");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "1");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-            "1");
 }
 
 TEST(SystemPropertyTest, RefcountSpecific) {
-  SystemProperties prop;
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", ""))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
   {
     auto handle = prop.SetProperty("system_server");
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-              "1");
-    {
-      auto handle2 = prop.SetProperty("system_server");
-      ASSERT_EQ(
-          android::base::GetProperty("heapprofd.enable.system_server", ""),
-          "1");
-    }
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-              "1");
+    { auto handle2 = prop.SetProperty("system_server"); }
   }
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-            "");
 }
 
 TEST(SystemPropertyTest, CleanupSpecific) {
-  SystemProperties prop;
-  {
-    auto handle2 = prop.SetProperty("system_server");
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "1");
-    ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-              "1");
-  }
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-            "");
+  MockSystemProperties prop;
+  InSequence s;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", ""))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
+  { auto handle2 = prop.SetProperty("system_server"); }
 }
 
 TEST(SystemPropertyTest, AllAndSpecific) {
-  SystemProperties prop;
+  MockSystemProperties prop;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", ""))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", ""))
+      .WillOnce(Return(true));
   auto handle = prop.SetAll();
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
   auto handle2 = prop.SetProperty("system_server");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "all");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-            "1");
   { SystemProperties::Handle destroy = std::move(handle); }
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable", ""), "1");
-  ASSERT_EQ(android::base::GetProperty("heapprofd.enable.system_server", ""),
-            "1");
 }
 
 }  // namespace
