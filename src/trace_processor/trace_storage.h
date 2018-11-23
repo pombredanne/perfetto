@@ -277,6 +277,47 @@ class TraceStorage {
     std::deque<RefType> types_;
   };
 
+  class Args {
+   public:
+    using Id = uint64_t;
+    struct Varardic {
+      Varardic(int64_t int_val) : type(kInt), int_value(int_val) {}
+
+      enum { kInt, kString, kReal } type;
+      union {
+        int64_t int_value;
+        double real_value;
+        StringId string_value;
+      }
+    };
+    enum Table : uint8_t {
+      kCounters = 1,
+    };
+
+    void AddInt64Arg(Table table,
+                     size_t row,
+                     StringId name_without_index,
+                     StringId name_with_index,
+                     int64_t value) {
+      PERFETTO_DCHECK(row < (1 << 48));
+      Id id = table << 48 | row;
+      ids_.emplace_back(id);
+      name_without_index_.emplace_back(name_with_index);
+      name_with_index_.emplace_back(name_with_index);
+      arg_value_.emplace_back(value);
+      args_for_id_.emplace(id, args_count() - 1);
+    }
+
+    size_t args_count() const { return ids_.size(); }
+
+   private:
+    std::deque<Id> ids_;
+    std::deque<StringId> name_without_index_;
+    std::deque<StringId> name_with_index_;
+    std::deque<Varardic> arg_value_;
+    std::multimap<Id, size_t> args_for_id_;
+  };
+
   void ResetStorage();
 
   UniqueTid AddEmptyThread(uint32_t tid) {
