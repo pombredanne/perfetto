@@ -41,7 +41,6 @@ source_set("daemon") {
   public_configs = [ "../../../buildtools:libunwindstack_config" ]
   deps = [
     ":wire_protocol",
-    "../../../buildtools:android_base",
     "../../../buildtools:libunwindstack",
     "../../../gn:default_deps",
     "../../base",
@@ -95,7 +94,6 @@ source_set("unittests") {
     ":client",
     ":daemon",
     ":wire_protocol",
-    "../../../buildtools:android_base",
     "../../../gn:default_deps",
     "../../../gn:gtest_deps",
     "../../base",
