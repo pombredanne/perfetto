@@ -37,9 +37,6 @@ namespace profiling {
 namespace {
 
 base::Event* g_dump_evt = nullptr;
-void DumpSignalHandler(int) {
-  g_dump_evt->Notify();
-}
 
 int HeapprofdMain(int, char**) {
   // We set this up before launching any threads, so we do not have to use a
@@ -50,7 +47,7 @@ int HeapprofdMain(int, char**) {
   HeapprofdProducer producer(&task_runner);
 
   struct sigaction action = {};
-  action.sa_handler = DumpSignalHandler;
+  action.sa_handler = [](int) { g_dump_evt->Notify(); };
   // Allow to trigger a full dump by sending SIGUSR1 to heapprofd.
   // This will allow manually deciding when to dump on userdebug.
   PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) == 0);
