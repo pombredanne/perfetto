@@ -671,14 +671,6 @@ source_set("lzma") {
   ]
 }
 
-source_set("android_base") {
-  include_dirs = [ "android-core/base/include" ]
-  sources = [
-    "android-core/base/properties.cpp",
-  ]
-  configs -= [ "//gn/standalone:extra_warnings" ]
-}
-
 source_set("libunwindstack") {
   include_dirs = [
     "android-core/libunwindstack/include",
