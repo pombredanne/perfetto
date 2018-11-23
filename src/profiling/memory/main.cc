@@ -51,6 +51,8 @@ int HeapprofdMain(int, char**) {
 
   struct sigaction action = {};
   action.sa_handler = DumpSignalHandler;
+  // Allow to trigger a full dump by sending SIGUSR1 to heapprofd.
+  // This will allow manually deciding when to dump on userdebug.
   PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) == 0);
   task_runner.AddFileDescriptorWatch(g_dump_evt->fd(), [&producer] {
     g_dump_evt->Clear();
