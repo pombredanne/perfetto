@@ -67,7 +67,6 @@ class SystemProperties {
 
   virtual ~SystemProperties();
 
- protected:
  private:
   void UnsetProperty(const std::string& name);
   void UnsetAll();
