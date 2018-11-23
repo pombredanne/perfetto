@@ -261,8 +261,8 @@ std::string FtraceProcfs::ReadFileIntoString(const std::string& path) const {
   return str;
 }
 
-std::set<std::string> FtraceProcfs::GetEventNamesForGroup(
-    const std::string& path) {
+const std::set<std::string> FtraceProcfs::GetEventNamesForGroup(
+    const std::string& path) const {
   std::set<std::string> names;
   std::string full_path = root_ + path;
   base::ScopedDir dir(opendir(full_path.c_str()));

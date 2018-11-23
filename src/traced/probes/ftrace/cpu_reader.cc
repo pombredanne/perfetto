@@ -81,19 +81,6 @@ bool ReadDataLoc(const uint8_t* start,
   return true;
 }
 
-const std::vector<bool> BuildEnabledVector(
-    const ProtoTranslationTable& table,
-    const std::set<std::string>& events) {
-  std::vector<bool> enabled(table.largest_id() + 1);
-  for (const std::string& name : events) {
-    const Event* event = table.GetEvent(GroupAndName(name));
-    if (!event)
-      continue;
-    enabled[event->ftrace_event_id] = true;
-  }
-  return enabled;
-}
-
 void SetBlocking(int fd, bool is_blocking) {
   int flags = fcntl(fd, F_GETFL, 0);
   flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
@@ -128,15 +115,6 @@ struct TimeStamp {
 }  // namespace
 
 using protos::pbzero::GenericFtraceEvent;
-
-EventFilter::EventFilter(const ProtoTranslationTable& table,
-                         std::set<std::string> events)
-    : enabled_ids_(BuildEnabledVector(table, events)), enabled_events_({}) {
-  for (const auto& event : events) {
-    enabled_events_.insert(GroupAndName(event));
-  }
-}
-EventFilter::~EventFilter() = default;
 
 CpuReader::CpuReader(const ProtoTranslationTable* table,
                      size_t cpu,

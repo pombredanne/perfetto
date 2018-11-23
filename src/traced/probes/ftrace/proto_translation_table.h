@@ -46,17 +46,6 @@ class GroupAndName {
   GroupAndName(const std::string& group, const std::string& name)
       : group_(group), name_(name) {}
 
-  GroupAndName(const std::string& event) {
-    auto slash_pos = event.find("/");
-    if (slash_pos == std::string::npos) {
-      group_ = "";
-      name_ = event;
-    } else {
-      group_ = event.substr(0, slash_pos);
-      name_ = event.substr(slash_pos + 1);
-    }
-  }
-
   bool operator==(const GroupAndName& other) const {
     return std::tie(group_, name_) == std::tie(other.group(), other.name());
   }
@@ -112,16 +101,9 @@ class ProtoTranslationTable {
   // is empty, an event with that name will be returned.
   // Virtual for testing.
   virtual const Event* GetEvent(const GroupAndName& group_and_name) const {
-    if (group_and_name.group().empty())
-      return GetEventByName(group_and_name.name());
-    if (!group_and_name_to_event_.count(group_and_name)) {
+    if (!group_and_name_to_event_.count(group_and_name))
       return nullptr;
-    }
     return group_and_name_to_event_.at(group_and_name);
-  }
-
-  const Event* GetEvent(const std::string& event) const {
-    return GetEvent(GroupAndName(event));
   }
 
   const std::vector<const Event*>* GetEventsByGroup(
@@ -139,7 +121,7 @@ class ProtoTranslationTable {
     return &events_.at(id);
   }
 
-  size_t EventToFtraceId(GroupAndName group_and_name) const {
+  size_t EventToFtraceId(const GroupAndName& group_and_name) const {
     if (!group_and_name_to_event_.count(group_and_name))
       return 0;
     return group_and_name_to_event_.at(group_and_name)->ftrace_event_id;
@@ -155,10 +137,6 @@ class ProtoTranslationTable {
   // new event with the proto id set to generic. Virtual for testing.
   virtual const Event* GetOrCreateEvent(const GroupAndName&);
 
- private:
-  ProtoTranslationTable(const ProtoTranslationTable&) = delete;
-  ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
-
   // This is for backwards compatibility. If a group is not specified in the
   // config then the first event with that name will be returned.
   const Event* GetEventByName(const std::string& name) const {
@@ -166,6 +144,10 @@ class ProtoTranslationTable {
       return nullptr;
     return name_to_events_.at(name)[0];
   }
+
+ private:
+  ProtoTranslationTable(const ProtoTranslationTable&) = delete;
+  ProtoTranslationTable& operator=(const ProtoTranslationTable&) = delete;
 
   // Store strings so they can be read when writing the trace output.
   const char* InternString(const std::string& str);
@@ -182,6 +164,55 @@ class ProtoTranslationTable {
   std::vector<Field> common_fields_;
   FtracePageHeaderSpec ftrace_page_header_spec_{};
   std::set<std::string> interned_strings_;
+};
+
+// Class for efficient 'is event with id x enabled?' tests.
+// Mirrors the data in a FtraceConfig but in a format better suited
+// to be consumed by CpuReader.
+class EventFilter {
+ public:
+  EventFilter();
+  ~EventFilter();
+  EventFilter(EventFilter&&) = default;
+  EventFilter& operator=(EventFilter&&) = default;
+
+  void AddEnabledEvent(size_t ftrace_event_id) {
+    if (ftrace_event_id >= enabled_ids_.size())
+      enabled_ids_.resize(ftrace_event_id + 1);
+    enabled_ids_[ftrace_event_id] = true;
+  }
+
+  void DisableEvent(size_t ftrace_event_id) {
+    if (ftrace_event_id + 1 > enabled_ids_.size())
+      return;
+    enabled_ids_[ftrace_event_id] = false;
+  }
+
+  bool IsEventEnabled(size_t ftrace_event_id) const {
+    if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size())
+      return false;
+    return enabled_ids_[ftrace_event_id];
+  }
+
+  const std::vector<bool>& enabled_ids() const { return enabled_ids_; }
+
+  void BitwiseOr(const EventFilter& other) {
+    size_t max_length =
+        std::max(enabled_ids_.size(), other.enabled_ids().size());
+    enabled_ids_.resize(max_length);
+    for (size_t i = 0; i < max_length; i++) {
+      if (i >= other.enabled_ids().size())
+        return;
+      if (other.enabled_ids()[i])
+        enabled_ids_[i] = true;
+    }
+  }
+
+ private:
+  EventFilter(const EventFilter&) = delete;
+  EventFilter& operator=(const EventFilter&) = delete;
+
+  std::vector<bool> enabled_ids_;
 };
 
 }  // namespace perfetto

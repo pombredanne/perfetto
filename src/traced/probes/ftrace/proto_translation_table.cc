@@ -413,8 +413,6 @@ const Event* ProtoTranslationTable::GetOrCreateEvent(
     return event;
   // The ftrace event does not already exist so a new one will be created
   // by parsing the format file.
-  if (group_and_name.group().empty() || group_and_name.name().empty())
-    return nullptr;
   std::string contents = ftrace_procfs_->ReadEventFormat(group_and_name.group(),
                                                          group_and_name.name());
   if (contents.empty())
@@ -491,6 +489,9 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
       field->ftrace_type, field->proto_field_type, &field->strategy));
   return field_end;
 }
+
+EventFilter::EventFilter() = default;
+EventFilter::~EventFilter() = default;
 
 ProtoTranslationTable::~ProtoTranslationTable() = default;
 

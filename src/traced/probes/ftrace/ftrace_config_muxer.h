@@ -71,20 +71,19 @@ class FtraceConfigMuxer {
     SetupClock(request);
   }
 
-  const FtraceConfig* GetConfig(FtraceConfigId id);
+  const FtraceConfig* GetConfigForTesting(FtraceConfigId id);
 
-  // This processes the config to get the exact events.
-  // It guarantees that all events in the return set will have a group and a
-  // name.
-  // group/* -> Will read the fs and add all events in group.
-  // event -> Will look up the event to find the group.
-  // atrace category -> Will add events in that category.
-  std::set<GroupAndName> GetFtraceEvents(const FtraceConfig& request,
-                                         const ProtoTranslationTable*);
+  const EventFilter* GetEventFilter(FtraceConfigId id);
+
+  std::set<GroupAndName> GetFtraceEventsForTesting(
+      const FtraceConfig& request,
+      const ProtoTranslationTable* table) {
+    return GetFtraceEvents(request, table);
+  }
 
  private:
   struct FtraceState {
-    std::set<GroupAndName> ftrace_events;
+    EventFilter ftrace_events;
     std::set<std::string> atrace_categories;
     std::set<std::string> atrace_apps;
     bool tracing_on = false;
@@ -100,6 +99,13 @@ class FtraceConfigMuxer {
   void UpdateAtrace(const FtraceConfig& request);
   void DisableAtrace();
 
+  // This processes the config to get the exact events.
+  // group/* -> Will read the fs and add all events in group.
+  // event -> Will look up the event to find the group.
+  // atrace category -> Will add events in that category.
+  std::set<GroupAndName> GetFtraceEvents(const FtraceConfig& request,
+                                         const ProtoTranslationTable*);
+
   FtraceConfigId GetNextId();
 
   FtraceConfigId last_id_ = 1;
@@ -107,6 +113,10 @@ class FtraceConfigMuxer {
   ProtoTranslationTable* table_;
 
   FtraceState current_state_;
+
+  // There is a filter per config. These filters allow a quick way
+  // to check if a certain ftrace event with id x is enabled.
+  std::map<FtraceConfigId, EventFilter> filters_;
 
   // Set of all configurations. Note that not all of them might be active.
   // When a config is present but not active, we do setup buffer sizes and

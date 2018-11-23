@@ -56,13 +56,6 @@ bool IsValidFtraceEventName(const std::string& str) {
 
 }  // namespace
 
-std::set<std::string> FtraceEventsAsSet(const FtraceConfig& config) {
-  std::set<std::string> events;
-  for (const std::string& event : config.ftrace_events())
-    events.insert(event);
-  return events;
-}
-
 FtraceConfig CreateFtraceConfig(std::set<std::string> names) {
   FtraceConfig config;
   for (const std::string& name : names)
