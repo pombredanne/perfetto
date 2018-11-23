@@ -93,7 +93,7 @@ class MockTaskRunner : public base::TaskRunner {
   std::function<void()> task_;
 };
 
-std::unique_ptr<Table> FakeTable(FtraceProcfs* ftrace) {
+std::unique_ptr<Table> FakeTable() {
   std::vector<Field> common_fields;
   std::vector<Event> events;
 
@@ -114,12 +114,13 @@ std::unique_ptr<Table> FakeTable(FtraceProcfs* ftrace) {
   }
 
   return std::unique_ptr<Table>(
-      new Table(ftrace, events, std::move(common_fields),
+      new Table(events, std::move(common_fields),
                 ProtoTranslationTable::DefaultPageHeaderSpecForTesting()));
 }
 
-std::unique_ptr<FtraceConfigMuxer> FakeModel(FtraceProcfs* ftrace,
-                                             ProtoTranslationTable* table) {
+std::unique_ptr<FtraceConfigMuxer> FakeModel(
+    FtraceProcfs* ftrace,
+    const ProtoTranslationTable* table) {
   return std::unique_ptr<FtraceConfigMuxer>(
       new FtraceConfigMuxer(ftrace, table));
 }
@@ -138,16 +139,6 @@ class MockFtraceProcfs : public FtraceProcfs {
     ON_CALL(*this, ReadFileIntoString("/root/per_cpu/cpu0/stats"))
         .WillByDefault(Return(""));
     EXPECT_CALL(*this, ReadFileIntoString("/root/per_cpu/cpu0/stats"))
-        .Times(AnyNumber());
-
-    ON_CALL(*this, ReadFileIntoString("/root/events//not_an_event/format"))
-        .WillByDefault(Return(""));
-    EXPECT_CALL(*this, ReadFileIntoString("/root/events//not_an_event/format"))
-        .Times(AnyNumber());
-
-    ON_CALL(*this, ReadFileIntoString("/root/events/group/bar/format"))
-        .WillByDefault(Return(""));
-    EXPECT_CALL(*this, ReadFileIntoString("/root/events/group/bar/format"))
         .Times(AnyNumber());
 
     ON_CALL(*this, WriteToFile(_, _)).WillByDefault(Return(true));
@@ -267,6 +258,8 @@ std::unique_ptr<TestFtraceController> CreateTestController(
     runner = std::unique_ptr<MockTaskRunner>(new MockTaskRunner());
   }
 
+  auto table = FakeTable();
+
   std::unique_ptr<MockFtraceProcfs> ftrace_procfs;
   if (procfs_is_nice_mock) {
     ftrace_procfs = std::unique_ptr<MockFtraceProcfs>(
@@ -275,8 +268,6 @@ std::unique_ptr<TestFtraceController> CreateTestController(
     ftrace_procfs =
         std::unique_ptr<MockFtraceProcfs>(new MockFtraceProcfs(cpu_count));
   }
-
-  auto table = FakeTable(ftrace_procfs.get());
 
   auto model = FakeModel(ftrace_procfs.get(), table.get());
 
@@ -302,17 +293,14 @@ TEST(FtraceControllerTest, RejectsBadEventNames) {
 
   FtraceConfig config = CreateFtraceConfig({"../try/to/escape"});
   EXPECT_FALSE(controller->AddFakeDataSource(config));
-  config = CreateFtraceConfig({"/event"});
-  EXPECT_FALSE(controller->AddFakeDataSource(config));
-  config = CreateFtraceConfig({"event/"});
-  EXPECT_FALSE(controller->AddFakeDataSource(config));
+  EXPECT_FALSE(controller->procfs()->is_tracing_on());
 }
 
 TEST(FtraceControllerTest, OneSink) {
   auto controller =
       CreateTestController(true /* nice runner */, false /* nice procfs */);
 
-  FtraceConfig config = CreateFtraceConfig({"group/foo"});
+  FtraceConfig config = CreateFtraceConfig({"foo"});
 
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));

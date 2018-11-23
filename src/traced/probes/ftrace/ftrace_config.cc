@@ -21,33 +21,14 @@
 namespace perfetto {
 namespace {
 
-bool IsGoodFtracePunctuation(char c) {
-  return c == '_' || c == '/';
-}
-
-bool IsGoodAtracePunctuation(char c) {
+bool IsGoodPunctuation(char c) {
   return c == '_' || c == '.';
 }
 
-bool IsValidAtraceEventName(const std::string& str) {
+bool IsValid(const std::string& str) {
   for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && !IsGoodAtracePunctuation(str[i]))
+    if (!isalnum(str[i]) && !IsGoodPunctuation(str[i]))
       return false;
-  }
-  return true;
-}
-
-bool IsValidFtraceEventName(const std::string& str) {
-  int slash_count = 0;
-  for (size_t i = 0; i < str.size(); i++) {
-    if (!isalnum(str[i]) && !IsGoodFtracePunctuation(str[i]))
-      return false;
-    if (str[i] == '/') {
-      slash_count++;
-      // At most one '/' allowed and not at the beginning or end.
-      if (slash_count > 1 || i == 0 || i == str.size() - 1)
-        return false;
-    }
   }
   return true;
 }
@@ -74,19 +55,19 @@ bool RequiresAtrace(const FtraceConfig& config) {
 
 bool ValidConfig(const FtraceConfig& config) {
   for (const std::string& event_name : config.ftrace_events()) {
-    if (!IsValidFtraceEventName(event_name)) {
+    if (!IsValid(event_name)) {
       PERFETTO_ELOG("Bad event name '%s'", event_name.c_str());
       return false;
     }
   }
   for (const std::string& category : config.atrace_categories()) {
-    if (!IsValidAtraceEventName(category)) {
+    if (!IsValid(category)) {
       PERFETTO_ELOG("Bad category name '%s'", category.c_str());
       return false;
     }
   }
   for (const std::string& app : config.atrace_apps()) {
-    if (!IsValidAtraceEventName(app)) {
+    if (!IsValid(app)) {
       PERFETTO_ELOG("Bad app '%s'", app.c_str());
       return false;
     }

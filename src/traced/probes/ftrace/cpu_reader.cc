@@ -33,7 +33,6 @@
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
-#include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -125,8 +124,6 @@ struct TimeStamp {
 };
 
 }  // namespace
-
-using protos::pbzero::GenericFtraceEvent;
 
 EventFilter::EventFilter(const ProtoTranslationTable& table,
                          std::set<std::string> names)
@@ -456,24 +453,10 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
-  // Parse generic event.
-  if (info.proto_field_id == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
-    nested->AppendString(GenericFtraceEvent::kEventNameFieldNumber, info.name);
-    for (const Field& field : info.fields) {
-      auto generic_field = nested->BeginNestedMessage<protozero::Message>(
-          GenericFtraceEvent::kFieldFieldNumber);
-      // TODO(taylori): Avoid outputting field names every time.
-      generic_field->AppendString(GenericFtraceEvent::Field::kNameFieldNumber,
-                                  field.ftrace_name);
-      success &= ParseField(field, start, end, generic_field, metadata);
-    }
-  } else {  // Parse all other events.
-    for (const Field& field : info.fields) {
-      success &= ParseField(field, start, end, nested, metadata);
-    }
-  }
+  for (const Field& field : info.fields)
+    success &= ParseField(field, start, end, nested, metadata);
 
-  // This finalizes |nested| and |proto_field| automatically.
+  // This finalizes |nested| automatically.
   message->Finalize();
   metadata->FinishEvent();
   return success;
@@ -495,11 +478,9 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint8ToUint32:
-    case kUint8ToUint64:
       ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kUint16ToUint32:
-    case kUint16ToUint64:
       ReadIntoVarInt<uint16_t>(field_start, field_id, message);
       return true;
     case kUint32ToUint32:
@@ -510,11 +491,9 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
     case kInt8ToInt32:
-    case kInt8ToInt64:
       ReadIntoVarInt<int8_t>(field_start, field_id, message);
       return true;
     case kInt16ToInt32:
-    case kInt16ToInt64:
       ReadIntoVarInt<int16_t>(field_start, field_id, message);
       return true;
     case kInt32ToInt32:
@@ -537,8 +516,7 @@ bool CpuReader::ParseField(const Field& field,
     case kDataLocToString:
       return ReadDataLoc(start, field_start, end, field, message);
     case kBoolToUint32:
-    case kBoolToUint64:
-      ReadIntoVarInt<uint8_t>(field_start, field_id, message);
+      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
       ReadInode<uint32_t>(field_start, field_id, message, metadata);
@@ -547,11 +525,9 @@ bool CpuReader::ParseField(const Field& field,
       ReadInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
     case kPid32ToInt32:
-    case kPid32ToInt64:
       ReadPid(field_start, field_id, message, metadata);
       return true;
     case kCommonPid32ToInt32:
-    case kCommonPid32ToInt64:
       ReadCommonPid(field_start, field_id, message, metadata);
       return true;
     case kDevId32ToUint64:
