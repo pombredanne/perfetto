@@ -24,7 +24,6 @@ namespace profiling {
 namespace {
 
 using ::testing::InSequence;
-using ::testing::Sequence;
 using ::testing::Return;
 
 class MockSystemProperties : public SystemProperties {
@@ -113,6 +112,7 @@ TEST(SystemPropertyTest, CleanupSpecific) {
 
 TEST(SystemPropertyTest, AllAndSpecific) {
   MockSystemProperties prop;
+  InSequence s;
   EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
       .WillOnce(Return(true));
   EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
