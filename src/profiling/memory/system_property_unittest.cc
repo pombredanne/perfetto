@@ -128,6 +128,32 @@ TEST(SystemPropertyTest, AllAndSpecific) {
   { SystemProperties::Handle destroy = std::move(handle); }
 }
 
+TEST(SystemPropertyTest, AllFailed) {
+  MockSystemProperties prop;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "all"))
+      .WillOnce(Return(false));
+  auto handle = prop.SetAll();
+  EXPECT_FALSE(handle);
+}
+
+TEST(SystemPropertyTest, SpecificFailed) {
+  MockSystemProperties prop;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(false));
+  auto handle = prop.SetProperty("system_server");
+  EXPECT_FALSE(handle);
+}
+
+TEST(SystemPropertyTest, SpecificFailedMainProperty) {
+  MockSystemProperties prop;
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable.system_server", "1"))
+      .WillOnce(Return(true));
+  EXPECT_CALL(prop, SetAndroidProperty("heapprofd.enable", "1"))
+      .WillOnce(Return(false));
+  auto handle = prop.SetProperty("system_server");
+  EXPECT_FALSE(handle);
+}
+
 }  // namespace
 }  // namespace profiling
 }  // namespace perfetto
