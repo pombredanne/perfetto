@@ -111,7 +111,9 @@ constexpr uint32_t kTypeTimeExtend = 30;
 constexpr uint32_t kTypeTimeStamp = 31;
 
 constexpr uint32_t kMainThread = 255;  // for METATRACE
-constexpr uint32_t kPoolPages = 32;    // 32 * 4K = 128 KB;
+
+// TODO: this should be as big as the kernel buffer I think. Think more. // DNS
+constexpr uint32_t kPoolPages = 32;  // 32 * 4K = 128 KB;
 
 struct PageHeader {
   uint64_t timestamp;
@@ -295,7 +297,6 @@ void CpuReader::RunWorkerThread(size_t cpu,
         // If we are in read mode (because of a previous flush) TODO descr.
         if (cur_mode == kRead && read_ftrace_pipe(kSplice, kNonBlock)) {
           cur_mode = kSplice;
-          PERFETTO_ILOG("recovered from read() misalignment");  // DNS
         }
 
         // Do as many non-blocking read/splice as we can. Note that even if
@@ -314,7 +315,6 @@ void CpuReader::RunWorkerThread(size_t cpu,
         while (read_ftrace_pipe(cur_mode, kNonBlock)) {
         }
         FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
-        PERFETTO_ELOG("switching to read() mode");  // DNS
 
       } break;
     }  // switch(cmd)
