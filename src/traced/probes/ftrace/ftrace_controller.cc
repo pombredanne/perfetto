@@ -44,7 +44,6 @@
 #include "src/traced/probes/ftrace/ftrace_stats.h"
 #include "src/traced/probes/ftrace/proto_translation_table.h"
 
-
 namespace perfetto {
 namespace {
 
@@ -62,6 +61,7 @@ constexpr int kDefaultDrainPeriodMs = 100;
 constexpr int kFlushTimeoutMs = 250;
 constexpr int kMinDrainPeriodMs = 1;
 constexpr int kMaxDrainPeriodMs = 1000 * 60;
+constexpr uint32_t kMainThread = 255;  // for METATRACE
 
 uint32_t ClampDrainPeriodMs(uint32_t drain_period_ms) {
   if (drain_period_ms == 0) {
@@ -135,10 +135,13 @@ FtraceController::FtraceController(std::unique_ptr<FtraceProcfs> ftrace_procfs,
                                    Observer* observer)
     : task_runner_(task_runner),
       observer_(observer),
+      thread_sync_(task_runner),
       ftrace_procfs_(std::move(ftrace_procfs)),
       table_(std::move(table)),
       ftrace_config_muxer_(std::move(model)),
-      weak_factory_(this) {}
+      weak_factory_(this) {
+  thread_sync_.trace_controller_weak = GetWeakPtr();
+}
 
 FtraceController::~FtraceController() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
@@ -153,24 +156,85 @@ uint64_t FtraceController::NowMs() const {
   return static_cast<uint64_t>(base::GetWallTimeMs().count());
 }
 
-void FtraceController::DrainCPUs(size_t generation) {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  PERFETTO_METATRACE("DrainCPUs()", 0);
+// The OnCpuReader* methods below are called on the CpuReader worker threads.
+// Lifetime is guaranteed to be valid, because the FtraceController dtor
+// (that happens on the main thread) joins the worker threads.
 
-  // We might have stopped tracing then quickly re-enabled it, in this case
-  // we don't want to end up with two periodic tasks for each CPU:
-  if (generation_ != generation)
+// static
+void FtraceController::OnCpuReaderRead(size_t cpu,
+                                       int generation,
+                                       FtraceThreadSync* thread_sync) {
+  PERFETTO_METATRACE("OnCpuReaderRead()", cpu);
+
+  {
+    std::lock_guard<std::mutex> lock(thread_sync->mutex);
+    // If this was the first CPU to wake up, schedule a drain for the next
+    // drain interval.
+    bool post_drain_task = thread_sync->cpus_to_drain.none();
+    thread_sync->cpus_to_drain[cpu] = true;
+    if (!post_drain_task)
+      return;
+  }  // lock(thread_sync_.mutex)
+
+  base::WeakPtr<FtraceController> weak_ctl = thread_sync->trace_controller_weak;
+  base::TaskRunner* task_runner = thread_sync->task_runner;
+
+  // The nested PostTask is used because the FtraceController (and hence
+  // GetDrainPeriodMs()) can be called only on the main thread.
+  task_runner->PostTask([weak_ctl, task_runner, generation] {
+
+    if (!weak_ctl)
+      return;
+    uint32_t drain_period_ms = weak_ctl->GetDrainPeriodMs();
+
+    task_runner->PostDelayedTask(
+        [weak_ctl, generation] {
+          if (weak_ctl)
+            weak_ctl->DrainCPUs(generation);
+        },
+        drain_period_ms - (weak_ctl->NowMs() % drain_period_ms));
+
+  });
+}
+
+// static
+void FtraceController::OnCpuReaderFlush(size_t cpu,
+                                        int generation,
+                                        FtraceThreadSync* thread_sync) {
+  // In the case of a flush, we want to drain the data as quickly as possible to
+  // minimize the flush latency, at the cost of more tasks / wakeups (eventually
+  // one task per cpu). Flushes are not supposed to happen too frequently.
+  {
+    std::lock_guard<std::mutex> lock(thread_sync->mutex);
+    thread_sync->cpus_to_drain[cpu] = true;
+    thread_sync->flush_acks[cpu] = true;
+  }  // lock(thread_sync_.mutex)
+
+  base::WeakPtr<FtraceController> weak_ctl = thread_sync->trace_controller_weak;
+  thread_sync->task_runner->PostTask([weak_ctl, generation] {
+    if (weak_ctl)
+      weak_ctl->DrainCPUs(generation);
+  });
+}
+
+void FtraceController::DrainCPUs(int generation) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  PERFETTO_METATRACE("DrainCPUs()", kMainThread);
+
+  if (generation != generation_)
     return;
 
   const size_t num_cpus = ftrace_procfs_->NumberOfCpus();
+  PERFETTO_DCHECK(cpu_readers_.size() == num_cpus);
   FlushRequestID ack_flush_request_id = 0;
   std::bitset<base::kMaxCpus> cpus_to_drain;
   {
-    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    std::lock_guard<std::mutex> lock(thread_sync_.mutex);
     std::swap(cpus_to_drain, thread_sync_.cpus_to_drain);
 
     if (cur_flush_request_id_) {
-      PERFETTO_DLOG("DrainCpus flush ack: %zu", thread_sync_.flush_acks.count());
+      PERFETTO_DLOG("DrainCpus flush ack: %zu",
+                    thread_sync_.flush_acks.count());
     }
     // Check also if a flush is pending and if all cpus have acked. If that's
     // the case, ack the overall Flush() request at the end of this function.
@@ -195,6 +259,9 @@ void FtraceController::DrainCPUs(size_t generation) {
   // notification is sent to make it less likely that they steal CPU time away
   // from traced.
   // If this drain was due to a flush request, UnblockReaders will be a no-op.
+
+  // TODO check that we did drain anything at all?
+
   base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostTask([weak_this] {
     if (weak_this)
@@ -216,7 +283,7 @@ void FtraceController::DrainCPUs(size_t generation) {
 }
 
 void FtraceController::UnblockReaders() {
-  PERFETTO_METATRACE("UnblockReaders()", 0);
+  PERFETTO_METATRACE("UnblockReaders()", kMainThread);
 
   // If a flush or a quit is pending, do nothing.
   std::unique_lock<std::mutex> lock(thread_sync_.mutex);
@@ -233,22 +300,21 @@ void FtraceController::StartIfNeeded() {
     return;
   PERFETTO_DCHECK(!started_data_sources_.empty());
   PERFETTO_DCHECK(cpu_readers_.empty());
-  generation_++;
   base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
 
   {
-    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+    std::lock_guard<std::mutex> lock(thread_sync_.mutex);
     thread_sync_.cmd = FtraceThreadSync::kRun;
     thread_sync_.cmd_id++;
   }
 
+  generation_++;
+  cpu_readers_.clear();
+  cpu_readers_.reserve(ftrace_procfs_->NumberOfCpus());
   for (size_t cpu = 0; cpu < ftrace_procfs_->NumberOfCpus(); cpu++) {
-    cpu_readers_.emplace(
-        cpu, std::unique_ptr<CpuReader>(new CpuReader(
-                 table_.get(), &thread_sync_, cpu,
-                 ftrace_procfs_->OpenPipeForCpu(cpu),
-                 std::bind(&FtraceController::OnDataAvailable, this, weak_this,
-                           generation_, cpu, GetDrainPeriodMs()))));
+    cpu_readers_.emplace_back(
+        new CpuReader(table_.get(), &thread_sync_, cpu, generation_,
+                      ftrace_procfs_->OpenPipeForCpu(cpu)));
   }
 }
 
@@ -328,56 +394,10 @@ void FtraceController::StopIfNeeded() {
   // non-graceful stop.
 
   IssueThreadSyncCmd(FtraceThreadSync::kQuit);
+
+  // Destroying the CpuReader(s) will join on their worker threads.
   cpu_readers_.clear();
   generation_++;
-}
-
-// This method is called on the worker thread. Lifetime is guaranteed to be
-// valid, because the FtraceController dtor (that happens on the main thread)
-// joins the worker threads. |weak_this| is passed and not derived, because the
-// WeakPtrFactory is accessible only on the main thread.
-void FtraceController::OnDataAvailable(
-    base::WeakPtr<FtraceController> weak_this,
-    size_t generation,
-    size_t cpu,
-    uint32_t drain_period_ms) {
-  PERFETTO_DCHECK(cpu < ftrace_procfs_->NumberOfCpus());
-  PERFETTO_METATRACE("OnDataAvailable()", cpu);
-
-  // TODO we should probabl have a start/stop state at the controllerlevel and
-  // quit here, instead of relying on kQuit being final.
-  bool post_drain_task = false;
-  {
-    std::unique_lock<std::mutex> lock(thread_sync_.mutex);
-    switch (thread_sync_.cmd) {
-      case FtraceThreadSync::kQuit:
-        return;  // Data arrived too late, ignore.
-
-      case FtraceThreadSync::kRun:
-        break;
-
-      case FtraceThreadSync::kFlush:
-        // In the case of a flush, drain soon to reduce flush latency. Flush
-        // should be quite rare and we don't care about extra cpu/wakeups
-        // required for the aggressive drain.
-        drain_period_ms = 0;
-        break;
-    }
-    // If this was the first CPU to wake up, schedule a drain for the next
-    // drain interval.
-    post_drain_task = thread_sync_.cpus_to_drain.none();
-    thread_sync_.cpus_to_drain[cpu] = true;
-  }  // lock(thread_sync_.mutex)
-
-  if (!post_drain_task)
-    return;
-
-  task_runner_->PostDelayedTask(
-      [weak_this, generation] {
-        if (weak_this)
-          weak_this->DrainCPUs(generation);
-      },
-      drain_period_ms ? (drain_period_ms - (NowMs() % drain_period_ms)) : 0);
 }
 
 bool FtraceController::AddDataSource(FtraceDataSource* data_source) {
@@ -446,8 +466,8 @@ void FtraceController::IssueThreadSyncCmd(
   // cond-variable.wait(), this, together with the one below, will have at best
   // the same effect of a spurious wakeup, depending on the implementation of
   // the condition variable.
-  for (const auto& kv : cpu_readers_)
-    kv.second->InterruptWorkerThreadWithSignal();
+  for (const auto& cpu_reader : cpu_readers_)
+    cpu_reader->InterruptWorkerThreadWithSignal();
 
   thread_sync_.cond.notify_all();
 }

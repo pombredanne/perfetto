@@ -28,34 +28,19 @@
 #include "perfetto/base/logging.h"
 #include "perfetto/base/metatrace.h"
 #include "perfetto/base/utils.h"
+#include "src/traced/probes/ftrace/ftrace_controller.h"
 #include "src/traced/probes/ftrace/ftrace_data_source.h"
 #include "src/traced/probes/ftrace/ftrace_thread_sync.h"
 #include "src/traced/probes/ftrace/proto_translation_table.h"
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
-
-#include "perfetto/base/time.h"  // DNS
 
 namespace perfetto {
 
 namespace {
-
-#if PERFETTO_DCHECK_IS_ON()
-std::atomic<bool> g_in_blocking_splice[base::kMaxCpus]{};
-
-void SetInBlockingSpliceForDebug(size_t cpu, bool value) {
-  g_in_blocking_splice[cpu].store(value, std::memory_order_relaxed);
-}
-
-bool IsInBlockingSpliceForDebug(size_t cpu) {
-  return g_in_blocking_splice[cpu].load(std::memory_order_relaxed);
-}
-#else
-void SetInBlockingSpliceForDebug(size_t, bool) {}
-bool IsInBlockingSpliceForDebug(size_t) { return false; }
-#endif
 
 bool ReadIntoString(const uint8_t* start,
                     const uint8_t* end,
@@ -110,25 +95,11 @@ const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
   return enabled;
 }
 
-bool SetBlockingNonFatal(int fd, bool is_blocking) {
+bool SetBlocking(int fd, bool is_blocking) {
   int flags = fcntl(fd, F_GETFL, 0);
   flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
   return fcntl(fd, F_SETFL, flags) == 0;
 }
-
-void SetBlocking(int fd, bool is_blocking) {
-  PERFETTO_CHECK(SetBlockingNonFatal(fd, is_blocking));
-}
-
-// Temporarily sets a FD as O_NONBLOCK.
-class ScopedNonBlock {
- public:
-  explicit ScopedNonBlock(int fd) : fd_(fd) { SetBlockingNonFatal(fd_, false); }
-  ~ScopedNonBlock() { SetBlockingNonFatal(fd_, true); }
-
- private:
-  int fd_;
-};
 
 // For further documentation of these constants see the kernel source:
 // linux/include/linux/ring_buffer.h
@@ -138,6 +109,9 @@ constexpr uint32_t kTypeDataTypeLengthMax = 28;
 constexpr uint32_t kTypePadding = 29;
 constexpr uint32_t kTypeTimeExtend = 30;
 constexpr uint32_t kTypeTimeStamp = 31;
+
+constexpr uint32_t kMainThread = 255;  // for METATRACE
+constexpr uint32_t kPoolPages = 32;    // 32 * 4K = 128 KB;
 
 struct PageHeader {
   uint64_t timestamp;
@@ -157,6 +131,8 @@ struct TimeStamp {
 
 }  // namespace
 
+using protos::pbzero::GenericFtraceEvent;
+
 EventFilter::EventFilter(const ProtoTranslationTable& table,
                          std::set<std::string> names)
     : enabled_ids_(BuildEnabledVector(table, names)),
@@ -166,28 +142,16 @@ EventFilter::~EventFilter() = default;
 CpuReader::CpuReader(const ProtoTranslationTable* table,
                      FtraceThreadSync* thread_sync,
                      size_t cpu,
-                     base::ScopedFile fd,
-                     std::function<void()> on_data_available)
+                     int generation,
+                     base::ScopedFile fd)
     : table_(table),
       thread_sync_(thread_sync),
       cpu_(cpu),
+      pool_(kPoolPages),
       trace_fd_(std::move(fd)) {
-  int pipe_fds[2];
-  PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
-  staging_read_fd_.reset(pipe_fds[0]);
-  staging_write_fd_.reset(pipe_fds[1]);
-
   // Make reads from the raw pipe blocking so that splice() can sleep.
   PERFETTO_CHECK(trace_fd_);
-  SetBlocking(*trace_fd_, true);
-
-  // Reads from the staging pipe are always non-blocking.
-  SetBlocking(*staging_read_fd_, false);
-
-  // Note: O_NONBLOCK seems to be ignored by splice() on the target pipe. The
-  // blocking vs non-blocking behavior is controlled solely by the
-  // SPLICE_F_NONBLOCK flag passed to splice().
-  SetBlocking(*staging_write_fd_, false);
+  PERFETTO_CHECK(SetBlocking(*trace_fd_, true));
 
   // We need a non-default SIGPIPE handler to make it so that the blocking
   // splice() is woken up when the ~CpuReader() dtor destroys the pipes.
@@ -206,17 +170,16 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
   }
 #pragma GCC diagnostic pop
 
-  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
-                                         *staging_write_fd_, thread_sync_,
-                                         on_data_available));
+  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, generation,
+                                         *trace_fd_, &pool_, thread_sync_));
 }
 
 CpuReader::~CpuReader() {
-  // FtraceController (who owns this) is supposed to issue a kStop notifitcation
-  // to the thread sync object before destroying the CpuReader.
+// FtraceController (who owns this) is supposed to issue a kStop notifitcation
+// to the thread sync object before destroying the CpuReader.
 #if PERFETTO_DCHECK_IS_ON()
   {
-    std::unique_lock<std::mutex> lock(thread_sync_->mutex);
+    std::lock_guard<std::mutex> lock(thread_sync_->mutex);
     PERFETTO_DCHECK(thread_sync_->cmd == FtraceThreadSync::kQuit);
   }
 #endif
@@ -237,33 +200,77 @@ void CpuReader::InterruptWorkerThreadWithSignal() {
 }
 
 // static
-void CpuReader::RunWorkerThread(
-    size_t cpu,
-    int trace_fd,
-    int staging_write_fd,
-    FtraceThreadSync* thread_sync,
-    const std::function<void()>& on_data_available) {
+// TODO long description
+void CpuReader::RunWorkerThread(size_t cpu,
+                                int generation,
+                                int trace_fd,
+                                PagePool* pool,
+                                FtraceThreadSync* thread_sync) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-  // This thread is responsible for moving data from the trace pipe into the
-  // staging pipe at least one page at a time. This is done using the splice(2)
-  // system call, which unlike poll/select makes it possible to block until at
-  // least a full page of data is ready to be read. The downside is that as the
-  // call is blocking we need a dedicated thread for each trace pipe (i.e.,
-  // CPU).
   char thread_name[16];
   snprintf(thread_name, sizeof(thread_name), "traced_probes%zu", cpu);
   pthread_setname_np(pthread_self(), thread_name);
+  base::Pipe sync_pipe = base::Pipe::Create(base::Pipe::kBothNonBlock);
+
+  enum ReadMode { kRead, kSplice };
+  enum Block { kBlock, kNonBlock };
+  constexpr auto kPageSize = base::kPageSize;
+
+  auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool](ReadMode mode,
+                                                       Block block) -> bool {
+    base::Optional<PagePool::Page> page = pool->GetFreePage();
+    if (!page.has_value())
+      return false;
+
+    ssize_t res;
+    if (mode == kSplice) {
+      uint32_t flags = SPLICE_F_MOVE | (block == kNonBlock) * SPLICE_F_NONBLOCK;
+      res = splice(trace_fd, nullptr, *sync_pipe.wr, nullptr, kPageSize, flags);
+      if (res > 0) {
+        ssize_t rdres = read(*sync_pipe.rd, pool->Data(*page), kPageSize);
+        PERFETTO_DCHECK(rdres = res);
+      }
+    } else {
+      if (block == kNonBlock)
+        SetBlocking(trace_fd, false);
+      res = read(trace_fd, pool->Data(*page), kPageSize);
+      if (block == kNonBlock)
+        SetBlocking(trace_fd, true);
+    }
+
+    static auto first = base::GetWallTimeNs();
+    PERFETTO_DLOG("[%.3f ms] %s(%s) = %zd",
+                  (base::GetWallTimeNs() - first).count() / 1e6,
+                  mode == kRead ? "read" : "splice",
+                  block == kBlock ? "block" : "non-block", res);
+
+    if (res > 0) {
+      // Both read() and splice() should return full pages.
+      PERFETTO_DCHECK(res == base::kPageSize);
+      pool->PushContentfulPage(std::move(*page), res);
+      return true;
+    }
+
+    int err = errno;
+    pool->FreePage(std::move(*page));
+    if (!res || err == EAGAIN || err == ENOMEM || err == EBUSY || err == EINTR)
+      return false;
+
+    // TODO think about EINVAL if we close the FD.  // DNS
+    PERFETTO_FATAL("Unrecoverable %s() failure",
+                   mode == kRead ? "read" : "splice");
+  };
 
   uint64_t last_cmd_id = 0;
+  ReadMode cur_mode = kSplice;
   for (bool run_loop = true; run_loop;) {
     FtraceThreadSync::Cmd cmd;
     {
-      PERFETTO_METATRACE("waiting cmd", cpu + 1);
+      PERFETTO_METATRACE("wait cmd", cpu);
       std::unique_lock<std::mutex> lock(thread_sync->mutex);
-      while (thread_sync->cmd_id == last_cmd_id) {
+      while (thread_sync->cmd_id == last_cmd_id)
         thread_sync->cond.wait(lock);
-      }
       cmd = thread_sync->cmd;
       last_cmd_id = thread_sync->cmd_id;
     }
@@ -274,165 +281,66 @@ void CpuReader::RunWorkerThread(
         break;
 
       case FtraceThreadSync::kRun: {
-        // First do a blocking splice which sleeps until there is at least one
-        // page of data available and enough space to write it into the staging
-        // pipe.
-        ssize_t splice_res;
-        {
-          PERFETTO_METATRACE("splice() blocking", cpu + 1);
-          SetInBlockingSpliceForDebug(cpu, true);
-          splice_res = splice(trace_fd, nullptr, staging_write_fd, nullptr,
-                              base::kPageSize, SPLICE_F_MOVE);
-          SetInBlockingSpliceForDebug(cpu, false);
-        }
-        if (splice_res < 0) {
-          const int saved_err = errno;
+        PERFETTO_METATRACE(cur_mode == kRead ? "read" : "splice", cpu);
 
-          // The blocking splice() failed, one of the following cases happened:
-          // A) The FtraceController, from the main thread, interrupted this
-          //    worker thread and issued a new |cmd|.
-          // B) A spurious wakeup or a temporary ftrace error occurred. In this
-          //    case just wait for the next kRun cycle and retry.
-          // C) splice() failed in an unexpected way. We treat this as an
-          //    unrecoverable error and bail out generating a crash report.
+        // Do a blocking read/splice. This can fail for a variety of reasons:
+        // - FtraceController interrupts us with a signal for a new cmd
+        //   (e.g. it wants us to quit or do a flush).
+        // - We are out of |pool| pages and need to wait that the
+        //   FtraceController catches up with reading.
+        // - A temporary read/splice() failure occurred (it has been observed
+        //   to happen if the system is under high load).
+        // In all these cases the only thing we can do is skipping the current
+        // cycle and trying again later.
+        if (!read_ftrace_pipe(cur_mode, kBlock))
+          break;  // Wait for next command.
 
-          // Case A (kRun or kFlush) or B.
-          if (saved_err == ENOMEM || saved_err == EBUSY || saved_err == EINTR) {
-            if (saved_err != EINTR)
-              PERFETTO_DPLOG("Transient splice failure (errno: %d)", errno);
-            break;  // Go back to main loop.
-          }
-
-          // Case A (kQuit). In the kQuit case, the CpuReader dtor will close
-          // the trace pipe, which makes the splice fail with EINVAL or similar.
-          // Just break the loop in that case and deal with the kQuit.
-          {
-            std::unique_lock<std::mutex> lock(thread_sync->mutex);
-            if (thread_sync->cmd == FtraceThreadSync::kQuit)
-              break;
-          }
-
-          // Case C.
-          errno = saved_err;
-          PERFETTO_FATAL("Unrecoverable splice() error on cpu %zu", cpu);
+        // If we are in read mode (because of a previous flush) TODO descr.
+        if (cur_mode == kRead && read_ftrace_pipe(kSplice, kNonBlock)) {
+          cur_mode = kSplice;
+          PERFETTO_ILOG("recovered");
         }
 
-        // The blocking splice() succeeded. Now do as many non-blocking splices
-        // as we can. This moves any full pages from the trace pipe into the
-        // staging pipe as long as there is data in the former and space in
-        // the latter.
-        while (true) {
-          PERFETTO_METATRACE("splice() non-blocking", cpu + 1);
-          splice_res =
-              splice(trace_fd, nullptr, staging_write_fd, nullptr,
-                     base::kPageSize, SPLICE_F_MOVE | SPLICE_F_NONBLOCK);
-          if (splice_res < 0) {
-            if (errno != EAGAIN && errno != ENOMEM && errno != EBUSY)
-              PERFETTO_PLOG("splice(SPLICE_F_NONBLOCK) error");
-            break;
-          }
+        // Do as many non-blocking read/splice as we can. Note that even if
+        // ftrace data is available (e.g., because we are in kRead mode and our
+        // own schduling activity creates more data), read_ftrace_pipe() will
+        // eventually fail because we run out of |pool| pages.
+        while (read_ftrace_pipe(cur_mode, kNonBlock)) {
         }
 
-        // Notify the FtraceController about the fact that we pushed new data
-        // into the |staging_write_fd| pipe.
-        {
-          PERFETTO_METATRACE("splice_callback", cpu + 1);
-          on_data_available();
-        }
-
-        // Go back to the main loop and wait for the next command.
+        FtraceController::OnCpuReaderRead(cpu, generation, thread_sync);
       } break;
 
       case FtraceThreadSync::kFlush: {
-        PERFETTO_METATRACE("Flush", cpu + 1);
-
-        auto tstart = base::GetWallTimeNs();
-        PERFETTO_DLOG("Flushing CPUReader %zd, trace fd=%d", cpu, trace_fd);  //////////////////////////////
-
-        // Note that, at any point during the execution of this block, the
-        // CpuReader might asked to quit, which in turn will close the
-        // |trace_fd| pipe and join on this thread.
-
-        ScopedNonBlock make_temporarily_non_blocking(trace_fd);
-
-        // |buf| needs to be precisely 4k. It relies on PIPE_BUF == 4096
-        // on Linux and on the fact that writes <= PIPE_BUF are atomic.
-        auto buf = base::PagedMemory::Allocate(base::kPageSize);
-
-        // Put a hard limit to the number of read()s. We can easily get into a
-        // livelock state where our own scheduling activity produce lot of
-        // trace data.
-        for(size_t i = 0; i < 64; i++) {
-          auto rsize = read(trace_fd, buf.Get(), base::kPageSize);
-          if (rsize <= 0)
-            break;
-
-          // Writing <= 4k on a non-blocking pipe is guaranteed to be atomic.
-          auto wsize =
-              write(staging_write_fd, buf.Get(), static_cast<size_t>(rsize));
-
-          if (wsize < 0) {
-            PERFETTO_PLOG("CPUReader flush write() failed");
-            break;
-            // TODO before landing. What else can we do here? Maybe wait a
-            // bit? But that coud deadlock if the main thread is waiting in Flush().
-            // remember that we can be re-ckicked for timedout here.
-          }
-
-          // If the read becomes significantly smaller than a page size, it
-          // means that we have consumed the last page of the ftrace buffer and
-          // started consuming events in real-time. We can stop now.
-          if (rsize < 1024)
-            break;
+        PERFETTO_METATRACE("flush", cpu);
+        cur_mode = kRead;
+        while (read_ftrace_pipe(cur_mode, kNonBlock)) {
         }
-
-        PERFETTO_DLOG("Flushed CPUReader %zd in %.3f ms", cpu, (base::GetWallTimeNs() - tstart).count() / 1E6);  //////////////////////////////
-
-        {
-          std::unique_lock<std::mutex> lock(thread_sync->mutex);
-          thread_sync->flush_acks.set(cpu);
-        }
-
-        // TODO: on_data_available should be called within the loop if the write fails to prevent deadlock.
-        on_data_available();
-
-        break;
-      }
-    }
-  }
+        FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
+      } break;
+    }  // switch(cmd)
+  }    // for(run_loop)
   PERFETTO_DPLOG("Terminating CPUReader thread for CPU %zd.", cpu);
 #else
   base::ignore_result(cpu);
   base::ignore_result(trace_fd);
-  base::ignore_result(staging_write_fd);
+  base::ignore_result(pool);
   base::ignore_result(thread_sync);
-  base::ignore_result(on_data_available);
   PERFETTO_ELOG("Supported only on Linux/Android");
 #endif
 }
 
-bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
-  PERFETTO_METATRACE("Drain(" + std::to_string(cpu_) + ")", 0);
-
+// Invoked on the main thread by FtraceController, |drain_rate_ms| after the
+// first CPU wakes up from the blocking read()/splice().
+void CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
-  while (true) {
-    PERFETTO_DCHECK(staging_read_fd_);
-    PERFETTO_DCHECK(fcntl(*staging_read_fd_, F_GETFL, 0) & O_NONBLOCK);
+  PERFETTO_METATRACE("Drain(" + std::to_string(cpu_) + ")", kMainThread);
 
-    // At this point the worker thread must be sitting waiting for the next
-    // FtraceThreadSync command and must not be in a blocking splice(). There is
-    // a kernel bug (b/119805587) in the ftrace splice implementation that
-    // causes the target pipe to be locked if the ftrace pipe is waiting for
-    // data.
-    PERFETTO_DCHECK(!IsInBlockingSpliceForDebug(cpu_));
-
-    uint8_t* buffer = GetBuffer();
-    long bytes =
-       PERFETTO_EINTR(read(*staging_read_fd_, buffer, base::kPageSize));
-
-    if (bytes == -1 && errno == EAGAIN)
+  for (;;) {
+    base::Optional<PagePool::Page> page = pool_.PopContentfulPage();
+    if (!page.has_value())
       break;
-    PERFETTO_CHECK(static_cast<size_t>(bytes) == base::kPageSize);
+    PERFETTO_DCHECK(page->used_size() > 0);
 
     for (FtraceDataSource* data_source : data_sources) {
       auto packet = data_source->trace_writer()->NewTracePacket();
@@ -445,21 +353,14 @@ bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
       // changes, change proto_trace_parser.cc accordingly.
       bundle->set_cpu(static_cast<uint32_t>(cpu_));
 
-      size_t evt_size = ParsePage(buffer, filter, bundle, table_, metadata);
+      const uint8_t* start = pool_.Data(*page);
+      const uint8_t* end = start + page->used_size();
+      size_t evt_size = ParsePage(start, end, filter, bundle, table_, metadata);
       PERFETTO_DCHECK(evt_size);
-
       bundle->set_overwrite_count(metadata->overwrite_count);
+      pool_.FreePage(std::move(*page));
     }
   }
-
-  return true;
-}
-
-uint8_t* CpuReader::GetBuffer() {
-  PERFETTO_DCHECK_THREAD(thread_checker_);
-  if (!buffer_.IsValid())
-    buffer_ = base::PagedMemory::Allocate(base::kPageSize);
-  return reinterpret_cast<uint8_t*>(buffer_.Get());
 }
 
 // The structure of a raw trace buffer page is as follows:
@@ -470,13 +371,13 @@ uint8_t* CpuReader::GetBuffer() {
 // Some information about the layout of the page header is available in user
 // space at: /sys/kernel/debug/tracing/events/header_event
 // This method is deliberately static so it can be tested independently.
-size_t CpuReader::ParsePage(const uint8_t* ptr,
+size_t CpuReader::ParsePage(const uint8_t* begin,
+                            const uint8_t* end_of_page,
                             const EventFilter* filter,
                             FtraceEventBundle* bundle,
                             const ProtoTranslationTable* table,
                             FtraceMetadata* metadata) {
-  const uint8_t* const start_of_page = ptr;
-  const uint8_t* const end_of_page = ptr + base::kPageSize;
+  const uint8_t* ptr = begin;
 
   PageHeader page_header;
   if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &page_header.timestamp))
@@ -496,6 +397,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
   metadata->overwrite_count = static_cast<uint32_t>(page_header.overwrite);
 
+  // TODO got a but here where we parse > size.
   PERFETTO_DCHECK(page_header.size <= base::kPageSize);
 
   // Reject rest of the number, if applicable. On 32-bit, size_bytes - 4 will
@@ -587,7 +489,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
       }
     }
   }
-  return static_cast<size_t>(ptr - start_of_page);
+  return static_cast<size_t>(ptr - begin);
 }
 
 // |start| is the start of the current event.
@@ -618,10 +520,24 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
-  for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, metadata);
+  // Parse generic event.
+  if (info.proto_field_id == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
+    nested->AppendString(GenericFtraceEvent::kEventNameFieldNumber, info.name);
+    for (const Field& field : info.fields) {
+      auto generic_field = nested->BeginNestedMessage<protozero::Message>(
+          GenericFtraceEvent::kFieldFieldNumber);
+      // TODO(taylori): Avoid outputting field names every time.
+      generic_field->AppendString(GenericFtraceEvent::Field::kNameFieldNumber,
+                                  field.ftrace_name);
+      success &= ParseField(field, start, end, generic_field, metadata);
+    }
+  } else {  // Parse all other events.
+    for (const Field& field : info.fields) {
+      success &= ParseField(field, start, end, nested, metadata);
+    }
+  }
 
-  // This finalizes |nested| automatically.
+  // This finalizes |nested| and |proto_field| automatically.
   message->Finalize();
   metadata->FinishEvent();
   return success;
@@ -643,9 +559,11 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint8ToUint32:
+    case kUint8ToUint64:
       ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kUint16ToUint32:
+    case kUint16ToUint64:
       ReadIntoVarInt<uint16_t>(field_start, field_id, message);
       return true;
     case kUint32ToUint32:
@@ -656,9 +574,11 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
     case kInt8ToInt32:
+    case kInt8ToInt64:
       ReadIntoVarInt<int8_t>(field_start, field_id, message);
       return true;
     case kInt16ToInt32:
+    case kInt16ToInt64:
       ReadIntoVarInt<int16_t>(field_start, field_id, message);
       return true;
     case kInt32ToInt32:
@@ -681,7 +601,8 @@ bool CpuReader::ParseField(const Field& field,
     case kDataLocToString:
       return ReadDataLoc(start, field_start, end, field, message);
     case kBoolToUint32:
-      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+    case kBoolToUint64:
+      ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
       ReadInode<uint32_t>(field_start, field_id, message, metadata);
@@ -690,9 +611,11 @@ bool CpuReader::ParseField(const Field& field,
       ReadInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
     case kPid32ToInt32:
+    case kPid32ToInt64:
       ReadPid(field_start, field_id, message, metadata);
       return true;
     case kCommonPid32ToInt32:
+    case kCommonPid32ToInt64:
       ReadCommonPid(field_start, field_id, message, metadata);
       return true;
     case kDevId32ToUint64:

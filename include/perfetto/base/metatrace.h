@@ -19,6 +19,8 @@
 
 #include <string.h>
 
+#include <string>
+
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 

@@ -60,6 +60,10 @@ class FtraceController {
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*, Observer*);
   virtual ~FtraceController();
 
+  // These two methods are called by CpuReader from their worker threads.
+  static void OnCpuReaderRead(size_t cpu, int generation, FtraceThreadSync*);
+  static void OnCpuReaderFlush(size_t cpu, int generation, FtraceThreadSync*);
+
   void DisableAllEvents();
   void WriteTraceMarker(const std::string& s);
   void ClearTrace();
@@ -99,18 +103,12 @@ class FtraceController {
   FtraceController(const FtraceController&) = delete;
   FtraceController& operator=(const FtraceController&) = delete;
 
-  // Called on a worker thread when |cpu| has at least one page of data
-  // available for reading.
-  void OnDataAvailable(base::WeakPtr<FtraceController>,
-                       size_t generation,
-                       size_t cpu,
-                       uint32_t drain_period_ms);
   void OnFlushTimeout(FlushRequestID);
-
-  void DrainCPUs(size_t generation);
+  void DrainCPUs(int generation);
   void UnblockReaders();
   void NotifyFlushCompleteToStartedDataSources(FlushRequestID);
-  void IssueThreadSyncCmd(FtraceThreadSync::Cmd, std::unique_lock<std::mutex> = {});
+  void IssueThreadSyncCmd(FtraceThreadSync::Cmd,
+                          std::unique_lock<std::mutex> = {});
 
   uint32_t GetDrainPeriodMs();
 
@@ -123,10 +121,10 @@ class FtraceController {
   std::unique_ptr<FtraceProcfs> ftrace_procfs_;
   std::unique_ptr<ProtoTranslationTable> table_;
   std::unique_ptr<FtraceConfigMuxer> ftrace_config_muxer_;
-  size_t generation_ = 0;
+  int generation_ = 0;
   FlushRequestID cur_flush_request_id_ = 0;
   bool atrace_running_ = false;
-  std::map<size_t, std::unique_ptr<CpuReader>> cpu_readers_;
+  std::vector<std::unique_ptr<CpuReader>> cpu_readers_;
   std::set<FtraceDataSource*> data_sources_;
   std::set<FtraceDataSource*> started_data_sources_;
   base::WeakPtrFactory<FtraceController> weak_factory_;  // Keep last.

@@ -20,12 +20,19 @@
 #include <stdint.h>
 
 #include <bitset>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
 
 #include "perfetto/base/utils.h"
+#include "perfetto/base/weak_ptr.h"
 
 namespace perfetto {
+
+namespace base {
+class TaskRunner;
+}  // namespace base
+
+class FtraceController;
 
 // This struct is acessed both by the FtraceController on the main thread and
 // by the CpuReader(s) on their worker threads. It is used to synchronize
@@ -33,8 +40,15 @@ namespace perfetto {
 // instance of this state, owned by the FtraceController and shared with all
 // CpuReader(s).
 struct FtraceThreadSync {
+  explicit FtraceThreadSync(base::TaskRunner* tr) : task_runner(tr) {}
+
+  // These variables are set upon initialization time and never changed. Can
+  // be accessed outside of the |mutex|.
+  base::TaskRunner* const task_runner;  // Where the FtraceController lives.
+  base::WeakPtr<FtraceController> trace_controller_weak;
+
   // Mutex & condition variable shared by main thread and all per-cpu workers.
-  // All fields of this class are read and modified holding |mutex|.
+  // All fields below are read and modified holding |mutex|.
   std::mutex mutex;
 
   // Used to suspend CpuReader(s) between cycles and to wake them up at the
