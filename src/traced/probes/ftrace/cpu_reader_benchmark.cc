@@ -38,7 +38,7 @@ perfetto::ExamplePage g_full_page_sched_switch{
 00000070: 6561 6400 6572 0000 7002 0000 6100 0000  ead.er..p...a...
 00000080: 0100 0000 0000 0000 4a69 7420 7468 7265  ........Jit thre
 00000090: 6164 2070 6f6f 6c00 140d 0000 8100 0000  ad pool.........
-000000a0: 50c2 0910 2f00 0103 140d 0000 4a69 7420  P.../.......Jit 
+000000a0: 50c2 0910 2f00 0103 140d 0000 4a69 7420  P.../.......Jit
 000000b0: 7468 7265 6164 2070 6f6f 6c00 140d 0000  thread pool.....
 000000c0: 8100 0000 0100 0000 0000 0000 7377 6170  ............swap
 000000d0: 7065 722f 3000 0000 0000 0000 0000 0000  per/0...........
@@ -315,7 +315,8 @@ static void BM_ParsePageFullOfSchedSwitch(benchmark::State& state) {
   FtraceMetadata metadata{};
   while (state.KeepRunning()) {
     writer.Reset(&stream);
-    CpuReader::ParsePage(page.get(), &filter, &writer, table, &metadata);
+    CpuReader::ParsePage(page.get(), page.get() + perfetto::base::kPageSize,
+                         &filter, &writer, table, &metadata);
     metadata.Clear();
   }
 }

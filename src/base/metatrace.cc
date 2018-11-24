@@ -48,8 +48,8 @@ void MetaTrace::WriteEvent(char type, const char* evt_name, size_t cpu) {
   char json[256];
   int len = sprintf(json,
                     "{\"ts\": %f, \"cat\": \"PERF\", \"ph\": \"%c\", \"name\": "
-                    "\"%s\", \"pid\": %zu},\n",
-                    GetWallTimeNs().count() / 1000.0, type, evt_name, cpu);
+                    "\"%s\", \"pid\": %zu, \"tid\": %zu},\n",
+                    GetWallTimeNs().count() / 1000.0, type, evt_name, cpu, cpu);
   ignore_result(WriteAll(fd, json, static_cast<size_t>(len)));
 }
 
