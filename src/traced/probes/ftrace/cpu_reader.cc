@@ -217,8 +217,11 @@ void CpuReader::RunWorkerThread(size_t cpu,
   enum Block { kBlock, kNonBlock };
   constexpr auto kPageSize = base::kPageSize;
 
-  auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool](ReadMode mode,
-                                                       Block block) -> bool {
+  auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool, cpu](
+                              ReadMode mode, Block block) -> bool {
+    PERFETTO_METATRACE((mode == kRead ? "read" : "splice") + std::string("-") +
+                           (block == kBlock ? "block" : "non-block"),
+                       cpu);
     base::Optional<PagePool::Page> page = pool->GetFreePage();
     if (!page.has_value())
       return false;
@@ -228,22 +231,16 @@ void CpuReader::RunWorkerThread(size_t cpu,
       uint32_t flags = SPLICE_F_MOVE | (block == kNonBlock) * SPLICE_F_NONBLOCK;
       res = splice(trace_fd, nullptr, *sync_pipe.wr, nullptr, kPageSize, flags);
       if (res > 0) {
-        ssize_t rdres = read(*sync_pipe.rd, pool->Data(*page), kPageSize);
+        ssize_t rdres = read(*sync_pipe.rd, page->data(), kPageSize);
         PERFETTO_DCHECK(rdres = res);
       }
     } else {
       if (block == kNonBlock)
         SetBlocking(trace_fd, false);
-      res = read(trace_fd, pool->Data(*page), kPageSize);
+      res = read(trace_fd, page->data(), kPageSize);
       if (block == kNonBlock)
         SetBlocking(trace_fd, true);
     }
-
-    static auto first = base::GetWallTimeNs();
-    PERFETTO_DLOG("[%.3f ms] %s(%s) = %zd",
-                  (base::GetWallTimeNs() - first).count() / 1e6,
-                  mode == kRead ? "read" : "splice",
-                  block == kBlock ? "block" : "non-block", res);
 
     if (res > 0) {
       // Both read() and splice() should return full pages.
@@ -298,7 +295,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
         // If we are in read mode (because of a previous flush) TODO descr.
         if (cur_mode == kRead && read_ftrace_pipe(kSplice, kNonBlock)) {
           cur_mode = kSplice;
-          PERFETTO_ILOG("recovered");
+          PERFETTO_ILOG("recovered from read() misalignment");  // DNS
         }
 
         // Do as many non-blocking read/splice as we can. Note that even if
@@ -317,12 +314,15 @@ void CpuReader::RunWorkerThread(size_t cpu,
         while (read_ftrace_pipe(cur_mode, kNonBlock)) {
         }
         FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
+        PERFETTO_ELOG("switching to read() mode");  // DNS
+
       } break;
     }  // switch(cmd)
   }    // for(run_loop)
   PERFETTO_DPLOG("Terminating CPUReader thread for CPU %zd.", cpu);
 #else
   base::ignore_result(cpu);
+  base::ignore_result(generation);
   base::ignore_result(trace_fd);
   base::ignore_result(pool);
   base::ignore_result(thread_sync);
@@ -353,7 +353,7 @@ void CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
       // changes, change proto_trace_parser.cc accordingly.
       bundle->set_cpu(static_cast<uint32_t>(cpu_));
 
-      const uint8_t* start = pool_.Data(*page);
+      const uint8_t* start = page->data();
       const uint8_t* end = start + page->used_size();
       size_t evt_size = ParsePage(start, end, filter, bundle, table_, metadata);
       PERFETTO_DCHECK(evt_size);

@@ -47,16 +47,6 @@
 namespace perfetto {
 namespace {
 
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
-constexpr const char* kTracingPaths[] = {
-    "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
-};
-#else
-constexpr const char* kTracingPaths[] = {
-    "/sys/kernel/debug/tracing/", nullptr,
-};
-#endif
-
 constexpr int kDefaultDrainPeriodMs = 100;
 constexpr int kFlushTimeoutMs = 250;
 constexpr int kMinDrainPeriodMs = 1;
@@ -88,6 +78,14 @@ void ClearFile(const char* path) {
 }
 
 }  // namespace
+
+const char* const FtraceController::kTracingPaths[] = {
+#if PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
+    "/sys/kernel/tracing/", "/sys/kernel/debug/tracing/", nullptr,
+#else
+    "/sys/kernel/debug/tracing/", nullptr,
+#endif
+};
 
 // Method of last resort to reset ftrace state.
 // We don't know what state the rest of the system and process is so as far

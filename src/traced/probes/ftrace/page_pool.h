@@ -34,19 +34,21 @@ class PagePool {
  public:
   class Page {
    public:
-    explicit Page(uint32_t index) : index_(index) {}
+    explicit Page(uint8_t* data) : data_(data) {}
     Page(Page&&) noexcept = default;
     Page& operator=(Page&&) = default;
-    uint32_t index() const { return index_; }
+
     constexpr size_t size() const { return base::kPageSize; }
-    void set_used_size(uint32_t v) {
-      PERFETTO_DCHECK(v <= base::kPageSize);
-      used_size_ = v;
+
+    void set_used_size(uint32_t used_size) {
+      PERFETTO_DCHECK(used_size <= base::kPageSize);
+      used_size_ = used_size;
     }
     uint32_t used_size() const { return used_size_; }
+    uint8_t* data() const { return data_; }
 
    private:
-    uint32_t index_;
+    uint8_t* data_;
     uint32_t used_size_ = 0;
   };
 
@@ -56,14 +58,10 @@ class PagePool {
   base::Optional<Page> PopContentfulPage();
   void FreePage(Page);
 
-  inline uint8_t* Data(const Page& page) {
-    PERFETTO_DCHECK(page.index() < num_pages_);
-    PERFETTO_DCHECK(!free_pages_.test(page.index()));
-    return reinterpret_cast<uint8_t*>(mem_.Get()) +
-           page.index() * base::kPageSize;
-  }
-
  private:
+  size_t IndexOf(const Page& page);
+  uint8_t* mem() { return reinterpret_cast<uint8_t*>(mem_.Get()); }
+
   static constexpr uint32_t kMaxPages = 64;
   const uint32_t num_pages_;
   base::PagedMemory mem_;

@@ -25,6 +25,14 @@ PagePool::PagePool(uint32_t num_pages) : num_pages_(num_pages) {
     free_pages_.set(i);
 }
 
+size_t PagePool::IndexOf(const Page& page) {
+  PERFETTO_DCHECK(page.data() >= mem() &&
+                  page.data() <= mem() + (num_pages_ - 1) * base::kPageSize);
+  auto off = static_cast<size_t>(page.data() - mem());
+  PERFETTO_DCHECK(off % base::kPageSize == 0);
+  return static_cast<size_t>(off / base::kPageSize);
+}
+
 base::Optional<PagePool::Page> PagePool::GetFreePage() {
   std::lock_guard<std::mutex> lock(mutex_);
   uint32_t p;
@@ -36,20 +44,22 @@ base::Optional<PagePool::Page> PagePool::GetFreePage() {
   if (p >= num_pages_)
     return base::nullopt;
   free_pages_.set(p, false);
-  return Page(p);
+  return Page(mem() + p * base::kPageSize);
 }
 
 void PagePool::FreePage(Page page) {
   std::lock_guard<std::mutex> lock(mutex_);
-  PERFETTO_DCHECK(page.index() < num_pages_);
-  PERFETTO_DCHECK(!free_pages_.test(page.index()));
-  free_pages_.set(page.index());
+  size_t page_index = IndexOf(page);
+  PERFETTO_DCHECK(page_index < num_pages_);
+  PERFETTO_DCHECK(!free_pages_.test(page_index));
+  free_pages_.set(page_index);
 }
 
 void PagePool::PushContentfulPage(Page page, ssize_t used_size) {
   std::lock_guard<std::mutex> lock(mutex_);
-  PERFETTO_DCHECK(page.index() < num_pages_);
-  PERFETTO_DCHECK(!free_pages_.test(page.index()));
+  size_t page_index = IndexOf(page);
+  PERFETTO_DCHECK(page_index < num_pages_);
+  PERFETTO_DCHECK(!free_pages_.test(page_index));
   page.set_used_size(static_cast<uint32_t>(used_size));
   contentful_pages_.push_back(std::move(page));
 }
@@ -60,8 +70,8 @@ base::Optional<PagePool::Page> PagePool::PopContentfulPage() {
     return base::nullopt;
   Page page = std::move(contentful_pages_.front());
   contentful_pages_.pop_front();
-  PERFETTO_DCHECK(page.index() < num_pages_);
-  PERFETTO_DCHECK(!free_pages_.test(page.index()));
+  PERFETTO_DCHECK(IndexOf(page) < num_pages_);
+  PERFETTO_DCHECK(!free_pages_.test(IndexOf(page)));
   return page;
 }
 

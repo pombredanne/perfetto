@@ -50,6 +50,8 @@ void HardResetFtraceState();
 // Utility class for controlling ftrace.
 class FtraceController {
  public:
+  static const char* const kTracingPaths[];
+
   class Observer {
    public:
     virtual ~Observer();
