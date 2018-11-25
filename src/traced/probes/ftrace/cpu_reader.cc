@@ -27,6 +27,7 @@
 #include "perfetto/base/build_config.h"
 #include "perfetto/base/logging.h"
 #include "perfetto/base/metatrace.h"
+#include "perfetto/base/optional.h"
 #include "perfetto/base/utils.h"
 #include "src/traced/probes/ftrace/ftrace_controller.h"
 #include "src/traced/probes/ftrace/ftrace_data_source.h"
@@ -41,6 +42,33 @@
 namespace perfetto {
 
 namespace {
+
+// For further documentation of these constants see the kernel source:
+// linux/include/linux/ring_buffer.h
+// Some information about the values of these constants are exposed to user
+// space at: /sys/kernel/debug/tracing/events/header_event
+constexpr uint32_t kTypeDataTypeLengthMax = 28;
+constexpr uint32_t kTypePadding = 29;
+constexpr uint32_t kTypeTimeExtend = 30;
+constexpr uint32_t kTypeTimeStamp = 31;
+
+constexpr uint32_t kMainThread = 255;  // for METATRACE
+
+struct PageHeader {
+  uint64_t timestamp;
+  uint64_t size;
+  uint64_t overwrite;
+};
+
+struct EventHeader {
+  uint32_t type_or_length : 5;
+  uint32_t time_delta : 27;
+};
+
+struct TimeStamp {
+  uint64_t tv_nsec;
+  uint64_t tv_sec;
+};
 
 bool ReadIntoString(const uint8_t* start,
                     const uint8_t* end,
@@ -101,35 +129,34 @@ bool SetBlocking(int fd, bool is_blocking) {
   return fcntl(fd, F_SETFL, flags) == 0;
 }
 
-// For further documentation of these constants see the kernel source:
-// linux/include/linux/ring_buffer.h
-// Some information about the values of these constants are exposed to user
-// space at: /sys/kernel/debug/tracing/events/header_event
-constexpr uint32_t kTypeDataTypeLengthMax = 28;
-constexpr uint32_t kTypePadding = 29;
-constexpr uint32_t kTypeTimeExtend = 30;
-constexpr uint32_t kTypeTimeStamp = 31;
+base::Optional<PageHeader> ParsePageHeader(const uint8_t** ptr,
+                                           uint16_t header_size_len) {
+  const uint8_t* end_of_page = *ptr + base::kPageSize;
+  PageHeader page_header;
+  if (!CpuReader::ReadAndAdvance<uint64_t>(ptr, end_of_page,
+                                           &page_header.timestamp))
+    return base::nullopt;
 
-constexpr uint32_t kMainThread = 255;  // for METATRACE
+  uint32_t overwrite_and_size;
 
-// TODO: this should be as big as the kernel buffer I think. Think more. // DNS
-constexpr uint32_t kPoolPages = 32;  // 32 * 4K = 128 KB;
+  // On little endian, we can just read a uint32_t and reject the rest of the
+  // number later.
+  if (!CpuReader::ReadAndAdvance<uint32_t>(
+          ptr, end_of_page, base::AssumeLittleEndian(&overwrite_and_size)))
+    return base::nullopt;
 
-struct PageHeader {
-  uint64_t timestamp;
-  uint64_t size;
-  uint64_t overwrite;
-};
+  page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
+  page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
+  PERFETTO_DCHECK(page_header.size <= base::kPageSize);
 
-struct EventHeader {
-  uint32_t type_or_length : 5;
-  uint32_t time_delta : 27;
-};
+  // Reject rest of the number, if applicable. On 32-bit, size_bytes - 4 will
+  // evaluate to 0 and this will be a no-op. On 64-bit, this will advance by 4
+  // bytes.
+  PERFETTO_DCHECK(header_size_len >= 4);
+  *ptr += header_size_len - 4;
 
-struct TimeStamp {
-  uint64_t tv_nsec;
-  uint64_t tv_sec;
-};
+  return base::make_optional(page_header);
+}
 
 }  // namespace
 
@@ -149,7 +176,6 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
     : table_(table),
       thread_sync_(thread_sync),
       cpu_(cpu),
-      pool_(kPoolPages),
       trace_fd_(std::move(fd)) {
   // Make reads from the raw pipe blocking so that splice() can sleep.
   PERFETTO_CHECK(trace_fd_);
@@ -172,8 +198,9 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
   }
 #pragma GCC diagnostic pop
 
-  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, generation,
-                                         *trace_fd_, &pool_, thread_sync_));
+  worker_thread_ =
+      std::thread(std::bind(&RunWorkerThread, cpu_, generation, *trace_fd_,
+                            &pool_, thread_sync_, table->header_size_len()));
 }
 
 CpuReader::~CpuReader() {
@@ -207,7 +234,8 @@ void CpuReader::RunWorkerThread(size_t cpu,
                                 int generation,
                                 int trace_fd,
                                 PagePool* pool,
-                                FtraceThreadSync* thread_sync) {
+                                FtraceThreadSync* thread_sync,
+                                uint16_t header_size_len) {
 #if PERFETTO_BUILDFLAG(PERFETTO_OS_LINUX) || \
     PERFETTO_BUILDFLAG(PERFETTO_OS_ANDROID)
   char thread_name[16];
@@ -219,46 +247,55 @@ void CpuReader::RunWorkerThread(size_t cpu,
   enum Block { kBlock, kNonBlock };
   constexpr auto kPageSize = base::kPageSize;
 
-  auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool, cpu](
-                              ReadMode mode, Block block) -> bool {
+  auto read_ftrace_pipe = [&sync_pipe, trace_fd, pool, cpu, header_size_len](
+                              ReadMode mode, Block block) -> int {
     PERFETTO_METATRACE((mode == kRead ? "read" : "splice") + std::string("-") +
                            (block == kBlock ? "block" : "non-block"),
                        cpu);
-    base::Optional<PagePool::Page> page = pool->GetFreePage();
-    if (!page.has_value())
-      return false;
+    uint8_t* page = pool->Allocate();
+    if (!page)
+      return -1;
 
     ssize_t res;
     if (mode == kSplice) {
       uint32_t flags = SPLICE_F_MOVE | (block == kNonBlock) * SPLICE_F_NONBLOCK;
       res = splice(trace_fd, nullptr, *sync_pipe.wr, nullptr, kPageSize, flags);
       if (res > 0) {
-        ssize_t rdres = read(*sync_pipe.rd, page->data(), kPageSize);
+        ssize_t rdres = read(*sync_pipe.rd, page, kPageSize);
         PERFETTO_DCHECK(rdres = res);
       }
     } else {
       if (block == kNonBlock)
         SetBlocking(trace_fd, false);
-      res = read(trace_fd, page->data(), kPageSize);
+      res = read(trace_fd, page, kPageSize);
+      if (res > 0) {
+        const uint8_t* ptr = page;  // ParsePageHeader() advances the |ptr| arg.
+        base::Optional<PageHeader> hdr = ParsePageHeader(&ptr, header_size_len);
+        PERFETTO_DCHECK(hdr && hdr->size > 0 && hdr->size <= base::kPageSize);
+        res = hdr.has_value() ? static_cast<int>(hdr->size) : -1;
+      }
       if (block == kNonBlock)
         SetBlocking(trace_fd, true);
     }
 
     if (res > 0) {
       // Both read() and splice() should return full pages.
-      PERFETTO_DCHECK(res == base::kPageSize);
-      pool->PushContentfulPage(std::move(*page), res);
-      return true;
+      PERFETTO_DCHECK(res == base::kPageSize || mode == kRead);
+      return static_cast<int>(res);
     }
 
     int err = errno;
-    pool->FreePage(std::move(*page));
-    if (!res || err == EAGAIN || err == ENOMEM || err == EBUSY || err == EINTR)
-      return false;
+    pool->FreeLastPage(page);
+    if (!res || err == EAGAIN || err == ENOMEM || err == EBUSY ||
+        err == EINTR || err == EBADF) {
+      // EAGAIN: no data when in non-blocking mode.
+      // ENONMEM, EBUSY: temporary failures (they happen).
+      // EINTR: signal interruption, likely from main thread to issue a new cmd.
+      // EBADF: the main thread has closed the fd (happens during dtor).
+      return -1;
+    }
 
-    // TODO think about EINVAL if we close the FD.  // DNS
-    PERFETTO_FATAL("Unrecoverable %s() failure",
-                   mode == kRead ? "read" : "splice");
+    PERFETTO_FATAL("Unrecoverable %s() err", mode == kRead ? "read" : "splice");
   };
 
   uint64_t last_cmd_id = 0;
@@ -299,23 +336,20 @@ void CpuReader::RunWorkerThread(size_t cpu,
           cur_mode = kSplice;
         }
 
-        // Do as many non-blocking read/splice as we can. Note that even if
-        // ftrace data is available (e.g., because we are in kRead mode and our
-        // own schduling activity creates more data), read_ftrace_pipe() will
-        // eventually fail because we run out of |pool| pages.
-        while (read_ftrace_pipe(cur_mode, kNonBlock)) {
+        // Do as many non-blocking read/splice as we can.
+        while (read_ftrace_pipe(cur_mode, kNonBlock) > 3000) {
         }
-
+        pool->FinishWrite();
         FtraceController::OnCpuReaderRead(cpu, generation, thread_sync);
       } break;
 
       case FtraceThreadSync::kFlush: {
         PERFETTO_METATRACE("flush", cpu);
         cur_mode = kRead;
-        while (read_ftrace_pipe(cur_mode, kNonBlock)) {
+        while (read_ftrace_pipe(cur_mode, kNonBlock) > 3000) {
         }
+        pool->FinishWrite();
         FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
-
       } break;
     }  // switch(cmd)
   }    // for(run_loop)
@@ -326,6 +360,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
   base::ignore_result(trace_fd);
   base::ignore_result(pool);
   base::ignore_result(thread_sync);
+  base::ignore_result(header_size_len);
   PERFETTO_ELOG("Supported only on Linux/Android");
 #endif
 }
@@ -336,31 +371,29 @@ void CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   PERFETTO_METATRACE("Drain(" + std::to_string(cpu_) + ")", kMainThread);
 
-  for (;;) {
-    base::Optional<PagePool::Page> page = pool_.PopContentfulPage();
-    if (!page.has_value())
-      break;
-    PERFETTO_DCHECK(page->used_size() > 0);
+  auto page_blocks = pool_.BeginRead();
+  for (const auto& page_block : page_blocks) {
+    for (size_t i = 0; i < page_block.size(); i++) {
+      const uint8_t* page = page_block.at(i);
 
-    for (FtraceDataSource* data_source : data_sources) {
-      auto packet = data_source->trace_writer()->NewTracePacket();
-      auto* bundle = packet->set_ftrace_events();
-      auto* metadata = data_source->mutable_metadata();
-      auto* filter = data_source->event_filter();
+      for (FtraceDataSource* data_source : data_sources) {
+        auto packet = data_source->trace_writer()->NewTracePacket();
+        auto* bundle = packet->set_ftrace_events();
+        auto* metadata = data_source->mutable_metadata();
+        auto* filter = data_source->event_filter();
 
-      // Note: The fastpath in proto_trace_parser.cc speculates on the fact
-      // that the cpu field is the first field of the proto message. If this
-      // changes, change proto_trace_parser.cc accordingly.
-      bundle->set_cpu(static_cast<uint32_t>(cpu_));
+        // Note: The fastpath in proto_trace_parser.cc speculates on the fact
+        // that the cpu field is the first field of the proto message. If this
+        // changes, change proto_trace_parser.cc accordingly.
+        bundle->set_cpu(static_cast<uint32_t>(cpu_));
 
-      const uint8_t* start = page->data();
-      const uint8_t* end = start + page->used_size();
-      size_t evt_size = ParsePage(start, end, filter, bundle, table_, metadata);
-      PERFETTO_DCHECK(evt_size);
-      bundle->set_overwrite_count(metadata->overwrite_count);
-      pool_.FreePage(std::move(*page));
+        size_t evt_size = ParsePage(page, filter, bundle, table_, metadata);
+        PERFETTO_DCHECK(evt_size);
+        bundle->set_overwrite_count(metadata->overwrite_count);
+      }
     }
   }
+  pool_.EndRead(std::move(page_blocks));
 }
 
 // The structure of a raw trace buffer page is as follows:
@@ -371,45 +404,26 @@ void CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
 // Some information about the layout of the page header is available in user
 // space at: /sys/kernel/debug/tracing/events/header_event
 // This method is deliberately static so it can be tested independently.
-size_t CpuReader::ParsePage(const uint8_t* begin,
-                            const uint8_t* end_of_page,
+size_t CpuReader::ParsePage(const uint8_t* ptr,
                             const EventFilter* filter,
                             FtraceEventBundle* bundle,
                             const ProtoTranslationTable* table,
                             FtraceMetadata* metadata) {
-  const uint8_t* ptr = begin;
+  const uint8_t* const start_of_page = ptr;
+  const uint8_t* const end_of_page = ptr + base::kPageSize;
 
-  PageHeader page_header;
-  if (!ReadAndAdvance<uint64_t>(&ptr, end_of_page, &page_header.timestamp))
+  auto page_header = ParsePageHeader(&ptr, table->header_size_len());
+  if (!page_header.has_value())
     return 0;
 
-  // TODO(fmayer): Do kernel deepdive to double check this.
-  uint16_t size_bytes = table->ftrace_page_header_spec().size.size;
-  PERFETTO_CHECK(size_bytes >= 4);
-  uint32_t overwrite_and_size;
-  // On little endian, we can just read a uint32_t and reject the rest of the
-  // number later.
-  if (!ReadAndAdvance<uint32_t>(&ptr, end_of_page,
-                                base::AssumeLittleEndian(&overwrite_and_size)))
-    return 0;
+  // ParsePageHeader advances |ptr| to point past the end of the header.
 
-  page_header.size = (overwrite_and_size & 0x000000000000ffffull) >> 0;
-  page_header.overwrite = (overwrite_and_size & 0x00000000ff000000ull) >> 24;
-  metadata->overwrite_count = static_cast<uint32_t>(page_header.overwrite);
-
-  // TODO got a but here where we parse > size.
-  PERFETTO_DCHECK(page_header.size <= base::kPageSize);
-
-  // Reject rest of the number, if applicable. On 32-bit, size_bytes - 4 will
-  // evaluate to 0 and this will be a no-op. On 64-bit, this will advance by 4
-  // bytes.
-  ptr += size_bytes - 4;
-
-  const uint8_t* const end = ptr + page_header.size;
+  metadata->overwrite_count = static_cast<uint32_t>(page_header->overwrite);
+  const uint8_t* const end = ptr + page_header->size;
   if (end > end_of_page)
     return 0;
 
-  uint64_t timestamp = page_header.timestamp;
+  uint64_t timestamp = page_header->timestamp;
 
   while (ptr < end) {
     EventHeader event_header;
@@ -489,7 +503,7 @@ size_t CpuReader::ParsePage(const uint8_t* begin,
       }
     }
   }
-  return static_cast<size_t>(ptr - begin);
+  return static_cast<size_t>(ptr - start_of_page);
 }
 
 // |start| is the start of the current event.

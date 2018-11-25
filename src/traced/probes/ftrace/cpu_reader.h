@@ -154,8 +154,7 @@ class CpuReader {
   // run time (e.g. field offset and size) information necessary to do this.
   // The table is initialized once at start time by the ftrace controller
   // which passes it to the CpuReader which passes it here.
-  static size_t ParsePage(const uint8_t* begin,
-                          const uint8_t* end,
+  static size_t ParsePage(const uint8_t* ptr,
                           const EventFilter*,
                           protos::pbzero::FtraceEventBundle*,
                           const ProtoTranslationTable* table,
@@ -186,7 +185,8 @@ class CpuReader {
                               int generation,
                               int trace_fd,
                               PagePool*,
-                              FtraceThreadSync*);
+                              FtraceThreadSync*,
+                              uint16_t header_size_len);
 
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;

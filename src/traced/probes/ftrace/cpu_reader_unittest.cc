@@ -367,9 +367,8 @@ TEST(CpuReaderTest, ParseSinglePrint) {
   EventFilter filter(*table, {"print"});
 
   FtraceMetadata metadata{};
-  size_t bytes =
-      CpuReader::ParsePage(page.get(), page.get() + base::kPageSize, &filter,
-                           bundle_provider.writer(), table, &metadata);
+  size_t bytes = CpuReader::ParsePage(
+      page.get(), &filter, bundle_provider.writer(), table, &metadata);
   EXPECT_EQ(bytes, 60ul);
 
   auto bundle = bundle_provider.ParseProto();
@@ -481,8 +480,8 @@ TEST(CpuReaderTest, ReallyLongEvent) {
   EventFilter filter(*table, {"print"});
 
   FtraceMetadata metadata{};
-  CpuReader::ParsePage(page.get(), page.get() + base::kPageSize, &filter,
-                       bundle_provider.writer(), table, &metadata);
+  CpuReader::ParsePage(page.get(), &filter, bundle_provider.writer(), table,
+                       &metadata);
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -516,9 +515,8 @@ TEST(CpuReaderTest, ParseSinglePrintMalformed) {
   EventFilter filter(*table, {"print"});
 
   FtraceMetadata metadata{};
-  ASSERT_FALSE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                    &filter, bundle_provider.writer(), table,
-                                    &metadata));
+  ASSERT_FALSE(CpuReader::ParsePage(
+      page.get(), &filter, bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -542,9 +540,8 @@ TEST(CpuReaderTest, FilterByEvent) {
   EventFilter filter(*table, {});
 
   FtraceMetadata metadata{};
-  ASSERT_TRUE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                   &filter, bundle_provider.writer(), table,
-                                   &metadata));
+  ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -596,9 +593,8 @@ TEST(CpuReaderTest, ParseThreePrint) {
   EventFilter filter(*table, {"print"});
 
   FtraceMetadata metadata{};
-  ASSERT_TRUE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                   &filter, bundle_provider.writer(), table,
-                                   &metadata));
+  ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -691,9 +687,8 @@ TEST(CpuReaderTest, ParseSixSchedSwitch) {
   EventFilter filter(*table, {"sched_switch"});
 
   FtraceMetadata metadata{};
-  ASSERT_TRUE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                   &filter, bundle_provider.writer(), table,
-                                   &metadata));
+  ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -1360,9 +1355,8 @@ TEST(CpuReaderTest, ParseFullPageSchedSwitch) {
   EventFilter filter(*table, {"sched_switch"});
 
   FtraceMetadata metadata{};
-  ASSERT_TRUE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                   &filter, bundle_provider.writer(), table,
-                                   &metadata));
+  ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);
@@ -1790,9 +1784,8 @@ TEST(CpuReaderTest, ParseExt4WithOverwrite) {
   EventFilter filter(*table, {"sched_switch"});
 
   FtraceMetadata metadata{};
-  ASSERT_TRUE(CpuReader::ParsePage(page.get(), page.get() + base::kPageSize,
-                                   &filter, bundle_provider.writer(), table,
-                                   &metadata));
+  ASSERT_TRUE(CpuReader::ParsePage(page.get(), &filter,
+                                   bundle_provider.writer(), table, &metadata));
 
   auto bundle = bundle_provider.ParseProto();
   ASSERT_TRUE(bundle);

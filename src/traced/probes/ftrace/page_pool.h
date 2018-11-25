@@ -19,56 +19,139 @@
 
 #include <stdint.h>
 
+#include <array>
 #include <bitset>
 #include <deque>
+#include <limits>
 #include <mutex>
+#include <vector>
 
 #include "perfetto/base/logging.h"
 #include "perfetto/base/optional.h"
 #include "perfetto/base/paged_memory.h"
+#include "perfetto/base/thread_checker.h"
 #include "perfetto/base/utils.h"
 
 namespace perfetto {
 
 class PagePool {
  public:
-  class Page {
+  class PageBlock {
    public:
-    explicit Page(uint8_t* data) : data_(data) {}
-    Page(Page&&) noexcept = default;
-    Page& operator=(Page&&) = default;
+    static constexpr size_t kPagesPerBlock = 32;  // 32 * 4KB = 128 KB.
+    static constexpr size_t kMemSize = kPagesPerBlock * base::kPageSize;
 
-    constexpr size_t size() const { return base::kPageSize; }
+    static PageBlock Create() { return PageBlock(); }
 
-    void set_used_size(uint32_t used_size) {
-      PERFETTO_DCHECK(used_size <= base::kPageSize);
-      used_size_ = used_size;
+    ~PageBlock() {
+      if (mem_.IsValid())
+        PERFETTO_ELOG("--------block");  // DNS
     }
-    uint32_t used_size() const { return used_size_; }
-    uint8_t* data() const { return data_; }
+
+    PageBlock(PageBlock&&) noexcept = default;
+    PageBlock& operator=(PageBlock&&) = default;
+
+    bool is_full() const { return size_ >= kPagesPerBlock; }
+    size_t size() const { return size_; }
+
+    uint8_t* at(size_t i) const {
+      PERFETTO_DCHECK(i < kPagesPerBlock);
+      return reinterpret_cast<uint8_t*>(mem_.Get()) + i * base::kPageSize;
+    }
 
    private:
-    uint8_t* data_;
-    uint32_t used_size_ = 0;
+    friend class PagePool;
+    PageBlock(const PageBlock&) = delete;
+    PageBlock& operator=(const PageBlock&) = delete;
+
+    PageBlock() {
+      PERFETTO_ILOG("++++++++block");  // DNS
+      mem_ = base::PagedMemory::Allocate(kMemSize);
+      static_assert(
+          kPagesPerBlock <= std::numeric_limits<decltype(size_)>::max(),
+          "size_ type is too small");
+    }
+
+    uint8_t* Allocate() {
+      PERFETTO_CHECK(!is_full());
+      return at(size_++);
+    }
+
+    void FreeLastPage(uint8_t* page) {
+      PERFETTO_DCHECK(size_ > 0);
+      size_--;
+      PERFETTO_DCHECK(page == at(size_));
+    }
+
+    void Clear() {
+      size_ = 0;
+      mem_.AdviseDontNeed(mem_.Get(), kMemSize);
+    }
+
+    base::PagedMemory mem_;
+    uint16_t size_ = 0;
   };
 
-  explicit PagePool(uint32_t num_pages);
-  base::Optional<Page> GetFreePage();
-  void PushContentfulPage(Page, ssize_t used_size);
-  base::Optional<Page> PopContentfulPage();
-  void FreePage(Page);
+  PagePool() {
+    PERFETTO_DETACH_FROM_THREAD(writer_thread_);
+    PERFETTO_DETACH_FROM_THREAD(reader_thread_);
+  }
 
- private:
-  size_t IndexOf(const Page& page);
-  uint8_t* mem() { return reinterpret_cast<uint8_t*>(mem_.Get()); }
+  uint8_t* Allocate() {
+    PERFETTO_DCHECK_THREAD(writer_thread_);
+    if (allocated_.empty() || allocated_.back().is_full()) {
+      // Need a new PageBlock, try taking from the freelist or create a new one.
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (freelist_.empty()) {
+        allocated_.emplace_back(PageBlock::Create());
+      } else {
+        allocated_.emplace_back(std::move(freelist_.back()));
+        freelist_.pop_back();
+      }
+      PERFETTO_DCHECK(allocated_.back().size() == 0);
+    }
+    return allocated_.back().Allocate();
+  }
 
-  static constexpr uint32_t kMaxPages = 64;
-  const uint32_t num_pages_;
-  base::PagedMemory mem_;
+  void FreeLastPage(uint8_t* page) {
+    PERFETTO_DCHECK_THREAD(writer_thread_);
+    PERFETTO_DCHECK(!allocated_.empty());
+    allocated_.back().FreeLastPage(page);
+  }
+
+  void FinishWrite() {
+    PERFETTO_DCHECK_THREAD(writer_thread_);
+    std::lock_guard<std::mutex> lock(mutex_);
+    ready_.insert(ready_.end(), std::make_move_iterator(allocated_.begin()),
+                  std::make_move_iterator(allocated_.end()));
+    allocated_.clear();
+  }
+
+  std::vector<PageBlock> BeginRead() {
+    PERFETTO_DCHECK_THREAD(reader_thread_);
+    std::lock_guard<std::mutex> lock(mutex_);
+    return std::move(ready_);
+  }
+
+  void EndRead(std::vector<PageBlock> page_blocks) {
+    PERFETTO_DCHECK_THREAD(reader_thread_);
+    for (PageBlock& page_block : page_blocks)
+      page_block.Clear();
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    freelist_.insert(freelist_.end(),
+                     std::make_move_iterator(page_blocks.begin()),
+                     std::make_move_iterator(page_blocks.end()));
+  }
+
+  PERFETTO_THREAD_CHECKER(writer_thread_)
+  std::vector<PageBlock> allocated_;  // Accessed exclusively by the writer.
 
   std::mutex mutex_;  // Protects all fields below.
-  std::bitset<kMaxPages> free_pages_;
-  std::deque<Page> contentful_pages_;
+
+  PERFETTO_THREAD_CHECKER(reader_thread_)
+  std::vector<PageBlock> ready_;     // Accessed by both threads.
+  std::vector<PageBlock> freelist_;  // Accessed by both threads.
 };
 
 }  // namespace perfetto
