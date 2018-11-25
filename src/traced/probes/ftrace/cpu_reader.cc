@@ -328,11 +328,11 @@ void CpuReader::RunWorkerThread(size_t cpu,
         //   to happen if the system is under high load).
         // In all these cases the only thing we can do is skipping the current
         // cycle and trying again later.
-        if (!read_ftrace_pipe(cur_mode, kBlock))
+        if (read_ftrace_pipe(cur_mode, kBlock) <= 0)
           break;  // Wait for next command.
 
         // If we are in read mode (because of a previous flush) TODO descr.
-        if (cur_mode == kRead && read_ftrace_pipe(kSplice, kNonBlock)) {
+        if (cur_mode == kRead && read_ftrace_pipe(kSplice, kNonBlock) > 0) {
           cur_mode = kSplice;
         }
 
