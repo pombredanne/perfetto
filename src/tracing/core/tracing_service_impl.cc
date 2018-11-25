@@ -673,15 +673,8 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
                                            bool post_next_only) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   TracingSession* tracing_session = GetTracingSession(tsid);
-
-  if (!post_next_only) {
-    if (!tracing_session || tracing_session->state != TracingSession::STARTED)
-      return;
-    Flush(tsid, kFlushTimeoutMs, [](bool success) {
-      if (!success)
-        PERFETTO_ELOG("Periodic flush timed out");
-    });
-  }
+  if (!tracing_session || tracing_session->state != TracingSession::STARTED)
+    return;
 
   uint32_t flush_period_ms = tracing_session->config.flush_period_ms();
   auto weak_this = weak_ptr_factory_.GetWeakPtr();
@@ -691,6 +684,14 @@ void TracingServiceImpl::PeriodicFlushTask(TracingSessionID tsid,
           weak_this->PeriodicFlushTask(tsid, /*post_next_only=*/false);
       },
       flush_period_ms - (base::GetWallTimeMs().count() % flush_period_ms));
+
+  if (post_next_only)
+    return;
+
+  Flush(tsid, kFlushTimeoutMs, [](bool success) {
+    if (!success)
+      PERFETTO_ELOG("Periodic flush timed out");
+  });
 }
 
 // Note: when this is called to write into a file passed when starting tracing
