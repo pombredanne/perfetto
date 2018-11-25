@@ -76,8 +76,8 @@ class PagedMemory {
   void EnsureCommitted(size_t /*committed_size*/) {}
 #endif  // TRACK_COMMITTED_SIZE()
 
-  inline void* Get() const noexcept { return p_; }
-  inline bool IsValid() const noexcept { return !!p_; }
+  void* Get() const noexcept;
+  bool IsValid() const noexcept;
 
  private:
   PagedMemory(char* p, size_t size);

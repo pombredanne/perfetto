@@ -19,8 +19,6 @@
 
 #include <string.h>
 
-#include <string>
-
 #include "perfetto/base/logging.h"
 #include "perfetto/base/utils.h"
 
@@ -33,11 +31,6 @@ class MetaTrace {
     WriteEvent('B', evt_name, cpu);
   }
 
-  MetaTrace(const std::string& str, size_t cpu)
-      : str_copy_(str), evt_name_(str_copy_.c_str()), cpu_(cpu) {
-    WriteEvent('B', evt_name_, cpu);
-  }
-
   ~MetaTrace() { WriteEvent('E', evt_name_, cpu_); }
 
  private:
@@ -46,7 +39,6 @@ class MetaTrace {
 
   void WriteEvent(char type, const char* evt_name, size_t cpu);
 
-  std::string str_copy_;
   const char* const evt_name_;
   const size_t cpu_;
 };

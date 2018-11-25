@@ -28,8 +28,6 @@
 #include "perfetto/tracing/core/trace_config.h"
 #include "perfetto/tracing/core/trace_packet.h"
 #include "src/base/test/test_task_runner.h"
-#include "src/traced/probes/ftrace/ftrace_controller.h"
-#include "src/traced/probes/ftrace/ftrace_procfs.h"
 #include "src/tracing/ipc/default_socket.h"
 #include "test/task_runner_thread.h"
 #include "test/task_runner_thread_delegates.h"
@@ -97,63 +95,6 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
       ASSERT_TRUE(packet.ftrace_events().event(ev).has_sched_switch());
     }
   }
-}
-
-// TODO(b/73453011): reenable this on more platforms (including standalone
-// Android).
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#define MAYBE_TestFtraceFlush TestFtraceFlush
-#else
-#define MAYBE_TestFtraceFlush DISABLED_TestFtraceFlush
-#endif
-TEST(PerfettoTest, MAYBE_TestFtraceFlush) {
-  base::TestTaskRunner task_runner;
-
-  TestHelper helper(&task_runner);
-  helper.StartServiceIfRequired();
-
-#if PERFETTO_BUILDFLAG(PERFETTO_START_DAEMONS)
-  TaskRunnerThread producer_thread("perfetto.prd");
-  producer_thread.Start(std::unique_ptr<ProbesProducerDelegate>(
-      new ProbesProducerDelegate(TEST_PRODUCER_SOCK_NAME)));
-#endif
-
-  helper.ConnectConsumer();
-  helper.WaitForConsumerConnect();
-
-  TraceConfig trace_config;
-  trace_config.add_buffers()->set_size_kb(1024);
-  trace_config.set_duration_ms(3000);
-
-  auto* ds_config = trace_config.add_data_sources()->mutable_config();
-  ds_config->set_name("linux.ftrace");
-  ds_config->set_target_buffer(0);
-
-  auto* ftrace_config = ds_config->mutable_ftrace_config();
-  *ftrace_config->add_ftrace_events() = "print";
-
-  helper.StartTracing(trace_config);
-
-  auto ftrace_procfs = FtraceProcfs::Create(FtraceController::kTracingPaths[0]);
-  while (!ftrace_procfs->IsTracingEnabled()) {
-    usleep(10000);
-  }
-  const char kMarker[] = "just_one_event";
-  EXPECT_TRUE(ftrace_procfs->WriteTraceMarker(kMarker));
-  helper.WaitForTracingDisabled();
-
-  helper.ReadData();
-  helper.WaitForReadData();
-
-  int marker_found = 0;
-  for (const auto& packet : helper.trace()) {
-    for (int i = 0; i < packet.ftrace_events().event_size(); i++) {
-      const auto& ev = packet.ftrace_events().event(i);
-      if (ev.has_print() && ev.print().buf().find(kMarker) != std::string::npos)
-        marker_found++;
-    }
-  }
-  ASSERT_EQ(marker_found, 1);
 }
 
 TEST(PerfettoTest, TestFakeProducer) {

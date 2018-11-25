@@ -36,13 +36,11 @@
 #include "perfetto/traced/data_source_types.h"
 #include "src/traced/probes/ftrace/ftrace_config.h"
 #include "src/traced/probes/ftrace/ftrace_metadata.h"
-#include "src/traced/probes/ftrace/page_pool.h"
 #include "src/traced/probes/ftrace/proto_translation_table.h"
 
 namespace perfetto {
 
 class FtraceDataSource;
-struct FtraceThreadSync;
 class ProtoTranslationTable;
 
 namespace protos {
@@ -59,17 +57,18 @@ class CpuReader {
  public:
   using FtraceEventBundle = protos::pbzero::FtraceEventBundle;
 
+  // |on_data_available| will be called on an arbitrary thread when at least one
+  // page of ftrace data is available for draining on this CPU.
   CpuReader(const ProtoTranslationTable*,
-            FtraceThreadSync*,
             size_t cpu,
-            int generation,
-            base::ScopedFile fd);
+            base::ScopedFile fd,
+            std::function<void()> on_data_available);
   ~CpuReader();
 
-  // Drains all available data into the buffer of the passed data sources.
-  void Drain(const std::set<FtraceDataSource*>&);
-
-  void InterruptWorkerThreadWithSignal();
+  // Drains all available data from the staging pipe into the buffer of the
+  // passed data sources.
+  // Should be called in response to the |on_data_available| callback.
+  bool Drain(const std::set<FtraceDataSource*>&);
 
   template <typename T>
   static bool ReadAndAdvance(const uint8_t** ptr, const uint8_t* end, T* out) {
@@ -154,8 +153,7 @@ class CpuReader {
   // run time (e.g. field offset and size) information necessary to do this.
   // The table is initialized once at start time by the ftrace controller
   // which passes it to the CpuReader which passes it here.
-  static size_t ParsePage(const uint8_t* begin,
-                          const uint8_t* end,
+  static size_t ParsePage(const uint8_t* ptr,
                           const EventFilter*,
                           protos::pbzero::FtraceEventBundle*,
                           const ProtoTranslationTable* table,
@@ -182,21 +180,24 @@ class CpuReader {
                          FtraceMetadata* metadata);
 
  private:
+  enum ThreadCtl : uint32_t { kRun = 0, kExit };
   static void RunWorkerThread(size_t cpu,
-                              int generation,
                               int trace_fd,
-                              PagePool*,
-                              FtraceThreadSync*);
+                              int staging_write_fd,
+                              const std::function<void()>& on_data_available,
+                              std::atomic<ThreadCtl>* cmd_atomic);
 
+  uint8_t* GetBuffer();
   CpuReader(const CpuReader&) = delete;
   CpuReader& operator=(const CpuReader&) = delete;
 
   const ProtoTranslationTable* const table_;
-  FtraceThreadSync* const thread_sync_;
   const size_t cpu_;
-  PagePool pool_;
   base::ScopedFile trace_fd_;
+  base::Pipe staging_pipe_;
+  base::PagedMemory buffer_;
   std::thread worker_thread_;
+  std::atomic<ThreadCtl> cmd_{kRun};
   PERFETTO_THREAD_CHECKER(thread_checker_)
 };
 

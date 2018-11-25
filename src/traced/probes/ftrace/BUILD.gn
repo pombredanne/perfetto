@@ -140,9 +140,6 @@ source_set("ftrace") {
     "ftrace_procfs.h",
     "ftrace_stats.cc",
     "ftrace_stats.h",
-    "ftrace_thread_sync.h",
-    "page_pool.cc",
-    "page_pool.h",
     "proto_translation_table.cc",
     "proto_translation_table.h",
   ]
