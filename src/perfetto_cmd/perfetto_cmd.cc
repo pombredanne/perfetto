@@ -169,6 +169,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_PBTXT_CONFIG,
     OPT_DROPBOX,
     OPT_ATRACE_APP,
+    OPT_IGNORE_GUARDRAILS,
   };
   static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
@@ -176,10 +177,10 @@ int PerfettoCmd::Main(int argc, char** argv) {
       {"config", required_argument, nullptr, 'c'},
       {"out", required_argument, nullptr, 'o'},
       {"background", no_argument, nullptr, 'd'},
-      {"no-guardrails", optional_argument, nullptr, 'n'},
       {"time", required_argument, nullptr, 't'},
       {"buffer", required_argument, nullptr, 'b'},
       {"size", required_argument, nullptr, 's'},
+      {"no-guardrails", optional_argument, nullptr, OPT_IGNORE_GUARDRAILS},
       {"txt", optional_argument, nullptr, OPT_PBTXT_CONFIG},
       {"dropbox", optional_argument, nullptr, OPT_DROPBOX},
       {"alert-id", required_argument, nullptr, OPT_ALERT_ID},
@@ -203,7 +204,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:dntb:s:", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:dt:b:s:", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -243,12 +244,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
       background = true;
       continue;
     }
-
-    if (option == 'n') {
-      ignore_guardrails = true;
-      continue;
-    }
-
     if (option == 't') {
       has_config_options = true;
       config_options.time = std::string(optarg);
@@ -279,6 +274,11 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
     if (option == OPT_PBTXT_CONFIG) {
       parse_as_pbtxt = true;
+      continue;
+    }
+
+    if (option == OPT_IGNORE_GUARDRAILS) {
+      ignore_guardrails = true;
       continue;
     }
 
