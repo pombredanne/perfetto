@@ -26,10 +26,11 @@ namespace trace_processor {
 
 class ArgsTable : public Table {
  public:
+  using VarardicType = TraceStorage::Args::Varardic::Type;
+
   static void RegisterTable(sqlite3* db, const TraceStorage* storage);
 
   ArgsTable(sqlite3*, const TraceStorage*);
-  ~ArgsTable() override;
 
   // Table implementation.
   Table::Schema CreateSchema(int argc, const char* const* argv) override;
@@ -38,10 +39,44 @@ class ArgsTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
-  std::deque<std::string> ref_types_;
+  class ValueColumn final : public StorageSchema::Column {
+   public:
+    ValueColumn(std::string col_name,
+                VarardicType type,
+                const TraceStorage* storage);
+
+    void ReportResult(sqlite3_context* ctx, uint32_t row) const override;
+
+    Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
+
+    Predicate Filter(int op, sqlite3_value* value) const override;
+
+    Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
+
+    bool IsNaturallyOrdered() const override { return false; }
+
+    Table::ColumnType GetType() const override {
+      switch (type_) {
+        case VarardicType::kInt:
+          return Table::ColumnType::kLong;
+        case VarardicType::kReal:
+          return Table::ColumnType::kDouble;
+        case VarardicType::kString:
+          return Table::ColumnType::kString;
+      }
+    }
+
+   private:
+    int CompareRefsAsc(uint32_t f, uint32_t s) const;
+
+    TraceStorage::Args::Varardic::Type type_;
+    const TraceStorage* storage_ = nullptr;
+  };
+
   StorageSchema schema_;
   const TraceStorage* const storage_;
 };
+
 }  // namespace trace_processor
 }  // namespace perfetto
 

@@ -281,40 +281,57 @@ class TraceStorage {
    public:
     using Id = uint64_t;
     struct Varardic {
-      Varardic(int64_t int_val) : type(kInt), int_value(int_val) {}
+      enum Type { kInt, kString, kReal };
 
-      enum { kInt, kString, kReal } type;
+      Varardic(int64_t int_val) : type(kInt), int_value(int_val) {}
+      Varardic(StringId string_val) : type(kString), string_value(string_val) {}
+      Varardic(double real_val) : type(kReal), real_value(real_val) {}
+
+      Type type;
       union {
         int64_t int_value;
-        double real_value;
         StringId string_value;
-      }
+        double real_value;
+      };
     };
     enum Table : uint8_t {
       kCounters = 1,
+      kMax = kCounters + 1,
     };
 
-    void AddInt64Arg(Table table,
-                     size_t row,
-                     StringId name_without_index,
-                     StringId name_with_index,
-                     int64_t value) {
-      PERFETTO_DCHECK(row < (1 << 48));
-      Id id = table << 48 | row;
-      ids_.emplace_back(id);
-      name_without_index_.emplace_back(name_with_index);
-      name_with_index_.emplace_back(name_with_index);
-      arg_value_.emplace_back(value);
-      args_for_id_.emplace(id, args_count() - 1);
+    Id CreateId(Table table, size_t row) {
+      PERFETTO_DCHECK(row < (1ul << 48ul));
+      uint64_t table_extended = static_cast<uint64_t>(table);
+      return (table_extended << 48ul) | row;
     }
 
+    Id AddInt64Arg(Id id,
+                   StringId name_without_index,
+                   StringId name_with_index,
+                   int64_t value) {
+      ids_.emplace_back(id);
+      names_without_index_.emplace_back(name_without_index);
+      names_with_index_.emplace_back(name_with_index);
+      arg_values_.emplace_back(value);
+      args_for_id_.emplace(id, args_count() - 1);
+      return id;
+    }
+
+    const std::deque<Id>& ids() const { return ids_; }
+    const std::deque<StringId>& names_without_index() const {
+      return names_without_index_;
+    }
+    const std::deque<StringId>& names_with_index() const {
+      return names_with_index_;
+    }
+    const std::deque<Varardic>& arg_values() const { return arg_values_; }
     size_t args_count() const { return ids_.size(); }
 
    private:
     std::deque<Id> ids_;
-    std::deque<StringId> name_without_index_;
-    std::deque<StringId> name_with_index_;
-    std::deque<Varardic> arg_value_;
+    std::deque<StringId> names_without_index_;
+    std::deque<StringId> names_with_index_;
+    std::deque<Varardic> arg_values_;
     std::multimap<Id, size_t> args_for_id_;
   };
 
@@ -380,6 +397,9 @@ class TraceStorage {
   const Stats& stats() const { return stats_; }
   Stats* mutable_stats() { return &stats_; }
 
+  const Args& args() const { return args_; }
+  Args* mutable_args() { return &args_; }
+
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -404,6 +424,9 @@ class TraceStorage {
   // One entry for each CPU in the trace.
   Slices slices_;
 
+  // Args for all other tables.
+  Args args_;
+
   // One entry for each unique string in the trace.
   std::deque<std::string> string_pool_;
 
@@ -424,6 +447,7 @@ class TraceStorage {
   Counters counters_;
 
   SqlStats sql_stats_;
+
   // These are instantaneous events in the trace. They have no duration
   // and do not have a value that make sense to track over time.
   // e.g. signal events
