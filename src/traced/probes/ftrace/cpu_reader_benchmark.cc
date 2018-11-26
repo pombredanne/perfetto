@@ -315,8 +315,7 @@ static void BM_ParsePageFullOfSchedSwitch(benchmark::State& state) {
   FtraceMetadata metadata{};
   while (state.KeepRunning()) {
     writer.Reset(&stream);
-    CpuReader::ParsePage(page.get(), page.get() + perfetto::base::kPageSize,
-                         &filter, &writer, table, &metadata);
+    CpuReader::ParsePage(page.get(), &filter, &writer, table, &metadata);
     metadata.Clear();
   }
 }
