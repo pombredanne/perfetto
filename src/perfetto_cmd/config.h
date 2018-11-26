@@ -29,9 +29,9 @@ namespace perfetto {
 // options in a proto is the job of CreateConfigFromOptions.
 
 struct ConfigOptions {
-  std::string time = "10s";
-  std::string max_file_size = "1gb";
-  std::string buffer_size = "24mb";
+  std::string time;
+  std::string max_file_size;
+  std::string buffer_size = "32mb";
   std::vector<std::string> atrace_apps;
   std::vector<std::string> categories;
 };

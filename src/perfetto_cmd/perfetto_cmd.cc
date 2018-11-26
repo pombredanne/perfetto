@@ -132,18 +132,18 @@ using protozero::proto_utils::MakeTagLengthDelimited;
 int PerfettoCmd::PrintUsage(const char* argv0) {
   PERFETTO_ELOG(R"(
 Usage: %s
-  --background     -b     : Exits immediately and continues tracing in background
+  --background     -d     : Exits immediately and continues tracing in background
   --config         -c     : /path/to/trace/config/file or - for stdin
   --out            -o     : /path/to/out/trace/file or - for stdout
   --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
   --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
-  --txt            -t     : Parse config as pbtxt. Not a stable API. Not for production use.
+  --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
   --help           -h
 
 
 light configuration flags: (only when NOT using -c/--config)
-  --length         -l      : Trace duration N[s,m,h] (default: 10s)
+  --time           -t      : Trace duration N[s,m,h] (default: 10s)
   --buffer         -b      : Ring buffer size N[mb,gb] (default: 32mb)
   --size           -s      : Maximum trace size N[mb,gb] (default: 100mb)
   ATRACE_CAT               : Record ATRACE_CAT (e.g. wm)
@@ -166,28 +166,27 @@ int PerfettoCmd::Main(int argc, char** argv) {
     OPT_CONFIG_ID,
     OPT_CONFIG_UID,
     OPT_RESET_GUARDRAILS,
-    OPT_TRACE_LENGTH,
-    OPT_BUFFER_SIZE,
-    OPT_MAX_FILE_SIZE,
-    OPT_ATRACE_PROCESS,
+    OPT_PBTXT_CONFIG,
+    OPT_DROPBOX,
+    OPT_ATRACE_APP,
   };
   static const struct option long_options[] = {
       // |option_index| relies on the order of options, don't reshuffle them.
       {"help", required_argument, nullptr, 'h'},
       {"config", required_argument, nullptr, 'c'},
       {"out", required_argument, nullptr, 'o'},
-      {"background", no_argument, nullptr, 'b'},
-      {"dropbox", optional_argument, nullptr, 'd'},
+      {"background", no_argument, nullptr, 'd'},
       {"no-guardrails", optional_argument, nullptr, 'n'},
-      {"txt", optional_argument, nullptr, 't'},
+      {"time", required_argument, nullptr, 't'},
+      {"buffer", required_argument, nullptr, 'b'},
+      {"size", required_argument, nullptr, 's'},
+      {"txt", optional_argument, nullptr, OPT_PBTXT_CONFIG},
+      {"dropbox", optional_argument, nullptr, OPT_DROPBOX},
       {"alert-id", required_argument, nullptr, OPT_ALERT_ID},
       {"config-id", required_argument, nullptr, OPT_CONFIG_ID},
       {"config-uid", required_argument, nullptr, OPT_CONFIG_UID},
       {"reset-guardrails", no_argument, nullptr, OPT_RESET_GUARDRAILS},
-      {"length", required_argument, nullptr, OPT_TRACE_LENGTH},
-      {"buffer", required_argument, nullptr, OPT_BUFFER_SIZE},
-      {"size", required_argument, nullptr, OPT_MAX_FILE_SIZE},
-      {"process", required_argument, nullptr, OPT_ATRACE_PROCESS},
+      {"app", required_argument, nullptr, OPT_ATRACE_APP},
       {nullptr, 0, nullptr, 0}};
 
   int option_index = 0;
@@ -204,7 +203,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   for (;;) {
     int option =
-        getopt_long(argc, argv, "c:o:bd::nt", long_options, &option_index);
+        getopt_long(argc, argv, "c:o:dntb:s:", long_options, &option_index);
 
     if (option == -1)
       break;  // EOF.
@@ -241,16 +240,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == 'd') {
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-      dropbox_tag_ = optarg ? optarg : kDefaultDropBoxTag;
-      continue;
-#else
-      PERFETTO_ELOG("DropBox is only supported with Android tree builds");
-      return 1;
-#endif
-    }
-
-    if (option == 'b') {
       background = true;
       continue;
     }
@@ -261,6 +250,34 @@ int PerfettoCmd::Main(int argc, char** argv) {
     }
 
     if (option == 't') {
+      has_config_options = true;
+      config_options.time = std::string(optarg);
+      continue;
+    }
+
+    if (option == 'b') {
+      has_config_options = true;
+      config_options.buffer_size = std::string(optarg);
+      continue;
+    }
+
+    if (option == 's') {
+      has_config_options = true;
+      config_options.max_file_size = std::string(optarg);
+      continue;
+    }
+
+    if (option == OPT_DROPBOX) {
+#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
+      dropbox_tag_ = optarg ? optarg : kDefaultDropBoxTag;
+      continue;
+#else
+      PERFETTO_ELOG("DropBox is only supported with Android tree builds");
+      return 1;
+#endif
+    }
+
+    if (option == OPT_PBTXT_CONFIG) {
       parse_as_pbtxt = true;
       continue;
     }
@@ -286,25 +303,7 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
-    if (option == OPT_TRACE_LENGTH) {
-      has_config_options = true;
-      config_options.time = std::string(optarg);
-      continue;
-    }
-
-    if (option == OPT_BUFFER_SIZE) {
-      has_config_options = true;
-      config_options.buffer_size = std::string(optarg);
-      continue;
-    }
-
-    if (option == OPT_MAX_FILE_SIZE) {
-      has_config_options = true;
-      config_options.max_file_size = std::string(optarg);
-      continue;
-    }
-
-    if (option == OPT_ATRACE_PROCESS) {
+    if (option == OPT_ATRACE_APP) {
       config_options.atrace_apps.push_back(std::string(optarg));
       has_config_options = true;
       continue;
@@ -364,14 +363,27 @@ int PerfettoCmd::Main(int argc, char** argv) {
     return 1;
 
   if (background) {
-    PERFETTO_CHECK(daemon(0 /*nochdir*/, 1 /*noclose*/) == 0);
-    PERFETTO_DLOG("Continuing in background");
-    printf("pid: %d\n", getpid());
-    base::ScopedFile null = base::OpenFile("/dev/null", O_RDONLY);
-    PERFETTO_CHECK(null);
-    PERFETTO_CHECK(dup2(*null, STDIN_FILENO) != -1);
-    PERFETTO_CHECK(dup2(*null, STDOUT_FILENO) != -1);
-    PERFETTO_CHECK(dup2(*null, STDERR_FILENO) != -1);
+    pid_t pid;
+    switch (pid = fork()) {
+      case -1:
+        PERFETTO_FATAL("fork");
+      case 0: {
+        PERFETTO_CHECK(setsid() != -1);
+        base::ignore_result(chdir("/"));
+        base::ScopedFile null = base::OpenFile("/dev/null", O_RDONLY);
+        PERFETTO_CHECK(null);
+        PERFETTO_CHECK(dup2(*null, STDIN_FILENO) != -1);
+        PERFETTO_CHECK(dup2(*null, STDOUT_FILENO) != -1);
+        PERFETTO_CHECK(dup2(*null, STDERR_FILENO) != -1);
+        // Do not accidentally close stdin/stdout/stderr.
+        if (*null <= 2)
+          null.release();
+        break;
+      }
+      default:
+        printf("%d\n", pid);
+        exit(0);
+    }
   }
 
   RateLimiter::Args args{};

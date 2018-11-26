@@ -66,7 +66,12 @@ bool ConvertTimeToMs(const std::string& arg, uint64_t* out) {
 bool ConvertSizeToKb(const std::string& arg, uint64_t* out) {
   return ConvertValue(arg,
                       {
-                          {"kb", 1}, {"mb", 1024}, {"gb", 1024 * 1024},
+                          {"kb", 1},
+                          {"mb", 1024},
+                          {"gb", 1024 * 1024},
+                          {"k", 1},
+                          {"m", 1024},
+                          {"g", 1024 * 1024},
                       },
                       out);
 }
@@ -76,16 +81,22 @@ bool ConvertSizeToKb(const std::string& arg, uint64_t* out) {
 bool CreateConfigFromOptions(const ConfigOptions& options,
                              TraceConfig* config) {
   uint64_t duration_ms = 0;
-  if (!ConvertTimeToMs(options.time, &duration_ms))
-    return false;
+  if (!options.time.empty()) {
+    if (!ConvertTimeToMs(options.time, &duration_ms))
+      return false;
+  }
 
   uint64_t buffer_size_kb = 0;
-  if (!ConvertSizeToKb(options.buffer_size, &buffer_size_kb))
-    return false;
+  if (!options.buffer_size.empty()) {
+    if (!ConvertSizeToKb(options.buffer_size, &buffer_size_kb))
+      return false;
+  }
 
   uint64_t max_file_size_kb = 0;
-  if (!ConvertSizeToKb(options.max_file_size, &max_file_size_kb))
-    return false;
+  if (!options.max_file_size.empty()) {
+    if (!ConvertSizeToKb(options.max_file_size, &max_file_size_kb))
+      return false;
+  }
 
   std::vector<std::string> ftrace_events;
   std::vector<std::string> atrace_categories;
