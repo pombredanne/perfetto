@@ -66,14 +66,14 @@ class FtraceConfigMuxer {
   // or already removed.
   bool RemoveConfig(FtraceConfigId);
 
+  const EventFilter* GetEventFilter(FtraceConfigId id);
+
   // public for testing
   void SetupClockForTesting(const FtraceConfig& request) {
     SetupClock(request);
   }
 
   const FtraceConfig* GetConfigForTesting(FtraceConfigId id);
-
-  const EventFilter* GetEventFilter(FtraceConfigId id);
 
   std::set<GroupAndName> GetFtraceEventsForTesting(
       const FtraceConfig& request,

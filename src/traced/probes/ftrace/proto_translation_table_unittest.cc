@@ -447,7 +447,7 @@ print fmt: "some format")"));
   EXPECT_EQ(uint_field.ftrace_offset, 33);
 }
 
-TEST(EventFilterTest, BitwiseOr) {
+TEST(EventFilterTest, EnableEventsFrom) {
   EventFilter filter;
   filter.AddEnabledEvent(1);
   filter.AddEnabledEvent(17);
@@ -456,19 +456,19 @@ TEST(EventFilterTest, BitwiseOr) {
   or_filter.AddEnabledEvent(4);
   or_filter.AddEnabledEvent(17);
 
-  filter.BitwiseOr(or_filter);
+  filter.EnableEventsFrom(or_filter);
   EXPECT_TRUE(filter.IsEventEnabled(4));
   EXPECT_TRUE(filter.IsEventEnabled(17));
   EXPECT_TRUE(filter.IsEventEnabled(1));
   EXPECT_FALSE(filter.IsEventEnabled(2));
 
   EventFilter empty_filter;
-  filter.BitwiseOr(empty_filter);
+  filter.EnableEventsFrom(empty_filter);
   EXPECT_TRUE(filter.IsEventEnabled(4));
   EXPECT_TRUE(filter.IsEventEnabled(17));
   EXPECT_TRUE(filter.IsEventEnabled(1));
 
-  empty_filter.BitwiseOr(filter);
+  empty_filter.EnableEventsFrom(filter);
   EXPECT_TRUE(empty_filter.IsEventEnabled(4));
   EXPECT_TRUE(empty_filter.IsEventEnabled(17));
   EXPECT_TRUE(empty_filter.IsEventEnabled(1));

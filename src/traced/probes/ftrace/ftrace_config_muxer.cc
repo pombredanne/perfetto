@@ -342,31 +342,29 @@ bool FtraceConfigMuxer::ActivateConfig(FtraceConfigId id) {
   return true;
 }
 
-bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId id) {
-  if (!id || !filters_.erase(id) || !configs_.erase(id))
+bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId config_id) {
+  if (!config_id || !filters_.erase(config_id) || !configs_.erase(config_id))
     return false;
   EventFilter expected_ftrace_events;
   for (const auto& id_filter : filters_) {
-    expected_ftrace_events.BitwiseOr(id_filter.second);
+    expected_ftrace_events.EnableEventsFrom(id_filter.second);
   }
 
   // Disable any events that are currently enabled, but are not in any configs
   // anymore.
-  for (size_t i = 0; i < current_state_.ftrace_events.enabled_ids().size();
-       i++) {
-    if ((i >= expected_ftrace_events.enabled_ids().size() ||
-         !expected_ftrace_events.enabled_ids()[i]) &&
-        current_state_.ftrace_events.enabled_ids()[i]) {
-      const Event* event = table_->GetEventById(i);
-      if (!event)
-        continue;
-      if (ftrace_->DisableEvent(event->group, event->name))
-        current_state_.ftrace_events.DisableEvent(event->ftrace_event_id);
-    }
+  std::set<size_t> event_ids = current_state_.ftrace_events.GetEnabledEvents();
+  for (size_t id : event_ids) {
+    if (expected_ftrace_events.IsEventEnabled(id))
+      continue;
+    const Event* event = table_->GetEventById(id);
+    if (!event)
+      continue;
+    if (ftrace_->DisableEvent(event->group, event->name))
+      current_state_.ftrace_events.DisableEvent(event->ftrace_event_id);
   }
 
   // If there aren't any more active configs, disable ftrace.
-  auto active_it = active_configs_.find(id);
+  auto active_it = active_configs_.find(config_id);
   if (active_it != active_configs_.end()) {
     PERFETTO_DCHECK(current_state_.tracing_on);
     active_configs_.erase(active_it);

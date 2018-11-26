@@ -181,7 +181,7 @@ class EventFilter {
   }
 
   void DisableEvent(size_t ftrace_event_id) {
-    if (ftrace_event_id + 1 > enabled_ids_.size())
+    if (ftrace_event_id >= enabled_ids_.size())
       return;
     enabled_ids_[ftrace_event_id] = false;
   }
@@ -192,19 +192,25 @@ class EventFilter {
     return enabled_ids_[ftrace_event_id];
   }
 
-  void BitwiseOr(const EventFilter& other) {
+  std::set<size_t> GetEnabledEvents() const {
+    std::set<size_t> enabled;
+    for (size_t i = 0; i < enabled_ids_.size(); i++) {
+      if (enabled_ids_[i]) {
+        enabled.insert(i);
+      }
+    }
+    return enabled;
+  }
+
+  void EnableEventsFrom(const EventFilter& other) {
     size_t max_length =
-        std::max(enabled_ids_.size(), other.enabled_ids().size());
+        std::max(enabled_ids_.size(), other.enabled_ids_.size());
     enabled_ids_.resize(max_length);
-    for (size_t i = 0; i < max_length; i++) {
-      if (i >= other.enabled_ids().size())
-        return;
-      if (other.enabled_ids()[i])
+    for (size_t i = 0; i < other.enabled_ids_.size(); i++) {
+      if (other.enabled_ids_[i])
         enabled_ids_[i] = true;
     }
   }
-
-  const std::vector<bool>& enabled_ids() const { return enabled_ids_; }
 
  private:
   EventFilter(const EventFilter&) = delete;
