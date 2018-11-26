@@ -467,6 +467,11 @@ TEST(EventFilterTest, BitwiseOr) {
   EXPECT_TRUE(filter.IsEventEnabled(4));
   EXPECT_TRUE(filter.IsEventEnabled(17));
   EXPECT_TRUE(filter.IsEventEnabled(1));
+
+  empty_filter.BitwiseOr(filter);
+  EXPECT_TRUE(empty_filter.IsEventEnabled(4));
+  EXPECT_TRUE(empty_filter.IsEventEnabled(17));
+  EXPECT_TRUE(empty_filter.IsEventEnabled(1));
 }
 
 }  // namespace

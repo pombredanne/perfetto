@@ -97,8 +97,6 @@ class ProtoTranslationTable {
 
   const std::vector<Field>& common_fields() const { return common_fields_; }
 
-  // Retrieve the event by the group and name. If the group
-  // is empty, an event with that name will be returned.
   // Virtual for testing.
   virtual const Event* GetEvent(const GroupAndName& group_and_name) const {
     if (!group_and_name_to_event_.count(group_and_name))
@@ -166,7 +164,7 @@ class ProtoTranslationTable {
   std::set<std::string> interned_strings_;
 };
 
-// Class for efficient 'is event with id x enabled?' tests.
+// Class for efficient 'is event with id x enabled?' checks.
 // Mirrors the data in a FtraceConfig but in a format better suited
 // to be consumed by CpuReader.
 class EventFilter {
@@ -194,8 +192,6 @@ class EventFilter {
     return enabled_ids_[ftrace_event_id];
   }
 
-  const std::vector<bool>& enabled_ids() const { return enabled_ids_; }
-
   void BitwiseOr(const EventFilter& other) {
     size_t max_length =
         std::max(enabled_ids_.size(), other.enabled_ids().size());
@@ -207,6 +203,8 @@ class EventFilter {
         enabled_ids_[i] = true;
     }
   }
+
+  const std::vector<bool>& enabled_ids() const { return enabled_ids_; }
 
  private:
   EventFilter(const EventFilter&) = delete;

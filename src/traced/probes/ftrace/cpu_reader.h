@@ -201,7 +201,6 @@ class CpuReader {
 };
 
 
-
 }  // namespace perfetto
 
 #endif  // SRC_TRACED_PROBES_FTRACE_CPU_READER_H_

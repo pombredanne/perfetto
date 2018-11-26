@@ -15,7 +15,6 @@
 #include "benchmark/benchmark.h"
 
 #include "src/traced/probes/ftrace/cpu_reader.h"
-#include "src/traced/probes/ftrace/proto_translation_table.h"
 
 #include "perfetto/base/utils.h"
 #include "perfetto/protozero/scattered_stream_null_delegate.h"
