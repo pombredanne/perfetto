@@ -16,8 +16,8 @@
 
 #include <limits>
 
-#include <stdint.h>
 #include <json/writer.h>
+#include <stdint.h>
 
 #include "src/trace_processor/slice_tracker.h"
 #include "src/trace_processor/trace_processor_context.h"
@@ -40,6 +40,55 @@ void SliceTracker::Begin(uint64_t timestamp,
   auto& stack = threads_[utid];
   MaybeCloseStack(timestamp, stack);
   stack.emplace_back(Slice{cat, name, timestamp, 0, thread_timestamp, 0, args});
+}
+
+void SliceTracker::BeginAsync(uint64_t timestamp,
+                              std::string async_id,
+                              StringId cat,
+                              StringId name,
+                              UniquePid upid) {
+  open_async_slices_[upid][async_id] = AsyncSlice{cat, name, timestamp, 0};
+}
+
+void SliceTracker::EndAsync(uint64_t timestamp,
+                            std::string async_id,
+                            StringId cat,
+                            StringId name,
+                            UniquePid upid) {
+  auto search_pid = open_async_slices_.find(upid);
+  if (search_pid == open_async_slices_.end()) {
+    // Never had a begin slice for this async event. Bail.
+    return;
+  }
+  auto& id_to_slice = search_pid->second;
+  auto search_async_id = id_to_slice.find(async_id);
+  if (search_async_id == id_to_slice.end()) {
+    // Never had a begin slice for this async event. Bail.
+    return;
+  }
+
+  auto async_id_str = search_async_id->first;
+  auto async_slice = search_async_id->second;
+  async_slice.end_ts = timestamp;
+  static bool warned_once = false;
+  if (cat != async_slice.cat_id || name != async_slice.name_id) {
+    auto& storage = context_->storage;
+    if (!warned_once) {
+      PERFETTO_ILOG("Mismatched cat or name for same async id.");
+      PERFETTO_ILOG("Async ID: %s", async_id.c_str());
+      PERFETTO_ILOG("Original name: %s",
+                    storage->string_pool()[async_slice.name_id].c_str());
+      PERFETTO_ILOG("New name: %s", storage->string_pool()[name].c_str());
+      PERFETTO_ILOG("Original cat: %s",
+                    storage->string_pool()[async_slice.cat_id].c_str());
+      PERFETTO_ILOG("New cat: %s", storage->string_pool()[cat].c_str());
+      PERFETTO_ILOG("Suppressing similar warnings of the same type.");
+      warned_once = true;
+    }
+  }
+  context_->storage->mutable_async_slices()->AddSlice(
+      async_slice.start_ts, async_slice.end_ts - async_slice.start_ts, upid,
+      async_slice.cat_id, async_slice.name_id, async_id_str);
 }
 
 void SliceTracker::Scoped(uint64_t timestamp,
@@ -70,8 +119,12 @@ void SliceTracker::End(uint64_t timestamp,
     return;
   }
 
-  PERFETTO_CHECK(cat == 0 || stack.back().cat_id == cat);
-  PERFETTO_CHECK(name == 0 || stack.back().name_id == name);
+  if (!(cat == 0 || stack.back().cat_id == cat) ||
+      !(name == 0 || stack.back().name_id == name)) {
+    // We have a slice end that we never began. Discard this.
+    return;
+  };
+  // PERFETTO_CHECK(name == 0 || stack.back().name_id == name);
 
   Slice& slice = stack.back();
   slice.end_ts = timestamp;
@@ -98,10 +151,11 @@ void SliceTracker::CompleteSlice(UniqueTid utid) {
   Json::FastWriter writer;
   Slice& slice = stack.back();
   auto* slices = context_->storage->mutable_nestable_slices();
-  slices->AddSlice(
-      slice.start_ts, slice.end_ts - slice.start_ts, slice.thread_start_ts,
-      slice.thread_end_ts - slice.thread_start_ts, utid, slice.cat_id,
-      slice.name_id, depth, stack_id, parent_stack_id, writer.write(slice.args));
+  slices->AddSlice(slice.start_ts, slice.end_ts - slice.start_ts,
+                   slice.thread_start_ts,
+                   slice.thread_end_ts - slice.thread_start_ts, utid,
+                   slice.cat_id, slice.name_id, depth, stack_id,
+                   parent_stack_id, writer.write(slice.args));
 
   stack.pop_back();
 }

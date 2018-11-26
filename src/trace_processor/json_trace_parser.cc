@@ -41,6 +41,24 @@ namespace {
 
 enum ReadDictRes { kFoundDict, kNeedsMoreData, kEndOfTrace, kFatalError };
 
+std::string GetAsyncId(Json::Value& event) {
+  Json::Value id = event["id"];
+  if (!id.isNull()) {
+    return id.asString();
+  } else {
+    Json::Value id2 = event["id2"];
+    if (id2.isNull())
+      return "";
+    auto local = id2["local"];
+    if (local.isNull())
+      return "";
+    auto scope = event["scope"];
+    if (scope.isNull())
+      return "";
+    return scope.asString() + local.asString();
+  }
+}
+
 // Parses at most one JSON dictionary and returns a pointer to the end of it,
 // or nullptr if no dict could be detected.
 // This is to avoid decoding the full trace in memory and reduce heap traffic.
@@ -130,6 +148,7 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
     StringId cat_id = storage->InternString(cat);
     StringId name_id = storage->InternString(name);
     UniqueTid utid = procs->UpdateThread(tid, pid);
+    UniquePid upid = storage->GetThread(utid).upid;
 
     switch (phase) {
       case 'B': {  // TRACE_EVENT_BEGIN.
@@ -143,7 +162,8 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
       case 'X': {  // TRACE_EVENT (scoped event).
         uint64_t duration = value["dur"].asUInt() * 1000;
         uint64_t tdur = value["tdur"].asUInt() * 1000;
-        slice_tracker->Scoped(ts, tts, tdur, utid, cat_id, name_id, duration, args);
+        slice_tracker->Scoped(ts, tts, tdur, utid, cat_id, name_id, duration,
+                              args);
         break;
       }
       case 'R': {  // TRACE_EVENT_MARK.
@@ -161,6 +181,23 @@ bool JsonTraceParser::Parse(std::unique_ptr<uint8_t[]> data, size_t size) {
           procs->UpdateProcess(pid, proc_name);
           break;
         }
+        break;
+      }
+      case 'b': {
+        std::string async_id = GetAsyncId(value);
+        if (async_id.empty()) {
+          break;
+        }
+        slice_tracker->BeginAsync(ts, async_id, cat_id, name_id, upid);
+        break;
+      }
+      case 'e': {
+        std::string async_id = GetAsyncId(value);
+        if (async_id.empty()) {
+          break;
+        }
+        slice_tracker->EndAsync(ts, async_id, cat_id, name_id, upid);
+        break;
       }
     }
   }

@@ -39,6 +39,18 @@ class SliceTracker {
              StringId name,
              const Json::Value& args);
 
+  void BeginAsync(uint64_t timestamp,
+             std::string async_id,
+             StringId cat,
+             StringId name,
+             UniquePid upid);
+
+  void EndAsync(uint64_t timestamp,
+                  std::string async_id,
+                  StringId cat,
+                  StringId name,
+                  UniquePid upid);
+
   void Scoped(uint64_t timestamp,
               uint64_t thread_timestamp,
               uint64_t thread_duration,
@@ -65,6 +77,15 @@ class SliceTracker {
     uint64_t thread_end_ts;  // Only for complete events (scoped TRACE_EVENT macros).
     Json::Value args;
   };
+
+  struct AsyncSlice {
+    StringId cat_id;
+    StringId name_id;
+    uint64_t start_ts;
+    uint64_t end_ts;
+    // We don't do args yet.
+  };
+
   using SlicesStack = std::vector<Slice>;
 
   static inline void MaybeCloseStack(uint64_t end_ts, SlicesStack&);
@@ -73,7 +94,9 @@ class SliceTracker {
   void CompleteSlice(UniqueTid tid);
 
   TraceProcessorContext* const context_;
+  using AsyncID = std::string;
   std::unordered_map<UniqueTid, SlicesStack> threads_;
+  std::unordered_map<UniquePid, std::unordered_map<AsyncID, AsyncSlice>> open_async_slices_;
 };
 
 }  // namespace trace_processor

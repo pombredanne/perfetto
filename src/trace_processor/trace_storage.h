@@ -169,7 +169,6 @@ class TraceStorage {
     // intern individual keys/values inside the json args.
     const std::deque<std::string>& args() const { return args_; }
 
-
    private:
     std::deque<uint64_t> start_ns_;
     std::deque<uint64_t> durations_;
@@ -182,6 +181,39 @@ class TraceStorage {
     std::deque<uint64_t> stack_ids_;
     std::deque<uint64_t> parent_stack_ids_;
     std::deque<std::string> args_;
+  };
+
+  class AsyncSlices {
+   public:
+    inline void AddSlice(uint64_t start_ns,
+                         uint64_t duration_ns,
+                         UniquePid upid,
+                         StringId cat,
+                         StringId name,
+                         std::string async_id) {
+      start_ns_.emplace_back(start_ns);
+      durations_.emplace_back(duration_ns);
+      upids_.emplace_back(upid);
+      cats_.emplace_back(cat);
+      names_.emplace_back(name);
+      async_ids_.emplace_back(async_id);
+    }
+
+    size_t slice_count() const { return start_ns_.size(); }
+    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
+    const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<UniquePid>& upids() const { return upids_; }
+    const std::deque<StringId>& cats() const { return cats_; }
+    const std::deque<StringId>& names() const { return names_; }
+    const std::deque<std::string>& async_ids() const { return async_ids_; }
+
+   private:
+    std::deque<uint64_t> start_ns_;
+    std::deque<uint64_t> durations_;
+    std::deque<UniquePid> upids_;
+    std::deque<StringId> cats_;
+    std::deque<StringId> names_;
+    std::deque<std::string> async_ids_;
   };
 
   class Counters {
@@ -300,6 +332,9 @@ class TraceStorage {
   const NestableSlices& nestable_slices() const { return nestable_slices_; }
   NestableSlices* mutable_nestable_slices() { return &nestable_slices_; }
 
+  const AsyncSlices& async_slices() const { return async_slices_; }
+  AsyncSlices* mutable_async_slices() { return &async_slices_; }
+
   const Counters& counters() const { return counters_; }
   Counters* mutable_counters() { return &counters_; }
 
@@ -344,6 +379,9 @@ class TraceStorage {
 
   // Slices coming from userspace events (e.g. Chromium TRACE_EVENT macros).
   NestableSlices nestable_slices_;
+
+  // Hack: Async events.
+  AsyncSlices async_slices_;
 
   // Counter events from the trace. This includes CPU frequency events as well
   // systrace trace_marker counter events.

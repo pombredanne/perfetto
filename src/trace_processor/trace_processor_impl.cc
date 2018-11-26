@@ -20,6 +20,7 @@
 #include <functional>
 
 #include "perfetto/base/time.h"
+#include "src/trace_processor/async_slice_table.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/json_trace_parser.h"
@@ -59,6 +60,7 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   ProcessTable::RegisterTable(*db_, context_.storage.get());
   SchedSliceTable::RegisterTable(*db_, context_.storage.get());
   SliceTable::RegisterTable(*db_, context_.storage.get());
+  AsyncSliceTable::RegisterTable(*db_, context_.storage.get());
   SqlStatsTable::RegisterTable(*db_, context_.storage.get());
   StringTable::RegisterTable(*db_, context_.storage.get());
   ThreadTable::RegisterTable(*db_, context_.storage.get());
