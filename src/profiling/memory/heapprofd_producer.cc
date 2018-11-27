@@ -104,7 +104,7 @@ void FindPidsForCmdlines(const std::vector<std::string>& cmdlines,
       return;
     }
     size_t atpos = process_cmdline.find('@');
-    if (atpos != std::string::npos || atpos < endpos)
+    if (atpos != std::string::npos && atpos < endpos)
       endpos = atpos;
     if (endpos < 1)
       return;
