@@ -114,7 +114,7 @@ class TraceStorage {
       kMax = kCounters + 1,
     };
 
-    static constexpr Id kInvalidId = 0;
+    static const Id kInvalidId;
 
     size_t AddInt64Arg(Table table,
                        size_t row,

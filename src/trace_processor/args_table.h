@@ -64,6 +64,7 @@ class ArgsTable : public Table {
         case VarardicType::kString:
           return Table::ColumnType::kString;
       }
+      PERFETTO_CHECK(false);
     }
 
    private:
