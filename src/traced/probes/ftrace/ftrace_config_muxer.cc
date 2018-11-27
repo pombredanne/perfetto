@@ -357,8 +357,8 @@ bool FtraceConfigMuxer::RemoveConfig(FtraceConfigId config_id) {
     if (expected_ftrace_events.IsEventEnabled(id))
       continue;
     const Event* event = table_->GetEventById(id);
-    if (!event)
-      continue;
+    // Any event that was enabled must exist.
+    PERFETTO_DCHECK(event);
     if (ftrace_->DisableEvent(event->group, event->name))
       current_state_.ftrace_events.DisableEvent(event->ftrace_event_id);
   }

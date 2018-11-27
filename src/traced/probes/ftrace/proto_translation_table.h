@@ -174,43 +174,11 @@ class EventFilter {
   EventFilter(EventFilter&&) = default;
   EventFilter& operator=(EventFilter&&) = default;
 
-  void AddEnabledEvent(size_t ftrace_event_id) {
-    if (ftrace_event_id >= enabled_ids_.size())
-      enabled_ids_.resize(ftrace_event_id + 1);
-    enabled_ids_[ftrace_event_id] = true;
-  }
-
-  void DisableEvent(size_t ftrace_event_id) {
-    if (ftrace_event_id >= enabled_ids_.size())
-      return;
-    enabled_ids_[ftrace_event_id] = false;
-  }
-
-  bool IsEventEnabled(size_t ftrace_event_id) const {
-    if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size())
-      return false;
-    return enabled_ids_[ftrace_event_id];
-  }
-
-  std::set<size_t> GetEnabledEvents() const {
-    std::set<size_t> enabled;
-    for (size_t i = 0; i < enabled_ids_.size(); i++) {
-      if (enabled_ids_[i]) {
-        enabled.insert(i);
-      }
-    }
-    return enabled;
-  }
-
-  void EnableEventsFrom(const EventFilter& other) {
-    size_t max_length =
-        std::max(enabled_ids_.size(), other.enabled_ids_.size());
-    enabled_ids_.resize(max_length);
-    for (size_t i = 0; i < other.enabled_ids_.size(); i++) {
-      if (other.enabled_ids_[i])
-        enabled_ids_[i] = true;
-    }
-  }
+  void AddEnabledEvent(size_t ftrace_event_id);
+  void DisableEvent(size_t ftrace_event_id);
+  bool IsEventEnabled(size_t ftrace_event_id) const;
+  std::set<size_t> GetEnabledEvents() const;
+  void EnableEventsFrom(const EventFilter&);
 
  private:
   EventFilter(const EventFilter&) = delete;

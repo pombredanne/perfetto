@@ -493,6 +493,43 @@ uint16_t ProtoTranslationTable::CreateGenericEventField(
 EventFilter::EventFilter() = default;
 EventFilter::~EventFilter() = default;
 
+void EventFilter::AddEnabledEvent(size_t ftrace_event_id) {
+  if (ftrace_event_id >= enabled_ids_.size())
+    enabled_ids_.resize(ftrace_event_id + 1);
+  enabled_ids_[ftrace_event_id] = true;
+}
+
+void EventFilter::DisableEvent(size_t ftrace_event_id) {
+  if (ftrace_event_id >= enabled_ids_.size())
+    return;
+  enabled_ids_[ftrace_event_id] = false;
+}
+
+bool EventFilter::IsEventEnabled(size_t ftrace_event_id) const {
+  if (ftrace_event_id == 0 || ftrace_event_id > enabled_ids_.size())
+    return false;
+  return enabled_ids_[ftrace_event_id];
+}
+
+std::set<size_t> EventFilter::GetEnabledEvents() const {
+  std::set<size_t> enabled;
+  for (size_t i = 0; i < enabled_ids_.size(); i++) {
+    if (enabled_ids_[i]) {
+      enabled.insert(i);
+    }
+  }
+  return enabled;
+}
+
+void EventFilter::EnableEventsFrom(const EventFilter& other) {
+  size_t max_length = std::max(enabled_ids_.size(), other.enabled_ids_.size());
+  enabled_ids_.resize(max_length);
+  for (size_t i = 0; i < other.enabled_ids_.size(); i++) {
+    if (other.enabled_ids_[i])
+      enabled_ids_[i] = true;
+  }
+}
+
 ProtoTranslationTable::~ProtoTranslationTable() = default;
 
 }  // namespace perfetto
