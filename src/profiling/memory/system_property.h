@@ -62,10 +62,12 @@ class SystemProperties {
   Handle SetProperty(std::string name);
   Handle SetAll();
 
+  virtual ~SystemProperties();
+
+ protected:
+  // virtual for testing.
   virtual bool SetAndroidProperty(const std::string& name,
                                   const std::string& value);
-
-  virtual ~SystemProperties();
 
  private:
   void UnsetProperty(const std::string& name);
