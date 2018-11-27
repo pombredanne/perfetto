@@ -32,9 +32,14 @@ namespace perfetto {
 namespace {
 
 class FakeProducerEndpoint : public TracingService::ProducerEndpoint {
+ public:
   void RegisterDataSource(const DataSourceDescriptor&) override {}
   void UnregisterDataSource(const std::string&) override {}
-  void CommitData(const CommitDataRequest&, CommitDataCallback) override {}
+  void RegisterTraceWriter(uint32_t, uint32_t) override {}
+  void UnregisterTraceWriter(uint32_t) override {}
+  void CommitData(const CommitDataRequest& req, CommitDataCallback) override {
+    last_commit_data_request = req;
+  }
   void NotifyFlushComplete(FlushRequestID) override {}
   void NotifyDataSourceStopped(DataSourceInstanceID) override {}
   SharedMemory* shared_memory() const override { return nullptr; }
@@ -42,6 +47,8 @@ class FakeProducerEndpoint : public TracingService::ProducerEndpoint {
   std::unique_ptr<TraceWriter> CreateTraceWriter(BufferID) override {
     return nullptr;
   }
+
+  CommitDataRequest last_commit_data_request;
 };
 
 class TraceWriterImplTest : public AlignedBufferTest {
@@ -104,6 +111,56 @@ TEST_P(TraceWriterImplTest, SingleWriter) {
   }
   EXPECT_EQ(kNumPackets, packets_count);
   // TODO(primiano): check also the content of the packets decoding the protos.
+}
+
+TEST_P(TraceWriterImplTest, FragmentingPacket) {
+  const BufferID kBufId = 42;
+  std::unique_ptr<TraceWriter> writer = arbiter_->CreateTraceWriter(kBufId);
+
+  // Write a packet that's guaranteed to span more than a single chunk.
+  auto packet = writer->NewTracePacket();
+  size_t chunk_size = page_size() / 4;
+  std::stringstream large_string_writer;
+  for (size_t pos = 0; pos < chunk_size; pos++)
+    large_string_writer << "x";
+  std::string large_string = large_string_writer.str();
+  packet->set_for_testing()->set_str(large_string.data(), large_string.size());
+
+  // First chunk should be committed.
+  arbiter_->FlushPendingCommitDataRequests();
+  const auto& last_commit = fake_producer_endpoint_.last_commit_data_request;
+  ASSERT_EQ(1, last_commit.chunks_to_move_size());
+  EXPECT_EQ(0u, last_commit.chunks_to_move()[0].page());
+  EXPECT_EQ(0u, last_commit.chunks_to_move()[0].chunk());
+  EXPECT_EQ(kBufId, last_commit.chunks_to_move()[0].target_buffer());
+  EXPECT_EQ(0, last_commit.chunks_to_patch_size());
+
+  SharedMemoryABI* abi = arbiter_->shmem_abi_for_testing();
+
+  // The first allocated chunk should be complete but need patching, since the
+  // packet extended past the chunk and no patches for the packet size or string
+  // field size were applied yet.
+  ASSERT_EQ(SharedMemoryABI::kChunkComplete, abi->GetChunkState(0u, 0u));
+  auto chunk = abi->TryAcquireChunkForReading(0u, 0u);
+  ASSERT_TRUE(chunk.is_valid());
+  ASSERT_EQ(1, chunk.header()->packets.load().count);
+  ASSERT_TRUE(chunk.header()->packets.load().flags &
+              SharedMemoryABI::ChunkHeader::kChunkNeedsPatching);
+  ASSERT_TRUE(chunk.header()->packets.load().flags &
+              SharedMemoryABI::ChunkHeader::kLastPacketContinuesOnNextChunk);
+
+  // Starting a new packet should cause patches to be applied.
+  packet->Finalize();
+  auto packet2 = writer->NewTracePacket();
+  arbiter_->FlushPendingCommitDataRequests();
+  EXPECT_EQ(0, last_commit.chunks_to_move_size());
+  ASSERT_EQ(1, last_commit.chunks_to_patch_size());
+  EXPECT_EQ(writer->writer_id(), last_commit.chunks_to_patch()[0].writer_id());
+  EXPECT_EQ(kBufId, last_commit.chunks_to_patch()[0].target_buffer());
+  EXPECT_EQ(chunk.header()->chunk_id.load(),
+            last_commit.chunks_to_patch()[0].chunk_id());
+  EXPECT_FALSE(last_commit.chunks_to_patch()[0].has_more_patches());
+  ASSERT_EQ(1, last_commit.chunks_to_patch()[0].patches_size());
 }
 
 // TODO(primiano): add multi-writer test.

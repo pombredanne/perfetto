@@ -26,6 +26,7 @@ CONFIG_PROTOS = (
   'protos/perfetto/config/data_source_config.proto',
   'protos/perfetto/config/ftrace/ftrace_config.proto',
   'protos/perfetto/config/inode_file/inode_file_config.proto',
+  'protos/perfetto/config/power/android_power_config.proto',
   'protos/perfetto/config/process_stats/process_stats_config.proto',
   'protos/perfetto/config/sys_stats/sys_stats_config.proto',
   'protos/perfetto/config/test_config.proto',
@@ -57,6 +58,7 @@ TRACE_PROTOS = (
   'protos/perfetto/trace/ftrace/signal.proto',
   'protos/perfetto/trace/ftrace/task.proto',
   'protos/perfetto/trace/ftrace/vmscan.proto',
+  'protos/perfetto/trace/power/battery_counters.proto',
   'protos/perfetto/trace/ps/process_stats.proto',
   'protos/perfetto/trace/ps/process_tree.proto',
   'protos/perfetto/trace/sys_stats/sys_stats.proto',
@@ -96,7 +98,6 @@ def merge_protos(proto_paths, output_path):
     if merged_content == '':
       merged_content += REPLACEMENT_HEADER.lstrip() % __file__
     content = re.sub(r'^import.*?\n', '', content, flags=re.MULTILINE)
-    content = re.sub(r'TODO\([^)]*\):', 'TODO:', content)
     merged_content += '\n// Begin of %s\n' % proto
     merged_content += content
     merged_content += '\n// End of %s\n' % proto

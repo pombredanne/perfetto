@@ -36,7 +36,7 @@ void ThreadTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<ThreadTable>(db, storage, "thread");
 }
 
-Table::Schema ThreadTable::CreateSchema(int, const char* const*) {
+base::Optional<Table::Schema> ThreadTable::Init(int, const char* const*) {
   return Schema(
       {
           Table::Column(Column::kUtid, "utid", ColumnType::kInt),
@@ -114,7 +114,7 @@ int ThreadTable::Cursor::Column(sqlite3_context* context, int N) {
     case Column::kName: {
       const auto& name = storage_->GetString(thread.name_id);
       sqlite3_result_text(context, name.c_str(),
-                          static_cast<int>(name.length()), nullptr);
+                          static_cast<int>(name.length()), kSqliteStatic);
       break;
     }
     case Column::kTid: {

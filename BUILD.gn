@@ -73,10 +73,7 @@ group("all") {
       if (is_linux || is_android) {
         deps += [ "tools/skippy" ]
       }
-      if (is_linux) {
-        deps += [ "tools:pipestats" ]
-      }
-      if (use_libfuzzer) {
+      if (is_fuzzer) {
         deps += [ ":fuzzers" ]
       }
     }
@@ -240,7 +237,14 @@ if (perfetto_build_standalone || perfetto_build_with_android) {
         "protos/perfetto/trace:lite",
       ]
     }
-  }
+
+    shared_library("libperfetto_android_internal") {
+      deps = [
+        "gn:default_deps",
+        "src/android_internal",
+      ]
+    }
+  }  # if (perfetto_build_with_android)
 }  # if (perfetto_build_standalone || perfetto_build_with_android)
 
 if (perfetto_build_with_embedder) {

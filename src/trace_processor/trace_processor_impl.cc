@@ -21,6 +21,7 @@
 #include <functional>
 
 #include "perfetto/base/time.h"
+#include "src/trace_processor/args_table.h"
 #include "src/trace_processor/counters_table.h"
 #include "src/trace_processor/event_tracker.h"
 #include "src/trace_processor/instants_table.h"
@@ -110,8 +111,10 @@ TraceProcessorImpl::TraceProcessorImpl(const Config& cfg) {
   context_.proto_parser.reset(new ProtoTraceParser(&context_));
   context_.process_tracker.reset(new ProcessTracker(&context_));
   context_.sorter.reset(
-      new TraceSorter(&context_, cfg.optimization_mode, cfg.window_size_ns));
+      new TraceSorter(&context_, cfg.optimization_mode,
+                      static_cast<int64_t>(cfg.window_size_ns)));
 
+  ArgsTable::RegisterTable(*db_, context_.storage.get());
   ProcessTable::RegisterTable(*db_, context_.storage.get());
   SchedSliceTable::RegisterTable(*db_, context_.storage.get());
   SliceTable::RegisterTable(*db_, context_.storage.get());
@@ -168,7 +171,7 @@ void TraceProcessorImpl::ExecuteQuery(
   base::TimeNanos t_start = base::GetWallTimeNs();
   const std::string& sql = args.sql_query();
   context_.storage->mutable_sql_stats()->RecordQueryBegin(
-      sql, args.time_queued_ns(), static_cast<uint64_t>(t_start.count()));
+      sql, static_cast<int64_t>(args.time_queued_ns()), t_start.count());
   sqlite3_stmt* raw_stmt;
   int err = sqlite3_prepare_v2(*db_, sql.c_str(), static_cast<int>(sql.size()),
                                &raw_stmt, nullptr);
@@ -239,8 +242,7 @@ void TraceProcessorImpl::ExecuteQuery(
   }
 
   base::TimeNanos t_end = base::GetWallTimeNs();
-  context_.storage->mutable_sql_stats()->RecordQueryEnd(
-      static_cast<uint64_t>(t_end.count()));
+  context_.storage->mutable_sql_stats()->RecordQueryEnd(t_end.count());
   proto.set_execution_time_ns(static_cast<uint64_t>((t_end - t_start).count()));
   callback(proto);
 }

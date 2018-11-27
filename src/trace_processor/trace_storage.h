@@ -42,7 +42,20 @@ using UniquePid = uint32_t;
 using UniqueTid = uint32_t;
 
 // StringId is an offset into |string_pool_|.
-using StringId = size_t;
+using StringId = uint32_t;
+
+// Identifiers for all the tables in the database.
+enum TableId : uint8_t {
+  // Intentionally don't have TableId == 0 so that RowId == 0 can refer to an
+  // invalid row id.
+  kCounters = 1,
+};
+
+// The top 8 bits are set to the TableId and the bottom 32 to the row of the
+// table.
+using RowId = int64_t;
+
+static const RowId kInvalidRowId = 0;
 
 enum RefType {
   kRefNoRef = 0,
@@ -66,16 +79,16 @@ class TraceStorage {
   virtual ~TraceStorage();
 
   struct Stats {
-    uint64_t mismatched_sched_switch_tids = 0;
-    uint64_t rss_stat_no_process = 0;
-    uint64_t mem_counter_no_process = 0;
+    int64_t mismatched_sched_switch_tids = 0;
+    int64_t rss_stat_no_process = 0;
+    int64_t mem_counter_no_process = 0;
   };
 
   // Information about a unique process seen in a trace.
   struct Process {
     explicit Process(uint32_t p) : pid(p) {}
-    uint64_t start_ns = 0;
-    uint64_t end_ns = 0;
+    int64_t start_ns = 0;
+    int64_t end_ns = 0;
     StringId name_id = 0;
     uint32_t pid = 0;
   };
@@ -83,18 +96,65 @@ class TraceStorage {
   // Information about a unique thread seen in a trace.
   struct Thread {
     explicit Thread(uint32_t t) : tid(t) {}
-    uint64_t start_ns = 0;
-    uint64_t end_ns = 0;
+    int64_t start_ns = 0;
+    int64_t end_ns = 0;
     StringId name_id = 0;
     base::Optional<UniquePid> upid;
     uint32_t tid = 0;
   };
 
+  // Generic key value storage which can be referenced by other tables.
+  class Args {
+   public:
+    // Varardic type representing the possible values for the args table.
+    struct Varardic {
+      enum Type { kInt, kString, kReal };
+
+      Varardic(int64_t int_val) : type(kInt), int_value(int_val) {}
+      Varardic(StringId string_val) : type(kString), string_value(string_val) {}
+      Varardic(double real_val) : type(kReal), real_value(real_val) {}
+
+      Type type;
+      union {
+        int64_t int_value;
+        StringId string_value;
+        double real_value;
+      };
+    };
+
+    const std::deque<RowId>& ids() const { return ids_; }
+    const std::deque<StringId>& flat_keys() const { return flat_keys_; }
+    const std::deque<StringId>& keys() const { return keys_; }
+    const std::deque<Varardic>& arg_values() const { return arg_values_; }
+    const std::multimap<RowId, uint32_t>& args_for_id() const {
+      return args_for_id_;
+    }
+    size_t args_count() const { return ids_.size(); }
+
+    void AddArg(RowId id, StringId flat_key, StringId key, int64_t value) {
+      if (id == kInvalidRowId)
+        return;
+
+      ids_.emplace_back(id);
+      flat_keys_.emplace_back(flat_key);
+      keys_.emplace_back(key);
+      arg_values_.emplace_back(value);
+      args_for_id_.emplace(id, static_cast<uint32_t>(args_count() - 1));
+    }
+
+   private:
+    std::deque<RowId> ids_;
+    std::deque<StringId> flat_keys_;
+    std::deque<StringId> keys_;
+    std::deque<Varardic> arg_values_;
+    std::multimap<RowId, uint32_t> args_for_id_;
+  };
+
   class Slices {
    public:
     inline size_t AddSlice(uint32_t cpu,
-                           uint64_t start_ns,
-                           uint64_t duration_ns,
+                           int64_t start_ns,
+                           int64_t duration_ns,
                            UniqueTid utid) {
       cpus_.emplace_back(cpu);
       start_ns_.emplace_back(start_ns);
@@ -103,7 +163,7 @@ class TraceStorage {
       return slice_count() - 1;
     }
 
-    void set_duration(size_t index, uint64_t duration_ns) {
+    void set_duration(size_t index, int64_t duration_ns) {
       durations_[index] = duration_ns;
     }
 
@@ -111,9 +171,9 @@ class TraceStorage {
 
     const std::deque<uint32_t>& cpus() const { return cpus_; }
 
-    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
+    const std::deque<int64_t>& start_ns() const { return start_ns_; }
 
-    const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<int64_t>& durations() const { return durations_; }
 
     const std::deque<UniqueTid>& utids() const { return utids_; }
 
@@ -121,21 +181,21 @@ class TraceStorage {
     // Each deque below has the same number of entries (the number of slices
     // in the trace for the CPU).
     std::deque<uint32_t> cpus_;
-    std::deque<uint64_t> start_ns_;
-    std::deque<uint64_t> durations_;
+    std::deque<int64_t> start_ns_;
+    std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
   };
 
   class NestableSlices {
    public:
-    inline size_t AddSlice(uint64_t start_ns,
-                           uint64_t duration_ns,
+    inline size_t AddSlice(int64_t start_ns,
+                           int64_t duration_ns,
                            UniqueTid utid,
                            StringId cat,
                            StringId name,
                            uint8_t depth,
-                           uint64_t stack_id,
-                           uint64_t parent_stack_id) {
+                           int64_t stack_id,
+                           int64_t parent_stack_id) {
       start_ns_.emplace_back(start_ns);
       durations_.emplace_back(duration_ns);
       utids_.emplace_back(utid);
@@ -147,41 +207,41 @@ class TraceStorage {
       return slice_count() - 1;
     }
 
-    void set_duration(size_t index, uint64_t duration_ns) {
+    void set_duration(size_t index, int64_t duration_ns) {
       durations_[index] = duration_ns;
     }
 
-    void set_stack_id(size_t index, uint64_t stack_id) {
+    void set_stack_id(size_t index, int64_t stack_id) {
       stack_ids_[index] = stack_id;
     }
 
     size_t slice_count() const { return start_ns_.size(); }
-    const std::deque<uint64_t>& start_ns() const { return start_ns_; }
-    const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<int64_t>& start_ns() const { return start_ns_; }
+    const std::deque<int64_t>& durations() const { return durations_; }
     const std::deque<UniqueTid>& utids() const { return utids_; }
     const std::deque<StringId>& cats() const { return cats_; }
     const std::deque<StringId>& names() const { return names_; }
     const std::deque<uint8_t>& depths() const { return depths_; }
-    const std::deque<uint64_t>& stack_ids() const { return stack_ids_; }
-    const std::deque<uint64_t>& parent_stack_ids() const {
+    const std::deque<int64_t>& stack_ids() const { return stack_ids_; }
+    const std::deque<int64_t>& parent_stack_ids() const {
       return parent_stack_ids_;
     }
 
    private:
-    std::deque<uint64_t> start_ns_;
-    std::deque<uint64_t> durations_;
+    std::deque<int64_t> start_ns_;
+    std::deque<int64_t> durations_;
     std::deque<UniqueTid> utids_;
     std::deque<StringId> cats_;
     std::deque<StringId> names_;
     std::deque<uint8_t> depths_;
-    std::deque<uint64_t> stack_ids_;
-    std::deque<uint64_t> parent_stack_ids_;
+    std::deque<int64_t> stack_ids_;
+    std::deque<int64_t> parent_stack_ids_;
   };
 
   class Counters {
    public:
-    inline size_t AddCounter(uint64_t timestamp,
-                             uint64_t duration,
+    inline size_t AddCounter(int64_t timestamp,
+                             int64_t duration,
                              StringId name_id,
                              double value,
                              int64_t ref,
@@ -195,15 +255,15 @@ class TraceStorage {
       return counter_count() - 1;
     }
 
-    void set_duration(size_t index, uint64_t duration) {
+    void set_duration(size_t index, int64_t duration) {
       durations_[index] = duration;
     }
 
     size_t counter_count() const { return timestamps_.size(); }
 
-    const std::deque<uint64_t>& timestamps() const { return timestamps_; }
+    const std::deque<int64_t>& timestamps() const { return timestamps_; }
 
-    const std::deque<uint64_t>& durations() const { return durations_; }
+    const std::deque<int64_t>& durations() const { return durations_; }
 
     const std::deque<StringId>& name_ids() const { return name_ids_; }
 
@@ -214,8 +274,8 @@ class TraceStorage {
     const std::deque<RefType>& types() const { return types_; }
 
    private:
-    std::deque<uint64_t> timestamps_;
-    std::deque<uint64_t> durations_;
+    std::deque<int64_t> timestamps_;
+    std::deque<int64_t> durations_;
     std::deque<StringId> name_ids_;
     std::deque<double> values_;
     std::deque<int64_t> refs_;
@@ -226,25 +286,25 @@ class TraceStorage {
    public:
     static constexpr size_t kMaxLogEntries = 100;
     void RecordQueryBegin(const std::string& query,
-                          uint64_t time_queued,
-                          uint64_t time_started);
-    void RecordQueryEnd(uint64_t time_ended);
+                          int64_t time_queued,
+                          int64_t time_started);
+    void RecordQueryEnd(int64_t time_ended);
     size_t size() const { return queries_.size(); }
     const std::deque<std::string>& queries() const { return queries_; }
-    const std::deque<uint64_t>& times_queued() const { return times_queued_; }
-    const std::deque<uint64_t>& times_started() const { return times_started_; }
-    const std::deque<uint64_t>& times_ended() const { return times_ended_; }
+    const std::deque<int64_t>& times_queued() const { return times_queued_; }
+    const std::deque<int64_t>& times_started() const { return times_started_; }
+    const std::deque<int64_t>& times_ended() const { return times_ended_; }
 
    private:
     std::deque<std::string> queries_;
-    std::deque<uint64_t> times_queued_;
-    std::deque<uint64_t> times_started_;
-    std::deque<uint64_t> times_ended_;
+    std::deque<int64_t> times_queued_;
+    std::deque<int64_t> times_started_;
+    std::deque<int64_t> times_ended_;
   };
 
   class Instants {
    public:
-    inline size_t AddInstantEvent(uint64_t timestamp,
+    inline size_t AddInstantEvent(int64_t timestamp,
                                   StringId name_id,
                                   double value,
                                   int64_t ref,
@@ -259,7 +319,7 @@ class TraceStorage {
 
     size_t instant_count() const { return timestamps_.size(); }
 
-    const std::deque<uint64_t>& timestamps() const { return timestamps_; }
+    const std::deque<int64_t>& timestamps() const { return timestamps_; }
 
     const std::deque<StringId>& name_ids() const { return name_ids_; }
 
@@ -270,7 +330,7 @@ class TraceStorage {
     const std::deque<RefType>& types() const { return types_; }
 
    private:
-    std::deque<uint64_t> timestamps_;
+    std::deque<int64_t> timestamps_;
     std::deque<StringId> name_ids_;
     std::deque<double> values_;
     std::deque<int64_t> refs_;
@@ -321,6 +381,11 @@ class TraceStorage {
     return unique_threads_[utid];
   }
 
+  static RowId CreateRowId(TableId table, uint32_t row) {
+    static constexpr uint8_t kRowIdTableShift = 32;
+    return (static_cast<RowId>(table) << kRowIdTableShift) | row;
+  }
+
   const Slices& slices() const { return slices_; }
   Slices* mutable_slices() { return &slices_; }
 
@@ -338,6 +403,9 @@ class TraceStorage {
 
   const Stats& stats() const { return stats_; }
   Stats* mutable_stats() { return &stats_; }
+
+  const Args& args() const { return args_; }
+  Args* mutable_args() { return &args_; }
 
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
@@ -363,6 +431,9 @@ class TraceStorage {
   // One entry for each CPU in the trace.
   Slices slices_;
 
+  // Args for all other tables.
+  Args args_;
+
   // One entry for each unique string in the trace.
   std::deque<std::string> string_pool_;
 
@@ -383,6 +454,7 @@ class TraceStorage {
   Counters counters_;
 
   SqlStats sql_stats_;
+
   // These are instantaneous events in the trace. They have no duration
   // and do not have a value that make sense to track over time.
   // e.g. signal events

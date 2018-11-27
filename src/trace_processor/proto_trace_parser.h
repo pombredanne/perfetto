@@ -56,36 +56,38 @@ class ProtoTraceParser {
   virtual ~ProtoTraceParser();
 
   // virtual for testing.
-  virtual void ParseTracePacket(uint64_t timestamp, TraceBlobView);
+  virtual void ParseTracePacket(int64_t timestamp, TraceBlobView);
   virtual void ParseFtracePacket(uint32_t cpu,
-                                 uint64_t timestamp,
+                                 int64_t timestamp,
                                  TraceBlobView);
   void ParseProcessTree(TraceBlobView);
-  void ParseProcessStats(uint64_t timestamp, TraceBlobView);
-  void ParseProcMemCounters(uint64_t timestamp, TraceBlobView);
-  void ParseSchedSwitch(uint32_t cpu, uint64_t timestamp, TraceBlobView);
-  void ParseCpuFreq(uint64_t timestamp, TraceBlobView);
-  void ParsePrint(uint32_t cpu,
-                  uint64_t timestamp,
-                  uint32_t pid,
-                  TraceBlobView);
+  void ParseProcessStats(int64_t timestamp, TraceBlobView);
+  void ParseProcMemCounters(int64_t timestamp, TraceBlobView);
+  void ParseSchedSwitch(uint32_t cpu, int64_t timestamp, TraceBlobView);
+  void ParseCpuFreq(int64_t timestamp, TraceBlobView);
+  void ParseCpuIdle(int64_t timestamp, TraceBlobView);
+  void ParsePrint(uint32_t cpu, int64_t timestamp, uint32_t pid, TraceBlobView);
   void ParseThread(TraceBlobView);
   void ParseProcess(TraceBlobView);
-  void ParseSysStats(uint64_t ts, TraceBlobView);
-  void ParseMemInfo(uint64_t ts, TraceBlobView);
-  void ParseVmStat(uint64_t ts, TraceBlobView);
-  void ParseCpuTimes(uint64_t ts, TraceBlobView);
-  void ParseIrqCount(uint64_t ts, TraceBlobView, bool is_soft);
-  void ParseRssStat(uint64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapGrow(uint64_t ts, uint32_t pid, TraceBlobView);
-  void ParseIonHeapShrink(uint64_t ts, uint32_t pid, TraceBlobView);
-  void ParseSignalDeliver(uint64_t ts, uint32_t pid, TraceBlobView);
-  void ParseSignalGenerate(uint64_t ts, TraceBlobView);
-  void ParseLowmemoryKill(uint64_t ts, TraceBlobView);
+  void ParseSysStats(int64_t ts, TraceBlobView);
+  void ParseMemInfo(int64_t ts, TraceBlobView);
+  void ParseVmStat(int64_t ts, TraceBlobView);
+  void ParseCpuTimes(int64_t ts, TraceBlobView);
+  void ParseIrqCount(int64_t ts, TraceBlobView, bool is_soft);
+  void ParseRssStat(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseIonHeapGrow(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseIonHeapShrink(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseSignalDeliver(int64_t ts, uint32_t pid, TraceBlobView);
+  void ParseSignalGenerate(int64_t ts, TraceBlobView);
+  void ParseLowmemoryKill(int64_t ts, TraceBlobView);
+  void ParseBatteryCounters(int64_t ts, TraceBlobView);
+  void ParseOOMScoreAdjUpdate(int64_t ts, TraceBlobView);
 
  private:
   TraceProcessorContext* context_;
+  const StringId utid_name_id_;
   const StringId cpu_freq_name_id_;
+  const StringId cpu_idle_name_id_;
   const StringId num_forks_name_id_;
   const StringId num_irq_total_name_id_;
   const StringId num_softirq_total_name_id_;
@@ -102,6 +104,11 @@ class ProtoTraceParser {
   const StringId ion_heap_shrink_id_;
   const StringId signal_deliver_id_;
   const StringId signal_generate_id_;
+  const StringId batt_charge_id_;
+  const StringId batt_capacity_id_;
+  const StringId batt_current_id_;
+  const StringId batt_current_avg_id_;
+  const StringId oom_score_adj_id_;
   std::vector<StringId> meminfo_strs_id_;
   std::vector<StringId> vmstat_strs_id_;
   std::vector<StringId> rss_members_;

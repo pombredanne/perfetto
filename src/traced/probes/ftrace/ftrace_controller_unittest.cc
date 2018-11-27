@@ -76,7 +76,11 @@ class MockTaskRunner : public base::TaskRunner {
     task_ = std::move(task);
   }
 
-  void RunLastTask() { TakeTask()(); }
+  void RunLastTask() {
+    auto task = TakeTask();
+    if (task)
+      task();
+  }
 
   std::function<void()> TakeTask() {
     std::unique_lock<std::mutex> lock(lock_);
@@ -216,18 +220,18 @@ class TestFtraceController : public FtraceController,
   uint32_t drain_period_ms() { return GetDrainPeriodMs(); }
 
   std::function<void()> GetDataAvailableCallback(size_t cpu) {
-    base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
-    size_t generation = generation_;
-    return [this, weak_this, generation, cpu] {
-      OnDataAvailable(weak_this, generation, cpu, GetDrainPeriodMs());
+    int generation = generation_;
+    auto* thread_sync = &thread_sync_;
+    return [cpu, generation, thread_sync] {
+      FtraceController::OnCpuReaderRead(cpu, generation, thread_sync);
     };
   }
 
   void WaitForData(size_t cpu) {
     for (;;) {
       {
-        std::unique_lock<std::mutex> lock(lock_);
-        if (cpus_to_drain_[cpu])
+        std::unique_lock<std::mutex> lock(thread_sync_.mutex);
+        if (thread_sync_.cpus_to_drain[cpu])
           return;
       }
       usleep(5000);
@@ -341,8 +345,8 @@ TEST(FtraceControllerTest, MultipleSinks) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
 
-  FtraceConfig configA = CreateFtraceConfig({"foo"});
-  FtraceConfig configB = CreateFtraceConfig({"foo", "bar"});
+  FtraceConfig configA = CreateFtraceConfig({"group/foo"});
+  FtraceConfig configB = CreateFtraceConfig({"group/foo", "group/bar"});
 
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
@@ -371,7 +375,7 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
 
-  FtraceConfig config = CreateFtraceConfig({"foo"});
+  FtraceConfig config = CreateFtraceConfig({"group/foo"});
 
   EXPECT_CALL(*controller->procfs(), WriteToFile("/root/buffer_size_kb", _));
   EXPECT_CALL(*controller->procfs(), WriteToFile(kFooEnablePath, "1"));
@@ -393,91 +397,6 @@ TEST(FtraceControllerTest, ControllerMayDieFirst) {
   data_source.reset();
 }
 
-TEST(FtraceControllerTest, TaskScheduling) {
-  auto controller = CreateTestController(
-      false /* nice runner */, false /* nice procfs */, 2 /* num cpus */);
-
-  // For this test we don't care about calls to WriteToFile/ClearFile.
-  EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
-  EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-
-  FtraceConfig config = CreateFtraceConfig({"foo"});
-  auto data_source = controller->AddFakeDataSource(config);
-  ASSERT_TRUE(controller->StartDataSource(data_source.get()));
-
-  // Only one call to drain should be scheduled for the next drain period.
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100));
-
-  // However both CPUs should be drained.
-  EXPECT_CALL(*controller, OnDrainCpuForTesting(_)).Times(2);
-
-  // Finally, another task should be posted to unblock the workers.
-  EXPECT_CALL(*controller->runner(), PostTask(_));
-
-  // Simulate two worker threads reporting available data.
-  auto on_data_available0 = controller->GetDataAvailableCallback(0u);
-  std::thread worker0([on_data_available0] { on_data_available0(); });
-
-  auto on_data_available1 = controller->GetDataAvailableCallback(1u);
-  std::thread worker1([on_data_available1] { on_data_available1(); });
-
-  // Poll until both worker threads have reported available data.
-  controller->WaitForData(0u);
-  controller->WaitForData(1u);
-
-  // Run the task to drain all CPUs.
-  controller->runner()->RunLastTask();
-
-  // Run the task to unblock all workers.
-  controller->runner()->RunLastTask();
-
-  worker0.join();
-  worker1.join();
-
-  data_source.reset();
-}
-
-// TODO(b/73452932): Fix and reenable this test.
-TEST(FtraceControllerTest, DISABLED_DrainPeriodRespected) {
-  auto controller =
-      CreateTestController(false /* nice runner */, false /* nice procfs */);
-
-  // For this test we don't care about calls to WriteToFile/ClearFile.
-  EXPECT_CALL(*controller->procfs(), WriteToFile(_, _)).Times(AnyNumber());
-  EXPECT_CALL(*controller->procfs(), ClearFile(_)).Times(AnyNumber());
-
-  FtraceConfig config = CreateFtraceConfig({"foo"});
-  auto data_source = controller->AddFakeDataSource(config);
-  ASSERT_TRUE(controller->StartDataSource(data_source.get()));
-
-  // Test several cycles of a worker producing data and make sure the drain
-  // delay is consistent with the drain period.
-  const int kCycles = 50;
-  EXPECT_CALL(*controller->runner(),
-              PostDelayedTask(_, controller->drain_period_ms()))
-      .Times(kCycles);
-  EXPECT_CALL(*controller, OnDrainCpuForTesting(_)).Times(kCycles);
-  EXPECT_CALL(*controller->runner(), PostTask(_)).Times(kCycles);
-
-  // Simulate a worker thread continually reporting pages of available data.
-  auto on_data_available = controller->GetDataAvailableCallback(0u);
-  std::thread worker([on_data_available] {
-    for (int i = 0; i < kCycles; i++)
-      on_data_available();
-  });
-
-  for (int i = 0; i < kCycles; i++) {
-    controller->WaitForData(0u);
-    // Run two tasks: one to drain each CPU and another to unblock the worker.
-    controller->runner()->RunLastTask();
-    controller->runner()->RunLastTask();
-    controller->now_ms += controller->drain_period_ms();
-  }
-
-  worker.join();
-  data_source.reset();
-}
-
 TEST(FtraceControllerTest, BackToBackEnableDisable) {
   auto controller =
       CreateTestController(false /* nice runner */, false /* nice procfs */);
@@ -488,8 +407,9 @@ TEST(FtraceControllerTest, BackToBackEnableDisable) {
   EXPECT_CALL(*controller->procfs(), ReadOneCharFromFile("/root/tracing_on"))
       .Times(AnyNumber());
 
-  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100)).Times(2);
-  FtraceConfig config = CreateFtraceConfig({"foo"});
+  EXPECT_CALL(*controller->runner(), PostTask(_)).Times(1);
+  EXPECT_CALL(*controller->runner(), PostDelayedTask(_, 100)).Times(1);
+  FtraceConfig config = CreateFtraceConfig({"group/foo"});
   auto data_source = controller->AddFakeDataSource(config);
   ASSERT_TRUE(controller->StartDataSource(data_source.get()));
 
@@ -528,7 +448,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // 8192kb = 8mb
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "512"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     auto data_source = controller->AddFakeDataSource(config);
     ASSERT_TRUE(controller->StartDataSource(data_source.get()));
   }
@@ -537,7 +457,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // Way too big buffer size -> max size.
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "65536"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_buffer_size_kb(10 * 1024 * 1024);
     auto data_source = controller->AddFakeDataSource(config);
     ASSERT_TRUE(controller->StartDataSource(data_source.get()));
@@ -547,7 +467,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // The limit is 64mb, 65mb is too much.
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "65536"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     ON_CALL(*controller->procfs(), NumberOfCpus()).WillByDefault(Return(2));
     config.set_buffer_size_kb(65 * 1024);
     auto data_source = controller->AddFakeDataSource(config);
@@ -558,7 +478,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // Your size ends up with less than 1 page per cpu -> 1 page.
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "4"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_buffer_size_kb(1);
     auto data_source = controller->AddFakeDataSource(config);
     ASSERT_TRUE(controller->StartDataSource(data_source.get()));
@@ -568,7 +488,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // You picked a good size -> your size rounded to nearest page.
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "40"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_buffer_size_kb(42);
     auto data_source = controller->AddFakeDataSource(config);
     ASSERT_TRUE(controller->StartDataSource(data_source.get()));
@@ -578,7 +498,7 @@ TEST(FtraceControllerTest, BufferSize) {
     // You picked a good size -> your size rounded to nearest page.
     EXPECT_CALL(*controller->procfs(),
                 WriteToFile("/root/buffer_size_kb", "40"));
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     ON_CALL(*controller->procfs(), NumberOfCpus()).WillByDefault(Return(2));
     config.set_buffer_size_kb(42);
     auto data_source = controller->AddFakeDataSource(config);
@@ -596,14 +516,14 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
 
   {
     // No period -> good default.
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     auto data_source = controller->AddFakeDataSource(config);
     EXPECT_EQ(100u, controller->drain_period_ms());
   }
 
   {
     // Pick a tiny value -> good default.
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_drain_period_ms(0);
     auto data_source = controller->AddFakeDataSource(config);
     EXPECT_EQ(100u, controller->drain_period_ms());
@@ -611,7 +531,7 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
 
   {
     // Pick a huge value -> good default.
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_drain_period_ms(1000 * 60 * 60);
     auto data_source = controller->AddFakeDataSource(config);
     EXPECT_EQ(100u, controller->drain_period_ms());
@@ -619,7 +539,7 @@ TEST(FtraceControllerTest, PeriodicDrainConfig) {
 
   {
     // Pick a resonable value -> get that value.
-    FtraceConfig config = CreateFtraceConfig({"foo"});
+    FtraceConfig config = CreateFtraceConfig({"group/foo"});
     config.set_drain_period_ms(200);
     auto data_source = controller->AddFakeDataSource(config);
     EXPECT_EQ(200u, controller->drain_period_ms());

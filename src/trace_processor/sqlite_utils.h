@@ -21,15 +21,19 @@
 #include <sqlite3.h>
 
 #include <functional>
+#include <limits>
 #include <string>
 
 #include "perfetto/base/logging.h"
+#include "perfetto/base/optional.h"
 #include "src/trace_processor/scoped_db.h"
 #include "src/trace_processor/table.h"
 
 namespace perfetto {
 namespace trace_processor {
 namespace sqlite_utils {
+
+const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
 
 inline bool IsOpEq(int op) {
   return op == SQLITE_INDEX_CONSTRAINT_EQ;
@@ -70,26 +74,6 @@ inline std::string OpToString(int op) {
   }
 }
 
-template <class T>
-std::function<bool(T, T)> GetPredicateForOp(int op) {
-  switch (op) {
-    case SQLITE_INDEX_CONSTRAINT_EQ:
-      return std::equal_to<T>();
-    case SQLITE_INDEX_CONSTRAINT_GE:
-      return std::greater_equal<T>();
-    case SQLITE_INDEX_CONSTRAINT_GT:
-      return std::greater<T>();
-    case SQLITE_INDEX_CONSTRAINT_LE:
-      return std::less_equal<T>();
-    case SQLITE_INDEX_CONSTRAINT_LT:
-      return std::less<T>();
-    case SQLITE_INDEX_CONSTRAINT_NE:
-      return std::not_equal_to<T>();
-    default:
-      PERFETTO_CHECK(false);
-  }
-}
-
 template <typename T>
 T ExtractSqliteValue(sqlite3_value* value);
 
@@ -108,13 +92,6 @@ inline uint32_t ExtractSqliteValue(sqlite3_value* value) {
 }
 
 template <>
-inline uint64_t ExtractSqliteValue(sqlite3_value* value) {
-  auto type = sqlite3_value_type(value);
-  PERFETTO_DCHECK(type == SQLITE_INTEGER);
-  return static_cast<uint64_t>(sqlite3_value_int64(value));
-}
-
-template <>
 inline int64_t ExtractSqliteValue(sqlite3_value* value) {
   auto type = sqlite3_value_type(value);
   PERFETTO_DCHECK(type == SQLITE_INTEGER);
@@ -128,14 +105,52 @@ inline double ExtractSqliteValue(sqlite3_value* value) {
   return sqlite3_value_double(value);
 }
 
-// On MacOS size_t !== uint64_t
-#if PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+// Do not add a uint64_t version of ExtractSqliteValue. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
+
 template <>
-inline size_t ExtractSqliteValue(sqlite3_value* value) {
-  PERFETTO_DCHECK(sqlite3_value_type(value) == SQLITE_INTEGER);
-  return static_cast<size_t>(sqlite3_value_int64(value));
+inline std::string ExtractSqliteValue(sqlite3_value* value) {
+  auto type = sqlite3_value_type(value);
+  PERFETTO_DCHECK(type == SQLITE_TEXT);
+  const auto* extracted =
+      reinterpret_cast<const char*>(sqlite3_value_text(value));
+  return std::string(extracted);
 }
-#endif  // PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+
+template <class T>
+std::function<bool(base::Optional<T>)> CreatePredicate(int op,
+                                                       sqlite3_value* value) {
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_ISNULL:
+      return [](base::Optional<T> f) { return !f.has_value(); };
+    case SQLITE_INDEX_CONSTRAINT_ISNOTNULL:
+      return [](base::Optional<T> f) { return f.has_value(); };
+  }
+
+  T val = ExtractSqliteValue<T>(value);
+  switch (op) {
+    case SQLITE_INDEX_CONSTRAINT_EQ:
+    case SQLITE_INDEX_CONSTRAINT_IS:
+      return [val](base::Optional<T> f) {
+        return f.has_value() && std::equal_to<T>()(*f, val);
+      };
+    case SQLITE_INDEX_CONSTRAINT_NE:
+    case SQLITE_INDEX_CONSTRAINT_ISNOT:
+      return [val](base::Optional<T> f) {
+        return f.has_value() && std::not_equal_to<T>()(*f, val);
+      };
+    case SQLITE_INDEX_CONSTRAINT_GE:
+      return [val](base::Optional<T> f) { return f.has_value() && *f >= val; };
+    case SQLITE_INDEX_CONSTRAINT_GT:
+      return [val](base::Optional<T> f) { return f.has_value() && *f > val; };
+    case SQLITE_INDEX_CONSTRAINT_LE:
+      return [val](base::Optional<T> f) { return f.has_value() && *f <= val; };
+    case SQLITE_INDEX_CONSTRAINT_LT:
+      return [val](base::Optional<T> f) { return f.has_value() && *f < val; };
+    default:
+      PERFETTO_FATAL("For GCC");
+  }
+}
 
 template <typename T>
 using is_float =
@@ -233,6 +248,9 @@ T FindEqBound(sqlite3_value* sqlite_val) {
 template <typename T>
 void ReportSqliteResult(sqlite3_context*, T value);
 
+// Do not add a uint64_t version of ReportSqliteResult. You should not be using
+// uint64_t at all given that SQLite doesn't support it.
+
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, int32_t value) {
   sqlite3_result_int(ctx, value);
@@ -251,11 +269,6 @@ inline void ReportSqliteResult(sqlite3_context* ctx, uint8_t value) {
 template <>
 inline void ReportSqliteResult(sqlite3_context* ctx, uint32_t value) {
   sqlite3_result_int64(ctx, value);
-}
-
-template <>
-inline void ReportSqliteResult(sqlite3_context* ctx, uint64_t value) {
-  sqlite3_result_int64(ctx, static_cast<sqlite_int64>(value));
 }
 
 template <>
@@ -302,7 +315,8 @@ inline std::vector<Table::Column> GetColumnsForTable(
     if (err == SQLITE_DONE)
       break;
     if (err != SQLITE_ROW) {
-      PERFETTO_ELOG("Querying schema of table failed");
+      PERFETTO_ELOG("Querying schema of table %s failed",
+                    raw_table_name.c_str());
       return {};
     }
 
@@ -310,9 +324,9 @@ inline std::vector<Table::Column> GetColumnsForTable(
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 0));
     const char* raw_type =
         reinterpret_cast<const char*>(sqlite3_column_text(*stmt, 1));
-    if (!name || !raw_type || !*name || !*raw_type) {
-      PERFETTO_ELOG("Schema has invalid column values");
-      return {};
+    if (!name || !raw_type || !*name) {
+      PERFETTO_FATAL("Schema for %s has invalid column values",
+                     raw_table_name.c_str());
     }
 
     Table::ColumnType type;
@@ -320,10 +334,21 @@ inline std::vector<Table::Column> GetColumnsForTable(
       type = Table::ColumnType::kUlong;
     } else if (strcmp(raw_type, "UNSIGNED INT") == 0) {
       type = Table::ColumnType::kUint;
+    } else if (strcmp(raw_type, "BIG INT") == 0) {
+      type = Table::ColumnType::kLong;
+    } else if (strcmp(raw_type, "INT") == 0) {
+      type = Table::ColumnType::kInt;
     } else if (strcmp(raw_type, "STRING") == 0) {
       type = Table::ColumnType::kString;
+    } else if (strcmp(raw_type, "DOUBLE") == 0) {
+      type = Table::ColumnType::kDouble;
+    } else if (!*raw_type) {
+      PERFETTO_DLOG("Unknown column type for %s %s", raw_table_name.c_str(),
+                    name);
+      type = Table::ColumnType::kUnknown;
     } else {
-      PERFETTO_FATAL("Unknown column type on table %s", raw_table_name.c_str());
+      PERFETTO_FATAL("Unknown column type '%s' on table %s", raw_type,
+                     raw_table_name.c_str());
     }
     columns.emplace_back(columns.size(), name, type);
   }

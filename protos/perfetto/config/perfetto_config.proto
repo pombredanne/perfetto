@@ -204,6 +204,7 @@ message DataSourceConfig {
   optional ProcessStatsConfig process_stats_config = 103;
   optional SysStatsConfig sys_stats_config = 104;
   optional HeapprofdConfig heapprofd_config = 105;
+  optional AndroidPowerConfig android_power_config = 106;
 
   // This is a fallback mechanism to send a free-form text config to the
   // producer. In theory this should never be needed. All the code that
@@ -271,6 +272,22 @@ message InodeFileConfig {
 
 // End of protos/perfetto/config/inode_file/inode_file_config.proto
 
+// Begin of protos/perfetto/config/power/android_power_config.proto
+
+message AndroidPowerConfig {
+  enum BatteryCounters {
+    BATTERY_COUNTER_UNSPECIFIED = 0;
+    BATTERY_COUNTER_CHARGE = 1;            // Coulomb counter.
+    BATTERY_COUNTER_CAPACITY_PERCENT = 2;  // Charge (%).
+    BATTERY_COUNTER_CURRENT = 3;           // Instantaneous current.
+    BATTERY_COUNTER_CURRENT_AVG = 4;       // Avg current.
+  }
+  optional uint32 battery_poll_ms = 1;
+  repeated BatteryCounters battery_counters = 2;
+}
+
+// End of protos/perfetto/config/power/android_power_config.proto
+
 // Begin of protos/perfetto/config/process_stats/process_stats_config.proto
 
 // When editing this file run ./tools/gen_tracing_cpp_headers_from_protos.py
@@ -300,13 +317,13 @@ message ProcessStatsConfig {
   // If > 0 samples counters (see process_stats.proto) from
   // /proc/pid/status every X ms.
   // This is required to be > 100ms to avoid excessive CPU usage.
-  // TODO: add CPU cost for change this value.
+  // TODO(primiano): add CPU cost for change this value.
   optional uint32 proc_stats_poll_ms = 4;
 
   // If empty samples stats for all processes. If non empty samples stats only
   // for processes matching the given string in their argv0 (i.e. the first
-  // entry of of /proc/pid/cmdline).
-  // TODO: implement this feature.
+  // entry of /proc/pid/cmdline).
+  // TODO(primiano): implement this feature.
   // repeated string proc_stats_filter = 5;
 }
 
@@ -419,7 +436,7 @@ message TestConfig {
 // It contains the general config for the logging buffer(s) and the configs for
 // all the data source being enabled.
 //
-// Next id: 13.
+// Next id: 14.
 message TraceConfig {
   message BufferConfig {
     optional uint32 size_kb = 1;
@@ -446,7 +463,7 @@ message TraceConfig {
     // Optional. If multiple producers (~processes) expose the same data source
     // and |producer_name_filter| != "", the data source is enabled only for
     // producers whose names match any of the producer_name_filter below.
-    // The |producer_name_filter| has to be an exact match. (TODO:
+    // The |producer_name_filter| has to be an exact match. (TODO(primiano):
     // support wildcards or regex).
     // This allows to enable a data source only for specific processes.
     // The "repeated" field has OR sematics: specifying a filter ["foo", "bar"]
@@ -533,6 +550,12 @@ message TraceConfig {
   // This should not be used in a remote trace config via statsd, doing so will
   // result in a hung trace session.
   optional bool deferred_start = 12;
+
+  // When set, it periodically issues a Flush() to all data source, forcing them
+  // to commit their data into the tracing service. This can be used for
+  // quasi-real-time streaming mode and to guarantee some partial ordering of
+  // events in the trace in windows of X ms.
+  optional uint32 flush_period_ms = 13;
 }
 
 // End of protos/perfetto/config/trace_config.proto
@@ -541,7 +564,7 @@ message TraceConfig {
 
 // Configuration for go/heapprofd.
 message HeapprofdConfig {
-  message ContinousDumpConfig {
+  message ContinuousDumpConfig {
     // ms to wait before first dump.
     optional uint32 dump_phase_ms = 5;
     // ms to wait between following dumps.
@@ -550,22 +573,22 @@ message HeapprofdConfig {
 
   // Set to 1 for perfect accuracy.
   // Otherwise, sample every sample_interval_bytes on average.
-  // TODO: Add link to docs elaborating on this.
+  // TODO(fmayer): Add link to docs elaborating on this.
   optional uint64 sampling_interval_bytes = 1;
 
   // E.g. surfaceflinger, com.android.phone
   repeated string process_cmdline = 2;
-  // repeated string android_app = 3;  // TODO: Implement
+  // repeated string android_app = 3;  // TODO(fmayer): Implement
   // For watermark based triggering or local debugging.
   repeated uint64 pid = 4;
   optional bool all = 5;
 
   // Dump once at the end of the trace, emitting the heap dump at maximum
   // memory usage.
-  // optional bool retain_max = 5;  // TODO: Implement
+  // optional bool retain_max = 5;  // TODO(fmayer): Implement
 
   // Dump at a predefined interval.
-  optional ContinousDumpConfig continuous_dump_config = 6;
+  optional ContinuousDumpConfig continuous_dump_config = 6;
 }
 
 // End of protos/perfetto/config/profiling/heapprofd_config.proto

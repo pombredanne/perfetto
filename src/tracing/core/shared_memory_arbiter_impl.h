@@ -56,6 +56,8 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
   // |OnPagesCompleteCallback|: a callback that will be posted on the passed
   // |TaskRunner| when one or more pages are complete (and hence the Producer
   // should send a CommitData request to the Service).
+  // |TaskRunner|: Task runner for perfetto's main thread, which executes the
+  // OnPagesCompleteCallback and IPC calls to the |ProducerEndpoint|.
   SharedMemoryArbiterImpl(void* start,
                           size_t size,
                           size_t page_size,
@@ -81,6 +83,13 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
                             BufferID target_buffer,
                             PatchList*);
 
+  // Send a request to the service to apply completed patches from |patch_list|.
+  // |writer_id| is the ID of the TraceWriter that calls this method,
+  // |target_buffer| is the global trace buffer ID of its target buffer.
+  void SendPatches(WriterID writer_id,
+                   BufferID target_buffer,
+                   PatchList* patch_list);
+
   // Forces a synchronous commit of the completed packets without waiting for
   // the next task.
   void FlushPendingCommitDataRequests(std::function<void()> callback = {});
@@ -105,6 +114,11 @@ class SharedMemoryArbiterImpl : public SharedMemoryArbiter {
 
   SharedMemoryArbiterImpl(const SharedMemoryArbiterImpl&) = delete;
   SharedMemoryArbiterImpl& operator=(const SharedMemoryArbiterImpl&) = delete;
+
+  void UpdateCommitDataRequest(SharedMemoryABI::Chunk chunk,
+                               WriterID writer_id,
+                               BufferID target_buffer,
+                               PatchList* patch_list);
 
   // Called by the TraceWriter destructor.
   void ReleaseWriterID(WriterID);

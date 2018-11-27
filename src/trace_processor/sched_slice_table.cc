@@ -16,9 +16,6 @@
 
 #include "src/trace_processor/sched_slice_table.h"
 
-#include "src/trace_processor/storage_cursor.h"
-#include "src/trace_processor/table_utils.h"
-
 namespace perfetto {
 namespace trace_processor {
 
@@ -29,16 +26,15 @@ void SchedSliceTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
   Table::Register<SchedSliceTable>(db, storage, "sched");
 }
 
-Table::Schema SchedSliceTable::CreateSchema(int, const char* const*) {
+base::Optional<Table::Schema> SchedSliceTable::Init(int, const char* const*) {
   const auto& slices = storage_->slices();
-  std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("ts", &slices.start_ns(),
-                                      false /* hidden */, true /* ordered */),
-      StorageSchema::NumericColumnPtr("cpu", &slices.cpus()),
-      StorageSchema::NumericColumnPtr("dur", &slices.durations()),
-      StorageSchema::TsEndPtr("ts_end", &slices.start_ns(),
-                              &slices.durations()),
-      StorageSchema::NumericColumnPtr("utid", &slices.utids())};
+  std::unique_ptr<StorageColumn> cols[] = {
+      NumericColumnPtr("ts", &slices.start_ns(), false /* hidden */,
+                       true /* ordered */),
+      NumericColumnPtr("cpu", &slices.cpus()),
+      NumericColumnPtr("dur", &slices.durations()),
+      TsEndPtr("ts_end", &slices.start_ns(), &slices.durations()),
+      NumericColumnPtr("utid", &slices.utids())};
   schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
@@ -50,10 +46,9 @@ std::unique_ptr<Table::Cursor> SchedSliceTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
   uint32_t count = static_cast<uint32_t>(storage_->slices().slice_count());
-  auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
-                                                               qc, argv);
+  auto it = CreateBestRowIteratorForGenericSchema(count, qc, argv);
   return std::unique_ptr<Table::Cursor>(
-      new StorageCursor(std::move(it), schema_.ToColumnReporters()));
+      new Cursor(std::move(it), schema_.mutable_columns()));
 }
 
 int SchedSliceTable::BestIndex(const QueryConstraints& qc,
