@@ -61,7 +61,7 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   // Test extremely large writes (fill the buffer)
   for (int i = 0; i < 3; i++) {
     // Write precisely |buf_size| bytes (minus the size header itself).
-    std::string data(buf_size - sizeof(uint32_t), '.' + static_cast<char>(i));
+    std::string data(buf_size - sizeof(uint64_t), '.' + static_cast<char>(i));
     ASSERT_TRUE(wr->Write(data.data(), data.size()));
     ASSERT_FALSE(wr->Write(data.data(), data.size()));
     ASSERT_FALSE(wr->Write("?", 1));
@@ -72,13 +72,13 @@ void StructuredTest(SharedRingBuffer* wr, SharedRingBuffer* rd) {
   }
 
   // Test large writes that wrap.
-  std::string data(buf_size / 4 * 3 - sizeof(uint32_t), '!');
+  std::string data(buf_size / 4 * 3 - sizeof(uint64_t), '!');
   ASSERT_TRUE(wr->Write(data.data(), data.size()));
   ASSERT_FALSE(wr->Write(data.data(), data.size()));
   buf_and_size = rd->Read();
   ASSERT_EQ(ToString(buf_and_size), data);
 
-  data = std::string(base::kPageSize - sizeof(uint32_t), '#');
+  data = std::string(base::kPageSize - sizeof(uint64_t), '#');
   for (int i = 0; i < 4; i++)
     ASSERT_TRUE(wr->Write(data.data(), data.size()));
 
@@ -121,8 +121,7 @@ TEST(SharedRingBufferTest, SingleThreadAttach) {
 }
 
 TEST(SharedRingBufferTest, MultiThreadingTest) {
-  // TODO got corrupted header with * 128 on mac.  // DNS
-  constexpr auto kBufSize = base::kPageSize * 128;
+  constexpr auto kBufSize = base::kPageSize * 1024;  // 4 MB
   SharedRingBuffer rd = *SharedRingBuffer::Create(kBufSize);
   SharedRingBuffer wr =
       *SharedRingBuffer::Attach(base::ScopedFile(dup(rd.fd())));
@@ -136,13 +135,17 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
     while (!writers_enabled.load()) {
     }
     std::minstd_rand0 rnd_engine(static_cast<uint32_t>(thread_id));
-    std::uniform_int_distribution<size_t> dist(1, base::kPageSize * 4);
+    std::uniform_int_distribution<size_t> dist(1, base::kPageSize * 8);
     for (int i = 0; i < 10000; i++) {
       size_t size = dist(rnd_engine);
-      std::string data(size, '0' + static_cast<char>(thread_id));
+      std::string data;
+      data.resize(size);
+      std::generate(data.begin(), data.end(), rnd_engine);
       if (wr.Write(data.data(), data.size())) {
         std::lock_guard<std::mutex> lock(mutex);
         expected_contents[std::move(data)]++;
+      } else {
+        std::this_thread::yield();
       }
     }
   };
@@ -156,6 +159,7 @@ TEST(SharedRingBufferTest, MultiThreadingTest) {
           // data left in the ring buffer.
           return;
         } else {
+          std::this_thread::yield();
           continue;
         }
       }

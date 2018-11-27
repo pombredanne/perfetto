@@ -30,6 +30,7 @@
 namespace perfetto {
 namespace profiling {
 
+// TODO like SEQ_PACKET. Both sides are trusted.
 class SharedRingBuffer {
  public:
   using BufferAndSize = std::pair<std::unique_ptr<uint8_t[]>, size_t>;
@@ -53,10 +54,11 @@ class SharedRingBuffer {
     uint64_t write_pos;
 
     // stats, for debugging only.
-    uint64_t bytes_written;
-    uint64_t num_writes_succeeded;
-    uint64_t num_writes_failed;
-    uint64_t num_reads_failed;
+    std::atomic<uint64_t> failed_spinlocks;
+    std::atomic<uint64_t> bytes_written;
+    std::atomic<uint64_t> num_writes_succeeded;
+    std::atomic<uint64_t> num_writes_failed;
+    std::atomic<uint64_t> num_reads_failed;
 
     // TODO static assert offsets.
   };
@@ -70,8 +72,21 @@ class SharedRingBuffer {
   void Initialize(base::ScopedFile mem_fd);
   bool IsCorrupt();
 
+  // Must be called holding the spinlock.
+  inline size_t read_avail() {
+    PERFETTO_DCHECK(meta_->write_pos >= meta_->read_pos);
+    auto res = static_cast<size_t>(meta_->write_pos - meta_->read_pos);
+    PERFETTO_DCHECK(res <= size_);
+    return res;
+  }
+
+  // Must be called holding the spinlock.
+  inline size_t write_avail() { return size_ - read_avail(); }
+
+  inline uint8_t* at(uint64_t pos) { return mem_ + (pos & (size_ - 1)); }
+
   base::ScopedFile mem_fd_;
-  MetadataPage* meta_ = nullptr;
+  MetadataPage* meta_ = nullptr;  // Start of the mmaped region.
   uint8_t* mem_ = nullptr;  // Start of the contents (i.e. meta_ + kPageSize).
 
   // Size of the ring buffer contents, without including metadata or the 2nd
