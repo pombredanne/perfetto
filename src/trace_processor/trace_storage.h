@@ -116,11 +116,11 @@ class TraceStorage {
 
     static const Id kInvalidId;
 
-    size_t AddInt64Arg(Table table,
-                       size_t row,
-                       StringId name_without_index,
-                       StringId name_with_index,
-                       int64_t value) {
+    Id AddInt64Arg(Table table,
+                   size_t row,
+                   StringId name_without_index,
+                   StringId name_with_index,
+                   int64_t value) {
       auto id = CreateId(table, row);
       ids_.emplace_back(id);
       names_without_index_.emplace_back(name_without_index);
