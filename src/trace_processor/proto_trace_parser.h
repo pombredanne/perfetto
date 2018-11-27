@@ -84,7 +84,10 @@ class ProtoTraceParser {
   void ParseLowmemoryKill(uint64_t ts, TraceBlobView);
 
  private:
+  using StorageTable = TraceStorage::Args::Table;
+
   TraceProcessorContext* context_;
+  const StringId utid_name_id_;
   const StringId cpu_freq_name_id_;
   const StringId num_forks_name_id_;
   const StringId num_irq_total_name_id_;
