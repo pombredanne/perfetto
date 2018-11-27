@@ -30,7 +30,29 @@
 namespace perfetto {
 namespace profiling {
 
-// TODO like SEQ_PACKET. Both sides are trusted.
+// A concurrent, multi-writer multi-reader ring buffer FIFO, based on a circular
+// buffer over shared memory.
+// It has similar semantics to a SEQ_PACKET + O_NONBLOCK socket, specifically:
+// - Writes are atomic, data is either written fully in the buffer or not.
+// - New writes are discarded if the buffer is full.
+// - If a write succeeds, the reader is guaranteed to see the whole buffer.
+// - Reads are atomic, no fragmentation.
+// - The reader sees writes in write order (% discarding).
+//
+// This class assumes that reader and write trust each other. Don't use in
+// untrusted contexts.
+//
+// TODO:
+// - The writer should hold a spinlock only for updating the write pointer. The
+//   underlying memcpy() should happen outside of the lock. Requires some small
+//   juggling with atomics, the size field should be written at the end with a
+//   release store (and matched with an acquire load on the reader side).
+// - The reader should be able to ahold of a buffer without copying it, with a
+//   BeginRead/EndRead API. That must prevent the writer from overwriting the
+//   data though.
+// - Rename methods to TryRead / TryWrite.
+// - Write a benchmark.
+// - Make the stats ifdef-able.
 class SharedRingBuffer {
  public:
   using BufferAndSize = std::pair<std::unique_ptr<uint8_t[]>, size_t>;
