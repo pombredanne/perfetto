@@ -1,9 +1,11 @@
 #!/bin/bash
+set -e
+
 echo ""
 echo "Downloading latest copy of test data"
 echo ""
-LATEST_TEST_DATA="$(gsutil ls gs://perfetto | sort | grep test-data | tail -n 1)"
-gsutil cp $LATEST_TEST_DATA /tmp/latest-test-data.zip
+LATEST_ZIP="$(gsutil ls gs://perfetto | sort | grep test-data | tail -n 1)"
+gsutil cp $LATEST_ZIP /tmp/latest-test-data.zip
 
 echo ""
 echo "Extracting test data to temp folder"
@@ -38,7 +40,7 @@ echo $(sha1sum /tmp/$NEW_TEST_DATA)
 echo ""
 echo "Cleaning up leftover files"
 echo ""
-rm -r /tmp/latest-test-data 
+rm -r /tmp/latest-test-data
 rm /tmp/latest-test-data.zip
 rm /tmp/$NEW_TEST_DATA
 
