@@ -72,15 +72,15 @@ void EventTracker::PushSchedSwitch(uint32_t cpu,
   pending_slice->pid = next_pid;
 }
 
-void EventTracker::PushCounter(uint64_t timestamp,
-                               double value,
-                               StringId name_id,
-                               uint64_t ref,
-                               RefType ref_type) {
+base::Optional<size_t> EventTracker::PushCounter(uint64_t timestamp,
+                                                 double value,
+                                                 StringId name_id,
+                                                 uint64_t ref,
+                                                 RefType ref_type) {
   if (timestamp < prev_timestamp_) {
     PERFETTO_ELOG("counter event out of order by %.4f ms, skipping",
                   (prev_timestamp_ - timestamp) / 1e6);
-    return;
+    return base::nullopt;
   }
   prev_timestamp_ = timestamp;
 
@@ -95,9 +95,11 @@ void EventTracker::PushCounter(uint64_t timestamp,
   }
 
   // At this point we don't know the duration so just store 0.
-  pending_counters_per_key_[key] =
+  size_t counter_idx =
       counters->AddCounter(timestamp, 0 /* duration */, name_id, value,
                            static_cast<int64_t>(ref), ref_type);
+  pending_counters_per_key_[key] = counter_idx;
+  return base::make_optional(counter_idx);
 }
 
 }  // namespace trace_processor

@@ -53,7 +53,7 @@ Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
     const QueryConstraints& qc,
     sqlite3_value** argv) {
-  uint32_t count = static_cast<uint32_t>(storage_->counters().counter_count());
+  uint32_t count = static_cast<uint32_t>(storage_->args().args_count());
   auto it = table_utils::CreateBestRowIteratorForGenericSchema(schema_, count,
                                                                qc, argv);
   return std::unique_ptr<Table::Cursor>(
