@@ -41,6 +41,11 @@ bool SplitValueAndUnit(const std::string& arg, ValueUnit* out) {
 bool ConvertValue(const std::string& arg,
                   std::vector<UnitMultipler> units,
                   uint64_t* out) {
+  if (arg.empty()) {
+    *out = 0;
+    return true;
+  }
+
   ValueUnit value_unit{};
   if (!SplitValueAndUnit(arg, &value_unit))
     return false;
@@ -81,38 +86,34 @@ bool ConvertSizeToKb(const std::string& arg, uint64_t* out) {
 bool CreateConfigFromOptions(const ConfigOptions& options,
                              TraceConfig* config) {
   uint64_t duration_ms = 0;
-  if (!options.time.empty()) {
-    if (!ConvertTimeToMs(options.time, &duration_ms))
-      return false;
-  }
+  if (!ConvertTimeToMs(options.time, &duration_ms))
+    return false;
 
   uint64_t buffer_size_kb = 0;
-  if (!options.buffer_size.empty()) {
-    if (!ConvertSizeToKb(options.buffer_size, &buffer_size_kb))
-      return false;
-  }
+  if (!ConvertSizeToKb(options.buffer_size, &buffer_size_kb))
+    return false;
 
   uint64_t max_file_size_kb = 0;
-  if (!options.max_file_size.empty()) {
-    if (!ConvertSizeToKb(options.max_file_size, &max_file_size_kb))
-      return false;
-  }
+  if (!ConvertSizeToKb(options.max_file_size, &max_file_size_kb))
+    return false;
 
   std::vector<std::string> ftrace_events;
   std::vector<std::string> atrace_categories;
   std::vector<std::string> atrace_apps = options.atrace_apps;
 
   for (const auto& category : options.categories) {
-    if (category.find(":") == std::string::npos) {
+    if (category.find("/") == std::string::npos) {
       atrace_categories.push_back(category);
     } else {
       ftrace_events.push_back(category);
     }
   }
 
+
   config->set_duration_ms(static_cast<unsigned int>(duration_ms));
   config->set_max_file_size_bytes(static_cast<unsigned int>(max_file_size_kb));
-  config->set_write_into_file(true);
+  if (max_file_size_kb)
+    config->set_write_into_file(true);
   config->add_buffers()->set_size_kb(static_cast<unsigned int>(buffer_size_kb));
   auto* ds_config = config->add_data_sources()->mutable_config();
   ds_config->set_name("linux.ftrace");

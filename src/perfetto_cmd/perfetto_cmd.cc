@@ -309,8 +309,13 @@ int PerfettoCmd::Main(int argc, char** argv) {
       continue;
     }
 
+    return PrintUsage(argv[0]);
+  }
+
+  for (ssize_t i = optind; i < argc; i++) {
     has_config_options = true;
-    config_options.categories.push_back(optarg);
+    PERFETTO_ELOG("%s", argv[i]);
+    config_options.categories.push_back(argv[i]);
   }
 
   if (!trace_out_path_.empty() && !dropbox_tag_.empty()) {
@@ -326,12 +331,13 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   perfetto::protos::TraceConfig trace_config_proto;
 
+
   bool parsed;
   if (has_config_options) {
     if (!trace_config_raw.empty()) {
       PERFETTO_ELOG(
-          "Cannot specify both -c/--config and any of --length, --size, "
-          "--buffer, --process, ATRACE_CAT, FTRACE_GROUP:FTRACE_NAME");
+          "Cannot specify both -c/--config and any of --time, --size, "
+          "--buffer, --app, ATRACE_CAT, FTRACE_GROUP:FTRACE_NAME");
       return 1;
     }
     parsed = CreateConfigFromOptions(config_options, &trace_config_proto);
@@ -353,11 +359,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
       PERFETTO_ELOG("Could not parse TraceConfig proto");
       return 1;
     }
-    *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
-    trace_config_.reset(new TraceConfig());
-    trace_config_->FromProto(trace_config_proto);
-    trace_config_raw.clear();
   }
+
+  *trace_config_proto.mutable_statsd_metadata() = std::move(statsd_metadata);
+  trace_config_.reset(new TraceConfig());
+  trace_config_->FromProto(trace_config_proto);
+  trace_config_raw.clear();
 
   if (!OpenOutputFile())
     return 1;
