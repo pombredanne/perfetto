@@ -76,7 +76,11 @@ class MockTaskRunner : public base::TaskRunner {
     task_ = std::move(task);
   }
 
-  void RunLastTask() { TakeTask()(); }
+  void RunLastTask() {
+    auto task = TakeTask();
+    if (task)
+      task();
+  }
 
   std::function<void()> TakeTask() {
     std::unique_lock<std::mutex> lock(lock_);
