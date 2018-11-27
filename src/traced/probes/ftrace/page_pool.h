@@ -34,19 +34,55 @@
 
 namespace perfetto {
 
+// This class is a page allocator designed around the way the ftrace CpuReader
+// (the thing that reads the kernel trace_pipe_raw) needs to manage memory.
+// For context, CpuReader (and hence this class) is used on two threads:
+// (1) A worker thread that writes into the buffer and (2) the main thread which
+// reads all the content in big batches and turn them into protos.
+// There is always at most one thread writing and one thread reading. In rare
+// circumstances they can be active at the same time.
+// It is optimized for the following use case:
+// - Most of the times CpuReader wants to write 4096 bytes. In some rare cases
+//   (read() during flush) it wants to write < 4096 bytes.
+// - Even when it writes < 4096 bytes, CpuReader can figure out the size of the
+//   payload from the ftrace header. We don't need extra tracking to tell how
+//   much of each 4KB are used.
+// - Doing a syscall for each page seems overkill. In most occasions CpuReader
+//   does bursts of several pages in one go.
+// - We can't really predict upfront how big the write bursts will be, hence we
+//   cannot predict the size of the pool, unless we accept a very high bound.
+//   In extreme conditions CpuReader will read the whole per-cpu ftrace buffer
+//   in one go, while the reader is still reading the previous batch.
+// - Write burst should not be too frequent, so once they are over it's worth
+//   spending some extra cycles to release the memory.
+// - The reader side always wants to read *all* the written pages in one batch.
+//   While this happens though, the write might want to write more.
+//
+// The architecture of this class is as follows. Pages are organized in
+// PageBlock(s). A PageBlock is simply an array of pages and is the elementary
+// unit of memory allocation and frees. Pages within one block are cheaply
+// allocated with a simple bump-pointer allocator.
+// At any point a whole PageBlock can be in any of these tree lists:
+//
+// |allocated_|: PageBlock(s) allocated and being written by the worker thread.
+//               This list is accessed only on the writer thread.
+// |ready_|:     PageBlock(s) that have been completely written and are ready
+//               be consumed by the reader.
+//               This list is accessed by both threads holding the mutex.
+// |freelist|:   PageBlock(s) that have been read and can be reused by the
+//               writer.
+//               This list is accessed by both threads holding the mutex.
 class PagePool {
  public:
+
   class PageBlock {
    public:
     static constexpr size_t kPagesPerBlock = 32;  // 32 * 4KB = 128 KB.
-    static constexpr size_t kMemSize = kPagesPerBlock * base::kPageSize;
+    static constexpr size_t kBlockSize = kPagesPerBlock * base::kPageSize;
 
+    // This factory method is just that we accidentally create extra blocks
+    // without realizing by triggering the default constructor in containers.
     static PageBlock Create() { return PageBlock(); }
-
-    ~PageBlock() {
-      if (mem_.IsValid())
-        PERFETTO_ELOG("--------block");  // DNS
-    }
 
     PageBlock(PageBlock&&) noexcept = default;
     PageBlock& operator=(PageBlock&&) = default;
@@ -54,42 +90,39 @@ class PagePool {
     bool is_full() const { return size_ >= kPagesPerBlock; }
     size_t size() const { return size_; }
 
+    // Returns the pointer to the contents of the i-th page in the block.
     uint8_t* at(size_t i) const {
       PERFETTO_DCHECK(i < kPagesPerBlock);
       return reinterpret_cast<uint8_t*>(mem_.Get()) + i * base::kPageSize;
     }
 
-   private:
-    friend class PagePool;
-    PageBlock(const PageBlock&) = delete;
-    PageBlock& operator=(const PageBlock&) = delete;
-
-    PageBlock() {
-      PERFETTO_ILOG("++++++++block");  // DNS
-      mem_ = base::PagedMemory::Allocate(kMemSize);
-      static_assert(
-          kPagesPerBlock <= std::numeric_limits<decltype(size_)>::max(),
-          "size_ type is too small");
-    }
-
+    // Gets a new page. The caller (PagePool) needs to check upfront that the
+    // pool is not full.
     uint8_t* Allocate() {
       PERFETTO_CHECK(!is_full());
       return at(size_++);
     }
 
+    // Puts back the last page allocated. |page| is used only for DCHECKs.
     void FreeLastPage(uint8_t* page) {
       PERFETTO_DCHECK(size_ > 0);
       size_--;
       PERFETTO_DCHECK(page == at(size_));
     }
 
+    // Releases memory of the block and marks it available for reuse.
     void Clear() {
       size_ = 0;
-      mem_.AdviseDontNeed(mem_.Get(), kMemSize);
+      mem_.AdviseDontNeed(mem_.Get(), kBlockSize);
     }
 
+   private:
+    PageBlock(const PageBlock&) = delete;
+    PageBlock& operator=(const PageBlock&) = delete;
+    PageBlock() { mem_ = base::PagedMemory::Allocate(kBlockSize); }
+
     base::PagedMemory mem_;
-    uint16_t size_ = 0;
+    size_t size_ = 0;
   };
 
   PagePool() {
