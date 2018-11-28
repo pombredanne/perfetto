@@ -107,7 +107,6 @@ def main(argv):
 
   args = parser.parse_args()
 
-
   fail = False
   if args.all is None and args.pid is None and args.name is None:
     print("FATAL: Neither --all nor PID nor NAME given.", file=sys.stderr)
