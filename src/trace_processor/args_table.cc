@@ -100,26 +100,25 @@ ArgsTable::ValueColumn::Bounds ArgsTable::ValueColumn::BoundFilter(
   return Bounds{};
 }
 
-void ArgsTable::ValueColumn::Filter(
-    int op,
-    sqlite3_value* value,
-    StorageSchema::FilterIterator iterator) const {
+void ArgsTable::ValueColumn::Filter(int op,
+                                    sqlite3_value* value,
+                                    StorageSchema::FilterHelper helper) const {
   switch (type_) {
     case VarardicType::kInt: {
       auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
       int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
-      for (; iterator.HasMore(); iterator.Next()) {
-        const auto& arg = storage_->args().arg_values()[iterator.Row()];
-        iterator.Set(arg.type == type_ && binary_op(arg.int_value, extracted));
+      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+        const auto& arg = storage_->args().arg_values()[it.Row()];
+        it.Set(arg.type == type_ && binary_op(arg.int_value, extracted));
       }
       break;
     }
     case VarardicType::kReal: {
       auto binary_op = sqlite_utils::GetPredicateForOp<double>(op);
       double extracted = sqlite_utils::ExtractSqliteValue<double>(value);
-      for (; iterator.HasMore(); iterator.Next()) {
-        const auto& arg = storage_->args().arg_values()[iterator.Row()];
-        iterator.Set(arg.type == type_ && binary_op(arg.real_value, extracted));
+      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+        const auto& arg = storage_->args().arg_values()[it.Row()];
+        it.Set(arg.type == type_ && binary_op(arg.real_value, extracted));
       }
       break;
     }
@@ -127,10 +126,10 @@ void ArgsTable::ValueColumn::Filter(
       auto binary_op = sqlite_utils::GetPredicateForOp<std::string>(op);
       const auto* extracted =
           reinterpret_cast<const char*>(sqlite3_value_text(value));
-      for (; iterator.HasMore(); iterator.Next()) {
-        const auto& arg = storage_->args().arg_values()[iterator.Row()];
+      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+        const auto& arg = storage_->args().arg_values()[it.Row()];
         const auto& str = storage_->GetString(arg.string_value);
-        iterator.Set(arg.type == type_ && binary_op(str, extracted));
+        it.Set(arg.type == type_ && binary_op(str, extracted));
       }
       break;
     }

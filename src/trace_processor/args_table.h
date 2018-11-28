@@ -51,7 +51,7 @@ class ArgsTable : public Table {
 
     void Filter(int op,
                 sqlite3_value* value,
-                StorageSchema::FilterIterator) const override;
+                StorageSchema::FilterHelper) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 

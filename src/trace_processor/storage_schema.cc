@@ -45,8 +45,12 @@ size_t StorageSchema::ColumnIndexFromName(const std::string& name) {
   return static_cast<size_t>(std::distance(columns_.begin(), it));
 }
 
-StorageSchema::FilterIterator::FilterIterator(uint32_t start_row,
-                                              std::vector<bool>* row_filter)
+StorageSchema::FilterHelper::FilterHelper(uint32_t start_row,
+                                          std::vector<bool>* row_filter)
+    : start_row_(start_row), row_filter_(row_filter) {}
+
+StorageSchema::FilterHelper::Iterator::Iterator(uint32_t start_row,
+                                                std::vector<bool>* row_filter)
     : start_row_(start_row), row_filter_(row_filter) {
   FindNext();
 }
@@ -77,13 +81,13 @@ StorageSchema::Column::Bounds StorageSchema::TsEndColumn::BoundFilter(
 
 void StorageSchema::TsEndColumn::Filter(int op,
                                         sqlite3_value* value,
-                                        FilterIterator iterator) const {
+                                        FilterHelper helper) const {
   auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
   uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-  for (; iterator.HasMore(); iterator.Next()) {
-    auto row = iterator.Row();
+  for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+    auto row = it.Row();
     uint64_t add = (*ts_start_)[row] + (*dur_)[row];
-    iterator.Set(binary_op(add, extracted));
+    it.Set(binary_op(add, extracted));
   }
 }
 
