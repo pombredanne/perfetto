@@ -87,7 +87,7 @@ SystemProperties::Handle SystemProperties::SetAll() {
 
 // This is conditionally noreturn, so disable the warning.
 #pragma GCC diagnostic push
-#if !PERFETTO_BUILDFLAG(PERFETTO_OS_MACOSX)
+#if PERFETTO_DCHECK_IS_ON()
 #pragma GCC diagnostic ignored "-Wmissing-noreturn"
 #endif
 
