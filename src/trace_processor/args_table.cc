@@ -131,6 +131,7 @@ ArgsTable::ValueColumn::Predicate ArgsTable::ValueColumn::Filter(
       };
     }
   }
+  PERFETTO_CHECK(false);
 }
 
 ArgsTable::ValueColumn::Comparator ArgsTable::ValueColumn::Sort(
