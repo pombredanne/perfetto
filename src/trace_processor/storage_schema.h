@@ -206,7 +206,6 @@ class StorageSchema {
     virtual void Filter(int op,
                         sqlite3_value* value,
                         FilterHelper helper) const override {
-      PERFETTO_LOG("TEST");
       auto type = sqlite3_value_type(value);
       if (type == SQLITE_INTEGER && std::is_integral<T>::value) {
         FilterWithCast<int64_t>(op, value, std::move(helper));
