@@ -70,15 +70,9 @@ inline RangeRowIterator CreateRangeIterator(
     auto* value = argv[c_idx];
 
     auto col = static_cast<size_t>(c.iColumn);
-    auto predicate = schema.GetColumn(col).Filter(c.op, value);
-
-    auto b = filter.begin();
-    auto e = filter.end();
-    using std::find;
-    for (auto it = find(b, e, true); it != e; it = find(it + 1, e, true)) {
-      auto filter_idx = static_cast<uint32_t>(std::distance(b, it));
-      *it = predicate(min_idx + filter_idx);
-    }
+    const auto& schema_col = schema.GetColumn(col);
+    schema_col.Filter(c.op, value,
+                      StorageSchema::FilterIterator(min_idx, &filter));
   }
   return RangeRowIterator(min_idx, desc, std::move(filter));
 }

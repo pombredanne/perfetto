@@ -45,6 +45,12 @@ size_t StorageSchema::ColumnIndexFromName(const std::string& name) {
   return static_cast<size_t>(std::distance(columns_.begin(), it));
 }
 
+StorageSchema::FilterIterator::FilterIterator(uint32_t start_row,
+                                              std::vector<bool>* row_filter)
+    : start_row_(start_row), row_filter_(row_filter) {
+  FindNext();
+}
+
 StorageSchema::Column::Column(std::string col_name, bool hidden)
     : col_name_(col_name), hidden_(hidden) {}
 StorageSchema::Column::~Column() = default;
@@ -69,15 +75,16 @@ StorageSchema::Column::Bounds StorageSchema::TsEndColumn::BoundFilter(
   return bounds;
 }
 
-StorageSchema::Column::Predicate StorageSchema::TsEndColumn::Filter(
-    int op,
-    sqlite3_value* value) const {
-  auto bipredicate = sqlite_utils::GetPredicateForOp<uint64_t>(op);
+void StorageSchema::TsEndColumn::Filter(int op,
+                                        sqlite3_value* value,
+                                        FilterIterator iterator) const {
+  auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
   uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-  return [this, bipredicate, extracted](uint32_t idx) {
-    uint64_t add = (*ts_start_)[idx] + (*dur_)[idx];
-    return bipredicate(add, extracted);
-  };
+  for (; iterator.HasMore(); iterator.Next()) {
+    auto row = iterator.Row();
+    uint64_t add = (*ts_start_)[row] + (*dur_)[row];
+    iterator.Set(binary_op(add, extracted));
+  }
 }
 
 StorageSchema::Column::Comparator StorageSchema::TsEndColumn::Sort(

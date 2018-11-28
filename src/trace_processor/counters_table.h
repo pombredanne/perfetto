@@ -45,7 +45,9 @@ class CountersTable : public Table {
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
 
-    Predicate Filter(int op, sqlite3_value* value) const override;
+    void Filter(int op,
+                sqlite3_value* value,
+                StorageSchema::FilterIterator) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 
