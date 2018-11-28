@@ -31,6 +31,61 @@ namespace trace_processor {
 // Used by all tables which are backed by data in TraceStorage.
 class StorageSchema {
  public:
+  // Helper used by filter operations. It is used to update a backing
+  // vector<bool>.
+  class FilterHelper {
+   public:
+    class Iterator {
+     public:
+      Iterator(uint32_t start_row, std::vector<bool>* row_filter);
+
+      PERFETTO_ALWAYS_INLINE void Next() {
+        offset_++;
+        FindNext();
+      }
+
+      PERFETTO_ALWAYS_INLINE bool HasMore() const {
+        return offset_ < row_filter_->size();
+      }
+
+      PERFETTO_ALWAYS_INLINE uint32_t Row() const {
+        return offset_ + start_row_;
+      }
+
+      PERFETTO_ALWAYS_INLINE void Set(bool value) {
+        (*row_filter_)[offset_] = value;
+      }
+
+     private:
+      PERFETTO_ALWAYS_INLINE void FindNext() {
+        auto begin = row_filter_->begin();
+        auto prev_it = begin + static_cast<ptrdiff_t>(offset_);
+        auto current_it = std::find(prev_it, row_filter_->end(), true);
+        offset_ = static_cast<uint32_t>(std::distance(begin, current_it));
+      }
+
+      uint32_t start_row_;
+      uint32_t offset_ = 0;
+      std::vector<bool>* row_filter_;
+    };
+
+    FilterHelper(uint32_t start_row, std::vector<bool>* row_filter);
+
+    // Allow std::move().
+    FilterHelper(FilterHelper&&) noexcept = default;
+    FilterHelper& operator=(FilterHelper&&) = default;
+
+    // Disable implicit copy.
+    FilterHelper(const FilterHelper&) = delete;
+    FilterHelper& operator=(const FilterHelper&) = delete;
+
+    Iterator Rows() const { return Iterator(start_row_, row_filter_); }
+
+   private:
+    uint32_t start_row_;
+    std::vector<bool>* row_filter_;
+  };
+
   // A column of data backed by data storage.
   class Column : public StorageCursor::ColumnReporter {
    public:
@@ -55,7 +110,7 @@ class StorageSchema {
     // Given a SQLite operator and value for the comparision, returns a
     // predicate which takes in a row index and returns whether the row should
     // be returned.
-    virtual Predicate Filter(int op, sqlite3_value* value) const = 0;
+    virtual void Filter(int op, sqlite3_value* value, FilterHelper) const = 0;
 
     // Given a order by constraint for this column, returns a comparator
     // function which compares data in this column at two indices.
@@ -128,12 +183,14 @@ class StorageSchema {
       return bounds;
     }
 
-    Predicate Filter(int op, sqlite3_value* value) const override {
+    void Filter(int op,
+                sqlite3_value* value,
+                FilterHelper helper) const override {
       auto type = sqlite3_value_type(value);
       if (type == SQLITE_INTEGER && std::is_integral<T>::value) {
-        return FilterWithCast<int64_t>(op, value);
+        FilterWithCast<int64_t>(op, value, std::move(helper));
       } else if (type == SQLITE_INTEGER || type == SQLITE_FLOAT) {
-        return FilterWithCast<double>(op, value);
+        FilterWithCast<double>(op, value, std::move(helper));
       } else {
         PERFETTO_FATAL("Unexpected sqlite value to compare against");
       }
@@ -173,13 +230,15 @@ class StorageSchema {
     T kTMax = std::numeric_limits<T>::max();
 
     template <typename C>
-    Predicate FilterWithCast(int op, sqlite3_value* value) const {
+    void FilterWithCast(int op,
+                        sqlite3_value* value,
+                        FilterHelper helper) const {
       auto binary_op = sqlite_utils::GetPredicateForOp<C>(op);
       C extracted = sqlite_utils::ExtractSqliteValue<C>(value);
-      return [this, binary_op, extracted](uint32_t idx) {
-        auto val = static_cast<C>((*deque_)[idx]);
-        return binary_op(val, extracted);
-      };
+      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+        auto val = static_cast<C>((*deque_)[it.Row()]);
+        it.Set(binary_op(val, extracted));
+      }
     }
 
     const std::deque<T>* deque_ = nullptr;
@@ -211,9 +270,7 @@ class StorageSchema {
       return bounds;
     }
 
-    Predicate Filter(int, sqlite3_value*) const override {
-      return [](uint32_t) { return true; };
-    }
+    void Filter(int, sqlite3_value*, FilterHelper) const override {}
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
@@ -250,20 +307,12 @@ class StorageSchema {
                 const std::deque<uint64_t>* dur);
     virtual ~TsEndColumn() override;
 
-    // Implements StorageCursor::ColumnReporter.
     void ReportResult(sqlite3_context*, uint32_t) const override;
 
-    // Bounds a filter on this column between a minimum and maximum index.
-    // Generally this is only possible if the column is sorted.
     Bounds BoundFilter(int op, sqlite3_value* value) const override;
 
-    // Given a SQLite operator and value for the comparision, returns a
-    // predicate which takes in a row index and returns whether the row should
-    // be returned.
-    Predicate Filter(int op, sqlite3_value* value) const override;
+    void Filter(int op, sqlite3_value* value, FilterHelper) const override;
 
-    // Given a order by constraint for this column, returns a comparator
-    // function which compares data in this column at two indices.
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 
     // Returns the type of this column.
@@ -271,7 +320,6 @@ class StorageSchema {
       return Table::ColumnType::kUlong;
     }
 
-    // Returns whether this column is sorted in the storage.
     bool IsNaturallyOrdered() const override { return false; }
 
    private:
@@ -296,13 +344,15 @@ class StorageSchema {
 
     Bounds BoundFilter(int, sqlite3_value*) const override { return Bounds{}; }
 
-    Predicate Filter(int op, sqlite3_value* value) const override {
+    void Filter(int op,
+                sqlite3_value* value,
+                FilterHelper helper) const override {
       auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
       uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-      return [this, binary_op, extracted](uint32_t idx) {
-        auto val = static_cast<uint64_t>((*ids_)[idx]);
-        return binary_op(val, extracted);
-      };
+      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
+        auto val = static_cast<uint64_t>((*ids_)[it.Row()]);
+        it.Set(binary_op(val, extracted));
+      }
     }
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
