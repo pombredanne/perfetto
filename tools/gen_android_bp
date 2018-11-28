@@ -189,6 +189,7 @@ class Module(object):
         self.export_generated_headers = []
         self.defaults = []
         self.cflags = set()
+        self.ldflags = set()
         self.local_include_dirs = []
         self.user_debug_flag = False
 
@@ -210,6 +211,7 @@ class Module(object):
         self._output_field(output, 'export_generated_headers')
         self._output_field(output, 'defaults')
         self._output_field(output, 'cflags')
+        self._output_field(output, 'ldflags')
         self._output_field(output, 'local_include_dirs')
         for key, value in additional_args.get(self.name, []):
           self._write_value(output, key, value)
@@ -589,6 +591,10 @@ def create_blueprint_for_targets(desc, targets):
         '-Wno-unused-parameter',
         '-fvisibility=hidden',
         '-Oz',
+        '-flto',
+    ]
+    defaults.ldflags = [
+        '-flto',
     ]
     defaults.user_debug_flag = True
 
