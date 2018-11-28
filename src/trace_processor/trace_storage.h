@@ -90,6 +90,85 @@ class TraceStorage {
     uint32_t tid = 0;
   };
 
+  class Args {
+   public:
+    using Id = uint64_t;
+
+    struct Varardic {
+      enum Type { kInt, kString, kReal };
+
+      Varardic(int64_t int_val) : type(kInt), int_value(int_val) {}
+      Varardic(StringId string_val) : type(kString), string_value(string_val) {}
+      Varardic(double real_val) : type(kReal), real_value(real_val) {}
+
+      Type type;
+      union {
+        int64_t int_value;
+        StringId string_value;
+        double real_value;
+      };
+    };
+
+    enum TableId : uint8_t {
+      // Intentionally don't have Table == 0 so that Id == 0 can refer to an
+      // invalid id.
+      kCounters = 1,
+    };
+
+    class Inserter {
+     public:
+      Inserter(TraceStorage* storage, TableId table_id, size_t row)
+          : storage_(storage), table_id_(table_id), row_(row) {}
+
+      Id AddInt64Arg(StringId name_without_index,
+                     StringId name_with_index,
+                     int64_t value) {
+        auto* args = storage_->mutable_args();
+        Id id = CreateId(table_id_, row_);
+        args->ids_.emplace_back(id);
+        args->names_without_index_.emplace_back(name_without_index);
+        args->names_with_index_.emplace_back(name_with_index);
+        args->arg_values_.emplace_back(value);
+        args->args_for_id_.emplace(id, args->args_count() - 1);
+        switch (table_id_) {
+          case TableId::kCounters:
+            storage_->mutable_counters()->set_arg_id(row_, id);
+        }
+        return id;
+      }
+
+     private:
+      TraceStorage* storage_;
+      TableId table_id_;
+      size_t row_;
+    };
+
+    static const Id kInvalidId;
+
+    const std::deque<Id>& ids() const { return ids_; }
+    const std::deque<StringId>& names_without_index() const {
+      return names_without_index_;
+    }
+    const std::deque<StringId>& names_with_index() const {
+      return names_with_index_;
+    }
+    const std::deque<Varardic>& arg_values() const { return arg_values_; }
+    size_t args_count() const { return ids_.size(); }
+
+   private:
+    static Id CreateId(TableId table, size_t row) {
+      PERFETTO_DCHECK(static_cast<uint64_t>(row) < (1ull << 48ul));
+      uint64_t table_extended = static_cast<uint64_t>(table);
+      return (table_extended << 48ul) | row;
+    }
+
+    std::deque<Id> ids_;
+    std::deque<StringId> names_without_index_;
+    std::deque<StringId> names_with_index_;
+    std::deque<Varardic> arg_values_;
+    std::multimap<Id, size_t> args_for_id_;
+  };
+
   class Slices {
    public:
     inline size_t AddSlice(uint32_t cpu,
@@ -192,12 +271,15 @@ class TraceStorage {
       values_.emplace_back(value);
       refs_.emplace_back(ref);
       types_.emplace_back(type);
+      arg_ids_.emplace_back(Args::kInvalidId);
       return counter_count() - 1;
     }
 
     void set_duration(size_t index, uint64_t duration) {
       durations_[index] = duration;
     }
+
+    void set_arg_id(size_t index, Args::Id arg_id) { arg_ids_[index] = arg_id; }
 
     size_t counter_count() const { return timestamps_.size(); }
 
@@ -213,6 +295,8 @@ class TraceStorage {
 
     const std::deque<RefType>& types() const { return types_; }
 
+    const std::deque<Args::Id>& arg_ids() const { return arg_ids_; }
+
    private:
     std::deque<uint64_t> timestamps_;
     std::deque<uint64_t> durations_;
@@ -220,6 +304,7 @@ class TraceStorage {
     std::deque<double> values_;
     std::deque<int64_t> refs_;
     std::deque<RefType> types_;
+    std::deque<Args::Id> arg_ids_;
   };
 
   class SqlStats {
@@ -339,6 +424,9 @@ class TraceStorage {
   const Stats& stats() const { return stats_; }
   Stats* mutable_stats() { return &stats_; }
 
+  const Args& args() const { return args_; }
+  Args* mutable_args() { return &args_; }
+
   const std::deque<std::string>& string_pool() const { return string_pool_; }
 
   // |unique_processes_| always contains at least 1 element becuase the 0th ID
@@ -363,6 +451,9 @@ class TraceStorage {
   // One entry for each CPU in the trace.
   Slices slices_;
 
+  // Args for all other tables.
+  Args args_;
+
   // One entry for each unique string in the trace.
   std::deque<std::string> string_pool_;
 
@@ -383,6 +474,7 @@ class TraceStorage {
   Counters counters_;
 
   SqlStats sql_stats_;
+
   // These are instantaneous events in the trace. They have no duration
   // and do not have a value that make sense to track over time.
   // e.g. signal events
