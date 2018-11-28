@@ -109,18 +109,6 @@ bool ReadDataLoc(const uint8_t* start,
   return true;
 }
 
-const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
-                                           const std::set<std::string>& names) {
-  std::vector<bool> enabled(table.largest_id() + 1);
-  for (const std::string& name : names) {
-    const Event* event = table.GetEventByName(name);
-    if (!event)
-      continue;
-    enabled[event->ftrace_event_id] = true;
-  }
-  return enabled;
-}
-
 bool SetBlocking(int fd, bool is_blocking) {
   int flags = fcntl(fd, F_GETFL, 0);
   flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
@@ -128,7 +116,7 @@ bool SetBlocking(int fd, bool is_blocking) {
 }
 
 base::Optional<PageHeader> ParsePageHeader(const uint8_t** ptr,
-                                           uint16_t header_size_len) {
+                                           uint16_t page_header_size_len) {
   const uint8_t* end_of_page = *ptr + base::kPageSize;
   PageHeader page_header;
   if (!CpuReader::ReadAndAdvance<uint64_t>(ptr, end_of_page,
@@ -150,8 +138,8 @@ base::Optional<PageHeader> ParsePageHeader(const uint8_t** ptr,
   // Reject rest of the number, if applicable. On 32-bit, size_bytes - 4 will
   // evaluate to 0 and this will be a no-op. On 64-bit, this will advance by 4
   // bytes.
-  PERFETTO_DCHECK(header_size_len >= 4);
-  *ptr += header_size_len - 4;
+  PERFETTO_DCHECK(page_header_size_len >= 4);
+  *ptr += page_header_size_len - 4;
 
   return base::make_optional(page_header);
 }
@@ -159,12 +147,6 @@ base::Optional<PageHeader> ParsePageHeader(const uint8_t** ptr,
 }  // namespace
 
 using protos::pbzero::GenericFtraceEvent;
-
-EventFilter::EventFilter(const ProtoTranslationTable& table,
-                         std::set<std::string> names)
-    : enabled_ids_(BuildEnabledVector(table, names)),
-      enabled_names_(std::move(names)) {}
-EventFilter::~EventFilter() = default;
 
 CpuReader::CpuReader(const ProtoTranslationTable* table,
                      size_t cpu,
@@ -353,7 +335,7 @@ size_t CpuReader::ParsePage(const uint8_t* ptr,
   const uint8_t* const start_of_page = ptr;
   const uint8_t* const end_of_page = ptr + base::kPageSize;
 
-  auto page_header = ParsePageHeader(&ptr, table->header_size_len());
+  auto page_header = ParsePageHeader(&ptr, table->page_header_size_len());
   if (!page_header.has_value())
     return 0;
 
