@@ -17,6 +17,37 @@
 #include "src/traced/probes/ftrace/page_pool.h"
 
 namespace perfetto {
-// TODO delete this file. // DNS
+
+namespace {
+constexpr size_t kMaxFreelistBlocks = 128;  // 128 * 32 * 4KB = 16MB.
+}
+
+void PagePool::NewPageBlock() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (freelist_.empty()) {
+    write_queue_.emplace_back(PageBlock::Create());
+  } else {
+    write_queue_.emplace_back(std::move(freelist_.back()));
+    freelist_.pop_back();
+  }
+  PERFETTO_DCHECK(write_queue_.back().size() == 0);
+}
+
+void PagePool::EndRead(std::vector<PageBlock> page_blocks) {
+  PERFETTO_DCHECK_THREAD(reader_thread_);
+  for (PageBlock& page_block : page_blocks)
+    page_block.Clear();
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  freelist_.insert(freelist_.end(),
+                   std::make_move_iterator(page_blocks.begin()),
+                   std::make_move_iterator(page_blocks.end()));
+
+  // Even if blocks in the freelist don't waste any resident memory (because
+  // the Clear() call above madvise()s them) let's avoid that in pathological
+  // cases we keep accumulating virtual address space reservations.
+  if (freelist_.size() > kMaxFreelistBlocks)
+    freelist_.erase(freelist_.begin() + kMaxFreelistBlocks, freelist_.end());
+}
 
 }  // namespace perfetto

@@ -180,9 +180,9 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
   }
 #pragma GCC diagnostic pop
 
-  worker_thread_ =
-      std::thread(std::bind(&RunWorkerThread, cpu_, generation, *trace_fd_,
-                            &pool_, thread_sync_, table->header_size_len()));
+  worker_thread_ = std::thread(std::bind(&RunWorkerThread, cpu_, generation,
+                                         *trace_fd_, &pool_, thread_sync_,
+                                         table->page_header_size_len()));
 }
 
 CpuReader::~CpuReader() {
@@ -234,7 +234,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
     PERFETTO_METATRACE((mode == kRead ? "read" : "splice") + std::string("-") +
                            (block == kBlock ? "block" : "non-block"),
                        cpu);
-    uint8_t* page = pool->Allocate();
+    uint8_t* page = pool->BeginWrite();
     if (!page)
       return -1;
 
@@ -261,15 +261,16 @@ void CpuReader::RunWorkerThread(size_t cpu,
     }
 
     if (res > 0) {
-      // Both read() and splice() should return full pages.
+      // splice() should return full pages, read can return < a page.
       PERFETTO_DCHECK(res == base::kPageSize || mode == kRead);
+      pool->EndWrite(page);
       return static_cast<int>(res);
     }
 
-    int err = errno;
-    pool->FreeLastPage(page);
-    if (!res || err == EAGAIN || err == ENOMEM || err == EBUSY ||
-        err == EINTR || err == EBADF) {
+    // It is fine to leave the BeginWrite() unpaired in the error case.
+
+    if (!res || errno == EAGAIN || errno == ENOMEM || errno == EBUSY ||
+        errno == EINTR || errno == EBADF) {
       // EAGAIN: no data when in non-blocking mode.
       // ENONMEM, EBUSY: temporary failures (they happen).
       // EINTR: signal interruption, likely from main thread to issue a new cmd.
@@ -321,7 +322,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
         // Do as many non-blocking read/splice as we can.
         while (read_ftrace_pipe(cur_mode, kNonBlock) > 3000) {
         }
-        pool->FinishWrite();
+        pool->CommitWrittenPages();
         FtraceController::OnCpuReaderRead(cpu, generation, thread_sync);
       } break;
 
@@ -330,7 +331,7 @@ void CpuReader::RunWorkerThread(size_t cpu,
         cur_mode = kRead;
         while (read_ftrace_pipe(cur_mode, kNonBlock) > 3000) {
         }
-        pool->FinishWrite();
+        pool->CommitWrittenPages();
         FtraceController::OnCpuReaderFlush(cpu, generation, thread_sync);
       } break;
     }  // switch(cmd)
@@ -356,7 +357,7 @@ void CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
   auto page_blocks = pool_.BeginRead();
   for (const auto& page_block : page_blocks) {
     for (size_t i = 0; i < page_block.size(); i++) {
-      const uint8_t* page = page_block.at(i);
+      const uint8_t* page = page_block.At(i);
 
       for (FtraceDataSource* data_source : data_sources) {
         auto packet = data_source->trace_writer()->NewTracePacket();
