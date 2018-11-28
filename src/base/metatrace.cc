@@ -45,6 +45,10 @@ void MetaTrace::WriteEvent(char type, const char* evt_name, size_t cpu) {
   if (fd == -1)
     return;
 
+  // The JSON event format expects both "pid" and "tid" fields to create
+  // per-process tracks. Here what we really want to achieve is having one track
+  // per cpu. So we just pretend that each CPU is its own process with
+  // pid == tid == cpu.
   char json[256];
   int len = sprintf(json,
                     "{\"ts\": %f, \"cat\": \"PERF\", \"ph\": \"%c\", \"name\": "
