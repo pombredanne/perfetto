@@ -14,3 +14,5 @@ process (e.g. `system_server`):
 ```
 tools/heap_profile --name system_server
 ```
+
+This will create a heap dump every second for a default of 1 minute.
