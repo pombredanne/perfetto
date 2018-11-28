@@ -86,8 +86,9 @@ void ArgsTable::ValueColumn::ReportResult(sqlite3_context* ctx,
       sqlite_utils::ReportSqliteResult(ctx, value.real_value);
       break;
     case VarardicType::kString: {
+      const auto kSqliteStatic = reinterpret_cast<sqlite3_destructor_type>(0);
       const char* str = storage_->GetString(value.string_value).c_str();
-      sqlite3_result_text(ctx, str, -1, nullptr);
+      sqlite3_result_text(ctx, str, -1, kSqliteStatic);
       break;
     }
   }
@@ -152,9 +153,9 @@ int ArgsTable::ValueColumn::CompareRefsAsc(uint32_t f, uint32_t s) const {
         return sqlite_utils::CompareValuesAsc(arg_f.real_value,
                                               arg_s.real_value);
       case VarardicType::kString: {
-        const char* f_str = storage_->GetString(arg_f.string_value).c_str();
-        const char* s_str = storage_->GetString(arg_s.string_value).c_str();
-        return sqlite_utils::CompareValuesAsc<std::string>(f_str, s_str);
+        const auto& f_str = storage_->GetString(arg_f.string_value);
+        const auto& s_str = storage_->GetString(arg_s.string_value);
+        return sqlite_utils::CompareValuesAsc(f_str, s_str);
       }
     }
   } else if (arg_s.type == type_) {

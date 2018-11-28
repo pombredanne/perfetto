@@ -93,6 +93,7 @@ class TraceStorage {
   class Args {
    public:
     using Id = uint64_t;
+
     struct Varardic {
       enum Type { kInt, kString, kReal };
 
@@ -107,28 +108,42 @@ class TraceStorage {
         double real_value;
       };
     };
-    enum Table : uint8_t {
+
+    enum TableId : uint8_t {
       // Intentionally don't have Table == 0 so that Id == 0 can refer to an
       // invalid id.
       kCounters = 1,
-      kMax = kCounters + 1,
+    };
+
+    class Inserter {
+     public:
+      Inserter(TraceStorage* storage, TableId table_id, size_t row)
+          : storage_(storage), table_id_(table_id), row_(row) {}
+
+      Id AddInt64Arg(StringId name_without_index,
+                     StringId name_with_index,
+                     int64_t value) {
+        auto* args = storage_->mutable_args();
+        Id id = CreateId(table_id_, row_);
+        args->ids_.emplace_back(id);
+        args->names_without_index_.emplace_back(name_without_index);
+        args->names_with_index_.emplace_back(name_with_index);
+        args->arg_values_.emplace_back(value);
+        args->args_for_id_.emplace(id, args->args_count() - 1);
+        switch (table_id_) {
+          case TableId::kCounters:
+            storage_->mutable_counters()->set_arg_id(row_, id);
+        }
+        return id;
+      }
+
+     private:
+      TraceStorage* storage_;
+      TableId table_id_;
+      size_t row_;
     };
 
     static const Id kInvalidId;
-
-    Id AddInt64Arg(Table table,
-                   size_t row,
-                   StringId name_without_index,
-                   StringId name_with_index,
-                   int64_t value) {
-      auto id = CreateId(table, row);
-      ids_.emplace_back(id);
-      names_without_index_.emplace_back(name_without_index);
-      names_with_index_.emplace_back(name_with_index);
-      arg_values_.emplace_back(value);
-      args_for_id_.emplace(id, args_count() - 1);
-      return id;
-    }
 
     const std::deque<Id>& ids() const { return ids_; }
     const std::deque<StringId>& names_without_index() const {
@@ -141,7 +156,7 @@ class TraceStorage {
     size_t args_count() const { return ids_.size(); }
 
    private:
-    static Id CreateId(Table table, size_t row) {
+    static Id CreateId(TableId table, size_t row) {
       PERFETTO_DCHECK(static_cast<uint64_t>(row) < (1ull << 48ul));
       uint64_t table_extended = static_cast<uint64_t>(table);
       return (table_extended << 48ul) | row;
