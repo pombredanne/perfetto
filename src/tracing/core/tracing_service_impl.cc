@@ -1462,6 +1462,13 @@ void TracingServiceImpl::ProducerEndpointImpl::UnregisterDataSource(
   service_->UnregisterDataSource(id_, name);
 }
 
+void TracingServiceImpl::ProducerEndpointImpl::AssociateTraceWriter(
+    uint32_t /*writer_id*/,
+    uint32_t /*target_buffer*/) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  // TODO(eseckler): Store association into a map.
+}
+
 void TracingServiceImpl::ProducerEndpointImpl::CommitData(
     const CommitDataRequest& req_untrusted,
     CommitDataCallback callback) {

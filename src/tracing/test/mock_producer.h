@@ -49,6 +49,7 @@ class MockProducer : public Producer {
                size_t shared_memory_size_hint_bytes = 0);
   void RegisterDataSource(const std::string& name, bool ack_stop = false);
   void UnregisterDataSource(const std::string& name);
+  void AssociateTraceWriter(uint32_t writer_id, uint32_t target_buffer);
   void WaitForTracingSetup();
   void WaitForDataSourceSetup(const std::string& name);
   void WaitForDataSourceStart(const std::string& name);

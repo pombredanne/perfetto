@@ -131,6 +131,24 @@ void ProducerIPCService::UnregisterDataSource(
       ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
 }
 
+void ProducerIPCService::AssociateTraceWriter(
+    const protos::AssociateTraceWriterRequest& req,
+    DeferredAssociateTraceWriterResponse response) {
+  RemoteProducer* producer = GetProducerForCurrentRequest();
+  if (!producer) {
+    PERFETTO_DLOG(
+        "Producer invoked AssociateTraceWriter() before "
+        "InitializeConnection()");
+    return response.Reject();
+  }
+  producer->service_endpoint->AssociateTraceWriter(req.trace_writer_id(),
+                                                   req.target_buffer());
+
+  // AssociateTraceWriter doesn't expect any meaningful response.
+  response.Resolve(
+      ipc::AsyncResult<protos::AssociateTraceWriterResponse>::Create());
+}
+
 void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
                                     DeferredCommitDataResponse resp) {
   RemoteProducer* producer = GetProducerForCurrentRequest();

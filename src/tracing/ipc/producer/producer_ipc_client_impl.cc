@@ -207,6 +207,21 @@ void ProducerIPCClientImpl::UnregisterDataSource(const std::string& name) {
       req, ipc::Deferred<protos::UnregisterDataSourceResponse>());
 }
 
+void ProducerIPCClientImpl::AssociateTraceWriter(uint32_t writer_id,
+                                                 uint32_t target_buffer) {
+  PERFETTO_DCHECK_THREAD(thread_checker_);
+  if (!connected_) {
+    PERFETTO_DLOG(
+        "Cannot AssociateTraceWriter(), not connected to tracing service");
+    return;
+  }
+  protos::AssociateTraceWriterRequest req;
+  req.set_trace_writer_id(writer_id);
+  req.set_target_buffer(target_buffer);
+  producer_port_.AssociateTraceWriter(
+      req, ipc::Deferred<protos::AssociateTraceWriterResponse>());
+}
+
 void ProducerIPCClientImpl::CommitData(const CommitDataRequest& req,
                                        CommitDataCallback callback) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
