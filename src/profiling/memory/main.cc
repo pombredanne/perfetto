@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 
+#include <getopt.h>
 #include <signal.h>
 
 #include "perfetto/base/event.h"
@@ -36,9 +37,41 @@ namespace perfetto {
 namespace profiling {
 namespace {
 
-int HeapprofdMain(int, char**) {
+base::Event* g_dump_evt = nullptr;
+
+int HeapprofdMain(int argc, char** argv) {
+  static struct option long_options[] = {
+      {"cleanup-after-crash", no_argument, nullptr, 'd'},
+      {nullptr, 0, nullptr, 0}};
+  int option_index;
+  int c;
+  while ((c = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+    switch (c) {
+      case 'd':
+        SystemProperties::ResetProperties();
+        return 0;
+      default:
+        PERFETTO_ELOG("Usage: %s [--cleanup-after-crash]", argv[0]);
+        return 1;
+    }
+  }
+
+  // We set this up before launching any threads, so we do not have to use a
+  // std::atomic for g_dump_evt.
+  g_dump_evt = new base::Event();
+
   base::UnixTaskRunner task_runner;
   HeapprofdProducer producer(&task_runner);
+
+  struct sigaction action = {};
+  action.sa_handler = [](int) { g_dump_evt->Notify(); };
+  // Allow to trigger a full dump by sending SIGUSR1 to heapprofd.
+  // This will allow manually deciding when to dump on userdebug.
+  PERFETTO_CHECK(sigaction(SIGUSR1, &action, nullptr) == 0);
+  task_runner.AddFileDescriptorWatch(g_dump_evt->fd(), [&producer] {
+    g_dump_evt->Clear();
+    producer.DumpAll();
+  });
   producer.ConnectWithRetries(GetProducerSocket());
   task_runner.Run();
   return 0;

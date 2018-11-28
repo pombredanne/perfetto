@@ -33,6 +33,7 @@
 
 #include "perfetto/trace/ftrace/ftrace_event.pbzero.h"
 #include "perfetto/trace/ftrace/ftrace_event_bundle.pbzero.h"
+#include "perfetto/trace/ftrace/generic.pbzero.h"
 #include "perfetto/trace/trace_packet.pbzero.h"
 
 namespace perfetto {
@@ -80,18 +81,6 @@ bool ReadDataLoc(const uint8_t* start,
   return true;
 }
 
-const std::vector<bool> BuildEnabledVector(const ProtoTranslationTable& table,
-                                           const std::set<std::string>& names) {
-  std::vector<bool> enabled(table.largest_id() + 1);
-  for (const std::string& name : names) {
-    const Event* event = table.GetEventByName(name);
-    if (!event)
-      continue;
-    enabled[event->ftrace_event_id] = true;
-  }
-  return enabled;
-}
-
 void SetBlocking(int fd, bool is_blocking) {
   int flags = fcntl(fd, F_GETFL, 0);
   flags = (is_blocking) ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
@@ -125,33 +114,22 @@ struct TimeStamp {
 
 }  // namespace
 
-EventFilter::EventFilter(const ProtoTranslationTable& table,
-                         std::set<std::string> names)
-    : enabled_ids_(BuildEnabledVector(table, names)),
-      enabled_names_(std::move(names)) {}
-EventFilter::~EventFilter() = default;
+using protos::pbzero::GenericFtraceEvent;
 
 CpuReader::CpuReader(const ProtoTranslationTable* table,
                      size_t cpu,
                      base::ScopedFile fd,
                      std::function<void()> on_data_available)
     : table_(table), cpu_(cpu), trace_fd_(std::move(fd)) {
-  int pipe_fds[2];
-  PERFETTO_CHECK(pipe(&pipe_fds[0]) == 0);
-  staging_read_fd_.reset(pipe_fds[0]);
-  staging_write_fd_.reset(pipe_fds[1]);
+  // Both reads and writes from/to the staging pipe are always non-blocking.
+  // Note: O_NONBLOCK seems to be ignored by splice() on the target pipe. The
+  // blocking vs non-blocking behavior is controlled solely by the
+  // SPLICE_F_NONBLOCK flag passed to splice().
+  staging_pipe_ = base::Pipe::Create(base::Pipe::kBothNonBlock);
 
   // Make reads from the raw pipe blocking so that splice() can sleep.
   PERFETTO_CHECK(trace_fd_);
   SetBlocking(*trace_fd_, true);
-
-  // Reads from the staging pipe are always non-blocking.
-  SetBlocking(*staging_read_fd_, false);
-
-  // Note: O_NONBLOCK seems to be ignored by splice() on the target pipe. The
-  // blocking vs non-blocking behavior is controlled solely by the
-  // SPLICE_F_NONBLOCK flag passed to splice().
-  SetBlocking(*staging_write_fd_, false);
 
   // We need a non-default SIGPIPE handler to make it so that the blocking
   // splice() is woken up when the ~CpuReader() dtor destroys the pipes.
@@ -172,7 +150,7 @@ CpuReader::CpuReader(const ProtoTranslationTable* table,
 
   worker_thread_ =
       std::thread(std::bind(&RunWorkerThread, cpu_, *trace_fd_,
-                            *staging_write_fd_, on_data_available, &cmd_));
+                            *staging_pipe_.wr, on_data_available, &cmd_));
 }
 
 CpuReader::~CpuReader() {
@@ -271,7 +249,7 @@ bool CpuReader::Drain(const std::set<FtraceDataSource*>& data_sources) {
   for (;;) {
     uint8_t* buffer = GetBuffer();
     long bytes =
-        PERFETTO_EINTR(read(*staging_read_fd_, buffer, base::kPageSize));
+        PERFETTO_EINTR(read(*staging_pipe_.rd, buffer, base::kPageSize));
     if (bytes == -1 && errno == EAGAIN)
       break;
     PERFETTO_CHECK(static_cast<size_t>(bytes) == base::kPageSize);
@@ -460,10 +438,24 @@ bool CpuReader::ParseEvent(uint16_t ftrace_event_id,
   protozero::Message* nested =
       message->BeginNestedMessage<protozero::Message>(info.proto_field_id);
 
-  for (const Field& field : info.fields)
-    success &= ParseField(field, start, end, nested, metadata);
+  // Parse generic event.
+  if (info.proto_field_id == protos::pbzero::FtraceEvent::kGenericFieldNumber) {
+    nested->AppendString(GenericFtraceEvent::kEventNameFieldNumber, info.name);
+    for (const Field& field : info.fields) {
+      auto generic_field = nested->BeginNestedMessage<protozero::Message>(
+          GenericFtraceEvent::kFieldFieldNumber);
+      // TODO(taylori): Avoid outputting field names every time.
+      generic_field->AppendString(GenericFtraceEvent::Field::kNameFieldNumber,
+                                  field.ftrace_name);
+      success &= ParseField(field, start, end, generic_field, metadata);
+    }
+  } else {  // Parse all other events.
+    for (const Field& field : info.fields) {
+      success &= ParseField(field, start, end, nested, metadata);
+    }
+  }
 
-  // This finalizes |nested| automatically.
+  // This finalizes |nested| and |proto_field| automatically.
   message->Finalize();
   metadata->FinishEvent();
   return success;
@@ -485,9 +477,11 @@ bool CpuReader::ParseField(const Field& field,
 
   switch (field.strategy) {
     case kUint8ToUint32:
+    case kUint8ToUint64:
       ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kUint16ToUint32:
+    case kUint16ToUint64:
       ReadIntoVarInt<uint16_t>(field_start, field_id, message);
       return true;
     case kUint32ToUint32:
@@ -498,9 +492,11 @@ bool CpuReader::ParseField(const Field& field,
       ReadIntoVarInt<uint64_t>(field_start, field_id, message);
       return true;
     case kInt8ToInt32:
+    case kInt8ToInt64:
       ReadIntoVarInt<int8_t>(field_start, field_id, message);
       return true;
     case kInt16ToInt32:
+    case kInt16ToInt64:
       ReadIntoVarInt<int16_t>(field_start, field_id, message);
       return true;
     case kInt32ToInt32:
@@ -523,7 +519,8 @@ bool CpuReader::ParseField(const Field& field,
     case kDataLocToString:
       return ReadDataLoc(start, field_start, end, field, message);
     case kBoolToUint32:
-      ReadIntoVarInt<uint32_t>(field_start, field_id, message);
+    case kBoolToUint64:
+      ReadIntoVarInt<uint8_t>(field_start, field_id, message);
       return true;
     case kInode32ToUint64:
       ReadInode<uint32_t>(field_start, field_id, message, metadata);
@@ -532,9 +529,11 @@ bool CpuReader::ParseField(const Field& field,
       ReadInode<uint64_t>(field_start, field_id, message, metadata);
       return true;
     case kPid32ToInt32:
+    case kPid32ToInt64:
       ReadPid(field_start, field_id, message, metadata);
       return true;
     case kCommonPid32ToInt32:
+    case kCommonPid32ToInt64:
       ReadCommonPid(field_start, field_id, message, metadata);
       return true;
     case kDevId32ToUint64:

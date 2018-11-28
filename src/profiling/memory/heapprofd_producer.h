@@ -25,6 +25,7 @@
 #include "perfetto/tracing/core/tracing_service.h"
 #include "src/profiling/memory/bounded_queue.h"
 #include "src/profiling/memory/socket_listener.h"
+#include "src/profiling/memory/system_property.h"
 
 namespace perfetto {
 namespace profiling {
@@ -47,6 +48,7 @@ class HeapprofdProducer : public Producer {
 
   // TODO(fmayer): Delete once we have generic reconnect logic.
   void ConnectWithRetries(const char* socket_name);
+  void DumpAll();
 
  private:
   // TODO(fmayer): Delete once we have generic reconnect logic.
@@ -85,6 +87,7 @@ class HeapprofdProducer : public Producer {
     // These are opaque handles that shut down the sockets in SocketListener
     // once they go away.
     std::vector<SocketListener::ProfilingSession> sessions;
+    std::vector<SystemProperties::Handle> properties;
   };
 
   std::map<DataSourceInstanceID, DataSource> data_sources_;
@@ -101,6 +104,7 @@ class HeapprofdProducer : public Producer {
   std::vector<std::thread> unwinding_threads_;
   SocketListener socket_listener_;
   std::unique_ptr<base::UnixSocket> socket_;
+  SystemProperties properties_;
 
   base::WeakPtrFactory<HeapprofdProducer> weak_factory_;
 };
