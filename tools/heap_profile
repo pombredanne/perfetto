@@ -46,7 +46,7 @@ def load_trace_to_text(platform):
   if not check_hash(local_file, sha_value):
     os.remove(local_file)
     raise ValueError("Invalid signature.")
-  os.chmod(local_file, 0o500)
+  os.chmod(local_file, 0o755)
   return local_file
 
 
