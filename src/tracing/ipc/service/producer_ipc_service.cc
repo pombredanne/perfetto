@@ -131,22 +131,39 @@ void ProducerIPCService::UnregisterDataSource(
       ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
 }
 
-void ProducerIPCService::AssociateTraceWriter(
-    const protos::AssociateTraceWriterRequest& req,
-    DeferredAssociateTraceWriterResponse response) {
+void ProducerIPCService::OnTraceWriterCreated(
+    const protos::OnTraceWriterCreatedRequest& req,
+    DeferredOnTraceWriterCreatedResponse response) {
   RemoteProducer* producer = GetProducerForCurrentRequest();
   if (!producer) {
     PERFETTO_DLOG(
-        "Producer invoked AssociateTraceWriter() before "
+        "Producer invoked OnTraceWriterCreated() before "
         "InitializeConnection()");
     return response.Reject();
   }
-  producer->service_endpoint->AssociateTraceWriter(req.trace_writer_id(),
+  producer->service_endpoint->OnTraceWriterCreated(req.trace_writer_id(),
                                                    req.target_buffer());
 
-  // AssociateTraceWriter doesn't expect any meaningful response.
+  // OnTraceWriterCreated doesn't expect any meaningful response.
   response.Resolve(
-      ipc::AsyncResult<protos::AssociateTraceWriterResponse>::Create());
+      ipc::AsyncResult<protos::OnTraceWriterCreatedResponse>::Create());
+}
+
+void ProducerIPCService::OnTraceWriterDestroyed(
+    const protos::OnTraceWriterDestroyedRequest& req,
+    DeferredOnTraceWriterDestroyedResponse response) {
+  RemoteProducer* producer = GetProducerForCurrentRequest();
+  if (!producer) {
+    PERFETTO_DLOG(
+        "Producer invoked OnTraceWriterDestroyed() before "
+        "InitializeConnection()");
+    return response.Reject();
+  }
+  producer->service_endpoint->OnTraceWriterDestroyed(req.trace_writer_id());
+
+  // OnTraceWriterDestroyed doesn't expect any meaningful response.
+  response.Resolve(
+      ipc::AsyncResult<protos::OnTraceWriterDestroyedResponse>::Create());
 }
 
 void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,

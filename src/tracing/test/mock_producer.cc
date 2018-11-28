@@ -67,9 +67,13 @@ void MockProducer::UnregisterDataSource(const std::string& name) {
   service_endpoint_->UnregisterDataSource(name);
 }
 
-void MockProducer::AssociateTraceWriter(uint32_t writer_id,
+void MockProducer::OnTraceWriterCreated(uint32_t writer_id,
                                         uint32_t target_buffer) {
-  service_endpoint_->AssociateTraceWriter(writer_id, target_buffer);
+  service_endpoint_->OnTraceWriterCreated(writer_id, target_buffer);
+}
+
+void MockProducer::OnTraceWriterDestroyed(uint32_t writer_id) {
+  service_endpoint_->OnTraceWriterDestroyed(writer_id);
 }
 
 void MockProducer::WaitForTracingSetup() {

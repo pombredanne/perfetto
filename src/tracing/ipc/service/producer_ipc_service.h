@@ -49,8 +49,10 @@ class ProducerIPCService : public protos::ProducerPort {
                           DeferredRegisterDataSourceResponse) override;
   void UnregisterDataSource(const protos::UnregisterDataSourceRequest&,
                             DeferredUnregisterDataSourceResponse) override;
-  void AssociateTraceWriter(const protos::AssociateTraceWriterRequest&,
-                            DeferredAssociateTraceWriterResponse) override;
+  void OnTraceWriterCreated(const protos::OnTraceWriterCreatedRequest&,
+                            DeferredOnTraceWriterCreatedResponse) override;
+  void OnTraceWriterDestroyed(const protos::OnTraceWriterDestroyedRequest&,
+                              DeferredOnTraceWriterDestroyedResponse) override;
   void CommitData(const protos::CommitDataRequest&,
                   DeferredCommitDataResponse) override;
   void NotifyDataSourceStopped(
