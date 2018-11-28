@@ -42,6 +42,7 @@ void UnixTaskRunner::WakeUp() {
 
 void UnixTaskRunner::Run() {
   PERFETTO_DCHECK_THREAD(thread_checker_);
+  created_thread_id_ = GetThreadId();
   quit_ = false;
   for (;;) {
     int poll_timeout_ms;
@@ -69,6 +70,11 @@ void UnixTaskRunner::Quit() {
     quit_ = true;
   }
   WakeUp();
+}
+
+bool UnixTaskRunner::QuitCalled() {
+  std::lock_guard<std::mutex> lock(lock_);
+  return quit_;
 }
 
 bool UnixTaskRunner::IsIdleForTesting() {
@@ -215,6 +221,10 @@ void UnixTaskRunner::RemoveFileDescriptorWatch(int fd) {
     watch_tasks_changed_ = true;
   }
   // No need to schedule a wake-up for this.
+}
+
+bool UnixTaskRunner::RunsTasksOnCurrentThread() const {
+  return GetThreadId() == created_thread_id_;
 }
 
 }  // namespace base
