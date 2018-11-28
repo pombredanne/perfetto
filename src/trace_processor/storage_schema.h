@@ -81,6 +81,26 @@ class StorageSchema {
 
     Iterator Rows() const { return Iterator(start_row_, row_filter_); }
 
+    PERFETTO_ALWAYS_INLINE void SetOnlyRows(std::vector<size_t> rows) {
+      // Sort the rows so that the algorithm below makes sense.
+      std::sort(rows.begin(), rows.end());
+
+      // Initialise start to the beginning of the vector.
+      auto start = row_filter_->begin();
+      for (size_t row : rows) {
+        // Unset all bits between the start iterator and the iterator pointing
+        // to the current row. That is, this loop sets all elements not pointed
+        // to by rows to false. It does not touch the rows themselves which
+        // means if they were already false (i.e. not returned) then they won't
+        // be returned now and if they were true (i.e. returned) they will still
+        // be returned.
+        auto end = row_filter_->begin() + static_cast<ptrdiff_t>(row);
+        std::fill(start, end, false);
+        start = end + 1;
+      }
+      std::fill(start, row_filter_->end(), false);
+    }
+
    private:
     uint32_t start_row_;
     std::vector<bool>* row_filter_;
@@ -132,7 +152,7 @@ class StorageSchema {
 
   // A column of numeric data backed by a deque.
   template <typename T>
-  class NumericColumn final : public Column {
+  class NumericColumn : public Column {
    public:
     NumericColumn(std::string col_name,
                   const std::deque<T>* deque,
@@ -183,9 +203,10 @@ class StorageSchema {
       return bounds;
     }
 
-    void Filter(int op,
-                sqlite3_value* value,
-                FilterHelper helper) const override {
+    virtual void Filter(int op,
+                        sqlite3_value* value,
+                        FilterHelper helper) const override {
+      PERFETTO_LOG("TEST");
       auto type = sqlite3_value_type(value);
       if (type == SQLITE_INTEGER && std::is_integral<T>::value) {
         FilterWithCast<int64_t>(op, value, std::move(helper));
@@ -225,6 +246,9 @@ class StorageSchema {
       PERFETTO_CHECK(false);
     }
 
+   protected:
+    const std::deque<T>* deque_ = nullptr;
+
    private:
     T kTMin = std::numeric_limits<T>::lowest();
     T kTMax = std::numeric_limits<T>::max();
@@ -241,7 +265,6 @@ class StorageSchema {
       }
     }
 
-    const std::deque<T>* deque_ = nullptr;
     bool is_naturally_ordered_ = false;
   };
 

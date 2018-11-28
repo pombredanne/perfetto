@@ -153,6 +153,9 @@ class TraceStorage {
       return names_with_index_;
     }
     const std::deque<Varardic>& arg_values() const { return arg_values_; }
+    const std::multimap<Id, size_t>& args_for_id() const {
+      return args_for_id_;
+    }
     size_t args_count() const { return ids_.size(); }
 
    private:

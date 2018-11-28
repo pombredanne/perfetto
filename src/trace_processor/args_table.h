@@ -39,6 +39,21 @@ class ArgsTable : public Table {
   int BestIndex(const QueryConstraints&, BestIndexInfo*) override;
 
  private:
+  class IdColumn final
+      : public StorageSchema::NumericColumn<TraceStorage::Args::Id> {
+   public:
+    IdColumn(std::string col_name,
+             const TraceStorage* storage,
+             const std::deque<TraceStorage::Args::Id>* ids);
+
+    void Filter(int op,
+                sqlite3_value* value,
+                StorageSchema::FilterHelper) const override;
+
+   private:
+    const TraceStorage* storage_ = nullptr;
+  };
+
   class ValueColumn final : public StorageSchema::Column {
    public:
     ValueColumn(std::string col_name,

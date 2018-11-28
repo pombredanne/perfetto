@@ -32,7 +32,7 @@ void ArgsTable::RegisterTable(sqlite3* db, const TraceStorage* storage) {
 Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
   const auto& args = storage_->args();
   std::unique_ptr<StorageSchema::Column> cols[] = {
-      StorageSchema::NumericColumnPtr("id", &args.ids()),
+      std::unique_ptr<IdColumn>(new IdColumn("id", storage_, &args.ids())),
       StorageSchema::StringColumnPtr("name", &args.names_without_index(),
                                      &storage_->string_pool()),
       StorageSchema::StringColumnPtr("indexed_name", &args.names_with_index(),
@@ -60,9 +60,42 @@ std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
       new StorageCursor(std::move(it), schema_.ToColumnReporters()));
 }
 
-int ArgsTable::BestIndex(const QueryConstraints&, BestIndexInfo*) {
-  // TODO(lalitm): implement BestIndex properly.
+int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
+  // In the case of an id equality filter, we can do a very efficient lookup.
+  if (qc.constraints().size() == 1) {
+    auto id = static_cast<int>(schema_.ColumnIndexFromName("id"));
+    const auto& cs = qc.constraints().back();
+    if (cs.iColumn == id && sqlite_utils::IsOpEq(cs.op)) {
+      info->estimated_cost = 1;
+      return SQLITE_OK;
+    }
+  }
+
+  // Otherwise, just give the worst case scenario.
+  info->estimated_cost = static_cast<uint32_t>(storage_->args().args_count());
   return SQLITE_OK;
+}
+
+ArgsTable::IdColumn::IdColumn(std::string col_name,
+                              const TraceStorage* storage,
+                              const std::deque<TraceStorage::Args::Id>* ids)
+    : NumericColumn(col_name, ids, false, false), storage_(storage) {}
+
+void ArgsTable::IdColumn::Filter(int op,
+                                 sqlite3_value* value,
+                                 StorageSchema::FilterHelper helper) const {
+  if (!sqlite_utils::IsOpEq(op)) {
+    NumericColumn::Filter(op, value, std::move(helper));
+    return;
+  }
+  auto id = sqlite_utils::ExtractSqliteValue<TraceStorage::Args::Id>(value);
+  const auto& args_for_id = storage_->args().args_for_id();
+  auto it_pair = args_for_id.equal_range(id);
+  std::vector<size_t> rows;
+  for (auto it = it_pair.first; it != it_pair.second; it++) {
+    rows.push_back(it->second);
+  }
+  helper.SetOnlyRows(std::move(rows));
 }
 
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
