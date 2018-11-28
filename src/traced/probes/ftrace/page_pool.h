@@ -170,12 +170,14 @@ class PagePool {
   size_t freelist_size_for_testing() const { return freelist_.size(); }
 
  private:
+  PagePool(const PagePool&) = delete;
+  PagePool& operator=(const PagePool&) = delete;
   void NewPageBlock();
 
   PERFETTO_THREAD_CHECKER(writer_thread_)
   std::vector<PageBlock> write_queue_;  // Accessed exclusively by the writer.
 
-  std::mutex mutex_;  // Protects all fields below.
+  std::mutex mutex_;  // Protects both the read queue and the freelist.
 
   PERFETTO_THREAD_CHECKER(reader_thread_)
   std::vector<PageBlock> read_queue_;  // Accessed by both threads.
