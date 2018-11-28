@@ -185,6 +185,8 @@ def main(argv):
   subprocess.check_call(['gzip'] + [os.path.join(profile_path, x) for x in
                                     os.listdir(profile_path)])
   print("Wrote profiles to {}".format(profile_path))
+  print("These can be viewed using pprof. Googlers: head to pprof/ and "
+        "upload them.")
 
 
 if __name__ == '__main__':
