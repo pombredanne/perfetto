@@ -109,7 +109,6 @@ bool CreateConfigFromOptions(const ConfigOptions& options,
     }
   }
 
-
   config->set_duration_ms(static_cast<unsigned int>(duration_ms));
   config->set_max_file_size_bytes(static_cast<unsigned int>(max_file_size_kb));
   if (max_file_size_kb)

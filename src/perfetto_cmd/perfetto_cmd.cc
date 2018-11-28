@@ -147,8 +147,8 @@ light configuration flags: (only when NOT using -c/--config)
   --buffer         -b      : Ring buffer size N[mb,gb] (default: 32mb)
   --size           -s      : Maximum trace size N[mb,gb] (default: 100mb)
   ATRACE_CAT               : Record ATRACE_CAT (e.g. wm)
-  FTRACE_GROUP:FTRACE_NAME : Record ftrace event (e.g. sched:sched_switch)
-  FTRACE_GROUP:*           : Record all events in group (e.g. sched:*)
+  FTRACE_GROUP/FTRACE_NAME : Record ftrace event (e.g. sched/sched_switch)
+  FTRACE_GROUP/*           : Record all events in group (e.g. sched/*)
 
 
 statsd-specific flags:
@@ -331,13 +331,12 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   perfetto::protos::TraceConfig trace_config_proto;
 
-
   bool parsed;
   if (has_config_options) {
     if (!trace_config_raw.empty()) {
       PERFETTO_ELOG(
           "Cannot specify both -c/--config and any of --time, --size, "
-          "--buffer, --app, ATRACE_CAT, FTRACE_GROUP:FTRACE_NAME");
+          "--buffer, --app, ATRACE_CAT, FTRACE_EVENT");
       return 1;
     }
     parsed = CreateConfigFromOptions(config_options, &trace_config_proto);

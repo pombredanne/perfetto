@@ -35,7 +35,7 @@ class CreateConfigFromOptionsTest : public ::testing::Test {
 
 TEST_F(CreateConfigFromOptionsTest, Default) {
   ASSERT_TRUE(CreateConfigFromOptions(options, &config));
-  EXPECT_TRUE(config.write_into_file());
+  EXPECT_FALSE(config.write_into_file());
 }
 
 TEST_F(CreateConfigFromOptionsTest, MilliSeconds) {
@@ -102,7 +102,7 @@ TEST_F(CreateConfigFromOptionsTest, OnlyUnit) {
 
 TEST_F(CreateConfigFromOptionsTest, Empty) {
   options.buffer_size = "";
-  ASSERT_FALSE(CreateConfigFromOptions(options, &config));
+  ASSERT_TRUE(CreateConfigFromOptions(options, &config));
 }
 
 TEST_F(CreateConfigFromOptionsTest, FullConfig) {
@@ -110,7 +110,7 @@ TEST_F(CreateConfigFromOptionsTest, FullConfig) {
   options.max_file_size = "1gb";
   options.time = "1h";
   options.categories.push_back("sw");
-  options.categories.push_back("sched:sched_switch");
+  options.categories.push_back("sched/sched_switch");
   options.atrace_apps.push_back("com.android.chrome");
   ASSERT_TRUE(CreateConfigFromOptions(options, &config));
   EXPECT_EQ(config.duration_ms(), 60 * 60 * 1000);
@@ -119,7 +119,7 @@ TEST_F(CreateConfigFromOptionsTest, FullConfig) {
   EXPECT_EQ(config.data_sources().Get(0).config().name(), "linux.ftrace");
   EXPECT_EQ(config.data_sources().Get(0).config().target_buffer(), 0);
   auto ftrace = config.data_sources().Get(0).config().ftrace_config();
-  EXPECT_THAT(ftrace.ftrace_events(), Contains("sched:sched_switch"));
+  EXPECT_THAT(ftrace.ftrace_events(), Contains("sched/sched_switch"));
   EXPECT_THAT(ftrace.atrace_categories(), Contains("sw"));
   EXPECT_THAT(ftrace.atrace_apps(), Contains("com.android.chrome"));
 }
