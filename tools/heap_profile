@@ -93,9 +93,9 @@ def on_exit(enforcing):
 def main(argv):
   parser = argparse.ArgumentParser()
   parser.add_argument("-i", "--interval", help="Sampling interval. "
-                      "E.g. 128000 for 128k", type=int)
-  parser.add_argument("-d", "--duration", help="Duration of profile (ms).",
-                      type=int)
+                      "Default 128000 (128kB)", type=int, default=128000)
+  parser.add_argument("-d", "--duration", help="Duration of profile (ms). "
+                      "Default 1 minute", type=int, default=60000)
   parser.add_argument("-a", "--all", help="Profile the whole system",
                       action='store_true')
   parser.add_argument("-p", "--pid", help="PIDs to profile", nargs='+',
@@ -103,7 +103,7 @@ def main(argv):
   parser.add_argument("-n", "--name", help="Process names to profile",
                       nargs='+')
   parser.add_argument("-t", "--trace-to-text-binary",
-                      help="Path to local trace to text.")
+                      help="Path to local trace to text. For debugging.")
 
   args = parser.parse_args()
 
@@ -119,6 +119,7 @@ def main(argv):
     print("FATAL: No interval given.", file=sys.stderr)
     fail = True
   if fail:
+    parser.print_help()
     return 1
   target_cfg = ""
   if args.pid:
