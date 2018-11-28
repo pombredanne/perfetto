@@ -29,6 +29,7 @@
 #include "perfetto/base/paged_memory.h"
 #include "perfetto/tracing/core/basic_types.h"
 #include "perfetto/tracing/core/slice.h"
+#include "perfetto/tracing/core/trace_stats.h"
 
 namespace perfetto {
 
@@ -56,11 +57,22 @@ class TracePacket;
 // sequences identified by the {ProducerID, WriterID} tuple. Any given chunk
 // will only contain packets (or fragments) belonging to the same sequence.
 //
-// The buffer operates by default as a ring buffer. Chunks are (over-)written
-// in the same order of the CopyChunkUntrusted() calls. When overwriting old
-// content, entire chunks are overwritten or clobbered. The buffer never leaves
-// a partial chunk around. Chunks' payload is copied as-is, but their header is
-// not and is repacked in order to keep the ProducerID around.
+// The buffer operates by default as a ring buffer.
+// It has two overwrite policies:
+//  1. kOverwrite (default): if the write pointer reaches the read pointer, old
+//     unread chunks will be overwritten by new chunks.
+//  2. kDiscard: if the write pointer reaches the read pointer, unread chunks
+//     are preserved and the new chunks are discarded. Any future write becomes
+//     a no-op, even if the reader manages to fully catch up. This is because
+//     once a chunk is discarded, the sequence of packets is broken and trying
+//     to recover would be too hard (also due to the fact that, at the same
+//     time, we allow out-of-order commits and chunk re-writes).
+//
+// Chunks are (over)written in the same order of the CopyChunkUntrusted() calls.
+// When overwriting old content, entire chunks are overwritten or clobbered.
+// The buffer never leaves a partial chunk around. Chunks' payload is copied
+// as-is, but their header is not and is repacked in order to keep the
+// ProducerID around.
 //
 // Chunks are stored in the buffer next to each other. Each chunk is prefixed by
 // an inline header (ChunkRecord), which contains most of the fields of the
@@ -128,19 +140,8 @@ class TraceBuffer {
  public:
   static const size_t InlineChunkHeaderSize;  // For test/fake_packet.{cc,h}.
 
-  // Maintain these fields consistent with trace_stats.proto. See comments in
-  // the .proto for the semantic of these fields.
-  struct Stats {
-    uint64_t bytes_written = 0;
-    uint64_t chunks_written = 0;
-    uint64_t chunks_overwritten = 0;
-    uint64_t write_wrap_count = 0;
-    uint64_t patches_succeeded = 0;
-    uint64_t patches_failed = 0;
-    uint64_t readaheads_succeeded = 0;
-    uint64_t readaheads_failed = 0;
-    uint64_t abi_violations = 0;
-  };
+  // See comment in the header above.
+  enum OverwritePolicy { kOverwrite, kDiscard };
 
   // Argument for out-of-band patches applied through TryPatchChunkContents().
   struct Patch {
@@ -152,23 +153,37 @@ class TraceBuffer {
   };
 
   // Can return nullptr if the memory allocation fails.
-  static std::unique_ptr<TraceBuffer> Create(size_t size_in_bytes);
+  static std::unique_ptr<TraceBuffer> Create(size_t size_in_bytes,
+                                             OverwritePolicy = kOverwrite);
 
   ~TraceBuffer();
 
   // Copies a Chunk from a producer Shared Memory Buffer into the trace buffer.
-  // |src| points to the first packet in the SharedMemoryABI's chunk shared
-  // with an untrusted producer. "untrusted" here means: the producer might be
+  // |src| points to the first packet in the SharedMemoryABI's chunk shared with
+  // an untrusted producer. "untrusted" here means: the producer might be
   // malicious and might change |src| concurrently while we read it (internally
-  // this method memcpy()-s first the chunk before processing it).
-  // None of the arguments should be trusted, unless otherwise stated. We can
-  // trust that |src| points to a valid memory area, but not its contents.
+  // this method memcpy()-s first the chunk before processing it). None of the
+  // arguments should be trusted, unless otherwise stated. We can trust that
+  // |src| points to a valid memory area, but not its contents.
+  //
+  // This method may be called multiple times for the same chunk. In this case,
+  // the original chunk's payload will be overridden and its number of fragments
+  // and flags adjusted to match |num_fragments| and |chunk_flags|. The service
+  // may use this to insert partial chunks (|chunk_complete = false|) before the
+  // producer has committed them.
+  //
+  // If |chunk_complete| is |false|, the TraceBuffer will only consider the
+  // first |num_fragments - 1| packets to be complete, since the producer may
+  // not have finished writing the latest packet. Reading from a sequence will
+  // also not progress past any incomplete chunks until they were rewritten with
+  // |chunk_complete = true|, e.g. after a producer's commit.
   void CopyChunkUntrusted(ProducerID producer_id_trusted,
                           uid_t producer_uid_trusted,
                           WriterID writer_id,
                           ChunkID chunk_id,
                           uint16_t num_fragments,
                           uint8_t chunk_flags,
+                          bool chunk_complete,
                           const uint8_t* src,
                           size_t size);
   // Applies a batch of |patches| to the given chunk, if the given chunk is
@@ -217,7 +232,7 @@ class TraceBuffer {
   //   P1, P5, P7, P4 (P4 cannot come after P5)
   bool ReadNextTracePacket(TracePacket*, uid_t* producer_uid);
 
-  const Stats& stats() const { return stats_; }
+  const TraceStats::BufferStats& stats() const { return stats_; }
   size_t size() const { return size_; }
 
  private:
@@ -312,6 +327,8 @@ class TraceBuffer {
                std::tie(other.producer_id, other.writer_id, other.chunk_id);
       }
 
+      bool operator!=(const Key& other) const { return !(*this == other); }
+
       // These fields should match at all times the corresponding fields in
       // the |chunk_record|. They are copied here purely for efficiency to avoid
       // dereferencing the buffer all the time.
@@ -320,14 +337,29 @@ class TraceBuffer {
       ChunkID chunk_id;
     };
 
-    ChunkMeta(ChunkRecord* c, uint16_t p, uint8_t f, uid_t u)
-        : chunk_record{c}, trusted_uid{u}, flags{f}, num_fragments{p} {}
+    ChunkMeta(ChunkRecord* r, uint16_t p, bool c, uint8_t f, uid_t u)
+        : chunk_record{r},
+          trusted_uid{u},
+          is_complete{c},
+          flags{f},
+          num_fragments{p} {}
 
-    ChunkRecord* const chunk_record;   // Addr of ChunkRecord within |data_|.
-    const uid_t trusted_uid;           // uid of the producer.
-    uint8_t flags = 0;                 // See SharedMemoryABI::flags.
-    const uint16_t num_fragments = 0;  // Total number of packet fragments.
-    uint16_t num_fragments_read = 0;   // Number of fragments already read.
+    ChunkRecord* const chunk_record;  // Addr of ChunkRecord within |data_|.
+    const uid_t trusted_uid;          // uid of the producer.
+
+    // If true, the chunk state was kChunkComplete at the time it was copied. If
+    // false, the chunk was still kChunkBeingWritten while copied. |is_complete|
+    // == false prevents the sequence to read past this chunk.
+    bool is_complete = false;
+
+    // Correspond to |chunk_record->flags| and |chunk_record->num_fragments|.
+    // Copied here for performance reasons (avoids having to dereference
+    // |chunk_record| while iterating over ChunkMeta) and to aid debugging in
+    // case the buffer gets corrupted.
+    uint8_t flags = 0;           // See SharedMemoryABI::flags.
+    uint16_t num_fragments = 0;  // Total number of packet fragments.
+
+    uint16_t num_fragments_read = 0;  // Number of fragments already read.
 
     // The start offset of the next fragment (the |num_fragments_read|-th) to be
     // read. This is the offset in bytes from the beginning of the ChunkRecord's
@@ -400,7 +432,7 @@ class TraceBuffer {
     kFailedStayOnSameSequence,
   };
 
-  TraceBuffer();
+  explicit TraceBuffer(OverwritePolicy);
   TraceBuffer(const TraceBuffer&) = delete;
   TraceBuffer& operator=(const TraceBuffer&) = delete;
 
@@ -431,9 +463,14 @@ class TraceBuffer {
   ReadAheadResult ReadAhead(TracePacket*);
 
   // Deletes (by marking the record invalid and removing form the index) all
-  // chunks from |wptr_| to |wptr_| + |bytes_to_clear|. Returns the size of the
-  // gap left between the next valid Chunk and the end of the deletion range, or
-  // 0 if such next valid chunk doesn't exist (if the buffer is still zeroed).
+  // chunks from |wptr_| to |wptr_| + |bytes_to_clear|.
+  // Returns:
+  //   * The size of the gap left between the next valid Chunk and the end of
+  //     the deletion range.
+  //   * 0 if no next valid chunk exists (if the buffer is still zeroed).
+  //   * -1 if the buffer |overwrite_policy_| == kDiscard and the deletion would
+  //     cause unread chunks to be overwritten. In this case the buffer is left
+  //     untouched.
   // Graphically, assume the initial situation is the following (|wptr_| = 10).
   // |0        |10 (wptr_)       |30       |40                 |60
   // +---------+-----------------+---------+-------------------+---------+
@@ -443,7 +480,7 @@ class TraceBuffer {
   //
   // A call to DeleteNextChunksFor(32) will remove chunks 2,3,4 and return 18
   // (60 - 42), the distance between chunk 5 and the end of the deletion range.
-  size_t DeleteNextChunksFor(size_t bytes_to_clear);
+  ssize_t DeleteNextChunksFor(size_t bytes_to_clear);
 
   // Decodes the boundaries of the next packet (or a fragment) pointed by
   // ChunkMeta and pushes that into |TracePacket|. It also increments the
@@ -467,10 +504,13 @@ class TraceBuffer {
     return reinterpret_cast<ChunkRecord*>(ptr);
   }
 
+  void DiscardWrite();
+
   // |src| can be nullptr (in which case |size| must be ==
   // record.size - sizeof(ChunkRecord)), for the case of writing a padding
   // record. |wptr_| is NOT advanced by this function, the caller must do that.
-  void WriteChunkRecord(const ChunkRecord& record,
+  void WriteChunkRecord(uint8_t* wptr,
+                        const ChunkRecord& record,
                         const uint8_t* src,
                         size_t size) {
     // Note: |record.size| will be slightly bigger than |size| because of the
@@ -482,21 +522,21 @@ class TraceBuffer {
     PERFETTO_DCHECK(record.size % sizeof(record) == 0);
     PERFETTO_DCHECK(record.size >= size + sizeof(record));
     PERFETTO_CHECK(record.size <= size_to_end());
-    DcheckIsAlignedAndWithinBounds(wptr_);
+    DcheckIsAlignedAndWithinBounds(wptr);
 
     // We may be writing to this area for the first time.
-    data_.EnsureCommitted(static_cast<size_t>(wptr_ + record.size - begin()));
+    data_.EnsureCommitted(static_cast<size_t>(wptr + record.size - begin()));
 
     // Deliberately not a *D*CHECK.
-    PERFETTO_CHECK(wptr_ + sizeof(record) + size <= end());
-    memcpy(wptr_, &record, sizeof(record));
+    PERFETTO_CHECK(wptr + sizeof(record) + size <= end());
+    memcpy(wptr, &record, sizeof(record));
     if (PERFETTO_LIKELY(src)) {
-      memcpy(wptr_ + sizeof(record), src, size);
+      memcpy(wptr + sizeof(record), src, size);
     } else {
       PERFETTO_DCHECK(size == record.size - sizeof(record));
     }
     const size_t rounding_size = record.size - sizeof(record) - size;
-    memset(wptr_ + sizeof(record) + size, 0, rounding_size);
+    memset(wptr + sizeof(record) + size, 0, rounding_size);
   }
 
   uint8_t* begin() const { return reinterpret_cast<uint8_t*>(data_.Get()); }
@@ -516,14 +556,24 @@ class TraceBuffer {
   // It becomes invalid after any call to methods that alters the |index_|.
   SequenceIterator read_iter_;
 
-  // Keeps track of the last ChunkID written for a given writer.
-  // TODO(primiano): should clean up keys from this map. Right now this map
-  // grows without bounds (although realistically is not a problem unless we
-  // have too many producers/writers within the same trace session).
-  std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_;
+  // See comments at the top of the file.
+  OverwritePolicy overwrite_policy_ = kOverwrite;
+
+  // Only used when |overwrite_policy_ == kDiscard|. This is set the first time
+  // a write fails because it would overwrite unread chunks.
+  bool discard_writes_ = false;
+
+  // Keeps track of the highest ChunkID written for a given sequence, taking
+  // into account a potential overflow of ChunkIDs. In the case of overflow,
+  // stores the highest ChunkID written since the overflow.
+  //
+  // TODO(primiano): should clean up keys from this map. Right now it grows
+  // without bounds (although realistically is not a problem unless we have too
+  // many producers/writers within the same trace session).
+  std::map<std::pair<ProducerID, WriterID>, ChunkID> last_chunk_id_written_;
 
   // Statistics about buffer usage.
-  Stats stats_;
+  TraceStats::BufferStats stats_;
 
 #if PERFETTO_DCHECK_IS_ON()
   bool changed_since_last_read_ = false;

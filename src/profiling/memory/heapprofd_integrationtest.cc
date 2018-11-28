@@ -17,6 +17,7 @@
 #include "src/base/test/test_task_runner.h"
 #include "src/ipc/test/test_socket.h"
 #include "src/profiling/memory/client.h"
+#include "src/profiling/memory/heapprofd_producer.h"
 #include "src/profiling/memory/socket_listener.h"
 #include "src/profiling/memory/unwinding.h"
 
@@ -45,7 +46,7 @@ class HeapprofdIntegrationTest : public ::testing::Test {
 
 // ASAN does not like sendmsg of the stack.
 // TODO(fmayer): Try to fix this more properly.
-#ifndef ADDRESS_SANITIZER
+#if !defined(ADDRESS_SANITIZER) && !defined(MEMORY_SANITIZER)
 #define MAYBE_EndToEnd EndToEnd
 #define MAYBE_MultiSession MultiSession
 #else
@@ -78,12 +79,13 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_EndToEnd) {
       },
       &bookkeeping_thread);
 
-  auto session = listener.ExpectPID(getpid(), {kSamplingInterval});
+  ProcessSetSpec spec{};
+  spec.pids.emplace(getpid());
+  spec.client_configuration.interval = kSamplingInterval;
+  auto session = listener.process_matcher().AwaitProcessSetSpec(spec);
   auto sock = base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
-  if (!sock->is_listening()) {
-    PERFETTO_ELOG("Socket not listening.");
-    PERFETTO_CHECK(false);
-  }
+  if (!sock->is_listening())
+    PERFETTO_FATAL("Socket not listening");
   std::thread th([kSamplingInterval] {
     Client client(kSocketName, 1);
     SomeFunction(&client);
@@ -105,16 +107,17 @@ TEST_F(HeapprofdIntegrationTest, MAYBE_MultiSession) {
   SocketListener listener([&done](UnwindingRecord) { done(); },
                           &bookkeeping_thread);
 
-  auto session = listener.ExpectPID(getpid(), {kSamplingInterval});
+  ProcessSetSpec spec{};
+  spec.pids.emplace(getpid());
+  spec.client_configuration.interval = kSamplingInterval;
+  auto session = listener.process_matcher().AwaitProcessSetSpec(spec);
   // Allow to get a second session, but it will still use the previous
   // sampling rate.
-  auto session2 = listener.ExpectPID(getpid(), {kSamplingInterval + 1});
-  session = SocketListener::ProfilingSession();
+  spec.client_configuration.interval = kSamplingInterval + 1;
+  auto session2 = listener.process_matcher().AwaitProcessSetSpec(spec);
   auto sock = base::UnixSocket::Listen(kSocketName, &listener, &task_runner);
-  if (!sock->is_listening()) {
-    PERFETTO_ELOG("Socket not listening.");
-    PERFETTO_CHECK(false);
-  }
+  if (!sock->is_listening())
+    PERFETTO_FATAL("Socket not listening");
   std::thread th([kSamplingInterval] {
     Client client(kSocketName, 1);
     SomeFunction(&client);
