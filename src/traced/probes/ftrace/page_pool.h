@@ -19,10 +19,6 @@
 
 #include <stdint.h>
 
-#include <array>
-#include <bitset>
-#include <deque>
-#include <limits>
 #include <mutex>
 #include <vector>
 
@@ -42,7 +38,7 @@ namespace perfetto {
 // For context, CpuReader (and hence this class) is used on two threads:
 // (1) A worker thread that writes into the buffer and (2) the main thread which
 // reads all the content in big batches and turn them into protos.
-// There is At most one thread writing and At most one thread reading. In rare
+// There is at most one thread writing and at most one thread reading. In rare
 // circumstances they can be active At the same time.
 // This class is optimized for the following use case:
 // - Most of the times CpuReader wants to write 4096 bytes. In some rare cases
@@ -126,9 +122,9 @@ class PagePool {
 
   // Grabs a new page, eventually allocating a whole new PageBlock.
   // If contents are written to the page, the caller must call EndWrite().
-  // Otherwise it is okay to leave the BeginWrite() unpaired (e.g., in case of
-  // a non-blocking read returning no data) and call again BeginWrite() in
-  // the future.
+  // If no data is written, it is okay to leave the BeginWrite() unpaired
+  // (e.g., in case of a non-blocking read returning no data) and call again
+  // BeginWrite() in the future.
   uint8_t* BeginWrite() {
     PERFETTO_DCHECK_THREAD(writer_thread_);
     if (write_queue_.empty() || write_queue_.back().IsFull())
@@ -159,7 +155,9 @@ class PagePool {
   std::vector<PageBlock> BeginRead() {
     PERFETTO_DCHECK_THREAD(reader_thread_);
     std::lock_guard<std::mutex> lock(mutex_);
-    return std::move(read_queue_);
+    auto res = std::move(read_queue_);
+    read_queue_.clear();
+    return res;
   }
 
   // Returns the page blocks borrowed for read and makes them available for
