@@ -177,7 +177,8 @@ class TraceStorage {
 
    private:
     static Id CreateId(TableId table, uint32_t row) {
-      return (static_cast<uint64_t>(table) << 32ul) | row;
+      static constexpr uint64_t kRowIdTableShift = 32ul;
+      return (static_cast<uint64_t>(table) << kRowIdTableShift) | row;
     }
 
     std::deque<Id> ids_;
