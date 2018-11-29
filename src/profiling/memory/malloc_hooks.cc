@@ -46,6 +46,11 @@ static const MallocDispatch* GetDispatch() {
   return g_dispatch.load(std::memory_order_relaxed);
 }
 
+// No-op until we implement libc support.
+static void MallocDispatchReset(const MallocDispatch* dispatch) {
+  __malloc_dispatch_reset(dispatch);
+}
+
 // This is so we can make an so that we can swap out with the existing
 // libc_malloc_hooks.so
 #ifndef HEAPPROFD_PREFIX
