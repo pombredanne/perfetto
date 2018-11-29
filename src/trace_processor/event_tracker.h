@@ -49,7 +49,6 @@ class EventTracker {
                                base::StringView next_comm);
 
   // This method is called when a cpu freq event is seen in the trace.
-  // TODO(taylori): Move to a more appropriate class or rename class.
   virtual base::Optional<TraceStorage::Args::Inserter> PushCounter(
       uint64_t timestamp,
       double value,
