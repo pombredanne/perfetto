@@ -123,33 +123,26 @@ class TraceStorage {
     };
 
     const std::deque<RowId>& ids() const { return ids_; }
-    const std::deque<StringId>& keys_without_index() const {
-      return keys_without_index_;
-    }
-    const std::deque<StringId>& keys_with_index() const {
-      return keys_with_index_;
-    }
+    const std::deque<StringId>& flat_keys() const { return flat_keys_; }
+    const std::deque<StringId>& keys() const { return keys_; }
     const std::deque<Varardic>& arg_values() const { return arg_values_; }
     size_t args_count() const { return ids_.size(); }
 
-    void AddArg(RowId id,
-                StringId key_without_index,
-                StringId key_with_index,
-                int64_t value) {
+    void AddArg(RowId id, StringId flat_key, StringId key, int64_t value) {
       if (id == kInvalidRowId)
         return;
 
       ids_.emplace_back(id);
-      keys_without_index_.emplace_back(key_without_index);
-      keys_with_index_.emplace_back(key_with_index);
+      flat_keys_.emplace_back(flat_key);
+      keys_.emplace_back(key);
       arg_values_.emplace_back(value);
       args_for_id_.emplace(id, args_count() - 1);
     }
 
    private:
     std::deque<RowId> ids_;
-    std::deque<StringId> keys_without_index_;
-    std::deque<StringId> keys_with_index_;
+    std::deque<StringId> flat_keys_;
+    std::deque<StringId> keys_;
     std::deque<Varardic> arg_values_;
     std::multimap<RowId, size_t> args_for_id_;
   };
