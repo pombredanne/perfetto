@@ -90,7 +90,9 @@ void ProducerIPCService::RegisterDataSource(
   if (!producer) {
     PERFETTO_DLOG(
         "Producer invoked RegisterDataSource() before InitializeConnection()");
-    return response.Reject();
+    if (response.IsBound())
+      response.Reject();
+    return;
   }
 
   DataSourceDescriptor dsd;
@@ -98,8 +100,10 @@ void ProducerIPCService::RegisterDataSource(
   GetProducerForCurrentRequest()->service_endpoint->RegisterDataSource(dsd);
 
   // RegisterDataSource doesn't expect any meaningful response.
-  response.Resolve(
-      ipc::AsyncResult<protos::RegisterDataSourceResponse>::Create());
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::RegisterDataSourceResponse>::Create());
+  }
 }
 
 // Called by the IPC layer.
@@ -122,13 +126,17 @@ void ProducerIPCService::UnregisterDataSource(
     PERFETTO_DLOG(
         "Producer invoked UnregisterDataSource() before "
         "InitializeConnection()");
-    return response.Reject();
+    if (response.IsBound())
+      response.Reject();
+    return;
   }
   producer->service_endpoint->UnregisterDataSource(req.data_source_name());
 
   // UnregisterDataSource doesn't expect any meaningful response.
-  response.Resolve(
-      ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::UnregisterDataSourceResponse>::Create());
+  }
 }
 
 void ProducerIPCService::RegisterTraceWriter(
@@ -139,14 +147,18 @@ void ProducerIPCService::RegisterTraceWriter(
     PERFETTO_DLOG(
         "Producer invoked RegisterTraceWriter() before "
         "InitializeConnection()");
-    return response.Reject();
+    if (response.IsBound())
+      response.Reject();
+    return;
   }
   producer->service_endpoint->RegisterTraceWriter(req.trace_writer_id(),
                                                   req.target_buffer());
 
   // RegisterTraceWriter doesn't expect any meaningful response.
-  response.Resolve(
-      ipc::AsyncResult<protos::RegisterTraceWriterResponse>::Create());
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::RegisterTraceWriterResponse>::Create());
+  }
 }
 
 void ProducerIPCService::UnregisterTraceWriter(
@@ -157,13 +169,17 @@ void ProducerIPCService::UnregisterTraceWriter(
     PERFETTO_DLOG(
         "Producer invoked UnregisterTraceWriter() before "
         "InitializeConnection()");
-    return response.Reject();
+    if (response.IsBound())
+      response.Reject();
+    return;
   }
   producer->service_endpoint->UnregisterTraceWriter(req.trace_writer_id());
 
   // UnregisterTraceWriter doesn't expect any meaningful response.
-  response.Resolve(
-      ipc::AsyncResult<protos::UnregisterTraceWriterResponse>::Create());
+  if (response.IsBound()) {
+    response.Resolve(
+        ipc::AsyncResult<protos::UnregisterTraceWriterResponse>::Create());
+  }
 }
 
 void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
@@ -172,6 +188,8 @@ void ProducerIPCService::CommitData(const protos::CommitDataRequest& proto_req,
   if (!producer) {
     PERFETTO_DLOG(
         "Producer invoked CommitData() before InitializeConnection()");
+    if (resp.IsBound())
+      resp.Reject();
     return;
   }
   CommitDataRequest req;
@@ -202,6 +220,8 @@ void ProducerIPCService::NotifyDataSourceStopped(
     PERFETTO_DLOG(
         "Producer invoked NotifyDataSourceStopped() before "
         "InitializeConnection()");
+    if (response.IsBound())
+      response.Reject();
     return;
   }
   producer->service_endpoint->NotifyDataSourceStopped(request.data_source_id());
