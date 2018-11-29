@@ -135,8 +135,8 @@ Usage: %s
   --background     -d     : Exits immediately and continues tracing in background
   --config         -c     : /path/to/trace/config/file or - for stdin
   --out            -o     : /path/to/out/trace/file or - for stdout
-  --dropbox        -d TAG : Upload trace into DropBox using tag TAG (default: %s)
-  --no-guardrails  -n     : Ignore guardrails triggered when using --dropbox (for testing).
+  --dropbox           TAG : Upload trace into DropBox using tag TAG (default: %s)
+  --no-guardrails         : Ignore guardrails triggered when using --dropbox (for testing).
   --txt                   : Parse config as pbtxt. Not a stable API. Not for production use.
   --reset-guardrails      : Resets the state of the guardails and exits (for testing).
   --help           -h
@@ -314,7 +314,6 @@ int PerfettoCmd::Main(int argc, char** argv) {
 
   for (ssize_t i = optind; i < argc; i++) {
     has_config_options = true;
-    PERFETTO_ELOG("%s", argv[i]);
     config_options.categories.push_back(argv[i]);
   }
 
