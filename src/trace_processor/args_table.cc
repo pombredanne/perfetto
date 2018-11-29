@@ -47,7 +47,7 @@ Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
   });
-  return schema_.ToTableSchema({"id", "indexed_key"});
+  return schema_.ToTableSchema({"id", "key"});
 }
 
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
