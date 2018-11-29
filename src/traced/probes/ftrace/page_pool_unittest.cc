@@ -16,6 +16,7 @@
 
 #include "src/traced/probes/ftrace/page_pool.h"
 
+#include <array>
 #include <mutex>
 #include <random>
 #include <thread>
@@ -36,9 +37,9 @@ TEST(PagePoolTest, SingleThreaded) {
       uint8_t* page = pool.BeginWrite();
       std::minstd_rand0 rnd_engine(seed);
       std::generate(page, page + base::kPageSize, rnd_engine);
-      // Deliberately make it so pages 3 and 4 are overwritten, so we should see
-      // only pages 0, 1, 2, 4, 5
-      if (seed <= 2 || seed >= 4)
+      // Deliberately make it so pages 3 is overwritten, so we should see only
+      // pages 0, 1, 2, 4, 5.
+      if (seed != 3)
         pool.EndWrite();
     }
 
