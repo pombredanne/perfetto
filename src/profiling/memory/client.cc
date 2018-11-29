@@ -216,10 +216,16 @@ void Client::Init(std::vector<base::ScopedFile> socks) {
   PERFETTO_DCHECK(pthread_key_.valid());
   PERFETTO_DCHECK(!inited());
 
+  // It is essential that this happens BEFORE re-initializing the SocketPool.
+  // Let's assume this is called while another thread is inside of
+  // RecordMalloc. If we stored the updated sequence number, the following
+  // could happen: the thread gets a socket before the sequence number is
+  // updated but after the socket pool has been reinitialized. It then sends
+  // a record with the old sequence number, confusing the central service.
+  sequence_number_.store(0, std::memory_order_release);
+
   socket_pool_.Init(std::move(socks));
   free_page_.Init();
-
-  sequence_number_ = 0;
 
   uint64_t size = 0;
   base::ScopedFile maps(base::OpenFile("/proc/self/maps", O_RDONLY));

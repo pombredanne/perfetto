@@ -121,8 +121,9 @@ bool HEAPPROFD_ADD_PREFIX(_initialize)(const MallocDispatch* malloc_dispatch,
 
     g_client.store(client.release());
   } else {
-    new_client->Init(perfetto::profiling::kHeapprofdSocketFile,
-                     kNumConnections);
+    if (!client->inited())
+      client->Init(perfetto::profiling::kHeapprofdSocketFile, kNumConnections);
+    return client->inited();
   }
   return true;
 }
