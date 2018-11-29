@@ -71,12 +71,14 @@ void FtraceDataSource::Flush(FlushRequestID flush_request_id,
     return;
 
   pending_flushes_[flush_request_id] = std::move(callback);
+
   // FtraceController will call OnFtraceFlushComplete() once the data has been
   // drained from the ftrace buffer and written into the various writers of
   // all its active data sources.
   controller_weak_->Flush(flush_request_id);
 }
 
+// Called by FtraceController after all CPUs have acked the flush or timed out.
 void FtraceDataSource::OnFtraceFlushComplete(FlushRequestID flush_request_id) {
   auto it = pending_flushes_.find(flush_request_id);
   if (it == pending_flushes_.end()) {

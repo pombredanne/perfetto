@@ -48,7 +48,7 @@ namespace perfetto {
 namespace {
 
 constexpr int kDefaultDrainPeriodMs = 100;
-constexpr int kFlushTimeoutMs = 250;
+constexpr int kFlushTimeoutMs = 500;
 constexpr int kMinDrainPeriodMs = 1;
 constexpr int kMaxDrainPeriodMs = 1000 * 60;
 constexpr uint32_t kMainThread = 255;  // for METATRACE
@@ -230,10 +230,6 @@ void FtraceController::DrainCPUs(int generation) {
     std::lock_guard<std::mutex> lock(thread_sync_.mutex);
     std::swap(cpus_to_drain, thread_sync_.cpus_to_drain);
 
-    if (cur_flush_request_id_) {
-      PERFETTO_DLOG("DrainCpus flush ack: %zu",
-                    thread_sync_.flush_acks.count());
-    }
     // Check also if a flush is pending and if all cpus have acked. If that's
     // the case, ack the overall Flush() request at the end of this function.
     if (cur_flush_request_id_ && thread_sync_.flush_acks.count() >= num_cpus) {
@@ -255,27 +251,26 @@ void FtraceController::DrainCPUs(int generation) {
   // If we filled up any SHM pages while draining the data, we will have posted
   // a task to notify traced about this. Only unblock the readers after this
   // notification is sent to make it less likely that they steal CPU time away
-  // from traced.
-  // If this drain was due to a flush request, UnblockReaders will be a no-op.
-
-  // TODO check that we did drain anything at all?
-
-  base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
-  task_runner_->PostTask([weak_this] {
-    if (weak_this)
-      weak_this->UnblockReaders();
-  });
+  // from traced. Also, don't unblock the readers until all of them have replied
+  // to the flush.
+  if (!cur_flush_request_id_) {
+    base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
+    task_runner_->PostTask([weak_this] {
+      if (weak_this)
+        weak_this->UnblockReaders();
+    });
+  }
 
   observer_->OnFtraceDataWrittenIntoDataSourceBuffers();
 
   if (ack_flush_request_id) {
-    {
-      std::unique_lock<std::mutex> lock(thread_sync_.mutex);
-      if (thread_sync_.cmd == FtraceThreadSync::kFlush)
-        IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
-    }
+    // Flush completed, all CpuReader(s) acked.
+
+    IssueThreadSyncCmd(FtraceThreadSync::kRun);  // Switch back to reading mode.
+
     // This will call FtraceDataSource::OnFtraceFlushComplete(), which in turn
-    // will flush the userspace buffers and ack the flush to the ProbesProducer.
+    // will flush the userspace buffers and ack the flush to the ProbesProducer
+    // which in turn will ack the flush to the tracing service.
     NotifyFlushCompleteToStartedDataSources(ack_flush_request_id);
   }
 }
@@ -352,8 +347,6 @@ void FtraceController::Flush(FlushRequestID flush_id) {
     IssueThreadSyncCmd(FtraceThreadSync::kFlush, std::move(lock));
   }
 
-  // TODO who resets the state to kRun?
-
   base::WeakPtr<FtraceController> weak_this = weak_factory_.GetWeakPtr();
   task_runner_->PostDelayedTask(
       [weak_this, flush_id] {
@@ -366,8 +359,8 @@ void FtraceController::Flush(FlushRequestID flush_id) {
 void FtraceController::OnFlushTimeout(FlushRequestID flush_request_id) {
   if (flush_request_id != cur_flush_request_id_)
     return;
-  unsigned long acks = 0;
 
+  uint64_t acks = 0;  // For debugging purposes only.
   {
     // Unlock the cpu readers and move on.
     std::unique_lock<std::mutex> lock(thread_sync_.mutex);
@@ -377,7 +370,7 @@ void FtraceController::OnFlushTimeout(FlushRequestID flush_request_id) {
       IssueThreadSyncCmd(FtraceThreadSync::kRun, std::move(lock));
   }
 
-  PERFETTO_ELOG("Flush(%" PRIu64 ") timed out. Acked cpu set: 0x%lx",
+  PERFETTO_ELOG("Ftrace flush(%" PRIu64 ") timed out. Acked cpus: 0x%" PRIx64,
                 flush_request_id, acks);
   cur_flush_request_id_ = 0;
   NotifyFlushCompleteToStartedDataSources(flush_request_id);
@@ -444,16 +437,19 @@ void FtraceController::DumpFtraceStats(FtraceStats* stats) {
 
 void FtraceController::IssueThreadSyncCmd(
     FtraceThreadSync::Cmd cmd,
-    std::unique_lock<std::mutex> already_locked) {
+    std::unique_lock<std::mutex> pass_lock_from_caller) {
   PERFETTO_DCHECK_THREAD(thread_checker_);
   {
-    std::unique_lock<std::mutex> lock(std::move(already_locked));
+    std::unique_lock<std::mutex> lock(std::move(pass_lock_from_caller));
     if (!lock.owns_lock())
       lock = std::unique_lock<std::mutex>(thread_sync_.mutex);
 
-    // If in kQuit state, we should never issue any other commands.
-    PERFETTO_DCHECK(thread_sync_.cmd != FtraceThreadSync::kQuit ||
-                    cmd == FtraceThreadSync::kQuit);
+    if (thread_sync_.cmd == FtraceThreadSync::kQuit &&
+        cmd != FtraceThreadSync::kQuit) {
+      // If in kQuit state, we should never issue any other commands.
+      return;
+    }
+
     thread_sync_.cmd = cmd;
     thread_sync_.cmd_id++;
   }

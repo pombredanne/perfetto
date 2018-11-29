@@ -62,7 +62,7 @@ class FtraceController {
   static std::unique_ptr<FtraceController> Create(base::TaskRunner*, Observer*);
   virtual ~FtraceController();
 
-  // These two methods are called by CpuReader from their worker threads.
+  // These two methods are called by CpuReader(s) from their worker threads.
   static void OnCpuReaderRead(size_t cpu, int generation, FtraceThreadSync*);
   static void OnCpuReaderFlush(size_t cpu, int generation, FtraceThreadSync*);
 
@@ -76,7 +76,7 @@ class FtraceController {
 
   // Force a read of the ftrace buffers, including kernel buffer pages that
   // are not full. Will call OnFtraceFlushComplete() on all
-  // |started_data_sources_| once all workers have flushed.
+  // |started_data_sources_| once all workers have flushed (or timed out).
   void Flush(FlushRequestID);
 
   void DumpFtraceStats(FtraceStats*);

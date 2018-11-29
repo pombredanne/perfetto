@@ -60,8 +60,7 @@ void FuzzCpuReaderParsePage(const uint8_t* data, size_t size) {
 
   writer.Reset(&stream);
   FtraceMetadata metadata{};
-  CpuReader::ParsePage(g_page, g_page + sizeof(g_page), &filter, &writer, table,
-                       &metadata);
+  CpuReader::ParsePage(g_page, &filter, &writer, table, &metadata);
 }
 
 }  // namespace perfetto

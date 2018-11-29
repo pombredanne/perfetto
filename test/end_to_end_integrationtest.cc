@@ -49,14 +49,14 @@ namespace perfetto {
 #define TEST_PRODUCER_SOCK_NAME ::perfetto::GetProducerSocket()
 #endif
 
-// TODO(b/73453011): reenable this on more platforms (including standalone
-// Android).
+// TODO(b/73453011): reenable on more platforms (including standalone Android).
 #if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#define MAYBE_TestFtraceProducer TestFtraceProducer
+#define TreeHuggerOnly(x) x
 #else
-#define MAYBE_TestFtraceProducer DISABLED_TestFtraceProducer
+#define TreeHuggerOnly(x) DISABLED_##x
 #endif
-TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
+
+TEST(PerfettoTest, TreeHuggerOnly(TestFtraceProducer)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
@@ -99,14 +99,7 @@ TEST(PerfettoTest, MAYBE_TestFtraceProducer) {
   }
 }
 
-// TODO(b/73453011): reenable this on more platforms (including standalone
-// Android).
-#if PERFETTO_BUILDFLAG(PERFETTO_ANDROID_BUILD)
-#define MAYBE_TestFtraceFlush TestFtraceFlush
-#else
-#define MAYBE_TestFtraceFlush DISABLED_TestFtraceFlush
-#endif
-TEST(PerfettoTest, MAYBE_TestFtraceFlush) {
+TEST(PerfettoTest, TreeHuggerOnly(TestFtraceFlush)) {
   base::TestTaskRunner task_runner;
 
   TestHelper helper(&task_runner);
