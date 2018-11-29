@@ -49,9 +49,7 @@ class ArgsTable : public Table {
 
     Bounds BoundFilter(int op, sqlite3_value* sqlite_val) const override;
 
-    void Filter(int op,
-                sqlite3_value* value,
-                StorageSchema::FilterHelper) const override;
+    void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 

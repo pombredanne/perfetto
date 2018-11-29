@@ -1,7 +1,13 @@
-select ts, counters.name as counters_name, value, dur, ref, ref_type,
-       arg_id, id, args.name as args_name,
+select ts,
+       dur,
+       counters.name as counters_name,
+       value,
+       ref,
+       ref_type,
+       id,
+       args.key as args_key,
        int_value as utid
 from counters
-inner join args on counters.arg_id = args.id
+inner join args using(id)
 where ref = 1
 limit 10;
