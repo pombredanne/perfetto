@@ -90,10 +90,12 @@ class TraceStorage {
     uint32_t tid = 0;
   };
 
+  // Generic key value storage which can be referenced by other tables.
   class Args {
    public:
     using Id = uint64_t;
 
+    // Varardic type representing the possible values for the args table.
     struct Varardic {
       enum Type { kInt, kString, kReal };
 
@@ -109,62 +111,78 @@ class TraceStorage {
       };
     };
 
+    // Identifiers for all the tables in the database.
     enum TableId : uint8_t {
       // Intentionally don't have Table == 0 so that Id == 0 can refer to an
       // invalid id.
       kCounters = 1,
     };
 
+    // Allows insertion of data into the args table.
     class Inserter {
      public:
-      Inserter(TraceStorage* storage, TableId table_id, size_t row)
-          : storage_(storage), table_id_(table_id), row_(row) {}
+      Inserter() : storage_(nullptr) {}
 
-      Id AddInt64Arg(StringId name_without_index,
-                     StringId name_with_index,
-                     int64_t value) {
+      Inserter(TraceStorage* storage, TableId table_id, uint32_t row)
+          : storage_(storage), table_and_row_(std::make_pair(table_id, row)) {}
+
+      // Allow std::move().
+      Inserter(Inserter&&) noexcept = default;
+      Inserter& operator=(Inserter&&) = default;
+
+      // Disable implicit copy.
+      Inserter(const Inserter&) = delete;
+      Inserter& operator=(const Inserter&) = delete;
+
+      void AddInt64Arg(StringId key_without_index,
+                       StringId key_with_index,
+                       int64_t value) {
+        if (!table_and_row_.has_value())
+          return;
+
+        const auto& table_and_row = table_and_row_.value();
+        TableId table_id = table_and_row.first;
+        uint32_t row = table_and_row.second;
+
+        Id id = CreateId(table_id, row);
         auto* args = storage_->mutable_args();
-        Id id = CreateId(table_id_, row_);
         args->ids_.emplace_back(id);
-        args->names_without_index_.emplace_back(name_without_index);
-        args->names_with_index_.emplace_back(name_with_index);
+        args->keys_without_index_.emplace_back(key_without_index);
+        args->keys_with_index_.emplace_back(key_with_index);
         args->arg_values_.emplace_back(value);
         args->args_for_id_.emplace(id, args->args_count() - 1);
-        switch (table_id_) {
+
+        switch (table_id) {
           case TableId::kCounters:
-            storage_->mutable_counters()->set_arg_id(row_, id);
+            storage_->mutable_counters()->set_arg_id(row, id);
         }
-        return id;
       }
 
      private:
       TraceStorage* storage_;
-      TableId table_id_;
-      size_t row_;
+      base::Optional<std::pair<TableId, uint32_t>> table_and_row_;
     };
 
     static const Id kInvalidId;
 
     const std::deque<Id>& ids() const { return ids_; }
-    const std::deque<StringId>& names_without_index() const {
-      return names_without_index_;
+    const std::deque<StringId>& keys_without_index() const {
+      return keys_without_index_;
     }
-    const std::deque<StringId>& names_with_index() const {
-      return names_with_index_;
+    const std::deque<StringId>& keys_with_index() const {
+      return keys_with_index_;
     }
     const std::deque<Varardic>& arg_values() const { return arg_values_; }
     size_t args_count() const { return ids_.size(); }
 
    private:
-    static Id CreateId(TableId table, size_t row) {
-      PERFETTO_DCHECK(static_cast<uint64_t>(row) < (1ull << 48ul));
-      uint64_t table_extended = static_cast<uint64_t>(table);
-      return (table_extended << 48ul) | row;
+    static Id CreateId(TableId table, uint32_t row) {
+      return (static_cast<uint64_t>(table) << 32ul) | row;
     }
 
     std::deque<Id> ids_;
-    std::deque<StringId> names_without_index_;
-    std::deque<StringId> names_with_index_;
+    std::deque<StringId> keys_without_index_;
+    std::deque<StringId> keys_with_index_;
     std::deque<Varardic> arg_values_;
     std::multimap<Id, size_t> args_for_id_;
   };

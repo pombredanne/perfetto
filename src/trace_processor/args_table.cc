@@ -33,9 +33,9 @@ Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
   const auto& args = storage_->args();
   std::unique_ptr<StorageSchema::Column> cols[] = {
       StorageSchema::NumericColumnPtr("id", &args.ids()),
-      StorageSchema::StringColumnPtr("name", &args.names_without_index(),
+      StorageSchema::StringColumnPtr("key", &args.keys_without_index(),
                                      &storage_->string_pool()),
-      StorageSchema::StringColumnPtr("indexed_name", &args.names_with_index(),
+      StorageSchema::StringColumnPtr("indexed_key", &args.keys_with_index(),
                                      &storage_->string_pool()),
       std::unique_ptr<ValueColumn>(
           new ValueColumn("int_value", VarardicType::kInt, storage_)),
