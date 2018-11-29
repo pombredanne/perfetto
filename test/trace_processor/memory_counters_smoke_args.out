@@ -1,4 +1,4 @@
-"id","key","indexed_key","int_value","string_value","real_value"
+"id","flat_key","key","int_value","string_value","real_value"
 4294967296,"utid","utid",7,"[NULL]","[NULL]"
 4294967297,"utid","utid",7,"[NULL]","[NULL]"
 4294967298,"utid","utid",7,"[NULL]","[NULL]"
