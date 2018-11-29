@@ -45,16 +45,6 @@ size_t StorageSchema::ColumnIndexFromName(const std::string& name) {
   return static_cast<size_t>(std::distance(columns_.begin(), it));
 }
 
-StorageSchema::FilterHelper::FilterHelper(uint32_t start_row,
-                                          std::vector<bool>* row_filter)
-    : start_row_(start_row), row_filter_(row_filter) {}
-
-StorageSchema::FilterHelper::Iterator::Iterator(uint32_t start_row,
-                                                std::vector<bool>* row_filter)
-    : start_row_(start_row), row_filter_(row_filter) {
-  FindNext();
-}
-
 StorageSchema::Column::Column(std::string col_name, bool hidden)
     : col_name_(col_name), hidden_(hidden) {}
 StorageSchema::Column::~Column() = default;
@@ -81,14 +71,13 @@ StorageSchema::Column::Bounds StorageSchema::TsEndColumn::BoundFilter(
 
 void StorageSchema::TsEndColumn::Filter(int op,
                                         sqlite3_value* value,
-                                        FilterHelper helper) const {
+                                        FilteredRowIndex* index) const {
   auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
   uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-  for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-    auto row = it.Row();
-    uint64_t add = (*ts_start_)[row] + (*dur_)[row];
-    it.Set(binary_op(add, extracted));
-  }
+  index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+    uint64_t val = (*ts_start_)[row] + (*dur_)[row];
+    return binary_op(val, extracted);
+  });
 }
 
 StorageSchema::Column::Comparator StorageSchema::TsEndColumn::Sort(
@@ -107,10 +96,9 @@ StorageSchema::Column::Comparator StorageSchema::TsEndColumn::Sort(
   };
 }
 
-StorageSchema::ArgIdColumn::ArgIdColumn(std::string column_name,
-                                        const std::deque<uint64_t>* ids)
-    : Column(std::move(column_name), false), ids_(std::move(ids)) {}
-StorageSchema::ArgIdColumn::~ArgIdColumn() = default;
+StorageSchema::IdColumn::IdColumn(std::string column_name, TableId table_id)
+    : Column(std::move(column_name), false), table_id_(table_id) {}
+StorageSchema::IdColumn::~IdColumn() = default;
 
 }  // namespace trace_processor
 }  // namespace perfetto

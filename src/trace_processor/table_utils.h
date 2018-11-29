@@ -57,24 +57,23 @@ inline RangeRowIterator CreateRangeIterator(
       bitvector_cs.emplace_back(i);
   }
 
-  // If we have no other constraints then we can just iterate between min
-  // and max.
-  if (bitvector_cs.empty())
-    return RangeRowIterator(min_idx, max_idx, desc);
-
-  // Otherwise, create a bitvector with true meaning the row should be returned
-  // and false otherwise.
-  std::vector<bool> filter(max_idx - min_idx, true);
+  // Create an filter index and allow each of the columns filter on it.
+  FilteredRowIndex index(min_idx, max_idx);
   for (const auto& c_idx : bitvector_cs) {
     const auto& c = cs[c_idx];
     auto* value = argv[c_idx];
 
-    auto col = static_cast<size_t>(c.iColumn);
-    const auto& schema_col = schema.GetColumn(col);
-    schema_col.Filter(c.op, value,
-                      StorageSchema::FilterHelper(min_idx, &filter));
+    const auto& schema_col = schema.GetColumn(static_cast<size_t>(c.iColumn));
+    schema_col.Filter(c.op, value, &index);
   }
-  return RangeRowIterator(min_idx, desc, std::move(filter));
+
+  switch (index.mode()) {
+    case FilteredRowIndex::Mode::kAllRows:
+      return RangeRowIterator(min_idx, max_idx, desc);
+    case FilteredRowIndex::Mode::kBitVector:
+      return RangeRowIterator(min_idx, desc, index.ReleaseBitVector());
+  }
+  PERFETTO_CHECK(false);
 }
 
 inline std::pair<bool, bool> IsOrdered(

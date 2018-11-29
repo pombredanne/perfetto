@@ -33,9 +33,9 @@ Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
   const auto& args = storage_->args();
   std::unique_ptr<StorageSchema::Column> cols[] = {
       std::unique_ptr<IdColumn>(new IdColumn("id", storage_, &args.ids())),
-      StorageSchema::StringColumnPtr("name", &args.names_without_index(),
+      StorageSchema::StringColumnPtr("flat_key", &args.flat_keys(),
                                      &storage_->string_pool()),
-      StorageSchema::StringColumnPtr("indexed_name", &args.names_with_index(),
+      StorageSchema::StringColumnPtr("key", &args.keys(),
                                      &storage_->string_pool()),
       std::unique_ptr<ValueColumn>(
           new ValueColumn("int_value", VarardicType::kInt, storage_)),
@@ -47,7 +47,7 @@ Table::Schema ArgsTable::CreateSchema(int, const char* const*) {
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
   });
-  return schema_.ToTableSchema({"id", "name"});
+  return schema_.ToTableSchema({"id", "key"});
 }
 
 std::unique_ptr<Table::Cursor> ArgsTable::CreateCursor(
@@ -78,24 +78,24 @@ int ArgsTable::BestIndex(const QueryConstraints& qc, BestIndexInfo* info) {
 
 ArgsTable::IdColumn::IdColumn(std::string col_name,
                               const TraceStorage* storage,
-                              const std::deque<TraceStorage::Args::Id>* ids)
+                              const std::deque<RowId>* ids)
     : NumericColumn(col_name, ids, false, false), storage_(storage) {}
 
 void ArgsTable::IdColumn::Filter(int op,
                                  sqlite3_value* value,
-                                 StorageSchema::FilterHelper helper) const {
+                                 FilteredRowIndex* index) const {
   if (!sqlite_utils::IsOpEq(op)) {
-    NumericColumn::Filter(op, value, std::move(helper));
+    NumericColumn::Filter(op, value, index);
     return;
   }
-  auto id = sqlite_utils::ExtractSqliteValue<TraceStorage::Args::Id>(value);
+  auto id = sqlite_utils::ExtractSqliteValue<RowId>(value);
   const auto& args_for_id = storage_->args().args_for_id();
   auto it_pair = args_for_id.equal_range(id);
   std::vector<size_t> rows;
   for (auto it = it_pair.first; it != it_pair.second; it++) {
     rows.push_back(it->second);
   }
-  helper.SetOnlyRows(std::move(rows));
+  index->SetOnlyRows(std::move(rows));
 }
 
 ArgsTable::ValueColumn::ValueColumn(std::string col_name,
@@ -135,35 +135,35 @@ ArgsTable::ValueColumn::Bounds ArgsTable::ValueColumn::BoundFilter(
 
 void ArgsTable::ValueColumn::Filter(int op,
                                     sqlite3_value* value,
-                                    StorageSchema::FilterHelper helper) const {
+                                    FilteredRowIndex* index) const {
   switch (type_) {
     case VarardicType::kInt: {
       auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
       int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
-      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-        const auto& arg = storage_->args().arg_values()[it.Row()];
-        it.Set(arg.type == type_ && binary_op(arg.int_value, extracted));
-      }
+      index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
+        return arg.type == type_ && binary_op(arg.int_value, extracted);
+      });
       break;
     }
     case VarardicType::kReal: {
       auto binary_op = sqlite_utils::GetPredicateForOp<double>(op);
       double extracted = sqlite_utils::ExtractSqliteValue<double>(value);
-      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-        const auto& arg = storage_->args().arg_values()[it.Row()];
-        it.Set(arg.type == type_ && binary_op(arg.real_value, extracted));
-      }
+      index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
+        return arg.type == type_ && binary_op(arg.real_value, extracted);
+      });
       break;
     }
     case VarardicType::kString: {
       auto binary_op = sqlite_utils::GetPredicateForOp<std::string>(op);
       const auto* extracted =
           reinterpret_cast<const char*>(sqlite3_value_text(value));
-      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-        const auto& arg = storage_->args().arg_values()[it.Row()];
+      index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+        const auto& arg = storage_->args().arg_values()[row];
         const auto& str = storage_->GetString(arg.string_value);
-        it.Set(arg.type == type_ && binary_op(str, extracted));
-      }
+        return arg.type == type_ && binary_op(str, extracted);
+      });
       break;
     }
   }

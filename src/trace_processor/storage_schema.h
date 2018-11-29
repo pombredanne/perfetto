@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <deque>
 
+#include "src/trace_processor/filtered_row_index.h"
 #include "src/trace_processor/sqlite_utils.h"
 #include "src/trace_processor/storage_cursor.h"
 #include "src/trace_processor/table.h"
@@ -31,81 +32,6 @@ namespace trace_processor {
 // Used by all tables which are backed by data in TraceStorage.
 class StorageSchema {
  public:
-  // Helper used by filter operations. It is used to update a backing
-  // vector<bool>.
-  class FilterHelper {
-   public:
-    class Iterator {
-     public:
-      Iterator(uint32_t start_row, std::vector<bool>* row_filter);
-
-      PERFETTO_ALWAYS_INLINE void Next() {
-        offset_++;
-        FindNext();
-      }
-
-      PERFETTO_ALWAYS_INLINE bool HasMore() const {
-        return offset_ < row_filter_->size();
-      }
-
-      PERFETTO_ALWAYS_INLINE uint32_t Row() const {
-        return offset_ + start_row_;
-      }
-
-      PERFETTO_ALWAYS_INLINE void Set(bool value) {
-        (*row_filter_)[offset_] = value;
-      }
-
-     private:
-      PERFETTO_ALWAYS_INLINE void FindNext() {
-        auto begin = row_filter_->begin();
-        auto prev_it = begin + static_cast<ptrdiff_t>(offset_);
-        auto current_it = std::find(prev_it, row_filter_->end(), true);
-        offset_ = static_cast<uint32_t>(std::distance(begin, current_it));
-      }
-
-      uint32_t start_row_;
-      uint32_t offset_ = 0;
-      std::vector<bool>* row_filter_;
-    };
-
-    FilterHelper(uint32_t start_row, std::vector<bool>* row_filter);
-
-    // Allow std::move().
-    FilterHelper(FilterHelper&&) noexcept = default;
-    FilterHelper& operator=(FilterHelper&&) = default;
-
-    // Disable implicit copy.
-    FilterHelper(const FilterHelper&) = delete;
-    FilterHelper& operator=(const FilterHelper&) = delete;
-
-    Iterator Rows() const { return Iterator(start_row_, row_filter_); }
-
-    PERFETTO_ALWAYS_INLINE void SetOnlyRows(std::vector<size_t> rows) {
-      // Sort the rows so that the algorithm below makes sense.
-      std::sort(rows.begin(), rows.end());
-
-      // Initialise start to the beginning of the vector.
-      auto start = row_filter_->begin();
-      for (size_t row : rows) {
-        // Unset all bits between the start iterator and the iterator pointing
-        // to the current row. That is, this loop sets all elements not pointed
-        // to by rows to false. It does not touch the rows themselves which
-        // means if they were already false (i.e. not returned) then they won't
-        // be returned now and if they were true (i.e. returned) they will still
-        // be returned.
-        auto end = row_filter_->begin() + static_cast<ptrdiff_t>(row);
-        std::fill(start, end, false);
-        start = end + 1;
-      }
-      std::fill(start, row_filter_->end(), false);
-    }
-
-   private:
-    uint32_t start_row_;
-    std::vector<bool>* row_filter_;
-  };
-
   // A column of data backed by data storage.
   class Column : public StorageCursor::ColumnReporter {
    public:
@@ -130,7 +56,7 @@ class StorageSchema {
     // Given a SQLite operator and value for the comparision, returns a
     // predicate which takes in a row index and returns whether the row should
     // be returned.
-    virtual void Filter(int op, sqlite3_value* value, FilterHelper) const = 0;
+    virtual void Filter(int op, sqlite3_value*, FilteredRowIndex*) const = 0;
 
     // Given a order by constraint for this column, returns a comparator
     // function which compares data in this column at two indices.
@@ -203,14 +129,14 @@ class StorageSchema {
       return bounds;
     }
 
-    virtual void Filter(int op,
-                        sqlite3_value* value,
-                        FilterHelper helper) const override {
+    void Filter(int op,
+                sqlite3_value* value,
+                FilteredRowIndex* index) const override {
       auto type = sqlite3_value_type(value);
       if (type == SQLITE_INTEGER && std::is_integral<T>::value) {
-        FilterWithCast<int64_t>(op, value, std::move(helper));
+        FilterWithCast<int64_t>(op, value, index);
       } else if (type == SQLITE_INTEGER || type == SQLITE_FLOAT) {
-        FilterWithCast<double>(op, value, std::move(helper));
+        FilterWithCast<double>(op, value, index);
       } else {
         PERFETTO_FATAL("Unexpected sqlite value to compare against");
       }
@@ -255,13 +181,13 @@ class StorageSchema {
     template <typename C>
     void FilterWithCast(int op,
                         sqlite3_value* value,
-                        FilterHelper helper) const {
+                        FilteredRowIndex* index) const {
       auto binary_op = sqlite_utils::GetPredicateForOp<C>(op);
       C extracted = sqlite_utils::ExtractSqliteValue<C>(value);
-      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-        auto val = static_cast<C>((*deque_)[it.Row()]);
-        it.Set(binary_op(val, extracted));
-      }
+      index->FilterRows([this, binary_op, extracted](uint32_t row) {
+        auto val = static_cast<C>((*deque_)[row]);
+        return binary_op(val, extracted);
+      });
     }
 
     bool is_naturally_ordered_ = false;
@@ -292,7 +218,7 @@ class StorageSchema {
       return bounds;
     }
 
-    void Filter(int, sqlite3_value*, FilterHelper) const override {}
+    void Filter(int, sqlite3_value*, FilteredRowIndex*) const override {}
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
@@ -333,7 +259,7 @@ class StorageSchema {
 
     Bounds BoundFilter(int op, sqlite3_value* value) const override;
 
-    void Filter(int op, sqlite3_value* value, FilterHelper) const override;
+    void Filter(int op, sqlite3_value* value, FilteredRowIndex*) const override;
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override;
 
@@ -351,40 +277,41 @@ class StorageSchema {
 
   // Column which is used to reference the args table in other tables. That is,
   // it acts as a "foreign key" into the args table.
-  class ArgIdColumn final : public Column {
+  class IdColumn final : public Column {
    public:
-    ArgIdColumn(std::string column_name, const std::deque<uint64_t>* ids);
-    virtual ~ArgIdColumn() override;
+    IdColumn(std::string column_name, TableId table_id);
+    virtual ~IdColumn() override;
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
-      auto id = (*ids_)[row];
-      if (id == TraceStorage::Args::kInvalidId)
-        sqlite3_result_null(ctx);
-      else
-        sqlite_utils::ReportSqliteResult(ctx, id);
+      auto id = TraceStorage::CreateRowId(table_id_, row);
+      sqlite_utils::ReportSqliteResult(ctx, id);
     }
 
     Bounds BoundFilter(int, sqlite3_value*) const override { return Bounds{}; }
 
     void Filter(int op,
                 sqlite3_value* value,
-                FilterHelper helper) const override {
-      auto binary_op = sqlite_utils::GetPredicateForOp<uint64_t>(op);
-      uint64_t extracted = sqlite_utils::ExtractSqliteValue<uint64_t>(value);
-      for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-        auto val = static_cast<uint64_t>((*ids_)[it.Row()]);
-        it.Set(binary_op(val, extracted));
-      }
+                FilteredRowIndex* index) const override {
+      auto binary_op = sqlite_utils::GetPredicateForOp<RowId>(op);
+      RowId extracted = sqlite_utils::ExtractSqliteValue<RowId>(value);
+      index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+        auto val = TraceStorage::CreateRowId(table_id_, row);
+        return binary_op(val, extracted);
+      });
     }
 
     Comparator Sort(const QueryConstraints::OrderBy& ob) const override {
       if (ob.desc) {
         return [this](uint32_t f, uint32_t s) {
-          return sqlite_utils::CompareValuesDesc((*ids_)[f], (*ids_)[s]);
+          auto a = TraceStorage::CreateRowId(table_id_, f);
+          auto b = TraceStorage::CreateRowId(table_id_, s);
+          return sqlite_utils::CompareValuesDesc(a, b);
         };
       }
       return [this](uint32_t f, uint32_t s) {
-        return sqlite_utils::CompareValuesAsc((*ids_)[f], (*ids_)[s]);
+        auto a = TraceStorage::CreateRowId(table_id_, f);
+        auto b = TraceStorage::CreateRowId(table_id_, s);
+        return sqlite_utils::CompareValuesAsc(a, b);
       };
     }
 
@@ -395,7 +322,7 @@ class StorageSchema {
     bool IsNaturallyOrdered() const override { return false; }
 
    private:
-    const std::deque<uint64_t>* ids_;
+    TableId table_id_;
   };
 
   StorageSchema();
@@ -442,10 +369,9 @@ class StorageSchema {
         new StringColumn<Id>(column_name, deque, lookup_map, hidden));
   }
 
-  static std::unique_ptr<ArgIdColumn> ArgIdColumnPtr(
-      std::string column_name,
-      const std::deque<TraceStorage::Args::Id>* deque) {
-    return std::unique_ptr<ArgIdColumn>(new ArgIdColumn(column_name, deque));
+  static std::unique_ptr<IdColumn> IdColumnPtr(std::string column_name,
+                                               TableId table_id) {
+    return std::unique_ptr<IdColumn>(new IdColumn(column_name, table_id));
   }
 
  private:

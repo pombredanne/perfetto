@@ -42,6 +42,7 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
   const auto& counters = storage_->counters();
 
   std::unique_ptr<StorageSchema::Column> cols[] = {
+      StorageSchema::IdColumnPtr("id", TableId::kCounters),
       StorageSchema::NumericColumnPtr("ts", &counters.timestamps(),
                                       false /* hidden */, true /* ordered */),
       StorageSchema::StringColumnPtr("name", &counters.name_ids(),
@@ -52,8 +53,7 @@ Table::Schema CountersTable::CreateSchema(int, const char* const*) {
                               &counters.durations()),
       std::unique_ptr<RefColumn>(new RefColumn("ref", storage_)),
       StorageSchema::StringColumnPtr("ref_type", &counters.types(),
-                                     &ref_types_),
-      StorageSchema::ArgIdColumnPtr("arg_id", &counters.arg_ids())};
+                                     &ref_types_)};
   schema_ = StorageSchema({
       std::make_move_iterator(std::begin(cols)),
       std::make_move_iterator(std::end(cols)),
@@ -114,25 +114,22 @@ CountersTable::RefColumn::Bounds CountersTable::RefColumn::BoundFilter(
   return Bounds{};
 }
 
-void CountersTable::RefColumn::Filter(
-    int op,
-    sqlite3_value* value,
-    StorageSchema::FilterHelper helper) const {
+void CountersTable::RefColumn::Filter(int op,
+                                      sqlite3_value* value,
+                                      FilteredRowIndex* index) const {
   auto binary_op = sqlite_utils::GetPredicateForOp<int64_t>(op);
   int64_t extracted = sqlite_utils::ExtractSqliteValue<int64_t>(value);
-  for (auto it = helper.Rows(); it.HasMore(); it.Next()) {
-    uint32_t idx = it.Row();
-    auto ref = storage_->counters().refs()[idx];
-    auto type = storage_->counters().types()[idx];
+  index->FilterRows([this, &binary_op, extracted](uint32_t row) {
+    auto ref = storage_->counters().refs()[row];
+    auto type = storage_->counters().types()[row];
     if (type == RefType::kRefUtidLookupUpid) {
       auto upid = storage_->GetThread(static_cast<uint32_t>(ref)).upid;
       // Trying to filter null with any operation we currently handle
       // should return false.
-      it.Set(upid.has_value() && binary_op(upid.value(), extracted));
-      continue;
+      return upid.has_value() && binary_op(upid.value(), extracted);
     }
-    it.Set(binary_op(ref, extracted));
-  }
+    return binary_op(ref, extracted);
+  });
 }
 
 CountersTable::RefColumn::Comparator CountersTable::RefColumn::Sort(
