@@ -288,10 +288,7 @@ class StorageSchema {
 
     void ReportResult(sqlite3_context* ctx, uint32_t row) const override {
       auto id = TraceStorage::CreateRowId(table_id_, row);
-      if (id == kInvalidRowId)
-        sqlite3_result_null(ctx);
-      else
-        sqlite_utils::ReportSqliteResult(ctx, id);
+      sqlite_utils::ReportSqliteResult(ctx, id);
     }
 
     Bounds BoundFilter(int, sqlite3_value*) const override { return Bounds{}; }
