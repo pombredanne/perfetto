@@ -58,7 +58,7 @@ namespace perfetto {
 namespace {
 
 constexpr char kDefaultDropBoxTag[] = "perfetto";
-constexpr uint32_t kFlushTimeout = 1000;  // 1 s
+constexpr uint32_t kFlushTimeoutMs = 1000;
 
 perfetto::PerfettoCmd* g_consumer_cmd;
 
@@ -505,8 +505,9 @@ void PerfettoCmd::SetupCtrlCSignalHandler() {
   sigaction(SIGINT, &sa, nullptr);
 
   task_runner_.AddFileDescriptorWatch(*ctrl_c_pipe_.rd, [this] {
-    consumer_endpoint_->Flush(
-        kFlushTimeout, [this](bool) { consumer_endpoint_->DisableTracing(); });
+    consumer_endpoint_->Flush(kFlushTimeoutMs, [this](bool) {
+      consumer_endpoint_->DisableTracing();
+    });
   });
 }
 
